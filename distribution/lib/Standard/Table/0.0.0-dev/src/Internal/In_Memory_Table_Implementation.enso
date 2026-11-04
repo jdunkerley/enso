@@ -19,7 +19,6 @@ import Standard.Base.Runtime.Context
 import Standard.Base.System.File.Generic.File_Like.File_Like
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
 from Standard.Base.Data.Index_Sub_Range import drop_helper, normalize_ranges, take_helper
-from Standard.Base.Data.XML import from_java_document
 
 import project.Aggregate_Column.Aggregate_Column
 import project.Blank_Selector.Blank_Selector
@@ -91,7 +90,6 @@ polyglot java import org.enso.table.data.table.join.conditions.Equals as Java_Jo
 polyglot java import org.enso.table.data.table.join.conditions.EqualsIgnoreCase as Java_Join_Equals_Ignore_Case
 polyglot java import org.enso.table.data.table.join.lookup.LookupJoin
 polyglot java import org.enso.table.data.table.Table as Java_Table
-polyglot java import org.enso.table.data.table.TableToXml as Java_TableToXml
 polyglot java import org.enso.table.error.NonUniqueLookupKey
 polyglot java import org.enso.table.error.NullValuesInKeyColumns
 polyglot java import org.enso.table.error.TooManyColumnsException
@@ -703,24 +701,6 @@ type In_Memory_Table_Implementation
 
     to_csv (this_table : Table & In_Memory_Table) =
         Text.from this_table (..Delimited delimiter=",")
-
-    to_xml (this_table : Table & In_Memory_Table) (element_columns : Vector (Integer | Text | Regex) | Text | Integer | Regex) (attribute_columns : Vector (Integer | Text | Regex) | Text | Integer | Regex) (value_column : Text | Integer | Nothing) root_name:Text row_name:Text on_problems:Problem_Behavior =
-        columns_helper = this_table.columns_helper
-        problem_builder = Problem_Builder.new error_on_missing_columns=True
-
-        resolved_element_columns = columns_helper.select_columns_helper element_columns Case_Sensitivity.Default False problem_builder
-        resolved_attribute_columns = columns_helper.select_columns_helper attribute_columns Case_Sensitivity.Default False problem_builder
-        resolved_value_column = if value_column.is_nothing then Nothing else (this_table.at value_column)
-        used_names = resolved_element_columns.map .name + resolved_attribute_columns.map .name + (if Nothing == resolved_value_column then [] else [resolved_value_column.name])
-
-        unused_columns = columns_helper.internal_columns.filter (c-> used_names.contains c.name . not) . map .name
-        if unused_columns.length > 0 then problem_builder.report_other_warning (Unexpected_Extra_Columns.Warning unused_columns)
-
-        problem_builder.attach_problems_before on_problems <|
-            java_element_columns = resolved_element_columns.map c->(c:In_Memory_Column).java_column
-            java_attribute_column = resolved_attribute_columns.map c->(c:In_Memory_Column).java_column
-            java_value_column = if value_column.is_nothing then Nothing else (resolved_value_column:In_Memory_Column).java_column
-            from_java_document (Java_TableToXml.to_xml this_table.row_count java_element_columns java_attribute_column java_value_column root_name row_name)
 
     columns_helper (this_table : Table & In_Memory_Table) =
         Table_Helpers.Table_Column_Helper.Value this_table.columns this_table.columns (x->x) this_table (x->x)

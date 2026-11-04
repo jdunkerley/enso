@@ -1,0 +1,3 @@
+## Enso Signatures 1.0
+## module Standard.XML.Table_Extensions
+- Standard.Table.Table.Table.to_xml self element_columns:((Standard.Base.Data.Vector.Vector Standard.Base.Any.Any)|Standard.Base.Data.Text.Text|Standard.Base.Data.Numbers.Integer|Standard.Base.Data.Text.Regex.Regex)= attribute_columns:((Standard.Base.Data.Vector.Vector Standard.Base.Any.Any)|Standard.Base.Data.Text.Text|Standard.Base.Data.Numbers.Integer|Standard.Base.Data.Text.Regex.Regex)= value_column:(Standard.Base.Data.Text.Text|Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)= root_name:Standard.Base.Data.Text.Text= row_name:Standard.Base.Data.Text.Text= on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior= -> Standard.XML.XML.XML_Document

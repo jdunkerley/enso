@@ -22,8 +22,6 @@ type Data
     single_values self = self.data.at 0
     uniform_json self = self.data.at 1
     non_uniform_json self = self.data.at 2
-    library_document self = self.data.at 3
-    library_root self = self.data.at 4
 
     setup = Data.Value <|
         single_values = [Nothing, 12, 13.4, True, "hello", Date.new 2023 10 6, Time_Of_Day.new 3 4 5 200, Date_Time.new 2023 11 7 2 3 4]
@@ -37,18 +35,10 @@ type Data
                 { "first": "Mary", "last": "Smith", "age": 23 },
                 { "height": 1.9, "weight": 70 }
             ]
-
-        library_test_file = enso_project.data / "xml" / "library.xml"
-        library_document = XML_Document.from_file library_test_file
-        library_root = library_document . root_element
-        [single_values, uniform_json, non_uniform_json, library_document, library_root]
+        [single_values, uniform_json, non_uniform_json]
 
 
 add_specs suite_builder =
-    trim_if_text x = case x of
-        _ : Text -> x.trim
-        _ -> x
-    
     data = Data.setup
 
     suite_builder.group "from_objects with single values" group_builder->
@@ -384,89 +374,6 @@ add_specs suite_builder =
         group_builder.specify "Missing column" <|
             table = Table.new [["aaa", [1, 2, 3]], ["notbbb", [8, 8, 8]], ["ccc", [5, 6, 7]]]
             table.expand_to_rows "bbb" . should_fail_with No_Such_Column
-
-    suite_builder.group "XML" group_builder->
-        group_builder.specify "Can convert XML_Document and XML_Element to a table" <|
-            [data.library_document, data.library_root].map x->
-                t = x.to Table
-                t.at "Name" . to_vector . should_equal ["Library"]
-                t.at "@catalog" . to_vector . should_equal ["Fiction"]
-                t.at "@letter" . to_vector . should_equal ["A"]
-                t.at "Children" . at 0 . at 0 . trim . should_equal "Hello"
-                t.at "Children" . at 0 . at 1 . name . should_equal "Book"
-                t.at "Children" . at 0 . at 2 . trim . should_equal "World"
-                t.at "Children" . at 0 . at 3 . name . should_equal "Book"
-                t.at "Children" . at 0 . at 4 . name . should_equal "Magazine"
-                t.column_names . should_not_contain "Value"
-
-        group_builder.specify "Can convert XML_Document and XML_Element to a table using to_table" <|
-            [data.library_document, data.library_root].map x->
-                t = x.to_table
-                t.at "Name" . to_vector . should_equal ["Library"]
-                t.at "@catalog" . to_vector . should_equal ["Fiction"]
-                t.at "@letter" . to_vector . should_equal ["A"]
-                t.at "Children" . at 0 . at 0 . trim . should_equal "Hello"
-                t.at "Children" . at 0 . at 1 . name . should_equal "Book"
-                t.at "Children" . at 0 . at 2 . trim . should_equal "World"
-                t.at "Children" . at 0 . at 3 . name . should_equal "Book"
-                t.at "Children" . at 0 . at 4 . name . should_equal "Magazine"
-                t.column_names . should_not_contain "Value"
-
-        group_builder.specify "Can expand the Children column to rows" <|
-            t = data.library_root.to Table . expand_to_rows "Children"
-            t.at "Name" . to_vector . should_equal (Vector.fill 5 "Library")
-            t.at "@catalog" . to_vector . should_equal (Vector.fill 5 "Fiction")
-            t.at "@letter" . to_vector . should_equal (Vector.fill 5 "A")
-            t.at "Children" . at 0 . trim . should_equal "Hello"
-            t.at "Children" . at 1 . name . should_equal "Book"
-            t.at "Children" . at 2 . trim . should_equal "World"
-            t.at "Children" . at 3 . name . should_equal "Book"
-            t.at "Children" . at 4 . name . should_equal "Magazine"
-            t.column_names . should_not_contain "Value"
-
-        group_builder.specify "Can expand the child nodes" <|
-            t = data.library_root.to Table . expand_to_rows "Children" . expand_column "Children"
-            t.at "Name" . to_vector . should_equal (Vector.fill 5 "Library")
-            t.at "@catalog" . to_vector . should_equal (Vector.fill 5 "Fiction")
-            t.at "@letter" . to_vector . should_equal (Vector.fill 5 "A")
-            t.at "Children" . to_vector . map trim_if_text . should_equal ["Hello", "My Book", "World", "Your Book", "Cheap Cars For You"]
-            t.at "Children Name" . to_vector . map trim_if_text . should_equal [Nothing, "Book", Nothing, "Book", "Magazine"]
-            t.at "Children @author" . to_vector . map trim_if_text . should_equal [Nothing, "An Author", Nothing, "Another Author", Nothing]
-            t.at "Children @month" . to_vector . map trim_if_text . should_equal [Nothing, Nothing, Nothing, Nothing, 'August-2023']
-            t.at "Children @series" . to_vector . map trim_if_text . should_equal [Nothing, Nothing, Nothing, Nothing, 'AutoCar']
-            t.column_names . should_not_contain "Children Children"
-
-        group_builder.specify "Can expand nested child nodes" <|
-            xml_string = '''
-                <a>
-                  <b>
-                    <c id="1"/>
-                    <c id="2"/>
-                  </b>
-                  <b>
-                    <c id="3"/>
-                    <c id="4"/>
-                  </b>
-                </a>
-            xml = XML_Document.parse xml_string . root_element
-            t = xml.to Table . expand_to_rows "Children" . expand_column "Children" . expand_to_rows "Children Children" . expand_column "Children Children"
-            t.at "Children Children @id" . to_vector . should_equal ["1", "2", "3", "4"]
-
-        group_builder.specify "Converting a node without child nodes produces a Value column" <|
-            book = data.library_root . at 1
-            t = book.to Table
-            t.at "Name" . to_vector . should_equal ["Book"]
-            t.at "@author" . to_vector . should_equal ["An Author"]
-            t.column_names . should_not_contain "Children"
-            t.at "Value" . to_vector . should_equal ["My Book"]
-
-        group_builder.specify "Converting a node without any child nodes does not produce Value or Children columns" <|
-            xml = XML_Document.parse '<foo id="10"></foo>'
-            t = xml.to Table
-            t.at "Name" . to_vector . should_equal ["foo"]
-            t.at "@id" . to_vector . should_equal ["10"]
-            t.column_names . should_not_contain "Children"
-            t.column_names . should_not_contain "Value"
 
 main filter=Nothing =
     suite = Test.build suite_builder->

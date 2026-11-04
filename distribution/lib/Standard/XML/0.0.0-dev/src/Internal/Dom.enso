@@ -1,0 +1,230 @@
+private
+
+from Standard.Base import all
+
+## Note [XML Uses Only The JDK]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   `Standard.XML` has no Java of its own: everything here is a call into the
+   JDK's XML APIs (`javax.xml`, `org.w3c.dom`). Under the native launcher the
+   library is hosted in the image (`EnsoLibraryFeature` marks it AOT-ready from
+   `enso.nativeImage.javaFreeLibraries`, registering only these JDK classes),
+   so the DOM lives on the host and walking it costs no cross-JVM round trips.
+   A helper jar would put the library in the guest JVM, where every DOM call is
+   a round trip (#521's review measured 160 µs per call). Keep it that way:
+   import only JDK classes, and `build.sbt` and `EnsoLibraryFeature` refuse a
+   library on that list that ships a jar.
+
+polyglot java import java.io.ByteArrayOutputStream
+polyglot java import java.io.StringReader
+polyglot java import java.lang.StringBuilder
+polyglot java import java.util.Objects
+polyglot java import java.util.regex.Pattern
+polyglot java import javax.xml.XMLConstants
+polyglot java import javax.xml.parsers.DocumentBuilderFactory
+polyglot java import javax.xml.xpath.XPathConstants
+polyglot java import javax.xml.xpath.XPathFactory
+polyglot java import org.w3c.dom.bootstrap.DOMImplementationRegistry
+polyglot java import org.xml.sax.helpers.DefaultHandler
+polyglot java import org.xml.sax.InputSource
+
+## Note [Interfaces Imported For The Image]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   The JDK hands back its own implementation classes (`DocumentBuilderImpl`,
+   `ElementImpl`, ...), in packages `java.xml` does not export. Host interop
+   calls their methods through the public types they implement, and in the
+   native image it can only see those types' methods if they were registered
+   for reflection. `EnsoLibraryFeature` registers what a library imports, so
+   these are imported for that alone: every public type whose methods this
+   library calls on an object it did not construct. Without one, the native
+   launcher fails with "Method `x` of type ...Impl could not be found", while
+   the JVM works.
+
+   Nothing at build time catches a missing one: `EnsoLibraryFeature` checks
+   only that the imports are JDK classes. It fails at run time, under the
+   native launcher only, so a change here needs `XML_Tests` run natively (CI's
+   native standard library suite runs it). This list, and being a Java-free
+   library at all (Note [Java-Free Libraries In The Image] in `build.sbt`),
+   is for Standard.XML only: no other library is to copy the pattern without
+   the owner's agreement.
+polyglot java import java.util.regex.Matcher
+polyglot java import javax.xml.parsers.DocumentBuilder
+polyglot java import javax.xml.xpath.XPath
+polyglot java import org.w3c.dom.Attr
+polyglot java import org.w3c.dom.Document
+polyglot java import org.w3c.dom.DOMConfiguration
+polyglot java import org.w3c.dom.DOMImplementation
+polyglot java import org.w3c.dom.Element
+polyglot java import org.w3c.dom.NamedNodeMap
+polyglot java import org.w3c.dom.Node
+polyglot java import org.w3c.dom.NodeList
+polyglot java import org.w3c.dom.Text as Dom_Text
+polyglot java import org.w3c.dom.ls.DOMImplementationLS
+polyglot java import org.w3c.dom.ls.LSOutput
+polyglot java import org.w3c.dom.ls.LSSerializer
+
+## Node types of `org.w3c.dom.Node`.
+private _ELEMENT_NODE = 1
+private _ATTRIBUTE_NODE = 2
+private _TEXT_NODE = 3
+
+## A document builder whose errors are thrown, not printed: `DefaultHandler`
+   ignores warnings and recoverable errors and throws fatal ones.
+
+   It reads nothing but the document (Note [No External Entities]).
+private _new_builder =
+    factory = DocumentBuilderFactory.newInstance
+    factory.setFeature XMLConstants.FEATURE_SECURE_PROCESSING True
+    factory.setFeature "http://xml.org/sax/features/external-general-entities" False
+    factory.setFeature "http://xml.org/sax/features/external-parameter-entities" False
+    factory.setFeature "http://apache.org/xml/features/nonvalidating/load-external-dtd" False
+    factory.setAttribute XMLConstants.ACCESS_EXTERNAL_DTD ""
+    factory.setAttribute XMLConstants.ACCESS_EXTERNAL_SCHEMA ""
+    factory.setXIncludeAware False
+    builder = factory.newDocumentBuilder
+    builder.setErrorHandler DefaultHandler.new
+    builder
+
+## Note [No External Entities]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   A document can name other files or URLs: an external entity
+   (`<!ENTITY x SYSTEM "file:///...">`), an external DTD or schema, an
+   XInclude. Resolving them would let a document read (and, through the
+   result, disclose) local files or reach the network (XXE). The parser and
+   XPath therefore use secure processing (which also limits entity
+   expansion), do not resolve external general or parameter entities, do not
+   load external DTDs, allow no external DTD or schema access at all, and do
+   not process XIncludes. A DOCTYPE is still accepted, so documents that have
+   one (XHTML) parse, and its internal entities are expanded. An external
+   entity is left out. `XML_Spec`'s "External entities" group checks this.
+
+## Parses a `java.io.InputStream`. A Java exception (`SAXParseException`,
+   `IOException`, ...) is thrown as a panic.
+parse_stream java_stream = _new_builder.parse (InputSource.new java_stream)
+
+## Parses `text`. A Java exception is thrown as a panic.
+parse_text text:Text = _new_builder.parse (InputSource.new (StringReader.new text))
+
+## The root element of `document`.
+document_element document = document.getDocumentElement
+
+## The tag name of `element`.
+node_name element -> Text = element.getNodeName
+
+## The text content of `node` and its descendants.
+text_content node -> Text = node.getTextContent
+
+## `node` with its tag and contents, as text.
+outer_xml node pretty_print:Boolean -> Text =
+    serializer = _new_serializer
+    serializer.getDomConfig.setParameter "format-pretty-print" pretty_print
+    serializer.writeToString node
+
+## The contents of `node`, without its tag, as text.
+inner_xml node -> Text =
+    out = ByteArrayOutputStream.new
+    dom = _ls_implementation
+    serializer = dom.createLSSerializer
+    serializer.getDomConfig.setParameter "xml-declaration" False
+    serializer.setNewLine '\n'
+    output = dom.createLSOutput
+    output.setByteStream out
+    # The bytes are decoded as UTF-8 below, whatever the document's own encoding.
+    output.setEncoding "UTF-8"
+    child_nodes = node.getChildNodes
+    0.up_to child_nodes.getLength . each i->
+        serializer.write (child_nodes.item i) output
+    out.toString "UTF-8"
+
+private _ls_implementation = DOMImplementationRegistry.newInstance.getDOMImplementation "LS"
+
+private _new_serializer =
+    serializer = _ls_implementation.createLSSerializer
+    serializer.getDomConfig.setParameter "xml-declaration" False
+    serializer.setNewLine '\n'
+    serializer
+
+## The nodes the XPath `expression` selects from `source` (an element or a
+   document), converted by `to_vector`: at most one when `first_only`.
+xpath source expression:Text make_element first_only:Boolean -> Vector =
+    xpath_factory = XPathFactory.newInstance
+    xpath_factory.setFeature XMLConstants.FEATURE_SECURE_PROCESSING True
+    node_list = xpath_factory.newXPath.evaluate expression source XPathConstants.NODESET
+    _convert_node_list node_list make_element (if first_only then 1 else Nothing)
+
+## The child elements and the non-blank text nodes of `element`: the first
+   `limit` of them, or all of them when it is `Nothing`.
+children element make_element (limit : Integer | Nothing = Nothing) -> Vector =
+    _convert_node_list element.getChildNodes make_element limit
+
+## How many children `children` would give, without converting any of them.
+child_count element -> Integer =
+    node_list = element.getChildNodes
+    count = node_list.getLength
+    go i acc = if i >= count then acc else
+        @Tail_Call go i+1 (if _is_wanted (node_list.item i) then acc+1 else acc)
+    go 0 0
+
+## The descendant elements of `element` with the tag `tag_name` (`*` for all).
+elements_by_tag_name element tag_name:Text make_element -> Vector =
+    _convert_node_list (element.getElementsByTagName tag_name) make_element Nothing
+
+## The value of the attribute `name` of `element`, or `Nothing`.
+attribute element name:Text -> Text | Nothing =
+    node = element.getAttributeNode name
+    if node.is_nothing then Nothing else node.getNodeValue
+
+## The names of the attributes of `element`, in the DOM's order.
+attribute_names element -> Vector Text =
+    map = element.getAttributes
+    Vector.new map.getLength i-> (map.item i).getNodeName
+
+## The attributes of `element`, in the DOM's order.
+attributes element -> Dictionary Text Text =
+    map = element.getAttributes
+    Dictionary.from_vector (Vector.new map.getLength i-> [(map.item i).getNodeName, (map.item i).getNodeValue])
+
+## Elements and attributes, and text nodes that are not blank; an attribute
+   becomes its value, a text node its text and an element `make_element`'s.
+   At most `limit` of them, unless it is `Nothing`.
+private _convert_node_list node_list make_element (limit : Integer | Nothing) -> Vector =
+    count = node_list.getLength
+    Vector.build builder->
+        go i taken = if i >= count || (Nothing != limit && taken >= limit) then Nothing else
+            node = node_list.item i
+            node_type = node.getNodeType
+            appended = if node_type == _ELEMENT_NODE then builder.append (make_element node) . if_not_error True else
+                if node_type == _ATTRIBUTE_NODE then builder.append node.getNodeValue . if_not_error True else
+                    if node_type == _TEXT_NODE && (_blank.matcher node.getNodeValue . matches . not) then builder.append node.getTextContent . if_not_error True else
+                        False
+            @Tail_Call go i+1 (if appended then taken+1 else taken)
+        go 0 0
+
+## Whether `_convert_node_list` keeps `node`.
+private _is_wanted node -> Boolean =
+    node_type = node.getNodeType
+    if node_type == _ELEMENT_NODE || node_type == _ATTRIBUTE_NODE then True else
+        node_type == _TEXT_NODE && (_blank.matcher node.getNodeValue . matches . not)
+
+## Text that Java's `String.trim` would empty: only characters up to U+0020.
+private _blank = Pattern.compile "[\x00-\x20]*"
+
+## A new, empty document.
+new_document = _new_builder.newDocument
+
+## A value as `Table.to_xml` writes it: its Java `toString`, as the table's
+   storage would give it (`1999-01-02T03:40Z[UTC]`, `true`).
+java_text value -> Text = Objects.toString value
+
+## Turns a column or tag name into a legal XML tag name: characters that may
+   not appear in one become `_`, and a name that may not start with its first
+   character (a UTF-16 unit, as before) gets a `_` prefix.
+legal_tag_name input:Text -> Text =
+    cleaned = _name_char.matcher input . replaceAll "_"
+    first_unit = if cleaned.is_empty then "" else (StringBuilder.new cleaned).substring 0 1
+    if cleaned.is_empty || (_name_start_char.matcher first_unit . matches) then "_" + cleaned else cleaned
+
+## The XML name classes, negated. The `\uXXXX` escapes are `Pattern`'s (the
+   text is raw), and `𐀀-􏿿` is the range U+10000 to
+   U+10FFFF.
+private _name_start_char = Pattern.compile "[^:A-Z_a-zÀ-ÖØ-öø-˿Ͱ-ͽͿ-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�𐀀-􏿿]"
+private _name_char = Pattern.compile "[^-.0-9:A-Z_a-z·̀-ͯ‿-⁀À-ÖØ-öø-˿Ͱ-ͽͿ-῿‌-‍⁰-↏Ⰰ-⿯、-퟿豈-﷏ﷰ-�𐀀-􏿿]"

@@ -14,7 +14,8 @@ from `Standard.Base`. Most types here are imported automatically by
 **Collections & utilities:** `Ordering`, `Sort_Direction`, `Index_Sub_Range`,
 `Locale`, `Encoding`, `Regex`.
 
-**JSON & serialization:** `Json`, `JS_Object`, `parse_json`, XML.
+**JSON & serialization:** `Json`, `JS_Object`, `parse_json`. XML is not here: it
+is `Standard.XML`.
 
 **I/O & file system:** `File`, `File_Format` (`JSON`, `Delimited`/CSV,
 `Plain_Text`, …), `System.File`, `System.Process`, `System.Environment`.
@@ -53,7 +54,7 @@ result = "not a number".parse_integer.catch _-> 0
 
 - `src/Data/` — foundational types: `Vector`, `Array`, `Text`, `Numbers`,
   `Boolean`, `Date`/`Time`, `Map`, `Pair`, `Dictionary`, `Range`, `Interval`,
-  `Json`, `XML`, `Regex`.
+  `Json`, `Regex`.
 - `src/System/` — file I/O, paths, environment, processes, file formats.
 - `src/Errors/` — error type definitions, `Problem_Behavior`.
 - `src/Network/` — HTTP, URI, Email.
