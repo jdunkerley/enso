@@ -1,3 +1,7 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
 ## Sales Overview
 
    Reads a messy sales CSV, cleans it up, and totals sales by month and region.
@@ -5,10 +9,6 @@
    a chart (use the visualization picker on the node).
 
    The data in `data/sales.csv` is synthetic.
-from Standard.Base import all
-from Standard.Table import all
-import Standard.Visualization
-
 main =
     sales = Data.read (enso_project.data / 'sales.csv') (..Delimited headers=..Has_Headers)
     unique = sales.distinct 'sale_id'

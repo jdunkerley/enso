@@ -1,3 +1,6 @@
+from Standard.Base import all
+from Standard.Table import all
+
 ## Orders and Customers
 
    Joins orders to the customers who placed them, builds a cross-tab of spend by
@@ -5,9 +8,6 @@
    `data/`.
 
    The data in `data/` is synthetic.
-from Standard.Base import all
-from Standard.Table import all
-
 main =
     orders = Data.read (enso_project.data / 'orders.csv') (..Delimited headers=..Has_Headers)
     customers = Data.read (enso_project.data / 'customers.csv') (..Delimited headers=..Has_Headers)

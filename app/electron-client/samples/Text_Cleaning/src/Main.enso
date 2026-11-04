@@ -1,3 +1,6 @@
+from Standard.Base import all
+from Standard.Table import all
+
 ## Text Cleaning
 
    Tidies a messy contacts table: fixes the spacing and capitalization of names,
@@ -6,9 +9,6 @@
    expression.
 
    The data in `data/contacts.csv` is synthetic.
-from Standard.Base import all
-from Standard.Table import all
-
 main =
     contacts = Data.read (enso_project.data / 'contacts.csv') (..Delimited headers=..Has_Headers)
     name = (contacts.at 'name').map (n-> (n.trim.replace ' +'.to_regex ' ').to_case ..Title)
