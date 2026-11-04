@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [Saving a version is easier: Ctrl/Cmd+S works from the code editor and the
+  documentation panel too, a toast shows while it saves, and it says so when
+  there is nothing to save. A comment given while a save is running is added to
+  it.][574]
 - [The component browser no longer lists the components of
   Standard.Visualization, the library the IDE uses to prepare visualization
   data.][565]
@@ -400,6 +404,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[574]: https://github.com/jdunkerley/enso/pull/574
 [565]: https://github.com/jdunkerley/enso/pull/565
 [552]: https://github.com/jdunkerley/enso/pull/552
 [519]: https://github.com/jdunkerley/enso/pull/519
