@@ -151,9 +151,7 @@ in both modes. Anything else runs once, unlicensed.
   file on every call): `dashboard/localVersioningAccessibility.spec.ts`
   (Settings → Local → Versions, `settings-versions-*.json`) and
   `project-view/localVersioningAccessibility.spec.ts` (the save controls and
-  dialogs, `project-save-*.json`). `project-save-bar.json` holds two entries
-  that are the tab bar's own (the tab's close button has no name; the tab
-  contains it, so it is a nested control).
+  dialogs, `project-save-*.json`), all empty.
 - **Accessibility-tree snapshots** (`toMatchAriaSnapshot`) pin the roles, names
   and states of the drive table header, the drive table's `grid` (its name, row
   groups and selected row, #208), the user menu (local items only) and the
