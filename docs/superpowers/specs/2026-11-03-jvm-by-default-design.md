@@ -712,3 +712,13 @@ A later phase with its own plan.
 
 3. **Memory: gate or report?** Is RSS report-only in stage 2, or should the gate
    also cap it (for example JVM ≤ native + 500 MB per project)?
+
+## Owner's answers (2026-11-04)
+
+1. **No Settings toggle.** The engine mode is chosen by `package.yaml` `jvm:`,
+   `--engine-mode` and `ENSO_ENGINE_MODE` only.
+2. **The native CLI switches to the JVM automatically** when a library's Java is
+   not in the native image (after the guest JVM is retired), with a one-line
+   notice.
+3. **Memory (RSS) is reported, not gated.** The gate is open time only; RSS is
+   measured and published beside it.
