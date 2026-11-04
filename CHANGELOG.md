@@ -5,7 +5,7 @@
 - [The Help menu, the Enso menu and the other links to the original company's
   website and community are gone, as are the online documentation links for
   components (including the F1 shortcut). Local versioning commits use your own
-  git identity, or `Enso IDE <ide@localhost>` when you have none.][565]
+  git identity, or `Enso IDE <ide@localhost>` when you have none.][566]
 - [Choosing a file format, or a file, in Data.read adds the import of the
   library that reads it.][552]
 - [A settings cog replaces the account menu at the top right of the dashboard;
@@ -393,7 +393,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[565]: https://github.com/jdunkerley/enso/pull/565
+[566]: https://github.com/jdunkerley/enso/pull/566
 [552]: https://github.com/jdunkerley/enso/pull/552
 [519]: https://github.com/jdunkerley/enso/pull/519
 [514]: https://github.com/jdunkerley/enso/pull/514
