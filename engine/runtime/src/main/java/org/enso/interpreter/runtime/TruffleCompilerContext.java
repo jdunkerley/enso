@@ -766,7 +766,10 @@ final class TruffleCompilerContext implements CompilerContext {
    * instead of ~2.4 s until the distribution was rebuilt (#562).
    *
    * So `readLibraryBindings` remembers a library whose cache it found and
-   * rejected, and after a compilation that generated code
+   * rejected, or whose cache is missing although `enso --compile` once wrote
+   * one (its directory is still there: `ImportExportCache.wasCompiled`; this
+   * also picks up a rewrite that an earlier run abandoned, see below), and
+   * after a compilation that generated code
    * (`Compiler.runInternal`) `rewriteRejectedLibraryBindings` writes it again,
    * once per library per context, from the library's modules that this run
    * compiled or loaded from their IR caches: those past the static passes whose
@@ -782,8 +785,28 @@ final class TruffleCompilerContext implements CompilerContext {
    * one `enso --compile` writes. A read tries the library's own location first,
    * then the user cache. The rewritten cache records the source hashes like
    * any other, so a further edit rejects it in turn. A library that never had a
-   * bindings cache, and the main project, are left alone: writing one costs the
-   * run that does it (the runner waits for pending serialisation at exit).
+   * bindings cache, and the main project, are left alone.
+   *
+   * A library stays on the list until a rewrite is queued for it, so a run
+   * that compiles none of its modules leaves the rewrite to a later
+   * compilation in the same context. The IR is copied on the compiling thread
+   * (as `serializeModule` does), since the language server keeps compiling
+   * while the write waits in the queue.
+   *
+   * A partial cache is not extended: it stays as written until the next edit
+   * rejects it, and the modules missing from it keep coming from their
+   * per-module IR caches (each written when the module was compiled), which is
+   * as fast as before #559 for those modules.
+   *
+   * The rewrite is not waited for at exit (`SerializationPool
+   * .submitAbandonableTask`): the runner waits up to 60 s for pending
+   * serialisation, and writing Base, Table and Database (~50 MB) was most of
+   * the first open after an edit. Once the pool shuts down, a rewrite still
+   * queued is skipped and one in progress stops at the next object it
+   * writes; the cache is written by renaming (Note [A Cache Is Written By
+   * Renaming] in `Cache`), so that leaves at most a temporary file, which a
+   * later write deletes, and the next run finds no cache for a library that
+   * had one and rewrites it.
    */
   private final java.util.Set<LibraryName> rejectedBindings =
       java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -797,15 +820,12 @@ final class TruffleCompilerContext implements CompilerContext {
     }
     var mainProject = getPackageRepository().getMainProjectPackage();
     for (var libraryName : List.copyOf(rejectedBindings)) {
-      if (!rejectedBindings.remove(libraryName)) {
-        continue;
-      }
       var pkg = getPackageRepository().getPackageForLibraryJava(libraryName);
       if (pkg.isEmpty() || (mainProject.isDefined() && mainProject.get() == pkg.get())) {
+        rejectedBindings.remove(libraryName);
         continue;
       }
-      // A snapshot taken here, on the compiling thread; the task only writes it.
-      var map = new HashMap<QualifiedName, org.enso.compiler.core.ir.Module>();
+      var modules = new java.util.ArrayList<CompilerContext.Module>();
       var it = getPackageRepository().getModulesForLibrary(libraryName);
       while (it.nonEmpty()) {
         var module = it.head();
@@ -813,12 +833,20 @@ final class TruffleCompilerContext implements CompilerContext {
             && !isInteractive(module)
             && module.getCompilationStage().isAtLeast(CompilationStage.AFTER_STATIC_PASSES)
             && cacheable.test(module)) {
-          map.put(module.getName(), module.getIr());
+          modules.add(module);
         }
         it = (scala.collection.immutable.List<CompilerContext.Module>) it.tail();
       }
-      if (map.isEmpty()) {
+      // Kept on the list until a rewrite is queued: a later compilation may use the library.
+      if (modules.isEmpty() || !rejectedBindings.remove(libraryName)) {
         continue;
+      }
+      // A copy taken here, on the compiling thread, as `serializeModule` does; the task writes it.
+      var map = new HashMap<QualifiedName, org.enso.compiler.core.ir.Module>();
+      for (var module : modules) {
+        var ir = module.getIr();
+        map.put(
+            module.getName(), compiler.updateMetadata(ir, ir.duplicate(true, true, true, true)));
       }
       logSerializationManager(
           Level.FINE,
@@ -832,22 +860,32 @@ final class TruffleCompilerContext implements CompilerContext {
             pool.waitWhileSerializing(name);
             pool.startSerializing(name);
             try {
-              var cache = ImportExportCache.createInUserCache(libraryName);
+              var cache = ImportExportCache.createInUserCache(libraryName, pool::isShuttingDown);
               var bindings =
                   new ImportExportCache.CachedBindings(
                       libraryName, new ImportExportCache.MapToBindings(map));
               return saveCache(cache, bindings) != null;
-            } catch (IOException e) {
-              logSerializationManager(
-                  Level.WARNING,
-                  "Rewriting the bindings cache of `" + libraryName + "` failed: " + e.getMessage(),
-                  e);
+            } catch (IOException | RuntimeException e) {
+              if (pool.isShuttingDown()) {
+                logSerializationManager(
+                    Level.FINE,
+                    "Abandoned the rewrite of the bindings cache of [{0}].",
+                    libraryName);
+              } else {
+                logSerializationManager(
+                    Level.WARNING,
+                    "Rewriting the bindings cache of `"
+                        + libraryName
+                        + "` failed: "
+                        + e.getMessage(),
+                    e);
+              }
               return false;
             } finally {
               pool.finishSerializing(name);
             }
           };
-      serializationPool.submitTask(task, isCreateThreadAllowed(), name);
+      serializationPool.submitAbandonableTask(task, isCreateThreadAllowed(), name);
     }
   }
 
@@ -1012,8 +1050,9 @@ final class TruffleCompilerContext implements CompilerContext {
     } else {
       pool.waitWhileSerializing(toQualifiedName(libraryName));
       var cache = ImportExportCache.create(libraryName);
-      // Note [A Rejected Bindings Cache Is Rewritten]: a miss deletes what it rejects.
-      var existed = cache.hasEntry(context);
+      // Note [A Rejected Bindings Cache Is Rewritten]: a miss deletes what it rejects, and a
+      // library `enso --compile` wrote a cache for once keeps its directory.
+      var existed = cache.hasEntry(context) || ImportExportCache.wasCompiled(context, libraryName);
       var loaded = loadCache(cache);
       if (loaded.isPresent()) {
         logSerializationManager(Level.FINE, "Restored bindings for library [{0}].", libraryName);

@@ -13,8 +13,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -186,19 +188,113 @@ public final class Cache<T, M> {
       TruffleFile metadataFile = getCacheMetadataPath(cacheRoot);
       TruffleFile parentPath = cacheDataFile.getParent();
 
-      closeMemoryArena();
-      if (writeBytesTo(cacheDataFile, bytesToWrite) && writeBytesTo(metadataFile, metadataBytes)) {
+      // Note [A Cache Is Written By Renaming]
+      deleteStaleTemporaryFiles(cacheRoot, logger);
+      var suffix =
+          TEMPORARY_INFIX
+              + Long.toHexString(ProcessHandle.current().pid())
+              + "-"
+              + TEMPORARY_COUNTER.incrementAndGet();
+      TruffleFile dataTemp = cacheRoot.resolve(cacheDataFile.getName() + suffix);
+      TruffleFile metadataTemp = cacheRoot.resolve(metadataFile.getName() + suffix);
+      try {
+        if (!writeBytesTo(dataTemp, bytesToWrite) || !writeBytesTo(metadataTemp, metadataBytes)) {
+          return false;
+        }
+        closeMemoryArena();
+        if (!moveInto(dataTemp, cacheDataFile, logger)) {
+          return false;
+        }
+        if (!moveInto(metadataTemp, metadataFile, logger)) {
+          // The new data must not stay paired with the old metadata.
+          deleteQuietly(cacheDataFile);
+          return false;
+        }
         logger.log(
             logLevel,
             "Written cache data [{0}] to [{1}] of size [{2}].",
             new Object[] {logName, toMaskedPath(parentPath).applyMasking(), bytesToWrite.length});
         return true;
-      } else {
-        // Clean up after ourselves if it fails.
-        cacheDataFile.delete();
+      } finally {
+        deleteQuietly(dataTemp);
+        deleteQuietly(metadataTemp);
       }
     }
     return false;
+  }
+
+  /* Note [A Cache Is Written By Renaming]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * A cache file may be memory-mapped by another engine while it is written
+   * (`loadCacheFrom` maps anything over 3 MB): a language server and a CLI run
+   * share the user cache, and truncating a mapped file under a reader is a
+   * SIGBUS on Linux. Two writers interleaving could also leave one's metadata
+   * paired with the other's data, and `ImportExportCache` does not check the
+   * data's digest. So the data and the metadata are each written to a
+   * temporary file in the same directory and renamed into place, data first and
+   * metadata last: a reader sees either the old pair, or the new data with the
+   * old metadata for a moment (which `ModuleCache`'s data digest catches, and
+   * which a bindings cache's source hash makes a miss at worst), never a torn
+   * file. The rename is atomic where the file system supports it, and replaces
+   * the target otherwise. On Windows a file another process has mapped cannot
+   * be replaced; the write is then skipped (logged at FINE) and the old cache
+   * stays. A write that is abandoned, or a process that dies mid-write, leaves
+   * only a temporary file; the next write to the same directory deletes
+   * temporary files older than `STALE_TEMPORARY_AGE`.
+   */
+  private static final String TEMPORARY_INFIX = ".tmp-";
+
+  private static final java.util.concurrent.atomic.AtomicLong TEMPORARY_COUNTER =
+      new java.util.concurrent.atomic.AtomicLong();
+
+  /** Older than this, a temporary file is not a write in progress. */
+  private static final java.time.Duration STALE_TEMPORARY_AGE = java.time.Duration.ofMinutes(10);
+
+  private static boolean moveInto(TruffleFile from, TruffleFile to, TruffleLogger logger) {
+    try {
+      try {
+        from.move(to, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+      } catch (AtomicMoveNotSupportedException | UnsupportedOperationException e) {
+        from.move(to, StandardCopyOption.REPLACE_EXISTING);
+      }
+      return true;
+    } catch (IOException | SecurityException e) {
+      // E.g. Windows: another process has the target mapped.
+      logger.log(
+          Level.FINE,
+          "Cannot replace the cache file [{0}], skipping the write: {1}",
+          new Object[] {toMaskedPath(to).applyMasking(), e.toString()});
+      return false;
+    }
+  }
+
+  private void deleteStaleTemporaryFiles(TruffleFile cacheRoot, TruffleLogger logger) {
+    var prefix = spi.entryName();
+    var cutoff = System.currentTimeMillis() - STALE_TEMPORARY_AGE.toMillis();
+    try (var children = cacheRoot.newDirectoryStream()) {
+      for (var child : children) {
+        var name = child.getName();
+        if (name != null
+            && name.startsWith(prefix)
+            && name.contains(TEMPORARY_INFIX)
+            && child.getLastModifiedTime().toMillis() < cutoff) {
+          deleteQuietly(child);
+        }
+      }
+    } catch (IOException | SecurityException e) {
+      logger.log(
+          Level.FINE,
+          "Cannot list [{0}] for stale temporary files: {1}",
+          new Object[] {toMaskedPath(cacheRoot).applyMasking(), e.toString()});
+    }
+  }
+
+  private static void deleteQuietly(TruffleFile file) {
+    try {
+      file.delete();
+    } catch (IOException | SecurityException e) {
+      // already gone, or not ours to delete
+    }
   }
 
   private boolean ensureRoot(TruffleFile cacheRoot) {

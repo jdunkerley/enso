@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 import org.enso.compiler.data.BindingsMap;
 import org.enso.compiler.data.BindingsMap.DefinedEntity;
@@ -34,9 +35,14 @@ public final class ImportExportCache
   private final LibraryName libraryName;
   private final boolean userCacheOnly;
 
-  private ImportExportCache(LibraryName libraryName, boolean userCacheOnly) {
+  /** Stops a write once it is no longer wanted; {@code null} for a write that must finish. */
+  private final BooleanSupplier abandoned;
+
+  private ImportExportCache(
+      LibraryName libraryName, boolean userCacheOnly, BooleanSupplier abandoned) {
     this.libraryName = libraryName;
     this.userCacheOnly = userCacheOnly;
+    this.abandoned = abandoned;
   }
 
   /**
@@ -46,17 +52,20 @@ public final class ImportExportCache
    */
   public static Cache<ImportExportCache.CachedBindings, ImportExportCache.Metadata> create(
       LibraryName libraryName) {
-    var impl = new ImportExportCache(libraryName, false);
+    var impl = new ImportExportCache(libraryName, false, null);
     return Cache.create(impl, Level.FINEST, libraryName.toString(), true, false);
   }
 
   /**
    * The library's bindings cache in the user cache only, for the rewrite of a rejected cache. See
    * Note [A Rejected Bindings Cache Is Rewritten] in {@code TruffleCompilerContext}.
+   *
+   * @param abandoned once {@code true}, a write in progress stops with an unchecked exception and
+   *     leaves the cache as it was
    */
   public static Cache<ImportExportCache.CachedBindings, ImportExportCache.Metadata>
-      createInUserCache(LibraryName libraryName) {
-    var impl = new ImportExportCache(libraryName, true);
+      createInUserCache(LibraryName libraryName, BooleanSupplier abandoned) {
+    var impl = new ImportExportCache(libraryName, true, abandoned);
     return Cache.create(impl, Level.FINEST, libraryName.toString(), true, false);
   }
 
@@ -95,7 +104,8 @@ public final class ImportExportCache
   public byte[] serialize(
       EnsoContext context, CachedBindings entry, Set<QualifiedName> referencedModules)
       throws IOException {
-    var pool = CacheUtils.createPool(context.getCompiler().context(), true, referencedModules);
+    var pool =
+        CacheUtils.createPool(context.getCompiler().context(), true, referencedModules, abandoned);
     var arr = pool.write(entry.bindings());
     return arr;
   }
@@ -151,6 +161,30 @@ public final class ImportExportCache
       return List.of(libraryRoot, userRoot);
     }
     return Collections.emptyList();
+  }
+
+  /**
+   * Whether the library's own bindings-cache directory exists: `enso --compile` wrote a cache there
+   * once, even if it has since been rejected and deleted. See Note [A Rejected Bindings Cache Is
+   * Rewritten] in {@code TruffleCompilerContext}.
+   *
+   * @param context the language context
+   * @param libraryName the library
+   * @return {@code true} if the directory exists
+   */
+  public static boolean wasCompiled(EnsoContext context, LibraryName libraryName) {
+    var pkg = context.getPackageRepository().getPackageForLibraryJava(libraryName);
+    if (pkg.isEmpty()) {
+      return false;
+    }
+    try {
+      return pkg.get()
+          .getBindingsCacheRootForPackage(BuildVersion.ensoVersion())
+          .resolve(libraryName.namespace())
+          .isDirectory();
+    } catch (SecurityException e) {
+      return false;
+    }
   }
 
   /**

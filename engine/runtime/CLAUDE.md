@@ -74,7 +74,9 @@ and links the required Graal/Truffle background reading.
   per-module IR caches; reads try the library's own location first, then the
   user cache (Note [A Rejected Bindings Cache Is Rewritten] in
   `TruffleCompilerContext`). Only `enso --compile` writes the library's own
-  location.
+  location. Exit does not wait for the rewrite. Every cache file is written to a
+  temporary file and renamed into place (Note [A Cache Is Written By Renaming]
+  in `Cache`).
 - **A library's bindings cache is read once per context**, by
   `TruffleCompilerContext.libraryBindings`, which import resolution and module
   loading share; see Note [One Bindings Cache Read Per Library].
