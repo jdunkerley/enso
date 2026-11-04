@@ -81,6 +81,63 @@ public final class CacheTests {
         "Memory arena is closed after cache save", memoryArena.get().scope().isAlive(), is(false));
   }
 
+  /** Note [A Cache That Does Not Load Is A Miss]: a cache that fails to load is deleted. */
+  @Test
+  public void aCacheThatFailsToLoadIsDeleted() throws IOException {
+    var ensoCtx = ctx.ensoContext();
+    var cacheRoots = createCacheRoots();
+    saveToLocalRoot(new byte[] {42}, cacheRoots);
+    var spi = new CacheSpi(cacheRoots);
+    spi.failure = new IllegalArgumentException("newPosition > limit");
+    var cache = Cache.create(spi, Level.FINE, "testCache", false, false);
+    assertThat("a miss", cache.load(ensoCtx).isPresent(), is(false));
+    assertThat("the cache is deleted", dataFile(cacheRoots).exists(), is(false));
+  }
+
+  /** ... but an interrupted load leaves it in place, and the thread still interrupted. */
+  @Test
+  public void anInterruptedLoadLeavesTheCacheInPlace() throws IOException {
+    var ensoCtx = ctx.ensoContext();
+    var cacheRoots = createCacheRoots();
+    saveToLocalRoot(new byte[] {42}, cacheRoots);
+    var spi = new CacheSpi(cacheRoots);
+    spi.failure = new java.io.InterruptedIOException("interrupted");
+    var cache = Cache.create(spi, Level.FINE, "testCache", false, false);
+    try {
+      assertThat("not loaded", cache.load(ensoCtx).isPresent(), is(false));
+      assertThat(
+          "the interrupt flag is restored", Thread.currentThread().isInterrupted(), is(true));
+    } finally {
+      Thread.interrupted();
+    }
+    assertThat("the cache is kept", dataFile(cacheRoots).exists(), is(true));
+  }
+
+  /** ... and a cancelled one is rethrown, also leaving it in place. */
+  @Test
+  public void aCancelledLoadIsRethrownAndLeavesTheCacheInPlace() throws IOException {
+    var ensoCtx = ctx.ensoContext();
+    var cacheRoots = createCacheRoots();
+    saveToLocalRoot(new byte[] {42}, cacheRoots);
+    var spi = new CacheSpi(cacheRoots);
+    var cancel = new org.enso.interpreter.runtime.control.ThreadInterruptedException();
+    spi.failure = cancel;
+    var cache = Cache.create(spi, Level.FINE, "testCache", false, false);
+    try {
+      cache.load(ensoCtx);
+      fail("the cancel is rethrown");
+    } catch (org.enso.interpreter.runtime.control.ThreadInterruptedException ex) {
+      assertThat(ex == cancel, is(true));
+    } finally {
+      Thread.interrupted();
+    }
+    assertThat("the cache is kept", dataFile(cacheRoots).exists(), is(true));
+  }
+
+  private static TruffleFile dataFile(Iterable<TruffleFile> cacheRoots) {
+    return firstElement(cacheRoots).resolve(CacheSpi.ENTRY_NAME + CacheSpi.DATA_SUFFIX);
+  }
+
   @Test
   public void cacheCannotBeLoaded_WithoutMetadataOnDisk() throws IOException {
     var ensoCtx = ctx.ensoContext();
@@ -204,14 +261,24 @@ public final class CacheTests {
     private final Iterable<TruffleFile> cacheRoots;
     private ByteBuffer deserializeBuffer;
 
+    /** What {@link #deserialize} throws, if set. */
+    private Exception failure;
+
     private CacheSpi(Iterable<TruffleFile> cacheRoots) {
       this.cacheRoots = cacheRoots;
     }
 
     @Override
     public CachedData deserialize(
-        EnsoContext context, ByteBuffer data, Metadata meta, TruffleLogger logger) {
+        EnsoContext context, ByteBuffer data, Metadata meta, TruffleLogger logger)
+        throws IOException {
       deserializeBuffer = data;
+      if (failure instanceof IOException io) {
+        throw io;
+      }
+      if (failure instanceof RuntimeException re) {
+        throw re;
+      }
       return new CachedData();
     }
 

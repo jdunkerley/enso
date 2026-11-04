@@ -56,8 +56,14 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
    *   only with the engine, whose version keys the cache directories.
    * - The check is cheap. Each library is hashed once per context, and every
    *   imported library's bindings cache is checked against the same hash
-   *   anyway. A library not loaded yet is loaded first, as resolving the cached
-   *   IR would do a moment later.
+   *   anyway. The libraries already loaded are checked first. A library not
+   *   loaded yet is then loaded, which is not extra work: hashing needs its
+   *   root, which only resolving it finds, the module check needs its modules
+   *   registered, and resolving the cached IR loads every library it names a
+   *   moment later anyway (`BindingsMap.toConcrete` calls
+   *   `ensurePackageIsLoaded` for each import target, and the modules of a
+   *   library named only through a re-export are reached through the
+   *   re-exporting library's imports).
    *
    * Why the hash, and not only checking that the named modules still exist:
    * `readResolve` fails ("Cannot convert") only when a named module is gone, but
@@ -132,24 +138,26 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
    */
   boolean areCurrent(EnsoContext context, String cacheName, TruffleLogger logger) {
     var repository = context.getPackageRepository();
+    // The libraries already loaded first: a stale cache is then usually turned down without
+    // loading anything. See Note [A Cache Records The Libraries It Refers To].
+    var notLoaded = new ArrayList<Library>();
     for (var library : libraries) {
+      if (!repository.isPackageLoaded(library.name())) {
+        notLoaded.add(library);
+      } else if (!hashMatches(context, library, cacheName, logger)) {
+        return false;
+      }
+    }
+    for (var library : notLoaded) {
       var name = library.name();
-      if (!repository.isPackageLoaded(name) && repository.ensurePackageIsLoaded(name).isLeft()) {
+      if (repository.ensurePackageIsLoaded(name).isLeft()) {
         logger.log(
             Level.FINE,
             "The cache of [{0}] refers to [{1}], which cannot be loaded.",
             new Object[] {cacheName, name});
         return false;
       }
-      var current =
-          repository
-              .getPackageForLibraryJava(name)
-              .flatMap(pkg -> context.getLibrarySourceHashes().of(pkg, logger));
-      if (current.isEmpty() || !current.get().equals(library.sourceHash())) {
-        logger.log(
-            Level.FINE,
-            "The cache of [{0}] refers to [{1}], whose sources changed.",
-            new Object[] {cacheName, name});
+      if (!hashMatches(context, library, cacheName, logger)) {
         return false;
       }
     }
@@ -163,6 +171,23 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
       }
     }
     return true;
+  }
+
+  private static boolean hashMatches(
+      EnsoContext context, Library library, String cacheName, TruffleLogger logger) {
+    var current =
+        context
+            .getPackageRepository()
+            .getPackageForLibraryJava(library.name())
+            .flatMap(pkg -> context.getLibrarySourceHashes().of(pkg, logger));
+    if (current.isPresent() && current.get().equals(library.sourceHash())) {
+      return true;
+    }
+    logger.log(
+        Level.FINE,
+        "The cache of [{0}] refers to [{1}], whose sources changed.",
+        new Object[] {cacheName, library.name()});
+    return false;
   }
 
   void write(DataOutputStream out) throws IOException {

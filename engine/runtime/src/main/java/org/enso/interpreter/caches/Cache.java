@@ -2,12 +2,15 @@ package org.enso.interpreter.caches;
 
 import com.oracle.truffle.api.TruffleFile;
 import com.oracle.truffle.api.TruffleLogger;
+import com.oracle.truffle.api.exception.AbstractTruffleException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.lang.foreign.Arena;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.nio.file.NoSuchFileException;
@@ -20,6 +23,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import org.enso.interpreter.runtime.EnsoContext;
+import org.enso.interpreter.runtime.control.ThreadInterruptedException;
 import org.enso.logger.masking.MaskedPath;
 import org.enso.pkg.QualifiedName;
 
@@ -319,6 +323,13 @@ public final class Cache<T, M> {
           throw new IOException("Cannot load " + dataPath + " due to: " + ex.getMessage(), ex);
         } catch (IOException | RuntimeException ex) {
           // Note [A Cache That Does Not Load Is A Miss]
+          if (isCancellation(ex)) {
+            // The load was stopped, not the cache found wanting: keep it.
+            if (isInterrupt(ex)) {
+              Thread.currentThread().interrupt();
+            }
+            throw ex;
+          }
           logger.log(
               Level.WARNING,
               "Discarding the cache for [{0}], which no longer loads ({1}); compiling from source.",
@@ -353,12 +364,50 @@ public final class Cache<T, M> {
    * deleted and the load is a miss, so the caller compiles from source: a
    * warning in the log, never an error for the user.
    *
+   * A load that was cancelled or interrupted (the IDE closing a project, the
+   * context being cancelled) says nothing about the cache: the exception is
+   * rethrown, the thread's interrupt flag is restored, and the cache stays
+   * (`CacheTests`). Truffle's cancel (`ThreadDeath`) is an `Error` and is not
+   * caught at all.
+   *
    * This covers what `deserialize` reads. Method bodies are read lazily, long
    * after the load, when a method is first called, and a failure there cannot
    * be turned into a miss. For them `Spi.dependenciesAreCurrent` checks, before
    * anything is read, that every module the IR names in another library still
    * exists (and that those libraries' sources are unchanged).
    */
+
+  /** Whether the failure is a cancel or an interrupt rather than a fault of the cache. */
+  @SuppressWarnings("removal")
+  private static boolean isCancellation(Throwable ex) {
+    if (Thread.currentThread().isInterrupted()) {
+      return true;
+    }
+    for (var t = ex; t != null; t = t.getCause()) {
+      if (t instanceof ThreadDeath || t instanceof AbstractTruffleException) {
+        return true;
+      }
+      if (t.getCause() == t) {
+        break;
+      }
+    }
+    return isInterrupt(ex);
+  }
+
+  private static boolean isInterrupt(Throwable ex) {
+    for (var t = ex; t != null; t = t.getCause()) {
+      if (t instanceof InterruptedException
+          || t instanceof InterruptedIOException
+          || t instanceof ClosedByInterruptException
+          || t instanceof ThreadInterruptedException) {
+        return true;
+      }
+      if (t.getCause() == t) {
+        break;
+      }
+    }
+    return false;
+  }
 
   /**
    * Close any previous arena and creates a new one. Closing the previous arena invalidates all byte
