@@ -1409,5 +1409,33 @@
     "module": "Standard.Table.Excel.Excel_Range",
     "documentation": null,
     "reexports": ["Standard.Table.Excel"]
+  },
+  {
+    "type": "module",
+    "module": "Standard.Visualization.Helpers",
+    "documentation": null,
+    "reexports": ["Standard.Visualization"]
+  },
+  {
+    "type": "method",
+    "reexport": "Standard.Visualization.Helpers",
+    "module": "Standard.Visualization.Helpers",
+    "name": "render_vector",
+    "arguments": [
+      {
+        "name": "object",
+        "reprType": "Standard.Base.Any.Any",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Visualization.Helpers",
+    "returnType": "Standard.Base.Data.Text.Text",
+    "isStatic": true,
+    "documentation": " Renders a vector for the table visualization.",
+    "annotations": [],
+    "reexports": ["Standard.Visualization"]
   }
 ]

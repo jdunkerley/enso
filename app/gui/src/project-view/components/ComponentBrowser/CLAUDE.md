@@ -3,9 +3,10 @@
 The component browser's list: what is shown and in which order.
 
 - `filtering.ts` — `Filtering.filter` decides whether an entry matches and its
-  score: methods only, not `private`, not in a standard library's `Internal`
-  module unless a self type is known, the self type, and the search pattern
-  (words, initials, aliases, owner). Lower scores are better.
+  score: methods only, not `private`, never from `Standard.Visualization` (an
+  IDE-only library, hidden even when a self type is known), not in a standard
+  library's `Internal` module unless a self type is known, the self type, and
+  the search pattern (words, initials, aliases, owner). Lower scores are better.
 - `component.ts` — `makeComponentLists` builds the groups' lists, ordered by
   `compareSuggestions`: score; then, while searching, entries of the libraries
   the module imports and of the project itself (`importedLibraries` in

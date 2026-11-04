@@ -285,6 +285,16 @@ test('Filling input with suggestion', async ({ editorPage, page }) => {
   await expect(locate.componentBrowserInput(page)).toHaveText('Data.read ')
 })
 
+test('Standard.Visualization is not listed', async ({ editorPage, page }) => {
+  await editorPage
+  await locate.addNewNodeButton(page).click()
+  await expect(locate.componentBrowser(page)).toExist()
+  // `render_vector` is in Standard.Visualization, which the IDE uses internally.
+  await locate.componentBrowserInput(page).fill('render_vector')
+  await expect(page.locator('[data-transitioning]')).toHaveCount(0)
+  await expect(locate.componentBrowserEntry(page)).toHaveCount(0)
+})
+
 test('Filtering list', async ({ editorPage, page }) => {
   await editorPage
   await locate.addNewNodeButton(page).click()
