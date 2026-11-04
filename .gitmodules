@@ -1,3 +1,0 @@
-[submodule "app/gui/.dev-env"]
-	path = app/gui/.dev-env
-	url = ../dev-env.git
