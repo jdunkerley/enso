@@ -853,7 +853,7 @@ final class TruffleCompilerContext implements CompilerContext {
           "Rewriting the bindings cache of [{0}] in the user cache: {1} modules.",
           libraryName,
           map.size());
-      var name = toQualifiedName(libraryName);
+      var name = rewriteKey(libraryName);
       Callable<Boolean> task =
           () -> {
             var pool = serializationPool;
@@ -1347,6 +1347,22 @@ final class TruffleCompilerContext implements CompilerContext {
   }
 
   private static void emitIOException() throws IOException {}
+
+  /** The serialization pool's key for the library's `serializeLibrary` job. */
+  static QualifiedName libraryKey(LibraryName libraryName) {
+    return toQualifiedName(libraryName);
+  }
+
+  /**
+   * The serialization pool's key for the rewrite of the library's bindings cache. See Note [A
+   * Rejected Bindings Cache Is Rewritten]. Not the library's own key: the pool tracks abandonable
+   * jobs by key, and a `serializeLibrary` of the same library must still be waited for at exit
+   * (`SerializationPoolExitTest`). `#` cannot occur in a module name.
+   */
+  static QualifiedName rewriteKey(LibraryName libraryName) {
+    var path = cons(libraryName.namespace(), cons(libraryName.name(), nil()));
+    return new QualifiedName(path, "#bindings-rewrite");
+  }
 
   private static QualifiedName toQualifiedName(LibraryName libraryName) {
     var namespace = cons(libraryName.namespace(), nil());

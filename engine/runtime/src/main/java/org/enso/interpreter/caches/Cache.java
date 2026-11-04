@@ -241,6 +241,13 @@ public final class Cache<T, M> {
    * stays. A write that is abandoned, or a process that dies mid-write, leaves
    * only a temporary file; the next write to the same directory deletes
    * temporary files older than `STALE_TEMPORARY_AGE`.
+   *
+   * A target that stays unreplaceable (kept mapped by a long-lived process on
+   * Windows) is tried again by every run that wants to write it, at the cost of
+   * serialising it each time. For a bindings-cache rewrite that is at most once
+   * per library per run (Note [A Rejected Bindings Cache Is Rewritten] in
+   * `TruffleCompilerContext`), and it stops once the other process lets go.
+   * No back-off is kept across runs.
    */
   private static final String TEMPORARY_INFIX = ".tmp-";
 
