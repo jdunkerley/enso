@@ -68,6 +68,15 @@ and links the required Graal/Truffle background reading.
   (Note [A Cache Records The Libraries It Refers To] in `LibraryDependencies`).
   A cache that fails to deserialise is deleted and is a miss, with a warning in
   the log (Note [A Cache That Does Not Load Is A Miss] in `Cache`).
+- **A rejected bindings cache is rewritten into the user cache.** When a run
+  rejects a library's bindings cache (its sources or a dependency's changed), it
+  writes a new one, from the modules it compiled, next to the library's
+  per-module IR caches; reads try the library's own location first, then the
+  user cache (Note [A Rejected Bindings Cache Is Rewritten] in
+  `TruffleCompilerContext`). Only `enso --compile` writes the library's own
+  location. Exit does not wait for the rewrite. Every cache file is written to a
+  temporary file and renamed into place (Note [A Cache Is Written By Renaming]
+  in `Cache`).
 - **A library's bindings cache is read once per context**, by
   `TruffleCompilerContext.libraryBindings`, which import resolution and module
   loading share; see Note [One Bindings Cache Read Per Library].

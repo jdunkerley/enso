@@ -261,8 +261,21 @@ class Compiler(
         go(pending, compiledModules ++ newCompiled)
       }
 
-    go(modules, List())
+    val result = go(modules, List())
+    if (generateCode && irCachingEnabled) {
+      // Note [A Rejected Bindings Cache Is Rewritten] in TruffleCompilerContext.
+      context.rewriteRejectedLibraryBindings(
+        this,
+        m =>
+          context.wasLoadedFromCache(m) || cacheableModules.contains(m.getName)
+      )
+    }
+    result
   }
+
+  /** Modules this compiler compiled and handed to per-module serialisation. */
+  private val cacheableModules: java.util.Set[QualifiedName] =
+    java.util.concurrent.ConcurrentHashMap.newKeySet[QualifiedName]()
 
   private def runCompilerPipeline(
     modules: List[Module],
@@ -548,6 +561,7 @@ class Compiler(
               shouldStoreCache && !hasErrors(module) &&
               !context.isInteractive(module) && !module.isSynthetic()
             ) {
+              cacheableModules.add(module.getName)
               if (isInteractiveMode) {
                 context.notifySerializeModule(module.getName())
               } else {
