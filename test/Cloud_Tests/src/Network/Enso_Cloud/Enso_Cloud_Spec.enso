@@ -2,6 +2,7 @@ from Standard.Base import all
 import Standard.Base.Enso_Cloud.Errors.Cloud_Session_Expired
 import Standard.Base.Enso_Cloud.Errors.Enso_Cloud_Error
 import Standard.Base.Enso_Cloud.Errors.Not_Logged_In
+import Standard.Base.Enso_Cloud.Internal.Audit_Log.Audit_Log
 import Standard.Base.Errors.Common.No_Such_Conversion
 import Standard.Base.Errors.Illegal_State.Illegal_State
 
@@ -46,6 +47,22 @@ add_specs suite_builder setup:Cloud_Tests_Setup =
             Test.expect_panic No_Such_Conversion (Enso_User.from (Json.parse "[]"))
 
     # These tests should be kept in sync with tools/http-test-helper/src/main/java/org/enso/shttp/cloud_mock/UsersHandler.java
+    suite_builder.group "Enso Cloud without a Cloud API URL" group_builder->
+        # There is no built-in default URL, so with ENSO_CLOUD_API_URL unset a Cloud call is an error
+        # (not a panic) that names the variable, and the audit log does nothing.
+        group_builder.specify "Enso_User.current is a dataflow error naming ENSO_CLOUD_API_URL" <|
+            Test_Environment.unsafe_with_environment_override "ENSO_CLOUD_API_URL" Nothing <|
+                Cloud_Tests_Setup.reset
+                result = Enso_User.current
+                result.should_fail_with Enso_Cloud_Error
+                result.catch.to_display_text . should_contain "ENSO_CLOUD_API_URL"
+
+        group_builder.specify "the audit log does nothing, quietly" <|
+            Test_Environment.unsafe_with_environment_override "ENSO_CLOUD_API_URL" Nothing <|
+                Cloud_Tests_Setup.reset
+                Audit_Log.report_event "Test" "no Cloud URL" async=False . should_equal Nothing
+                Audit_Log.report_event "Test" "no Cloud URL" . should_equal Nothing
+
     suite_builder.group "Enso_User - local mock integration tests" pending=setup.httpbin_pending group_builder->
         group_builder.specify "current user can be fetched from mock API" <| Cloud_Tests_Setup.run_with_mock_cloud <|
             current = Enso_User.current

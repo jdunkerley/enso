@@ -49,6 +49,14 @@ public final class CloudAPI implements ReloadDetector.HasClearableCache {
   }
 
   /**
+   * Whether {@code ENSO_CLOUD_API_URL} is set. Without it no Cloud call can be made, and the audit
+   * log has nowhere to go.
+   */
+  public boolean isConfigured() {
+    return apiRootUri != null;
+  }
+
+  /**
    * Returns the URI to the root of the Cloud API.
    *
    * <p>It always ends with a slash.
