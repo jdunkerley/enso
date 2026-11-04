@@ -330,7 +330,10 @@ class Compiler(
      * `indexStdLibs` compiles. Otherwise IR cached by another checkout of the
      * same library (every `0.0.0-dev` checkout shares the per-user IR caches)
      * resolved `answer` to a module that no longer has it (#473,
-     * `LibraryCacheDigestTest`).
+     * `LibraryCacheDigestTest`). A module in another library is not covered
+     * here: the cache records that library's source hash and misses when it
+     * changed (Note [A Cache Records The Libraries It Refers To] in
+     * `LibraryDependencies`).
      */
     val requiredModules = modules.flatMap { module =>
       val isLoadedFromSource =

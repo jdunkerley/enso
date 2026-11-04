@@ -14,11 +14,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Level;
 import org.apache.commons.lang3.StringUtils;
 import org.enso.common.CompilationStage;
 import org.enso.compiler.core.ir.Module;
 import org.enso.interpreter.runtime.EnsoContext;
+import org.enso.pkg.QualifiedName;
 import org.enso.version.BuildVersion;
 
 public final class ModuleCache
@@ -51,16 +53,37 @@ public final class ModuleCache
   }
 
   @Override
-  public byte[] metadata(String sourceDigest, String blobDigest, CachedModule entry)
+  public byte[] metadata(
+      EnsoContext context,
+      String sourceDigest,
+      String blobDigest,
+      CachedModule entry,
+      Set<QualifiedName> referencedModules,
+      TruffleLogger logger)
       throws IOException {
-    return new Metadata(sourceDigest, blobDigest, entry.compilationStage().toString()).toBytes();
+    var own = LibraryDependencies.libraryOf(module.getName()).orElse(null);
+    var dependencies =
+        LibraryDependencies.of(context, referencedModules, own, logger)
+            .orElseThrow(
+                () ->
+                    new IOException("unable to hash the libraries " + module.getName() + " uses"));
+    return new Metadata(sourceDigest, blobDigest, entry.compilationStage().toString(), dependencies)
+        .toBytes();
   }
 
   @Override
-  public byte[] serialize(EnsoContext context, CachedModule entry) throws IOException {
-    var pool = CacheUtils.createPool(context.getCompiler().context(), true);
+  public byte[] serialize(
+      EnsoContext context, CachedModule entry, Set<QualifiedName> referencedModules)
+      throws IOException {
+    var pool = CacheUtils.createPool(context.getCompiler().context(), true, referencedModules);
     var arr = pool.write(entry.moduleIR());
     return arr;
+  }
+
+  /** See Note [A Cache Records The Libraries It Refers To] in {@link LibraryDependencies}. */
+  @Override
+  public boolean dependenciesAreCurrent(EnsoContext context, Metadata meta, TruffleLogger logger) {
+    return meta.dependencies().areCurrent(context, module.getName().toString(), logger);
   }
 
   @Override
@@ -95,7 +118,9 @@ public final class ModuleCache
 
   /**
    * The digest of the module's own source. What its names resolved to in the modules it imports is
-   * not part of it: see Note [A Cached Module Follows Its Library's Imports] in {@code Compiler}.
+   * not part of it: see Note [A Cached Module Follows Its Library's Imports] in {@code Compiler}
+   * and, for other libraries, Note [A Cache Records The Libraries It Refers To] in {@link
+   * LibraryDependencies}.
    */
   @Override
   public Optional<String> computeDigest(
@@ -151,13 +176,18 @@ public final class ModuleCache
 
   public record CachedModule(Module moduleIR, CompilationStage compilationStage, Source source) {}
 
-  public record Metadata(String sourceHash, String blobHash, String compilationStage) {
+  public record Metadata(
+      String sourceHash,
+      String blobHash,
+      String compilationStage,
+      LibraryDependencies dependencies) {
     byte[] toBytes() throws IOException {
       try (var os = new ByteArrayOutputStream();
           var dos = new DataOutputStream(os)) {
         dos.writeUTF(sourceHash());
         dos.writeUTF(blobHash());
         dos.writeUTF(compilationStage());
+        dependencies().write(dos);
         return os.toByteArray();
       }
     }
@@ -165,7 +195,8 @@ public final class ModuleCache
     static Metadata read(byte[] arr) throws IOException {
       try (var is = new ByteArrayInputStream(arr);
           var dis = new DataInputStream(is)) {
-        return new Metadata(dis.readUTF(), dis.readUTF(), dis.readUTF());
+        return new Metadata(
+            dis.readUTF(), dis.readUTF(), dis.readUTF(), LibraryDependencies.read(dis));
       }
     }
   }
