@@ -5,7 +5,9 @@
 - [The Help menu, the Enso menu and the other links to the original company's
   website and community are gone, as are the online documentation links for
   components (including the F1 shortcut). Local versioning commits use your own
-  git identity, or `Enso IDE <ide@localhost>` when you have none.][566]
+  git identity, or `Enso IDE <ide@localhost>` when you have none. The settings
+  button moves from the top bar to the bottom of the left rail, and both rails
+  now run the full height of the window.][566]
 - [The component browser no longer lists the components of
   Standard.Visualization, the library the IDE uses to prepare visualization
   data.][565]

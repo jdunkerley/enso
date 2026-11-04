@@ -57,7 +57,6 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   // Dashboard features ported to Vue, mounted by the shared app shell.
   'layouts/DriveView.vue',
   'layouts/Settings',
-  'pages/dashboard/UserBar/UserBar.vue',
   // The dashboard's global stylesheets.
   'styles.css',
   'tailwind.css',

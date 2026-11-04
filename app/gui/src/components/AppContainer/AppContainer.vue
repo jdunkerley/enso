@@ -1,5 +1,4 @@
 <script lang="ts">
-import UserBar from '#/pages/dashboard/UserBar/UserBar.vue'
 import CommandPalette from '$/components/CommandPalette.vue'
 import ModalHost from '$/components/ModalHost/ModalHost.vue'
 import { useContainerData } from '$/providers/container'
@@ -31,7 +30,7 @@ const fullscreenRoot = shallowRef<HTMLElement>()
 
 const openedProjects = useOpenedProjects()
 const containerData = useContainerData()
-const { openProjectLocally, openSettingsTab, closeCurrentTab } = containerData
+const { openProjectLocally, closeCurrentTab } = containerData
 const { focusedPanel, middlePanelShown } = toRefs(containerData)
 const text = useText()
 provideAsyncResources(openedProjects)
@@ -51,10 +50,6 @@ const keydownHandler = appContainerBindings.handler(
     (actionName) => actionHandlers[actionName].action,
   ),
 )
-
-function goToSettingsPage() {
-  openSettingsTab()
-}
 
 const { globalEventRegistry } = useGlobalEventRegistry()
 useEvent(globalEventRegistry, 'keydown', (event) => {
@@ -97,7 +92,6 @@ onUnmounted(() => {
         <div class="tabPanel" :class="{ noMiddlePanel: !middlePanelShown }">
           <div class="bar">
             <TabBar />
-            <UserBar :goToSettingsPage="goToSettingsPage" />
           </div>
           <div class="belowBar">
             <MiddlePanel v-if="middlePanelShown" />
@@ -159,7 +153,8 @@ onUnmounted(() => {
   justify-content: right;
   height: var(--top-bar-height);
   min-height: var(--top-bar-height);
-  padding: 0 8px 0 0;
+  /* The tab bar runs between the rails: the right panel's rail (48px) goes to the top. */
+  padding: 0 48px 0 0;
   z-index: 1;
 }
 

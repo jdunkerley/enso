@@ -6,6 +6,7 @@ import type { SuggestionEntry } from 'ydoc-shared/languageServerTypes/suggestion
 import * as locate from '../project-view/locate'
 import { goToPageActions, type GoToPageActions } from './goToPageActions'
 import PageActions from './PageActions'
+import { MOUSE_OFF_RAIL } from './utilities'
 
 export interface RelativePos {
   relativeTo?: string
@@ -108,7 +109,7 @@ export default class EditorPageActions<Context = object> extends PageActions<Con
   ) {
     return this.step(`Expect edge '${sourceNode || '*'}' -> '${targetNode || '*'}'`, async () => {
       // The mouse is often in output port area, making our checks fooled by the edge ghost.
-      await this.page.mouse.move(0, 0)
+      await this.page.mouse.move(MOUSE_OFF_RAIL.x, MOUSE_OFF_RAIL.y)
 
       const [sourceId, targetId] = await Promise.all([
         sourceNode ? this.locateNodes(sourceNode).getAttribute('data-node-id') : undefined,

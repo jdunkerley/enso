@@ -16,6 +16,7 @@ import { Path } from 'enso-common/src/services/Backend'
 import { computed, ref, shallowRef, toRef, toRefs, useTemplateRef } from 'vue'
 import CategoryButton from './CategoryButton.vue'
 import PanelContents from './PanelContents.vue'
+import UserMenu from './UserMenu.vue'
 
 const LEFT_BAR_EXTENSION_TIME_MS = 550
 const categories = useCategories()
@@ -111,6 +112,10 @@ registerHandlers({
           @click="onAddDirectoryClick"
         />
       </div>
+      <!-- Last in the Tab order, at the bottom of the rail. -->
+      <div class="settings">
+        <UserMenu :extended="leftBarExtended" />
+      </div>
       <div class="shadow" />
     </div>
     <SizeTransition width :duration="250">
@@ -144,8 +149,8 @@ registerHandlers({
   position: absolute;
   width: 48px;
   max-width: 48px;
-  height: calc(100% - var(--top-bar-height));
-  margin-top: var(--top-bar-height);
+  /* The rail runs the window's full height, above the top bar's strip. */
+  height: 100%;
   padding: 16px 0;
   background-color: var(--color-dashboard-background);
   display: flex;
@@ -179,6 +184,25 @@ registerHandlers({
     width: calc(100% - 32px);
     height: 1px;
     margin: 0 16px;
+    background-color: rgba(0 0 0 / 0.1);
+  }
+}
+
+/* The settings button, below a divider like the one above Add Directory. */
+.settings {
+  width: 100%;
+  margin-top: auto;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 8px;
+
+  &:before {
+    content: '';
+    align-self: stretch;
+    height: 1px;
+    margin: 0 4px;
     background-color: rgba(0 0 0 / 0.1);
   }
 }

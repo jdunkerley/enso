@@ -235,7 +235,8 @@ description and ticks it off. The flake baseline it compares against is
   (`<div class="categories"> from <div class="leftBar expanded"> intercepts pointer events`)
   — but only when the next click lands more than ~550ms later, i.e. on a loaded
   CI runner (#146). Every helper that clicks or drops on the bar ends with
-  `page.mouse.move(0, 0)`; do the same in new ones.
+  `page.mouse.move(MOUSE_OFF_RAIL.x, MOUSE_OFF_RAIL.y)` (the rail runs the
+  window's full height, so the corner (0, 0) is on it); do the same in new ones.
 - **Await every Playwright call.** `@typescript-eslint/no-floating-promises` is
   on for this directory (#202): an unawaited `expect.poll`, assertion or action
   races the rest of the test, and one still running when the test returns fails
