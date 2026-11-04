@@ -1,0 +1,17 @@
+## Orders and Customers
+
+   Joins orders to the customers who placed them, builds a cross-tab of spend by
+   segment and category, and writes the result to an Excel workbook in
+   `data/`.
+
+   The data in `data/` is synthetic.
+from Standard.Base import all
+from Standard.Table import all
+
+main =
+    orders = Data.read (enso_project.data / 'orders.csv') (..Delimited headers=..Has_Headers)
+    customers = Data.read (enso_project.data / 'customers.csv') (..Delimited headers=..Has_Headers)
+    joined = orders.join customers (..Inner) [..Equals 'customer_id']
+    spend = joined.cross_tab ['segment'] 'category' (..Sum 'total') . sort [..Name 'segment']
+    report = enso_project.data / 'spend_by_segment.xlsx'
+    spend.write report (..Sheet 'Spend by segment') on_existing_file=..Overwrite

@@ -250,14 +250,14 @@ export async function fillWidgetText(
 }
 
 /**
- * Wait for the Samples folder download
- * This function retries to access passed file every 5 sec, fails after 1 min
+ * Wait for a file to appear.
+ * This function retries to access the passed file every 5 sec, fails after 1 min.
  */
-export async function waitForDownload(pathToFile: string): Promise<void> {
+export async function waitForFile(pathToFile: string): Promise<void> {
   const start = Date.now()
   while (true) {
     try {
-      await fs.access(pathToFile) // ✅ file exists
+      await fs.access(pathToFile) // file exists
       return
     } catch {
       if (Date.now() - start > 60_000) {
@@ -266,6 +266,22 @@ export async function waitForDownload(pathToFile: string): Promise<void> {
       await new Promise((r) => setTimeout(r, 5_000))
     }
   }
+}
+
+/**
+ * Put the bank data of the Getting Started exercises (a generated workbook, see `tests/fixtures`)
+ * into `Samples/Data` of the projects directory.
+ *
+ * The IDE copies its bundled samples to `Samples` at start-up and skips that when the directory
+ * exists, so this first waits for a bundled sample to be there. Returns the workbook's path.
+ */
+export async function addBankData(projectsDir: string): Promise<string> {
+  const samples = path.join(projectsDir, 'Samples')
+  await waitForFile(path.join(samples, 'Sales_Overview', 'package.yaml'))
+  const target = path.join(samples, 'Data', 'sample_bank_data.xlsx')
+  await fs.mkdir(path.dirname(target), { recursive: true })
+  await fs.copyFile(path.join(__dirname, 'fixtures', 'sample_bank_data.xlsx'), target)
+  return target
 }
 
 /** Open drop-down menu in WidgetSelection with given label. */

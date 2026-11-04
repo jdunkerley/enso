@@ -36,6 +36,16 @@ desktop binary (AppImage/DMG/exe + installer).
   serves project assets to the window and refuses paths outside a project. The
   OS deep-link registration (`setAsDefaultProtocolClient`) was removed: there
   are no deep links.
+- Installs the bundled sample projects at start-up (`installSamples` in
+  `project-manager-shim`, called from `onStart`): `samples/` in this package is
+  shipped as `resources/samples` (`extraResources`) and copied to
+  `<projects>/Samples` only when that directory is missing. Nothing is
+  downloaded. The samples are original and use synthetic data; each is a project
+  (`package.yaml`, `src/Main.enso`, `data/`) that must run on the current
+  engine, so re-run them with `enso --run` after a standard-library change that
+  touches `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
+  Playwright spec adds its own `tests/fixtures/sample_bank_data.xlsx` to
+  `Samples/Data` (`addBankData`).
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).

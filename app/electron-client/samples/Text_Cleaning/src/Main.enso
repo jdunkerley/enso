@@ -1,0 +1,20 @@
+## Text Cleaning
+
+   Tidies a messy contacts table: fixes the spacing and capitalization of names,
+   splits them into first and last name, strips the punctuation from phone
+   numbers, and pulls the reference code out of a free-text note with a regular
+   expression.
+
+   The data in `data/contacts.csv` is synthetic.
+from Standard.Base import all
+from Standard.Table import all
+
+main =
+    contacts = Data.read (enso_project.data / 'contacts.csv') (..Delimited headers=..Has_Headers)
+    name = (contacts.at 'name').map (n-> (n.trim.replace ' +'.to_regex ' ').to_case ..Title)
+    tidy_names = contacts.set name 'name'
+    split = tidy_names.split_to_columns 'name' ' '
+    names = split.rename_columns ['id', 'first_name', 'last_name', 'phone', 'note']
+    phones = names.text_replace 'phone' '[^0-9]'.to_regex ''
+    codes = phones.parse_to_columns 'note' '(?<kind>[A-Z]{3})-(?<number>[0-9]+)'
+    codes

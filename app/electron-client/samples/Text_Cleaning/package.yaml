@@ -1,0 +1,7 @@
+name: Text_Cleaning
+namespace: local
+version: 0.0.1
+license: Apache-2.0
+author: jdunkerley
+maintainer: jdunkerley
+prefer-local-libraries: true

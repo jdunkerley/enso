@@ -1,8 +1,8 @@
 /** @file A series of tests designed for testing 'Getting Started with Enso Analytics'. */
 
-import path from 'path'
 import { expect } from 'playwright/test'
 import {
+  addBankData,
   addFirstElementToWidgetVector,
   closeWelcome,
   createNewProject,
@@ -16,7 +16,6 @@ import {
   test,
   visualizeData,
   waitForDashboard,
-  waitForDownload,
 } from './electronTest'
 
 test.skip(SKIP_ON_WINDOWS_CI, SKIP_ON_WINDOWS_CI_REASON)
@@ -38,11 +37,8 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     await expect(dataReadEntry).toBeVisible()
     await dataReadEntry.click()
 
-    // Create relative path to file
-    const filePath = path.join(projectsDir, 'Samples', 'Data', 'sample_bank_data.xlsx')
-
-    // Waiting for file download
-    await waitForDownload(filePath)
+    // The workbook the exercise reads (the samples are bundled, nothing is downloaded)
+    await addBankData(projectsDir)
 
     // Filling in file url
     await fillWidgetText(page, 'path‘‘', 'Samples/Data/sample_bank_data.xlsx')
@@ -173,9 +169,10 @@ test('Exercise 1', async ({ page, projectsDir }) => {
 })
 
 // Second exercise in Enso Analytics 101
-test('Exercise 2', async ({ page }) => {
+test('Exercise 2', async ({ page, projectsDir }) => {
   await waitForDashboard(page)
   await closeWelcome(page)
+  await addBankData(projectsDir)
 
   // ---------------- Objective 1 ----------------
   await test.step('Objective 1: Let’s read a single sheet in from Excel', async () => {

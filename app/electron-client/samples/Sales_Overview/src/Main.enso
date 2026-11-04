@@ -1,0 +1,23 @@
+## Sales Overview
+
+   Reads a messy sales CSV, cleans it up, and totals sales by month and region.
+   Select the `by_region` and `monthly` nodes to see the results as a table or
+   a chart (use the visualization picker on the node).
+
+   The data in `data/sales.csv` is synthetic.
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+main =
+    sales = Data.read (enso_project.data / 'sales.csv') (..Delimited headers=..Has_Headers)
+    unique = sales.distinct 'sale_id'
+    complete = unique.filter 'amount' (..Not_Nothing)
+    region = (complete.at 'region').map (r-> r.trim.to_case ..Title)
+    cleaned = complete.set region 'region'
+    month = (cleaned.at 'sale_date').format 'yyyy-MM'
+    dated = cleaned.set month 'month'
+    by_region = dated.aggregate ['region'] [..Sum 'amount' 'Total Sales', ..Count 'Sales']
+    monthly = dated.aggregate ['month'] [..Sum 'amount' 'Total Sales'] . sort [..Name 'month']
+    grid = dated.cross_tab ['month'] 'region' (..Sum 'amount') . sort [..Name 'month']
+    grid
