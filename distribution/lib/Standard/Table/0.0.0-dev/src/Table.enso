@@ -3618,62 +3618,6 @@ type Table
         self.implementation.to_csv self.underlying
 
     ## ---
-       group: Standard.Base.Conversions
-       icon: convert
-       ---
-       Returns an `XML_Document` representation of the table.
-
-       ## Arguments
-        - `element_columns`: Columns to be used as elements in the XML.
-        - `attribute_columns`: Columns to be used as attributes in the XML.
-        - `value_column`: Column to be used as the value for the row tag in the
-          XML.
-        - `root_name`: The name of the root tag in the XML.
-        - `row_name`: The name of the row tag in the XML.
-        - `on_problems`: Specifies how to handle warnings if they occur,
-          reporting them as warnings by default.
-
-       ## Examples
-       ### to_xml Operation
-
-         Input Table `table`:
-
-       ```
-            Title                  | Author              | Price | Year
-           ------------------------+---------------------+-------+------
-            A Tale Of Two Cities   | Charles Dickens     | 9.99  | 1859
-            The Great Gatsby       | F. Scott Fitzgerald | 5.99  | 1925
-       ```
-         Result `r = t.to_xml ["Year"] ["Author", "Price"] "Title" "Books" "Book"`:
-
-       ```
-            <Books>
-              <Book Author="Charles Dickens" Price="9.99">
-                A Tale Of Two Cities
-                <Year>1859</Year>
-              </Book>
-              <Book Author="F. Scott Fitzgerald" Price="5.99">
-                The Great Gatsby
-                <Year>1925</Year>
-              </Book>
-            </Books>
-       ```
-
-       ## Errors
-        - If a column in `element_columns`, `attribute_columns` or `value_column`
-          is not in the input table, a `Missing_Input_Columns` is raised as an
-          error.
-        - If any incoming columns are not specified in one of
-          `element_columns`, `attribute_columns` or `value_column`, a
-          `Unexpected_Extra_Columns` is reported according to the `on_problems`
-          setting.
-    @element_columns Widget_Helpers.make_column_name_vector_selector
-    @attribute_columns Widget_Helpers.make_column_name_vector_selector
-    @value_column Widget_Helpers.make_column_name_selector
-    to_xml self (element_columns : Vector (Integer | Text | Regex) | Text | Integer | Regex = self.column_names) (attribute_columns : Vector (Integer | Text | Regex) | Text | Integer | Regex = []) (value_column : Text | Integer | Nothing = Nothing) root_name:Text="Table" row_name:Text="Row" on_problems:Problem_Behavior=..Report_Warning -> XML_Document =
-        self.implementation.to_xml self.underlying element_columns attribute_columns value_column root_name row_name on_problems
-
-    ## ---
        private: true
        ---
     columns_helper : Table_Column_Helper
@@ -4096,46 +4040,6 @@ Table.from (that:Range) (name:Text="Range") = Table.new [Column.from_vector name
    ---
    Conversion method to a Column from a Vector.
 Table.from (that:Date_Range) (name:Text=that.default_column_name) = Table.new [Column.from_vector name that.to_vector]
-
-## ---
-   private: true
-   ---
-   Convert an `XML_Element` into a `Table` Generates a single-row table with
-   columns for the tag's contents.
-
-   The columns generated are:
-   - Name: the root tag name
-   - @[attribute name]: the attribute with that name.
-   - Children: the children of the tag, including `XML_Element`s and text
-     elements. This is only generated if the tag has `XML_Element` children
-   - Value: the text content of the tag. This is only generated if the tag does
-     not have `XML_Element` children Either `Children` or `Value` will be
-     generated, but not both.
-
-   ## Arguments
-    - `that`: The XML_Element to convert
-Table.from (that:XML_Element) =
-    # Generating a table from an `XML_Element` is the same logic as `expand_column`
-    Table.new [["x", [that]]] . expand_column 'x' prefix=Prefix_Name.None
-
-## ---
-   private: true
-   ---
-   Convert an `XML_Document` into a `Table` Generates a single-row table with
-   columns for the root tag's contents.
-
-   The columns generated are:
-   - Name: the root tag name
-   - @[attribute name]: the attribute with that name
-   - Children: the children of the tag, including `XML_Element`s and text
-     elements. This is only generated if the tag has `XML_Element` children
-   - Value: the text content of the tag. This is only generated if the tag does
-     not have `XML_Element` children Either `Children` or `Value` will be
-     generated, but not both.
-
-   ## Arguments
-    - `that`: The XML_Document to convert
-Table.from (that:XML_Document) = Table.from that.root_element
 
 ## ---
    private: true

@@ -31,6 +31,8 @@ One directory per suite, typically:
 - Database backends run `Standard.Database_Test_Suite` with a `Backend`
   descriptor; see that library's `CLAUDE.md`.
 - `Geo_Tests/`, `Image_Tests/` — media suites.
+- `XML_Tests/` — `Standard.XML`: parsing, XPath, writing, `Table.to_xml`, the
+  table conversions and the Table visualisation of XML values.
 - `Examples_Tests/` — runs the `Standard.Examples` workflows and asserts their
   outputs.
 - `Visualization_Tests/` — exercises the visualization builtins.

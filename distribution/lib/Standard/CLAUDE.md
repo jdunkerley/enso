@@ -31,6 +31,8 @@ there.
 - `Google_Api/` — **Deprecated** placeholder; use `Google` instead.
 - `Saas/` — Salesforce, Strava, SMTP email.
 - `Tableau/` — Tableau Hyper extract (`.hyper`) read/write.
+- `XML/` — XML documents (`XML_Document`, `XML_Element`, XPath), the `.xml` file
+  format, and `Table.to_xml`.
 - `Image/` — Image read/write and arithmetic via OpenCV.
 - `Geo/` — Latitude/longitude, distance, GeoJSON to table.
 - `Examples/` — Sample data referenced by `## Examples` doc blocks.
@@ -146,7 +148,7 @@ formats, data links, email providers, etc. without modifying `Base`. Pattern:
 ```
 services:
   - provides: Standard.Base.System.File_Format.File_Format_SPI
-    with: Standard.Base.Data.XML.XML_Format.XML_Format
+    with: Standard.XML.XML_Format.XML_Format
 ```
 
 `Meta.lookup_services` finds the providers of every installed library, imported

@@ -36,6 +36,7 @@ libraries:
   Tableau: { stdBits: [tableau], dependsOn: [Base, Table] }
   Test: { stdBits: [], dependsOn: [Base] }
   Visualization: { stdBits: [], dependsOn: [Base, Database, Table] }
+  XML: { stdBits: [], dependsOn: [Base, Table] }
 
 testProjects:
   AWS_Tests:
@@ -44,7 +45,7 @@ testProjects:
   Base_Internal_Tests: { imports: [Base, Test], testImports: [Cloud_Tests] }
   Base_Tests: { imports: [AWS, Base, Test], testImports: [Helpers] }
   Cloud_Tests:
-    imports: [Base, Database, Database_Test_Suite, Table, Test]
+    imports: [Base, Database, Database_Test_Suite, Table, Test, XML]
     testImports: [Base_Tests]
   DuckDB_Tests:
     imports: [Base, Database, Database_Test_Suite, DuckDB, Table, Test]
@@ -94,6 +95,9 @@ testProjects:
   Visualization_Tests:
     imports:
       [Base, Database, Examples, Geo, Image, SQLite, Table, Test, Visualization]
+    testImports: []
+  XML_Tests:
+    imports: [Base, Table, Test, Visualization, XML]
     testImports: []
 
 # The jobs a standard library suite that runs "every project but …" splits into; a suite with an

@@ -132,10 +132,6 @@ export project.Data.Time.Time_Period.Time_Period
 export project.Data.Time.Time_Zone.Time_Zone
 export project.Data.Vector.Report_Unmatched
 export project.Data.Vector.Vector
-export project.Data.XML.XML_Document
-export project.Data.XML.XML_Element
-export project.Data.XML.XML_Error
-export project.Data.XML.XML_Format.XML_Format
 
 export project.Enso_Cloud.Enso_File.Enso_File
 export project.Enso_Cloud.Enso_Secret.Enso_Secret

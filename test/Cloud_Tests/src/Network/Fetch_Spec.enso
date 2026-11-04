@@ -15,6 +15,8 @@ from Standard.Table import all
 from Standard.Test import all
 import Standard.Test.Test_Environment
 
+from Standard.XML import XML_Document
+
 import project.Network.Enso_Cloud.Cloud_Tests_Setup.Cloud_Tests_Setup
 
 import Standard.Database_Test_Suite.Util
