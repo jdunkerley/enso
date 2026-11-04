@@ -37,7 +37,8 @@ public final class EnsoLibraryFeature implements Feature {
         }
       }
     }
-    libs.addAll(javaFreeLibraries());
+    var javaFree = javaFreeLibraries();
+    libs.addAll(javaFree);
 
     /*
       To run Standard.Test one shall analyze its polyglot/java files. But there are none
@@ -78,6 +79,14 @@ public final class EnsoLibraryFeature implements Feature {
                     throw new IllegalStateException("Cannot load " + entity.getJavaName());
                   }
                   name.setCharAt(at, '$');
+                }
+                if (javaFree.contains(p) && !isJdkClass(clazz)) {
+                  throw new IllegalStateException(
+                      p
+                          + " is a Java-free library, but imports "
+                          + clazz.getName()
+                          + ", which is not a JDK class. See Note [Java-Free Libraries In The"
+                          + " Image] in build.sbt.");
                 }
                 classes.add(clazz.getName());
                 RuntimeReflection.register(clazz);
@@ -138,6 +147,12 @@ public final class EnsoLibraryFeature implements Feature {
       result.add(root);
     }
     return result;
+  }
+
+  /** Whether {@code clazz} comes from a JDK module ({@code java.*} or {@code jdk.*}). */
+  private static boolean isJdkClass(Class<?> clazz) {
+    var module = clazz.getModule().getName();
+    return module != null && (module.startsWith("java.") || module.startsWith("jdk."));
   }
 
   private void makeEnsoLibAvailableForShims() {
