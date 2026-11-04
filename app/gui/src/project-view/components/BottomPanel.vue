@@ -25,7 +25,8 @@ defineSlots<{ code(): unknown; logs(): unknown }>()
 
 const idBase = useId()
 
-const MIN_DOCK_SIZE_PX = 20
+/** The tab strip's height (`BottomPanelTabs.vue`): a smaller dock would clip the tabs. */
+const MIN_DOCK_SIZE_PX = 28
 
 const rootElement = ref<HTMLElement>()
 

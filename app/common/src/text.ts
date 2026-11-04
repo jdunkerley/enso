@@ -64,6 +64,7 @@ interface PlaceholderOverrides {
   readonly engineLogsHistoryFailed: [message: string]
   readonly engineLogsDownloadFailed: [message: string]
   readonly engineLogsSessionUnlisted: [name: string]
+  readonly engineLogsSessionLabel: [session: string, created: string]
   readonly engineLogsOriginOne: [source: string]
   readonly engineLogsOriginSome: [ticked: number, shown: number]
   readonly engineLogsUnseenErrors: [count: number]

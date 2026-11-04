@@ -1,6 +1,7 @@
 /** @file The bottom dock's Logs tab: the open project's engine log, live (engine logs panel). */
 import { expect, test, type Locator, type Page } from 'integration-test/base'
 import * as fs from 'node:fs/promises'
+import { expectNoNewAxeViolations } from '../accessibility'
 import * as locate from './locate'
 
 async function box(locator: Locator) {
@@ -88,6 +89,17 @@ test('the Logs tab follows the engine log and filters by level', async ({
   })
 })
 
+test('the Logs tab: no new axe violations', async ({ editorPage }) => {
+  await editorPage.do(async (page) => {
+    await page.keyboard.press('ControlOrMeta+L')
+    const dock = locate.bottomDock(page)
+    await expect(dock.getByRole('log').getByText('Something failed')).toBeVisible()
+    await expectNoNewAxeViolations(page, 'engine-logs', {
+      include: ['[data-testid="bottomDock"]'],
+    })
+  })
+})
+
 test('the Logs tab filters by source: engine, libraries, user log messages', async ({
   editorPage,
 }) => {
@@ -133,7 +145,7 @@ test('the Sources popover opens from the text filter, which keeps the focus', as
     await page.keyboard.press('ControlOrMeta+L')
     const dock = locate.bottomDock(page)
     const log = dock.getByRole('log')
-    const filter = dock.getByRole('searchbox', { name: 'Filter logs' })
+    const filter = dock.getByRole('combobox', { name: 'Filter logs' })
     const sources = page.getByRole('dialog', { name: 'Sources' })
     await filter.click()
     await expect(sources).toBeVisible()
@@ -416,7 +428,7 @@ test('keys typed into the filter reach it, not the graph’s shortcuts', async (
     const nodeCount = await locate.graphNode(page).count()
     const node = locate.graphNodeByBinding(page, 'aggregated')
     await page.keyboard.press('ControlOrMeta+L')
-    const filter = locate.bottomDock(page).getByRole('searchbox', { name: 'Filter logs' })
+    const filter = locate.bottomDock(page).getByRole('combobox', { name: 'Filter logs' })
     await filter.click()
     // The component stays selected, so each key below would reach a graph action that applies.
     await expect(locate.selectedNodes(page)).toHaveCount(1)

@@ -17,6 +17,8 @@
   --color-dim: rgb(0 0 0 / 0.25);
   --color-frame-bg: rgb(255 255 255 / 0.3);
   --color-frame-selected-bg: rgb(255 255 255 / 0.7);
+  --color-dock-tab-bg: rgb(255 255 255 / 0.5);
+  --color-dock-tab-selected-bg: rgb(255 255 255 / 0.9);
   --color-widget: rgb(255 255 255 / 0.12);
   --color-widget-focus: rgb(255 255 255 / 1);
   --color-widget-selected: rgb(255 255 255 / 0.58);
