@@ -12,7 +12,10 @@ import {
 } from '$/providers/openedProjects/widgetRegistry'
 import { proxyRefs } from '$/utils/reactivity'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
-import { formatTypeForPathUpdate } from '@/components/GraphEditor/widgets/WidgetFunction/formatForPath'
+import {
+  formatTypeForPathUpdate,
+  trackFormatConfig,
+} from '@/components/GraphEditor/widgets/WidgetFunction/formatForPath'
 import {
   getPotentialModuleFunctionPointer,
   useWidgetFunctionCallInfo,
@@ -32,7 +35,7 @@ import { partitionPoint } from '@/util/data/array'
 import { methodPointerEquals, type MethodPointer } from '@/util/methodPointer'
 import { isIdentifier } from '@/util/qualifiedName'
 import { Err, Ok } from 'enso-common/src/utilities/data/result'
-import { computed } from 'vue'
+import { computed, watchEffect } from 'vue'
 import { FunctionName } from './WidgetFunctionName.vue'
 
 const props = defineProps(widgetProps(widgetDefinition))
@@ -54,6 +57,15 @@ const { methodCallInfo, application, subject, subjectInfo } = useWidgetFunctionC
   projectNames,
   () => suggestionDb.value.groups,
 )
+
+// A file dropped on the graph (#489) matches the format options a node here has already loaded.
+// Withdrawn when this call's configuration changes or the node goes away.
+const formatConfigKey = Symbol('formatConfig')
+watchEffect((onCleanup) => {
+  if (application.value instanceof ArgumentApplication) {
+    onCleanup(trackFormatConfig(project.value.id, formatConfigKey, application.value))
+  }
+})
 
 provideFunctionInfo(
   proxyRefs({

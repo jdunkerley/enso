@@ -2805,6 +2805,13 @@
   "fields":[{"name":"root"}]
 },
 {
+  "name":"scala.Symbol",
+  "allDeclaredConstructors":true,
+  "allPublicConstructors":true,
+  "allDeclaredFields":true,
+  "allDeclaredMethods":true
+},
+{
   "name":"sun.management.ClassLoadingImpl",
   "queryAllPublicConstructors":true
 },

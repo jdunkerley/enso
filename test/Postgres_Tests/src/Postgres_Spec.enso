@@ -284,6 +284,26 @@ postgres_specific_spec suite_builder create_connection_fn db_name setup =
             expected_code = code_template.replace "{Tinfo}" data.tinfo
             (t.distinct ["strs"] : DB_Table) . to_sql . prepare . should_equal [expected_code, []]
 
+        ## distinct
+           The `DISTINCT ON` level orders itself, by its key and then by the
+           table's ordering; the subquery has no `ORDER BY`.
+        group_builder.specify "should generate queries for the Distinct operation on an ordered table" <|
+            t = data.connection.query (SQL_Query.Table_Name data.tinfo)
+            code_template = 'SELECT "{Tinfo}"."strs" AS "strs", "{Tinfo}"."ints" AS "ints", "{Tinfo}"."bools" AS "bools", "{Tinfo}"."doubles" AS "doubles" FROM (SELECT DISTINCT ON ("{Tinfo}_inner"."strs") "{Tinfo}_inner"."strs" AS "strs", "{Tinfo}_inner"."ints" AS "ints", "{Tinfo}_inner"."bools" AS "bools", "{Tinfo}_inner"."doubles" AS "doubles" FROM (SELECT "{Tinfo}"."strs" AS "strs", "{Tinfo}"."ints" AS "ints", "{Tinfo}"."bools" AS "bools", "{Tinfo}"."doubles" AS "doubles" FROM "{Tinfo}" AS "{Tinfo}") AS "{Tinfo}_inner" ORDER BY "{Tinfo}_inner"."strs" ASC, "{Tinfo}_inner"."ints" DESC NULLS LAST, "{Tinfo}_inner"."doubles" ASC NULLS FIRST) AS "{Tinfo}"'
+            expected_code = code_template.replace "{Tinfo}" data.tinfo
+            ordered = t.sort [..Name "ints" ..Descending, ..Name "doubles"]
+            (ordered.distinct ["strs"] : DB_Table) . to_sql . prepare . should_equal [expected_code, []]
+
+        ## distinct
+           An ordering by an expression that is not a column is exposed by the
+           subquery as a helper column, which the result does not select.
+        group_builder.specify "should generate queries for the Distinct operation ordered by an expression" <|
+            t = data.connection.query (SQL_Query.Table_Name data.tinfo)
+            code_template = 'SELECT "{Tinfo}"."strs" AS "strs", "{Tinfo}"."ints" AS "ints" FROM (SELECT DISTINCT ON ("{Tinfo}_inner"."ints") "{Tinfo}_inner"."strs" AS "strs", "{Tinfo}_inner"."ints" AS "ints" FROM (SELECT "{Tinfo}"."strs" AS "strs", "{Tinfo}"."ints" AS "ints", LOWER(UPPER("{Tinfo}"."strs")) AS "__enso_distinct_order" FROM "{Tinfo}" AS "{Tinfo}") AS "{Tinfo}_inner" ORDER BY "{Tinfo}_inner"."ints" ASC, "{Tinfo}_inner"."__enso_distinct_order" ASC NULLS FIRST) AS "{Tinfo}"'
+            expected_code = code_template.replace "{Tinfo}" data.tinfo
+            ordered = t.select_columns ["strs", "ints"] . sort [..Name "strs"] text_ordering=..Case_Insensitive
+            (ordered.distinct ["ints"] : DB_Table) . to_sql . prepare . should_equal [expected_code, []]
+
     suite_builder.group "[PostgreSQL] Table.aggregate should correctly infer result types, and the resulting values should be of the correct type" group_builder->
         data = Postgres_Aggregate_Data.setup create_connection_fn
 
