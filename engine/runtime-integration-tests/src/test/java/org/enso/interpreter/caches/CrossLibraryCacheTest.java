@@ -46,6 +46,9 @@ public class CrossLibraryCacheTest {
 
   private Path irCacheRoot;
 
+  /** A second project, if a test made one. */
+  private String otherProject;
+
   private static final String PROJ_MAIN =
       """
       from %s.Alpha import all
@@ -65,7 +68,11 @@ public class CrossLibraryCacheTest {
   public void deleteIrCaches() throws IOException {
     if (irCacheRoot != null) {
       for (var dir :
-          new Path[] {irCacheRoot.resolve(ns), irCacheRoot.resolve("local").resolve(project)}) {
+          new Path[] {
+            irCacheRoot.resolve(ns),
+            irCacheRoot.resolve("local").resolve(project),
+            irCacheRoot.resolve("local").resolve(otherProject == null ? project : otherProject)
+          }) {
         if (Files.isDirectory(dir)) {
           ProjectUtils.deleteRecursively(dir);
         }
@@ -123,7 +130,14 @@ public class CrossLibraryCacheTest {
 
     writeLibrary(root, "Beta", Map.of("Main", "answer = 2\n"));
     var loaded = new HashMap<String, Boolean>();
-    assertEquals(2L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
+    assertEquals(
+        2L,
+        run(
+            root,
+            ctx -> {
+              loaded.putAll(loadedFromCache(ctx));
+              awaitRewrittenBindings("Alpha");
+            }));
     assertFalse("the first run after the edit recompiles Alpha", loaded.get("Alpha.Main"));
 
     // Only a bindings cache can now give Alpha's IR.
@@ -138,6 +152,83 @@ public class CrossLibraryCacheTest {
     loaded.clear();
     assertEquals(3L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
     assertFalse("the rewritten cache is invalidated by another edit", loaded.get("Alpha.Main"));
+  }
+
+  /**
+   * A rewritten bindings cache holds only the modules the run compiled. Alpha has two modules: the
+   * first run after the edit (another project) uses only `Alpha.Main`, so the rewrite holds only
+   * it; the next run, of a project whose cached `Main` also imports `Alpha.Other`, reads
+   * `Alpha.Main` from the rewritten cache and compiles `Alpha.Other`, which the cache does not
+   * have, from source (`DefaultPackageRepository.getLibraryBindings` answers `None` for it, not
+   * `Some(null)`).
+   */
+  @Test
+  public void aModuleMissingFromARewrittenBindingsCacheFallsBack() throws IOException {
+    var root = createTree(Map.of("Main", "answer = 1\n"));
+    writeLibrary(
+        root,
+        "Alpha",
+        Map.of(
+            "Main", ALPHA_MAIN.formatted(ns),
+            "Other", "from %s.Beta import all\n\nother_value = answer\n".formatted(ns)));
+    Files.writeString(
+        root.resolve("Proj").resolve("src").resolve("Main.enso"),
+        """
+        from %s.Alpha import all
+        from %s.Alpha.Other import all
+
+        main = other_value
+        """
+            .formatted(ns, ns));
+    var other = "Other" + randomWord();
+    var otherRoot = Files.createDirectory(root.resolve("Proj2"));
+    ProjectUtils.createProject(other, PROJ_MAIN.formatted(ns), otherRoot);
+    otherProject = other;
+
+    compile(root.resolve("Alpha"));
+    assertEquals(1L, run(root, ctx -> {}));
+
+    writeLibrary(root, "Beta", Map.of("Main", "answer = 2\n"));
+    assertEquals(2L, runProject(otherRoot, ctx -> awaitRewrittenBindings("Alpha")));
+    deleteModuleCaches("Alpha");
+
+    var loaded = new HashMap<String, Boolean>();
+    assertEquals(
+        2L,
+        run(
+            root,
+            ctx -> {
+              loaded.putAll(loadedFromCache(ctx));
+              var o = ctx.findModule(ns + ".Alpha.Other");
+              loaded.put("Alpha.Other", o.isPresent() && o.get().wasLoadedFromCache());
+            }));
+    assertTrue("Alpha.Main comes from the rewritten bindings cache", loaded.get("Alpha.Main"));
+    assertFalse("Alpha.Other, missing from it, is compiled", loaded.get("Alpha.Other"));
+    assertEquals("a second run gives the same result", 2L, run(root, ctx -> {}));
+  }
+
+  /**
+   * Waits, while the context is still open, for the library's bindings cache to be rewritten into
+   * the user cache: closing the context does not wait for the rewrite.
+   */
+  private void awaitRewrittenBindings(String library) {
+    var deadline = System.currentTimeMillis() + 60_000;
+    while (System.currentTimeMillis() < deadline) {
+      try (var files = Files.walk(irCacheRoot.resolve(ns).resolve(library))) {
+        if (files.anyMatch(f -> f.getFileName().toString().equals(library + ".bindings.meta"))) {
+          return;
+        }
+      } catch (IOException | java.io.UncheckedIOException e) {
+        // not there yet
+      }
+      try {
+        Thread.sleep(50);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new AssertionError(e);
+      }
+    }
+    throw new AssertionError(library + "'s bindings cache was not rewritten within 60 s");
   }
 
   /** Deletes the library's per-module IR caches, keeping any bindings cache. */
@@ -381,7 +472,11 @@ public class CrossLibraryCacheTest {
    * @return what `main` returned
    */
   private long run(Path root, Consumer<EnsoContext> inContext) {
-    var projectRoot = root.resolve("Proj");
+    return runProject(root.resolve("Proj"), inContext);
+  }
+
+  /** `enso --run` of the project at {@code projectRoot}. */
+  private long runProject(Path projectRoot, Consumer<EnsoContext> inContext) {
     try (var ctx = builder(projectRoot).build()) {
       var polyCtx = new PolyglotContext(ctx.context());
       var mainMod = polyCtx.evalModule(projectRoot.resolve("src").resolve("Main.enso").toFile());
