@@ -113,15 +113,24 @@ private _new_serializer =
    document), converted by `to_vector`: at most one when `first_only`.
 xpath source expression:Text make_element first_only:Boolean -> Vector =
     node_list = XPathFactory.newInstance.newXPath.evaluate expression source XPathConstants.NODESET
-    _convert_node_list node_list make_element first_only
+    _convert_node_list node_list make_element (if first_only then 1 else Nothing)
 
-## The child elements and the non-blank text nodes of `element`.
-children element make_element -> Vector =
-    _convert_node_list element.getChildNodes make_element False
+## The child elements and the non-blank text nodes of `element`: the first
+   `limit` of them, or all of them when it is `Nothing`.
+children element make_element (limit : Integer | Nothing = Nothing) -> Vector =
+    _convert_node_list element.getChildNodes make_element limit
+
+## How many children `children` would give, without converting any of them.
+child_count element -> Integer =
+    node_list = element.getChildNodes
+    count = node_list.getLength
+    go i acc = if i >= count then acc else
+        @Tail_Call go i+1 (if _is_wanted (node_list.item i) then acc+1 else acc)
+    go 0 0
 
 ## The descendant elements of `element` with the tag `tag_name` (`*` for all).
 elements_by_tag_name element tag_name:Text make_element -> Vector =
-    _convert_node_list (element.getElementsByTagName tag_name) make_element False
+    _convert_node_list (element.getElementsByTagName tag_name) make_element Nothing
 
 ## The value of the attribute `name` of `element`, or `Nothing`.
 attribute element name:Text -> Text | Nothing =
@@ -140,18 +149,25 @@ attributes element -> Dictionary Text Text =
 
 ## Elements and attributes, and text nodes that are not blank; an attribute
    becomes its value, a text node its text and an element `make_element`'s.
-private _convert_node_list node_list make_element first_only:Boolean -> Vector =
+   At most `limit` of them, unless it is `Nothing`.
+private _convert_node_list node_list make_element (limit : Integer | Nothing) -> Vector =
     count = node_list.getLength
     Vector.build builder->
-        go i = if i >= count then Nothing else
+        go i taken = if i >= count || (Nothing != limit && taken >= limit) then Nothing else
             node = node_list.item i
             node_type = node.getNodeType
             appended = if node_type == _ELEMENT_NODE then builder.append (make_element node) . if_not_error True else
                 if node_type == _ATTRIBUTE_NODE then builder.append node.getNodeValue . if_not_error True else
                     if node_type == _TEXT_NODE && (_blank.matcher node.getNodeValue . matches . not) then builder.append node.getTextContent . if_not_error True else
                         False
-            if appended && first_only then Nothing else @Tail_Call go i+1
-        go 0
+            @Tail_Call go i+1 (if appended then taken+1 else taken)
+        go 0 0
+
+## Whether `_convert_node_list` keeps `node`.
+private _is_wanted node -> Boolean =
+    node_type = node.getNodeType
+    if node_type == _ELEMENT_NODE || node_type == _ATTRIBUTE_NODE then True else
+        node_type == _TEXT_NODE && (_blank.matcher node.getNodeValue . matches . not)
 
 ## Text that Java's `String.trim` would empty: only characters up to U+0020.
 private _blank = Pattern.compile "[\x00-\x20]*"

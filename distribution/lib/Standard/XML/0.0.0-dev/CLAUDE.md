@@ -41,7 +41,6 @@ xml = table.to_xml ["Year"] ["Author"] "Title" "Books" "Book"
 - `src/XML_Format.enso` — the file format.
 - `src/Table_Extensions.enso` — `Table.to_xml`.
 - `src/Internal/Dom.enso` — the calls into the JDK's XML APIs.
-- `src/Internal/Telemetry.enso` — this library's copy of the telemetry logger.
 
 ## No Java of its own
 

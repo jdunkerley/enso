@@ -988,19 +988,28 @@ Table_Viz_Data.from (that:XML_Document) =
    ---
    Renders an `XML_Element`'s attributes and children (at most `max_items` of
    them: the row limit the Table visualisation shows) as a key/type/value grid.
+   Only the rows shown are converted: the children past the limit are counted,
+   not built, and a shown child's own children are looked at only to say how
+   many there are.
 private _table_viz_json xml_element:XML_Element type:Text max_items:Integer -> JS_Object =
     header = ["header", ["key", "type", "value"]]
-    all_rows = ["all_rows_count", xml_element.attributes.length + xml_element.children.length]
+    all_attributes = xml_element.attributes
+    all_rows = ["all_rows_count", all_attributes.length + (Dom.child_count xml_element.java_element)]
 
-    attribs = xml_element.attributes.to_vector.take max_items . map a-> ["@" + a.first, "Attribute", a.second]
-    children = xml_element.children.take (max_items - attribs.length) . map_with_index i->c-> if c.is_a Text then [i.to_text, "Text", c] else
+    attribs = all_attributes.to_vector.take max_items . map a-> ["@" + a.first, "Attribute", a.second]
+    shown_children = _xml_errors <| Dom.children xml_element.java_element (e-> XML_Element.new e) (max_items - attribs.length)
+    children = shown_children.map_with_index i->c-> if c.is_a Text then [i.to_text, "Text", c] else
         render_start = "<"+c.name
-        render_attribs = if c.attributes.length == 0 then "" else
-            " " + ((c.attributes.to_vector.take 5 . map a-> a.first+'="'+a.second+'"') . join " ") + (if c.attributes.length > 5 then " ..." else "")
-        render_end = case c.child_count of
+        child_attributes = c.attributes
+        render_attribs = if child_attributes.length == 0 then "" else
+            " " + ((child_attributes.to_vector.take 5 . map a-> a.first+'="'+a.second+'"') . join " ") + (if child_attributes.length > 5 then " ..." else "")
+        grandchild_count = Dom.child_count c.java_element
+        render_end = case grandchild_count of
             0 -> "/>"
-            1 -> if c.children.first.is_a Text then ">" + c.children.first + "</" + c.name + ">" else "> ... 1 child element ... </" + c.name + ">"
-            _ -> ">..." + c.child_count.to_text + " child elements...</" + c.name + ">"
+            1 ->
+                only = Dom.children c.java_element (e-> XML_Element.new e) 1 . first
+                if only.is_a Text then ">" + only + "</" + c.name + ">" else "> ... 1 child element ... </" + c.name + ">"
+            _ -> ">..." + grandchild_count.to_text + " child elements...</" + c.name + ">"
         [i.to_text, "Element", render_start+render_attribs+render_end]
     map_vector = Warning.clear (attribs + children)
 

@@ -3991,9 +3991,7 @@ lazy val `engine-runner` = project
         // registers those JDK classes and marks it AOT-ready, so its calls do not
         // cross to the guest JVM. Such a library must ship no jar, or its Java
         // would end up in the image.
-        val javaFreeLibraries =
-          if (GraalVM.EnsoLauncher.fast) Seq()
-          else Seq(stdLibComponentRoot("XML"))
+        val javaFreeLibraries = javaFreeLibraryRoots
         for (lib <- javaFreeLibraries) {
           val jars = Option((lib / "polyglot" / "java").listFiles())
             .getOrElse(Array[File]())
@@ -4094,8 +4092,12 @@ lazy val `engine-runner` = project
         .incrementalNativeImageBuild(
           rebuildNativeImage,
           "enso",
-          targetDir   = engineDistributionRoot.value / "bin",
-          extraInputs = Def.task((Runtime / modulePath).value)
+          targetDir = engineDistributionRoot.value / "bin",
+          // The Java-free libraries' sources too: `EnsoLibraryFeature` reads their
+          // `polyglot java import`s (Note [Java-Free Libraries In The Image]).
+          extraInputs = Def.task(
+            (Runtime / modulePath).value ++ javaFreeLibraryRoots.map(_ / "src")
+          )
         )
     }.value,
     checkNativeImageSize := Def
@@ -5029,6 +5031,13 @@ lazy val `locking-test-helper` = project
   )
 
 val `std-lib-root` = file("distribution/lib/Standard/")
+
+/** The Java-free libraries hosted in the native image (Note [Java-Free Libraries
+  * In The Image] in `engine-runner`'s `rebuildNativeImage`). None when the image
+  * leaves out every library but Base (`ENSO_LAUNCHER=fast`).
+  */
+def javaFreeLibraryRoots: Seq[File] =
+  if (GraalVM.EnsoLauncher.fast) Seq() else Seq(stdLibComponentRoot("XML"))
 
 def stdLibComponentRoot(name: String): File =
   `std-lib-root` / name / stdLibVersion
