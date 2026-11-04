@@ -1,12 +1,12 @@
 [package]
 name = "enso-parser-generate-java"
 version = "0.1.0"
-authors = ["Enso Team <enso-dev@enso.org>"]
+authors = ["jdunkerley"]
 edition = "2024"
 description = "Generates Java bindings and deserialization for Enso Parser AST types."
 readme = "README.md"
-homepage = "https://github.com/enso-org/enso"
-repository = "https://github.com/enso-org/enso"
+homepage = "https://github.com/jdunkerley/enso"
+repository = "https://github.com/jdunkerley/enso"
 license-file = "../../LICENSE"
 
 [dependencies]

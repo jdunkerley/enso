@@ -16,8 +16,9 @@ import scala.jdk.CollectionConverters.IteratorHasAsScala
   * difference between `TruffleFile` and `File` or a codec change cannot turn
   * the catalogues off unnoticed (Note [Library Catalogue] in
   * `TruffleCompilerContext`). It also checks that the shipped bindings and
-  * suggestions caches record their libraries' source hashes, so that they are
-  * used rather than rebuilt by every user.
+  * suggestions caches record their libraries' source hashes, and that the
+  * bindings caches record the shipped hashes of the libraries they depend on,
+  * so that they are used rather than rebuilt by every user.
   *
   * It needs the distribution's `lib` directory as the `lib` config entry, and
   * is cancelled without it, as in `sbt test`. CI's engine distribution build
@@ -129,6 +130,69 @@ class ShippedCataloguesSpec
         problems shouldEqual Seq()
         // Base, at least, ships both.
         metas.count(_._1 == "Standard.Base") shouldEqual 2
+    }
+
+    "ship bindings caches whose dependency hashes match the shipped libraries" in {
+      (configMap: ConfigMap) =>
+        // Note [A Cache Records The Libraries It Refers To] in
+        // `LibraryDependencies`: a shipped bindings cache records the source
+        // hash of every other library its IR names. If one is not that
+        // library's shipped sources' hash (a build step touched `src/*.enso`
+        // after `indexStdLibs`), every user rebuilds the cache.
+        val lib = configMap.getOptional[String]("lib") match {
+          case Some(path) => new File(path)
+          case None =>
+            cancel("No `lib` given: run with `-- -Dlib=<distribution>/lib`.")
+        }
+        val found  = libraries(lib).toMap
+        val hashes = collection.mutable.Map[String, String]()
+        def hashOf(library: String): Option[String] =
+          found.get(library).map { root =>
+            hashes.getOrElseUpdate(
+              library,
+              PackageManager.Default.loadPackage(root).get.sourceHash()
+            )
+          }
+        val metas = found.toSeq.flatMap { case (library, root) =>
+          val cache = root.toPath.resolve(".enso").resolve("cache")
+          if (Files.isDirectory(cache))
+            scala.util.Using.resource(Files.walk(cache)) { walk =>
+              walk
+                .iterator()
+                .asScala
+                .filter(_.getFileName.toString.endsWith(".bindings.meta"))
+                .map(f => (library, f))
+                .toVector
+            }
+          else Vector()
+        }
+        var recorded = 0
+        val problems = metas.flatMap { case (library, meta) =>
+          val dependencies = scala.util.Using.resource(
+            new DataInputStream(Files.newInputStream(meta))
+          ) { in =>
+            in.readUTF() // source hash
+            in.readUTF() // blob hash
+            (0 until in.readInt()).map { _ =>
+              (s"${in.readUTF()}.${in.readUTF()}", in.readUTF())
+            }
+          }
+          recorded += dependencies.size
+          dependencies.flatMap { case (dependency, hash) =>
+            hashOf(dependency) match {
+              case None =>
+                Some(s"$library: depends on $dependency, which is not shipped")
+              case Some(expected) if expected != hash =>
+                Some(
+                  s"$library: records $dependency as $hash, its sources are $expected"
+                )
+              case _ => None
+            }
+          }
+        }
+        problems shouldEqual Seq()
+        // Table, at least, refers to Base.
+        recorded should be > 0
     }
   }
 }

@@ -1,12 +1,12 @@
 [package]
 name = "enso-prelude"
 version = "0.2.7"
-authors = ["Enso Team <enso-dev@enso.org>"]
+authors = ["jdunkerley"]
 edition = "2024"
 description = "An augmented standard library in the vein of Haskell's prelude."
 readme = "README.md"
-homepage = "https://github.com/enso-org/enso"
-repository = "https://github.com/enso-org/enso"
+homepage = "https://github.com/jdunkerley/enso"
+repository = "https://github.com/jdunkerley/enso"
 license-file = "../../LICENSE"
 keywords = ["prelude", "standard-library"]
 categories = ["algorithms"]

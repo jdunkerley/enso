@@ -47,9 +47,11 @@ public class ModuleCacheTest {
     var cm = new ModuleCache.CachedModule(ir, CompilationStage.AFTER_CODEGEN, module.getSource());
 
     var mc = module.getCache().asSpi(ModuleCache.class);
-    byte[] arr = mc.serialize(ensoCtx, cm);
+    byte[] arr = mc.serialize(ensoCtx, cm, new java.util.HashSet<>());
 
-    var meta = new ModuleCache.Metadata("hash", "code", CompilationStage.AFTER_CODEGEN.toString());
+    var meta =
+        new ModuleCache.Metadata(
+            "hash", "code", CompilationStage.AFTER_CODEGEN.toString(), LibraryDependencies.NONE);
     var cachedIr = mc.deserialize(ensoCtx, ByteBuffer.wrap(arr), meta, null);
     assertNotNull("IR read", cachedIr);
     CompilerTests.assertIR(name, ir, cachedIr.moduleIR());
@@ -78,9 +80,11 @@ public class ModuleCacheTest {
     var ir = module.getIr().duplicate(true, true, true, true);
     var cm = new ModuleCache.CachedModule(ir, CompilationStage.AFTER_CODEGEN, module.getSource());
     var mc = module.getCache().asSpi(ModuleCache.class);
-    byte[] arr = mc.serialize(ensoCtx, cm);
+    byte[] arr = mc.serialize(ensoCtx, cm, new java.util.HashSet<>());
 
-    var meta = new ModuleCache.Metadata("hash", "code", CompilationStage.AFTER_CODEGEN.toString());
+    var meta =
+        new ModuleCache.Metadata(
+            "hash", "code", CompilationStage.AFTER_CODEGEN.toString(), LibraryDependencies.NONE);
     var cachedIr = mc.deserialize(ensoCtx, ByteBuffer.wrap(arr), meta, null);
     assertNotNull("IR read", cachedIr);
     CompilerTests.assertIR(name, ir, cachedIr.moduleIR());

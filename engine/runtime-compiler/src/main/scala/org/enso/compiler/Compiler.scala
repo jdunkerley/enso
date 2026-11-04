@@ -261,8 +261,21 @@ class Compiler(
         go(pending, compiledModules ++ newCompiled)
       }
 
-    go(modules, List())
+    val result = go(modules, List())
+    if (generateCode && irCachingEnabled) {
+      // Note [A Rejected Bindings Cache Is Rewritten] in TruffleCompilerContext.
+      context.rewriteRejectedLibraryBindings(
+        this,
+        m =>
+          context.wasLoadedFromCache(m) || cacheableModules.contains(m.getName)
+      )
+    }
+    result
   }
+
+  /** Modules this compiler compiled and handed to per-module serialisation. */
+  private val cacheableModules: java.util.Set[QualifiedName] =
+    java.util.concurrent.ConcurrentHashMap.newKeySet[QualifiedName]()
 
   private def runCompilerPipeline(
     modules: List[Module],
@@ -330,7 +343,10 @@ class Compiler(
      * `indexStdLibs` compiles. Otherwise IR cached by another checkout of the
      * same library (every `0.0.0-dev` checkout shares the per-user IR caches)
      * resolved `answer` to a module that no longer has it (#473,
-     * `LibraryCacheDigestTest`).
+     * `LibraryCacheDigestTest`). A module in another library is not covered
+     * here: the cache records that library's source hash and misses when it
+     * changed (Note [A Cache Records The Libraries It Refers To] in
+     * `LibraryDependencies`).
      */
     val requiredModules = modules.flatMap { module =>
       val isLoadedFromSource =
@@ -545,6 +561,7 @@ class Compiler(
               shouldStoreCache && !hasErrors(module) &&
               !context.isInteractive(module) && !module.isSynthetic()
             ) {
+              cacheableModules.add(module.getName)
               if (isInteractiveMode) {
                 context.notifySerializeModule(module.getName())
               } else {

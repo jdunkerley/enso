@@ -15,7 +15,7 @@
                 <version>14.1</version>
                 <configuration>
                     <useOSGiDependencies>false</useOSGiDependencies>
-                    <author>Enso.org</author>
+                    <author>jdunkerley</author>
                     <licenseName>Apache 2.0</licenseName>
                     <licenseFile>../../LICENSE</licenseFile>
                     <nbmResources>

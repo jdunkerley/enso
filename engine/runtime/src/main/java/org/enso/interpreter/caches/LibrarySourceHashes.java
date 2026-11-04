@@ -71,8 +71,9 @@ public final class LibrarySourceHashes {
    * `serializeLibrary` forgets the hash first, so that `enso --compile`
    * records the sources it compiled.
    *
-   * Not covered: a cache records its own library's sources, not those of the
-   * libraries it depends on.
+   * The IR caches also record the hashes of the other libraries their IR
+   * refers to: Note [A Cache Records The Libraries It Refers To] in
+   * `LibraryDependencies`.
    *
    * The standard libraries ship their bindings and suggestions caches, written
    * by `indexStdLibs` from the files that ship; `ShippedCataloguesSpec` checks

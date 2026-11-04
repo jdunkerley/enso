@@ -35,7 +35,10 @@ polyglot java import org.enso.base.enso_cloud.CloudRequestCache
 ## ---
    private: true
    ---
-cloud_root_uri = "" + CloudAPI.getInstance.getAPIRootURI
+cloud_root_uri =
+    api = CloudAPI.getInstance
+    if api.isConfigured then "" + api.getAPIRootURI else
+        Error.throw Enso_Cloud_Error.Not_Configured
 
 ## ---
    private: true

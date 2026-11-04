@@ -327,6 +327,7 @@ export class Filtering {
    */
   filter(entry: SuggestionEntry, db: SuggestionDb): MatchResult | null {
     if (entry.isPrivate || entry.kind != SuggestionKind.Method) return null
+    if (isIdeOnly(entry)) return null
     if (this.selfArg == null && isInternal(entry)) return null
     let result = this.selfTypeMatches(entry, db)
     if (result == null) return null
@@ -358,6 +359,18 @@ export class Filtering {
 
     return result
   }
+}
+
+/**
+ * Libraries that exist only for the IDE: they prepare visualization data and are never components
+ * a user picks. Their modules are public, since the IDE calls them by name. They also add methods
+ * to other types (`default_visualization`), so these are hidden even when a self type is known.
+ */
+const IDE_ONLY_LIBRARIES = new Set(['Standard.Visualization'])
+
+function isIdeOnly(entry: SuggestionEntry): boolean {
+  const project = entry.definedIn.project
+  return project != null && IDE_ONLY_LIBRARIES.has(project)
 }
 
 function isInternal(entry: SuggestionEntry): boolean {

@@ -73,6 +73,12 @@ type Enso_Cloud_Error
     ## ---
        private: true
        ---
+       Enso Cloud is not configured: there is no Cloud API URL.
+    Not_Configured
+
+    ## ---
+       private: true
+       ---
     to_display_text : Text
     to_display_text self = case self of
         Enso_Cloud_Error.Unexpected_Service_Error method uri status_code payload ->
@@ -83,6 +89,8 @@ type Enso_Cloud_Error
             "Enso Cloud credentials file was found, but the service responded with Unauthorized. You may try logging in again and restarting the workflow."
         Enso_Cloud_Error.Connection_Error cause ->
             "Error connecting to Enso Cloud: " + cause.to_display_text
+        Enso_Cloud_Error.Not_Configured ->
+            "Enso Cloud is not configured: the ENSO_CLOUD_API_URL environment variable is not set."
 
 ## ---
    private: true

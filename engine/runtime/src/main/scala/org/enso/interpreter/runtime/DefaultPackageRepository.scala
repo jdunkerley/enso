@@ -689,7 +689,10 @@ private class DefaultPackageRepository(
         .asInstanceOf[TruffleCompilerContext]
         .libraryBindings(libraryName)
     }
-    cache.map(_.bindings.findForModule(moduleName))
+    // A module missing from the cache is `None`, so that it is parsed: a cache rewritten by a run
+    // holds only the modules it compiled (Note [A Rejected Bindings Cache Is Rewritten] in
+    // TruffleCompilerContext).
+    cache.flatMap(c => Option(c.bindings.findForModule(moduleName)))
   }
 
   private def loadDependencies(pkg: Package[TruffleFile]): Unit = {

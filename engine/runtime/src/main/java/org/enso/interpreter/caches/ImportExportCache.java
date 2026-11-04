@@ -9,7 +9,10 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.logging.Level;
 import org.enso.compiler.data.BindingsMap;
 import org.enso.compiler.data.BindingsMap.DefinedEntity;
@@ -18,6 +21,7 @@ import org.enso.editions.LibraryName;
 import org.enso.interpreter.runtime.EnsoContext;
 import org.enso.persist.Persistable;
 import org.enso.persist.Persistance;
+import org.enso.pkg.Package;
 import org.enso.pkg.QualifiedName;
 import org.enso.version.BuildVersion;
 
@@ -29,14 +33,39 @@ public final class ImportExportCache
     implements Cache.Spi<ImportExportCache.CachedBindings, ImportExportCache.Metadata> {
 
   private final LibraryName libraryName;
+  private final boolean userCacheOnly;
 
-  private ImportExportCache(LibraryName libraryName) {
+  /** Stops a write once it is no longer wanted; {@code null} for a write that must finish. */
+  private final BooleanSupplier abandoned;
+
+  private ImportExportCache(
+      LibraryName libraryName, boolean userCacheOnly, BooleanSupplier abandoned) {
     this.libraryName = libraryName;
+    this.userCacheOnly = userCacheOnly;
+    this.abandoned = abandoned;
   }
 
+  /**
+   * The library's bindings cache: read from the library's own (shipped) location, then from the
+   * user cache; written to the library's location, or to the user cache if that is not writable.
+   * See Note [A Rejected Bindings Cache Is Rewritten] in {@code TruffleCompilerContext}.
+   */
   public static Cache<ImportExportCache.CachedBindings, ImportExportCache.Metadata> create(
       LibraryName libraryName) {
-    var impl = new ImportExportCache(libraryName);
+    var impl = new ImportExportCache(libraryName, false, null);
+    return Cache.create(impl, Level.FINEST, libraryName.toString(), true, false);
+  }
+
+  /**
+   * The library's bindings cache in the user cache only, for the rewrite of a rejected cache. See
+   * Note [A Rejected Bindings Cache Is Rewritten] in {@code TruffleCompilerContext}.
+   *
+   * @param abandoned once {@code true}, a write in progress stops with an unchecked exception and
+   *     leaves the cache as it was
+   */
+  public static Cache<ImportExportCache.CachedBindings, ImportExportCache.Metadata>
+      createInUserCache(LibraryName libraryName, BooleanSupplier abandoned) {
+    var impl = new ImportExportCache(libraryName, true, abandoned);
     return Cache.create(impl, Level.FINEST, libraryName.toString(), true, false);
   }
 
@@ -56,16 +85,35 @@ public final class ImportExportCache
   }
 
   @Override
-  public byte[] metadata(String sourceDigest, String blobDigest, CachedBindings entry)
+  public byte[] metadata(
+      EnsoContext context,
+      String sourceDigest,
+      String blobDigest,
+      CachedBindings entry,
+      Set<QualifiedName> referencedModules,
+      TruffleLogger logger)
       throws IOException {
-    return new Metadata(sourceDigest, blobDigest).toBytes();
+    var dependencies =
+        LibraryDependencies.of(context, referencedModules, libraryName, logger)
+            .orElseThrow(
+                () -> new IOException("unable to hash the libraries " + libraryName + " uses"));
+    return new Metadata(sourceDigest, blobDigest, dependencies).toBytes();
   }
 
   @Override
-  public byte[] serialize(EnsoContext context, CachedBindings entry) throws IOException {
-    var pool = CacheUtils.createPool(context.getCompiler().context(), true);
+  public byte[] serialize(
+      EnsoContext context, CachedBindings entry, Set<QualifiedName> referencedModules)
+      throws IOException {
+    var pool =
+        CacheUtils.createPool(context.getCompiler().context(), true, referencedModules, abandoned);
     var arr = pool.write(entry.bindings());
     return arr;
+  }
+
+  /** See Note [A Cache Records The Libraries It Refers To] in {@link LibraryDependencies}. */
+  @Override
+  public boolean dependenciesAreCurrent(EnsoContext context, Metadata meta, TruffleLogger logger) {
+    return meta.dependencies().areCurrent(context, libraryName.toString(), logger);
   }
 
   @Override
@@ -101,12 +149,59 @@ public final class ImportExportCache
     var pkg = context.getPackageRepository().getPackageForLibraryJava(libraryName);
 
     if (pkg.isPresent()) {
+      var userRoot = userCacheRoot(context, pkg.get());
+      if (userCacheOnly) {
+        return List.of(userRoot);
+      }
       TruffleFile bindingsCacheRoot =
           pkg.get().getBindingsCacheRootForPackage(BuildVersion.ensoVersion());
-      var perUserRoot = bindingsCacheRoot.resolve(libraryName.namespace());
-      return Collections.singletonList(perUserRoot);
+      var libraryRoot = bindingsCacheRoot.resolve(libraryName.namespace());
+      // The library's own location first: `enso --compile` writes the whole library there, while
+      // a rewrite in the user cache holds only the modules a run compiled.
+      return List.of(libraryRoot, userRoot);
     }
     return Collections.emptyList();
+  }
+
+  /**
+   * Whether the library's own bindings-cache directory exists: `enso --compile` wrote a cache there
+   * once, even if it has since been rejected and deleted. See Note [A Rejected Bindings Cache Is
+   * Rewritten] in {@code TruffleCompilerContext}.
+   *
+   * @param context the language context
+   * @param libraryName the library
+   * @return {@code true} if the directory exists
+   */
+  public static boolean wasCompiled(EnsoContext context, LibraryName libraryName) {
+    var pkg = context.getPackageRepository().getPackageForLibraryJava(libraryName);
+    if (pkg.isEmpty()) {
+      return false;
+    }
+    try {
+      return pkg.get()
+          .getBindingsCacheRootForPackage(BuildVersion.ensoVersion())
+          .resolve(libraryName.namespace())
+          .isDirectory();
+    } catch (SecurityException e) {
+      return false;
+    }
+  }
+
+  /**
+   * The user-cache location of the library's bindings cache: next to its per-module IR caches
+   * (`ModuleCache`), which sit one level deeper, under the module's namespace.
+   */
+  private static TruffleFile userCacheRoot(EnsoContext context, Package<TruffleFile> pkg) {
+    var path =
+        context
+            .getDistributionManager()
+            .LocallyInstalledDirectories()
+            .irCacheDirectory()
+            .resolve(pkg.namespace())
+            .resolve(pkg.normalizedName())
+            .resolve(pkg.getConfig().version())
+            .resolve(BuildVersion.ensoVersion());
+    return context.getTruffleFile(path.toFile());
   }
 
   @Override
@@ -152,12 +247,14 @@ public final class ImportExportCache
 
   public static record CachedBindings(LibraryName libraryName, MapToBindings bindings) {}
 
-  public record Metadata(String sourceHash, String blobHash) {
+  /** The source hash comes first: {@code ShippedCataloguesSpec} reads it. */
+  public record Metadata(String sourceHash, String blobHash, LibraryDependencies dependencies) {
     byte[] toBytes() throws IOException {
       try (var os = new ByteArrayOutputStream();
           var dos = new DataOutputStream(os)) {
         dos.writeUTF(sourceHash());
         dos.writeUTF(blobHash());
+        dependencies().write(dos);
         return os.toByteArray();
       }
     }
@@ -165,7 +262,7 @@ public final class ImportExportCache
     static Metadata read(byte[] arr) throws IOException {
       try (var is = new ByteArrayInputStream(arr);
           var dis = new DataInputStream(is)) {
-        return new Metadata(dis.readUTF(), dis.readUTF());
+        return new Metadata(dis.readUTF(), dis.readUTF(), LibraryDependencies.read(dis));
       }
     }
   }
