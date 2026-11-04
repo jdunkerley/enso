@@ -34,12 +34,18 @@ settings. Every workflow is hand-written YAML (build simplification;
   `promote.yml` (by hand, or from `nightly.yml`'s daily cron) computes the
   version and calls `release.yml`, which drafts the release, builds and uploads
   the installers and publishes it with `tools/build-scripts`' `release` command
-  (Note [Where The Release Logic Lives] in `release.yml`). Change them only
-  together with an rc release test. `engine-checks-nightly.yml` (by hand) adds
-  macOS and Oracle GraalVM to the engine checks, `extra-nightly-tests.yml` (by
-  hand) the suites that need the Snowflake and Enso Cloud secrets, and
-  `macos-checks.yml` the self-hosted Mac's checks for `macos-pull-request.yml`;
-  all three call `engine-checks-platform.yml`.
+  (Note [Where The Release Logic Lives] in `release.yml`). A release needs the
+  macOS `.dmg` (#258): `release.yml` waits 12 minutes for the self-hosted Mac
+  (`enso-mac`) and fails when it is offline, before a draft exists; the macOS
+  jobs have no `continue-on-error`; and `publish-release` needs their success
+  (`release publish` also refuses a draft with no installer for a platform). The
+  checks (`engine-checks-nightly.yml`, `macos-pull-request.yml`) may still skip
+  the Mac; `check-workflows.mjs` encodes both. Change them only together with an
+  rc release test. `engine-checks-nightly.yml` (by hand) adds macOS and Oracle
+  GraalVM to the engine checks, `extra-nightly-tests.yml` (by hand) the suites
+  that need the Snowflake and Enso Cloud secrets, and `macos-checks.yml` the
+  self-hosted Mac's checks for `macos-pull-request.yml`; all three call
+  `engine-checks-platform.yml`.
 - `workflows/engine-benchmark.yml`, `std-libs-benchmark.yml` — benchmarks,
   started by hand. Their artifacts are the only output: the upstream
   `bench-upload.yml` was removed (#307), as the fork has no results repository.
@@ -137,10 +143,19 @@ settings. Every workflow is hand-written YAML (build simplification;
   name its shell, and on Windows `tar` behaves differently under Git Bash.
 - **`ENSO_CI_CLEAN_BUILD`**, set at the top of a workflow, decides whether
   `git-clean` cleans: the `CI: Clean build required` label, a run on `develop`,
-  or the `clean_build_required` input.
-- **Actions are pinned by major tag** (`@v5`), as everywhere here; a new
-  third-party action or image must be at least two weeks old. The actionlint
-  image is pinned to an exact version.
+  or the `clean_build_required` input. A workflow that uses `git-clean` defines
+  it as a string (top level or job), the cleanup after the work runs
+  `if: always()`, and every local action comes after `actions/checkout`;
+  `check-workflows.mjs` fails one that does not.
+- **A job's `runs-on` (and a caller's `with.os`) that reads `matrix.<key>` must
+  find the key in the job's own `strategy.matrix`**, so the macOS rules can see
+  which legs are macOS. `paths:` and `paths-ignore:` are matched as real globs
+  against a spec file (`'**'` does not leave the specs out).
+- **Actions are pinned by major tag** (`@v5`), as everywhere here (the one
+  exception, `ataylorme/eslint-annotate-action`, is pinned to a full commit SHA
+  with its version in a trailing comment); a new third-party action or image
+  must be at least two weeks old. The actionlint image is pinned to an exact
+  version.
 - **A job that runs `sbt` itself uses `setup-jvm` first.** Jobs that resolve the
   same build share a `cache-key` (`engine` for the engine build, JVM tests, lint
   and the IDE's backend), so that one ~830 MB entry per OS serves them all: the

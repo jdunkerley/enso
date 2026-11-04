@@ -13,7 +13,7 @@ from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Text_Input
 
 import project.Internal.Java_Problems
-import project.Internal.Telemetry
+import Standard.Base.Internal.Telemetry
 import project.Internal.Widget_Helpers
 import project.Table.Table
 import project.In_Memory_Table.In_Memory_Table

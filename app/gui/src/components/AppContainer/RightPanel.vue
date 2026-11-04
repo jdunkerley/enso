@@ -129,7 +129,7 @@ registerHandlers({
     </SizeTransition>
     <div class="rightBar">
       <div class="shadow" />
-      <div class="tabs">
+      <div class="tabs" role="tablist" aria-orientation="vertical">
         <SelectableTab
           v-for="[id, tabInfo] in visibleTabs"
           :key="id"

@@ -58,9 +58,6 @@ it downloadable is tracked in
 - `enso_project` in the suite names the project that runs it, not the suite: the
   suite's own files are reached through `Database_Test_Suite.data_directory`
   (`Project_Description.new Standard.Database_Test_Suite.Main`).
-- A lambda whose whole body is an ascription (`x-> (x:Numeric_Column)`) cannot
-  be written to the IR cache (`No persistance for … Type$Ascription`), so
-  library indexing fails; bind it first (`refined = (x:T)`, then `refined`).
 - The suite imports no test project (`enso_dev.*`) and writes no file into
   itself: it uses `File.create_temporary_file`.
 
@@ -78,10 +75,10 @@ descriptor; `test/DuckDB_Tests/src/DuckDB_Spec.enso` is the smallest one.
 
    ```enso
    import Standard.Database_Test_Suite
-   from Standard.Database_Test_Suite import Backend, Known_Issue, Suite_Part
+   from Standard.Database_Test_Suite import Backend, Suite_Part
 
    duckdb_backend =
-       Backend.Value "DuckDB In-Memory" (_ -> Database.connect DuckDB.In_Memory) temporary_tables=False known_failures=[Known_Issue.Filter_After_Distinct] parts=[Suite_Part.Common, Suite_Part.Table_Operations]
+       Backend.Value "DuckDB In-Memory" (_ -> Database.connect DuckDB.In_Memory) temporary_tables=False parts=[Suite_Part.Common, Suite_Part.Table_Operations]
 
    add_specs suite_builder =
        Database_Test_Suite.add_specs suite_builder duckdb_backend

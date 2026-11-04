@@ -30,17 +30,27 @@ interface ConsentRecord {
 
 const EMPTY_RECORD: ConsentRecord = { enabledRepositories: [], disabledRepositories: [] }
 
-const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every((entry) => typeof entry === 'string')
+/** The string entries of `value` (a bad entry is dropped, not the whole list), or `undefined` if it is no array. */
+const stringEntries = (value: unknown): string[] | undefined =>
+  Array.isArray(value) ?
+    value.filter((entry): entry is string => typeof entry === 'string')
+  : undefined
 
+/**
+ * A malformed entry costs only itself: one bad item must not reset the consent of every other
+ * repository, which would prompt for each again. Only a file whose lists are not lists is rejected.
+ */
 function parseConsentRecord(json: unknown): ConsentRecord | undefined {
   if (!isRecord(json)) return undefined
   const { enabledRepositories, disabledRepositories } = json
-  if (!isStringArray(enabledRepositories)) return undefined
+  const enabled = stringEntries(enabledRepositories)
+  if (enabled === undefined) return undefined
   // Written before opt-outs were recorded: none.
-  if (disabledRepositories === undefined) return { enabledRepositories, disabledRepositories: [] }
-  if (!isStringArray(disabledRepositories)) return undefined
-  return { enabledRepositories, disabledRepositories }
+  if (disabledRepositories === undefined)
+    return { enabledRepositories: enabled, disabledRepositories: [] }
+  const disabled = stringEntries(disabledRepositories)
+  if (disabled === undefined) return undefined
+  return { enabledRepositories: enabled, disabledRepositories: disabled }
 }
 
 /**

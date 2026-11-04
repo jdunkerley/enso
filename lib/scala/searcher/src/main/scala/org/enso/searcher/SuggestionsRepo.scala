@@ -81,7 +81,10 @@ trait SuggestionsRepo[F[_]] {
     */
   def removeAll(ids: Seq[Long]): F[(Long, Seq[Long])]
 
-  /** Cleans the repo resetting the version. */
+  /** Cleans the repo, moving the version on: every update made before the
+    * clean is older than the empty repo (Note [The Snapshot Follows The
+    * Clear] in the language server's `SuggestionsHandler`).
+    */
   def clean: F[Unit]
 }
 

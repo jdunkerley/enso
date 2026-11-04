@@ -86,6 +86,11 @@ export interface OpenTimeReport {
   readonly template: Template
   /** Present when the report has JVM runs. */
   readonly jvmAot?: JvmAot
+  /**
+   * The harness's own project (`--template`, `projectTemplates.ts`) when it was not the new-project
+   * template; the headline is then that project's library table, not the welcome table.
+   */
+  readonly project?: string
   readonly runs: readonly RunResult[]
 }
 
@@ -302,7 +307,7 @@ export function renderMarkdown(report: OpenTimeReport, baseline: Baseline): stri
     )
     .join('; ')
   return [
-    `Medians, ${report.platform}, ${report.template} template${report.commit ? ` at \`${report.commit.slice(0, 10)}\`` : ''} (${counts})${report.jvmAot ? `; JVM AOT cache: ${report.jvmAot}` : ''}.`,
+    `Medians, ${report.platform}, ${report.template} template${report.commit ? ` at \`${report.commit.slice(0, 10)}\`` : ''} (${counts})${report.jvmAot ? `; JVM AOT cache: ${report.jvmAot}` : ''}${report.project ? `; project \`${report.project}\`: the headline is its library's table` : ''}.`,
     '',
     `| ${header.join(' | ')} |`,
     `| ${header.map((_, i) => (i === 0 ? '---' : '---:')).join(' | ')} |`,

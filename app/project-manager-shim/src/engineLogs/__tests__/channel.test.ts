@@ -97,6 +97,50 @@ describe('EngineLogChannel', () => {
     )
   })
 
+  test('once the session file is found, hello names it and stderr lines carry its id', async () => {
+    const log = collect()
+    channel.engineStarted()
+    await vi.waitFor(() => expect(log.types()).toEqual(['waiting']))
+    const before = channel.subscribe(NOOP)
+    before.unsubscribe()
+    expect(before.hello.sessionId).toBeNull()
+    expect(before.hello.logFile).toBeNull()
+
+    await writeLog(FIRST, 'started\n')
+    await vi.waitFor(() => expect(log.types()).toContain('session'))
+    const sessionId = encodeSessionId(KEY, FIRST)
+    const after = channel.subscribe(NOOP)
+    after.unsubscribe()
+    expect(after.hello.sessionId).toBe(sessionId)
+    expect(after.hello.logFile).toBe(path.join(logDirectory, `${FIRST}.log`))
+
+    channel.engineStderr(Buffer.from('late stderr\n'))
+    expect(log.events.at(-1)).toMatchObject({
+      type: 'line',
+      source: 'stderr',
+      sessionId,
+      text: 'late stderr',
+    })
+  })
+
+  test('unsubscribe stops delivery to that subscriber only', () => {
+    const first: string[] = []
+    const second: string[] = []
+    const one = channel.subscribe({
+      event: (event) => event.type === 'line' && first.push(event.text),
+      end: () => {},
+    })
+    channel.subscribe({
+      event: (event) => event.type === 'line' && second.push(event.text),
+      end: () => {},
+    })
+    channel.engineStderr(Buffer.from('a\n'))
+    one.unsubscribe()
+    channel.engineStderr(Buffer.from('b\n'))
+    expect(first).toEqual(['a'])
+    expect(second).toEqual(['a', 'b'])
+  })
+
   test("a respawn switches to the new session's file", async () => {
     const log = collect()
     channel.engineStarted()

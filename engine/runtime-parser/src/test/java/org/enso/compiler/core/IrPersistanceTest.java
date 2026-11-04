@@ -15,6 +15,7 @@ import org.enso.compiler.core.ir.Location;
 import org.enso.compiler.core.ir.MetadataStorage;
 import org.enso.compiler.core.ir.Module;
 import org.enso.compiler.core.ir.Name;
+import org.enso.compiler.core.ir.Type;
 import org.enso.persist.Persistable;
 import org.enso.persist.Persistance;
 import org.junit.Before;
@@ -447,6 +448,29 @@ public class IrPersistanceTest {
     var out = serde(AscriptionReason.class, in, -1);
     assertNotSame(in, out);
     assertEquals(in, out);
+  }
+
+  /**
+   * A block whose last line is an ascription keeps its {@code Type.Ascription} through the compiler
+   * passes (it becomes a type check), so the IR cache has to be able to store it (#495).
+   */
+  @Test
+  public void typeAscription() throws Exception {
+    var typed = Name.Literal.builder().name("x").isMethod(false).build();
+    var signature = Name.Literal.builder().name("Integer").isMethod(false).build();
+    var loc = new IdentifiedLocation(new Location(3, 14), null);
+    var in =
+        Type.Ascription.builder()
+            .typed(typed)
+            .signature(signature)
+            .reason(AscriptionReason.forFunctionResult("fn"))
+            .location(loc)
+            .build();
+
+    var out = serde(Type.Ascription.class, in, -1);
+    assertEquals("They are structurally equal", in, out);
+    assertNotSame("But not ==", in, out);
+    assertEquals("Reason is kept", in.reason(), out.reason());
   }
 
   private static <T> T serde(Class<T> clazz, T l, int expectedSize) throws IOException {

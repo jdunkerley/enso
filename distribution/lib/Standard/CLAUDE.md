@@ -75,6 +75,11 @@ Generated code uses only the public API:
 - Any module whose first non-blank source line is `private` is a private module
   — do not import.
 - `@Builtin_Method` marks internal builtins; call the public wrapper.
+- A helper that several standard libraries share lives in `Standard.Base` under
+  `src/Internal/` as a module that is **not** `private` (so other libraries can
+  import it) whose entities carry `private: true` (so the component browser and
+  the catalogue skip them), e.g. `Standard.Base.Internal.Telemetry`. Libraries
+  other than the standard ones must not import it.
 
 ### Library layout
 
@@ -149,6 +154,12 @@ services:
 `Meta.lookup_services` finds the providers of every installed library, imported
 or not (a library is loaded when its provider is first resolved), so a new
 backend or format shows in the dropdowns without an import.
+
+A format dropdown builds its options with `File_Format.dropdown_options`, which
+gives each registered format's options `requires` (the format type's qualified
+name) and `patterns` (its `get_name_patterns`). The IDE adds the format's
+library import from them when the user picks the format, or picks a file the
+format reads (#489). `Choice.Option` emits both in its JSON only when set.
 
 ## Public types
 

@@ -107,8 +107,6 @@ Table.from_objects value (fields : Vector | Nothing = Nothing) =
    If there are no marked groups, there will be a single column with the whole
    content of the match. Otherwise, each group becomes a column (with the column
    name taken from the group name if the group is named in the regex).
-   For details on Enso's Regex syntax, see the [Help
-   Documentation](https://help.enso.org/docs/using-enso/regular-expressions).
 
    ## Arguments
     - `pattern`: The regular expression as either `Text` or `Regex` to search

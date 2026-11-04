@@ -1,0 +1,12 @@
+[
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": ".CloseButton"
+  },
+  {
+    "rule": "nested-interactive",
+    "impact": "serious",
+    "target": ".selected"
+  }
+]

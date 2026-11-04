@@ -37,6 +37,16 @@ public class SerdeCompilerTest {
     parseSerializedModule(testName, forbiddenMessage);
   }
 
+  /**
+   * A block whose last line is an ascription keeps its {@code Type.Ascription} to codegen: the body
+   * of {@code x-> (x:T)} on its own line, or a method ending in {@code b:T}. Such a library could
+   * not be written to the IR cache (#495).
+   */
+  @Test
+  public void testAscriptionAsLastLineOfBlock() throws Exception {
+    parseSerializedModule("Ascription_Test", null);
+  }
+
   private void parseSerializedModule(String projectName, String forbiddenMessage)
       throws InterruptedException, ExecutionException, IOException, TimeoutException {
     Module old;
@@ -72,7 +82,7 @@ public class SerdeCompilerTest {
       futures.add(compiler.compile(false, true, scala.Option.empty()));
       for (var f : futures) {
         var persisted = f.get(10, TimeUnit.SECONDS);
-        assertEquals("Fib_Test library has been fully persisted", true, persisted);
+        assertEquals(projectName + " library has been fully persisted", true, persisted);
       }
       old = module.getIr().duplicate(true, true, true, false);
       ctx.leave();
@@ -97,9 +107,11 @@ public class SerdeCompilerTest {
 
       var methods =
           org.enso.interpreter.runtime.Module.fromCompilerModule(module).getScope().getAllMethods();
-      var main = methods.get(0);
-
-      assertEquals("Main.main", main.getName());
+      var main =
+          methods.stream()
+              .filter(m -> "Main.main".equals(m.getName()))
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("No Main.main in " + methods));
       var mainValue = ctx.asValue(main);
       assertEquals(42, mainValue.execute().asInt());
 

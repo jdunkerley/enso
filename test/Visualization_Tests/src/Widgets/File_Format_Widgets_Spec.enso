@@ -20,6 +20,21 @@ add_specs suite_builder =
             result.should_contain "Excel Sheet"
             result.should_contain "SQLite"
 
+        group_builder.specify "should name each registered format's type and file patterns" <|
+            result = Widgets.get_widget_json Data .read ["format"]
+            result.should_contain '"label":"SQLite","value":"..SQLite","parameters":[],"icon":"","requires":"Standard.SQLite.SQLite_Format.SQLite_Format","patterns":["*.sqlite","*.db"]}'
+            result.should_contain '"label":"Delimited","value":"..Delimited","parameters":[],"icon":"","requires":"Standard.Table.Delimited.Delimited_Format.Delimited_Format","patterns":["*.csv","*.tsv","*.tab"]}'
+            result.should_contain '"label":"Excel Sheet","value":"..Sheet","parameters":[],"icon":"","requires":"Standard.Table.Excel.Excel_Format.Excel_Format"'
+
+        group_builder.specify "should give Auto Detect neither field" <|
+            result = Widgets.get_widget_json Data .read ["format"]
+            result.should_contain '{"label":"Auto Detect","value":"Standard.Base.System.File_Format.Auto_Detect","parameters":[],"icon":""}'
+
+        group_builder.specify "should fill the fields in Data.fetch's formats, and not in Raw Response" <|
+            result = Widgets.get_widget_json Data .fetch ["format"]
+            result.should_contain '"requires":"Standard.SQLite.SQLite_Format.SQLite_Format"'
+            result.should_contain '{"label":"Raw HTTP Response","value":"Standard.Base.Data.Raw_Response","parameters":[],"icon":""}'
+
         group_builder.specify "should provide a list of available file name patterns" <|
             result = Widgets.get_widget_json Data .list ["name_filter"]
             result.should_contain "*.txt"

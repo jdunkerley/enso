@@ -553,7 +553,13 @@ function slotPreprocessorKey(request: VisRequestPreprocessor): string | null {
     if (!exprAst) return null
     const { func } = Ast.analyzeAppLike(exprAst)
     if (!(func instanceof Ast.PropertyAccess && func.lhs)) return null
-    return `${func.lhs.code()}.${func.rhs.code()}`
+    const key = `${func.lhs.code()}.${func.rhs.code()}`
+    // A widget query evaluated directly (the format of a dropped file, #489): `get_widget_json
+    // <type> <call name> …`, routed like the visualization form, by its call name (`.read`).
+    if (key === `${WIDGETS_ENSO_MODULE}.${GET_WIDGETS_METHOD}`) {
+      return Ast.analyzeAppLike(exprAst).args.at(1)?.code() ?? null
+    }
+    return key
   }
   if (expression.module === WIDGETS_ENSO_MODULE && expression.name === GET_WIDGETS_METHOD) {
     return request.positionalArgumentsExpressions?.at(0) ?? null
@@ -614,12 +620,39 @@ function writeSlotResponse(slot: YMap<unknown>, bytes: Uint8Array): void {
   })
 }
 
+/** The mocked module documents, to tell which expression ids the engine would execute. */
+const mockModuleDocs = new Set<Doc>()
+
+/** Whether `id` is the external id of the body of a method of a mocked module. */
+function isMethodBodyId(id: string | undefined): boolean {
+  if (id == null) return false
+  for (const doc of mockModuleDocs) {
+    const root = new Ast.MutableModule(doc).root()
+    if (!(root instanceof Ast.BodyBlock)) continue
+    for (const statement of root.statements()) {
+      if (statement instanceof Ast.FunctionDef && statement.body?.externalId === id) return true
+    }
+  }
+  return false
+}
+
 /** If the slot's preprocessor is mocked, write the mock bytes into it. */
 function maybeRespondToSlot(slot: YMap<unknown>): void {
   const request = slot.get(VIS_SLOT_FIELDS.request) as VisRequestPreprocessor | undefined
   if (!request) return
   const key = slotPreprocessorKey(request)
   if (!key) return
+  // A direct widget query (the format of a dropped file, #489) is answered only in the context
+  // the engine would run it in: a method's body. In the definition itself nothing ever
+  // runs, so the real engine never answers there.
+  if (
+    typeof request.expression === 'object' &&
+    'inFrame' in request.expression &&
+    request.expression.inFrame.includes(GET_WIDGETS_METHOD) &&
+    !isMethodBodyId(slot.get(VIS_SLOT_FIELDS.nodeExternalId) as string | undefined)
+  ) {
+    return
+  }
   const bytes = responseBytesFor(key, slotPositionalArgs(request))
   if (bytes) writeSlotResponse(slot, bytes)
 }
@@ -701,7 +734,10 @@ export const mockYdocProvider = (room: string, doc: Doc) => {
     })
   } else if (room.startsWith('mock-')) {
     const fileContents = srcFiles[room.slice('mock-'.length)]
-    if (fileContents) new Ast.MutableModule(doc).syncToCode(fileContents)
+    if (fileContents) {
+      new Ast.MutableModule(doc).syncToCode(fileContents)
+      mockModuleDocs.add(doc)
+    }
   }
 }
 

@@ -114,6 +114,18 @@ has silently produced a wrong result here:
 
 ## Conventions worth knowing up front
 
+- **The pre-commit hook formats staged files only**: Husky runs lint-staged
+  (`lint-staged.config.mjs`): Prettier for the web files, `rustfmt` (per staged
+  file, with the owning crate's `--edition`) for `.rs`, and standalone
+  google-java-format and scalafmt, at the versions pinned in
+  `project/plugins.sbt` and `.scalafmt.conf`, for `.java` and `.scala`/`.sbt`
+  (`tools/pre-commit/format-staged.mjs`). A missing tool (no `rustfmt`, JDK 21+
+  or `cs`), a failed download or an offline Coursier prints a skip notice and
+  never blocks the commit; only a formatter rejecting a staged file does. A
+  change to the hook must keep that, and must not read or write unstaged or
+  untracked files. The google-java-format jar's SHA-256 is pinned in the script:
+  bump it with the version in `project/plugins.sbt`. Details in
+  `docs/CONTRIBUTING.md` ("Formatting hook").
 - **A `CHANGELOG.md` entry is for features and visible style changes only.** The
   `Changelog` CI job fails a PR that has neither an entry nor the
   `CI: No changelog needed` label, so every PR takes exactly one of the two:

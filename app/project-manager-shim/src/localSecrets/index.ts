@@ -214,6 +214,7 @@ export class LocalSecrets {
   /** Replace a secret's value, keeping its creation time. */
   async update(name: string, value: string): Promise<void> {
     validateName(name)
+    await this.#requireFile(name)
     await this.#write((key, root, now) => {
       const secrets = secretsOf(root)
       const old = getOwn(secrets, name)
@@ -229,6 +230,7 @@ export class LocalSecrets {
   /** Remove a secret. */
   async delete(name: string): Promise<void> {
     validateName(name)
+    await this.#requireFile(name)
     await this.#write((_key, root) => {
       const secrets = secretsOf(root)
       if (!Object.hasOwn(secrets, name)) throw notFound(name)
@@ -309,6 +311,14 @@ export class LocalSecrets {
   async fileKeyId(): Promise<string | null> {
     const root = await this.#readRoot()
     return root != null && typeof root.keyId === 'string' ? root.keyId : null
+  }
+
+  /**
+   * Fail with `NOT_FOUND` when there is no file at all, before taking the lock: taking it would
+   * create the file's directory and a transient lock file just to say that nothing is there.
+   */
+  async #requireFile(name: string): Promise<void> {
+    if ((await this.#readRoot()) == null) throw notFound(name)
   }
 
   async #readValue(name: string): Promise<string> {

@@ -56,16 +56,25 @@ type Choice
         - `parameters`: A list of parameters for the arguments for the `value`.
           This provides the structure needed for nested widgets.
         - `icon`: The icon to display for the entry. By default, no icon is used.
-    Option label:Text value:(Text | Vector Choice)=label parameters:(Vector (Pair Text Widget))=[] icon:Text=""
+        - `requires`: The fully qualified name of a type whose library the entry
+          needs, e.g. `"Standard.SQLite.SQLite_Format.SQLite_Format"`. Choosing
+          the entry adds that library's import. By default, none.
+        - `patterns`: The file name patterns (e.g. `*.db`) of the files the
+          entry reads. When a path argument of the same call changes, a single
+          matching entry adds the import of its `requires`. By default, none.
+    Option label:Text value:(Text | Vector Choice)=label parameters:(Vector (Pair Text Widget))=[] icon:Text="" requires:Text="" patterns:(Vector Text)=[]
 
     ## ---
        private: true
        ---
-       In-lined JSON representation of the Choice.
+       In-lined JSON representation of the Choice. `requires` and `patterns`
+       appear only when set, so an option without them serialises as before.
     to_json self -> Text =
         parameter_json = if self.parameters.length == 0 then '[]' else
             '[' + ((self.parameters.map p-> '[' + p.first.to_json + ',' + p.second.to_json + ']').join ',') + ']'
-        '{"label":' + self.label.to_json + ',"value":' + self.value.to_json + ',"parameters":' + parameter_json + ',"icon":' + self.icon.to_json + '}'
+        requires_json = if self.requires == "" then "" else ',"requires":' + self.requires.to_json
+        patterns_json = if self.patterns.is_empty then "" else ',"patterns":' + self.patterns.to_json
+        '{"label":' + self.label.to_json + ',"value":' + self.value.to_json + ',"parameters":' + parameter_json + ',"icon":' + self.icon.to_json + requires_json + patterns_json + '}'
 
 type File_Type
     ## Describes a file type.

@@ -22,7 +22,9 @@ Enso project.
 
 ## Conduct
 
-**Contact**: [moderators@enso.org](mailto:moderators@enso.org)
+**Contact**: report to the repository maintainer. Open a private report via
+GitHub (Security -> Report a vulnerability for security issues), or contact
+[`@jdunkerley`](https://github.com/jdunkerley).
 
 - We are committed to providing a friendly, safe and welcoming environment for
   all, regardless of level of experience, gender identity and expression, sexual
@@ -103,13 +105,9 @@ includes the official discord and GitHub repositories under `enso-org`.
 
 ### Moderators
 
-The following members of the Enso organisation can be contacted as moderators:
-
-- [`@wdanilo`](https://github.com/wdanilo)
-- [`@sylwiabr`](https://github.com/sylwiabr)
-
-Alternatively, you can send an email to the moderation team at
-[moderators@enso.org](mailto:moderators@enso.org).
+Report to the repository maintainer: open a private report via GitHub (Security
+-> Report a vulnerability for security issues), or contact
+[`@jdunkerley`](https://github.com/jdunkerley).
 
 ## Credit
 

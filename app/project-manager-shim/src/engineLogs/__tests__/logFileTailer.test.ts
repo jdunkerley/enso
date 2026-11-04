@@ -4,6 +4,17 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { LogFileTailer } from '../logFileTailer.js'
 
+/** Lets a test make the tailer's `open` fail; every other call goes to the real module. */
+const failOpen = vi.hoisted(() => ({ error: undefined as Error | undefined }))
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    open: ((...args: Parameters<typeof actual.open>) =>
+      failOpen.error ? Promise.reject(failOpen.error) : actual.open(...args)) as typeof actual.open,
+  }
+})
+
 let dir: string
 let tailer: LogFileTailer | undefined
 let lines: string[]
@@ -114,5 +125,87 @@ describe('LogFileTailer', () => {
     await fs.appendFile(file, 'done\nno newline')
     await t.stop()
     expect(lines).toEqual(['done', 'no newline'])
+  })
+
+  test('reads a file larger than one 64 KB read, every line once and in order', async () => {
+    const file = path.join(dir, 'big.log')
+    const expected = Array.from({ length: 4_000 }, (_, n) => `line ${n} ${'x'.repeat(90)}`)
+    await fs.writeFile(file, expected.join('\n') + '\n')
+    expect((await fs.stat(file)).size).toBeGreaterThan(3 * 64 * 1024)
+    const t = follow(file)
+    await t.poll()
+    expect(lines).toEqual(expected)
+    // An append after the multi-read poll continues where it ended.
+    await fs.appendFile(file, 'after\n')
+    await t.poll()
+    expect(lines.at(-1)).toBe('after')
+    expect(lines).toHaveLength(expected.length + 1)
+  })
+
+  test('keeps a multi-byte character that spans two reads whole', async () => {
+    const file = path.join(dir, 'utf8.log')
+    // The 3-byte euro sign starts one byte before the 64 KB boundary of the first read.
+    const first = 'a'.repeat(64 * 1024 - 1) + '€'
+    await fs.writeFile(file, `${first}\nnext ünï\n`)
+    const t = follow(file)
+    await t.poll()
+    expect(lines).toEqual([first, 'next ünï'])
+  })
+
+  test('stop during a read in flight waits for it, loses and repeats no line', async () => {
+    const file = path.join(dir, 'a.log')
+    const expected = Array.from({ length: 3_000 }, (_, n) => `line ${n} ${'y'.repeat(90)}`)
+    await fs.writeFile(file, expected.join('\n') + '\npartial')
+    const t = follow(file)
+    const reading = t.poll()
+    // The read has begun (it is asynchronous); stopping now must neither cut it short nor repeat it.
+    await t.stop()
+    await reading
+    expect(lines).toEqual([...expected, 'partial'])
+    const count = lines.length
+    await fs.appendFile(file, ' more\nlate\n')
+    await t.poll()
+    expect(lines).toHaveLength(count)
+  })
+
+  describe('a read that fails', () => {
+    afterEach(() => {
+      failOpen.error = undefined
+      vi.restoreAllMocks()
+    })
+
+    test('is logged once while it keeps failing, and again after a read has succeeded', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const file = path.join(dir, 'a.log')
+      await fs.writeFile(file, 'one\n')
+      const t = follow(file)
+      failOpen.error = Object.assign(new Error('EBUSY: file is locked'), { code: 'EBUSY' })
+      for (let poll = 0; poll < 5; poll += 1) await t.poll()
+      // Before: five lines (one per poll).
+      expect(error).toHaveBeenCalledTimes(1)
+      expect(lines).toEqual([])
+      failOpen.error = undefined
+      await t.poll()
+      expect(lines).toEqual(['one'])
+      await fs.appendFile(file, 'two\n')
+      failOpen.error = Object.assign(new Error('EBUSY: file is locked'), { code: 'EBUSY' })
+      await t.poll()
+      await t.poll()
+      expect(error).toHaveBeenCalledTimes(2)
+    })
+
+    test('is logged again when it changes', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const file = path.join(dir, 'a.log')
+      await fs.writeFile(file, 'one\n')
+      const t = follow(file)
+      failOpen.error = Object.assign(new Error('EBUSY'), { code: 'EBUSY' })
+      await t.poll()
+      await t.poll()
+      failOpen.error = Object.assign(new Error('EACCES'), { code: 'EACCES' })
+      await t.poll()
+      await t.poll()
+      expect(error).toHaveBeenCalledTimes(2)
+    })
   })
 })

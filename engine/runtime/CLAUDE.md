@@ -55,6 +55,28 @@ and links the required Graal/Truffle background reading.
 - **Compiling a library writes its `catalogue.json`.** Next to `package.yaml`,
   from the suggestions cache's list, filtered to what the component browser
   shows; see Note [Library Catalogue] in `TruffleCompilerContext`.
+- **Library caches are keyed by the library's sources.** The bindings and
+  suggestions caches record `Package.sourceHash`, computed once per library per
+  context (`LibrarySourceHashes`), so two checkouts of a library with the same
+  name and version share them only when their sources match; see Note [Library
+  Caches Are Keyed By The Sources]. A module's IR cache stays keyed by its own
+  source; a cached module whose same-library import changed is recompiled (Note
+  [A Cached Module Follows Its Library's Imports] in `Compiler`).
+- **IR caches record the other libraries they refer to.** A module's IR cache
+  and a library's bindings cache record the source hash of every other library
+  their IR names, and the modules it names there, and miss when one changed
+  (Note [A Cache Records The Libraries It Refers To] in `LibraryDependencies`).
+  A cache that fails to deserialise is deleted and is a miss, with a warning in
+  the log (Note [A Cache That Does Not Load Is A Miss] in `Cache`).
+- **A rejected bindings cache is rewritten into the user cache.** When a run
+  rejects a library's bindings cache (its sources or a dependency's changed), it
+  writes a new one, from the modules it compiled, next to the library's
+  per-module IR caches; reads try the library's own location first, then the
+  user cache (Note [A Rejected Bindings Cache Is Rewritten] in
+  `TruffleCompilerContext`). Only `enso --compile` writes the library's own
+  location. Exit does not wait for the rewrite. Every cache file is written to a
+  temporary file and renamed into place (Note [A Cache Is Written By Renaming]
+  in `Cache`).
 - **A library's bindings cache is read once per context**, by
   `TruffleCompilerContext.libraryBindings`, which import resolution and module
   loading share; see Note [One Bindings Cache Read Per Library].

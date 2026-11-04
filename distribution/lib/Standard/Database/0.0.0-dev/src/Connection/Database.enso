@@ -7,7 +7,7 @@ from Standard.Base.Metadata.Widget import Single_Choice
 import project.Connection.Connection.Connection
 import project.Connection.Connection_Details.Connection_Details
 import project.Connection.Connection_Options.Connection_Options
-import project.Internal.Telemetry
+import Standard.Base.Internal.Telemetry
 from project.Errors import SQL_Error
 
 ## ---

@@ -271,11 +271,12 @@ class InMemorySuggestionsRepo(implicit ec: ExecutionContext)
     }
   }
 
-  /** Cleans the repo resetting the version. */
+  /** Cleans the repo, moving the version on. */
   override def clean: Future[Unit] = Future {
     if (db != null) {
       db.synchronized {
         db.clear()
+        versionIncrement()
       }
     }
   }

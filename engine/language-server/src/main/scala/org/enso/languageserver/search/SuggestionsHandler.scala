@@ -27,6 +27,7 @@ import org.enso.languageserver.runtime.{
   ContextRegistryProtocol,
   RuntimeFailureMapper
 }
+import org.enso.languageserver.requesthandler.RequestTimeout
 import org.enso.languageserver.search.SearchProtocol._
 import org.enso.languageserver.search.handler.InvalidateModulesIndexHandler
 import org.enso.languageserver.session.SessionRouter.DeliverToJsonController
@@ -83,11 +84,41 @@ import scala.util.{Failure, Success}
  * insertion (it runs as a suggestion loading) and applied after, swapping
  * out the entries just inserted. A module update already running when the
  * clear or the insertion starts is waited for first. One running at the
- * clear has its entries go with the clean; the runtime sends them again.
+ * clear has its entries go with the clean; the runtime sends them again,
+ * and a client that asked for the database drops its notification (Note
+ * [The Snapshot Follows The Clear]).
  *
  * `State.loadedLibraries` survives the clear: a library stays loaded in the
  * runtime's context, and after the invalidation the runtime sends its
  * suggestions again, so its catalogue is not inserted again.
+ */
+
+/* Note [The Snapshot Follows The Clear]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * `search/getSuggestionsDatabase` invalidates the runtime's modules index and
+ * clears the repository; the runtime then sends everything again, as module
+ * updates and loaded-suggestions notifications. A client builds its copy from
+ * the answer (entries and version) plus the update notifications not older
+ * than it (`currentVersion` below the answer's: dropped), whenever they
+ * arrive, before or after the answer.
+ *
+ * So the answer is the repository read right after the clean, and the clean
+ * moves the version on (`SuggestionsRepo.clean`). Every notification of an
+ * update applied before the clean (a module update running when the request
+ * arrived, or stashed while the runtime invalidated) is then older than the
+ * answer, and the client drops it: its entries went with the clean. Every
+ * update applied after it is held until the answer is read, so it is not
+ * older and the client applies it. #477: the answer used to go out at once,
+ * empty with version 0, and a module update that finished before the clean
+ * left its ids on the client.
+ *
+ * A request waits for the clear its own invalidation sends, not for an
+ * earlier one still waiting for a running update (`State.clearsReceived`,
+ * `State.snapshotRequests`). The invalidations are counted by their results,
+ * not their clears: a clear stashed while one invalidation runs can be
+ * stashed again by the next, which a request stashed ahead of it starts. If
+ * the invalidation fails, or the runtime never answers it, nothing is
+ * cleared, and the answer is the repository as it is.
  */
 
 /** The handler of search requests.
@@ -217,30 +248,72 @@ final class SuggestionsHandler(
     case _ => stash()
   }
 
+  /** Waiting for the runtime to invalidate its modules index.
+    *
+    * @param requester who asked for the invalidation
+    * (`search/invalidateSuggestionsDatabase`), to send its result to
+    * @param snapshotRequester who asked for the database
+    * (`search/getSuggestionsDatabase`), to send it to after the clear
+    */
   private def invalidatingModules(
     projectName: String,
     graph: TypeGraph,
     clients: Set[ClientId],
     state: State,
-    requester: Option[ActorRef]
+    requester: Option[ActorRef],
+    snapshotRequester: Option[ActorRef]
   ): Receive = {
     case SearchProtocol.InvalidateSuggestionsDatabaseResult =>
+      // A successful invalidation sends its clear just before this result.
+      // Counted here, and not at the clear: a clear stashed here can be
+      // handled here again, after a request stashed ahead of it starts
+      // another invalidation, but a result cannot. The snapshot goes out
+      // after this clear and not an earlier one still waiting (Note [The
+      // Snapshot Follows The Clear]).
+      state.clearsReceived += 1
       requester.foreach(_ ! SearchProtocol.InvalidateSuggestionsDatabaseResult)
+      snapshotRequester.foreach { ref =>
+        state.snapshotRequests.enqueue(state.clearsReceived -> ref)
+      }
       unstashAll()
       context.become(initialized(projectName, graph, clients, state))
     case failure: ContextRegistryProtocol.Failure =>
       // The invalidation failed: nothing is cleared, and only the failure is
-      // sent (`InvalidateModulesIndexHandler.negativeResponse`).
+      // sent (`InvalidateModulesIndexHandler.negativeResponse`). The
+      // database is sent as it is.
       requester.foreach(_ ! failure)
+      snapshotRequester.foreach(sendSnapshot)
       unstashAll()
       context.become(initialized(projectName, graph, clients, state))
     case failure: Status.Failure =>
       // The runtime's error could not be mapped to a failure.
       requester.foreach(_ ! failure)
+      snapshotRequester.foreach(sendSnapshot)
+      unstashAll()
+      context.become(initialized(projectName, graph, clients, state))
+    case RequestTimeout =>
+      // The runtime never answered (`InvalidateModulesIndexHandler` gave up
+      // after its retries): nothing is cleared, as for a failure.
+      logger.error("The runtime did not invalidate its modules index.")
+      requester.foreach(_ ! RequestTimeout)
+      snapshotRequester.foreach(sendSnapshot)
       unstashAll()
       context.become(initialized(projectName, graph, clients, state))
     case _ => stash()
   }
+
+  /** Send the repository's entries, with its version, as they are now. */
+  private def sendSnapshot(requester: ActorRef): Unit =
+    snapshot.pipeTo(requester)
+
+  /** The repository's entries, with its version, read in one step. */
+  private def snapshot: Future[GetSuggestionsDatabaseResult] =
+    suggestionsRepo.getAll.map { case (version, entries) =>
+      GetSuggestionsDatabaseResult(
+        version,
+        entries.map(SuggestionDatabaseEntry(_))
+      )
+    }
 
   private def initialized(
     projectName: String,
@@ -410,16 +483,26 @@ final class SuggestionsHandler(
         // Hold module updates, in order, until the repository is clean: one
         // applied meanwhile would be cleaned away. `Cleaned` releases them.
         state.updatesHeldForCatalogues = true
+        val fill = state.fill
         suggestionsRepo.clean
           .recover { case error =>
             logger.error("Cannot clean the suggestions database", error)
           }
-          .map(_ => Cleaned)
+          // Read before the held updates go in: Note [The Snapshot Follows
+          // The Clear].
+          .flatMap(_ => snapshot)
+          .transform(result => Success(Cleaned(fill, result)))
           .pipeTo(self)
       }
 
-    case Cleaned =>
+    case Cleaned(fill, cleanDatabase) =>
       state.updatesHeldForCatalogues = false
+      // The requests whose invalidation led to this clear, or to an earlier
+      // one.
+      while (state.snapshotRequests.headOption.exists(_._1 <= fill)) {
+        val (_, requester) = state.snapshotRequests.dequeue()
+        requester ! cleanDatabase.fold(Status.Failure(_), identity)
+      }
       self ! SuggestionUpdatesCompleted
       logger.trace(
         "ClearSuggestionsDatabase [{}]",
@@ -502,16 +585,16 @@ final class SuggestionsHandler(
       )
 
       handler ! SearchProtocol.InvalidateModulesIndex
-
-      sender() ! GetSuggestionsDatabaseResult(0, Seq())
-
+      // Answered once the repository is clean: Note [The Snapshot Follows
+      // The Clear].
       context.become(
         invalidatingModules(
           projectName,
           graph,
           clients,
           state.backgroundProcessingStopped(),
-          None
+          None,
+          Some(sender())
         )
       )
 
@@ -571,7 +654,8 @@ final class SuggestionsHandler(
           graph,
           clients,
           state.backgroundProcessingStopped(),
-          Some(sender())
+          Some(sender()),
+          None
         )
       )
 
@@ -948,8 +1032,16 @@ object SuggestionsHandler {
     */
   val DefaultFirstExecutionTimeout: FiniteDuration = 30.seconds
 
-  /** The repository is clean after `ClearSuggestionsDatabase`. */
-  private case object Cleaned
+  /** The repository is clean after `ClearSuggestionsDatabase`.
+    *
+    * @param fill the clear this is
+    * @param database the repository read right after the clean, to send to
+    * the clients that asked for it
+    */
+  private case class Cleaned(
+    fill: Long,
+    database: scala.util.Try[GetSuggestionsDatabaseResult]
+  )
 
   /** Insert the catalogues, for the `fill`th clear of the database.
     *
@@ -1038,6 +1130,17 @@ object SuggestionsHandler {
 
     /** How many times the database has been cleared. */
     var fill: Long = 0
+
+    /** How many invalidations have succeeded. Each sends one
+      * `ClearSuggestionsDatabase`, and the clears are handled in order, so
+      * the `n`th is the `n`th clear (`fill`).
+      */
+    var clearsReceived: Long = 0
+
+    /** The `search/getSuggestionsDatabase` requests waiting for a clear to
+      * finish, with the number of the clear (`fill`) they wait for.
+      */
+    val snapshotRequests: mutable.Queue[(Long, ActorRef)] = mutable.Queue.empty
 
     /** @return `true` if suggestion updates actions are in progress. */
     def isSuggestionUpdatesRunning: Boolean =

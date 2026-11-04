@@ -60,3 +60,18 @@ is already on the row, drawn by `WidgetIcon` at the root.
   `localSecrets.ts` (the local secrets and **New secret…**, which set
   `Enso_Secret.get 'secret://<name>'`), and `browsableTypes.ts` (which kind an
   argument takes, its current path, and the edit that sets one).
+- `WidgetFunction/formatForPath.ts` — with `format` on `Auto_Detect`, which
+  format library a call's new `path` needs: the one format type whose options'
+  `patterns` match the file name (case ignored). `WidgetFunction.vue`'s
+  `handleArgUpdate` adds its import in the update's edit; it is the one handler
+  that sees every argument's update and every sibling's widget configuration
+  (#489). A dropdown option's own `requires` is applied by
+  `WidgetSelection/tags.ts`. A file dropped on the graph (`GraphEditor.vue`'s
+  `uploadedFormatImports`) has no node of its own: it uses the `format` options
+  that a `path`-and-`format` node holds right now (`trackFormatConfig`, which
+  `WidgetFunction.vue` calls and withdraws when the node or its configuration
+  goes, so nothing outlives its node, an engine restart or a project switch),
+  and otherwise asks the engine (`DATA_READ_FORMAT_WIDGET_QUERY`, in the current
+  method's body context, 1 s timeout, so the node creation waits at most that
+  long and one undo still removes node and import); `formatTypeForDrop` does
+  both. The import goes in the node creation's edit.

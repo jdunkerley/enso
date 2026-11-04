@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
+import { requiredImportsForTypeName } from '$/providers/openedProjects/module/imports'
 import type { MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
 import {
   Score,
@@ -11,6 +12,10 @@ import {
 } from '$/providers/openedProjects/widgetRegistry'
 import { proxyRefs } from '$/utils/reactivity'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
+import {
+  formatTypeForPathUpdate,
+  trackFormatConfig,
+} from '@/components/GraphEditor/widgets/WidgetFunction/formatForPath'
 import {
   getPotentialModuleFunctionPointer,
   useWidgetFunctionCallInfo,
@@ -30,7 +35,7 @@ import { partitionPoint } from '@/util/data/array'
 import { methodPointerEquals, type MethodPointer } from '@/util/methodPointer'
 import { isIdentifier } from '@/util/qualifiedName'
 import { Err, Ok } from 'enso-common/src/utilities/data/result'
-import { computed } from 'vue'
+import { computed, watchEffect } from 'vue'
 import { FunctionName } from './WidgetFunctionName.vue'
 
 const props = defineProps(widgetProps(widgetDefinition))
@@ -52,6 +57,15 @@ const { methodCallInfo, application, subject, subjectInfo } = useWidgetFunctionC
   projectNames,
   () => suggestionDb.value.groups,
 )
+
+// A file dropped on the graph (#489) matches the format options a node here has already loaded.
+// Withdrawn when this call's configuration changes or the node goes away.
+const formatConfigKey = Symbol('formatConfig')
+watchEffect((onCleanup) => {
+  if (application.value instanceof ArgumentApplication) {
+    onCleanup(trackFormatConfig(project.value.id, formatConfigKey, application.value))
+  }
+})
 
 provideFunctionInfo(
   proxyRefs({
@@ -100,10 +114,36 @@ const innerInput = computed(() => {
 })
 
 /**
+ * With `format` on `Auto_Detect`, a change of the `path` argument also adds the import of the
+ * library whose format reads that file (`WidgetFunction/formatForPath.ts`), in the same edit, so
+ * that one undo removes both. Then the update is processed as before.
+ */
+function handleArgUpdate(update: WidgetUpdate): HandledUpdate {
+  const app = application.value
+  const formatType =
+    app instanceof ArgumentApplication ? formatTypeForPathUpdate(app, update) : undefined
+  const imports =
+    formatType ?
+      requiredImportsForTypeName(
+        suggestionDb.value.entries,
+        projectNames.value,
+        suggestionDb.value.libraryPublicTypes,
+        formatType,
+      )
+    : undefined
+  if (!imports?.length) return applyArgUpdate(update)
+  const withImports = (edit: Ast.MutableModule) => {
+    module.value.addMissingImports(edit, imports)
+    return applyArgUpdate({ ...update, edit })
+  }
+  return update.edit ? withImports(update.edit) : module.value.edit(withImports)
+}
+
+/**
  * Process an argument value update. Takes care of inserting assigned placeholder values, as well as
  * handling deletions of arguments and rewriting the applications to named as appropriate.
  */
-function handleArgUpdate(update: WidgetUpdate): HandledUpdate {
+function applyArgUpdate(update: WidgetUpdate): HandledUpdate {
   const app = application.value
   if (update.portUpdate && app instanceof ArgumentApplication) {
     if (!('value' in update.portUpdate)) {

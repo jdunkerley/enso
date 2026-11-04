@@ -231,6 +231,15 @@ sqlite_specific_spec suite_builder prefix create_connection_func setup =
             r = t.distinct ["strs"]
             (r:DB_Table).to_sql . prepare . should_equal [expected_code, []]
 
+        ## An ordered table keeps the first row of each group by numbering
+           them, not with `GROUP BY` (#545). The row number is not selected.
+        group_builder.specify "should generate queries for the Distinct operation on an ordered table" <|
+            t = data.connection.query (SQL_Query.Table_Name data.tinfo)
+            code_template = 'SELECT "{Tinfo}"."strs" AS "strs", "{Tinfo}"."ints" AS "ints", "{Tinfo}"."bools" AS "bools", "{Tinfo}"."reals" AS "reals" FROM (SELECT "{Tinfo}"."strs" AS "strs", "{Tinfo}"."ints" AS "ints", "{Tinfo}"."bools" AS "bools", "{Tinfo}"."reals" AS "reals" FROM (SELECT "{Tinfo}_inner"."strs" AS "strs", "{Tinfo}_inner"."ints" AS "ints", "{Tinfo}_inner"."bools" AS "bools", "{Tinfo}_inner"."reals" AS "reals", (row_number() OVER (PARTITION BY "{Tinfo}_inner"."strs" ORDER BY "{Tinfo}_inner"."ints" DESC) * (1) + (0)) AS "__enso_distinct_row_number" FROM (SELECT "{Tinfo}"."strs" AS "strs", "{Tinfo}"."ints" AS "ints", "{Tinfo}"."bools" AS "bools", "{Tinfo}"."reals" AS "reals" FROM "{Tinfo}" AS "{Tinfo}") AS "{Tinfo}_inner") AS "{Tinfo}" WHERE ("{Tinfo}"."__enso_distinct_row_number") = (1)) AS "{Tinfo}"'
+            expected_code = code_template.replace "{Tinfo}" data.tinfo
+            r = t.sort [..Name "ints" ..Descending] . distinct ["strs"]
+            (r:DB_Table).to_sql . prepare . should_equal [expected_code, []]
+
     suite_builder.group prefix+"math functions" group_builder->
         data = Test_Data.setup create_connection_func
 

@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [Choosing a file format, or a file, in Data.read adds the import of the
+  library that reads it.][552]
 - [A settings cog replaces the account menu at the top right of the dashboard;
   it opens Settings and About. The Account settings page, the empty notification
   tray and the offline notice are gone, and Settings opens on the Local
@@ -395,6 +397,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[552]: https://github.com/jdunkerley/enso/pull/552
 [519]: https://github.com/jdunkerley/enso/pull/519
 [514]: https://github.com/jdunkerley/enso/pull/514
 [476]: https://github.com/jdunkerley/enso/pull/476

@@ -261,8 +261,21 @@ class Compiler(
         go(pending, compiledModules ++ newCompiled)
       }
 
-    go(modules, List())
+    val result = go(modules, List())
+    if (generateCode && irCachingEnabled) {
+      // Note [A Rejected Bindings Cache Is Rewritten] in TruffleCompilerContext.
+      context.rewriteRejectedLibraryBindings(
+        this,
+        m =>
+          context.wasLoadedFromCache(m) || cacheableModules.contains(m.getName)
+      )
+    }
+    result
   }
+
+  /** Modules this compiler compiled and handed to per-module serialisation. */
+  private val cacheableModules: java.util.Set[QualifiedName] =
+    java.util.concurrent.ConcurrentHashMap.newKeySet[QualifiedName]()
 
   private def runCompilerPipeline(
     modules: List[Module],
@@ -319,6 +332,22 @@ class Compiler(
       }
     )
 
+    /* Note [A Cached Module Follows Its Library's Imports]
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     * A module's IR cache is keyed by its own source (`ModuleCache`), but its
+     * IR also records what its names resolved to in the modules it imports.
+     * So a module loaded from its cache is parsed again when a module it
+     * imports was not (its source changed). Across libraries that happens
+     * only when dependencies are compiled; inside the module's own library it
+     * always does, `--no-compile-dependencies` included, which is how
+     * `indexStdLibs` compiles. Otherwise IR cached by another checkout of the
+     * same library (every `0.0.0-dev` checkout shares the per-user IR caches)
+     * resolved `answer` to a module that no longer has it (#473,
+     * `LibraryCacheDigestTest`). A module in another library is not covered
+     * here: the cache records that library's source hash and misses when it
+     * changed (Note [A Cache Records The Libraries It Refers To] in
+     * `LibraryDependencies`).
+     */
     val requiredModules = modules.flatMap { module =>
       val isLoadedFromSource =
         (m: Module) => !context.wasLoadedFromCache(m) && !m.isSynthetic()
@@ -326,10 +355,15 @@ class Compiler(
         module,
         generateCode && context.wasLoadedFromCache(module)
       )
+      // Note [A Cached Module Follows Its Library's Imports]: inside a
+      // library, even under `--no-compile-dependencies`.
+      val sameLibrary =
+        (m: Module) => m.getPackage != null && m.getPackage == module.getPackage
       if (
-        shouldCompileDependencies &&
         context.wasLoadedFromCache(module) &&
-        importedModules.exists(isLoadedFromSource)
+        importedModules.exists(m =>
+          isLoadedFromSource(m) && (shouldCompileDependencies || sameLibrary(m))
+        )
       ) {
         val importedModulesLoadedFromSource = importedModules
           .filter(isLoadedFromSource)
@@ -527,6 +561,7 @@ class Compiler(
               shouldStoreCache && !hasErrors(module) &&
               !context.isInteractive(module) && !module.isSynthetic()
             ) {
+              cacheableModules.add(module.getName)
               if (isInteractiveMode) {
                 context.notifySerializeModule(module.getName())
               } else {

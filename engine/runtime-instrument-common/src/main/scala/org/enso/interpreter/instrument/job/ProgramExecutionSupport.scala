@@ -118,7 +118,8 @@ object ProgramExecutionSupport {
         processAllUnevaluatedVisualizations(
           contextId,
           executionFrame.cache,
-          executionFrame.syncState
+          executionFrame.syncState,
+          Some(value)
         )
       }
     }
@@ -711,30 +712,51 @@ object ProgramExecutionSupport {
 
   /** Process all pending unevaluated visualizations.
     * Called after each expression completes to check if any pending
-    * visualizations can now be processed (their expression value is in cache).
+    * visualizations can now be processed (the value of their expression was
+    * just computed, or is in the cache).
     *
     * @param contextId an identifier of an execution context
     * @param runtimeCache runtime cache for this execution
     * @param syncState reference to synchronization state
+    * @param computed the value that was just computed, if any
     * @param ctx the runtime context
     */
   private def processAllUnevaluatedVisualizations(
     contextId: Api.ContextId,
     runtimeCache: RuntimeCache,
-    syncState: UpdatesSynchronizationState
+    syncState: UpdatesSynchronizationState,
+    computed: Option[ExpressionValue] = None
   )(implicit ctx: RuntimeContext): Unit = {
     val holder     = ctx.contextManager.getVisualizationHolder(contextId)
     val allPending = holder.getAllUnevaluated
 
+    // Note [A Deferred Visualization Of An Uncached Value]
     val collected = runtimeCache.runQuery(
       null,
       { immutable =>
         allPending.flatMap { unevaluated =>
-          val cachedValue = immutable.get(unevaluated.expressionId)
-          Option(cachedValue).map((unevaluated, _))
+          val value = computed
+            .filter(_.getExpressionId == unevaluated.expressionId)
+            .map(_.getValue)
+            .filter(v => !VisualizationResult.isInterruptedException(v))
+            .orElse(Option(immutable.get(unevaluated.expressionId)))
+          value.map((unevaluated, _))
         }
       }
     )
+
+    /* Note [A Deferred Visualization Of An Uncached Value]
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     * A visualization deferred by `UpsertVisualizationJob` (it could not take
+     * the write compilation lock, e.g. while a background `SerializeModuleJob`
+     * held the read one) waits here for its expression's value. The cache
+     * keeps the values of bindings only (`CachePreferenceAnalysis`), so for
+     * any other expression, such as a method's last line, the cache never
+     * has it: the value must be taken as it is computed, as
+     * `sendVisualizationUpdates` does for an attached visualization.
+     * Otherwise the visualization is never evaluated and its update never
+     * sent (#546).
+     */
 
     collected.foreach { case (unevaluated, cachedValue) =>
       processUnevaluatedVisualization(

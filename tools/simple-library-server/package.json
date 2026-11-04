@@ -11,7 +11,7 @@
     "libraries",
     "server"
   ],
-  "author": "Enso Team",
+  "author": "jdunkerley",
   "license": "Apache-2.0",
   "dependencies": {
     "compression": "^1.8.2",

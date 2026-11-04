@@ -77,11 +77,27 @@ describe('VersioningConsent', () => {
     expect((await fs.readdir(path.dirname(file()))).some((n) => n.includes('.corrupt-'))).toBe(true)
   })
 
-  test('a file of the wrong shape is moved aside', async () => {
+  test('a file whose lists are not arrays is moved aside', async () => {
     await fs.mkdir(path.dirname(file()), { recursive: true })
-    await fs.writeFile(file(), JSON.stringify({ version: 1, enabledRepositories: [1] }))
+    await fs.writeFile(file(), JSON.stringify({ version: 1, enabledRepositories: 'repo' }))
     expect(await store().isEnabled(path.join(dir, 'repo'))).toBe(false)
     expect(warn).toHaveBeenCalledOnce()
+  })
+
+  test('a bad entry costs only itself: every other repository keeps its consent', async () => {
+    const repo = path.join(dir, 'repo')
+    await store().enable(repo)
+    await fs.mkdir(path.join(dir, 'optedOut'))
+    await store().disable(path.join(dir, 'optedOut'))
+    const json = JSON.parse(await fs.readFile(file(), 'utf8'))
+    json.enabledRepositories.push(1, null)
+    json.disabledRepositories.push({})
+    await fs.writeFile(file(), JSON.stringify(json))
+    expect(await store().isEnabled(repo)).toBe(true)
+    expect(await store().isOptedOut(path.join(dir, 'optedOut'))).toBe(true)
+    // Nothing was moved aside, so there is nothing to recover by hand.
+    expect(warn).not.toHaveBeenCalled()
+    expect(await fs.readdir(path.dirname(file()))).toEqual([VERSIONING_FILE_NAME])
   })
 
   test('a newer file is moved aside', async () => {
@@ -127,11 +143,11 @@ describe('opting out', () => {
     expect(warn).not.toHaveBeenCalled()
   })
 
-  test('a disabledRepositories that is not a list of strings is a file of the wrong shape', async () => {
+  test('a disabledRepositories that is not a list is a file of the wrong shape', async () => {
     await fs.mkdir(path.join(dir, 'userData'), { recursive: true })
     await fs.writeFile(
       file(),
-      JSON.stringify({ version: 1, enabledRepositories: [], disabledRepositories: [3] }),
+      JSON.stringify({ version: 1, enabledRepositories: [], disabledRepositories: 3 }),
     )
     expect(await store().isOptedOut(path.join(dir, 'repo'))).toBe(false)
     expect(warn).toHaveBeenCalled()

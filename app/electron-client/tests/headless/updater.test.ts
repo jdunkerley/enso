@@ -1,6 +1,6 @@
 /** @file The automatic-update state machine (`src/updater.ts`), against a fake `electron-updater`. */
 import { EventEmitter } from 'node:events'
-import { describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import type { UpdateStatus } from 'enso-common/src/updater'
 import { resolveUpdateMode, Updater, type UpdaterDeps } from '../../src/updater'
@@ -369,19 +369,100 @@ describe('Updater stable fallback', () => {
   })
 })
 
-const { handleMock, sendMock } = vi.hoisted(() => ({
+const { handleMock, sendMock, windows } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   sendMock: vi.fn(),
+  windows: [] as { isDestroyed: () => boolean; send: (...args: unknown[]) => void }[],
 }))
 vi.mock('electron', () => ({
   app: { isPackaged: true },
   ipcMain: { handle: handleMock },
-  webContents: {
-    getAllWebContents: () => [{ isDestroyed: () => false, send: sendMock }],
-  },
+  webContents: { getAllWebContents: () => windows },
 }))
 
 describe('initUpdaterIpc', () => {
+  beforeEach(() => {
+    handleMock.mockClear()
+    sendMock.mockClear()
+    windows.splice(0, windows.length, { isDestroyed: () => false, send: sendMock })
+    // An AppImage is what lets a packaged Linux run update itself, so `auto` holds on every host.
+    vi.stubEnv('APPIMAGE', '/opt/Enso.AppImage')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  /** The handler registered for `channel`, after `initUpdaterIpc`. */
+  async function handlers(
+    autoUpdater = new FakeAutoUpdater(),
+    buildMode: 'auto' | 'manual' = 'auto',
+  ) {
+    const { initUpdaterIpc } = await import('../../src/updaterIpc')
+    const { Channel } = await import('../../src/ipc')
+    handleMock.mockClear()
+    initUpdaterIpc(buildMode, autoUpdater as unknown as UpdaterDeps['autoUpdater'])
+    const handler = (channel: string) =>
+      handleMock.mock.calls.find(([name]) => name === channel)![1] as (
+        ...args: unknown[]
+      ) => unknown
+    return {
+      autoUpdater,
+      Channel,
+      mode: () => handler(Channel.updaterMode)({}),
+      check: (arg: unknown) => handler(Channel.updaterCheck)({}, arg),
+      download: () => handler(Channel.updaterDownload)({}),
+      quitAndInstall: () => handler(Channel.updaterQuitAndInstall)({}),
+    }
+  }
+
+  test('the mode reply is the resolved update mode', async () => {
+    expect(await (await handlers(undefined, 'manual')).mode()).toBe('manual')
+    expect(await (await handlers(undefined, 'auto')).mode()).toBe('auto')
+  })
+
+  test('check coerces its argument: only true allows prereleases', async () => {
+    const { autoUpdater, check } = await handlers()
+    // The first underlying check of each `check` call (a prerelease check is followed by a stable one).
+    const seen: boolean[] = []
+    let calls: boolean[] = []
+    autoUpdater.checkForUpdates.mockImplementation(async () => {
+      calls.push(autoUpdater.allowPrerelease)
+      autoUpdater.emit('update-not-available', { version: '2026.1.1' })
+      return null
+    })
+    for (const arg of [true, false, undefined, null, 'true', 1, {}]) {
+      calls = []
+      await check(arg)
+      seen.push(calls[0]!)
+    }
+    expect(seen).toEqual([true, false, false, false, false, false, false])
+  })
+
+  test('download and quit-and-install reach the updater; quit-and-install replies nothing', async () => {
+    const { autoUpdater, download, quitAndInstall } = await handlers()
+    expect(quitAndInstall()).toBeUndefined()
+    expect(autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
+    await download()
+  })
+
+  test('broadcast skips destroyed windows and survives a send that throws', async () => {
+    const { autoUpdater, Channel } = await handlers()
+    const closed = vi.fn(() => {
+      throw new Error('Object has been destroyed')
+    })
+    const destroyed = vi.fn()
+    windows.unshift(
+      { isDestroyed: () => false, send: closed },
+      { isDestroyed: () => true, send: destroyed },
+    )
+    expect(() => autoUpdater.emit('update-downloaded', { version: '2026.2.0' })).not.toThrow()
+    expect(closed).toHaveBeenCalledOnce()
+    expect(destroyed).not.toHaveBeenCalled()
+    // The window after the failing one still gets the status.
+    expect(sendMock).toHaveBeenCalledWith(Channel.updaterStatus, {
+      state: 'ready',
+      version: '2026.2.0',
+    })
+  })
+
   test('registers the four handlers and broadcasts status changes', async () => {
     const { initUpdaterIpc } = await import('../../src/updaterIpc')
     const { Channel } = await import('../../src/ipc')

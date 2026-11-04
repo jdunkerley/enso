@@ -146,6 +146,8 @@ error kinds are specified in
   with the file untouched.
 - `EnsoRunner.hasRunningProjects()` counts opened projects (loading included)
   and live `--run` processes; key rotation and reset wait for it to be false.
+- `update` and `delete` with no file at all answer `NOT_FOUND` before taking the
+  lock, which would create the directory and a transient lock file.
 - Bad names throw a plain `Error`; the store's own failures are
   `LocalSecretsError` with a `kind`.
 
@@ -231,10 +233,11 @@ versions a repository only once it is _enabled_.
 - Consent is a per-repository record in `<userData>/versioning.json`
   (`{ version: 1, enabledRepositories: [...], disabledRepositories?: [...] }`,
   written by `VersioningConsent` through the `jsonFile.ts` helpers, so a corrupt
-  or newer file is moved aside and read as empty, as for `labels.json`). It is
-  never written into the user's repository or git configuration. Repositories
-  are compared by real path, lowercased on Windows (`repositoryKey`, which the
-  operation lock uses too).
+  or newer file, or one whose lists are not lists, is moved aside and read as
+  empty, as for `labels.json`; an entry that is not a string is dropped alone,
+  so the others keep their consent). It is never written into the user's
+  repository or git configuration. Repositories are compared by real path,
+  lowercased on Windows (`repositoryKey`, which the operation lock uses too).
 - `disable` records an opt-out (`disabledRepositories` in `versioning.json`,
   still version 1); only `enable` clears it; `status` reports `optedOut`.
   `enableIfInside` never re-enables an opted-out repository.
@@ -457,7 +460,9 @@ buffer; the runner feeds it through `EngineLogSink` (`engineStarted`,
   `<getEngineLogDirectory()>/<local project key>/<prefix>-yyyy-MM-dd-HH-mm-ss.log`
   — the newest such file that was not there when the engine started — followed
   by `LogFileTailer` (a directory `fs.watch` plus a 500 ms poll; a smaller or a
-  different file is a roll-over, read again from offset 0).
+  different file is a roll-over, read again from offset 0). A read that fails is
+  logged once, not on every poll: the same failure again is silent until a read
+  succeeds or the failure changes. After `stop()`, `poll()` no longer reads.
 - **Events.** `waiting` (an engine started; its file is not there yet),
   `session` (`sessionId` in the `listProjectSessions` format, `logFile`) and
   `line` (`source`, `sessionId` — `null` before the file is found — `text`).

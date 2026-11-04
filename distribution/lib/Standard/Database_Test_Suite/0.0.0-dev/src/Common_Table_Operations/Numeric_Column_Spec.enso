@@ -31,9 +31,7 @@ add_numeric_columns_specs suite_builder setup =
             column = numeric_column.get
             column.value_type.is_numeric . should_be_true
             check_column_refinements column x->
-                # Bound first: a lone ascription as a block's value cannot be cached as IR.
-                refined = (x:Numeric_Column)
-                refined
+                (x:Numeric_Column)
 
         group_builder.specify "a text column cannot be cast to Numeric_Column" <|
             column = table_builder [["X", ["txt"]]] . at "X"

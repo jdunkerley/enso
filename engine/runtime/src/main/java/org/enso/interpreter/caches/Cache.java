@@ -2,23 +2,32 @@ package org.enso.interpreter.caches;
 
 import com.oracle.truffle.api.TruffleFile;
 import com.oracle.truffle.api.TruffleLogger;
+import com.oracle.truffle.api.exception.AbstractTruffleException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.lang.foreign.Arena;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import org.enso.interpreter.runtime.EnsoContext;
+import org.enso.interpreter.runtime.control.ThreadInterruptedException;
 import org.enso.logger.masking.MaskedPath;
+import org.enso.pkg.QualifiedName;
 
 /**
  * Cache encapsulates a common functionality needed to serialize and de-serialize objects, while
@@ -164,32 +173,135 @@ public final class Cache<T, M> {
       EnsoContext context, TruffleFile cacheRoot, T entry, TruffleLogger logger)
       throws IOException {
     if (ensureRoot(cacheRoot)) {
-      byte[] bytesToWrite = spi.serialize(context, entry);
+      // Note [A Cache Records The Libraries It Refers To] in `LibraryDependencies`.
+      var referencedModules = new HashSet<QualifiedName>();
+      byte[] bytesToWrite = spi.serialize(context, entry, referencedModules);
 
       String blobDigest = CacheUtils.computeDigestFromBytes(ByteBuffer.wrap(bytesToWrite));
-      String sourceDigest = spi.computeDigest(entry, logger).get();
-      if (sourceDigest == null) {
-        throw new IOException("unable to compute digest");
-      }
-      byte[] metadataBytes = spi.metadata(sourceDigest, blobDigest, entry);
+      String sourceDigest =
+          spi.computeDigest(context, entry, logger)
+              .orElseThrow(() -> new IOException("unable to compute digest"));
+      byte[] metadataBytes =
+          spi.metadata(context, sourceDigest, blobDigest, entry, referencedModules, logger);
 
       TruffleFile cacheDataFile = getCacheDataPath(cacheRoot);
       TruffleFile metadataFile = getCacheMetadataPath(cacheRoot);
       TruffleFile parentPath = cacheDataFile.getParent();
 
-      closeMemoryArena();
-      if (writeBytesTo(cacheDataFile, bytesToWrite) && writeBytesTo(metadataFile, metadataBytes)) {
+      // Note [A Cache Is Written By Renaming]
+      deleteStaleTemporaryFiles(cacheRoot, logger);
+      var suffix =
+          TEMPORARY_INFIX
+              + Long.toHexString(ProcessHandle.current().pid())
+              + "-"
+              + TEMPORARY_COUNTER.incrementAndGet();
+      TruffleFile dataTemp = cacheRoot.resolve(cacheDataFile.getName() + suffix);
+      TruffleFile metadataTemp = cacheRoot.resolve(metadataFile.getName() + suffix);
+      try {
+        if (!writeBytesTo(dataTemp, bytesToWrite) || !writeBytesTo(metadataTemp, metadataBytes)) {
+          return false;
+        }
+        closeMemoryArena();
+        if (!moveInto(dataTemp, cacheDataFile, logger)) {
+          return false;
+        }
+        if (!moveInto(metadataTemp, metadataFile, logger)) {
+          // The new data must not stay paired with the old metadata.
+          deleteQuietly(cacheDataFile);
+          return false;
+        }
         logger.log(
             logLevel,
             "Written cache data [{0}] to [{1}] of size [{2}].",
             new Object[] {logName, toMaskedPath(parentPath).applyMasking(), bytesToWrite.length});
         return true;
-      } else {
-        // Clean up after ourselves if it fails.
-        cacheDataFile.delete();
+      } finally {
+        deleteQuietly(dataTemp);
+        deleteQuietly(metadataTemp);
       }
     }
     return false;
+  }
+
+  /* Note [A Cache Is Written By Renaming]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * A cache file may be memory-mapped by another engine while it is written
+   * (`loadCacheFrom` maps anything over 3 MB): a language server and a CLI run
+   * share the user cache, and truncating a mapped file under a reader is a
+   * SIGBUS on Linux. Two writers interleaving could also leave one's metadata
+   * paired with the other's data, and `ImportExportCache` does not check the
+   * data's digest. So the data and the metadata are each written to a
+   * temporary file in the same directory and renamed into place, data first and
+   * metadata last: a reader sees either the old pair, or the new data with the
+   * old metadata for a moment (which `ModuleCache`'s data digest catches, and
+   * which a bindings cache's source hash makes a miss at worst), never a torn
+   * file. The rename is atomic where the file system supports it, and replaces
+   * the target otherwise. On Windows a file another process has mapped cannot
+   * be replaced; the write is then skipped (logged at FINE) and the old cache
+   * stays. A write that is abandoned, or a process that dies mid-write, leaves
+   * only a temporary file; the next write to the same directory deletes
+   * temporary files older than `STALE_TEMPORARY_AGE`.
+   *
+   * A target that stays unreplaceable (kept mapped by a long-lived process on
+   * Windows) is tried again by every run that wants to write it, at the cost of
+   * serialising it each time. For a bindings-cache rewrite that is at most once
+   * per library per run (Note [A Rejected Bindings Cache Is Rewritten] in
+   * `TruffleCompilerContext`), and it stops once the other process lets go.
+   * No back-off is kept across runs.
+   */
+  private static final String TEMPORARY_INFIX = ".tmp-";
+
+  private static final java.util.concurrent.atomic.AtomicLong TEMPORARY_COUNTER =
+      new java.util.concurrent.atomic.AtomicLong();
+
+  /** Older than this, a temporary file is not a write in progress. */
+  private static final java.time.Duration STALE_TEMPORARY_AGE = java.time.Duration.ofMinutes(10);
+
+  private static boolean moveInto(TruffleFile from, TruffleFile to, TruffleLogger logger) {
+    try {
+      try {
+        from.move(to, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+      } catch (AtomicMoveNotSupportedException | UnsupportedOperationException e) {
+        from.move(to, StandardCopyOption.REPLACE_EXISTING);
+      }
+      return true;
+    } catch (IOException | SecurityException e) {
+      // E.g. Windows: another process has the target mapped.
+      logger.log(
+          Level.FINE,
+          "Cannot replace the cache file [{0}], skipping the write: {1}",
+          new Object[] {toMaskedPath(to).applyMasking(), e.toString()});
+      return false;
+    }
+  }
+
+  private void deleteStaleTemporaryFiles(TruffleFile cacheRoot, TruffleLogger logger) {
+    var prefix = spi.entryName();
+    var cutoff = System.currentTimeMillis() - STALE_TEMPORARY_AGE.toMillis();
+    try (var children = cacheRoot.newDirectoryStream()) {
+      for (var child : children) {
+        var name = child.getName();
+        if (name != null
+            && name.startsWith(prefix)
+            && name.contains(TEMPORARY_INFIX)
+            && child.getLastModifiedTime().toMillis() < cutoff) {
+          deleteQuietly(child);
+        }
+      }
+    } catch (IOException | SecurityException e) {
+      logger.log(
+          Level.FINE,
+          "Cannot list [{0}] for stale temporary files: {1}",
+          new Object[] {toMaskedPath(cacheRoot).applyMasking(), e.toString()});
+    }
+  }
+
+  private static void deleteQuietly(TruffleFile file) {
+    try {
+      file.delete();
+    } catch (IOException | SecurityException e) {
+      // already gone, or not ours to delete
+    }
   }
 
   private boolean ensureRoot(TruffleFile cacheRoot) {
@@ -262,10 +374,12 @@ public final class Cache<T, M> {
     var meta = loadCacheMetadata(metadataPath, logger);
     if (meta != null) {
       boolean sourceDigestValid =
-          !needsSourceDigestVerification
-              || spi.computeDigestFromSource(context, logger)
-                  .map(digest -> digest.equals(spi.sourceHash(meta)))
-                  .orElseGet(() -> false);
+          (!needsSourceDigestVerification
+                  || spi.computeDigestFromSource(context, logger)
+                      .map(digest -> digest.equals(spi.sourceHash(meta)))
+                      .orElseGet(() -> false))
+              // Note [A Cache Records The Libraries It Refers To] in `LibraryDependencies`.
+              && spi.dependenciesAreCurrent(context, meta, logger);
       var file = new File(dataPath.toUri());
       ByteBuffer blobBytes;
       var threeMbs = 3 * 1024 * 1024;
@@ -310,6 +424,23 @@ public final class Cache<T, M> {
         } catch (ClassNotFoundException ex) {
           invalidateCache(cacheRoot, logger);
           throw new IOException("Cannot load " + dataPath + " due to: " + ex.getMessage(), ex);
+        } catch (IOException | RuntimeException ex) {
+          // Note [A Cache That Does Not Load Is A Miss]
+          if (isCancellation(ex)) {
+            // The load was stopped, not the cache found wanting: keep it.
+            if (isInterrupt(ex)) {
+              Thread.currentThread().interrupt();
+            }
+            throw ex;
+          }
+          logger.log(
+              Level.WARNING,
+              "Discarding the cache for [{0}], which no longer loads ({1}); compiling from source.",
+              new Object[] {logName, ex.getMessage()});
+          logger.log(Level.FINE, "The cache for [" + logName + "] failed to load.", ex);
+          closeMemoryArena();
+          invalidateCache(cacheRoot, logger);
+          throw new IOException("Cannot load " + dataPath + " due to: " + ex.getMessage(), ex);
         }
       } else {
         invalidateCache(cacheRoot, logger);
@@ -324,6 +455,61 @@ public final class Cache<T, M> {
               + toMaskedPath(metadataPath).applyMasking()
               + "].");
     }
+  }
+
+  /* Note [A Cache That Does Not Load Is A Miss]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Restoring a cache can fail in ways its digests do not predict: most often
+   * `CacheUtils.readResolve` cannot restore a module reference ("Cannot
+   * convert"), because IR written before Note [A Cache Records The Libraries
+   * It Refers To] (`LibraryDependencies`) names a module that has since moved
+   * to another library (#542). Whatever `Spi.deserialize` throws, the cache is
+   * deleted and the load is a miss, so the caller compiles from source: a
+   * warning in the log, never an error for the user.
+   *
+   * A load that was cancelled or interrupted (the IDE closing a project, the
+   * context being cancelled) says nothing about the cache: the exception is
+   * rethrown, the thread's interrupt flag is restored, and the cache stays
+   * (`CacheTests`). Truffle's cancel (`ThreadDeath`) is an `Error` and is not
+   * caught at all.
+   *
+   * This covers what `deserialize` reads. Method bodies are read lazily, long
+   * after the load, when a method is first called, and a failure there cannot
+   * be turned into a miss. For them `Spi.dependenciesAreCurrent` checks, before
+   * anything is read, that every module the IR names in another library still
+   * exists (and that those libraries' sources are unchanged).
+   */
+
+  /** Whether the failure is a cancel or an interrupt rather than a fault of the cache. */
+  @SuppressWarnings("removal")
+  private static boolean isCancellation(Throwable ex) {
+    if (Thread.currentThread().isInterrupted()) {
+      return true;
+    }
+    for (var t = ex; t != null; t = t.getCause()) {
+      if (t instanceof ThreadDeath || t instanceof AbstractTruffleException) {
+        return true;
+      }
+      if (t.getCause() == t) {
+        break;
+      }
+    }
+    return isInterrupt(ex);
+  }
+
+  private static boolean isInterrupt(Throwable ex) {
+    for (var t = ex; t != null; t = t.getCause()) {
+      if (t instanceof InterruptedException
+          || t instanceof InterruptedIOException
+          || t instanceof ClosedByInterruptException
+          || t instanceof ThreadInterruptedException) {
+        return true;
+      }
+      if (t.getCause() == t) {
+        break;
+      }
+    }
+    return false;
   }
 
   /**
@@ -428,6 +614,25 @@ public final class Cache<T, M> {
     }
   }
 
+  /**
+   * Whether any of the cache's locations holds an entry, valid or not. Nothing is read.
+   *
+   * @param context the language context
+   * @return {@code true} if some location has the entry's metadata file
+   */
+  public final boolean hasEntry(EnsoContext context) {
+    for (var root : spi.getCacheRoots(context)) {
+      try {
+        if (getCacheMetadataPath(root).exists()) {
+          return true;
+        }
+      } catch (SecurityException e) {
+        // not readable: as if absent
+      }
+    }
+    return false;
+  }
+
   final <T> T asSpi(Class<T> type) {
     return type.cast(spi);
   }
@@ -478,22 +683,48 @@ public final class Cache<T, M> {
      *
      * @param context context we operate in
      * @param entry entry to persist
+     * @param referencedModules to collect the modules the written data refers to, if the cache
+     *     records them (see {@link #dependenciesAreCurrent})
      * @return array of bytes
      * @throws java.io.IOException if something goes wrong
      */
-    public abstract byte[] serialize(EnsoContext context, T entry) throws IOException;
+    public abstract byte[] serialize(
+        EnsoContext context, T entry, Set<QualifiedName> referencedModules) throws IOException;
 
     /**
      * Return serialized representation of data's metadata.
      *
+     * @param context the language context in which saving is taking place
      * @param sourceDigest digest of data's source
      * @param blobDigest digest of serialized data
      * @param entry data to serialize
+     * @param referencedModules what {@link #serialize} collected
+     * @param logger Truffle's logger
      * @return raw bytes representing serialized metadata
      * @throws java.io.IOException in case of I/O error
      */
-    public abstract byte[] metadata(String sourceDigest, String blobDigest, T entry)
+    public abstract byte[] metadata(
+        EnsoContext context,
+        String sourceDigest,
+        String blobDigest,
+        T entry,
+        Set<QualifiedName> referencedModules,
+        TruffleLogger logger)
         throws IOException;
+
+    /**
+     * Whether the other libraries the cached data refers to still have the sources it was written
+     * from, and the modules it names in them still exist. Checked before the data is deserialised.
+     * See Note [A Cache Records The Libraries It Refers To] in {@link LibraryDependencies}.
+     *
+     * @param context the language context in which loading is taking place
+     * @param meta the cache's metadata
+     * @param logger Truffle's logger
+     * @return {@code true} unless the cache must not be used
+     */
+    default boolean dependenciesAreCurrent(EnsoContext context, M meta, TruffleLogger logger) {
+      return true;
+    }
 
     /**
      * De-serializes raw bytes to data's metadata.
@@ -506,13 +737,16 @@ public final class Cache<T, M> {
     public abstract M metadataFromBytes(byte[] bytes, TruffleLogger logger) throws IOException;
 
     /**
-     * Compute digest of cache's data
+     * Compute the digest of the sources of the data being saved; {@link #computeDigestFromSource}
+     * must compute the same one from the sources on load.
      *
+     * @param context the language context in which saving is taking place
      * @param entry data for which digest should be computed
      * @param logger Truffle's logger
      * @return non-empty digest, if successful
      */
-    public abstract Optional<String> computeDigest(T entry, TruffleLogger logger);
+    public abstract Optional<String> computeDigest(
+        EnsoContext context, T entry, TruffleLogger logger);
 
     /**
      * Compute digest of data's source

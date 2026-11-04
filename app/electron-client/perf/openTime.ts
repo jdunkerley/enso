@@ -33,6 +33,12 @@ import {
   type RunResult,
   type Template,
 } from './openTimeReport'
+import {
+  parseTemplateName,
+  projectTemplate,
+  type ProjectTemplate,
+  type TemplateName,
+} from './projectTemplates'
 
 const OPEN_TIMEOUT_MS = 180_000
 const POLL_MS = 20
@@ -49,6 +55,8 @@ interface Options {
   readonly extrasMs: number
   readonly jvmDiagnostics: boolean
   readonly jvmOptions: string
+  readonly template: TemplateName
+  readonly engineLogLevel: string | undefined
 }
 
 function parseOptions(argv: readonly string[]): Options {
@@ -66,6 +74,8 @@ function parseOptions(argv: readonly string[]): Options {
       'extras-seconds': { type: 'string', default: '15' },
       'jvm-diagnostics': { type: 'boolean', default: false },
       'jvm-options': { type: 'string', default: '' },
+      template: { type: 'string', default: 'welcome' },
+      'engine-log-level': { type: 'string' },
     },
   })
   // `parseArgs` types an option with a default as possibly undefined: apply the defaults here.
@@ -83,6 +93,8 @@ function parseOptions(argv: readonly string[]): Options {
     extrasMs: Number(values['extras-seconds'] ?? '15') * 1000,
     jvmDiagnostics: values['jvm-diagnostics'] ?? false,
     jvmOptions: values['jvm-options'] ?? '',
+    template: parseTemplateName(values.template ?? 'welcome'),
+    engineLogLevel: values['engine-log-level'],
   }
 }
 
@@ -149,6 +161,15 @@ async function runLauncher(
   })
 }
 
+/** Write `project` over the new project at `dir`. */
+function writeTemplate(dir: string, project: ProjectTemplate) {
+  fs.writeFileSync(path.join(dir, 'src', 'Main.enso'), project.main)
+  for (const [file, data] of Object.entries(project.files)) {
+    fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true })
+    fs.writeFileSync(path.join(dir, file), data)
+  }
+}
+
 /** Run the bundled launcher's `--new`, as the dashboard's New Project button does. */
 async function createProject(launcher: string, projectsDir: string, name: string) {
   fs.mkdirSync(projectsDir, { recursive: true })
@@ -189,6 +210,7 @@ async function openProject(
   profile: boolean,
   extrasMs: number,
   snapshot: (phase: string) => void,
+  project: ProjectTemplate | undefined,
 ) {
   const row = page.getByTestId('drive-view').getByText(name, { exact: true })
   await row.waitFor({ state: 'visible', timeout: 60_000 })
@@ -207,19 +229,24 @@ async function openProject(
     async () =>
       (
         (await page.locator('.TableVisualization').first().textContent({ timeout: 100 })) ?? ''
-      ).includes('Welcome To Enso!'),
+      ).includes(project?.headline ?? 'Welcome To Enso!'),
     OPEN_TIMEOUT_MS,
   )
-  if (!shown) throw new Error(`${tag}: no welcome table within ${OPEN_TIMEOUT_MS} ms`)
+  if (!shown) throw new Error(`${tag}: no headline table within ${OPEN_TIMEOUT_MS} ms`)
+  // The headline: the welcome table, or the table of a template's library result (`libraryShown`
+  // marks the same moment, so the two are not mistaken for each other in `marks.json`).
   marks.add(`${tag}:welcomeShown`)
+  if (project != null) marks.add(`${tag}:libraryShown`)
   snapshot(`${tag}-welcomeShown`)
   if (cdp) {
     const { profile: cpuProfile } = await cdp.send('Profiler.stop')
     fs.writeFileSync(path.join(dir, `${tag}.cpuprofile`), JSON.stringify(cpuProfile))
     await cdp.detach()
   }
-  await measureExtras(page, tag, marks, dir, extrasMs)
-  snapshot(`${tag}-extras`)
+  if (project?.extras ?? true) {
+    await measureExtras(page, tag, marks, dir, extrasMs)
+    snapshot(`${tag}-extras`)
+  }
 }
 
 /* Note [JVM Counters At Each Phase]
@@ -410,7 +437,11 @@ async function measureLaunch(
     first: `OpenTime${stamp}a`,
     second: `OpenTime${stamp}b`,
   } as const
-  for (const tag of opens) await createProject(launcher, projectsDir, names[tag])
+  const project = projectTemplate(options.template)
+  for (const tag of opens) {
+    await createProject(launcher, projectsDir, names[tag])
+    if (project != null) writeTemplate(path.join(projectsDir, names[tag]), project)
+  }
   const marks = new Marks()
   const stdoutLines: string[] = []
   const out = fs.createWriteStream(path.join(dir, 'electron-out.log'))
@@ -420,13 +451,23 @@ async function measureLaunch(
     ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
     ENSO_AI_DISABLED: '1',
     ENSO_LOG_DIRECTORY: logDir,
+    // `--engine-log-level debug`: the engine's own log at that level, to split an open (e.g.
+    // `AttachVisualizationCmd`, `Starting ExecuteJob`, module loading); slower, so not for medians.
+    ...(options.engineLogLevel ?
+      { ENSO_LOGSERVER_LOG_TO_FILE_LOG_LEVEL: options.engineLogLevel }
+    : {}),
     ...extraEnv,
   }
   let app: ElectronApplication | undefined
   let page: Page | undefined
   let error: string | undefined
+  // A native engine has a JVM only for a library's Java (a guest JVM, Note [A Project That Uses A
+  // Library With Java Code] in `projectTemplates.ts`), so the welcome template's native launches
+  // have no counters to copy.
   const snapshot =
-    engine === 'native' ? () => {} : (phase: string) => snapshotJvmCounters(dir, phase, marks)
+    engine === 'native' && project == null ?
+      () => {}
+    : (phase: string) => snapshotJvmCounters(dir, phase, marks)
   try {
     marks.add('launch')
     app = await _electron.launch({
@@ -475,6 +516,7 @@ async function measureLaunch(
         options.profile,
         options.extrasMs,
         snapshot,
+        project,
       )
       await closeProject(page, names[tag])
       await page.waitForTimeout(2000)
@@ -484,6 +526,14 @@ async function measureLaunch(
     error = String(e).slice(0, 2000)
     // What the page showed when the launch gave up (uploaded by CI with the extras' screenshots).
     await page?.screenshot({ path: path.join(dir, 'failed.png'), timeout: 5000 }).catch(() => {})
+    // And the nodes' text, which holds an error message too small to read in the screenshot.
+    const nodes = await page
+      ?.locator('.GraphNode')
+      .allTextContents()
+      .catch(() => [])
+    if (nodes != null && nodes.length > 0) {
+      out.write(`${Date.now()} nodes ${JSON.stringify(nodes).slice(0, 4000)}\n`)
+    }
   } finally {
     await Promise.race([app?.close(), new Promise((resolve) => setTimeout(resolve, 20_000))]).catch(
       () => {},
@@ -579,7 +629,8 @@ function readReports(targets: readonly string[]): OpenTimeReport[] {
 async function main() {
   const options = parseOptions(process.argv.slice(2))
   fs.mkdirSync(options.out, { recursive: true })
-  const template = await packagedTemplate(options)
+  // A project of the harness's own is compared with nothing (`other`).
+  const template = options.template === 'welcome' ? await packagedTemplate(options) : 'other'
   const runs: RunResult[] = []
   let jvmAot: JvmAot | undefined
   for (const engine of options.engines) {
@@ -666,6 +717,7 @@ async function main() {
     platform: process.platform,
     commit: process.env.GITHUB_SHA ?? null,
     template,
+    ...(options.template !== 'welcome' ? { project: options.template } : {}),
     ...(jvmAot ? { jvmAot } : {}),
     runs,
   }

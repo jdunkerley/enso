@@ -12,11 +12,17 @@ import {
   callsSbt,
   checkBuildScriptsSpawnSbtThroughHelper,
   checkChangedFilesCountDeletions,
+  checkCleanAfterAlwaysRuns,
+  checkCleanBuildVariableIsDefined,
+  checkLocalActionsFollowCheckout,
+  checkRunsOnResolvesAgainstItsMatrix,
+  globMatches,
+  pathsMatch,
   checkIdePackagingNeedsNoCloudAccount,
   checkJobsHaveTimeouts,
   checkMacosChecksRunWhatIsRequested,
   checkMacosJobsAreGated,
-  checkOnlyMacosReleaseJobsMayFail,
+  checkMacosReleaseJobsAreRequired,
   checkOpenPerf,
   checkPublicTypes,
   checkPullRequestsIgnoreSpecs,
@@ -72,7 +78,8 @@ env:
 jobs:
   check-the-mac-os-runner:
     runs-on: ubuntu-latest
-    steps: []
+    steps:
+      - run: ./tools/ci/wait-for-macos-runner.sh 12 fail
   draft-release:
     runs-on: ubuntu-latest
     steps:
@@ -83,7 +90,6 @@ jobs:
     needs: [check-the-mac-os-runner]
     ${GATE_IF}
     runs-on: [self-hosted, macOS]
-    continue-on-error: true
     steps: []
   upload-ide:
     runs-on: ubuntu-latest
@@ -93,13 +99,12 @@ jobs:
     needs: [check-the-mac-os-runner, build-backend-macos]
     ${GATE_IF}
     runs-on: [self-hosted, macOS]
-    continue-on-error: true
     steps:
       - run: corepack pnpm --filter build-scripts run release upload-ide
   publish-release:
     runs-on: ubuntu-latest
     needs: [draft-release, license-check, upload-ide, upload-ide-macos]
-    if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success'))"
+    if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success' && needs.upload-ide-macos.result == 'success'))"
     steps:
       - run: corepack pnpm --filter build-scripts run release publish
   update-latest-release-version:
@@ -258,24 +263,28 @@ describe('checkReleaseIsIdeOnly', () => {
   })
 })
 
-describe('checkOnlyMacosReleaseJobsMayFail', () => {
+describe('checkMacosReleaseJobsAreRequired', () => {
   const problems = (text) =>
-    checkOnlyMacosReleaseJobsMayFail(fixture({ 'workflows/release.yml': text }))
-  test('accepts tolerant macOS backend and IDE jobs', () => {
+    checkMacosReleaseJobsAreRequired(fixture({ 'workflows/release.yml': text }))
+  test('accepts required macOS jobs and a runner check that fails', () => {
     assert.deepEqual(problems(RELEASE_OK), [])
   })
-  test('rejects a tolerant Linux job and a blocking macOS upload', () => {
+  test('rejects continue-on-error on any job, macOS included', () => {
     const text = RELEASE_OK.replace(
-      '    runs-on: [self-hosted, macOS]\n    continue-on-error: true\n    steps:\n',
-      '    runs-on: [self-hosted, macOS]\n    steps:\n',
+      '    runs-on: [self-hosted, macOS]\n    steps:\n      - run',
+      '    runs-on: [self-hosted, macOS]\n    continue-on-error: true\n    steps:\n      - run',
     ).replace(
       '  draft-release:\n    runs-on: ubuntu-latest',
       '  draft-release:\n    runs-on: ubuntu-latest\n    continue-on-error: true',
     )
     const found = problems(text)
     assert.equal(found.length, 2)
-    assert.ok(found.some((p) => p.includes('draft-release: only macOS jobs')))
-    assert.ok(found.some((p) => p.includes('upload-ide-macos: a macOS backend or IDE job')))
+    assert.ok(found.some((p) => p.includes('draft-release: must not set')))
+    assert.ok(found.some((p) => p.includes('upload-ide-macos: must not set')))
+  })
+  test('rejects a runner check that skips instead of failing', () => {
+    const found = problems(RELEASE_OK.replace('12 fail', '1 skip'))
+    assert.ok(found.some((p) => p.includes('check-the-mac-os-runner: must run')))
   })
   test('rejects a release without its macOS IDE upload job, and an unexpected macOS job', () => {
     const found = problems(RELEASE_OK.replace('upload-ide-macos:', 'something-else:'))
@@ -286,7 +295,7 @@ describe('checkOnlyMacosReleaseJobsMayFail', () => {
 
 describe('checkMacosJobsAreGated', () => {
   const problems = (text) => checkMacosJobsAreGated(fixture({ 'workflows/release.yml': text }))
-  test('accepts a gated release whose publish job does not wait on macOS', () => {
+  test('accepts a gated release whose publish job waits on macOS', () => {
     assert.deepEqual(problems(RELEASE_OK), [])
   })
   test('accepts a gated nightly', () => {
@@ -326,7 +335,7 @@ jobs:
   })
   test('rejects macOS jobs when the gate job is missing', () => {
     const text = RELEASE_OK.replace(
-      '  check-the-mac-os-runner:\n    runs-on: ubuntu-latest\n    steps: []\n',
+      '  check-the-mac-os-runner:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./tools/ci/wait-for-macos-runner.sh 12 fail\n',
       '',
     )
     assert.ok(problems(text).some((p) => p.includes('no `check-the-mac-os-runner` gate job')))
@@ -349,14 +358,11 @@ jobs:
     )
     assert.ok(problems(text).some((p) => p.includes('must still need the macOS IDE upload')))
   })
-  test('rejects a publish job that waits on macOS, and one that drops a required result', () => {
-    const waits = problems(
-      RELEASE_OK.replace(
-        'inputs.publish && needs.draft-release',
-        "inputs.publish && needs.upload-ide-macos.result == 'success' && needs.draft-release",
-      ),
+  test('rejects a publish job that does not require macOS, and one that drops a required result', () => {
+    const skips = problems(
+      RELEASE_OK.replace(" && needs.upload-ide-macos.result == 'success'", ''),
     )
-    assert.ok(waits.some((p) => p.includes('must not wait on a macOS job')))
+    assert.ok(skips.some((p) => p.includes("lacks `needs.upload-ide-macos.result == 'success'`")))
     const drops = problems(RELEASE_OK.replace(" && needs.license-check.result == 'success'", ''))
     assert.ok(drops.some((p) => p.includes("lacks `needs.license-check.result == 'success'`")))
     const unheld = problems(RELEASE_OK.replace('inputs.publish && ', ''))
@@ -1252,5 +1258,283 @@ ${env}`
       'workflows/b.yml': job('        env:\n          ENSO_TEST_GROUP_FILTER: x', only),
     })
     assert.equal(checkStdlibTestsGetTheGroupFilter(repo).length, 2)
+  })
+})
+
+describe('globMatches and pathsMatch', () => {
+  test('* stays within a directory, ** crosses them, ? is one character', () => {
+    assert.equal(globMatches('docs/*', 'docs/a.md'), true)
+    assert.equal(globMatches('docs/*', 'docs/superpowers/a.md'), false)
+    assert.equal(globMatches('docs/**', 'docs/superpowers/specs/a.md'), true)
+    assert.equal(globMatches('**/*.md', 'docs/superpowers/a.md'), true)
+    assert.equal(globMatches('**/*.md', 'a.md'), true)
+    assert.equal(globMatches('*', 'docs/a.md'), false)
+    assert.equal(globMatches('**', 'docs/a.md'), true)
+    assert.equal(globMatches('docs/a?.md', 'docs/.md'), true)
+    assert.equal(globMatches('docs/a?.md', 'docs/a.md'), true)
+    assert.equal(globMatches('docs/a?.md', 'docs/aa.md'), false)
+    assert.equal(globMatches('engine/**', 'docs/a.md'), false)
+  })
+  test('+ is one or more of the preceding character, [] a character class, braces literal', () => {
+    assert.equal(globMatches('docs/a+.md', 'docs/a.md'), true)
+    assert.equal(globMatches('docs/a+.md', 'docs/aaa.md'), true)
+    assert.equal(globMatches('docs/a+.md', 'docs/.md'), false)
+    assert.equal(globMatches('docs/[ab].md', 'docs/b.md'), true)
+    assert.equal(globMatches('docs/[a-c].md', 'docs/c.md'), true)
+    assert.equal(globMatches('docs/[a-c].md', 'docs/d.md'), false)
+    assert.equal(globMatches('docs/{a,b}.md', 'docs/a.md'), false)
+    assert.equal(globMatches('docs/{a,b}.md', 'docs/{a,b}.md'), true)
+  })
+  test('an unclosed [ or a stray quantifier is literal and never throws', () => {
+    assert.equal(globMatches('docs/[a.md', 'docs/[a.md'), true)
+    assert.equal(globMatches('docs/[a.md', 'docs/a.md'), false)
+    assert.equal(globMatches('docs/[]a', 'docs/[]a'), true)
+    assert.equal(globMatches('+a', '+a'), true)
+    assert.equal(globMatches('docs/(a', 'docs/(a'), true)
+  })
+  test('a later ! pattern excludes what an earlier one included', () => {
+    assert.equal(pathsMatch(['docs/**', '!docs/superpowers/**'], 'docs/superpowers/a.md'), false)
+    assert.equal(pathsMatch(['docs/**', '!docs/superpowers/**'], 'docs/other.md'), true)
+    assert.equal(pathsMatch(['!docs/superpowers/**', 'docs/**'], 'docs/superpowers/a.md'), true)
+  })
+})
+
+describe('checkPullRequestsIgnoreSpecs: real glob matching', () => {
+  const on = (filter) =>
+    fixture({ 'workflows/a.yml': `on:\n  pull_request:\n${filter}\njobs: {}\n` })
+  test('rejects a whitelist whose glob matches the specs', () => {
+    assert.equal(checkPullRequestsIgnoreSpecs(on('    paths: ["**"]')).length, 1)
+    assert.equal(checkPullRequestsIgnoreSpecs(on('    paths: ["**/*.md"]')).length, 1)
+    assert.equal(checkPullRequestsIgnoreSpecs(on('    paths: ["docs/**"]')).length, 1)
+    assert.equal(
+      checkPullRequestsIgnoreSpecs(on('    paths: ["engine/**", "docs/superpowers/**"]')).length,
+      1,
+    )
+  })
+  test('accepts a whitelist that leaves the specs out', () => {
+    assert.deepEqual(checkPullRequestsIgnoreSpecs(on('    paths: ["*", "engine/**"]')), [])
+    assert.deepEqual(
+      checkPullRequestsIgnoreSpecs(on('    paths: ["docs/**", "!docs/superpowers/**"]')),
+      [],
+    )
+  })
+  test('accepts a paths-ignore whose glob covers the specs, rejects one that does not', () => {
+    assert.deepEqual(checkPullRequestsIgnoreSpecs(on('    paths-ignore: ["docs/**"]')), [])
+    assert.equal(checkPullRequestsIgnoreSpecs(on('    paths-ignore: ["docs/*"]')).length, 1)
+    assert.equal(checkPullRequestsIgnoreSpecs(on('    paths-ignore: ["**.txt"]')).length, 1)
+  })
+})
+
+describe('checkLocalActionsFollowCheckout', () => {
+  const job = (steps) => `on: push\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n${steps}`
+  const CHECKOUT = '      - uses: actions/checkout@v5\n'
+  const LOCAL = '      - name: Set up\n        uses: ./.github/actions/setup-jvm\n'
+  test('accepts a local action after the checkout, and a job with no local action', () => {
+    const repo = fixture({
+      'workflows/a.yml': job(CHECKOUT + LOCAL),
+      'workflows/b.yml': job('      - run: echo hi\n'),
+    })
+    assert.deepEqual(checkLocalActionsFollowCheckout(repo), [])
+  })
+  test('rejects a local action before the checkout, or with none', () => {
+    const repo = fixture({
+      'workflows/a.yml': job(LOCAL + CHECKOUT),
+      'workflows/b.yml': job(LOCAL),
+    })
+    assert.deepEqual(checkLocalActionsFollowCheckout(repo), [
+      'a.yml › j: `Set up` uses a local action before `actions/checkout` (the action is not on the runner until then)',
+      'b.yml › j: `Set up` uses a local action before `actions/checkout` (the action is not on the runner until then)',
+    ])
+  })
+})
+
+describe('checkCleanAfterAlwaysRuns', () => {
+  const job = (steps) => `on: push\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps:\n${steps}`
+  const CLEAN = (name, cond = '') =>
+    `      - name: ${name}\n${cond}        uses: ./.github/actions/git-clean\n`
+  test('accepts a "Clean after" with if: always(), and an unconditional "Clean before"', () => {
+    const repo = fixture({
+      'workflows/a.yml': job(
+        CLEAN('Clean before') + CLEAN('Clean after', '        if: always()\n'),
+      ),
+      'workflows/b.yml': job(CLEAN('Clean after', '        if: always() && inputs.x\n')),
+    })
+    assert.deepEqual(checkCleanAfterAlwaysRuns(repo), [])
+  })
+  test('rejects a "Clean after" that a failed job would skip', () => {
+    const repo = fixture({
+      'workflows/a.yml': job(CLEAN('Clean before') + CLEAN('Clean after')),
+      'workflows/b.yml': job(CLEAN('Clean after', '        if: success()\n')),
+      'workflows/c.yml': job(CLEAN('Clean after', '        if: ${{ !cancelled() }}\n')),
+    })
+    const problems = checkCleanAfterAlwaysRuns(repo)
+    assert.equal(problems.length, 3)
+    assert.match(problems[0], /^a\.yml › j: `Clean after` .*`if: always\(\)`/)
+  })
+  test('rejects a later git-clean call that is not named "Clean after"', () => {
+    const repo = fixture({
+      'workflows/a.yml': job(CLEAN('Clean before') + CLEAN('Tidy up')),
+    })
+    assert.equal(checkCleanAfterAlwaysRuns(repo).length, 1)
+  })
+})
+
+describe('checkCleanBuildVariableIsDefined', () => {
+  const wf = (env, jobEnv = '') =>
+    `on: push\n${env}jobs:\n  j:\n    runs-on: ubuntu-latest\n${jobEnv}    steps:\n      - uses: ./.github/actions/git-clean\n`
+  test('accepts a string at the top of the workflow, or on the job', () => {
+    const repo = fixture({
+      'workflows/a.yml': wf('env:\n  ENSO_CI_CLEAN_BUILD: "true"\n'),
+      'workflows/b.yml': wf(
+        'env:\n  ENSO_CI_CLEAN_BUILD: "${{ github.ref == \'refs/heads/develop\' }}"\n',
+      ),
+      'workflows/c.yml': wf('', '    env:\n      ENSO_CI_CLEAN_BUILD: "false"\n'),
+      'workflows/d.yml': 'on: push\njobs:\n  j:\n    runs-on: ubuntu-latest\n    steps: []\n',
+    })
+    assert.deepEqual(checkCleanBuildVariableIsDefined(repo), [])
+  })
+  test('rejects a workflow that never defines it, or defines a boolean', () => {
+    const repo = fixture({
+      'workflows/a.yml': wf(''),
+      'workflows/b.yml': wf('env:\n  ENSO_CI_CLEAN_BUILD: true\n'),
+    })
+    assert.deepEqual(checkCleanBuildVariableIsDefined(repo), [
+      'a.yml › j: uses `git-clean` but defines no `ENSO_CI_CLEAN_BUILD` (at the top of the workflow or on the job)',
+      'b.yml › j: `ENSO_CI_CLEAN_BUILD` must be a string (`"true"`), not true',
+    ])
+  })
+})
+
+describe('macOS rules with a matrix runs-on', () => {
+  const MATRIX_MAC = `    strategy:
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+          - os: macos
+            runner: macos-latest
+`
+  const releaseWithMatrixMac = RELEASE_OK.replace(
+    '  upload-ide-macos:',
+    `  matrix-mac:
+    needs: [check-the-mac-os-runner]
+    runs-on: \${{ matrix.runner }}
+${MATRIX_MAC}    steps: []
+  upload-ide-macos:`,
+  )
+  test('a matrix job with a macOS leg counts as a macOS job (unexpected here)', () => {
+    const repo = fixture({ 'workflows/release.yml': releaseWithMatrixMac })
+    assert.ok(
+      checkMacosReleaseJobsAreRequired(repo).some((p) =>
+        p.includes('matrix-mac: unexpected macOS job'),
+      ),
+    )
+  })
+  test('a matrix macOS job must be gated on the Mac', () => {
+    const repo = fixture({ 'workflows/release.yml': releaseWithMatrixMac })
+    assert.ok(
+      checkMacosJobsAreGated(repo).some((p) =>
+        p.includes('release.yml › matrix-mac: a macOS job must need'),
+      ),
+    )
+  })
+  test('a call with os from the matrix must be gated when a leg is macos', () => {
+    const repo = fixture({
+      'workflows/engine-checks-nightly.yml': `
+on: workflow_dispatch
+jobs:
+  check-the-mac-os-runner:
+    runs-on: ubuntu-latest
+    steps: []
+  platform:
+    strategy:
+      matrix:
+        include:
+          - os: linux
+          - os: macos
+    uses: ./.github/workflows/engine-checks-platform.yml
+    with:
+      os: \${{ matrix.os }}
+`,
+    })
+    assert.ok(
+      checkMacosJobsAreGated(repo).some((p) =>
+        p.includes('engine-checks-nightly.yml › platform: a macOS job must need'),
+      ),
+    )
+  })
+  test('a matrix with only Linux and Windows legs is not a macOS job', () => {
+    const repo = fixture({
+      'workflows/release.yml': RELEASE_OK.replace(
+        '  upload-ide:\n    runs-on: ubuntu-latest',
+        '  upload-ide:\n    runs-on: ${{ matrix.runner }}\n    strategy:\n      matrix:\n        runner: [ubuntu-latest, windows-latest]',
+      ),
+    })
+    assert.deepEqual(checkMacosReleaseJobsAreRequired(repo), [])
+    assert.deepEqual(checkMacosJobsAreGated(repo), [])
+  })
+  describe('checkRunsOnResolvesAgainstItsMatrix', () => {
+    const job = (runsOn, strategy = '') =>
+      `on: push\njobs:\n  j:\n    runs-on: ${runsOn}\n${strategy}    steps: []\n`
+    test('accepts literals, inputs and a matrix key every leg defines', () => {
+      const repo = fixture({
+        'workflows/a.yml': job('ubuntu-latest'),
+        'workflows/b.yml': job('${{ inputs.runner }}'),
+        'workflows/c.yml': job('${{ matrix.runner }}', MATRIX_MAC),
+        'workflows/d.yml': job(
+          '${{ matrix.runner }}',
+          '    strategy:\n      matrix:\n        runner: [ubuntu-latest, windows-latest]\n',
+        ),
+      })
+      assert.deepEqual(checkRunsOnResolvesAgainstItsMatrix(repo), [])
+    })
+    test('rejects a matrix expression its strategy does not define, or computes', () => {
+      const repo = fixture({
+        'workflows/a.yml': job('${{ matrix.runner }}'),
+        'workflows/b.yml': job(
+          '${{ matrix.runner }}',
+          '    strategy:\n      matrix:\n        os: [linux]\n',
+        ),
+        'workflows/c.yml': job(
+          '${{ matrix.runner }}',
+          '    strategy:\n      matrix: ${{ fromJSON(inputs.m) }}\n',
+        ),
+        'workflows/d.yml': job(
+          '${{ matrix.runner }}',
+          '    strategy:\n      matrix:\n        include:\n          - os: linux\n            runner: ubuntu-latest\n          - os: macos\n',
+        ),
+      })
+      const problems = checkRunsOnResolvesAgainstItsMatrix(repo)
+      assert.equal(problems.length, 4)
+      assert.match(problems[0], /^a\.yml › j: `runs-on` reads `matrix\.runner`/)
+    })
+  })
+})
+
+describe('checkSbtRunsAfterSetupJvm: a conditional setup-jvm', () => {
+  const wf = (setupIf, sbtIf) => `
+on: push
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - ${setupIf}uses: ./.github/actions/setup-jvm
+        with: { cache-key: a }
+      - name: Build
+        ${sbtIf}run: sbt compile
+`
+  test('rejects sbt after a setup-jvm that may be skipped', () => {
+    const repo = fixture({ 'workflows/a.yml': wf('if: inputs.build\n        ', '') })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [
+      'a.yml › j: `Build` runs sbt before `./.github/actions/setup-jvm`',
+    ])
+  })
+  test('accepts sbt under the same condition as the setup-jvm, or an unconditional one', () => {
+    const same = fixture({
+      'workflows/a.yml': wf('if: inputs.build\n        ', 'if: inputs.build\n        '),
+    })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(same), [])
+    const plain = fixture({ 'workflows/a.yml': wf('', '') })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(plain), [])
   })
 })
