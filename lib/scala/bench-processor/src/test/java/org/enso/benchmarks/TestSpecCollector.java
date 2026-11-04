@@ -3,6 +3,7 @@ package org.enso.benchmarks;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -10,6 +11,7 @@ import java.io.File;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.util.List;
+import org.enso.benchmarks.processor.SpecCollectionException;
 import org.enso.benchmarks.processor.SpecCollector;
 import org.enso.common.LanguageInfo;
 import org.enso.common.MethodNames.TopScope;
@@ -28,6 +30,8 @@ public class TestSpecCollector {
   private File ensoDir;
   private File ensoHomeOverride;
   private Value testCollectorMainModule;
+  private File testCollectorPath;
+  private String mainModuleNameStr;
 
   @Before
   public void setup() {
@@ -39,10 +43,11 @@ public class TestSpecCollector {
 
     // Note that ensoHomeOverride does not have to exist, only its parent directory
     ensoHomeOverride = ensoDir.toPath().resolve("distribution").resolve("component").toFile();
-    File testCollectorPath =
+    testCollectorPath =
         new File(getClass().getClassLoader().getResource("Test_Collector").getPath());
     var pkg = PackageManager.Default().fromDirectory(testCollectorPath).get();
     var mainModuleName = pkg.moduleNameForFile(pkg.mainFile());
+    mainModuleNameStr = mainModuleName.toString();
     ctx =
         Context.newBuilder(LanguageInfo.ID)
             .allowAllAccess(true)
@@ -105,6 +110,38 @@ public class TestSpecCollector {
       assertEquals(14, group.configuration().measure().seconds());
     }
     assertFalse(moduleBenchSuites.isEmpty());
+  }
+
+  /** Generating the sources of a module with benchmarks writes one class per group. */
+  @Test
+  public void testGenerateBenchSpecsWritesAClassPerGroup() {
+    var classes = new java.util.ArrayList<String>();
+    var collector =
+        SpecCollector.create(
+            mainModuleNameStr,
+            "group_1",
+            testCollectorPath,
+            ensoHomeOverride,
+            (className, content) -> classes.add(className));
+    collector.generateBenchSpecs();
+    assertEquals(List.of("org.enso.benchmarks.generated.Test_Group"), classes);
+  }
+
+  /**
+   * Finding no benchmark must fail, not generate nothing: without any source JMH writes no {@code
+   * META-INF/BenchmarkList}, and the run dies much later (#554).
+   */
+  @Test
+  public void testGenerateBenchSpecsFailsWhenNoBenchmarkIsFound() {
+    var collector =
+        SpecCollector.create(
+            mainModuleNameStr,
+            "NOOOON_existent_FOO",
+            testCollectorPath,
+            ensoHomeOverride,
+            (className, content) -> fail("Unexpected class " + className));
+    var ex = assertThrows(SpecCollectionException.class, collector::generateBenchSpecs);
+    assertTrue(ex.getMessage(), ex.getMessage().contains("No benchmark group found"));
   }
 
   @Test
