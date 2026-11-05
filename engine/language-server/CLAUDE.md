@@ -82,6 +82,11 @@ engine started without one refuses every channel socket (`403`; an unknown kind
 is `404`). The socket is only as private as the `--interface` the engine binds:
 the shim passes loopback. See Note [The Channel Socket].
 
+A session opens **two** `json` sockets (the ydoc server's proxy channel for the
+GUI and its backend channel); each socket is its own channel and controller. The
+visualization bridge drops a control or data channel when it closes (unless a
+newer one replaced it): a closed channel is a normal end, logged at trace.
+
 See [Language-Server](https://github.com/jdunkerley/enso/wiki/Language-Server)
 for every endpoint's schema.
 

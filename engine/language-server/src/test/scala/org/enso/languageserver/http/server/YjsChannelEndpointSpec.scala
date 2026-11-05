@@ -118,6 +118,45 @@ class YjsChannelEndpointSpec
       }
     }
 
+    "accept two concurrent json sockets with the same token and keep them apart" in {
+      // A session opens a proxy channel for the GUI and a backend channel for
+      // the ydoc server, both of kind json.
+      val (e, connected) = endpoint(Some("t0k"))
+      val proxyWs        = WSProbe()
+      val backendWs      = WSProbe()
+      WS("/channel/json?token=t0k", proxyWs.flow) ~> e.route ~> check {
+        val proxy = poll(connected("json"))
+        WS("/channel/json?token=t0k", backendWs.flow) ~> e.route ~> check {
+          val backend = poll(connected("json"))
+          (proxy eq backend) shouldBe false
+          val proxyIn   = new LinkedBlockingQueue[Object]()
+          val backendIn = new LinkedBlockingQueue[Object]()
+          proxy.subscribe(m => { proxyIn.add(m); () })
+          backend.subscribe(m => { backendIn.add(m); () })
+
+          proxyWs.sendMessage("from proxy")
+          backendWs.sendMessage("from backend")
+          poll(proxyIn) shouldBe "from proxy"
+          poll(backendIn) shouldBe "from backend"
+          proxy.send("to proxy")
+          backend.send("to backend")
+          proxyWs.expectMessage("to proxy")
+          backendWs.expectMessage("to backend")
+
+          // Closing one socket ends only its channel.
+          val closes = new LinkedBlockingQueue[String]()
+          proxy.onClose(() => closes.add("proxy"))
+          backend.onClose(() => closes.add("backend"))
+          backendWs.sendCompletion()
+          poll(closes) shouldBe "backend"
+          closes.poll(300, TimeUnit.MILLISECONDS) shouldBe null
+          proxyWs.sendMessage("still open")
+          poll(proxyIn) shouldBe "still open"
+          proxyWs.sendCompletion()
+        }
+      }
+    }
+
     "answer 404 for an unknown kind" in {
       val (e, _) = endpoint(Some("t0k"))
       WS("/channel/other?token=t0k", WSProbe().flow) ~> e.route ~> check {
