@@ -12,4 +12,3 @@
 - Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns.from that:Standard.Base.Data.Range.Range -> Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns
 - Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns.from that:Standard.Base.Data.Time.Date_Range.Date_Range -> Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns
 - Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns.from that:Standard.Base.Any.Any -> Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns
-- Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns.from that:Standard.Base.Data.XML.XML_Element -> Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns

@@ -1,11 +1,11 @@
 [package]
 name = "enso-macros"
 version = "0.2.7"
-authors = ["Enso Team <enso-dev@enso.org>"]
+authors = ["jdunkerley"]
 edition = "2024"
 description = "Common macros used in Enso codebase."
-homepage = "https://github.com/enso-org/enso"
-repository = "https://github.com/enso-org/enso"
+homepage = "https://github.com/jdunkerley/enso"
+repository = "https://github.com/jdunkerley/enso"
 license-file = "../../../LICENSE"
 
 [lib]

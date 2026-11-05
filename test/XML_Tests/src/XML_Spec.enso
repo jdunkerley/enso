@@ -4,6 +4,8 @@ from Standard.Base.Runtime import assert
 
 from Standard.Test import all
 
+from Standard.XML import all
+
 depretty xmlText =
     xmlText.replace (Regex.compile "\r?\n\s*") ""
 
@@ -235,9 +237,54 @@ add_specs suite_builder =
             (data.root.get_xpath "/class/teacher[2]/bio" . at 0 . inner_xml) . should_equal '\n            This that\n        '
             (data.root.get_xpath "/class/teacher[2]" . at 0 . inner_xml) . should_equal '\n        <firstname>Bob</firstname>\n        <lastname>Jones</lastname>\n        <bio>\n            This that\n        </bio>\n    '
 
+        group_builder.specify "Can get the inner xml of non-ASCII text" <|
+            doc = XML_Document.parse '<a><b>żółw — 日本 €</b></a>'
+            doc.root_element.inner_xml . should_equal '<b>żółw — 日本 €</b>'
+            doc.inner_xml . should_equal '<a><b>żółw — 日本 €</b></a>'
+
         group_builder.specify "Can get the outer xml" <|
             (data.root.get_xpath "/class/teacher[1]/bio" . at 0 . outer_xml) . should_equal '<bio>\n            Blah blah\n        </bio>'
             (data.root.get_xpath "/class/teacher[2]/bio" . at 0 . outer_xml) . should_equal '<bio>\n            This that\n        </bio>'
+
+    suite_builder.group "External entities" group_builder->
+        file_uri file =
+            path = file.absolute.path.replace '\\' '/'
+            if path.starts_with "/" then "file://" + path else "file:///" + path
+
+        with_secret_file action =
+            secret_file = File.create_temporary_file "xxe-secret" ".txt"
+            Panic.with_finalizer secret_file.delete <|
+                "XXE_SECRET_CONTENT" . write secret_file on_existing_file=..Overwrite . should_succeed
+                action secret_file
+
+        # The document parses with the entity left out, or fails to parse; it
+        # never holds the file's contents.
+        check_secret_not_read result =
+            if result.is_error then result.catch . should_be_a XML_Error else
+                result.outer_xml . should_not_contain "XXE_SECRET_CONTENT"
+                result.root_element.text . should_not_contain "XXE_SECRET_CONTENT"
+
+        group_builder.specify "An external general entity does not read a local file" <|
+            with_secret_file secret_file->
+                xml = '<?xml version="1.0"?>\n<!DOCTYPE foo [<!ENTITY xxe SYSTEM "' + (file_uri secret_file) + '">]>\n<foo>&xxe;</foo>'
+                check_secret_not_read (XML_Document.parse xml)
+
+        group_builder.specify "An external parameter entity does not read a local file" <|
+            with_secret_file secret_file->
+                xml = '<?xml version="1.0"?>\n<!DOCTYPE foo [<!ENTITY % xxe SYSTEM "' + (file_uri secret_file) + '"> %xxe;]>\n<foo>bar</foo>'
+                check_secret_not_read (XML_Document.parse xml)
+
+        group_builder.specify "An external entity in a file does not read a local file" <|
+            with_secret_file secret_file->
+                xml_file = File.create_temporary_file "xxe" ".xml"
+                Panic.with_finalizer xml_file.delete <|
+                    xml = '<?xml version="1.0"?>\n<!DOCTYPE foo [<!ENTITY xxe SYSTEM "' + (file_uri secret_file) + '">]>\n<foo>&xxe;</foo>'
+                    xml.write xml_file on_existing_file=..Overwrite . should_succeed
+                    check_secret_not_read (XML_Document.from_file xml_file)
+
+        group_builder.specify "A document with an internal DOCTYPE still parses, with its internal entities" <|
+            doc = XML_Document.parse '<?xml version="1.0"?>\n<!DOCTYPE foo [<!ENTITY hi "hello">]>\n<foo>&hi; world</foo>'
+            doc.root_element.text . should_equal "hello world"
 
     suite_builder.group "Get by tag name" group_builder->
         group_builder.specify "Can get elements by tag name" <|

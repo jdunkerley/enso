@@ -2,7 +2,7 @@
 name = "enso-metamodel-lexpr"
 version = "0.1.0"
 edition = "2024"
-authors = ["Enso Team <contact@enso.org>"]
+authors = ["jdunkerley"]
 
 [dependencies]
 lexpr = "0.2.6"

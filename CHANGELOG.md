@@ -6,6 +6,9 @@
   customers, a local SQLite database, text cleaning), copied to the Samples
   folder on first start. The IDE no longer downloads samples from the
   internet.][570]
+- [The component browser no longer lists the components of
+  Standard.Visualization, the library the IDE uses to prepare visualization
+  data.][565]
 - [Choosing a file format, or a file, in Data.read adds the import of the
   library that reads it.][552]
 - [A settings cog replaces the account menu at the top right of the dashboard;
@@ -356,6 +359,14 @@
   and `Generic_JDBC` connections to their URLs, need
   `from Standard.Postgres import all` or `from Standard.SQLite import all` added
   by hand.
+- [XML is now its own library, `Standard.XML`][521]: `XML_Document`,
+  `XML_Element`, `XML_Error`, `XML_Format` and `Table.to_xml` are no longer part
+  of `Standard.Base` and `Standard.Table`. `Data.read` and `Data.fetch` of XML
+  work without the import, and the IDE adds `from Standard.XML import …` where
+  code names an XML type, including when an older project opens. Code that calls
+  `to_xml` on a table, and code run outside the IDE (`enso --run`), needs
+  `from Standard.XML import all` added by hand, as does an import of the old
+  module (`import Standard.Base.Data.XML.XML_Document`).
 - [Every database connection can log its SQL queries][344], not only one opened
   from a data link: with the `Standard.Database.Connection` logger at `info`
   (the IDE's Log SQL queries setting), each statement is logged with the
@@ -394,6 +405,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [570]: https://github.com/jdunkerley/enso/pull/570
+[565]: https://github.com/jdunkerley/enso/pull/565
 [552]: https://github.com/jdunkerley/enso/pull/552
 [519]: https://github.com/jdunkerley/enso/pull/519
 [514]: https://github.com/jdunkerley/enso/pull/514
@@ -475,6 +487,7 @@
 [468]: https://github.com/jdunkerley/enso/pull/468
 [481]: https://github.com/jdunkerley/enso/pull/481
 [492]: https://github.com/jdunkerley/enso/pull/492
+[521]: https://github.com/jdunkerley/enso/pull/521
 
 # Enso 2026.1
 

@@ -36,10 +36,27 @@ test.each([
   makeModule('local.New_Project'), // Main module
   makeModule('Standard.Base.Data'), // Top module
   makeStaticMethod('Standard.Base.Internal.Foo.bar'), // Internal method
+  makeModuleMethod('Standard.Visualization.Helpers.recover_errors'), // IDE-only library
+  makeStaticMethod('Standard.Visualization.Table.Visualization.prepare_visualization'), // IDE-only library
 ])('$name entry is not in the CB main view', (entry) => {
   const filtering = new Filtering({})
   const db = new SuggestionDb()
   expect(filtering.filter(entry, db)).toBeNull()
+})
+
+test('Standard.Visualization methods are hidden even with a self type', () => {
+  const entry = makeMethod('Standard.Visualization.Helpers.Any.default_visualization')
+  const filtering = new Filtering({
+    selfArg: {
+      type: 'known',
+      typeInfo: TypeInfo.fromParsedTypes([stdPath('Standard.Base.Any.Any')], [])!,
+      ancestors: [],
+    },
+  })
+  expect(filtering.filter(entry, new SuggestionDb())).toBeNull()
+  expect(
+    new Filtering({ pattern: 'default_visualization' }).filter(entry, new SuggestionDb()),
+  ).toBeNull()
 })
 
 test.each`

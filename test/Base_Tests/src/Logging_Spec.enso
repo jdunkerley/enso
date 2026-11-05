@@ -165,10 +165,13 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
         if proc.exit_code != Exit_Code.Success then
             Test.fail proc.stdout+proc.stderr+proc.exit_code.to_text
 
-        arr = logs_dir.list 
-        arr.length . should_equal 1
-
-        log = Data.read (arr.at 0) : Text
+        # The log rolls daily (UTC), so a run crossing midnight leaves two files
+        # in this run's own fresh directory. Require at least one and read all.
+        arr = logs_dir.list
+        if arr.is_empty then Test.fail "No log file was written to "+logs_dir.to_text
+        sorted = arr.sort on=(.name)
+        texts = sorted.map read_log_text
+        log = texts.join ""
         console_log = proc.stdout+proc.stderr
 
         Pair.new log console_log
@@ -351,6 +354,9 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
         log . contains_line "INFO.*Standard\.Database\.Connection.*jdbc:sqlite::memory: - .*logged_table"
         # Values bound to a query's parameters are never logged.
         log . not_contains_line "Standard\.Database\.Connection.*Geheim2"
+
+read_log_text (f : File) -> Text =
+    Data.read f : Text
 
 Text.contains_line self regex:Text =
     r = Regex.compile regex

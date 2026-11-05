@@ -3,7 +3,7 @@ namespace: enso_dev
 enso-version: default
 version: 0.0.1
 license: MIT
-author: enso-dev@enso.org
-maintainer: enso-dev@enso.org
+author: jdunkerley
+maintainer: jdunkerley
 # Examples_Tests import stuff from Base_Tests sibling project. So we need this property here.
 prefer-local-libraries: true

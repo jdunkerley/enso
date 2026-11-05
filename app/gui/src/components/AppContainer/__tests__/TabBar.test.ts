@@ -63,4 +63,18 @@ describe('TabBar', () => {
     expect(indicator()).toBeNull()
     expect(tab()?.getAttribute('aria-label')).toBe('P')
   })
+
+  test('names the close button and keeps it out of the tab', async () => {
+    current.changed = false
+    await mountWithProviders(TabBar)
+    const tab = document.querySelector('[role="tab"]')!
+    const close = document.querySelector('.CloseButton')!
+    expect(close.getAttribute('aria-label')).toBe('Close P')
+    // A control must not be nested in a `role="tab"` element (axe `nested-interactive`).
+    expect(tab.contains(close)).toBe(false)
+    // A `tablist` owns only tabs, so the close button is a pointer shortcut (Mod+W is the keyboard's).
+    expect(close.getAttribute('aria-hidden')).toBe('true')
+    expect(close.getAttribute('tabindex')).toBe('-1')
+    expect(tab.querySelector('button, [role="button"]')).toBeNull()
+  })
 })

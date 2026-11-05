@@ -49,6 +49,14 @@ final class SerializationPool {
   /** The thread pool that handles serialization. */
   private final ExecutorService pool;
 
+  /**
+   * Keys of jobs that {@link #shutdown} does not wait for: they stop once {@link #isShuttingDown}
+   * says so. See Note [A Rejected Bindings Cache Is Rewritten] in {@link TruffleCompilerContext}.
+   */
+  private final Set<QualifiedName> abandonable = ConcurrentHashMap.newKeySet();
+
+  private volatile boolean shuttingDown;
+
   /** all associated threads */
   private final Set<Thread> threads = Collections.synchronizedSet(new HashSet<>());
 
@@ -62,8 +70,18 @@ final class SerializationPool {
    */
   private boolean hasJobsRemaining() {
     synchronized (isWaitingForSerialization) {
-      return !isWaitingForSerialization.isEmpty() || !isSerializing.isEmpty();
+      return isWaitingForSerialization.keySet().stream().anyMatch(k -> !abandonable.contains(k))
+          || isSerializing.keySet().stream().anyMatch(k -> !abandonable.contains(k));
     }
+  }
+
+  /**
+   * Whether the pool is shutting down: an abandonable job should stop.
+   *
+   * @return {@code true} once {@link #shutdown} has been called
+   */
+  boolean isShuttingDown() {
+    return shuttingDown;
   }
 
   /**
@@ -73,6 +91,8 @@ final class SerializationPool {
    *     serialization jobs
    */
   void shutdown(boolean waitForPendingJobCompletion) throws InterruptedException {
+    // Abandonable jobs stop now, so that they do not hold up the jobs the wait is for.
+    shuttingDown = true;
     if (!pool.isShutdown()) {
       if (waitForPendingJobCompletion && this.hasJobsRemaining()) {
         int waitingCount;
@@ -163,6 +183,28 @@ final class SerializationPool {
       isSerializing.remove(name);
       isWaitingForSerialization.notifyAll();
     }
+  }
+
+  /**
+   * Submits a job that {@link #shutdown} does not wait for. The job must check {@link
+   * #isShuttingDown} and stop, leaving nothing half-written, once it is {@code true}.
+   */
+  <T> Future<T> submitAbandonableTask(Callable<T> task, boolean useThreadPool, QualifiedName key) {
+    abandonable.add(key);
+    Callable<T> wrapped =
+        () -> {
+          try {
+            return shuttingDown ? null : task.call();
+          } finally {
+            synchronized (isWaitingForSerialization) {
+              // A skipped job never called `startSerializing`, which drops the key.
+              isWaitingForSerialization.remove(key);
+              abandonable.remove(key);
+              isWaitingForSerialization.notifyAll();
+            }
+          }
+        };
+    return submitTask(wrapped, useThreadPool, key);
   }
 
   <T> Future<T> submitTask(Callable<T> task, boolean useThreadPool, QualifiedName key) {

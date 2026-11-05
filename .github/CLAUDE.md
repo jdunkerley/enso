@@ -151,9 +151,11 @@ settings. Every workflow is hand-written YAML (build simplification;
   find the key in the job's own `strategy.matrix`**, so the macOS rules can see
   which legs are macOS. `paths:` and `paths-ignore:` are matched as real globs
   against a spec file (`'**'` does not leave the specs out).
-- **Actions are pinned by major tag** (`@v5`), as everywhere here; a new
-  third-party action or image must be at least two weeks old. The actionlint
-  image is pinned to an exact version.
+- **Actions are pinned by major tag** (`@v5`), as everywhere here (the one
+  exception, `ataylorme/eslint-annotate-action`, is pinned to a full commit SHA
+  with its version in a trailing comment); a new third-party action or image
+  must be at least two weeks old. The actionlint image is pinned to an exact
+  version.
 - **A job that runs `sbt` itself uses `setup-jvm` first.** Jobs that resolve the
   same build share a `cache-key` (`engine` for the engine build, JVM tests, lint
   and the IDE's backend), so that one ~830 MB entry per OS serves them all: the

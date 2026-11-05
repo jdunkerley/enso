@@ -13,9 +13,7 @@ The fork adjusts the build and runs **without Enso Analytics' cloud services**.
 The IDE is local-only: there is no sign-in and no cloud drive. Projects, labels,
 version history (local git) and secrets stay on your machine. It is intended for
 community contributions and development, and for building and running Enso for
-personal use (or where that fits the
-[license terms](https://ensoanalytics.com/eula) of Enso Analytics). It is not
-intended for commercial use or distribution.
+personal use. It is not intended for commercial use or distribution.
 
 ## Download
 
@@ -35,9 +33,8 @@ release channels and updates.
 
 ## Using Enso
 
-User documentation for the language, the libraries and the IDE is at
-[help.enso.org](https://help.enso.org). Some of it describes Enso Cloud
-features, which this fork does not have.
+Documentation is in this repository's
+[wiki](https://github.com/jdunkerley/enso/wiki/Home).
 
 ## Building from source
 

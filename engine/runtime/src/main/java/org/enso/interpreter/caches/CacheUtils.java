@@ -8,6 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import org.enso.compiler.context.CompilerContext;
 import org.enso.compiler.data.BindingsMap$ModuleReference$Abstract;
@@ -31,26 +32,52 @@ final class CacheUtils {
    */
   static Persistance.Pool createPool(
       CompilerContext context, boolean keepUUIDs, Set<QualifiedName> referencedModules) {
+    return createPool(context, keepUUIDs, referencedModules, null);
+  }
+
+  /**
+   * @param abandoned if not {@code null}, checked for every object written; once it is {@code true}
+   *     the write stops with {@link WriteAbandoned}
+   */
+  static Persistance.Pool createPool(
+      CompilerContext context,
+      boolean keepUUIDs,
+      Set<QualifiedName> referencedModules,
+      BooleanSupplier abandoned) {
     return PersistUtils.POOL
         .withReadResolve(readResolve(context))
-        .withWriteReplace(writeReplace(context, keepUUIDs, referencedModules));
+        .withWriteReplace(writeReplace(context, keepUUIDs, referencedModules, abandoned));
+  }
+
+  /** A write stopped because its result is no longer wanted (the process is exiting). */
+  static final class WriteAbandoned extends RuntimeException {
+    WriteAbandoned() {
+      super("the cache write was abandoned", null, false, false);
+    }
   }
 
   private static Function<Object, Object> writeReplace(
-      CompilerContext context, boolean keepUUIDs, Set<QualifiedName> referencedModules) {
-    return (obj) ->
-        switch (obj) {
-          case IRPass.IRMetadata metadata -> metadata.prepareForSerialization(context);
-          case UUID id -> keepUUIDs ? id : null;
-          case BindingsMap$ModuleReference$Abstract ref -> {
-            if (referencedModules != null) {
-              referencedModules.add(ref.name());
-            }
-            yield ref;
+      CompilerContext context,
+      boolean keepUUIDs,
+      Set<QualifiedName> referencedModules,
+      BooleanSupplier abandoned) {
+    return (obj) -> {
+      if (abandoned != null && abandoned.getAsBoolean()) {
+        throw new WriteAbandoned();
+      }
+      return switch (obj) {
+        case IRPass.IRMetadata metadata -> metadata.prepareForSerialization(context);
+        case UUID id -> keepUUIDs ? id : null;
+        case BindingsMap$ModuleReference$Abstract ref -> {
+          if (referencedModules != null) {
+            referencedModules.add(ref.name());
           }
-          case null -> null;
-          default -> obj;
-        };
+          yield ref;
+        }
+        case null -> null;
+        default -> obj;
+      };
+    };
   }
 
   private static Function<Object, Object> readResolve(CompilerContext context) {

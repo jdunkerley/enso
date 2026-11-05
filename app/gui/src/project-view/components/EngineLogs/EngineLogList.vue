@@ -88,6 +88,15 @@ function onWheel(event: WheelEvent) {
   }
 }
 
+/**
+ * The keyboard's way up at the top, for the same reason: a list that fits the view cannot scroll,
+ * so ArrowUp, PageUp and Home there would otherwise never ask for the earlier lines.
+ */
+function onKeydown(event: KeyboardEvent) {
+  if (event.key !== 'ArrowUp' && event.key !== 'PageUp' && event.key !== 'Home') return
+  if ((scroller.value?.scrollTop ?? 0) <= 0 && rows.length > 0) emit('reachedTop')
+}
+
 onMounted(() => {
   if (follow.value) scrollToEnd()
 })
@@ -144,6 +153,7 @@ watch(follow, (following) => {
     tabindex="0"
     :aria-label="getText('bottomDockLogsTab')"
     @scroll="onScroll"
+    @keydown="onKeydown"
     @wheel.stop.passive="onWheel"
   >
     <div class="content" :style="{ height: `${rows.length * ROW_HEIGHT_PX}px` }">
@@ -156,7 +166,9 @@ watch(follow, (following) => {
         :title="row.kind === 'line' ? row.text : undefined"
       >
         <template v-if="row.kind === 'line'">
-          <span v-if="row.source === 'stderr'" class="marker">stderr</span>
+          <span v-if="row.source === 'stderr'" class="marker">{{
+            getText('engineLogsStderr')
+          }}</span>
           <span class="text">{{ row.text }}</span>
         </template>
         <template v-else>

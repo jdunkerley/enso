@@ -141,15 +141,6 @@ handler before assigning `this.client`, so the first attempt always throws and
 the retry recovers. A healthy session shows that warning exactly once and no
 `Request timeout` lines at all. Repeated 15 s timeouts are the real failure.
 
-**Always run `git submodule update --init --recursive` before building.** In
-particular, `app/gui/.dev-env/` is a private submodule which a fresh worktree
-must initialise for the `.env.staging` / `.env.production` symlinks. Init the
-submodules before any IDE build (and before running the e2e suite that loads
-that build).
-
-For testing, always build with `--mode staging`, to not pollute production
-backend and telemetry with test runs.
-
 `watch:linux` / `watch:macos` / `watch:windows` scripts are for local iteration
 once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
 

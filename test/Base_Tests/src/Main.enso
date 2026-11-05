@@ -58,7 +58,6 @@ import project.Data.Text.Encoding_Spec
 import project.Data.Text.Parse_Spec
 import project.Data.Text.Regex_Spec
 import project.Data.Text.Span_Spec
-import project.Data.XML.XML_Spec
 
 import project.Data.Vector.Slicing_Helpers_Spec
 
@@ -183,7 +182,6 @@ main filter=Nothing =
         Logging_Spec.add_specs suite_builder
         Random_Spec.add_specs suite_builder
         Metadata_Spec.add_specs suite_builder
-        XML_Spec.add_specs suite_builder
         Decimal_Spec.add_specs suite_builder
         Runner_Spec.add_specs suite_builder
 
