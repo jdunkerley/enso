@@ -226,7 +226,4 @@ export function suggestionDocumentationUrl(entry: SuggestionEntry): string | und
   return [DOCUMENTATION_ROOT, project, ...qnSegments(path), postPath].join('/')
 }
 
-/** `true` if calling the function without providing a value for this argument will result in an error. */
-export function isRequiredArgument(info: SuggestionEntryArgument) {
-  return !!info.defaultValue?.startsWith('Missing_Argument.')
-}
+export { isRequiredArgument } from './argument'

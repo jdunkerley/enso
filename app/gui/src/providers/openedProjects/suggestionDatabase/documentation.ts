@@ -1,4 +1,4 @@
-import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
+import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase/groupInfo'
 import { extractMetadata } from '@/components/ComponentHelp/metadata'
 import { findIndexOpt } from '@/util/data/array'
 import type { Opt } from '@/util/data/opt'

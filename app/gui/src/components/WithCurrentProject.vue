@@ -1,13 +1,12 @@
 <script lang="ts">
 import { useOpenedProjects } from '$/providers/openedProjects'
 import type { Initialized as InitializedProject } from '$/providers/openedProjects/projectStates'
-import { groupColorVar } from '@/composables/nodeColors'
 import { createContextStore } from '@/providers'
 import Result from '$/components/Result/Result.vue'
 import Loader from '$/components/Spinner/Loader.vue'
 import { assert } from '@/util/assert'
-import { colorFromString } from '@/util/colors'
 import type { Opt } from '@/util/data/opt'
+import { groupColor, groupColorVar } from '@/util/groupColors'
 import type { ProjectId } from 'enso-common/src/services/Backend'
 import { computed, type Ref, shallowRef, watch } from 'vue'
 
@@ -123,7 +122,7 @@ const groupColors = computed(() => {
   const styles: { [key: string]: string } = {}
   const groups = initializedProject.value?.suggestionDb.groups ?? []
   for (const group of groups) {
-    styles[groupColorVar(group)] = group.color ?? colorFromString(group.name)
+    styles[groupColorVar(group)] = groupColor(group)
   }
   return styles
 })
