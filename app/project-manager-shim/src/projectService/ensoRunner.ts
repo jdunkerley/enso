@@ -11,7 +11,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import * as portfinder from 'portfinder'
 import { CommandError, runCommand as runChildCommand } from '../childProcess/runCommand.js'
-import { timeoutFromEnv } from './timeouts.js'
+import { ENGINE_TIMEOUTS, engineTimeouts } from './timeouts.js'
 import { Path } from './types.js'
 
 const HEALTHCHECK_FAILURES_TO_RESTART = 3
@@ -55,7 +55,7 @@ const YDOC_POLL_INTERVAL = 10
 const YDOC_CONNECT_TIMEOUT_MS = 250
 
 /** The default for how long an open waits for the engine's ydoc port to accept connections. */
-export const DEFAULT_YDOC_WAIT_MS = 5000
+export const DEFAULT_YDOC_WAIT_MS = ENGINE_TIMEOUTS.native.ydocWaitMs
 
 /** Whether a TCP connection to `socket` is accepted right now. */
 function acceptsConnections(socket: Socket): Promise<boolean> {
@@ -183,16 +183,16 @@ export type ShutdownHookType = keyof ShutdownHookRegistry
 
 const DEFAULT_JSONRPC_PORT = 30616
 /** How long an engine has to pass its first health check before it is killed. */
-export const LANGUAGE_SERVER_STARTUP_TIMEOUT_MS = 30_000
+export const LANGUAGE_SERVER_STARTUP_TIMEOUT_MS = ENGINE_TIMEOUTS.native.startupMs
 
 /**
- * How long an engine has to exit after it was asked to, before it is killed: 10 s, or
+ * How long a native engine has to exit after it was asked to, before it is killed: 10 s, or
  * `ENSO_ENGINE_TERMINATE_TIMEOUT_MS`. The open-time harness's JDK AOT training launch needs longer:
  * the recording JVM writes its training data as it exits, which took more than 10 s on the
  * Windows runner.
  */
 function terminateTimeoutMs(): number {
-  return timeoutFromEnv(process.env.ENSO_ENGINE_TERMINATE_TIMEOUT_MS, 10_000)
+  return engineTimeouts('native').terminateMs
 }
 
 /**
