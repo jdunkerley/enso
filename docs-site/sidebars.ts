@@ -10,7 +10,15 @@ const apiSidebars: SidebarsConfig =
   : { api: [{ type: 'doc', id: 'api/index', label: 'Components' }] }
 
 const sidebars: SidebarsConfig = {
-  guides: ['intro'],
+  guides: [
+    'intro',
+    'getting-started/index',
+    'installing-and-updating/index',
+    'samples/index',
+    'local-versioning/index',
+    'secrets/index',
+    'engine-logs/index',
+  ],
   ...apiSidebars,
 }
 
