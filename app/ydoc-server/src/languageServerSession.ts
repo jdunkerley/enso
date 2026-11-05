@@ -140,14 +140,20 @@ export class LanguageServerSession {
       const indexDoc = new WSSharedDoc()
       const transport = new YjsServerTransport(indexDoc.doc, url, callbacks)
       const ls = new LanguageServer(crypto.randomUUID(), transport)
-      return new LanguageServerSession(
+      const created: LanguageServerSession = new LanguageServerSession(
         ls,
         indexDoc,
-        () => LanguageServerSession.sessions.delete(url),
+        // A session that was already replaced under this URL must not evict its replacement (#593).
+        () => {
+          if (LanguageServerSession.sessions.get(url) === created) {
+            LanguageServerSession.sessions.delete(url)
+          }
+        },
         visControlServer,
         visDataServer,
         byteBufferClass,
       )
+      return created
     })
     session.retain()
     return session

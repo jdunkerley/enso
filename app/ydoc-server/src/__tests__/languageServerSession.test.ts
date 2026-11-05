@@ -118,6 +118,23 @@ describe('LanguageServerSession', () => {
     }
   })
 
+  test('a late release of a replaced session leaves its replacement registered', async () => {
+    // The Language Server dropped, so the first session unregistered and the GUI's reconnect made a
+    // second under the same URL; the first is only released when its last GUI socket closes (#593).
+    const url = 'ws://replaced-test'
+    const ls = fakeLanguageServer()
+    const get = () =>
+      LanguageServerSession.get(url, ls.server, noChannels, noChannels, {} as JavaByteBufferClass)
+    const first = get()
+    await vi.waitFor(() => expect(ls.requests.map((r) => r.method)).toContain('file/list'))
+    ;(first as any).unregister()
+    session = get()
+    expect(session).not.toBe(first)
+
+    await first.release()
+    expect(LanguageServerSession.sessions.get(url)).toBe(session)
+  })
+
   test('a released session never connects to the Language Server again', async () => {
     // Its retries outlive it: a session whose Language Server went away keeps reading its initial
     // state and then restarting its client on a backoff. Under the Node ydoc host, which outlives
