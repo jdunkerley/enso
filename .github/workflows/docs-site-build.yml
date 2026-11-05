@@ -53,6 +53,18 @@ jobs:
         run: |
           corepack pnpm --filter @lezer/markdown run prepare
           corepack pnpm --filter enso-gui run generate-icons
+      # The typecheck follows the imports of the IDE's code into `ydoc-shared/src/ast`, which needs
+      # the generated `ast.ts` (Cargo, no WASM). The generator itself does not load it, so the
+      # build below runs without. Shares the GUI checks' Rust cache and never saves it.
+      - name: Cache the Rust build
+        if: inputs.static-checks
+        uses: ./.github/actions/setup-rust
+        with:
+          shared-key: wasm-parser
+          save: "false"
+      - name: Generate the AST types
+        if: inputs.static-checks
+        run: corepack pnpm --filter ydoc-shared run generate-ast
       - name: Typecheck
         if: inputs.static-checks
         run: corepack pnpm --filter docs-site run typecheck
