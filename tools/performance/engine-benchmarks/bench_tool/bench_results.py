@@ -163,12 +163,26 @@ async def get_bench_report(bench_run: JobRun, temp_dir: str, cache: ReportCache)
     _logger.debug(f"Extracting {zip_file_name} into {extracted_dirname}")
     zip_file = zipfile.ZipFile(zip_file_name, "r")
     zip_file.extractall(extracted_dirname)
-    bench_report_xml = path.join(extracted_dirname, "bench-report.xml")
-    assert path.exists(bench_report_xml)
+    bench_report_xml = _find_bench_report_xml(extracted_dirname)
 
     bench_report_parsed = _parse_bench_report_from_xml(bench_report_xml, bench_run)
     await cache.put(bench_run.id, bench_report_parsed)
     return bench_report_parsed
+
+
+def _find_bench_report_xml(extracted_dirname: str) -> str:
+    """
+    The report to analyse in an extracted artifact. A run of std-libs-benchmark.yml with
+    `jvm-options` uploads `bench-report-baseline.xml` (the JVM defaults) and
+    `bench-report-candidate.xml` (with the options) instead of `bench-report.xml`; the
+    baseline is the one that is comparable with other runs.
+    """
+    for name in ("bench-report.xml", "bench-report-baseline.xml"):
+        candidate = path.join(extracted_dirname, name)
+        if path.exists(candidate):
+            return candidate
+    raise FileNotFoundError(
+        f"No bench-report.xml or bench-report-baseline.xml in {extracted_dirname}")
 
 
 def _parse_bench_report_from_xml(bench_report_xml_path: str, bench_run: JobRun) -> "JobReport":
