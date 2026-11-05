@@ -152,15 +152,16 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   up, trains only when the JVM is the resolved default
   (`resolveDefaultEngineMode`, so nothing happens while the default is native),
   there is no cache for the key and no other process holds `<root>/train.lock`
-  (`lock.ts`: created exclusively with the pid; a lock whose pid is dead is
-  taken over). `EngineTrainer` makes a scratch project with `enso --new`
-  (native, the welcome template) in `<root>/train/`, starts
-  `enso --jvm --server` on it at below-normal priority (`os.setPriority`) with
-  `ENSO_JVM_OPTIONS` adding `-XX:AOTMode=record` and
-  `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a fresh
-  `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`, waits for
-  `/_health` (180 s), and `driveOpen` plays an open over the Language Server's
-  channel sockets (`/channel/{json,vis-control,vis-data}?token=`):
+  (`lock.ts`: created exclusively with the pid and touched every minute; a lock
+  whose pid is dead, or that has not been touched for 10 minutes, since pids are
+  reused, is taken over by renaming it aside first, so two takers never both
+  win). `EngineTrainer` makes a scratch project with `enso --new` (native, the
+  welcome template) in `<root>/enso-aot-training/`, starts `enso --jvm --server`
+  on it at below-normal priority (`os.setPriority`) with `ENSO_JVM_OPTIONS`
+  adding `-XX:AOTMode=record` and `-XX:AOTConfiguration=<key>/enso.aot.aotconf`,
+  a fresh `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`,
+  waits for `/_health` (180 s), and `driveOpen` plays an open over the Language
+  Server's channel sockets (`/channel/{json,vis-control,vis-data}?token=`):
   `session/initProtocolConnection`, `executionContext/create` and `push` of
   `main`, an `attach` of the table visualisation to the node the template's
   metadata shows one for (`welcomeNodeId`), then waits for `executionComplete`
@@ -168,10 +169,16 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   the JVM to write the configuration and exit, and the bundled `java` creates
   the cache (`aotCreateArguments`: the launcher's fixed options, the
   `jvm.options` lines, an inherited `ENSO_JVM_OPTIONS`) as `.tmp`, renamed into
-  place. A finished training deletes every other directory under the root (an
-  upgrade changed the key) except the lock. A failed one leaves no `enso.aot`
-  and is retried at the next launch. Three things measured on the Windows bundle
-  shaped this (Notes in `driver.ts` and `trainer.ts`):
+  place. A finished training keeps its own key directory and the most recently
+  used other one (two installs sharing `userData` would otherwise delete each
+  other's cache at every launch) and deletes older ones; it only ever deletes
+  directories named like a key (16 hex digits), since `ENSO_JVM_AOT_DIR` may
+  name a directory holding other things. A failed training (not an abort) leaves
+  no `enso.aot` and is not retried until the next launch. `dispose()`
+  (Electron's `before-quit`) aborts a running training before it awaits
+  anything, which kills its engine or `java` at once; the `.tmp` and `.aotconf`
+  such a quit can leave are deleted by the next `start()`. Three things measured
+  on the Windows bundle shaped this (Notes in `driver.ts` and `trainer.ts`):
   - `/_health` passes while the Language Server is still initialising, and a
     channel socket opened then is dropped (`1006`): the driver reconnects once a
     second until the session is initialised (a `403` fails at once).
@@ -187,12 +194,13 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   restarts 60 s after the last open in flight was answered.
 - **Use**: a JVM open or run gets `jvmOptions()` in its launch, two options,
   `-XX:AOTCache=<key>/enso.aot` and
-  `-Xlog:aot=warning,cds=warning:file="<key>/use.log"` (the path quoted, so the
-  `:` of `C:` does not end the option), when the cache exists. `AOTMode` stays
-  `auto`, so a cache the JVM refuses costs only its benefit. After such an open
-  `checkUseLog()` deletes the cache when `use.log` has a line `aotRejection`
-  (`useLog.ts`, also the open-time harness's) matches; it retrains at the next
-  launch.
+  `-Xlog:aot=warning,cds=warning:file="<key>/use.log"::filecount=0` (the path
+  quoted, so the `:` of `C:` does not end the option; no rotation, so one log
+  rewritten by each JVM), when the cache exists. The log's time is the key's
+  "last used". `AOTMode` stays `auto`, so a cache the JVM refuses costs only its
+  benefit. After such an open `checkUseLog()` deletes the cache when `use.log`
+  has a line `aotRejection` (`useLog.ts`, also the open-time harness's) matches;
+  it retrains at the next launch.
 - **`ENSO_JVM_OPTIONS`** is built by `jvmOptionsValue`
   (`projectService/jvmOptions.ts`, which also holds `LAUNCHER_JVM_OPTIONS`,
   `parseJvmOptionsFile` and `aotCreateArguments`; the open-time harness
@@ -202,10 +210,11 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   the launcher reads it as a line and a space in its path survives.
 - **Known limits**: `os.setPriority` lowers the launcher's process; on Linux,
   where priority is per thread, threads the JVM created before the call keep
-  normal priority. Two JVM engines open at once share `use.log`, and the JVM's
-  default log rotation keeps up to five old ones (`use.log.0` …) beside it. The
-  Linux AppImage mounts at a new path each launch, so its key changes every time
-  (PR J of the plan deals with it).
+  normal priority. Two JVM engines open at once share `use.log`. Any `[warning]`
+  from `aot`/`cds` deletes the cache, so a benign warning that recurs would
+  retrain at every launch (none seen so far). The Linux AppImage mounts at a new
+  path each launch, so its key changes every time (PR J of the plan deals with
+  it).
 - **Tests**: `jvmAot/__tests__/` — `key`, `lock`, `driver` (against
   `fakeLanguageServer.ts`), `trainer` (a fake `enso` script that imports the
   same fake, port band `JVM_AOT_TRAINER_PORT`) and `cache` (a fake trainer and

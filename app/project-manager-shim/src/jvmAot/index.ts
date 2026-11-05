@@ -7,7 +7,7 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { aotKey, enginePaths, isTranslocated, readJvmOptionsText } from './key.js'
-import { acquireTrainingLock, LOCK_FILE_NAME } from './lock.js'
+import { acquireTrainingLock } from './lock.js'
 import { EngineTrainer, type Trainer } from './trainer.js'
 import { aotRejection } from './useLog.js'
 
@@ -39,7 +39,15 @@ export interface JvmAotCacheSettings {
 const CACHE_FILE = 'enso.aot'
 const USE_LOG_FILE = 'use.log'
 /** The trainer's scratch project, beside the key directories. */
-const SCRATCH_DIRECTORY = 'train'
+const SCRATCH_DIRECTORY = 'enso-aot-training'
+/** A key directory's name (`aotKey`). Nothing else in the root is ever deleted. */
+const KEY_DIRECTORY = /^[0-9a-f]{16}$/
+/**
+ * How many key directories a finished training keeps: its own and the most recently used other
+ * one, so two installs that share `userData` (a release and a nightly) do not delete each other's
+ * cache at every launch.
+ */
+const KEYS_KEPT = 2
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError'
@@ -52,6 +60,21 @@ async function exists(file: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * When the key directory was last used: its `use.log` (rewritten by every JVM that used the cache)
+ * or, failing that, its `enso.aot`.
+ */
+async function lastUsed(directory: string): Promise<number> {
+  for (const file of [USE_LOG_FILE, CACHE_FILE]) {
+    try {
+      return (await fs.stat(path.join(directory, file))).mtimeMs
+    } catch {
+      // Try the next.
+    }
+  }
+  return (await fs.stat(directory)).mtimeMs
 }
 
 /** The cache of one installation for one user. */
@@ -109,7 +132,10 @@ export class JvmAotCache {
   async start(): Promise<void> {
     if (this.disposed || !this.settings.isJvmDefault()) return
     const cache = await this.cacheFile()
-    if (cache == null || (await exists(cache))) return
+    if (cache == null) return
+    // A training interrupted by a quit can leave its files (the next training deletes them too).
+    await this.deleteLeftovers(cache)
+    if (await exists(cache)) return
     this.wanted = true
     await this.beginTraining()
   }
@@ -148,8 +174,14 @@ export class JvmAotCache {
           await this.deleteOtherKeys(directory)
         },
         (error: unknown) => {
-          if (isAbortError(error)) console.info('JDK AOT cache: training stopped for an open.')
-          else console.error('JDK AOT cache: training failed:', error)
+          if (isAbortError(error)) {
+            console.info('JDK AOT cache: training stopped.')
+          } else {
+            // Not retried after every open: a failure that repeats would cost a JVM start, an
+            // open and a cache creation each time. The next launch tries again.
+            this.wanted = false
+            console.error('JDK AOT cache: training failed; trying again at the next launch:', error)
+          }
         },
       )
       .finally(async () => {
@@ -159,7 +191,24 @@ export class JvmAotCache {
     this.training = { controller, done }
   }
 
-  /** After a training: every other key's directory goes (an upgrade changed the key). */
+  /** A training's files that an interrupted one (a quit) can leave: `.tmp` and `.aotconf`. */
+  private async deleteLeftovers(cache: string): Promise<void> {
+    const release = await acquireTrainingLock(this.settings.rootDirectory).catch(() => undefined)
+    if (release == null) return
+    try {
+      for (const file of [`${cache}.tmp`, `${cache}.aotconf`]) {
+        await fs.rm(file, { force: true }).catch(() => undefined)
+      }
+    } finally {
+      await release().catch(() => undefined)
+    }
+  }
+
+  /**
+   * After a training: the key directories beyond the {@link KEYS_KEPT} most recently used go (an
+   * upgrade changed the key). Only directories named like a key are touched: `ENSO_JVM_AOT_DIR`
+   * may name a directory that holds other things.
+   */
   private async deleteOtherKeys(keep: string): Promise<void> {
     let entries: string[]
     try {
@@ -167,11 +216,22 @@ export class JvmAotCache {
     } catch {
       return
     }
-    for (const entry of entries) {
-      if (entry === path.basename(keep) || entry === LOCK_FILE_NAME) continue
+    const others: { name: string; usedAt: number }[] = []
+    for (const name of entries) {
+      if (name === path.basename(keep) || !KEY_DIRECTORY.test(name)) continue
+      const directory = path.join(this.settings.rootDirectory, name)
+      try {
+        if (!(await fs.stat(directory)).isDirectory()) continue
+        others.push({ name, usedAt: await lastUsed(directory) })
+      } catch {
+        // Gone meanwhile.
+      }
+    }
+    others.sort((a, b) => b.usedAt - a.usedAt)
+    for (const { name } of others.slice(KEYS_KEPT - 1)) {
       await fs
-        .rm(path.join(this.settings.rootDirectory, entry), { recursive: true, force: true })
-        .catch((error: unknown) => console.warn(`JDK AOT cache: could not delete ${entry}:`, error))
+        .rm(path.join(this.settings.rootDirectory, name), { recursive: true, force: true })
+        .catch((error: unknown) => console.warn(`JDK AOT cache: could not delete ${name}:`, error))
     }
   }
 
@@ -206,7 +266,8 @@ export class JvmAotCache {
     if (!(await exists(cache))) return []
     return [
       `-XX:AOTCache=${cache}`,
-      `-Xlog:aot=warning,cds=warning:file="${path.join(directory, USE_LOG_FILE)}"`,
+      // `filecount=0`: one log, rewritten at each start, instead of five rotated ones.
+      `-Xlog:aot=warning,cds=warning:file="${path.join(directory, USE_LOG_FILE)}"::filecount=0`,
     ]
   }
 
@@ -228,11 +289,16 @@ export class JvmAotCache {
       .catch((error: unknown) => console.warn('JDK AOT cache: could not delete it:', error))
   }
 
-  /** Stop: no new training, and a running one is killed. */
+  /**
+   * Stop: no new training, and a running one is killed at once (its engine or `java`), before
+   * anything is awaited, since the app may exit without waiting for this.
+   */
   async dispose(): Promise<void> {
     this.disposed = true
     clearTimeout(this.retrainTimer)
     this.retrainTimer = undefined
+    this.training?.controller.abort()
+    // A training being started checks `disposed` once it has the lock.
     await this.starting
     const training = this.training
     training?.controller.abort()

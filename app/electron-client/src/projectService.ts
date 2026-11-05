@@ -2,10 +2,10 @@
 
 import { app, net } from 'electron'
 import * as os from 'node:os'
-import * as path from 'node:path'
 import * as url from 'node:url'
 
 import type { Electron } from '@/electron'
+import { isJvmDefaultEngine, jvmAotRootDirectory } from '@/jvmAotSettings'
 import * as paths from '@/paths'
 import { lazyKeyringEntries, SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
 import { findEnsoExecutable, getProjectRoot } from 'project-manager-shim'
@@ -13,11 +13,7 @@ import { JvmAotCache } from 'project-manager-shim/jvmAot'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { defaultSecretsFilePath, encodeKey, LocalSecrets } from 'project-manager-shim/localSecrets'
 import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
-import {
-  ProjectService,
-  resolveDefaultEngineMode,
-  type EngineSettings,
-} from 'project-manager-shim/projectService'
+import { ProjectService, type EngineSettings } from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
 /** Where the engine mode may come from besides a project's `package.yaml`. */
@@ -120,14 +116,10 @@ function createJvmAotCache(
   const ensoExecutable = findEnsoExecutable(paths.resourcesPath(electron, electronIsDev))
   if (ensoExecutable == null) return null
   return new JvmAotCache({
-    rootDirectory: process.env.ENSO_JVM_AOT_DIR ?? path.join(app.getPath('userData'), 'jvm-aot'),
+    rootDirectory: jvmAotRootDirectory(process.env, app.getPath('userData')),
     appVersion: app.getVersion(),
     ensoExecutable,
-    isJvmDefault: () =>
-      resolveDefaultEngineMode({
-        option: engine?.option,
-        environment: process.env.ENSO_ENGINE_MODE,
-      }).mode === 'jvm',
+    isJvmDefault: () => isJvmDefaultEngine(engine, process.env),
   })
 }
 

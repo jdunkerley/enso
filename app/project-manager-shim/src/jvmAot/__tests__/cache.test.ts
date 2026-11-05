@@ -6,7 +6,12 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { JvmAotCache, type JvmAotCacheSettings, type Trainer } from '../index.js'
 
 class FakeTrainer implements Trainer {
-  runs: { output: string; signal: AbortSignal; finish: () => Promise<void> }[] = []
+  runs: {
+    output: string
+    signal: AbortSignal
+    finish: () => Promise<void>
+    fail: () => void
+  }[] = []
   train(output: string, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
       signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
@@ -18,6 +23,7 @@ class FakeTrainer implements Trainer {
           await fs.writeFile(output, 'cache')
           resolve()
         },
+        fail: () => reject(new Error('the engine crashed')),
       })
     })
   }
@@ -92,7 +98,7 @@ test('trains at launch when the JVM is the default, and uses the cache after', a
   const [aot, log] = await created.jvmOptions()
   expect(aot).toBe(`-XX:AOTCache=${trainer.runs[0]!.output}`)
   expect(log).toBe(
-    `-Xlog:aot=warning,cds=warning:file="${path.join((await created.keyDirectory())!, 'use.log')}"`,
+    `-Xlog:aot=warning,cds=warning:file="${path.join((await created.keyDirectory())!, 'use.log')}"::filecount=0`,
   )
   // The lock is released once the training is over.
   await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
@@ -205,14 +211,77 @@ test('an empty or info-only use.log keeps the cache', async () => {
   expect(await created.jvmOptions()).toHaveLength(2)
 })
 
-test("a finished training deletes other keys' directories", async () => {
-  await fs.mkdir(path.join(root, 'oldkey'), { recursive: true })
-  await fs.writeFile(path.join(root, 'oldkey', 'enso.aot'), 'old')
+/** A key directory of another install or version, last used at `usedAt` (ms since the epoch). */
+async function otherKey(name: string, usedAt: number): Promise<string> {
+  const directory = path.join(root, name)
+  await fs.mkdir(directory, { recursive: true })
+  await fs.writeFile(path.join(directory, 'enso.aot'), 'old')
+  await fs.writeFile(path.join(directory, 'use.log'), '')
+  const time = new Date(usedAt)
+  await fs.utimes(path.join(directory, 'use.log'), time, time)
+  return directory
+}
+
+test('a finished training keeps the most recently used other key and deletes the rest', async () => {
+  const older = await otherKey('00000000000000aa', Date.now() - 3 * 86_400_000)
+  const newer = await otherKey('00000000000000bb', Date.now() - 86_400_000)
   const trainer = new FakeTrainer()
   const created = cache(trainer)
   const dir = await trained(trainer, created)
-  await vi.waitFor(async () => expect(await exists(path.join(root, 'oldkey'))).toBe(false))
+  await vi.waitFor(async () => expect(await exists(older)).toBe(false))
+  expect(await exists(newer)).toBe(true)
   expect(await exists(path.join(dir, 'enso.aot'))).toBe(true)
+})
+
+test('nothing in the root but key directories is ever deleted', async () => {
+  // `ENSO_JVM_AOT_DIR` may name a directory that holds other things.
+  await fs.mkdir(path.join(root, 'notes'), { recursive: true })
+  await fs.writeFile(path.join(root, 'notes', 'keep.txt'), 'mine')
+  await fs.writeFile(path.join(root, 'readme.txt'), 'mine')
+  await fs.mkdir(path.join(root, 'train'), { recursive: true })
+  await fs.mkdir(path.join(root, '0123456789ABCDEF'), { recursive: true })
+  await otherKey('00000000000000aa', Date.now() - 3 * 86_400_000)
+  await otherKey('00000000000000bb', Date.now() - 86_400_000)
+  const trainer = new FakeTrainer()
+  const created = cache(trainer)
+  await trained(trainer, created)
+  await vi.waitFor(async () =>
+    expect(await exists(path.join(root, '00000000000000aa'))).toBe(false),
+  )
+  for (const kept of ['notes/keep.txt', 'readme.txt', 'train', '0123456789ABCDEF']) {
+    expect(await exists(path.join(root, kept))).toBe(true)
+  }
+})
+
+test('a failed training is not retried after opens, only at the next launch', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  const trainer = new FakeTrainer()
+  const created = cache(trainer)
+  await created.start()
+  trainer.runs[0]!.fail()
+  await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
+  created.openStarted()
+  created.openAnswered()
+  await vi.advanceTimersByTimeAsync(61_000)
+  expect(trainer.runs).toHaveLength(1)
+  // The next launch tries again.
+  await cache(trainer).start()
+  expect(trainer.runs).toHaveLength(2)
+})
+
+test('a quit during a training leaves nothing that the next launch keeps', async () => {
+  const trainer = new FakeTrainer()
+  const created = cache(trainer)
+  await created.start()
+  const output = trainer.runs[0]!.output
+  // What a killed `java -XX:AOTMode=create` and recording engine leave.
+  await fs.mkdir(path.dirname(output), { recursive: true })
+  await fs.writeFile(`${output}.tmp`, 'partial')
+  await fs.writeFile(`${output}.aotconf`, 'partial')
+  await created.dispose()
+  await cache(trainer).start()
+  expect(await exists(`${output}.tmp`)).toBe(false)
+  expect(await exists(`${output}.aotconf`)).toBe(false)
 })
 
 test('the key moves with the app version', async () => {
@@ -222,11 +291,12 @@ test('the key moves with the app version', async () => {
   expect(path.dirname((await one.keyDirectory())!)).toBe(root)
 })
 
-test('dispose stops a running training', async () => {
+test('dispose stops a running training at once, before it awaits anything', async () => {
   const trainer = new FakeTrainer()
   const created = cache(trainer)
   await created.start()
-  await created.dispose()
+  const disposed = created.dispose()
   expect(trainer.runs[0]!.signal.aborted).toBe(true)
+  await disposed
   expect(await exists(path.join(root, 'train.lock'))).toBe(false)
 })

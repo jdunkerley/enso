@@ -80,10 +80,13 @@ interface Engine {
 function killTree(child: childProcess.ChildProcess): void {
   if (child.pid == null || child.exitCode != null || child.signalCode != null) return
   if (process.platform === 'win32') {
-    childProcess.spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
-      stdio: 'ignore',
-      windowsHide: true,
-    })
+    childProcess
+      .spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+        stdio: 'ignore',
+        windowsHide: true,
+      })
+      // A failed spawn must not be an unhandled error in Electron's main process (#401).
+      .on('error', (error) => console.warn('JDK AOT cache: taskkill failed:', error))
   } else {
     child.kill('SIGKILL')
   }

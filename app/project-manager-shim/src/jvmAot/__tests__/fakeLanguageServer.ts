@@ -12,7 +12,11 @@ export interface FakeLanguageServerOptions {
   readonly token: string
   /** 0 (the default) for any free port. */
   readonly port?: number
-  /** How long after `executionContext/push` it reports `executionComplete`; `null`: never. */
+  /**
+   * How long after the `attach` that follows `executionContext/push` it reports
+   * `executionComplete` (the real engine reported nothing until a visualisation was attached:
+   * Note [The Driver Attaches Before The Execution Completes]); `null`: never.
+   */
   readonly completeAfterMs?: number | null
   /**
    * How many channel sockets it accepts and then drops with no close frame, as a Language Server
@@ -42,6 +46,7 @@ export async function startFakeLanguageServer(
   const received: ReceivedMessage[] = []
   const sockets = new Map<string, WebSocket>()
   let dropped = 0
+  let pushed: { ws: WebSocket; contextId: string } | undefined
   const server = http.createServer((request, response) => {
     if (request.url === '/_health') response.end('OK')
     else {
@@ -96,18 +101,7 @@ export async function startFakeLanguageServer(
       }
       case 'executionContext/push': {
         reply(null)
-        const after = options.completeAfterMs === undefined ? 100 : options.completeAfterMs
-        if (after != null) {
-          setTimeout(() => {
-            ws.send(
-              JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'executionContext/executionComplete',
-                params: { contextId: params.contextId },
-              }),
-            )
-          }, after)
-        }
+        pushed = { ws, contextId: params.contextId as string }
         break
       }
       default:
@@ -118,6 +112,19 @@ export async function startFakeLanguageServer(
   function answerControl(message: unknown): void {
     const { kind, requestId } = message as { kind: string; requestId: string }
     if (kind !== 'attach') return
+    const after = options.completeAfterMs === undefined ? 100 : options.completeAfterMs
+    const execution = pushed
+    if (after != null && execution != null) {
+      setTimeout(() => {
+        execution.ws.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'executionContext/executionComplete',
+            params: { contextId: execution.contextId },
+          }),
+        )
+      }, after)
+    }
     sockets.get('vis-control')?.send(JSON.stringify({ kind: 'ready', requestId }))
     sockets.get('vis-data')?.send(Buffer.from([1, 2, 3]))
   }
