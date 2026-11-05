@@ -122,6 +122,15 @@ export class EngineLogChannel {
     this.closedCallbacks.push(callback)
   }
 
+  /**
+   * A line of the shim's own for the log, such as the engine mode: one `stderr` line before any
+   * session, emitted at once.
+   */
+  notice(text: string): void {
+    if (this.state !== 'open') return
+    this.emitLines('stderr', [text], null)
+  }
+
   /** An engine process has started: the first one, or a respawn after a crash. */
   engineStarted(): void {
     if (this.state !== 'open') return

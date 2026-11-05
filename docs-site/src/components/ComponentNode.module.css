@@ -1,13 +1,18 @@
-/* The graph editor's node: a 32px pill, white on the group colour, in both colour modes. */
+/*
+ * The graph editor's node: a 32px pill, white on the group colour, in both colour modes. On a narrow
+ * screen its pills wrap onto more lines rather than widen the page; the tooltips are placed under
+ * the node (not under their pill) and wrap within the screen.
+ */
 .node {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  min-height: 32px;
   border-radius: 16px;
   padding-right: 6px;
   width: fit-content;
   max-width: 100%;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   background-color: var(--node-color, var(--group-color-fallback, #006b8a));
   color: #fff;
   font-size: 13px;
@@ -15,7 +20,7 @@
   margin: 0.25rem 0 1rem;
 }
 .small {
-  height: 24px;
+  min-height: 24px;
   border-radius: 12px;
   font-size: 12px;
   margin: 0.25rem 0 0.5rem;
@@ -31,7 +36,6 @@
   height: 16px;
 }
 .pill {
-  position: relative;
   display: inline-flex;
 }
 .name,
@@ -69,7 +73,11 @@
   top: calc(100% + 6px);
   left: 0;
   z-index: 10;
-  white-space: pre;
+  width: max-content;
+  /* The node sits in the content column, whose gutters are at least 16px on each side. */
+  max-width: min(40rem, calc(100vw - 2rem));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   padding: 4px 8px;
   border-radius: 4px;
   background: var(--ifm-color-emphasis-900);

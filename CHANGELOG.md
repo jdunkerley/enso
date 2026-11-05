@@ -53,17 +53,15 @@
   its button names the sources shown, and it opens as you start typing in the
   filter. The Logger box is gone, and the Logs tab always shows the running
   session: earlier sessions open from Activity → Show Logs.][347]
-- Table views no longer require an AG Grid Enterprise license to work. When no
-  `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
-  provides its own equivalents for the Enterprise features the IDE uses —
-  server-driven paging (via the Infinite Row Model), set/multi-value column
-  filters, multi-cell range selection with copy/cut/paste, and the cell and
-  column context menus — instead of running Enterprise code unlicensed behind a
-  watermark. With a licence key configured, behaviour is unchanged.
+- Table views no longer need an AG Grid Enterprise licence. The grid uses AG
+  Grid Community and provides its own equivalents for the Enterprise features
+  the IDE used — server-driven paging (via the Infinite Row Model),
+  set/multi-value column filters, multi-cell range selection with
+  copy/cut/paste, and the cell and column context menus — instead of running
+  Enterprise code unlicensed behind a watermark.
 - [The table grid has been updated to AG Grid 36 (from 32)][37]. Table views
-  keep the same appearance and behaviour, licensed or not — the Community
-  fallback above is unaffected. Internally the IDE now uses AG Grid's own Vue
-  component instead of a local copy of it.
+  keep the same appearance and behaviour. Internally the IDE now uses AG Grid's
+  own Vue component instead of a local copy of it.
 - [The frontend toolchain has been brought up to date][39]: pnpm 12, Vue 3.5.43
   and ESLint 10. No user-visible behaviour changes; the build now fails loudly
   rather than silently skipping a dependency's install scripts, which had been

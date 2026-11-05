@@ -11,9 +11,11 @@ import { getProjectRoot } from 'project-manager-shim'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { defaultSecretsFilePath, encodeKey, LocalSecrets } from 'project-manager-shim/localSecrets'
 import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
-import { ProjectService } from 'project-manager-shim/projectService'
+import { ProjectService, type EngineSettings } from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
+/** Where the engine mode may come from besides a project's `package.yaml`. */
+let engineSettings: EngineSettings | undefined
 let localMetadata: LocalMetadata | null = null
 let localVersioning: LocalVersioning | null = null
 let localSecrets: LocalSecrets | null = null
@@ -92,6 +94,7 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
       getLocalMetadata(),
       getLocalVersioning(),
       secretsKeyEnvironment,
+      engineSettings,
     )
   }
   return projectService
@@ -102,8 +105,10 @@ export function setupProjectService(
   args: readonly string[],
   electron: Electron,
   electronIsDev: boolean,
+  engine?: EngineSettings,
 ): ProjectService {
   extraArgs = args
+  engineSettings = engine
   if (!projectService) {
     projectService = ProjectService.default(
       paths.resourcesPath(electron, electronIsDev),
@@ -111,6 +116,7 @@ export function setupProjectService(
       getLocalMetadata(),
       getLocalVersioning(),
       secretsKeyEnvironment,
+      engineSettings,
     )
   }
   return projectService

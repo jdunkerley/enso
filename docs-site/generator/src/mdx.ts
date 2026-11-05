@@ -23,6 +23,41 @@ export function escapeMdxText(text: string): string {
     .replace(/>/g, '&gt;')
 }
 
+/**
+ * Escape text for MDX outside its code spans, which are copied as they are (inline code is literal
+ * in MDX). For a line that is not parsed as Markdown, such as a row of a result table.
+ */
+export function escapeOutsideCodeSpans(text: string): string {
+  let result = ''
+  let last = 0
+  for (const match of text.matchAll(/(`+)[^`]*?\1/g)) {
+    result += escapeMdxText(text.slice(last, match.index)) + match[0]
+    last = match.index + match[0].length
+  }
+  return result + escapeMdxText(text.slice(last))
+}
+
+/**
+ * A Markdown backslash escape, as MDX must see it. `\{` and `\}` stay as they are (MDX reads them
+ * as literal braces); `\<` and `\>` become entities, since MDX would otherwise keep the backslash;
+ * any other escape is the same in Markdown and MDX. Never `escapeMdxText`: that would turn `\{`
+ * into `\\{`, a literal backslash followed by an expression.
+ */
+function escapeNode(text: string): string {
+  const char = text.slice(1)
+  if (char === '<') return '&lt;'
+  if (char === '>') return '&gt;'
+  return text
+}
+
+/**
+ * A block MDX would read as an ES module statement (`import …` or `export …` at the start of a
+ * top-level paragraph) gets its first letter as an entity, so it stays text.
+ */
+function guardEsm(block: string): string {
+  return block.replace(/^(import|export)\b/, (word) => `&#${word.charCodeAt(0)};${word.slice(1)}`)
+}
+
 /** Escape a cell's MDX for a GFM table: `|` must not end the cell, even inside code. */
 export function escapeTableCell(mdx: string): string {
   return mdx.replace(/\|/g, '\\|').replace(/\n/g, ' ')
@@ -72,7 +107,7 @@ function emit(node: SyntaxNode, source: string, options: MdxOptions): string {
       // Result tables in doc comments are indented more deeply than their text, so CommonMark reads
       // them as code (spec, open question 10); the help panel's reading decides (Task 13).
       if (lines.every((line) => !line.trim() || line.trim().startsWith('|')))
-        return lines.join('\n')
+        return lines.map(escapeOutsideCodeSpans).join('\n')
       return ['```enso', ...lines, '```'].join('\n')
     }
     case 'Autolink': {
@@ -81,13 +116,20 @@ function emit(node: SyntaxNode, source: string, options: MdxOptions): string {
     }
     case 'URL':
       return text
+    case 'Escape':
+      return escapeNode(text)
     default: {
       let result = ''
       let position = node.from
       for (let child = node.firstChild; child; child = child.nextSibling) {
         result += escapeMdxText(source.slice(position, child.from))
         result +=
-          CODE.has(child.name) || child.firstChild || child.name === 'Autolink' ?
+          (
+            CODE.has(child.name) ||
+            child.firstChild ||
+            child.name === 'Autolink' ||
+            child.name === 'Escape'
+          ) ?
             emit(child, source, options)
           : escapeMdxText(source.slice(child.from, child.to))
         position = child.to
@@ -106,7 +148,7 @@ export function markdownToMdx(markdown: string, options: MdxOptions = {}): strin
     block = block.nextSibling
   ) {
     if (block.name === 'YAMLFrontMatter') continue
-    blocks.push(emit(block, markdown, options))
+    blocks.push(guardEsm(emit(block, markdown, options)))
   }
   return blocks.join('\n\n')
 }

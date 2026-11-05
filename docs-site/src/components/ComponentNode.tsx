@@ -1,7 +1,7 @@
 /**
  * @file A function drawn as a graph-editor node. Each pill is a button whose tooltip shows on hover
- * (and while the pointer is over the tooltip), on keyboard focus, and on tap (a tap toggles it;
- * tapping elsewhere closes it); Escape closes it (WCAG 1.4.13). Before hydration, or without
+ * (and while the pointer is over the tooltip), on keyboard focus, and on tap. A tap, click, Enter or
+ * Space toggles it, tapping elsewhere closes it, and Escape closes it (WCAG 1.4.13). Before hydration, or without
  * JavaScript, CSS shows the tooltips on hover and focus.
  */
 import useBaseUrl from '@docusaurus/useBaseUrl'
@@ -18,6 +18,11 @@ function Pill(props: { className: string; text: string; tooltip: string }): JSX.
   const [pinned, setPinned] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const open = !dismissed && (hovered || focused || pinned)
+  /**
+   * Whether the tooltip was open when the pointer went down. A tap focuses the button before its
+   * click, and focus opens the tooltip, so the click must toggle from the state before the tap.
+   */
+  const openAtPointerDown = useRef<boolean | undefined>(undefined)
 
   useEffect(() => setHydrated(true), [])
   useEffect(() => {
@@ -59,9 +64,14 @@ function Pill(props: { className: string; text: string; tooltip: string }): JSX.
           setFocused(true)
         }}
         onBlur={() => setFocused(false)}
+        onPointerDown={() => {
+          openAtPointerDown.current = open
+        }}
         onClick={() => {
-          setDismissed(false)
-          setPinned((was) => !was)
+          const wasOpen = openAtPointerDown.current ?? open
+          openAtPointerDown.current = undefined
+          setDismissed(wasOpen)
+          setPinned(!wasOpen)
         }}
       >
         {props.text}

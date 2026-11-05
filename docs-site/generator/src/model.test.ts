@@ -8,6 +8,8 @@ const page = (path: string) => model.byPath.get(path)
 test('classification and paths', () => {
   expect([...model.byPath.keys()].sort()).toEqual([
     'Standard.Fixture',
+    'Standard.Fixture/Measures',
+    'Standard.Fixture/Measures/Square.perimeter',
     'Standard.Fixture/Shapes',
     'Standard.Fixture/Shapes/Shape',
     'Standard.Fixture/Shapes/Shape.area',
@@ -85,7 +87,7 @@ test('the groups of every library, with or without a catalogue', () => {
 })
 
 test('function pages', () => {
-  expect(model.pages.filter(isFunctionPage).length).toBe(9)
+  expect(model.pages.filter(isFunctionPage).length).toBe(10)
 })
 
 test('two entries with one path fail the run', () => {

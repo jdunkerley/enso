@@ -228,7 +228,7 @@ overrides:
   reka-ui>@vueuse/core: ^15.0.0
   reka-ui>@vueuse/shared: ^15.0.0
 
-packageExtensionsChecksum: sha256-p9LKveiVde0FPbzspvZMw1J82x59IumlZcgCj3nQDGk=
+packageExtensionsChecksum: sha256-2Ui9uG/5W4zrxY47D5OXciv+89u/YpNq8OfYbsqO30M=
 
 pnpmfileChecksum: sha256-UtO9fqHFiHrcyVfxRK3T27+ItLb0V49gpeqgN3Zj4zw=
 
@@ -558,9 +558,6 @@ importers:
         specifier: ^2.0.0
         version: 2.0.0(vue@3.5.43(typescript@6.0.3))
       ag-grid-community:
-        specifier: ^36.2.0
-        version: 36.2.0
-      ag-grid-enterprise:
         specifier: ^36.2.0
         version: 36.2.0
       ag-grid-vue3:
@@ -1203,14 +1200,20 @@ importers:
       '@lezer/common':
         specifier: 'catalog:'
         version: 1.5.2
+      '@mdx-js/mdx':
+        specifier: 3.1.1
+        version: 3.1.1(supports-color@8.1.1)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
       '@types/react':
         specifier: 19.3.0
         version: 19.3.0
+      '@types/react-dom':
+        specifier: 19.3.0
+        version: 19.3.0(@types/react@19.3.0)
       cross-env:
-        specifier: ^7.0.3
+        specifier: 7.0.3
         version: 7.0.3
       enso-common:
         specifier: workspace:*
@@ -1218,6 +1221,9 @@ importers:
       playwright:
         specifier: 'catalog:'
         version: 1.63.0
+      remark-gfm:
+        specifier: 4.0.1
+        version: 4.0.1(supports-color@8.1.1)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1231,7 +1237,7 @@ importers:
         specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.12.2)(@vitest/browser@3.2.4)(jiti@2.6.1)(jsdom@26.1.0(supports-color@8.1.1))(supports-color@8.1.1)(terser@5.37.0)(yaml@2.9.1)
       yaml:
-        specifier: ^2.9.1
+        specifier: 2.9.1
         version: 2.9.1
       ydoc-shared:
         specifier: workspace:*
@@ -4423,6 +4429,11 @@ packages:
   '@types/range-parser@1.2.7':
     resolution: {integrity: sha512-hKormJbkJqzQGhziax5PItDUTMAM9uE2XXQmM37dyd4hVM+5aVl7oVxMVUiVQn2oCQFN/LKCZdvSM0pFRqbSmQ==}
 
+  '@types/react-dom@19.3.0':
+    resolution: {integrity: sha512-ZI7bU42mZXXKHn/qNLEw2IrbiINU7X5+vfgdixBHkCNpYWXjKgfQ/P+uyGb5CjOLB9UcnTeg3rylQtV2hym44Q==}
+    peerDependencies:
+      '@types/react': ^19.3.0
+
   '@types/react-router-config@5.0.11':
     resolution: {integrity: sha512-WmSAg7WgqW7m4x8Mt4N6ZyKz0BubSj/2tVUMsAHp+Yd2AMwcSbeFq9WympT19p5heCFmF97R9eD5uUR/t4HEqw==}
 
@@ -4872,26 +4883,11 @@ packages:
     resolution: {integrity: sha512-XNAb/a6TCqou+TufU8/u11HCu9x1gYvOoxLwtlXgIqmkrYQADVv6ljyW2zwiPhHz9R1gItAWpuDrdJMmrOBFEA==}
     engines: {node: '>= 16.0.0'}
 
-  ag-charts-community@14.2.0:
-    resolution: {integrity: sha512-AQ9u5jJGjCGWY19XMehZFhC5db6e9J5DGCurSGjm1h9MUkfTQfj9KMDHLhTQqdNhVvTXI7J4OB8ZNbWMh3TJug==}
-
-  ag-charts-core@14.2.0:
-    resolution: {integrity: sha512-te4u0sFYMNuzfZMU/uh3nVEctIFpsAfLFBJIJtlMqBKI8otYdB3y4M5Ax8KAAg888X6G1lDaBW8FoNGzX3caSg==}
-
-  ag-charts-enterprise@14.2.0:
-    resolution: {integrity: sha512-Qw/TICVK1lGfiz5L4QPgzTD2bffWfRWMydvnlH/fbWUUz7E9noE/bERD+E65nRKmzH+++i7hSvQDGEob13SRPA==}
-
-  ag-charts-locale@14.2.0:
-    resolution: {integrity: sha512-zoG9yxh193FKc7jvx9FFp8oWUTcYIzHJLNmq1+54KCIe0us9Ay5odkp31y7WJX5gDtty8hKq+uyOEBPXtE9GHw==}
-
   ag-charts-types@14.2.0:
     resolution: {integrity: sha512-4pDV6/4zbzPN7t607Gr1o6DO9RhmPafQGr+hIpTJBaerbaMoC+WOO3v/wkxFbvCNrHKOexEKSfNTH7PaAR4UzA==}
 
   ag-grid-community@36.2.0:
     resolution: {integrity: sha512-tK0Toj7t0fV/OMLPnDc0xlYKAqDbnCT3iJodYSn2TJ541caU8jPdYwWhMdW+AP2+pUNwFiJVgc04eJNfvBPsWw==}
-
-  ag-grid-enterprise@36.2.0:
-    resolution: {integrity: sha512-xwc8yVqjSaJPb0sPzFeLoidtF+cGBMyqXQHmkRzuBj1o44cibCoTP3ICshhc5upfc+ewhSYknBC8KPxcB+d0Ag==}
 
   ag-grid-vue3@36.2.0:
     resolution: {integrity: sha512-B6P5QHJGxY5g2LjHINAI904x1oMYb/VRlLWgmVylwEov0OicpowHSIxld28vgVkWkHGsdgqnbE4iDHQpVt4zPw==}
@@ -14193,10 +14189,10 @@ snapshots:
   '@ianvs/prettier-plugin-sort-imports@4.3.0(@vue/compiler-sfc@3.5.43)(prettier@3.9.8)(supports-color@8.1.1)':
     dependencies:
       '@babel/core': 7.29.7(supports-color@8.1.1)
-      '@babel/generator': 7.29.12
-      '@babel/parser': 7.29.12
-      '@babel/traverse': 7.29.12(supports-color@8.1.1)
-      '@babel/types': 7.29.11
+      '@babel/generator': 7.29.8
+      '@babel/parser': 7.29.9
+      '@babel/traverse': 7.29.8(supports-color@8.1.1)
+      '@babel/types': 7.29.8
       prettier: 3.9.8
       semver: 7.8.5
     optionalDependencies:
@@ -15723,6 +15719,10 @@ snapshots:
 
   '@types/range-parser@1.2.7': {}
 
+  '@types/react-dom@19.3.0(@types/react@19.3.0)':
+    dependencies:
+      '@types/react': 19.3.0
+
   '@types/react-router-config@5.0.11':
     dependencies:
       '@types/history': 4.7.11
@@ -16038,7 +16038,7 @@ snapshots:
 
   '@vue/compiler-core@3.5.13':
     dependencies:
-      '@babel/parser': 7.29.12
+      '@babel/parser': 7.29.9
       '@babel/types': 8.0.6
       '@vue/shared': 3.5.13
       entities: 4.5.0
@@ -16327,41 +16327,12 @@ snapshots:
 
   address@2.0.3: {}
 
-  ag-charts-community@14.2.0:
-    dependencies:
-      ag-charts-core: 14.2.0
-      ag-charts-locale: 14.2.0
-      ag-charts-types: 14.2.0
-    optional: true
-
-  ag-charts-core@14.2.0:
-    dependencies:
-      ag-charts-types: 14.2.0
-    optional: true
-
-  ag-charts-enterprise@14.2.0:
-    dependencies:
-      ag-charts-community: 14.2.0
-      ag-charts-core: 14.2.0
-    optional: true
-
-  ag-charts-locale@14.2.0:
-    optional: true
-
   ag-charts-types@14.2.0: {}
 
   ag-grid-community@36.2.0:
     dependencies:
       ag-charts-types: 14.2.0
       ag-stack: 36.2.0
-
-  ag-grid-enterprise@36.2.0:
-    dependencies:
-      ag-grid-community: 36.2.0
-      ag-stack: 36.2.0
-    optionalDependencies:
-      ag-charts-community: 14.2.0
-      ag-charts-enterprise: 14.2.0
 
   ag-grid-vue3@36.2.0(vue@3.5.43(typescript@6.0.3)):
     dependencies:

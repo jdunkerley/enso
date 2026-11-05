@@ -89,3 +89,13 @@ test('golden: Table.filter', () => {
   const page = goldenModel.byPath.get('Standard.Table/Table/Table.filter')!
   expect(renderPage(page, goldenModel)).toBe(readFileSync(`${golden}/Table.filter.mdx`, 'utf8'))
 })
+
+test('a method another module defines on a type of the same library is on both pages (R7)', () => {
+  expect(render('Standard.Fixture/Measures')).toContain('## Extension methods')
+  expect(render('Standard.Fixture/Measures')).toContain(
+    '### [perimeter](Square.perimeter/index.mdx)',
+  )
+  expect(render('Standard.Fixture/Shapes/Square')).toContain(
+    '### [perimeter](../../Measures/Square.perimeter/index.mdx)',
+  )
+})

@@ -243,6 +243,31 @@
       "documentation": "---\nicon: not_an_icon\n---\nHas an icon the IDE does not know.",
       "annotations": [],
       "reexports": []
+    },
+    {
+      "type": "module",
+      "module": "Standard.Fixture.Measures",
+      "documentation": "Measures of shapes, defined apart from them.",
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture.Measures",
+      "name": "perimeter",
+      "arguments": [
+        {
+          "name": "self",
+          "reprType": "Standard.Fixture.Shapes.Square",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes.Square",
+      "returnType": "Standard.Base.Data.Numbers.Float",
+      "isStatic": false,
+      "documentation": "The perimeter of the square, defined in another module.",
+      "annotations": [],
+      "reexports": []
     }
   ]
 }

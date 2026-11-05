@@ -18,7 +18,7 @@ function baseProps() {
   }
 }
 
-test('opens GridPopupMenu with the column mainMenuItems on right-click when unlicensed', async () => {
+test('opens GridPopupMenu with the column mainMenuItems on right-click', async () => {
   const props = baseProps()
   // `GridPopupMenu` is stubbed rather than deep-rendered: its real implementation teleports to
   // `#floatingLayer` and injects the ancestor-provided interaction handler

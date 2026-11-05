@@ -131,6 +131,19 @@ function metadataOf(documentation: string | undefined): DocumentationMetadata | 
 }
 
 /**
+ * Whether a page is a method on a type of its own library that another module of that library
+ * defines (Base's methods on `Any`, for example). Like an extension method (R7), it is listed on
+ * its type's page and on its defining module's page, and sits in the sidebar under its defining
+ * module, where its URL is.
+ */
+export function isMethodFromOtherModule(page: Page, model: SiteModel): boolean {
+  if (page.kind !== 'staticMethod' && page.kind !== 'instanceMethod') return false
+  const selfType = page.entry && 'selfType' in page.entry ? page.entry.selfType : undefined
+  const type = selfType ? model.types.get(selfType) : undefined
+  return type != null && type.module !== page.module
+}
+
+/**
  * The site's pages and indexes from the libraries. Throws when two entries share a path; records
  * paths that differ only in case.
  */
