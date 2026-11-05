@@ -6,10 +6,10 @@
     "generate": "vite-node --config vitest.config.ts generator/src/main.ts --",
     "start": "docusaurus start",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 docusaurus build",
-    "serve": "docusaurus serve --dir build --port 3210 --no-open",
+    "serve": "node scripts/serve.mts --port 3210",
     "clear": "docusaurus clear",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint generator src e2e docusaurus.config.ts sidebars.ts vitest.config.ts playwright.config.ts --cache --max-warnings=0",
+    "lint": "eslint generator src e2e scripts docusaurus.config.ts sidebars.ts vitest.config.ts playwright.config.ts --cache --max-warnings=0",
     "test:unit": "vitest run",
     "test:e2e": "playwright test"
   },

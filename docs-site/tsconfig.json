@@ -13,5 +13,5 @@
       "#/*": ["../app/gui/src/dashboard/*"]
     }
   },
-  "include": ["generator", "src", "e2e", "*.ts"]
+  "include": ["generator", "src", "e2e", "scripts", "*.ts"]
 }

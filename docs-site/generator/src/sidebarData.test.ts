@@ -1,0 +1,96 @@
+import { expect, test } from 'vitest'
+import { FIXTURES_LIB, readLibraries } from './catalogue'
+import { buildModel } from './model'
+import { buildSidebars } from './sidebarData'
+
+const sidebars = buildSidebars(buildModel(readLibraries([FIXTURES_LIB])))
+
+test('the Components intro sidebar lists the libraries', () => {
+  expect(sidebars.api).toEqual([
+    { type: 'doc', id: 'api/index', label: 'Components' },
+    {
+      type: 'ref',
+      id: 'api/Standard.Fixture/index',
+      label: 'Standard.Fixture',
+    },
+    {
+      type: 'ref',
+      id: 'api/Standard.Fixture_Ext/index',
+      label: 'Standard.Fixture_Ext',
+    },
+  ])
+})
+
+test('one sidebar per library: modules, then types (collapsed) with constructors and methods', () => {
+  expect(sidebars['api-Standard.Fixture']).toEqual([
+    {
+      type: 'doc',
+      id: 'api/Standard.Fixture/index',
+      label: 'Standard.Fixture',
+    },
+    {
+      type: 'category',
+      label: 'Shapes',
+      link: { type: 'doc', id: 'api/Standard.Fixture/Shapes/index' },
+      collapsed: true,
+      items: [
+        {
+          type: 'category',
+          label: 'Shape',
+          link: { type: 'doc', id: 'api/Standard.Fixture/Shapes/Shape/index' },
+          collapsed: true,
+          items: [
+            {
+              type: 'doc',
+              id: 'api/Standard.Fixture/Shapes/Shape.unit/index',
+              label: 'Shape.unit',
+            },
+            {
+              type: 'doc',
+              id: 'api/Standard.Fixture/Shapes/Shape.area/index',
+              label: 'area',
+            },
+            {
+              type: 'doc',
+              id: 'api/Standard.Fixture/Shapes/Shape.op-2b/index',
+              label: '+',
+            },
+            {
+              type: 'doc',
+              id: 'api/Standard.Fixture/Shapes/Shape.undocumented/index',
+              label: 'undocumented',
+            },
+            {
+              type: 'doc',
+              id: 'api/Standard.Fixture/Shapes/Shape.odd_icon/index',
+              label: 'odd_icon',
+            },
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Square',
+          link: { type: 'doc', id: 'api/Standard.Fixture/Shapes/Square/index' },
+          collapsed: true,
+          items: [
+            {
+              type: 'doc',
+              id: 'api/Standard.Fixture/Shapes/Square.Value/index',
+              label: 'Square.Value',
+            },
+            {
+              type: 'doc',
+              id: 'api/Standard.Fixture/Shapes/Square.side/index',
+              label: 'side',
+            },
+          ],
+        },
+        {
+          type: 'doc',
+          id: 'api/Standard.Fixture/Shapes/make_shape/index',
+          label: 'make_shape',
+        },
+      ],
+    },
+  ])
+})
