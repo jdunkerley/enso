@@ -33,7 +33,7 @@ jobs:
   benchmark-standard-libraries-graal-vm-ce:
     name: Benchmark Standard Libraries (GraalVM CE)
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 300
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -51,8 +51,9 @@ jobs:
       # `std-benchmarks/bench` builds the engine distribution first (its annotation processor
       # needs one), with the native runner that `ENSO_LAUNCHER` asks for.
       - name: Run the benchmarks
-        # A hung benchmark otherwise holds the runner for the job's whole 4 hours.
-        timeout-minutes: 150
+        # A hung benchmark otherwise holds the runner for the job's whole 5 hours. Two arms of
+        # `Table|Vector` took 115 minutes (#585), so 280 keeps the 1.5x headroom for the single arm of a larger run.
+        timeout-minutes: 280
         run: |-
           task="std-benchmarks/bench"
           if [ -n "$BENCH_NAME" ]; then task="std-benchmarks/benchOnly $BENCH_NAME"; fi
