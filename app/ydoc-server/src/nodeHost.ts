@@ -1,6 +1,8 @@
 /** @file The ydoc server hosted in Node: one WebSocket listener per opened project (spec stage 1a (b)). */
+import type { IncomingMessage } from 'node:http'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { docName } from './auth'
+import { LanguageServerSession } from './languageServerSession'
 import { nodeByteBufferClass } from './nodeByteBuffer'
 import { originAllowed } from './origin'
 import { remoteChannelServer, type LanguageServerChannelAddress } from './remoteChannelServer'
@@ -16,6 +18,31 @@ export interface YdocListenRequest {
    * Checks Origin]). Absent or empty, every handshake that carries an `Origin` is refused.
    */
   readonly allowedOrigins?: readonly string[] | undefined
+}
+
+/* Note [An Unknown Document Is Refused Before The Upgrade]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * `y-websocket` (1.5.4) resets its reconnect backoff when a socket opens. A socket for a document
+ * the session does not know used to be upgraded and closed at once, so the client never backed
+ * off: a GUI holding a module doc id of an earlier session asked for it again every ~100 ms, for
+ * as long as it held it (#601). So a socket is refused before the upgrade, with `404`, when it
+ * names a module doc its `ls=` session does not hold, or a session that does not exist (only the
+ * `index` doc starts one; a module doc of a session not yet started cannot be one it lists), and
+ * with `400` when it names no document or no `ls=`. The client's `onopen` is then never reached
+ * and its delay grows (to `y-websocket`'s cap). The check runs again in `setupGatewayClient` after
+ * the upgrade, which also covers a doc removed in between.
+ */
+/** Why a GUI handshake for `url` is refused before the upgrade, or `undefined` to accept it. */
+function unknownDocument(url: URL): { status: number; reason: string } | undefined {
+  const doc = docName(url.pathname)
+  const ls = url.searchParams.get('ls')
+  if (doc == null || ls == null) return { status: 400, reason: 'no document or no ls= parameter' }
+  if (doc === 'index') return undefined
+  const session = LanguageServerSession.sessions.get(ls)
+  if (session?.getYDoc(doc) == null) {
+    return { status: 404, reason: `document '${doc}' not found in language server session` }
+  }
+  return undefined
 }
 
 interface Listener {
@@ -50,10 +77,21 @@ export class NodeYdocHost {
       host: request.host,
       port: request.port,
       // Refused before the upgrade, with `403`: Note [The ydoc Listener Checks Origin].
-      verifyClient: ({ origin }: { origin: string | undefined }, done) => {
-        if (originAllowed(origin, allowedOrigins)) return done(true)
-        console.warn(`Refused a ydoc socket on port ${request.port} from origin ${origin}.`)
-        done(false, 403, 'Forbidden')
+      verifyClient: (
+        { origin, req }: { origin: string | undefined; req: IncomingMessage },
+        done: (result: boolean, code?: number, message?: string) => void,
+      ) => {
+        if (!originAllowed(origin, allowedOrigins)) {
+          console.warn(`Refused a ydoc socket on port ${request.port} from origin ${origin}.`)
+          return done(false, 403, 'Forbidden')
+        }
+        // Note [An Unknown Document Is Refused Before The Upgrade].
+        const refusal = unknownDocument(new URL(req.url ?? '/', 'ws://ydoc.local'))
+        if (refusal) {
+          console.warn(`Refused a ydoc socket on port ${request.port}: ${refusal.reason}.`)
+          return done(false, refusal.status)
+        }
+        done(true)
       },
     })
     server.on('connection', (socket, httpRequest) => {

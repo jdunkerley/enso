@@ -129,6 +129,14 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   loaded), `dev:vite`'s `ssrYdocHost` with the dev server's own addresses. No
   list refuses every browser page. Not covered: the engine-hosted server
   (`ENSO_YDOC_HOST=engine`), and other local processes, which can omit `Origin`.
+- **A socket for a document its session does not hold is refused before the
+  upgrade** (#601, Note [An Unknown Document Is Refused Before The Upgrade] in
+  `src/nodeHost.ts`): `404` for a module doc the `ls=` session does not hold (or
+  a session that does not exist yet), `400` with no doc or no `ls=`.
+  `y-websocket` resets its backoff when a socket opens, so upgrading and then
+  closing made a stale client retry every ~100 ms (91 attempts in 10 s,
+  measured); refused before the upgrade it backs off (7 in 10 s). The
+  engine-hosted server still upgrades and closes.
 - **One session opens two `json` sockets**, not one: `YjsServerTransport` hands
   the Language Server a proxy channel (for the GUI) and a backend channel (the
   ydoc server's own). The Language Server must accept both.
