@@ -150,6 +150,12 @@ From the catalogues of develop run 41928058656 (2026.1.1-dev):
   20-minute and 10 GB limits, so no fallback is on (`@docusaurus/faster` and
   per-library docs instances were not needed). Windows: 216 s. The output is
   about 310 MB.
+- **CI (`ubuntu-latest`, 4 vCPU, 16 GB, 2026-11-05):** the build step takes 5 to
+  6 minutes (324 s in the engine checks, 317 s and 362 s in `docs-site.yml`)
+  with a peak RSS of 5.8 GiB under the 8 GB heap limit, so the 32-core numbers
+  above are the upper bound and no fallback is needed. The whole job is about
+  7.5 minutes (`timeout-minutes: 30`); with `static-checks` and the WASM build
+  it is the same.
 - **Search index:** `search-index.json` is 13.2 MB, 2.3 MB gzipped, under the 5
   MB limit, so one index serves the whole site (no `searchContextByPaths`).
 - **Dotted paths, local half:** `serve` redirects `…/Table.filter` to
