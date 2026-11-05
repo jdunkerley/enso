@@ -76,7 +76,6 @@
     "@vueuse/core": "^15.0.0",
     "@vueuse/gesture": "^2.0.0",
     "ag-grid-community": "^36.2.0",
-    "ag-grid-enterprise": "^36.2.0",
     "ag-grid-vue3": "^36.2.0",
     "ajv": "^8.17.1",
     "codemirror": "^6.0.2",

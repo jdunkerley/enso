@@ -100,6 +100,7 @@ object SmallJDK {
     val jlinkArgs = Seq(
       "--no-header-files",
       "--no-man-pages",
+      "--generate-cds-archive",
       "--module-path",
       mp,
       "--output",
@@ -114,6 +115,27 @@ object SmallJDK {
       "Directory of small JDK " + targetJdkDirectory +
       " was not created."
     )
+  }
+
+  /** Fails the build when `jdkDirectory`'s `java` cannot map its CDS archive
+    * (spec stage 1b).
+    */
+  def checkSharing(jdkDirectory: File, log: sbt.Logger): Unit = {
+    val isWindows = sys.props("os.name").toLowerCase.contains("windows")
+    val java = new File(
+      new File(jdkDirectory, "bin"),
+      if (isWindows) "java.exe" else "java"
+    )
+    val output = new StringBuilder
+    val exit = scala.sys.process
+      .Process(Seq(java.getAbsolutePath, "-Xshare:on", "-version"))
+      .!(scala.sys.process.ProcessLogger(l => output.append(l).append('\n')))
+    if (exit != 0) {
+      throw new RuntimeException(
+        s"$java -Xshare:on -version exited $exit: the bundled JDK has no usable CDS archive.\n$output"
+      )
+    }
+    log.info(s"CDS archive in $jdkDirectory maps (-Xshare:on).")
   }
 
   private def runJlink(

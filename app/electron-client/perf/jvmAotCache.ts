@@ -60,7 +60,7 @@ const AOT_LOGGING = '-Xlog:aot=info,cds=info'
  * starting the Language Server after 30 s (run 41509148874: "Language server startup timeout",
  * the engine killed at 30.0 s), so it never exited by itself, wrote no configuration, and every
  * Windows JVM run fell back to a `launcher-trained` cache. The training launch gives the engine
- * 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`, read by `ProjectService.default`).
+ * 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`, read by `engineTimeouts` at each open).
  */
 const TRAINING_STARTUP_TIMEOUT_MS = 180_000
 

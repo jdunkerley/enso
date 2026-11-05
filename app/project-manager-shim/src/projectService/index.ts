@@ -15,10 +15,17 @@ import { EngineLogHub } from '../engineLogs/hub.js'
 import type { ProjectLifecycleListener } from '../localMetadata/index.js'
 import { withinVersioningTimeout, type LocalVersioning } from '../localVersioning/index.js'
 import {
+  describeEngineMode,
+  liftJvmFlag,
+  resolveEngineMode,
+  type EngineMode,
+  type EngineModeSettings,
+} from './engineMode.js'
+import {
   DEFAULT_YDOC_WAIT_MS,
   EnsoRunner,
   findEnsoExecutable,
-  LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
+  type EngineLaunch,
   type LanguageServerSockets,
   type Runner,
   type Socket,
@@ -30,7 +37,7 @@ import {
   type ProjectMetadata,
   type ProjectRepository,
 } from './projectRepository.js'
-import { timeoutFromEnv } from './timeouts.js'
+import { engineTimeouts } from './timeouts.js'
 import { UUID, type Path } from './types.js'
 
 export interface RunningLanguageServerInfo {
@@ -38,6 +45,14 @@ export interface RunningLanguageServerInfo {
   readonly projectName: string
   readonly projectNormalizedName: string
   readonly projectNamespace: string
+}
+
+/** Where the engine mode may come from besides a project's `package.yaml` (`engineMode.ts`). */
+export interface EngineSettings {
+  /** Electron's `--engine-mode` (or its alias `--jvm`). */
+  readonly option?: EngineMode | undefined
+  /** The raw `ENSO_ENGINE_MODE`; the process environment's when omitted. */
+  readonly environment?: string | undefined
 }
 
 /** Parameters for the "create project" endpoint. */
@@ -96,7 +111,15 @@ export class ProjectService {
     private readonly versioning?: LocalVersioning,
     /** Environment variables added to every engine this service starts. */
     private readonly extraEnvironment?: () => readonly (readonly [string, string])[],
+    private readonly engine?: EngineSettings,
   ) {}
+
+  private engineModeSettings(): EngineModeSettings {
+    return {
+      option: this.engine?.option,
+      environment: this.engine?.environment ?? process.env.ENSO_ENGINE_MODE,
+    }
+  }
 
   /** Why the last close-commit of each project (by path) failed, until `closeProject` reports it. */
   private readonly versioningWarnings = new Map<string, string>()
@@ -111,28 +134,22 @@ export class ProjectService {
     lifecycle?: ProjectLifecycleListener,
     versioning?: LocalVersioning,
     extraEnvironment?: () => readonly (readonly [string, string])[],
+    engine?: EngineSettings,
   ): ProjectService {
     const ensoPath = findEnsoExecutable(workDir)
     if (!ensoPath) {
       throw new Error(`${PRODUCT_NAME} executable not found`)
     }
-    // `ENSO_ENGINE_STARTUP_TIMEOUT_MS` lengthens the engine's start-up timeout (30 s): the
-    // open-time harness's JDK AOT training launch, a JVM with no class data sharing at all that
-    // also records every class, does not pass its first health check within 30 s on the Windows
-    // runner, and is killed before it can write its training data.
-    const startupTimeoutMs = timeoutFromEnv(
-      process.env.ENSO_ENGINE_STARTUP_TIMEOUT_MS,
-      LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
-    )
-    const runner = new EnsoRunner(ensoPath, {
-      ydocWaitMs: DEFAULT_YDOC_WAIT_MS,
-      startupTimeoutMs,
-    })
+    // The start-up and terminate timeouts come per launch, from the engine mode's column
+    // (`engineTimeouts`; `ENSO_ENGINE_STARTUP_TIMEOUT_MS` and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS`
+    // override both). `ydocWaitMs` is the fallback for a launch without a mode.
+    const runner = new EnsoRunner(ensoPath, { ydocWaitMs: DEFAULT_YDOC_WAIT_MS })
 
     // Read extra arguments from environment variable
     const envArgs = process.env.ENSO_ENGINE_ARGS
     const envArgsArray = envArgs ? envArgs.split(/\s+/).filter((arg) => arg.length > 0) : []
-    const allExtraArgs = [...envArgsArray, ...extraArgs]
+    const lifted = liftJvmFlag([...envArgsArray, ...extraArgs], engine?.option)
+    const allExtraArgs = lifted.args
 
     return new ProjectService(
       runner,
@@ -141,6 +158,7 @@ export class ProjectService {
       lifecycle,
       versioning,
       extraEnvironment,
+      { ...engine, option: lifted.option },
     )
   }
 
@@ -235,9 +253,12 @@ export class ProjectService {
   async runProject(projectId: UUID, projectsDirectory: Path): Promise<number> {
     const project = await this.getProject(projectId, projectsDirectory, true)
     this.logger.debug(`Running project '${project.path}'`)
+    const mode = await resolveEngineMode(project.path, this.engineModeSettings())
+    const launch: EngineLaunch = { mode, timeouts: engineTimeouts(mode.mode) }
     const exitCode = await this.runner.runProject(
       project.path,
       this.projectEnvVars(await makeProjectTelemetryKey(projectsDirectory, projectId)),
+      launch,
     )
     this.logger.debug(`Project '${project.path}' finished running`)
     return exitCode
@@ -264,6 +285,8 @@ export class ProjectService {
 
     // The log channel opens before the engine starts, so that its start-up is in the replay buffer.
     const localProjectKey = await makeProjectTelemetryKey(projectsDirectory, projectId)
+    // An open project keeps the engine it has: no second mode line in the middle of its log.
+    const alreadyLogging = this.engineLogs.get(project.path)?.isOpen === true
     const engineLog = this.engineLogs.open({
       projectPath: project.path,
       logDirectory: path.join(getEngineLogDirectory(), localProjectKey),
@@ -272,14 +295,19 @@ export class ProjectService {
 
     // Start the language server
     let sockets: LanguageServerSockets
+    let launch: EngineLaunch
     const engineArgs = [...this.extraArgs, ...engineLoggingArgs(engineLogging)]
     try {
+      const mode = await resolveEngineMode(project.path, this.engineModeSettings())
+      if (!alreadyLogging) engineLog.notice(describeEngineMode(mode))
+      launch = { mode, timeouts: engineTimeouts(mode.mode) }
       sockets = await this.runner.openProject(
         project.path,
         projectId,
         engineArgs.length > 0 ? engineArgs : undefined,
         this.projectEnvVars(localProjectKey),
         engineLog,
+        launch,
       )
     } catch (error) {
       await engineLog.close()

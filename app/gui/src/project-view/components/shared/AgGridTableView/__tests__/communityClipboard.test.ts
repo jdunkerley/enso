@@ -18,10 +18,7 @@ function makeDeps(overrides: Partial<ClipboardDeps> = {}): ClipboardDeps {
     b: vi.fn(() => true),
   }
   return {
-    enterpriseAvailable: false,
     gridApi: {
-      cutToClipboard: vi.fn(),
-      copyToClipboard: vi.fn(),
       getDisplayedRowAtIndex: (rowIndex: number) => ({ data: rows[rowIndex] }),
       getCellValue: ({ rowNode, colKey }: { rowNode: { data: unknown }; colKey: string }) =>
         (rowNode.data as Record<string, string>)[colKey],
@@ -40,36 +37,28 @@ function makeDeps(overrides: Partial<ClipboardDeps> = {}): ClipboardDeps {
 }
 
 describe('performCopy', () => {
-  test('licensed: delegates to the real AG Grid API', () => {
-    const deps = makeDeps({ enterpriseAvailable: true })
-    performCopy(deps, false)
-    expect(deps.gridApi.copyToClipboard).toHaveBeenCalled()
-    expect(deps.sendToClipboard).not.toHaveBeenCalled()
-  })
-
-  test('unlicensed: builds a TSV (headers row always first) from the tracked rectangle', () => {
+  test('builds a TSV (headers row always first) from the tracked rectangle', () => {
     const deps = makeDeps()
-    performCopy(deps, false)
-    expect(deps.gridApi.copyToClipboard).not.toHaveBeenCalled()
+    performCopy(deps)
     expect(deps.sendToClipboard).toHaveBeenCalledWith({
       data: 'A\tB\nx1\ty1\nx2\ty2',
     })
   })
 
-  test('unlicensed: no-ops when there is no tracked rectangle', () => {
+  test('no-ops when there is no tracked rectangle', () => {
     const deps = makeDeps({ rectangle: () => undefined })
-    performCopy(deps, false)
+    performCopy(deps)
     expect(deps.sendToClipboard).not.toHaveBeenCalled()
   })
 
-  test('unlicensed: does not double-escape values processCellForClipboard already quoted', () => {
+  test('does not double-escape values processCellForClipboard already quoted', () => {
     // `processCellForClipboard` performs its own RFC-4180 quoting (see AgGridTableView.vue); a
     // value it already wrapped in quotes must pass through `buildTsv` unchanged, not get
     // quote-wrapped a second time.
     const deps = makeDeps({
       processCellForClipboard: () => '"he said ""hi"""',
     })
-    performCopy(deps, false)
+    performCopy(deps)
     expect(deps.sendToClipboard).toHaveBeenCalledWith({
       data: 'A\tB\n"he said ""hi"""\t"he said ""hi"""\n"he said ""hi"""\t"he said ""hi"""',
     })
@@ -77,13 +66,7 @@ describe('performCopy', () => {
 })
 
 describe('performCut', () => {
-  test('licensed: delegates to the real AG Grid API', () => {
-    const deps = makeDeps({ enterpriseAvailable: true })
-    performCut(deps)
-    expect(deps.gridApi.cutToClipboard).toHaveBeenCalled()
-  })
-
-  test('unlicensed: copies the rectangle then clears every cell via its valueSetter', () => {
+  test('copies the rectangle then clears every cell via its valueSetter', () => {
     const deps = makeDeps()
     performCut(deps)
     expect(deps.sendToClipboard).toHaveBeenCalledWith({
@@ -95,7 +78,7 @@ describe('performCut', () => {
     expect(colB.valueSetter).toHaveBeenCalledTimes(2)
   })
 
-  test('unlicensed: skips columns with no valueSetter (read-only columns) without throwing', () => {
+  test('skips columns with no valueSetter (read-only columns) without throwing', () => {
     const deps = makeDeps()
     ;(deps.gridApi.getColumn('a')!.getColDef().valueSetter as unknown) = undefined
     expect(() => performCut(deps)).not.toThrow()
@@ -104,9 +87,7 @@ describe('performCut', () => {
 
 function makePasteDeps(overrides: Partial<PasteDeps> = {}): PasteDeps {
   return {
-    enterpriseAvailable: false,
     gridApi: {
-      pasteFromClipboard: vi.fn(),
       getFocusedCell: () => ({ rowIndex: 1, column: { getColId: () => 'a' } }),
     },
     readClipboardText: vi.fn(async () => 'x\ty\n1\t2'),
@@ -117,14 +98,7 @@ function makePasteDeps(overrides: Partial<PasteDeps> = {}): PasteDeps {
 }
 
 describe('performPaste', () => {
-  test('licensed: delegates to the real AG Grid API', async () => {
-    const deps = makePasteDeps({ enterpriseAvailable: true })
-    await performPaste(deps)
-    expect(deps.gridApi.pasteFromClipboard).toHaveBeenCalled()
-    expect(deps.readClipboardText).not.toHaveBeenCalled()
-  })
-
-  test('unlicensed: reads the clipboard, parses TSV, and forwards it with the focused cell', async () => {
+  test('reads the clipboard, parses TSV, and forwards it with the focused cell', async () => {
     const deps = makePasteDeps()
     await performPaste(deps)
     expect(deps.processDataFromClipboard).toHaveBeenCalledWith({
@@ -136,9 +110,9 @@ describe('performPaste', () => {
     })
   })
 
-  test('unlicensed: no-ops if no cell is focused', async () => {
+  test('no-ops if no cell is focused', async () => {
     const deps = makePasteDeps({
-      gridApi: { pasteFromClipboard: vi.fn(), getFocusedCell: () => null },
+      gridApi: { getFocusedCell: () => null },
     })
     await performPaste(deps)
     expect(deps.processDataFromClipboard).not.toHaveBeenCalled()
@@ -146,28 +120,7 @@ describe('performPaste', () => {
 })
 
 describe('installCommunityClipboardPatch', () => {
-  test('licensed: leaves the real copyToClipboard/cutToClipboard/pasteFromClipboard untouched', () => {
-    const realCopy = vi.fn()
-    const realCut = vi.fn()
-    const realPaste = vi.fn()
-    const api = {
-      copyToClipboard: realCopy,
-      cutToClipboard: realCut,
-      pasteFromClipboard: realPaste,
-    }
-    installCommunityClipboardPatch(
-      api,
-      true,
-      () => makeDeps(),
-      () => makePasteDeps(),
-      () => false,
-    )
-    expect(api.copyToClipboard).toBe(realCopy)
-    expect(api.cutToClipboard).toBe(realCut)
-    expect(api.pasteFromClipboard).toBe(realPaste)
-  })
-
-  test('unlicensed: replaces copyToClipboard/cutToClipboard/pasteFromClipboard with Community-backed implementations', () => {
+  test('replaces copyToClipboard/cutToClipboard/pasteFromClipboard with the implementations above', () => {
     const api: {
       copyToClipboard?(): void
       cutToClipboard?(): void
@@ -181,10 +134,8 @@ describe('installCommunityClipboardPatch', () => {
     const pasteDeps = makePasteDeps()
     installCommunityClipboardPatch(
       api,
-      false,
       () => clipboardDeps,
       () => pasteDeps,
-      () => false,
     )
     api.copyToClipboard!()
     expect(clipboardDeps.sendToClipboard).toHaveBeenCalledWith({

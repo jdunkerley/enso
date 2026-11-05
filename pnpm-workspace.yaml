@@ -81,9 +81,6 @@ overrides:
   "reka-ui>@vueuse/core": ^15.0.0
   "reka-ui>@vueuse/shared": ^15.0.0
 packageExtensions:
-  ag-grid-enterprise:
-    dependencies:
-      ag-grid-community: "*"
   "@open-rpc/client-js":
     dependencies:
       events: ^3.3.0

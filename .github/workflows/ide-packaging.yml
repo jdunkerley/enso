@@ -292,7 +292,6 @@ jobs:
       - name: Build GUI
         run: corepack pnpm run build:gui --mode=production
         env:
-          ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
           ENSO_IDE_COMMIT_HASH: ${{ github.sha }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
@@ -388,7 +387,6 @@ jobs:
         name: Package the IDE
         run: corepack pnpm --filter build-scripts run ide-build
         env:
-          ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
@@ -397,7 +395,6 @@ jobs:
         name: Package the IDE
         run: corepack pnpm --filter build-scripts run ide-build
         env:
-          ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}

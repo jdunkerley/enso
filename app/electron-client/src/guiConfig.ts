@@ -19,7 +19,6 @@ const GUI_CONFIG_KEYS = [
   'COMMIT_HASH',
   'GOOGLE_ANALYTICS_TAG',
   'YDOC_SERVER_URL',
-  'AG_GRID_LICENSE_KEY',
 ] as const satisfies readonly (keyof $Config)[]
 
 type _AssertAllGuiConfigKeysCovered =

@@ -11,7 +11,8 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import * as portfinder from 'portfinder'
 import { CommandError, runCommand as runChildCommand } from '../childProcess/runCommand.js'
-import { timeoutFromEnv } from './timeouts.js'
+import type { ResolvedEngineMode } from './engineMode.js'
+import { ENGINE_TIMEOUTS, engineTimeouts, type EngineTimeouts } from './timeouts.js'
 import { Path } from './types.js'
 
 const HEALTHCHECK_FAILURES_TO_RESTART = 3
@@ -55,7 +56,7 @@ const YDOC_POLL_INTERVAL = 10
 const YDOC_CONNECT_TIMEOUT_MS = 250
 
 /** The default for how long an open waits for the engine's ydoc port to accept connections. */
-export const DEFAULT_YDOC_WAIT_MS = 5000
+export const DEFAULT_YDOC_WAIT_MS = ENGINE_TIMEOUTS.native.ydocWaitMs
 
 /** Whether a TCP connection to `socket` is accepted right now. */
 function acceptsConnections(socket: Socket): Promise<boolean> {
@@ -78,7 +79,11 @@ const LANGUAGE_SERVER_CRASH_LOOP_MAX = 5
 const LANGUAGE_SERVER_CRASH_LOOP_WINDOW_MS = 60_000
 
 export interface Runner {
-  runProject(projectPath: Path, extraEnv?: readonly (readonly [string, string])[]): Promise<number>
+  runProject(
+    projectPath: Path,
+    extraEnv?: readonly (readonly [string, string])[],
+    launch?: EngineLaunch,
+  ): Promise<number>
   createProject(path: Path, name: string, projectTemplate?: string): Promise<void>
   openProject(
     projectPath: Path,
@@ -86,6 +91,7 @@ export interface Runner {
     extraArgs?: readonly string[],
     extraEnv?: readonly (readonly [string, string])[],
     logSink?: EngineLogSink,
+    launch?: EngineLaunch,
   ): Promise<LanguageServerSockets>
   closeProject(projectPath: Path): Promise<void>
   isProjectRunning(projectPath: Path): Promise<boolean>
@@ -181,18 +187,42 @@ export interface ShutdownHookRegistry {
 
 export type ShutdownHookType = keyof ShutdownHookRegistry
 
+/**
+ * How one engine is launched: its resolved mode (`--jvm` for a JVM engine), the timeouts of that
+ * mode's column, and extra JVM options (`ENSO_JVM_OPTIONS`, one per line). Without it a launch is
+ * what it was before engine modes: no `--jvm`, the runner's own timeouts.
+ */
+export interface EngineLaunch {
+  readonly mode: ResolvedEngineMode
+  readonly timeouts: EngineTimeouts
+  readonly jvmOptions?: readonly string[]
+}
+
+/** `--jvm` for a JVM launch, nothing otherwise. */
+function modeArgs(launch: EngineLaunch | undefined): readonly string[] {
+  return launch?.mode.mode === 'jvm' ? ['--jvm'] : []
+}
+
+/** `ENSO_JVM_OPTIONS` with `launch`'s options appended one per line (ruling 2 of the plan). */
+function jvmOptionsEnv(launch: EngineLaunch | undefined): Record<string, string> {
+  const options = launch?.jvmOptions ?? []
+  if (options.length === 0) return {}
+  const inherited = process.env.ENSO_JVM_OPTIONS?.trim()
+  return { ENSO_JVM_OPTIONS: [...(inherited ? [inherited] : []), ...options].join('\n') }
+}
+
 const DEFAULT_JSONRPC_PORT = 30616
 /** How long an engine has to pass its first health check before it is killed. */
-export const LANGUAGE_SERVER_STARTUP_TIMEOUT_MS = 30_000
+export const LANGUAGE_SERVER_STARTUP_TIMEOUT_MS = ENGINE_TIMEOUTS.native.startupMs
 
 /**
- * How long an engine has to exit after it was asked to, before it is killed: 10 s, or
+ * How long a native engine has to exit after it was asked to, before it is killed: 10 s, or
  * `ENSO_ENGINE_TERMINATE_TIMEOUT_MS`. The open-time harness's JDK AOT training launch needs longer:
  * the recording JVM writes its training data as it exits, which took more than 10 s on the
  * Windows runner.
  */
 function terminateTimeoutMs(): number {
-  return timeoutFromEnv(process.env.ENSO_ENGINE_TERMINATE_TIMEOUT_MS, 10_000)
+  return engineTimeouts('native').terminateMs
 }
 
 /**
@@ -228,6 +258,7 @@ class OpenedProject {
     private readonly logSink: EngineLogSink | undefined,
     private readonly startupTimeoutMs: number,
     private readonly ydocWaitMs: number,
+    private readonly terminateMs: number,
   ) {
     this.loaded = this.loadedDeferred.promise
     this.loadedDeferred.promise.catch(() => undefined)
@@ -253,12 +284,21 @@ class OpenedProject {
     logSink: EngineLogSink | undefined,
     startupTimeoutMs: number,
     ydocWaitMs: number,
+    terminateMs: number,
   ) {
     const sockets = {
       jsonSocket: { host: '127.0.0.1', port: jsonPort },
       ydocSocket: { host: '127.0.0.1', port: ydocPort },
     }
-    const project = new OpenedProject(path, sockets, spawner, logSink, startupTimeoutMs, ydocWaitMs)
+    const project = new OpenedProject(
+      path,
+      sockets,
+      spawner,
+      logSink,
+      startupTimeoutMs,
+      ydocWaitMs,
+      terminateMs,
+    )
     // Surface synchronous spawn failures (bad executable path, etc.) to the caller.
     await project.watcher.firstSpawn
     return project
@@ -436,7 +476,7 @@ class OpenedProject {
         )
         // The respawn triggers `onUnexpectedExit` followed by `onChildStarted`, which restarts
         // this watchdog loop on the new child. Don't schedule another `check` here.
-        void this.watcher.respawn(terminateTimeoutMs())
+        void this.watcher.respawn(this.terminateMs)
       } else {
         // Not using setInterval to not pile slow-responding healthchecks.
         this.nextWatchdogCheck = setTimeout(check, WATCHDOG_HEALTHCHECK_INTERVAL)
@@ -460,7 +500,7 @@ class OpenedProject {
           console.error('Language Server process of', this.path, "didn't finish in time. Killing.")
           handle.child.kill('SIGKILL')
         }
-      }, terminateTimeoutMs())
+      }, this.terminateMs)
       try {
         await handle.waitForExit()
       } finally {
@@ -469,7 +509,7 @@ class OpenedProject {
       console.log('Language server process of', this.path, 'exited')
     } else {
       // No stdin to write to — fall back to SIGTERM with SIGKILL after timeout.
-      await handle.terminate({ timeoutMs: terminateTimeoutMs() })
+      await handle.terminate({ timeoutMs: this.terminateMs })
     }
     // Its last stderr may still be in the pipe at the exit: the log must not end before it.
     await handle.waitForDrain()
@@ -573,9 +613,14 @@ export class EnsoRunner implements Runner {
   async runProject(
     projectPath: Path,
     extraEnv?: readonly (readonly [string, string])[],
+    launch?: EngineLaunch,
   ): Promise<number> {
-    const args = ['--run', projectPath]
-    const env = { ...process.env, ...(extraEnv ? Object.fromEntries(extraEnv) : {}) }
+    const args = [...modeArgs(launch), '--run', projectPath]
+    const env = {
+      ...process.env,
+      ...jvmOptionsEnv(launch),
+      ...(extraEnv ? Object.fromEntries(extraEnv) : {}),
+    }
     const cwd = path.dirname(projectPath)
     const spawnedProcess = await this.runProcess(args, (cmd, cmdArgs) =>
       childProcess.spawn(cmd, cmdArgs, { env, cwd, stdio: ['inherit', 'inherit', 'inherit'] }),
@@ -615,6 +660,7 @@ export class EnsoRunner implements Runner {
     extraArgs?: readonly string[],
     extraEnv?: readonly (readonly [string, string])[],
     logSink?: EngineLogSink,
+    launch?: EngineLaunch,
   ): Promise<LanguageServerSockets> {
     // Check if the project is already running
     const runningProject = this.runningProjects.get(projectPath)
@@ -643,6 +689,7 @@ export class EnsoRunner implements Runner {
         )
         const rootId = crypto.randomUUID()
         const args: readonly string[] = [
+          ...modeArgs(launch),
           '--server',
           '--root-id',
           rootId,
@@ -660,6 +707,7 @@ export class EnsoRunner implements Runner {
         const env = {
           ...process.env,
           LANGUAGE_SERVER_YDOC_PORT: ydocPort.toString(),
+          ...jvmOptionsEnv(launch),
           ...(extraEnv ? Object.fromEntries(extraEnv) : {}),
         }
 
@@ -679,8 +727,11 @@ export class EnsoRunner implements Runner {
               }),
             ),
           logSink,
-          this.options.startupTimeoutMs ?? LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
-          this.options.ydocWaitMs ?? 0,
+          launch?.timeouts.startupMs ??
+            this.options.startupTimeoutMs ??
+            LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
+          launch?.timeouts.ydocWaitMs ?? this.options.ydocWaitMs ?? 0,
+          launch?.timeouts.terminateMs ?? terminateTimeoutMs(),
         )
         project.shutdownHooks.set('remove-from-list', () => {
           this.runningProjects.delete(projectPath)

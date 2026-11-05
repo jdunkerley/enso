@@ -2,8 +2,9 @@ import { PRODUCT_NAME } from 'enso-common/src/constants'
 import { Path, type UUID } from 'enso-common/src/services/ProjectManager/types'
 import { dirname, resolve } from 'node:path'
 import { getFileSystemEntry } from './handler/index.js'
+import type { Runner } from './projectService/ensoRunner.js'
 import { EnsoRunner, findEnsoExecutable } from './projectService/ensoRunner.js'
-import { ProjectService } from './projectService/index.js'
+import { ProjectService, type EngineSettings } from './projectService/index.js'
 
 function getWorkDir() {
   if (process.env.NODE_ENV === 'development') {
@@ -13,21 +14,35 @@ function getWorkDir() {
   }
 }
 
-function createProjectService(): ProjectService {
+function createProjectService(engine?: EngineSettings, runner?: Runner): ProjectService {
+  if (runner)
+    return new ProjectService(runner, [], console, undefined, undefined, undefined, engine)
   const ensoPath = findEnsoExecutable(getWorkDir())
   if (!ensoPath) {
     throw new Error(`${PRODUCT_NAME} executable not found`)
   }
-  const runner = new EnsoRunner(ensoPath)
-  return new ProjectService(runner, [])
+  return new ProjectService(
+    new EnsoRunner(ensoPath),
+    [],
+    console,
+    undefined,
+    undefined,
+    undefined,
+    engine,
+  )
 }
 
-/** Run a local project by UUID. */
+/**
+ * Run a local project by UUID. `engine` carries the command line's `--engine-mode`; `runner` is for
+ * tests (the Enso executable's runner otherwise).
+ */
 export async function runLocalProjectByUuid(
   projectId: UUID,
   projectsDirectory: Path,
+  engine?: EngineSettings,
+  runner?: Runner,
 ): Promise<number> {
-  const projectService = createProjectService()
+  const projectService = createProjectService(engine, runner)
   try {
     const exitCode = await projectService.runProject(projectId, projectsDirectory)
     return exitCode
@@ -39,12 +54,15 @@ export async function runLocalProjectByUuid(
 }
 
 /** Run a local project by path. */
-export async function runLocalProjectByPath(projectPath: Path): Promise<number> {
+export async function runLocalProjectByPath(
+  projectPath: Path,
+  engine?: EngineSettings,
+): Promise<number> {
   const directoryId = Path(dirname(projectPath))
   const project = await getFileSystemEntry(projectPath)
   if (project.type !== 'ProjectEntry') {
     throw new Error(`The path '${projectPath}' does not point to a project.`)
   }
-  const exitCode = await runLocalProjectByUuid(project.metadata.id as UUID, directoryId)
+  const exitCode = await runLocalProjectByUuid(project.metadata.id as UUID, directoryId, engine)
   return exitCode
 }
