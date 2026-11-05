@@ -178,3 +178,48 @@ describe('setupGatewayClient binary channel (#396)', () => {
     expect(binary.connections()).toBe(1)
   })
 })
+
+describe('setupGatewayClient with an unknown document', () => {
+  afterEach(async () => {
+    await settle()
+  })
+
+  test('a connection to a document the session does not have does not keep the session', async () => {
+    // A GUI that outlived its session (its Language Server restarted, under the Node ydoc host)
+    // reconnects its module docs by their old ids; the new session has none of them. Each such
+    // connection is refused, and must not hold the session: one that is never released keeps its
+    // Language Server client, which later reconnects and takes the modules' write capabilities
+    // from the session the GUI is using.
+    const index = new MockSocket()
+    setupGatewayClient(
+      index,
+      LS_URL,
+      null,
+      'index',
+      byteBuffer,
+      jsonServer,
+      fakeBinaryServer().server,
+      { onConnect: () => {} },
+      { onConnect: () => {} },
+    )
+    const stale = new MockSocket()
+    setupGatewayClient(
+      stale,
+      LS_URL,
+      null,
+      'a-module-doc-of-an-earlier-session',
+      byteBuffer,
+      jsonServer,
+      fakeBinaryServer().server,
+      { onConnect: () => {} },
+      { onConnect: () => {} },
+    )
+    expect(stale.readyState).toBe(WebSocket.CLOSED)
+    await settle()
+    expect(LanguageServerSession.sessions.size).toBe(1)
+
+    index.close()
+    await settle()
+    expect(LanguageServerSession.sessions.size).toBe(0)
+  })
+})

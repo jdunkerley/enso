@@ -126,7 +126,17 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
 - **An LS restart takes the GUI sockets with it.** When a `json` socket closes
   without the ydoc side having closed it, the listener closes every GUI socket
   it holds and the session goes with them; the GUI reconnects, as after an
-  engine restart when the server lived in the engine.
+  engine restart when the server lived in the engine. The session's own
+  `YjsServerTransport` closes too when the Language Server ends either of its
+  channels (Note [The Language Server Ends A Channel] in
+  `ydoc-shared/src/util/net/YjsTransport.ts`), so the session gives up its URL
+  at once. Before that, a session outlived the engine's restart, sent into dead
+  channels for ~75 s and then took `src/Main.enso`'s write capability from the
+  GUI's new session (#593).
+- **Every session reference is released.** The process outlives its engines, so
+  a session that is never released lives on with its Language Server client: a
+  connection refused because its doc is unknown (a GUI reconnecting with the
+  module doc ids of an earlier session) releases the session it was handed.
 - **Sessions are process-global.** `LanguageServerSession.sessions` is keyed by
   the GUI's `ls=` name, not by listener, so one Node process hosting several
   listeners relies on those names being distinct. They are: the GUI's `ls=` is
