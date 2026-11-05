@@ -17,16 +17,18 @@ graph. Everything stays on your computer: Enso needs no account.
 
 When Enso starts it shows your projects in the _drive_. The buttons down the
 left edge switch between **Local** (your projects folder), **Recent** (the
-projects you opened lately) and saved folders you added with **Add Folder**.
+projects you opened lately) and folders you added with **Add Directory** (the
+last button; it shows its name when the edge is expanded).
 
-![The drive's toolbar: New Project, then New Folder, New Datalink and New Secret, then upload and download buttons, and the search box.](./images/drive-toolbar.png)
+![The drive's toolbar: New Project, then New Folder, New Datalink and New Secret, then **Import** and **Export** buttons, and the search box.](./images/drive-toolbar.png)
 
 Choose **New Project**. Enso creates a project called "New Project 1" (or the
 next free number) and opens it in the editor beside the drive. To open a project
 that is already there, click the ▶ button at the start of its row.
 
 Projects are folders. By default they are kept in an `enso-projects` folder
-inside your Documents folder. To keep them somewhere else, change the **Root
+inside your Documents folder (or in `enso/projects` in your home folder if you
+have no Documents folder). To keep them somewhere else, change the **Root
 Folder** in Settings (the cog at the bottom of the left edge, then **Settings**,
 then **Local**).
 
@@ -36,8 +38,8 @@ Components are the building blocks: reading data, filtering, joining, charting
 and so on. To add one, click an empty part of the graph and press
 <kbd>Enter</kbd>. The component browser opens.
 
-<!-- TODO screenshot: the component browser, with a few characters typed and the matching
-     components listed (needs a running engine for its component list). -->
+{/* TODO screenshot: the component browser, with a few characters typed and the
+matching components listed (needs a running engine for its component list). */}
 
 Start typing what you want to do. The browser lists the components that match
 what you typed, and it also matches their alternative names, so searching for
@@ -79,12 +81,12 @@ examples. There are three ways to see it:
 - in the component browser, the help beside the list shows the highlighted
   component's documentation;
 - click the **?** button beside a selected node to open that component's
-  documentation in the **Help** tab on the right of the editor;
+  documentation in the **Component help** tab on the right of the editor;
 - read it here, in the [Components](../api/index.md) reference, which has the
   same text for every component of the standard libraries.
 
-<!-- TODO screenshot: the Help tab with a component's documentation open (needs a running
-     engine for the component documentation). -->
+{/* TODO screenshot: the Component help tab with a component's documentation
+open (needs a running engine for the component documentation). */}
 
 ## Save and close
 

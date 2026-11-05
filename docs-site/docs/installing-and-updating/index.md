@@ -80,10 +80,11 @@ dialog shows the progress and you can keep working.
 
 ![The "Downloading update" dialog, with a progress bar.](./images/update-downloading.png)
 
-When the download is finished, choose **Restart to update**. Enso closes your
-open projects, installs the new version and starts again. If you would rather
-wait, choose **Remind me later**: the update is installed the next time you quit
-Enso.
+When the download is finished, choose **Restart to update**. Enso restarts and
+installs the new version. Restarting does not save a version of your open
+projects, so save any you want to keep first (see
+[versions](../local-versioning/index.md)). If you would rather wait, choose
+**Remind me later**: the update is installed the next time you quit Enso.
 
 ![The "Update ready" dialog, with the buttons Remind me later and Restart to update.](./images/update-ready.png)
 
@@ -115,7 +116,7 @@ This setting only appears in the desktop app.
 
 - **Windows:** open **Settings**, then **Apps**, find **Enso** and choose
   **Uninstall**.
-- **macOS:** drag **Enso** from your Applications folder to the Bin.
+- **macOS:** drag **Enso** from your Applications folder to the Trash.
 - **Linux:** delete the AppImage file.
 
 Your projects are kept: they are in your Documents folder, not with the

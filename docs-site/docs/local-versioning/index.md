@@ -36,7 +36,9 @@ repository, Enso asks:
 
 - **Create** makes a Git repository in your projects folder and keeps versions
   of every project in it.
-- **Not now** skips it; Enso asks again the next time you start.
+- **Not now** skips it for now. Enso does not ask again when you close a project
+  during this session, but it asks again if you save by hand, and it asks again
+  the next time you start Enso.
 - **Don't ask again for this folder** stops the question for good.
 
 If your projects folder is already inside a Git repository that you made

@@ -97,7 +97,7 @@ toolbar help with that:
 
 - **Download log file** saves the session's log file you can attach to your
   report.
-- **Show in Explorer** (**Show in Finder** on macOS, **Show in folder** on
+- **Reveal in Explorer** (**Show in Finder** on macOS, **Show in folder** on
   Linux) opens the folder that holds the log file, in the desktop app.
 
 Look through the log before you share it. It can contain names of files and

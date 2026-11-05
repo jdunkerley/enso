@@ -51,8 +51,8 @@ text. On such an argument, open the argument's list: it shows the names of your
 secrets, and **New secret…** to make one on the spot. Choosing a name fills the
 argument in with that secret.
 
-<!-- TODO screenshot: a component's argument with its list of secrets open (needs a running
-     engine for a component with a secret argument). -->
+{/* TODO screenshot: a component's argument with its list of secrets open (needs
+a running engine for a component with a secret argument). */}
 
 In the code, that looks like this:
 
@@ -103,12 +103,12 @@ Two things follow:
 
 ### Rotating the key
 
-**Rotate key** re-encrypts every secret with a new key. Enso reminds you once
-the key is over a year old, and reminds you again each month until you rotate
-it. Close your open projects first, because a running project holds the old key:
-the button is not available while any project is open. If you have copied the
-key to a server, that server needs the new key and the new `secrets.json`
-afterwards.
+**Rotate key** re-encrypts every secret with a new key. Once the key is over a
+year old, Enso shows a message when it starts, with **Rotate now** and **Remind
+me in a month**; it asks again each month until you rotate the key. Close your
+open projects first, because a running project holds the old key: the button is
+not available while any project is open. If you have copied the key to a server,
+that server needs the new key and the new `secrets.json` afterwards.
 
 ### Using secrets on a server
 

@@ -43,11 +43,11 @@ editor to read what it does and which nodes to look at. Select a node and press
 Two things to know:
 
 - `Local_Database` previews database changes while you edit and does not run
-  them. Press the **Write** button (the ▶ button at the top of the graph) to run
-  the upload, then select the `summary` node to see the result.
+  them. Press the **Write All** button at the top of the graph (or **Write** on
+  the node) to run the upload, then select the `summary` node to see the result.
 - `Orders_And_Customers` writes an Excel file, `spend_by_segment.xlsx`, into the
   project's `data` folder. As with the database upload, this happens when you
-  press **Write**.
+  press **Write All** (or **Write** on the node).
 
 ## They are ordinary projects
 
