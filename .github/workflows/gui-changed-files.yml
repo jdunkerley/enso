@@ -41,6 +41,7 @@ jobs:
         with:
           files: |
             app/**
+            docs-site/**
             lib/rust/**
             .cargo/**
             Cargo.lock
@@ -64,14 +65,17 @@ jobs:
             .git-*
             **/*.md
       # The same set minus the GUI's own unit and Playwright tests and their configuration, which
-      # the IDE package neither contains nor runs (packaging is `vite build` with `vite.config.ts`).
-      # Keep the two lists in sync.
+      # the IDE package neither contains nor runs (packaging is `vite build` with `vite.config.ts`),
+      # and minus `docs-site/`: the user documentation site is checked by the GUI checks' typecheck,
+      # lint and unit tests (the root `ci:*` scripts run every workspace package's), but it is not
+      # part of the IDE, so a change to it alone does not package the IDE. Keep the two lists in sync.
       - name: Get changed files, excluding GUI tests
         id: gui-changed-files-excluding-tests
         uses: step-security/changed-files@v45
         with:
           files: |
             app/**
+            docs-site/**
             lib/rust/**
             .cargo/**
             Cargo.lock
@@ -102,6 +106,7 @@ jobs:
             app/gui/vite.test.config.ts
             app/gui/playwright.config.ts
             app/gui/tsconfig.app.vitest.json
+            docs-site/**
       - name: List all changed files
         env:
           ALL_CHANGED_FILES: ${{ steps.gui-changed-files.outputs.all_modified_files }}

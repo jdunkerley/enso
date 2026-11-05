@@ -43,6 +43,10 @@ deserialize parser output.
   internals, LSP protocol) is in the
   [wiki](https://github.com/jdunkerley/enso/wiki/Home); see `docs/CLAUDE.md` for
   how to read it locally.
+- `docs-site/` — The user documentation site (Docusaurus; React only here):
+  hand-written guides and a Components reference generated from the standard
+  libraries' catalogues. Published from `develop` to GitHub Pages. See
+  `docs-site/CLAUDE.md`.
 - `project/` — SBT plugins and build helpers for the engine.
 - `internal/`, `patches/` — Build plumbing.
 
@@ -54,7 +58,7 @@ Three, **which one to use depends on what you're building**:
   parser crates under `lib/rust/`, `parser/debug` and its fuzzer,
   `app/rust-ffi`). sbt and the pnpm `postinstall` run it for you.
 - **pnpm + Vite/esbuild** — for the TypeScript monorepo (packages listed in
-  `pnpm-workspace.yaml`).
+  `pnpm-workspace.yaml`, including `docs-site`).
 - **SBT** — for the Scala/Java engine (`build.sbt`). See
   [SBT-Cheatsheet](https://github.com/jdunkerley/enso/wiki/SBT-Cheatsheet).
 
