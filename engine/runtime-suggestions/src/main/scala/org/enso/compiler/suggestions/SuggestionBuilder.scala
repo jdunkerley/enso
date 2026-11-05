@@ -775,28 +775,31 @@ final class SuggestionBuilder[A: IndexedSource](
   private def buildReturnType(typeDef: Option[TypeArg]): String =
     typeDef.map(buildTypeArgumentName).getOrElse(Any)
 
+  /** The module text the IR locations index: the parser reads a CRLF line
+    * ending as a single character, so the text is normalized the same way.
+    * `None` unless the builder was given a `CharSequence`.
+    */
+  private lazy val locationText: Option[String] =
+    (source: Any) match {
+      case chars: CharSequence => Some(chars.toString.replace("\r\n", "\n"))
+      case _                   => None
+    }
+
   /** Build argument default value from the expression.
     *
     * The default is reproduced as the source text the expression was parsed
     * from: the IR's `showCode` is a debugging format that writes applications
     * as `((f) args)`. It is only used when the expression has no location.
     *
-    * [[IdentifiedLocation]] offsets index the module's characters, which is
-    * what the builder is given in practice (`CharSequence`).
-    *
     * @param expr the argument expression
     * @return the argument default value
     */
   private def buildDefaultValue(expr: IR): String = {
     val fromSource = for {
-      loc <- expr.location
-      text <- (source: Any) match {
-        case chars: CharSequence
-            if 0 <= loc.start && loc.start < loc.end && loc.end <= chars.length =>
-          Some(chars.subSequence(loc.start, loc.end).toString)
-        case _ => None
-      }
-    } yield text
+      loc  <- expr.location
+      text <- locationText
+      if 0 <= loc.start && loc.start < loc.end && loc.end <= text.length
+    } yield text.substring(loc.start, loc.end)
     fromSource.getOrElse(expr.showCode())
   }
 
