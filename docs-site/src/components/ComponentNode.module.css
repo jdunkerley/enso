@@ -1,0 +1,84 @@
+/* The graph editor's node: a 32px pill, white on the group colour, in both colour modes. */
+.node {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  border-radius: 16px;
+  padding-right: 6px;
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  background-color: var(--node-color, var(--group-color-fallback, #006b8a));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0.25rem 0 1rem;
+}
+.small {
+  height: 24px;
+  border-radius: 12px;
+  font-size: 12px;
+  margin: 0.25rem 0 0.5rem;
+}
+.icon {
+  width: 24px;
+  height: 24px;
+  margin: 4px;
+  flex: none;
+}
+.small .icon {
+  width: 16px;
+  height: 16px;
+}
+.pill {
+  position: relative;
+  display: inline-flex;
+}
+.name,
+.param {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: help;
+  padding: 0 2px;
+  margin-left: 4px;
+}
+.name {
+  font-weight: 600;
+}
+.param {
+  padding-left: 4px;
+  border-left: 2px solid #0003;
+  color: #fffc;
+  font-weight: 400;
+}
+.optional {
+  font-style: italic;
+}
+.name:focus-visible,
+.param:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+.tooltip {
+  visibility: hidden;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  white-space: pre;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--ifm-color-emphasis-900);
+  color: var(--ifm-color-emphasis-0);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+}
+.pill:hover > .tooltip:not([data-open]),
+.pill:focus-within > .tooltip:not([data-open]),
+.tooltip[data-open="true"] {
+  visibility: visible;
+}
