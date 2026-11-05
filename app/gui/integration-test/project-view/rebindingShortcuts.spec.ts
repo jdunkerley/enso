@@ -6,17 +6,16 @@
  */
 import type { Page } from 'integration-test/base'
 import { expect, test } from 'integration-test/base'
-import { TEXT } from '../actions'
+import { railButton, TEXT } from '../actions'
 import * as locate from './locate'
 
 /** The new key for the Code Editor shortcut (default `Mod+\``), which nothing else has. */
 const NEW_KEY = 'ControlOrMeta+Shift+U'
 const OLD_KEY = 'ControlOrMeta+`'
 
-/** Open Settings → Keyboard shortcuts from the user menu, over the graph. */
+/** Open Settings → Keyboard shortcuts from the left rail, over the graph. */
 async function openKeyboardShortcuts(page: Page) {
-  await page.getByLabel(TEXT.userMenuLabel).locator('visible=true').click()
-  await page.getByTestId('user-menu').getByRole('button', { name: TEXT.settingsShortcut }).click()
+  await railButton(page, TEXT.settingsShortcut).click()
   await expect(page.getByTestId('settings-panel')).toBeVisible()
   await page
     .getByRole('button', { name: TEXT.keyboardShortcutsSettingsTab })

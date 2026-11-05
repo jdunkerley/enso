@@ -2,6 +2,12 @@
 
 #### Enso IDE
 
+- [The Help menu, the Enso menu and the other links to the original company's
+  website and community are gone, as are the online documentation links for
+  components (including the F1 shortcut). Local versioning commits use your own
+  git identity, or `Enso IDE <ide@localhost>` when you have none. Settings and
+  About become two buttons at the bottom of the left rail, replacing the menu in
+  the top bar, and both rails now run the full height of the window.][566]
 - [Projects open faster: the collaborative-editing server now runs beside the
   engine instead of inside it.][593]
 - [The installer includes four sample projects (sales overview, orders and
@@ -405,6 +411,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [593]: https://github.com/jdunkerley/enso/pull/593
+[566]: https://github.com/jdunkerley/enso/pull/566
 [570]: https://github.com/jdunkerley/enso/pull/570
 [565]: https://github.com/jdunkerley/enso/pull/565
 [552]: https://github.com/jdunkerley/enso/pull/552

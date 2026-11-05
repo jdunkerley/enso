@@ -11,12 +11,15 @@ export class GitUnavailableError extends Error {
   }
 }
 
-/** The identity commits are made with when the user has none configured. Never written to config. */
+/**
+ * The identity commits are made with when git can resolve none (no `user.name`/`user.email`, and
+ * nothing it can guess). Never written to config. Otherwise git's own resolution is used.
+ */
 const FALLBACK_IDENTITY: readonly string[] = [
   '-c',
-  'user.name=Enso',
+  'user.name=Enso IDE',
   '-c',
-  'user.email=noreply@enso.org',
+  'user.email=ide@localhost',
 ]
 
 let gitLookup: Promise<string | null> | undefined

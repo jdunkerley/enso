@@ -4,8 +4,7 @@
   "private": true,
   "type": "commonjs",
   "author": {
-    "name": "Enso Team",
-    "email": "contact@enso.org"
+    "name": "jdunkerley"
   },
   "main": "./dist/main.js",
   "scripts": {

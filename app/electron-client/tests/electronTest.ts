@@ -392,3 +392,15 @@ export async function showAllComponents(page: Page) {
 export function addFirstElementToWidgetVector(locator: Locator) {
   return locator.getByRole('list').filter({ hasText: /^$/ }).getByLabel('Add a new item').click()
 }
+
+/**
+ * Leave the mouse where nothing is under it and it is off both rails (the left one runs the
+ * window's full height, so the corner (0, 0) is on it): the empty bottom of the right rail.
+ */
+export async function parkMouse(page: Page): Promise<void> {
+  const { width, height } = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }))
+  await page.mouse.move(width - 24, height - 100)
+}
