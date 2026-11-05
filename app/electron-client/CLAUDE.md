@@ -145,6 +145,12 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   `--engine-mode` and a project's `package.yaml` `jvm:` key (see
   `project-manager-shim/CLAUDE.md`, "Engine mode"). `--engine-mode <mode>` is
   the command-line form; `--jvm` is its alias.
+- `ENSO_JVM_AOT_DIR` — where the per-user JDK AOT cache lives instead of
+  `<userData>/jvm-aot` (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
+  cache trains in the background, once the window is up, only when the JVM is
+  the default engine; `before-quit` stops a running training. The open-time
+  harness points it at an empty directory of its run (`<out>/shim-jvm-aot`), so
+  its JVM launches never pick up the user's cache.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.

@@ -44,12 +44,14 @@ import { setupLogger } from './log.js'
 import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from './menuItems.js'
 import { capitalizeFirstLetter } from './naming.js'
 import {
+  disposeJvmAotCache,
   getLocalMetadata,
   getLocalSecrets,
   getLocalVersioning,
   getSecretsKeySource,
   handleProjectProtocol,
   setupProjectService,
+  startJvmAotCache,
   version,
 } from './projectService.js'
 import { enableAll } from './security.js'
@@ -179,6 +181,10 @@ class App {
 
       this.electron.app.on('before-quit', () => {
         shutdownClaudeAgent()
+      })
+
+      this.electron.app.on('before-quit', () => {
+        void disposeJvmAotCache()
       })
 
       this.electron.app.on('second-instance', (_event, argv) => {
@@ -315,6 +321,8 @@ class App {
       await this.createWindowIfEnabled(args)
       initIpc(this.window, this.electron, this.electronIsDev)
       await this.loadWindowContent(args)
+      // Once the window is up: a JDK AOT training, if one is needed, runs behind the dashboard.
+      startJvmAotCache()
     } catch (err) {
       console.error('Failed to initialize the application, shutting down. Error: ', err)
       this.quit()

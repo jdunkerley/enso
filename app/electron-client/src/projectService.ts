@@ -2,16 +2,22 @@
 
 import { app, net } from 'electron'
 import * as os from 'node:os'
+import * as path from 'node:path'
 import * as url from 'node:url'
 
 import type { Electron } from '@/electron'
 import * as paths from '@/paths'
 import { lazyKeyringEntries, SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
-import { getProjectRoot } from 'project-manager-shim'
+import { findEnsoExecutable, getProjectRoot } from 'project-manager-shim'
+import { JvmAotCache } from 'project-manager-shim/jvmAot'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { defaultSecretsFilePath, encodeKey, LocalSecrets } from 'project-manager-shim/localSecrets'
 import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
-import { ProjectService, type EngineSettings } from 'project-manager-shim/projectService'
+import {
+  ProjectService,
+  resolveDefaultEngineMode,
+  type EngineSettings,
+} from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
 /** Where the engine mode may come from besides a project's `package.yaml`. */
@@ -21,6 +27,7 @@ let localVersioning: LocalVersioning | null = null
 let localSecrets: LocalSecrets | null = null
 let secretsKeySource: SecretsKeySource | null = null
 let extraArgs: readonly string[] = []
+let jvmAotCache: JvmAotCache | null = null
 
 /** The local labels and Recent store, kept in Electron's `userData` directory. */
 export function getLocalMetadata(): LocalMetadata {
@@ -100,6 +107,42 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
   return projectService
 }
 
+/**
+ * The per-user JDK AOT cache (`project-manager-shim/jvmAot`), under `<userData>/jvm-aot`, or
+ * `ENSO_JVM_AOT_DIR` (the open-time harness points it at its own directory). `null` when the
+ * engine cannot be found.
+ */
+function createJvmAotCache(
+  electron: Electron,
+  electronIsDev: boolean,
+  engine: EngineSettings | undefined,
+): JvmAotCache | null {
+  const ensoExecutable = findEnsoExecutable(paths.resourcesPath(electron, electronIsDev))
+  if (ensoExecutable == null) return null
+  return new JvmAotCache({
+    rootDirectory: process.env.ENSO_JVM_AOT_DIR ?? path.join(app.getPath('userData'), 'jvm-aot'),
+    appVersion: app.getVersion(),
+    ensoExecutable,
+    isJvmDefault: () =>
+      resolveDefaultEngineMode({
+        option: engine?.option,
+        environment: process.env.ENSO_ENGINE_MODE,
+      }).mode === 'jvm',
+  })
+}
+
+/** Train the JDK AOT cache in the background if it is needed (the JVM is the default engine). */
+export function startJvmAotCache(): void {
+  jvmAotCache?.start().catch((error: unknown) => {
+    console.error('Failed to start the JDK AOT cache:', error)
+  })
+}
+
+/** Stop a running AOT training. */
+export async function disposeJvmAotCache(): Promise<void> {
+  await jvmAotCache?.dispose()
+}
+
 /** Setup the project service.*/
 export function setupProjectService(
   args: readonly string[],
@@ -108,7 +151,8 @@ export function setupProjectService(
   engine?: EngineSettings,
 ): ProjectService {
   extraArgs = args
-  engineSettings = engine
+  jvmAotCache ??= createJvmAotCache(electron, electronIsDev, engine)
+  engineSettings = { ...engine, jvmAot: jvmAotCache ?? undefined }
   if (!projectService) {
     projectService = ProjectService.default(
       paths.resourcesPath(electron, electronIsDev),

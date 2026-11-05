@@ -19,6 +19,7 @@ Consumers import by subpath (see `package.json#exports`):
 
 - `project-manager-shim` — public helpers (`findEnsoExecutable`,
   `findStdlibRoot`, …).
+- `project-manager-shim/jvmAot` — the per-user JDK AOT cache (see below).
 - `project-manager-shim/handler` — JSON-RPC request handler, and
   `acceptLocalRequest` / `checkLocalRequest` (`handler/localRequest.ts`): the
   one check both hosts (Electron's `server.ts`, the Vite middleware in
@@ -129,6 +130,71 @@ the `jvm` option by `ProjectService.default` (`liftJvmFlag`): the log names
 Headless `--startup.project` runs take `--engine-mode` too
 (`runLocalProjectByPath`'s `engine`). Re-opening an open project writes no
 second mode line.
+
+## JDK AOT cache (`src/jvmAot/`)
+
+A JVM engine starts faster with a JDK AOT cache (JEP 483/514). A cache records
+the module path and the runtime it was trained with, and no platform installs
+the IDE at a fixed path, so it cannot ship in the installer: each user trains
+their own (spec `docs/superpowers/specs/2026-11-03-jvm-by-default-design.md`,
+stage 1d). `JvmAotCache` (`index.ts`) owns its lifecycle; Electron creates one
+in `app/electron-client/src/projectService.ts` and passes it to the
+`ProjectService` as `EngineSettings.jvmAot`. The Vite dev server has none.
+
+- **Key** (`key.ts`): the first 16 hex digits of SHA-256 over the app version,
+  the real path of the engine distribution (`dist/<version>`), the bundled
+  runtime (the one directory under `<root>/runtime/`) and the text of the
+  engine's `jvm.options`. The cache is `<userData>/jvm-aot/<key>/enso.aot`
+  (`ENSO_JVM_AOT_DIR` replaces `<userData>/jvm-aot`). No runtime (a development
+  build) or a macOS `AppTranslocation/` path: no key, so nothing is trained or
+  used.
+- **Training** (`trainer.ts`, `driver.ts`): `start()`, called once the window is
+  up, trains only when the JVM is the resolved default
+  (`resolveDefaultEngineMode`, so nothing happens while the default is native),
+  there is no cache for the key and no other process holds `<root>/train.lock`
+  (`lock.ts`: created exclusively with the pid; a lock whose pid is dead is
+  taken over). `EngineTrainer` makes a scratch project with `enso --new`
+  (native, the welcome template) in `<root>/train/`, starts
+  `enso --jvm --server` on it at below-normal priority (`os.setPriority`) with
+  `ENSO_JVM_OPTIONS=-XX:AOTCacheOutput=<key>/enso.aot.tmp`, a fresh
+  `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`, waits for
+  `/_health` (180 s), and `driveOpen` plays an open over the Language Server's
+  channel sockets (`/channel/{json,vis-control,vis-data}?token=`):
+  `session/initProtocolConnection`, `executionContext/create` and `push` of
+  `main`, the `executionComplete`, then an `attach` of the table visualisation
+  to the node the template's metadata shows one for (`welcomeNodeId`). Then the
+  stdin newline, up to 5 minutes for the JVM to write the cache and exit, and
+  `.tmp` is renamed into place. A finished training deletes every other
+  directory under the root (an upgrade changed the key) except the lock. A
+  failed one leaves no `enso.aot` and is retried at the next launch.
+- **Yielding**: `ProjectService.openProject` calls `openStarted()` before the
+  engine starts (any mode) and `openAnswered()` after the answer, a failure
+  included. An open kills a running training (on Windows with `taskkill /T`, so
+  a `.bat` launcher's child goes too) and deletes its `.tmp`; the training
+  restarts 60 s after the last open in flight was answered.
+- **Use**: a JVM open or run gets `jvmOptions()` in its launch, two options,
+  `-XX:AOTCache=<key>/enso.aot` and
+  `-Xlog:aot=warning,cds=warning:file="<key>/use.log"` (the path quoted, so the
+  `:` of `C:` does not end the option), when the cache exists. `AOTMode` stays
+  `auto`, so a cache the JVM refuses costs only its benefit. After such an open
+  `checkUseLog()` deletes the cache when `use.log` has a line `aotRejection`
+  (`useLog.ts`, also the open-time harness's) matches; it retrains at the next
+  launch.
+- **`ENSO_JVM_OPTIONS`** is built by `jvmOptionsValue`
+  (`projectService/jvmOptions.ts`): an inherited value is split as the launcher
+  splits it (lines if it has a newline, else whitespace) and the shim's options
+  follow one per line; a single option gets a trailing newline, so that the
+  launcher reads it as a line and a space in its path survives.
+- **Known limits**: `os.setPriority` lowers the launcher's process; on Linux,
+  where priority is per thread, threads the JVM created before the call keep
+  normal priority. Two JVM engines open at once share `use.log`. The Linux
+  AppImage mounts at a new path each launch, so its key changes every time (PR J
+  of the plan deals with it).
+- **Tests**: `jvmAot/__tests__/` — `key`, `lock`, `driver` (against
+  `fakeLanguageServer.ts`), `trainer` (a fake `enso` script that imports the
+  same fake, port band `JVM_AOT_TRAINER_PORT`) and `cache` (a fake trainer and
+  fake timers); `projectService/__tests__/jvmAot.test.ts` covers the service's
+  calls.
 
 ## Child processes
 
