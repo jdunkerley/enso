@@ -10,8 +10,8 @@ from Standard.SQLite import all
    the trip date is formatted before the upload.
 
    Uploading to a database is only previewed while you edit, so the `summary`
-   node first shows the SQL it would run. Press the Write button (the play icon
-   at the top of the graph) to run the upload, then select `summary` and pick
+   node first shows the SQL it would run. Press Write All (the play icon at the
+   top of the graph) to run the upload, then select `summary` and pick
    the Table visualization to see the result.
 
    The data in `data/trips.csv` is synthetic.
