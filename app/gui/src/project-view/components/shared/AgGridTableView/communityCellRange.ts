@@ -32,8 +32,8 @@ export function cellCoordFromEvent(event: Event): CellCoord | undefined {
 
 /**
  * Tracks one contiguous rectangular cell selection from Community-native inputs (mouse
- * down/drag, keyboard extension), replacing AG Grid Enterprise's `cellSelection` for the
- * unlicensed fallback. Deliberately supports only a single rectangle — multi-range (ctrl+click)
+ * down/drag, keyboard extension), standing in for AG Grid's `cellSelection`, which only AG Grid
+ * Enterprise provides. Deliberately supports only a single rectangle — multi-range (ctrl+click)
  * selection isn't used anywhere in this codebase today.
  */
 export function useCommunityCellRange(displayedColumnIds: () => string[]) {

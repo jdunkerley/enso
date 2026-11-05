@@ -15,6 +15,8 @@ const isTestMode = process.env.NODE_ENV === 'test'
 const IS_ELECTRON_DEV_MODE = process.env.ELECTRON_DEV_MODE === 'true'
 
 if (isDevMode) {
+  // An engine serves ydoc on 5976 only when started with
+  // LANGUAGE_SERVER_YDOC_PORT=5976 (the shim sets it; there is no default).
   process.env.ENSO_IDE_YDOC_SERVER_URL ||= 'ws://__HOSTNAME__:5976'
   process.env.ENSO_IDE_YDOC_LS_DEBUG ||= 'true'
 }

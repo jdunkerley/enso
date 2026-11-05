@@ -4,7 +4,7 @@ import {
 } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import { InteractionHandler } from '@/providers/interactionHandler'
 import type { PortId } from '@/providers/portInfo'
-import type { EditingCellPosition } from 'ag-grid-enterprise'
+import type { EditingCellPosition } from 'ag-grid-community'
 import { expect, test, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { useTableEditHandler, type EditedCell } from '../editHandler'

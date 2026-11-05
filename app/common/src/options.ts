@@ -12,6 +12,8 @@ export const OptionsSchema = z.object({
   useServer: z.boolean().default(true),
   engineEnabled: z.boolean().default(true),
   useJvm: z.boolean().default(false),
+  /** Which engine to start: no default, since the engine mode's own precedence picks one. */
+  engineMode: z.enum(['native', 'jvm']).optional(),
   startup: z
     .object({
       project: z.string().default(''),

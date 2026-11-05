@@ -216,17 +216,20 @@ blank.
 `src/project-view/assets/__tests__/iconStyle.test.ts` enforces the mechanical
 rules; see `src/project-view/assets/CLAUDE.md`.
 
-## Gotcha: builds without an AG Grid licence ship AG Grid Community
+## AG Grid is Community only
 
-The table view falls back to AG Grid Community when
-`ENSO_IDE_AG_GRID_LICENSE_KEY` is empty — silently, with no watermark or console
-error. This applies to releases too: CI passes the `ENSO_AG_GRID_LICENSE_KEY`
-repository variable when it exists, and the fork has none, so its releases ship
-Community. (Releases used to fail the build without a key; that gate was removed
-so the fork can release.)
-
-Note `.env` sets `ENSO_IDE_AG_GRID_LICENSE_KEY=` as an empty placeholder, so any
-check on this key must test for non-empty, never merely "is set".
+The tables (the table visualization, the Table Input widget) use AG Grid
+Community; the fork has no AG Grid licence, and `ag-grid-enterprise` is not a
+dependency. The Enterprise features they would otherwise use are our own code in
+`project-view/components/shared/AgGridTableView/` and
+`visualizations/TableVisualization/`: cell-range selection
+(`communityCellRange.ts`), copy, cut and paste (`communityClipboard.ts`), the
+context and column menus (`gridPopupMenuItems.ts`, `GridPopupMenu.vue`), the set
+filter (`CommunitySetFilter.ts`), and the row counts below the table.
+Server-side sorting and filtering runs on the Infinite Row Model. An
+Enterprise-only grid or column option is not an error at build time: AG Grid
+only logs a missing-module error in the console when the grid is created, so
+check the console after adding one.
 
 ## Gotcha: node memory
 

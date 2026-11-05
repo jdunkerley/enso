@@ -241,10 +241,9 @@ const config = [
       camelcase: ['warn', { ignoreImports: true, ignoreDestructuring: true }],
       'no-inner-declarations': 'off',
       // `import { type A } from 'mod'` is NOT erased under `verbatimModuleSyntax` — it emits a
-      // bare side-effect import that loads `mod` at runtime. That silently pulled AG Grid
-      // Enterprise into the ProjectView chunk and ran its LicenseManager even when we had
-      // deliberately fallen back to Community. This rule requires the top-level `import type`
-      // qualifier, which is erased. See `AgGridTableView/agGridLicense.ts`.
+      // bare side-effect import that loads `mod` at runtime. That once silently pulled AG Grid
+      // Enterprise into the ProjectView chunk. This rule requires the top-level `import type`
+      // qualifier, which is erased.
       '@typescript-eslint/no-import-type-side-effects': 'error',
       // Off because it contradicts type-based props, which is how this codebase declares them.
       // `defineProps<{ label?: string }>()` already says the prop may be absent; adding

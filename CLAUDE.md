@@ -274,9 +274,9 @@ has silently produced a wrong result here:
   API we depend on, cast with `as T`, never `as unknown as T` — the single cast
   still compiles but makes the compiler verify the shape against the real type.
   A double cast on AG Grid's `GridApi` hid `api.getValue` being removed in v33;
-  the unlicensed copy/paste path broke silently and reached CI. Note the unit
-  tests could not catch it either: they stub the grid API, so the stub simply
-  mirrored the outdated assumption and stayed green.
+  the grid's copy/paste path broke silently and reached CI. Note the unit tests
+  could not catch it either: they stub the grid API, so the stub simply mirrored
+  the outdated assumption and stayed green.
 - **Run the formatting job's own command after touching `project/plugins.sbt` or
   `project/build.properties`.** Neither `compile` nor `buildEngineDistribution`
   invokes `scalafmtCheck`, so a green native-image build is silent about an

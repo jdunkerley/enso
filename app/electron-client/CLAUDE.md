@@ -36,6 +36,16 @@ desktop binary (AppImage/DMG/exe + installer).
   serves project assets to the window and refuses paths outside a project. The
   OS deep-link registration (`setAsDefaultProtocolClient`) was removed: there
   are no deep links.
+- Installs the bundled sample projects at start-up (`installSamples` in
+  `project-manager-shim`, called from `onStart`): `samples/` in this package is
+  shipped as `resources/samples` (`extraResources`) and copied to
+  `<projects>/Samples` only when that directory is missing. Nothing is
+  downloaded. The samples are original and use synthetic data; each is a project
+  (`package.yaml`, `src/Main.enso`, `data/`) that must run on the current
+  engine, so re-run them with `enso --run` after a standard-library change that
+  touches `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
+  Playwright spec adds its own `tests/fixtures/sample_bank_data.xlsx` to
+  `Samples/Data` (`addBankData`).
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).
@@ -141,6 +151,10 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   scripts still set it, but the bundled engine is whatever is in
   `ENSO_BUILD_BACKEND`.
 - `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
+- `ENSO_ENGINE_MODE` (`native` | `jvm`) — which engine projects get, below
+  `--engine-mode` and a project's `package.yaml` `jvm:` key (see
+  `project-manager-shim/CLAUDE.md`, "Engine mode"). `--engine-mode <mode>` is
+  the command-line form; `--jvm` is its alias.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.
@@ -794,10 +808,17 @@ time) when the first node and the welcome table show and after the extras (Note
 [JVM Counters At Each Phase]). `--jvm-diagnostics` adds one launch per JVM
 engine, outside the medians (`<engine>-diag/`), that traces Truffle's
 compilations (Note [Truffle Diagnostics]), and `--jvm-options` adds JVM options
-to the measured JVM launches, for an experiment. CI uploads `electron-out.log`
-and `hsperf/` too; by hand, `ide-packaging.yml` takes `open_perf_engines`,
-`open_perf_runs`, `open_perf_budget`, `open_perf_diagnostics` and
-`open_perf_jvm_options`.
+to the JVM engines, for an experiment. They are engine options, so they go in
+`ENSO_JVM_OPTIONS` (which the launcher adds to the JVM it starts; see
+`engine/runner/CLAUDE.md`), not `JAVA_TOOL_OPTIONS`, and they apply to the AOT
+training, check and `-XX:AOTMode=create` launches too, since a cache must be
+trained with the options it is used with. The `create` step starts `java`
+itself, so it adds the lines of the package's `jvm.options`
+(`parseJvmOptionsFile`) as well as `LAUNCHER_JVM_OPTIONS`; a unit test reads
+`distribution/engine/jvm.options` so the two cannot drift. Truffle diagnostics
+stay in `JAVA_TOOL_OPTIONS`. CI uploads `electron-out.log` and `hsperf/` too; by
+hand, `ide-packaging.yml` takes `open_perf_engines`, `open_perf_runs`,
+`open_perf_budget`, `open_perf_diagnostics` and `open_perf_jvm_options`.
 
 `--template image` opens, instead of the new-project template, a project whose
 first node calls `Standard.Image` on a PNG in its `data/` and whose second shows

@@ -51,6 +51,14 @@ object VisualizationBridgeServer {
   /** Inbound message: a data channel has been established. */
   final case class DataChannelEstablished(channel: YjsChannel)
 
+  /** Inbound message: a control channel has closed. A normal end (the ydoc
+    * host disconnected or its session ended), not an error.
+    */
+  final case class ControlChannelClosed(channel: YjsChannel)
+
+  /** Inbound message: a data channel has closed. A normal end. */
+  final case class DataChannelClosed(channel: YjsChannel)
+
   /** Inbound message: raw JSON string received on the control channel. */
   final case class ControlMessage(json: String)
 
@@ -66,6 +74,7 @@ object VisualizationBridgeServer {
       logger.trace(s"vis:control channel connected")
       bridge ! ControlChannelEstablished(channel)
       channel.subscribe(new ControlMessageHandler(bridge))
+      channel.onClose(() => bridge ! ControlChannelClosed(channel))
     }
   }
 
@@ -104,6 +113,7 @@ object VisualizationBridgeServer {
     override def onConnect(channel: YjsChannel): Unit = {
       logger.trace(s"vis:data channel connected")
       bridge ! DataChannelEstablished(channel)
+      channel.onClose(() => bridge ! DataChannelClosed(channel))
     }
   }
 
@@ -403,6 +413,15 @@ final class VisualizationBridgeActor(
       logger.trace("vis bridge received data channel")
       dataChannel = Some(ch)
 
+    // A channel that closes is dropped unless a newer one has replaced it.
+    case ControlChannelClosed(ch) =>
+      logger.trace("vis bridge control channel closed")
+      if (controlChannel.exists(_ eq ch)) controlChannel = None
+
+    case DataChannelClosed(ch) =>
+      logger.trace("vis bridge data channel closed")
+      if (dataChannel.exists(_ eq ch)) dataChannel = None
+
     case ControlMessage(json) =>
       handleControl(json)
 
@@ -665,7 +684,7 @@ final class VisualizationBridgeActor(
       return
     }
     dataChannel match {
-      case None => logger.warn("vis: data channel not ready; dropping frame")
+      case None => logger.debug("vis: data channel not ready; dropping frame")
       case Some(ch) =>
         val buffer = ByteBuffer.allocateDirect(16 + payload.length)
         buffer.putLong(uuid.getMostSignificantBits)
@@ -681,7 +700,7 @@ final class VisualizationBridgeActor(
   ): Unit = {
     controlChannel match {
       case None =>
-        logger.warn("vis: control channel not ready; dropping message")
+        logger.debug("vis: control channel not ready; dropping message")
       case Some(ch) => ch.send(msg.asJson.noSpaces)
     }
   }

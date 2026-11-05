@@ -137,9 +137,11 @@ object Dependencies {
   val akkaActor   = akkaPkg("actor")
   val akkaStream  = akkaPkg("stream")
   val akkaTestkit = akkaPkg("testkit")
-  val akkaSLF4J   = akkaPkg("slf4j")
-  val akkaHttp    = akkaHTTPPkg("http")
-  val logbackTest = logbackPkg.map(_ % Test)
+  // The WebSocket test probe (`WSProbe`) of akka-http-testkit needs it.
+  val akkaStreamTestkit = akkaPkg("stream-testkit")
+  val akkaSLF4J         = akkaPkg("slf4j")
+  val akkaHttp          = akkaHTTPPkg("http")
+  val logbackTest       = logbackPkg.map(_ % Test)
   val akka =
     Seq(
       akkaActor,

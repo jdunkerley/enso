@@ -1,4 +1,3 @@
-import { AG_GRID_ENTERPRISE_AVAILABLE } from '@/components/shared/AgGridTableView/agGridLicense'
 import type { SetFilterValuesFuncParams } from 'ag-grid-community'
 import { CommunitySetFilter } from './CommunitySetFilter'
 import { isNumericType, type ValueType } from './tableVizUtils'
@@ -6,38 +5,18 @@ import { isNumericType, type ValueType } from './tableVizUtils'
 export const getFilterParams = (
   isSSRM: boolean,
   valueType: ValueType | null | undefined,
-  filterType: string | typeof CommunitySetFilter | null,
   getFilterValues: (params: SetFilterValuesFuncParams<any, string>) => Promise<void>,
 ) => {
   const filterOptions = valueType ? getFilterOptions(valueType.constructor) : null
   const filterButtons = valueType ? getFilterButtons(valueType.constructor) : null
 
-  const defaultFilter = {
+  return {
     maxNumConditions: 1,
     values: isSSRM ? getFilterValues : null,
     filterOptions: filterOptions,
     buttons: filterButtons,
     refreshValuesOnOpen: true,
   }
-
-  return filterType != 'agMultiColumnFilter' ? defaultFilter : (
-      {
-        filters: [
-          {
-            filter: 'agTextColumnFilter',
-            filterParams: {
-              ...defaultFilter,
-            },
-          },
-          {
-            filter: 'agSetColumnFilter',
-            filterParams: {
-              ...defaultFilter,
-            },
-          },
-        ],
-      }
-    )
 }
 
 export const getFilterType = (valueType: string, usingMultiFilter: boolean) => {
@@ -46,12 +25,11 @@ export const getFilterType = (valueType: string, usingMultiFilter: boolean) => {
   } else if (isNumericType(valueType)) {
     return 'agNumberColumnFilter'
   } else if (valueType === 'Char') {
-    if (!usingMultiFilter) return 'agTextColumnFilter'
-    return AG_GRID_ENTERPRISE_AVAILABLE ? 'agMultiColumnFilter' : CommunitySetFilter
+    return usingMultiFilter ? CommunitySetFilter : 'agTextColumnFilter'
   } else if (valueType === 'Date_Time' || valueType === 'Time_Of_Day' || valueType === 'Mixed') {
     return null
   } else {
-    return AG_GRID_ENTERPRISE_AVAILABLE ? 'agSetColumnFilter' : CommunitySetFilter
+    return CommunitySetFilter
   }
 }
 

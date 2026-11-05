@@ -155,6 +155,10 @@ public class BenchmarksRunner {
     @Override
     public void startBenchmark(BenchmarkParams benchParams) {
       output.println("::group::" + benchParams.getBenchmark());
+      // JMH's own text format prints this line, but this wrapper replaces `startBenchmark`.
+      // It shows whether options given to the host JVM reached the forks (std-libs-benchmark.yml
+      // runs a candidate set of them).
+      output.println("# VM options: " + String.join(" ", benchParams.getJvmArgs()));
     }
 
     @Override
