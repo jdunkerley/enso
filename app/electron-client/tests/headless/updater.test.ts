@@ -15,13 +15,17 @@ class FakeAutoUpdater extends EventEmitter {
   quitAndInstall = vi.fn()
 }
 
-function setup(mode: 'auto' | 'manual' = 'auto') {
+function setup(
+  mode: 'auto' | 'manual' = 'auto',
+  confirmNoStableRelease: () => Promise<boolean> = async () => false,
+) {
   const autoUpdater = new FakeAutoUpdater()
   const statuses: UpdateStatus[] = []
   const deps: UpdaterDeps = {
     autoUpdater: autoUpdater as unknown as UpdaterDeps['autoUpdater'],
     mode,
     onStatus: (status) => statuses.push(status),
+    confirmNoStableRelease,
   }
   return { autoUpdater, statuses, updater: new Updater(deps) }
 }
@@ -336,19 +340,60 @@ describe('Updater stable fallback', () => {
     return Object.assign(new Error(message), { code })
   }
 
-  test('a prerelease check that throws falls back to the stable release', async () => {
-    const { autoUpdater, statuses, updater } = setup()
-    const seen: boolean[] = []
+  // Messages as `electron-updater` 6.8.3 and `builder-util-runtime` 9.5.1 produce them against
+  // github.com (recorded from a run against this fork, which has no stable release: its
+  // `/releases/latest` redirects to `/releases`, which answers 406 to `Accept: application/json`).
+  const LATEST_NOT_FOUND =
+    'Unable to find latest version on GitHub (https://github.com/jdunkerley/enso/releases/latest), ' +
+    'please ensure a production release exists: HttpError: '
+  const NO_STABLE_406 = coded(
+    'ERR_UPDATER_INVALID_RELEASE_FEED',
+    `Cannot parse releases feed: Error: ${LATEST_NOT_FOUND}406 Not Acceptable\n` +
+      '"method: GET url: https://github.com/jdunkerley/enso/releases\\n\\n          Data:\\n          \\n          "\n' +
+      'Headers: {\n  "date": "Thu, 05 Nov 2026 00:09:45 GMT",\n  "content-type": "text/html; charset=utf-8"\n}',
+  )
+  const SERVER_ERROR = coded(
+    'ERR_UPDATER_LATEST_VERSION_NOT_FOUND',
+    `${LATEST_NOT_FOUND}500 Internal Server Error\n"method: GET url: https://github.com/jdunkerley/enso/releases/latest"`,
+  )
+  const OFFLINE = coded(
+    'ERR_UPDATER_LATEST_VERSION_NOT_FOUND',
+    'Unable to find latest version on GitHub (https://github.com/jdunkerley/enso/releases/latest), ' +
+      'please ensure a production release exists: Error: getaddrinfo ENOTFOUND github.com',
+  )
+  const NO_PUBLISHED = coded('ERR_UPDATER_NO_PUBLISHED_VERSIONS', 'No published versions on GitHub')
+  const NO_ENTRY = coded('ERR_XML_MISSED_ELEMENT', 'No published versions on GitHub')
+  const BROKEN_RC = coded(
+    'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND',
+    'Cannot find rc.yml in the latest release artifacts (https://github.com/jdunkerley/enso/releases/download/2026.2.0-rc.1/rc.yml): HttpError: 404 Not Found',
+  )
+
+  /** Throws `prerelease` from the prerelease pass and `stable` from the stable one (or finds 2026.1.1). */
+  function failing(
+    autoUpdater: FakeAutoUpdater,
+    prerelease: Error | null,
+    stable: Error | null,
+    seen: boolean[] = [],
+  ) {
     autoUpdater.checkForUpdates.mockImplementation(async () => {
       seen.push(autoUpdater.allowPrerelease)
-      if (autoUpdater.allowPrerelease) {
-        const error = coded('ERR_UPDATER_NO_PUBLISHED_VERSIONS', 'No published versions on GitHub')
+      const error = autoUpdater.allowPrerelease ? prerelease : stable
+      if (error != null) {
         autoUpdater.emit('error', error)
         throw error
       }
       autoUpdater.emit('update-available', { version: '2026.1.1', releaseDate: '' })
       return null
     })
+    return seen
+  }
+
+  test.each([
+    ['no published versions', NO_PUBLISHED],
+    ['an empty feed', NO_ENTRY],
+  ])('a prerelease check that throws (%s) falls back to the stable release', async (_n, error) => {
+    const { autoUpdater, statuses, updater } = setup()
+    const seen = failing(autoUpdater, error, null)
     expect(await updater.check(true)).toEqual({
       state: 'available',
       version: '2026.1.1',
@@ -358,52 +403,89 @@ describe('Updater stable fallback', () => {
     expect(statuses.some((s) => s.state === 'error')).toBe(false)
   })
 
-  test('a throwing prerelease check and a stable release that is not there is none', async () => {
-    const { autoUpdater, updater } = setup()
-    autoUpdater.checkForUpdates.mockImplementation(async () => {
-      const error =
-        autoUpdater.allowPrerelease ?
-          coded('ERR_UPDATER_NO_PUBLISHED_VERSIONS', 'No published versions on GitHub')
-        : coded('ERR_UPDATER_LATEST_VERSION_NOT_FOUND', 'Unable to find latest version: 404')
-      autoUpdater.emit('error', error)
-      throw error
-    })
+  test('nothing published, and no stable release either (confirmed by the API), is none', async () => {
+    const confirm = vi.fn(async () => true)
+    const { autoUpdater, statuses, updater } = setup('auto', confirm)
+    failing(autoUpdater, NO_PUBLISHED, NO_STABLE_406)
     expect(await updater.check(true)).toEqual({ state: 'none' })
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(statuses.some((s) => s.state === 'error')).toBe(false)
+  })
+
+  test('nothing published, and the stable check really fails, is the stable error', async () => {
+    const { autoUpdater, updater } = setup('auto', async () => false)
+    failing(autoUpdater, NO_PUBLISHED, SERVER_ERROR)
+    expect(await updater.check(true)).toEqual({
+      state: 'error',
+      message: SERVER_ERROR.message,
+      version: null,
+    })
   })
 
   test('both passes failing is an error, reporting the prerelease failure', async () => {
     const { autoUpdater, statuses, updater } = setup()
-    autoUpdater.checkForUpdates.mockImplementation(async () => {
-      const error = new Error(autoUpdater.allowPrerelease ? 'offline' : 'still offline')
-      autoUpdater.emit('error', error)
-      throw error
+    failing(autoUpdater, BROKEN_RC, OFFLINE)
+    expect(await updater.check(true)).toEqual({
+      state: 'error',
+      message: BROKEN_RC.message,
+      version: null,
     })
-    expect(await updater.check(true)).toEqual({ state: 'error', message: 'offline', version: null })
     expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
     expect(autoUpdater.allowPrerelease).toBe(true)
     expect(statuses.filter((s) => s.state === 'error')).toHaveLength(1)
   })
 
-  test('no stable release (404) without prereleases is none, not an error', async () => {
-    const { autoUpdater, statuses, updater } = setup()
-    autoUpdater.checkForUpdates.mockImplementation(async () => {
-      const error = coded(
-        'ERR_UPDATER_LATEST_VERSION_NOT_FOUND',
-        'Unable to find latest version on GitHub: HttpError: 404 Not Found',
+  test('a real prerelease failure and no stable release is none, with a warning', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const { autoUpdater, updater } = setup('auto', async () => true)
+      failing(autoUpdater, BROKEN_RC, NO_STABLE_406)
+      expect(await updater.check(true)).toEqual({ state: 'none' })
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('No stable release'),
+        BROKEN_RC.message,
       )
-      autoUpdater.emit('error', error)
-      throw error
-    })
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  test('without prereleases, no stable release (406, confirmed by the API) is none', async () => {
+    const confirm = vi.fn(async () => true)
+    const { autoUpdater, statuses, updater } = setup('auto', confirm)
+    failing(autoUpdater, null, NO_STABLE_406)
     expect(await updater.check(false)).toEqual({ state: 'none' })
+    expect(confirm).toHaveBeenCalledOnce()
     expect(statuses.some((s) => s.state === 'error')).toBe(false)
   })
 
-  test('a failed /releases/latest that is not a 404 stays an error', async () => {
-    const { autoUpdater, updater } = setup()
-    autoUpdater.checkForUpdates.mockRejectedValue(
-      coded('ERR_UPDATER_LATEST_VERSION_NOT_FOUND', 'Unable to find latest version: ENOTFOUND'),
-    )
+  test.each([
+    ['the API does not say 404', NO_STABLE_406, async () => false],
+    ['a server error', SERVER_ERROR, async () => false],
+    ['offline', OFFLINE, async () => false],
+    [
+      'the confirmation itself fails',
+      NO_STABLE_406,
+      async (): Promise<boolean> => {
+        throw new Error('rate limited')
+      },
+    ],
+  ])('without prereleases, %s stays an error', async (_n, error, confirm) => {
+    const { autoUpdater, updater } = setup('auto', confirm)
+    failing(autoUpdater, null, error)
+    expect(await updater.check(false)).toEqual({
+      state: 'error',
+      message: error.message,
+      version: null,
+    })
+  })
+
+  test('an error with another code is never sent to the API', async () => {
+    const confirm = vi.fn(async () => true)
+    const { autoUpdater, updater } = setup('auto', confirm)
+    failing(autoUpdater, null, BROKEN_RC)
     expect(await updater.check(false)).toMatchObject({ state: 'error' })
+    expect(confirm).not.toHaveBeenCalled()
   })
 
   test('without prereleases there is only one check', async () => {
@@ -429,6 +511,45 @@ describe('Updater stable fallback', () => {
     expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
     finishStable()
     expect(await first).toEqual({ state: 'none' })
+  })
+})
+
+describe('confirmNoStableRelease', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  /** A fresh copy of the module, so that no earlier answer is cached. */
+  async function load(response: () => Promise<Response>) {
+    const fetchMock = vi.fn<typeof fetch>(response)
+    vi.stubGlobal('fetch', fetchMock)
+    vi.resetModules()
+    const { confirmNoStableRelease } = await import('../../src/updater')
+    return { confirmNoStableRelease, fetchMock }
+  }
+
+  test('a 404 from the API means no stable release, and is remembered', async () => {
+    const { confirmNoStableRelease, fetchMock } = await load(
+      async () => new Response('{}', { status: 404 }),
+    )
+    expect(await confirmNoStableRelease()).toBe(true)
+    expect(await confirmNoStableRelease()).toBe(true)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      'https://api.github.com/repos/jdunkerley/enso/releases/latest',
+    )
+  })
+
+  test.each([200, 403, 406, 500])('a %s from the API does not', async (status) => {
+    const { confirmNoStableRelease } = await load(async () => new Response('{}', { status }))
+    expect(await confirmNoStableRelease()).toBe(false)
+  })
+
+  test('no answer at all rejects, and is not remembered', async () => {
+    const { confirmNoStableRelease, fetchMock } = await load(async () => {
+      throw new TypeError('fetch failed')
+    })
+    await expect(confirmNoStableRelease()).rejects.toThrow('fetch failed')
+    await expect(confirmNoStableRelease()).rejects.toThrow('fetch failed')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
 

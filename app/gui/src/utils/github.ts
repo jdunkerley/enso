@@ -3,6 +3,7 @@ import * as common from 'enso-common/src/constants'
 import * as detect from 'enso-common/src/utilities/detect'
 import gt from 'semver/functions/gt'
 import parse from 'semver/functions/parse'
+import { isOfferedVersion } from './offeredVersion'
 
 const ONE_HOUR_MS = 3_600_000
 const HTTP_NOT_FOUND = 404
@@ -159,8 +160,8 @@ function writeCache(gitHubRelease: GitHubRelease | null, includePrereleases: boo
 export class ReleaseCheckError extends Error {}
 
 /**
- * The release with the greatest semantic version among `releases`, ignoring drafts and tags that
- * are not versions; `null` when there is none. (GitHub lists by creation date, which is not
+ * The release with the greatest semantic version among `releases`, ignoring drafts, nightlies and
+ * other prereleases but rcs (see {@link isOfferedVersion}), and tags that are not versions; `null` when there is none. (GitHub lists by creation date, which is not
  * version order: an rc of the next release can be older than a patch of this one.)
  */
 export function newestRelease(releases: readonly GitHubRelease[]): GitHubRelease | null {
@@ -168,7 +169,11 @@ export function newestRelease(releases: readonly GitHubRelease[]): GitHubRelease
     null
   for (const release of releases) {
     const version = release.draft ? null : parse(release.tag_name)
-    if (version != null && (newest == null || gt(version, newest.version)))
+    if (
+      version != null &&
+      isOfferedVersion(version) &&
+      (newest == null || gt(version, newest.version))
+    )
       newest = { release, version }
   }
   return newest?.release ?? null
@@ -237,7 +242,12 @@ const appExtension = (() => {
 
 /** Gets the download URL of the latest release of the app, or `null` when there is none to be had. */
 export async function getDownloadUrl(includePrereleases = false) {
-  const assets = (await getLatestRelease(includePrereleases).catch(() => null))?.assets ?? []
+  return downloadUrlOf(await getLatestRelease(includePrereleases).catch(() => null))
+}
+
+/** The URL of the app's download among the assets of `release`, or `null` when there is none. */
+export function downloadUrlOf(release: Pick<GitHubRelease, 'assets'> | null) {
+  const assets = release?.assets ?? []
   return (
     assets.find((item) => item.browser_download_url.endsWith(appExtension))?.browser_download_url ??
     null

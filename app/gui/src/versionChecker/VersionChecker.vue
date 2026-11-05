@@ -29,7 +29,7 @@ import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
 import { useIncludePrereleases } from '$/providers/updateSettings'
 import { download } from '$/utils/download'
-import { getDownloadUrl, getLatestRelease, RELEASES_REPOSITORY } from '$/utils/github'
+import { downloadUrlOf, getLatestRelease, RELEASES_REPOSITORY } from '$/utils/github'
 import { openInNewBrowserTab } from '$/utils/window'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, onScopeDispose, ref, watch, watchEffect } from 'vue'
@@ -102,6 +102,8 @@ const metadataQuery = useQuery({
       tagName: parseVersion(data.tag_name) == null ? currentVersion : data.tag_name,
       htmlUrl: data.html_url,
       isPostponed: data.isPostponed,
+      // Of the release shown, not of whatever is the latest by the time of the click.
+      downloadUrl: downloadUrlOf(data),
     }
   },
   meta: { persist: false },
@@ -196,8 +198,8 @@ function remindLater() {
   }
 }
 
-async function onDownload() {
-  const downloadUrl = await getDownloadUrl(includePrereleases.value)
+function onDownload() {
+  const downloadUrl = metadataQuery.data.value?.downloadUrl ?? null
   if (downloadUrl == null) {
     const message = `${getText('noAppDownloadError')}.`
     toasts.show(message, { type: 'error' })

@@ -2,10 +2,10 @@
 
 #### Enso IDE
 
-- [The update check no longer fails when the search for prerelease versions
-  does, and a repository with no stable release counts as up to date. Without
-  the built-in updater, "Include prerelease versions" now also applies to the
-  new-version dialog.][573]
+- [The "Include prerelease versions" setting now applies in every build: the
+  new-version dialog of builds that cannot update themselves (development builds
+  and unsigned macOS) offers release candidates too, and a repository with no
+  stable release no longer reports a failed update check.][573]
 - [The component browser no longer lists the components of
   Standard.Visualization, the library the IDE uses to prepare visualization
   data.][565]

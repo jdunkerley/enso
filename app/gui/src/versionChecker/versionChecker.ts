@@ -7,6 +7,7 @@
  */
 import { useBackends } from '$/providers/backends'
 import { useDevtoolsStore } from '$/providers/devTools'
+import { isOfferedVersion } from '$/utils/offeredVersion'
 import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'
 import gt from 'semver/functions/gt'
 import parse from 'semver/functions/parse'
@@ -33,12 +34,17 @@ export function parseVersion(version: string) {
 /**
  * Whether the release tagged `releaseTag` is an update of the build `currentVersion`: both are
  * versions, the release's is the greater by semantic-versioning precedence (so a release is newer
- * than its own rcs), and the build is a release or an rc (not a development, nightly or test one).
+ * than its own rcs), the release is a release or an rc, and so is the build (not a development,
+ * nightly or test one).
  */
 export function isNewerRelease(releaseTag: string, currentVersion: string) {
   const release = parseVersion(releaseTag)
   const current = parseVersion(currentVersion)
-  const isReleaseOrRc =
-    current != null && (current.prerelease.length === 0 || current.prerelease[0] === 'rc')
-  return release != null && current != null && isReleaseOrRc && gt(release, current)
+  return (
+    release != null &&
+    current != null &&
+    isOfferedVersion(release) &&
+    isOfferedVersion(current) &&
+    gt(release, current)
+  )
 }

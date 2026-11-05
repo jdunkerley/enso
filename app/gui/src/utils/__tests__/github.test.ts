@@ -122,6 +122,13 @@ test('with prereleases: a release is newer than its own rcs, and drafts are igno
   expect((await getLatestRelease(true))?.tag_name).toBe('2026.1.1')
 })
 
+test('with prereleases: nightlies are not offered, as in auto mode', async () => {
+  fetchMock.mockResolvedValue(
+    Response.json([tagged('2026.3.0-nightly.2026.11.1'), tagged('2026.1.1-rc.2')]),
+  )
+  expect((await getLatestRelease(true))?.tag_name).toBe('2026.1.1-rc.2')
+})
+
 test('with prereleases: no release (404) or none that is a version is null', async () => {
   fetchMock.mockResolvedValueOnce(Response.json({ message: 'Not Found' }, { status: 404 }))
   expect(await getLatestRelease(true)).toBeNull()

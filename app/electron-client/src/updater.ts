@@ -5,7 +5,7 @@
  * next quit. See `docs/superpowers/specs/2026-10-18-standard-installer-and-updates-design.md`.
  */
 import type { AppUpdater } from 'electron-updater'
-import type { UpdateMode, UpdateStatus } from 'enso-common/src/updater'
+import { UPDATE_REPOSITORY, type UpdateMode, type UpdateStatus } from 'enso-common/src/updater'
 
 /** The slice of `electron-updater`'s `AppUpdater` the updater uses. */
 export type AutoUpdaterLike = Pick<
@@ -23,6 +23,11 @@ export interface UpdaterDeps {
   readonly mode: UpdateMode
   /** Called on every status change, to forward it to the GUI. */
   readonly onStatus: (status: UpdateStatus) => void
+  /**
+   * Whether the repository has no stable release, for a stable check that failed in a way that
+   * could mean so ({@link mayMeanNoStableRelease}); see {@link confirmNoStableRelease}, the default.
+   */
+  readonly confirmNoStableRelease?: () => Promise<boolean>
 }
 
 /** Whether this run can update itself; see {@link UpdateMode}. */
@@ -84,7 +89,7 @@ export class Updater {
       // fallback is `none`.
       if (this.pass !== 'single') return
       // A repository with no stable release is simply up to date; `check` sets `none`.
-      if (isNothingPublished(error)) return
+      if (mayMeanNoStableRelease(error)) return
       this.set({
         state: 'error',
         message: error.message,
@@ -117,7 +122,7 @@ export class Updater {
       // No event fires when the updater is inactive.
       if (this.status().state === 'checking') this.set({ state: 'none' })
     } catch (error) {
-      if (isNothingPublished(error)) this.set({ state: 'none' })
+      if (await this.isNoStableRelease(error)) this.set({ state: 'none' })
       else this.fail(error, null)
     }
     return this.current
@@ -132,9 +137,14 @@ export class Updater {
    * stable release. Setting `channel` instead would also enable `allowDowngrade`.
    *
    * The prerelease pass can throw (`ERR_UPDATER_NO_PUBLISHED_VERSIONS`, say), which must not hide
-   * a stable release. The check fails only when both passes do: the stable pass failing for a
-   * reason other than there being no stable release (see {@link isNothingPublished}), after the
-   * prerelease pass threw as well. A stable pass failing after a clean prerelease pass is `none`.
+   * a stable release. The check fails only when both passes do:
+   *
+   * - a stable pass that finds no stable release ({@link isNoStableRelease}) is not a failure;
+   * - after a prerelease failure, a stable failure is an error: the prerelease one, unless that
+   *   only said nothing was published, when it is the stable one;
+   * - a prerelease failure that is a real one (a broken release, say) followed by "no stable
+   *   release" ends as `none`, with a warning in the log, since the stable feed had nothing to add;
+   * - a stable failure after a clean prerelease pass is `none`.
    */
   private async checkWithStableFallback() {
     const autoUpdater = this.deps.autoUpdater
@@ -155,12 +165,34 @@ export class Updater {
     try {
       await autoUpdater.checkForUpdates()
     } catch (error) {
-      // A fork with no stable release yet answers 404; there is simply nothing newer.
       console.info('[Updater] The stable-release check failed:', messageOf(error))
-      if (prereleaseError != null && !isNothingPublished(error)) throw prereleaseError
+      if (await this.isNoStableRelease(error)) {
+        if (prereleaseError != null && !isNothingPublished(prereleaseError))
+          console.warn(
+            '[Updater] No stable release, and the prerelease check failed:',
+            messageOf(prereleaseError),
+          )
+      } else if (prereleaseError != null)
+        throw isNothingPublished(prereleaseError) ? error : prereleaseError
     } finally {
       this.pass = 'single'
       autoUpdater.allowPrerelease = true
+    }
+  }
+
+  /**
+   * Whether a failed stable check means the repository has no stable release, which is "no
+   * update", not a failure. `electron-updater` wraps every failure of its `/releases/latest`
+   * request alike, and on github.com that request does not even answer 404 when there is no stable
+   * release (a redirect to a page that answers 406), so the status in the message proves nothing:
+   * the GitHub API is asked, and only its 404 counts.
+   */
+  private async isNoStableRelease(error: unknown) {
+    if (!mayMeanNoStableRelease(error)) return false
+    try {
+      return await (this.deps.confirmNoStableRelease ?? confirmNoStableRelease)()
+    } catch {
+      return false
     }
   }
 
@@ -207,17 +239,57 @@ function messageOf(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-/**
- * Whether a check failed because the repository has nothing to offer, which is "no update", not a
- * failure: no published versions at all, or (the stable feed asks `/releases/latest`) no stable
- * release, which GitHub answers with 404. `electron-updater` wraps every failure of that request in
- * `ERR_UPDATER_LATEST_VERSION_NOT_FOUND`, so an offline machine is told apart by the missing 404.
- */
+/** The codes of the errors `electron-updater` throws when a feed holds no release for it. */
+const NOTHING_PUBLISHED_CODES = [
+  // The prerelease feed has entries, but none of the current channel.
+  'ERR_UPDATER_NO_PUBLISHED_VERSIONS',
+  // The prerelease feed has no entry at all (`feed.element('entry', false, 'No published versions…')`).
+  'ERR_XML_MISSED_ELEMENT',
+]
+
+function codeOf(error: unknown) {
+  return error instanceof Error && 'code' in error ? error.code : undefined
+}
+
+/** Whether a prerelease check failed only because the feed has nothing for this channel. */
 function isNothingPublished(error: unknown) {
-  if (!(error instanceof Error)) return false
-  const code = 'code' in error ? error.code : undefined
+  return NOTHING_PUBLISHED_CODES.includes(codeOf(error) as string)
+}
+
+/**
+ * Whether a failed stable check could be down to there being no stable release: the code
+ * `electron-updater` gives every failure of the `/releases/latest` request, or a feed with
+ * nothing in it. Whether it is must be confirmed, see {@link Updater.isNoStableRelease}.
+ */
+function mayMeanNoStableRelease(error: unknown) {
   return (
-    code === 'ERR_UPDATER_NO_PUBLISHED_VERSIONS' ||
-    (code === 'ERR_UPDATER_LATEST_VERSION_NOT_FOUND' && /\b404\b/.test(error.message))
+    isNothingPublished(error) ||
+    // What a stable check of a fork with no stable release really throws on github.com: the
+    // `/releases/latest` request fails with a 406, which the provider wraps as the first, and
+    // then, as it parses the feed it gets in the same `try`, as the second.
+    codeOf(error) === 'ERR_UPDATER_LATEST_VERSION_NOT_FOUND' ||
+    codeOf(error) === 'ERR_UPDATER_INVALID_RELEASE_FEED'
   )
+}
+
+const NO_STABLE_RELEASE_CACHE_MS = 60 * 60 * 1000
+let noStableReleaseConfirmedAt = 0
+
+/**
+ * Asks the GitHub API whether the repository has a stable release: `true` when
+ * `/releases/latest` answers 404, `false` for any other answer or no answer (offline,
+ * rate-limited). The answer is cached for an hour, as the GUI's own GitHub calls are, so that
+ * repeated checks cost one request.
+ */
+export async function confirmNoStableRelease(): Promise<boolean> {
+  if (Date.now() - noStableReleaseConfirmedAt < NO_STABLE_RELEASE_CACHE_MS) return true
+  const response = await fetch(
+    `https://api.github.com/repos/${UPDATE_REPOSITORY}/releases/latest`,
+    {
+      headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+    },
+  )
+  const answer = response.status === 404
+  if (answer) noStableReleaseConfirmedAt = Date.now()
+  return answer
 }
