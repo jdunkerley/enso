@@ -23,6 +23,7 @@
     "./src/project-view/util/fileFilter.ts",
     "./src/project-view/util/menuItems.ts",
     "./src/project-view/util/projectPath.ts",
+    "./src/project-view/util/projectPathKey.ts",
     "./src/project-view/util/qualifiedName.ts",
     "./src/project-view/util/ast/abstract.ts",
     "./src/project-view/components/GraphEditor/widgets/WidgetFunction/consts.ts",

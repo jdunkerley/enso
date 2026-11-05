@@ -1,12 +1,10 @@
 import type { NodeId } from '$/providers/openedProjects/graph'
 import type { GraphDb, MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
 import { evaluationProgress } from '$/providers/openedProjects/project/computedValueRegistry'
-import {
-  SuggestionKind,
-  type SuggestionEntry,
-} from '$/providers/openedProjects/suggestionDatabase/entry'
+import type { SuggestionEntry } from '$/providers/openedProjects/suggestionDatabase/entry'
 import type { ToValue } from '$/utils/reactivity'
 import type { ValidCachedAppearance } from '@/util/cachedAppearance'
+import { DEFAULT_ICON, entryIcon } from '@/util/entryIcon'
 import type { Icon } from '@/util/iconMetadata/iconName'
 import type { MethodPointer } from '@/util/methodPointer'
 import type { ProjectPath } from '@/util/projectPath'
@@ -14,6 +12,8 @@ import type { QualifiedName } from '@/util/qualifiedName'
 import { computed, toValue, type ComputedRef } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import type { AnyIcon, AnyWidgetIcon } from './icons'
+
+export { DEFAULT_ICON } from '@/util/entryIcon'
 
 const typeNameToIconLookup: Record<string, Icon> = {
   'Data.Text.Text': 'text_input',
@@ -26,8 +26,6 @@ const typeNameToIconLookup: Record<string, Icon> = {
   'Data.Time.Time_Of_Day.Time_Of_Day': 'time',
 }
 
-export const DEFAULT_ICON = 'enso_logo'
-
 /** Returns an icon override for certain standard library types. */
 export function typeNameToIcon(typePath: ProjectPath): Icon {
   if (typePath.project === ('Standard.Base' as QualifiedName) && typePath.path != null) {
@@ -39,10 +37,7 @@ export function typeNameToIcon(typePath: ProjectPath): Icon {
 
 /** Returns an icon override for a suggestion entry kind. */
 export function suggestionEntryToIcon(entry: SuggestionEntry) {
-  if (entry.iconName) return entry.iconName
-  if (entry.kind === SuggestionKind.Local) return 'local_scope'
-  if (entry.kind === SuggestionKind.Module) return 'collection'
-  return DEFAULT_ICON
+  return entryIcon(entry)
 }
 
 /**

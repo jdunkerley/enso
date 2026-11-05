@@ -1,0 +1,7 @@
+name: Fixture
+namespace: Standard
+version: 0.0.0-dev
+component-groups:
+  new:
+    - Selections: { color: oklch(0.464 0.14 325) }
+    - Shaping

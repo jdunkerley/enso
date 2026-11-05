@@ -207,7 +207,4 @@ export function entryHasOwner(entry: SuggestionEntry): entry is SuggestionEntry 
   return entry.kind === SuggestionKind.Method || entry.kind === SuggestionKind.Constructor
 }
 
-/** `true` if calling the function without providing a value for this argument will result in an error. */
-export function isRequiredArgument(info: SuggestionEntryArgument) {
-  return !!info.defaultValue?.startsWith('Missing_Argument.')
-}
+export { isRequiredArgument } from './argument'

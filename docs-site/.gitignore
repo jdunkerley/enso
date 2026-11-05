@@ -1,0 +1,12 @@
+/node_modules/
+/build/
+/.docusaurus/
+/generated/
+/docs/api/*
+!/docs/api/index.md
+/src/css/groups.generated.css
+/static/img/icons.svg
+/test-results/
+/playwright-report/
+/.eslintcache
+/eslint_report.json

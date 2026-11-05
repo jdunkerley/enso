@@ -31,6 +31,14 @@ tools/http-test-helper/www-files
 pnpm-lock.yaml
 
 # Generated files
+docs-site/build/
+docs-site/.docusaurus/
+docs-site/generated/
+docs-site/docs/api/
+!docs-site/docs/api/index.md
+docs-site/src/css/groups.generated.css
+docs-site/static/img/icons.svg
+docs-site/generator/fixtures/golden/*.mdx
 app/ide-desktop/lib/client/electron-builder-config.json
 app/ide-desktop/lib/content-config/src/config.json
 app/gui/playwright-report/

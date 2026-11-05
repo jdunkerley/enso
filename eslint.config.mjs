@@ -190,6 +190,9 @@ const config = [
     // Playwright build cache and Vite build directory.
     ignores: [
       '**/.cache/**',
+      'docs-site/build/',
+      'docs-site/.docusaurus/',
+      'docs-site/docs/',
       '**/playwright-report',
       '**/dist',
       '**/test-results',
