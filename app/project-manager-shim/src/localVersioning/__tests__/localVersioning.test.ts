@@ -184,7 +184,22 @@ describe('commit', () => {
       await git(root, 'config', 'user.useConfigOnly', 'true')
       const { id } = await versioning.commit([path.join(root, 'A')], 'Saved')
       expect(await git(root, 'log', '-1', '--format=%an <%ae>', id!)).toBe(
-        'Enso <noreply@enso.org>',
+        'Enso IDE <ide@localhost>',
+      )
+    })
+  })
+
+  test("commits under the identity from the user's git config", async () => {
+    await withProjects(async (root, versioning) => {
+      await versioning.init(root)
+      await git(root, 'config', 'user.name', 'Ada Lovelace')
+      await git(root, 'config', 'user.email', 'ada@example.test')
+      const { id } = await versioning.commit([path.join(root, 'A')], 'Saved')
+      expect(await git(root, 'log', '-1', '--format=%an <%ae>', id!)).toBe(
+        'Ada Lovelace <ada@example.test>',
+      )
+      expect(await git(root, 'log', '-1', '--format=%cn <%ce>', id!)).toBe(
+        'Ada Lovelace <ada@example.test>',
       )
     })
   })

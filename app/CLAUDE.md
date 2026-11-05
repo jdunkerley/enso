@@ -27,13 +27,16 @@ Electron shell — plus a few grammars and shims.
 - `ydoc-shared/` — Shared AST + language-server types + binary protocol.
   Consumed by both client and server halves. Exports `/ast`.
 - `ydoc-server/` — Yjs server: adapts the Enso LS text protocol into Yjs CRDT
-  updates, merges edits from multiple clients. It runs inside the engine (see
-  below), in development too; the plain Node build is used only by the
-  Playwright mocks (`gui/integration-test/mock/localApi.ts`).
+  updates, merges edits from multiple clients. It runs in Node as
+  `NodeYdocHost`: in the IDE in an Electron utility process
+  (`electron-client/src/ydocHost/`), under `dev:vite` in the dev server, both
+  reaching the Language Server over its channel sockets. The Playwright mocks
+  (`gui/integration-test/mock/localApi.ts`) use its pieces directly.
 - `ydoc-server-polyglot/` — The server bundled (esbuild, CommonJS) to run
-  **inside** the GraalVM JVM engine process via GraalJS. This is how the IDE
-  runs it; there is no separate Node runtime. It reaches the language server
-  through in-process channel callbacks, not a socket.
+  **inside** the GraalVM JVM engine process via GraalJS, through in-process
+  channel callbacks. Since stage 1a of the JVM-by-default plan this is only the
+  rollback host (`ENSO_YDOC_HOST=engine`), until it is deleted one release later
+  (PR M).
 - `ydoc-channel/` — Small Yjs-based bidirectional message channel library, used
   by both client and server.
 - `ydoc-inspect/` — Dev-only proxy that logs Ydoc/LS traffic for debugging

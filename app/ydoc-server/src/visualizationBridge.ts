@@ -99,7 +99,12 @@ export class VisualizationBridge {
   private disposed = false
 
   /** Observe `vis` and translate slot mutations into `control` / `data` frames. */
-  constructor(vis: Visualizations, control: YjsChannel<string>, data: YjsChannel<Uint8Array>) {
+  constructor(
+    vis: Visualizations,
+    control: YjsChannel<string>,
+    data: YjsChannel<Uint8Array>,
+    private readonly languageServerEnds: readonly { close(): void }[] = [],
+  ) {
     this.vis = vis
     this.control = control
     this.data = data
@@ -251,6 +256,9 @@ export class VisualizationBridge {
     this.vis.slots.unobserveDeep(this.observer)
     this.unsubscribeControl()
     this.unsubscribeData()
+    // The Language Server's ends of the channels: under the Node host each is a socket, which would
+    // otherwise stay open after the session is gone.
+    for (const end of this.languageServerEnds) end.close()
   }
 }
 
@@ -283,7 +291,10 @@ export function createVisualizationBridge(
   )
   controlServer.onConnect(lsControl)
   dataServer.onConnect(lsData)
-  return new VisualizationBridge(new Visualizations(visSubdoc), bridgeControl, bridgeData)
+  return new VisualizationBridge(new Visualizations(visSubdoc), bridgeControl, bridgeData, [
+    lsControl,
+    lsData,
+  ])
 }
 
 export const VIS_CONTROL_CHANNEL = 'vis:control'

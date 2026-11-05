@@ -2259,6 +2259,7 @@ lazy val `language-server` = (project in file("engine/language-server"))
       "com.github.pureconfig"      %% "pureconfig"           % pureconfigVersion,
       akkaSLF4J,
       akkaTestkit           % Test,
+      akkaStreamTestkit     % Test,
       "com.typesafe.akka"  %% "akka-http-testkit"       % akkaHTTPVersion           % Test,
       "org.scalatest"      %% "scalatest"               % scalatestVersion          % Test,
       "org.scalacheck"     %% "scalacheck"              % scalacheckVersion         % Test,

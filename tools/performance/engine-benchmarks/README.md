@@ -36,8 +36,10 @@ Run a single test with `-k <test_name>`.
 
 ## Relation to GH Actions
 
-The `bench_download.py` script downloads the `benchmark-results.xml` artifact
-(containing `bench-report.xml`) that the
+The `bench_download.py` script downloads the `benchmark-results` artifact (`benchmark-results.xml`
+in older runs; it contains `bench-report.xml`, or `bench-report-baseline.xml` and
+`bench-report-candidate.xml` for a standard library run given `jvm-options`,
+where the baseline is analysed) that the
 [Benchmark Engine](../../../.github/workflows/engine-benchmark.yml) and
 [Benchmark Standard Libraries](../../../.github/workflows/std-libs-benchmark.yml)
 workflows of `jdunkerley/enso` upload. Their IDs are in `bench_tool/__init__.py`

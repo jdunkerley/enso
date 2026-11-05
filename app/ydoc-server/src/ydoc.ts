@@ -125,6 +125,11 @@ export function setupGatewayClient(
   const wsDoc = getSessionDoc(lsSession, docName)
   if (!wsDoc) {
     ws.close()
+    // `getSessionForUrl` retained the session for this connection; with no connection to release
+    // it on close, an unreleased session would never be disposed. Under the Node ydoc host, which
+    // outlives its engines, such a session kept its Language Server client and later took the
+    // modules' write capabilities from the session the GUI uses (#593).
+    void lsSession.release().catch((error) => console.error('Session release failed.\n', error))
     return
   }
 
@@ -188,7 +193,7 @@ function getSessionDoc(lsSession: LanguageServerSession, docName: string) {
 
 /** Subset of WebSocket that can be mocked */
 export interface YjsSocket {
-  binaryType: 'arraybuffer'
+  binaryType: 'arraybuffer' | 'nodebuffer' | 'fragments'
   readonly readyState:
     | typeof WebSocket.CONNECTING
     | typeof WebSocket.OPEN

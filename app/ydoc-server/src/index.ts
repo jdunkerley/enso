@@ -14,6 +14,7 @@ import { deserializeIdMap } from './serialization'
 import { setupGatewayClient, WSSharedDoc, YjsConnection, type YjsSocket } from './ydoc'
 
 export { InspectManager } from './inspect.js'
+export { NodeYdocHost, type YdocListenRequest } from './nodeHost'
 export { deserializeIdMap, docName, setupGatewayClient, WSSharedDoc, YjsConnection, type YjsSocket }
 
 /** @param customLogger Optional external logger to use for all debug logs. */

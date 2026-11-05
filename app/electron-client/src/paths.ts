@@ -68,6 +68,18 @@ export function resourcesPath(electron: Electron | undefined, electronIsDev: boo
   return electronIsDev ? appPath(electron) : path.join(appPath(electron), '..')
 }
 
+/**
+ * The sample projects shipped with the application: `resources/samples` once packaged (see
+ * `extraResources` in `electron-builder-config.ts`), the `samples` directory of this package in
+ * development.
+ */
+export function samplesPath(electron: Electron | undefined, electronIsDev: boolean): string {
+  return path.join(
+    electronIsDev ? appPath(electron) : resourcesPath(electron, electronIsDev),
+    'samples',
+  )
+}
+
 /** Bundled engine's `lib/Standard` directory, or `undefined` if it cannot be located. */
 export function stdlibRoot(
   electron: Electron | undefined,

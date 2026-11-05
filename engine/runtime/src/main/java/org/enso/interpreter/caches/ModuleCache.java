@@ -110,17 +110,63 @@ public final class ModuleCache
       } else {
         sourceBytes = source.getCharacters().toString().getBytes(StandardCharsets.UTF_8);
       }
-      return Optional.of(CacheUtils.computeDigestFromBytes(ByteBuffer.wrap(sourceBytes)));
+      return Optional.of(
+          CacheUtils.computeDigestFromBytes(ByteBuffer.wrap(withSubmodules(sourceBytes))));
     } else {
       return Optional.empty();
     }
   }
 
   /**
-   * The digest of the module's own source. What its names resolved to in the modules it imports is
-   * not part of it: see Note [A Cached Module Follows Its Library's Imports] in {@code Compiler}
-   * and, for other libraries, Note [A Cache Records The Libraries It Refers To] in {@link
-   * LibraryDependencies}.
+   * The module's source followed by the modules in its directory, which it exports although its
+   * source does not say so (`Compiler.injectSyntheticModuleExports`), sorted. A module with none
+   * keeps the digest of its source alone. See Note [A Cached Module Follows Its Directory].
+   */
+  private byte[] withSubmodules(byte[] sourceBytes) {
+    var submodules = module.getDirectModulesRefs();
+    if (submodules.isEmpty()) {
+      return sourceBytes;
+    }
+    var names = new ArrayList<String>();
+    for (var name : submodules) {
+      names.add(name.toString());
+    }
+    names.sort(null);
+    var suffix = ("\0" + String.join("\n", names)).getBytes(StandardCharsets.UTF_8);
+    var bytes = Arrays.copyOf(sourceBytes, sourceBytes.length + suffix.length);
+    System.arraycopy(suffix, 0, bytes, sourceBytes.length, suffix.length);
+    return bytes;
+  }
+
+  /* Note [A Cached Module Follows Its Directory]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * A module exports the modules in its directory (`Shapes.enso` exports
+   * `Shapes/Circle.enso`), which its source does not list, and whether
+   * `import project.Shapes.Thing` names the module `Shapes/Thing.enso` or the
+   * type `Thing` in `Shapes` depends on whether that file exists. So the digest
+   * of a module's IR cache covers the names of the modules in its directory as
+   * well as its source (#584):
+   *
+   * - A module added to or removed from `Shapes/` changes `Shapes`'s digest, so
+   *   `Shapes` is compiled from source, and a cached module importing it is
+   *   compiled again with it (Note [A Cached Module Follows Its Library's
+   *   Imports] in `Compiler`). That covers an import that a new module now
+   *   shadows, and a cached `Shapes` whose exports lack the new module.
+   * - A cached importer that named the removed module itself (`import
+   *   project.Shapes.Thing` resolved to the module) is caught when it is
+   *   loaded: its cache records the modules it names in its own library, and one
+   *   is gone (Note [A Cache Records The Libraries It Refers To] in
+   *   `LibraryDependencies`).
+   *
+   * A library's bindings cache needs neither: `Package.sourceHash` covers every
+   * source file's path.
+   */
+
+  /**
+   * The digest of the module's own source and of the modules in its directory. What its names
+   * resolved to in the modules it imports is not part of it: see Note [A Cached Module Follows Its
+   * Library's Imports] in {@code Compiler} and, for other libraries, Note [A Cache Records The
+   * Libraries It Refers To] in {@link LibraryDependencies}.
    */
   @Override
   public Optional<String> computeDigest(

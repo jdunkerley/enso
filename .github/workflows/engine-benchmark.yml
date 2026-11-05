@@ -75,7 +75,7 @@ jobs:
         if: ${{ !inputs.just-check }}
         uses: actions/upload-artifact@v5
         with:
-          name: benchmark-results.xml
+          name: benchmark-results
           path: engine/runtime-benchmarks/bench-report.xml
           if-no-files-found: error
       - name: Clean after

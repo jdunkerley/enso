@@ -423,6 +423,61 @@ export const LAUNCHER_JVM_OPTIONS = [
   '--add-opens=java.base/java.nio=ALL-UNNAMED',
 ] as const
 
+/**
+ * The lines of an engine package's `jvm.options` (beside `component/`, read by the launcher in
+ * `engine/runner`'s `JvmOptions.java`): one option per line, `#` comments and blank lines left out.
+ * The harness starts `java` itself to create the AOT cache, so it adds them too.
+ */
+export function parseJvmOptionsFile(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map(cleanJvmOptionLine)
+    .filter((line) => line !== '' && !line.startsWith('#'))
+}
+
+/** Trims a line and drops a leading UTF-8 byte order mark, which `trim` leaves. */
+function cleanJvmOptionLine(line: string): string {
+  const trimmed = line.trim()
+  return trimmed.charCodeAt(0) === 0xfeff ? trimmed.slice(1).trim() : trimmed
+}
+
+/**
+ * Splits an `ENSO_JVM_OPTIONS` value as the launcher does (`JvmOptions.fromEnvironment`): a value
+ * with a newline is one option per line (so an option may contain spaces), otherwise options are
+ * separated by whitespace.
+ */
+export function splitJvmOptions(value: string): string[] {
+  const parts = value.includes('\n') ? value.split(/\r?\n/) : value.split(/\s+/)
+  return parts.map(cleanJvmOptionLine).filter((part) => part !== '')
+}
+
+/**
+ * The arguments of the `java` that creates the AOT cache, which the harness starts itself: it
+ * mirrors the JVM the launcher starts (`Main.launchJvm`: its fixed options, the package's
+ * `jvm.options` lines, then `ENSO_JVM_OPTIONS`).
+ */
+export function aotCreateArguments(args: {
+  config: string
+  cache: string
+  component: string
+  /** The text of the package's `jvm.options`, if it has one. */
+  optionsFile: string | undefined
+  /** The experiment's options (`--jvm-options`, the value of `ENSO_JVM_OPTIONS`). */
+  jvmOptions: string
+}): string[] {
+  return [
+    '-XX:AOTMode=create',
+    `-XX:AOTConfiguration=${args.config}`,
+    `-XX:AOTCache=${args.cache}`,
+    ...LAUNCHER_JVM_OPTIONS,
+    ...(args.optionsFile != null ? parseJvmOptionsFile(args.optionsFile) : []),
+    ...splitJvmOptions(args.jvmOptions),
+    `--module-path=${args.component}`,
+    '-m',
+    'org.enso.runner/org.enso.runner.Main',
+  ]
+}
+
 const AOT_PROBLEM =
   /\[(?:error|warning)\]\[(?:aot|cds)[^\]]*\]|mismatch|Unable to use|unable to map|AOT cache.*(?:different|invalid|failed|disabled)/i
 

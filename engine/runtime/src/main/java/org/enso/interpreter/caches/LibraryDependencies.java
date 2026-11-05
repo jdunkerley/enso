@@ -17,8 +17,8 @@ import org.enso.pkg.QualifiedName;
 
 /**
  * The other libraries a cache's IR refers to, each with the source hash ({@link
- * LibrarySourceHashes}) it had when the cache was written, and the modules in them that the IR
- * names. See Note [A Cache Records The Libraries It Refers To].
+ * LibrarySourceHashes}) it had when the cache was written, and the modules that the IR names, in
+ * those libraries and in its own. See Note [A Cache Records The Libraries It Refers To].
  *
  * @param libraries sorted by name
  * @param modules sorted
@@ -47,11 +47,13 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
    *   `writeReplace` sees every `ModuleReference.Abstract` that goes into the
    *   blob, so nothing a later read could trip over is missed, and no separate
    *   walk of the IR is needed.
-   * - The cache's own library is left out. Inside it, a module's IR cache stays
-   *   keyed by its own source and follows its imports (Note [A Cached Module
-   *   Follows Its Library's Imports] in `Compiler`), so an edit costs that
-   *   module and its importers, not the whole library or project (#541's
-   *   review). A bindings cache is keyed by its own library's hash already.
+   * - The cache's own library's hash is left out. Inside it, a module's IR
+   *   cache stays keyed by its own source and follows its imports (Note [A
+   *   Cached Module Follows Its Library's Imports] in `Compiler`), so an edit
+   *   costs that module and its importers, not the whole library or project
+   *   (#541's review). A bindings cache is keyed by its own library's hash
+   *   already. The modules the IR names in its own library are recorded all
+   *   the same (see below).
    * - A library without a package (`Standard.Builtins`) is left out: it changes
    *   only with the engine, whose version keys the cache directories.
    * - The check is cheap. Each library is hashed once per context, and every
@@ -72,23 +74,72 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
    *
    * The named modules are recorded and checked as well. A module can only go
    * away when its library's sources change, so with matching hashes the check
-   * never fails; it is the safety net that makes "a cache that does not resolve
-   * is a miss" hold for method bodies too, which are read long after the load
-   * (Note [A Cache That Does Not Load Is A Miss] in `Cache`).
+   * never fails for another library; it is the safety net that makes "a cache
+   * that does not resolve is a miss" hold for method bodies too, which are read
+   * long after the load (Note [A Cache That Does Not Load Is A Miss] in
+   * `Cache`).
+   *
+   * For the cache's own library the check is what catches it (#584). A
+   * module's IR cache matches on its own source alone, and the same source can
+   * name a module in one tree of the library and not in another. A module
+   * exports the modules in its directory, which its source does not list:
+   * `Standard.Base.Data` was unchanged when `Data/XML.enso` moved to
+   * `Standard.XML` (#521). And `import project.Shapes.Circle` resolves to the
+   * module `Shapes.Circle` if there is one, else to the type `Circle` in
+   * `Shapes`. Every `0.0.0-dev` checkout shares the per-user IR caches, so a
+   * module cached by another checkout was accepted, and its `BindingsMap`,
+   * which is converted lazily, failed at the import resolution that follows
+   * the load ("Cannot deserialize BindingsMap"), fatally: before Note [A Cached
+   * Module Follows Its Library's Imports] could compile it again.
+   * `indexStdLibs` hit it. Now such a cache is a miss when it is loaded. A
+   * module that lost its source file and is now synthetic (standing for its
+   * directory only) is caught too: each module is recorded with whether it was
+   * synthetic, since the importer cached IR naming a type in `Shapes.enso` and
+   * synthetic modules are never loaded from source, so Note [A Cached Module
+   * Follows Its Library's Imports] cannot fire for them. This check catches
+   * only a module that is gone or changed kind. A module added to a directory
+   * (new exports, or a module that now shadows an imported type) changes the
+   * digest of the directory's module instead (Note [A Cached Module Follows
+   * Its Directory] in `ModuleCache`). What a module that is still there
+   * resolved names to is left to Note [A Cached Module Follows Its Library's
+   * Imports].
    *
    * Granularity: an edit anywhere in a library costs the caches that name it.
    * Released libraries never change; a standard-library developer recompiles
    * what depends on the library being edited.
    *
    * A cache written before this records neither; its metadata no longer reads,
-   * so it is a miss and is rewritten.
+   * so it is a miss and is rewritten. Likewise a cache written before #584,
+   * which leaves out its own library's modules: the record starts with {@link
+   * #FORMAT}, which it does not have.
    */
+
+  /**
+   * Starts the record: a cache whose record does not start with it was written by an engine that
+   * recorded something else, and is a miss. Negative, so that an engine from before it reads it as
+   * a corrupt size and turns the cache down in turn.
+   */
+  static final int FORMAT = -584;
+
+  /**
+   * Marks a recorded module that had no source file of its own (a synthetic module, standing for a
+   * directory): a module that gains or loses its file changes what it defines, and a cache naming
+   * it is a miss. Not a character a module name can hold.
+   */
+  private static final String SYNTHETIC = "~";
+
+  /** The module as recorded: its name, marked if it is synthetic. */
+  private static String recorded(EnsoContext context, QualifiedName module) {
+    var name = module.toString();
+    var loaded = context.getPackageRepository().getLoadedModule(name);
+    return loaded.isDefined() && loaded.get().isSynthetic() ? SYNTHETIC + name : name;
+  }
 
   /**
    * The other libraries the IR just written refers to, with their current source hashes.
    *
    * @param referenced the modules {@link CacheUtils#createPool} saw in the IR
-   * @param own the cache's own library, left out
+   * @param own the cache's own library: its modules are recorded, its hash is not
    * @return empty if the hash of one of them cannot be computed: the cache must not be written then
    */
   static Optional<LibraryDependencies> of(
@@ -97,7 +148,11 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
     var modules = new ArrayList<String>();
     for (var module : referenced) {
       var library = libraryOf(module);
-      if (library.isEmpty() || library.get().equals(own)) {
+      if (library.isEmpty()) {
+        continue;
+      }
+      if (library.get().equals(own)) {
+        modules.add(recorded(context, module));
         continue;
       }
       var key = library.get().qualifiedName();
@@ -112,7 +167,7 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
         }
         hashes.put(key, new Library(library.get(), hash.get()));
       }
-      modules.add(module.toString());
+      modules.add(recorded(context, module));
     }
     modules.sort(Comparator.naturalOrder());
     return Optional.of(new LibraryDependencies(List.copyOf(hashes.values()), List.copyOf(modules)));
@@ -161,12 +216,22 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
         return false;
       }
     }
-    for (var module : modules) {
-      if (repository.getLoadedModule(module).isEmpty()) {
+    for (var entry : modules) {
+      var synthetic = entry.startsWith(SYNTHETIC);
+      var module = synthetic ? entry.substring(SYNTHETIC.length()) : entry;
+      var loaded = repository.getLoadedModule(module);
+      if (loaded.isEmpty()) {
         logger.log(
             Level.FINE,
             "The cache of [{0}] refers to the module [{1}], which no longer exists.",
             new Object[] {cacheName, module});
+        return false;
+      }
+      if (loaded.get().isSynthetic() != synthetic) {
+        logger.log(
+            Level.FINE,
+            "The cache of [{0}] refers to the module [{1}], whose source file was {2}.",
+            new Object[] {cacheName, module, synthetic ? "added" : "removed"});
         return false;
       }
     }
@@ -191,6 +256,7 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
   }
 
   void write(DataOutputStream out) throws IOException {
+    out.writeInt(FORMAT);
     out.writeInt(libraries.size());
     for (var library : libraries) {
       out.writeUTF(library.name().namespace());
@@ -204,6 +270,9 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
   }
 
   static LibraryDependencies read(DataInputStream in) throws IOException {
+    if (in.readInt() != FORMAT) {
+      throw new IOException("Cache metadata in an older format");
+    }
     var librariesSize = checkedSize(in.readInt());
     var libraries = new ArrayList<Library>(librariesSize);
     for (var i = 0; i < librariesSize; i++) {

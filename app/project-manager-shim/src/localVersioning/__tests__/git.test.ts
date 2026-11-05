@@ -17,7 +17,7 @@ vi.mock('../../childProcess/runCommand.js', async (importOriginal) => {
   return { ...actual, runCommand: vi.fn(actual.runCommand) }
 })
 
-const FALLBACK_IDENTITY = ['-c', 'user.name=Enso', '-c', 'user.email=noreply@enso.org']
+const FALLBACK_IDENTITY = ['-c', 'user.name=Enso IDE', '-c', 'user.email=ide@localhost']
 
 type Result = { stdout: string; stderr: string }
 

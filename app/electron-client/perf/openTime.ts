@@ -646,6 +646,7 @@ async function main() {
           (env, opens, label, beforeClose) =>
             measureLaunch(options, 'jvm', 0, env, opens, label, beforeClose),
           (env) => runProjectOnJvm(options, env),
+          options.jvmOptions,
         )
       } catch (e) {
         console.warn(`Open time: no JVM runs, the AOT cache could not be made: ${String(e)}`)
@@ -675,13 +676,11 @@ async function main() {
       extraEnv = { ENSO_ENGINE_ARGS: '--jvm' }
     }
     if (engine !== 'native' && options.jvmOptions.trim() !== '') {
-      // An experiment (`--jvm-options`, e.g. `-XX:TieredStopAtLevel=1`): the measured launches
-      // only, not the AOT cache's training. Said in the log, as the report does not record it.
+      // An experiment (`--jvm-options`, e.g. `-XX:TieredStopAtLevel=1`): engine options, so they
+      // go in `ENSO_JVM_OPTIONS`, which the launcher adds to the JVM it starts. The AOT cache's
+      // training got them too. Said in the log, as the report does not record it.
       console.warn(`Open time: ${engine} launches with ${options.jvmOptions}`)
-      extraEnv = {
-        ...extraEnv,
-        JAVA_TOOL_OPTIONS: joinJvmOptions(extraEnv.JAVA_TOOL_OPTIONS, options.jvmOptions),
-      }
+      extraEnv = { ...extraEnv, ENSO_JVM_OPTIONS: options.jvmOptions }
     }
     for (let run = 1; run <= options.runs; run++) {
       if (Date.now() > deadline) {
