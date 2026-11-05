@@ -71,5 +71,6 @@ export async function readJvmOptionsText(engineRoot: string): Promise<string> {
  * useless at the next launch, so none is trained or used.
  */
 export function isTranslocated(engineRoot: string): boolean {
-  return engineRoot.includes('/AppTranslocation/')
+  // macOS only; either separator, so that the tests run on every host.
+  return /[\\/]AppTranslocation[\\/]/.test(engineRoot)
 }

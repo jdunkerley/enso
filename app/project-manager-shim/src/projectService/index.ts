@@ -12,6 +12,7 @@ import * as crypto from 'node:crypto'
 import * as path from 'node:path'
 import { getEngineLogDirectory } from '../distributionManager.js'
 import { EngineLogHub } from '../engineLogs/hub.js'
+import type { JvmAotCache } from '../jvmAot/index.js'
 import type { ProjectLifecycleListener } from '../localMetadata/index.js'
 import { withinVersioningTimeout, type LocalVersioning } from '../localVersioning/index.js'
 import {
@@ -40,6 +41,8 @@ import {
 import { engineTimeouts } from './timeouts.js'
 import { UUID, type Path } from './types.js'
 
+export { resolveDefaultEngineMode } from './engineMode.js'
+
 export interface RunningLanguageServerInfo {
   readonly sockets: LanguageServerSockets
   readonly projectName: string
@@ -53,6 +56,8 @@ export interface EngineSettings {
   readonly option?: EngineMode | undefined
   /** The raw `ENSO_ENGINE_MODE`; the process environment's when omitted. */
   readonly environment?: string | undefined
+  /** The per-user JDK AOT cache: its options go to every JVM engine, and opens stop its training. */
+  readonly jvmAot?: JvmAotCache | undefined
 }
 
 /** Parameters for the "create project" endpoint. */
@@ -118,6 +123,19 @@ export class ProjectService {
     return {
       option: this.engine?.option,
       environment: this.engine?.environment ?? process.env.ENSO_ENGINE_MODE,
+    }
+  }
+
+  /** The AOT cache's options for a JVM engine (`jvmOptions` of its launch), when there is a cache. */
+  private async aotOptions(mode: EngineMode): Promise<Pick<EngineLaunch, 'jvmOptions'>> {
+    const jvmAot = this.engine?.jvmAot
+    if (mode !== 'jvm' || jvmAot == null) return {}
+    try {
+      const jvmOptions = await jvmAot.jvmOptions()
+      return jvmOptions.length > 0 ? { jvmOptions } : {}
+    } catch (error) {
+      this.logger.error('Failed to read the AOT cache:', error)
+      return {}
     }
   }
 
@@ -254,7 +272,11 @@ export class ProjectService {
     const project = await this.getProject(projectId, projectsDirectory, true)
     this.logger.debug(`Running project '${project.path}'`)
     const mode = await resolveEngineMode(project.path, this.engineModeSettings())
-    const launch: EngineLaunch = { mode, timeouts: engineTimeouts(mode.mode) }
+    const launch: EngineLaunch = {
+      mode,
+      timeouts: engineTimeouts(mode.mode),
+      ...(await this.aotOptions(mode.mode)),
+    }
     const exitCode = await this.runner.runProject(
       project.path,
       this.projectEnvVars(await makeProjectTelemetryKey(projectsDirectory, projectId)),
@@ -295,12 +317,15 @@ export class ProjectService {
 
     // Start the language server
     let sockets: LanguageServerSockets
-    let launch: EngineLaunch
+    let launch: EngineLaunch | undefined
     const engineArgs = [...this.extraArgs, ...engineLoggingArgs(engineLogging)]
+    // A running AOT training yields to the open (spec, stage 1d "Yielding").
+    const jvmAot = this.engine?.jvmAot
+    jvmAot?.openStarted()
     try {
       const mode = await resolveEngineMode(project.path, this.engineModeSettings())
       if (!alreadyLogging) engineLog.notice(describeEngineMode(mode))
-      launch = { mode, timeouts: engineTimeouts(mode.mode) }
+      launch = { mode, timeouts: engineTimeouts(mode.mode), ...(await this.aotOptions(mode.mode)) }
       sockets = await this.runner.openProject(
         project.path,
         projectId,
@@ -312,6 +337,14 @@ export class ProjectService {
     } catch (error) {
       await engineLog.close()
       throw error
+    } finally {
+      jvmAot?.openAnswered()
+      if (jvmAot != null && (launch?.jvmOptions?.length ?? 0) > 0) {
+        // The JVM has written its warnings by now: a cache it refused is deleted.
+        void jvmAot
+          .checkUseLog()
+          .catch((error: unknown) => this.logger.error('Failed to check the AOT cache:', error))
+      }
     }
 
     // Registered before any rename hook, so a project is saved before its directory moves.

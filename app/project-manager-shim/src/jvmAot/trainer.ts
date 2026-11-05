@@ -71,6 +71,7 @@ function killTree(child: childProcess.ChildProcess): void {
 
 /** Implementation of {@link Trainer} with the bundled engine. */
 export class EngineTrainer implements Trainer {
+  /** A trainer for the engine whose launcher is `options.ensoExecutable`. */
   constructor(private readonly options: EngineTrainerOptions) {}
 
   private spawn(args: readonly string[], env: NodeJS.ProcessEnv, cwd: string): Engine {
@@ -148,6 +149,7 @@ export class EngineTrainer implements Trainer {
     }
   }
 
+  /** Train into `output` (see the file comment); an abort kills the engine and deletes the files. */
   async train(output: string, signal: AbortSignal): Promise<void> {
     const temporary = `${output}.tmp`
     const scratchRoot = this.options.scratchRoot

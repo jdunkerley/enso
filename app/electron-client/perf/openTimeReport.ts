@@ -478,25 +478,11 @@ export function aotCreateArguments(args: {
   ]
 }
 
-const AOT_PROBLEM =
-  /\[(?:error|warning)\]\[(?:aot|cds)[^\]]*\]|mismatch|Unable to use|unable to map|AOT cache.*(?:different|invalid|failed|disabled)/i
-
 /**
- * The first line of the JVM's output that says the AOT cache could not be used (the JVM reports
- * these as `[cds]` or `[aot]` records, or as a mismatch), or `undefined`.
+ * The first line of the JVM's output that says the AOT cache could not be used, or `undefined`.
+ * The shim reads its engines' `use.log` with the same pattern, so there is one copy, in the shim.
  */
-export function aotRejection(output: string): string | undefined {
-  return output
-    .split(/\r?\n/)
-    .find((line) => !UNIFIED_LOG_INFO.test(line) && AOT_PROBLEM.test(line))
-}
-
-/**
- * A unified-logging record below `warning` (`[0.1s][info][aot] ...`). The check launch logs `aot`
- * and `cds` at `info`, so that its output says what the JVM did with the cache; such a record can
- * name a feature of a cache in use as "disabled".
- */
-const UNIFIED_LOG_INFO = /^(?:\[[^\]]*\])*?\[(?:info|debug|trace)\]\[/
+export { aotRejection } from 'project-manager-shim/jvmAot'
 
 /** The engines named by `--engines` (comma-separated); throws on an unknown one. */
 export function parseEngines(value: string): Engine[] {
