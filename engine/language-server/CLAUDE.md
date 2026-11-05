@@ -3,8 +3,10 @@
 The Enso Language Server (LS). Embedder-side service that owns a GraalVM
 polyglot `Context` running the Enso runtime and exposes its capabilities over
 **JSON-RPC (text protocol)** and a **binary protocol** for data links. The GUI
-reaches the server only through the ydoc server that runs inside this process;
-the `--rpc-port` JSON-RPC listener (default 8080) is still bound directly.
+reaches the server only through the ydoc server. The ydoc server runs in Node
+and connects to the channel sockets below, or runs inside this process when
+`LANGUAGE_SERVER_YDOC_PORT` is set (it has no default); the `--rpc-port`
+JSON-RPC listener (default 8080) is still bound directly.
 
 Read `README.md` here and
 [Language-Server](https://github.com/jdunkerley/enso/wiki/Language-Server) for
@@ -69,6 +71,16 @@ The Clear] in `SuggestionsHandler` (#477).
   transfers.
 - **Ydoc**: Yjs updates tunneled via a binary channel. When enabled, text
   protocol is still active but most edits ride on Yjs.
+
+**Channel sockets.** `YjsChannelEndpoint` serves the ydoc server's four channels
+as WebSockets on the RPC port:
+`/channel/{json,binary,vis-control,vis-data}?token=<t>` (text frames are
+`String`s, binary frames `ByteBuffer`s). The token is
+`LANGUAGE_SERVER_CHANNEL_TOKEN` (`language-server.channel-token`), a random
+string per engine start; it is compared in constant time, never logged, and an
+engine started without one refuses every channel socket (`403`; an unknown kind
+is `404`). The socket is only as private as the `--interface` the engine binds:
+the shim passes loopback. See Note [The Channel Socket].
 
 See [Language-Server](https://github.com/jdunkerley/enso/wiki/Language-Server)
 for every endpoint's schema.

@@ -3,8 +3,14 @@ package org.enso.languageserver.boot.config
 import pureconfig.ConfigSource
 import pureconfig.generic.auto._
 
-/** An `application.conf` configuration. */
-case class ApplicationConfig(ydoc: YdocConfig)
+/** An `application.conf` configuration.
+  *
+  * @param ydoc the embedded ydoc server
+  * @param channelToken the token a ydoc host must present on the channel
+  *                     sockets (`LANGUAGE_SERVER_CHANNEL_TOKEN`); without one
+  *                     every channel socket is refused
+  */
+case class ApplicationConfig(ydoc: YdocConfig, channelToken: Option[String])
 
 object ApplicationConfig {
 
