@@ -105,7 +105,38 @@ the socket is open (Note [The GUI Is Connected When Its Socket Is Open] in
 Linux), the address the probe and the GUI use. The wait is bounded, the startup
 timeout stops applying once `/_health` has passed, and `EnsoRunner` defaults to
 none, because the fake engines of the tests have no ydoc server
-(`healthPolling.test.ts` has the one that does).
+(`healthPolling.test.ts` has the one that does). Under the Node ydoc host (next
+section) there is no wait: the listener is up before the engine is spawned.
+
+## ydoc host (`projectService/ydocHost.ts`)
+
+An opened project's ydoc server runs in one of two places, chosen per open by
+`ENSO_YDOC_HOST` (`ydocHostKind`; any case, an unknown value warns and means
+`node`):
+
+- `node` (default) — the runner's `YdocHost` (`EnsoRunner`'s `ydocHost` option,
+  passed in as `EngineSettings.ydocHost`) `listen`s on the ydoc port **before**
+  the engine is spawned, connected to the engine's Language Server channel
+  sockets (`ws://127.0.0.1:<rpc port>/channel/<kind>?token=…`). The engine gets
+  no `LANGUAGE_SERVER_YDOC_PORT`, so it starts no embedded server. The listener
+  is closed by the `close-ydoc-listener` shutdown hook (after the engine has
+  exited) and when an attempt fails. A listener whose port was taken after the
+  search (`EADDRINUSE`) makes the open search again, like an engine's bind
+  failure. Electron's host is a utility process
+  (`app/electron-client/src/ydocHost/`), `dev:vite`'s is `NodeYdocHost` itself.
+- `engine` — the one-release rollback (removed with the engine-hosted server, PR
+  M of the JVM-by-default plan): the engine gets `LANGUAGE_SERVER_YDOC_PORT` and
+  serves ydoc in GraalJS, as before. A runner without a host (the tests' fakes,
+  headless runs) behaves the same way.
+
+Either way every engine start gets `LANGUAGE_SERVER_CHANNEL_TOKEN`
+(`newChannelToken`, 32 random bytes as hex, fresh per open; a respawn keeps its
+open's token). The Language Server refuses channel sockets without it, from a
+non-loopback peer, or with an `Origin` header. Sessions in one host are keyed by
+the GUI's `ls=` name, which is `gui-rpc-<random uuid>` per opened project in the
+GUI, so two listeners in one process never share one
+(`app/ydoc-server/CLAUDE.md`, "Sessions are process-global"). Tests:
+`__tests__/ydocHost.test.ts`.
 
 ## Engine mode (`projectService/engineMode.ts`)
 
