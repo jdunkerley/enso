@@ -7,8 +7,8 @@ import type { QualifiedName } from '@/util/qualifiedName'
 import type { SyntaxNodeRef } from '@lezer/common'
 import { unwrapOrWithLog } from 'enso-common/src/utilities/data/result'
 import type { DeepReadonly } from 'vue'
-import { prerenderMarkdown } from 'ydoc-shared/ast/documentation'
 import { ensoMarkdownParser } from 'ydoc-shared/ast/ensoMarkdown'
+import { prerenderMarkdown } from 'ydoc-shared/ast/prerenderMarkdown'
 
 /** Icon names already warned about via {@link warnUnknownIconNameOnce}, so each logs once. */
 const warnedUnknownIconNames = new Set<string>()
