@@ -14,6 +14,11 @@ export interface FakeLanguageServerOptions {
   readonly port?: number
   /** How long after `executionContext/push` it reports `executionComplete`; `null`: never. */
   readonly completeAfterMs?: number | null
+  /**
+   * How many channel sockets it accepts and then drops with no close frame, as a Language Server
+   * that answers `/_health` before it has initialised does.
+   */
+  readonly dropFirst?: number
 }
 
 /** A message a client sent, in the order received. */
@@ -36,6 +41,7 @@ export async function startFakeLanguageServer(
 ): Promise<FakeLanguageServer> {
   const received: ReceivedMessage[] = []
   const sockets = new Map<string, WebSocket>()
+  let dropped = 0
   const server = http.createServer((request, response) => {
     if (request.url === '/_health') response.end('OK')
     else {
@@ -56,6 +62,11 @@ export async function startFakeLanguageServer(
       return
     }
     wss.handleUpgrade(request, socket, head, (ws) => {
+      if (dropped < (options.dropFirst ?? 0)) {
+        dropped += 1
+        setTimeout(() => ws.terminate(), 50)
+        return
+      }
       sockets.set(kind, ws)
       ws.on('message', (raw, isBinary) => {
         const text = isBinary ? undefined : raw.toString()

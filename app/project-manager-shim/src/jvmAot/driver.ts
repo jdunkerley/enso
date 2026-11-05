@@ -63,13 +63,19 @@ async function projectName(projectRoot: string): Promise<string> {
   return name
 }
 
-/** Open one channel socket; rejects when it fails to open. */
-function openChannel(rpcPort: number, token: string, kind: string): Promise<WebSocket> {
+/** Open one channel socket (added to `sockets` at once, to be closed); rejects when it fails to open. */
+function openChannel(
+  rpcPort: number,
+  token: string,
+  kind: string,
+  sockets: WebSocket[],
+): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(
       `ws://127.0.0.1:${rpcPort}/channel/${kind}?token=${encodeURIComponent(token)}`,
       { maxPayload: 0 },
     )
+    sockets.push(socket)
     socket.once('open', () => resolve(socket))
     socket.once('error', (error) => reject(new Error(`Channel ${kind}: ${error.message}`)))
   })
@@ -84,9 +90,9 @@ interface JsonRpcMessage {
 }
 
 /**
- * Play an IDE open: initialise a session, create an execution context and push `main`, wait for
- * the execution to complete, then attach the welcome node's table visualisation and wait for its
- * first answer (data, or a `ready`/`failed` message). Throws on a timeout, an abort, a failed
+ * Play an IDE open: initialise a session, create an execution context and push `main`, attach the
+ * welcome node's table visualisation, then wait for the execution to complete and for the
+ * visualisation's first answer (data, or a `ready`/`failed` message). Throws on a timeout, an abort, a failed
  * request or an `executionFailed`.
  */
 export async function driveOpen(options: DriveOpenOptions): Promise<void> {
@@ -97,18 +103,22 @@ export async function driveOpen(options: DriveOpenOptions): Promise<void> {
   const sockets: WebSocket[] = []
   let timeout: ReturnType<typeof setTimeout> | undefined
   let onAbort: (() => void) | undefined
+  let over = false
   const stopped = new Promise<never>((_, reject) => {
-    timeout = setTimeout(
-      () => reject(new Error(`The training open did not finish in ${options.timeoutMs} ms`)),
-      options.timeoutMs,
-    )
-    onAbort = () => reject(new DOMException('The training open was aborted', 'AbortError'))
+    timeout = setTimeout(() => {
+      over = true
+      reject(new Error(`The training open did not finish in ${options.timeoutMs} ms`))
+    }, options.timeoutMs)
+    onAbort = () => {
+      over = true
+      reject(new DOMException('The training open was aborted', 'AbortError'))
+    }
     if (options.signal?.aborted) onAbort()
     else options.signal?.addEventListener('abort', onAbort, { once: true })
   })
   stopped.catch(() => undefined)
   try {
-    await Promise.race([stopped, play(options, name, nodeId, sockets, stopped)])
+    await Promise.race([stopped, play(options, name, nodeId, sockets, stopped, () => over)])
   } finally {
     clearTimeout(timeout)
     if (onAbort) options.signal?.removeEventListener('abort', onAbort)
@@ -116,29 +126,54 @@ export async function driveOpen(options: DriveOpenOptions): Promise<void> {
   }
 }
 
-async function play(
+/* Note [The Health Check Passes Before The Language Server Is Ready]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The Language Server binds its port, and answers `/_health`, while it is still initialising: on
+ * the Windows bundle (JVM, recording) `/_health` passed some 20 s before the log's `Started server
+ * at json`. A channel socket opened in that window is accepted and then dropped (`1006`, no close
+ * frame). The GUI reconnects; the driver likewise opens its sockets and initialises the session
+ * again, once a second, until the session is initialised or the drive's time is up.
+ */
+const RECONNECT_DELAY_MS = 1000
+
+/** The channel sockets of one initialised session, and its JSON-RPC requests. */
+interface Session {
+  readonly control: WebSocket
+  readonly data: WebSocket
+  readonly request: (method: string, params: unknown) => Promise<unknown>
+  readonly notifications: Map<string, (params: unknown) => void>
+  /** Rejects when any of the sockets closes. */
+  readonly socketClosed: Promise<never>
+}
+
+/** Open the three sockets and initialise a session; rejects when a socket fails or closes first. */
+async function connect(
   options: DriveOpenOptions,
-  name: string,
-  nodeId: string | undefined,
   sockets: WebSocket[],
   stopped: Promise<never>,
-): Promise<void> {
-  const [json, control, data] = await Promise.all(
-    ['json', 'vis-control', 'vis-data'].map((kind) =>
-      openChannel(options.rpcPort, options.token, kind).then((socket) => {
-        sockets.push(socket)
-        return socket
-      }),
+): Promise<Session> {
+  const [json, control, data] = await Promise.race([
+    Promise.all(
+      ['json', 'vis-control', 'vis-data'].map((kind) =>
+        openChannel(options.rpcPort, options.token, kind, sockets),
+      ),
     ),
-  )
+    stopped,
+  ])
   let nextId = 1
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>()
   const notifications = new Map<string, (params: unknown) => void>()
   let closed: (error: Error) => void = () => {}
   const socketClosed = new Promise<never>((_, reject) => (closed = reject))
   socketClosed.catch(() => undefined)
-  for (const socket of [json, control, data]) {
-    socket!.once('close', () => closed(new Error('The Language Server closed a channel')))
+  for (const [kind, socket] of [
+    ['json', json],
+    ['vis-control', control],
+    ['vis-data', data],
+  ] as const) {
+    socket!.once('close', (code, reason) =>
+      closed(new Error(`The Language Server closed the ${kind} channel (${code} ${reason})`)),
+    )
   }
   json!.on('message', (raw) => {
     let message: JsonRpcMessage
@@ -164,6 +199,36 @@ async function play(
   }
 
   await request('session/initProtocolConnection', { clientId: crypto.randomUUID() })
+  return { control: control!, data: data!, request, notifications, socketClosed }
+}
+
+async function play(
+  options: DriveOpenOptions,
+  name: string,
+  nodeId: string | undefined,
+  sockets: WebSocket[],
+  stopped: Promise<never>,
+  isOver: () => boolean,
+): Promise<void> {
+  let session: Session
+  for (;;) {
+    const attempt: WebSocket[] = []
+    try {
+      session = await connect(options, attempt, stopped)
+      sockets.push(...attempt)
+      break
+    } catch (error) {
+      for (const socket of attempt) socket.terminate()
+      // A refused token (403) is a misconfiguration, not a server still starting.
+      if (isOver() || /Unexpected server response: 403/.test(String(error))) throw error
+      // Note [The Health Check Passes Before The Language Server Is Ready]
+      await Promise.race([
+        new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS)),
+        stopped,
+      ])
+    }
+  }
+  const { control, data, request, notifications, socketClosed } = session
   const created = (await request('executionContext/create', {
     contextId: crypto.randomUUID(),
   })) as { contextId?: string } | null
@@ -191,9 +256,11 @@ async function play(
       positionalArgumentsExpressions: [],
     },
   })
-  await Promise.race([executed, socketClosed, stopped])
-
-  if (nodeId == null) return
+  // Note [The Driver Attaches Before The Execution Completes]
+  if (nodeId == null) {
+    await Promise.race([executed, socketClosed, stopped])
+    return
+  }
   const requestId = crypto.randomUUID()
   const shown = new Promise<void>((resolve) => {
     data!.once('message', () => resolve())
@@ -226,5 +293,16 @@ async function play(
       },
     }),
   )
-  await Promise.race([shown, socketClosed, stopped])
+  await Promise.race([Promise.all([executed, shown]), socketClosed, stopped])
 }
+
+/* Note [The Driver Attaches Before The Execution Completes]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The GUI attaches the welcome node's visualisation as it connects, before the first execution
+ * has finished, and so does the driver: right after the push, then it waits for both. Measured on
+ * the Windows bundle (JVM, 2026-11-05): with no visualisation attached, `executionComplete` did not
+ * come within 150 s (8 minutes with the AOT recording on), the execution reporting nothing after
+ * its first `executionStatus`; attaching made the update, the visualisation's data and
+ * `executionComplete` arrive within a second. Waiting for the execution before attaching, as the
+ * plan first had it, never finished.
+ */

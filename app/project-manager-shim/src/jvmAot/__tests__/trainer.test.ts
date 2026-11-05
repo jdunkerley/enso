@@ -1,7 +1,8 @@
 /**
- * @file The trainer with a fake `enso`: a Node script that makes the scratch project for `--new`,
- * and for `--server` serves the fake Language Server and, on the stdin newline, writes the file
- * named by `-XX:AOTCacheOutput=` and exits.
+ * @file The trainer with a fake bundle: a fake `enso` (a Node script) that makes the scratch
+ * project for `--new`, and for `--server` serves the fake Language Server and, on the stdin
+ * newline, writes the file named by `-XX:AOTConfiguration=` and exits; and a fake `java` that
+ * writes the cache named by `-XX:AOTCache=` from that configuration.
  */
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
@@ -9,6 +10,7 @@ import * as path from 'node:path'
 import * as url from 'node:url'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { JVM_AOT_TRAINER_PORT } from '../../projectService/__tests__/testPorts.js'
+import { LAUNCHER_JVM_OPTIONS } from '../../projectService/jvmOptions.js'
 import { EngineTrainer } from '../trainer.js'
 
 const FAKE_LS = url.pathToFileURL(path.join(import.meta.dirname, 'fakeLanguageServer.ts')).href
@@ -45,29 +47,40 @@ await startFakeLanguageServer({
   completeAfterMs: never ? null : 100,
 })
 process.stdin.on('data', () => {
-  const output = process.env.ENSO_JVM_OPTIONS.split(/\\r?\\n/)
-    .find((o) => o.startsWith('-XX:AOTCacheOutput='))
-    .slice('-XX:AOTCacheOutput='.length)
+  const config = process.env.ENSO_JVM_OPTIONS.split(/\\r?\\n/)
+    .find((o) => o.startsWith('-XX:AOTConfiguration='))
+    .slice('-XX:AOTConfiguration='.length)
   const code = Number(process.env.FAKE_EXIT_CODE ?? '0')
-  if (code === 0) fs.writeFileSync(output, 'cache')
+  if (code === 0) fs.writeFileSync(config, 'config')
   process.exit(code)
 })
 `
 
-let root: string
+const FAKE_JAVA = `
+import * as fs from 'node:fs'
+const args = process.argv.slice(2)
+const option = (name) => args.find((a) => a.startsWith(name + '=')).slice(name.length + 1)
+fs.writeFileSync(process.env.FAKE_JAVA_RECORD, JSON.stringify({ args }))
+if (fs.readFileSync(option('-XX:AOTConfiguration'), 'utf8') !== 'config') process.exit(2)
+fs.writeFileSync(option('-XX:AOTCache'), 'cache')
+`
 
-async function fakeEnso(directory: string): Promise<string> {
-  const script = path.join(directory, 'fake-enso.mjs')
-  await fs.writeFile(script, FAKE_ENSO)
+let root: string
+let bundle: string
+
+/** A launcher for `script`: a `.bat` on Windows (as the trainer expects), a shell script elsewhere. */
+async function launcher(directory: string, name: string, script: string): Promise<string> {
+  const scriptFile = path.join(directory, `fake-${name}.mjs`)
+  await fs.writeFile(scriptFile, script)
   if (process.platform === 'win32') {
-    const launcher = path.join(directory, 'enso.bat')
-    await fs.writeFile(launcher, `@"${process.execPath}" "${script}" %*\r\n`)
-    return launcher
+    const file = path.join(directory, `${name}.bat`)
+    await fs.writeFile(file, `@"${process.execPath}" "${scriptFile}" %*\r\n`)
+    return file
   }
-  const launcher = path.join(directory, 'enso')
-  await fs.writeFile(launcher, `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`)
-  await fs.chmod(launcher, 0o755)
-  return launcher
+  const file = path.join(directory, name)
+  await fs.writeFile(file, `#!/bin/sh\nexec "${process.execPath}" "${scriptFile}" "$@"\n`)
+  await fs.chmod(file, 0o755)
+  return file
 }
 
 interface Recorded {
@@ -79,6 +92,7 @@ interface Recorded {
 }
 
 const recordFile = () => path.join(root, 'record.json')
+const javaRecordFile = () => path.join(root, 'java-record.json')
 const recorded = async () => JSON.parse(await fs.readFile(recordFile(), 'utf8')) as Recorded
 
 async function exists(file: string): Promise<boolean> {
@@ -98,8 +112,15 @@ function isAlive(pid: number): boolean {
 }
 
 async function trainer(): Promise<EngineTrainer> {
+  const engineRoot = path.join(bundle, 'enso', 'dist', '1.0')
+  const bin = path.join(engineRoot, 'bin')
+  const runtimeBin = path.join(bundle, 'enso', 'runtime', 'graalvm', 'bin')
+  await fs.mkdir(bin, { recursive: true })
+  await fs.mkdir(runtimeBin, { recursive: true })
+  await fs.writeFile(path.join(engineRoot, 'jvm.options'), '# c\n-Dfrom.file=1\n')
   return new EngineTrainer({
-    ensoExecutable: await fakeEnso(root),
+    ensoExecutable: await launcher(bin, 'enso', FAKE_ENSO),
+    javaExecutable: await launcher(runtimeBin, 'java', FAKE_JAVA),
     scratchRoot: path.join(root, 'scratch'),
     firstPort: JVM_AOT_TRAINER_PORT,
     startupTimeoutMs: 20_000,
@@ -110,7 +131,9 @@ async function trainer(): Promise<EngineTrainer> {
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-trainer-'))
+  bundle = path.join(root, 'bundle')
   vi.stubEnv('FAKE_RECORD', recordFile())
+  vi.stubEnv('FAKE_JAVA_RECORD', javaRecordFile())
   vi.stubEnv('LANGUAGE_SERVER_YDOC_PORT', '1234')
   vi.stubEnv('ENSO_JVM_OPTIONS', '')
 })
@@ -120,23 +143,39 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
-test('a training writes the cache and removes the scratch directory', async () => {
+test('a training writes the cache and removes the configuration and scratch directory', async () => {
   const output = path.join(root, 'key dir', 'enso.aot')
   await (await trainer()).train(output, new AbortController().signal)
   expect(await fs.readFile(output, 'utf8')).toBe('cache')
   expect(await exists(`${output}.tmp`)).toBe(false)
+  expect(await exists(`${output}.aotconf`)).toBe(false)
   expect(await exists(path.join(root, 'scratch'))).toBe(false)
 })
 
-test('the engine gets --jvm, the output option, a token and no ydoc port', async () => {
+test('the engine records with --jvm, a token and no ydoc port; java creates as the launcher would', async () => {
+  vi.stubEnv('ENSO_JVM_OPTIONS', '-Dinherited=1')
   const output = path.join(root, 'key dir', 'enso.aot')
   await (await trainer()).train(output, new AbortController().signal)
   const engine = await recorded()
   expect(engine.args.slice(0, 2)).toEqual(['--jvm', '--server'])
   expect(engine.args[engine.args.indexOf('--path') + 1]).toBe(path.join(root, 'scratch', 'Train'))
-  expect(engine.jvmOptions).toBe(`-XX:AOTCacheOutput=${output}.tmp\n`)
+  expect(engine.jvmOptions).toBe(
+    `-Dinherited=1\n-XX:AOTMode=record\n-XX:AOTConfiguration=${output}.aotconf`,
+  )
   expect(engine.token).toMatch(/^[0-9a-f]{64}$/)
   expect(engine.ydocPort).toBeNull()
+  const java = JSON.parse(await fs.readFile(javaRecordFile(), 'utf8')) as { args: string[] }
+  expect(java.args).toEqual([
+    '-XX:AOTMode=create',
+    `-XX:AOTConfiguration=${output}.aotconf`,
+    `-XX:AOTCache=${output}.tmp`,
+    ...LAUNCHER_JVM_OPTIONS,
+    '-Dfrom.file=1',
+    '-Dinherited=1',
+    `--module-path=${path.join(bundle, 'enso', 'dist', '1.0', 'component')}`,
+    '-m',
+    'org.enso.runner/org.enso.runner.Main',
+  ])
 })
 
 test('an abort during the drive kills the engine and leaves no files', async () => {
@@ -166,4 +205,5 @@ test('an engine that exits 1 fails the training and leaves no cache', async () =
   )
   expect(await exists(output)).toBe(false)
   expect(await exists(`${output}.tmp`)).toBe(false)
+  expect(await exists(javaRecordFile())).toBe(false)
 })

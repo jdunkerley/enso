@@ -11,6 +11,13 @@ import { acquireTrainingLock, LOCK_FILE_NAME } from './lock.js'
 import { EngineTrainer, type Trainer } from './trainer.js'
 import { aotRejection } from './useLog.js'
 
+export {
+  aotCreateArguments,
+  jvmOptionsValue,
+  LAUNCHER_JVM_OPTIONS,
+  parseJvmOptionsFile,
+  splitJvmOptions,
+} from '../projectService/jvmOptions.js'
 export { driveOpen, welcomeNodeId } from './driver.js'
 export { aotKey, enginePaths, isTranslocated, readJvmOptionsText } from './key.js'
 export { acquireTrainingLock } from './lock.js'

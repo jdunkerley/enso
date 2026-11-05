@@ -84,6 +84,24 @@ test('driveOpen plays an open: init, create, push, then attach the welcome node'
   })
 })
 
+test('driveOpen connects again when the Language Server drops its first sockets', async () => {
+  ls = await startFakeLanguageServer({ token: TOKEN, dropFirst: 3 })
+  await driveOpen({
+    rpcPort: ls.port,
+    token: TOKEN,
+    projectRoot: await project(),
+    timeoutMs: 10_000,
+  })
+  const methods = ls.received
+    .filter((r) => r.channel === 'json')
+    .map((r) => (r.message as { method: string }).method)
+  expect(methods).toEqual([
+    'session/initProtocolConnection',
+    'executionContext/create',
+    'executionContext/push',
+  ])
+})
+
 test('driveOpen rejects after timeoutMs when the execution never completes', async () => {
   ls = await startFakeLanguageServer({ token: TOKEN, completeAfterMs: null })
   const projectRoot = await project()

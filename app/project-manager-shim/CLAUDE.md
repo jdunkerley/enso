@@ -156,17 +156,30 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   taken over). `EngineTrainer` makes a scratch project with `enso --new`
   (native, the welcome template) in `<root>/train/`, starts
   `enso --jvm --server` on it at below-normal priority (`os.setPriority`) with
-  `ENSO_JVM_OPTIONS=-XX:AOTCacheOutput=<key>/enso.aot.tmp`, a fresh
+  `ENSO_JVM_OPTIONS` adding `-XX:AOTMode=record` and
+  `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a fresh
   `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`, waits for
   `/_health` (180 s), and `driveOpen` plays an open over the Language Server's
   channel sockets (`/channel/{json,vis-control,vis-data}?token=`):
   `session/initProtocolConnection`, `executionContext/create` and `push` of
-  `main`, the `executionComplete`, then an `attach` of the table visualisation
-  to the node the template's metadata shows one for (`welcomeNodeId`). Then the
-  stdin newline, up to 5 minutes for the JVM to write the cache and exit, and
-  `.tmp` is renamed into place. A finished training deletes every other
-  directory under the root (an upgrade changed the key) except the lock. A
-  failed one leaves no `enso.aot` and is retried at the next launch.
+  `main`, an `attach` of the table visualisation to the node the template's
+  metadata shows one for (`welcomeNodeId`), then waits for `executionComplete`
+  and the visualisation's answer. Then the stdin newline, up to 5 minutes for
+  the JVM to write the configuration and exit, and the bundled `java` creates
+  the cache (`aotCreateArguments`: the launcher's fixed options, the
+  `jvm.options` lines, an inherited `ENSO_JVM_OPTIONS`) as `.tmp`, renamed into
+  place. A finished training deletes every other directory under the root (an
+  upgrade changed the key) except the lock. A failed one leaves no `enso.aot`
+  and is retried at the next launch. Three things measured on the Windows bundle
+  shaped this (Notes in `driver.ts` and `trainer.ts`):
+  - `/_health` passes while the Language Server is still initialising, and a
+    channel socket opened then is dropped (`1006`): the driver reconnects once a
+    second until the session is initialised (a `403` fails at once).
+  - With no visualisation attached, `executionComplete` never came; the GUI
+    attaches as it connects, and so does the driver.
+  - JEP 514's one-step `-XX:AOTCacheOutput=` fails: its forked child JVM lacks
+    the JNI-started JVM's modules (`jdk.internal.vm.ci`), hence record, then
+    create with `java`, as the open-time harness does.
 - **Yielding**: `ProjectService.openProject` calls `openStarted()` before the
   engine starts (any mode) and `openAnswered()` after the answer, a failure
   included. An open kills a running training (on Windows with `taskkill /T`, so
@@ -181,15 +194,18 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   (`useLog.ts`, also the open-time harness's) matches; it retrains at the next
   launch.
 - **`ENSO_JVM_OPTIONS`** is built by `jvmOptionsValue`
-  (`projectService/jvmOptions.ts`): an inherited value is split as the launcher
-  splits it (lines if it has a newline, else whitespace) and the shim's options
-  follow one per line; a single option gets a trailing newline, so that the
-  launcher reads it as a line and a space in its path survives.
+  (`projectService/jvmOptions.ts`, which also holds `LAUNCHER_JVM_OPTIONS`,
+  `parseJvmOptionsFile` and `aotCreateArguments`; the open-time harness
+  re-exports them, so there is one copy): an inherited value is split as the
+  launcher splits it (lines if it has a newline, else whitespace) and the shim's
+  options follow one per line; a single option gets a trailing newline, so that
+  the launcher reads it as a line and a space in its path survives.
 - **Known limits**: `os.setPriority` lowers the launcher's process; on Linux,
   where priority is per thread, threads the JVM created before the call keep
-  normal priority. Two JVM engines open at once share `use.log`. The Linux
-  AppImage mounts at a new path each launch, so its key changes every time (PR J
-  of the plan deals with it).
+  normal priority. Two JVM engines open at once share `use.log`, and the JVM's
+  default log rotation keeps up to five old ones (`use.log.0` …) beside it. The
+  Linux AppImage mounts at a new path each launch, so its key changes every time
+  (PR J of the plan deals with it).
 - **Tests**: `jvmAot/__tests__/` — `key`, `lock`, `driver` (against
   `fakeLanguageServer.ts`), `trainer` (a fake `enso` script that imports the
   same fake, port band `JVM_AOT_TRAINER_PORT`) and `cache` (a fake trainer and
