@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { FIXTURES_LIB, readLibraries, type LibraryInput } from './catalogue'
-import { buildModel, isFunctionPage } from './model'
+import { buildModel, CaseSafeDirs, isFunctionPage } from './model'
 
 const model = buildModel(readLibraries([FIXTURES_LIB]))
 const page = (path: string) => model.byPath.get(path)
@@ -122,5 +122,24 @@ test('paths that differ only in case are recorded', () => {
   }
   expect(buildModel([withUpper, libraries[1]!]).caseCollisions).toEqual([
     ['Standard.Fixture/Shapes/Square.side', 'Standard.Fixture/Shapes/Square.Side'],
+  ])
+})
+
+test('folders stay apart on a case-insensitive file system, and pages under a renamed folder follow it', () => {
+  const dirs = new CaseSafeDirs()
+  expect(
+    [
+      'L/Data/download',
+      'L/Data/Download/Format',
+      'L/Data/Download',
+      'L/Data/DOWNLOAD',
+      'L/Data/x',
+    ].map((path) => dirs.dirOf(path)),
+  ).toEqual([
+    'L/Data/download',
+    'L/Data/Download~1/Format',
+    'L/Data/Download~1',
+    'L/Data/DOWNLOAD~2',
+    'L/Data/x',
   ])
 })

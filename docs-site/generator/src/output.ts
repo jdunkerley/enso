@@ -37,7 +37,7 @@ export function writeSite(
   mkdirSync(apiDir, { recursive: true })
   if (model.caseCollisions.length)
     console.warn(
-      `${model.caseCollisions.length} paths differ from another only in case; each later one is written to <path>~<n>. ` +
+      `${model.caseCollisions.length} paths differ from another only in case; their files go to folders named <name>~<n>. ` +
         'A Docusaurus build on a case-insensitive file system (Windows, macOS) still writes both into one output ' +
         'folder and keeps only one of each pair; build on Linux for a complete site.',
     )

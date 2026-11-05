@@ -38,9 +38,9 @@ export interface Page {
   /** The page's path under the Components root (`apiPath`): its URL. */
   path: string
   /**
-   * The folder of its file under `docs/api/`: `path`, or `path~<n>` for the n-th further page whose
-   * path differs from an earlier one only in case, so the two files cannot land in one folder on a
-   * case-insensitive file system. The front matter's `slug` keeps the URL `path`.
+   * The folder of its file under `docs/api/`: `path`, except that a folder whose name differs from
+   * an earlier one's only in case becomes `<name>~<n>` (see {@link CaseSafeDirs}). The front
+   * matter's `slug` keeps the URL `path`.
    */
   dir: string
   /** The page's `h1`. */
@@ -75,6 +75,33 @@ export interface SiteModel {
   skipped: string[]
   /** Pairs of paths that differ only in case (Task 13 decides what to do with any). */
   caseCollisions: [string, string][]
+}
+
+/**
+ * Folders for page paths that stay apart on a case-insensitive file system (Windows, macOS). The
+ * reference has pages whose paths differ only in case (a constructor `Name` and a getter `name`, a
+ * module `Download` and a function `download`); written as they are, two would share one folder, and
+ * a module's pages would land in its namesake's folder. Each folder is decided segment by segment, in
+ * the order paths are first seen: the first spelling keeps its name, a later spelling of the same
+ * name gets `~1`, `~2`, …, and everything under it follows.
+ */
+export class CaseSafeDirs {
+  private readonly dirs = new Map<string, string>()
+  private readonly taken = new Map<string, string>()
+
+  /** The folder for `path` (segments separated by `/`). */
+  dirOf(path: string): string {
+    const known = this.dirs.get(path)
+    if (known != null) return known
+    const slash = path.lastIndexOf('/')
+    const parent = slash < 0 ? '' : this.dirOf(path.slice(0, slash))
+    const base = (parent ? `${parent}/` : '') + path.slice(slash + 1)
+    let dir = base
+    for (let n = 1; this.taken.has(dir.toLowerCase()); n++) dir = `${base}~${n}`
+    this.taken.set(dir.toLowerCase(), path)
+    this.dirs.set(path, dir)
+    return dir
+  }
 }
 
 const FUNCTION_KINDS = new Set<PageKind>([
@@ -120,18 +147,19 @@ export function buildModel(libraries: LibraryInput[]): SiteModel {
     skipped: libraries.filter((library) => !library.catalogue).map((library) => library.name),
     caseCollisions: [],
   }
-  const lowerCase = new Map<string, string[]>()
+  const lowerCase = new Map<string, string>()
+  const dirs = new CaseSafeDirs()
 
   const add = (fields: Omit<Page, 'dir'>) => {
     const existing = model.byPath.get(fields.path)
     if (existing)
       throw new Error(`Two pages at ${fields.path}: ${existing.title} and ${fields.title}`)
-    const folded = lowerCase.get(fields.path.toLowerCase()) ?? []
-    if (folded.length) model.caseCollisions.push([folded[0]!, fields.path])
-    lowerCase.set(fields.path.toLowerCase(), [...folded, fields.path])
+    const folded = lowerCase.get(fields.path.toLowerCase())
+    if (folded) model.caseCollisions.push([folded, fields.path])
+    else lowerCase.set(fields.path.toLowerCase(), fields.path)
     const page: Page = {
       ...fields,
-      dir: folded.length ? `${fields.path}~${folded.length}` : fields.path,
+      dir: dirs.dirOf(fields.path),
     }
     model.byPath.set(page.path, page)
     model.pages.push(page)
