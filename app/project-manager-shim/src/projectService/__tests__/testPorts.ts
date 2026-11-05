@@ -13,11 +13,11 @@
 import * as crypto from 'node:crypto'
 
 /** Ports in each band. A runner needs two per engine, searching upward from its start. */
-const BAND_SIZE = 3_000
+const BAND_SIZE = 2_000
 /** Room left at the top of a band for the search to step past ports already in use. */
 const BAND_HEADROOM = 100
 /**
- * Low enough that seven bands end at 30,000, below the default and the ephemeral ranges. An eighth
+ * Low enough that ten bands end at 29,000, below the default and the ephemeral ranges. An eleventh
  * band needs this lowered again (or the bands narrowed).
  */
 const FIRST_BAND_START = 9_000
@@ -42,3 +42,9 @@ export const RESPAWN_CLOSE_PORT = randomPortInBand(4)
 export const PORT_IN_USE_PORT = randomPortInBand(5)
 /** `healthPolling.test.ts`. */
 export const HEALTH_POLLING_PORT = randomPortInBand(6)
+/** `engineLaunch.test.ts`. */
+export const ENGINE_MODE_PORT = randomPortInBand(7)
+/** `jvmAot/__tests__/trainer.test.ts`. */
+export const JVM_AOT_TRAINER_PORT = randomPortInBand(8)
+/** `ydocHost.test.ts`. */
+export const YDOC_HOST_PORT = randomPortInBand(9)

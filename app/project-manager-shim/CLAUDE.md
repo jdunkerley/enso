@@ -59,7 +59,8 @@ Test files that start (fake) engines pass `firstPort` from
 `projectService/__tests__/testPorts.ts`, never the default: each file has its
 own band (parallel workers), and each run starts at a random port inside it
 (another checkout's run at the same time). A new such file needs a band of its
-own there.
+own there. The bands are 2,000 ports wide and ten of them end at 29,000; an
+eleventh needs the first band's start lowered.
 
 ## Ports and the engine's health check
 
@@ -73,29 +74,61 @@ engine, up to `PORT_ATTEMPTS` (3) times; any other early exit fails the open
 (#336). Not covered: another program that answers `/_health` with a success
 before the engine has failed to bind. The start-up checks run every 25 ms for
 the first second and every 250 ms after (Note [Start-up Health Polling] in
-`ensoRunner.ts`). An engine that has not passed `/_health` within 30 s is
-killed; `ENSO_ENGINE_STARTUP_TIMEOUT_MS` lengthens that in
-`ProjectService.default` (the open-time harness's JDK AOT training launch needs
-it on Windows, where a `--jvm` engine with no class data sharing, recording its
-classes, took longer), and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS` the 10 s an engine
-has to exit when asked (the same JVM writes its training data as it exits).
+`ensoRunner.ts`). The limits come per launch from the engine mode's column
+(`ENGINE_TIMEOUTS`, `engineTimeouts(mode)` in `projectService/timeouts.ts`):
+
+| Limit                                   | Native | JVM engine |
+| --------------------------------------- | -----: | ---------: |
+| Start-up: `/_health` passed             |   30 s |      120 s |
+| Terminate: exit after the stdin newline |   10 s |       30 s |
+| ydoc port wait                          |    5 s |       30 s |
+
+An engine that has not passed `/_health` within the start-up limit is killed.
+`ENSO_ENGINE_STARTUP_TIMEOUT_MS` and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS` override
+both columns (the open-time harness's JDK AOT training launch needs it on
+Windows, where a `--jvm` engine with no class data sharing, recording its
+classes, takes longer, and writes its training data as it exits). A runner
+called without a launch (tests) keeps the native values.
 
 `project/open` is also answered only once the engine's ydoc port accepts a
-connection (`EnsoRunner`'s `ydocWaitMs`, `DEFAULT_YDOC_WAIT_MS` in
-`ProjectService.default`; Note [Open Waits For The Ydoc Port]). The ydoc server
-listens ~300 ms after `/_health` passes, and a GUI that connected earlier was
-refused (measured). That is consistent with Windows retrying a refused loopback
-connect after ~500 ms (inferred from the constant 510 to 525 ms gap). On Linux
-the GUI was refused too and connected only on y-websocket's third retry, ~1.4 s
-after the answer, so the wait helps there as well; the open-time harness hid it
-until `guiConnected` was changed to mean the socket is open (Note [The GUI Is
-Connected When Its Socket Is Open] in
+connection (`EnsoRunner`'s `ydocWaitMs`, per launch from the mode's column,
+`DEFAULT_YDOC_WAIT_MS` only for a launch without a mode; Note [Open Waits For
+The Ydoc Port]). The ydoc server listens ~300 ms after `/_health` passes, and a
+GUI that connected earlier was refused (measured). That is consistent with
+Windows retrying a refused loopback connect after ~500 ms (inferred from the
+constant 510 to 525 ms gap). On Linux the GUI was refused too and connected only
+on y-websocket's third retry, ~1.4 s after the answer, so the wait helps there
+as well; the open-time harness hid it until `guiConnected` was changed to mean
+the socket is open (Note [The GUI Is Connected When Its Socket Is Open] in
 `app/electron-client/perf/openTimeReport.ts`). The ydoc server binds
 `localhost`, which the JVM resolves to `127.0.0.1` (an IPv4-mapped address on
 Linux), the address the probe and the GUI use. The wait is bounded, the startup
 timeout stops applying once `/_health` has passed, and `EnsoRunner` defaults to
 none, because the fake engines of the tests have no ydoc server
 (`healthPolling.test.ts` has the one that does).
+
+## Engine mode (`projectService/engineMode.ts`)
+
+`ProjectService.openProject` and `runProject` resolve which engine a project
+gets, the first match winning: the project's `package.yaml` `jvm: true|false`
+(`readPackageJvmMode`; a non-boolean or malformed value is ignored, so
+`jvm: false` now means native even when the default is JVM); Electron's
+`--engine-mode=native|jvm` (`--jvm` is an alias; passed in as
+`EngineSettings.option`); `ENSO_ENGINE_MODE=native|jvm` (an unknown value is
+ignored); then `DEFAULT_ENGINE_MODE`, `native` for now. The result
+(`ResolvedEngineMode`: mode and source) decides whether the runner puts `--jvm`
+first in the engine's arguments and which timeout column applies; both travel in
+the `EngineLaunch` that `Runner.openProject`/`runProject` take. `--new`,
+`--version` and the filesystem commands do not take a launch and stay native.
+The engine log panel's first line is `Engine mode: <mode> (<source>)`
+(`EngineLogChannel.notice`, a `stderr` line before any session).
+
+A `--jvm` in `ENSO_ENGINE_ARGS` (the open-time harness uses it) is lifted into
+the `jvm` option by `ProjectService.default` (`liftJvmFlag`): the log names
+`--engine-mode`, the JVM limits apply, and a project's `jvm: false` still wins.
+Headless `--startup.project` runs take `--engine-mode` too
+(`runLocalProjectByPath`'s `engine`). Re-opening an open project writes no
+second mode line.
 
 ## Child processes
 

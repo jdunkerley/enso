@@ -141,6 +141,10 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   scripts still set it, but the bundled engine is whatever is in
   `ENSO_BUILD_BACKEND`.
 - `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
+- `ENSO_ENGINE_MODE` (`native` | `jvm`) — which engine projects get, below
+  `--engine-mode` and a project's `package.yaml` `jvm:` key (see
+  `project-manager-shim/CLAUDE.md`, "Engine mode"). `--engine-mode <mode>` is
+  the command-line form; `--jvm` is its alias.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.
