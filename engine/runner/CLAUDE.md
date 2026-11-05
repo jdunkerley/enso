@@ -78,6 +78,7 @@ Rules for an option line (in the file or in `ENSO_JVM_OPTIONS`):
 The shell launchers `distribution/bin/enso` and `enso.bat` start the JVM
 themselves and `--jvm` does not relaunch from them, so `Main.launchJvm` is not
 involved: they read `jvm.options` on their own (`enso` with the same rules;
-`enso.bat` skips blank and `#` lines and quotes each line, so a line must not
-start with spaces or a byte order mark or contain a double quote). They do not
-read `ENSO_JVM_OPTIONS`.
+`enso.bat` skips blank, whitespace-only and `#` lines, also indented ones, trims
+leading and trailing spaces and quotes each line, so `^ % ! & | < >` and spaces
+survive literally; it does not support a byte order mark, a double quote or a
+single quote in an option). They do not read `ENSO_JVM_OPTIONS`.
