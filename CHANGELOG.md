@@ -5,7 +5,7 @@
 - [The sample projects share their input files in one Samples/Data folder and
   write their results to their own output folder. Each opens with its nodes laid
   out and commented, and its description says which nodes to select to see the
-  results.][PRNUM]
+  results.][607]
 - [A user documentation site, with guides to the IDE and a reference of every
   standard library component, drawn as the graph editor shows it, at
   https://jdunkerley.github.io/enso/.][592]
@@ -417,7 +417,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[PRNUM]: https://github.com/jdunkerley/enso/pull/PRNUM
+[607]: https://github.com/jdunkerley/enso/pull/607
 [592]: https://github.com/jdunkerley/enso/pull/592
 [593]: https://github.com/jdunkerley/enso/pull/593
 [566]: https://github.com/jdunkerley/enso/pull/566
