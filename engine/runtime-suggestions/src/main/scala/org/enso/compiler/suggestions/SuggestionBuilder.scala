@@ -527,7 +527,11 @@ final class SuggestionBuilder[A: IndexedSource](
       case union: `type`.Set.Union =>
         TypeArg.Sum(None, union.operands.map(go))
       case inter: `type`.Set.Intersection =>
-        TypeArg.Binary(go(inter.left), go(inter.right), `type`.Set.Intersection.NAME)
+        TypeArg.Binary(
+          go(inter.left),
+          go(inter.right),
+          `type`.Set.Intersection.NAME
+        )
       case app: Application.Prefix =>
         TypeArg.Application(
           go(app.function),
