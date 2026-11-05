@@ -423,6 +423,18 @@ export const LAUNCHER_JVM_OPTIONS = [
   '--add-opens=java.base/java.nio=ALL-UNNAMED',
 ] as const
 
+/**
+ * The lines of an engine package's `jvm.options` (beside `component/`, read by the launcher in
+ * `engine/runner`'s `JvmOptions.java`): one option per line, `#` comments and blank lines left out.
+ * The harness starts `java` itself to create the AOT cache, so it adds them too.
+ */
+export function parseJvmOptionsFile(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.startsWith('#'))
+}
+
 const AOT_PROBLEM =
   /\[(?:error|warning)\]\[(?:aot|cds)[^\]]*\]|mismatch|Unable to use|unable to map|AOT cache.*(?:different|invalid|failed|disabled)/i
 

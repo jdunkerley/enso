@@ -39,3 +39,24 @@ libraries `build.sbt` names in `enso.nativeImage.javaFreeLibraries`
 `polyglot java import` of those libraries for reflection and marks them
 AOT-ready; any other library loads its Java in the guest JVM. See Note
 [Java-Free Libraries In The Image] in `build.sbt`.
+
+## JVM mode (`--jvm`)
+
+`Main.launchJvm` starts the JVM with a fixed option list, then appends
+`JvmOptions.all(component, System.getenv("ENSO_JVM_OPTIONS"))`, in this order:
+
+1. `jvm.options` in the engine package root, beside `component/` (source
+   `distribution/engine/jvm.options`, copied by `DistributionPackage` and
+   required by `EngineDistributionChecks`): one option per line, `#` comments
+   and blank lines ignored. It is the engine's, so the IDE and the CLI both get
+   it.
+2. `ENSO_JVM_OPTIONS`. A value containing a newline is split on newlines, so an
+   option may contain spaces (a path under `C:\Users\John Smith\`, a quoted
+   `-Xlog:…:file="…"`); the IDE's project-manager shim always writes it that
+   way. A value without a newline is split on whitespace, which is what a person
+   types.
+
+Both come after the fixed list and before `--module-path`/`-m`. Keep
+`JvmOptions` Native-Image friendly (plain `java.io`/`java.nio` only): it runs in
+the `enso` native image. The open-time harness reads the same file when it
+starts `java` itself (`app/electron-client/perf/jvmAotCache.ts`).

@@ -1,0 +1,6 @@
+# Options for the JVM that `enso --jvm` starts (engine/runner JvmOptions.java), one per line,
+# after the launcher's fixed list and before ENSO_JVM_OPTIONS. They are the engine's: the IDE
+# and the CLI both get them, and the IDE's AOT cache key includes this file's hash.
+#
+# JDK 25 warns about these modules' restricted method calls; a later JDK makes them errors.
+--enable-native-access=ALL-UNNAMED,org.enso.language.server

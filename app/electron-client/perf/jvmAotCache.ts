@@ -13,6 +13,7 @@ import {
   credentialFreeEnv,
   LAUNCHER_JVM_OPTIONS,
   type OpenTag,
+  parseJvmOptionsFile,
   type RunResult,
 } from './openTimeReport'
 
@@ -102,11 +103,12 @@ export async function createJvmAotCache(
   exe: string,
   launch: Launch,
   trainDirect: TrainDirect,
+  jvmOptions = '',
 ): Promise<JvmAotCache> {
-  const first = await prepareJvmAotCache(out, exe, launch, trainDirect)
+  const first = await prepareJvmAotCache(out, exe, launch, trainDirect, jvmOptions)
   if (first.cache != null) return first
   console.warn(`Open time: ${first.rejection}; preparing the AOT cache once more.`)
-  return await prepareJvmAotCache(out, exe, launch, trainDirect)
+  return await prepareJvmAotCache(out, exe, launch, trainDirect, jvmOptions)
 }
 
 async function prepareJvmAotCache(
@@ -114,7 +116,12 @@ async function prepareJvmAotCache(
   exe: string,
   launch: Launch,
   trainDirect: TrainDirect,
+  jvmOptions: string,
 ): Promise<JvmAotCache> {
+  // An experiment's options (`--jvm-options`) reach the training, the creation and the check as
+  // they reach the measured launches: a cache must be trained with the options it is used with.
+  const optionsEnv: Record<string, string> =
+    jvmOptions.trim() === '' ? {} : { ENSO_JVM_OPTIONS: jvmOptions }
   const java = findBundledJava(exe)
   const component = findEngineComponent(exe)
   if (!java || !component) throw new Error(`No bundled JDK or engine component next to ${exe}`)
@@ -126,6 +133,7 @@ async function prepareJvmAotCache(
 
   const training = await launch(
     {
+      ...optionsEnv,
       ENSO_ENGINE_ARGS: '--jvm',
       JAVA_TOOL_OPTIONS: `-XX:AOTMode=record -XX:AOTConfiguration=${config} ${AOT_LOGGING}`,
       ENSO_ENGINE_STARTUP_TIMEOUT_MS: String(TRAINING_STARTUP_TIMEOUT_MS),
@@ -144,6 +152,7 @@ async function prepareJvmAotCache(
       `Open time: the IDE training launch wrote no AOT configuration (${training.error ?? 'no error'}); training with the launcher instead.`,
     )
     await trainDirect({
+      ...optionsEnv,
       ENSO_ENGINE_ARGS: '--jvm',
       JAVA_TOOL_OPTIONS: `-XX:AOTMode=record -XX:AOTConfiguration=${config}`,
     })
@@ -154,6 +163,15 @@ async function prepareJvmAotCache(
     )
   }
 
+  // `java` is started here, not through the launcher, so the engine package's `jvm.options` lines
+  // and the experiment's options, which the launcher would add, are added by hand.
+  const optionsFile = path.join(path.dirname(component), 'jvm.options')
+  const engineJvmOptions = [
+    ...(fs.existsSync(optionsFile) ?
+      parseJvmOptionsFile(fs.readFileSync(optionsFile, 'utf8'))
+    : []),
+    ...jvmOptions.split(/\s+/).filter((option) => option !== ''),
+  ]
   const created = spawnSync(
     java,
     [
@@ -161,6 +179,7 @@ async function prepareJvmAotCache(
       `-XX:AOTConfiguration=${config}`,
       `-XX:AOTCache=${cache}`,
       ...LAUNCHER_JVM_OPTIONS,
+      ...engineJvmOptions,
       `--module-path=${component}`,
       '-m',
       'org.enso.runner/org.enso.runner.Main',
@@ -183,6 +202,7 @@ async function prepareJvmAotCache(
   // reason (a `[cds]` or `[aot]` record, a mismatch) is found in the output too.
   const check = await launch(
     {
+      ...optionsEnv,
       ENSO_ENGINE_ARGS: '--jvm',
       JAVA_TOOL_OPTIONS: `-XX:AOTMode=on -XX:AOTCache=${cache} ${AOT_LOGGING}`,
     },

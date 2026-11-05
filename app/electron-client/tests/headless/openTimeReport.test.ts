@@ -13,6 +13,7 @@ import {
   notMeasured,
   openTimes,
   parseEngines,
+  parseJvmOptionsFile,
   parseLsLogLine,
   regressionWarnings,
   renderMarkdown,
@@ -344,6 +345,23 @@ describe('LAUNCHER_JVM_OPTIONS', () => {
     for (const option of LAUNCHER_JVM_OPTIONS) {
       expect(source).toContain(`commandAndArgs.add("${option}")`)
     }
+  })
+})
+
+describe('JVM_OPTIONS_FILE_LINES', () => {
+  const distributionFile = path.resolve(__dirname, '../../../../distribution/engine/jvm.options')
+  test('parseJvmOptionsFile keeps one option per line, without comments and blanks', () => {
+    expect(parseJvmOptionsFile('# c\n-Da=1\r\n\n  -Db=2  \n')).toEqual(['-Da=1', '-Db=2'])
+  })
+  test('the engine package ships the file, and it holds options', () => {
+    const lines = parseJvmOptionsFile(fs.readFileSync(distributionFile, 'utf8'))
+    expect(lines).toContain('--enable-native-access=ALL-UNNAMED,org.enso.language.server')
+  })
+  test('the harness starts java itself with the file and the experiment options', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, '../../perf/jvmAotCache.ts'), 'utf8')
+    expect(source).toContain('jvm.options')
+    expect(source).toContain('...LAUNCHER_JVM_OPTIONS')
+    expect(source).toContain('...engineJvmOptions')
   })
 })
 

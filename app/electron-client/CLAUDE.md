@@ -794,10 +794,17 @@ time) when the first node and the welcome table show and after the extras (Note
 [JVM Counters At Each Phase]). `--jvm-diagnostics` adds one launch per JVM
 engine, outside the medians (`<engine>-diag/`), that traces Truffle's
 compilations (Note [Truffle Diagnostics]), and `--jvm-options` adds JVM options
-to the measured JVM launches, for an experiment. CI uploads `electron-out.log`
-and `hsperf/` too; by hand, `ide-packaging.yml` takes `open_perf_engines`,
-`open_perf_runs`, `open_perf_budget`, `open_perf_diagnostics` and
-`open_perf_jvm_options`.
+to the JVM engines, for an experiment. They are engine options, so they go in
+`ENSO_JVM_OPTIONS` (which the launcher adds to the JVM it starts; see
+`engine/runner/CLAUDE.md`), not `JAVA_TOOL_OPTIONS`, and they apply to the AOT
+training, check and `-XX:AOTMode=create` launches too, since a cache must be
+trained with the options it is used with. The `create` step starts `java`
+itself, so it adds the lines of the package's `jvm.options`
+(`parseJvmOptionsFile`) as well as `LAUNCHER_JVM_OPTIONS`; a unit test reads
+`distribution/engine/jvm.options` so the two cannot drift. Truffle diagnostics
+stay in `JAVA_TOOL_OPTIONS`. CI uploads `electron-out.log` and `hsperf/` too; by
+hand, `ide-packaging.yml` takes `open_perf_engines`, `open_perf_runs`,
+`open_perf_budget`, `open_perf_diagnostics` and `open_perf_jvm_options`.
 
 `--template image` opens, instead of the new-project template, a project whose
 first node calls `Standard.Image` on a PNG in its `data/` and whose second shows
