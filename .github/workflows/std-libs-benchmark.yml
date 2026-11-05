@@ -14,6 +14,13 @@ on:
         required: true
         type: boolean
         default: false
+      jvm-options:
+        description: >-
+          JVM options to compare with the defaults (space-separated). When set, the benchmarks run
+          twice in this job, without and then with them, and both reports are uploaded.
+        required: false
+        type: string
+        default: ""
 
 env:
   # Benchmarks always start and end with a clean working tree. Read by `.github/actions/git-clean`.
@@ -50,9 +57,21 @@ jobs:
           task="std-benchmarks/bench"
           if [ -n "$BENCH_NAME" ]; then task="std-benchmarks/benchOnly $BENCH_NAME"; fi
           sbt "-Dbench.compileOnly=$JUST_CHECK" "-Dsbt.server.autostart=false" "$task"
+          # Note [Benchmarks Compare JVM Options In One Job]
+          # Runners vary between dispatches, so the candidate options run after the baseline in
+          # the same job. They are appended to `std-benchmarks`' `javaOptions`, and JMH's forks
+          # inherit the host JVM's input arguments. Check mode writes no report, so it runs once.
+          if [ -n "$JVM_OPTIONS" ] && [ "$JUST_CHECK" != true ]; then
+            mv std-bits/benchmarks/bench-report.xml std-bits/benchmarks/bench-report-baseline.xml
+            opts=""
+            for o in $JVM_OPTIONS; do opts="$opts\"$o\","; done
+            sbt "-Dsbt.server.autostart=false" "set \`std-benchmarks\` / javaOptions ++= Seq(${opts%,})" "$task"
+            mv std-bits/benchmarks/bench-report.xml std-bits/benchmarks/bench-report-candidate.xml
+          fi
         env:
           BENCH_NAME: ${{ inputs.bench-name }}
           JUST_CHECK: ${{ inputs.just-check }}
+          JVM_OPTIONS: ${{ inputs.jvm-options }}
           ENSO_LAUNCHER: native,-ls
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
@@ -62,8 +81,8 @@ jobs:
         if: ${{ !inputs.just-check }}
         uses: actions/upload-artifact@v5
         with:
-          name: benchmark-results.xml
-          path: std-bits/benchmarks/bench-report.xml
+          name: benchmark-results
+          path: std-bits/benchmarks/bench-report*.xml
           if-no-files-found: error
       - name: Clean after
         if: always()
