@@ -1,6 +1,9 @@
 package org.enso.languageserver.http.server
 
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{AttributeKeys, RemoteAddress, StatusCodes}
+import akka.http.scaladsl.model.headers.{`X-Forwarded-For`, HttpOrigin, Origin}
+import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.http.scaladsl.model.ws.Message
 import akka.http.scaladsl.model.ws.BinaryMessage
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import akka.util.ByteString
@@ -8,6 +11,7 @@ import org.enso.ydoc.api.YjsChannel
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 
@@ -16,16 +20,40 @@ class YjsChannelEndpointSpec
     with Matchers
     with ScalatestRouteTest {
 
-  private def endpoint(token: Option[String]) = {
+  private def peer(host: String): RemoteAddress =
+    RemoteAddress(InetAddress.getByName(host), Some(40000))
+
+  /** A handshake as the HTTP server sees it from a loopback peer. */
+  private def loopbackWS(uri: String, flow: Flow[Message, Message, Any]) =
+    WS(uri, flow).addAttribute(AttributeKeys.remoteAddress, peer("127.0.0.1"))
+
+  private def endpoint(
+    token: Option[String],
+    outgoingBufferSize: Int                    = 10000,
+    maxPending: Int                            = 1024,
+    onConnect: Map[String, YjsChannel => Unit] = Map.empty
+  ) = {
     val connected = YjsChannelEndpoint.Kinds
       .map(_ -> new LinkedBlockingQueue[YjsChannel]())
       .toMap
     val servers: Map[String, YjsChannel.Server] =
       connected.map { case (kind, queue) =>
-        val server: YjsChannel.Server = (c: YjsChannel) => { queue.add(c); () }
+        val server: YjsChannel.Server = (c: YjsChannel) => {
+          onConnect.get(kind).foreach(_(c))
+          queue.add(c)
+          ()
+        }
         kind -> server
       }
-    (new YjsChannelEndpoint(token, () => servers), connected)
+    (
+      new YjsChannelEndpoint(
+        token,
+        () => servers,
+        outgoingBufferSize,
+        maxPending
+      ),
+      connected
+    )
   }
 
   private def poll[A <: AnyRef](q: LinkedBlockingQueue[A]): A = {
@@ -39,7 +67,7 @@ class YjsChannelEndpointSpec
       val (e, connected) = endpoint(Some("t0k"))
       for (kind <- Seq("json", "vis-control")) {
         val ws = WSProbe()
-        WS(s"/channel/$kind?token=t0k", ws.flow) ~> e.route ~> check {
+        loopbackWS(s"/channel/$kind?token=t0k", ws.flow) ~> e.route ~> check {
           isWebSocketUpgrade shouldBe true
           val channel  = poll(connected(kind))
           val received = new LinkedBlockingQueue[Object]()
@@ -56,7 +84,7 @@ class YjsChannelEndpointSpec
     "carry binary frames as ByteBuffers" in {
       val (e, connected) = endpoint(Some("t0k"))
       val ws             = WSProbe()
-      WS("/channel/binary?token=t0k", ws.flow) ~> e.route ~> check {
+      loopbackWS("/channel/binary?token=t0k", ws.flow) ~> e.route ~> check {
         val channel  = poll(connected("binary"))
         val received = new LinkedBlockingQueue[Object]()
         channel.subscribe(m => { received.add(m); () })
@@ -74,7 +102,7 @@ class YjsChannelEndpointSpec
     "refuse to send anything but a String or a ByteBuffer" in {
       val (e, connected) = endpoint(Some("t0k"))
       val ws             = WSProbe()
-      WS("/channel/json?token=t0k", ws.flow) ~> e.route ~> check {
+      loopbackWS("/channel/json?token=t0k", ws.flow) ~> e.route ~> check {
         val channel = poll(connected("json"))
         an[IllegalArgumentException] should be thrownBy channel.send(
           Integer.valueOf(1)
@@ -86,7 +114,7 @@ class YjsChannelEndpointSpec
     "run onClose once when the socket closes" in {
       val (e, connected) = endpoint(Some("t0k"))
       val ws             = WSProbe()
-      WS("/channel/vis-data?token=t0k", ws.flow) ~> e.route ~> check {
+      loopbackWS("/channel/vis-data?token=t0k", ws.flow) ~> e.route ~> check {
         val channel = poll(connected("vis-data"))
         val closes  = new LinkedBlockingQueue[String]()
         channel.onClose(() => closes.add("closed"))
@@ -102,7 +130,7 @@ class YjsChannelEndpointSpec
     "refuse a socket without the token, with a wrong one, or when none is configured" in {
       val (e, _) = endpoint(Some("t0k"))
       for (query <- Seq("", "?token=nope", "?token=")) {
-        WS(s"/channel/json$query", WSProbe().flow) ~> e.route ~> check {
+        loopbackWS(s"/channel/json$query", WSProbe().flow) ~> e.route ~> check {
           status shouldBe StatusCodes.Forbidden
         }
       }
@@ -113,7 +141,7 @@ class YjsChannelEndpointSpec
       ) ~> open.route ~> check {
         status shouldBe StatusCodes.Forbidden
       }
-      WS("/channel/json", WSProbe().flow) ~> open.route ~> check {
+      loopbackWS("/channel/json", WSProbe().flow) ~> open.route ~> check {
         status shouldBe StatusCodes.Forbidden
       }
     }
@@ -124,9 +152,12 @@ class YjsChannelEndpointSpec
       val (e, connected) = endpoint(Some("t0k"))
       val proxyWs        = WSProbe()
       val backendWs      = WSProbe()
-      WS("/channel/json?token=t0k", proxyWs.flow) ~> e.route ~> check {
+      loopbackWS("/channel/json?token=t0k", proxyWs.flow) ~> e.route ~> check {
         val proxy = poll(connected("json"))
-        WS("/channel/json?token=t0k", backendWs.flow) ~> e.route ~> check {
+        loopbackWS(
+          "/channel/json?token=t0k",
+          backendWs.flow
+        ) ~> e.route ~> check {
           val backend = poll(connected("json"))
           (proxy eq backend) shouldBe false
           val proxyIn   = new LinkedBlockingQueue[Object]()
@@ -157,9 +188,122 @@ class YjsChannelEndpointSpec
       }
     }
 
+    "refuse a peer that is not on loopback, however it presents itself" in {
+      val (e, connected) = endpoint(Some("t0k"))
+      val uri            = "/channel/json?token=t0k"
+      WS(uri, WSProbe().flow).addAttribute(
+        AttributeKeys.remoteAddress,
+        peer("192.0.2.7")
+      ) ~> e.route ~> check {
+        status shouldBe StatusCodes.Forbidden
+      }
+      // The client controls X-Forwarded-For; only the connection's own
+      // address counts.
+      WS(uri, WSProbe().flow)
+        .addAttribute(AttributeKeys.remoteAddress, peer("192.0.2.7"))
+        .addHeader(
+          `X-Forwarded-For`(RemoteAddress(InetAddress.getByName("127.0.0.1")))
+        ) ~> e.route ~> check {
+        status shouldBe StatusCodes.Forbidden
+      }
+      // No address at all: refuse.
+      WS(uri, WSProbe().flow) ~> e.route ~> check {
+        status shouldBe StatusCodes.Forbidden
+      }
+      connected("json").isEmpty shouldBe true
+    }
+
+    "refuse a handshake that carries an Origin header" in {
+      val (e, connected) = endpoint(Some("t0k"))
+      loopbackWS("/channel/json?token=t0k", WSProbe().flow)
+        .addHeader(
+          Origin(HttpOrigin("http://localhost:5173"))
+        ) ~> e.route ~> check {
+        status shouldBe StatusCodes.Forbidden
+      }
+      connected("json").isEmpty shouldBe true
+    }
+
+    "treat a blank configured token as none" in {
+      val (e, _) = endpoint(Some(""))
+      for (query <- Seq("", "?token=")) {
+        loopbackWS(s"/channel/json$query", WSProbe().flow) ~> e.route ~> check {
+          status shouldBe StatusCodes.Forbidden
+        }
+      }
+    }
+
+    "keep a bounded, ordered backlog for a handler that subscribes late" in {
+      val (e, connected) = endpoint(Some("t0k"), maxPending = 3)
+      val ws             = WSProbe()
+      loopbackWS("/channel/vis-data?token=t0k", ws.flow) ~> e.route ~> check {
+        val channel = poll(connected("vis-data"))
+        for (i <- 1 to 5) ws.sendMessage(s"m$i")
+        // Let the frames reach the channel before subscribing.
+        Thread.sleep(500)
+        val received = new LinkedBlockingQueue[Object]()
+        channel.subscribe(m => { received.add(m); () })
+        Seq(poll(received), poll(received), poll(received)) shouldBe
+        Seq("m3", "m4", "m5")
+        ws.sendMessage("live")
+        poll(received) shouldBe "live"
+        received.poll(200, TimeUnit.MILLISECONDS) shouldBe null
+        ws.sendCompletion()
+      }
+    }
+
+    "close the channel when its outgoing buffer overflows" in {
+      val (e, connected) = endpoint(Some("t0k"), outgoingBufferSize = 1)
+      val ws             = WSProbe()
+      loopbackWS("/channel/json?token=t0k", ws.flow) ~> e.route ~> check {
+        val channel = poll(connected("json"))
+        val closes  = new LinkedBlockingQueue[String]()
+        channel.onClose(() => closes.add("closed"))
+        // The probe does not ask for frames, so the buffer fills.
+        for (i <- 1 to 50) channel.send(s"out$i")
+        poll(closes) shouldBe "closed"
+      }
+    }
+
+    "close the channel when the client's stream fails" in {
+      val (e, connected) = endpoint(Some("t0k"))
+      val failing: Flow[Message, Message, Any] =
+        Flow.fromSinkAndSource(
+          Sink.ignore,
+          Source.failed[Message](new RuntimeException("boom"))
+        )
+      loopbackWS("/channel/json?token=t0k", failing) ~> e.route ~> check {
+        val channel = poll(connected("json"))
+        val closes  = new LinkedBlockingQueue[String]()
+        channel.onClose(() => closes.add("closed"))
+        poll(closes) shouldBe "closed"
+        closes.poll(300, TimeUnit.MILLISECONDS) shouldBe null
+      }
+    }
+
+    "run the close handlers of a server whose onConnect throws" in {
+      val closes = new LinkedBlockingQueue[String]()
+      val (e, _) = endpoint(
+        Some("t0k"),
+        onConnect = Map("json" -> { c =>
+          c.onClose(() => closes.add("closed"))
+          throw new IllegalStateException("no")
+        })
+      )
+      loopbackWS(
+        "/channel/json?token=t0k",
+        WSProbe().flow
+      ) ~> e.route ~> check {
+        poll(closes) shouldBe "closed"
+      }
+    }
+
     "answer 404 for an unknown kind" in {
       val (e, _) = endpoint(Some("t0k"))
-      WS("/channel/other?token=t0k", WSProbe().flow) ~> e.route ~> check {
+      loopbackWS(
+        "/channel/other?token=t0k",
+        WSProbe().flow
+      ) ~> e.route ~> check {
         status shouldBe StatusCodes.NotFound
       }
     }

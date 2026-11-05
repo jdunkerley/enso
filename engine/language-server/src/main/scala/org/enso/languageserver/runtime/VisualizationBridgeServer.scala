@@ -684,7 +684,7 @@ final class VisualizationBridgeActor(
       return
     }
     dataChannel match {
-      case None => logger.warn("vis: data channel not ready; dropping frame")
+      case None => logger.debug("vis: data channel not ready; dropping frame")
       case Some(ch) =>
         val buffer = ByteBuffer.allocateDirect(16 + payload.length)
         buffer.putLong(uuid.getMostSignificantBits)
@@ -700,7 +700,7 @@ final class VisualizationBridgeActor(
   ): Unit = {
     controlChannel match {
       case None =>
-        logger.warn("vis: control channel not ready; dropping message")
+        logger.debug("vis: control channel not ready; dropping message")
       case Some(ch) => ch.send(msg.asJson.noSpaces)
     }
   }

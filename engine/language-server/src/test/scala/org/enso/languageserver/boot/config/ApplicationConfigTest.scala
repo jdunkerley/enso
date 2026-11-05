@@ -17,4 +17,14 @@ class ApplicationConfigTest extends AnyFlatSpec with Matchers {
       .map(_.toInt)
     config.channelToken shouldBe sys.env.get("LANGUAGE_SERVER_CHANNEL_TOKEN")
   }
+
+  it should "keep the channel token out of its string form" in {
+    val config = ApplicationConfig(
+      YdocConfig("localhost", None),
+      Some("hunter2-token")
+    )
+    config.toString should not include "hunter2-token"
+    config.toString should include("redacted")
+    config.copy(channelToken = None).toString should not include "redacted"
+  }
 }

@@ -79,8 +79,12 @@ as WebSockets on the RPC port:
 `LANGUAGE_SERVER_CHANNEL_TOKEN` (`language-server.channel-token`), a random
 string per engine start; it is compared in constant time, never logged, and an
 engine started without one refuses every channel socket (`403`; an unknown kind
-is `404`). The socket is only as private as the `--interface` the engine binds:
-the shim passes loopback. See Note [The Channel Socket].
+is `404`). Also refused with `403`, before the token is looked at: a peer that
+is not on loopback (the connection's own remote address, never
+`X-Forwarded-For`; needs `remote-address-attribute = on`, set in
+`application-ls.conf`) and a handshake with an `Origin` header. A blank token is
+no token. Inbound messages for a handler that has not subscribed yet are kept
+(the newest 1024 per channel). See Note [The Channel Socket].
 
 A session opens **two** `json` sockets (the ydoc server's proxy channel for the
 GUI and its backend channel); each socket is its own channel and controller. The
