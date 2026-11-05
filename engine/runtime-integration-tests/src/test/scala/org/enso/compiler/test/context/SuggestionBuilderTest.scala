@@ -4262,34 +4262,34 @@ class SuggestionBuilderTest extends AnyWordSpecLike with Matchers {
   }
 
   for ((eol, label) <- Seq(("\n", "LF"), ("\r\n", "CRLF"))) {
-  s"render default values as written in the source ($label)" in {
-    val code =
-      """|import Standard.Base.Errors.Common.Forbidden_Operation
-         |
-         |type Test
-         |    foo self (a = Missing_Argument.throw "column") (b = Filter_Condition.Equal True) (c = ..Report_Warning) (d = [Join_Condition.Equals self.column_names.first]) (e = 42) (f = "txt") (g = x.y) (h = f (g 1) 2) (i = ..Equal 5) (j = (a + b)) = self
-         |""".stripMargin
-        .replace("\r\n", "\n")
-        .replace("\n", eol)
-    val module      = code.preprocessModule()
-    val suggestions = build(code, module)
-    val method = suggestions.collectFirst {
-      case s: Suggestion.DefinedMethod if s.name == "foo" => s
+    s"render default values as written in the source ($label)" in {
+      val code =
+        """|import Standard.Base.Errors.Common.Forbidden_Operation
+           |
+           |type Test
+           |    foo self (a = Missing_Argument.throw "column") (b = Filter_Condition.Equal True) (c = ..Report_Warning) (d = [Join_Condition.Equals self.column_names.first]) (e = 42) (f = "txt") (g = x.y) (h = f (g 1) 2) (i = ..Equal 5) (j = (a + b)) = self
+           |""".stripMargin
+          .replace("\r\n", "\n")
+          .replace("\n", eol)
+      val module      = code.preprocessModule()
+      val suggestions = build(code, module)
+      val method = suggestions.collectFirst {
+        case s: Suggestion.DefinedMethod if s.name == "foo" => s
+      }
+      method shouldBe defined
+      method.get.arguments.drop(1).map(_.defaultValue) shouldEqual Seq(
+        Some("Missing_Argument.throw \"column\""),
+        Some("Filter_Condition.Equal True"),
+        Some("..Report_Warning"),
+        Some("[Join_Condition.Equals self.column_names.first]"),
+        Some("42"),
+        Some("\"txt\""),
+        Some("x.y"),
+        Some("f (g 1) 2"),
+        Some("..Equal 5"),
+        Some("a + b")
+      )
     }
-    method shouldBe defined
-    method.get.arguments.drop(1).map(_.defaultValue) shouldEqual Seq(
-      Some("Missing_Argument.throw \"column\""),
-      Some("Filter_Condition.Equal True"),
-      Some("..Report_Warning"),
-      Some("[Join_Condition.Equals self.column_names.first]"),
-      Some("42"),
-      Some("\"txt\""),
-      Some("x.y"),
-      Some("f (g 1) 2"),
-      Some("..Equal 5"),
-      Some("a + b")
-    )
-  }
   }
 
   private def build(
