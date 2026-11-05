@@ -24,6 +24,8 @@ export const STALE_LOCK_MS = 10 * 60_000
 /** Test hooks: called between a taker's inspection of a stale lock and its takeover. */
 export interface LockHooks {
   readonly beforeTakeover?: () => Promise<void>
+  /** Replaces `fs.link` when a takeover puts back a lock it should not have moved. */
+  readonly link?: (existing: string, target: string) => Promise<void>
 }
 
 /** Whether a process with `pid` exists (`EPERM`: it does, owned by someone else). */
@@ -106,7 +108,7 @@ async function deleteOldStaleLocks(root: string): Promise<void> {
  * rename moved is that taker's fresh lock: it is put back (unless something is there by then),
  * and this taker gives up. Returns whether the stale lock is gone and the lock may be created.
  */
-async function takeOver(file: string, seen: Seen): Promise<boolean> {
+async function takeOver(file: string, seen: Seen, hooks: LockHooks): Promise<boolean> {
   const aside = `${file}${STALE_INFIX}${process.pid}-${Date.now()}-${crypto.randomUUID()}`
   try {
     await fs.rename(file, aside)
@@ -122,9 +124,20 @@ async function takeOver(file: string, seen: Seen): Promise<boolean> {
   }
   // Not the stale lock: put it back without replacing anything that is there now.
   try {
-    await fs.link(aside, file)
-  } catch {
-    // Something is there (another lock) or links are unsupported: that lock stands.
+    await (hooks.link ?? fs.link)(aside, file)
+  } catch (error) {
+    if (errorCode(error) === 'EEXIST') {
+      // Another lock is there now and stands; the moved one is a duplicate of nothing.
+      await fs.rm(aside, { force: true }).catch(() => undefined)
+      return false
+    }
+    // No hard links here (FAT, some network or synced folders) or a refusal (`EPERM` from an
+    // antivirus): the moved lock is live, so it must not be deleted. Rename it back while nothing
+    // is in its place; otherwise leave it aside, where the stale-aside clean-up finds it later.
+    if ((await look(file)) === undefined) {
+      await fs.rename(aside, file).catch(() => undefined)
+    }
+    return false
   }
   await fs.rm(aside, { force: true }).catch(() => undefined)
   return false
@@ -168,7 +181,7 @@ export async function acquireTrainingLock(
     if (isHeld(seen)) return undefined
     await hooks.beforeTakeover?.()
     await deleteOldStaleLocks(root)
-    if (!(await takeOver(file, seen))) {
+    if (!(await takeOver(file, seen, hooks))) {
       // Someone else took it over: whoever holds it now is live.
       const now = await look(file)
       if (now != null && isHeld(now)) return undefined

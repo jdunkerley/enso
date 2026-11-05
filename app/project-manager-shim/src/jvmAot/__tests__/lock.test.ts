@@ -141,3 +141,32 @@ test('a takeover deletes locks moved aside long ago, and keeps recent ones', asy
     await fs.rm(root, { recursive: true, force: true })
   }
 })
+
+test('a takeover that cannot link the live lock back renames it back instead of deleting it', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    const file = await deadLock(root)
+    let second: (() => Promise<void>) | undefined
+    let secondsLock = ''
+    const refuse = async () => {
+      throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' })
+    }
+    const first = await acquireTrainingLock(root, {
+      beforeTakeover: async () => {
+        second = await acquireTrainingLock(root)
+        secondsLock = await fs.readFile(file, 'utf8')
+      },
+      // A file system without hard links, or an antivirus refusing it.
+      link: refuse,
+    })
+    expect(second).toBeDefined()
+    expect(first).toBeUndefined()
+    // The live lock survives, in its place.
+    expect(await fs.readFile(file, 'utf8')).toBe(secondsLock)
+    expect((await fs.readdir(root)).sort()).toEqual(['train.lock'])
+    await second!()
+    expect(await fs.readdir(root)).toEqual([])
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
