@@ -39,6 +39,14 @@ import {
 } from './projectRepository.js'
 import { engineTimeouts } from './timeouts.js'
 import { UUID, type Path } from './types.js'
+import type { YdocHost } from './ydocHost.js'
+
+export {
+  ydocHostKind,
+  type YdocHost,
+  type YdocHostKind,
+  type YdocListenRequest,
+} from './ydocHost.js'
 
 export interface RunningLanguageServerInfo {
   readonly sockets: LanguageServerSockets
@@ -53,6 +61,11 @@ export interface EngineSettings {
   readonly option?: EngineMode | undefined
   /** The raw `ENSO_ENGINE_MODE`; the process environment's when omitted. */
   readonly environment?: string | undefined
+  /**
+   * Where opened projects' ydoc servers run when `ENSO_YDOC_HOST` is `node` (the default): Electron's
+   * utility process, or `NodeYdocHost` in the Vite dev server. Without one the engine serves it.
+   */
+  readonly ydocHost?: YdocHost | undefined
 }
 
 /** Parameters for the "create project" endpoint. */
@@ -143,7 +156,10 @@ export class ProjectService {
     // The start-up and terminate timeouts come per launch, from the engine mode's column
     // (`engineTimeouts`; `ENSO_ENGINE_STARTUP_TIMEOUT_MS` and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS`
     // override both). `ydocWaitMs` is the fallback for a launch without a mode.
-    const runner = new EnsoRunner(ensoPath, { ydocWaitMs: DEFAULT_YDOC_WAIT_MS })
+    const runner = new EnsoRunner(ensoPath, {
+      ydocWaitMs: DEFAULT_YDOC_WAIT_MS,
+      ydocHost: engine?.ydocHost,
+    })
 
     // Read extra arguments from environment variable
     const envArgs = process.env.ENSO_ENGINE_ARGS

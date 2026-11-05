@@ -52,7 +52,7 @@ import {
 } from 'project-manager-shim/handler'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
-import { ProjectService } from 'project-manager-shim/projectService'
+import { ProjectService, type YdocHost } from 'project-manager-shim/projectService'
 import { tarFsPack, unzipEntries, zipWriteStream } from './archive'
 
 // =================
@@ -95,6 +95,13 @@ export class ProjectManagerShimMiddleware {
     consent: new VersioningConsent({ userDataDirectory: DEV_USER_DATA_DIRECTORY }),
   })
 
+  /**
+   * Where opened projects' ydoc servers run under `ENSO_YDOC_HOST=node` (the default): the dev
+   * server's own `NodeYdocHost`, set by `vite.config.ts` once the server exists. Without one (the
+   * preview server) the engine serves ydoc, as under `ENSO_YDOC_HOST=engine`.
+   */
+  ydocHost: YdocHost | undefined
+
   /** Create the new middleware. */
   constructor(private readonly setup: () => Promise<void>) {}
 
@@ -107,6 +114,8 @@ export class ProjectManagerShimMiddleware {
         [],
         this.localMetadata,
         this.localVersioning,
+        undefined,
+        { ydocHost: this.ydocHost },
       )
     }
     return this.projectService

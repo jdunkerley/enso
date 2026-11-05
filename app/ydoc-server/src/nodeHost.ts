@@ -66,9 +66,17 @@ export class NodeYdocHost {
       )
     })
     await new Promise<void>((resolve, reject) => {
-      server.once('listening', resolve)
+      server.once('listening', () => {
+        server.off('error', reject)
+        resolve()
+      })
       server.once('error', reject)
     })
+    // One process hosts every project's listener: an error after the start, unhandled, would throw
+    // and take all of them down.
+    server.on('error', (error) =>
+      console.error(`The ydoc listener on port ${request.port} failed:`, error),
+    )
     this.listeners.set(request.port, { server, clients })
   }
 

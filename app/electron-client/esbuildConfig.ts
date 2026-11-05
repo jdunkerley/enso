@@ -23,7 +23,14 @@ export function bundlerOptions(outdir: string, devMode = false): esbuild.BuildOp
   return {
     bundle: true,
     outdir,
-    entryPoints: ['src/index.ts', 'src/preload.ts'],
+    // `ydocHost.mjs` is the ydoc server's utility process (`src/ydocHost/`). It is bundled beside
+    // `index.mjs`, not in a subdirectory: `esbuild-plugin-wasm` resolves the WASM file's path against
+    // the bundle only when it starts with `./`.
+    entryPoints: [
+      'src/index.ts',
+      'src/preload.ts',
+      { in: 'src/ydocHost/main.ts', out: 'ydocHost' },
+    ],
     outbase: 'src',
     format: 'esm',
     platform: 'node',

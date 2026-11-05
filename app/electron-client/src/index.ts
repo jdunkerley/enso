@@ -44,6 +44,7 @@ import { setupLogger } from './log.js'
 import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from './menuItems.js'
 import { capitalizeFirstLetter } from './naming.js'
 import {
+  disposeYdocHost,
   getLocalMetadata,
   getLocalSecrets,
   getLocalVersioning,
@@ -179,6 +180,10 @@ class App {
 
       this.electron.app.on('before-quit', () => {
         shutdownClaudeAgent()
+      })
+
+      this.electron.app.on('will-quit', () => {
+        disposeYdocHost()
       })
 
       this.electron.app.on('second-instance', (_event, argv) => {
