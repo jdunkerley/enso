@@ -1,5 +1,6 @@
 /** @file Utilities getting various metadata about the app. */
 import * as common from 'enso-common/src/constants'
+import { UPDATE_REPOSITORY } from 'enso-common/src/updater'
 import * as detect from 'enso-common/src/utilities/detect'
 import gt from 'semver/functions/gt'
 import parse from 'semver/functions/parse'
@@ -13,7 +14,7 @@ const HTTP_NOT_FOUND = 404
  * upstream `enso-org/enso`. The fork diverges from upstream, so an upstream release is not an update
  * of this build; #180 decided this.
  */
-export const RELEASES_REPOSITORY = 'jdunkerley/enso'
+export const RELEASES_REPOSITORY = UPDATE_REPOSITORY
 export const LATEST_RELEASE_PAGE_URL = `https://github.com/${RELEASES_REPOSITORY}/releases/latest`
 const LATEST_RELEASE_API_URL = `https://api.github.com/repos/${RELEASES_REPOSITORY}/releases/latest`
 // Includes prereleases, which `/releases/latest` never does. The newest 30 are plenty.
@@ -161,8 +162,9 @@ export class ReleaseCheckError extends Error {}
 
 /**
  * The release with the greatest semantic version among `releases`, ignoring drafts, nightlies and
- * other prereleases but rcs (see {@link isOfferedVersion}), and tags that are not versions; `null` when there is none. (GitHub lists by creation date, which is not
- * version order: an rc of the next release can be older than a patch of this one.)
+ * other prereleases but rcs (see {@link isOfferedVersion}), and tags that are not versions; `null`
+ * when there is none. (GitHub lists by creation date, which is not version order: an rc of the
+ * next release can be older than a patch of this one.)
  */
 export function newestRelease(releases: readonly GitHubRelease[]): GitHubRelease | null {
   let newest: { release: GitHubRelease; version: NonNullable<ReturnType<typeof parse>> } | null =

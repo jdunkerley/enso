@@ -17,7 +17,7 @@ class FakeAutoUpdater extends EventEmitter {
 
 function setup(
   mode: 'auto' | 'manual' = 'auto',
-  confirmNoStableRelease: () => Promise<boolean> = async () => false,
+  confirmNoStableRelease: (allowCached: boolean) => Promise<boolean> = async () => false,
 ) {
   const autoUpdater = new FakeAutoUpdater()
   const statuses: UpdateStatus[] = []
@@ -480,6 +480,19 @@ describe('Updater stable fallback', () => {
     })
   })
 
+  test.each([
+    ['a feed that was not found (406)', NO_STABLE_406, true],
+    ['a server error', SERVER_ERROR, true],
+    ['offline', OFFLINE, false],
+    ['nothing published', NO_PUBLISHED, false],
+  ])('%s: a remembered answer is allowed: %s', async (_n, error, allowCached) => {
+    const confirm = vi.fn(async (_allowCached: boolean) => true)
+    const { autoUpdater, updater } = setup('auto', confirm)
+    failing(autoUpdater, null, error)
+    await updater.check(false)
+    expect(confirm).toHaveBeenCalledWith(allowCached)
+  })
+
   test('an error with another code is never sent to the API', async () => {
     const confirm = vi.fn(async () => true)
     const { autoUpdater, updater } = setup('auto', confirm)
@@ -530,12 +543,44 @@ describe('confirmNoStableRelease', () => {
     const { confirmNoStableRelease, fetchMock } = await load(
       async () => new Response('{}', { status: 404 }),
     )
-    expect(await confirmNoStableRelease()).toBe(true)
-    expect(await confirmNoStableRelease()).toBe(true)
+    expect(await confirmNoStableRelease(true)).toBe(true)
+    expect(await confirmNoStableRelease(true)).toBe(true)
     expect(fetchMock).toHaveBeenCalledOnce()
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
       'https://api.github.com/repos/jdunkerley/enso/releases/latest',
     )
+  })
+
+  test('the remembered 404 is not used unless allowed, and a later answer replaces it', async () => {
+    let status = 404
+    const { confirmNoStableRelease, fetchMock } = await load(
+      async () => new Response('{}', { status }),
+    )
+    expect(await confirmNoStableRelease(true)).toBe(true)
+    expect(await confirmNoStableRelease(false)).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    status = 200
+    expect(await confirmNoStableRelease(false)).toBe(false)
+    expect(await confirmNoStableRelease(true)).toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  test('the remembered 404 lasts under ten minutes', async () => {
+    vi.useFakeTimers()
+    try {
+      const { confirmNoStableRelease, fetchMock } = await load(
+        async () => new Response('{}', { status: 404 }),
+      )
+      await confirmNoStableRelease(true)
+      vi.advanceTimersByTime(9 * 60 * 1000)
+      await confirmNoStableRelease(true)
+      expect(fetchMock).toHaveBeenCalledOnce()
+      vi.advanceTimersByTime(2 * 60 * 1000)
+      await confirmNoStableRelease(true)
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   test.each([200, 403, 406, 500])('a %s from the API does not', async (status) => {

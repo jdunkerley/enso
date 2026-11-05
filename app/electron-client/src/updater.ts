@@ -27,7 +27,7 @@ export interface UpdaterDeps {
    * Whether the repository has no stable release, for a stable check that failed in a way that
    * could mean so ({@link mayMeanNoStableRelease}); see {@link confirmNoStableRelease}, the default.
    */
-  readonly confirmNoStableRelease?: () => Promise<boolean>
+  readonly confirmNoStableRelease?: (allowCached: boolean) => Promise<boolean>
 }
 
 /** Whether this run can update itself; see {@link UpdateMode}. */
@@ -190,7 +190,11 @@ export class Updater {
   private async isNoStableRelease(error: unknown) {
     if (!mayMeanNoStableRelease(error)) return false
     try {
-      return await (this.deps.confirmNoStableRelease ?? confirmNoStableRelease)()
+      // An answer from a minute ago stands only for the same kind of failure: a feed that was
+      // not found. Anything else (offline, say) is looked at afresh, and without an answer is an error.
+      return await (this.deps.confirmNoStableRelease ?? confirmNoStableRelease)(
+        isFeedNotFound(error),
+      )
     } catch {
       return false
     }
@@ -257,6 +261,19 @@ function isNothingPublished(error: unknown) {
 }
 
 /**
+ * Whether a failed stable check is the feed not being found: the request got an HTTP error answer
+ * (`HttpError: 406 Not Acceptable`), not a network failure such as `ENOTFOUND`.
+ */
+function isFeedNotFound(error: unknown) {
+  return (
+    (codeOf(error) === 'ERR_UPDATER_LATEST_VERSION_NOT_FOUND' ||
+      codeOf(error) === 'ERR_UPDATER_INVALID_RELEASE_FEED') &&
+    error instanceof Error &&
+    /HttpError: \d{3}\b/.test(error.message)
+  )
+}
+
+/**
  * Whether a failed stable check could be down to there being no stable release: the code
  * `electron-updater` gives every failure of the `/releases/latest` request, or a feed with
  * nothing in it. Whether it is must be confirmed, see {@link Updater.isNoStableRelease}.
@@ -272,24 +289,39 @@ function mayMeanNoStableRelease(error: unknown) {
   )
 }
 
-const NO_STABLE_RELEASE_CACHE_MS = 60 * 60 * 1000
+const NO_STABLE_RELEASE_CACHE_MS = 10 * 60 * 1000
 let noStableReleaseConfirmedAt = 0
 
 /**
  * Asks the GitHub API whether the repository has a stable release: `true` when
  * `/releases/latest` answers 404, `false` for any other answer or no answer (offline,
- * rate-limited). The answer is cached for an hour, as the GUI's own GitHub calls are, so that
- * repeated checks cost one request.
+ * rate-limited). With `allowCached`, a 404 seen in the last ten minutes stands, so that repeated
+ * checks cost one request; a stable release published since is found by the next check after that.
  */
-export async function confirmNoStableRelease(): Promise<boolean> {
-  if (Date.now() - noStableReleaseConfirmedAt < NO_STABLE_RELEASE_CACHE_MS) return true
-  const response = await fetch(
+export async function confirmNoStableRelease(allowCached = false): Promise<boolean> {
+  if (allowCached && Date.now() - noStableReleaseConfirmedAt < NO_STABLE_RELEASE_CACHE_MS)
+    return true
+  const response = await fetchThroughElectron(
     `https://api.github.com/repos/${UPDATE_REPOSITORY}/releases/latest`,
     {
       headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
     },
   )
   const answer = response.status === 404
-  if (answer) noStableReleaseConfirmedAt = Date.now()
+  noStableReleaseConfirmedAt = answer ? Date.now() : 0
   return answer
+}
+
+/**
+ * `fetch` through Electron's network stack, which honours the system proxy as `electron-updater`
+ * does; plain `fetch` outside Electron (tests).
+ */
+async function fetchThroughElectron(url: string, init: RequestInit) {
+  let electronNet: typeof import('electron').net | undefined
+  try {
+    electronNet = (await import('electron')).net
+  } catch {
+    // Not running in Electron.
+  }
+  return electronNet?.fetch != null ? electronNet.fetch(url, init) : fetch(url, init)
 }
