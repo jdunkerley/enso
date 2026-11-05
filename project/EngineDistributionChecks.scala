@@ -15,7 +15,9 @@ object EngineDistributionChecks {
     log: ManagedLogger
   ): Unit = {
     if (!(packageRoot / "jvm.options").isFile)
-      throw new RuntimeException(s"${packageRoot / "jvm.options"} is missing (spec stage 1c).")
+      throw new RuntimeException(
+        s"${packageRoot / "jvm.options"} is missing (spec stage 1c)."
+      )
     IRCaches.checkCacheSizes(
       stdLibRoot  = packageRoot / "lib" / "Standard",
       ensoVersion = ensoVersion,
