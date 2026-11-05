@@ -188,7 +188,7 @@ function getSessionDoc(lsSession: LanguageServerSession, docName: string) {
 
 /** Subset of WebSocket that can be mocked */
 export interface YjsSocket {
-  binaryType: 'arraybuffer'
+  binaryType: 'arraybuffer' | 'nodebuffer' | 'fragments'
   readonly readyState:
     | typeof WebSocket.CONNECTING
     | typeof WebSocket.OPEN

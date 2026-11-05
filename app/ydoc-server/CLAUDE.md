@@ -46,6 +46,8 @@ This server:
 - `src/fileFormat.ts` — Enso `.enso` file serialization.
 - `src/YjsBinaryChannel.ts` — custom binary channel over Yjs (for metadata the
   engine doesn't parse).
+- `src/nodeHost.ts`, `src/remoteChannelServer.ts`, `src/nodeByteBuffer.ts` — the
+  Node host (see "Node host" below).
 - `src/inspect.ts` — developer instrumentation; gated by env vars and used by
   `ydoc-inspect`.
 
@@ -56,6 +58,8 @@ This server:
   with `ENSO_IDE_YDOC_SERVER_URL=ws://host:port`.
 - Standalone: `pnpm run dev:inspect` runs the server through `ydoc-inspect`.
 - Polyglot (inside engine): see `ydoc-server-polyglot/`.
+- Node host (`NodeYdocHost`): library code only so far; nothing starts it until
+  the project-manager shim does (stage 1a of the JVM-by-default plan).
 
 ## Gotchas
 
@@ -90,6 +94,34 @@ This server:
   the engine's `ydoc-server` jar), so a change reaches the IDE only through a
   rebuilt engine — an installer built with `--backend-source local` against an
   old engine still runs the old server.
+
+## Node host
+
+`NodeYdocHost` (`src/nodeHost.ts`) runs this server in a plain Node process
+instead of the engine's GraalJS: `listen({ host, port, languageServer })` starts
+one WebSocket listener per opened project (resolving once the port accepts; a
+second `listen` on a port replaces the first), `close(port)` and `closeAll()`
+stop them. It reaches the Language Server through `remoteChannelServer`
+(`src/remoteChannelServer.ts`), a `YjsChannelServer` whose every channel is one
+WebSocket to `ws://<host>:<port>/channel/<kind>?token=<token>`, kind being
+`json`, `binary`, `vis-control` or `vis-data`. Messages sent before the socket
+opens are buffered; text frames are strings, binary frames `Uint8Array`s. The
+token is the engine's `LANGUAGE_SERVER_CHANNEL_TOKEN`; the Language Server
+refuses a socket without it. Bytes are `Uint8Array`s (`nodeByteBufferClass`,
+whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
+
+- **One session opens two `json` sockets**, not one: `YjsServerTransport` hands
+  the Language Server a proxy channel (for the GUI) and a backend channel (the
+  ydoc server's own). The Language Server must accept both.
+- **An LS restart takes the GUI sockets with it.** When a `json` socket closes
+  without the ydoc side having closed it, the listener closes every GUI socket
+  it holds and the session goes with them; the GUI reconnects, as after an
+  engine restart when the server lived in the engine.
+- A closed session closes the Language Server ends of its visualization channels
+  too (`VisualizationBridge.close`): in Node each is a socket.
+- The four socket races (#214 first message on open, #396 shared data channel,
+  #409 double close, #494 local terminate) are re-tested on this transport in
+  `__tests__/nodeHost.test.ts`, 50 cycles each, against a fake Language Server.
 
 ## Control channel
 
