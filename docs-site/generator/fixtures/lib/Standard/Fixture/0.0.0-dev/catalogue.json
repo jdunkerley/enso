@@ -1,0 +1,248 @@
+{
+  "format": 1,
+  "library": "Standard.Fixture",
+  "version": "0.0.0-dev",
+  "engineVersion": "0.0.0-dev",
+  "sourceHash": "fixture",
+  "entries": [
+    {
+      "type": "module",
+      "module": "Standard.Fixture.Main",
+      "documentation": "The fixture library.",
+      "reexports": []
+    },
+    {
+      "type": "module",
+      "module": "Standard.Fixture.Shapes",
+      "documentation": "Shapes and what to do with them.",
+      "reexports": []
+    },
+    {
+      "type": "type",
+      "module": "Standard.Fixture.Shapes",
+      "name": "Shape",
+      "params": [],
+      "parentType": "Standard.Base.Any.Any",
+      "documentation": "A shape.\n\nUse `Square` for squares.",
+      "reexport": "Standard.Fixture.Main",
+      "reexports": ["Standard.Fixture.Main"]
+    },
+    {
+      "type": "type",
+      "module": "Standard.Fixture.Shapes",
+      "name": "Square",
+      "params": [],
+      "parentType": "Standard.Fixture.Shapes.Shape",
+      "documentation": "A square.",
+      "reexports": []
+    },
+    {
+      "type": "constructor",
+      "module": "Standard.Fixture.Shapes",
+      "name": "Value",
+      "arguments": [
+        {
+          "name": "side",
+          "reprType": "Standard.Base.Data.Numbers.Float",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "returnType": "Standard.Fixture.Shapes.Square",
+      "documentation": "A square of the given side.",
+      "annotations": [],
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture.Shapes",
+      "name": "unit",
+      "arguments": [
+        {
+          "name": "self",
+          "reprType": "Standard.Fixture.Shapes.Shape",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes.Shape",
+      "returnType": "Standard.Fixture.Shapes.Square",
+      "isStatic": true,
+      "documentation": "---\ngroup: Shaping\n---\nThe unit square.",
+      "annotations": [],
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture.Shapes",
+      "name": "area",
+      "arguments": [
+        {
+          "name": "self",
+          "reprType": "Standard.Fixture.Shapes.Shape",
+          "isSuspended": false,
+          "hasDefault": false
+        },
+        {
+          "name": "units",
+          "reprType": "Standard.Base.Data.Text.Text | Standard.Base.Nothing.Nothing",
+          "isSuspended": false,
+          "hasDefault": true,
+          "defaultValue": "Nothing",
+          "tagValues": ["'cm'", "'m'"]
+        },
+        {
+          "name": "scale",
+          "reprType": "Standard.Base.Data.Numbers.Float",
+          "isSuspended": true,
+          "hasDefault": true,
+          "defaultValue": "Missing_Argument.throw \"scale\""
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes.Shape",
+      "returnType": "Standard.Base.Data.Numbers.Float",
+      "isStatic": false,
+      "documentation": "---\naliases: [size, extent]\nmacros:\n  - doubled: scale=2\ngroup: Standard.Fixture.Selections\nicon: preparation\nadvanced: true\ndeprecated: true\nunstable: true\nadded: '2026.1'\nmodified: '2026.2'\nremoved: '2026.3'\n---\nThe area of a shape. Uses {braces} and <angles>.\n\nMore text, see `Square` and `Square.side`.\n\n## Arguments\n- `units`: The units.\n- ``scale``: How much to scale by.\n- `extra`: Not an argument.\n\n## Returns\nThe area as a `Float`.\n\n## Examples\n### Area of a unit square.\n\n```\nShape.unit.area\n```\nReturns\n\n        | Area |\n        |------|\n        | 1    |\n\n## Errors\n- `Illegal_Argument` when the scale is negative.\n\n## Remarks\n### Precision\nFloats are approximate.\n\n## Implementation Notes\nNot for users.",
+      "annotations": [],
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture.Shapes",
+      "name": "side",
+      "arguments": [
+        {
+          "name": "self",
+          "reprType": "Standard.Fixture.Shapes.Square",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes.Square",
+      "returnType": "Standard.Base.Data.Numbers.Float",
+      "isStatic": false,
+      "documentation": "The side of the square.",
+      "annotations": [],
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture.Shapes",
+      "name": "from",
+      "arguments": [
+        {
+          "name": "that",
+          "reprType": "Standard.Base.Data.Numbers.Integer",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes.Square",
+      "returnType": "Standard.Fixture.Shapes.Square",
+      "isStatic": false,
+      "documentation": "A square with an integer side.",
+      "annotations": [],
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture.Shapes",
+      "name": "from",
+      "arguments": [
+        {
+          "name": "that",
+          "reprType": "Standard.Base.Data.Text.Text",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes.Square",
+      "returnType": "Standard.Fixture.Shapes.Square",
+      "isStatic": false,
+      "documentation": "A square parsed from text.",
+      "annotations": [],
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture.Shapes",
+      "name": "+",
+      "arguments": [
+        {
+          "name": "self",
+          "reprType": "Standard.Fixture.Shapes.Shape",
+          "isSuspended": false,
+          "hasDefault": false
+        },
+        {
+          "name": "that",
+          "reprType": "Standard.Fixture.Shapes.Shape",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes.Shape",
+      "returnType": "Standard.Fixture.Shapes.Shape",
+      "isStatic": false,
+      "documentation": "Two shapes side by side.",
+      "annotations": [],
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture.Shapes",
+      "name": "make_shape",
+      "arguments": [
+        {
+          "name": "self",
+          "reprType": "Standard.Fixture.Shapes",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes",
+      "returnType": "Standard.Base.Any.Any",
+      "isStatic": false,
+      "documentation": "Makes some shape.",
+      "annotations": [],
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture.Shapes",
+      "name": "undocumented",
+      "arguments": [
+        {
+          "name": "self",
+          "reprType": "Standard.Fixture.Shapes.Shape",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes.Shape",
+      "returnType": "Standard.Fixture.Shapes.Square",
+      "isStatic": false,
+      "annotations": [],
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture.Shapes",
+      "name": "odd_icon",
+      "arguments": [
+        {
+          "name": "self",
+          "reprType": "Standard.Fixture.Shapes.Shape",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes.Shape",
+      "returnType": "Standard.Fixture.Shapes.Shape | Standard.Base.Nothing.Nothing",
+      "isStatic": false,
+      "documentation": "---\nicon: not_an_icon\n---\nHas an icon the IDE does not know.",
+      "annotations": [],
+      "reexports": []
+    }
+  ]
+}
