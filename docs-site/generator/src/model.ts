@@ -78,6 +78,7 @@ const FUNCTION_KINDS = new Set<PageKind>([
   'extensionMethod',
 ])
 
+/** Whether a page documents a function (a constructor or a method of any kind). */
 export function isFunctionPage(
   page: Page,
 ): page is Page & { kind: FunctionKind; entry: CatalogueEntry } {
@@ -95,6 +96,10 @@ function metadataOf(documentation: string | undefined): DocumentationMetadata | 
   return result.ok ? (result.value ?? undefined) : undefined
 }
 
+/**
+ * The site's pages and indexes from the libraries. Throws when two entries share a path; records
+ * paths that differ only in case.
+ */
 export function buildModel(libraries: LibraryInput[]): SiteModel {
   const groups = libraries.flatMap((library) => library.groups)
   const model: SiteModel = {
