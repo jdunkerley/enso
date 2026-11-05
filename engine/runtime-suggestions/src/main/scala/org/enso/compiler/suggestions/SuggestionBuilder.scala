@@ -526,6 +526,8 @@ final class SuggestionBuilder[A: IndexedSource](
         TypeArg.Function(fn.args.map(go).toVector, go(fn.result))
       case union: `type`.Set.Union =>
         TypeArg.Sum(None, union.operands.map(go))
+      case inter: `type`.Set.Intersection =>
+        TypeArg.Binary(go(inter.left), go(inter.right), `type`.Set.Intersection.NAME)
       case app: Application.Prefix =>
         TypeArg.Application(
           go(app.function),
@@ -771,17 +773,28 @@ final class SuggestionBuilder[A: IndexedSource](
 
   /** Build argument default value from the expression.
     *
+    * The default is reproduced as the source text the expression was parsed
+    * from: the IR's `showCode` is a debugging format that writes applications
+    * as `((f) args)`. It is only used when the expression has no location.
+    *
+    * [[IdentifiedLocation]] offsets index the module's characters, which is
+    * what the builder is given in practice (`CharSequence`).
+    *
     * @param expr the argument expression
     * @return the argument default value
     */
-  private def buildDefaultValue(expr: IR): String =
-    expr match {
-      case app: Application.Prefix =>
-        val name = app.function
-        val path = app.arguments
-        path.map(_.value.showCode()).mkString(".") + "." + name.showCode()
-      case other => other.showCode()
-    }
+  private def buildDefaultValue(expr: IR): String = {
+    val fromSource = for {
+      loc <- expr.location
+      text <- (source: Any) match {
+        case chars: CharSequence
+            if 0 <= loc.start && loc.start < loc.end && loc.end <= chars.length =>
+          Some(chars.subSequence(loc.start, loc.end).toString)
+        case _ => None
+      }
+    } yield text
+    fromSource.getOrElse(expr.showCode())
+  }
 
   /** Build scope from the location. */
   private def buildScope(location: Location): Suggestion.Scope =

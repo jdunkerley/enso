@@ -4239,6 +4239,55 @@ class SuggestionBuilderTest extends AnyWordSpecLike with Matchers {
     method.get.returnType shouldEqual "Test.Test"
   }
 
+  "keep an intersection return type" in {
+    val code =
+      """|import Standard.Base.Any.Any
+         |import Standard.Base.Errors.Common.Forbidden_Operation
+         |
+         |type Test
+         |    filter self -> Test & Any ! Forbidden_Operation = self
+         |    other self -> Test & Any & Test = self
+         |""".stripMargin
+    val module      = code.preprocessModule()
+    val suggestions = build(code, module)
+    val filter = suggestions.collectFirst {
+      case s: Suggestion.DefinedMethod if s.name == "filter" => s
+    }
+    filter shouldBe defined
+    filter.get.returnType shouldEqual "Test.Test & Standard.Base.Any.Any"
+    val other = suggestions.collectFirst {
+      case s: Suggestion.DefinedMethod if s.name == "other" => s
+    }
+    other.get.returnType shouldEqual "Test.Test & Standard.Base.Any.Any & Test.Test"
+  }
+
+  "render default values as written in the source" in {
+    val code =
+      """|import Standard.Base.Errors.Common.Forbidden_Operation
+         |
+         |type Test
+         |    foo self (a = Missing_Argument.throw "column") (b = Filter_Condition.Equal True) (c = ..Report_Warning) (d = [Join_Condition.Equals self.column_names.first]) (e = 42) (f = "txt") (g = x.y) (h = f (g 1) 2) (i = ..Equal 5) (j = (a + b)) = self
+         |""".stripMargin
+    val module      = code.preprocessModule()
+    val suggestions = build(code, module)
+    val method = suggestions.collectFirst {
+      case s: Suggestion.DefinedMethod if s.name == "foo" => s
+    }
+    method shouldBe defined
+    method.get.arguments.drop(1).map(_.defaultValue) shouldEqual Seq(
+      Some("Missing_Argument.throw \"column\""),
+      Some("Filter_Condition.Equal True"),
+      Some("..Report_Warning"),
+      Some("[Join_Condition.Equals self.column_names.first]"),
+      Some("42"),
+      Some("\"txt\""),
+      Some("x.y"),
+      Some("f (g 1) 2"),
+      Some("..Equal 5"),
+      Some("a + b")
+    )
+  }
+
   private def build(
     source: String,
     ir: Module,
