@@ -55,7 +55,10 @@ This server:
 
 - In dev: `dev:vite` does not start a ydoc server. It points the GUI at the
   engine's (`ENSO_IDE_YDOC_SERVER_URL`, default `ws://<host>:5976`); override
-  with `ENSO_IDE_YDOC_SERVER_URL=ws://host:port`.
+  with `ENSO_IDE_YDOC_SERVER_URL=ws://host:port`. The engine serves ydoc on 5976
+  only when started with `LANGUAGE_SERVER_YDOC_PORT=5976` (the project manager
+  shim sets it; a hand-started `enso --server` has no default port any more, so
+  set the variable for `dev:vite`).
 - Standalone: `pnpm run dev:inspect` runs the server through `ydoc-inspect`.
 - Polyglot (inside engine): see `ydoc-server-polyglot/`.
 - Node host (`NodeYdocHost`): library code only so far; nothing starts it until
