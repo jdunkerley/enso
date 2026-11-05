@@ -118,15 +118,90 @@ test('a child that exits fails what it had not answered, and is forked again wit
   expect(spawn).toHaveBeenCalledTimes(2)
 })
 
-test('a child that keeps exiting is restarted once, then only on the next request', async () => {
+test('a child that keeps exiting is restarted with a growing delay, then left until a request', async () => {
+  vi.useFakeTimers()
+  try {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { host, spawn, children } = setup()
+    await host.listen(request(4000))
+    // The first exit restarts at once; each quick exit after that waits twice as long (1 s, 2 s,
+    // 4 s, 8 s), and after five restarts nothing is forked until the next request.
+    children[0]!.crash()
+    expect(spawn).toHaveBeenCalledTimes(2)
+    for (const [index, delay] of [1000, 2000, 4000, 8000].entries()) {
+      children[index + 1]!.crash()
+      expect(spawn).toHaveBeenCalledTimes(index + 2)
+      await vi.advanceTimersByTimeAsync(delay - 1)
+      expect(spawn).toHaveBeenCalledTimes(index + 2)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(spawn).toHaveBeenCalledTimes(index + 3)
+    }
+    children[5]!.crash()
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(spawn).toHaveBeenCalledTimes(6)
+    expect(error.mock.calls.some(([m]) => String(m).includes('not restarted'))).toBe(true)
+    // A request forks again, with the listener still to restore.
+    const restored = host.listen(request(5000))
+    expect(spawn).toHaveBeenCalledTimes(7)
+    await restored
+    expect(children[6]!.requests.map((r) => r.type === 'listen' && r.request.port)).toEqual([
+      4000, 5000,
+    ])
+    error.mockRestore()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('a child that ran for a while is restarted at once again', async () => {
+  vi.useFakeTimers()
+  try {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { host, spawn, children } = setup()
+    await host.listen(request(4000))
+    children[0]!.crash()
+    children[1]!.crash()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(spawn).toHaveBeenCalledTimes(3)
+    await vi.advanceTimersByTimeAsync(61_000)
+    children[2]!.crash()
+    expect(spawn).toHaveBeenCalledTimes(4)
+    error.mockRestore()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('an error event from the child is logged, and its exit restarts it', async () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
   const { host, spawn, children } = setup()
   await host.listen(request(4000))
+  expect(() => children[0]!.emit('error', 'FatalError', 'v8', 'report')).not.toThrow()
+  expect(error).toHaveBeenCalled()
+  expect(spawn).toHaveBeenCalledOnce()
   children[0]!.crash()
   expect(spawn).toHaveBeenCalledTimes(2)
-  children[1]!.crash()
-  expect(spawn).toHaveBeenCalledTimes(2)
-  await host.listen(request(5000))
-  expect(spawn).toHaveBeenCalledTimes(3)
+  error.mockRestore()
+})
+
+test('a listen on a port another project holds is refused without reaching the child', async () => {
+  const { host, children } = setup()
+  await host.listen(request(4000))
+  await expect(host.listen(request(4000))).rejects.toThrow(/EADDRINUSE/)
+  expect(children[0]!.requests).toHaveLength(1)
+  // Once closed, the port is free again.
+  await host.close(4000)
+  await host.listen(request(4000))
+})
+
+test('a close during a restore reaches the child after the restoring listen', async () => {
+  const { host, children } = setup()
+  await host.listen(request(4000))
+  children[0]!.crash()
+  await host.close(4000)
+  expect(
+    children[1]!.requests.map((r) => r.type + (r.type === 'listen' ? r.request.port : r.port)),
+  ).toEqual(['listen4000', 'close4000'])
 })
 
 test('dispose kills the child and fails later requests', async () => {

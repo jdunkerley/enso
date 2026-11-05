@@ -6,7 +6,8 @@ import '../cjs-shim' // must be imported first
 
 import { configureAllDebugLogs, NodeYdocHost } from 'ydoc-server'
 
-import type { YdocHostRequest, YdocHostResponse } from './protocol'
+import type { YdocHostRequest } from './protocol'
+import { ydocRequestHandler } from './serve'
 
 configureAllDebugLogs(
   process.env.ENSO_IDE_YDOC_LS_DEBUG === 'true',
@@ -18,20 +19,10 @@ const host = new NodeYdocHost()
 // Read by the open-time harness to sample this process's memory (ruling 14 of the plan).
 console.log(`ydoc host pid=${process.pid}`)
 
-const reply = (response: YdocHostResponse) => process.parentPort.postMessage(response)
+const handle = ydocRequestHandler(host)
 
-// Calls for one port must not overlap (`NodeYdocHost.listen`): the shim makes them one at a time,
-// and they are handled in order of arrival here.
 process.parentPort.on('message', (event) => {
-  const message = event.data as YdocHostRequest
-  const work = message.type === 'listen' ? host.listen(message.request) : host.close(message.port)
-  work.then(
-    () => reply({ type: 'done', id: message.id }),
-    (error: unknown) =>
-      reply({
-        type: 'failed',
-        id: message.id,
-        message: error instanceof Error ? error.message : String(error),
-      }),
+  void handle(event.data as YdocHostRequest).then((response) =>
+    process.parentPort.postMessage(response),
   )
 })

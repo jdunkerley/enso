@@ -136,7 +136,11 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   handed the other project's session (and that listener's `dropClients` would
   not cover it).
 - **`listen` calls for one port must not overlap**: await each; two concurrent
-  calls both pass `close` and the second fails with EADDRINUSE.
+  calls both pass `close` and the second fails with EADDRINUSE. (Electron's
+  utility process chains them per port,
+  `electron-client/src/ydocHost/serve.ts`.)
+- A listener's server error after it started is logged, not thrown: one process
+  hosts every project's listener.
 - **Channel sockets have no `maxPayload`** (`0`), like the in-process channels
   they replace; `ws`'s 100 MiB default would close a channel on a large
   visualization frame. The token is only sent to loopback hosts (`channelUrl`

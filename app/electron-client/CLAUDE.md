@@ -46,13 +46,22 @@ desktop binary (AppImage/DMG/exe + installer).
   side (`listen`/`close` messages answered by id, `protocol.ts`): forked at
   start-up (`setupProjectService` calls `start()` under the Node host; forking
   it on the first open put ~0.4 s on Windows, ~0.2 s on Linux, in front of that
-  project's engine, measured), forked again at once with the open listeners if
-  it exits (once a minute; after that only on the next request), killed on
-  `will-quit`. It prints `ydoc host pid=<pid>` at start; its stdout and stderr
-  go through the main process's console, so they reach the IDE log.
-  `ENSO_YDOC_HOST=engine` puts the server back in the engine for one release
-  (see `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
-  `tests/headless/ydocHostClient.test.ts` (against a fake child).
+  project's engine, measured), and killed on `will-quit`. If it exits it is
+  forked again with the open listeners: at once, then, while it keeps dying
+  within a minute of its start, after 1, 2, 4 and 8 s; after five such restarts
+  it waits for the next open or close and logs that (Note [The ydoc Host
+  Restarts With A Bounded Backoff] in `client.ts`). Its `error` event (a fatal
+  V8 error) is logged; unhandled it would throw in the main process. A `listen`
+  on a port another open listener holds (one still being restored after a
+  restart) is refused as `EADDRINUSE`, so the shim searches new ports instead of
+  handing that project's GUI to another engine. In the process, `serve.ts`
+  chains one port's requests, so a `close` cannot overtake a restoring `listen`.
+  It prints `ydoc host pid=<pid>` at start; its stdout and stderr go through the
+  main process's console, so they reach the IDE log. `ENSO_YDOC_HOST=engine`
+  puts the server back in the engine for one release (see
+  `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
+  `tests/headless/ydocHostClient.test.ts` (against a fake child),
+  `tests/headless/ydocHostServe.test.ts`.
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).

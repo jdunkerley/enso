@@ -179,7 +179,12 @@ function ssrYdocHost(server: ViteDevServer): YdocHost {
   const get = () =>
     (host ??= server
       .ssrLoadModule('ydoc-server')
-      .then((module) => new (module as typeof import('ydoc-server')).NodeYdocHost()))
+      .then((module) => new (module as typeof import('ydoc-server')).NodeYdocHost())
+      .catch((error: unknown) => {
+        // Not cached: the next open loads it again (a failed SSR transform need not be permanent).
+        host = undefined
+        throw error
+      }))
   return {
     listen: async (request) => (await get()).listen(request),
     close: async (port) => (await get()).close(port),

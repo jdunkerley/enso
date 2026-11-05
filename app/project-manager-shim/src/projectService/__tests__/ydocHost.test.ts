@@ -51,13 +51,20 @@ const seenEnv = async (project: string) =>
     LANGUAGE_SERVER_CHANNEL_TOKEN?: string
   }
 
-/** A host that records its calls as text. */
-function recordingHost(calls: string[]): YdocHost {
+/** Whether any engine has started in the test's root (each fake writes `<project>.env.json`). */
+async function anEngineStarted(): Promise<boolean> {
+  return (await fs.readdir(root)).some((name) => name.endsWith('.env.json'))
+}
+
+/** A host that records its calls as text, and whether an engine had started at each `listen`. */
+function recordingHost(calls: string[], engineStartedAtListen: boolean[] = []): YdocHost {
   return {
-    listen: async (r) =>
-      void calls.push(
+    listen: async (r) => {
+      engineStartedAtListen.push(await anEngineStarted())
+      calls.push(
         `listen ${r.host}:${r.port} ls=${r.languageServer.host}:${r.languageServer.port} token=${r.languageServer.token}`,
-      ),
+      )
+    },
     close: async (port) => void calls.push(`close ${port}`),
   }
 }
@@ -73,10 +80,11 @@ afterEach(async () => {
 
 test('node: the host listens on the ydoc port before the engine starts, with the engine token', async () => {
   const calls: string[] = []
+  const engineStartedAtListen: boolean[] = []
   vi.stubEnv('ENSO_YDOC_HOST', 'node')
   const runner = new EnsoRunner(await fakeEnso(root), {
     firstPort: YDOC_HOST_PORT,
-    ydocHost: recordingHost(calls),
+    ydocHost: recordingHost(calls, engineStartedAtListen),
   })
   const p = path.join(root, 'N')
   const sockets = await runner.openProject(Path(p), 'id-n')
@@ -86,9 +94,27 @@ test('node: the host listens on the ydoc port before the engine starts, with the
   expect(calls).toEqual([
     `listen 127.0.0.1:${sockets.ydocSocket.port} ls=127.0.0.1:${sockets.jsonSocket.port} token=${seen.LANGUAGE_SERVER_CHANNEL_TOKEN}`,
   ])
+  expect(engineStartedAtListen).toEqual([false])
   await runner.closeProject(Path(p))
   expect(calls.at(-1)).toBe(`close ${sockets.ydocSocket.port}`)
 })
+
+test('node: the open does not wait for a ydoc port, which the engine does not serve', async () => {
+  // The fake engine never listens on the ydoc port: under `engine` the open would wait the whole
+  // `ydocWaitMs`; under `node` the host has the port already, so there is no wait at all.
+  vi.stubEnv('ENSO_YDOC_HOST', 'node')
+  const ydocWaitMs = 10_000
+  const runner = new EnsoRunner(await fakeEnso(root), {
+    firstPort: YDOC_HOST_PORT,
+    ydocWaitMs,
+    ydocHost: recordingHost([]),
+  })
+  const p = path.join(root, 'Q')
+  const started = Date.now()
+  await runner.openProject(Path(p), 'id-q')
+  expect(Date.now() - started).toBeLessThan(ydocWaitMs / 2)
+  await runner.closeProject(Path(p))
+}, 30_000)
 
 test('node is the default: no ENSO_YDOC_HOST uses the host', async () => {
   const calls: string[] = []

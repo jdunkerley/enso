@@ -39,18 +39,24 @@ function forkYdocHost(): YdocHostChild {
     serviceName: 'Enso ydoc server',
     stdio: 'pipe',
   })
-  if (child.stdout) {
-    readline.createInterface({ input: child.stdout }).on('line', (line) => console.log(line))
+  // The `error` listeners keep a failed pipe from becoming an unhandled error in this process; the
+  // child's own `error` and `exit` are handled by `UtilityProcessYdocHost`.
+  const forward = (input: NodeJS.ReadableStream | null, write: (line: string) => void) => {
+    if (!input) return
+    input.on('error', (error) => console.error('The ydoc host output failed:', error))
+    readline
+      .createInterface({ input })
+      .on('line', write)
+      .on('error', (error) => console.error('The ydoc host output failed:', error))
   }
-  if (child.stderr) {
-    readline.createInterface({ input: child.stderr }).on('line', (line) => console.error(line))
-  }
+  forward(child.stdout, (line) => console.log(line))
+  forward(child.stderr, (line) => console.error(line))
   return child
 }
 
 /**
  * Where opened projects' ydoc servers run under `ENSO_YDOC_HOST=node` (the default): a utility
- * process, forked on the first open.
+ * process, forked at start-up by `setupProjectService` (`start()`).
  */
 function getYdocHost(): UtilityProcessYdocHost {
   ydocHost ??= new UtilityProcessYdocHost(forkYdocHost)
