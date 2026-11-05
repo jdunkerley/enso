@@ -18,3 +18,13 @@
   --ifm-color-primary-lighter: #73c6df;
   --ifm-color-primary-lightest: #9ad6e8;
 }
+
+/* Links in running text are underlined, so colour is not their only mark (WCAG 1.4.1). */
+.markdown a {
+  text-decoration: underline;
+}
+
+/* The search plugin's keyboard hint (`ctrl` `K`) is too faint on the light navbar (WCAG 1.4.3). */
+.navbar kbd[class*="searchHint"] {
+  color: var(--ifm-color-emphasis-800);
+}
