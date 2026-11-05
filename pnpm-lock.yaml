@@ -1225,8 +1225,8 @@ importers:
         specifier: ^7.3.2
         version: 7.3.6(@types/node@24.12.2)(jiti@2.6.1)(terser@5.37.0)(yaml@2.9.1)
       vite-node:
-        specifier: 3.0.3
-        version: 3.0.3(@types/node@24.12.2)(jiti@2.6.1)(supports-color@8.1.1)(terser@5.37.0)(yaml@2.9.1)
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@24.12.2)(jiti@2.6.1)(supports-color@8.1.1)(terser@5.37.0)(yaml@2.9.1)
       vitest:
         specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.12.2)(@vitest/browser@3.2.4)(jiti@2.6.1)(jsdom@26.1.0(supports-color@8.1.1))(supports-color@8.1.1)(terser@5.37.0)(yaml@2.9.1)
@@ -14193,10 +14193,10 @@ snapshots:
   '@ianvs/prettier-plugin-sort-imports@4.3.0(@vue/compiler-sfc@3.5.43)(prettier@3.9.8)(supports-color@8.1.1)':
     dependencies:
       '@babel/core': 7.29.7(supports-color@8.1.1)
-      '@babel/generator': 7.29.8
-      '@babel/parser': 7.29.9
-      '@babel/traverse': 7.29.8(supports-color@8.1.1)
-      '@babel/types': 7.29.8
+      '@babel/generator': 7.29.12
+      '@babel/parser': 7.29.12
+      '@babel/traverse': 7.29.12(supports-color@8.1.1)
+      '@babel/types': 7.29.11
       prettier: 3.9.8
       semver: 7.8.5
     optionalDependencies:
@@ -16038,7 +16038,7 @@ snapshots:
 
   '@vue/compiler-core@3.5.13':
     dependencies:
-      '@babel/parser': 7.29.9
+      '@babel/parser': 7.29.12
       '@babel/types': 8.0.6
       '@vue/shared': 3.5.13
       entities: 4.5.0

@@ -1,0 +1,97 @@
+{
+  "format": 1,
+  "library": "Standard.Table",
+  "version": "2026.1.1-dev",
+  "engineVersion": "2026.1.1-dev",
+  "sourceHash": "sha256:27e206f415f46b8edc2dbf48d6a130e626f550c2e640f6535837d31d92faa73a",
+  "entries": [
+    {
+      "type": "module",
+      "reexport": null,
+      "module": "Standard.Table.Table",
+      "documentation": null,
+      "reexports": []
+    },
+    {
+      "type": "type",
+      "reexport": "Standard.Table.Main",
+      "module": "Standard.Table.Table",
+      "name": "Table",
+      "params": [],
+      "parentType": "Standard.Base.Any.Any",
+      "documentation": " Represents a column-oriented table data structure.",
+      "reexports": ["Standard.Table.Main", "Standard.Table.Table"]
+    },
+    {
+      "type": "method",
+      "module": "Standard.Table.Table",
+      "name": "filter",
+      "arguments": [
+        {
+          "name": "self",
+          "reprType": "Standard.Table.Table.Table",
+          "isSuspended": false,
+          "hasDefault": false,
+          "defaultValue": null,
+          "tagValues": null
+        },
+        {
+          "name": "column",
+          "reprType": "Standard.Table.Column.Column | Standard.Table.Expression.Expression | Standard.Base.Data.Text.Text | Standard.Base.Data.Numbers.Integer",
+          "isSuspended": false,
+          "hasDefault": true,
+          "defaultValue": "Missing_Argument.\"column\".throw",
+          "tagValues": null
+        },
+        {
+          "name": "filter",
+          "reprType": "Standard.Base.Data.Filter_Condition.Filter_Condition | (Standard.Base.Any.Any -> Standard.Base.Data.Boolean.Boolean)",
+          "isSuspended": false,
+          "hasDefault": true,
+          "defaultValue": "Filter_Condition.True.Equal",
+          "tagValues": [
+            "..Less",
+            "..Equal_Or_Less",
+            "..Equal",
+            "..Equal_Or_Greater",
+            "..Greater",
+            "..Not_Equal",
+            "..Between",
+            "..Equal_Ignore_Case",
+            "..Starts_With",
+            "..Ends_With",
+            "..Contains",
+            "..Is_Nothing",
+            "..Not_Nothing",
+            "..Is_Nan",
+            "..Not_Nan",
+            "..Is_Infinite",
+            "..Is_Finite",
+            "..Is_True",
+            "..Is_False",
+            "..Is_Empty",
+            "..Not_Empty",
+            "..Like",
+            "..Regex_Match",
+            "..Is_In",
+            "..Predicate"
+          ]
+        },
+        {
+          "name": "on_problems",
+          "reprType": "Standard.Base.Errors.Problem_Behavior.Problem_Behavior",
+          "isSuspended": false,
+          "hasDefault": true,
+          "defaultValue": "Report_Warning",
+          "tagValues": ["..Ignore", "..Report_Warning", "..Report_Error"]
+        }
+      ],
+      "selfType": "Standard.Table.Table.Table",
+      "returnType": "Standard.Base.Any.Any",
+      "isStatic": false,
+      "documentation": " ---\naliases: [filter rows, where]\nmacros:\n- equals: filter=..Equal\n- not_equals: filter=..Not_Equal\n- not_nothing: filter=..Not_Nothing\n- is_nothing: filter=..Is_Nothing\n- is_in: filter=..Is_In\n- less_than: filter=..Less\n- greater_than: filter=..Greater\n- between: filter=..Between\n- contains: filter=..Contains\n- starts_with: filter=..Starts_With\n- ends_with: filter=..Ends_With\n- like: filter=..Like\n- regex_match: filter=..Regex_Match\ngroup: Standard.Base.Selections\nicon: preparation\nsuggested: 2\n---\nCreates a new table with a filtered subset of rows.\n\nThe rows are selected from the input table using a condition. The rows\nthat meet the condition will remain after the filter. Filters can compare\ncolumns, compare against static values, or compare against an argument\nfrom another component.\n\n- `action`:\nThis can be set to `Keep`, which keeps all rows which meet the condition.\nIt can also be set to `Remove`, which will instead only keep the rows that\ndo not meet the condition.\nFor example, `[people] Is Null` would keep all the rows where the column\n`people` had a Null value. Changing this to `Remove` would remove all of\nthe rows where `people` had a Null value, leaving only the records that\nare not null.\n- `on_problems`: specified how to report any issues encountered during the\n operation.\n\n## Arguments\n- ``column``: The column our condition is tested against. This can be a\n  column name, the column's index or an expression.\n- ``filter``: The filter to apply to the column. It can either be an\n  instance of `Filter_Condition` or a predicate taking a cell value and\n  returning a boolean value indicating whether the corresponding row\n  should be kept or not.\n\n## Returns\n- Returns a Table of all of the rows that met the specified condition.\n\n## Examples\n### Filter where an Age is Greater than 30.\n\n```\n     table1 = Table.new [['Name', ['John', 'Paul', 'Ringo']], ['Age', [25, 35, 40]]]\n     filter1 = table1.filter 'Age' (..Greater 30)\n```\nReturns a Table\n\n        | Name  | Age |\n        |-------|-----|\n        | Paul  | 35  |\n        | Ringo | 40  |\n\n### Filter where an Age is Between 30 and 39.\n\n```\n     table1 = Table.new [['Name', ['John', 'Paul', 'Ringo']], ['Age', [25, 35, 40]]]\n     filter1 = table1.filter 'Age' (..Between 30 39)\n\n```\nReturns a Table\n\n        | Name | Age |\n        |------|-----|\n        | Paul | 35  |\n\n### Select rows where more than 50% of the stock is sold.\n\n```\n     table2 = Table.new [['Name', ['John', 'Paul']], ['sold_stock', [20, 30]], ['total_stock', [50, 50]]]\n     filter3= table2.filter 'sold_stock' (..Greater (expr '[total_stock]/2'))\n```\nReturns a Table\n\n        | Name | sold_stock | total_stock |\n        |------|------------|-------------|\n        | Paul | 30         | 50          |\n\n### Select people celebrating a jubilee.\n\n```\n     table3 = Table.new [['Name', ['John', 'Paul', 'Ringo']], ['Age', [25, 35, 40]]]\n     filter4 = table3.filter (expr '[Age] % 10 = 0') ..Is_True\n```\nReturns a Table\n\n        | Name  | Age |\n        |-------|-----|\n        | Ringo | 40  |\n\n## Errors\n- If a column name cannot be found, a `No_Such_Column` dataflow error is\n  raised.\n- If a column index is invalid, an `Index_Out_Of_Bounds` dataflow error\n  is raised.\n- If the column is an invalid type for the filter, an\n  `Invalid_Value_Type` dataflow error is raised.\n- Additionally, the following problems may be reported according to the\n  `on_problems` setting:\n- If filtering by equality on a floating-point column, a\n  `Floating_Point_Equality` will warn the user that comparing floats is\n  imprecise, so results may be inconsistent.\n\n## Remarks\n\n### Nothing Equality\nWhen comparing `Nothing` values, filter follows the ANSI SQL conventions\nthat `Nothing ==  Nothing` results in a `Nothing`. This includes both\n`Equal` and `Is_In` conditions. If you want to filter out `Nothing` use\n`Is_Not_Nothing` condition (or `Is_Nothing` to filter out non-`Nothing`).",
+      "annotations": ["column", "filter"],
+      "reexports": []
+    }
+  ]
+}
