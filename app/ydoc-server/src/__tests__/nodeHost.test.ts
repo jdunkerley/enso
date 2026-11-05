@@ -40,8 +40,8 @@ class FakeLanguageServer {
   private server!: WebSocketServer
   port = 0
 
-  async start() {
-    this.server = new WebSocketServer({ host: '127.0.0.1', port: 0 })
+  async start(port = 0) {
+    this.server = new WebSocketServer({ host: '127.0.0.1', port })
     this.server.on('connection', (socket, request) => {
       const url = request.url ?? ''
       this.urls.push(url)
@@ -165,6 +165,43 @@ test('the LS going away closes the GUI sockets', async () => {
   ls.closeAll()
   await closed(gui)
   expect(gui.readyState).toBe(WebSocket.CLOSED)
+})
+
+test('a bad frame closes that GUI socket only', async () => {
+  const good = connectGui('index')
+  await firstMessage(good)
+  const bad = new WebSocket(`ws://127.0.0.1:${port}/project/index?ls=ws://127.0.0.1:${ls.port}`, {
+    skipUTF8Validation: true,
+  })
+  guis.push(bad)
+  await new Promise((resolve) => bad.once('open', resolve))
+  bad.send(Buffer.from([0xff, 0xfe, 0xfd]), { binary: false }) // text frame, invalid UTF-8
+  await closed(bad)
+  // The host and the other socket are unharmed.
+  expect(good.readyState).toBe(WebSocket.OPEN)
+  const another = connectGui('index')
+  await firstMessage(another)
+})
+
+test('the GUI reconnects to a restarted LS and gets a fresh working session', async () => {
+  const gui = connectGui('index')
+  await firstMessage(gui)
+  await vi.waitFor(() => expect(ls.open('json')).toHaveLength(JSON_SOCKETS))
+  // The Language Server exits and a new one starts on the same port, as an engine restart does.
+  const lsPort = ls.port
+  await ls.stop()
+  await closed(gui)
+  await vi.waitFor(() => expect(LanguageServerSession.sessions.size).toBe(0))
+  const restarted = new FakeLanguageServer()
+  await restarted.start(lsPort)
+  ls = restarted
+  {
+    const again = connectGui('index')
+    await firstMessage(again)
+    await vi.waitFor(() => expect(restarted.open('json')).toHaveLength(JSON_SOCKETS))
+    // The session is working: it initialised against the new Language Server.
+    await vi.waitFor(() => expect(LanguageServerSession.sessions.size).toBe(1))
+  }
 })
 
 // The four socket races found on the engine-hosted server (JVM + GraalJS), tested again on this

@@ -21,7 +21,11 @@ interface Listener {
 export class NodeYdocHost {
   private readonly listeners = new Map<number, Listener>()
 
-  /** Start listening on `request.port`; resolves once it accepts connections. */
+  /**
+   * Start listening on `request.port`; resolves once it accepts connections. Calls for one port
+   * must not overlap (await each): two concurrent calls both pass the `close` and the second
+   * rejects with EADDRINUSE.
+   */
   async listen(request: YdocListenRequest): Promise<void> {
     await this.close(request.port)
     const clients = new Set<WebSocket>()
@@ -45,6 +49,9 @@ export class NodeYdocHost {
         return
       }
       clients.add(socket)
+      // A bad frame (invalid UTF-8, an oversized message) makes `ws` emit `error` and then close
+      // this socket; unhandled, the error would take down the host and every other project.
+      socket.on('error', (error) => console.error('A GUI socket failed:', error))
       socket.on('close', () => clients.delete(socket))
       setupGatewayClient(
         socket,

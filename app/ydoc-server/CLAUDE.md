@@ -117,6 +117,21 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   without the ydoc side having closed it, the listener closes every GUI socket
   it holds and the session goes with them; the GUI reconnects, as after an
   engine restart when the server lived in the engine.
+- **Sessions are process-global.** `LanguageServerSession.sessions` is keyed by
+  the GUI's `ls=` URL, not by listener. One Node process hosting several
+  listeners (PR F) must give each project a distinct Language Server URL, or
+  listener B's GUI can be handed listener A's session (and A's `dropClients`
+  does not cover it).
+- **`listen` calls for one port must not overlap**: await each; two concurrent
+  calls both pass `close` and the second fails with EADDRINUSE.
+- **Channel sockets have no `maxPayload`** (`0`), like the in-process channels
+  they replace; `ws`'s 100 MiB default would close a channel on a large
+  visualization frame. The token is only sent to loopback hosts (`channelUrl`
+  throws otherwise).
+- A socket that fails to connect (the Language Server gone, or a 403 for a wrong
+  token, logged as a misconfiguration) is reported after a doubling delay (250
+  ms to 5 s) so the GUI's reconnecting is not a hot loop. A GUI socket error
+  (bad frame) closes only that socket.
 - A closed session closes the Language Server ends of its visualization channels
   too (`VisualizationBridge.close`): in Node each is a socket.
 - The four socket races (#214 first message on open, #396 shared data channel,

@@ -115,3 +115,74 @@ test('a channel closed by ydoc closes its socket, and is not reported', async ()
   await socketClosed
   expect(onUnexpectedClose).not.toHaveBeenCalled()
 })
+
+test('the channel token is only sent to loopback hosts', () => {
+  expect(() => channelUrl({ host: 'example.com', port: 1, token: 't' }, 'json')).toThrow(/loopback/)
+  expect(() => channelUrl({ host: '10.0.0.1', port: 1, token: 't' }, 'json')).toThrow(/loopback/)
+  expect(channelUrl({ host: '::1', port: 1, token: 't' }, 'json')).toContain('::1')
+})
+
+test('a 403 is logged as a misconfiguration, and reported after a delay', async () => {
+  lsServer = new WebSocketServer({
+    host: '127.0.0.1',
+    port: 0,
+    verifyClient: (_info, done) => done(false, 403),
+  })
+  await new Promise((r) => lsServer!.once('listening', r))
+  const port = (lsServer.address() as { port: number }).port
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const lsEnd = new YjsChannel<string>(new Y.Doc(), 'json')
+    const onUnexpectedClose = vi.fn()
+    const started = Date.now()
+    remoteChannelServer<string>(
+      { host: '127.0.0.1', port, token: 'wrong' },
+      'json',
+      onUnexpectedClose,
+    ).onConnect(lsEnd)
+    await vi.waitFor(() => expect(onUnexpectedClose).toHaveBeenCalledOnce())
+    expect(Date.now() - started).toBeGreaterThanOrEqual(200)
+    expect(error.mock.calls.flat().join(' ')).toMatch(/misconfiguration/)
+    expect(error.mock.calls.flat().join(' ')).not.toContain('wrong')
+  } finally {
+    error.mockRestore()
+  }
+})
+
+test('a channel closed while its socket connects is quiet', async () => {
+  const ls = await fakeLanguageServer()
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const lsEnd = new YjsChannel<string>(new Y.Doc(), 'json')
+    const onUnexpectedClose = vi.fn()
+    remoteChannelServer<string>(
+      { host: '127.0.0.1', port: ls.port, token: 't' },
+      'json',
+      onUnexpectedClose,
+    ).onConnect(lsEnd)
+    lsEnd.close()
+    await new Promise((r) => setTimeout(r, 100))
+    expect(error).not.toHaveBeenCalled()
+    expect(onUnexpectedClose).not.toHaveBeenCalled()
+  } finally {
+    error.mockRestore()
+  }
+})
+
+test('frames over the ws default limit (100 MiB) are accepted', async () => {
+  const ls = await fakeLanguageServer()
+  const doc = new Y.Doc()
+  const codec = new JavaByteBufferCodec(nodeByteBufferClass)
+  const lsEnd = new YjsChannel<JavaByteBuffer, Uint8Array>(doc, 'vis-data', codec)
+  const ydocEnd = new YjsChannel<JavaByteBuffer, Uint8Array>(doc, 'vis-data', codec)
+  const sizes: number[] = []
+  ydocEnd.subscribe((m) => sizes.push(nodeByteBufferClass.view!(m).byteLength))
+  remoteChannelServer<JavaByteBuffer>(
+    { host: '127.0.0.1', port: ls.port, token: 't' },
+    'vis-data',
+  ).onConnect(lsEnd)
+  await vi.waitFor(() => expect(ls.sockets).toHaveLength(1))
+  const size = 101 * 1024 * 1024
+  ls.sockets[0]!.socket.send(Buffer.alloc(size))
+  await vi.waitFor(() => expect(sizes).toEqual([size]), { timeout: 20_000 })
+}, 30_000)
