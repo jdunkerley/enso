@@ -1,7 +1,8 @@
 package org.enso.compiler.test.context
 
 import com.oracle.truffle.api.TruffleFile
-import org.enso.compiler.suggestions.SuggestionBuilder
+import org.enso.compiler.core.ir.expression.Application
+import org.enso.compiler.suggestions.{SuggestionBuilder, SuggestionDiff}
 import org.enso.compiler.core.ir.Module
 import org.enso.interpreter.runtime
 import org.enso.interpreter.runtime.EnsoContext
@@ -4211,6 +4212,7 @@ class SuggestionBuilderTest extends AnyWordSpecLike with Matchers {
       """|import Standard.Base.Data.Text.Text
          |import Standard.Base.Data.Numbers.Integer
          |import Standard.Base.Data.Boolean.Boolean
+         |import Standard.Base.Data.Vector.Vector
          |import Standard.Base.Errors.Common.Forbidden_Operation
          |
          |type Test
@@ -4247,59 +4249,131 @@ class SuggestionBuilderTest extends AnyWordSpecLike with Matchers {
          |type Test
          |    filter self -> Test & Any ! Forbidden_Operation = self
          |    other self -> Test & Any & Test = self
+         |    nested self -> (Test | Any) & Test = self
+         |    applied self -> Vector Test & Any = self
          |""".stripMargin
     val module      = code.preprocessModule()
     val suggestions = build(code, module)
-    val filter = suggestions.collectFirst {
-      case s: Suggestion.DefinedMethod if s.name == "filter" => s
-    }
-    filter shouldBe defined
-    filter.get.returnType shouldEqual "Test.Test & Standard.Base.Any.Any"
-    val other = suggestions.collectFirst {
-      case s: Suggestion.DefinedMethod if s.name == "other" => s
-    }
-    other.get.returnType shouldEqual "Test.Test & Standard.Base.Any.Any & Test.Test"
+    def returnType(name: String) =
+      suggestions.collectFirst {
+        case s: Suggestion.DefinedMethod if s.name == name => s.returnType
+      }.get
+    returnType("filter") shouldEqual "Test.Test & Standard.Base.Any.Any"
+    returnType(
+      "other"
+    ) shouldEqual "Test.Test & Standard.Base.Any.Any & Test.Test"
+    returnType(
+      "nested"
+    ) shouldEqual "(Test.Test | Standard.Base.Any.Any) & Test.Test"
+    returnType(
+      "applied"
+    ) shouldEqual "(Vector Test.Test) & Standard.Base.Any.Any"
+  }
+
+  private val defaultsCode =
+    """|import Standard.Base.Errors.Common.Forbidden_Operation
+       |
+       |type Test
+       |    foo self (a = Missing_Argument.throw "column") (b = Filter_Condition.Equal True) (c = ..Report_Warning) (d = [Join_Condition.Equals self.column_names.first]) (e = 42) (f = "txt") (g = x.y) (h = f (g 1) 2) (i = ..Equal 5) (j = (a + b)) (k = "é😀x") (l = 7) = self
+       |""".stripMargin
+
+  private val defaultsExpected = Seq(
+    Some("Missing_Argument.throw \"column\""),
+    Some("Filter_Condition.Equal True"),
+    Some("..Report_Warning"),
+    Some("[Join_Condition.Equals self.column_names.first]"),
+    Some("42"),
+    Some("\"txt\""),
+    Some("x.y"),
+    Some("f (g 1) 2"),
+    Some("..Equal 5"),
+    Some("a + b"),
+    Some("\"é😀x\""),
+    Some("7")
+  )
+
+  private def fooDefaults(suggestions: Tree.Root[Suggestion]) =
+    suggestions.collectFirst {
+      case s: Suggestion.DefinedMethod if s.name == "foo" =>
+        s.arguments.drop(1).map(_.defaultValue)
+    }.get
+
+  "render default values as written in the source" in {
+    val code = defaultsCode.replace("\r\n", "\n")
+    fooDefaults(build(code, code.preprocessModule())) shouldEqual
+    defaultsExpected
   }
 
   for ((eol, label) <- Seq(("\n", "LF"), ("\r\n", "CRLF"))) {
-    s"render default values as written in the source ($label)" in {
-      val code =
-        """|import Standard.Base.Errors.Common.Forbidden_Operation
-           |
-           |type Test
-           |    foo self (a = Missing_Argument.throw "column") (b = Filter_Condition.Equal True) (c = ..Report_Warning) (d = [Join_Condition.Equals self.column_names.first]) (e = 42) (f = "txt") (g = x.y) (h = f (g 1) 2) (i = ..Equal 5) (j = (a + b)) = self
-           |""".stripMargin
-          .replace("\r\n", "\n")
-          .replace("\n", eol)
-      val module      = code.preprocessModule()
-      val suggestions = build(code, module)
-      val method = suggestions.collectFirst {
-        case s: Suggestion.DefinedMethod if s.name == "foo" => s
-      }
-      method shouldBe defined
-      method.get.arguments.drop(1).map(_.defaultValue) shouldEqual Seq(
-        Some("Missing_Argument.throw \"column\""),
-        Some("Filter_Condition.Equal True"),
-        Some("..Report_Warning"),
-        Some("[Join_Condition.Equals self.column_names.first]"),
-        Some("42"),
-        Some("\"txt\""),
-        Some("x.y"),
-        Some("f (g 1) 2"),
-        Some("..Equal 5"),
-        Some("a + b")
-      )
+    // The parser's locations index the raw text, line endings included: the
+    // text is parsed and sliced exactly as given.
+    s"render default values from raw text ($label)" in {
+      val code = defaultsCode.replace("\r\n", "\n").replace("\n", eol)
+      val ir   = parseRaw(code)
+      fooDefaults(build(code, ir, normalize = false)) shouldEqual
+      defaultsExpected
     }
   }
 
+  "collapse a multi-line default value to one line" in {
+    // The parser reads no multi-line argument default in a definition, but a
+    // default can still span lines in a module with text blocks or lambdas.
+    SuggestionBuilder.collapseLines(
+      "[1,\n    2,\r\n    3]"
+    ) shouldEqual "[1, 2, 3]"
+    SuggestionBuilder.collapseLines("f 1 2") shouldEqual "f 1 2"
+  }
+
+  "render an application without source text readably" in {
+    val module = "x = f (g 1) 2".preprocessModule()
+    val app = module
+      .preorder()
+      .collectFirst { case a: Application.Prefix => a }
+      .get
+    SuggestionBuilder.renderCode(app) shouldEqual "f (g 1) 2"
+  }
+
+  "build the same defaults from a Rope source, so that an edit has no diff" in {
+    val code = defaultsCode.replace("\r\n", "\n")
+    val ir   = code.preprocessModule()
+    val types = org.enso.interpreter.runtime.Module
+      .findTypeHierarchy(langCtx.getCompiler.context)
+    val fromRope = SuggestionBuilder(
+      org.enso.text.buffer.Rope(normalized(code)),
+      types,
+      langCtx.getCompiler
+    ).build(Module, ir)
+    val fromString = build(code, ir)
+    fooDefaults(fromRope) shouldEqual defaultsExpected
+    fromRope shouldEqual fromString
+    SuggestionDiff
+      .compute(fromRope, fromString)
+      .fold(0)((n, _) => n + 1) shouldEqual 0
+  }
+
+  private def normalized(code: String): String =
+    code.stripMargin.linesIterator.mkString("\n")
+
+  private def parseRaw(code: String): Module = {
+    val module = new runtime.Module(Module, null, code)
+    langCtx.getCompiler.run(module.asCompilerModule())
+    module.getIr
+  }
+
+  /** @param normalize whether to normalize the source the way
+    *        `preprocessModule` does before parsing: the test sources are
+    *        checked out with the platform's line endings.
+    */
   private def build(
     source: String,
     ir: Module,
-    module: QualifiedName = Module
+    module: QualifiedName = Module,
+    normalize: Boolean    = true
   ): Tree.Root[Suggestion] = {
     val compiler = langCtx.getCompiler
     val types =
       org.enso.interpreter.runtime.Module.findTypeHierarchy(compiler.context)
-    SuggestionBuilder(source, types, compiler).build(module, ir)
+    val text = if (normalize) normalized(source) else source
+    SuggestionBuilder(text, types, compiler).build(module, ir)
   }
 }

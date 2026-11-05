@@ -29,6 +29,7 @@ import org.enso.compiler.pass.resolve.{
 import org.enso.pkg.QualifiedName
 import org.enso.polyglot.Suggestion
 import org.enso.polyglot.data.{Tree, TypeGraph}
+import org.enso.text.buffer.Rope
 import org.enso.text.editing.IndexedSource
 
 import java.util.UUID
@@ -58,6 +59,9 @@ final class SuggestionBuilder[A: IndexedSource](
   def build(module: QualifiedName, ir: IR): Tree.Root[Suggestion] = {
     type TreeBuilder =
       mutable.Builder[Tree.Node[Suggestion], Vector[Tree.Node[Suggestion]]]
+
+    locationsFitText =
+      locationText.forall(text => ir.location.forall(_.end <= text.length))
 
     def go(tree: TreeBuilder, scope: Scope): Vector[Tree.Node[Suggestion]] = {
       if (scope.queue.isEmpty) {
@@ -728,9 +732,18 @@ final class SuggestionBuilder[A: IndexedSource](
           if (level > 0) typeList.mkString("(", " -> ", ")")
           else typeList.mkString(" -> ")
         case TypeArg.Binary(l, r, op) =>
-          val left  = go(l, level + 1)
-          val right = go(r, level + 1)
-          s"$left $op $right"
+          // A nested sum, or a binary of another operator, would read
+          // ambiguously without brackets: `(A | B) & C`. A left-nested binary
+          // of the same operator is just a chain: `A & B & C`.
+          def operand(t: TypeArg, isLeft: Boolean): String =
+            t match {
+              case TypeArg.Sum(None, vs) if vs.size > 1 =>
+                s"(${go(t, level + 1)})"
+              case TypeArg.Binary(_, _, op2) if op2 != op || !isLeft =>
+                s"(${go(t, level + 1)})"
+              case _ => go(t, level + 1)
+            }
+          s"${operand(l, isLeft = true)} $op ${operand(r, isLeft = false)}"
         case TypeArg.Application(fun, args) =>
           val funText  = go(fun, level)
           val argsList = args.map(go(_, level + 1)).mkString(" ")
@@ -738,7 +751,12 @@ final class SuggestionBuilder[A: IndexedSource](
           if (level > 0) s"($typeName)" else typeName
         case TypeArg.Sum(Some(n), _) => n.toString
         case TypeArg.Sum(None, variants) =>
-          variants.map(go(_, level + 1)).mkString(" | ")
+          variants
+            .map {
+              case b: TypeArg.Binary => s"(${go(b, level + 1)})"
+              case v                 => go(v, level + 1)
+            }
+            .mkString(" | ")
       }
 
     go(targ, 0)
@@ -775,21 +793,32 @@ final class SuggestionBuilder[A: IndexedSource](
   private def buildReturnType(typeDef: Option[TypeArg]): String =
     typeDef.map(buildTypeArgumentName).getOrElse(Any)
 
-  /** The module text the IR locations index: the parser reads a CRLF line
-    * ending as a single character, so the text is normalized the same way.
-    * `None` unless the builder was given a `CharSequence`.
+  /** The module text the IR locations index. The parser's locations are
+    * UTF-16 offsets into the raw text, line endings included, so the text is
+    * used as given. `None` unless the builder was given a `CharSequence` or a
+    * `Rope`.
     */
   private lazy val locationText: Option[String] =
     (source: Any) match {
-      case chars: CharSequence => Some(chars.toString.replace("\r\n", "\n"))
+      case chars: CharSequence => Some(chars.toString)
+      case rope: Rope          => Some(rope.toString)
       case _                   => None
     }
+
+  /** Whether the locations of the IR being built fit the text. The builder is
+    * handed the text and the IR separately, so a pair that has drifted apart
+    * (a stale source, an IR of another version) is detected where it is
+    * cheap to: the IR must not reach past the end of the text.
+    */
+  private var locationsFitText: Boolean = true
 
   /** Build argument default value from the expression.
     *
     * The default is reproduced as the source text the expression was parsed
-    * from: the IR's `showCode` is a debugging format that writes applications
-    * as `((f) args)`. It is only used when the expression has no location.
+    * from, collapsed to one line. The IR's `showCode` is a debugging format
+    * that writes applications as `((f) args)`, so when the text cannot be used
+    * (the expression has no location, or the locations do not fit the text) it
+    * is rendered by [[SuggestionBuilder.renderCode]].
     *
     * @param expr the argument expression
     * @return the argument default value
@@ -797,10 +826,12 @@ final class SuggestionBuilder[A: IndexedSource](
   private def buildDefaultValue(expr: IR): String = {
     val fromSource = for {
       loc  <- expr.location
-      text <- locationText
+      text <- locationText if locationsFitText
       if 0 <= loc.start && loc.start < loc.end && loc.end <= text.length
     } yield text.substring(loc.start, loc.end)
-    fromSource.getOrElse(expr.showCode())
+    fromSource
+      .map(collapseLines)
+      .getOrElse(renderCode(expr))
   }
 
   /** Build scope from the location. */
@@ -819,6 +850,34 @@ final class SuggestionBuilder[A: IndexedSource](
 }
 
 object SuggestionBuilder {
+
+  /** Put a possibly multi-line piece of source on one line: each line is
+    * trimmed and the lines are joined with a space.
+    */
+  def collapseLines(text: String): String =
+    if (!text.exists(c => c == '\n' || c == '\r')) text
+    else
+      text.linesIterator.map(_.trim).filter(_.nonEmpty).mkString(" ")
+
+  /** Render an expression that has no source text to slice, in a readable
+    * form: an application as `f x y` rather than the debug `((f) x y)`.
+    */
+  def renderCode(expr: IR): String =
+    expr match {
+      case app: Application.Prefix =>
+        val args = app.arguments.map { arg =>
+          val value = arg.value match {
+            case nested @ (_: Application.Prefix | _: Operator.Binary) =>
+              s"(${renderCode(nested)})"
+            case other => renderCode(other)
+          }
+          arg.name.map(n => s"${n.name}=$value").getOrElse(value)
+        }
+        (renderCode(app.function) +: args).mkString(" ")
+      case bin: Operator.Binary =>
+        s"${renderCode(bin.left.value)} ${bin.operator.name} ${renderCode(bin.right.value)}"
+      case other => other.showCode()
+    }
 
   /** Creates the suggestion builder for a module.
     *
