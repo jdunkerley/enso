@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [A user documentation site, with guides to the IDE and a reference of every
+  standard library component, drawn as the graph editor shows it, at
+  https://jdunkerley.github.io/enso/.][592]
 - [The Help menu, the Enso menu and the other links to the original company's
   website and community are gone, as are the online documentation links for
   components (including the F1 shortcut). Local versioning commits use your own
@@ -410,6 +413,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[592]: https://github.com/jdunkerley/enso/pull/592
 [593]: https://github.com/jdunkerley/enso/pull/593
 [566]: https://github.com/jdunkerley/enso/pull/566
 [570]: https://github.com/jdunkerley/enso/pull/570

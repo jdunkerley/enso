@@ -4,9 +4,10 @@ The user documentation site: hand-written guides plus a Components reference
 generated from every standard library's `catalogue.json`, one page per function,
 each drawn as the graph editor draws it. Docusaurus 3; React is used here and
 nowhere else in the repository. Published from `develop` to
-`https://jdunkerley.github.io/enso/` (the workflows come with the plan's PR 3).
-Design: `docs/superpowers/specs/2026-11-04-user-docs-site-design.md` (the
-versioning design is its section 6); plan:
+`https://jdunkerley.github.io/enso/` (the workflows are in
+`.github/workflows/docs-site*.yml`; see "CI"). Design:
+`docs/superpowers/specs/2026-11-04-user-docs-site-design.md` (the versioning
+design is its section 6); plan:
 `docs/superpowers/plans/2026-11-04-user-docs-site.md`.
 
 ## Layout
@@ -64,6 +65,47 @@ rm built-distribution.tar
 
 Keep `$SCRATCH` outside the checkout.
 
+## CI
+
+Three routes (`.github/CLAUDE.md` has the workflow notes):
+
+- **A. Engine checks.** `engine-checks-platform.yml` › Docs site (Linux, GraalVM
+  CE) calls `docs-site-build.yml` with the run's distribution: it extracts the
+  catalogues (`scripts/extract-catalogues.sh`), uploads them as
+  `docs-site-catalogues`, generates, builds, runs the browser tests and uploads
+  the site as `docs-site`. A doc comment that breaks the site fails the PR that
+  changes it.
+- **B. Site-only pull requests.** `docs-site.yml` runs when a PR touches
+  `docs-site/` or the GUI code the generator loads. It takes the catalogues of
+  the newest `develop` run that has them and whose commit is an ancestor of the
+  PR's merge commit (Note [Docs Site Catalogues]), then calls the same build
+  with `static-checks` (typecheck, lint, unit tests). These PRs do not run the
+  GUI checks.
+- **C. Deploy.** `docs-site-deploy.yml` publishes a `develop` engine run's
+  `docs-site` artifact with `actions/deploy-pages`, only when the repository
+  variable `DOCS_SITE_DEPLOY` is `true`.
+
+`docs-site.yml`'s `paths` whitelist must cover every file the generator loads;
+`generator/src/workflowPaths.test.ts` crawls the imports of `gui.ts` and fails
+when one is missing. Adding an import to `gui.ts` that leaves the listed
+directories means adding a path. The globs cover whole packages
+(`app/ydoc-shared/**`, `app/common/**`), so most PRs touching those also run
+route B (about 8 minutes); route A runs on every engine-checked PR (about 7.5
+runner-minutes, off the critical path). Both are accepted costs. No pnpm-store
+or Playwright-browser cache yet: each run installs cold.
+
+**Preview a PR's site:** download the `docs-site` artifact of the PR's run,
+unzip it into `docs-site/build`, then
+`corepack pnpm --filter docs-site run serve`.
+
+**One-time Pages setup (the repository owner):** Settings › Pages › Source
+"GitHub Actions"; Settings › Environments › `github-pages` › deployment branches
+`develop` only; Settings › Variables › Actions: `DOCS_SITE_DEPLOY` = `true`.
+Until then the deploy job is skipped. After the first deploy check
+`curl -sI https://jdunkerley.github.io/enso/docs/api/Standard.Table/Table/Table.filter`
+answers a 301 to the slashed URL (OQ 8, the GitHub Pages half); if not, add the
+redirect another way.
+
 ## Rules
 
 - **The generator imports the IDE's code, never copies it**, and only through
@@ -113,6 +155,12 @@ From the catalogues of develop run 41928058656 (2026.1.1-dev):
   20-minute and 10 GB limits, so no fallback is on (`@docusaurus/faster` and
   per-library docs instances were not needed). Windows: 216 s. The output is
   about 310 MB.
+- **CI (`ubuntu-latest`, 4 vCPU, 16 GB, 2026-11-05):** the build step takes 5 to
+  6 minutes (324 s in the engine checks, 317 s and 362 s in `docs-site.yml`)
+  with a peak RSS of 5.8 GiB under the 8 GB heap limit, so the 32-core numbers
+  above are the upper bound and no fallback is needed. The whole job is about
+  7.5 minutes (`timeout-minutes: 30`); with `static-checks` and the WASM build
+  it is the same.
 - **Search index:** `search-index.json` is 13.2 MB, 2.3 MB gzipped, under the 5
   MB limit, so one index serves the whole site (no `searchContextByPaths`).
 - **Dotted paths, local half:** `serve` redirects `…/Table.filter` to

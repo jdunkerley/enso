@@ -1,0 +1,132 @@
+# This file is not auto-generated. Feel free to edit it.
+
+# Builds the user documentation site (`docs-site/`) and uploads it as the `docs-site` artifact,
+# which is the pull request's preview and what `docs-site-deploy.yml` publishes from develop.
+# It only ever downloads from its own run, so it needs no `actions: read` (see Note [Docs Site
+# Catalogues] in `docs-site.yml`). Called with a matrix leg's inputs, so it has no `concurrency:`.
+#
+# Memory: the build runs Node with an 8 GB old-space limit (`docs-site/package.json`); the full
+# reference peaked at 7.7 GiB resident on a 32-core machine, and `ubuntu-latest` has 16 GB, so it
+# fits without a fallback. The measured CI time is in `docs-site/CLAUDE.md`.
+name: Docs Site Build
+
+on:
+  workflow_call:
+    inputs:
+      source:
+        description: >-
+          `distribution`: extract the catalogues from this run's engine distribution artifact and
+          upload them as `docs-site-catalogues` (the engine checks). `catalogues`: use this run's
+          `docs-site-catalogues` artifact (`docs-site.yml`).
+        required: true
+        type: string
+      distribution-artifact:
+        description: "The engine distribution artifact, for `source: distribution`."
+        required: false
+        type: string
+        default: Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
+      static-checks:
+        description: >-
+          Also typecheck, lint and unit-test `docs-site/` (`docs-site.yml`, for pull requests that
+          change only the site; the GUI checks do not run for those). The engine checks leave them
+          to the GUI checks.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build the docs site
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-node
+      # No Rust: the generator loads no WASM; only the Markdown parser fork and the icon list need
+      # building, which `--ignore-scripts` skipped.
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build the Markdown parser and the icon list
+        run: |
+          corepack pnpm --filter @lezer/markdown run prepare
+          corepack pnpm --filter enso-gui run generate-icons
+      # The typecheck follows the imports of the IDE's code into `ydoc-shared/src/ast`, which needs
+      # the generated `ast.ts` and the WASM parser's bindings (`rust-ffi`), as the GUI checks do. The
+      # generator itself loads neither, so the build below runs without. Shares the GUI checks' Rust
+      # cache (`wasm-parser`) and never saves it.
+      - name: Cache the Rust build
+        if: inputs.static-checks
+        uses: ./.github/actions/setup-rust
+        with:
+          shared-key: wasm-parser
+          save: "false"
+      - name: Add the wasm target
+        if: inputs.static-checks
+        run: rustup target add wasm32-unknown-unknown
+      - name: Install wasm-bindgen-cli
+        if: inputs.static-checks
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.128
+      - name: Build the WASM parser and generate the AST types
+        if: inputs.static-checks
+        run: |
+          corepack pnpm --filter rust-ffi run build-wasm
+          corepack pnpm --filter ydoc-shared run generate-ast
+      - name: Typecheck
+        if: inputs.static-checks
+        run: corepack pnpm --filter docs-site run typecheck
+      - name: Lint
+        if: inputs.static-checks
+        run: corepack pnpm --filter docs-site run lint
+      - name: Unit tests
+        if: inputs.static-checks
+        run: corepack pnpm --filter docs-site run test:unit
+      - name: Download the engine distribution
+        if: inputs.source == 'distribution'
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.distribution-artifact }}
+      - name: Extract the catalogues
+        if: inputs.source == 'distribution'
+        run: |
+          bash docs-site/scripts/extract-catalogues.sh built-distribution.tar docs-site-input
+          rm built-distribution.tar
+      - name: Upload the catalogues
+        if: inputs.source == 'distribution'
+        uses: actions/upload-artifact@v5
+        with:
+          name: docs-site-catalogues
+          path: docs-site-input
+          if-no-files-found: error
+      - name: Download the catalogues
+        if: inputs.source == 'catalogues'
+        uses: actions/download-artifact@v5
+        with:
+          name: docs-site-catalogues
+          path: docs-site-input
+      - name: Generate the Components reference
+        run: corepack pnpm --filter docs-site run generate -- --lib "$GITHUB_WORKSPACE/docs-site-input/lib"
+      - name: Build the site
+        run: |
+          start=$(date +%s)
+          /usr/bin/time -v -o time.log corepack pnpm --filter docs-site run build
+          elapsed=$(( $(date +%s) - start ))
+          rss=$(awk '/Maximum resident set size/ {print $NF}' time.log)
+          echo "Site build: ${elapsed}s, peak RSS $(( rss / 1024 )) MiB (of the runner's $(free -m | awk '/Mem:/ {print $2}') MiB)" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Install the browser
+        run: corepack pnpm --filter docs-site exec playwright install --with-deps chromium
+      - name: Accessibility and keyboard tests
+        run: corepack pnpm --filter docs-site run test:e2e
+        env:
+          DOCS_SITE_E2E_FUNCTION: docs/api/Standard.Table/Table/Table.filter/
+          DOCS_SITE_E2E_TYPE: docs/api/Standard.Table/Table/Table/
+      - name: Upload the site
+        uses: actions/upload-artifact@v5
+        with:
+          name: docs-site
+          path: docs-site/build
+          if-no-files-found: error
