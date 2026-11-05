@@ -92,10 +92,10 @@ test('the JVM options reach ENSO_JVM_OPTIONS one per line, after an inherited va
   const p = path.join(root, 'O')
   await runner.openProject(Path(p), 'id-o', undefined, undefined, undefined, {
     ...jvm(),
-    jvmOptions: ['-XX:AOTCache=C:\Users\John Smith\enso.aot', '-Dx=y'],
+    jvmOptions: ['-XX:AOTCache=C:\\Users\\John Smith\\enso.aot', '-Dx=y'],
   })
   expect((await recorded(p)).jvmOptions).toBe(
-    '-Dinherited=1\n-XX:AOTCache=C:\Users\John Smith\enso.aot\n-Dx=y',
+    '-Dinherited=1\n-XX:AOTCache=C:\\Users\\John Smith\\enso.aot\n-Dx=y',
   )
   await runner.closeProject(Path(p))
 })

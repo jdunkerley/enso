@@ -23,7 +23,12 @@ import { join as joinPath } from 'node:path'
 import process from 'node:process'
 import { downloadSamples, runLocalProjectByPath } from 'project-manager-shim'
 import { shutdownClaudeAgent } from './ai/claudeAgent.js'
-import { parseArgs, withoutDeepLink, withoutInstallerFlags } from './configParser.js'
+import {
+  engineModeOption,
+  parseArgs,
+  withoutDeepLink,
+  withoutInstallerFlags,
+} from './configParser.js'
 import { VERSION } from './contentConfig.js'
 import { printInfo, VERSION_INFO } from './debug.js'
 import { initIpc, registerShortcuts, setChromeOptions } from './electron.js'
@@ -337,9 +342,10 @@ class App {
     const backendProfileTime = ['--profiling-time', String(args.debug.profileTime)]
     const backendProfileOpts =
       args.debug.profile ? ['--profiling-path', 'profiling.npss', ...backendProfileTime] : []
-    const backendJvmOpts = args.useJvm ? ['--jvm'] : []
-    const backendOpts = [...backendVerboseOpts, ...backendProfileOpts, ...backendJvmOpts]
-    return setupProjectService(backendOpts, this.electron, this.electronIsDev)
+    const backendOpts = [...backendVerboseOpts, ...backendProfileOpts]
+    return setupProjectService(backendOpts, this.electron, this.electronIsDev, {
+      option: engineModeOption(args),
+    })
   }
 
   /** Start the content server, which will serve the application content (HTML) to the window. */
