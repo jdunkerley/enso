@@ -4,8 +4,9 @@
  * version. Shown only for a local project whose repository is enabled and whose status is known
  * (`$/providers/localVersioning`); an unknown status shows nothing rather than a stale dot.
  *
- * The dot's space is reserved wherever it can appear (a local project whose versions are kept), so that its
- * coming and going does not move what is beside it in the top bar, the zoom controls included.
+ * The dot's space is reserved wherever it can appear (a local project whose versions are kept), so
+ * that its coming and going does not move what is beside it in the top bar, the zoom controls
+ * included.
  */
 import { useLocalVersioning } from '$/providers/localVersioning'
 import type { RunMode } from '$/providers/openedProjects/projectInfo'

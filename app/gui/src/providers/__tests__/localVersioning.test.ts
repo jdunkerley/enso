@@ -791,6 +791,54 @@ describe('save progress and joined saves', () => {
     }
   })
 
+  test('a queued save is made, and the slot is freed, although the save before it rejected', async () => {
+    const first = deferred<{ id: string | null }>()
+    const commitVersion = vi
+      .fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockResolvedValue({ id: 'b'.repeat(40) })
+    const { toasts, store } = setup({ commitVersion })
+    // The first save cannot even report its outcome: it rejects (the toast store throws twice).
+    const boom = () => {
+      throw new Error('boom')
+    }
+    vi.spyOn(toasts, 'update').mockImplementationOnce(boom).mockImplementationOnce(boom)
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
+    const running = store.save(PROJECT, 'First')
+    const rejected = expect(running).rejects.toThrow('boom')
+    await vi.waitFor(() => expect(commitVersion).toHaveBeenCalledTimes(1))
+    const queued = store.save(PROJECT, 'Queued')
+    first.resolve({ id: 'a'.repeat(40) })
+    await rejected
+    await queued
+    expect(commitVersion).toHaveBeenCalledTimes(2)
+    expect(commitVersion).toHaveBeenLastCalledWith(PROJECT, 'Queued')
+    await store.save(PROJECT, 'After')
+    expect(commitVersion).toHaveBeenCalledTimes(3)
+  })
+
+  test('closing the project while a follow-up with a comment is queued says it was not saved', async () => {
+    for (const comment of ['', 'My note']) {
+      const first = deferred<{ id: string | null }>()
+      const commitVersion = vi.fn(() => first.promise)
+      const { toasts, store } = setup({ commitVersion })
+      store.watchProject(PROJECT, FLUSHED)
+      await store.refresh(PROJECT)
+      const running = store.save(PROJECT)
+      await vi.waitFor(() => expect(commitVersion).toHaveBeenCalledTimes(1))
+      const queued = store.save(PROJECT, comment)
+      store.unwatchProject(PROJECT)
+      first.resolve({ id: 'a'.repeat(40) })
+      await Promise.all([running, queued])
+      expect(commitVersion).toHaveBeenCalledTimes(1)
+      const warnings = toasts.toasts.value.filter((t) => t.type === 'warning').map((t) => t.content)
+      expect(warnings).toEqual(
+        comment === '' ? [] : ['The project was closed before your comment could be saved'],
+      )
+    }
+  })
+
   test('each save shows its own progress and result, also one right after another', async () => {
     const gate = deferred<FlushOutcome>()
     const { toasts, store } = setup({
@@ -880,6 +928,17 @@ describe('saveFromShortcut', () => {
     await store.refresh(PROJECT)
     expect(store.statusOf(PROJECT)).toBeUndefined()
     expect(store.saveFromShortcut(PROJECT, false)).toBe(true)
+    expect(store.saveFromShortcut(PROJECT, false)).toBe(true)
+    expect(messages(toasts)).toEqual([
+      ['info', "Versions are not ready yet: the project's status is still being read"],
+    ])
+  })
+
+  test('the first read failed: the hint that it is not ready, not silence', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { toasts, store } = setup({ versioningStatus: vi.fn().mockRejectedValue(new Error('x')) })
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
     expect(store.saveFromShortcut(PROJECT, false)).toBe(true)
     expect(messages(toasts)).toEqual([
       ['info', "Versions are not ready yet: the project's status is still being read"],

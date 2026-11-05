@@ -480,7 +480,9 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       }
       existing.next = next
       addComment(next, comment)
-      next.done = existing.done.then(() => run(projectId, next))
+      // Whatever became of the running save, the queued one is made (and frees the slot).
+      const start = () => run(projectId, next)
+      next.done = existing.done.then(start, start)
     } else {
       addComment(existing.next, comment)
     }
@@ -490,7 +492,13 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   async function makeSave(projectId: ProjectId, running: RunningSave) {
     const project = watched.get(projectId)
     const backend = deps.localBackend()
-    if (project == null || backend == null) return
+    if (project == null || backend == null) {
+      // A queued save's comment has nowhere to go once the project is closed.
+      if (running.followUp === true && running.comment.trim() !== '') {
+        deps.toasts.show(deps.getText('versionCommentNotSaved'), { type: 'warning' })
+      }
+      return
+    }
     const offer = await offerRepository(projectId, 'save')
     if (offer !== 'ready') {
       // 'failed' has its own toast, and the rest need no word.
@@ -579,10 +587,10 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     const status = statuses.get(projectId)
     if (status == null) {
       const git = gitFound.get(projectId)
-      // No git before the first read: nothing to say yet (the key is taken, so the browser's own
-      // save does not fire), and nothing if there is no git at all.
-      if (git === undefined) return true
-      if (!git) return false
+      // No git known before the first read: while it is in flight there is nothing to say (the
+      // key is taken, so the browser's own save does not fire). If it failed, say so.
+      if (git === undefined && !unknown.has(projectId)) return true
+      if (git === false) return false
       hint('notReady', deps.getText('versionStatusNotReady'), 'info')
       return true
     }
