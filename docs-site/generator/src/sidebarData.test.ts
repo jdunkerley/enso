@@ -21,74 +21,90 @@ test('the Components intro sidebar lists the libraries', () => {
   ])
 })
 
-test('one sidebar per library: modules, then types (collapsed) with constructors and methods', () => {
+test('one sidebar per library, the library above its modules (breadcrumbs Library › Module › Type › function); types with constructors and methods; a method defined in another module under that module', () => {
   expect(sidebars['api-Standard.Fixture']).toEqual([
     {
-      type: 'doc',
-      id: 'api/Standard.Fixture/index',
-      label: 'Standard.Fixture',
-    },
-    {
       type: 'category',
-      label: 'Shapes',
-      link: { type: 'doc', id: 'api/Standard.Fixture/Shapes/index' },
-      collapsed: true,
+      label: 'Standard.Fixture',
+      link: { type: 'doc', id: 'api/Standard.Fixture/index' },
+      collapsed: false,
       items: [
         {
           type: 'category',
-          label: 'Shape',
-          link: { type: 'doc', id: 'api/Standard.Fixture/Shapes/Shape/index' },
+          label: 'Shapes',
+          link: { type: 'doc', id: 'api/Standard.Fixture/Shapes/index' },
           collapsed: true,
           items: [
             {
-              type: 'doc',
-              id: 'api/Standard.Fixture/Shapes/Shape.unit/index',
-              label: 'Shape.unit',
+              type: 'category',
+              label: 'Shape',
+              link: { type: 'doc', id: 'api/Standard.Fixture/Shapes/Shape/index' },
+              collapsed: true,
+              items: [
+                {
+                  type: 'doc',
+                  id: 'api/Standard.Fixture/Shapes/Shape.unit/index',
+                  label: 'Shape.unit',
+                },
+                {
+                  type: 'doc',
+                  id: 'api/Standard.Fixture/Shapes/Shape.area/index',
+                  label: 'area',
+                },
+                {
+                  type: 'doc',
+                  id: 'api/Standard.Fixture/Shapes/Shape.op-2b/index',
+                  label: '+',
+                },
+                {
+                  type: 'doc',
+                  id: 'api/Standard.Fixture/Shapes/Shape.undocumented/index',
+                  label: 'undocumented',
+                },
+                {
+                  type: 'doc',
+                  id: 'api/Standard.Fixture/Shapes/Shape.odd_icon/index',
+                  label: 'odd_icon',
+                },
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Square',
+              link: { type: 'doc', id: 'api/Standard.Fixture/Shapes/Square/index' },
+              collapsed: true,
+              items: [
+                {
+                  type: 'doc',
+                  id: 'api/Standard.Fixture/Shapes/Square.Value/index',
+                  label: 'Square.Value',
+                },
+                {
+                  type: 'doc',
+                  id: 'api/Standard.Fixture/Shapes/Square.side/index',
+                  label: 'side',
+                },
+              ],
             },
             {
               type: 'doc',
-              id: 'api/Standard.Fixture/Shapes/Shape.area/index',
-              label: 'area',
-            },
-            {
-              type: 'doc',
-              id: 'api/Standard.Fixture/Shapes/Shape.op-2b/index',
-              label: '+',
-            },
-            {
-              type: 'doc',
-              id: 'api/Standard.Fixture/Shapes/Shape.undocumented/index',
-              label: 'undocumented',
-            },
-            {
-              type: 'doc',
-              id: 'api/Standard.Fixture/Shapes/Shape.odd_icon/index',
-              label: 'odd_icon',
+              id: 'api/Standard.Fixture/Shapes/make_shape/index',
+              label: 'make_shape',
             },
           ],
         },
         {
           type: 'category',
-          label: 'Square',
-          link: { type: 'doc', id: 'api/Standard.Fixture/Shapes/Square/index' },
+          label: 'Measures',
+          link: { type: 'doc', id: 'api/Standard.Fixture/Measures/index' },
           collapsed: true,
           items: [
             {
               type: 'doc',
-              id: 'api/Standard.Fixture/Shapes/Square.Value/index',
-              label: 'Square.Value',
-            },
-            {
-              type: 'doc',
-              id: 'api/Standard.Fixture/Shapes/Square.side/index',
-              label: 'side',
+              id: 'api/Standard.Fixture/Measures/Square.perimeter/index',
+              label: 'perimeter',
             },
           ],
-        },
-        {
-          type: 'doc',
-          id: 'api/Standard.Fixture/Shapes/make_shape/index',
-          label: 'make_shape',
         },
       ],
     },

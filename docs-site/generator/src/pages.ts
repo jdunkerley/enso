@@ -3,7 +3,7 @@ import { posix } from 'node:path'
 import type { CatalogueEntry } from './catalogue'
 import { nodeJsx, nodeProps } from './componentNode'
 import { escapeMdxText, escapeTableCell, linkedType, markdownToMdx } from './mdx'
-import { isFunctionPage, type Page, type SiteModel } from './model'
+import { isFunctionPage, isMethodFromOtherModule, type Page, type SiteModel } from './model'
 import { argumentDescriptions, KNOWN_SECTIONS, splitSections } from './sections'
 import { simpleName } from './typeText'
 
@@ -297,7 +297,9 @@ function modulePage(page: Page, model: SiteModel): string {
     )
   const functions = own.filter((p) => p.kind === 'moduleFunction')
   if (functions.length) parts.push('## Functions', ...functionList(page, functions, model))
-  const extensions = own.filter((p) => p.kind === 'extensionMethod')
+  const extensions = own.filter(
+    (p) => p.kind === 'extensionMethod' || isMethodFromOtherModule(p, model),
+  )
   if (extensions.length)
     parts.push('## Extension methods', ...functionList(page, extensions, model))
   return parts.join('\n\n') + '\n'

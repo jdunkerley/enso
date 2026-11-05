@@ -19,7 +19,7 @@ test('reads the fixture libraries with their groups and catalogues', () => {
     'Standard.Fixture_Ext',
   ])
   expect(libraries[0]!.groups.map((group) => group.name)).toEqual(['Selections', 'Shaping'])
-  expect(libraries[0]!.catalogue?.entries.length).toBe(14)
+  expect(libraries[0]!.catalogue?.entries.length).toBe(16)
 })
 
 test('a library without a catalogue is kept for its groups, with no catalogue', () => {

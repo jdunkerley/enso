@@ -1,4 +1,4 @@
-import { isFunctionPage, type Page, type SiteModel } from './model'
+import { isFunctionPage, isMethodFromOtherModule, type Page, type SiteModel } from './model'
 import { simpleName } from './typeText'
 
 const id = (page: Page) => `api/${page.dir}/index`
@@ -31,7 +31,9 @@ export function buildSidebars(model: SiteModel): Record<string, unknown[]> {
             page.entry.returnType === qualified) ||
             ((page.kind === 'staticMethod' || page.kind === 'instanceMethod') &&
               'selfType' in page.entry &&
-              page.entry.selfType === qualified)),
+              page.entry.selfType === qualified &&
+              // Listed under the module that defines it, where its URL is.
+              !isMethodFromOtherModule(page, model))),
       )
     }
     const orderMembers = (members: Page[]) => [
@@ -57,7 +59,9 @@ export function buildSidebars(model: SiteModel): Record<string, unknown[]> {
         ...pages
           .filter(
             (page) =>
-              (page.kind === 'moduleFunction' || page.kind === 'extensionMethod') &&
+              (page.kind === 'moduleFunction' ||
+                page.kind === 'extensionMethod' ||
+                isMethodFromOtherModule(page, model)) &&
               page.module === module.module,
           )
           .map((page) => doc(page, page.nodeName)),
@@ -67,10 +71,21 @@ export function buildSidebars(model: SiteModel): Record<string, unknown[]> {
       (page) =>
         page.kind !== 'library' && page.kind !== 'module' && page.module === libraryPage.module,
     )
+    // The library is a category above its modules, so a page's breadcrumbs read
+    // Library › Module › Type › function (spec, "Page design"). `Main`'s own members get a
+    // category without a page of its own: the library's page is `Main`'s.
+    const { link: _mainLink, ...mainCategory } = moduleCategory(libraryPage)
     sidebars[`api-${library}`] = [
-      doc(libraryPage, library),
-      ...(mainHasMembers ? [moduleCategory(libraryPage)] : []),
-      ...pages.filter((page) => page.kind === 'module').map(moduleCategory),
+      {
+        type: 'category',
+        label: library,
+        link: { type: 'doc', id: id(libraryPage) },
+        collapsed: false,
+        items: [
+          ...(mainHasMembers ? [mainCategory] : []),
+          ...pages.filter((page) => page.kind === 'module').map(moduleCategory),
+        ],
+      },
     ]
   }
   return sidebars
