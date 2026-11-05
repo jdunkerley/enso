@@ -47,6 +47,16 @@ project-service request with the same message. The `ProjectService` tests skip
 without one; GUI CI on Linux gives them develop's engine distribution artifact
 (`.github/workflows/gui-checks.yml`).
 
+## Sample projects
+
+`installSamples(bundledDir)` (`projectManagement.ts`) copies the samples shipped
+with the application into `<projects>/Samples` when that directory does not
+exist, and does nothing otherwise, so a user's edits and deletions are never
+undone. It copies to `.Samples.<pid>.tmp` and renames, so an interrupted copy
+cannot leave a half-filled `Samples` that blocks later starts. Nothing is
+downloaded (the old `downloadSamples` fetched an unpinned upstream branch on
+every start). Test: `src/__tests__/installSamples.test.ts`.
+
 ## Scope
 
 Historically some advanced features (multi-engine, upgrade) deferred to the old
