@@ -1,12 +1,15 @@
 /** @file Project Manager Shim bindings. */
 
-import { app, net } from 'electron'
+import { app, net, utilityProcess } from 'electron'
 import * as os from 'node:os'
+import * as path from 'node:path'
+import * as readline from 'node:readline'
 import * as url from 'node:url'
 
 import type { Electron } from '@/electron'
 import * as paths from '@/paths'
 import { lazyKeyringEntries, SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
+import { UtilityProcessYdocHost, type YdocHostChild } from '@/ydocHost/client'
 import { getProjectRoot } from 'project-manager-shim'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { defaultSecretsFilePath, encodeKey, LocalSecrets } from 'project-manager-shim/localSecrets'
@@ -21,6 +24,44 @@ let localVersioning: LocalVersioning | null = null
 let localSecrets: LocalSecrets | null = null
 let secretsKeySource: SecretsKeySource | null = null
 let extraArgs: readonly string[] = []
+let ydocHost: UtilityProcessYdocHost | null = null
+
+/**
+ * Fork the ydoc server's utility process (`ydocHost/main.ts`, bundled as `ydocHost.mjs` beside
+ * `index.mjs`). Its output goes through this process's console, so it reaches the IDE's log file.
+ */
+function forkYdocHost(): YdocHostChild {
+  const child = utilityProcess.fork(path.join(import.meta.dirname, 'ydocHost.mjs'), [], {
+    serviceName: 'Enso ydoc server',
+    stdio: 'pipe',
+  })
+  if (child.stdout) {
+    readline.createInterface({ input: child.stdout }).on('line', (line) => console.log(line))
+  }
+  if (child.stderr) {
+    readline.createInterface({ input: child.stderr }).on('line', (line) => console.error(line))
+  }
+  return child
+}
+
+/**
+ * Where opened projects' ydoc servers run under `ENSO_YDOC_HOST=node` (the default): a utility
+ * process, forked on the first open.
+ */
+function getYdocHost(): UtilityProcessYdocHost {
+  ydocHost ??= new UtilityProcessYdocHost(forkYdocHost)
+  return ydocHost
+}
+
+/** Stop the ydoc server's utility process, if it was started. */
+export function disposeYdocHost(): void {
+  ydocHost?.dispose()
+}
+
+/** The engine settings, with the ydoc host. */
+function engineSettingsWithHost(): EngineSettings {
+  return { ...engineSettings, ydocHost: getYdocHost() }
+}
 
 /** The local labels and Recent store, kept in Electron's `userData` directory. */
 export function getLocalMetadata(): LocalMetadata {
@@ -94,7 +135,7 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
       getLocalMetadata(),
       getLocalVersioning(),
       secretsKeyEnvironment,
-      engineSettings,
+      engineSettingsWithHost(),
     )
   }
   return projectService
@@ -116,7 +157,7 @@ export function setupProjectService(
       getLocalMetadata(),
       getLocalVersioning(),
       secretsKeyEnvironment,
-      engineSettings,
+      engineSettingsWithHost(),
     )
   }
   return projectService

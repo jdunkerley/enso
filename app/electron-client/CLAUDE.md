@@ -36,6 +36,21 @@ desktop binary (AppImage/DMG/exe + installer).
   serves project assets to the window and refuses paths outside a project. The
   OS deep-link registration (`setAsDefaultProtocolClient`) was removed: there
   are no deep links.
+- Hosts the opened projects' ydoc servers in an Electron **utility process**
+  (`src/ydocHost/`, spec stage 1a of the JVM-by-default plan), not in the
+  engine: `main.ts` (bundled as `ydocHost.mjs` beside `index.mjs`, since
+  `esbuild-plugin-wasm` resolves the WASM file only from `./`) runs
+  `ydoc-server`'s `NodeYdocHost`, one WebSocket listener per opened project,
+  each talking to its engine's Language Server over the channel sockets.
+  `client.ts`'s `UtilityProcessYdocHost` is the shim's `YdocHost` on the main
+  side (`listen`/`close` messages answered by id, `protocol.ts`): forked on the
+  first open, forked again at once with the open listeners if it exits (once a
+  minute; after that only on the next request), killed on `will-quit`. It prints
+  `ydoc host pid=<pid>` at start; its stdout and stderr go through the main
+  process's console, so they reach the IDE log. `ENSO_YDOC_HOST=engine` puts the
+  server back in the engine for one release (see
+  `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
+  `tests/headless/ydocHostClient.test.ts` (against a fake child).
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).
@@ -141,6 +156,9 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   scripts still set it, but the bundled engine is whatever is in
   `ENSO_BUILD_BACKEND`.
 - `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
+- `ENSO_YDOC_HOST` (`node` | `engine`, default `node`) — where opened projects'
+  ydoc servers run: the utility process above, or (the one-release rollback)
+  inside the engine.
 - `ENSO_ENGINE_MODE` (`native` | `jvm`) — which engine projects get, below
   `--engine-mode` and a project's `package.yaml` `jvm:` key (see
   `project-manager-shim/CLAUDE.md`, "Engine mode"). `--engine-mode <mode>` is
