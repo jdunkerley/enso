@@ -12,6 +12,7 @@ import * as path from 'node:path'
 import * as portfinder from 'portfinder'
 import { CommandError, runCommand as runChildCommand } from '../childProcess/runCommand.js'
 import type { ResolvedEngineMode } from './engineMode.js'
+import { jvmOptionsValue } from './jvmOptions.js'
 import { ENGINE_TIMEOUTS, engineTimeouts, type EngineTimeouts } from './timeouts.js'
 import { Path } from './types.js'
 
@@ -207,8 +208,7 @@ function modeArgs(launch: EngineLaunch | undefined): readonly string[] {
 function jvmOptionsEnv(launch: EngineLaunch | undefined): Record<string, string> {
   const options = launch?.jvmOptions ?? []
   if (options.length === 0) return {}
-  const inherited = process.env.ENSO_JVM_OPTIONS?.trim()
-  return { ENSO_JVM_OPTIONS: [...(inherited ? [inherited] : []), ...options].join('\n') }
+  return { ENSO_JVM_OPTIONS: jvmOptionsValue(process.env.ENSO_JVM_OPTIONS, options) }
 }
 
 const DEFAULT_JSONRPC_PORT = 30616
