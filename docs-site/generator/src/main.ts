@@ -11,6 +11,13 @@ import { buildModel, isFunctionPage } from './model'
 import { writeSite } from './output'
 import { formatReport } from './report'
 
+/**
+ * The fewest function pages a run with `--lib` may write, unless `--min-function-pages` says
+ * otherwise: 80 % of the 3244 the develop distribution gave on 2026-11-05, rounded down to a
+ * hundred. Fewer means a catalogue came out empty or truncated. `--fixtures` runs have no floor.
+ */
+export const MIN_FUNCTION_PAGES = 2500
+
 const SITE_DIR = fileURLToPath(new URL('../..', import.meta.url))
 
 const { values } = parseArgs({
@@ -30,7 +37,7 @@ if (!roots.length) {
 const model = buildModel(readLibraries(roots))
 writeSite(model, SITE_DIR)
 console.info(formatReport(model))
-const floor = Number(values['min-function-pages'] ?? 0)
+const floor = Number(values['min-function-pages'] ?? (values.lib?.length ? MIN_FUNCTION_PAGES : 0))
 const functionPages = model.pages.filter(isFunctionPage).length
 if (functionPages < floor) {
   console.error(

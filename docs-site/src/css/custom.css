@@ -9,8 +9,9 @@
   --ifm-color-primary-lightest: #008bb3;
 }
 
+/* The dark ramp starts lighter than #4fb7d6, which is 4.47:1 on a striped table row (#404042). */
 [data-theme="dark"] {
-  --ifm-color-primary: #4fb7d6;
+  --ifm-color-primary: #62c1dd;
   --ifm-color-primary-dark: #35acd0;
   --ifm-color-primary-darker: #2ea4c7;
   --ifm-color-primary-darkest: #2687a4;

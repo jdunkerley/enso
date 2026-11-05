@@ -50,7 +50,8 @@
 .param {
   padding-left: 4px;
   border-left: 2px solid #0003;
-  color: #fffc;
+  /* Full white: 80 % white on the fallback colour is 4.46:1, under WCAG's 4.5:1. */
+  color: #fff;
   font-weight: 400;
 }
 .optional {
