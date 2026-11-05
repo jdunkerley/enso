@@ -117,6 +117,37 @@ describe('LanguageServerSession', () => {
       expect(request.connection).toBeGreaterThanOrEqual(connectionsBefore)
     }
   })
+
+  test('a released session never connects to the Language Server again', async () => {
+    // Its retries outlive it: a session whose Language Server went away keeps reading its initial
+    // state and then restarting its client on a backoff. Under the Node ydoc host, which outlives
+    // its engines, a released session that reconnected opened the modules again on the restarted
+    // engine, beside the session the GUI had moved to (#593).
+    const ls = fakeLanguageServer()
+    const released = LanguageServerSession.get(
+      'ws://released-test',
+      ls.server,
+      noChannels,
+      noChannels,
+      {} as JavaByteBufferClass,
+    )
+    await vi.waitFor(() => expect(ls.requests.map((r) => r.method)).toContain('file/list'))
+    await released.release()
+    const connectionsBefore = ls.connections()
+    const requestsBefore = ls.requests.length
+
+    const restartClient = (released as any).restartClient.bind(released) as () => Promise<
+      Result<void>
+    >
+    await restartClient()
+    const readInitialState = (released as any).readInitialState.bind(released) as () => Promise<
+      Result<void>
+    >
+    await readInitialState()
+
+    expect(ls.connections()).toBe(connectionsBefore)
+    expect(ls.requests.slice(requestsBefore)).toEqual([])
+  })
 })
 
 const MAIN = 'main = 1\n'

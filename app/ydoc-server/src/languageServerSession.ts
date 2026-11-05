@@ -70,6 +70,8 @@ export class LanguageServerSession {
   visualizationBridge: VisualizationBridge
   /** The control channel (`ydoc-shared/ydocControl`): the GUI asks for its modules to be written. */
   control: YjsChannel<string>
+  /** Released for the last time: it must not reach the Language Server again. */
+  private disposed = false
 
   static DEBUG = false
 
@@ -152,6 +154,9 @@ export class LanguageServerSession {
   }
 
   private restartClient() {
+    // A retry that outlived the session: reconnecting would open its modules again on the
+    // Language Server, beside the session that replaced it (#593).
+    if (this.disposed) return Promise.resolve(Ok())
     this.ls.reconnect()
     return exponentialBackoff(() => this.readInitialState())
   }
@@ -237,6 +242,7 @@ export class LanguageServerSession {
   }
 
   private async readInitialState(): Promise<Result<void>> {
+    if (this.disposed) return Ok()
     return await withContext(
       () => 'When reading initial state',
       async () => {
@@ -346,6 +352,7 @@ export class LanguageServerSession {
   async release(): Promise<void> {
     this.retainCount -= 1
     if (this.retainCount !== 0) return
+    this.disposed = true
     this.unregister()
     this.visualizationBridge.close()
     this.control.close()
