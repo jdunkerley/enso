@@ -87,6 +87,7 @@ describe('RailFooter', () => {
 
   test('Settings and About act; there is no menu', async () => {
     await mountFooter()
+    // `element.click()`: user-event's pointer sequence does not reach `MenuButton`'s handler in jsdom.
     settingsButton().click()
     expect(openSettingsTab).toHaveBeenCalledOnce()
     expect(useAboutModal().isOpen.value).toBe(false)

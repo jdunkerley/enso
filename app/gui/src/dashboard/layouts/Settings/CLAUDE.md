@@ -16,7 +16,7 @@ tab.
   shortcuts. The page opens on Local (`DEFAULT_TAB`), or on the first tab shown
   when there is no local backend. There is no Account tab: the local user has no
   account settings (it showed only the stand-in name and a note), so it went
-  with the settings cog (the left rail's settings menu opens the page). The
+  with the settings cog (the left rail's Settings button opens the page). The
   cloud's tabs (Organization, Billing & Plans, Members, User groups, Activity
   log, API keys, Usage) were deleted with the cloud UI, and so were their
   `SettingsTabType` values. `SettingsTab.vue` lays out a tab's sections; a form
