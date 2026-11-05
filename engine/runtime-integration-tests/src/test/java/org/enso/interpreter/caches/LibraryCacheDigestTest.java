@@ -3,6 +3,7 @@ package org.enso.interpreter.caches;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.io.DataOutputStream;
@@ -176,17 +177,153 @@ public class LibraryCacheDigestTest {
    */
   @Test
   public void aCachedModuleNamingAModuleItsLibraryNoLongerHasIsRecompiled() throws IOException {
-    // An import names a module if there is one, and a type otherwise: in the first tree
-    // `project.Shapes.Thing` is a module, in the second a type in `project.Shapes`.
-    var main = "import project.Shapes.Thing\n\nmain = Thing.answer\n";
-    var first = createLibrary("first", Map.of("Main", main, "Shapes.Thing", "answer = 1\n"));
+    var first =
+        createLibrary("first", Map.of("Main", SHADOWING_MAIN, "Shapes.Thing", "answer = 1\n"));
+    var second =
+        createLibrary(
+            "second", Map.of("Main", SHADOWING_MAIN, "Shapes", "type Thing\n    answer = 2\n"));
+    assertStaleCacheIsNotUsed(first, second, "Main", 1L, 2L);
+  }
+
+  /**
+   * An import names a module if there is one, and a type otherwise: `project.Shapes.Thing` is
+   * either the module `Shapes/Thing.enso` or the type `Thing` in `Shapes`.
+   */
+  private static final String SHADOWING_MAIN =
+      "import project.Shapes.Thing\n\nmain = Thing.answer\n";
+
+  /**
+   * The mirror image of the above: a module `Shapes/Thing.enso` is added next to the type `Thing`
+   * in an unchanged `Shapes.enso`, which `Main`'s cached IR resolved its import to. Compiled
+   * afresh, that is a conflict; from the caches it used to run the old `Thing.answer` silently.
+   * `Shapes`'s digest covers the modules in its directory (Note [A Cached Module Follows Its
+   * Directory] in {@code ModuleCache}), so `Shapes` is compiled and reports the conflict.
+   */
+  @Test
+  public void aModuleThatNowShadowsAnImportedTypeIsNotHiddenByTheCache() throws IOException {
+    var shapes = "type Thing\n    answer = 1\n";
+    var first = createLibrary("first", Map.of("Main", SHADOWING_MAIN, "Shapes", shapes));
     assertEquals(1L, run(first, ctx -> {}));
+    assertNotNull("the first tree writes Shapes's IR cache", findIrCache("Shapes.meta"));
 
     var second =
-        createLibrary("second", Map.of("Main", main, "Shapes", "type Thing\n    answer = 2\n"));
-    // As `indexStdLibs` compiles, which is where #584 was seen.
+        createLibrary(
+            "second",
+            Map.of("Main", SHADOWING_MAIN, "Shapes", shapes, "Shapes.Thing", "answer = 2\n"));
+    var error = assertThrows(RuntimeException.class, () -> run(second, ctx -> {}));
+    assertTrue(error.getMessage(), error.getMessage().contains("Conflicting resolutions"));
+  }
+
+  /**
+   * A module added to `Shapes/` is exported by `Shapes`, although `Shapes.enso` is unchanged: its
+   * cached IR, which does not export it, is not used.
+   */
+  @Test
+  public void aModuleAddedToADirectoryIsExportedByItsCachedParent() throws IOException {
+    var shapes = "answer = 1\n";
+    var first =
+        createLibrary(
+            "first",
+            Map.of(
+                "Main",
+                "import project.Shapes\n\nmain = Shapes.answer\n",
+                "Shapes",
+                shapes,
+                "Shapes.Circle",
+                "radius = 1\n"));
+    var second =
+        createLibrary(
+            "second",
+            Map.of(
+                "Main",
+                "import project.Shapes\n\nmain = Shapes.Square.side\n",
+                "Shapes",
+                shapes,
+                "Shapes.Circle",
+                "radius = 1\n",
+                "Shapes.Square",
+                "side = 2\n"));
+    assertStaleCacheIsNotUsed(first, second, "Shapes", 1L, 2L);
+  }
+
+  /**
+   * The last resort: a cached `BindingsMap` that names a module that is gone, although its cache's
+   * record says nothing of it (here the record is cut by hand), is compiled from source with a
+   * warning, not a fatal "Cannot deserialize BindingsMap". See Note [A Cache That Does Not Load Is
+   * A Miss] in {@code Cache}.
+   */
+  @Test
+  public void aCachedBindingsMapThatDoesNotResolveIsRecompiled() throws IOException {
+    var first =
+        createLibrary("first", Map.of("Main", SHADOWING_MAIN, "Shapes.Thing", "answer = 1\n"));
+    assertEquals(1L, run(first, ctx -> {}));
+    var meta = findIrCache("Main.meta");
+    dropRecordedModules(meta);
+
+    var second =
+        createLibrary(
+            "second", Map.of("Main", SHADOWING_MAIN, "Shapes", "type Thing\n    answer = 2\n"));
     compile(second, false);
     assertEquals(2L, run(second, ctx -> {}));
+  }
+
+  /**
+   * Runs {@code first}, which writes the IR cache of {@code module}; then runs {@code second},
+   * which must not load {@code module} from it; then, after {@code first} has written its cache
+   * again, compiles {@code second} as `indexStdLibs` does (where #584 was seen).
+   */
+  private void assertStaleCacheIsNotUsed(
+      Path first, Path second, String module, long firstAnswer, long secondAnswer)
+      throws IOException {
+    assertEquals(firstAnswer, run(first, ctx -> {}));
+    assertNotNull("the first tree writes " + module + "'s IR cache", findIrCache(module + ".meta"));
+    var loaded = new boolean[] {true};
+    assertEquals(
+        secondAnswer,
+        run(
+            second,
+            ctx -> {
+              var found = ctx.findModule("local." + name + "." + module);
+              loaded[0] = found.isPresent() && found.get().wasLoadedFromCache();
+            }));
+    assertFalse("the second tree does not load " + module + " from the cache", loaded[0]);
+
+    assertEquals(firstAnswer, run(first, ctx -> {}));
+    compile(second, false);
+    assertEquals(secondAnswer, run(second, ctx -> {}));
+  }
+
+  private Path findIrCache(String fileName) throws IOException {
+    if (irCacheDir == null || !Files.isDirectory(irCacheDir)) {
+      return null;
+    }
+    try (var files = Files.walk(irCacheDir)) {
+      return files
+          .filter(f -> f.getFileName().toString().equals(fileName))
+          .findFirst()
+          .orElse(null);
+    }
+  }
+
+  /** Rewrites a `ModuleCache` metadata file as if its IR named no modules. */
+  private static void dropRecordedModules(Path meta) throws IOException {
+    assertNotNull("the IR cache was written", meta);
+    var out = new java.io.ByteArrayOutputStream();
+    try (var in = new java.io.DataInputStream(Files.newInputStream(meta));
+        var dos = new DataOutputStream(out)) {
+      for (var i = 0; i < 3; i++) {
+        dos.writeUTF(in.readUTF()); // source digest, blob digest, compilation stage
+      }
+      dos.writeInt(in.readInt()); // LibraryDependencies.FORMAT
+      var libraries = in.readInt();
+      dos.writeInt(libraries);
+      for (var i = 0; i < libraries * 3; i++) {
+        dos.writeUTF(in.readUTF());
+      }
+      assertTrue("Main records the module it names", in.readInt() > 0);
+      dos.writeInt(0);
+    }
+    Files.write(meta, out.toByteArray());
   }
 
   /**
@@ -202,13 +339,10 @@ public class LibraryCacheDigestTest {
     var first =
         createLibrary(
             "first", Map.of("Main", main, "Shapes", shapes, "Shapes.Circle", "radius = 1\n"));
-    assertEquals(1L, run(first, ctx -> {}));
-
     var second =
         createLibrary(
             "second", Map.of("Main", main, "Shapes", shapes, "Shapes.Square", "side = 2\n"));
-    compile(second, false);
-    assertEquals(1L, run(second, ctx -> {}));
+    assertStaleCacheIsNotUsed(first, second, "Shapes", 1L, 1L);
   }
 
   @Test

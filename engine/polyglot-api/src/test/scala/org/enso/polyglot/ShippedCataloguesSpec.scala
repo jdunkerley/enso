@@ -173,7 +173,11 @@ class ShippedCataloguesSpec
           ) { in =>
             in.readUTF() // source hash
             in.readUTF() // blob hash
-            in.readInt() // `LibraryDependencies.FORMAT`
+            withClue(
+              s"$meta starts its record with `LibraryDependencies.FORMAT`: "
+            ) {
+              in.readInt() shouldEqual -584
+            }
             (0 until in.readInt()).map { _ =>
               (s"${in.readUTF()}.${in.readUTF()}", in.readUTF())
             }

@@ -48,12 +48,17 @@ final class ImportResolver(compiler: Compiler) extends ImportResolverForIR {
             BindingAnalysis,
             s"Non-parsed module ${module.getName} used in ImportResolver"
           )
+          // A cached `BindingsMap` resolves its module references lazily, on
+          // first use: here, so that one naming a module that is gone takes the
+          // recovery below (Note [A Cache That Does Not Load Is A Miss] in
+          // `Cache`).
+          currentLocal.resolvedImports
           (ir, currentLocal)
         } catch {
           case ex: IOException =>
             context.logSerializationManager(
               Level.WARNING,
-              "Deserialization of " + module.getName() + " failed",
+              "Deserialization of " + current.getName() + " failed",
               ex
             )
             context.updateModule(

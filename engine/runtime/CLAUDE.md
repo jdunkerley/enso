@@ -60,8 +60,10 @@ and links the required Graal/Truffle background reading.
   context (`LibrarySourceHashes`), so two checkouts of a library with the same
   name and version share them only when their sources match; see Note [Library
   Caches Are Keyed By The Sources]. A module's IR cache stays keyed by its own
-  source; a cached module whose same-library import changed is recompiled (Note
-  [A Cached Module Follows Its Library's Imports] in `Compiler`).
+  source and the names of the modules in its directory (Note [A Cached Module
+  Follows Its Directory] in `ModuleCache`); a cached module whose same-library
+  import changed is recompiled (Note [A Cached Module Follows Its Library's
+  Imports] in `Compiler`).
 - **IR caches record the other libraries they refer to.** A module's IR cache
   and a library's bindings cache record the source hash of every other library
   their IR names, and the modules it names there and in its own library, and

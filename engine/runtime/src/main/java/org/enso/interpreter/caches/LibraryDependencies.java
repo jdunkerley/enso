@@ -91,8 +91,18 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
    * which is converted lazily, failed at the import resolution that follows
    * the load ("Cannot deserialize BindingsMap"), fatally: before Note [A Cached
    * Module Follows Its Library's Imports] could compile it again.
-   * `indexStdLibs` hit it. Now such a cache is a miss when it is loaded. What a
-   * module that is still there resolved names to is still left to that Note.
+   * `indexStdLibs` hit it. Now such a cache is a miss when it is loaded. A
+   * module that lost its source file and is now synthetic (standing for its
+   * directory only) is caught too: each module is recorded with whether it was
+   * synthetic, since the importer cached IR naming a type in `Shapes.enso` and
+   * synthetic modules are never loaded from source, so Note [A Cached Module
+   * Follows Its Library's Imports] cannot fire for them. This check catches
+   * only a module that is gone or changed kind. A module added to a directory
+   * (new exports, or a module that now shadows an imported type) changes the
+   * digest of the directory's module instead (Note [A Cached Module Follows
+   * Its Directory] in `ModuleCache`). What a module that is still there
+   * resolved names to is left to Note [A Cached Module Follows Its Library's
+   * Imports].
    *
    * Granularity: an edit anywhere in a library costs the caches that name it.
    * Released libraries never change; a standard-library developer recompiles
@@ -112,6 +122,20 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
   static final int FORMAT = -584;
 
   /**
+   * Marks a recorded module that had no source file of its own (a synthetic module, standing for a
+   * directory): a module that gains or loses its file changes what it defines, and a cache naming
+   * it is a miss. Not a character a module name can hold.
+   */
+  private static final String SYNTHETIC = "~";
+
+  /** The module as recorded: its name, marked if it is synthetic. */
+  private static String recorded(EnsoContext context, QualifiedName module) {
+    var name = module.toString();
+    var loaded = context.getPackageRepository().getLoadedModule(name);
+    return loaded.isDefined() && loaded.get().isSynthetic() ? SYNTHETIC + name : name;
+  }
+
+  /**
    * The other libraries the IR just written refers to, with their current source hashes.
    *
    * @param referenced the modules {@link CacheUtils#createPool} saw in the IR
@@ -128,7 +152,7 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
         continue;
       }
       if (library.get().equals(own)) {
-        modules.add(module.toString());
+        modules.add(recorded(context, module));
         continue;
       }
       var key = library.get().qualifiedName();
@@ -143,7 +167,7 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
         }
         hashes.put(key, new Library(library.get(), hash.get()));
       }
-      modules.add(module.toString());
+      modules.add(recorded(context, module));
     }
     modules.sort(Comparator.naturalOrder());
     return Optional.of(new LibraryDependencies(List.copyOf(hashes.values()), List.copyOf(modules)));
@@ -192,12 +216,22 @@ public record LibraryDependencies(List<Library> libraries, List<String> modules)
         return false;
       }
     }
-    for (var module : modules) {
-      if (repository.getLoadedModule(module).isEmpty()) {
+    for (var entry : modules) {
+      var synthetic = entry.startsWith(SYNTHETIC);
+      var module = synthetic ? entry.substring(SYNTHETIC.length()) : entry;
+      var loaded = repository.getLoadedModule(module);
+      if (loaded.isEmpty()) {
         logger.log(
             Level.FINE,
             "The cache of [{0}] refers to the module [{1}], which no longer exists.",
             new Object[] {cacheName, module});
+        return false;
+      }
+      if (loaded.get().isSynthetic() != synthetic) {
+        logger.log(
+            Level.FINE,
+            "The cache of [{0}] refers to the module [{1}], whose source file was {2}.",
+            new Object[] {cacheName, module, synthetic ? "added" : "removed"});
         return false;
       }
     }
