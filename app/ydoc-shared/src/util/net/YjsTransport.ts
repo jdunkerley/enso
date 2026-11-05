@@ -178,6 +178,9 @@ export class YjsTransport extends Transport {
  *
  * Every {@link connect} hands the LS a fresh pair of channels, and {@link close} closes them, so
  * after a reconnect only the new LS connection receives messages.
+ *
+ * The LS may also end a channel itself (Note [The Language Server Ends A Channel]); the transport
+ * then closes, as if {@link close} had been called.
  */
 export class YjsServerTransport extends YjsTransport {
   private readonly proxyChannelName: string
@@ -196,21 +199,37 @@ export class YjsServerTransport extends YjsTransport {
    * Initiate the channel subscription.
    */
   override connect(): Promise<void> {
-    const proxyConnect = new Promise<void>((resolve) => {
-      this.languageServerChannels = [
-        new YjsChannel(this.doc, this.proxyChannelName),
-        new YjsChannel(this.doc, this.channelName),
-      ]
-      for (const channel of this.languageServerChannels) this.server.onConnect(channel)
-      resolve()
+    const channels = [
+      new YjsChannel(this.doc, this.proxyChannelName),
+      new YjsChannel(this.doc, this.channelName),
+    ]
+    this.languageServerChannels = channels
+    for (const channel of channels) this.server.onConnect(channel)
+    return super.connect().then(() => {
+      // Note [The Language Server Ends A Channel]
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // In the engine the channels end only with the engine, which takes this ydoc server down
+      // with it. Over sockets (the Node ydoc host's `remoteChannelServer`) the ydoc server outlives
+      // the engine: a channel ends when its Language Server exits, restarts or drops the socket.
+      // A transport left open would keep sending into a channel nobody reads, each request waiting
+      // for its timeout, and its session would hold its modules (and their write capabilities)
+      // while the GUI reconnects to a fresh one. So the end of either channel of the current pair
+      // closes the transport: its `LanguageServer` reports `transport/closed`, and the session
+      // gives up its URL (`LanguageServerSession.setupClient`).
+      for (const channel of channels) {
+        channel.onClose(() => {
+          if (this.languageServerChannels.includes(channel)) this.close()
+        })
+      }
     })
-    return proxyConnect.then(() => super.connect())
   }
 
   /** Close the channel and clean up subscriptions. */
   override close(): void {
-    for (const channel of this.languageServerChannels) channel.close()
+    const channels = this.languageServerChannels
+    // Cleared first: the channels' own close handlers must not close the transport again.
     this.languageServerChannels = []
+    for (const channel of channels) channel.close()
     super.close()
   }
 }
