@@ -36,6 +36,42 @@ desktop binary (AppImage/DMG/exe + installer).
   serves project assets to the window and refuses paths outside a project. The
   OS deep-link registration (`setAsDefaultProtocolClient`) was removed: there
   are no deep links.
+- Hosts the opened projects' ydoc servers in an Electron **utility process**
+  (`src/ydocHost/`, spec stage 1a of the JVM-by-default plan), not in the
+  engine: `main.ts` (bundled as `ydocHost.mjs` beside `index.mjs`, since
+  `esbuild-plugin-wasm` resolves the WASM file only from `./`) runs
+  `ydoc-server`'s `NodeYdocHost`, one WebSocket listener per opened project,
+  each talking to its engine's Language Server over the channel sockets.
+  `client.ts`'s `UtilityProcessYdocHost` is the shim's `YdocHost` on the main
+  side (`listen`/`close` messages answered by id, `protocol.ts`): forked at
+  start-up (`setupProjectService` calls `start()` under the Node host; forking
+  it on the first open put ~0.4 s on Windows, ~0.2 s on Linux, in front of that
+  project's engine, measured), and killed on `will-quit`. If it exits it is
+  forked again with the open listeners: at once, then, while it keeps dying
+  within a minute of its start, after 1, 2, 4 and 8 s; after five such restarts
+  it waits for the next open or close and logs that (Note [The ydoc Host
+  Restarts With A Bounded Backoff] in `client.ts`). Its `error` event (a fatal
+  V8 error) is logged; unhandled it would throw in the main process. A `listen`
+  on a port another open listener holds (one still being restored after a
+  restart) is refused as `EADDRINUSE`, so the shim searches new ports instead of
+  handing that project's GUI to another engine. In the process, `serve.ts`
+  chains one port's requests, so a `close` cannot overtake a restoring `listen`.
+  It prints `ydoc host pid=<pid>` at start; its stdout and stderr go through the
+  main process's console, so they reach the IDE log. `ENSO_YDOC_HOST=engine`
+  puts the server back in the engine for one release (see
+  `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
+  `tests/headless/ydocHostClient.test.ts` (against a fake child),
+  `tests/headless/ydocHostServe.test.ts`.
+- Installs the bundled sample projects at start-up (`installSamples` in
+  `project-manager-shim`, called from `onStart`): `samples/` in this package is
+  shipped as `resources/samples` (`extraResources`) and copied to
+  `<projects>/Samples` only when that directory is missing. Nothing is
+  downloaded. The samples are original and use synthetic data; each is a project
+  (`package.yaml`, `src/Main.enso`, `data/`) that must run on the current
+  engine, so re-run them with `enso --run` after a standard-library change that
+  touches `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
+  Playwright spec adds its own `tests/fixtures/sample_bank_data.xlsx` to
+  `Samples/Data` (`addBankData`).
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).
@@ -141,6 +177,9 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   scripts still set it, but the bundled engine is whatever is in
   `ENSO_BUILD_BACKEND`.
 - `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
+- `ENSO_YDOC_HOST` (`node` | `engine`, default `node`) — where opened projects'
+  ydoc servers run: the utility process above, or (the one-release rollback)
+  inside the engine.
 - `ENSO_ENGINE_MODE` (`native` | `jvm`) — which engine projects get, below
   `--engine-mode` and a project's `package.yaml` `jvm:` key (see
   `project-manager-shim/CLAUDE.md`, "Engine mode"). `--engine-mode <mode>` is

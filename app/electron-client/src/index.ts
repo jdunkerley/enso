@@ -9,7 +9,7 @@
 
 import './cjs-shim' // must be imported first
 
-import { appPath, assetsPath } from '@/paths'
+import { appPath, assetsPath, samplesPath } from '@/paths'
 import type { BrowserWindowConstructorOptions, WebPreferences } from 'electron'
 import { PRODUCT_NAME } from 'enso-common/src/constants'
 import {
@@ -21,7 +21,7 @@ import { Path } from 'enso-common/src/utilities/file'
 import { access, constants, readFile, writeFile } from 'node:fs/promises'
 import { join as joinPath } from 'node:path'
 import process from 'node:process'
-import { downloadSamples, runLocalProjectByPath } from 'project-manager-shim'
+import { installSamples, runLocalProjectByPath } from 'project-manager-shim'
 import { shutdownClaudeAgent } from './ai/claudeAgent.js'
 import {
   engineModeOption,
@@ -45,6 +45,7 @@ import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from '.
 import { capitalizeFirstLetter } from './naming.js'
 import {
   disposeJvmAotCache,
+  disposeYdocHost,
   getLocalMetadata,
   getLocalSecrets,
   getLocalVersioning,
@@ -171,7 +172,7 @@ class App {
       setChromeOptions(electron)
       enableAll()
 
-      this.onStart(this.electron).catch((err) => {
+      this.onStart(this.electron, this.electronIsDev).catch((err) => {
         console.error(err)
       })
 
@@ -185,6 +186,10 @@ class App {
 
       this.electron.app.on('before-quit', () => {
         void disposeJvmAotCache()
+      })
+
+      this.electron.app.on('will-quit', () => {
+        disposeYdocHost()
       })
 
       this.electron.app.on('second-instance', (_event, argv) => {
@@ -223,7 +228,7 @@ class App {
   }
 
   /** Background tasks scheduled on the application startup. */
-  async onStart(electron: Electron | undefined) {
+  async onStart(electron: Electron | undefined, electronIsDev: boolean) {
     const writeVersionInfoPromise = (async () => {
       if (!electron) return
       const userData = electron.app.getPath('userData')
@@ -242,9 +247,9 @@ class App {
       return writeFile(versionInfoPath, JSON.stringify(VERSION_INFO), 'utf8')
     })()
 
-    const downloadSamplesPromise = downloadSamples()
+    const installSamplesPromise = installSamples(samplesPath(electron, electronIsDev))
 
-    return Promise.allSettled([writeVersionInfoPromise, downloadSamplesPromise])
+    return Promise.allSettled([writeVersionInfoPromise, installSamplesPromise])
   }
 
   /** Process the command line arguments. */

@@ -12,6 +12,7 @@ import * as path from 'node:path'
 import * as portfinder from 'portfinder'
 import { renameWithRetry } from '../localMetadata/jsonFile.js'
 import { aotCreateArguments, jvmOptionsValue } from '../projectService/jvmOptions.js'
+import { newChannelToken } from '../projectService/ydocHost.js'
 import { driveOpen } from './driver.js'
 import { enginePaths, readJvmOptionsText } from './key.js'
 
@@ -59,11 +60,6 @@ const HEALTH_FAST_PERIOD_MS = 1000
 const HEALTH_INTERVAL_MS = 250
 /** How much of the engine's output is kept, to say why a training failed. */
 const OUTPUT_TAIL_LENGTH = 4096
-
-/** A fresh `LANGUAGE_SERVER_CHANNEL_TOKEN`: 32 random bytes as hex. */
-function newToken(): string {
-  return crypto.randomBytes(32).toString('hex')
-}
 
 function abortError(): DOMException {
   return new DOMException('The AOT training was aborted', 'AbortError')
@@ -230,7 +226,7 @@ export class EngineTrainer implements Trainer {
         port: this.options.firstPort ?? DEFAULT_FIRST_PORT,
       })
       if (signal.aborted) throw abortError()
-      const token = newToken()
+      const token = newChannelToken()
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         ENSO_JVM_OPTIONS: jvmOptionsValue(process.env.ENSO_JVM_OPTIONS, [

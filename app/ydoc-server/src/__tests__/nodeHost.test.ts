@@ -137,6 +137,18 @@ test('listen resolves once the port accepts, and close frees it', async () => {
   await host.close(port) // an unknown port is a no-op
 })
 
+test('a server error after listening is logged, and the host stays up', async () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const server = (
+    host as unknown as { listeners: Map<number, { server: NodeJS.EventEmitter }> }
+  ).listeners.get(port)!.server
+  expect(() => server.emit('error', new Error('first'))).not.toThrow()
+  expect(() => server.emit('error', new Error('second'))).not.toThrow()
+  expect(error).toHaveBeenCalledTimes(2)
+  error.mockRestore()
+  await expect(connectTcp(port)).resolves.toBeUndefined()
+})
+
 test('a second listen on a port replaces the first listener', async () => {
   await host.listen({ host: '127.0.0.1', port, languageServer: ls.address() })
   await expect(connectTcp(port)).resolves.toBeUndefined()

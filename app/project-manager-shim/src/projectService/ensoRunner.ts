@@ -15,6 +15,7 @@ import type { ResolvedEngineMode } from './engineMode.js'
 import { jvmOptionsValue } from './jvmOptions.js'
 import { ENGINE_TIMEOUTS, engineTimeouts, type EngineTimeouts } from './timeouts.js'
 import { Path } from './types.js'
+import { newChannelToken, ydocHostKind, type YdocHost } from './ydocHost.js'
 
 const HEALTHCHECK_FAILURES_TO_RESTART = 3
 const LOAD_HEALTHCHECK_INTERVAL = 250
@@ -50,7 +51,9 @@ export function loadHealthcheckDelay(elapsedMs: number): number {
  * a native engine: 300 to 450 ms after `/_health`, the same with or without probing). It
  * is bounded by `ydocWaitMs` (an engine without a ydoc server, such as a fake one in a test, only
  * delays the answer by that), and the startup timeout does not apply once the health check has
- * passed, so the wait can never get a healthy engine killed.
+ * passed, so the wait can never get a healthy engine killed. Under the Node ydoc host (the default,
+ * `ydocHost.ts`) the shim's listener is up before the engine is even spawned, so there is nothing to
+ * wait for and the wait is skipped.
  */
 const YDOC_POLL_INTERVAL = 10
 /** How long one connection attempt to the ydoc port may take. */
@@ -184,6 +187,7 @@ export interface ShutdownHookRegistry {
   'rename-project-directory': true
   'remove-from-list': true
   'version-on-close': true
+  'close-ydoc-listener': true
 }
 
 export type ShutdownHookType = keyof ShutdownHookRegistry
@@ -236,6 +240,11 @@ const STDERR_TAIL_LENGTH = 4096
 const STDERR_END_TIMEOUT_MS = 1000
 /** What a language server prints when it cannot bind its port (Akka, the JVM; Windows and Unix). */
 const PORT_IN_USE = /address already in use|EADDRINUSE|BindException/i
+
+/** Whether a ydoc host's `listen` failed because the port was taken after the search found it. */
+function listenPortInUse(error: unknown): boolean {
+  return PORT_IN_USE.test(error instanceof Error ? error.message : String(error))
+}
 
 class OpenedProject {
   loaded: Promise<void>
@@ -549,7 +558,9 @@ export class EnsoRunner implements Runner {
    * for an engine's free ports starts; `startupTimeoutMs` is how long an engine has to pass its
    * first health check before it is killed. `ydocWaitMs` is how long an open then waits for the
    * engine's ydoc port to accept connections (0, the default, does not wait: an engine that has no
-   * ydoc server, as the fakes of the tests, would only delay its open).
+   * ydoc server, as the fakes of the tests, would only delay its open). `ydocHost` serves the ydoc
+   * server outside the engine when `ENSO_YDOC_HOST` is `node` (the default); without one, the engine
+   * serves it, as under `ENSO_YDOC_HOST=engine`.
    */
   constructor(
     private ensoPath: Path,
@@ -557,6 +568,7 @@ export class EnsoRunner implements Runner {
       readonly firstPort?: number
       readonly startupTimeoutMs?: number
       readonly ydocWaitMs?: number
+      readonly ydocHost?: YdocHost | undefined
     } = {},
   ) {}
 
@@ -688,6 +700,32 @@ export class EnsoRunner implements Runner {
           this.options.firstPort ?? DEFAULT_JSONRPC_PORT,
         )
         const rootId = crypto.randomUUID()
+        // Each engine gets its own token, which the Language Server requires of a channel socket.
+        const token = newChannelToken()
+        const nodeHost = ydocHostKind() === 'node' ? this.options.ydocHost : undefined
+        if (nodeHost) {
+          try {
+            await nodeHost.listen({
+              host: '127.0.0.1',
+              port: ydocPort,
+              languageServer: { host: '127.0.0.1', port: jsonPort, token },
+            })
+          } catch (error) {
+            // As for the engine's own ports: taken between the search and the bind, so search again.
+            if (attempt >= PORT_ATTEMPTS || !listenPortInUse(error)) throw error
+            console.warn(
+              `The ydoc listener for project ${projectPath} could not bind its port; looking for new ports.`,
+            )
+            continue
+          }
+        }
+        const closeListener = async () => {
+          try {
+            await nodeHost?.close(ydocPort)
+          } catch (error) {
+            console.error(`Failed to close the ydoc listener of project ${projectPath}:`, error)
+          }
+        }
         const args: readonly string[] = [
           ...modeArgs(launch),
           '--server',
@@ -706,41 +744,52 @@ export class EnsoRunner implements Runner {
 
         const env = {
           ...process.env,
-          LANGUAGE_SERVER_YDOC_PORT: ydocPort.toString(),
+          ...(nodeHost ? {} : { LANGUAGE_SERVER_YDOC_PORT: ydocPort.toString() }),
+          LANGUAGE_SERVER_CHANNEL_TOKEN: token,
           ...jvmOptionsEnv(launch),
           ...(extraEnv ? Object.fromEntries(extraEnv) : {}),
         }
 
         const cwd = path.dirname(projectPath)
-        const project = await OpenedProject.create(
-          projectPath,
-          jsonPort,
-          ydocPort,
-          () =>
-            this.runProcess(args, (cmd, cmdArgs) =>
-              childProcess.spawn(cmd, cmdArgs, {
-                env,
-                detached: false,
-                cwd,
-                stdio: ['pipe', 'inherit', 'pipe'],
-                windowsHide: true,
-              }),
-            ),
-          logSink,
-          launch?.timeouts.startupMs ??
-            this.options.startupTimeoutMs ??
-            LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
-          launch?.timeouts.ydocWaitMs ?? this.options.ydocWaitMs ?? 0,
-          launch?.timeouts.terminateMs ?? terminateTimeoutMs(),
-        )
+        let project: OpenedProject
+        try {
+          project = await OpenedProject.create(
+            projectPath,
+            jsonPort,
+            ydocPort,
+            () =>
+              this.runProcess(args, (cmd, cmdArgs) =>
+                childProcess.spawn(cmd, cmdArgs, {
+                  env,
+                  detached: false,
+                  cwd,
+                  stdio: ['pipe', 'inherit', 'pipe'],
+                  windowsHide: true,
+                }),
+              ),
+            logSink,
+            launch?.timeouts.startupMs ??
+              this.options.startupTimeoutMs ??
+              LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
+            // Nothing to wait for when the shim's listener serves the port (Note [Open Waits For
+            // The Ydoc Port]).
+            nodeHost ? 0 : (launch?.timeouts.ydocWaitMs ?? this.options.ydocWaitMs ?? 0),
+            launch?.timeouts.terminateMs ?? terminateTimeoutMs(),
+          )
+        } catch (error) {
+          await closeListener()
+          throw error
+        }
         project.shutdownHooks.set('remove-from-list', () => {
           this.runningProjects.delete(projectPath)
           this.loadingProjects.delete(projectPath)
         })
+        if (nodeHost) project.shutdownHooks.set('close-ydoc-listener', closeListener)
         try {
           await project.loaded
           return project
         } catch (error) {
+          await closeListener()
           if (attempt >= PORT_ATTEMPTS || !(await project.failedToBindPort())) throw error
           console.warn(
             `Language Server for project ${projectPath} could not bind its port; looking for new ports.`,

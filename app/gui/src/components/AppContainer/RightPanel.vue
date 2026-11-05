@@ -113,6 +113,7 @@ registerHandlers({
   <div class="RightPanel withBackgroundColor bg-dashboard" data-testid="right-panel">
     <SizeTransition width :duration="250">
       <div v-if="component != null" class="sizeWrapper">
+        <div class="shadow" />
         <div ref="contentElement" class="content" :style="widthStyle">
           <PanelContents
             v-slot="{ toolbarElement }"
@@ -171,15 +172,21 @@ registerHandlers({
  * the framerate drastically.
  */
 .sizeWrapper {
+  position: relative;
   height: 100%;
   min-width: 0;
   flex-grow: 1;
   background-color: var(--panel-background);
 }
 
+/* The rail runs the full height, up over the top bar's strip; the open panel's content stays below
+ * the bar. */
 .rightBar {
+  position: relative;
   display: flex;
   flex-direction: column;
+  margin-top: calc(-1 * var(--top-bar-height));
+  background-color: var(--color-dashboard-background);
 }
 
 .tabs {
@@ -207,5 +214,10 @@ registerHandlers({
     0 18px 85px 0 rgb(0 0 0 / 3%);
   clip-path: polygon(-100vw 0, 100% 0, 100% 100%, -100vw 100%);
   z-index: -1;
+}
+/* The rail goes up through the top bar's strip, but its shadow starts below it. */
+.rightBar > .shadow {
+  top: var(--top-bar-height);
+  height: calc(100% - var(--top-bar-height));
 }
 </style>

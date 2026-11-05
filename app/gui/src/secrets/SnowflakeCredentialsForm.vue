@@ -5,7 +5,6 @@
  */
 import * as snowflake from '$/secrets/serviceCredentials/snowflake'
 import type { CredentialRecipe } from '$/secrets/serviceCredentials/types'
-import Button from '$/components/Button/Button.vue'
 import Form from '$/components/Form/Form.vue'
 import Input from '$/components/Inputs/Input.vue'
 import { useText } from '$/providers/text'
@@ -35,13 +34,6 @@ async function submit(values: Parameters<typeof snowflake.submitForm>[2]) {
     class="w-full"
     @submit="submit"
   >
-    <Button
-      variant="link"
-      href="https://help.enso.org/docs/using-enso/connecting-to-snowflake#oauth-integration"
-      target="_blank"
-    >
-      {{ getText('snowflakeIntegrationGetHelp') }}
-    </Button>
     <Input name="name" :label="getText('name')" />
     <Input name="account" :label="getText('snowflakeCredentialAccount')" />
     <Input name="clientId" :label="getText('snowflakeCredentialClientId')" autocomplete="off" />
