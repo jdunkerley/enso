@@ -1,11 +1,14 @@
 # ydoc-server
 
 Yjs server that bridges the Enso Language Server and GUI clients (Yjs/CRDT over
-WebSocket). It runs inside the engine's JVM via `ydoc-server-polyglot`
-(GraalJS), in development too, and reaches the language server through
-in-process channel callbacks. The plain Node build is used only by the
-Playwright mocks (`gui/integration-test/mock/localApi.ts`). It holds a Yjs
-document per opened Enso module and reconciles local edits with LS file state.
+WebSocket). It runs in Node beside the engine (`NodeYdocHost`, "Node host"
+below): in the IDE in an Electron utility process, under `dev:vite` in the dev
+server itself, reaching the Language Server over its channel sockets. Under
+`ENSO_YDOC_HOST=engine` (the one-release rollback) it still runs inside the
+engine's JVM via `ydoc-server-polyglot` (GraalJS), through in-process channel
+callbacks. The Playwright mocks (`gui/integration-test/mock/localApi.ts`) use
+its `WSSharedDoc`/`YjsConnection` directly. It holds a Yjs document per opened
+Enso module and reconciles local edits with LS file state.
 
 ## Role in the architecture
 
@@ -46,14 +49,25 @@ This server:
 - `src/fileFormat.ts` — Enso `.enso` file serialization.
 - `src/YjsBinaryChannel.ts` — custom binary channel over Yjs (for metadata the
   engine doesn't parse).
+- `src/nodeHost.ts`, `src/remoteChannelServer.ts`, `src/nodeByteBuffer.ts` — the
+  Node host (see "Node host" below).
 - `src/inspect.ts` — developer instrumentation; gated by env vars and used by
   `ydoc-inspect`.
 
 ## Running
 
-- In dev: `dev:vite` does not start a ydoc server. It points the GUI at the
-  engine's (`ENSO_IDE_YDOC_SERVER_URL`, default `ws://<host>:5976`); override
-  with `ENSO_IDE_YDOC_SERVER_URL=ws://host:port`.
+- In the IDE: Electron's utility process (`electron-client/src/ydocHost/`) hosts
+  one listener per opened project; the project-manager shim asks it to listen
+  before it starts the engine (`project-manager-shim/CLAUDE.md`, "ydoc host").
+- In dev: `dev:vite` hosts it in the dev server's own Node: `vite.config.ts`
+  loads this package through Vite's SSR loader (`ssrYdocHost`; the compiled
+  `dist/` does not run in plain Node) and hands the shim middleware a
+  `NodeYdocHost`. The GUI takes each project's ydoc address from `project/open`.
+  A change here reaches the next opened project after a dev server restart (the
+  host is created once).
+- `ENSO_YDOC_HOST=engine` (rollback, one release): the engine serves ydoc on the
+  port the shim passes as `LANGUAGE_SERVER_YDOC_PORT`; a hand-started
+  `enso --server` serves none unless that variable is set.
 - Standalone: `pnpm run dev:inspect` runs the server through `ydoc-inspect`.
 - Polyglot (inside engine): see `ydoc-server-polyglot/`.
 
@@ -86,10 +100,84 @@ This server:
 - The Polyglot variant runs on GraalJS — only a subset of Node APIs is
   available. Check that any new dep works in both `node` and `graaljs` before
   importing.
-- **This code runs in the engine's JVM** (`ydoc-server-polyglot`, packed into
-  the engine's `ydoc-server` jar), so a change reaches the IDE only through a
-  rebuilt engine — an installer built with `--backend-source local` against an
-  old engine still runs the old server.
+- **Under `ENSO_YDOC_HOST=engine` this code runs in the engine's JVM**
+  (`ydoc-server-polyglot`, packed into the engine's `ydoc-server` jar), so a
+  change reaches that path only through a rebuilt engine. The default Node host
+  is bundled into the Electron client (`ydocHost.mjs`) instead.
+
+## Node host
+
+`NodeYdocHost` (`src/nodeHost.ts`) runs this server in a plain Node process
+instead of the engine's GraalJS: `listen({ host, port, languageServer })` starts
+one WebSocket listener per opened project (resolving once the port accepts; a
+second `listen` on a port replaces the first), `close(port)` and `closeAll()`
+stop them. It reaches the Language Server through `remoteChannelServer`
+(`src/remoteChannelServer.ts`), a `YjsChannelServer` whose every channel is one
+WebSocket to `ws://<host>:<port>/channel/<kind>?token=<token>`, kind being
+`json`, `binary`, `vis-control` or `vis-data`. Messages sent before the socket
+opens are buffered; text frames are strings, binary frames `Uint8Array`s. The
+token is the engine's `LANGUAGE_SERVER_CHANNEL_TOKEN`; the Language Server
+refuses a socket without it. Bytes are `Uint8Array`s (`nodeByteBufferClass`,
+whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
+
+- **One session opens two `json` sockets**, not one: `YjsServerTransport` hands
+  the Language Server a proxy channel (for the GUI) and a backend channel (the
+  ydoc server's own). The Language Server must accept both.
+- **An LS restart takes the GUI sockets with it.** When a `json` socket closes
+  without the ydoc side having closed it, the listener closes every GUI socket
+  it holds and the session goes with them; the GUI reconnects, as after an
+  engine restart when the server lived in the engine. The session's own
+  `YjsServerTransport` closes too when the Language Server ends either of its
+  channels (Note [The Language Server Ends A Channel] in
+  `ydoc-shared/src/util/net/YjsTransport.ts`), so the session gives up its URL
+  at once. Before that, a session outlived the engine's restart, sent into dead
+  channels for ~75 s and then took `src/Main.enso`'s write capability from the
+  GUI's new session (#593).
+- **A new session makes the GUI rebuild its project stores.** When the Node host
+  restarts, the Language Server keeps running, but the GUI's JSON session over
+  the old proxy socket ends with the process (and the Language Server destroys
+  that client's execution context); the new session's proxy socket is a session
+  nobody initializes. Each session adds its id to the index doc's
+  `serverSessions` (Note [A New Server Session] in `ydoc-shared/yjsModel.ts`). A
+  GUI that sees a second id calls `reconnectProject`, which rebuilds the
+  project's stores with a new `ls=` name (deferred to the end of an opening
+  under way) and shows a toast: edits that had not reached a live session, and
+  the project view's own state, are lost. An engine restart should take the same
+  path in both host modes (the Node host's sockets are dropped with the engine,
+  and under `ENSO_YDOC_HOST=engine` the server dies with it), but that is #602
+  and unverified; under the engine host a restart on new ports leaves the GUI
+  retrying the old `ydocUrl`, which this does not cover.
+- **Every session reference is released.** The process outlives its engines, so
+  a session that is never released lives on with its Language Server client: a
+  connection refused because its doc is unknown (a GUI reconnecting with the
+  module doc ids of an earlier session) releases the session it was handed.
+- **Sessions are process-global.** `LanguageServerSession.sessions` is keyed by
+  the GUI's `ls=` name, not by listener, so one Node process hosting several
+  listeners relies on those names being distinct. They are: the GUI's `ls=` is
+  `gui-rpc-<random uuid>`, made per opened project
+  (`gui/src/providers/openedProjects/project/project.ts`), not the Language
+  Server's address. A client that reused one name across projects would be
+  handed the other project's session (and that listener's `dropClients` would
+  not cover it).
+- **`listen` calls for one port must not overlap**: await each; two concurrent
+  calls both pass `close` and the second fails with EADDRINUSE. (Electron's
+  utility process chains them per port,
+  `electron-client/src/ydocHost/serve.ts`.)
+- A listener's server error after it started is logged, not thrown: one process
+  hosts every project's listener.
+- **Channel sockets have no `maxPayload`** (`0`), like the in-process channels
+  they replace; `ws`'s 100 MiB default would close a channel on a large
+  visualization frame. The token is only sent to loopback hosts (`channelUrl`
+  throws otherwise).
+- A socket that fails to connect (the Language Server gone, or a 403 for a wrong
+  token, logged as a misconfiguration) is reported after a doubling delay (250
+  ms to 5 s) so the GUI's reconnecting is not a hot loop. A GUI socket error
+  (bad frame) closes only that socket.
+- A closed session closes the Language Server ends of its visualization channels
+  too (`VisualizationBridge.close`): in Node each is a socket.
+- The four socket races (#214 first message on open, #396 shared data channel,
+  #409 double close, #494 local terminate) are re-tested on this transport in
+  `__tests__/nodeHost.test.ts`, 50 cycles each, against a fake Language Server.
 
 ## Control channel
 

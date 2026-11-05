@@ -38,7 +38,13 @@ class VisualizationBridgeActorSpec
 
     override def subscribe(messageHandler: Consumer[Object]): Unit = ()
 
-    override def onClose(closeHandler: Runnable): Unit = ()
+    val closeHandlers: ConcurrentLinkedQueue[Runnable] =
+      new ConcurrentLinkedQueue[Runnable]()
+
+    override def onClose(closeHandler: Runnable): Unit =
+      closeHandlers.add(closeHandler)
+
+    def close(): Unit = closeHandlers.forEach(_.run())
   }
 
   private def pollSentAsString(
@@ -555,6 +561,67 @@ class VisualizationBridgeActorSpec
     msg must include(requestId)
     msg must include(""""diagnostic"""")
     msg must include("runtime panic")
+
+    system.stop(actor)
+  }
+
+  private def attachAndReject(
+    actor: akka.actor.ActorRef,
+    runtime: TestProbe
+  ) = {
+    val requestId = UUID.randomUUID().toString
+    val attachJson =
+      s"""{"kind":"attach","requestId":"$requestId",
+         |"visualizationId":"${UUID.randomUUID()}","contextId":"${UUID
+        .randomUUID()}",
+         |"nodeExternalId":"${UUID
+        .randomUUID()}","request":{"visualizationModule":"M",
+         |"expression":"identity"}}""".stripMargin
+    actor ! ControlMessage(attachJson)
+    val fwd = runtime.expectMsgType[Api.Request]
+    actor ! Api.Response(fwd.requestId, Api.ModuleNotFound("Missing.Module"))
+  }
+
+  it must "watch the closing of the channels it is given" in {
+    val runtime = TestProbe()
+    val actor = system.actorOf(
+      VisualizationBridgeServer.props(runtime.ref, system.eventStream)
+    )
+    val (controlServer, dataServer) = VisualizationBridgeServer.callbacks(actor)
+    val control                     = new RecordingChannel
+    val data                        = new RecordingChannel
+    controlServer.onConnect(control)
+    dataServer.onConnect(data)
+    control.closeHandlers.size() must be(1)
+    data.closeHandlers.size() must be(1)
+
+    // Closing is a normal end: the actor survives and drops the channels.
+    control.close()
+    data.close()
+    attachAndReject(actor, runtime)
+    Thread.sleep(200)
+    control.sent.isEmpty must be(true)
+    val probe = TestProbe()
+    probe.watch(actor)
+    probe.expectNoMessage(scala.concurrent.duration.DurationInt(300).millis)
+
+    system.stop(actor)
+  }
+
+  it must "keep a newer control channel when an older one closes" in {
+    val runtime = TestProbe()
+    val actor = system.actorOf(
+      VisualizationBridgeServer.props(runtime.ref, system.eventStream)
+    )
+    val older = new RecordingChannel
+    val newer = new RecordingChannel
+    actor ! ControlChannelEstablished(older)
+    actor ! ControlChannelEstablished(newer)
+    actor ! ControlChannelClosed(older)
+
+    attachAndReject(actor, runtime)
+    pollSentAsString(newer) must include(""""kind":"failed"""")
+    older.sent.isEmpty must be(true)
 
     system.stop(actor)
   }

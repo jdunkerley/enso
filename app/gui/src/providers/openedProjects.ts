@@ -7,9 +7,11 @@ import {
   type ProjectAsset,
 } from 'enso-common/src/services/Backend'
 import { Err, Ok, type Result, type ResultError } from 'enso-common/src/utilities/data/result'
-import { shallowReactive } from 'vue'
+import { effectScope, shallowReactive } from 'vue'
 import type { ProjectInfo, RunningProjectInfo } from './openedProjects/projectInfo'
 import { useProjectStates, type ProjectState } from './openedProjects/projectStates'
+import { useText } from './text'
+import { useToasts } from './toasts'
 
 /** A reason given to AbortController when opening, restoring or closing process is being aborted. */
 const PROCESS_ABORTED = 'aborted'
@@ -31,6 +33,11 @@ export interface Project {
     | undefined
   /** Error of the last unsuccessful step of opening, closing or restoring. */
   error: ResultError | Error | undefined
+  /**
+   * A reconnect asked for while the project was opening: carried out once the opening finishes
+   * ({@link OpenedProjectsStore.reconnectProject}).
+   */
+  reconnectPending?: boolean
 }
 
 /**
@@ -45,6 +52,8 @@ export function createOpenedProjectsStore() {
   const projects = shallowReactive(new Map<ProjectId, Project>())
 
   const projectStates = useProjectStates()
+  const toasts = useToasts()
+  const { getText } = useText()
   const projectReadyCallbacks: ((project: Project) => void)[] = []
 
   /** Open project. */
@@ -130,6 +139,46 @@ export function createOpenedProjectsStore() {
     return Ok()
   }
 
+  /**
+   * Make an initialized project's stores again, against its running engine: the ydoc server
+   * session they were made with was replaced (Note [A New Server Session] in `ydoc-shared`'s
+   * `yjsModel.ts`), so their Language Server session and execution context are gone. The old
+   * stores' scope is stopped, which closes their sockets; the project is not opened in the backend
+   * again. Edits that had not reached a live session before then are lost with the old stores, and
+   * so is the project view's own state (selection, undo history, open panels): the user is told.
+   *
+   * A project still opening (or reopening) gets the reconnect when its opening finishes: the store
+   * that asks may be the one being made, and a session replaced while it is made must not be
+   * dropped. A project closing, or not opened, is left alone.
+   */
+  function reconnectProject(id: ProjectId) {
+    const project = projects.get(id)
+    if (project == null) return
+    const process = project.nextTask?.process
+    if (process === 'opening' || process === 'restoring') {
+      project.reconnectPending = true
+      return
+    }
+    if (process != null) return
+    const state = project.state
+    if (state.status !== 'initialized') return
+    project.reconnectPending = false
+    console.warn(`The ydoc server of project ${state.info.title} was replaced; reconnecting.`)
+    toasts.show(getText('projectConnectionRestarted'), {
+      type: 'warning',
+      toastId: `project-connection-restarted-${id}`,
+      autoClose: false,
+    })
+    state.scope.stop()
+    project.state = {
+      status: 'opened',
+      info: state.info,
+      runningId: state.runningId,
+      scope: effectScope(),
+    }
+    void performProcess(project, 'opening')
+  }
+
   /** Perform a process across mulitple project states until finished or errored. */
   async function performProcess(project: Project, process: Process) {
     const abort = new AbortController()
@@ -164,6 +213,10 @@ export function createOpenedProjectsStore() {
         const promise = PROCESS_STEPS[process](project.state, abort.signal)
         project.nextTask = promise ? { abort, promise, process } : undefined
       } while (project.nextTask != null)
+      if (project.reconnectPending) {
+        if (project.state.status === 'initialized') reconnectProject(project.state.info.id)
+        else project.reconnectPending = false
+      }
     } catch (err) {
       if (err === PROCESS_ABORTED) {
         console.log(`${process} process aborted.`)
@@ -272,6 +325,7 @@ export function createOpenedProjectsStore() {
     closeAllProjects,
     renameProject,
     restoreProject,
+    reconnectProject,
     get,
     listProjects,
     isProjectOpening,

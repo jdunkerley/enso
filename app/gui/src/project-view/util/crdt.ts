@@ -84,7 +84,9 @@ export function attachProvider(
   doc.on('subdocs', onSubdocs)
 
   function dispose() {
-    provider.disconnect()
+    // `destroy`, not `disconnect`: y-websocket's check and resync intervals, cleared only by
+    // `destroy`, would keep the provider and its doc alive after the store is gone (#593).
+    provider.destroy()
     provider.off('sync', onSync)
     provider.off('connection-close', onDrop)
     provider.off('connection-error', onDrop)

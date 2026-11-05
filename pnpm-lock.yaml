@@ -1019,6 +1019,9 @@ importers:
       modern-isomorphic-ws:
         specifier: ^1.0.5
         version: 1.0.5(@types/ws@8.5.13)(ws@8.21.3)
+      ws:
+        specifier: ^8.18.0
+        version: 8.21.3
       y-protocols:
         specifier: ^1.0.7
         version: 1.0.7(yjs@13.6.32)

@@ -8,7 +8,6 @@
  * When running dev server, the config variables are grabbed from appropriate .env file.
  */
 const DEFAULT_CONFIG = {
-  HOST: import.meta.env.ENSO_IDE_HOST,
   ENVIRONMENT: import.meta.env.ENSO_IDE_ENVIRONMENT,
   SENTRY_DSN: import.meta.env.ENSO_IDE_SENTRY_DSN,
   VERSION: import.meta.env.ENSO_IDE_VERSION,

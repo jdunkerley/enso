@@ -5,7 +5,6 @@ import { standardBaseMainPath, type ProjectPath } from '@/util/projectPath'
 import {
   qnJoin,
   qnLastSegment,
-  qnSegments,
   type Identifier,
   type IdentifierOrOperatorIdentifier,
   type QualifiedName,
@@ -206,24 +205,6 @@ export function entryDisplayOwner(entry: SuggestionEntry & IsMemberOf): Qualifie
 /** Type predicate for {@link SuggestionEntry} that have the `memberOf` field. */
 export function entryHasOwner(entry: SuggestionEntry): entry is SuggestionEntry & IsMemberOf {
   return entry.kind === SuggestionKind.Method || entry.kind === SuggestionKind.Constructor
-}
-
-const DOCUMENTATION_ROOT = 'https://help.enso.org/docs/api'
-
-/** TODO: Add docs */
-export function suggestionDocumentationUrl(entry: SuggestionEntry): string | undefined {
-  if (entry.kind !== SuggestionKind.Method && entry.kind !== SuggestionKind.Function) return
-
-  const { project, path } = entry.definedIn
-  if (!project?.startsWith('Standard.') || !path) return
-
-  const functionPath = entry.definitionPath.path
-  if (!functionPath) return
-  const postPath = functionPath.replace(`${path}.`, '')
-
-  // The path should be split into qualified name segments as the definition file.
-  // The function Path (e.g. Table.filter) is kept as a single part of the URL.
-  return [DOCUMENTATION_ROOT, project, ...qnSegments(path), postPath].join('/')
 }
 
 export { isRequiredArgument } from './argument'

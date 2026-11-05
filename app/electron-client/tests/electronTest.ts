@@ -250,14 +250,14 @@ export async function fillWidgetText(
 }
 
 /**
- * Wait for the Samples folder download
- * This function retries to access passed file every 5 sec, fails after 1 min
+ * Wait for a file to appear.
+ * This function retries to access the passed file every 5 sec, fails after 1 min.
  */
-export async function waitForDownload(pathToFile: string): Promise<void> {
+export async function waitForFile(pathToFile: string): Promise<void> {
   const start = Date.now()
   while (true) {
     try {
-      await fs.access(pathToFile) // ✅ file exists
+      await fs.access(pathToFile) // file exists
       return
     } catch {
       if (Date.now() - start > 60_000) {
@@ -266,6 +266,22 @@ export async function waitForDownload(pathToFile: string): Promise<void> {
       await new Promise((r) => setTimeout(r, 5_000))
     }
   }
+}
+
+/**
+ * Put the bank data of the Getting Started exercises (a generated workbook, see `tests/fixtures`)
+ * into `Samples/Data` of the projects directory.
+ *
+ * The IDE copies its bundled samples to `Samples` at start-up and skips that when the directory
+ * exists, so this first waits for a bundled sample to be there. Returns the workbook's path.
+ */
+export async function addBankData(projectsDir: string): Promise<string> {
+  const samples = path.join(projectsDir, 'Samples')
+  await waitForFile(path.join(samples, 'Sales_Overview', 'package.yaml'))
+  const target = path.join(samples, 'Data', 'sample_bank_data.xlsx')
+  await fs.mkdir(path.dirname(target), { recursive: true })
+  await fs.copyFile(path.join(import.meta.dirname, 'fixtures', 'sample_bank_data.xlsx'), target)
+  return target
 }
 
 /** Open drop-down menu in WidgetSelection with given label. */
@@ -375,4 +391,16 @@ export async function showAllComponents(page: Page) {
 /** Find and click + button in an empty Vector Widget inside provided locator. */
 export function addFirstElementToWidgetVector(locator: Locator) {
   return locator.getByRole('list').filter({ hasText: /^$/ }).getByLabel('Add a new item').click()
+}
+
+/**
+ * Leave the mouse where nothing is under it and it is off both rails (the left one runs the
+ * window's full height, so the corner (0, 0) is on it): the empty bottom of the right rail.
+ */
+export async function parkMouse(page: Page): Promise<void> {
+  const { width, height } = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }))
+  await page.mouse.move(width - 24, height - 100)
 }

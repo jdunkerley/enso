@@ -126,6 +126,18 @@ export function createProjectStore(
   })
 
   const projectModel = new DistributedProject(doc)
+  // A new ydoc server session has none of this store's Language Server session, execution context
+  // or module docs (Note [A New Server Session] in `ydoc-shared`'s `yjsModel.ts`): the project's
+  // stores are made again. Deferred, since that stops this store's own scope.
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+  const stopObservingSessions = projectModel.observeServerSessionReplaced(() => {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = setTimeout(() => openedProjects.reconnectProject(projectAssetId))
+  })
+  onScopeDispose(() => {
+    stopObservingSessions()
+    clearTimeout(reconnectTimer)
+  })
   // Writes the open modules before a version is saved (`flush.ts`). Made before any module doc is
   // added to the index doc, so that it tracks each one's deletions from the start. A flush while
   // the index doc is not connected and synced is refused: the request could not reach the ydoc
@@ -454,6 +466,16 @@ export function createProjectStore(
   lsRpcConnection.on('refactoring/projectRenamed', ({ oldNormalizedName, newNormalizedName }) => {
     projectNames.onProjectRenamed(oldNormalizedName, newNormalizedName)
   })
+
+  // The awareness's own check interval would otherwise keep the index doc, and with it every module
+  // doc, alive after the store is gone (#593). After the whole scope has stopped: the stores made
+  // after this one in the same scope (module, graph) clean up against these docs.
+  onScopeDispose(() =>
+    setTimeout(() => {
+      awareness.internal.destroy()
+      doc.destroy()
+    }),
+  )
 
   return proxyRefs({
     setObservedFileName(name: string) {

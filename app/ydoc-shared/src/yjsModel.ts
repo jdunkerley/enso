@@ -70,6 +70,11 @@ export class DistributedProject {
    *  {@link observeVisualizationsDoc}.
    */
   visualizationsContainer: Y.Map<Y.Doc>
+  /**
+   * The ids of the ydoc server sessions that have served this doc, one per session (Note [A New
+   * Server Session]).
+   */
+  serverSessions: Y.Array<string>
 
   /** TODO: Add docs */
   constructor(doc: Y.Doc) {
@@ -78,6 +83,45 @@ export class DistributedProject {
     this.modules = this.doc.getMap('modules')
     this.settings = this.doc.getMap('settings')
     this.visualizationsContainer = this.doc.getMap('visualizations')
+    this.serverSessions = this.doc.getArray('serverSessions')
+  }
+
+  /* Note [A New Server Session]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * A client's Language Server session, its execution context and its module and visualization
+   * docs belong to the ydoc server session that served its index doc. When that session goes (the
+   * ydoc host restarted, or the engine the ydoc server ran in), the client's index doc reconnects
+   * to a new session that has none of them: the client's requests reach a Language Server session
+   * that was never initialized, its execution context was destroyed with the old one (so nothing
+   * recomputes), and its module docs are unknown. Each session therefore adds its own id to
+   * `serverSessions` when it starts; a client that has met one session and then sees another id
+   * arrive knows it was replaced, and must make its project stores again
+   * (`observeServerSessionReplaced`). An array, not a map key: a client syncing its old state into
+   * the new session would make a map key a conflict either side could win.
+   */
+
+  /** Record the start of a ydoc server session. Called by the session, once, as it starts. */
+  markServerSession(id: string): void {
+    this.serverSessions.push([id])
+  }
+
+  /**
+   * Call `onReplaced` whenever a ydoc server session other than those this client met first starts
+   * serving the doc (Note [A New Server Session]). The ids present when the first ones arrive are
+   * all taken as the first session's. Returns a function that stops the observation.
+   */
+  observeServerSessionReplaced(onReplaced: () => void): () => void {
+    const known = new Set(this.serverSessions.toArray())
+    const listener = () => {
+      const ids = this.serverSessions.toArray()
+      const fresh = ids.filter((id) => !known.has(id))
+      if (fresh.length === 0) return
+      const firstMeeting = known.size === 0
+      for (const id of fresh) known.add(id)
+      if (!firstMeeting) onReplaced()
+    }
+    this.serverSessions.observe(listener)
+    return () => this.serverSessions.unobserve(listener)
   }
 
   /** Return the visualizations subdoc if one has been created yet, else null. */

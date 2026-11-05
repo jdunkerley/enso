@@ -3,7 +3,7 @@ import os
 import unittest
 
 from bench_tool import ENGINE_BENCH_WORKFLOW_ID, STDLIBS_BENCH_WORKFLOW_ID,     ENSO_REPO, JobReport, JobRun, Commit, Author, Source
-from .bench_results import _parse_bench_report_from_xml
+from .bench_results import _find_bench_report_xml, _parse_bench_report_from_xml
 from .utils import WithTempDir
 
 sample_job_report = JobReport(
@@ -55,6 +55,24 @@ class TestBenchResults(unittest.IsolatedAsyncioTestCase):
         # The newest score wins when there are several
         self.assertEqual({"a.Bench": 2.5, "b.Bench": 3.0}, report.label_score_dict)
         self.assertEqual(sample_job_report.bench_run, report.bench_run)
+
+    def test_find_bench_report_xml(self):
+        with WithTempDir("test_find_bench_report") as temp_dir:
+            with self.assertRaises(FileNotFoundError):
+                _find_bench_report_xml(temp_dir)
+            # A run with jvm-options: the baseline is the report to analyse.
+            for name in ("bench-report-candidate.xml", "bench-report-baseline.xml"):
+                open(os.path.join(temp_dir, name), "w").close()
+            self.assertEqual(os.path.join(temp_dir, "bench-report-baseline.xml"),
+                             _find_bench_report_xml(temp_dir))
+            open(os.path.join(temp_dir, "bench-report.xml"), "w").close()
+            self.assertEqual(os.path.join(temp_dir, "bench-report.xml"),
+                             _find_bench_report_xml(temp_dir))
+
+    def test_stdlib_artifact_names_keep_the_old_name(self):
+        names = Source.STDLIB.artifact_names()
+        self.assertIn("benchmark-results", names)
+        self.assertIn("benchmark-results.xml", names)
 
     def test_workflow_ids_are_the_forks(self):
         self.assertEqual("jdunkerley/enso", ENSO_REPO)

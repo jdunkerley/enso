@@ -8,8 +8,12 @@ type (the rest of the pnpm workspace uses `module`).
 
 The Enso engine ships as a GraalVM process that already has a JS runtime
 (GraalJS). Rather than requiring a separate Node.js to run the ydoc server next
-to it, we bundle the server into a polyglot script the engine can embed. This is
-the **production** deployment for the collaborative editing story.
+to it, we bundled the server into a polyglot script the engine can embed. It is
+now **the rollback host until PR M** of the JVM-by-default plan: the IDE runs
+the server in Node (`NodeYdocHost` in an Electron utility process), and the
+engine starts this bundle only when the shim passes `LANGUAGE_SERVER_YDOC_PORT`,
+which it does under `ENSO_YDOC_HOST=engine`. Keep it building and working until
+it is deleted.
 
 ## Build
 
