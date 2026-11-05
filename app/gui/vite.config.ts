@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 import postcssNesting from 'postcss-nesting'
 import { findEnsoExecutable } from 'project-manager-shim'
-import type { YdocHost } from 'project-manager-shim/projectService'
+import { loopbackOrigins, type YdocHost } from 'project-manager-shim/projectService'
 import tailwindcss from 'tailwindcss'
 import tailwindcssNesting from 'tailwindcss/nesting'
 import {
@@ -186,9 +186,26 @@ function ssrYdocHost(server: ViteDevServer): YdocHost {
         throw error
       }))
   return {
-    listen: async (request) => (await get()).listen(request),
+    listen: async (request) =>
+      (await get()).listen({
+        ...request,
+        allowedOrigins: request.allowedOrigins ?? devServerOrigins(server),
+      }),
     close: async (port) => (await get()).close(port),
   }
+}
+
+/**
+ * The origins the dev server's pages are loaded from, whose sockets a ydoc listener accepts (any
+ * other browser origin is refused, #596): the addresses Vite prints, and the port under every
+ * loopback name. Read at each open, once the server is listening.
+ */
+function devServerOrigins(server: ViteDevServer): string[] {
+  const urls = [...(server.resolvedUrls?.local ?? []), ...(server.resolvedUrls?.network ?? [])]
+  const address = server.httpServer?.address()
+  const port = typeof address === 'object' && address != null ? address.port : undefined
+  const protocol = server.config.server.https ? 'https:' : 'http:'
+  return [...urls, ...(port != null ? loopbackOrigins(protocol, port) : [])]
 }
 
 /**

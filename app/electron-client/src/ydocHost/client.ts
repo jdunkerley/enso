@@ -61,6 +61,11 @@ export class UtilityProcessYdocHost implements YdocHost {
   private quickExits = 0
   private restartTimer: ReturnType<typeof setTimeout> | undefined
   private disposed = false
+  /**
+   * The origins whose pages may open the listeners' sockets, added to every `listen` that names
+   * none (Note [The ydoc Listener Checks Origin] in `ydoc-server`). Set by {@link allowOrigins}.
+   */
+  private allowedOrigins: readonly string[] = []
 
   /** @param spawn Forks the utility process (`utilityProcess.fork` in Electron). */
   constructor(private readonly spawn: () => YdocHostChild) {}
@@ -75,8 +80,20 @@ export class UtilityProcessYdocHost implements YdocHost {
         `listen EADDRINUSE: port ${request.port} is held by another project's listener`,
       )
     }
-    await this.send({ type: 'listen', id: this.nextId++, request })
-    this.open.set(request.port, request)
+    const withOrigins = {
+      ...request,
+      allowedOrigins: request.allowedOrigins ?? this.allowedOrigins,
+    }
+    await this.send({ type: 'listen', id: this.nextId++, request: withOrigins })
+    this.open.set(request.port, withOrigins)
+  }
+
+  /**
+   * Let pages from these origins (the window's) connect to listeners started from now on; the
+   * window's address is known only once the content server has found its port.
+   */
+  allowOrigins(origins: readonly string[]): void {
+    this.allowedOrigins = [...origins]
   }
 
   /** Stop the listener on `port` in the utility process. */

@@ -44,6 +44,7 @@ import { setupLogger } from './log.js'
 import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from './menuItems.js'
 import { capitalizeFirstLetter } from './naming.js'
 import {
+  allowYdocOrigin,
   disposeJvmAotCache,
   disposeYdocHost,
   getLocalMetadata,
@@ -496,6 +497,7 @@ class App {
     const address = new URL('https://localhost')
     address.port = this.serverPort(args).toString()
     address.search = searchParams.toString()
+    allowYdocOrigin(this.serverPort(args))
     console.log(`Loading the window address '${address.toString()}'.`)
     if (process.env.ELECTRON_DEV_MODE === 'true') {
       // Vite takes a while to be `import`ed, so the first load almost always fails.

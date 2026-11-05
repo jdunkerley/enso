@@ -1,5 +1,5 @@
 import * as net from 'node:net'
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WebSocket, WebSocketServer } from 'ws'
 import { LanguageServerSession } from '../languageServerSession'
 import { NodeYdocHost } from '../nodeHost'
@@ -290,4 +290,64 @@ test('#494: terminating the listener locally does not hang and releases the sess
     )
     await host.listen({ host: '127.0.0.1', port, languageServer: ls.address() })
   }
+})
+
+describe('Origin of a GUI socket (#596)', () => {
+  const APP = 'https://localhost:8080'
+
+  /** The status a handshake to the index doc is answered with: 101 when it is upgraded. */
+  function handshakeStatus(origin: string | undefined): Promise<number> {
+    const gui = new WebSocket(
+      `ws://127.0.0.1:${port}/project/index?ls=ws://127.0.0.1:${ls.port}`,
+      origin != null ? { origin } : {},
+    )
+    guis.push(gui)
+    return new Promise((resolve, reject) => {
+      gui.once('upgrade', (response) => resolve(response.statusCode ?? 0))
+      gui.once('unexpected-response', (_request, response) => resolve(response.statusCode ?? 0))
+      gui.once('error', reject)
+    })
+  }
+
+  beforeEach(async () => {
+    await host.listen({
+      host: '127.0.0.1',
+      port,
+      languageServer: ls.address(),
+      allowedOrigins: [APP, 'https://127.0.0.1:8080'],
+    })
+  })
+
+  test('the app’s own origin is upgraded', async () => {
+    await expect(handshakeStatus(APP)).resolves.toBe(101)
+    await expect(handshakeStatus('https://127.0.0.1:8080')).resolves.toBe(101)
+  })
+
+  test('a handshake without Origin (a Node client) is upgraded', async () => {
+    await expect(handshakeStatus(undefined)).resolves.toBe(101)
+  })
+
+  test('any other origin is refused with 403 before the upgrade', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    for (const origin of [
+      'https://evil.example',
+      'http://localhost:8080', // another scheme
+      'https://localhost:8081', // another port
+      'null', // a sandboxed frame or a file: page
+    ]) {
+      await expect(handshakeStatus(origin), origin).resolves.toBe(403)
+    }
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('https://evil.example'))
+    warn.mockRestore()
+    // Nothing reached the Language Server.
+    expect(ls.urls).toEqual([])
+  })
+
+  test('a listener told no origins refuses every browser page', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await host.listen({ host: '127.0.0.1', port, languageServer: ls.address() })
+    await expect(handshakeStatus(APP)).resolves.toBe(403)
+    await expect(handshakeStatus(undefined)).resolves.toBe(101)
+    warn.mockRestore()
+  })
 })

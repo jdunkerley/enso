@@ -75,8 +75,25 @@ test('listen and close resolve on done, with the request passed through', async 
   await host.close(4000)
   expect(spawn).toHaveBeenCalledOnce()
   expect(children[0]!.requests).toEqual([
-    { type: 'listen', id: 1, request: request(4000) },
+    { type: 'listen', id: 1, request: { ...request(4000), allowedOrigins: [] } },
     { type: 'close', id: 2, port: 4000 },
+  ])
+})
+
+test('listens carry the allowed origins, also when restored after an exit (#596)', async () => {
+  const { host, children } = setup()
+  const origins = ['https://localhost:8080', 'https://127.0.0.1:8080']
+  host.allowOrigins(origins)
+  await host.listen(request(4000))
+  // A request that names its own origins keeps them.
+  await host.listen({ ...request(5000), allowedOrigins: ['http://localhost:5173'] })
+  const sent = () =>
+    children.at(-1)!.requests.flatMap((r) => (r.type === 'listen' ? [r.request] : []))
+  expect(sent().map((r) => r.allowedOrigins)).toEqual([origins, ['http://localhost:5173']])
+  children[0]!.crash()
+  expect(sent().map((r) => [r.port, r.allowedOrigins])).toEqual([
+    [4000, origins],
+    [5000, ['http://localhost:5173']],
   ])
 })
 
