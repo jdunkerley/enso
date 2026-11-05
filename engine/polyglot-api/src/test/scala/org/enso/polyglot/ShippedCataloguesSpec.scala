@@ -173,6 +173,7 @@ class ShippedCataloguesSpec
           ) { in =>
             in.readUTF() // source hash
             in.readUTF() // blob hash
+            in.readInt() // `LibraryDependencies.FORMAT`
             (0 until in.readInt()).map { _ =>
               (s"${in.readUTF()}.${in.readUTF()}", in.readUTF())
             }
