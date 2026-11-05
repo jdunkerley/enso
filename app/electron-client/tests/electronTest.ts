@@ -280,7 +280,7 @@ export async function addBankData(projectsDir: string): Promise<string> {
   await waitForFile(path.join(samples, 'Sales_Overview', 'package.yaml'))
   const target = path.join(samples, 'Data', 'sample_bank_data.xlsx')
   await fs.mkdir(path.dirname(target), { recursive: true })
-  await fs.copyFile(path.join(__dirname, 'fixtures', 'sample_bank_data.xlsx'), target)
+  await fs.copyFile(path.join(import.meta.dirname, 'fixtures', 'sample_bank_data.xlsx'), target)
   return target
 }
 
