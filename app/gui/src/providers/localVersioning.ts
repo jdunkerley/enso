@@ -414,6 +414,8 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     committing: boolean
     /** The save to make after this one, for a request that came too late to join it. */
     next?: RunningSave
+    /** Queued behind another save: silent when nothing changed and it has no comment to lose. */
+    followUp?: boolean
   }
 
   /** The saves being made, so that a second request for the same project joins the first. */
@@ -470,7 +472,12 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       return existing.done
     }
     if (existing.next == null) {
-      const next: RunningSave = { comment: '', committing: false, done: Promise.resolve() }
+      const next: RunningSave = {
+        comment: '',
+        committing: false,
+        followUp: true,
+        done: Promise.resolve(),
+      }
       existing.next = next
       addComment(next, comment)
       next.done = existing.done.then(() => run(projectId, next))
@@ -523,7 +530,12 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       running.committing = true
       const { id } = await backend.commitVersion(projectId, running.comment)
       if (id == null) {
-        finish('info', deps.getText('versionNothingToSave'))
+        // A follow-up with no comment changed nothing the user asked for: no word.
+        if (running.followUp === true && running.comment.trim() === '') {
+          deps.toasts.dismiss(toastId)
+        } else {
+          finish('info', deps.getText('versionNothingToSave'))
+        }
       } else {
         finish(
           'success',

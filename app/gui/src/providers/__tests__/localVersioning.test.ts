@@ -766,6 +766,31 @@ describe('save progress and joined saves', () => {
     expect(toasts.toasts.value.some((t) => t.type === 'warning')).toBe(false)
   })
 
+  test('a queued follow-up that finds nothing changed is silent, unless it carries a comment', async () => {
+    for (const comment of ['', 'My note']) {
+      localStorage.clear()
+      const first = deferred<{ id: string | null }>()
+      const commitVersion = vi
+        .fn()
+        .mockImplementationOnce(() => first.promise)
+        .mockResolvedValueOnce({ id: null })
+      const { toasts, store } = setup({ commitVersion })
+      store.watchProject(PROJECT, FLUSHED)
+      const saving = store.save(PROJECT)
+      await vi.waitFor(() => expect(commitVersion).toHaveBeenCalledTimes(1))
+      const followUp = store.save(PROJECT, comment)
+      first.resolve({ id: 'a'.repeat(40) })
+      await Promise.all([saving, followUp])
+      expect(commitVersion).toHaveBeenCalledTimes(2)
+      const shown = toasts.toasts.value.filter((t) => t.isIn).map((t) => t.content)
+      expect(shown).toEqual(
+        comment === '' ?
+          ['Version saved']
+        : ['Version saved', 'Nothing has changed since the last version'],
+      )
+    }
+  })
+
   test('each save shows its own progress and result, also one right after another', async () => {
     const gate = deferred<FlushOutcome>()
     const { toasts, store } = setup({
