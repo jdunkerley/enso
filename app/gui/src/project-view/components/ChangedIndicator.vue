@@ -4,7 +4,7 @@
  * version. Shown only for a local project whose repository is enabled and whose status is known
  * (`$/providers/localVersioning`); an unknown status shows nothing rather than a stale dot.
  *
- * The dot's space is reserved wherever it can appear (a local project with git), so that its
+ * The dot's space is reserved wherever it can appear (a local project whose versions are kept), so that its
  * coming and going does not move what is beside it in the top bar, the zoom controls included.
  */
 import { useLocalVersioning } from '$/providers/localVersioning'
@@ -22,7 +22,7 @@ const localVersioning = useLocalVersioning()
 const { getText } = useText()
 
 /** Whether a dot may show: the slot for it is kept even while there is none. */
-const reserved = computed(() => mode === 'local' && localVersioning.hasGit(projectId))
+const reserved = computed(() => mode === 'local' && localVersioning.hasVersioning(projectId))
 
 const changed = computed(() => {
   if (mode !== 'local') return false

@@ -103,6 +103,8 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   const unknown = shallowReactive(new Set<ProjectId>())
   /** Whether git was found, as last read for each project: kept while a read fails. */
   const gitFound = shallowReactive(new Map<ProjectId, boolean>())
+  /** Whether versions are kept for the project's folder, as last read: kept while a read fails. */
+  const versioningEnabled = shallowReactive(new Map<ProjectId, boolean>())
   const watched = new Map<ProjectId, WatchedProject>()
   /**
    * The real request pending for each project, kept apart from the watch so that re-watching a
@@ -164,6 +166,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       unknown.delete(projectId)
       statuses.set(projectId, status)
       gitFound.set(projectId, status.git)
+      versioningEnabled.set(projectId, status.enabled)
     } catch (error) {
       // A transient failure must not suppress the offer for the session.
       if (offered != null) offeredToShim.delete(offered)
@@ -243,6 +246,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     statuses.delete(projectId)
     unknown.delete(projectId)
     gitFound.delete(projectId)
+    versioningEnabled.delete(projectId)
   }
 
   /** The last status read, or `undefined` while none is known (see {@link isStatusUnknown}). */
@@ -262,6 +266,15 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
    */
   function hasGit(projectId: ProjectId) {
     return gitFound.get(projectId) === true
+  }
+
+  /**
+   * Whether git was found and versions are kept for the project's folder, by the last read that
+   * succeeded: where the changed dot can appear. Kept while a read fails, so the dot's space in
+   * the top bar does not come and go.
+   */
+  function hasVersioning(projectId: ProjectId) {
+    return gitFound.get(projectId) === true && versioningEnabled.get(projectId) === true
   }
 
   function isVersioned(projectId: ProjectId) {
@@ -397,49 +410,74 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     done: Promise<void>
     /** The comment the commit will carry; a save that joins before `committing` adds to it. */
     comment: string
-    /** The commit has been requested: the comment can no longer change. */
+    /** The commit has been requested: the comment can no longer change, nor the content. */
     committing: boolean
+    /** The save to make after this one, for a request that came too late to join it. */
+    next?: RunningSave
   }
 
   /** The saves being made, so that a second request for the same project joins the first. */
   const saving = new Map<ProjectId, RunningSave>()
 
+  /** Makes the ids of the saves' progress toasts, so that each save shows its own. */
+  let saveCount = 0
+
   /**
-   * Add `comment` to the comment of a save that has not yet committed. Returns whether it could.
-   * An empty comment adds nothing, and so always "can"; one the running comment already holds is
-   * not repeated.
+   * Add `comment` to the comment of a save that has not yet committed. A blank comment adds
+   * nothing, and one the comment already holds as a whole part (the parts are separated by "; ")
+   * is not repeated.
    */
   function addComment(running: RunningSave, comment: string) {
     const added = comment.trim()
-    if (added === '') return true
-    if (running.committing) return false
-    if (running.comment.trim() === '') running.comment = added
-    else if (!running.comment.includes(added)) running.comment = `${running.comment}; ${added}`
-    return true
+    if (added === '') return
+    if (running.comment.trim() === '') {
+      running.comment = added
+    } else if (!running.comment.split(';').some((part) => part.trim() === added)) {
+      running.comment = `${running.comment}; ${added}`
+    }
+  }
+
+  /** Run `running` as the project's save; once it settles, the queued one (if any) takes over. */
+  function run(projectId: ProjectId, running: RunningSave): Promise<void> {
+    saving.set(projectId, running)
+    running.done = makeSave(projectId, running).finally(() => {
+      if (saving.get(projectId) !== running) return
+      // A queued save takes over the project's slot at once, so none can start beside it.
+      if (running.next != null) saving.set(projectId, running.next)
+      else saving.delete(projectId)
+    })
+    return running.done
   }
 
   /**
    * Save a version: make sure a repository is in use, write the open modules, then commit with
    * `comment` as given (the shim saves an empty one as "Saved"). A declined write is a failure:
-   * an error toast, and no commit. A save asked for while one is being made for the project joins
-   * that one: no second commit is started. Its comment is added to the running save's while that
-   * can still change (until the commit is requested); afterwards it cannot be kept, and a toast
-   * says so.
+   * an error toast, and no commit.
+   *
+   * A save asked for while one is being made for the project joins it while it can still change:
+   * no second commit is started, and the comment is added to the running save's. Once the commit
+   * has been requested the running save has what it has (the content as flushed, the comment as
+   * given), so the request is queued as one save to make after it, which takes the later edits
+   * and carries the comments of every request queued meanwhile.
    */
   function save(projectId: ProjectId, comment = ''): Promise<void> {
     const existing = saving.get(projectId)
-    if (existing != null) {
-      if (!addComment(existing, comment)) {
-        deps.toasts.show(deps.getText('versionCommentNotSaved'), { type: 'warning' })
-      }
+    if (existing == null) {
+      return run(projectId, { comment, committing: false, done: Promise.resolve() })
+    }
+    if (!existing.committing) {
+      addComment(existing, comment)
       return existing.done
     }
-    const running: RunningSave = { comment, committing: false, done: Promise.resolve() }
-    saving.set(projectId, running)
-    running.done = makeSave(projectId, running).finally(() => {
-      if (saving.get(projectId) === running) saving.delete(projectId)
-    })
-    return running.done
+    if (existing.next == null) {
+      const next: RunningSave = { comment: '', committing: false, done: Promise.resolve() }
+      existing.next = next
+      addComment(next, comment)
+      next.done = existing.done.then(() => run(projectId, next))
+    } else {
+      addComment(existing.next, comment)
+    }
+    return existing.next.done
   }
 
   async function makeSave(projectId: ProjectId, running: RunningSave) {
@@ -462,7 +500,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       return
     }
     // The flush and the commit can take seconds: a loading toast, which the outcome replaces.
-    const toastId = `versioning-save-${projectId}`
+    const toastId = `versioning-save-${++saveCount}`
     deps.toasts.show(deps.getText('versionSaving'), {
       toastId,
       isLoading: true,
@@ -516,25 +554,33 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   /**
    * What a save shortcut does for the project: starts the save, or tells the user why nothing
    * happens. Returns whether the key was used. A project with no git is not the store's business
-   * (`false`, and no word), as it would be for a project that is not versioned at all.
+   * (`false`, and no word), as it would be for a project that is not versioned at all. Before
+   * the first status read it is not known whether there is git: the key is used (so that the
+   * browser's own save does not fire), and nothing is said.
    * @param withComment - open the "Save a version" dialog rather than save at once.
    */
   function saveFromShortcut(projectId: ProjectId, withComment: boolean): boolean {
     if (!watched.has(projectId)) return false
+    /** A hint, shown once however often the key is pressed (the toast has a fixed id). */
+    const hint = (key: string, text: string, type: 'info' | 'error') =>
+      deps.toasts.show(text, { type, toastId: `versioning-hint-${key}-${projectId}` })
     const status = statuses.get(projectId)
     if (status == null) {
-      // Not read yet, or the read failed: there is no telling, except by the last read that worked.
-      if (gitFound.get(projectId) === false) return false
-      deps.toasts.show(deps.getText('versionStatusNotReady'), { type: 'info' })
+      const git = gitFound.get(projectId)
+      // No git before the first read: nothing to say yet (the key is taken, so the browser's own
+      // save does not fire), and nothing if there is no git at all.
+      if (git === undefined) return true
+      if (!git) return false
+      hint('notReady', deps.getText('versionStatusNotReady'), 'info')
       return true
     }
     if (!status.git) return false
     if (status.blocked != null) {
-      deps.toasts.show(deps.getText('versioningBlocked', status.blocked), { type: 'error' })
+      hint('blocked', deps.getText('versioningBlocked', status.blocked), 'error')
       return true
     }
     if (!canSave(projectId)) {
-      deps.toasts.show(deps.getText('versionNothingToSave'), { type: 'info' })
+      hint('nothing', deps.getText('versionNothingToSave'), 'info')
       return true
     }
     if (withComment) askToSave(projectId)
@@ -560,6 +606,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     statusOf,
     isStatusUnknown,
     hasGit,
+    hasVersioning,
     isVersioned,
     offerRepository,
     resetPrompts,

@@ -103,7 +103,7 @@ registerHandlers({
 </script>
 
 <template>
-  <div class="LeftPanel">
+  <div class="LeftPanel" data-panel-side="left">
     <div
       class="leftBar"
       :class="{ expanded: leftBarExtended }"

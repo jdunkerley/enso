@@ -5,7 +5,8 @@
 - [Saving a version is easier: Ctrl/Cmd+S works from the code editor and the
   documentation panel too, a toast shows while it saves, and it says so when
   there is nothing to save. A comment given while a save is running is added to
-  it.][574]
+  it, or, if that save has already committed, saved in a second version right
+  after.][574]
 - [The component browser no longer lists the components of
   Standard.Visualization, the library the IDE uses to prepare visualization
   data.][565]

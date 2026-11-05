@@ -12,7 +12,7 @@ const current = reactive({ enabled: true, changed: true, known: true, git: true 
 
 vi.mock('$/providers/localVersioning', () => ({
   useLocalVersioning: () => ({
-    hasGit: () => current.git,
+    hasVersioning: () => current.git && current.enabled,
     statusOf: () =>
       current.known ?
         {
@@ -65,7 +65,7 @@ describe('ChangedIndicator', () => {
     expect(dot()).toBeNull()
   })
 
-  test('keeps its space while there is no dot, for a local project with git', async () => {
+  test('keeps its space while there is no dot, for a local project whose versions are kept', async () => {
     current.enabled = true
     current.changed = false
     current.known = true

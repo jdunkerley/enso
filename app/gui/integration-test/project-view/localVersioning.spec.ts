@@ -5,12 +5,30 @@
  */
 import { expect, test } from 'integration-test/base'
 import { posix } from 'node:path'
+import type { Page } from 'playwright/test'
 import { TEXT } from '../actions'
 import { expectScreenshot } from '../screenshot'
 
 const ROOT = '/home/user/enso/enso-projects'
 const MOCK_PROJECT_PATH = posix.join(ROOT, 'Mock_Project')
 const saveButton = 'action:graph.saveVersionWithComment'
+
+/**
+ * Records the keys whose `preventDefault` is called from now on (`window.preventedKeys`): the
+ * browser's own Ctrl+S ("Save page") is cancelled only if somebody prevents it.
+ */
+async function spyOnPreventedKeys(page: Page) {
+  await page.evaluate(() => {
+    const seen: string[] = ((window as any).preventedKeys = [])
+    const original = KeyboardEvent.prototype.preventDefault
+    KeyboardEvent.prototype.preventDefault = function (this: KeyboardEvent) {
+      seen.push(this.key.toLowerCase())
+      original.call(this)
+    }
+  })
+}
+
+const preventedKeys = (page: Page) => page.evaluate(() => (window as any).preventedKeys as string[])
 
 /** The dialogs are translucent over a blurred page, which renders slightly differently each time. */
 const BLUR_TOLERANT = { threshold: 0.3, maxDiffPixelRatio: 0.02 }
@@ -86,22 +104,16 @@ test.describe('with versions kept at the root, and changes', () => {
     const editor = page.locator('.CodeEditor .cm-content')
     await editor.click()
     await expect(editor).toBeFocused()
-    // Whoever handles the key must also keep the default (a "Save page" dialog in a browser).
-    await page.evaluate(() => {
-      const seen: string[] = ((window as any).preventedKeys = [])
-      const original = KeyboardEvent.prototype.preventDefault
-      KeyboardEvent.prototype.preventDefault = function (this: KeyboardEvent) {
-        seen.push(this.key.toLowerCase())
-        original.call(this)
-      }
-    })
+    // CodeMirror does not prevent Ctrl+S, so the key was taken by the save: the toast and the
+    // commit show it ran, and the default (a "Save page" dialog in a browser) was cancelled.
+    await spyOnPreventedKeys(page)
     await page.keyboard.press('ControlOrMeta+S')
     await expect(page.getByTestId('toast-host')).toContainText('Version saved')
     expect(localApi.versioning.commits).toEqual([[MOCK_PROJECT_PATH, 'Saved']])
-    expect(await page.evaluate(() => (window as any).preventedKeys)).toContain('s')
+    expect(await preventedKeys(page)).toContain('s')
   })
 
-  test('Ctrl+S in the drive beside the project does not save the project', async ({
+  test('Ctrl+S in the drive, or on its category buttons, does not save the project', async ({
     page,
     editorPage,
     localApi,
@@ -109,11 +121,33 @@ test.describe('with versions kept at the root, and changes', () => {
     await editorPage
     const drive = page.getByTestId('drive-view')
     await expect(drive).toBeVisible()
-    await drive.getByRole('row').first().click()
+    await spyOnPreventedKeys(page)
+    // A data row, not the header; Ctrl+S has no drive action, so nothing else happens.
+    await drive.getByRole('row', { name: /Mock Project/ }).click()
     await expect(page.locator('[data-panel-side="left"]').locator(':focus')).toHaveCount(1)
+    await page.keyboard.press('ControlOrMeta+S')
+    // The left bar's category buttons are outside the drive's panel; Ctrl+Shift+S is the drive's
+    // Download, with nothing selected there.
+    await page.locator('.LeftPanel .leftBar button').first().focus()
     await page.keyboard.press('ControlOrMeta+S')
     await page.keyboard.press('ControlOrMeta+Shift+S')
     await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByTestId('toast-host')).not.toContainText('Version saved')
+    expect(localApi.versioning.commits).toEqual([])
+    // Not the save's, so not prevented either: the browser keeps its own.
+    expect(await preventedKeys(page)).not.toContain('s')
+  })
+
+  test('Ctrl+S typed in the command palette does not save the project', async ({
+    page,
+    editorPage,
+    localApi,
+  }) => {
+    await editorPage
+    await page.keyboard.press('ControlOrMeta+K')
+    const input = page.locator('.CommandPalette input')
+    await expect(input).toBeFocused()
+    await page.keyboard.press('ControlOrMeta+S')
     await expect(page.getByTestId('toast-host')).not.toContainText('Version saved')
     expect(localApi.versioning.commits).toEqual([])
   })
@@ -157,17 +191,18 @@ test.describe('with versions kept at the root, and changes', () => {
     await expect(toast).not.toContainText('Saving a version…')
   })
 
-  test('a comment that comes too late to join the running save is reported', async ({
+  test('a save asked for once the commit is requested is queued after it, with its comment', async ({
     page,
     editorPage,
-    localApi,
   }) => {
     await editorPage
     let release!: () => void
     const gate = new Promise<void>((resolve) => (release = resolve))
     let reached!: () => void
     const commitRequested = new Promise<void>((resolve) => (reached = resolve))
-    await page.route('/api/project-service/versioning/commit', async (route) => {
+    const messages: string[] = []
+    await page.route('/api/project-service/versioning/commit', async (route, request) => {
+      messages.push(String(request.postDataJSON()?.message))
       reached()
       await gate
       await route.fallback()
@@ -177,10 +212,11 @@ test.describe('with versions kept at the root, and changes', () => {
     await page.keyboard.press('ControlOrMeta+Shift+S')
     await page.getByRole('textbox', { name: 'Comment (optional)' }).fill('Added a filter')
     await page.getByTestId('save-version-save').click()
-    await expect(page.getByTestId('toast-host')).toContainText('your comment was not kept')
     release()
-    await expect(page.getByTestId('toast-host')).toContainText('Version saved')
-    expect(localApi.versioning.commits).toEqual([[MOCK_PROJECT_PATH, 'Saved']])
+    // The first save commits; the second one is made after it, with the comment.
+    await expect.poll(() => messages.length).toBe(2)
+    expect(messages[1]).toBe('Added a filter')
+    await expect(page.getByTestId('toast-host')).not.toContainText('was not kept')
   })
 
   test('a close whose version could not be saved shows a warning toast', async ({

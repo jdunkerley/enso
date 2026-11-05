@@ -40,6 +40,18 @@ describe('saveShortcutInScope', () => {
     expect(saveShortcutInScope(target, PROJECT, undefined)).toBe(false)
   })
 
+  test('does not act in the command palette, the component browser or the tab bar', () => {
+    for (const part of ['CommandPalette', 'ComponentBrowser', 'TabBar']) {
+      const target = mount(`<div class="${part}" data-no-save-shortcut><input id="target" /></div>`)
+      expect(saveShortcutInScope(target, PROJECT, PROJECT)).toBe(false)
+    }
+  })
+
+  test('does not act in the left panel (the drive), the left bar included', () => {
+    const bar = mount('<div data-panel-side="left"><button id="target"></button></div>')
+    expect(saveShortcutInScope(bar, PROJECT, PROJECT)).toBe(false)
+  })
+
   test('does not act in the left panel (the drive)', () => {
     const target = mount('<div data-panel-side="left"><div id="target"></div></div>')
     expect(saveShortcutInScope(target, PROJECT, PROJECT)).toBe(false)
