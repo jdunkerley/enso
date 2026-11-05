@@ -77,9 +77,10 @@ Three routes (`.github/CLAUDE.md` has the workflow notes):
   changes it.
 - **B. Site-only pull requests.** `docs-site.yml` runs when a PR touches
   `docs-site/` or the GUI code the generator loads. It takes the catalogues of
-  the newest `develop` run that has them (Note [Docs Site Catalogues]), then
-  calls the same build with `static-checks` (typecheck, lint, unit tests). These
-  PRs do not run the GUI checks.
+  the newest `develop` run that has them and whose commit is an ancestor of the
+  PR's merge commit (Note [Docs Site Catalogues]), then calls the same build
+  with `static-checks` (typecheck, lint, unit tests). These PRs do not run the
+  GUI checks.
 - **C. Deploy.** `docs-site-deploy.yml` publishes a `develop` engine run's
   `docs-site` artifact with `actions/deploy-pages`, only when the repository
   variable `DOCS_SITE_DEPLOY` is `true`.
@@ -87,7 +88,11 @@ Three routes (`.github/CLAUDE.md` has the workflow notes):
 `docs-site.yml`'s `paths` whitelist must cover every file the generator loads;
 `generator/src/workflowPaths.test.ts` crawls the imports of `gui.ts` and fails
 when one is missing. Adding an import to `gui.ts` that leaves the listed
-directories means adding a path.
+directories means adding a path. The globs cover whole packages
+(`app/ydoc-shared/**`, `app/common/**`), so most PRs touching those also run
+route B (about 8 minutes); route A runs on every engine-checked PR (about 7.5
+runner-minutes, off the critical path). Both are accepted costs. No pnpm-store
+or Playwright-browser cache yet: each run installs cold.
 
 **Preview a PR's site:** download the `docs-site` artifact of the PR's run,
 unzip it into `docs-site/build`, then

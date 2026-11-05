@@ -35,7 +35,8 @@ jobs:
   deploy:
     name: Deploy the docs site
     if: >-
-      vars.DOCS_SITE_DEPLOY == 'true' && (github.event_name == 'workflow_dispatch' ||
+      vars.DOCS_SITE_DEPLOY == 'true' && ((github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/develop') ||
       (github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
@@ -55,8 +56,19 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run-id || github.event.workflow_run.id }}
         run: |
-          found=$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
-            --jq '[.artifacts[] | select(.name == "docs-site" and (.expired | not))] | length')
+          # The run id comes from a person on a manual start: it must be a develop push run of the
+          # engine workflow in this repository (the `if` above says the same of `workflow_run`), or
+          # a pull request's own build of the site could be published.
+          if ! [[ "$RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::run-id must be a number."
+            exit 1
+          fi
+          read -r event branch repo path < <(gh api "repos/$REPO/actions/runs/$RUN_ID"             --jq '[.event, .head_branch, .head_repository.full_name, .path] | join(" ")')
+          if [ "$event" != push ] || [ "$branch" != develop ] || [ "$repo" != "$REPO" ]             || [ "$path" != .github/workflows/engine-pull-request.yml ]; then
+            echo "::error::Run $RUN_ID is not a develop push run of engine-pull-request.yml in $REPO ($event, $branch, $repo, $path)."
+            exit 1
+          fi
+          found=$(gh api -X GET "repos/$REPO/actions/runs/$RUN_ID/artifacts" -f name=docs-site             --jq '[.artifacts[] | select(.expired | not)] | length')
           echo "run-id=$RUN_ID" >> "$GITHUB_OUTPUT"
           if [ "$found" -ge 1 ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"

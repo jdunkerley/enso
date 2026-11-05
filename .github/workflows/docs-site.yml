@@ -34,6 +34,8 @@ on:
       - "app/ydoc-shared/**"
       - "app/common/**"
       - "app/lezer-markdown/**"
+      - "app/rust-ffi/**"
+      - ".github/actions/setup-rust/**"
       - "app/vitest.node.base.ts"
       - "package.json"
       - "pnpm-lock.yaml"

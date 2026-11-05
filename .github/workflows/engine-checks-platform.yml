@@ -566,8 +566,9 @@ jobs:
 
   # The user documentation site, built from this run's distribution (route A of the docs site's
   # spec, section 5): a doc comment that breaks the site fails here, on the pull request that
-  # changes it. Linux and GraalVM CE only, once per run, and not in `extra-nightly-tests.yml`
-  # (which passes `linux-checks: false`). It uploads `docs-site-catalogues` and `docs-site`.
+  # changes it. Linux and GraalVM CE only, once per run: `engine-checks-nightly.yml`'s Linux leg
+  # builds it too; `extra-nightly-tests.yml` (which passes `linux-checks: false`) does not.
+  # It uploads `docs-site-catalogues` and `docs-site`.
   docs-site:
     name: Docs site
     if: inputs.os == 'linux' && inputs.edition == 'GraalVM CE' && inputs.linux-checks

@@ -113,7 +113,7 @@ jobs:
       - name: Build the site
         run: |
           start=$(date +%s)
-          /usr/bin/time -v corepack pnpm --filter docs-site run build 2> time.log || { cat time.log; exit 1; }
+          /usr/bin/time -v -o time.log corepack pnpm --filter docs-site run build
           elapsed=$(( $(date +%s) - start ))
           rss=$(awk '/Maximum resident set size/ {print $NF}' time.log)
           echo "Site build: ${elapsed}s, peak RSS $(( rss / 1024 )) MiB (of the runner's $(free -m | awk '/Mem:/ {print $2}') MiB)" | tee -a "$GITHUB_STEP_SUMMARY"
