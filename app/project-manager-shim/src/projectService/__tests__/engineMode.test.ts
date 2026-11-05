@@ -4,6 +4,7 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import {
   describeEngineMode,
+  liftJvmFlag,
   parseEngineMode,
   resolveDefaultEngineMode,
   resolveEngineMode,
@@ -90,4 +91,17 @@ test('describeEngineMode', () => {
   expect(describeEngineMode({ mode: 'native', source: 'default' })).toBe(
     'Engine mode: native (default)',
   )
+})
+
+test('liftJvmFlag turns a --jvm argument into the jvm option', () => {
+  expect(liftJvmFlag(['--log-level', 'info'], undefined)).toEqual({
+    args: ['--log-level', 'info'],
+    option: undefined,
+  })
+  expect(liftJvmFlag(['--jvm', '--log-level', 'info'], undefined)).toEqual({
+    args: ['--log-level', 'info'],
+    option: 'jvm',
+  })
+  // An explicit option wins over the back door.
+  expect(liftJvmFlag(['--jvm'], 'native')).toEqual({ args: [], option: 'native' })
 })

@@ -45,6 +45,19 @@ export async function resolveEngineMode(
   return resolveDefaultEngineMode(settings)
 }
 
+/**
+ * `ENSO_ENGINE_ARGS` is a developer back door that used to be the only way to ask for a JVM engine
+ * (the open-time harness does). A `--jvm` in it is lifted out into the `jvm` option, so the
+ * resolver, the log line and the JVM timeouts see it, and `--jvm` is not passed twice.
+ */
+export function liftJvmFlag(
+  args: readonly string[],
+  option: EngineMode | undefined,
+): { readonly args: readonly string[]; readonly option: EngineMode | undefined } {
+  if (!args.includes('--jvm')) return { args, option }
+  return { args: args.filter((arg) => arg !== '--jvm'), option: option ?? 'jvm' }
+}
+
 const SOURCE_NAMES: Readonly<Record<EngineModeSource, string>> = {
   'package.yaml': 'package.yaml',
   option: '--engine-mode',

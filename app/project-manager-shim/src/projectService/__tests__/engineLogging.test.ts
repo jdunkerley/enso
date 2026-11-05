@@ -108,6 +108,7 @@ test('the open takes the option when package.yaml says nothing', async () => {
 })
 
 test('with no settings the open is native, from the default', async () => {
+  vi.stubEnv('ENSO_ENGINE_MODE', '')
   const service = new ProjectService(fakeRunner(), [])
   await service.openProject(UUID('id-1'), Path(root))
   expect(launches.at(-1)?.mode).toEqual({ mode: 'native', source: 'default' })
@@ -146,4 +147,19 @@ test('the engine log starts with the mode', async () => {
     (event) => (event.type === 'line' ? [event.text] : []),
   )
   expect(lines[0]).toBe('Engine mode: jvm (ENSO_ENGINE_MODE)')
+})
+
+test('re-opening an open project writes no second mode line', async () => {
+  const service = new ProjectService(fakeRunner(), [], console, undefined, undefined, undefined, {
+    environment: 'jvm',
+  })
+  await service.openProject(UUID('id-1'), Path(root))
+  await service.openProject(UUID('id-1'), Path(root))
+  const replay = service.engineLogs
+    .get(path.join(root, 'P'))
+    ?.subscribe({ event: () => {}, end: () => {} }).replay
+  const modeLines = (replay ?? []).filter(
+    (event) => event.type === 'line' && event.text.startsWith('Engine mode:'),
+  )
+  expect(modeLines).toHaveLength(1)
 })

@@ -561,7 +561,9 @@ class App {
         return this.exit(1)
       } else if (projectToOpen) {
         try {
-          const exitCode = await runLocalProjectByPath(Path(projectToOpen))
+          const exitCode = await runLocalProjectByPath(Path(projectToOpen), {
+            option: engineModeOption(args),
+          })
           // Forward exact failure exit code if available (or 0 if no error).
           this.exit(exitCode)
         } catch (error) {

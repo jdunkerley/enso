@@ -122,7 +122,7 @@ test("a launch's startup timeout replaces the runner's", async () => {
 })
 
 test("a launch's terminate timeout replaces the native default", async () => {
-  vi.stubEnv('EXIT_DELAY_MS', '4000')
+  vi.stubEnv('EXIT_DELAY_MS', '6000')
   const runner = new EnsoRunner(await fakeEnso(root), { firstPort: ENGINE_MODE_PORT })
   const p = path.join(root, 'T')
   await runner.openProject(
@@ -135,6 +135,6 @@ test("a launch's terminate timeout replaces the native default", async () => {
   )
   const started = Date.now()
   await runner.closeProject(Path(p))
-  // Killed after 500 ms rather than waited for (4 s); the 1 s of slack is the drain wait of the Windows launcher.
+  // Killed after 500 ms rather than waited for (6 s); the 1 s of slack is the drain wait of the Windows launcher.
   expect(Date.now() - started).toBeLessThan(3000)
 })

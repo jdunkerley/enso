@@ -91,15 +91,15 @@ classes, takes longer, and writes its training data as it exits). A runner
 called without a launch (tests) keeps the native values.
 
 `project/open` is also answered only once the engine's ydoc port accepts a
-connection (`EnsoRunner`'s `ydocWaitMs`, `DEFAULT_YDOC_WAIT_MS` in
-`ProjectService.default`; Note [Open Waits For The Ydoc Port]). The ydoc server
-listens ~300 ms after `/_health` passes, and a GUI that connected earlier was
-refused (measured). That is consistent with Windows retrying a refused loopback
-connect after ~500 ms (inferred from the constant 510 to 525 ms gap). On Linux
-the GUI was refused too and connected only on y-websocket's third retry, ~1.4 s
-after the answer, so the wait helps there as well; the open-time harness hid it
-until `guiConnected` was changed to mean the socket is open (Note [The GUI Is
-Connected When Its Socket Is Open] in
+connection (`EnsoRunner`'s `ydocWaitMs`, per launch from the mode's column,
+`DEFAULT_YDOC_WAIT_MS` only for a launch without a mode; Note [Open Waits For
+The Ydoc Port]). The ydoc server listens ~300 ms after `/_health` passes, and a
+GUI that connected earlier was refused (measured). That is consistent with
+Windows retrying a refused loopback connect after ~500 ms (inferred from the
+constant 510 to 525 ms gap). On Linux the GUI was refused too and connected only
+on y-websocket's third retry, ~1.4 s after the answer, so the wait helps there
+as well; the open-time harness hid it until `guiConnected` was changed to mean
+the socket is open (Note [The GUI Is Connected When Its Socket Is Open] in
 `app/electron-client/perf/openTimeReport.ts`). The ydoc server binds
 `localhost`, which the JVM resolves to `127.0.0.1` (an IPv4-mapped address on
 Linux), the address the probe and the GUI use. The wait is bounded, the startup
@@ -123,9 +123,12 @@ the `EngineLaunch` that `Runner.openProject`/`runProject` take. `--new`,
 The engine log panel's first line is `Engine mode: <mode> (<source>)`
 (`EngineLogChannel.notice`, a `stderr` line before any session).
 
-`ENSO_ENGINE_ARGS=--jvm` still makes the engine a JVM one (the open-time harness
-uses it), but bypasses the resolver: the log says `native (default)` and the
-native timeouts apply, so pair it with the timeout variables.
+A `--jvm` in `ENSO_ENGINE_ARGS` (the open-time harness uses it) is lifted into
+the `jvm` option by `ProjectService.default` (`liftJvmFlag`): the log names
+`--engine-mode`, the JVM limits apply, and a project's `jvm: false` still wins.
+Headless `--startup.project` runs take `--engine-mode` too
+(`runLocalProjectByPath`'s `engine`). Re-opening an open project writes no
+second mode line.
 
 ## Child processes
 

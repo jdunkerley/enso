@@ -16,6 +16,7 @@ import type { ProjectLifecycleListener } from '../localMetadata/index.js'
 import { withinVersioningTimeout, type LocalVersioning } from '../localVersioning/index.js'
 import {
   describeEngineMode,
+  liftJvmFlag,
   resolveEngineMode,
   type EngineMode,
   type EngineModeSettings,
@@ -147,7 +148,8 @@ export class ProjectService {
     // Read extra arguments from environment variable
     const envArgs = process.env.ENSO_ENGINE_ARGS
     const envArgsArray = envArgs ? envArgs.split(/\s+/).filter((arg) => arg.length > 0) : []
-    const allExtraArgs = [...envArgsArray, ...extraArgs]
+    const lifted = liftJvmFlag([...envArgsArray, ...extraArgs], engine?.option)
+    const allExtraArgs = lifted.args
 
     return new ProjectService(
       runner,
@@ -156,7 +158,7 @@ export class ProjectService {
       lifecycle,
       versioning,
       extraEnvironment,
-      engine,
+      { ...engine, option: lifted.option },
     )
   }
 
@@ -283,6 +285,8 @@ export class ProjectService {
 
     // The log channel opens before the engine starts, so that its start-up is in the replay buffer.
     const localProjectKey = await makeProjectTelemetryKey(projectsDirectory, projectId)
+    // An open project keeps the engine it has: no second mode line in the middle of its log.
+    const alreadyLogging = this.engineLogs.get(project.path)?.isOpen === true
     const engineLog = this.engineLogs.open({
       projectPath: project.path,
       logDirectory: path.join(getEngineLogDirectory(), localProjectKey),
@@ -295,7 +299,7 @@ export class ProjectService {
     const engineArgs = [...this.extraArgs, ...engineLoggingArgs(engineLogging)]
     try {
       const mode = await resolveEngineMode(project.path, this.engineModeSettings())
-      engineLog.notice(describeEngineMode(mode))
+      if (!alreadyLogging) engineLog.notice(describeEngineMode(mode))
       launch = { mode, timeouts: engineTimeouts(mode.mode) }
       sockets = await this.runner.openProject(
         project.path,
