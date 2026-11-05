@@ -67,11 +67,13 @@ desktop binary (AppImage/DMG/exe + installer).
   shipped as `resources/samples` (`extraResources`) and copied to
   `<projects>/Samples` only when that directory is missing. Nothing is
   downloaded. The samples are original and use synthetic data; each is a project
-  (`package.yaml`, `src/Main.enso`, `data/`) that must run on the current
-  engine, so re-run them with `enso --run` after a standard-library change that
-  touches `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
-  Playwright spec adds its own `tests/fixtures/sample_bank_data.xlsx` to
-  `Samples/Data` (`addBankData`).
+  (`package.yaml`, `src/Main.enso`, `data/`; `Main.enso` must
+  `import Standard.Visualization`, or the Language Server cannot run the nodes'
+  visualizations and widget queries: `tests/headless/samples.test.ts`) that must
+  run on the current engine, so re-run them with `enso --run` after a
+  standard-library change that touches `Data.read`, the table API, or
+  `Standard.SQLite`. The Getting Started Playwright spec adds its own
+  `tests/fixtures/sample_bank_data.xlsx` to `Samples/Data` (`addBankData`).
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).
@@ -184,6 +186,14 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   `--engine-mode` and a project's `package.yaml` `jvm:` key (see
   `project-manager-shim/CLAUDE.md`, "Engine mode"). `--engine-mode <mode>` is
   the command-line form; `--jvm` is its alias.
+- `ENSO_JVM_AOT_DIR` — where the per-user JDK AOT cache lives instead of
+  `<userData>/jvm-aot` (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
+  cache trains in the background, once the window is up, only when the JVM is
+  the default engine; `before-quit` stops a running training. The open-time
+  harness points it at an empty directory of its run (`<out>/shim-jvm-aot`), so
+  its JVM launches never pick up the user's cache. An empty value counts as
+  unset. The root and the gate are in `src/jvmAotSettings.ts` (tested in
+  `tests/headless/jvmAotSettings.test.ts`).
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.
