@@ -18,6 +18,12 @@ export type JavaByteBuffer = number & { readonly __brand: 'JavaByteBuffer' }
 export interface JavaByteBufferClass {
   /** Allocates a new direct byte buffer with the given capacity */
   allocateDirect(capacity: number): JavaByteBuffer
+  /**
+   * A `Uint8Array` over the buffer's bytes. Hosts whose buffers are not GraalJS-style handles (Node)
+   * provide it; without it `new Uint8Array(new ArrayBuffer(buffer))` is used, which only GraalJS
+   * understands.
+   */
+  view?(buffer: JavaByteBuffer): Uint8Array
 }
 
 /**
@@ -34,13 +40,13 @@ export class JavaByteBufferCodec implements ChannelCodec<JavaByteBuffer, Uint8Ar
 
   /** Wrap a Java `ByteBuffer` in a `Uint8Array` view without copying. */
   encode(message: JavaByteBuffer): Uint8Array {
-    return new Uint8Array(new ArrayBuffer(message))
+    return this.ByteBuffer.view?.(message) ?? new Uint8Array(new ArrayBuffer(message))
   }
 
   /** Allocate a direct Java `ByteBuffer` and copy the stored bytes into it. */
   decode(stored: Uint8Array): JavaByteBuffer {
     const bb = this.ByteBuffer.allocateDirect(stored.byteLength)
-    const arr = new Uint8Array(new ArrayBuffer(bb))
+    const arr = this.ByteBuffer.view?.(bb) ?? new Uint8Array(new ArrayBuffer(bb))
     arr.set(stored)
     return bb
   }

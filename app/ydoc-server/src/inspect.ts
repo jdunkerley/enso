@@ -80,7 +80,7 @@ export class InspectManager {
         this.registerChannel(
           channel,
           'data',
-          (m) => toBinary(m),
+          (m) => toBinary(m, this.byteBufferClass),
           (v) => this.fromBinary(v),
         )
         delegate.onConnect(channel)
@@ -115,7 +115,7 @@ export class InspectManager {
         this.registerChannel(
           channel,
           'data',
-          (m) => toBinary(m),
+          (m) => toBinary(m, this.byteBufferClass),
           (v) => this.fromBinary(v),
         )
         delegate.onConnect(channel)
@@ -173,7 +173,7 @@ export class InspectManager {
 
   private fromBinary(data: Uint8Array): JavaByteBuffer {
     const bb = this.byteBufferClass.allocateDirect(data.byteLength)
-    const arr = new Uint8Array(new ArrayBuffer(bb))
+    const arr = this.byteBufferClass.view?.(bb) ?? new Uint8Array(new ArrayBuffer(bb))
     arr.set(data)
     return bb
   }
@@ -262,9 +262,12 @@ export class InspectManager {
   }
 }
 
-function toBinary(message: JavaByteBuffer | Uint8Array): Uint8Array {
+function toBinary(
+  message: JavaByteBuffer | Uint8Array,
+  byteBufferClass: JavaByteBufferClass,
+): Uint8Array {
   // In production GraalJS sends a `JavaByteBuffer` numeric handle. Tests
   // (and any non-polyglot code path) may send a `Uint8Array` directly.
   if (message instanceof Uint8Array) return message
-  return new Uint8Array(new ArrayBuffer(message))
+  return byteBufferClass.view?.(message) ?? new Uint8Array(new ArrayBuffer(message))
 }
