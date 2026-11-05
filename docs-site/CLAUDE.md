@@ -146,9 +146,17 @@ From the catalogues of develop run 41928058656 (2026.1.1-dev):
 - **`vite-node` 3.2.4, not 3.0.3.** 3.0.3 against the repository's Vite 7 fails
   with `__vite_ssr_exportName__ is not defined`.
 - **`hoist=false`** (`.npmrc`): every package reached must be declared. No
-  package had to be added for Docusaurus. pnpm 12 also asks for a decision on
-  every build script: `core-js` is `false` in `pnpm-workspace.yaml`'s
-  `allowBuilds`.
+  package had to be added for Docusaurus. `@mdx-js/mdx` and `remark-gfm` (the
+  versions Docusaurus uses) and `@types/react-dom` are dev dependencies for
+  `mdxRender.test.ts`, which compiles and renders generated MDX. pnpm 12 also
+  asks for a decision on every build script: `core-js` is `false` in
+  `pnpm-workspace.yaml`'s `allowBuilds`.
+- **MDX escaping** (`mdx.ts`): text escapes `{ } < >`; a Markdown backslash
+  escape is kept (`\{`) or made an entity (`\<`), never escaped again; a result
+  table's rows are escaped outside their code spans; a block starting with
+  `import`/`export` gets its first letter as an entity. `mdxRender.test.ts`
+  holds the adversarial cases; add one there for any new path from doc text to
+  MDX.
 - **Default values are shown as the catalogue gives them.** The engine renders a
   prefix application with its arguments first (`Missing_Argument."column".throw`
   for `Missing_Argument.throw "column"`), #582. The generator does not rewrite
