@@ -162,7 +162,7 @@
 
   --drive-bar-gap: 0.625rem;
   --drive-bar-padding-y: 0.125rem;
-  /* The gap between each item in the horizontal user bar. */
+  /* The gap between each item in a horizontal bar of controls (the info bar). */
   --user-bar-gap: 0.5rem;
   /* The gap between a user permission and the corresponding username. */
   --user-permission-gap: 0.75rem;

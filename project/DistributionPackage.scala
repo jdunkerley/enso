@@ -154,6 +154,12 @@ object DistributionPackage {
     )
 
     copyFilesIncremental(
+      Seq(file("distribution/engine/jvm.options")),
+      distributionRoot,
+      cacheFactory.make("engine-jvm-options")
+    )
+
+    copyFilesIncremental(
       jarModulesToCopy,
       distributionRoot / "component",
       cacheFactory.make("module jars")

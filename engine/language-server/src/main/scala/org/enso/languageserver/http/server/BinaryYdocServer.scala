@@ -77,11 +77,19 @@ object BinaryYdocServer {
     ): Unit = {
       logger.trace(s"Received binary message ${message.getClass}")
       try {
-        val value   = context.asValue(message)
-        val address = value.asNativePointer()
-        val segment =
-          MemorySegment.ofAddress(address).reinterpret(value.getBufferSize());
-        val buffer  = segment.asByteBuffer()
+        val buffer = message match {
+          // The WebSocket channel of the Language Server (a Node ydoc host)
+          // hands over a Java buffer; only the in-process ydoc server's
+          // JavaScript buffers need the polyglot native pointer.
+          case b: ByteBuffer => b
+          case _ =>
+            val value   = context.asValue(message)
+            val address = value.asNativePointer()
+            MemorySegment
+              .ofAddress(address)
+              .reinterpret(value.getBufferSize())
+              .asByteBuffer()
+        }
         val decoded = decoder.decode(buffer)
         incomingMessageHandler ! decoded
         messageCallbacks.foreach(cb => cb(buffer))

@@ -1,5 +1,7 @@
 /** @file The electron-builder configuration: installer targets, the update feed and blockmaps. */
 import * as electronBuilder from 'electron-builder'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { afterEach, beforeAll, describe, expect, test } from 'vitest'
 
 type ConfigModule = typeof import('../../electron-builder-config')
@@ -104,6 +106,28 @@ describe('Native addons', () => {
       electronBuilder.Platform.MAC,
     ]) {
       expect(configFor(platform).asarUnpack).toEqual(['**/*.node'])
+    }
+  })
+})
+
+describe('Sample projects', () => {
+  test('ship in resources/samples on every platform, from the package directory', () => {
+    for (const platform of [
+      electronBuilder.Platform.WINDOWS,
+      electronBuilder.Platform.LINUX,
+      electronBuilder.Platform.MAC,
+    ]) {
+      expect(configFor(platform).extraResources).toContainEqual({ from: 'samples/', to: 'samples' })
+    }
+  })
+
+  test('are each a project with a Main module', () => {
+    const samples = path.join(__dirname, '..', '..', 'samples')
+    const projects = fs.readdirSync(samples)
+    expect(projects.length).toBeGreaterThan(0)
+    for (const project of projects) {
+      expect(fs.existsSync(path.join(samples, project, 'package.yaml'))).toBe(true)
+      expect(fs.existsSync(path.join(samples, project, 'src', 'Main.enso'))).toBe(true)
     }
   })
 })

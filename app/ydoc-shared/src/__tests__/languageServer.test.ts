@@ -172,4 +172,23 @@ describe('LanguageServer initialization', () => {
     expect(warn).not.toHaveBeenCalled()
     expect(error).not.toHaveBeenCalled()
   })
+
+  test('a request waiting for initialization ends with an error when the server is disposed', async () => {
+    const transport = new YjsTransport(doc, CHANNEL)
+    ls = new LanguageServer(CLIENT_ID, transport)
+    expect((await ls.initialized).ok).toBe(true)
+    // The transport closes and never opens again, so initialization never completes.
+    transport.close()
+    const root = { rootId: CLIENT_ID, segments: [] }
+    const waiting = ls.listFiles(root)
+    const roots = ls.contentRoots
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    ls.stopReconnecting()
+    ls.release()
+    ls = undefined
+    const result = await waiting
+    expect(result.ok).toBe(false)
+    expect(await roots).toEqual([])
+  })
 })

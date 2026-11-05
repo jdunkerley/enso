@@ -138,6 +138,7 @@ function onRemoveLocalDirClick(directory: LocalDirectory) {
     <SvgButton
       v-if="extended && category.type === 'local'"
       name="settings"
+      :title="getText('localSettingsButtonLabel')"
       @activate="
         () =>
           router.push({

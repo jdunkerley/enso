@@ -346,6 +346,7 @@ public class CrossLibraryCacheTest {
       for (var i = 0; i < 3; i++) {
         dos.writeUTF(in.readUTF()); // source digest, blob digest, compilation stage
       }
+      dos.writeInt(in.readInt()); // LibraryDependencies.FORMAT
       var libraries = in.readInt();
       assertTrue("Alpha.Main records Beta", libraries > 0);
       for (var i = 0; i < libraries * 3; i++) {

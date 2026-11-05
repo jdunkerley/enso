@@ -7,7 +7,7 @@ import EditorPageActions from './EditorPageActions'
 import { goToPageActions, type GoToPageActions } from './goToPageActions'
 import NewDataLinkModalActions from './NewDataLinkModalActions'
 import PageActions from './PageActions'
-import { TEXT } from './utilities'
+import { parkMouse, TEXT } from './utilities'
 
 const ASSET_ROW_SAFE_POSITION = { x: 150, y: 16 }
 
@@ -83,7 +83,7 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
       // timer is cleared and any in-flight expansion collapses. The expanded leftBar
       // (~150px wide, `position: absolute; z-index: 2`) otherwise covers the leftmost
       // toolbar/table buttons and intercepts subsequent clicks.
-      await page.mouse.move(0, 0)
+      await parkMouse(page)
       await this.expectCategory(category)
       // The sidebar marks the new category at once, but the drive view keeps showing the old one
       // (`layouts/Drive/driveView.ts`): until the new category has loaded, the previous one's rows
@@ -222,7 +222,7 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
           // Move the cursor off so the leftBar's hover-to-expand timer doesn't fire and
           // intercept later clicks on the leftmost row buttons (e.g. the directory navigate
           // button). Same mitigation as in `dragRowToCategory` and `goToCategoryNamed`.
-          await page.mouse.move(0, 0)
+          await parkMouse(page)
         })
       },
       /** Drag a row onto another row. */
@@ -247,7 +247,7 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
             })
             // Drop ends with the cursor on the leftBar; move it off so the
             // hover-to-expand timer doesn't fire and intercept later clicks.
-            await page.mouse.move(0, 0)
+            await parkMouse(page)
           },
         )
       },
@@ -257,7 +257,7 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
           const navigateButton = getRow(page, row).getByTestId('directory-row-navigate-button')
           await expect(navigateButton).toHaveAttribute('aria-label', TEXT.open)
           await navigateButton.click()
-          await page.mouse.move(0, 0) // prevent popup from appearing
+          await parkMouse(page) // prevent popup from appearing
         })
       },
       /** Open a project at a specific row. */
@@ -265,7 +265,7 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
         return self.step(`Open directory on drive table row ${row}`, async (page) => {
           const button = getRow(page, row).getByLabel(TEXT.openInEditor)
           await button.click()
-          await page.mouse.move(0, 0) // prevent popup from appearing
+          await parkMouse(page) // prevent popup from appearing
         })
       },
       /** Close a project at a specific row. */
@@ -273,7 +273,7 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
         return self.step(`Open directory on drive table row ${row}`, async (page) => {
           const button = getRow(page, row).getByLabel(TEXT.stopExecution)
           await button.click()
-          await page.mouse.move(0, 0) // prevent popup from appearing
+          await parkMouse(page) // prevent popup from appearing
         })
       },
       /**

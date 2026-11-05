@@ -53,9 +53,9 @@ class Source(Enum):
 
     def artifact_names(self) -> List[str]:
         if self == Source.ENGINE:
-            return ["Runtime Benchmark Report", "benchmark-results.xml"]
+            return ["Runtime Benchmark Report", "benchmark-results.xml", "benchmark-results"]
         elif self == Source.STDLIB:
-            return ["Enso JMH Benchmark Report", "benchmark-results.xml"]
+            return ["Enso JMH Benchmark Report", "benchmark-results.xml", "benchmark-results"]
         else:
             raise ValueError(f"Unknown source {self}")
 

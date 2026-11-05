@@ -78,7 +78,6 @@ describe('the graph editor’s defaults', () => {
       'graph.navigateUp': ['Mod+Shift+E'],
       'components.pickColorMulti': ['Mod+Shift+C'],
       'components.tidyUp': ['Mod+Shift+L'],
-      'graph.openDocumentation': ['F1'],
       'graph.deleteSelectedEdge': ['Delete', 'Backspace'],
     })
     expect(Object.keys(GRAPH_BINDINGS)).toEqual([
@@ -104,7 +103,6 @@ describe('the graph editor’s defaults', () => {
       'graph.navigateUp',
       'components.pickColorMulti',
       'components.tidyUp',
-      'graph.openDocumentation',
       'graph.deleteSelectedEdge',
     ])
   })

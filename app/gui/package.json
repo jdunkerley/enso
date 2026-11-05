@@ -4,16 +4,15 @@
   "type": "module",
   "private": true,
   "author": {
-    "name": "Enso Team",
-    "email": "contact@enso.org"
+    "name": "jdunkerley"
   },
-  "homepage": "https://github.com/enso-org/enso/tree/develop/app/gui",
+  "homepage": "https://github.com/jdunkerley/enso/tree/develop/app/gui",
   "repository": {
     "type": "git",
-    "url": "git@github.com:enso-org/enso.git"
+    "url": "git@github.com:jdunkerley/enso.git"
   },
   "bugs": {
-    "url": "https://github.com/enso-org/enso/issues"
+    "url": "https://github.com/jdunkerley/enso/issues"
   },
   "//": [
     "--max-old-space-size=4096 is required when sourcemaps are enabled,",

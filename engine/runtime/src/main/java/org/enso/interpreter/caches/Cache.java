@@ -473,11 +473,19 @@ public final class Cache<T, M> {
    * (`CacheTests`). Truffle's cancel (`ThreadDeath`) is an `Error` and is not
    * caught at all.
    *
-   * This covers what `deserialize` reads. Method bodies are read lazily, long
-   * after the load, when a method is first called, and a failure there cannot
-   * be turned into a miss. For them `Spi.dependenciesAreCurrent` checks, before
-   * anything is read, that every module the IR names in another library still
-   * exists (and that those libraries' sources are unchanged).
+   * This covers what `deserialize` reads. Two parts of the IR are restored
+   * later:
+   *
+   * - Method bodies are read lazily, long after the load, when a method is
+   *   first called, and a failure there cannot be turned into a miss.
+   * - A module's `BindingsMap` converts its module references on first use
+   *   ("Cannot deserialize BindingsMap", #584). `ImportResolver.analyzeModule`
+   *   makes that first use inside the `try` that already turns a failed
+   *   deserialisation into a warning and a compilation from source.
+   *
+   * For both, `Spi.dependenciesAreCurrent` checks, before anything is read,
+   * that every module the IR names still exists, in its own library or in
+   * another (and that the other libraries' sources are unchanged).
    */
 
   /** Whether the failure is a cancel or an interrupt rather than a fault of the cache. */

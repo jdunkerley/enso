@@ -114,7 +114,6 @@ const GRAPH_BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
       icon: 'tidy_up',
       category: 'graphComponents',
     },
-    'graph.openDocumentation': { bindings: ['F1'], icon: 'help', category: 'graphEditor' },
     // Not rebindable on its own: it follows `components.deleteSelected` (`GRAPH_BINDING_FOLLOWERS`).
     'graph.deleteSelectedEdge': {
       bindings: ['Delete', 'Backspace'],

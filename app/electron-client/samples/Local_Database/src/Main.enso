@@ -1,0 +1,25 @@
+from Standard.Base import all
+from Standard.Table import all
+from Standard.Database import all
+from Standard.SQLite import all
+
+## Local Database
+
+   Loads a CSV of trips into an in-memory SQLite database, then summarizes it
+   with a query that runs inside the database. SQLite stores dates as text, so
+   the trip date is formatted before the upload.
+
+   Uploading to a database is only previewed while you edit, so the `summary`
+   node first shows the SQL it would run. Press Write All (the play icon at the
+   top of the graph) to run the upload, then select `summary` and pick
+   the Table visualization to see the result.
+
+   The data in `data/trips.csv` is synthetic.
+main =
+    trips = Data.read (enso_project.data / 'trips.csv') (..Delimited headers=..Has_Headers)
+    trip_date = (trips.at 'trip_date').format 'yyyy-MM-dd'
+    prepared = trips.set trip_date 'trip_date'
+    connection = Database.connect SQLite.In_Memory
+    table = prepared.select_into_database_table connection 'trips' temporary=True
+    summary = table.aggregate ['mode'] [..Count 'Trips', ..Sum 'distance_km' 'Total km', ..Average 'minutes' 'Average minutes'] . sort [..Name 'Total km' ..Descending]
+    summary
