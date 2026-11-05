@@ -152,14 +152,18 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   up, trains only when the JVM is the resolved default
   (`resolveDefaultEngineMode`, so nothing happens while the default is native),
   there is no cache for the key and no other process holds `<root>/train.lock`
-  (`lock.ts`: created exclusively with the pid and touched every minute; a lock
-  whose pid is dead, or that has not been touched for 10 minutes, since pids are
-  reused, is taken over by renaming it aside first, so two takers never both
-  win). `EngineTrainer` makes a scratch project with `enso --new` (native, the
-  welcome template) in `<root>/enso-aot-training/`, starts `enso --jvm --server`
-  on it at below-normal priority (`os.setPriority`) with `ENSO_JVM_OPTIONS`
-  adding `-XX:AOTMode=record` and `-XX:AOTConfiguration=<key>/enso.aot.aotconf`,
-  a fresh `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`,
+  (`lock.ts`: created exclusively with the pid and a random token, and touched
+  every minute; a lock whose pid is dead, or that has not been touched for 10
+  minutes, since pids are reused, is taken over by renaming it aside and
+  checking that what moved is the lock that was inspected, putting it back
+  (`link`, which never replaces a newer lock) when another taker got there
+  first; the heartbeat and the release touch the file only while it holds this
+  acquisition's token, and a takeover deletes asides older than 10 minutes).
+  `EngineTrainer` makes a scratch project with `enso --new` (native, the welcome
+  template) in `<root>/enso-aot-training/`, starts `enso --jvm --server` on it
+  at below-normal priority (`os.setPriority`) with `ENSO_JVM_OPTIONS` adding
+  `-XX:AOTMode=record` and `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a
+  fresh `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`,
   waits for `/_health` (180 s), and `driveOpen` plays an open over the Language
   Server's channel sockets (`/channel/{json,vis-control,vis-data}?token=`):
   `session/initProtocolConnection`, `executionContext/create` and `push` of
@@ -196,11 +200,13 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   `-XX:AOTCache=<key>/enso.aot` and
   `-Xlog:aot=warning,cds=warning:file="<key>/use.log"::filecount=0` (the path
   quoted, so the `:` of `C:` does not end the option; no rotation, so one log
-  rewritten by each JVM), when the cache exists. The log's time is the key's
-  "last used". `AOTMode` stays `auto`, so a cache the JVM refuses costs only its
-  benefit. After such an open `checkUseLog()` deletes the cache when `use.log`
-  has a line `aotRejection` (`useLog.ts`, also the open-time harness's) matches;
-  it retrains at the next launch.
+  rewritten by each JVM: checked on the bundled JDK, its mtime moves at every
+  start even when it stays empty), when the cache exists. The log's time is the
+  key's "last used"; without a log, `enso.aot`'s. `AOTMode` stays `auto`, so a
+  cache the JVM refuses costs only its benefit. After such an open
+  `checkUseLog()` deletes the cache when `use.log` has a line `aotRejection`
+  (`useLog.ts`, also the open-time harness's) matches; it retrains at the next
+  launch.
 - **`ENSO_JVM_OPTIONS`** is built by `jvmOptionsValue`
   (`projectService/jvmOptions.ts`, which also holds `LAUNCHER_JVM_OPTIONS`,
   `parseJvmOptionsFile` and `aotCreateArguments`; the open-time harness

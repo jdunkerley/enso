@@ -91,7 +91,7 @@ export class JvmAotCache {
   private retrainTimer: ReturnType<typeof setTimeout> | undefined
   private disposed = false
 
-  /** The trainer defaults to an {@link EngineTrainer} with its scratch project in `<root>/train`. */
+  /** The trainer defaults to an {@link EngineTrainer} with its scratch project in `<root>/enso-aot-training`. */
   constructor(
     private readonly settings: JvmAotCacheSettings,
     trainer?: Trainer,

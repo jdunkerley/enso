@@ -150,6 +150,8 @@ test('an open kills the training; it restarts 60 s after the last answer', async
   await created.start()
   created.openStarted()
   expect(trainer.runs[0]!.signal.aborted).toBe(true)
+  // The killed training's lock is released (real file I/O, outside the fake clock).
+  await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
   created.openAnswered()
   await vi.advanceTimersByTimeAsync(30_000)
   created.openStarted()
@@ -168,6 +170,8 @@ test('no restart while an open is still in flight', async () => {
   created.openStarted()
   created.openStarted()
   created.openAnswered()
+  // The killed training's lock is released (real file I/O, outside the fake clock).
+  await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
   await vi.advanceTimersByTimeAsync(120_000)
   expect(trainer.runs).toHaveLength(1)
   created.openAnswered()

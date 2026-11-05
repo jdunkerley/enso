@@ -1,14 +1,17 @@
 /**
  * @file The training lock: one AOT training at a time across IDE processes (a second window, or a
- * second instance of another version). It is `<root>/train.lock`, holding the owner's pid, and its
- * owner touches it every minute while it holds it.
+ * second instance of another version). It is `<root>/train.lock`, holding the owner's pid and a
+ * random token of this acquisition, and its owner touches it every minute while it holds it.
  */
+import * as crypto from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { errorCode } from '../localMetadata/jsonFile.js'
 
 /** The lock file's name. */
 export const LOCK_FILE_NAME = 'train.lock'
+/** A lock moved aside by a takeover is `<lock>.stale-<pid>-<time>` until it is deleted. */
+const STALE_INFIX = '.stale-'
 
 /** How often a holder touches the lock. */
 const HEARTBEAT_MS = 60_000
@@ -17,6 +20,11 @@ const HEARTBEAT_MS = 60_000
  * Windows), so a crashed IDE's pid can belong to an unrelated live process.
  */
 export const STALE_LOCK_MS = 10 * 60_000
+
+/** Test hooks: called between a taker's inspection of a stale lock and its takeover. */
+export interface LockHooks {
+  readonly beforeTakeover?: () => Promise<void>
+}
 
 /** Whether a process with `pid` exists (`EPERM`: it does, owned by someone else). */
 function isAlive(pid: number): boolean {
@@ -28,12 +36,12 @@ function isAlive(pid: number): boolean {
   }
 }
 
-/** Create the lock file exclusively with this process's pid; `false` when it already exists. */
-async function createLock(file: string): Promise<boolean> {
+/** Create the lock file exclusively with `content`; `false` when it already exists. */
+async function createLock(file: string, content: string): Promise<boolean> {
   try {
     const handle = await fs.open(file, 'wx')
     try {
-      await handle.writeFile(String(process.pid))
+      await handle.writeFile(content)
     } finally {
       await handle.close()
     }
@@ -44,46 +52,107 @@ async function createLock(file: string): Promise<boolean> {
   }
 }
 
-/** Whether the lock in `file` is held: a live pid that has touched it recently. */
-async function isHeld(file: string): Promise<boolean | undefined> {
-  let text: string
-  let touched: number
+/** A lock file as one taker saw it. */
+interface Seen {
+  readonly content: string
+  readonly mtimeMs: number
+}
+
+/** What is at `file` now, or `undefined` when nothing is. */
+async function look(file: string): Promise<Seen | undefined> {
   try {
-    text = await fs.readFile(file, 'utf8')
-    touched = (await fs.stat(file)).mtimeMs
+    const content = await fs.readFile(file, 'utf8')
+    const mtimeMs = (await fs.stat(file)).mtimeMs
+    return { content, mtimeMs }
   } catch (error) {
-    // Released meanwhile: not held.
     if (errorCode(error) === 'ENOENT') return undefined
     throw error
   }
-  const holder = Number(text.trim())
+}
+
+/** Whether the lock seen is held: a live pid that has touched it recently. */
+function isHeld(seen: Seen): boolean {
+  const holder = Number(seen.content.trim().split(/\s+/)[0])
   return (
     Number.isInteger(holder) &&
     holder > 0 &&
     isAlive(holder) &&
-    Date.now() - touched < STALE_LOCK_MS
+    Date.now() - seen.mtimeMs < STALE_LOCK_MS
   )
 }
 
+/** Delete locks moved aside by takeovers that never finished (a crash between rename and delete). */
+async function deleteOldStaleLocks(root: string): Promise<void> {
+  let entries: string[]
+  try {
+    entries = await fs.readdir(root)
+  } catch {
+    return
+  }
+  for (const name of entries) {
+    if (!name.startsWith(LOCK_FILE_NAME + STALE_INFIX)) continue
+    const file = path.join(root, name)
+    try {
+      if (Date.now() - (await fs.stat(file)).mtimeMs > STALE_LOCK_MS) await fs.rm(file)
+    } catch {
+      // Gone meanwhile, or in use.
+    }
+  }
+}
+
 /**
- * Take the training lock in `root`: create `<root>/train.lock` with this pid, taking over a lock
- * whose pid is not alive, that is unreadable, or that has not been touched for
- * {@link STALE_LOCK_MS}. Returns the function that releases it, or `undefined` when another
- * process holds it.
- *
- * A takeover first renames the stale file to a name of its own, which only one of two racing
- * takers can do, and then creates the lock exclusively, so two takers never both hold it.
+ * Take a stale lock seen as `seen`: move whatever is at `file` aside, and keep it moved only if
+ * it is the lock that was seen. Another taker may have taken over in between, and then what the
+ * rename moved is that taker's fresh lock: it is put back (unless something is there by then),
+ * and this taker gives up. Returns whether the stale lock is gone and the lock may be created.
+ */
+async function takeOver(file: string, seen: Seen): Promise<boolean> {
+  const aside = `${file}${STALE_INFIX}${process.pid}-${Date.now()}-${crypto.randomUUID()}`
+  try {
+    await fs.rename(file, aside)
+  } catch (error) {
+    // Another taker moved it first.
+    if (errorCode(error) === 'ENOENT') return false
+    throw error
+  }
+  const moved = await look(aside)
+  if (moved != null && moved.content === seen.content && moved.mtimeMs === seen.mtimeMs) {
+    await fs.rm(aside, { force: true }).catch(() => undefined)
+    return true
+  }
+  // Not the stale lock: put it back without replacing anything that is there now.
+  try {
+    await fs.link(aside, file)
+  } catch {
+    // Something is there (another lock) or links are unsupported: that lock stands.
+  }
+  await fs.rm(aside, { force: true }).catch(() => undefined)
+  return false
+}
+
+/**
+ * Take the training lock in `root`: create `<root>/train.lock` with this pid and a fresh token,
+ * taking over a lock whose pid is not alive, that is unreadable, or that has not been touched for
+ * {@link STALE_LOCK_MS} (see `takeOver`). Returns the function that releases it, or `undefined`
+ * when another process holds it. The heartbeat and the release touch the file only while it holds
+ * this acquisition's token, so a holder whose lock was taken over never touches the new holder's.
  */
 export async function acquireTrainingLock(
   root: string,
+  hooks: LockHooks = {},
 ): Promise<(() => Promise<void>) | undefined> {
   await fs.mkdir(root, { recursive: true })
   const file = path.join(root, LOCK_FILE_NAME)
+  const content = `${process.pid} ${crypto.randomUUID()}`
+  const ours = async () => (await look(file))?.content === content
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (await createLock(file)) {
+    if (await createLock(file, content)) {
       const heartbeat = setInterval(() => {
-        const now = new Date()
-        void fs.utimes(file, now, now).catch(() => undefined)
+        void (async () => {
+          if (!(await ours())) return
+          const now = new Date()
+          await fs.utimes(file, now, now)
+        })().catch(() => undefined)
       }, HEARTBEAT_MS)
       heartbeat.unref()
       let released = false
@@ -91,21 +160,19 @@ export async function acquireTrainingLock(
         if (released) return
         released = true
         clearInterval(heartbeat)
-        await fs.rm(file, { force: true })
+        if (await ours().catch(() => false)) await fs.rm(file, { force: true })
       }
     }
-    const held = await isHeld(file)
-    if (held === undefined) continue
-    if (held) return undefined
-    const stale = `${file}.stale-${process.pid}-${Date.now()}`
-    try {
-      await fs.rename(file, stale)
-    } catch (error) {
-      // Another taker moved it first: try to create it again (one of us will).
-      if (errorCode(error) === 'ENOENT') continue
-      throw error
+    const seen = await look(file)
+    if (seen === undefined) continue
+    if (isHeld(seen)) return undefined
+    await hooks.beforeTakeover?.()
+    await deleteOldStaleLocks(root)
+    if (!(await takeOver(file, seen))) {
+      // Someone else took it over: whoever holds it now is live.
+      const now = await look(file)
+      if (now != null && isHeld(now)) return undefined
     }
-    await fs.rm(stale, { force: true }).catch(() => undefined)
   }
   return undefined
 }
