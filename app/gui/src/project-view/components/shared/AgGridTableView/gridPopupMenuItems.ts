@@ -82,7 +82,7 @@ const KNOWN_BUILTIN_ITEMS: Record<string, (ctx: GridMenuContext) => GridMenuItem
     name: 'Autosize All Columns',
     action: () => ctx.api.autoSizeAllColumns(),
   }),
-  // Excel export is explicitly out of scope for the Community fallback (see the design spec's
+  // Excel export is explicitly out of scope for the Community grid (see the design spec's
   // non-goals) — this built-in token only offers CSV export, which ag-grid-community supports.
   export: (ctx) => ({
     type: 'item',
