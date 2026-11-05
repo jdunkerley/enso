@@ -16,7 +16,7 @@ import { Path } from 'enso-common/src/services/Backend'
 import { computed, ref, shallowRef, toRef, toRefs, useTemplateRef } from 'vue'
 import CategoryButton from './CategoryButton.vue'
 import PanelContents from './PanelContents.vue'
-import UserMenu from './UserMenu.vue'
+import RailFooter from './RailFooter.vue'
 
 const LEFT_BAR_EXTENSION_TIME_MS = 550
 const categories = useCategories()
@@ -112,9 +112,9 @@ registerHandlers({
           @click="onAddDirectoryClick"
         />
       </div>
-      <!-- The last of the rail's controls, at its bottom. -->
+      <!-- The last of the rail's controls, at its bottom: Settings and About. -->
       <div class="settings">
-        <UserMenu :extended="leftBarExtended" />
+        <RailFooter :extended="leftBarExtended" />
       </div>
       <div class="shadow" />
     </div>
@@ -190,7 +190,7 @@ registerHandlers({
   }
 }
 
-/* The settings button, below a divider like the one above Add Directory. */
+/* The Settings and About buttons, below a divider like the one above Add Directory. */
 .settings {
   width: 100%;
   margin-top: auto;

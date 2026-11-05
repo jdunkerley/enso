@@ -177,8 +177,8 @@ use:
 
 A `data-testid` is a contract: keep it on the equivalent element. The ones the
 page objects rely on include `drive-view`, `asset-row`, `asset-row-name`,
-`dummy-row`, `context-menu`, `modal-dialog`, `user-menu`, `right-panel`,
-`asset-search-bar`, `directory-row-navigate-button` and `toast-host`.
+`dummy-row`, `context-menu`, `modal-dialog`, `right-panel`, `asset-search-bar`,
+`directory-row-navigate-button` and `toast-host`.
 
 ## Port parity checklist
 

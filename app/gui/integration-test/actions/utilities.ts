@@ -17,3 +17,8 @@ export async function parkMouse(page: Page) {
   }))
   await page.mouse.move(width - 24, height - 100)
 }
+
+/** A button at the bottom of the left rail (#566): Settings or About, by its accessible name. */
+export function railButton(page: Page, name: string) {
+  return page.getByRole('button', { name, exact: true }).locator('visible=true')
+}

@@ -5,7 +5,7 @@
  * anything.
  */
 import { expect, test, type Page } from 'integration-test/base'
-import { TEXT } from '../actions'
+import { railButton, TEXT } from '../actions'
 import BaseActions from '../actions/BaseActions'
 
 const settingsPanel = (page: Page) => page.getByTestId('settings-panel')
@@ -49,14 +49,16 @@ test('settings open on the Local tab', async ({ drivePage, page }) => {
   await expect(sectionHeadings(page)).toHaveCount(4)
 })
 
-test('the settings cog opens a menu with Settings and About', async ({ drivePage, page }) => {
+test('the rail has Settings and About buttons, and Settings opens the Local tab', async ({
+  drivePage,
+  page,
+}) => {
   await drivePage
 
-  // The cog is the only control of the settings button: no avatar, notifications or offline notice.
-  await page.getByRole('button', { name: TEXT.userMenuLabel }).click()
-  const menu = page.getByTestId('user-menu')
-  await expect(menu).not.toContainText(TEXT.offlineUserName)
-  await menu.getByRole('button', { name: TEXT.settingsShortcut }).click()
+  // The buttons are the only controls of the footer: no avatar, notifications or offline notice.
+  await expect(railButton(page, TEXT.aboutThisAppShortcut)).toBeVisible()
+  await expect(page.getByText(TEXT.offlineUserName)).toHaveCount(0)
+  await railButton(page, TEXT.settingsShortcut).click()
   await expect(settingsPanel(page)).toBeVisible()
   await expect(sidebarTab(page, TEXT.localSettingsTab)).toHaveClass(/bg-white/)
 })

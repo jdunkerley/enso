@@ -14,7 +14,7 @@ import { expect, test } from 'integration-test/base'
 import type { MockLocalApi } from 'integration-test/mock/localApi'
 import { posix } from 'node:path'
 import { expectNoNewAxeViolations } from '../accessibility'
-import { TEXT } from '../actions'
+import { railButton, TEXT } from '../actions'
 
 /** The drive the first three drive tests look at. It is added before the app loads. */
 function seedDrive(localApi: MockLocalApi) {
@@ -158,15 +158,10 @@ test('asset panel: no new axe violations', async ({ drivePage, localApi }) => {
     })
 })
 
-test('user menu tree', async ({ drivePage }) => {
-  await drivePage.openUserMenu().do(async (page) => {
-    const menu = page.getByTestId('user-menu')
-    await expect(menu).toBeVisible()
-    await expect(menu).toMatchAriaSnapshot(`
-      - dialog "Settings menu":
-        - button /^Settings/
-        - button /^About Enso/
-    `)
+test('left rail footer tree', async ({ drivePage }) => {
+  await drivePage.do(async (page) => {
+    await expect(railButton(page, TEXT.settingsShortcut)).toBeVisible()
+    await expect(railButton(page, TEXT.aboutThisAppShortcut)).toBeVisible()
   })
 })
 
