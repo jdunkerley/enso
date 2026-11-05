@@ -60,3 +60,24 @@ Both come after the fixed list and before `--module-path`/`-m`. Keep
 `JvmOptions` Native-Image friendly (plain `java.io`/`java.nio` only): it runs in
 the `enso` native image. The open-time harness reads the same file when it
 starts `java` itself (`app/electron-client/perf/jvmAotCache.ts`).
+
+Rules for an option line (in the file or in `ENSO_JVM_OPTIONS`):
+
+- It must be a JVM option, not a `java`-launcher one, in single-token form with
+  `=`: `--add-opens=java.base/java.nio=ALL-UNNAMED`, never
+  `--add-opens java.base/java.nio=…`, and no `@argfile`, `-jar` or `-cp`. On the
+  native `enso` (the JNI path) each line becomes one `JavaVMOption`, which the
+  launcher's own argument parsing never sees.
+- The quoted form `-Xlog:…:file="C:\Users\John Smith\use.log"` is for the JNI
+  path only (the `enso` native image, which is what the IDE runs). Where a JVM
+  runs the runner and relaunches through `ProcessBuilder` (`--jvm <other JDK>`),
+  Windows' argument quoting splits such an argument at its space; write the path
+  unquoted there.
+- A leading UTF-8 byte order mark is ignored.
+
+The shell launchers `distribution/bin/enso` and `enso.bat` start the JVM
+themselves and `--jvm` does not relaunch from them, so `Main.launchJvm` is not
+involved: they read `jvm.options` on their own (`enso` with the same rules;
+`enso.bat` skips blank and `#` lines and quotes each line, so a line must not
+start with spaces or a byte order mark or contain a double quote). They do not
+read `ENSO_JVM_OPTIONS`.

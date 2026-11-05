@@ -26,7 +26,7 @@ final class JvmOptions {
     try {
       var result = new ArrayList<String>();
       for (var line : Files.readAllLines(file.toPath())) {
-        var option = line.trim();
+        var option = clean(line);
         if (!option.isEmpty() && !option.startsWith("#")) {
           result.add(option);
         }
@@ -42,12 +42,21 @@ final class JvmOptions {
   // A value with a newline is one option per line, so that an option may contain spaces (an AOT
   // cache under `C:\Users\John Smith\`, a quoted `-Xlog` file); the IDE's shim always writes it
   // that way. A value without one is split on whitespace, which is what a person types.
+  /** Trims a line and drops a leading UTF-8 byte order mark, which {@code trim} leaves. */
+  private static String clean(String line) {
+    var s = line.trim();
+    if (!s.isEmpty() && s.charAt(0) == (char) 0xFEFF) {
+      s = s.substring(1).trim();
+    }
+    return s;
+  }
+
   static List<String> fromEnvironment(String value) {
     if (value == null || value.isBlank()) {
       return List.of();
     }
     var parts = value.contains("\n") ? value.split("\r?\n") : value.trim().split("\\s+");
-    return Arrays.stream(parts).map(String::trim).filter(s -> !s.isEmpty()).toList();
+    return Arrays.stream(parts).map(JvmOptions::clean).filter(s -> !s.isEmpty()).toList();
   }
 
   static List<String> all(File componentDir, String environmentValue) {

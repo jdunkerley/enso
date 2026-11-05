@@ -27,7 +27,10 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   overwritten later in the same indexing process.
   `EngineBundle.librariesNotBundled` names the standard libraries the IDE bundle
   leaves out (and `IRCaches.checkCacheSizes` does not count):
-  `Database_Test_Suite`.
+  `Database_Test_Suite`. `createEnginePackage` also copies
+  `distribution/engine/jvm.options` to the package root (beside `component/`),
+  and `EngineDistributionChecks.afterBuild` fails when it is missing: the
+  launcher (`engine/runner` `JvmOptions`) and the shell launchers read it.
 - `Editions.scala` — Edition-manifest generation (fills in the versions of
   `distribution/edition.template.yaml`).
 - `GatherLicenses.scala` — Drives the legal-review report and checks

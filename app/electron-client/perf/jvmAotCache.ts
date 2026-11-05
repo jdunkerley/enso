@@ -9,11 +9,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { findBundledJava, findEngineComponent } from '../tests/packagedIde'
 import {
+  aotCreateArguments,
   aotRejection,
   credentialFreeEnv,
-  LAUNCHER_JVM_OPTIONS,
   type OpenTag,
-  parseJvmOptionsFile,
   type RunResult,
 } from './openTimeReport'
 
@@ -165,25 +164,17 @@ async function prepareJvmAotCache(
 
   // `java` is started here, not through the launcher, so the engine package's `jvm.options` lines
   // and the experiment's options, which the launcher would add, are added by hand.
-  const optionsFile = path.join(path.dirname(component), 'jvm.options')
-  const engineJvmOptions = [
-    ...(fs.existsSync(optionsFile) ?
-      parseJvmOptionsFile(fs.readFileSync(optionsFile, 'utf8'))
-    : []),
-    ...jvmOptions.split(/\s+/).filter((option) => option !== ''),
-  ]
+  const optionsFilePath = path.join(path.dirname(component), 'jvm.options')
   const created = spawnSync(
     java,
-    [
-      '-XX:AOTMode=create',
-      `-XX:AOTConfiguration=${config}`,
-      `-XX:AOTCache=${cache}`,
-      ...LAUNCHER_JVM_OPTIONS,
-      ...engineJvmOptions,
-      `--module-path=${component}`,
-      '-m',
-      'org.enso.runner/org.enso.runner.Main',
-    ],
+    aotCreateArguments({
+      config,
+      cache,
+      component,
+      optionsFile:
+        fs.existsSync(optionsFilePath) ? fs.readFileSync(optionsFilePath, 'utf8') : undefined,
+      jvmOptions,
+    }),
     {
       encoding: 'utf8',
       // The repo types `ProcessEnv` as closed; a spawned process takes any variable.

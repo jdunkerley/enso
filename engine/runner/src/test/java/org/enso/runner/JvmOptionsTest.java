@@ -55,6 +55,16 @@ public class JvmOptionsTest {
   }
 
   @Test
+  public void byteOrderMarkIsIgnored() throws Exception {
+    var component = component();
+    var bom = String.valueOf((char) 0xFEFF);
+    Files.writeString(
+        new File(component.getParentFile(), "jvm.options").toPath(), bom + "# comment\n-Da=1\n");
+    assertEquals(List.of("-Da=1"), JvmOptions.fromFile(component));
+    assertEquals(List.of("-Db=2"), JvmOptions.fromEnvironment(bom + "-Db=2\n"));
+  }
+
+  @Test
   public void fileComesBeforeEnvironment() throws Exception {
     var component = component();
     Files.writeString(new File(component.getParentFile(), "jvm.options").toPath(), "-Dfrom=file\n");

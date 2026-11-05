@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import {
+  aotCreateArguments,
   aotRejection,
   classifyTemplate,
   credentialFreeEnv,
@@ -17,6 +18,7 @@ import {
   parseLsLogLine,
   regressionWarnings,
   renderMarkdown,
+  splitJvmOptions,
   type Engine,
   type Mark,
   type OpenTimeReport,
@@ -357,11 +359,37 @@ describe('JVM_OPTIONS_FILE_LINES', () => {
     const lines = parseJvmOptionsFile(fs.readFileSync(distributionFile, 'utf8'))
     expect(lines).toContain('--enable-native-access=ALL-UNNAMED,org.enso.language.server')
   })
-  test('the harness starts java itself with the file and the experiment options', () => {
-    const source = fs.readFileSync(path.resolve(__dirname, '../../perf/jvmAotCache.ts'), 'utf8')
-    expect(source).toContain('jvm.options')
-    expect(source).toContain('...LAUNCHER_JVM_OPTIONS')
-    expect(source).toContain('...engineJvmOptions')
+  test('a byte order mark does not make the first line an option', () => {
+    const bom = String.fromCharCode(0xfeff)
+    expect(parseJvmOptionsFile(bom + '# c\n-Da=1\n')).toEqual(['-Da=1'])
+    expect(parseJvmOptionsFile(bom + '-Da=1\n')).toEqual(['-Da=1'])
+  })
+  test('splitJvmOptions follows the launcher: lines when there is a newline, else whitespace', () => {
+    expect(splitJvmOptions('  -Da=1   -Db=2 ')).toEqual(['-Da=1', '-Db=2'])
+    expect(splitJvmOptions('')).toEqual([])
+    expect(splitJvmOptions('-Da=a b\r\n-Db=2\n\n')).toEqual(['-Da=a b', '-Db=2'])
+  })
+  test('the AOT create launch gets the fixed options, the file, the experiment, then the module', () => {
+    expect(
+      aotCreateArguments({
+        config: 'c.aotconf',
+        cache: 'c.aot',
+        component: 'comp',
+        optionsFile: '# x\n--enable-native-access=ALL-UNNAMED\n',
+        jvmOptions: '-Da=1\n-Db=a b',
+      }),
+    ).toEqual([
+      '-XX:AOTMode=create',
+      '-XX:AOTConfiguration=c.aotconf',
+      '-XX:AOTCache=c.aot',
+      ...LAUNCHER_JVM_OPTIONS,
+      '--enable-native-access=ALL-UNNAMED',
+      '-Da=1',
+      '-Db=a b',
+      '--module-path=comp',
+      '-m',
+      'org.enso.runner/org.enso.runner.Main',
+    ])
   })
 })
 
