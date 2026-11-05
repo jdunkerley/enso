@@ -135,4 +135,65 @@ describe('reconnecting an opened project', () => {
     expect(mocks.toasts[0]!.content).toContain('projectConnectionRestarted')
     expect(mocks.toasts[0]!.options.type).toBe('warning')
   })
+
+  test('a reconnect seen during an opening that throws is not carried into the next opening', async () => {
+    const id = 'p4' as ProjectId
+    const info = { mode: 'local', id, title: 'p4' }
+    mocks.openProject.mockReset()
+    mocks.initializeProject.mockReset()
+    mocks.toasts.length = 0
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mocks.openProject.mockImplementation(async () => ({
+      ok: true,
+      value: { status: 'opened', info, runningId: id, scope: effectScope() },
+    }))
+    let failFirst: (() => void) | undefined
+    mocks.initializeProject.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          failFirst = () => reject(new Error('unexpected'))
+        }),
+    )
+    mocks.initializeProject.mockImplementation(async (state: { scope: EffectScope }) => ({
+      ok: true,
+      value: { status: 'initialized', info, runningId: id, scope: state.scope },
+    }))
+    const store = createOpenedProjectsStore()
+    store.openProject(info as never)
+    await vi.waitFor(() => expect(failFirst).toBeDefined())
+    store.reconnectProject(id)
+    failFirst!()
+    await vi.waitFor(() => expect(store.get(id)?.error).toBeDefined())
+
+    store.openProject(info as never)
+    await vi.waitFor(() => expect(store.get(id)?.state.status).toBe('initialized'))
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(mocks.initializeProject).toHaveBeenCalledTimes(2)
+    expect(mocks.toasts).toEqual([])
+    error.mockRestore()
+  })
+
+  test('the restarted-connection notice closes by itself', async () => {
+    const id = 'p5' as ProjectId
+    const info = { mode: 'local', id, title: 'p5' }
+    mocks.openProject.mockReset()
+    mocks.initializeProject.mockReset()
+    mocks.toasts.length = 0
+    mocks.openProject.mockImplementation(async () => ({
+      ok: true,
+      value: { status: 'opened', info, runningId: id, scope: effectScope() },
+    }))
+    mocks.initializeProject.mockImplementation(async (state: { scope: EffectScope }) => ({
+      ok: true,
+      value: { status: 'initialized', info, runningId: id, scope: state.scope },
+    }))
+    const store = createOpenedProjectsStore()
+    store.openProject(info as never)
+    await vi.waitFor(() => expect(store.get(id)?.state.status).toBe('initialized'))
+    store.reconnectProject(id)
+    const autoClose = mocks.toasts[0]!.options.autoClose
+    expect(autoClose).toEqual(expect.any(Number))
+    expect(autoClose as number).toBeGreaterThanOrEqual(10_000)
+    expect(autoClose as number).toBeLessThanOrEqual(20_000)
+  })
 })

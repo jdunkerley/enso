@@ -51,15 +51,17 @@ desktop binary (AppImage/DMG/exe + installer).
   within a minute of its start, after 1, 2, 4 and 8 s; after five such restarts
   it waits for the next open or close and logs that (Note [The ydoc Host
   Restarts With A Bounded Backoff] in `client.ts`). Its `error` event (a fatal
-  V8 error) is logged; unhandled it would throw in the main process. A `listen`
-  on a port another open listener holds (one still being restored after a
-  restart) is refused as `EADDRINUSE`, so the shim searches new ports instead of
-  handing that project's GUI to another engine. In the process, `serve.ts`
-  chains one port's requests, so a `close` cannot overtake a restoring `listen`.
-  It prints `ydoc host pid=<pid>` at start; its stdout and stderr go through the
-  main process's console, so they reach the IDE log. `ENSO_YDOC_HOST=engine`
-  puts the server back in the engine for one release (see
-  `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
+  V8 error) is logged; unhandled it would throw in the main process. A request
+  while a backoff is pending forks at once but does not reset the restart count,
+  and a `close` while a `listen` is in flight keeps the port out of the restored
+  set. A `listen` on a port another open listener holds (one still being
+  restored after a restart) is refused as `EADDRINUSE`, so the shim searches new
+  ports instead of handing that project's GUI to another engine. In the process,
+  `serve.ts` chains one port's requests, so a `close` cannot overtake a
+  restoring `listen`. It prints `ydoc host pid=<pid>` at start; its stdout and
+  stderr go through the main process's console, so they reach the IDE log.
+  `ENSO_YDOC_HOST=engine` puts the server back in the engine for one release
+  (see `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
   `tests/headless/ydocHostClient.test.ts` (against a fake child),
   `tests/headless/ydocHostServe.test.ts`.
 - Installs the bundled sample projects at start-up (`installSamples` in
