@@ -37,6 +37,28 @@ export async function readPackageLabels(projectPath: string): Promise<string[]> 
 }
 
 /**
+ * The `jvm` key of the `package.yaml` in `projectPath`: `true` or `false` when it is a boolean,
+ * `undefined` when the file, the key or a boolean value is missing (or the YAML is malformed).
+ * The engine's own launcher reads the same key (`Main.isJvmModeEnabled`).
+ */
+export async function readPackageJvmMode(projectPath: string): Promise<boolean | undefined> {
+  let text: string
+  try {
+    text = await fs.readFile(path.join(projectPath, PACKAGE_METADATA_RELATIVE_PATH), 'utf8')
+  } catch {
+    return undefined
+  }
+  try {
+    const value: unknown = yaml.parse(text)
+    if (value == null || typeof value !== 'object' || !('jvm' in value)) return undefined
+    const jvm = (value as { jvm: unknown }).jvm
+    return typeof jvm === 'boolean' ? jvm : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Replace the `labels` list in `projectPath`'s `package.yaml`, keeping every
  * other key, its order and comments. An empty list removes the key.
  * @throws {Error} when the file is missing, has YAML syntax errors (it is left untouched), or is
