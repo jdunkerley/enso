@@ -168,6 +168,49 @@ public class LibraryCacheDigestTest {
     assertEquals(2L, run(second, ctx -> {}));
   }
 
+  /**
+   * #584: `Main` is the same in both trees, so its IR cache's own digest matches, but the module
+   * its import resolved to is gone from the second, where the same import names a type. Before, the
+   * cache was accepted and the import resolution failed later, fatally, with "Cannot deserialize
+   * BindingsMap"; now the cache is a miss and `Main` is compiled from source.
+   */
+  @Test
+  public void aCachedModuleNamingAModuleItsLibraryNoLongerHasIsRecompiled() throws IOException {
+    // An import names a module if there is one, and a type otherwise: in the first tree
+    // `project.Shapes.Thing` is a module, in the second a type in `project.Shapes`.
+    var main = "import project.Shapes.Thing\n\nmain = Thing.answer\n";
+    var first = createLibrary("first", Map.of("Main", main, "Shapes.Thing", "answer = 1\n"));
+    assertEquals(1L, run(first, ctx -> {}));
+
+    var second =
+        createLibrary("second", Map.of("Main", main, "Shapes", "type Thing\n    answer = 2\n"));
+    // As `indexStdLibs` compiles, which is where #584 was seen.
+    compile(second, false);
+    assertEquals(2L, run(second, ctx -> {}));
+  }
+
+  /**
+   * #584 as `indexStdLibs` met it: `Standard.Base.Data` was unchanged when `Data/XML.enso` moved to
+   * `Standard.XML`. A module exports the modules in its directory, so its IR names them although
+   * its source does not, and the IR cached by a tree that still had `Data/XML.enso` failed with
+   * "Cannot deserialize BindingsMap".
+   */
+  @Test
+  public void aCachedModuleWhoseDirectoryLostAModuleIsRecompiled() throws IOException {
+    var main = "import project.Shapes\n\nmain = Shapes.answer\n";
+    var shapes = "answer = 1\n";
+    var first =
+        createLibrary(
+            "first", Map.of("Main", main, "Shapes", shapes, "Shapes.Circle", "radius = 1\n"));
+    assertEquals(1L, run(first, ctx -> {}));
+
+    var second =
+        createLibrary(
+            "second", Map.of("Main", main, "Shapes", shapes, "Shapes.Square", "side = 2\n"));
+    compile(second, false);
+    assertEquals(1L, run(second, ctx -> {}));
+  }
+
   @Test
   public void theSameSourcesShareModuleIR() throws IOException {
     var first = createLibrary("first", FIRST);
