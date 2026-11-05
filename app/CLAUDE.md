@@ -28,8 +28,9 @@ Electron shell — plus a few grammars and shims.
   Consumed by both client and server halves. Exports `/ast`.
 - `ydoc-server/` — Yjs server: adapts the Enso LS text protocol into Yjs CRDT
   updates, merges edits from multiple clients. It runs inside the engine (see
-  below), in development too; the plain Node build is used only by the
-  Playwright mocks (`gui/integration-test/mock/localApi.ts`).
+  below), in development too; the plain Node build is used by the Playwright
+  mocks (`gui/integration-test/mock/localApi.ts`) and will be hosted by the shim
+  as `NodeYdocHost` (library code only so far, `ydoc-server/CLAUDE.md`).
 - `ydoc-server-polyglot/` — The server bundled (esbuild, CommonJS) to run
   **inside** the GraalVM JVM engine process via GraalJS. This is how the IDE
   runs it; there is no separate Node runtime. It reaches the language server
