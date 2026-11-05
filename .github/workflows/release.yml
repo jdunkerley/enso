@@ -80,7 +80,7 @@ env:
 # - `backend sbt verifyLicensePackages` is a plain sbt step.
 # - Gone, because the fork has no use for them: Sentry (`SENTRY_AUTH_TOKEN` and the
 #   `ENSO_IDE_SENTRY_*` variables), the cloud and analytics variables (`ENSO_IDE_HOST`, the Google
-#   Analytics tag; the IDE is local-only), the AG Grid licence key (the grid runs without one), the
+#   Analytics tag; the IDE is local-only), the AG Grid licence key (the IDE uses AG Grid Community), the
 #   Apple and Microsoft signing secrets, and `assets.json` (only upstream's website read it).
 #
 # Note [Publishing Later]

@@ -1,5 +1,5 @@
 import { svgUseHref } from '@/util/icons'
-import type { Column, GridApi, IRowNode, MenuItemDef } from 'ag-grid-enterprise'
+import type { Column, GridApi, IRowNode, MenuItemDef } from 'ag-grid-community'
 
 /**
  * Build the `icon` HTML for a menu item from an Enso sprite icon name.
@@ -26,15 +26,15 @@ const AG_ICON_SPRITES: Record<string, string> = {
 /**
  * Swap an AG Grid icon-font span for the equivalent Enso sprite icon, leaving anything else as-is.
  *
- * `commonContextMenuActions` supplies its icons as `<span class="ag-icon ag-icon-copy">`, which is
- * right for the licensed path: AG Grid renders its own menu inside the grid, where the theme
- * stylesheet is in scope. It is wrong here — `GridPopupMenu.vue` renders in the light DOM, and
+ * `commonContextMenuActions` supplies its icons as `<span class="ag-icon ag-icon-copy">`, the form
+ * AG Grid's own menus take, which only works inside the grid, where the theme stylesheet is in
+ * scope. `GridPopupMenu.vue` renders in the light DOM instead, and
  * because `AgGridTableView.vue` lives under `components/shared/` its style blocks compile in
  * custom-element mode and exist only inside the grid's shadow root. There, `.ag-icon` has no
  * styling at all and the span collapses to an empty box, so the icon silently vanishes.
  *
- * Substituting at this boundary rather than at the definitions keeps the licensed menu byte-for-byte
- * unchanged, and covers any `ag-icon` span added later without it having to know about this.
+ * Substituting at this boundary rather than at the definitions covers any `ag-icon` span added
+ * later without it having to know about this.
  */
 function substituteAgIcon(icon: string): string {
   const glyph = /\bag-icon-([a-z0-9-]+)/.exec(icon)?.[1]
@@ -82,7 +82,7 @@ const KNOWN_BUILTIN_ITEMS: Record<string, (ctx: GridMenuContext) => GridMenuItem
     name: 'Autosize All Columns',
     action: () => ctx.api.autoSizeAllColumns(),
   }),
-  // Excel export is explicitly out of scope for the Community fallback (see the design spec's
+  // Excel export is explicitly out of scope for the Community grid (see the design spec's
   // non-goals) — this built-in token only offers CSV export, which ag-grid-community supports.
   export: (ctx) => ({
     type: 'item',

@@ -24,11 +24,10 @@ interface CommunitySetFilterModel {
 }
 
 /**
- * Community-only replacement for AG Grid Enterprise's Set Filter / Multi Filter, used when no AG
- * Grid Enterprise license is configured (see `AG_GRID_ENTERPRISE_AVAILABLE` in
- * `components/shared/AgGridTableView/agGridLicense.ts`). Shows a search box that narrows a
- * checkbox list of distinct column values — the search box only narrows which checkboxes are
- * shown, it is not a separate filter condition — and produces the same
+ * A set filter for AG Grid Community, which has no Set Filter or Multi Filter of its own (both are
+ * AG Grid Enterprise features). Shows a search box that narrows a checkbox list of distinct column
+ * values — the search box only narrows which checkboxes are shown, it is not a separate filter
+ * condition — and produces the same
  * `{ filterType: 'set', values: string[] }` model AG Grid's own Set Filter produces, so existing
  * filter-model parsing (`tableVizFilterUtils.ts`) needs no changes. When `filterParams.values` is
  * not provided (the client-side row model has no server-side value source), distinct values are
