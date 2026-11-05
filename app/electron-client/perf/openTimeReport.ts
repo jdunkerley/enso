@@ -416,87 +416,23 @@ export function credentialFreeEnv(
   )
 }
 
-/** The options the launcher gives the JVM it starts through JNI (`Main.launchJvm`). */
-export const LAUNCHER_JVM_OPTIONS = [
-  '--sun-misc-unsafe-memory-access=allow',
-  '--enable-native-access=org.graalvm.truffle',
-  '--add-opens=java.base/java.nio=ALL-UNNAMED',
-] as const
+/**
+ * The launcher's fixed JVM options, the lines of a package's `jvm.options`, the launcher's split of
+ * `ENSO_JVM_OPTIONS`, and the arguments of the `java` that creates an AOT cache. The shim trains
+ * its per-user cache with the same, so there is one copy, in the shim.
+ */
+export {
+  LAUNCHER_JVM_OPTIONS,
+  aotCreateArguments,
+  parseJvmOptionsFile,
+  splitJvmOptions,
+} from 'project-manager-shim/jvmAot'
 
 /**
- * The lines of an engine package's `jvm.options` (beside `component/`, read by the launcher in
- * `engine/runner`'s `JvmOptions.java`): one option per line, `#` comments and blank lines left out.
- * The harness starts `java` itself to create the AOT cache, so it adds them too.
+ * The first line of the JVM's output that says the AOT cache could not be used, or `undefined`.
+ * The shim reads its engines' `use.log` with the same pattern, so there is one copy, in the shim.
  */
-export function parseJvmOptionsFile(text: string): string[] {
-  return text
-    .split(/\r?\n/)
-    .map(cleanJvmOptionLine)
-    .filter((line) => line !== '' && !line.startsWith('#'))
-}
-
-/** Trims a line and drops a leading UTF-8 byte order mark, which `trim` leaves. */
-function cleanJvmOptionLine(line: string): string {
-  const trimmed = line.trim()
-  return trimmed.charCodeAt(0) === 0xfeff ? trimmed.slice(1).trim() : trimmed
-}
-
-/**
- * Splits an `ENSO_JVM_OPTIONS` value as the launcher does (`JvmOptions.fromEnvironment`): a value
- * with a newline is one option per line (so an option may contain spaces), otherwise options are
- * separated by whitespace.
- */
-export function splitJvmOptions(value: string): string[] {
-  const parts = value.includes('\n') ? value.split(/\r?\n/) : value.split(/\s+/)
-  return parts.map(cleanJvmOptionLine).filter((part) => part !== '')
-}
-
-/**
- * The arguments of the `java` that creates the AOT cache, which the harness starts itself: it
- * mirrors the JVM the launcher starts (`Main.launchJvm`: its fixed options, the package's
- * `jvm.options` lines, then `ENSO_JVM_OPTIONS`).
- */
-export function aotCreateArguments(args: {
-  config: string
-  cache: string
-  component: string
-  /** The text of the package's `jvm.options`, if it has one. */
-  optionsFile: string | undefined
-  /** The experiment's options (`--jvm-options`, the value of `ENSO_JVM_OPTIONS`). */
-  jvmOptions: string
-}): string[] {
-  return [
-    '-XX:AOTMode=create',
-    `-XX:AOTConfiguration=${args.config}`,
-    `-XX:AOTCache=${args.cache}`,
-    ...LAUNCHER_JVM_OPTIONS,
-    ...(args.optionsFile != null ? parseJvmOptionsFile(args.optionsFile) : []),
-    ...splitJvmOptions(args.jvmOptions),
-    `--module-path=${args.component}`,
-    '-m',
-    'org.enso.runner/org.enso.runner.Main',
-  ]
-}
-
-const AOT_PROBLEM =
-  /\[(?:error|warning)\]\[(?:aot|cds)[^\]]*\]|mismatch|Unable to use|unable to map|AOT cache.*(?:different|invalid|failed|disabled)/i
-
-/**
- * The first line of the JVM's output that says the AOT cache could not be used (the JVM reports
- * these as `[cds]` or `[aot]` records, or as a mismatch), or `undefined`.
- */
-export function aotRejection(output: string): string | undefined {
-  return output
-    .split(/\r?\n/)
-    .find((line) => !UNIFIED_LOG_INFO.test(line) && AOT_PROBLEM.test(line))
-}
-
-/**
- * A unified-logging record below `warning` (`[0.1s][info][aot] ...`). The check launch logs `aot`
- * and `cds` at `info`, so that its output says what the JVM did with the cache; such a record can
- * name a feature of a cache in use as "disabled".
- */
-const UNIFIED_LOG_INFO = /^(?:\[[^\]]*\])*?\[(?:info|debug|trace)\]\[/
+export { aotRejection } from 'project-manager-shim/jvmAot'
 
 /** The engines named by `--engines` (comma-separated); throws on an unknown one. */
 export function parseEngines(value: string): Engine[] {

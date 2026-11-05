@@ -451,6 +451,10 @@ async function measureLaunch(
     ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
     ENSO_AI_DISABLED: '1',
     ENSO_LOG_DIRECTORY: logDir,
+    // The shim's own JDK AOT cache (`project-manager-shim/jvmAot`) stays out of the measurement
+    // until the harness measures it (PR K of the JVM-by-default plan): an empty directory of the
+    // run's, never the user's `<userData>/jvm-aot`, so `jvm-nocache` is uncached.
+    ENSO_JVM_AOT_DIR: path.join(options.out, 'shim-jvm-aot'),
     // `--engine-log-level debug`: the engine's own log at that level, to split an open (e.g.
     // `AttachVisualizationCmd`, `Starting ExecuteJob`, module loading); slower, so not for medians.
     ...(options.engineLogLevel ?
