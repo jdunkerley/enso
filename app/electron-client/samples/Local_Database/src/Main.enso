@@ -2,6 +2,7 @@ from Standard.Base import all
 from Standard.Table import all
 from Standard.Database import all
 from Standard.SQLite import all
+import Standard.Visualization
 
 ## Local Database
 

@@ -1,7 +1,7 @@
 # Options for the JVM that `enso --jvm` starts (engine/runner JvmOptions.java), one per line,
 # after the launcher's fixed list and before ENSO_JVM_OPTIONS. They are the engine's: the IDE
-# and the CLI both get them. (PR I of the JVM-by-default plan will put this file's hash in the
-# IDE's AOT cache key.)
+# and the CLI both get them. The IDE's per-user AOT cache key includes this file's text, so a
+# change here retrains it (project-manager-shim jvmAot/key.ts).
 #
 # JDK 25 warns about these modules' restricted method calls; a later JDK makes them errors.
 --enable-native-access=ALL-UNNAMED,org.enso.language.server

@@ -14,6 +14,11 @@
       "types": "./dist/handler/index.d.ts",
       "import": "./dist/handler/index.js"
     },
+    "./jvmAot": {
+      "source": "./src/jvmAot/index.ts",
+      "types": "./dist/jvmAot/index.d.ts",
+      "import": "./dist/jvmAot/index.js"
+    },
     "./localMetadata": {
       "source": "./src/localMetadata/index.ts",
       "types": "./dist/localMetadata/index.d.ts",
@@ -43,6 +48,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/ws": "^8.5.13",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
@@ -52,6 +58,7 @@
     "portfinder": "^1.0.38",
     "tar": "^7.5.22",
     "trash": "^9.0.0",
+    "ws": "^8.21.3",
     "yaml": "^2.9.1"
   }
 }
