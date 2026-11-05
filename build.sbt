@@ -303,6 +303,7 @@ buildEngineBundle := Def
       EngineDistributionChecks.afterBuild(root, ensoVersion, log)
       val smallJdk = baseDirectory.value / "target" / "small-jdk"
       SmallJDK.buildSmallJDKForRelease(smallJdk)
+      SmallJDK.checkSharing(smallJdk, log)
       val (os, arch) = packageBuilder.value.localPlatform
       EngineBundle.create(
         bundleRoot = EngineBundle
