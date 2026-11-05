@@ -7,7 +7,7 @@ import {
   type ProjectAsset,
 } from 'enso-common/src/services/Backend'
 import { Err, Ok, type Result, type ResultError } from 'enso-common/src/utilities/data/result'
-import { shallowReactive } from 'vue'
+import { effectScope, shallowReactive } from 'vue'
 import type { ProjectInfo, RunningProjectInfo } from './openedProjects/projectInfo'
 import { useProjectStates, type ProjectState } from './openedProjects/projectStates'
 
@@ -128,6 +128,29 @@ export function createOpenedProjectsStore() {
     const renamed = await projectStates.renameProject(project.state, newName)
     if (!renamed.ok) return renamed
     return Ok()
+  }
+
+  /**
+   * Make an initialized project's stores again, against its running engine: the ydoc server
+   * session they were made with was replaced (Note [A New Server Session] in `ydoc-shared`'s
+   * `yjsModel.ts`), so their Language Server session and execution context are gone. The old
+   * stores' scope is stopped, which closes their sockets; the project is not opened in the backend
+   * again. A project that is not initialized, or has a process under way, is left alone.
+   */
+  function reconnectProject(id: ProjectId) {
+    const project = projects.get(id)
+    if (project == null || project.nextTask != null) return
+    const state = project.state
+    if (state.status !== 'initialized') return
+    console.warn(`The ydoc server of project ${state.info.title} was replaced; reconnecting.`)
+    state.scope.stop()
+    project.state = {
+      status: 'opened',
+      info: state.info,
+      runningId: state.runningId,
+      scope: effectScope(),
+    }
+    void performProcess(project, 'opening')
   }
 
   /** Perform a process across mulitple project states until finished or errored. */
@@ -272,6 +295,7 @@ export function createOpenedProjectsStore() {
     closeAllProjects,
     renameProject,
     restoreProject,
+    reconnectProject,
     get,
     listProjects,
     isProjectOpening,

@@ -126,6 +126,14 @@ export function createProjectStore(
   })
 
   const projectModel = new DistributedProject(doc)
+  // A new ydoc server session has none of this store's Language Server session, execution context
+  // or module docs (Note [A New Server Session] in `ydoc-shared`'s `yjsModel.ts`): the project's
+  // stores are made again. Deferred, since that stops this store's own scope.
+  onScopeDispose(
+    projectModel.observeServerSessionReplaced(() =>
+      setTimeout(() => openedProjects.reconnectProject(projectAssetId)),
+    ),
+  )
   // Writes the open modules before a version is saved (`flush.ts`). Made before any module doc is
   // added to the index doc, so that it tracks each one's deletions from the start. A flush while
   // the index doc is not connected and synced is refused: the request could not reach the ydoc

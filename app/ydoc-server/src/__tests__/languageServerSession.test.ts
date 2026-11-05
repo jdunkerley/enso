@@ -165,6 +165,36 @@ describe('LanguageServerSession', () => {
     expect(ls.connections()).toBe(connectionsBefore)
     expect(ls.requests.slice(requestsBefore)).toEqual([])
   })
+
+  test('a session marks its index doc, so a GUI can tell a new session from its own', async () => {
+    // A GUI that reconnects its index doc after the ydoc host restarted meets a session that has
+    // none of its Language Server session, execution context or module docs (#593).
+    const ls = fakeLanguageServer()
+    const first = LanguageServerSession.get(
+      'ws://mark-test-1',
+      ls.server,
+      noChannels,
+      noChannels,
+      {} as JavaByteBufferClass,
+    )
+    const second = LanguageServerSession.get(
+      'ws://mark-test-2',
+      ls.server,
+      noChannels,
+      noChannels,
+      {} as JavaByteBufferClass,
+    )
+    try {
+      const firstIds = first.model.serverSessions.toArray()
+      const secondIds = second.model.serverSessions.toArray()
+      expect(firstIds).toHaveLength(1)
+      expect(secondIds).toHaveLength(1)
+      expect(firstIds[0]).not.toEqual(secondIds[0])
+    } finally {
+      await first.release()
+      await second.release()
+    }
+  })
 })
 
 const MAIN = 'main = 1\n'

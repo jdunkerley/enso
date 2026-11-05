@@ -92,6 +92,9 @@ export class LanguageServerSession {
     this.indexDoc = indexDoc
     this.docs.set('index', this.indexDoc)
     this.model = new DistributedProject(this.indexDoc.doc)
+    // A GUI that reconnects to this session after its previous one went learns from this that its
+    // Language Server session and execution context are gone (Note [A New Server Session]).
+    this.model.markServerSession(crypto.randomUUID())
     this.projectRootId = null
     this.authoritativeModules = new Map()
 
