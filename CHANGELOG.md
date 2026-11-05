@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [Projects open faster: the collaborative-editing server now runs beside the
+  engine instead of inside it.][593]
 - [The component browser no longer lists the components of
   Standard.Visualization, the library the IDE uses to prepare visualization
   data.][565]
@@ -398,6 +400,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[593]: https://github.com/jdunkerley/enso/pull/593
 [565]: https://github.com/jdunkerley/enso/pull/565
 [552]: https://github.com/jdunkerley/enso/pull/552
 [519]: https://github.com/jdunkerley/enso/pull/519
