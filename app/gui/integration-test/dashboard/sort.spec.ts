@@ -3,7 +3,7 @@ import { expect, test } from 'integration-test/base'
 import type { MockLocalApi } from 'integration-test/mock/localApi'
 
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
-import { MOUSE_OFF_RAIL } from '../actions/utilities'
+import { parkMouse } from '../actions/utilities'
 
 const START_DATE_EPOCH_MS = 1.7e12
 /** The number of milliseconds in a minute. */
@@ -107,7 +107,7 @@ test('sort', async ({ drivePage }) => {
     // Sorting should be unset.
     .driveTable.clickNameColumnHeading()
     .do(async (thePage) => {
-      await thePage.mouse.move(MOUSE_OFF_RAIL.x, MOUSE_OFF_RAIL.y)
+      await parkMouse(thePage)
     })
     .driveTable.withRows(async (rows) => {
       await expect(rows).toHaveText([
@@ -161,7 +161,7 @@ test('sort', async ({ drivePage }) => {
     // Sorting should be unset.
     .driveTable.clickModifiedColumnHeading()
     .do(async (thePage) => {
-      await thePage.mouse.move(MOUSE_OFF_RAIL.x, MOUSE_OFF_RAIL.y)
+      await parkMouse(thePage)
     })
     .driveTable.withRows(async (rows) => {
       await expect(rows).toHaveText([

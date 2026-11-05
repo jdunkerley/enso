@@ -404,6 +404,7 @@
   "profilePictureSettingsCustomEntryAliases": "user profile picture",
   "localSettingsTab": "Local",
   "localSettingsSection": "Local",
+  "localSettingsButtonLabel": "Local settings",
   "localRootPathSettingsInput": "Root Folder",
   "localRootPathButtonSettingsCustomEntryAliases": "reset root folder\nreset root directory",
   "downloadDirectorySettingsInput": "Download Folder",

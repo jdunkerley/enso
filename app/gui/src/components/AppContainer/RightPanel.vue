@@ -215,4 +215,9 @@ registerHandlers({
   clip-path: polygon(-100vw 0, 100% 0, 100% 100%, -100vw 100%);
   z-index: -1;
 }
+/* The rail goes up through the top bar's strip, but its shadow starts below it. */
+.rightBar > .shadow {
+  top: var(--top-bar-height);
+  height: calc(100% - var(--top-bar-height));
+}
 </style>

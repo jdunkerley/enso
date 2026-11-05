@@ -16,13 +16,13 @@ tab.
   shortcuts. The page opens on Local (`DEFAULT_TAB`), or on the first tab shown
   when there is no local backend. There is no Account tab: the local user has no
   account settings (it showed only the stand-in name and a note), so it went
-  with the settings cog (the user bar's menu opens the page). The cloud's tabs
-  (Organization, Billing & Plans, Members, User groups, Activity log, API keys,
-  Usage) were deleted with the cloud UI, and so were their `SettingsTabType`
-  values. `SettingsTab.vue` lays out a tab's sections; a form entry is
-  `SettingsFormEntry.vue`, a component entry reads the page's context with
-  `useSettingsContext` (`$/providers/settingsContext`). A tab with no sections
-  is not listed.
+  with the settings cog (the left rail's settings menu opens the page). The
+  cloud's tabs (Organization, Billing & Plans, Members, User groups, Activity
+  log, API keys, Usage) were deleted with the cloud UI, and so were their
+  `SettingsTabType` values. `SettingsTab.vue` lays out a tab's sections; a form
+  entry is `SettingsFormEntry.vue`, a component entry reads the page's context
+  with `useSettingsContext` (`$/providers/settingsContext`). A tab with no
+  sections is not listed.
 - **Further sections could come through `$/providers/settingsContributions`**
   (see "Contribution registries" in `app/gui/CLAUDE.md`), which nothing uses
   now; the settings route waits for them to load. There is no sign-in (the

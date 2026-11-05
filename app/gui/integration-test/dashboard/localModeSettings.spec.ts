@@ -52,7 +52,7 @@ test('settings open on the Local tab', async ({ drivePage, page }) => {
 test('the settings cog opens a menu with Settings and About', async ({ drivePage, page }) => {
   await drivePage
 
-  // The cog is the only control of the user bar: no avatar, notifications or offline notice.
+  // The cog is the only control of the settings button: no avatar, notifications or offline notice.
   await page.getByRole('button', { name: TEXT.userMenuLabel }).click()
   const menu = page.getByTestId('user-menu')
   await expect(menu).not.toContainText(TEXT.offlineUserName)

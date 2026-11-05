@@ -7,6 +7,7 @@ import {
   closeWelcome,
   createNewProject,
   getNewestProject,
+  parkMouse,
   SKIP_ON_WINDOWS_CI,
   test,
   waitForDashboard,
@@ -162,7 +163,7 @@ localWorkflowTest('Local Workflow', async ({ page, app, projectsDir }) => {
   // Press `Write once` button.
   await writeNode.locator('.More').click()
   await writeNode.getByTestId('action:component.recompute').click()
-  await page.mouse.move(0, 0) // Avoid showing a tooltip
+  await parkMouse(page) // Avoid showing a tooltip
   await expect(page.locator('.GraphEditor .GraphNode.pending')).toHaveCount(0)
 
   // Check that the output file is created and contains expected text.

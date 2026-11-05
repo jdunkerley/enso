@@ -9,6 +9,7 @@ import {
   fillWidgetText,
   openComponentBrowser,
   openDropdownInWidget,
+  parkMouse,
   showAllComponents,
   showSelectedComponent,
   SKIP_ON_WINDOWS_CI,
@@ -273,7 +274,7 @@ test('Exercise 2', async ({ page }) => {
   await test.step('Objective 3: Create table of currencies by product names', async () => {
     // Park the cursor, so that the view moving under it cannot leave it over a
     // column header whose tooltip would intercept the next click.
-    await page.mouse.move(0, 0)
+    await parkMouse(page)
     await showAllComponents(page)
 
     // Creating cross_tab component
@@ -318,8 +319,8 @@ test('Exercise 2', async ({ page }) => {
 
   // ---------------- Objective 4 ----------------
   await test.step('Objective 4:  Fixing Dirty Data', async () => {
-    // See note on the matching `mouse.move(0, 0)` in Objective 3.
-    await page.mouse.move(0, 0)
+    // See note on the matching `parkMouse` in Objective 3.
+    await parkMouse(page)
     await showAllComponents(page)
 
     // Creating set component

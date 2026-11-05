@@ -112,7 +112,7 @@ registerHandlers({
           @click="onAddDirectoryClick"
         />
       </div>
-      <!-- Last in the Tab order, at the bottom of the rail. -->
+      <!-- The last of the rail's controls, at its bottom. -->
       <div class="settings">
         <UserMenu :extended="leftBarExtended" />
       </div>
@@ -139,7 +139,9 @@ registerHandlers({
 .LeftPanel {
   position: relative;
   min-width: 48px;
-  z-index: 1;
+  /* Above the tab bar (`AppContainer`'s `.bar`, 1): the rail runs up through the bar's strip, and
+   * expands over it when the panel is hidden. The same as the right panel, which it never meets. */
+  z-index: 2;
 }
 
 .leftBar {
