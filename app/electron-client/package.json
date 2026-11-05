@@ -5,16 +5,16 @@
   "version": "0.0.0-dev",
   "type": "module",
   "author": {
-    "name": "Enso Team",
-    "email": "contact@enso.org"
+    "name": "jdunkerley",
+    "email": "jdunkerley@users.noreply.github.com"
   },
-  "homepage": "https://github.com/enso-org/ide",
+  "homepage": "https://github.com/jdunkerley/enso",
   "repository": {
     "type": "git",
-    "url": "git@github.com:enso-org/ide.git"
+    "url": "git@github.com:jdunkerley/enso.git"
   },
   "bugs": {
-    "url": "https://github.com/enso-org/ide/issues"
+    "url": "https://github.com/jdunkerley/enso/issues"
   },
   "dependencies": {
     "@electron/asar": "^3.2.9",

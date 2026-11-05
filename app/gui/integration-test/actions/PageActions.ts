@@ -1,8 +1,6 @@
 /** @file Actions common to all pages. */
 import { expect, type Page } from 'integration-test/base'
 import BaseActions, { type BaseActionsClass, type LocatorCallback } from './BaseActions'
-import { openUserMenuAction } from './openUserMenuAction'
-import { userMenuActions } from './userMenuActions'
 
 /** Find right panel. */
 function locateRightPanel(page: Page) {
@@ -22,16 +20,6 @@ export default class PageActions<
   Context,
   ParentClass extends BaseActionsClass<Context> = never,
 > extends BaseActions<Context, ParentClass> {
-  /** Actions related to the User Menu. */
-  get userMenu() {
-    return userMenuActions(this.step.bind(this))
-  }
-
-  /** Open the User Menu. */
-  openUserMenu() {
-    return openUserMenuAction(this.step.bind(this))
-  }
-
   /** Show the properties tab of the Right Panel. */
   togglePropertiesAssetPanel() {
     return this.step('Toggle properties asset panel', async (page) => {

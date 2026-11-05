@@ -152,8 +152,8 @@ use:
 
 A `data-testid` is a contract: keep it on the equivalent element. The ones the
 page objects rely on include `drive-view`, `asset-row`, `asset-row-name`,
-`dummy-row`, `context-menu`, `modal-dialog`, `user-menu`, `right-panel`,
-`asset-search-bar`, `directory-row-navigate-button` and `toast-host`.
+`dummy-row`, `context-menu`, `modal-dialog`, `right-panel`, `asset-search-bar`,
+`directory-row-navigate-button` and `toast-host`.
 
 ## Port parity checklist
 
@@ -208,7 +208,9 @@ description and ticks it off. The flake baseline it compares against is
   (`<div class="categories"> from <div class="leftBar expanded"> intercepts pointer events`)
   — but only when the next click lands more than ~550ms later, i.e. on a loaded
   CI runner (#146). Every helper that clicks or drops on the bar ends with
-  `page.mouse.move(0, 0)`; do the same in new ones.
+  `parkMouse(page)` (`actions/utilities.ts`: the empty bottom of the right rail;
+  the left rail runs the window's full height, so the corner (0, 0) is on it);
+  do the same in new ones.
 - **Await every Playwright call.** `@typescript-eslint/no-floating-promises` is
   on for this directory (#202): an unawaited `expect.poll`, assertion or action
   races the rest of the test, and one still running when the test returns fails

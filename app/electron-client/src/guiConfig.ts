@@ -12,7 +12,6 @@ const GUI_ENV_DIR = fileURLToPath(new URL('../../gui', import.meta.url))
 type GuiEnv = Record<string, string | undefined>
 
 const GUI_CONFIG_KEYS = [
-  'HOST',
   'ENVIRONMENT',
   'SENTRY_DSN',
   'VERSION',

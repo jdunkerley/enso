@@ -80,9 +80,7 @@ describe('CreateCredentialModal', () => {
     for (const label of ['Name', 'Account', 'Client ID', 'Client Secret', 'Role']) {
       expect(inputLabelled(label), label).toBeDefined()
     }
-    expect(dialog().querySelector('a')!.getAttribute('href')).toBe(
-      'https://help.enso.org/docs/using-enso/connecting-to-snowflake#oauth-integration',
-    )
+    expect(dialog().querySelector('a')).toBeNull()
   })
 
   test('an empty Snowflake form shows each field error and creates nothing', async () => {

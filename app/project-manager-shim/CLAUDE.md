@@ -351,7 +351,9 @@ project's own `log`.
 
 `identityArgs` tries `git var GIT_AUTHOR_IDENT`. If git has no identity (a
 minimal config), commits and notes use `-c` overrides for
-`Enso <noreply@enso.org>`; nothing is written to the user's config.
+`Enso IDE <ide@localhost>`; nothing is written to the user's config. When git
+does resolve an identity (`user.name`/`user.email`, or the environment), commits
+use it and no override is passed.
 
 ### Ignore lines
 

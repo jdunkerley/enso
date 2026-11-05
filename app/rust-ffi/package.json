@@ -1,7 +1,7 @@
 {
   "name": "rust-ffi",
   "collaborators": [
-    "Enso Team <contact@enso.org>"
+    "jdunkerley"
   ],
   "version": "0.1.0",
   "type": "module",
