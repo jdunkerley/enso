@@ -33,7 +33,8 @@ jobs:
   benchmark-standard-libraries-graal-vm-ce:
     name: Benchmark Standard Libraries (GraalVM CE)
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    # A run with `jvm-options` runs the benchmarks twice (115 minutes for `Table|Vector`, #585).
+    timeout-minutes: ${{ inputs.jvm-options != '' && 300 || 240 }}
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -51,10 +52,15 @@ jobs:
       # `std-benchmarks/bench` builds the engine distribution first (its annotation processor
       # needs one), with the native runner that `ENSO_LAUNCHER` asks for.
       - name: Run the benchmarks
-        # A hung benchmark otherwise holds the runner for the job's whole 5 hours. Two arms of
-        # `Table|Vector` took 115 minutes (#585), so 280 keeps the 1.5x headroom for the single arm of a larger run.
-        timeout-minutes: 280
+        # A hung benchmark otherwise holds the runner for the job's whole 4 hours (5 with two arms).
+        timeout-minutes: ${{ inputs.jvm-options != '' && 280 || 150 }}
         run: |-
+          set -f # the options are split on spaces below, and must not be globbed
+          # The options are pasted into an sbt Scala expression: allow plain characters only.
+          if [ -n "$(printf '%s' "$JVM_OPTIONS" | tr -d 'A-Za-z0-9_=:.,/+ -')" ]; then
+            echo "::error::jvm-options may only contain letters, digits and _ = : . , / + - and spaces"
+            exit 1
+          fi
           task="std-benchmarks/bench"
           if [ -n "$BENCH_NAME" ]; then task="std-benchmarks/benchOnly $BENCH_NAME"; fi
           sbt "-Dbench.compileOnly=$JUST_CHECK" "-Dsbt.server.autostart=false" "$task"
