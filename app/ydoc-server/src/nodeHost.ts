@@ -30,7 +30,8 @@ export class NodeYdocHost {
     const dropClients = () => {
       for (const client of clients) client.close()
     }
-    const json = remoteChannelServer<string>(request.languageServer, 'json', dropClients)
+    // The JSON channel is typed `unknown` by `setupGatewayClient`; its messages are strings.
+    const json = remoteChannelServer<unknown>(request.languageServer, 'json', dropClients)
     const binary = remoteChannelServer<JavaByteBuffer>(request.languageServer, 'binary')
     const visControl = remoteChannelServer<string>(request.languageServer, 'vis-control')
     const visData = remoteChannelServer<JavaByteBuffer>(request.languageServer, 'vis-data')
