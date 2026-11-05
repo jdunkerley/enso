@@ -1,0 +1,80 @@
+# This file is not auto-generated. Feel free to edit it.
+
+# Publishes the docs site that a develop run of the engine checks built (its `docs-site` artifact)
+# to GitHub Pages. The site is deployed when it built, even if an unrelated engine test failed.
+#
+# Note [The Docs Site Deploy Is Switched On By A Variable]
+# ========================================================
+# GitHub Pages must be enabled (source "GitHub Actions") and the `github-pages` environment
+# restricted to `develop` before a deploy can succeed; both are the repository owner's settings.
+# Until the owner has done that and set the repository variable `DOCS_SITE_DEPLOY` to `true`, the
+# deploy job is skipped, not failed, so merging this workflow cannot turn develop red. Nothing else
+# needs Pages: pull requests only build the site.
+name: Docs Site Deploy
+
+on:
+  workflow_run:
+    workflows: ["✨ Engine"]
+    types: [completed]
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: 'The develop run of "✨ Engine" whose `docs-site` artifact to publish.'
+        required: true
+        type: string
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy the docs site
+    if: >-
+      vars.DOCS_SITE_DEPLOY == 'true' && (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read # Download the engine run's `docs-site` artifact
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run-id || github.event.workflow_run.id }}
+        run: |
+          found=$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+            --jq '[.artifacts[] | select(.name == "docs-site" and (.expired | not))] | length')
+          echo "run-id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          if [ "$found" -ge 1 ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Run $RUN_ID has no docs-site artifact (the site did not build); nothing deployed."
+          fi
+      - if: steps.run.outputs.found == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: docs-site
+          run-id: ${{ steps.run.outputs.run-id }}
+          github-token: ${{ github.token }}
+          path: site
+      - if: steps.run.outputs.found == 'true'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - if: steps.run.outputs.found == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v5
