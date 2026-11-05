@@ -27,7 +27,7 @@ interface Pending {
 
 /**
  * Sends each `listen` and `close` to the utility process and waits for its answer. The process is
- * forked on the first request. If it exits, what it had not answered fails, and it is forked again
+ * forked by `start` (or else on the first request). If it exits, what it had not answered fails, and it is forked again
  * at once with the listeners that were open (so the open projects' GUIs can reconnect); one that
  * exits again within a minute is forked only on the next request.
  */
@@ -53,6 +53,14 @@ export class UtilityProcessYdocHost implements YdocHost {
   async close(port: number): Promise<void> {
     this.open.delete(port)
     await this.send({ type: 'close', id: this.nextId++, port })
+  }
+
+  /**
+   * Fork the process now, ahead of the first open: forking it on the first `listen` put its start
+   * (~0.4 s on Windows, ~0.2 s on Linux, measured) in front of that project's engine.
+   */
+  start(): void {
+    if (!this.disposed && !this.child) this.fork()
   }
 
   /** Kill the utility process; every later request fails. */

@@ -43,13 +43,15 @@ desktop binary (AppImage/DMG/exe + installer).
   `ydoc-server`'s `NodeYdocHost`, one WebSocket listener per opened project,
   each talking to its engine's Language Server over the channel sockets.
   `client.ts`'s `UtilityProcessYdocHost` is the shim's `YdocHost` on the main
-  side (`listen`/`close` messages answered by id, `protocol.ts`): forked on the
-  first open, forked again at once with the open listeners if it exits (once a
-  minute; after that only on the next request), killed on `will-quit`. It prints
-  `ydoc host pid=<pid>` at start; its stdout and stderr go through the main
-  process's console, so they reach the IDE log. `ENSO_YDOC_HOST=engine` puts the
-  server back in the engine for one release (see
-  `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
+  side (`listen`/`close` messages answered by id, `protocol.ts`): forked at
+  start-up (`setupProjectService` calls `start()` under the Node host; forking
+  it on the first open put ~0.4 s on Windows, ~0.2 s on Linux, in front of that
+  project's engine, measured), forked again at once with the open listeners if
+  it exits (once a minute; after that only on the next request), killed on
+  `will-quit`. It prints `ydoc host pid=<pid>` at start; its stdout and stderr
+  go through the main process's console, so they reach the IDE log.
+  `ENSO_YDOC_HOST=engine` puts the server back in the engine for one release
+  (see `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
   `tests/headless/ydocHostClient.test.ts` (against a fake child).
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`

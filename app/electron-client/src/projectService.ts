@@ -14,7 +14,11 @@ import { getProjectRoot } from 'project-manager-shim'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { defaultSecretsFilePath, encodeKey, LocalSecrets } from 'project-manager-shim/localSecrets'
 import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
-import { ProjectService, type EngineSettings } from 'project-manager-shim/projectService'
+import {
+  ProjectService,
+  ydocHostKind,
+  type EngineSettings,
+} from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
 /** Where the engine mode may come from besides a project's `package.yaml`. */
@@ -160,6 +164,8 @@ export function setupProjectService(
       engineSettingsWithHost(),
     )
   }
+  // The ydoc host's start is not left to the first open, whose engine would wait for it.
+  if (ydocHostKind() === 'node') getYdocHost().start()
   return projectService
 }
 

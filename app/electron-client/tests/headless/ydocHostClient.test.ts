@@ -53,6 +53,22 @@ test('nothing is forked until the first listen', () => {
   expect(spawn).not.toHaveBeenCalled()
 })
 
+test('start forks ahead of the first open, once', async () => {
+  const { host, spawn } = setup()
+  host.start()
+  host.start()
+  expect(spawn).toHaveBeenCalledOnce()
+  await host.listen(request(4000))
+  expect(spawn).toHaveBeenCalledOnce()
+})
+
+test('start after dispose forks nothing', () => {
+  const { host, spawn } = setup()
+  host.dispose()
+  host.start()
+  expect(spawn).not.toHaveBeenCalled()
+})
+
 test('listen and close resolve on done, with the request passed through', async () => {
   const { host, spawn, children } = setup()
   await host.listen(request(4000))
