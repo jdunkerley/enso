@@ -1,0 +1,43 @@
+{
+  "name": "docs-site",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "generate": "vite-node --config vitest.config.ts generator/src/main.ts --",
+    "start": "docusaurus start",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 docusaurus build",
+    "serve": "docusaurus serve --dir build --port 3210 --no-open",
+    "clear": "docusaurus clear",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint generator src e2e docusaurus.config.ts sidebars.ts vitest.config.ts playwright.config.ts --cache --max-warnings=0",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@docusaurus/core": "3.10.2",
+    "@docusaurus/preset-classic": "3.10.2",
+    "@easyops-cn/docusaurus-search-local": "0.55.3",
+    "@mdx-js/react": "3.1.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@docusaurus/module-type-aliases": "3.10.2",
+    "@docusaurus/plugin-content-docs": "3.10.2",
+    "@docusaurus/theme-classic": "3.10.2",
+    "@docusaurus/types": "3.10.2",
+    "@lezer/common": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "19.3.0",
+    "cross-env": "^7.0.3",
+    "enso-common": "workspace:*",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-node": "3.0.3",
+    "vitest": "catalog:",
+    "yaml": "^2.9.1",
+    "ydoc-shared": "workspace:*"
+  }
+}

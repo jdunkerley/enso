@@ -2,6 +2,7 @@ overrides:
   - files:
       - "*.js"
       - "*.ts"
+      - "*.tsx"
       - "*.mjs"
       - "*.cjs"
       - "*.vue"

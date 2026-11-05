@@ -1,0 +1,20 @@
+/* Site colours. Component nodes do not use these: they keep the graph editor's colours. */
+:root {
+  --ifm-color-primary: #006b8a;
+  --ifm-color-primary-dark: #00607c;
+  --ifm-color-primary-darker: #005b75;
+  --ifm-color-primary-darkest: #004b61;
+  --ifm-color-primary-light: #007698;
+  --ifm-color-primary-lighter: #007b9f;
+  --ifm-color-primary-lightest: #008bb3;
+}
+
+[data-theme="dark"] {
+  --ifm-color-primary: #4fb7d6;
+  --ifm-color-primary-dark: #35acd0;
+  --ifm-color-primary-darker: #2ea4c7;
+  --ifm-color-primary-darkest: #2687a4;
+  --ifm-color-primary-light: #69c2dc;
+  --ifm-color-primary-lighter: #73c6df;
+  --ifm-color-primary-lightest: #9ad6e8;
+}
