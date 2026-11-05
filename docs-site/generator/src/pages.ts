@@ -11,7 +11,7 @@ import { simpleName } from './typeText'
 // eslint-disable-next-line camelcase
 const TOC_TO_LEVEL_2 = { toc_max_heading_level: 2 }
 
-const fileOf = (page: Page) => `${page.path}/index.mdx`
+const fileOf = (page: Page) => `${page.dir}/index.mdx`
 
 /** A relative link from one page's file to another's, which Docusaurus checks at build time. */
 export function relativeLink(from: Page, to: Page): string {

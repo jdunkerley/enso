@@ -35,7 +35,14 @@ export interface Page {
   library: string
   /** The defining module, fully qualified (for a library page, its `Main`). */
   module: string
+  /** The page's path under the Components root (`apiPath`): its URL. */
   path: string
+  /**
+   * The folder of its file under `docs/api/`: `path`, or `path~<n>` for the n-th further page whose
+   * path differs from an earlier one only in case, so the two files cannot land in one folder on a
+   * case-insensitive file system. The front matter's `slug` keeps the URL `path`.
+   */
+  dir: string
   /** The page's `h1`. */
   title: string
   /** The label of the component node; the title's last part for instance methods. */
@@ -113,14 +120,19 @@ export function buildModel(libraries: LibraryInput[]): SiteModel {
     skipped: libraries.filter((library) => !library.catalogue).map((library) => library.name),
     caseCollisions: [],
   }
-  const lowerCase = new Map<string, string>()
+  const lowerCase = new Map<string, string[]>()
 
-  const add = (page: Page) => {
-    const existing = model.byPath.get(page.path)
-    if (existing) throw new Error(`Two pages at ${page.path}: ${existing.title} and ${page.title}`)
-    const folded = lowerCase.get(page.path.toLowerCase())
-    if (folded) model.caseCollisions.push([folded, page.path])
-    else lowerCase.set(page.path.toLowerCase(), page.path)
+  const add = (fields: Omit<Page, 'dir'>) => {
+    const existing = model.byPath.get(fields.path)
+    if (existing)
+      throw new Error(`Two pages at ${fields.path}: ${existing.title} and ${fields.title}`)
+    const folded = lowerCase.get(fields.path.toLowerCase()) ?? []
+    if (folded.length) model.caseCollisions.push([folded[0]!, fields.path])
+    lowerCase.set(fields.path.toLowerCase(), [...folded, fields.path])
+    const page: Page = {
+      ...fields,
+      dir: folded.length ? `${fields.path}~${folded.length}` : fields.path,
+    }
     model.byPath.set(page.path, page)
     model.pages.push(page)
     return page

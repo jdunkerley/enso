@@ -1,7 +1,7 @@
 import { isFunctionPage, type Page, type SiteModel } from './model'
 import { simpleName } from './typeText'
 
-const id = (page: Page) => `api/${page.path}/index`
+const id = (page: Page) => `api/${page.dir}/index`
 const doc = (page: Page, label: string) => ({
   type: 'doc',
   id: id(page),

@@ -35,11 +35,17 @@ export function writeSite(
 ): void {
   const apiDir = join(siteDir, 'docs/api')
   mkdirSync(apiDir, { recursive: true })
+  if (model.caseCollisions.length)
+    console.warn(
+      `${model.caseCollisions.length} paths differ from another only in case; each later one is written to <path>~<n>. ` +
+        'A Docusaurus build on a case-insensitive file system (Windows, macOS) still writes both into one output ' +
+        'folder and keeps only one of each pair; build on Linux for a complete site.',
+    )
   for (const name of readdirSync(apiDir)) {
     if (name !== 'index.md') rmSync(join(apiDir, name), { recursive: true, force: true })
   }
   for (const page of model.pages) {
-    const file = join(apiDir, page.path, 'index.mdx')
+    const file = join(apiDir, page.dir, 'index.mdx')
     mkdirSync(dirname(file), { recursive: true })
     writeFileSync(file, renderPage(page, model))
   }

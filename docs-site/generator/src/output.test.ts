@@ -5,6 +5,7 @@ import { expect, test } from 'vitest'
 import { FIXTURES_LIB, readLibraries } from './catalogue'
 import { buildModel } from './model'
 import { groupsCss, readFallbackColour, writeSite } from './output'
+import { renderPage } from './pages'
 
 const model = buildModel(readLibraries([FIXTURES_LIB]))
 
@@ -40,9 +41,47 @@ test('every icon a node uses is a symbol of the sprite', () => {
   writeSite(model, site)
   const sprite = readFileSync(join(site, 'static/img/icons.svg'), 'utf8')
   const used = new Set<string>()
-  for (const file of model.pages.map((page) => join(site, 'docs/api', page.path, 'index.mdx'))) {
+  for (const file of model.pages.map((page) => join(site, 'docs/api', page.dir, 'index.mdx'))) {
     for (const match of readFileSync(file, 'utf8').matchAll(/icon=\{"([^"]+)"\}/g))
       used.add(match[1]!)
   }
   for (const icon of used) expect(sprite).toContain(`<symbol id="${icon}"`)
+})
+
+test('a page whose path differs from another only in case gets its own folder; links follow it', () => {
+  const libraries = readLibraries([FIXTURES_LIB])
+  const fixture = libraries[0]!
+  const side = fixture.catalogue!.entries.find(
+    (entry) => entry.type === 'method' && entry.name === 'side',
+  )!
+  const upperSide = { ...side, name: 'Side' }
+  const withUpper = buildModel([
+    {
+      ...fixture,
+      catalogue: {
+        ...fixture.catalogue!,
+        entries: [...fixture.catalogue!.entries, upperSide],
+      },
+    },
+    libraries[1]!,
+  ])
+  const upper = withUpper.byPath.get('Standard.Fixture/Shapes/Square.Side')!
+  expect(upper.dir).toBe('Standard.Fixture/Shapes/Square.Side~1')
+  expect(withUpper.byPath.get('Standard.Fixture/Shapes/Square.side')!.dir).toBe(
+    'Standard.Fixture/Shapes/Square.side',
+  )
+  const site = mkdtempSync(join(tmpdir(), 'docs-site-'))
+  writeSite(withUpper, site)
+  const moved = readFileSync(
+    join(site, 'docs/api/Standard.Fixture/Shapes/Square.Side~1/index.mdx'),
+    'utf8',
+  )
+  expect(moved).toContain('slug: "/api/Standard.Fixture/Shapes/Square.Side/"')
+  expect(
+    readFileSync(join(site, 'docs/api/Standard.Fixture/Shapes/Square.side/index.mdx'), 'utf8'),
+  ).toContain('slug: "/api/Standard.Fixture/Shapes/Square.side/"')
+  // The type page links to the moved file.
+  expect(renderPage(withUpper.byPath.get('Standard.Fixture/Shapes/Square')!, withUpper)).toContain(
+    '(../Square.Side~1/index.mdx)',
+  )
 })
