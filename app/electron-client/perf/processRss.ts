@@ -82,6 +82,17 @@ export function executableName(command: string): string {
   return executable.split(/[\\/]/).pop() ?? ''
 }
 
+const normalisePath = (file: string) => file.replace(/\\/g, '/').toLowerCase()
+
+/** The full path of a command line's executable, normalised (see {@link executableName}). */
+export function executablePath(command: string): string {
+  const trimmed = command.trim()
+  const quoted = /^"([^"]*)"/.exec(trimmed)
+  if (quoted) return normalisePath(quoted[1]!)
+  const exe = /^(.*?\.exe)(?=\s|$)/i.exec(trimmed)
+  return normalisePath(exe ? exe[1]! : (trimmed.split(/\s/)[0] ?? ''))
+}
+
 /** Names of the engine's own processes: the launcher, the native image and the JVM it starts. */
 const ENGINE_EXECUTABLES = new Set(['enso', 'enso.exe', 'java', 'java.exe'])
 
@@ -90,8 +101,11 @@ const ENGINE_EXECUTABLES = new Set(['enso', 'enso.exe', 'java', 'java.exe'])
  * process, the ydoc host's utility process) run the IDE's binary, which is also called `enso` or
  * `Enso.exe`; they carry `--type=`, the engine does not.
  */
-function isEngineProcess(info: ProcessInfo): boolean {
+function isEngineProcess(info: ProcessInfo, ideExecutable: string | undefined): boolean {
   if (/(^|\s)--type=/.test(info.command)) return false
+  if (ideExecutable != null && executablePath(info.command) === normalisePath(ideExecutable)) {
+    return false
+  }
   return ENGINE_EXECUTABLES.has(executableName(info.command).toLowerCase())
 }
 
@@ -113,16 +127,20 @@ function descendants(processes: readonly ProcessInfo[], root: number): Set<numbe
 
 /**
  * The engine's processes: every descendant of `electronPid` that is the launcher, the native image
- * or `java`, and all their descendants, each once.
+ * or `java`, and all their descendants, each once. `ideExecutable` is the IDE's own binary: a
+ * process running it is never the engine, whatever its arguments. On Windows Playwright's
+ * `electronApplication.process()` is a launcher, and the real main process (`Enso.exe --inspect=0
+ * --remote-debugging-port=0`, no `--type=`) is its child: without this the whole IDE was summed.
  */
 export function engineProcesses(
   processes: readonly ProcessInfo[],
   electronPid: number,
+  ideExecutable?: string,
 ): ProcessInfo[] {
   const below = descendants(processes, electronPid)
   const counted = new Set<number>()
   for (const p of processes) {
-    if (!below.has(p.pid) || !isEngineProcess(p)) continue
+    if (!below.has(p.pid) || !isEngineProcess(p, ideExecutable)) continue
     counted.add(p.pid)
     for (const pid of descendants(processes, p.pid)) counted.add(pid)
   }
@@ -133,8 +151,9 @@ export function engineProcesses(
 export function engineRssKb(
   processes: readonly ProcessInfo[],
   electronPid: number,
+  ideExecutable?: string,
 ): number | undefined {
-  const engine = engineProcesses(processes, electronPid)
+  const engine = engineProcesses(processes, electronPid, ideExecutable)
   return engine.length === 0 ? undefined : engine.reduce((sum, p) => sum + p.rssKb, 0)
 }
 

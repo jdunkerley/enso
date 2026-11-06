@@ -883,10 +883,11 @@ trained with the options it is used with. Truffle diagnostics stay in
 **RSS** is reported, not gated. On the first open of every launch the harness
 sums the memory of the engine's processes (the launcher, the native image or
 `java` under it, and their children: descendants of the Electron process named
-`enso`, `enso.exe`, `java` or `java.exe`, never Electron's own `--type=`
-helpers) and of the ydoc host's utility process (its pid is the last
-`ydoc host pid=` line of the output), at `welcomeShown` and 30 s later
-(`perf/processRss.ts`: `ps -axo` on Linux and macOS,
+`enso`, `enso.exe`, `java` or `java.exe`, never Electron's own `--type=` helpers
+and any process running the IDE's own binary, which on Windows includes the real
+main process under Playwright's launcher) and of the ydoc host's utility process
+(its pid is the last `ydoc host pid=` line of the output), at `welcomeShown` and
+30 s later (`perf/processRss.ts`: `ps -axo` on Linux and macOS,
 `Get-CimInstance Win32_Process` on Windows, whose working set is the figure).
 `open-time.md` prints the medians in MiB, a row per engine (`rss` in
 `open-time.json`; "Working set" on Windows, which is not Linux's resident set,

@@ -253,8 +253,9 @@ async function openProject(
  * comparable with a launch that did not wait, and the headline is the first open's anyway.
  *
  * Which processes were summed is written to `rss-<phase>.json` (pid, parent, KiB, command line), so
- * a surprising figure (Windows reads ~1.2 GiB for native against ~0.4 on Linux) can be explained
- * afterwards. A process that is not found is no sample, never 0 KiB. The ydoc host's pid is the
+ * a surprising figure can be explained afterwards. (The first Windows numbers, ~1.2 GiB for native
+ * against ~0.4 on Linux, were the whole IDE: Playwright's `process()` is a launcher there, its child
+ * the real main process, which matched by name; the IDE binary is now excluded by path.) A process that is not found is no sample, never 0 KiB. The ydoc host's pid is the
  * last `ydoc host pid=` line, as the host is forked again if it dies.
  *
  * The first sample is taken right after the headline, before the extras. On Windows its query (a
@@ -496,7 +497,7 @@ async function measureLaunch(
       if (electronPid == null) return
       const began = Date.now()
       const processes = await listProcesses()
-      const engine = engineProcesses(processes, electronPid)
+      const engine = engineProcesses(processes, electronPid, options.exe)
       const ydoc = Number.isFinite(ydocPid) ? processes.find((p) => p.pid === ydocPid) : undefined
       fs.writeFileSync(
         path.join(dir, `rss-${phase.replace('+', '-')}.json`),

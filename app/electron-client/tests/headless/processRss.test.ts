@@ -10,6 +10,7 @@ import {
   type ProcessInfo,
 } from '../../perf/processRss'
 
+const BS = String.fromCharCode(92)
 const p = (pid: number, ppid: number, rssKb: number, command: string): ProcessInfo => ({
   pid,
   ppid,
@@ -47,6 +48,49 @@ describe('engineRssKb', () => {
   })
   test('engineProcesses names the processes that were summed', () => {
     expect(engineProcesses(windows, 100).map((x) => x.pid)).toEqual([103, 104])
+  })
+})
+
+describe('the IDE binary is never the engine', () => {
+  // The Windows tree of dispatch 42180192094: Playwright's launcher, then the real main process.
+  const ide = 'C:' + BS + 'ide' + BS + 'Enso.exe'
+  const tree: ProcessInfo[] = [
+    p(1, 0, 10, '"C:' + BS + 'ide' + BS + 'Enso.exe" --inspect=0'),
+    p(
+      2,
+      1,
+      180_000,
+      '"C:' + BS + 'ide' + BS + 'Enso.exe"  "--inspect=0" "--remote-debugging-port=0"',
+    ),
+    p(3, 2, 180_000, '"C:' + BS + 'ide' + BS + 'Enso.exe" --type=gpu-process'),
+    p(
+      4,
+      2,
+      30_000,
+      '"C:' +
+        BS +
+        'ide' +
+        BS +
+        'resources' +
+        BS +
+        'enso' +
+        BS +
+        'dist' +
+        BS +
+        'bin' +
+        BS +
+        'enso.exe" --server',
+    ),
+  ]
+  test('without it the main process and its helpers are summed (the bug)', () => {
+    expect(engineRssKb(tree, 1)).toBe(180_000 + 180_000 + 30_000)
+  })
+  test('with it only the engine is', () => {
+    expect(engineRssKb(tree, 1, ide)).toBe(30_000)
+    expect(engineProcesses(tree, 1, ide).map((x) => x.pid)).toEqual([4])
+  })
+  test('the path match ignores case and slash direction', () => {
+    expect(engineRssKb(tree, 1, 'c:/IDE/enso.exe')).toBe(30_000)
   })
 })
 
