@@ -39,14 +39,15 @@ Consumers import by subpath (see `package.json#exports`):
 
 ## Finding the engine
 
-`findEnsoExecutable` looks at `ENSO_ENGINE_PATH`, then next to the running
-executable (the packaged app), then under the checkout's `built-distribution/`
-(`sbt buildEngineDistribution`). Nothing downloads an engine (#359): a prebuilt
-one would not match the checkout, and the fork's releases ship installers only.
-Dev mode (`dev:vite`) warns at start-up when there is none, and fails the first
-project-service request with the same message. The `ProjectService` tests skip
-without one; GUI CI on Linux gives them develop's engine distribution artifact
-(`.github/workflows/gui-checks.yml`).
+`findEnsoExecutable` looks at `ENSO_ENGINE_PATH`, then at the caller's
+`preferred` launcher (a Linux AppImage's copy, `EngineSettings.ensoExecutable`),
+then next to the running executable (the packaged app), then under the
+checkout's `built-distribution/` (`sbt buildEngineDistribution`). Nothing
+downloads an engine (#359): a prebuilt one would not match the checkout, and the
+fork's releases ship installers only. Dev mode (`dev:vite`) warns at start-up
+when there is none, and fails the first project-service request with the same
+message. The `ProjectService` tests skip without one; GUI CI on Linux gives them
+develop's engine distribution artifact (`.github/workflows/gui-checks.yml`).
 
 ## Sample projects (`src/samples/`)
 
@@ -289,7 +290,8 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   runtime (the one directory under `<root>/runtime/`) and the text of the
   engine's `jvm.options`. The cache is `<userData>/jvm-aot/<key>/enso.aot`
   (`ENSO_JVM_AOT_DIR` replaces `<userData>/jvm-aot`). No runtime (a development
-  build) or a macOS `AppTranslocation/` path: no key, so nothing is trained or
+  build), a macOS `AppTranslocation/` path or a Linux AppImage mount
+  (`/.mount_<random>/`, `isAppImageMount`): no key, so nothing is trained or
   used.
 - **Training** (`trainer.ts`, `driver.ts`): `start()`, called once the window is
   up, trains only when the JVM is the resolved default
@@ -297,14 +299,20 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   there is no cache for the key and no other process holds `<root>/train.lock`
   (`lock.ts`: created exclusively with the pid and a random token, and touched
   every minute; a lock whose pid is dead, or that has not been touched for 10
-  minutes, since pids are reused, is taken over by renaming it aside and
-  checking that what moved is the lock that was inspected, putting it back
-  (`link`, which never replaces a newer lock) when another taker got there
-  first; the heartbeat and the release touch the file only while it holds this
-  acquisition's token, and a takeover deletes asides older than 10 minutes).
-  `EngineTrainer` makes a scratch project with `enso --new` (native, the welcome
-  template) in `<root>/enso-aot-training/`, starts `enso --jvm --server` on it
-  at below-normal priority (`os.setPriority`) with `ENSO_JVM_OPTIONS` adding
+  minutes, since pids are reused, is taken over. A takeover, a heartbeat and a
+  release run only while holding `train.lock.takeover`, created exclusively, so
+  a stale lock is removed in place, never moved aside and put back, and no
+  takeover can land between a holder's token check and its touch or delete (Note
+  [Takeovers Are Serialised], #603). A taker that finds the takeover file held
+  gives up; a release retries for 2 s and then leaves its lock. A takeover file
+  is stale when its pid is dead or after 30 s, since it is held for
+  milliseconds. Both files are written under a unique name and hard-linked into
+  place, so neither is ever seen empty (Note [A Lock File Appears Complete]).
+  `.stale-` asides left by earlier versions, and `.new-` files a crash left, are
+  deleted once older than 10 minutes). `EngineTrainer` makes a scratch project
+  with `enso --new` (native, the welcome template) in
+  `<root>/enso-aot-training/`, starts `enso --jvm --server` on it at
+  below-normal priority (`os.setPriority`) with `ENSO_JVM_OPTIONS` adding
   `-XX:AOTMode=record` and `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a
   fresh `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`,
   waits for `/_health` (180 s), and `driveOpen` plays an open over the Language
@@ -361,14 +369,58 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   where priority is per thread, threads the JVM created before the call keep
   normal priority. Two JVM engines open at once share `use.log`. Any `[warning]`
   from `aot`/`cds` deletes the cache, so a benign warning that recurs would
-  retrain at every launch (none seen so far). The Linux AppImage mounts at a new
-  path each launch, so its key changes every time (PR J of the plan deals with
-  it).
+  retrain at every launch (none seen so far). A Linux AppImage's first launch of
+  a build has no cache (next bullet).
+- **Linux AppImage** (`stableEngine.ts`, Note [The AppImage Engine Is Copied
+  Out]): an AppImage mounts at a new `/tmp/.mount_<random>` at every launch (and
+  `--appimage-extract-and-run` extracts to a `/tmp/appimage_extracted_<hash>/`
+  that it deletes; `isAppImageMount` covers both), and the JVM refuses a cache
+  whose module path moved (`shared class paths mismatch`). A symlink at a fixed
+  path does not help, because the native launcher resolves its own executable,
+  so the JVM still sees the mount's paths (experiment X1 of the plan, measured
+  on WSLg; discussion #518). So the IDE runs a copy of the bundle:
+  `stableEnginePath` copies `resources/enso` (`.enso.bundle`, without which the
+  launcher does not find the bundled runtime, `dist/`, `runtime/`: ~1.8 GB, ~15
+  s with `fs.cp` on an NVMe disk under WSL) to `<userData>/engine/<version>/`,
+  times kept, through a temporary directory renamed into place with a
+  `.complete` file written last that holds a fingerprint of the bundle (the
+  launcher's and `runtime.jar`'s size and mtime, the runtime's name; a dev build
+  keeps its version, so the fingerprint decides).
+  - **Only when the JVM is the default engine** (Electron's `appImageEngine`
+    checks `isJvmDefaultEngine`): while it is native, an AppImage copies nothing
+    and uses no disk.
+  - **Room first**: the copy needs the bundle's size plus 1 GiB or 20%,
+    whichever is more (`fs.statfs`); short of that it deletes the other copies
+    and looks again, then gives up. A failed copy is deleted at once (a
+    read-only directory is made writable and the delete retried) and recorded in
+    `<userData>/engine/.failed.json` (fingerprint, time, reason); that build is
+    not tried again for a day. A success deletes the record.
+  - **Clean-up**: a copy also deletes leftover temporary directories and other
+    versions' copies except the most recently used one (the marker is touched at
+    each use), but never a copy holding a running process's executable
+    (`/proc/<pid>/exe`; an engine left by a crashed IDE).
+  - **Wiring**: Electron (`appImageEngine` in
+    `app/electron-client/src/jvmAotSettings.ts`), when `APPIMAGE` is set and
+    `ENSO_ENGINE_PATH` is not (one inside `<userData>/engine/` is not the user's
+    but an earlier IDE's copy, inherited through an update's relaunch:
+    `prepareAppImageEngine` drops it, `isEngineCopyPath`), passes a complete
+    copy's launcher as `EngineSettings.ensoExecutable` (and to
+    `findEnsoExecutable`'s `preferred` for the cache) before the project service
+    and the cache are created. It is never put in the environment: an in-app
+    update relaunches the new AppImage with the old process's environment, which
+    would make the new version run the old version's copy. With no complete
+    copy, that launch runs the mounted engine with no cache and starts the copy
+    once the first open has been answered (`EngineSettings.openObserver`; or a
+    minute after the window loaded with no open, never while one is in flight),
+    so that the copy does not compete with that open for the AppImage's mount;
+    the cache trains from the next launch on. If the copy cannot be made, the
+    AppImage runs the JVM with CDS only, the spec's accepted fallback.
 - **Tests**: `jvmAot/__tests__/` — `key`, `lock`, `driver` (against
   `fakeLanguageServer.ts`), `trainer` (a fake `enso` script that imports the
-  same fake, port band `JVM_AOT_TRAINER_PORT`) and `cache` (a fake trainer and
-  fake timers); `projectService/__tests__/jvmAot.test.ts` covers the service's
-  calls.
+  same fake, port band `JVM_AOT_TRAINER_PORT`), `cache` (a fake trainer and fake
+  timers) and `stableEngine` (a fake bundle in a temp tree, with hooks for free
+  space, running processes and the copy); `findEnsoExecutable.test.ts` the
+  order; `projectService/__tests__/jvmAot.test.ts` covers the service's calls.
 
 ## Child processes
 

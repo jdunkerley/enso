@@ -134,6 +134,17 @@ test('no cache and no training for a translocated app or a bundle without a runt
   expect(await noRuntime.jvmOptions()).toEqual([])
 })
 
+test('no cache and no training for an engine in an AppImage mount', async () => {
+  // A new mount at every launch: a cache trained there would be useless at the next one.
+  const mounted = path.join(path.dirname(root), 'tmp', '.mount_enso-abc123', 'resources')
+  const trainer = new FakeTrainer()
+  const created = cache(trainer, { ensoExecutable: await fakeBundle(mounted) })
+  await created.start()
+  expect(trainer.runs).toHaveLength(0)
+  expect(await created.keyDirectory()).toBeUndefined()
+  expect(await created.jvmOptions()).toEqual([])
+})
+
 test('no training while another live process holds the lock', async () => {
   await fs.mkdir(root, { recursive: true })
   // This test's own pid is alive.

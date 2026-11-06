@@ -637,7 +637,7 @@
   "versioningNotForThisFolder": "This project is outside your projects folder and in no git repository, so no versions are kept for it.",
   "versioningBlocked": "Versions cannot be saved: $0",
   "versioningNotConnected": "Not connected to the project",
-  "projectConnectionRestarted": "The connection to the project was restarted. Changes made in the last few seconds may not have been saved.",
+  "projectConnectionRestarted": "The connection to the project was restarted. Changes made in the last few seconds may not have been saved, and the view's selection and undo history were reset.",
   "localVersionsLoading": "Reading the versions status…",
   "localVersionsStatusError": "The versions status could not be read: $0"
 }

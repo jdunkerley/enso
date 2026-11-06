@@ -114,3 +114,18 @@ test('a JVM run gets the cache options', async () => {
   await service('native').runProject(UUID('id-1'), Path(root))
   expect(launches[1]?.jvmOptions).toBeUndefined()
 })
+
+test('an open observer (the AppImage engine copy waits for one) hears every open, a failed one too', async () => {
+  const heard: string[] = []
+  const observed = new ProjectService(fakeRunner(), [], console, undefined, undefined, undefined, {
+    environment: 'native',
+    openObserver: {
+      openStarted: () => heard.push('started'),
+      openAnswered: () => heard.push('answered'),
+    },
+  })
+  await observed.openProject(UUID('id-1'), Path(root))
+  failOpen = true
+  await expect(observed.openProject(UUID('id-1'), Path(root))).rejects.toThrow('no engine')
+  expect(heard).toEqual(['started', 'answered', 'started', 'answered'])
+})

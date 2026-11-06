@@ -1040,8 +1040,13 @@ function checkExecutables(...segments: readonly string[]): Path | undefined {
   return
 }
 
-/** Find the path to the `enso` executable. */
-export function findEnsoExecutable(workDir: string = '.'): Path | undefined {
+/**
+ * Find the path to the `enso` executable: the user's `ENSO_ENGINE_PATH`, then `preferred` (the
+ * caller's engine: a Linux AppImage's copy, passed explicitly so that it never reaches the
+ * environment that child processes inherit), then next to the running executable and under
+ * `workDir`.
+ */
+export function findEnsoExecutable(workDir: string = '.', preferred?: string): Path | undefined {
   workDir = path.resolve(workDir)
 
   // Check ENSO_ENGINE_PATH environment variable first
@@ -1052,6 +1057,14 @@ export function findEnsoExecutable(workDir: string = '.'): Path | undefined {
       return checkExecutable(envPath)
     } catch {
       // File doesn't exist, continue searching
+    }
+  }
+  if (preferred) {
+    try {
+      fs.accessSync(preferred)
+      return checkExecutable(preferred)
+    } catch {
+      // Gone: continue searching.
     }
   }
 

@@ -162,17 +162,25 @@ export function extractTypeAndPath<Id extends AssetId>(id: Id): AssetTypeAndId {
 interface ConfigConfig {
   readonly dir: string
   readonly port: number
+  /**
+   * Called with the port once the server listens: the app's pages are served from
+   * `https://localhost:<port>`, with or without a window (`--no-window` serves them to a browser),
+   * and that is the origin the ydoc listeners accept (#596).
+   */
+  readonly onListening?: ((port: number) => void) | undefined
 }
 
 /** Server configuration. */
 export class Config {
   dir: string
   port: number
+  onListening: ((port: number) => void) | undefined
 
   /** Create a server configuration. */
   constructor(cfg: ConfigConfig) {
     this.dir = path.resolve(cfg.dir)
     this.port = cfg.port
+    this.onListening = cfg.onListening
   }
 }
 
@@ -286,6 +294,7 @@ export class Server {
       console.warn(`Not listening on [${IPV6_LOOPBACK}]: ${code}.`)
     }
     this.servers = ipv6Server ? [ipv4Server, ipv6Server] : [ipv4Server]
+    this.config.onListening?.(this.config.port)
     if (process.env.ELECTRON_DEV_MODE === 'true') {
       // Vite's hot-reload WebSocket listens for upgrades on one server; hand it both.
       ipv6Server?.on('upgrade', (...args) => ipv4Server.emit('upgrade', ...args))

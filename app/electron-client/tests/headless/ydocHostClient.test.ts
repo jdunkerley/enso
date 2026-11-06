@@ -75,8 +75,25 @@ test('listen and close resolve on done, with the request passed through', async 
   await host.close(4000)
   expect(spawn).toHaveBeenCalledOnce()
   expect(children[0]!.requests).toEqual([
-    { type: 'listen', id: 1, request: request(4000) },
+    { type: 'listen', id: 1, request: { ...request(4000), allowedOrigins: [] } },
     { type: 'close', id: 2, port: 4000 },
+  ])
+})
+
+test('listens carry the allowed origins, also when restored after an exit (#596)', async () => {
+  const { host, children } = setup()
+  const origins = ['https://localhost:8080', 'https://127.0.0.1:8080']
+  host.allowOrigins(origins)
+  await host.listen(request(4000))
+  // A request that names its own origins keeps them.
+  await host.listen({ ...request(5000), allowedOrigins: ['http://localhost:5173'] })
+  const sent = () =>
+    children.at(-1)!.requests.flatMap((r) => (r.type === 'listen' ? [r.request] : []))
+  expect(sent().map((r) => r.allowedOrigins)).toEqual([origins, ['http://localhost:5173']])
+  children[0]!.crash()
+  expect(sent().map((r) => [r.port, r.allowedOrigins])).toEqual([
+    [4000, origins],
+    [5000, ['http://localhost:5173']],
   ])
 })
 
@@ -213,4 +230,54 @@ test('dispose kills the child and fails later requests', async () => {
   expect(spawn).toHaveBeenCalledOnce()
   await expect(host.listen(request(5000))).rejects.toThrow(/disposed/)
   expect(spawn).toHaveBeenCalledOnce()
+})
+
+test('a request during a backoff does not reset the restart limit', async () => {
+  vi.useFakeTimers()
+  try {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { host, spawn, children } = setup()
+    await host.listen(request(4000))
+    // Four quick restarts later the fifth exit is waiting out its 8 s delay.
+    children[0]!.crash()
+    for (const [index, delay] of [1000, 2000, 4000].entries()) {
+      children[index + 1]!.crash()
+      await vi.advanceTimersByTimeAsync(delay)
+    }
+    children[4]!.crash()
+    expect(spawn).toHaveBeenCalledTimes(5)
+    // A request forks at once, but this is still the same crash loop: its exit is the sixth.
+    const pending = host.listen(request(5000))
+    expect(spawn).toHaveBeenCalledTimes(6)
+    await pending
+    children[5]!.crash()
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(spawn).toHaveBeenCalledTimes(6)
+    expect(error.mock.calls.some(([m]) => String(m).includes('not restarted'))).toBe(true)
+    error.mockRestore()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('a close during an in-flight listen wins: nothing is recorded as open', async () => {
+  let release: (() => void) | undefined
+  const { host, children } = setup((r) => {
+    if (r.type === 'listen' && !release) {
+      release = () => children[0]!.emit('message', done(r))
+      return undefined
+    }
+    return done(r)
+  })
+  const listening = host.listen(request(4000))
+  const closing = host.close(4000)
+  release!()
+  await listening
+  await closing
+  // The listener is not recorded as open: a restart does not restore it, and the port is free.
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  children[0]!.crash()
+  error.mockRestore()
+  expect(children).toHaveLength(1)
+  await host.listen(request(4000))
 })

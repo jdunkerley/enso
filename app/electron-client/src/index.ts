@@ -45,6 +45,7 @@ import { setupLogger } from './log.js'
 import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from './menuItems.js'
 import { capitalizeFirstLetter } from './naming.js'
 import {
+  allowYdocOrigin,
   disposeJvmAotCache,
   disposeYdocHost,
   getLocalMetadata,
@@ -52,7 +53,9 @@ import {
   getLocalVersioning,
   getSecretsKeySource,
   handleProjectProtocol,
+  prepareAppImageEngine,
   setupProjectService,
+  startAppImageEngineCopy,
   startJvmAotCache,
   version,
 } from './projectService.js'
@@ -355,6 +358,10 @@ class App {
       if (this.electron) {
         // Before the server and any engine start, so both see the key.
         await this.initialiseSecretsKey()
+        // Before the project service and the JDK AOT cache find the engine.
+        await prepareAppImageEngine(this.electron, this.electronIsDev, {
+          option: engineModeOption(args),
+        })
         // Note that we want to do all the actions synchronously, so when the window
         // appears, it serves the website immediately.
         await this.startContentServerIfEnabled(args)
@@ -374,6 +381,8 @@ class App {
       await this.loadWindowContent(args)
       // Once the window is up: a JDK AOT training, if one is needed, runs behind the dashboard.
       startJvmAotCache()
+      // After the window too, so that it does not compete with loading it (one build's first launch).
+      startAppImageEngineCopy()
     } catch (err) {
       console.error('Failed to initialize the application, shutting down. Error: ', err)
       this.quit()
@@ -414,6 +423,9 @@ class App {
     const serverCfg = new Config({
       dir: assetsPath(this.electron),
       port: args.server.port,
+      // The pages' origin, which the ydoc listeners accept: a window's, or a browser's under
+      // `--no-window` (#596).
+      onListening: allowYdocOrigin,
     })
     const projectService = this.createProjectService(args)
     this.projectService = projectService
