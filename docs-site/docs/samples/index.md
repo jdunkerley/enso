@@ -29,7 +29,8 @@ your changes are never overwritten, and a sample you delete stays deleted.
 ## Open a sample
 
 Open the **Local** drive and double-click the `Samples` folder to look inside,
-then click the ▶ button at the start of a sample's row to open it.
+then click the ▶ button at the start of a sample's row to open it. The `Data`
+folder beside them holds the samples' input files; it is not a project.
 
 ![The Local drive, listing a Samples folder.](./images/samples-folder.png)
 
@@ -46,8 +47,17 @@ Two things to know:
   them. Press the **Write All** button at the top of the graph (or **Write** on
   the node) to run the upload, then select the `summary` node to see the result.
 - `Orders_And_Customers` writes an Excel file, `spend_by_segment.xlsx`, into the
-  project's `data` folder. As with the database upload, this happens when you
-  press **Write All** (or **Write** on the node).
+  project's own `output` folder. As with the database upload, this happens when
+  you press **Write All** (or **Write** on the node).
+
+## Where their data is
+
+The samples share one folder of input files, `Samples/Data`, beside the sample
+projects. Each sample reads its file from there, relative to its own place in
+`Samples`, so a sample you copy or move out of the `Samples` folder can no
+longer find its data: its read node shows an error. To use a sample elsewhere,
+change the path in its file node (the one named like `sales_file`, at the start
+of the graph) to where the file is.
 
 ## They are ordinary projects
 
