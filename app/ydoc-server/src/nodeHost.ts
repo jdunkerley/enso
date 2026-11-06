@@ -33,10 +33,20 @@ export interface YdocListenRequest {
  * the upgrade, which also covers a doc removed in between.
  */
 /** Why a GUI handshake for `url` is refused before the upgrade, or `undefined` to accept it. */
-function unknownDocument(url: URL): { status: number; reason: string } | undefined {
+function unknownDocument(
+  target: string | undefined,
+): { status: number; reason: string } | undefined {
+  // A request target such as `//` is no URL path: `new URL` throws, which in `verifyClient` (run in
+  // `ws`'s `upgrade` handler) would take the host, and every project's listener, down.
+  let url: URL
+  try {
+    url = new URL(target ?? '/', 'ws://ydoc.local')
+  } catch {
+    return { status: 400, reason: 'a request target that is not a path' }
+  }
   const doc = docName(url.pathname)
   const ls = url.searchParams.get('ls')
-  if (doc == null || ls == null) return { status: 400, reason: 'no document or no ls= parameter' }
+  if (doc == null || !ls) return { status: 400, reason: 'no document or no ls= parameter' }
   if (doc === 'index') return undefined
   const session = LanguageServerSession.sessions.get(ls)
   if (session?.getYDoc(doc) == null) {
@@ -86,7 +96,7 @@ export class NodeYdocHost {
           return done(false, 403, 'Forbidden')
         }
         // Note [An Unknown Document Is Refused Before The Upgrade].
-        const refusal = unknownDocument(new URL(req.url ?? '/', 'ws://ydoc.local'))
+        const refusal = unknownDocument(req.url)
         if (refusal) {
           console.warn(`Refused a ydoc socket on port ${request.port}: ${refusal.reason}.`)
           return done(false, refusal.status)

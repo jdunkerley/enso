@@ -391,7 +391,38 @@ describe('a socket for a document the session does not hold (#601)', () => {
   test('no document or no ls= parameter is refused with 400', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     await expect(handshakeStatus('index', 'data=x')).resolves.toBe(400)
+    await expect(handshakeStatus('index', 'ls=')).resolves.toBe(400)
     await expect(handshakeStatus('not a doc!')).resolves.toBe(400)
     warn.mockRestore()
   })
+})
+
+test('a request target that is not a path is refused with 400, and the host stays up', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  for (const target of ['//', 'http://']) {
+    const status = await new Promise<string>((resolve, reject) => {
+      const socket = net.connect(port, '127.0.0.1', () =>
+        socket.write(
+          [
+            `GET ${target} HTTP/1.1`,
+            `Host: 127.0.0.1:${port}`,
+            'Upgrade: websocket',
+            'Connection: Upgrade',
+            'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+            'Sec-WebSocket-Version: 13',
+            '',
+            '',
+          ].join('\r\n'),
+        ),
+      )
+      socket.once('data', (data) => {
+        resolve(String(data).split('\r\n')[0]!)
+        socket.destroy()
+      })
+      socket.once('error', reject)
+    })
+    expect(status, target).toMatch(/^HTTP\/1\.1 400/)
+  }
+  warn.mockRestore()
+  await firstMessage(connectGui('index'))
 })
