@@ -77,4 +77,5 @@ jobs:
     uses: ./.github/workflows/gui-checks.yml
     with:
       runs-on: '["self-hosted", "macOS"]'
+      windows-shim-tests: false
     secrets: inherit

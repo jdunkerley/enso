@@ -509,6 +509,13 @@ Rules worth keeping:
   bare `fs.rename`. On Windows, real-time virus scanning holds a file it has
   just seen written for about a second, and a rename over it fails with `EPERM`
   meanwhile; the helper retries `EPERM`/`EACCES`/`EBUSY` for up to 5 s (#275).
+  The same goes for a folder: Windows refuses to rename one while another
+  process has any file in it open. Under `%TEMP%` (where the tests run), a bare
+  rename of a folder inside one that had just been renamed into place failed
+  with `EPERM` in 15 to 50% of attempts, each lock gone within ~2 to 70 ms; the
+  same steps elsewhere on the disk never failed, which points at the scanner
+  (Defender) rather than at Node. A test that renames such a folder itself
+  retries too (#622).
 - A corrupt or newer `labels.json`/`recent.json` is renamed to
   `<name>.corrupt-<ts>`/`<name>.newer-<ts>` and treated as empty. A corrupt
   `project.json` is never moved: that would cost the project its UUID.

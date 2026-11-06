@@ -787,7 +787,8 @@ export class LocalSamples {
         filter: (source) => pathModule.resolve(source) !== notes,
       })
       await writeJsonAtomic(pathModule.join(staging, SAMPLES_MANIFEST_NAME), bundle.hashes)
-      await fs.promises.rename(staging, this.samplesDirectory)
+      // A folder just filled is what a virus scanner opens: a bare rename can meet its lock.
+      await renameWithRetry(staging, this.samplesDirectory)
     } catch (error) {
       await fs.promises.rm(staging, { recursive: true, force: true }).catch(() => {})
       throw error

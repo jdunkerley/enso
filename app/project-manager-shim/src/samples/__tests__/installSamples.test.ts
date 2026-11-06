@@ -2,7 +2,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { serialised } from '../../localMetadata/jsonFile.js'
+import { renameWithRetry, serialised } from '../../localMetadata/jsonFile.js'
 import {
   carryLocalState,
   compareSample,
@@ -128,6 +128,25 @@ describe('installSamples: the first start', () => {
     await installSamples(bundled, projects)
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
     expect(fs.existsSync(path.join(samples, 'One', 'CLAUDE.md'))).toBe(true)
+  })
+
+  // Windows refuses to rename a folder while another process has a file in it open, as a virus
+  // scanner does for a moment with files just written; elsewhere the handle blocks nothing.
+  test('installs when a file in the staged copy is held open for a moment', async () => {
+    const cp = fs.promises.cp
+    let released: Promise<void> | undefined
+    vi.spyOn(fs.promises, 'cp').mockImplementation(async (source, destination, options) => {
+      await cp(source, destination, options)
+      const file = await fs.promises.open(path.join(String(destination), 'One', 'package.yaml'))
+      released = new Promise((resolve) => setTimeout(resolve, 300)).then(() => file.close())
+    })
+    try {
+      expect(await installSamples(bundled, projects)).toMatchObject({ installed: true })
+    } finally {
+      await released
+    }
+    expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
+    expect(listing(projects)).toEqual(['Samples'])
   })
 
   test.each([undefined, 'missing'])('installs nothing when the bundle is %s', async (dir) => {
@@ -267,7 +286,9 @@ describe('installSamples: later starts', () => {
 
   test('clear what an interrupted change left behind', async () => {
     // Stopped between its renames: the sample is aside as `.old`, and is moved back.
-    fs.renameSync(path.join(samples, 'One'), path.join(samples, '.One.4242.old'))
+    // Retried as the code under test does: on Windows a virus scanner can still hold a file in the
+    // folder `beforeEach` just installed, and a bare rename then fails with `EPERM`.
+    await renameWithRetry(path.join(samples, 'One'), path.join(samples, '.One.4242.old'))
     write(path.join(samples, '.Two.4242.tmp', 'package.yaml'), 'name: Two\n')
     write(path.join(samples, 'Data', '.rows.csv.4242.tmp'), 'partial')
     await installSamples(bundled, projects)
