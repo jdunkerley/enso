@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { YjsChannel, type YjsChannelServer } from 'ydoc-channel'
 import { LanguageServerSession } from '../languageServerSession'
 import { setupGatewayClient, type YjsSocket } from '../ydoc'
@@ -221,5 +221,28 @@ describe('setupGatewayClient with an unknown document', () => {
     index.close()
     await settle()
     expect(LanguageServerSession.sessions.size).toBe(0)
+  })
+
+  test('a module document asked for with no session creates no session', () => {
+    // The GUI's stale module-doc reconnects can reach the listener before its index reconnect;
+    // no session can have such a document, so none is built (and torn down) to find that out.
+    const stale = new MockSocket()
+    const inspect = { registerSession: vi.fn(), unregisterSession: vi.fn() }
+    setupGatewayClient(
+      stale,
+      LS_URL,
+      null,
+      'a-module-doc-of-an-earlier-session',
+      byteBuffer,
+      jsonServer,
+      fakeBinaryServer().server,
+      { onConnect: () => {} },
+      { onConnect: () => {} },
+      inspect as never,
+    )
+    expect(stale.readyState).toBe(WebSocket.CLOSED)
+    expect(LanguageServerSession.sessions.size).toBe(0)
+    // Not even registered for inspection: no session was built.
+    expect(inspect.registerSession).not.toHaveBeenCalled()
   })
 })

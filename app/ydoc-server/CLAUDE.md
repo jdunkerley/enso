@@ -150,7 +150,9 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
 - **Every session reference is released.** The process outlives its engines, so
   a session that is never released lives on with its Language Server client: a
   connection refused because its doc is unknown (a GUI reconnecting with the
-  module doc ids of an earlier session) releases the session it was handed.
+  module doc ids of an earlier session) releases the session it was handed, and
+  one that arrives when there is no session at all is refused before any is
+  built (only `index` may start one).
 - **Sessions are process-global.** `LanguageServerSession.sessions` is keyed by
   the GUI's `ls=` name, not by listener, so one Node process hosting several
   listeners relies on those names being distinct. They are: the GUI's `ls=` is
