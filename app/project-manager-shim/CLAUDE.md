@@ -304,8 +304,8 @@ in `app/electron-client/src/projectService.ts` and passes it to the
     copy, that launch runs the mounted engine with no cache and starts the copy
     once the first open has been answered (`EngineSettings.openObserver`; or a
     minute after the window loaded with no open, never while one is in flight),
-    since a copy running alongside the first open slowed it down in WSL; the
-    cache trains from the next launch on. If the copy cannot be made, the
+    so that the copy does not compete with that open for the AppImage's mount;
+    the cache trains from the next launch on. If the copy cannot be made, the
     AppImage runs the JVM with CDS only, the spec's accepted fallback.
 - **Tests**: `jvmAot/__tests__/` — `key`, `lock`, `driver` (against
   `fakeLanguageServer.ts`), `trainer` (a fake `enso` script that imports the

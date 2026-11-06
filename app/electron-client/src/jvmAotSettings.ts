@@ -79,8 +79,8 @@ export async function appImageEngine(
 /**
  * Holds a task (a Linux AppImage's engine copy, 1.8 GB read through the AppImage's mount) back
  * until the first project open has been answered, or `delayMs` after it is scheduled when no open
- * has started by then, and never while an open is in flight: on a build's first launch in WSL the
- * copy running alongside the first open made it ~0.9 s slower (PR #612). It runs at most once.
+ * has started by then, and never while an open is in flight, so that the copy does not compete with
+ * the first open for the AppImage's mount (PR #612's review, I3). It runs at most once.
  */
 export class AfterFirstOpen {
   private inFlight = 0
