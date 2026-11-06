@@ -62,3 +62,50 @@ export async function appImageEngine(
   if (enginePath != null) return { enginePath }
   return { startCopy: () => stableEnginePath(options) }
 }
+
+/**
+ * Holds a task (a Linux AppImage's engine copy, 1.8 GB read through the AppImage's mount) back
+ * until the first project open has been answered, or `delayMs` after it is scheduled when no open
+ * has started by then, and never while an open is in flight: on a build's first launch in WSL the
+ * copy running alongside the first open made it ~0.9 s slower (PR #612). It runs at most once.
+ */
+export class AfterFirstOpen {
+  private inFlight = 0
+  private answered = false
+  private delayed = false
+  private task: (() => void) | undefined
+  private timer: ReturnType<typeof setTimeout> | undefined
+
+  /** `delayMs`: how long to wait for a first open. */
+  constructor(private readonly delayMs: number) {}
+
+  /** Run `task` once the conditions above hold. */
+  schedule(task: () => void): void {
+    this.task = task
+    this.timer = setTimeout(() => {
+      this.delayed = true
+      this.runIfIdle()
+    }, this.delayMs)
+    this.runIfIdle()
+  }
+
+  /** An open started: the task waits for it. */
+  openStarted(): void {
+    this.inFlight += 1
+  }
+
+  /** An open was answered (or failed): the task may run. */
+  openAnswered(): void {
+    this.inFlight = Math.max(0, this.inFlight - 1)
+    this.answered = true
+    this.runIfIdle()
+  }
+
+  private runIfIdle(): void {
+    if (this.task == null || this.inFlight > 0 || !(this.answered || this.delayed)) return
+    const task = this.task
+    this.task = undefined
+    clearTimeout(this.timer)
+    task()
+  }
+}

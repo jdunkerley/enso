@@ -5,8 +5,13 @@
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { describe, expect, test } from 'vitest'
-import { appImageEngine, isJvmDefaultEngine, jvmAotRootDirectory } from '../../src/jvmAotSettings'
+import { describe, expect, test, vi } from 'vitest'
+import {
+  AfterFirstOpen,
+  appImageEngine,
+  isJvmDefaultEngine,
+  jvmAotRootDirectory,
+} from '../../src/jvmAotSettings'
 
 describe('isJvmDefaultEngine', () => {
   test('native by default: nothing is trained before the switch', () => {
@@ -102,4 +107,60 @@ describe('appImageEngine', () => {
       expect((await appImageEngine(env, app, jvm)).enginePath).toBeDefined()
       expect(env).toEqual({ APPIMAGE: '/a/Enso.AppImage' })
     }))
+})
+
+describe('AfterFirstOpen', () => {
+  test('runs once the first open is answered, not while one is in flight', () => {
+    vi.useFakeTimers()
+    try {
+      const gate = new AfterFirstOpen(60_000)
+      const task = vi.fn()
+      gate.schedule(task)
+      gate.openStarted()
+      gate.openStarted()
+      gate.openAnswered()
+      expect(task).not.toHaveBeenCalled()
+      gate.openAnswered()
+      expect(task).toHaveBeenCalledTimes(1)
+      gate.openStarted()
+      gate.openAnswered()
+      vi.advanceTimersByTime(120_000)
+      expect(task).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('without any open, runs after the delay; an open in flight then holds it until answered', () => {
+    vi.useFakeTimers()
+    try {
+      const idle = new AfterFirstOpen(60_000)
+      const task = vi.fn()
+      idle.schedule(task)
+      vi.advanceTimersByTime(59_999)
+      expect(task).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
+      expect(task).toHaveBeenCalledTimes(1)
+
+      const busy = new AfterFirstOpen(60_000)
+      const later = vi.fn()
+      busy.schedule(later)
+      busy.openStarted()
+      vi.advanceTimersByTime(60_000)
+      expect(later).not.toHaveBeenCalled()
+      busy.openAnswered()
+      expect(later).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('an open answered before the task is scheduled lets it run at once', () => {
+    const gate = new AfterFirstOpen(60_000)
+    gate.openStarted()
+    gate.openAnswered()
+    const task = vi.fn()
+    gate.schedule(task)
+    expect(task).toHaveBeenCalledTimes(1)
+  })
 })

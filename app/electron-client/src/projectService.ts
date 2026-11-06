@@ -7,7 +7,12 @@ import * as readline from 'node:readline'
 import * as url from 'node:url'
 
 import type { Electron } from '@/electron'
-import { appImageEngine, isJvmDefaultEngine, jvmAotRootDirectory } from '@/jvmAotSettings'
+import {
+  AfterFirstOpen,
+  appImageEngine,
+  isJvmDefaultEngine,
+  jvmAotRootDirectory,
+} from '@/jvmAotSettings'
 import * as paths from '@/paths'
 import { lazyKeyringEntries, SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
 import { UtilityProcessYdocHost, type YdocHostChild } from '@/ydocHost/client'
@@ -185,6 +190,8 @@ function createJvmAotCache(
 let appImageEnginePath: string | undefined
 /** The copy to make once the window is up, when there is no complete one. */
 let appImageCopy: (() => Promise<string>) | undefined
+/** Holds the copy back until the first open has been answered (or a minute without one). */
+const appImageCopyGate = new AfterFirstOpen(60_000)
 
 /**
  * Decide which engine a Linux AppImage runs (see {@link appImageEnginePath}). Called before the
@@ -214,15 +221,22 @@ export async function prepareAppImageEngine(
   }
 }
 
-/** Make the AppImage's engine copy, if one is due; called once the window is up. */
+/**
+ * Make the AppImage's engine copy, if one is due: called once the window is up, it waits for the
+ * first open to be answered (`AfterFirstOpen`), so that the copy does not slow that open down.
+ */
 export function startAppImageEngineCopy(): void {
   const copy = appImageCopy
   appImageCopy = undefined
-  copy?.().then(
-    (launcher) =>
-      console.info(`Copied the AppImage's engine to ${launcher}; used from the next launch.`),
-    (error: unknown) => console.warn("Did not copy the AppImage's engine:", error),
-  )
+  if (copy == null) return
+  appImageCopyGate.schedule(() => {
+    console.info("Copying the AppImage's engine for the next launch.")
+    copy().then(
+      (launcher) =>
+        console.info(`Copied the AppImage's engine to ${launcher}; used from the next launch.`),
+      (error: unknown) => console.warn("Did not copy the AppImage's engine:", error),
+    )
+  })
 }
 
 /** Train the JDK AOT cache in the background if it is needed (the JVM is the default engine). */
@@ -250,6 +264,7 @@ export function setupProjectService(
     ...engine,
     jvmAot: jvmAotCache ?? undefined,
     ensoExecutable: appImageEnginePath,
+    openObserver: appImageCopyGate,
   }
   if (!projectService) {
     projectService = ProjectService.default(

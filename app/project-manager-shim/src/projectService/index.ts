@@ -76,6 +76,14 @@ export interface EngineSettings {
    * `jvmAot/stableEngine.ts`); a user's `ENSO_ENGINE_PATH` still wins (`findEnsoExecutable`).
    */
   readonly ensoExecutable?: string | undefined
+  /** Told when each open starts and is answered (a failure too), like `jvmAot`. */
+  readonly openObserver?: OpenObserver | undefined
+}
+
+/** Hears opens: Electron holds a Linux AppImage's engine copy back until the first is answered. */
+export interface OpenObserver {
+  openStarted(): void
+  openAnswered(): void
 }
 
 /** Parameters for the "create project" endpoint. */
@@ -343,6 +351,7 @@ export class ProjectService {
     // A running AOT training yields to the open (spec, stage 1d "Yielding").
     const jvmAot = this.engine?.jvmAot
     jvmAot?.openStarted()
+    this.engine?.openObserver?.openStarted()
     try {
       const mode = await resolveEngineMode(project.path, this.engineModeSettings())
       if (!alreadyLogging) engineLog.notice(describeEngineMode(mode))
@@ -360,6 +369,7 @@ export class ProjectService {
       throw error
     } finally {
       jvmAot?.openAnswered()
+      this.engine?.openObserver?.openAnswered()
       if (jvmAot != null && (launch?.jvmOptions?.length ?? 0) > 0) {
         // The JVM has written its warnings by now: a cache it refused is deleted.
         void jvmAot
