@@ -95,3 +95,21 @@ test('other folders and projects have no sample entries', async ({ page, drivePa
     await expect(page.getByRole('button', { name: TEXT.resetAllSamplesShortcut })).toHaveCount(0)
   })
 })
+
+test('an open sample has Reset Sample disabled, with a tooltip saying why', async ({
+  page,
+  drivePage,
+}) => {
+  await drivePage.driveTable
+    .doubleClickRow('Samples')
+    .driveTable.openProject('Sales_Overview')
+    .expectProjectEditorOpened('Sales_Overview')
+    .goToPage.drive()
+    .driveTable.rightClickRow('Sales_Overview')
+    .do(async () => {
+      const reset = page.getByRole('button', { name: TEXT.resetSampleShortcut })
+      await expect(reset).toBeDisabled()
+      await reset.hover({ force: true })
+      await expect(page.getByText(TEXT.resetSampleOpenTooltip)).toBeVisible()
+    })
+})

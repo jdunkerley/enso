@@ -526,7 +526,11 @@ describe('samples routes', () => {
     expect(await fs.readFile(path.join(directory, 'One', 'src', 'Main.enso'), 'utf8')).toBe(
       'main = 1\n',
     )
-    expect((await call('samples/reset-all', {})).result).toEqual({ kept: [], unrenamed: [] })
+    expect((await call('samples/reset-all', {})).result).toEqual({
+      kept: [],
+      unrenamed: [],
+      failed: [],
+    })
   })
 
   test('the resets refuse an open sample', async () => {

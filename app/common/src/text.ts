@@ -91,6 +91,7 @@ interface PlaceholderOverrides {
   readonly resetAllSamplesKept: [keptNames: string]
   readonly resetSampleError: [sampleName: string]
   readonly resetSampleUnrenamed: [keptName: string]
+  readonly resetAllSamplesFailed: [failures: string]
 }
 
 // This is intentionally unused. This line throws an error if `PlaceholderOverrides` ever becomes

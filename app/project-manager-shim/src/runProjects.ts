@@ -5,7 +5,7 @@ import { getFileSystemEntry } from './handler/index.js'
 import type { Runner } from './projectService/ensoRunner.js'
 import { EnsoRunner, findEnsoExecutable } from './projectService/ensoRunner.js'
 import { ProjectService, type EngineSettings } from './projectService/index.js'
-import { markProjectRunning } from './samples/runMarker.js'
+import { markProjectRunning, removeOnSignals } from './samples/runMarker.js'
 
 function getWorkDir() {
   if (process.env.NODE_ENV === 'development') {
@@ -69,10 +69,13 @@ export async function runLocalProjectByPath(
     throw new Error(`The path '${projectPath}' does not point to a project.`)
   }
   // An IDE started meanwhile must not update a bundled sample this process runs.
-  const unmark = await markProjectRunning(projectPath)
+  const marker = await markProjectRunning(projectPath)
+  // Ctrl+C or a terminate would otherwise leave the marker behind.
+  const stopListening = removeOnSignals(marker)
   try {
     return await runLocalProjectByUuid(project.metadata.id as UUID, directoryId, engine, runner)
   } finally {
-    await unmark()
+    stopListening()
+    await marker.remove()
   }
 }

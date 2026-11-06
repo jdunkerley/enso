@@ -20,9 +20,14 @@ import { pipeline } from 'node:stream/promises'
 import * as yaml from 'yaml'
 import { renameWithRetry, serialised, writeJsonAtomic } from '../localMetadata/jsonFile.js'
 import { getProjectsDirectory } from '../projectManagement.js'
-import { hasLiveRunMarker } from './runMarker.js'
+import { findLiveRunMarker, isRunMarkerName } from './runMarker.js'
 
-export { markProjectRunning } from './runMarker.js'
+export {
+  findLiveRunMarker,
+  markProjectRunning,
+  removeOnSignals,
+  RUN_MARKER_HEARTBEAT_MS,
+} from './runMarker.js'
 
 const logger = console
 
@@ -125,7 +130,12 @@ export interface SamplesResetResult {
    * the sample's: the user should rename them.
    */
   readonly unrenamed: readonly string[]
+  /** What Reset All could not reset (samples by name, `Data/` files as `Data/<file>`), and why. */
+  readonly failed: readonly { readonly name: string; readonly error: string }[]
 }
+
+/** A sample is open, opening or marked as run by another process, so it must not be changed. */
+export class SampleBusyError extends Error {}
 
 /** Whether the project at a path is open or opening; such a project is never changed. */
 export type IsProjectOpen = (path: string) => Promise<boolean>
@@ -602,12 +612,14 @@ async function updatePackageYaml(
  * IDE's `.enso/`, with the project's id), what is in its `output/` (the user's copy of a file the
  * bundle also ships there wins), and its labels.
  */
-async function carryLocalState(installed: string, staging: string): Promise<void> {
+export async function carryLocalState(installed: string, staging: string): Promise<void> {
   for (const entry of await fs.promises.readdir(installed)) {
     if (!isHidden(entry) && entry !== OUTPUT_DIRECTORY_NAME) continue
     await fs.promises.cp(pathModule.join(installed, entry), pathModule.join(staging, entry), {
       recursive: true,
       force: true,
+      // A run marker belongs to the folder it was written in, and to the run that wrote it.
+      filter: (source) => !isRunMarkerName(pathModule.basename(source)),
     })
   }
   const labels = await readLabels(installed)
@@ -645,6 +657,8 @@ async function keepEditedSample(
   const kept = editedCopyPath(path, now, false)
   await fileOps.rename(path, kept)
   const name = pathModule.basename(kept)
+  // A file where the sample's folder should be has no `package.yaml` to rename.
+  if (!(await fs.promises.stat(kept)).isDirectory()) return { name, renamed: true }
   try {
     await updatePackageYaml(kept, { name })
     return { name, renamed: true }
@@ -712,11 +726,23 @@ export class LocalSamples {
   }
 
   /**
-   * Whether a sample is open or opening: in this process (`isOpen`), or in another one that marked
-   * it (a headless `--startup.project` run, `markProjectRunning`).
+   * Throw a {@link SampleBusyError} when the sample `name` is open or opening in this process
+   * (`isOpen`), or marked by another one (a headless `--startup.project` run,
+   * `markProjectRunning`). Asked before a change and again just before its rename.
+   * @param doing - What would change it, for the message: "resetting it", ….
    */
-  private async isBusy(path: string, isOpen: IsProjectOpen): Promise<boolean> {
-    return (await isOpen(toSlashes(path))) || (await hasLiveRunMarker(path))
+  private async requireNotBusy(name: string, isOpen: IsProjectOpen, doing: string): Promise<void> {
+    const path = this.samplePath(name)
+    if (await isOpen(toSlashes(path))) {
+      throw new SampleBusyError(`The sample '${name}' is open. Close it before ${doing}.`)
+    }
+    const marker = await findLiveRunMarker(path)
+    if (marker != null) {
+      throw new SampleBusyError(
+        `The sample '${name}' is being run by another Enso process (its marker is '${marker}'). ` +
+          `Stop that run before ${doing}; if none is running, delete the marker.`,
+      )
+    }
   }
 
   /**
@@ -794,23 +820,28 @@ export class LocalSamples {
         if (comparison.state === 'unreadable') {
           logger.warn(`Samples: '${target}' could not be read, left alone:`, describe(disk))
         }
-        if (comparison.action === 'update' && (await this.isBusy(target, isOpen))) {
-          // Updated on a later start, once it is closed.
-          updateAvailable.push(name)
-          continue
-        }
         if (comparison.action === 'install') {
           await replaceWith(source, target)
           copied.push(name)
         } else if (comparison.action === 'update') {
-          await replaceWith(source, target, (staging) => carryLocalState(target, staging))
+          await this.requireNotBusy(name, isOpen, 'updating it')
+          await replaceWith(source, target, async (staging) => {
+            await carryLocalState(target, staging)
+            // Copying the user's `output/` can take a while: ask again just before the rename.
+            await this.requireNotBusy(name, isOpen, 'updating it')
+          })
           updated.push(name)
         } else if (comparison.state === 'updateAvailable') {
           updateAvailable.push(name)
         }
         if (comparison.record !== undefined) samples[name] = comparison.record
       } catch (error) {
-        logger.error(`Samples: could not check or update '${target}':`, error)
+        if (error instanceof SampleBusyError) {
+          // Updated on a later start, once it is closed.
+          updateAvailable.push(name)
+        } else {
+          logger.error(`Samples: could not check or update '${target}':`, error)
+        }
       }
     }
 
@@ -921,22 +952,27 @@ export class LocalSamples {
       const bundle = await this.readBundle()
       const source = bundle?.samples.get(name)
       if (bundle == null || source == null) throw new Error(`'${name}' is not a bundled sample.`)
-      if (await this.isBusy(this.samplePath(name), isOpen)) {
-        throw new Error(`The sample '${name}' is open. Close it before resetting it.`)
-      }
+      const check = () => this.requireNotBusy(name, isOpen, 'resetting it')
+      await check()
       const manifest = await this.requireOwnManifest()
-      const kept = await this.resetSample(name, source, bundle, manifest, now)
+      const kept = await this.resetSample(name, source, bundle, manifest, now, check)
       await this.record(
         { samples: { [name]: bundle.hashes.samples[name]! } },
         withoutPrefix(manifest?.files, `${name}/`),
       )
-      return { kept: kept ? [kept.name] : [], unrenamed: kept && !kept.renamed ? [kept.name] : [] }
+      return {
+        kept: kept ? [kept.name] : [],
+        unrenamed: kept && !kept.renamed ? [kept.name] : [],
+        failed: [],
+      }
     })
   }
 
   /**
    * Put every bundled sample and `Data/` file back to the bundle, keeping each edited (or
    * unreadable) copy beside the original. Samples and files that are not bundled are left alone.
+   * One that fails (a file another program holds) is reported in `failed`; the others are still
+   * reset, and their copies reported and recorded.
    * @throws {Error} when a bundled sample is open or opening; nothing is changed then.
    */
   resetAll(
@@ -946,37 +982,52 @@ export class LocalSamples {
     return this.serialised(async () => {
       const bundle = await this.readBundle()
       if (bundle == null) throw new Error('There are no bundled samples.')
-      for (const name of bundle.samples.keys()) {
-        if (await this.isBusy(this.samplePath(name), isOpen)) {
-          throw new Error(`The sample '${name}' is open. Close it before resetting the samples.`)
-        }
-      }
+      const doing = 'resetting the samples'
+      for (const name of bundle.samples.keys()) await this.requireNotBusy(name, isOpen, doing)
       const manifest = fs.existsSync(this.samplesDirectory) ? await this.requireOwnManifest() : null
       await fs.promises.mkdir(this.samplesDirectory, { recursive: true })
       const kept: string[] = []
       const unrenamed: string[] = []
+      const failed: { name: string; error: string }[] = []
+      const samples: Record<string, RecordedHash> = {}
+      const data: Record<string, RecordedHash> = {}
       for (const [name, source] of bundle.samples) {
-        const copy = await this.resetSample(name, source, bundle, manifest, now)
-        if (copy != null) kept.push(copy.name)
-        if (copy != null && !copy.renamed) unrenamed.push(copy.name)
+        try {
+          const check = () => this.requireNotBusy(name, isOpen, doing)
+          const copy = await this.resetSample(name, source, bundle, manifest, now, check)
+          if (copy != null) kept.push(copy.name)
+          if (copy != null && !copy.renamed) unrenamed.push(copy.name)
+          samples[name] = bundle.hashes.samples[name]!
+        } catch (error) {
+          logger.error(`Samples: could not reset '${name}':`, error)
+          failed.push({ name, error: error instanceof Error ? error.message : String(error) })
+        }
       }
       const hasher = new FileHasher(manifest?.files)
       for (const [file, source] of bundle.data) {
         const target = this.dataPath(file)
-        const disk = await hashDataFile(target, hasher, `${SAMPLES_DATA_DIRECTORY_NAME}/${file}`)
-        if (disk === bundle.hashes.data[file]) continue
-        if (disk !== undefined) {
-          // Edited, or unreadable: either way it is the user's, and is kept.
-          const copy = editedCopyPath(target, now, true)
-          await fileOps.rename(target, copy)
-          kept.push(
-            `${SAMPLES_DATA_DIRECTORY_NAME}/${toSlashes(pathModule.relative(this.dataPath(''), copy))}`,
-          )
+        const key = `${SAMPLES_DATA_DIRECTORY_NAME}/${file}`
+        try {
+          const disk = await hashDataFile(target, hasher, key)
+          if (disk !== bundle.hashes.data[file]) {
+            if (disk !== undefined) {
+              // Edited, or unreadable: either way it is the user's, and is kept.
+              const copy = editedCopyPath(target, now, true)
+              await fileOps.rename(target, copy)
+              kept.push(
+                `${SAMPLES_DATA_DIRECTORY_NAME}/${toSlashes(pathModule.relative(this.dataPath(''), copy))}`,
+              )
+            }
+            await replaceWith(source, target)
+          }
+          data[file] = bundle.hashes.data[file]!
+        } catch (error) {
+          logger.error(`Samples: could not reset '${target}':`, error)
+          failed.push({ name: key, error: error instanceof Error ? error.message : String(error) })
         }
-        await replaceWith(source, target)
       }
-      await this.record(bundle.hashes, {})
-      return { kept, unrenamed }
+      await this.record({ samples, data }, {})
+      return { kept, unrenamed, failed }
     })
   }
 
@@ -987,22 +1038,28 @@ export class LocalSamples {
     bundle: Bundle,
     manifest: SamplesManifest | null,
     now: Date,
+    /** Throws when the sample may not be changed; asked again just before each rename. */
+    check: () => Promise<void>,
   ): Promise<{ readonly name: string; readonly renamed: boolean } | null> {
     const target = this.samplePath(name)
     const disk = await hashSample(target, new FileHasher(manifest?.files), name)
     if (disk === undefined) {
-      await replaceWith(source, target)
+      await replaceWith(source, target, check)
       return null
     }
     if (disk === bundle.hashes.samples[name]) {
       // Already as bundled: refresh it, keeping its id, outputs and labels.
-      await replaceWith(source, target, (staging) => carryLocalState(target, staging))
+      await replaceWith(source, target, async (staging) => {
+        await carryLocalState(target, staging)
+        await check()
+      })
       return null
     }
     // Edited, or unreadable: either way it is the user's, and is kept.
     const staging = await stage(source, target)
     let kept: { readonly name: string; readonly renamed: boolean }
     try {
+      await check()
       kept = await keepEditedSample(target, now)
     } catch (error) {
       await fs.promises.rm(staging, { recursive: true, force: true }).catch(() => {})
@@ -1034,6 +1091,17 @@ export class LocalSamples {
       files,
     } satisfies SamplesManifest)
   }
+}
+
+/**
+ * Settles once every change queued for the `Samples` folder that holds `projectPath` has settled;
+ * at once for a project anywhere else. `openProject` waits for it, so a sample is never opened
+ * while it is being updated or reset.
+ */
+export function samplesSettled(projectPath: string): Promise<void> {
+  const parent = pathModule.dirname(pathModule.resolve(projectPath))
+  if (pathModule.basename(parent) !== SAMPLES_DIRECTORY_NAME) return Promise.resolve()
+  return serialised(parent, async () => {})
 }
 
 /**

@@ -135,7 +135,7 @@ export function useResetSamples() {
     const backend = backends.localBackend
     if (backend == null) return
     try {
-      const { kept, unrenamed } = await backend.resetAllSamples()
+      const { kept, unrenamed, failed } = await backend.resetAllSamples()
       toasts.show(
         kept.length > 0 ?
           getText('resetAllSamplesKept', kept.join(', '))
@@ -143,6 +143,10 @@ export function useResetSamples() {
         { type: 'success' },
       )
       warnUnrenamed(unrenamed)
+      if (failed.length > 0) {
+        const failures = failed.map(({ name, error }) => `${name} (${error})`).join('; ')
+        toastAndLog(null, getText('resetAllSamplesFailed', failures))
+      }
     } catch (error) {
       toastAndLog('resetAllSamplesError', error)
     } finally {

@@ -15,6 +15,7 @@ import { EngineLogHub } from '../engineLogs/hub.js'
 import type { JvmAotCache } from '../jvmAot/index.js'
 import type { ProjectLifecycleListener } from '../localMetadata/index.js'
 import { withinVersioningTimeout, type LocalVersioning } from '../localVersioning/index.js'
+import { samplesSettled } from '../samples/index.js'
 import {
   describeEngineMode,
   liftJvmFlag,
@@ -321,6 +322,8 @@ export class ProjectService {
     const openingKey = comparableProjectPath(project.path)
     this.openingProjects.set(openingKey, (this.openingProjects.get(openingKey) ?? 0) + 1)
     try {
+      // Counted as opening first, so a samples change still queued sees it and leaves it alone.
+      await samplesSettled(project.path)
       return await this.openFoundProject(project, projectId, projectsDirectory, engineLogging)
     } finally {
       const count = (this.openingProjects.get(openingKey) ?? 1) - 1

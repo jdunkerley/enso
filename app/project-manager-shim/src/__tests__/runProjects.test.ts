@@ -7,7 +7,7 @@ import { createProject } from '../localMetadata/__tests__/testUtils.js'
 import type { EngineLaunch, Runner } from '../projectService/ensoRunner.js'
 import { Path, UUID } from '../projectService/types.js'
 import { runLocalProjectByPath, runLocalProjectByUuid } from '../runProjects.js'
-import { hasLiveRunMarker } from '../samples/runMarker.js'
+import { findLiveRunMarker } from '../samples/runMarker.js'
 
 let root: string
 let launches: (EngineLaunch | undefined)[]
@@ -60,11 +60,11 @@ test('a run by path marks the project as running while it runs', async () => {
   const runner: Runner = {
     ...fakeRunner(),
     runProject: async () => {
-      markedDuringRun.push(await hasLiveRunMarker(project))
+      markedDuringRun.push((await findLiveRunMarker(project)) != null)
       return 0
     },
   }
   expect(await runLocalProjectByPath(Path(project), undefined, runner)).toBe(0)
   expect(markedDuringRun).toEqual([true])
-  expect(await hasLiveRunMarker(project)).toBe(false)
+  expect((await findLiveRunMarker(project)) != null).toBe(false)
 })

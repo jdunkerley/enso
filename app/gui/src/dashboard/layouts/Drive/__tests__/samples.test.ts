@@ -58,7 +58,11 @@ beforeEach(() => {
     Promise.resolve({ kept: ['Sales_Overview_edited_2026_11_06'], unrenamed: [] as string[] }),
   )
   resetAllSamples = vi.fn(() =>
-    Promise.resolve({ kept: [] as string[], unrenamed: [] as string[] }),
+    Promise.resolve({
+      kept: [] as string[],
+      unrenamed: [] as string[],
+      failed: [] as { name: string; error: string }[],
+    }),
   )
   fake.localBackend = { samplesStatus, resetSample, resetAllSamples }
   fake.openedProjects = shallowReactive([])
@@ -234,6 +238,33 @@ describe('useSampleMenuEntries', () => {
       `The edited copy '${copy}' still has the sample's project name. Rename it in the Drive ` +
         'before you open it.',
     )
+  })
+
+  test('a Reset All that fails part way says what it kept, and what failed', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    resetAllSamples.mockResolvedValue({
+      kept: ['Text_Cleaning_edited_2026_11_06'],
+      unrenamed: [],
+      failed: [{ name: 'Data/orders.csv', error: 'EBUSY: resource busy or locked' }],
+    })
+    const entries = await setup(() =>
+      useSampleMenuEntries(
+        () => directory(SAMPLES),
+        () => false,
+      ),
+    )
+    entries.value[0]?.doAction()
+    await flushPromises()
+    const toasts = useToasts().toasts.value.map((toast) => [toast.type, toast.content])
+    expect(toasts).toContainEqual([
+      'success',
+      'Reset the samples to the bundled version. Your edited copies are kept: ' +
+        'Text_Cleaning_edited_2026_11_06.',
+    ])
+    expect(toasts).toContainEqual([
+      'error',
+      'Some samples were not reset: Data/orders.csv (EBUSY: resource busy or locked)',
+    ])
   })
 
   test('the samples status is not fetched again for each row', async () => {

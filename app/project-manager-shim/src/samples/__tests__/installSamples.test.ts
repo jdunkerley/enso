@@ -2,15 +2,22 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { serialised } from '../../localMetadata/jsonFile.js'
 import {
+  carryLocalState,
   compareSample,
   ensoCodeForHash,
   fileOps,
+  findLiveRunMarker,
   hashSample,
   installSamples,
   LocalSamples,
   markProjectRunning,
   readSamplesManifest,
+  removeOnSignals,
+  RUN_MARKER_HEARTBEAT_MS,
+  SampleBusyError,
+  samplesSettled,
   Unreadable,
   type SamplesManifest,
 } from '../index.js'
@@ -347,6 +354,7 @@ describe('reset', () => {
     expect(await local.reset('One', undefined, NOW)).toEqual({
       kept: ['One_edited_2026_11_06'],
       unrenamed: [],
+      failed: [],
     })
     const kept = path.join(samples, 'One_edited_2026_11_06')
     expect(read(path.join(kept, 'src', 'Main.enso'))).toBe('main = 99\n')
@@ -362,6 +370,7 @@ describe('reset', () => {
     expect(await local.reset('One', undefined, NOW)).toEqual({
       kept: ['One_edited_2026_11_06_2'],
       unrenamed: [],
+      failed: [],
     })
     expect(listing(samples)).toEqual([
       '.samples.json',
@@ -374,13 +383,21 @@ describe('reset', () => {
   })
 
   test('keeps no copy of an unedited sample', async () => {
-    expect(await local.reset('Two', undefined, NOW)).toEqual({ kept: [], unrenamed: [] })
+    expect(await local.reset('Two', undefined, NOW)).toEqual({
+      kept: [],
+      unrenamed: [],
+      failed: [],
+    })
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
   })
 
   test('brings back a deleted sample', async () => {
     fs.rmSync(path.join(samples, 'Two'), { recursive: true })
-    expect(await local.reset('Two', undefined, NOW)).toEqual({ kept: [], unrenamed: [] })
+    expect(await local.reset('Two', undefined, NOW)).toEqual({
+      kept: [],
+      unrenamed: [],
+      failed: [],
+    })
     expect(read(path.join(samples, 'Two', 'src', 'Main.enso'))).toBe('main = 2\n')
   })
 
@@ -409,6 +426,7 @@ describe('resetAll', () => {
     expect(await local.resetAll(undefined, NOW)).toEqual({
       kept: ['One_edited_2026_11_06', 'Data/rows_edited_2026_11_06.csv'],
       unrenamed: [],
+      failed: [],
     })
     expect(listing(samples)).toEqual([
       '.samples.json',
@@ -443,7 +461,7 @@ describe('resetAll', () => {
 
   test('works when Samples is gone', async () => {
     fs.rmSync(samples, { recursive: true })
-    expect(await local.resetAll(undefined, NOW)).toEqual({ kept: [], unrenamed: [] })
+    expect(await local.resetAll(undefined, NOW)).toEqual({ kept: [], unrenamed: [], failed: [] })
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
   })
 })
@@ -542,6 +560,7 @@ describe('what cannot be read', () => {
     expect(await local.reset('One', undefined, NOW)).toEqual({
       kept: ['One_edited_2026_11_06'],
       unrenamed: [],
+      failed: [],
     })
     vi.restoreAllMocks()
     expect(read(path.join(samples, 'One_edited_2026_11_06', 'src', 'Main.enso'))).toBe('main = 1\n')
@@ -592,19 +611,26 @@ describe('open samples', () => {
 
   test('a sample another process runs (its run marker) is neither updated nor reset', async () => {
     const one = path.join(samples, 'One')
-    const unmark = await markProjectRunning(one)
+    const marker = await markProjectRunning(one)
     write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
     const local = new LocalSamples(bundled, projects)
     expect(await local.sync()).toMatchObject({ updated: [], updateAvailable: ['One'] })
-    await expect(local.reset('One', undefined, NOW)).rejects.toThrow(/is open/)
-    await expect(local.resetAll(undefined, NOW)).rejects.toThrow(/is open/)
+    await expect(local.reset('One', undefined, NOW)).rejects.toThrow(
+      /being run by another Enso process/,
+    )
+    await expect(local.resetAll(undefined, NOW)).rejects.toThrow(
+      /being run by another Enso process/,
+    )
     expect(read(path.join(one, 'src', 'Main.enso'))).toBe('main = 1\n')
-    await unmark()
+    await marker.remove()
     expect(await local.sync()).toMatchObject({ updated: ['One'] })
   })
 
   test('a marker left by a process that has gone is ignored', async () => {
-    write(path.join(samples, 'One', '.enso', 'run-999999999.lock'), '')
+    write(
+      path.join(samples, 'One', '.enso', 'run-999999999.lock'),
+      JSON.stringify({ pid: 999_999_999, host: os.hostname() }),
+    )
     write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
     expect(await installSamples(bundled, projects)).toMatchObject({ updated: ['One'] })
   })
@@ -691,6 +717,7 @@ describe('a rename that fails', () => {
     expect(await new LocalSamples(bundled, projects).reset('One', undefined, NOW)).toEqual({
       kept: ['One_edited_2026_11_06'],
       unrenamed: ['One_edited_2026_11_06'],
+      failed: [],
     })
     expect(read(path.join(samples, 'One_edited_2026_11_06', 'package.yaml'))).toBe('name: One\n')
     expect(listing(path.join(samples, 'One_edited_2026_11_06'))).toEqual([
@@ -698,5 +725,178 @@ describe('a rename that fails', () => {
       'package.yaml',
       'src',
     ])
+  })
+})
+
+describe('run markers', () => {
+  const marker = (name: string) => path.join(samples, 'One', '.enso', name)
+  function writeMarker(name: string, content: object, ageMs = 0) {
+    write(marker(name), JSON.stringify(content))
+    const time = new Date(Date.now() - ageMs)
+    fs.utimesSync(marker(name), time, time)
+  }
+
+  beforeEach(async () => {
+    await installSamples(bundled, projects)
+  })
+
+  test('a marker carries the pid and the host, and is touched while the run goes on', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      const kept = await markProjectRunning(path.join(samples, 'One'))
+      expect(JSON.parse(read(kept.path))).toEqual({ pid: process.pid, host: os.hostname() })
+      const old = new Date(Date.now() - 100_000)
+      fs.utimesSync(kept.path, old, old)
+      vi.advanceTimersByTime(RUN_MARKER_HEARTBEAT_MS)
+      await vi.waitFor(() => {
+        expect(Date.now() - fs.statSync(kept.path).mtimeMs).toBeLessThan(10_000)
+      })
+      await kept.remove()
+      expect(fs.existsSync(kept.path)).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test.each([
+    ['its process is gone', { pid: 999_999_999, host: os.hostname() }, 0],
+    ['it comes from another host', { pid: process.pid, host: `not-${os.hostname()}` }, 0],
+    ['it was not touched for two minutes', { pid: process.pid, host: os.hostname() }, 121_000],
+  ])('a marker is stale, and deleted when read, when %s', async (_why, content, ageMs) => {
+    writeMarker('run-123.lock', content, ageMs)
+    expect(await findLiveRunMarker(path.join(samples, 'One'))).toBeNull()
+    expect(fs.existsSync(marker('run-123.lock'))).toBe(false)
+  })
+
+  test('a process the system will not answer for (EPERM) is live while the marker is fresh', async () => {
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw Object.assign(new Error('EPERM'), { code: 'EPERM' })
+    })
+    writeMarker('run-123.lock', { pid: 123, host: os.hostname() })
+    expect(await findLiveRunMarker(path.join(samples, 'One'))).toBe(marker('run-123.lock'))
+    writeMarker('run-123.lock', { pid: 123, host: os.hostname() }, 121_000)
+    expect(await findLiveRunMarker(path.join(samples, 'One'))).toBeNull()
+  })
+
+  test('a reset blocked by a marker names the marker', async () => {
+    writeMarker('run-123.lock', { pid: process.pid, host: os.hostname() })
+    await expect(new LocalSamples(bundled, projects).reset('One', undefined, NOW)).rejects.toThrow(
+      marker('run-123.lock'),
+    )
+  })
+
+  test('an update does not carry a marker into the new copy', async () => {
+    const one = path.join(samples, 'One')
+    const staging = path.join(root, 'staging')
+    write(path.join(staging, 'package.yaml'), 'name: One\n')
+    writeMarker('run-123.lock', { pid: process.pid, host: os.hostname() })
+    write(path.join(one, '.enso', 'project.json'), '{"id":"one-id"}')
+    await carryLocalState(one, staging)
+    expect(listing(path.join(staging, '.enso'))).toEqual(['project.json'])
+  })
+
+  test('Ctrl+C or a terminate removes the marker, then exits as the signal would', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    for (const [signal, code] of [
+      ['SIGINT', 130],
+      ['SIGTERM', 143],
+    ] as const) {
+      const kept = await markProjectRunning(path.join(samples, 'One'))
+      const stop = removeOnSignals(kept)
+      process.emit(signal)
+      expect(fs.existsSync(kept.path)).toBe(false)
+      expect(exit).toHaveBeenLastCalledWith(code)
+      stop()
+      await kept.remove()
+    }
+  })
+})
+
+describe('a sample opened while it is changed', () => {
+  beforeEach(async () => {
+    await installSamples(bundled, projects)
+  })
+
+  /** An `isOpen` that says no the first time it is asked about `name`, and yes after. */
+  function opensMeanwhile(name: string) {
+    let asked = 0
+    return async (p: string) => p.endsWith(`/${name}`) && asked++ > 0
+  }
+
+  test('is not updated: the check is made again just before the rename', async () => {
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    const local = new LocalSamples(bundled, projects)
+    expect(await local.sync(opensMeanwhile('One'))).toMatchObject({
+      updated: [],
+      updateAvailable: ['One'],
+    })
+    expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 1\n')
+    expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
+  })
+
+  test('is not reset: the check is made again just before the rename', async () => {
+    write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
+    await expect(
+      new LocalSamples(bundled, projects).reset('One', opensMeanwhile('One'), NOW),
+    ).rejects.toThrow(SampleBusyError)
+    expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 99\n')
+    expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
+  })
+
+  test('samplesSettled waits for a change queued on Samples, and not for others', async () => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const local = new LocalSamples(bundled, projects)
+    // A long change: the status waits behind it in the same queue.
+    void serialised(local.samplesDirectory, () => held)
+    let settled = false
+    const waiting = samplesSettled(path.join(samples, 'One')).then(() => (settled = true))
+    await samplesSettled(path.join(projects, 'Elsewhere'))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(settled).toBe(false)
+    release()
+    await waiting
+    expect(settled).toBe(true)
+  })
+})
+
+describe('a Reset All that fails part way', () => {
+  test('reports and records what it did reset', async () => {
+    await installSamples(bundled, projects)
+    write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
+    write(path.join(samples, 'Data', 'rows.csv'), 'mine\n')
+    const recordedData = manifest().data['rows.csv']
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    const rename = fileOps.rename
+    vi.spyOn(fileOps, 'rename').mockImplementation((from, to) =>
+      path.basename(from) === 'rows.csv' ?
+        Promise.reject(new Error('EBUSY: rows.csv is open in another program'))
+      : rename(from, to),
+    )
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await new LocalSamples(bundled, projects).resetAll(undefined, NOW)).toEqual({
+      kept: ['One_edited_2026_11_06'],
+      unrenamed: [],
+      failed: [{ name: 'Data/rows.csv', error: 'EBUSY: rows.csv is open in another program' }],
+    })
+    expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 10\n')
+    expect(read(path.join(samples, 'Data', 'rows.csv'))).toBe('mine\n')
+    expect(manifest().samples['One']).toBe(await hashSample(path.join(bundled, 'One')))
+    expect(manifest().data['rows.csv']).toBe(recordedData)
+  })
+})
+
+describe('a file where a sample should be', () => {
+  test('is kept by a reset, with no warning about its name', async () => {
+    await installSamples(bundled, projects)
+    fs.rmSync(path.join(samples, 'One'), { recursive: true })
+    write(path.join(samples, 'One'), 'not a project')
+    expect(await new LocalSamples(bundled, projects).reset('One', undefined, NOW)).toEqual({
+      kept: ['One_edited_2026_11_06'],
+      unrenamed: [],
+      failed: [],
+    })
+    expect(read(path.join(samples, 'One_edited_2026_11_06'))).toBe('not a project')
+    expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 1\n')
   })
 })

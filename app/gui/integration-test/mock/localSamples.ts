@@ -40,7 +40,7 @@ export async function registerSamplesRoutes(page: Page, state: MockSamples) {
     for (const sample of state.samples) {
       if (name == null || sample.name === name) sample.state = 'current'
     }
-    return { kept: state.kept, unrenamed: [] }
+    return { kept: state.kept, unrenamed: [], failed: [] }
   }
   await page.route('/api/project-service/samples/status', (route) =>
     route.fulfill({

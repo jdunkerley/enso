@@ -110,13 +110,22 @@ passes it to the server) installs the samples shipped with the application in
   `isOpen`, which Electron answers with `ProjectService.isProjectOpenOrOpening`
   (from the moment `openProject` starts on a project, through the runner's
   loading and running projects, paths compared whatever their separators and, on
-  Windows, case). The start-up check runs while the window waits (at most 10 s),
-  so a user can open a sample before it ends; that sample's update is left for a
-  later start. A headless `--startup.project` run takes no single-instance lock,
-  so `runLocalProjectByPath` writes a run marker,
-  `<project>/.enso/run-<pid>.lock` (`samples/runMarker.ts`), and a sample with a
-  marker whose process is alive is treated as open too. What remains is the
-  moment between the check and the rename.
+  Windows, case). They ask before a change and again just before its rename
+  (after the user's `output/` has been copied, which can take a while); a sample
+  found busy is a `SampleBusyError`, whose message says why (open, or the run
+  marker's path). The other side waits too: `openProject` of a project in a
+  `Samples` folder counts it as opening and then waits for the changes queued on
+  that folder (`samplesSettled`), so an open never meets a half-done update.
+- **Run markers** (`samples/runMarker.ts`). A headless `--startup.project` run
+  takes no single-instance lock, so `runLocalProjectByPath` writes
+  `<project>/.enso/run-<pid>.lock` (`{ pid, host }`), touches it every 30 s,
+  removes it when the run ends and on SIGINT/SIGTERM (`removeOnSignals`, which
+  then exits with 130/143), and the samples treat a project with a live marker
+  as open. A marker is live when touched within 2 minutes, written on this host,
+  and its pid is not known to be gone (`EPERM`, another user's process, is not
+  known either way, so the heartbeat decides); any other marker is deleted when
+  read, so a crash or a reused pid blocks nothing for long. An update never
+  carries a marker into the new copy.
 - **Reset** (`reset(name)`, `resetAll()`): a sample that differs from the
   bundle, or cannot be read, is renamed to `<Name>_edited_<yyyy>_<mm>_<dd>`
   (then `_2`, `_3`, ...) beside it, with that name in its `package.yaml` too,
@@ -124,26 +133,29 @@ passes it to the server) installs the samples shipped with the application in
   `<name>_edited_<date><ext>`. The date uses underscores because a project name
   allows only letters, digits and `_`. A copy whose `package.yaml` cannot be
   renamed is still kept, and is reported in `unrenamed` (the Drive tells the
-  user to rename it). `resetAll` covers every bundled sample and `Data/` file
-  and nothing else, and changes nothing when a sample is open. Both record the
-  bundle's hashes. **A reset does not tell local versioning**: it does not call
-  `commitMove`, so in a versioned repository the history stays on the sample's
-  path, which now holds the fresh copy, and the `_edited_` copy starts with
-  none.
+  user to rename it); a file where a sample's folder should be has no
+  `package.yaml` and is not reported. `resetAll` covers every bundled sample and
+  `Data/` file and nothing else, and changes nothing when a sample is open. An
+  item that fails part way (a `Data/` file open in another program) is reported
+  in `failed`; the rest are still reset, and the copies kept and the hashes of
+  what was reset are recorded. The Drive shows both. **A reset does not tell
+  local versioning**: it does not call `commitMove`, so in a versioned
+  repository the history stays on the sample's path, which now holds the fresh
+  copy, and the `_edited_` copy starts with none.
 - **Routes** (POST to `/api/project-service/samples/*`, served by
   `handler/projectService.ts` from the `LocalSamples` passed to
   `handleProjectServiceRequest` after `keyFromEnvironment`): `status` (each
   bundled sample's `name`, `path` and `state`: `current`, `edited`,
   `updateAvailable`, `missing` or `unreadable`, and the `Samples` `directory`,
   all with `/`), `reset` `{ name }` and `reset-all`, which answer
-  `{ kept, unrenamed }`. The resets refuse a sample the project service has open
-  or opening. The Vite middleware has no `LocalSamples`, so under `dev:vite` the
-  routes fail and the Drive shows no sample actions.
+  `{ kept, unrenamed, failed }`. The resets refuse a sample the project service
+  has open or opening. The Vite middleware has no `LocalSamples`, so under
+  `dev:vite` the routes fail and the Drive shows no sample actions.
 
 Tests: `src/samples/__tests__/installSamples.test.ts`, the `samples routes` in
 `handler/__tests__/projectService.test.ts`,
-`projectService/__tests__/openOrOpening.test.ts` and the run marker in
-`__tests__/runProjects.test.ts`.
+`projectService/__tests__/openOrOpening.test.ts` (with the wait on `Samples`)
+and the run marker in `__tests__/runProjects.test.ts`.
 
 ## Scope
 

@@ -8,6 +8,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createProject } from '../../localMetadata/__tests__/testUtils.js'
+import { serialised } from '../../localMetadata/jsonFile.js'
 import { comparableProjectPath, EnsoRunner, type Runner } from '../ensoRunner.js'
 import { ProjectService } from '../index.js'
 import { Path, UUID } from '../types.js'
@@ -86,4 +87,38 @@ test('comparableProjectPath ignores separators, and case on Windows', () => {
   if (process.platform === 'win32') {
     expect(comparableProjectPath('C:\\Projects\\P')).toBe(comparableProjectPath('c:/projects/p'))
   }
+})
+
+test('opening a sample waits for a change queued on Samples, counted as opening meanwhile', async () => {
+  const samples = path.join(root, 'Samples')
+  const sample = await createProject(path.join(samples, 'S'), 'id-2')
+  let release!: () => void
+  const held = new Promise<void>((resolve) => (release = resolve))
+  void serialised(samples, () => held)
+  const opened: string[] = []
+  const runner: Runner = {
+    runProject: async () => 0,
+    createProject: async () => {},
+    openProject: async (projectPath) => {
+      opened.push(projectPath)
+      return {
+        jsonSocket: { host: '127.0.0.1', port: 1 },
+        ydocSocket: { host: '127.0.0.1', port: 2 },
+      }
+    },
+    closeProject: async () => {},
+    isProjectRunning: async () => false,
+    hasRunningProjects: async () => false,
+    renameProject: async () => {},
+    registerShutdownHook: async () => {},
+    version: async () => '0.0.0',
+  }
+  const service = new ProjectService(runner, [])
+  const open = service.openProject(UUID('id-2'), Path(samples))
+  await vi.waitFor(async () => expect(await service.isProjectOpenOrOpening(sample)).toBe(true))
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  expect(opened).toEqual([])
+  release()
+  await open
+  expect(opened).toHaveLength(1)
 })

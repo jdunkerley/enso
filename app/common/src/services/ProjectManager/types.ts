@@ -309,6 +309,8 @@ export interface SamplesResetResult {
   readonly kept: readonly string[]
   /** Kept copies whose `package.yaml` still has the sample's name: the user should rename them. */
   readonly unrenamed: readonly string[]
+  /** What Reset All could not reset (samples by name, `Data/` files as `Data/<file>`), and why. */
+  readonly failed: readonly { readonly name: string; readonly error: string }[]
 }
 
 /** What is known about a local project's versioning. */
