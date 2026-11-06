@@ -7,7 +7,13 @@ import * as readline from 'node:readline'
 import * as url from 'node:url'
 
 import type { Electron } from '@/electron'
-import { isJvmDefaultEngine, jvmAotRootDirectory } from '@/jvmAotSettings'
+import {
+  AfterFirstOpen,
+  appImageEngine,
+  isEngineCopyPath,
+  isJvmDefaultEngine,
+  jvmAotRootDirectory,
+} from '@/jvmAotSettings'
 import * as paths from '@/paths'
 import { lazyKeyringEntries, SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
 import { UtilityProcessYdocHost, type YdocHostChild } from '@/ydocHost/client'
@@ -173,13 +179,81 @@ function createJvmAotCache(
   electronIsDev: boolean,
   engine: EngineSettings | undefined,
 ): JvmAotCache | null {
-  const ensoExecutable = findEnsoExecutable(paths.resourcesPath(electron, electronIsDev))
+  const ensoExecutable = findEnsoExecutable(
+    paths.resourcesPath(electron, electronIsDev),
+    appImageEnginePath,
+  )
   if (ensoExecutable == null) return null
   return new JvmAotCache({
     rootDirectory: jvmAotRootDirectory(process.env, app.getPath('userData')),
     appVersion: app.getVersion(),
     ensoExecutable,
     isJvmDefault: () => isJvmDefaultEngine(engine, process.env),
+  })
+}
+
+/**
+ * Under a Linux AppImage with the JVM as the default engine, the engine is run from its copy at
+ * `<userData>/engine/<version>/` (`appImageEngine`): its launcher when the copy is complete, given
+ * to the project service and the AOT cache explicitly, never through the environment.
+ */
+let appImageEnginePath: string | undefined
+/** The copy to make once the window is up, when there is no complete one. */
+let appImageCopy: (() => Promise<string>) | undefined
+/** Holds the copy back until the first open has been answered (or a minute without one). */
+const appImageCopyGate = new AfterFirstOpen(60_000)
+
+/**
+ * Decide which engine a Linux AppImage runs (see {@link appImageEnginePath}). Called before the
+ * project service and the JDK AOT cache are created, since both find the engine once.
+ */
+export async function prepareAppImageEngine(
+  electron: Electron,
+  electronIsDev: boolean,
+  engine: EngineSettings | undefined,
+): Promise<void> {
+  const userData = app.getPath('userData')
+  const inherited = process.env.ENSO_ENGINE_PATH
+  if (inherited && isEngineCopyPath(inherited, userData)) {
+    // Not the user's: an earlier IDE's copy, passed on by an in-app update's relaunch. Dropped so
+    // that neither `findEnsoExecutable` nor the engines this process starts run it.
+    console.info(`Ignoring the inherited ENSO_ENGINE_PATH ${inherited}: an IDE engine copy.`)
+    Reflect.deleteProperty(process.env, 'ENSO_ENGINE_PATH')
+  }
+  try {
+    const { enginePath, startCopy } = await appImageEngine(
+      process.env,
+      {
+        resourcesPath: paths.resourcesPath(electron, electronIsDev),
+        userData,
+        version: app.getVersion(),
+      },
+      engine,
+    )
+    if (enginePath != null)
+      console.info(`Running the AppImage's engine from its copy at ${enginePath}.`)
+    appImageEnginePath = enginePath
+    appImageCopy = startCopy
+  } catch (error) {
+    console.warn("Failed to check the AppImage's engine copy:", error)
+  }
+}
+
+/**
+ * Make the AppImage's engine copy, if one is due: called once the window is up, it waits for the
+ * first open to be answered (`AfterFirstOpen`), so that the copy does not slow that open down.
+ */
+export function startAppImageEngineCopy(): void {
+  const copy = appImageCopy
+  appImageCopy = undefined
+  if (copy == null) return
+  appImageCopyGate.schedule(() => {
+    console.info("Copying the AppImage's engine for the next launch.")
+    copy().then(
+      (launcher) =>
+        console.info(`Copied the AppImage's engine to ${launcher}; used from the next launch.`),
+      (error: unknown) => console.warn("Did not copy the AppImage's engine:", error),
+    )
   })
 }
 
@@ -204,7 +278,12 @@ export function setupProjectService(
 ): ProjectService {
   extraArgs = args
   jvmAotCache ??= createJvmAotCache(electron, electronIsDev, engine)
-  engineSettings = { ...engine, jvmAot: jvmAotCache ?? undefined }
+  engineSettings = {
+    ...engine,
+    jvmAot: jvmAotCache ?? undefined,
+    ensoExecutable: appImageEnginePath,
+    openObserver: appImageCopyGate,
+  }
   if (!projectService) {
     projectService = ProjectService.default(
       paths.resourcesPath(electron, electronIsDev),

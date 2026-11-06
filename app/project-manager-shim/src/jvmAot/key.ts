@@ -74,3 +74,15 @@ export function isTranslocated(engineRoot: string): boolean {
   // macOS only; either separator, so that the tests run on every host.
   return /[\\/]AppTranslocation[\\/]/.test(engineRoot)
 }
+
+/**
+ * Whether the engine runs from a Linux AppImage's mount (`$TMPDIR/.mount_<random>/`), or from
+ * the directory `--appimage-extract-and-run` extracts it to (`$TMPDIR/appimage_extracted_<hash>/`,
+ * deleted when the app exits); both move or vanish between launches. A cache trained there would be
+ * useless at the next launch, so none is trained or used. The IDE runs the AppImage's engine from a copy instead (`stableEngine.ts`), from the
+ * second launch of a build.
+ */
+export function isAppImageMount(engineRoot: string): boolean {
+  // Either separator, so that the tests run on every host.
+  return /[\\/](?:\.mount_|appimage_extracted_)[^\\/]+[\\/]/.test(engineRoot)
+}
