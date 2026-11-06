@@ -251,6 +251,12 @@ jobs:
         run: pnpm --filter "project-manager-shim^..." run compile
 
       - name: 🧪 Unit Tests
+        # The runner's TEMP is in its 8.3 form (`C:\Users\RUNNER~1\...`), while git and `realpath`
+        # answer the long one, so tests comparing a temporary path with what those report fail.
+        # `runner.temp` is a long path.
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
         run: pnpm --filter project-manager-shim run test:unit
 
   playwright:

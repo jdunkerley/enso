@@ -56,6 +56,9 @@ export async function startFakeLanguageServer(
   })
   const wss = new WebSocketServer({ noServer: true })
   server.on('upgrade', (request, socket, head) => {
+    // A refused client drops its connection, which on Windows resets this socket (`ECONNRESET`);
+    // with no listener that is an uncaught exception that fails the whole run.
+    socket.on('error', () => {})
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
     const kind = url.pathname.replace(/^\/channel\//, '')
     if (!url.pathname.startsWith('/channel/') || !KINDS.has(kind)) {
