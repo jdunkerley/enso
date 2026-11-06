@@ -33,6 +33,11 @@ function code(sample: string): string {
   return index === -1 ? main : main.slice(0, index)
 }
 
+/** An expression with its text literals emptied, so a column name is not counted as a use. */
+function withoutText(expression: string): string {
+  return expression.replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, "''")
+}
+
 interface Node {
   readonly name: string
   readonly expression: string
@@ -98,6 +103,13 @@ describe('bundled samples', () => {
       const docblock = match![2]!
       expect(docblock).toMatch(/\bSelect `[a-z_]+`/)
       expect(docblock).toContain('`Samples/Data`')
+      // Every name the docblock puts in backticks, as it does the nodes to select, is a node.
+      const nodeNames = new Set(mainBody(sample).nodes.map((node) => node.name))
+      for (const [, named] of docblock.matchAll(/`([a-z_][a-z0-9_]*)`/g)) {
+        expect(nodeNames.has(named!), `${sample}: the docblock names '${named}', not a node`).toBe(
+          true,
+        )
+      }
     },
   )
 
@@ -118,7 +130,7 @@ describe('bundled samples', () => {
     nodes.slice(0, -1).forEach((node, i) => {
       const usedLater = nodes
         .slice(i + 1)
-        .some((later) => new RegExp(`\\b${node.name}\\b`).test(later.expression))
+        .some((later) => new RegExp(`\\b${node.name}\\b`).test(withoutText(later.expression)))
       expect(usedLater, `${sample}: node '${node.name}' is never used`).toBe(true)
     })
   })
@@ -128,10 +140,14 @@ describe('bundled samples', () => {
     const index = main.indexOf(METADATA_MARKER)
     expect(index, `${sample} has no '#### METADATA ####'`).toBeGreaterThan(-1)
     const [idMap, ideMetadata] = main.slice(index + METADATA_MARKER.length).split('\n')
-    expect(Array.isArray(JSON.parse(idMap!))).toBe(true)
+    const ids = (JSON.parse(idMap!) as [unknown, string][]).map(([, id]) => id)
     const nodes = JSON.parse(ideMetadata!).ide.node as Record<string, { position?: unknown }>
-    const positioned = Object.values(nodes).filter((node) => node.position != null)
-    expect(positioned.length).toBeGreaterThanOrEqual(mainBody(sample).nodes.length)
+    // As the IDE writes it: one id per node of main and one for the returned name, each with a
+    // stored position, and no position for an id the map does not hold.
+    expect(ids.length).toBe(mainBody(sample).nodes.length + 1)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(Object.keys(nodes).sort()).toEqual([...ids].sort())
+    for (const id of ids) expect(nodes[id]?.position, `${sample}: node ${id}`).toBeDefined()
   })
 
   test.each(samples)(`%s has lines of at most ${MAX_LINE_LENGTH} characters`, (sample) => {

@@ -56,7 +56,9 @@ exist, and does nothing otherwise, so a user's edits and deletions are never
 undone. It copies to `.Samples.<pid>.tmp` and renames, so an interrupted copy
 cannot leave a half-filled `Samples` that blocks later starts. Nothing is
 downloaded (the old `downloadSamples` fetched an unpinned upstream branch on
-every start). Test: `src/__tests__/installSamples.test.ts`.
+every start). The top-level `CLAUDE.md` of the bundle is not copied: a dev run
+copies the source `samples/`, whose contributor notes the packaged app leaves
+out. Test: `src/__tests__/installSamples.test.ts`.
 
 ## Scope
 
