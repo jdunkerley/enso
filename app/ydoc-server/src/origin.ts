@@ -15,12 +15,40 @@
 
 /** The origin of `url` (`scheme://host[:port]`), or `undefined` when it is not a URL with a host. */
 function originOf(url: string): string | undefined {
+  // GraalJS, which runs the engine-hosted listener (#614), has no `URL`.
+  if (typeof URL !== 'function') return parseOrigin(url)
   try {
     const origin = new URL(url).origin
     return origin === 'null' ? undefined : origin
   } catch {
     return undefined
   }
+}
+
+/** The ports a scheme uses when a URL names none, which an origin leaves out. */
+const DEFAULT_PORTS: Readonly<Record<string, string>> = { 'http:': '80', 'https:': '443' }
+
+/** `scheme://host[:port]`, then optionally a path, query or fragment (ignored). */
+const ORIGIN_PATTERN =
+  /^([a-z][a-z0-9+.-]*:)\/\/(\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::(\d{1,5}))?(?:[/?#].*)?$/i
+
+/**
+ * {@link originOf} without `URL`, for plain origins as browsers send them and as the app's own
+ * origins are written: the scheme and host in lower case, the default port left out. Anything it
+ * does not recognise (user info, a non-ASCII host) is `undefined`, so it is refused, never let in.
+ * Exported for its tests, which hold it to `URL`'s answers.
+ */
+export function parseOrigin(url: string): string | undefined {
+  const match = ORIGIN_PATTERN.exec(url)
+  if (match == null) return undefined
+  const scheme = match[1]!.toLowerCase()
+  const host = match[2]!.toLowerCase()
+  const rawPort = match[3]
+  const port = rawPort == null ? undefined : String(Number(rawPort))
+  if (port != null && Number(port) > 65535) return undefined
+  return port == null || port === DEFAULT_PORTS[scheme] ?
+      `${scheme}//${host}`
+    : `${scheme}//${host}:${port}`
 }
 
 /**

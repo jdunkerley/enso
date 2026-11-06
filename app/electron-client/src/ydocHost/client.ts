@@ -67,7 +67,7 @@ export class UtilityProcessYdocHost implements YdocHost {
    * The origins whose pages may open the listeners' sockets, added to every `listen` that names
    * none (Note [The ydoc Listener Checks Origin] in `ydoc-server`). Set by {@link allowOrigins}.
    */
-  private allowedOrigins: readonly string[] = []
+  private origins: readonly string[] = []
 
   /** @param spawn Forks the utility process (`utilityProcess.fork` in Electron). */
   constructor(private readonly spawn: () => YdocHostChild) {}
@@ -84,7 +84,7 @@ export class UtilityProcessYdocHost implements YdocHost {
     }
     const withOrigins = {
       ...request,
-      allowedOrigins: request.allowedOrigins ?? this.allowedOrigins,
+      allowedOrigins: request.allowedOrigins ?? this.origins,
     }
     const closes = this.closes.get(request.port) ?? 0
     await this.send({ type: 'listen', id: this.nextId++, request: withOrigins })
@@ -99,7 +99,12 @@ export class UtilityProcessYdocHost implements YdocHost {
    * window's address is known only once the content server has found its port.
    */
   allowOrigins(origins: readonly string[]): void {
-    this.allowedOrigins = [...origins]
+    this.origins = [...origins]
+  }
+
+  /** The origins set by {@link allowOrigins}; also the engine-hosted listener's (`ENSO_YDOC_HOST=engine`). */
+  allowedOrigins(): readonly string[] {
+    return this.origins
   }
 
   /** Stop the listener on `port` in the utility process. */

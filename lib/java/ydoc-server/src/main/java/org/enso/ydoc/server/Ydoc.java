@@ -20,11 +20,31 @@ public final class Ydoc implements AutoCloseable {
   private static final String YDOC_PATH_ENV_NAME = "YDOC_SERVER_JS";
   private static final String YDOC_PATH = "ydoc.cjs";
 
+  /**
+   * The browser origins whose pages may open a socket, comma-separated; set by the project manager
+   * shim. See Note [The Engine-Hosted Listener Checks Origin].
+   */
+  static final String ALLOWED_ORIGINS_ENV_NAME = "LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS";
+
+  /*
+   * Note [The Engine-Hosted Listener Checks Origin]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Under `ENSO_YDOC_HOST=engine` this listener plays the Node host's part, so it makes the same
+   * checks before the upgrade (#614): a handshake whose `Origin` is not one of `allowedOrigins` is
+   * refused with 403 (Note [The ydoc Listener Checks Origin] in `ydoc-server`), one without `Origin`
+   * is accepted, and one for a document the session does not hold gets 404 (Note [An Unknown
+   * Document Is Refused Before The Upgrade]). The shim passes the app's origins in
+   * `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS`; without it, every browser page is refused (fails
+   * closed). The check itself is the Node host's own code, run through the polyfill's
+   * `verifyClient` (`ydoc-server-polyglot`'s `main.ts`).
+   */
+
   private final YdocScheduledExecutorService executor;
   private final ParserPolyfill parser;
   private final Context.Builder contextBuilder;
   private final String hostname;
   private final int port;
+  private final String allowedOrigins;
   private final YjsChannel.Server jsonChannelCallbacks;
   private final YjsChannel.Server binaryChannelCallbacks;
   private final YjsChannel.Server visControlChannelCallbacks;
@@ -39,6 +59,7 @@ public final class Ydoc implements AutoCloseable {
       Context.Builder contextBuilder,
       String hostname,
       int port,
+      String allowedOrigins,
       YjsChannel.Server jsonChannelCallbacks,
       YjsChannel.Server binaryChannelCallbacks,
       YjsChannel.Server visControlChannelCallbacks,
@@ -48,6 +69,7 @@ public final class Ydoc implements AutoCloseable {
     this.contextBuilder = contextBuilder;
     this.hostname = hostname;
     this.port = port;
+    this.allowedOrigins = allowedOrigins;
     this.jsonChannelCallbacks = jsonChannelCallbacks;
     this.binaryChannelCallbacks = binaryChannelCallbacks;
     this.visControlChannelCallbacks = visControlChannelCallbacks;
@@ -65,6 +87,7 @@ public final class Ydoc implements AutoCloseable {
     private HostAccess hostAccess;
     private String hostname;
     private int port = -1;
+    private String allowedOrigins;
     private YjsChannel.Server jsonChannelCallbacks;
     private YjsChannel.Server binaryChannelCallbacks;
     private YjsChannel.Server visControlChannelCallbacks;
@@ -176,6 +199,16 @@ public final class Ydoc implements AutoCloseable {
       return this;
     }
 
+    /**
+     * The browser origins whose pages may connect, comma-separated; by default {@value
+     * #ALLOWED_ORIGINS_ENV_NAME}, and none without it. See Note [The Engine-Hosted Listener Checks
+     * Origin].
+     */
+    public Builder allowedOrigins(String origins) {
+      this.allowedOrigins = origins;
+      return this;
+    }
+
     public Builder jsonChannelCallbacks(YjsChannel.Server callbacks) {
       this.jsonChannelCallbacks = callbacks;
       return this;
@@ -221,6 +254,11 @@ public final class Ydoc implements AutoCloseable {
         port = DEFAULT_PORT;
       }
 
+      if (allowedOrigins == null) {
+        var fromEnv = System.getenv(ALLOWED_ORIGINS_ENV_NAME);
+        allowedOrigins = fromEnv == null ? "" : fromEnv;
+      }
+
       var isTracing = LOG.isLoggable(System.Logger.Level.TRACE);
       LOG.log(System.Logger.Level.DEBUG, "Created Ydoc [{0}, {1}]", hostname, port);
 
@@ -230,6 +268,7 @@ public final class Ydoc implements AutoCloseable {
           contextBuilder,
           hostname,
           port,
+          allowedOrigins,
           isTracing
               ? new DelegateYjsChannel.Server("JSON", jsonChannelCallbacks)
               : jsonChannelCallbacks,
@@ -330,6 +369,7 @@ public final class Ydoc implements AutoCloseable {
               var bindings = ctx.getBindings("js");
               bindings.putMember("YDOC_HOST", hostname);
               bindings.putMember("YDOC_PORT", port);
+              bindings.putMember("YDOC_ALLOWED_ORIGINS", allowedOrigins);
               bindings.putMember(
                   "YDOC_JSON_CHANNEL_CALLBACKS", getJsonChannelCallbacksSynchronized());
               bindings.putMember(

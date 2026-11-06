@@ -1,9 +1,13 @@
 package org.enso.ydoc.polyfill.web;
 
 import io.helidon.common.buffers.BufferData;
+import io.helidon.http.DirectHandler;
+import io.helidon.http.HeaderNames;
 import io.helidon.http.Headers;
 import io.helidon.http.HttpPrologue;
 import io.helidon.http.Method;
+import io.helidon.http.RequestException;
+import io.helidon.http.Status;
 import io.helidon.webclient.websocket.WsClient;
 import io.helidon.webclient.websocket.WsClientProtocolConfig;
 import io.helidon.webserver.WebServer;
@@ -136,6 +140,7 @@ final class WebSocket implements ProxyExecutable {
         var host = arguments[1].asString();
         var port = arguments[2].asInt();
         var handleConnect = arguments[3];
+        var handleVerify = arguments.length > 4 && !arguments[4].isNull() ? arguments[4] : null;
 
         var webSocketRouting =
             WsRouting.builder()
@@ -153,6 +158,7 @@ final class WebSocket implements ProxyExecutable {
                         try {
                           log.trace("Waiting for connection");
                           connection = connectionFuture.get();
+                          connection.verifier = handleVerify;
                         } catch (InterruptedException e) {
                           log.debug("Interrupted", e);
                           continue;
@@ -279,6 +285,8 @@ final class WebSocket implements ProxyExecutable {
 
     // Written by Helidon's thread in `onOpen`, read by the executor's.
     private volatile WsSession session;
+    // The server's `verifyClient`, if any; set before Helidon calls `onHttpUpgrade`.
+    private volatile Value verifier;
     private final List<byte[]> fragments = new ArrayList<>();
     private final AtomicBoolean closeDispatched = new AtomicBoolean();
 
@@ -402,10 +410,73 @@ final class WebSocket implements ProxyExecutable {
     public Optional<Headers> onHttpUpgrade(HttpPrologue prologue, Headers headers) {
       log.debug("onHttpUpgrade [{}]", prologue);
 
+      // Note [The Engine-Hosted Listener Refuses Before The Upgrade]
+      refuseIfNotVerified(prologue, headers);
       var url = new URL(prologue);
       handleCallback(() -> handleUpgrade.executeVoid(url));
 
       return Optional.empty();
+    }
+
+    /*
+     * Note [The Engine-Hosted Listener Refuses Before The Upgrade]
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     * `ws`'s `verifyClient` lets the Node ydoc host refuse a handshake with a status before the
+     * upgrade (#605: a foreign `Origin`, 403; #608: an unknown document, 404). The server's
+     * `verifyClient(url, origin)` (`url` as `onconnect` gets it, `origin` null when absent) plays
+     * that part here: it runs on the JS executor, as every JS callback does, while Helidon's thread waits for it, and
+     * returns nothing to accept or `{status, reason}` to refuse. A refusal is thrown as a
+     * `RequestException`, which Helidon answers with that status instead of `101`. A failing
+     * `verifyClient` refuses too (500): a check that cannot run must not let the socket in.
+     */
+    private void refuseIfNotVerified(HttpPrologue prologue, Headers headers) {
+      var verify = verifier;
+      if (verify == null) {
+        return;
+      }
+      var url = new URL(prologue);
+      var origin = headers.first(HeaderNames.ORIGIN).orElse(null);
+      int status;
+      String reason;
+      try {
+        var refusal =
+            executor
+                .submit(
+                    () -> {
+                      var result = verify.execute(url, origin);
+                      if (result.isNull()) {
+                        return null;
+                      }
+                      return new Object[] {
+                        result.getMember("status").asInt(),
+                        result.hasMember("reason") && !result.getMember("reason").isNull()
+                            ? result.getMember("reason").asString()
+                            : "Refused"
+                      };
+                    })
+                .get();
+        if (refusal == null) {
+          return;
+        }
+        status = (Integer) refusal[0];
+        reason = (String) refusal[1];
+      } catch (ExecutionException | RuntimeException e) {
+        log.error("verifyClient failed; refusing the handshake", e);
+        status = Status.INTERNAL_SERVER_ERROR_500.code();
+        reason = "Internal error";
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        status = Status.INTERNAL_SERVER_ERROR_500.code();
+        reason = "Interrupted";
+      }
+      throw RequestException.builder()
+          .type(
+              status == Status.BAD_REQUEST_400.code()
+                  ? DirectHandler.EventType.BAD_REQUEST
+                  : DirectHandler.EventType.OTHER)
+          .status(Status.create(status))
+          .message(reason)
+          .build();
     }
 
     private void handleCallback(Runnable code) {

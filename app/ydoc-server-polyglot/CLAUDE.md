@@ -15,6 +15,13 @@ engine starts this bundle only when the shim passes `LANGUAGE_SERVER_YDOC_PORT`,
 which it does under `ENSO_YDOC_HOST=engine`. Keep it building and working until
 it is deleted.
 
+It refuses before the upgrade what the Node host refuses (#614): a foreign
+`Origin` (403; the allowed origins come from `YDOC_ALLOWED_ORIGINS`, which
+`Ydoc.java` reads from `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS`) and an unknown
+document (404/400). `main.ts` passes a `verifyClient` to the polyfill's
+`WebSocketServer`, with `ydoc-server`'s own `originAllowed` and
+`documentRefusal`.
+
 ## Build
 
 - `pnpm run compile` → `node ./build.mjs build` (esbuild-driven, writes

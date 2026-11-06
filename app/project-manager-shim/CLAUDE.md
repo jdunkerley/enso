@@ -140,8 +140,11 @@ An opened project's ydoc server runs in one of two places, chosen per open by
   (`app/electron-client/src/ydocHost/`), `dev:vite`'s is `NodeYdocHost` itself.
 - `engine` — the one-release rollback (removed with the engine-hosted server, PR
   M of the JVM-by-default plan): the engine gets `LANGUAGE_SERVER_YDOC_PORT` and
-  serves ydoc in GraalJS, as before. A runner without a host (the tests' fakes,
-  headless runs) behaves the same way.
+  serves ydoc in GraalJS, as before. It also gets
+  `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS`, the host's `allowedOrigins()`
+  comma-separated (empty without a host, so every browser page is refused;
+  #614). A runner without a host (the tests' fakes, headless runs) behaves the
+  same way.
 
 Either way every engine start gets `LANGUAGE_SERVER_CHANNEL_TOKEN`
 (`newChannelToken`, 32 random bytes as hex, fresh per open; a respawn keeps its

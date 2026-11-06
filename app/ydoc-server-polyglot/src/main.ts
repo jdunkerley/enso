@@ -1,8 +1,22 @@
-import { configureAllDebugLogs, docName, InspectManager, setupGatewayClient } from 'ydoc-server'
+import {
+  configureAllDebugLogs,
+  docName,
+  documentRefusal,
+  InspectManager,
+  originAllowed,
+  setupGatewayClient,
+} from 'ydoc-server'
 
 const host = typeof YDOC_HOST == 'string' ? YDOC_HOST : 'localhost'
 const port = typeof YDOC_PORT == 'number' ? YDOC_PORT : 1234
 const debug = typeof YDOC_LS_DEBUG == 'boolean' ? YDOC_LS_DEBUG : false
+// Note [The Engine-Hosted Listener Checks Origin] in `Ydoc.java`: none, every browser page is refused.
+const allowedOrigins =
+  typeof YDOC_ALLOWED_ORIGINS == 'string' ?
+    YDOC_ALLOWED_ORIGINS.split(',')
+      .map((origin) => origin.trim())
+      .filter((origin) => origin !== '')
+  : []
 
 configureAllDebugLogs(debug)
 
@@ -39,7 +53,36 @@ const visDataCallbacks =
     inspectManager.wrapVisDataServer(YDOC_VIS_DATA_CHANNEL_CALLBACKS)
   : YDOC_VIS_DATA_CHANNEL_CALLBACKS
 
-const wss = new WebSocketServer({ host, port })
+/** The polyfill's `URL` of a handshake (`URL.java`). */
+interface PolyfillUrl {
+  readonly pathname: string
+  readonly searchParams: { get(name: string): string | null }
+}
+
+/** Whether `doc` is one of the inspector's own sockets (served only with `YDOC_LS_DEBUG`). */
+function isInspectDoc(doc: string | null): boolean {
+  return inspectManager != null && doc != null && (doc === 'inspect' || doc.startsWith('inspect/'))
+}
+
+const wss = new WebSocketServer({
+  host,
+  port,
+  // Refused before the upgrade, as the Node host refuses them: a foreign `Origin` (403, Note [The
+  // ydoc Listener Checks Origin]) and an unknown document (404, Note [An Unknown Document Is
+  // Refused Before The Upgrade]). Note [The Engine-Hosted Listener Refuses Before The Upgrade] in
+  // the polyfill's `WebSocket.java`.
+  verifyClient: (url: PolyfillUrl, origin: string | null) => {
+    if (!originAllowed(origin ?? undefined, allowedOrigins)) {
+      console.warn(`Refused a ydoc socket on port ${port} from origin ${origin}.`)
+      return { status: 403, reason: 'Forbidden' }
+    }
+    const doc = docName(url.pathname)
+    if (isInspectDoc(doc)) return undefined
+    const refusal = documentRefusal(doc, url.searchParams.get('ls'))
+    if (refusal) console.warn(`Refused a ydoc socket on port ${port}: ${refusal.reason}.`)
+    return refusal
+  },
+})
 
 wss.onconnect = (socket, url) => {
   const doc = docName(url.pathname)
