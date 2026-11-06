@@ -23,6 +23,7 @@ import {
   parseLsLogLine,
   regressionWarnings,
   renderMarkdown,
+  usedAotCache,
   type Engine,
   type LsLogLine,
   type Mark,
@@ -34,7 +35,7 @@ import {
   type ShimAot,
   type Template,
 } from './openTimeReport'
-import { engineRssKb, listProcesses, processRssKb } from './processRss'
+import { engineProcesses, listProcesses, processRssKb } from './processRss'
 import {
   parseTemplateName,
   projectTemplate,
@@ -250,6 +251,17 @@ async function openProject(
  * the headline and 30 s later. Only the first open, and the 30 s are waited out before the project
  * closes, so the second open of such a launch starts later than the others': its numbers are not
  * comparable with a launch that did not wait, and the headline is the first open's anyway.
+ *
+ * Which processes were summed is written to `rss-<phase>.json` (pid, parent, KiB, command line), so
+ * a surprising figure (Windows reads ~1.2 GiB for native against ~0.4 on Linux) can be explained
+ * afterwards. A process that is not found is no sample, never 0 KiB. The ydoc host's pid is the
+ * last `ydoc host pid=` line, as the host is forked again if it dies.
+ *
+ * The first sample is taken right after the headline, before the extras. On Windows its query (a
+ * PowerShell `Get-CimInstance`) competes with them: `welcomeShown` to `cbEntries` was ~1.3 s in the
+ * sampled first open against ~0.75 s in the second (dispatch 42163352009), so the first open's
+ * extras read ~0.5 s slow there; the sampling time is in the `rss` mark (`ms`). The extras are not
+ * gated and the headline is taken before the sample.
  */
 type RssPhase = 'welcomeShown' | 'welcomeShown+30s'
 const RSS_LATER_MS = 30_000
@@ -434,7 +446,7 @@ async function measureLaunch(
   opens: readonly OpenTag[] = ['first', 'second'],
   label = `${engine}-${run}`,
   beforeClose: () => Promise<void> = async () => {},
-): Promise<RunResult & { readonly stdout: string }> {
+): Promise<RunResult & { readonly stdout: string; readonly cacheUsed?: boolean }> {
   const dir = path.join(options.out, label)
   fs.rmSync(dir, { recursive: true, force: true })
   // A launch with no opens (the AOT preparation) creates no project, so nothing else makes it.
@@ -464,7 +476,7 @@ async function measureLaunch(
     ENSO_LOG_DIRECTORY: logDir,
     // The shim's own JDK AOT cache (`project-manager-shim/jvmAot`) is a directory of the run's,
     // never the user's `<userData>/jvm-aot`. A `jvm` engine points it at `<out>/jvm-aot`
-    // (`jvmEngineEnv`), which the preparation launch fills; native never trains, so it keeps this.
+    // (`engineEnv`), which the preparation launch fills; native never trains, so it keeps this.
     ENSO_JVM_AOT_DIR: path.join(options.out, 'shim-jvm-aot'),
     // `--engine-log-level debug`: the engine's own log at that level, to split an open (e.g.
     // `AttachVisualizationCmd`, `Starting ExecuteJob`, module loading); slower, so not for medians.
@@ -479,14 +491,31 @@ async function measureLaunch(
   const sampleRss = async (phase: RssPhase) => {
     try {
       const electronPid = app?.process().pid
-      const ydocPid = Number(/ydoc host pid=(\d+)/.exec(stdoutLines.join(' '))?.[1])
+      const ydocPids = [...stdoutLines.join('\n').matchAll(/ydoc host pid=(\d+)/g)]
+      const ydocPid = Number(ydocPids.at(-1)?.[1])
       if (electronPid == null) return
+      const began = Date.now()
       const processes = await listProcesses()
+      const engine = engineProcesses(processes, electronPid)
+      const ydoc = Number.isFinite(ydocPid) ? processes.find((p) => p.pid === ydocPid) : undefined
+      fs.writeFileSync(
+        path.join(dir, `rss-${phase.replace('+', '-')}.json`),
+        JSON.stringify({ electronPid, ydocPid, engine, ydoc: ydoc ?? null }, null, 1),
+      )
+      const engineKb = engine.length === 0 ? undefined : engine.reduce((n, p) => n + p.rssKb, 0)
+      const ydocKb = ydocPid ? processRssKb(processes, ydocPid) : undefined
+      // -1: no sample (`runRss`).
       marks.add('rss', {
         phase,
-        engineKb: engineRssKb(processes, electronPid),
-        ydocKb: Number.isFinite(ydocPid) ? processRssKb(processes, ydocPid) : -1,
+        engineKb: engineKb ?? -1,
+        ydocKb: ydocKb ?? -1,
+        ms: Date.now() - began,
       })
+      if (engineKb == null || ydocKb == null) {
+        console.warn(
+          `Open time: no RSS at ${phase}: ${engineKb == null ? 'no engine process' : 'no ydoc host'} found (see rss-*.json).`,
+        )
+      }
     } catch (e) {
       // Not worth a failed launch: the report just has no RSS for it.
       console.warn(`Open time: no RSS sample at ${phase}: ${String(e)}`)
@@ -591,6 +620,7 @@ async function measureLaunch(
       openTimes(marks.list, 'second', logOf(logs, marks.list, 'second'))
     : null
   const rss = runRss(marks.list)
+  const cacheUsed = usedAotCache(marks.list)
   return {
     engine,
     run,
@@ -601,6 +631,7 @@ async function measureLaunch(
     notMeasured: [...new Set([...notMeasured(first), ...(second ? notMeasured(second) : [])])],
     ...(error ? { error } : {}),
     stdout: stdoutLines.join('\n'),
+    ...(cacheUsed === undefined ? {} : { cacheUsed }),
   }
 }
 
@@ -611,7 +642,9 @@ function runRss(marks: readonly Mark[]): RunRss | undefined {
     if (mark == null || typeof mark.engineKb !== 'number' || typeof mark.ydocKb !== 'number') {
       return undefined
     }
-    return mark.ydocKb < 0 ? undefined : { engineKb: mark.engineKb, ydocKb: mark.ydocKb }
+    return mark.ydocKb < 0 || mark.engineKb < 0 ?
+        undefined
+      : { engineKb: mark.engineKb, ydocKb: mark.ydocKb }
   }
   const atWelcome = sample('welcomeShown')
   const after30s = sample('welcomeShown+30s')
@@ -685,7 +718,10 @@ function readReports(targets: readonly string[]): OpenTimeReport[] {
  * complete, and records how long that took (`trainingMs`) and how big it is. The measured launches
  * then use the cache; after each, the harness looks that it is still there, as the shim deletes a
  * cache the JVM rejected. `jvm-first` deletes the directory before every launch instead: a
- * user's very first launch, which trains in the background while the project opens.
+ * user's very first launch. Nothing trains during its open: the shim stops a running training when
+ * an open starts (`openStarted`) and restarts it 60 s after the last open was answered, so the
+ * background training and the RSS samples stay clear of the measured open as long as
+ * `welcomeShown` is under 30 s after `openAnswered` (~12 s on Windows).
  */
 const AOT_WAIT_MS = 10 * 60_000
 
@@ -781,6 +817,7 @@ async function main() {
       console.warn(`Open time: ${engine} launches with ${options.jvmOptions}`)
     }
     const rejectedIn: number[] = []
+    const uncachedIn: number[] = []
     for (let run = 1; run <= options.runs; run++) {
       if (Date.now() > deadline) {
         console.warn(
@@ -788,10 +825,33 @@ async function main() {
         )
         break
       }
-      // A user's first launch has no cache yet (and trains one in the background).
-      if (engine === 'jvm-first')
-        fs.rmSync(shimAotDirectory(options), { recursive: true, force: true })
-      const { stdout, ...result } = await measureLaunch(options, engine, run, extraEnv)
+      // A user's first launch has no cache yet. On Windows the previous launch's JVM can still hold
+      // `enso.aot` mapped, so the delete is retried; if it still fails the launch is recorded as
+      // failed, not the whole report lost.
+      if (engine === 'jvm-first') {
+        try {
+          fs.rmSync(shimAotDirectory(options), {
+            recursive: true,
+            force: true,
+            maxRetries: 8,
+            retryDelay: 500,
+          })
+        } catch (e) {
+          console.warn(
+            `Open time: jvm-first launch ${run} skipped, the cache is locked: ${String(e)}`,
+          )
+          runs.push({
+            engine,
+            run,
+            first: {},
+            second: null,
+            notMeasured: [],
+            error: `could not delete the AOT cache: ${String(e)}`,
+          })
+          continue
+        }
+      }
+      const { stdout, cacheUsed, ...result } = await measureLaunch(options, engine, run, extraEnv)
       void stdout
       console.log(`${engine} ${run}: ${JSON.stringify(result)}`)
       runs.push(result)
@@ -801,10 +861,20 @@ async function main() {
         rejectedIn.push(run)
         console.warn(`Open time: the shim's AOT cache is gone after jvm launch ${run}.`)
       }
+      // Evidence from the JVM itself: a cache that was skipped without a warning shows as almost
+      // no shared classes (`usedAotCache`).
+      if (engine === 'jvm' && cacheUsed === false) {
+        uncachedIn.push(run)
+        console.warn(`Open time: jvm launch ${run} loaded almost no classes from the AOT cache.`)
+      }
     }
-    if (prepared != null) shimAot = { ...prepared, rejectedIn }
+    if (prepared != null) shimAot = { ...prepared, rejectedIn, uncachedIn }
     if (options.jvmDiagnostics && engine !== 'native') {
-      const { stdout, ...result } = await measureLaunch(
+      const {
+        stdout,
+        cacheUsed: _cacheUsed,
+        ...result
+      } = await measureLaunch(
         options,
         engine,
         0,

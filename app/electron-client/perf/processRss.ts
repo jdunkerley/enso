@@ -112,10 +112,13 @@ function descendants(processes: readonly ProcessInfo[], root: number): Set<numbe
 }
 
 /**
- * The memory of the engine: every descendant of `electronPid` that is the launcher, the native image
- * or `java`, and all their descendants, each counted once.
+ * The engine's processes: every descendant of `electronPid` that is the launcher, the native image
+ * or `java`, and all their descendants, each once.
  */
-export function engineRssKb(processes: readonly ProcessInfo[], electronPid: number): number {
+export function engineProcesses(
+  processes: readonly ProcessInfo[],
+  electronPid: number,
+): ProcessInfo[] {
   const below = descendants(processes, electronPid)
   const counted = new Set<number>()
   for (const p of processes) {
@@ -123,10 +126,19 @@ export function engineRssKb(processes: readonly ProcessInfo[], electronPid: numb
     counted.add(p.pid)
     for (const pid of descendants(processes, p.pid)) counted.add(pid)
   }
-  return processes.filter((p) => counted.has(p.pid)).reduce((sum, p) => sum + p.rssKb, 0)
+  return processes.filter((p) => counted.has(p.pid))
 }
 
-/** One process's memory; 0 when it is gone. */
-export function processRssKb(processes: readonly ProcessInfo[], pid: number): number {
-  return processes.find((p) => p.pid === pid)?.rssKb ?? 0
+/** The sum of {@link engineProcesses}; `undefined` when there is none (not 0 KiB: no sample). */
+export function engineRssKb(
+  processes: readonly ProcessInfo[],
+  electronPid: number,
+): number | undefined {
+  const engine = engineProcesses(processes, electronPid)
+  return engine.length === 0 ? undefined : engine.reduce((sum, p) => sum + p.rssKb, 0)
+}
+
+/** One process's memory; `undefined` when it is gone (not 0 KiB: no sample). */
+export function processRssKb(processes: readonly ProcessInfo[], pid: number): number | undefined {
+  return processes.find((p) => p.pid === pid)?.rssKb
 }

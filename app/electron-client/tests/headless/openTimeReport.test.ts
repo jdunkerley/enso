@@ -13,6 +13,7 @@ import {
   regressionWarnings,
   renderMarkdown,
   summarise,
+  usedAotCache,
   type Engine,
   type Mark,
   type OpenTimeReport,
@@ -448,6 +449,66 @@ describe('RSS', () => {
     expect(markdown).toContain('| jvm | 1024 | 1024 | 50 | 50 |')
   })
   test('no samples, no table', () => {
-    expect(renderMarkdown(report([3000, 3000, 3000]), undefined)).not.toContain('RSS')
+    expect(renderMarkdown(report([3000, 3000, 3000]), undefined)).not.toContain('Resident memory')
+  })
+})
+
+describe('RSS caption', () => {
+  test('says working set on Windows, resident memory elsewhere', () => {
+    const win = {
+      ...report([3000, 3000, 3000], 'jvm'),
+      platform: 'win32',
+      runs: report([3000], 'jvm').runs.map((r) => ({
+        ...r,
+        rss: { atWelcome: { engineKb: 1, ydocKb: 1 }, after30s: { engineKb: 1, ydocKb: 1 } },
+      })),
+    }
+    expect(renderMarkdown(win, undefined)).toContain('Working set, MiB')
+    expect(renderMarkdown({ ...win, platform: 'linux' }, undefined)).toContain(
+      'Resident memory, MiB',
+    )
+  })
+})
+
+describe('the jvm baseline', () => {
+  const shimAot = { trainingMs: 1000, cacheBytes: 1, rejectedIn: [] as number[] }
+  const current = { ...report([9000, 9000, 9000], 'jvm'), shimAot }
+  test('pools only reports made through the shim cache', () => {
+    const old = report([20_000, 20_000, 20_000], 'jvm')
+    const fresh = { ...report([8000, 8000, 8000], 'jvm'), shimAot }
+    const medians = developMedians(current, [old, fresh])
+    expect(medians).toHaveLength(1)
+    expect(medians[0]!.reports).toBe(1)
+    expect(medians[0]!.first.welcomeShown).toBe(8000)
+  })
+  test('an old report alone is no baseline', () => {
+    expect(developMedians(current, [report([20_000, 20_000, 20_000], 'jvm')])).toEqual([])
+  })
+  test('native is still compared with every report', () => {
+    const native = { ...report([4000, 4000, 4000], 'native'), shimAot }
+    expect(developMedians(native, [report([4000, 4000, 4000], 'native')])).toHaveLength(1)
+  })
+})
+
+describe('usedAotCache', () => {
+  const jvmMark = (sharedClasses: number): Mark => ({ k: 'jvm', t: 1, sharedClasses })
+  test('is true when a JVM loaded many classes from the cache', () => {
+    expect(usedAotCache([jvmMark(1500), jvmMark(18_000)])).toBe(true)
+  })
+  test('is false when none did', () => {
+    expect(usedAotCache([jvmMark(1500), jvmMark(1400)])).toBe(false)
+  })
+  test('is undefined without counters', () => {
+    expect(usedAotCache([{ k: 'launch', t: 1 }])).toBeUndefined()
+  })
+  test('uncachedIn is printed and warned about', () => {
+    const base = {
+      ...report([3000, 3000, 3000], 'jvm'),
+      shimAot: { trainingMs: 1000, cacheBytes: 1048576, rejectedIn: [], uncachedIn: [2] },
+    }
+    expect(renderMarkdown(base, undefined)).toContain('no classes from the cache in launches 2')
+    expect(regressionWarnings(base, undefined)).toEqual([
+      expect.stringContaining('loaded almost no classes'),
+    ])
   })
 })

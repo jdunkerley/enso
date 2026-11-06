@@ -1,6 +1,7 @@
 /** @file Picking the engine's and the ydoc host's memory out of a process list. */
 import { describe, expect, test } from 'vitest'
 import {
+  engineProcesses,
   engineRssKb,
   executableName,
   parseCim,
@@ -40,16 +41,19 @@ describe('engineRssKb', () => {
     ]
     expect(engineRssKb(processes, 10)).toBe(50 + 800 + 40)
   })
-  test('is 0 when the engine is not running, or Electron is gone', () => {
-    expect(engineRssKb(windows.slice(0, 3), 100)).toBe(0)
-    expect(engineRssKb(windows, 999)).toBe(0)
+  test('is undefined, not 0, when the engine is not running or Electron is gone', () => {
+    expect(engineRssKb(windows.slice(0, 3), 100)).toBeUndefined()
+    expect(engineRssKb(windows, 999)).toBeUndefined()
+  })
+  test('engineProcesses names the processes that were summed', () => {
+    expect(engineProcesses(windows, 100).map((x) => x.pid)).toEqual([103, 104])
   })
 })
 
 describe('processRssKb', () => {
-  test('is one process, 0 when it is gone', () => {
+  test('is one process, undefined when it is gone', () => {
     expect(processRssKb(windows, 102)).toBe(4000)
-    expect(processRssKb(windows, 5)).toBe(0)
+    expect(processRssKb(windows, 5)).toBeUndefined()
   })
 })
 

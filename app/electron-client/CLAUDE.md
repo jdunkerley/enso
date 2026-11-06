@@ -850,12 +850,19 @@ Every launch sets the engine mode as a user would: `ENSO_ENGINE_MODE=native` or
   at most; the trainer renames the file into place when complete). The report's
   `shimAot` records `trainingMs` (launch to file), `cacheBytes`, and
   `rejectedIn`, the launches after which the cache was gone, which is what the
-  shim does with a cache the JVM rejected: a warning, and the later launches ran
-  uncached (Note [The Shim's AOT Cache Is Prepared Before The Launches]).
-  `open-time.md` prints it under the caption.
+  shim does with a cache the JVM rejected: a warning, and that launch and the
+  later ones ran uncached. `uncachedIn` is the JVM's own evidence: the launches
+  whose JVMs loaded under 5000 classes from the cache (hsperf `sharedClasses`:
+  ~18,000 with it, ~1,500 without), which also catches a cache skipped without a
+  warning (Note [The Shim's AOT Cache Is Prepared Before The Launches]). A
+  baseline report counts for `jvm` only when it has `shimAot`: older `jvm` runs
+  had the harness's own cache. `open-time.md` prints it under the caption.
 - `jvm-first`: the same variables, with `<out>/jvm-aot` deleted before every
-  launch: a user's very first launch, which trains in the background while the
-  project opens.
+  launch: a user's very first launch. Nothing trains during its open: the shim
+  stops a running training when an open starts and restarts it 60 s after the
+  open was answered (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). A
+  delete that fails (a JVM of the last launch still holding `enso.aot` on
+  Windows) is retried, then the launch is recorded as failed.
 
 `jvm-nocache` is gone (`parseEngines` says so, naming `jvm-first`), and with it
 the harness's own recorded-and-created cache (`perf/jvmAotCache.ts`): the
@@ -877,20 +884,28 @@ trained with the options it is used with. Truffle diagnostics stay in
 sums the memory of the engine's processes (the launcher, the native image or
 `java` under it, and their children: descendants of the Electron process named
 `enso`, `enso.exe`, `java` or `java.exe`, never Electron's own `--type=`
-helpers) and of the ydoc host's utility process (its pid is the `ydoc host pid=`
-line of the output), at `welcomeShown` and 30 s later (`perf/processRss.ts`:
-`ps -axo` on Linux and macOS, `Get-CimInstance Win32_Process` on Windows, whose
-working set is the figure). `open-time.md` prints the medians in MiB, a row per
-engine (`rss` in `open-time.json`). The 30 s are waited out before the project
-closes, so the second open of such a launch starts later; see Note [RSS Is
-Sampled On The First Open].
+helpers) and of the ydoc host's utility process (its pid is the last
+`ydoc host pid=` line of the output), at `welcomeShown` and 30 s later
+(`perf/processRss.ts`: `ps -axo` on Linux and macOS,
+`Get-CimInstance Win32_Process` on Windows, whose working set is the figure).
+`open-time.md` prints the medians in MiB, a row per engine (`rss` in
+`open-time.json`; "Working set" on Windows, which is not Linux's resident set,
+so compare engines within a platform). A process that is not found is no sample,
+never 0 KiB, and is warned about. Each launch directory has
+`rss-welcomeShown.json` and `rss-welcomeShown-30s.json` listing the processes
+that were summed (pid, parent, KiB, command line). The sample is taken before
+the extras and its PowerShell query costs the first open's extras about 0.5 s on
+Windows (Note [RSS Is Sampled On The First Open]). The 30 s are waited out
+before the project closes, so the second open of such a launch starts later; see
+Note [RSS Is Sampled On The First Open].
 
 **The gate** (`perf/gate.ts`) is the JVM-by-default plan's: the median over
 three dispatches of the ratio JVM/native, within each dispatch, for
 `welcomeShown` (welcome template) and `libraryShown` (`image` template), both at
-most 1.5 passing and either over 1.6 failing (between: the owner decides). Run a
-dispatch with `open_perf_engines=native,jvm,jvm-first` and
-`open_perf_template=welcome,image`, download both platforms
+most 1.5 passing and either over 1.6 failing (between: the owner decides), on
+the values as printed. Run a dispatch with
+`open_perf_engines=native,jvm,jvm-first` and `open_perf_template=welcome,image`,
+download both platforms
 (`gh run download <id> --name open-perf-windows --dir <dir>/<id>/windows`, and
 `open-perf-linux`), and
 
@@ -898,10 +913,18 @@ dispatch with `open_perf_engines=native,jvm,jvm-first` and
 corepack pnpm --filter enso exec vite-node perf/gate.ts -- <dir>/<id1> <dir>/<id2> <dir>/<id3>
 ```
 
-prints, per platform, the per-dispatch ratios and the gate value of `jvm` and
-`jvm-first`, and the outcome for Windows (Linux and macOS are reported, not
-gated). The `image` template's headline is both marks at once, and a report
-records it as `welcomeShown`, so `libraryShown` falls back to it.
+prints, per platform, the per-dispatch ratios with their launch counts
+(`successes/launches` for the JVM, and native's) and the gate value of `jvm` and
+`jvm-first`. It drops nothing quietly (Note [The Gate Drops Nothing]): a JVM
+launch that never reached the phase ranks as slower than every success (and a
+native one as faster), a cell with fewer than 3 successes is incomplete, and
+without three dispatches whose Windows cells are all complete it prints
+"insufficient data" instead of an outcome. Only Windows has an outcome; Linux
+and macOS are informational. It refuses a dispatch whose `jvm` launches have no
+`shimAot` (made before PR K, with the harness's own cache). The `image`
+template's headline is both marks at once, and a report records it as
+`welcomeShown`, so `libraryShown` falls back to it, for a report of the `image`
+project only.
 
 CI uploads `electron-out.log` and `hsperf/` too; by hand, `ide-packaging.yml`
 takes `open_perf_engines`, `open_perf_runs`, `open_perf_budget`,

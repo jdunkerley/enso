@@ -93,7 +93,27 @@ export type Template = 'core' | 'full' | 'other'
 export interface ShimAot {
   readonly trainingMs: number
   readonly cacheBytes: number
+  /** Launches after which the shim had deleted the cache. */
   readonly rejectedIn: readonly number[]
+  /**
+   * Launches whose JVMs loaded almost no classes from the cache (hsperf `sharedClasses`, see
+   * {@link usedAotCache}): the cache was skipped, with or without a warning. Absent in older reports.
+   */
+  readonly uncachedIn?: readonly number[]
+}
+
+/** A JVM that used the AOT cache loaded ~18,000 classes from it; one that did not, ~1,500. */
+const CACHED_SHARED_CLASSES = 5000
+
+/**
+ * Whether a `jvm` launch's JVMs used the AOT cache, from the hsperf counters its `jvm` marks hold
+ * (the engine's JVM has the most shared classes): `undefined` when it has no counters.
+ */
+export function usedAotCache(marks: readonly Mark[]): boolean | undefined {
+  const counts = marks.flatMap((m) =>
+    m.k === 'jvm' && typeof m.sharedClasses === 'number' ? m.sharedClasses : [],
+  )
+  return counts.length === 0 ? undefined : Math.max(...counts) >= CACHED_SHARED_CLASSES
 }
 
 export interface OpenTimeReport {
@@ -300,9 +320,13 @@ export interface Develop {
 export function developMedians(report: OpenTimeReport, baseline: Baseline): Develop[] {
   const reports = baselineReports(report, baseline).slice(0, BASELINE_RUNS)
   return [...new Set(report.runs.map((r) => r.engine))].flatMap((engine) => {
-    const summaries = reports.flatMap(
-      (b) => summarise(b).find((s) => s.engine === engine && s.succeeded >= MIN_SUCCESSFUL) ?? [],
-    )
+    // `jvm` numbers are comparable only when made through the shim's cache (`shimAot`); an older
+    // report's `jvm` had the harness's own cache (`jvmAot`), or none.
+    const summaries = reports
+      .filter((b) => engine !== 'jvm' || b.shimAot != null)
+      .flatMap(
+        (b) => summarise(b).find((s) => s.engine === engine && s.succeeded >= MIN_SUCCESSFUL) ?? [],
+      )
     if (summaries.length === 0) return []
     const first: OpenTimes = {}
     for (const key of [...PHASES, ...EXTRAS]) {
@@ -320,13 +344,17 @@ export function describeShimAot(aot: ShimAot): string {
     aot.rejectedIn.length === 0 ?
       'never rejected'
     : `rejected in launches ${aot.rejectedIn.join(', ')}`
-  return `Shim AOT cache: trained in ${(aot.trainingMs / 1000).toFixed(1)} s, ${mib} MiB, ${rejected}.`
+  const uncached =
+    aot.uncachedIn != null && aot.uncachedIn.length > 0 ?
+      `; no classes from the cache in launches ${aot.uncachedIn.join(', ')}`
+    : ''
+  return `Shim AOT cache: trained in ${(aot.trainingMs / 1000).toFixed(1)} s, ${mib} MiB, ${rejected}${uncached}.`
 }
 
 const cell = (value: number | undefined) => (value == null ? '–' : String(Math.round(value)))
 
 /** The RSS medians, in MiB: one row per engine that has samples; empty when none has. */
-function rssTable(summaries: readonly EngineSummary[]): string[] {
+function rssTable(summaries: readonly EngineSummary[], platform: string): string[] {
   const rows = summaries.flatMap((s) => {
     if (s.rss == null) return []
     const mib = (kb: number) => String(Math.round(kb / 1024))
@@ -336,7 +364,7 @@ function rssTable(summaries: readonly EngineSummary[]): string[] {
   })
   if (rows.length === 0) return []
   return [
-    'Resident memory, MiB, medians of the first open (engine: the launcher and the JVM or native image under it; ydoc: the utility process).',
+    `${platform === 'win32' ? 'Working set' : 'Resident memory'}, MiB, medians of the first open (engine: the launcher and the JVM or native image under it; ydoc: the utility process).`,
     '',
     '| Engine | Engine at welcome table | Engine 30 s later | Ydoc host at welcome table | Ydoc host 30 s later |',
     '| --- | ---: | ---: | ---: | ---: |',
@@ -378,7 +406,7 @@ export function renderMarkdown(report: OpenTimeReport, baseline: Baseline): stri
     `| ${header.map((_, i) => (i === 0 ? '---' : '---:')).join(' | ')} |`,
     ...rows,
     '',
-    ...rssTable(ours),
+    ...rssTable(ours, report.platform),
   ].join('\n')
 }
 
@@ -410,7 +438,12 @@ export function regressionWarnings(
   }
   if (report.shimAot != null && report.shimAot.rejectedIn.length > 0) {
     warnings.push(
-      `jvm: the shim's AOT cache was rejected (and deleted) after launches ${report.shimAot.rejectedIn.join(', ')}; later launches ran uncached`,
+      `jvm: the shim's AOT cache was rejected (and deleted) after launches ${report.shimAot.rejectedIn.join(', ')}; that launch and the later ones ran uncached`,
+    )
+  }
+  if (report.shimAot?.uncachedIn != null && report.shimAot.uncachedIn.length > 0) {
+    warnings.push(
+      `jvm: launches ${report.shimAot.uncachedIn.join(', ')} loaded almost no classes from the AOT cache (hsperf sharedClasses), so they ran uncached`,
     )
   }
   // A launch that reached the welcome table but failed later (the second open) still counts in the
