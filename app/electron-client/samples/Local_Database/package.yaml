@@ -1,0 +1,8 @@
+name: Local_Database
+description: Load a CSV into an in-memory SQLite database and summarize it with a database query.
+namespace: local
+version: 0.0.1
+license: Apache-2.0
+author: jdunkerley
+maintainer: jdunkerley
+prefer-local-libraries: true

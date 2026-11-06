@@ -14,12 +14,6 @@ export const PRODUCT_NAME: string = 'Enso'
 export const COMPANY_NAME: string = 'Enso International, Inc.'
 
 /**
- * The domain on which the Cloud Dashboard web app is hosted.
- * Excludes the protocol (`https://`).
- */
-export const CLOUD_DASHBOARD_DOMAIN: string = 'cloud.enso.org'
-
-/**
  * COOP, COEP, and CORP headers: https://web.dev/coop-coep/
  *
  * These are required to increase the resolution of `performance.now()` timers,

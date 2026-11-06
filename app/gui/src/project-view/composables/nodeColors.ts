@@ -2,8 +2,11 @@ import type { GraphStore, NodeId } from '$/providers/openedProjects/graph'
 import type { NodeType } from '$/providers/openedProjects/graph/graphDatabase'
 import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
 import { colorFromString } from '@/util/colors'
+import { groupColorStyle } from '@/util/groupColors'
 import { ProjectPath } from '@/util/projectPath'
 import { computed } from 'vue'
+
+export { groupColorStyle, groupColorVar } from '@/util/groupColors'
 
 /** TODO: Add docs */
 export function useNodeColors(graphStore: GraphStore, getCssValue: (variable: string) => string) {
@@ -73,15 +76,4 @@ export function computeNodeColor(
   const cachedColor = getCachedColor()
   if (cachedColor) return { color: cachedColor, source: 'cached' }
   return { color: 'var(--node-color-no-type)', source: 'none' }
-}
-
-/** TODO: Add docs */
-export function groupColorVar(group: GroupInfo | undefined): string {
-  const name = group ? `${group.project}-${group.name}`.replace(/[^\w]/g, '-') : 'fallback'
-  return `--group-color-${name}`
-}
-
-/** TODO: Add docs */
-export function groupColorStyle(group: GroupInfo | undefined): string {
-  return `var(${groupColorVar(group)})`
 }

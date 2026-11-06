@@ -51,6 +51,19 @@ async function writeLog(baseName: string, content: string) {
 }
 
 describe('EngineLogChannel', () => {
+  test('notice emits one stderr line before any session', () => {
+    const log = collect()
+    channel.notice('Engine mode: native (default)')
+    expect(log.events).toContainEqual(
+      expect.objectContaining({
+        type: 'line',
+        source: 'stderr',
+        sessionId: null,
+        text: 'Engine mode: native (default)',
+      }),
+    )
+  })
+
   test('a started engine is waiting until its log file appears, then the file is followed', async () => {
     const log = collect()
     channel.engineStarted()

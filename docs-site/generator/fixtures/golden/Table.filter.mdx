@@ -1,0 +1,108 @@
+---
+slug: "/api/Standard.Table/Table/Table.filter/"
+title: "Table.filter"
+sidebar_label: "filter"
+description: "Creates a new table with a filtered subset of rows."
+keywords: ["between","contains","ends_with","equals","filter rows","greater_than","is_in","is_nothing","less_than","like","not_equals","not_nothing","regex_match","starts_with","where"]
+---
+
+# Table.filter
+
+<ComponentNode name={"filter"} icon={"preparation"} color={"var(--group-color-Standard-Base-Selections)"} returns={"Returns Any"} params={[{"name":"column","tooltip":"Column | Expression | Text | Integer = Missing_Argument.\"column\".throw","optional":false},{"name":"filter","tooltip":"Filter_Condition | (Any -> Boolean) = Filter_Condition.True.Equal","optional":true},{"name":"on_problems","tooltip":"Problem_Behavior = Report_Warning","optional":true}]} label={"filter(column: Column | Expression | Text | Integer = Missing_Argument.\"column\".throw, filter: Filter_Condition | (Any -> Boolean) = Filter_Condition.True.Equal, on_problems: Problem_Behavior = Report_Warning) -> Any"} />
+
+**Group**: Selections / **Aliases**: `between`, `contains`, `ends_with`, `equals`, `filter rows`, `greater_than`, `is_in`, `is_nothing`, `less_than`, `like`, `not_equals`, `not_nothing`, `regex_match`, `starts_with`, `where`
+
+Creates a new table with a filtered subset of rows.
+
+The rows are selected from the input table using a condition. The rows that meet the condition will remain after the filter. Filters can compare columns, compare against static values, or compare against an argument from another component.
+
+- `action`: This can be set to `Keep`, which keeps all rows which meet the condition. It can also be set to `Remove`, which will instead only keep the rows that do not meet the condition. For example, `[people] Is Null` would keep all the rows where the column `people` had a Null value. Changing this to `Remove` would remove all of the rows where `people` had a Null value, leaving only the records that are not null.
+- `on_problems`: specified how to report any issues encountered during the operation.
+
+## Arguments
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `column` | Column \| Expression \| Text \| Integer | `Missing_Argument."column".throw` | The column our condition is tested against. This can be a column name, the column's index or an expression. |
+| `filter` | Filter_Condition \| (Any -&gt; Boolean) | `Filter_Condition.True.Equal` | The filter to apply to the column. It can either be an instance of `Filter_Condition` or a predicate taking a cell value and returning a boolean value indicating whether the corresponding row should be kept or not. |
+| `on_problems` | Problem_Behavior | `Report_Warning` |  |
+
+Allowed values for `filter`: `..Less`, `..Equal_Or_Less`, `..Equal`, `..Equal_Or_Greater`, `..Greater`, `..Not_Equal`, `..Between`, `..Equal_Ignore_Case`, `..Starts_With`, `..Ends_With`, `..Contains`, `..Is_Nothing`, `..Not_Nothing`, `..Is_Nan`, `..Not_Nan`, `..Is_Infinite`, `..Is_Finite`, `..Is_True`, `..Is_False`, `..Is_Empty`, `..Not_Empty`, `..Like`, `..Regex_Match`, `..Is_In`, `..Predicate`
+
+Allowed values for `on_problems`: `..Ignore`, `..Report_Warning`, `..Report_Error`
+
+## Returns
+
+Any
+
+- Returns a Table of all of the rows that met the specified condition.
+
+## Examples
+
+### Filter where an Age is Greater than 30.
+
+```enso
+     table1 = Table.new [['Name', ['John', 'Paul', 'Ringo']], ['Age', [25, 35, 40]]]
+     filter1 = table1.filter 'Age' (..Greater 30)
+```
+
+Returns a Table
+
+| Name  | Age |
+|-------|-----|
+| Paul  | 35  |
+| Ringo | 40  |
+
+### Filter where an Age is Between 30 and 39.
+
+```enso
+     table1 = Table.new [['Name', ['John', 'Paul', 'Ringo']], ['Age', [25, 35, 40]]]
+     filter1 = table1.filter 'Age' (..Between 30 39)
+
+```
+
+Returns a Table
+
+| Name | Age |
+|------|-----|
+| Paul | 35  |
+
+### Select rows where more than 50% of the stock is sold.
+
+```enso
+     table2 = Table.new [['Name', ['John', 'Paul']], ['sold_stock', [20, 30]], ['total_stock', [50, 50]]]
+     filter3= table2.filter 'sold_stock' (..Greater (expr '[total_stock]/2'))
+```
+
+Returns a Table
+
+| Name | sold_stock | total_stock |
+|------|------------|-------------|
+| Paul | 30         | 50          |
+
+### Select people celebrating a jubilee.
+
+```enso
+     table3 = Table.new [['Name', ['John', 'Paul', 'Ringo']], ['Age', [25, 35, 40]]]
+     filter4 = table3.filter (expr '[Age] % 10 = 0') ..Is_True
+```
+
+Returns a Table
+
+| Name  | Age |
+|-------|-----|
+| Ringo | 40  |
+
+## Errors
+
+- If a column name cannot be found, a `No_Such_Column` dataflow error is raised.
+- If a column index is invalid, an `Index_Out_Of_Bounds` dataflow error is raised.
+- If the column is an invalid type for the filter, an `Invalid_Value_Type` dataflow error is raised.
+- Additionally, the following problems may be reported according to the `on_problems` setting:
+- If filtering by equality on a floating-point column, a `Floating_Point_Equality` will warn the user that comparing floats is imprecise, so results may be inconsistent.
+
+## Remarks
+
+### Nothing Equality
+
+When comparing `Nothing` values, filter follows the ANSI SQL conventions that `Nothing ==  Nothing` results in a `Nothing`. This includes both `Equal` and `Is_In` conditions. If you want to filter out `Nothing` use `Is_Not_Nothing` condition (or `Is_Nothing` to filter out non-`Nothing`).

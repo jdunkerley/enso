@@ -1,0 +1,41 @@
+from Standard.Base import all
+from Standard.Table import all
+from Standard.Database import all
+from Standard.SQLite import all
+import Standard.Visualization
+
+## Local Database
+
+   Loads a CSV of trips into an in-memory SQLite database, then summarizes it with a query that
+   runs inside the database.
+
+   Uploading to a database is only previewed while you edit, so `summary` first shows the SQL it
+   would run. Press Write All (the play icon at the top of the graph) to run the upload.
+   Select `summary` and pick the Table visualization to see the trips per mode of transport.
+
+   The data is `trips.csv` in the shared `Samples/Data` folder, found relative to this project, so
+   the sample only runs from its place in `Samples`. The data is synthetic.
+main =
+    ## The trips file in the shared Samples/Data folder.
+    trips_file = enso_project.root.parent / 'Data' / 'trips.csv'
+    ## One row per trip.
+    trips = Data.read trips_file (..Delimited headers=..Has_Headers)
+    ## SQLite stores dates as text, so the trip date is formatted before the upload.
+    trip_date = (trips.at 'trip_date').format 'yyyy-MM-dd'
+    ## The trips, with the date as text.
+    prepared = trips.set trip_date 'trip_date'
+    ## A database that lives in memory while the project is open.
+    connection = Database.connect SQLite.In_Memory
+    ## The trips, uploaded into a temporary table.
+    table = prepared.select_into_database_table connection 'trips' temporary=True
+    ## The number of trips, total distance and average time per mode, computed by the database.
+    totals = table.aggregate ['mode'] [..Count, ..Sum 'distance_km', ..Average 'minutes']
+    ## The modes, with the longest total distance first.
+    summary = totals.sort [..Name 'Sum distance_km' ..Descending]
+    summary
+
+
+
+#### METADATA ####
+[[{"index":{"value":839},"size":{"value":47}},"509680e2-d716-44b7-a443-5fb9e75dc0f1"],[{"index":{"value":924},"size":{"value":56}},"2e69b015-55ae-4a43-988e-857580e5998a"],[{"index":{"value":1082},"size":{"value":42}},"6c902673-2055-4241-a9e0-1686eb4a17e8"],[{"index":{"value":1181},"size":{"value":31}},"dc810515-5f63-43d2-b3ce-ac805590a1a6"],[{"index":{"value":1296},"size":{"value":33}},"5d1ec73e-030b-46e2-ab28-c074fba76052"],[{"index":{"value":1393},"size":{"value":69}},"967744bc-987c-4789-b685-b5d462a9cabd"],[{"index":{"value":1572},"size":{"value":76}},"c31cc081-d4e8-4c2e-80d2-ea70f00dc0c8"],[{"index":{"value":1720},"size":{"value":51}},"040acd7f-5cfa-4242-b492-39de68b63a8d"],[{"index":{"value":1776},"size":{"value":7}},"c5dad178-7179-4d62-9b3b-51c61ad02311"]]
+{"ide":{"node":{"509680e2-d716-44b7-a443-5fb9e75dc0f1":{"position":{"vector":[-16,16]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"folder"}},"2e69b015-55ae-4a43-988e-857580e5998a":{"position":{"vector":[-16,-56]},"cachedAppearance":{"color":"oklch(0.464 0.14 170)","icon":"data_input"}},"6c902673-2055-4241-a9e0-1686eb4a17e8":{"position":{"vector":[-16,-128]},"cachedAppearance":{"color":"oklch(0.464 0.14 40)","icon":"convert"}},"dc810515-5f63-43d2-b3ce-ac805590a1a6":{"position":{"vector":[666,-200]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"column_add"}},"5d1ec73e-030b-46e2-ab28-c074fba76052":{"position":{"vector":[1413,16]},"cachedAppearance":{"color":"oklch(0.464 0.14 130)","icon":"drive"}},"967744bc-987c-4789-b685-b5d462a9cabd":{"position":{"vector":[666,-272]},"cachedAppearance":{"color":"oklch(0.464 0.14 130)","icon":"data_output"}},"c31cc081-d4e8-4c2e-80d2-ea70f00dc0c8":{"position":{"vector":[666,-344]},"cachedAppearance":{"color":"oklch(0.464 0.14 230)","icon":"transform"}},"040acd7f-5cfa-4242-b492-39de68b63a8d":{"position":{"vector":[666,-416]},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"order"}},"c5dad178-7179-4d62-9b3b-51c61ad02311":{"position":{"vector":[666,-488]}}},"widget":{},"import":{}}}

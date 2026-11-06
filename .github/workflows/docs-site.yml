@@ -1,0 +1,121 @@
+# This file is not auto-generated. Feel free to edit it.
+
+# Note [Docs Site Catalogues]
+# ===========================
+# The docs site needs only each library's `catalogue.json` and `package.yaml`, which the engine
+# build produces. A pull request that changes the engine or the standard library builds the site in
+# its own engine checks (`engine-checks-platform.yml` › Docs site), which uploads them as
+# `docs-site-catalogues`. This workflow is for pull requests that change only the site or the GUI
+# code it reuses: it takes the catalogues of the newest develop run of `engine-pull-request.yml`
+# whose commit is an ancestor of the pull request's merge commit (the `find-backend` pattern of
+# `ide-packaging.yml`), falling back to that run's Linux distribution artifact while no develop run
+# has the small one, and re-uploads them into this run, so `docs-site-build.yml` downloads only from
+# its own run and the engine workflows' permissions stay as they are. A pull request that changes
+# both kinds of file runs both; this one is a few minutes and harmless.
+#
+# These pull requests do not run the GUI checks (`gui-changed-files.yml` leaves `docs-site/**` out of
+# the gate that starts them), so the build also typechecks, lints and unit-tests the site
+# (`static-checks`).
+name: Docs Site
+
+on:
+  pull_request:
+    # A whitelist, which leaves out `docs/superpowers/**` (`checkPullRequestsIgnoreSpecs`).
+    # `docs-site/generator/src/workflowPaths.test.ts` checks it covers what the generator loads:
+    # the closure of the imports of `docs-site/generator/src/gui.ts`.
+    paths:
+      - "docs-site/**"
+      - "app/gui/src/providers/openedProjects/suggestionDatabase/**"
+      - "app/gui/src/project-view/components/ComponentHelp/**"
+      - "app/gui/src/project-view/util/**"
+      - "app/gui/src/project-view/assets/icons.svg"
+      - "app/gui/src/project-view/assets/base.css"
+      - "app/gui/scripts/generateIconMetadata.mjs"
+      - "app/ydoc-shared/**"
+      - "app/common/**"
+      - "app/lezer-markdown/**"
+      - "app/rust-ffi/**"
+      - ".github/actions/setup-rust/**"
+      - "app/vitest.node.base.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".npmrc"
+      - ".node-version"
+      - "tsconfig.json"
+      - "eslint.config.mjs"
+      - ".github/workflows/docs-site.yml"
+      - ".github/workflows/docs-site-build.yml"
+      - ".github/actions/setup-node/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-docs-site
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  find-catalogues:
+    name: Find develop's catalogues
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read # Download another run's artifacts
+    steps:
+      - uses: actions/checkout@v5
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          for artifact in docs-site-catalogues "Engine Distribution (GraalVM CE) (native,test) (linux, amd64)"; do
+            candidates=$(gh api -X GET "repos/$REPO/actions/artifacts" -f name="$artifact" -f per_page=100 \
+              --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_branch == "develop" and .workflow_run.head_repository_id == .workflow_run.repository_id)
+                     | "\(.workflow_run.id) \(.workflow_run.head_sha)"] | .[:30] | .[]')
+            while read -r run_id sha; do
+              [ -n "$run_id" ] || continue
+              path=$(gh api "repos/$REPO/actions/runs/$run_id" --jq .path) || continue
+              [ "$path" = ".github/workflows/engine-pull-request.yml" ] || continue
+              status=$(gh api "repos/$REPO/compare/$sha...$HEAD_SHA" --jq .status) || continue
+              case "$status" in ahead|identical) ;; *) continue ;; esac
+              { echo "run-id=$run_id"; echo "artifact=$artifact"; } >> "$GITHUB_OUTPUT"
+              echo "Catalogues from develop run [$run_id](https://github.com/$REPO/actions/runs/$run_id) at \`$sha\` (\`$artifact\`)." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            done <<< "$candidates"
+          done
+          echo "::error::No develop engine run whose commit is an ancestor of $HEAD_SHA has the catalogues. Merge develop into the branch."
+          exit 1
+      - name: Download them
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ steps.find.outputs.artifact }}
+          run-id: ${{ steps.find.outputs.run-id }}
+          github-token: ${{ github.token }}
+          path: downloaded
+      - name: Extract the catalogues from the distribution
+        if: steps.find.outputs.artifact != 'docs-site-catalogues'
+        run: |
+          bash docs-site/scripts/extract-catalogues.sh downloaded/built-distribution.tar docs-site-input
+          rm downloaded/built-distribution.tar
+      - name: Use the catalogues as they are
+        if: steps.find.outputs.artifact == 'docs-site-catalogues'
+        run: mv downloaded docs-site-input
+      - name: Upload them into this run
+        uses: actions/upload-artifact@v5
+        with:
+          name: docs-site-catalogues
+          path: docs-site-input
+          if-no-files-found: error
+          retention-days: 1
+
+  build:
+    name: Docs site
+    needs: [find-catalogues]
+    uses: ./.github/workflows/docs-site-build.yml
+    with:
+      source: catalogues
+      static-checks: true

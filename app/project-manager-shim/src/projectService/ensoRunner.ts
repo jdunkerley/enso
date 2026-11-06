@@ -11,8 +11,11 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import * as portfinder from 'portfinder'
 import { CommandError, runCommand as runChildCommand } from '../childProcess/runCommand.js'
-import { timeoutFromEnv } from './timeouts.js'
+import type { ResolvedEngineMode } from './engineMode.js'
+import { jvmOptionsValue } from './jvmOptions.js'
+import { ENGINE_TIMEOUTS, engineTimeouts, type EngineTimeouts } from './timeouts.js'
 import { Path } from './types.js'
+import { newChannelToken, ydocHostKind, type YdocHost } from './ydocHost.js'
 
 const HEALTHCHECK_FAILURES_TO_RESTART = 3
 const LOAD_HEALTHCHECK_INTERVAL = 250
@@ -48,14 +51,16 @@ export function loadHealthcheckDelay(elapsedMs: number): number {
  * a native engine: 300 to 450 ms after `/_health`, the same with or without probing). It
  * is bounded by `ydocWaitMs` (an engine without a ydoc server, such as a fake one in a test, only
  * delays the answer by that), and the startup timeout does not apply once the health check has
- * passed, so the wait can never get a healthy engine killed.
+ * passed, so the wait can never get a healthy engine killed. Under the Node ydoc host (the default,
+ * `ydocHost.ts`) the shim's listener is up before the engine is even spawned, so there is nothing to
+ * wait for and the wait is skipped.
  */
 const YDOC_POLL_INTERVAL = 10
 /** How long one connection attempt to the ydoc port may take. */
 const YDOC_CONNECT_TIMEOUT_MS = 250
 
 /** The default for how long an open waits for the engine's ydoc port to accept connections. */
-export const DEFAULT_YDOC_WAIT_MS = 5000
+export const DEFAULT_YDOC_WAIT_MS = ENGINE_TIMEOUTS.native.ydocWaitMs
 
 /** Whether a TCP connection to `socket` is accepted right now. */
 function acceptsConnections(socket: Socket): Promise<boolean> {
@@ -78,7 +83,11 @@ const LANGUAGE_SERVER_CRASH_LOOP_MAX = 5
 const LANGUAGE_SERVER_CRASH_LOOP_WINDOW_MS = 60_000
 
 export interface Runner {
-  runProject(projectPath: Path, extraEnv?: readonly (readonly [string, string])[]): Promise<number>
+  runProject(
+    projectPath: Path,
+    extraEnv?: readonly (readonly [string, string])[],
+    launch?: EngineLaunch,
+  ): Promise<number>
   createProject(path: Path, name: string, projectTemplate?: string): Promise<void>
   openProject(
     projectPath: Path,
@@ -86,6 +95,7 @@ export interface Runner {
     extraArgs?: readonly string[],
     extraEnv?: readonly (readonly [string, string])[],
     logSink?: EngineLogSink,
+    launch?: EngineLaunch,
   ): Promise<LanguageServerSockets>
   closeProject(projectPath: Path): Promise<void>
   isProjectRunning(projectPath: Path): Promise<boolean>
@@ -177,22 +187,46 @@ export interface ShutdownHookRegistry {
   'rename-project-directory': true
   'remove-from-list': true
   'version-on-close': true
+  'close-ydoc-listener': true
 }
 
 export type ShutdownHookType = keyof ShutdownHookRegistry
 
+/**
+ * How one engine is launched: its resolved mode (`--jvm` for a JVM engine), the timeouts of that
+ * mode's column, and extra JVM options (`ENSO_JVM_OPTIONS`, one per line). Without it a launch is
+ * what it was before engine modes: no `--jvm`, the runner's own timeouts.
+ */
+export interface EngineLaunch {
+  readonly mode: ResolvedEngineMode
+  readonly timeouts: EngineTimeouts
+  readonly jvmOptions?: readonly string[]
+}
+
+/** `--jvm` for a JVM launch, nothing otherwise. */
+function modeArgs(launch: EngineLaunch | undefined): readonly string[] {
+  return launch?.mode.mode === 'jvm' ? ['--jvm'] : []
+}
+
+/** `ENSO_JVM_OPTIONS` with `launch`'s options appended one per line (ruling 2 of the plan). */
+function jvmOptionsEnv(launch: EngineLaunch | undefined): Record<string, string> {
+  const options = launch?.jvmOptions ?? []
+  if (options.length === 0) return {}
+  return { ENSO_JVM_OPTIONS: jvmOptionsValue(process.env.ENSO_JVM_OPTIONS, options) }
+}
+
 const DEFAULT_JSONRPC_PORT = 30616
 /** How long an engine has to pass its first health check before it is killed. */
-export const LANGUAGE_SERVER_STARTUP_TIMEOUT_MS = 30_000
+export const LANGUAGE_SERVER_STARTUP_TIMEOUT_MS = ENGINE_TIMEOUTS.native.startupMs
 
 /**
- * How long an engine has to exit after it was asked to, before it is killed: 10 s, or
+ * How long a native engine has to exit after it was asked to, before it is killed: 10 s, or
  * `ENSO_ENGINE_TERMINATE_TIMEOUT_MS`. The open-time harness's JDK AOT training launch needs longer:
  * the recording JVM writes its training data as it exits, which took more than 10 s on the
  * Windows runner.
  */
 function terminateTimeoutMs(): number {
-  return timeoutFromEnv(process.env.ENSO_ENGINE_TERMINATE_TIMEOUT_MS, 10_000)
+  return engineTimeouts('native').terminateMs
 }
 
 /**
@@ -206,6 +240,11 @@ const STDERR_TAIL_LENGTH = 4096
 const STDERR_END_TIMEOUT_MS = 1000
 /** What a language server prints when it cannot bind its port (Akka, the JVM; Windows and Unix). */
 const PORT_IN_USE = /address already in use|EADDRINUSE|BindException/i
+
+/** Whether a ydoc host's `listen` failed because the port was taken after the search found it. */
+function listenPortInUse(error: unknown): boolean {
+  return PORT_IN_USE.test(error instanceof Error ? error.message : String(error))
+}
 
 class OpenedProject {
   loaded: Promise<void>
@@ -228,6 +267,7 @@ class OpenedProject {
     private readonly logSink: EngineLogSink | undefined,
     private readonly startupTimeoutMs: number,
     private readonly ydocWaitMs: number,
+    private readonly terminateMs: number,
   ) {
     this.loaded = this.loadedDeferred.promise
     this.loadedDeferred.promise.catch(() => undefined)
@@ -253,12 +293,21 @@ class OpenedProject {
     logSink: EngineLogSink | undefined,
     startupTimeoutMs: number,
     ydocWaitMs: number,
+    terminateMs: number,
   ) {
     const sockets = {
       jsonSocket: { host: '127.0.0.1', port: jsonPort },
       ydocSocket: { host: '127.0.0.1', port: ydocPort },
     }
-    const project = new OpenedProject(path, sockets, spawner, logSink, startupTimeoutMs, ydocWaitMs)
+    const project = new OpenedProject(
+      path,
+      sockets,
+      spawner,
+      logSink,
+      startupTimeoutMs,
+      ydocWaitMs,
+      terminateMs,
+    )
     // Surface synchronous spawn failures (bad executable path, etc.) to the caller.
     await project.watcher.firstSpawn
     return project
@@ -436,7 +485,7 @@ class OpenedProject {
         )
         // The respawn triggers `onUnexpectedExit` followed by `onChildStarted`, which restarts
         // this watchdog loop on the new child. Don't schedule another `check` here.
-        void this.watcher.respawn(terminateTimeoutMs())
+        void this.watcher.respawn(this.terminateMs)
       } else {
         // Not using setInterval to not pile slow-responding healthchecks.
         this.nextWatchdogCheck = setTimeout(check, WATCHDOG_HEALTHCHECK_INTERVAL)
@@ -460,7 +509,7 @@ class OpenedProject {
           console.error('Language Server process of', this.path, "didn't finish in time. Killing.")
           handle.child.kill('SIGKILL')
         }
-      }, terminateTimeoutMs())
+      }, this.terminateMs)
       try {
         await handle.waitForExit()
       } finally {
@@ -469,7 +518,7 @@ class OpenedProject {
       console.log('Language server process of', this.path, 'exited')
     } else {
       // No stdin to write to — fall back to SIGTERM with SIGKILL after timeout.
-      await handle.terminate({ timeoutMs: terminateTimeoutMs() })
+      await handle.terminate({ timeoutMs: this.terminateMs })
     }
     // Its last stderr may still be in the pipe at the exit: the log must not end before it.
     await handle.waitForDrain()
@@ -509,7 +558,9 @@ export class EnsoRunner implements Runner {
    * for an engine's free ports starts; `startupTimeoutMs` is how long an engine has to pass its
    * first health check before it is killed. `ydocWaitMs` is how long an open then waits for the
    * engine's ydoc port to accept connections (0, the default, does not wait: an engine that has no
-   * ydoc server, as the fakes of the tests, would only delay its open).
+   * ydoc server, as the fakes of the tests, would only delay its open). `ydocHost` serves the ydoc
+   * server outside the engine when `ENSO_YDOC_HOST` is `node` (the default); without one, the engine
+   * serves it, as under `ENSO_YDOC_HOST=engine`.
    */
   constructor(
     private ensoPath: Path,
@@ -517,6 +568,7 @@ export class EnsoRunner implements Runner {
       readonly firstPort?: number
       readonly startupTimeoutMs?: number
       readonly ydocWaitMs?: number
+      readonly ydocHost?: YdocHost | undefined
     } = {},
   ) {}
 
@@ -573,9 +625,14 @@ export class EnsoRunner implements Runner {
   async runProject(
     projectPath: Path,
     extraEnv?: readonly (readonly [string, string])[],
+    launch?: EngineLaunch,
   ): Promise<number> {
-    const args = ['--run', projectPath]
-    const env = { ...process.env, ...(extraEnv ? Object.fromEntries(extraEnv) : {}) }
+    const args = [...modeArgs(launch), '--run', projectPath]
+    const env = {
+      ...process.env,
+      ...jvmOptionsEnv(launch),
+      ...(extraEnv ? Object.fromEntries(extraEnv) : {}),
+    }
     const cwd = path.dirname(projectPath)
     const spawnedProcess = await this.runProcess(args, (cmd, cmdArgs) =>
       childProcess.spawn(cmd, cmdArgs, { env, cwd, stdio: ['inherit', 'inherit', 'inherit'] }),
@@ -615,6 +672,7 @@ export class EnsoRunner implements Runner {
     extraArgs?: readonly string[],
     extraEnv?: readonly (readonly [string, string])[],
     logSink?: EngineLogSink,
+    launch?: EngineLaunch,
   ): Promise<LanguageServerSockets> {
     // Check if the project is already running
     const runningProject = this.runningProjects.get(projectPath)
@@ -642,7 +700,34 @@ export class EnsoRunner implements Runner {
           this.options.firstPort ?? DEFAULT_JSONRPC_PORT,
         )
         const rootId = crypto.randomUUID()
+        // Each engine gets its own token, which the Language Server requires of a channel socket.
+        const token = newChannelToken()
+        const nodeHost = ydocHostKind() === 'node' ? this.options.ydocHost : undefined
+        if (nodeHost) {
+          try {
+            await nodeHost.listen({
+              host: '127.0.0.1',
+              port: ydocPort,
+              languageServer: { host: '127.0.0.1', port: jsonPort, token },
+            })
+          } catch (error) {
+            // As for the engine's own ports: taken between the search and the bind, so search again.
+            if (attempt >= PORT_ATTEMPTS || !listenPortInUse(error)) throw error
+            console.warn(
+              `The ydoc listener for project ${projectPath} could not bind its port; looking for new ports.`,
+            )
+            continue
+          }
+        }
+        const closeListener = async () => {
+          try {
+            await nodeHost?.close(ydocPort)
+          } catch (error) {
+            console.error(`Failed to close the ydoc listener of project ${projectPath}:`, error)
+          }
+        }
         const args: readonly string[] = [
+          ...modeArgs(launch),
           '--server',
           '--root-id',
           rootId,
@@ -659,37 +744,52 @@ export class EnsoRunner implements Runner {
 
         const env = {
           ...process.env,
-          LANGUAGE_SERVER_YDOC_PORT: ydocPort.toString(),
+          ...(nodeHost ? {} : { LANGUAGE_SERVER_YDOC_PORT: ydocPort.toString() }),
+          LANGUAGE_SERVER_CHANNEL_TOKEN: token,
+          ...jvmOptionsEnv(launch),
           ...(extraEnv ? Object.fromEntries(extraEnv) : {}),
         }
 
         const cwd = path.dirname(projectPath)
-        const project = await OpenedProject.create(
-          projectPath,
-          jsonPort,
-          ydocPort,
-          () =>
-            this.runProcess(args, (cmd, cmdArgs) =>
-              childProcess.spawn(cmd, cmdArgs, {
-                env,
-                detached: false,
-                cwd,
-                stdio: ['pipe', 'inherit', 'pipe'],
-                windowsHide: true,
-              }),
-            ),
-          logSink,
-          this.options.startupTimeoutMs ?? LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
-          this.options.ydocWaitMs ?? 0,
-        )
+        let project: OpenedProject
+        try {
+          project = await OpenedProject.create(
+            projectPath,
+            jsonPort,
+            ydocPort,
+            () =>
+              this.runProcess(args, (cmd, cmdArgs) =>
+                childProcess.spawn(cmd, cmdArgs, {
+                  env,
+                  detached: false,
+                  cwd,
+                  stdio: ['pipe', 'inherit', 'pipe'],
+                  windowsHide: true,
+                }),
+              ),
+            logSink,
+            launch?.timeouts.startupMs ??
+              this.options.startupTimeoutMs ??
+              LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
+            // Nothing to wait for when the shim's listener serves the port (Note [Open Waits For
+            // The Ydoc Port]).
+            nodeHost ? 0 : (launch?.timeouts.ydocWaitMs ?? this.options.ydocWaitMs ?? 0),
+            launch?.timeouts.terminateMs ?? terminateTimeoutMs(),
+          )
+        } catch (error) {
+          await closeListener()
+          throw error
+        }
         project.shutdownHooks.set('remove-from-list', () => {
           this.runningProjects.delete(projectPath)
           this.loadingProjects.delete(projectPath)
         })
+        if (nodeHost) project.shutdownHooks.set('close-ydoc-listener', closeListener)
         try {
           await project.loaded
           return project
         } catch (error) {
+          await closeListener()
           if (attempt >= PORT_ATTEMPTS || !(await project.failedToBindPort())) throw error
           console.warn(
             `Language Server for project ${projectPath} could not bind its port; looking for new ports.`,
@@ -918,8 +1018,13 @@ function checkExecutables(...segments: readonly string[]): Path | undefined {
   return
 }
 
-/** Find the path to the `enso` executable. */
-export function findEnsoExecutable(workDir: string = '.'): Path | undefined {
+/**
+ * Find the path to the `enso` executable: the user's `ENSO_ENGINE_PATH`, then `preferred` (the
+ * caller's engine: a Linux AppImage's copy, passed explicitly so that it never reaches the
+ * environment that child processes inherit), then next to the running executable and under
+ * `workDir`.
+ */
+export function findEnsoExecutable(workDir: string = '.', preferred?: string): Path | undefined {
   workDir = path.resolve(workDir)
 
   // Check ENSO_ENGINE_PATH environment variable first
@@ -930,6 +1035,14 @@ export function findEnsoExecutable(workDir: string = '.'): Path | undefined {
       return checkExecutable(envPath)
     } catch {
       // File doesn't exist, continue searching
+    }
+  }
+  if (preferred) {
+    try {
+      fs.accessSync(preferred)
+      return checkExecutable(preferred)
+    } catch {
+      // Gone: continue searching.
     }
   }
 

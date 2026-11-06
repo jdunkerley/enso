@@ -1,3 +1,4 @@
+import { projectPathKey } from '@/util/projectPathKey'
 import {
   qnJoin,
   qnSplit,
@@ -108,9 +109,7 @@ export class ProjectPath {
    * Create a string representation of project path that is suitable for usage as a hashmap key.
    */
   key() {
-    const normalized = this.normalized()
-    const projectKey = normalized.project ?? '$'
-    return normalized.path ? `${projectKey}.${normalized.path}` : projectKey
+    return projectPathKey(this.project, this.path)
   }
 }
 

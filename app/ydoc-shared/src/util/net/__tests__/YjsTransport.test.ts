@@ -348,4 +348,53 @@ describe('YjsTransport reconnect', () => {
     transport.close()
     expect(ended).toEqual(['ls-url#1', 'backend-ls-url#2', 'ls-url#3', 'backend-ls-url#4'])
   })
+
+  test.each(['ls-url', 'backend-ls-url'])(
+    'server transport closes when the Language Server ends its %s channel',
+    async (ended) => {
+      // A Language Server reached over a socket (the Node ydoc host's `remoteChannelServer`) can
+      // end a channel on its own: the engine exited, or dropped the socket. The transport must then
+      // close, as it does when the engine-hosted ydoc server dies with the engine; otherwise its
+      // requests go into a channel nobody reads, each waiting for its timeout.
+      const doc = new Y.Doc()
+      const channels = new Map<string, YjsChannel>()
+      const server: YjsChannelServer = {
+        onConnect: (channel) => void channels.set(channel.channelName, channel as YjsChannel),
+      }
+      const transport = new YjsServerTransport(doc, 'ls-url', server)
+      let closes = 0
+      transport.on('close', () => (closes += 1))
+      await transport.connect()
+      expect(transport.isOpen).toBe(true)
+
+      channels.get(ended)!.close()
+
+      // Once: the transport's own close, which ends the other channel, does not close it again.
+      expect(closes).toBe(1)
+      expect(transport.isOpen).toBe(false)
+      // Every channel of that connection ends with it, so the Language Server ends both sessions.
+      for (const channel of channels.values()) {
+        let closed = false
+        channel.onClose(() => (closed = true))
+        expect(closed).toBe(true)
+      }
+      // A reconnect serves again.
+      const answered: string[] = []
+      server.onConnect = (channel) => void respondOn(channel as YjsChannel<string>, answered)
+      await transport.connect()
+      await expect(transport.sendData(createRequest('again', 3), 1000)).resolves.toBe('again')
+      transport.close()
+    },
+  )
+
+  test('server transport does not report its own close twice', async () => {
+    const doc = new Y.Doc()
+    const server: YjsChannelServer = { onConnect: () => {} }
+    const transport = new YjsServerTransport(doc, 'ls-url', server)
+    let closes = 0
+    transport.on('close', () => (closes += 1))
+    await transport.connect()
+    transport.close()
+    expect(closes).toBe(1)
+  })
 })

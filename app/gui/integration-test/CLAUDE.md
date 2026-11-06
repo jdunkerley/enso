@@ -56,31 +56,6 @@ before trusting a Windows result. Differences to know about:
   Windows, so no POSIX paths, no `VAR=value` prefixes, and no `.bin` shims
   (`playwright.config.ts` runs Vite's `bin/vite.js` with `node`).
 
-## AG Grid licensed vs unlicensed
-
-The suite runs in two Playwright projects, because the IDE's table view behaves
-differently with and without an AG Grid Enterprise licence (see
-`docs/superpowers/specs/2026-09-15-ag-grid-community-fallback-design.md`):
-
-- **`Integration Tests`** — the whole suite, with **no** licence key. Exercises
-  the AG Grid Community fallbacks (Infinite Row Model, custom set filter, custom
-  range selection/clipboard, custom context/column menus).
-- **`Integration Tests (AG Grid licensed)`** — re-runs only the tests tagged
-  `@ag-grid`, with a licence key, so the Enterprise path keeps its coverage.
-  Registered **only** when `ENSO_IDE_AG_GRID_LICENSE_KEY` is set; otherwise it
-  is skipped rather than run against an invalid key (which would exercise a
-  watermarked, licence-erroring grid instead of real licensed behaviour). CI
-  supplies it from `vars.ENSO_AG_GRID_LICENSE_KEY`.
-
-Both projects inject `window.$config` before any app script runs (see
-`mock/registerMocks.ts`), which `src/config.ts` prefers over the values Vite
-baked in. That lets one build serve both modes — and, importantly, keeps the
-unlicensed project unlicensed even when a key is present in the build
-environment.
-
-**Tag any new test that touches the grid** with `{ tag: '@ag-grid' }` so it runs
-in both modes. Anything else runs once, unlicensed.
-
 ## Caveats
 
 - `DASHBOARD_TESTS=true` switches the run to a mocked backend (see
@@ -177,8 +152,8 @@ use:
 
 A `data-testid` is a contract: keep it on the equivalent element. The ones the
 page objects rely on include `drive-view`, `asset-row`, `asset-row-name`,
-`dummy-row`, `context-menu`, `modal-dialog`, `user-menu`, `right-panel`,
-`asset-search-bar`, `directory-row-navigate-button` and `toast-host`.
+`dummy-row`, `context-menu`, `modal-dialog`, `right-panel`, `asset-search-bar`,
+`directory-row-navigate-button` and `toast-host`.
 
 ## Port parity checklist
 
@@ -233,7 +208,9 @@ description and ticks it off. The flake baseline it compares against is
   (`<div class="categories"> from <div class="leftBar expanded"> intercepts pointer events`)
   — but only when the next click lands more than ~550ms later, i.e. on a loaded
   CI runner (#146). Every helper that clicks or drops on the bar ends with
-  `page.mouse.move(0, 0)`; do the same in new ones.
+  `parkMouse(page)` (`actions/utilities.ts`: the empty bottom of the right rail;
+  the left rail runs the window's full height, so the corner (0, 0) is on it);
+  do the same in new ones.
 - **Await every Playwright call.** `@typescript-eslint/no-floating-promises` is
   on for this directory (#202): an unawaited `expect.poll`, assertion or action
   races the rest of the test, and one still running when the test returns fails

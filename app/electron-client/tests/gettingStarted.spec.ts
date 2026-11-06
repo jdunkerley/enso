@@ -1,14 +1,19 @@
-/** @file A series of tests designed for testing 'Getting Started with Enso Analytics'. */
+/**
+ * @file The first start: a fresh install opens the bundled Getting_Started sample. Then the
+ * exercises of 'Getting Started with Enso Analytics', each in a new project.
+ */
 
-import path from 'path'
 import { expect } from 'playwright/test'
 import {
+  addBankData,
   addFirstElementToWidgetVector,
   closeWelcome,
+  COLD_PROJECT_TIMEOUT,
   createNewProject,
   fillWidgetText,
   openComponentBrowser,
   openDropdownInWidget,
+  parkMouse,
   showAllComponents,
   showSelectedComponent,
   SKIP_ON_WINDOWS_CI,
@@ -16,10 +21,45 @@ import {
   test,
   visualizeData,
   waitForDashboard,
-  waitForDownload,
+  WELCOME_PROJECT_TAB,
 } from './electronTest'
 
 test.skip(SKIP_ON_WINDOWS_CI, SKIP_ON_WINDOWS_CI_REASON)
+
+/** The nodes of `samples/Getting_Started`, in order. */
+const GETTING_STARTED_NODES = [
+  'orders_file',
+  'orders',
+  'books',
+  'month',
+  'dated',
+  'totals',
+  'monthly',
+]
+
+test.describe('fresh install', () => {
+  // The only spec that lets the app open the welcome project (the fixture turns it off).
+  test.use({ welcomeProject: true })
+
+  // A fresh install (every spec has a fresh projects directory) opens the Getting_Started
+  // sample: its graph, and the last node's stored chart of the 12 monthly totals. The open has a
+  // cold Language Server, hence the long waits.
+  test('A fresh install opens the Getting Started sample', async ({ page }) => {
+    test.setTimeout(COLD_PROJECT_TIMEOUT + 60_000)
+    const tab = page.getByRole('tab', { name: WELCOME_PROJECT_TAB, exact: true })
+    await expect(tab).toBeVisible({ timeout: 60_000 })
+    const nodes = page.locator('.GraphNode')
+    await expect(nodes.first()).toBeVisible({ timeout: COLD_PROJECT_TIMEOUT })
+    for (const binding of GETTING_STARTED_NODES) {
+      const node = nodes.filter({
+        has: page.locator('.binding').getByText(binding, { exact: true }),
+      })
+      await expect(node).toHaveCount(1)
+    }
+    const chart = page.locator('.ScatterplotVisualization')
+    await expect(chart.locator('.scatterPoint')).toHaveCount(12, { timeout: COLD_PROJECT_TIMEOUT })
+  })
+})
 
 // First excercise in Enso Analytics 101
 test('Exercise 1', async ({ page, projectsDir }) => {
@@ -38,11 +78,8 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     await expect(dataReadEntry).toBeVisible()
     await dataReadEntry.click()
 
-    // Create relative path to file
-    const filePath = path.join(projectsDir, 'Samples', 'Data', 'sample_bank_data.xlsx')
-
-    // Waiting for file download
-    await waitForDownload(filePath)
+    // The workbook the exercise reads (the samples are bundled, nothing is downloaded)
+    await addBankData(projectsDir)
 
     // Filling in file url
     await fillWidgetText(page, 'path‘‘', 'Samples/Data/sample_bank_data.xlsx')
@@ -173,9 +210,10 @@ test('Exercise 1', async ({ page, projectsDir }) => {
 })
 
 // Second exercise in Enso Analytics 101
-test('Exercise 2', async ({ page }) => {
+test('Exercise 2', async ({ page, projectsDir }) => {
   await waitForDashboard(page)
   await closeWelcome(page)
+  await addBankData(projectsDir)
 
   // ---------------- Objective 1 ----------------
   await test.step('Objective 1: Let’s read a single sheet in from Excel', async () => {
@@ -273,7 +311,7 @@ test('Exercise 2', async ({ page }) => {
   await test.step('Objective 3: Create table of currencies by product names', async () => {
     // Park the cursor, so that the view moving under it cannot leave it over a
     // column header whose tooltip would intercept the next click.
-    await page.mouse.move(0, 0)
+    await parkMouse(page)
     await showAllComponents(page)
 
     // Creating cross_tab component
@@ -318,8 +356,8 @@ test('Exercise 2', async ({ page }) => {
 
   // ---------------- Objective 4 ----------------
   await test.step('Objective 4:  Fixing Dirty Data', async () => {
-    // See note on the matching `mouse.move(0, 0)` in Objective 3.
-    await page.mouse.move(0, 0)
+    // See note on the matching `parkMouse` in Objective 3.
+    await parkMouse(page)
     await showAllComponents(page)
 
     // Creating set component

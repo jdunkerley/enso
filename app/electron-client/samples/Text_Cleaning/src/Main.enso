@@ -1,0 +1,39 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+## Text Cleaning
+
+   Tidies a messy contacts table: fixes the spacing and capitalization of names, splits them into
+   first and last name, strips the punctuation from phone numbers, and pulls the reference code
+   out of a free-text note with a regular expression.
+
+   Select `contacts` to see the messy input, then `codes` for the clean result: a first and last
+   name, a phone number of digits only, and the kind and number of each reference code.
+
+   The data is `contacts.csv` in the shared `Samples/Data` folder, found relative to this project,
+   so the sample only runs from its place in `Samples`. The data is synthetic.
+main =
+    ## The contacts file in the shared Samples/Data folder.
+    contacts_file = enso_project.root.parent / 'Data' / 'contacts.csv'
+    ## One row per contact, with untidy names and phone numbers.
+    contacts = Data.read contacts_file (..Delimited headers=..Has_Headers)
+    ## The names, with single spaces and in title case.
+    name = (contacts.at 'name').map (n-> (n.trim.replace ' +'.to_regex ' ').to_case ..Title)
+    ## The contacts, with the tidy names.
+    tidy_names = contacts.set name 'name'
+    ## The names, split at the space into two columns.
+    split = tidy_names.split_to_columns 'name' ' '
+    ## The columns, with clear names.
+    names = split.rename_columns ['id', 'first_name', 'last_name', 'phone', 'note']
+    ## The phone numbers, with only their digits.
+    phones = names.text_replace 'phone' '[^0-9]'.to_regex ''
+    ## The reference code in each note, as a kind and a number.
+    codes = phones.parse_to_columns 'note' '(?<kind>[A-Z]{3})-(?<number>[0-9]+)'
+    codes
+
+
+
+#### METADATA ####
+[[{"index":{"value":810},"size":{"value":50}},"a51c621d-7dbf-4873-93bf-dfb77c55b3cb"],[{"index":{"value":941},"size":{"value":59}},"aeae0a59-9937-4f65-afb3-2f7adde8e675"],[{"index":{"value":1068},"size":{"value":81}},"f986e9e9-4327-4ab9-9d45-01f17d727a61"],[{"index":{"value":1209},"size":{"value":24}},"18002225-620a-4ccb-964c-46918f9bfb94"],[{"index":{"value":1301},"size":{"value":38}},"161d0eaf-b2bb-44fe-8813-54ab38bc2b53"],[{"index":{"value":1390},"size":{"value":71}},"0b64ddaa-521e-4178-90a6-4c9308ca029a"],[{"index":{"value":1525},"size":{"value":47}},"b8cdff0d-c35f-4c49-9c55-3245f9404519"],[{"index":{"value":1649},"size":{"value":68}},"24718ffa-0688-4307-b235-9fb70eb10b21"],[{"index":{"value":1722},"size":{"value":5}},"dde3e61e-4112-467c-ba47-aa510d829e30"]]
+{"ide":{"node":{"a51c621d-7dbf-4873-93bf-dfb77c55b3cb":{"position":{"vector":[-16,16]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"folder"}},"aeae0a59-9937-4f65-afb3-2f7adde8e675":{"position":{"vector":[-16,-56]},"cachedAppearance":{"color":"oklch(0.464 0.14 170)","icon":"data_input"}},"f986e9e9-4327-4ab9-9d45-01f17d727a61":{"position":{"vector":[-16,-128]},"cachedAppearance":{"color":"oklch(0.464 0.14 86.1328125)","icon":"column_add"}},"18002225-620a-4ccb-964c-46918f9bfb94":{"position":{"vector":[763,-200]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"column_add"}},"161d0eaf-b2bb-44fe-8813-54ab38bc2b53":{"position":{"vector":[763,-272]},"cachedAppearance":{"color":"oklch(0.464 0.14 40)","icon":"split"}},"0b64ddaa-521e-4178-90a6-4c9308ca029a":{"position":{"vector":[763,-344]},"cachedAppearance":{"color":"oklch(0.464 0.14 120)","icon":"table_edit"}},"b8cdff0d-c35f-4c49-9c55-3245f9404519":{"position":{"vector":[763,-416]},"cachedAppearance":{"color":"oklch(0.464 0.14 290)","icon":"column_add"}},"24718ffa-0688-4307-b235-9fb70eb10b21":{"position":{"vector":[763,-488]},"cachedAppearance":{"color":"oklch(0.464 0.14 40)","icon":"split"}},"dde3e61e-4112-467c-ba47-aa510d829e30":{"position":{"vector":[763,-560]}}},"widget":{},"import":{}}}

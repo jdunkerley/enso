@@ -5,16 +5,16 @@
   "version": "0.0.0-dev",
   "type": "module",
   "author": {
-    "name": "Enso Team",
-    "email": "contact@enso.org"
+    "name": "jdunkerley",
+    "email": "jdunkerley@users.noreply.github.com"
   },
-  "homepage": "https://github.com/enso-org/ide",
+  "homepage": "https://github.com/jdunkerley/enso",
   "repository": {
     "type": "git",
-    "url": "git@github.com:enso-org/ide.git"
+    "url": "git@github.com:jdunkerley/enso.git"
   },
   "bugs": {
-    "url": "https://github.com/enso-org/ide/issues"
+    "url": "https://github.com/jdunkerley/enso/issues"
   },
   "dependencies": {
     "@electron/asar": "^3.2.9",
@@ -81,6 +81,7 @@
     "dist": "vite-node dist.ts",
     "macos:build-dmg": "node macos/build-dmg.mjs",
     "lint": "eslint . --cache --max-warnings=0",
+    "test:unit": "vitest run",
     "ide-integration-test": "playwright test",
     "perf:open": "vite-node perf/openTime.ts",
     "watch:windows": "cross-env ENSO_IDE_VERSION=0.0.0-dev ENSO_IDE_COMMIT_HASH=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ENSO_BUILD_IDE=%LOCALAPPDATA%\\Temp\\enso\\dist\\ide ENSO_BUILD_BACKEND=%CD%\\..\\..\\dist\\backend ENSO_BUILD_IDE_BUNDLED_ENGINE_VERSION=0 ENSO_POLYGLOT_YDOC_SERVER=wss://localhost:8080 vite-node watch.ts",

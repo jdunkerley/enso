@@ -1,0 +1,42 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+## Sales Overview
+
+   Reads a messy sales CSV, cleans it up, and totals the sales by month and region.
+
+   Select `sales` to see the messy input, and `totals` for the total of each month and region.
+   Select `grid` and pick the Table visualization to see the same totals with one row per month
+   and one column per region.
+
+   The data is `sales.csv` in the shared `Samples/Data` folder, found relative to this project, so
+   the sample only runs from its place in `Samples`. The data is synthetic.
+main =
+    ## The sales file in the shared Samples/Data folder.
+    sales_file = enso_project.root.parent / 'Data' / 'sales.csv'
+    ## One row per sale, with repeated sales, missing amounts and untidy region names.
+    sales = Data.read sales_file (..Delimited headers=..Has_Headers)
+    ## The first copy of each sale.
+    unique = sales.distinct 'sale_id'
+    ## The sales that have an amount.
+    complete = unique.filter 'amount' (..Not_Nothing)
+    ## The region names, trimmed and in title case.
+    region = (complete.at 'region').map (r-> r.trim.to_case ..Title)
+    ## The sales, with the tidy region names.
+    cleaned = complete.set region 'region'
+    ## The month of each sale, such as 2025-07.
+    month = (cleaned.at 'sale_date').format 'yyyy-MM'
+    ## The sales, with their month.
+    dated = cleaned.set month 'month'
+    ## The total sales of each month and region.
+    totals = dated.aggregate ['month', 'region'] [..Sum 'amount' 'Total Sales']
+    ## The totals, with one row per month and one column per region.
+    grid = totals.cross_tab ['month'] 'region' (..Sum 'Total Sales') . sort [..Name 'month']
+    grid
+
+
+
+#### METADATA ####
+[[{"index":{"value":674},"size":{"value":47}},"13d77240-fb2d-40d3-baff-6b623034f460"],[{"index":{"value":821},"size":{"value":56}},"bb7233af-ef8a-4d74-ab54-9cb457ce9fd4"],[{"index":{"value":927},"size":{"value":24}},"0dec15bb-23fb-4ff2-9660-8481da44e7dd"],[{"index":{"value":1005},"size":{"value":38}},"44163ca4-5c15-485d-9299-04a1899e601f"],[{"index":{"value":1109},"size":{"value":55}},"a7933db0-4fd4-4815-b2da-ee69970c99e4"],[{"index":{"value":1225},"size":{"value":28}},"bd4d5bca-85b2-47a0-a3be-629ff2fe257d"],[{"index":{"value":1314},"size":{"value":41}},"3e6f9392-1054-4592-9000-89516a98ca4b"],[{"index":{"value":1404},"size":{"value":25}},"2ae48b3c-6fa3-4be6-baf7-0e1f0d28c96e"],[{"index":{"value":1492},"size":{"value":66}},"293248bf-be58-401c-98f5-68b8863cf9b8"],[{"index":{"value":1639},"size":{"value":81}},"607600b8-469a-4dfe-97ab-0bb47a02f3e9"],[{"index":{"value":1725},"size":{"value":4}},"64e4cdf8-2028-45c3-a258-a8363d1f5eff"]]
+{"ide":{"node":{"13d77240-fb2d-40d3-baff-6b623034f460":{"position":{"vector":[-16,16]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"folder"}},"bb7233af-ef8a-4d74-ab54-9cb457ce9fd4":{"position":{"vector":[-16,-56]},"cachedAppearance":{"color":"oklch(0.464 0.14 170)","icon":"data_input"}},"0dec15bb-23fb-4ff2-9660-8481da44e7dd":{"position":{"vector":[-16,-128]},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"preparation"}},"44163ca4-5c15-485d-9299-04a1899e601f":{"position":{"vector":[-16,-200]},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"preparation"}},"a7933db0-4fd4-4815-b2da-ee69970c99e4":{"position":{"vector":[-16,-272]},"cachedAppearance":{"color":"oklch(0.464 0.14 86.1328125)","icon":"column_add"}},"bd4d5bca-85b2-47a0-a3be-629ff2fe257d":{"position":{"vector":[666,-344]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"column_add"}},"3e6f9392-1054-4592-9000-89516a98ca4b":{"position":{"vector":[666,-416]},"cachedAppearance":{"color":"oklch(0.464 0.14 40)","icon":"convert"}},"2ae48b3c-6fa3-4be6-baf7-0e1f0d28c96e":{"position":{"vector":[1173,-488]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"column_add"}},"293248bf-be58-401c-98f5-68b8863cf9b8":{"position":{"vector":[1173,-560]},"cachedAppearance":{"color":"oklch(0.464 0.14 230)","icon":"transform"}},"607600b8-469a-4dfe-97ab-0bb47a02f3e9":{"position":{"vector":[1173,-632]},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"order"}},"64e4cdf8-2028-45c3-a258-a8363d1f5eff":{"position":{"vector":[1173,-704]}}},"widget":{},"import":{}}}

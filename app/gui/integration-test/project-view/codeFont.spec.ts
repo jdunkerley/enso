@@ -464,8 +464,6 @@ async function openSampleTable(editorPage: EditorPageActions, page: Page, localA
   return tableVisualization
 }
 
-// Deliberately not tagged `@ag-grid`: the licensed project would need its own baseline, and the
-// grid's cells render the same in both modes.
 test('Table visualization uses Monaspace Neon', async ({ editorPage, page, localApi }) => {
   const tableVisualization = await openSampleTable(editorPage, page, localApi)
 
@@ -511,7 +509,6 @@ test('Documentation code uses Monaspace Neon', async ({ editorPage, page }) => {
   })
 })
 
-// Not tagged `@ag-grid` either, for the same reason as the table visualization.
 test('Table editor widget uses Monaspace Neon', async ({ editorPage, page }) => {
   await editorPage
   const node = await createTableNode(page)

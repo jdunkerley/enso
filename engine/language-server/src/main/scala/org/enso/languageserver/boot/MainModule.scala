@@ -22,7 +22,10 @@ import org.enso.languageserver.capability.CapabilityRouter
 import org.enso.languageserver.data._
 import org.enso.languageserver.effect
 import org.enso.languageserver.filemanager._
-import org.enso.languageserver.http.server.BinaryYdocServer
+import org.enso.languageserver.http.server.{
+  BinaryYdocServer,
+  YjsChannelEndpoint
+}
 import org.enso.languageserver.io._
 import org.enso.languageserver.libraries._
 import org.enso.languageserver.monitoring.{
@@ -507,7 +510,24 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
     )
 
   val materializer: Materializer = Materializer.createMaterializer(system)
-  val jsonRpcServer =
+  private val applicationConfig =
+    org.enso.languageserver.boot.config.ApplicationConfig.load()
+
+  // The closure runs per connection, after construction, so the later vals
+  // are initialised by then. Note [The Channel Socket].
+  private val channelEndpoint =
+    new YjsChannelEndpoint(
+      applicationConfig.channelToken,
+      () =>
+        Map(
+          "json"        -> jsonRpcServer.yjsChannelCallbacks,
+          "binary"      -> binaryChannelCallbacks,
+          "vis-control" -> visualizationBridge.controlCallbacks,
+          "vis-data"    -> visualizationBridge.dataCallbacks
+        )
+    )(system)
+
+  val jsonRpcServer: YdocJsonRpcServer =
     new YdocJsonRpcServer(
       jsonRpcProtocolFactory,
       jsonRpcControllerFactory,
@@ -517,7 +537,12 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
           lazyMessageTimeout = 10.seconds,
           secureConfig       = secureConfig
         ),
-      List(healthCheckEndpoint, idlenessEndpoint, renameProjectEndpoint),
+      List(
+        healthCheckEndpoint,
+        idlenessEndpoint,
+        renameProjectEndpoint,
+        channelEndpoint
+      ),
       messagesCallback
     )(system)
   log.trace("Created JSON RPC Server [{}]", jsonRpcServer)
@@ -543,28 +568,28 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
     visualizationBridge.actor
   )
 
-  private val ydoc = {
-    val c = org.enso.languageserver.boot.config.ApplicationConfig.load().ydoc
-    val ydocExecutor = Executors.newSingleThreadExecutor(r => {
-      val thread = new Thread(r)
-      thread.setName("Ydoc main thread")
-      // Ydoc should not prevent JVM from exiting
-      thread.setDaemon(true)
-      thread
-    })
-    ydocExecutor.execute(() =>
-      org.enso.ydoc.api.YdocServerApi
-        .launchYdocServer(
-          c.hostname,
-          c.port,
-          jsonRpcServer.yjsChannelCallbacks,
-          binaryChannelCallbacks,
-          visualizationBridge.controlCallbacks,
-          visualizationBridge.dataCallbacks
-        )
-    )
-    ydocExecutor
-  }
+  private val ydoc: Option[java.util.concurrent.ExecutorService] =
+    applicationConfig.ydoc.port.map { port =>
+      val ydocExecutor = Executors.newSingleThreadExecutor(r => {
+        val thread = new Thread(r)
+        thread.setName("Ydoc main thread")
+        // Ydoc should not prevent JVM from exiting
+        thread.setDaemon(true)
+        thread
+      })
+      ydocExecutor.execute(() =>
+        org.enso.ydoc.api.YdocServerApi
+          .launchYdocServer(
+            applicationConfig.ydoc.hostname,
+            port,
+            jsonRpcServer.yjsChannelCallbacks,
+            binaryChannelCallbacks,
+            visualizationBridge.controlCallbacks,
+            visualizationBridge.dataCallbacks
+          )
+      )
+      ydocExecutor
+    }
 
   log.debug(
     "Main module of the Language Server initialized with config [{}]",
@@ -575,7 +600,7 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
   def close(): Unit = {
     suggestionsRepo.close()
     contextSupervisor.close()
-    ydoc.shutdownNow()
+    ydoc.foreach(_.shutdownNow())
     runtimeEventsMonitor.close()
     log.info("Stopped Language Server")
     MDC.remove("projectLocalId")

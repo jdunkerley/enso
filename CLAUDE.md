@@ -43,6 +43,10 @@ deserialize parser output.
   internals, LSP protocol) is in the
   [wiki](https://github.com/jdunkerley/enso/wiki/Home); see `docs/CLAUDE.md` for
   how to read it locally.
+- `docs-site/` — The user documentation site (Docusaurus; React only here):
+  hand-written guides and a Components reference generated from the standard
+  libraries' catalogues. Published from `develop` to GitHub Pages. See
+  `docs-site/CLAUDE.md`.
 - `project/` — SBT plugins and build helpers for the engine.
 - `internal/`, `patches/` — Build plumbing.
 
@@ -54,7 +58,7 @@ Three, **which one to use depends on what you're building**:
   parser crates under `lib/rust/`, `parser/debug` and its fuzzer,
   `app/rust-ffi`). sbt and the pnpm `postinstall` run it for you.
 - **pnpm + Vite/esbuild** — for the TypeScript monorepo (packages listed in
-  `pnpm-workspace.yaml`).
+  `pnpm-workspace.yaml`, including `docs-site`).
 - **SBT** — for the Scala/Java engine (`build.sbt`). See
   [SBT-Cheatsheet](https://github.com/jdunkerley/enso/wiki/SBT-Cheatsheet).
 
@@ -274,9 +278,9 @@ has silently produced a wrong result here:
   API we depend on, cast with `as T`, never `as unknown as T` — the single cast
   still compiles but makes the compiler verify the shape against the real type.
   A double cast on AG Grid's `GridApi` hid `api.getValue` being removed in v33;
-  the unlicensed copy/paste path broke silently and reached CI. Note the unit
-  tests could not catch it either: they stub the grid API, so the stub simply
-  mirrored the outdated assumption and stayed green.
+  the grid's copy/paste path broke silently and reached CI. Note the unit tests
+  could not catch it either: they stub the grid API, so the stub simply mirrored
+  the outdated assumption and stayed green.
 - **Run the formatting job's own command after touching `project/plugins.sbt` or
   `project/build.properties`.** Neither `compile` nor `buildEngineDistribution`
   invokes `scalafmtCheck`, so a green native-image build is silent about an

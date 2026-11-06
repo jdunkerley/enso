@@ -1,0 +1,8 @@
+name: Sales_Overview
+description: Clean up a messy sales CSV and total the sales by month and region.
+namespace: local
+version: 0.0.1
+license: Apache-2.0
+author: jdunkerley
+maintainer: jdunkerley
+prefer-local-libraries: true

@@ -12,14 +12,12 @@ const GUI_ENV_DIR = fileURLToPath(new URL('../../gui', import.meta.url))
 type GuiEnv = Record<string, string | undefined>
 
 const GUI_CONFIG_KEYS = [
-  'HOST',
   'ENVIRONMENT',
   'SENTRY_DSN',
   'VERSION',
   'COMMIT_HASH',
   'GOOGLE_ANALYTICS_TAG',
   'YDOC_SERVER_URL',
-  'AG_GRID_LICENSE_KEY',
 ] as const satisfies readonly (keyof $Config)[]
 
 type _AssertAllGuiConfigKeysCovered =

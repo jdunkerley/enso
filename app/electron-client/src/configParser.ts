@@ -9,6 +9,9 @@ import {
   type Options,
 } from 'enso-common/src/options'
 
+/** The engine modes, as `--engine-mode` takes them (the shim's `EngineMode`). */
+type EngineMode = NonNullable<Options['engineMode']>
+
 // CLI-only metadata defining flags and descriptions.
 const OPTIONS_META: Readonly<Record<string, { flag: string; description: string }>> = {
   version: { flag: '-v, --version', description: 'Show version and exit' },
@@ -26,10 +29,19 @@ const OPTIONS_META: Readonly<Record<string, { flag: string; description: string 
     description: 'Do not start server; connect to external server at --server.port',
   },
   engineEnabled: { flag: '--no-engine', description: 'Do not start engine process' },
-  useJvm: { flag: '--jvm', description: 'Run engine in JVM mode' },
+  useJvm: { flag: '--jvm', description: 'Same as --engine-mode jvm' },
+  engineMode: {
+    flag: '--engine-mode <mode>',
+    description:
+      "Engine mode: native or jvm (overrides ENSO_ENGINE_MODE; a project's package.yaml `jvm:` key wins)",
+  },
   'startup.project': {
     flag: '--startup.project <name>',
     description: 'Project to open or create at startup',
+  },
+  'startup.welcomeProject': {
+    flag: '--no-welcome-project',
+    description: 'Do not open the Getting_Started sample on a fresh install',
   },
   'server.port': {
     flag: '--server.port',
@@ -101,6 +113,14 @@ export function withoutInstallerFlags(args: readonly string[]): readonly string[
   return args.filter((arg) => !INSTALLER_FLAGS.has(arg))
 }
 
+/** Options in the schema that have no default: absent unless given. */
+const OPTIONS_WITHOUT_DEFAULT: ReadonlySet<string> = new Set(['engineMode'])
+
+/** The engine mode the arguments ask for: `--engine-mode`, else `--jvm` as its alias. */
+export function engineModeOption(args: Options): EngineMode | undefined {
+  return args.engineMode ?? (args.useJvm ? 'jvm' : undefined)
+}
+
 /** Parse command line arguments to validated options. */
 export function parseArgs(argv: readonly string[]): Options {
   const command = new Command()
@@ -111,12 +131,13 @@ export function parseArgs(argv: readonly string[]): Options {
   const optionPathToAttrName = new Map<string, string>()
   for (const [key, meta] of Object.entries(OPTIONS_META)) {
     const def = options[key]
-    if (def == null) {
+    if (def == null && !OPTIONS_WITHOUT_DEFAULT.has(key)) {
       throw new Error(`Option ${key} provided in CLI, but not defined in the schema.`)
     }
     const opt = command.createOption(meta.flag, meta.description)
     if (typeof def === 'number') opt.argParser(parseNumber)
-    opt.default(def)
+    if (key === 'engineMode') opt.argParser(parseEngineModeArgument)
+    if (def != null) opt.default(def)
     command.addOption(opt)
     optionPathToAttrName.set(key, opt.attributeName())
   }
@@ -128,6 +149,15 @@ export function parseArgs(argv: readonly string[]): Options {
     if (attr in raw) options[key] = raw[attr]
   }
   return OptionsSchema.parse(unflattenObject(options))
+}
+
+/** Parse `--engine-mode`'s value. */
+function parseEngineModeArgument(value: string, _: EngineMode | undefined): EngineMode {
+  const parsed = value.trim().toLowerCase()
+  if (parsed !== 'native' && parsed !== 'jvm') {
+    throw new InvalidArgumentError('expected native or jvm')
+  }
+  return parsed
 }
 
 /** Parse an integer value from input string. */

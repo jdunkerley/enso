@@ -5,7 +5,6 @@ import { standardBaseMainPath, type ProjectPath } from '@/util/projectPath'
 import {
   qnJoin,
   qnLastSegment,
-  qnSegments,
   type Identifier,
   type IdentifierOrOperatorIdentifier,
   type QualifiedName,
@@ -208,25 +207,4 @@ export function entryHasOwner(entry: SuggestionEntry): entry is SuggestionEntry 
   return entry.kind === SuggestionKind.Method || entry.kind === SuggestionKind.Constructor
 }
 
-const DOCUMENTATION_ROOT = 'https://help.enso.org/docs/api'
-
-/** TODO: Add docs */
-export function suggestionDocumentationUrl(entry: SuggestionEntry): string | undefined {
-  if (entry.kind !== SuggestionKind.Method && entry.kind !== SuggestionKind.Function) return
-
-  const { project, path } = entry.definedIn
-  if (!project?.startsWith('Standard.') || !path) return
-
-  const functionPath = entry.definitionPath.path
-  if (!functionPath) return
-  const postPath = functionPath.replace(`${path}.`, '')
-
-  // The path should be split into qualified name segments as the definition file.
-  // The function Path (e.g. Table.filter) is kept as a single part of the URL.
-  return [DOCUMENTATION_ROOT, project, ...qnSegments(path), postPath].join('/')
-}
-
-/** `true` if calling the function without providing a value for this argument will result in an error. */
-export function isRequiredArgument(info: SuggestionEntryArgument) {
-  return !!info.defaultValue?.startsWith('Missing_Argument.')
-}
+export { isRequiredArgument } from './argument'

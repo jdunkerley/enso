@@ -3,12 +3,7 @@
 // would stop them matching what `Data` actually receives, so the rule is disabled for this file.
 /* eslint-disable camelcase */
 import { describe, expect, test } from 'vitest'
-import {
-  computeCommunityStatusBar,
-  computeStatusBar,
-  computeUseBottomStatusBar,
-} from '../TableVisualization.vue'
-import { TableVizStatusBar } from '../TableVisualization/TableVizStatusBar'
+import { computeBottomStatusBar } from '../TableVisualization.vue'
 
 const baseEnsoTableData = {
   type: 'EnsoTableOrColumn' as const,
@@ -28,78 +23,26 @@ const baseEnsoTableData = {
   is_using_multi_filter: [],
 }
 
-describe('computeUseBottomStatusBar', () => {
-  test('is false when the backend requests it but no AG Grid Enterprise license is configured', () => {
+describe('computeBottomStatusBar', () => {
+  test('shows the row counts when the backend asks for a bottom status bar', () => {
     const data = { ...baseEnsoTableData, use_bottom_status_bar: true }
-    expect(computeUseBottomStatusBar(data, false)).toBe(false)
-  })
-
-  test('is true when the backend requests it and a license is configured', () => {
-    const data = { ...baseEnsoTableData, use_bottom_status_bar: true }
-    expect(computeUseBottomStatusBar(data, true)).toBe(true)
-  })
-
-  test('is false when the backend does not request it, even when licensed', () => {
-    const data = { ...baseEnsoTableData, use_bottom_status_bar: false }
-    expect(computeUseBottomStatusBar(data, true)).toBe(false)
-  })
-
-  test('is false for data shapes without a use_bottom_status_bar field, regardless of license', () => {
-    expect(computeUseBottomStatusBar('a plain string value', true)).toBe(false)
-    expect(computeUseBottomStatusBar('a plain string value', false)).toBe(false)
-  })
-})
-
-describe('computeStatusBar', () => {
-  test('is undefined when unlicensed, even when the backend requests the bottom status bar', () => {
-    expect(computeStatusBar(false, true, 10, null)).toBeUndefined()
-  })
-
-  test('is undefined when unlicensed and the backend does not request the bottom status bar', () => {
-    expect(computeStatusBar(false, false, 10, null)).toBeUndefined()
-  })
-
-  test('is the status panel list when licensed and use_bottom_status_bar is true (unchanged behavior)', () => {
-    expect(computeStatusBar(true, true, 42, 7)).toEqual({
-      statusPanels: [
-        {
-          statusPanel: TableVizStatusBar,
-          statusPanelParams: { total: 42, filtered: 7 },
-        },
-      ],
-    })
-  })
-
-  test('is an empty status panel list when licensed but use_bottom_status_bar is false (unchanged behavior)', () => {
-    expect(computeStatusBar(true, false, 42, null)).toEqual({ statusPanels: [] })
-  })
-})
-
-describe('computeCommunityStatusBar', () => {
-  test('stands in for the Enterprise panel when the backend asks for it and we are unlicensed', () => {
-    const data = { ...baseEnsoTableData, use_bottom_status_bar: true }
-    expect(computeCommunityStatusBar(data, false, 42, null)).toEqual({
+    expect(computeBottomStatusBar(data, 42, null)).toEqual({
       total: 42,
       filtered: null,
       showFiltered: false,
     })
   })
 
-  test('is absent when licensed — AG Grid renders its own panel then', () => {
-    const data = { ...baseEnsoTableData, use_bottom_status_bar: true }
-    expect(computeCommunityStatusBar(data, true, 42, null)).toBeUndefined()
-  })
-
   test('is absent when the backend did not ask for a bottom status bar', () => {
     const data = { ...baseEnsoTableData, use_bottom_status_bar: false }
-    expect(computeCommunityStatusBar(data, false, 42, null)).toBeUndefined()
-    expect(computeCommunityStatusBar('a plain string value', false, 42, null)).toBeUndefined()
+    expect(computeBottomStatusBar(data, 42, null)).toBeUndefined()
+    expect(computeBottomStatusBar('a plain string value', 42, null)).toBeUndefined()
   })
 
-  test('shows the filtered count only when it differs from the total, as TableVizStatusBar does', () => {
+  test('shows the filtered count only when it differs from the total', () => {
     const data = { ...baseEnsoTableData, use_bottom_status_bar: true }
-    expect(computeCommunityStatusBar(data, false, 42, 7)?.showFiltered).toBe(true)
-    expect(computeCommunityStatusBar(data, false, 42, 42)?.showFiltered).toBe(false)
-    expect(computeCommunityStatusBar(data, false, 42, null)?.showFiltered).toBe(false)
+    expect(computeBottomStatusBar(data, 42, 7)?.showFiltered).toBe(true)
+    expect(computeBottomStatusBar(data, 42, 42)?.showFiltered).toBe(false)
+    expect(computeBottomStatusBar(data, 42, null)?.showFiltered).toBe(false)
   })
 })

@@ -4,6 +4,7 @@ import BaseActions from './BaseActions'
 import DrivePageActions from './DrivePageActions'
 import EditorPageActions from './EditorPageActions'
 import SettingsPageActions from './SettingsPageActions'
+import { parkMouse } from './utilities'
 
 /** Actions for going to a different page. */
 export interface GoToPageActions<Context> {
@@ -29,7 +30,7 @@ export function goToPageActions<Context>(
         // uncovered, so a later click on the toolbar or a row's leftmost button then waits out its
         // whole timeout under a bar that never collapses. Leaving the bar cancels the expansion,
         // as a user's pointer heading for those buttons would.
-        await page.mouse.move(0, 0)
+        await parkMouse(page)
       }).into(DrivePageActions<Context>),
     projectView: () =>
       step('Go to Project page', (page) =>

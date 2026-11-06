@@ -1,0 +1,40 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+## Orders and Customers
+
+   Joins orders to the customers who placed them, builds a cross-tab of spend by segment and
+   category, and writes it to an Excel workbook.
+
+   Select `spend` and pick the Table visualization to see the cross-tab. Writing a file is only
+   previewed while you edit: press Write All (the play icon at the top of the graph) to write
+   `output/spend_by_segment.xlsx` in this project, which `saved` then shows.
+
+   The data is `orders.csv` and `customers.csv` in the shared `Samples/Data` folder, found
+   relative to this project, so the sample only runs from its place in `Samples`. The data is
+   synthetic.
+main =
+    ## The orders file in the shared Samples/Data folder.
+    orders_file = enso_project.root.parent / 'Data' / 'orders.csv'
+    ## One row per order.
+    orders = Data.read orders_file (..Delimited headers=..Has_Headers)
+    ## The customers file in the shared Samples/Data folder.
+    customers_file = enso_project.root.parent / 'Data' / 'customers.csv'
+    ## One row per customer, with their segment.
+    customers = Data.read customers_file (..Delimited headers=..Has_Headers)
+    ## Each order, with the customer who placed it.
+    joined = orders.join customers (..Inner) [..Equals 'customer_id']
+    ## The total spend per segment (rows) and category (columns).
+    spend = joined.cross_tab ['segment'] 'category' (..Sum 'total') . sort [..Name 'segment']
+    ## Where the workbook goes: the output folder of this project.
+    report_file = enso_project.root / 'output' / 'spend_by_segment.xlsx'
+    ## The cross-tab, written to a sheet of the workbook.
+    saved = spend.write report_file (..Sheet 'Spend by segment') on_existing_file=..Overwrite
+    saved
+
+
+
+#### METADATA ####
+[[{"index":{"value":810},"size":{"value":48}},"e7bd373a-2c30-4be7-bbc1-cc5b0733e07c"],[{"index":{"value":898},"size":{"value":57}},"ca9a9804-cd07-4106-ab3f-f0a8a25847ab"],[{"index":{"value":1038},"size":{"value":51}},"744348b9-9ec1-4635-a7f3-4ad165f155a9"],[{"index":{"value":1155},"size":{"value":60}},"ddf62f9a-1098-492f-b21f-8f554901b9f3"],[{"index":{"value":1281},"size":{"value":56}},"58199436-b342-4fd5-968b-dacf43b94624"],[{"index":{"value":1416},"size":{"value":81}},"0df75a20-7ea3-4f04-8671-9638fdfd5f8b"],[{"index":{"value":1583},"size":{"value":54}},"36d66741-a827-41fe-afb1-8bd9c0e9a442"],[{"index":{"value":1708},"size":{"value":81}},"64a92da4-6f39-4d29-a7ae-e199e922b594"],[{"index":{"value":1794},"size":{"value":5}},"e6406e6e-ee60-4bac-a74e-e92c8cb746bb"]]
+{"ide":{"node":{"e7bd373a-2c30-4be7-bbc1-cc5b0733e07c":{"position":{"vector":[-16,16]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"folder"}},"ca9a9804-cd07-4106-ab3f-f0a8a25847ab":{"position":{"vector":[-16,-56]},"cachedAppearance":{"color":"oklch(0.464 0.14 170)","icon":"data_input"}},"744348b9-9ec1-4635-a7f3-4ad165f155a9":{"position":{"vector":[747,16]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"folder"}},"ddf62f9a-1098-492f-b21f-8f554901b9f3":{"position":{"vector":[747,-56]},"cachedAppearance":{"color":"oklch(0.464 0.14 170)","icon":"data_input"}},"58199436-b342-4fd5-968b-dacf43b94624":{"position":{"vector":[-16,-128]},"cachedAppearance":{"color":"oklch(0.464 0.14 230)","icon":"join"}},"0df75a20-7ea3-4f04-8671-9638fdfd5f8b":{"position":{"vector":[-16,-200]},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"order"}},"36d66741-a827-41fe-afb1-8bd9c0e9a442":{"position":{"vector":[1429,16]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"folder"}},"64a92da4-6f39-4d29-a7ae-e199e922b594":{"position":{"vector":[-16,-272]},"cachedAppearance":{"color":"oklch(0.464 0.14 170)","icon":"data_output"}},"e6406e6e-ee60-4bac-a74e-e92c8cb746bb":{"position":{"vector":[-16,-344]}}},"widget":{},"import":{}}}

@@ -12,6 +12,7 @@ packages:
   - app/ydoc-server
   - app/ydoc-server-polyglot
   - app/ydoc-shared
+  - docs-site
   - lib/js/runner
   - tools/build-scripts
   - tools/simple-library-server
@@ -80,9 +81,6 @@ overrides:
   "reka-ui>@vueuse/core": ^15.0.0
   "reka-ui>@vueuse/shared": ^15.0.0
 packageExtensions:
-  ag-grid-enterprise:
-    dependencies:
-      ag-grid-community: "*"
   "@open-rpc/client-js":
     dependencies:
       events: ^3.3.0
@@ -129,3 +127,5 @@ allowBuilds:
   # Its postinstall runs `vue-demi-switch`, which picks the shim for Vue 2 vs Vue 3. This repo is
   # Vue 3 only, which is what the package already ships by default.
   vue-demi: false
+  # Reached through Docusaurus (`docs-site/`). Its postinstall only prints a funding banner.
+  core-js: false

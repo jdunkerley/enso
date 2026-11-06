@@ -14,6 +14,7 @@ const { Config, Server } = await import('../../src/server')
 let server: InstanceType<typeof Server>
 let dir: string
 let port: number
+const listening = vi.fn<(port: number) => void>()
 
 /** A port free on every address. */
 async function freePort(): Promise<number> {
@@ -77,7 +78,7 @@ beforeAll(async () => {
   await fs.writeFile(path.join(dir, 'index.html'), '<p>app</p>')
   port = await freePort()
   const unused = {} as never
-  server = new Server(new Config({ dir, port }), unused, unused, unused)
+  server = new Server(new Config({ dir, port, onListening: listening }), unused, unused, unused)
   await server.run()
 })
 
@@ -87,6 +88,10 @@ afterAll(async () => {
 })
 
 describe('listening', () => {
+  test("tells its port once it listens, window or not (the ydoc listeners' origin, #596)", () => {
+    expect(listening).toHaveBeenCalledExactlyOnceWith(port)
+  })
+
   test('answers on 127.0.0.1', async () => {
     expect(await send({ path: '/' })).toEqual({ status: 200, body: '<p>app</p>' })
   })

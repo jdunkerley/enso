@@ -19,6 +19,7 @@ Consumers import by subpath (see `package.json#exports`):
 
 - `project-manager-shim` — public helpers (`findEnsoExecutable`,
   `findStdlibRoot`, …).
+- `project-manager-shim/jvmAot` — the per-user JDK AOT cache (see below).
 - `project-manager-shim/handler` — JSON-RPC request handler, and
   `acceptLocalRequest` / `checkLocalRequest` (`handler/localRequest.ts`): the
   one check both hosts (Electron's `server.ts`, the Vite middleware in
@@ -38,14 +39,27 @@ Consumers import by subpath (see `package.json#exports`):
 
 ## Finding the engine
 
-`findEnsoExecutable` looks at `ENSO_ENGINE_PATH`, then next to the running
-executable (the packaged app), then under the checkout's `built-distribution/`
-(`sbt buildEngineDistribution`). Nothing downloads an engine (#359): a prebuilt
-one would not match the checkout, and the fork's releases ship installers only.
-Dev mode (`dev:vite`) warns at start-up when there is none, and fails the first
-project-service request with the same message. The `ProjectService` tests skip
-without one; GUI CI on Linux gives them develop's engine distribution artifact
-(`.github/workflows/gui-checks.yml`).
+`findEnsoExecutable` looks at `ENSO_ENGINE_PATH`, then at the caller's
+`preferred` launcher (a Linux AppImage's copy, `EngineSettings.ensoExecutable`),
+then next to the running executable (the packaged app), then under the
+checkout's `built-distribution/` (`sbt buildEngineDistribution`). Nothing
+downloads an engine (#359): a prebuilt one would not match the checkout, and the
+fork's releases ship installers only. Dev mode (`dev:vite`) warns at start-up
+when there is none, and fails the first project-service request with the same
+message. The `ProjectService` tests skip without one; GUI CI on Linux gives them
+develop's engine distribution artifact (`.github/workflows/gui-checks.yml`).
+
+## Sample projects
+
+`installSamples(bundledDir)` (`projectManagement.ts`) copies the samples shipped
+with the application into `<projects>/Samples` when that directory does not
+exist, and does nothing otherwise, so a user's edits and deletions are never
+undone. It copies to `.Samples.<pid>.tmp` and renames, so an interrupted copy
+cannot leave a half-filled `Samples` that blocks later starts. Nothing is
+downloaded (the old `downloadSamples` fetched an unpinned upstream branch on
+every start). The top-level `CLAUDE.md` of the bundle is not copied: a dev run
+copies the source `samples/`, whose contributor notes the packaged app leaves
+out. Test: `src/__tests__/installSamples.test.ts`.
 
 ## Scope
 
@@ -59,7 +73,8 @@ Test files that start (fake) engines pass `firstPort` from
 `projectService/__tests__/testPorts.ts`, never the default: each file has its
 own band (parallel workers), and each run starts at a random port inside it
 (another checkout's run at the same time). A new such file needs a band of its
-own there.
+own there. The bands are 2,000 ports wide and ten of them end at 29,000; an
+eleventh needs the first band's start lowered.
 
 ## Ports and the engine's health check
 
@@ -73,29 +88,239 @@ engine, up to `PORT_ATTEMPTS` (3) times; any other early exit fails the open
 (#336). Not covered: another program that answers `/_health` with a success
 before the engine has failed to bind. The start-up checks run every 25 ms for
 the first second and every 250 ms after (Note [Start-up Health Polling] in
-`ensoRunner.ts`). An engine that has not passed `/_health` within 30 s is
-killed; `ENSO_ENGINE_STARTUP_TIMEOUT_MS` lengthens that in
-`ProjectService.default` (the open-time harness's JDK AOT training launch needs
-it on Windows, where a `--jvm` engine with no class data sharing, recording its
-classes, took longer), and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS` the 10 s an engine
-has to exit when asked (the same JVM writes its training data as it exits).
+`ensoRunner.ts`). The limits come per launch from the engine mode's column
+(`ENGINE_TIMEOUTS`, `engineTimeouts(mode)` in `projectService/timeouts.ts`):
+
+| Limit                                   | Native | JVM engine |
+| --------------------------------------- | -----: | ---------: |
+| Start-up: `/_health` passed             |   30 s |      120 s |
+| Terminate: exit after the stdin newline |   10 s |       30 s |
+| ydoc port wait                          |    5 s |       30 s |
+
+An engine that has not passed `/_health` within the start-up limit is killed.
+`ENSO_ENGINE_STARTUP_TIMEOUT_MS` and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS` override
+both columns (the open-time harness's JDK AOT training launch needs it on
+Windows, where a `--jvm` engine with no class data sharing, recording its
+classes, takes longer, and writes its training data as it exits). A runner
+called without a launch (tests) keeps the native values.
 
 `project/open` is also answered only once the engine's ydoc port accepts a
-connection (`EnsoRunner`'s `ydocWaitMs`, `DEFAULT_YDOC_WAIT_MS` in
-`ProjectService.default`; Note [Open Waits For The Ydoc Port]). The ydoc server
-listens ~300 ms after `/_health` passes, and a GUI that connected earlier was
-refused (measured). That is consistent with Windows retrying a refused loopback
-connect after ~500 ms (inferred from the constant 510 to 525 ms gap). On Linux
-the GUI was refused too and connected only on y-websocket's third retry, ~1.4 s
-after the answer, so the wait helps there as well; the open-time harness hid it
-until `guiConnected` was changed to mean the socket is open (Note [The GUI Is
-Connected When Its Socket Is Open] in
+connection (`EnsoRunner`'s `ydocWaitMs`, per launch from the mode's column,
+`DEFAULT_YDOC_WAIT_MS` only for a launch without a mode; Note [Open Waits For
+The Ydoc Port]). The ydoc server listens ~300 ms after `/_health` passes, and a
+GUI that connected earlier was refused (measured). That is consistent with
+Windows retrying a refused loopback connect after ~500 ms (inferred from the
+constant 510 to 525 ms gap). On Linux the GUI was refused too and connected only
+on y-websocket's third retry, ~1.4 s after the answer, so the wait helps there
+as well; the open-time harness hid it until `guiConnected` was changed to mean
+the socket is open (Note [The GUI Is Connected When Its Socket Is Open] in
 `app/electron-client/perf/openTimeReport.ts`). The ydoc server binds
 `localhost`, which the JVM resolves to `127.0.0.1` (an IPv4-mapped address on
 Linux), the address the probe and the GUI use. The wait is bounded, the startup
 timeout stops applying once `/_health` has passed, and `EnsoRunner` defaults to
 none, because the fake engines of the tests have no ydoc server
-(`healthPolling.test.ts` has the one that does).
+(`healthPolling.test.ts` has the one that does). Under the Node ydoc host (next
+section) there is no wait: the listener is up before the engine is spawned.
+
+## ydoc host (`projectService/ydocHost.ts`)
+
+An opened project's ydoc server runs in one of two places, chosen per open by
+`ENSO_YDOC_HOST` (`ydocHostKind`; any case, an unknown value warns and means
+`node`):
+
+- `node` (default) — the runner's `YdocHost` (`EnsoRunner`'s `ydocHost` option,
+  passed in as `EngineSettings.ydocHost`) `listen`s on the ydoc port **before**
+  the engine is spawned, connected to the engine's Language Server channel
+  sockets (`ws://127.0.0.1:<rpc port>/channel/<kind>?token=…`). The engine gets
+  no `LANGUAGE_SERVER_YDOC_PORT`, so it starts no embedded server. The listener
+  is closed by the `close-ydoc-listener` shutdown hook (after the engine has
+  exited) and when an attempt fails. A listener whose port was taken after the
+  search (`EADDRINUSE`) makes the open search again, like an engine's bind
+  failure. Electron's host is a utility process
+  (`app/electron-client/src/ydocHost/`), `dev:vite`'s is `NodeYdocHost` itself.
+- `engine` — the one-release rollback (removed with the engine-hosted server, PR
+  M of the JVM-by-default plan): the engine gets `LANGUAGE_SERVER_YDOC_PORT` and
+  serves ydoc in GraalJS, as before. A runner without a host (the tests' fakes,
+  headless runs) behaves the same way.
+
+Either way every engine start gets `LANGUAGE_SERVER_CHANNEL_TOKEN`
+(`newChannelToken`, 32 random bytes as hex, fresh per open; a respawn keeps its
+open's token). The Language Server refuses channel sockets without it, from a
+non-loopback peer, or with an `Origin` header. Sessions in one host are keyed by
+the GUI's `ls=` name, which is `gui-rpc-<random uuid>` per opened project in the
+GUI, so two listeners in one process never share one
+(`app/ydoc-server/CLAUDE.md`, "Sessions are process-global"). Tests:
+`__tests__/ydocHost.test.ts`.
+
+## Engine mode (`projectService/engineMode.ts`)
+
+`ProjectService.openProject` and `runProject` resolve which engine a project
+gets, the first match winning: the project's `package.yaml` `jvm: true|false`
+(`readPackageJvmMode`; a non-boolean or malformed value is ignored, so
+`jvm: false` now means native even when the default is JVM); Electron's
+`--engine-mode=native|jvm` (`--jvm` is an alias; passed in as
+`EngineSettings.option`); `ENSO_ENGINE_MODE=native|jvm` (an unknown value is
+ignored); then `DEFAULT_ENGINE_MODE`, `native` for now. The result
+(`ResolvedEngineMode`: mode and source) decides whether the runner puts `--jvm`
+first in the engine's arguments and which timeout column applies; both travel in
+the `EngineLaunch` that `Runner.openProject`/`runProject` take. `--new`,
+`--version` and the filesystem commands do not take a launch and stay native.
+The engine log panel's first line is `Engine mode: <mode> (<source>)`
+(`EngineLogChannel.notice`, a `stderr` line before any session).
+
+A `--jvm` in `ENSO_ENGINE_ARGS` (the open-time harness uses it) is lifted into
+the `jvm` option by `ProjectService.default` (`liftJvmFlag`): the log names
+`--engine-mode`, the JVM limits apply, and a project's `jvm: false` still wins.
+Headless `--startup.project` runs take `--engine-mode` too
+(`runLocalProjectByPath`'s `engine`). Re-opening an open project writes no
+second mode line.
+
+## JDK AOT cache (`src/jvmAot/`)
+
+A JVM engine starts faster with a JDK AOT cache (JEP 483/514). A cache records
+the module path and the runtime it was trained with, and no platform installs
+the IDE at a fixed path, so it cannot ship in the installer: each user trains
+their own (spec `docs/superpowers/specs/2026-11-03-jvm-by-default-design.md`,
+stage 1d). `JvmAotCache` (`index.ts`) owns its lifecycle; Electron creates one
+in `app/electron-client/src/projectService.ts` and passes it to the
+`ProjectService` as `EngineSettings.jvmAot`. The Vite dev server has none.
+
+- **Key** (`key.ts`): the first 16 hex digits of SHA-256 over the app version,
+  the real path of the engine distribution (`dist/<version>`), the bundled
+  runtime (the one directory under `<root>/runtime/`) and the text of the
+  engine's `jvm.options`. The cache is `<userData>/jvm-aot/<key>/enso.aot`
+  (`ENSO_JVM_AOT_DIR` replaces `<userData>/jvm-aot`). No runtime (a development
+  build), a macOS `AppTranslocation/` path or a Linux AppImage mount
+  (`/.mount_<random>/`, `isAppImageMount`): no key, so nothing is trained or
+  used.
+- **Training** (`trainer.ts`, `driver.ts`): `start()`, called once the window is
+  up, trains only when the JVM is the resolved default
+  (`resolveDefaultEngineMode`, so nothing happens while the default is native),
+  there is no cache for the key and no other process holds `<root>/train.lock`
+  (`lock.ts`: created exclusively with the pid and a random token, and touched
+  every minute; a lock whose pid is dead, or that has not been touched for 10
+  minutes, since pids are reused, is taken over. A takeover, a heartbeat and a
+  release run only while holding `train.lock.takeover`, created exclusively, so
+  a stale lock is removed in place, never moved aside and put back, and no
+  takeover can land between a holder's token check and its touch or delete (Note
+  [Takeovers Are Serialised], #603). A taker that finds the takeover file held
+  gives up; a release retries for 2 s and then leaves its lock. A takeover file
+  is stale when its pid is dead or after 30 s, since it is held for
+  milliseconds. Both files are written under a unique name and hard-linked into
+  place, so neither is ever seen empty (Note [A Lock File Appears Complete]).
+  `.stale-` asides left by earlier versions, and `.new-` files a crash left, are
+  deleted once older than 10 minutes). `EngineTrainer` makes a scratch project
+  with `enso --new` (native, the welcome template) in
+  `<root>/enso-aot-training/`, starts `enso --jvm --server` on it at
+  below-normal priority (`os.setPriority`) with `ENSO_JVM_OPTIONS` adding
+  `-XX:AOTMode=record` and `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a
+  fresh `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`,
+  waits for `/_health` (180 s), and `driveOpen` plays an open over the Language
+  Server's channel sockets (`/channel/{json,vis-control,vis-data}?token=`):
+  `session/initProtocolConnection`, `executionContext/create` and `push` of
+  `main`, an `attach` of the table visualisation to the node the template's
+  metadata shows one for (`welcomeNodeId`), then waits for `executionComplete`
+  and the visualisation's answer. Then the stdin newline, up to 5 minutes for
+  the JVM to write the configuration and exit, and the bundled `java` creates
+  the cache (`aotCreateArguments`: the launcher's fixed options, the
+  `jvm.options` lines, an inherited `ENSO_JVM_OPTIONS`) as `.tmp`, renamed into
+  place. A finished training keeps its own key directory and the most recently
+  used other one (two installs sharing `userData` would otherwise delete each
+  other's cache at every launch) and deletes older ones; it only ever deletes
+  directories named like a key (16 hex digits), since `ENSO_JVM_AOT_DIR` may
+  name a directory holding other things. A failed training (not an abort) leaves
+  no `enso.aot` and is not retried until the next launch. `dispose()`
+  (Electron's `before-quit`) aborts a running training before it awaits
+  anything, which kills its engine or `java` at once; the `.tmp` and `.aotconf`
+  such a quit can leave are deleted by the next `start()`. Three things measured
+  on the Windows bundle shaped this (Notes in `driver.ts` and `trainer.ts`):
+  - `/_health` passes while the Language Server is still initialising, and a
+    channel socket opened then is dropped (`1006`): the driver reconnects once a
+    second until the session is initialised (a `403` fails at once).
+  - With no visualisation attached, `executionComplete` never came; the GUI
+    attaches as it connects, and so does the driver.
+  - JEP 514's one-step `-XX:AOTCacheOutput=` fails: its forked child JVM lacks
+    the JNI-started JVM's modules (`jdk.internal.vm.ci`), hence record, then
+    create with `java`, as the open-time harness does.
+- **Yielding**: `ProjectService.openProject` calls `openStarted()` before the
+  engine starts (any mode) and `openAnswered()` after the answer, a failure
+  included. An open kills a running training (on Windows with `taskkill /T`, so
+  a `.bat` launcher's child goes too) and deletes its `.tmp`; the training
+  restarts 60 s after the last open in flight was answered.
+- **Use**: a JVM open or run gets `jvmOptions()` in its launch, two options,
+  `-XX:AOTCache=<key>/enso.aot` and
+  `-Xlog:aot=warning,cds=warning:file="<key>/use.log"::filecount=0` (the path
+  quoted, so the `:` of `C:` does not end the option; no rotation, so one log
+  rewritten by each JVM: checked on the bundled JDK, its mtime moves at every
+  start even when it stays empty), when the cache exists. The log's time is the
+  key's "last used"; without a log, `enso.aot`'s. `AOTMode` stays `auto`, so a
+  cache the JVM refuses costs only its benefit. After such an open
+  `checkUseLog()` deletes the cache when `use.log` has a line `aotRejection`
+  (`useLog.ts`, also the open-time harness's) matches; it retrains at the next
+  launch.
+- **`ENSO_JVM_OPTIONS`** is built by `jvmOptionsValue`
+  (`projectService/jvmOptions.ts`, which also holds `LAUNCHER_JVM_OPTIONS`,
+  `parseJvmOptionsFile` and `aotCreateArguments`; the open-time harness
+  re-exports them, so there is one copy): an inherited value is split as the
+  launcher splits it (lines if it has a newline, else whitespace) and the shim's
+  options follow one per line; a single option gets a trailing newline, so that
+  the launcher reads it as a line and a space in its path survives.
+- **Known limits**: `os.setPriority` lowers the launcher's process; on Linux,
+  where priority is per thread, threads the JVM created before the call keep
+  normal priority. Two JVM engines open at once share `use.log`. Any `[warning]`
+  from `aot`/`cds` deletes the cache, so a benign warning that recurs would
+  retrain at every launch (none seen so far). A Linux AppImage's first launch of
+  a build has no cache (next bullet).
+- **Linux AppImage** (`stableEngine.ts`, Note [The AppImage Engine Is Copied
+  Out]): an AppImage mounts at a new `/tmp/.mount_<random>` at every launch (and
+  `--appimage-extract-and-run` extracts to a `/tmp/appimage_extracted_<hash>/`
+  that it deletes; `isAppImageMount` covers both), and the JVM refuses a cache
+  whose module path moved (`shared class paths mismatch`). A symlink at a fixed
+  path does not help, because the native launcher resolves its own executable,
+  so the JVM still sees the mount's paths (experiment X1 of the plan, measured
+  on WSLg; discussion #518). So the IDE runs a copy of the bundle:
+  `stableEnginePath` copies `resources/enso` (`.enso.bundle`, without which the
+  launcher does not find the bundled runtime, `dist/`, `runtime/`: ~1.8 GB, ~15
+  s with `fs.cp` on an NVMe disk under WSL) to `<userData>/engine/<version>/`,
+  times kept, through a temporary directory renamed into place with a
+  `.complete` file written last that holds a fingerprint of the bundle (the
+  launcher's and `runtime.jar`'s size and mtime, the runtime's name; a dev build
+  keeps its version, so the fingerprint decides).
+  - **Only when the JVM is the default engine** (Electron's `appImageEngine`
+    checks `isJvmDefaultEngine`): while it is native, an AppImage copies nothing
+    and uses no disk.
+  - **Room first**: the copy needs the bundle's size plus 1 GiB or 20%,
+    whichever is more (`fs.statfs`); short of that it deletes the other copies
+    and looks again, then gives up. A failed copy is deleted at once (a
+    read-only directory is made writable and the delete retried) and recorded in
+    `<userData>/engine/.failed.json` (fingerprint, time, reason); that build is
+    not tried again for a day. A success deletes the record.
+  - **Clean-up**: a copy also deletes leftover temporary directories and other
+    versions' copies except the most recently used one (the marker is touched at
+    each use), but never a copy holding a running process's executable
+    (`/proc/<pid>/exe`; an engine left by a crashed IDE).
+  - **Wiring**: Electron (`appImageEngine` in
+    `app/electron-client/src/jvmAotSettings.ts`), when `APPIMAGE` is set and
+    `ENSO_ENGINE_PATH` is not (one inside `<userData>/engine/` is not the user's
+    but an earlier IDE's copy, inherited through an update's relaunch:
+    `prepareAppImageEngine` drops it, `isEngineCopyPath`), passes a complete
+    copy's launcher as `EngineSettings.ensoExecutable` (and to
+    `findEnsoExecutable`'s `preferred` for the cache) before the project service
+    and the cache are created. It is never put in the environment: an in-app
+    update relaunches the new AppImage with the old process's environment, which
+    would make the new version run the old version's copy. With no complete
+    copy, that launch runs the mounted engine with no cache and starts the copy
+    once the first open has been answered (`EngineSettings.openObserver`; or a
+    minute after the window loaded with no open, never while one is in flight),
+    so that the copy does not compete with that open for the AppImage's mount;
+    the cache trains from the next launch on. If the copy cannot be made, the
+    AppImage runs the JVM with CDS only, the spec's accepted fallback.
+- **Tests**: `jvmAot/__tests__/` — `key`, `lock`, `driver` (against
+  `fakeLanguageServer.ts`), `trainer` (a fake `enso` script that imports the
+  same fake, port band `JVM_AOT_TRAINER_PORT`), `cache` (a fake trainer and fake
+  timers) and `stableEngine` (a fake bundle in a temp tree, with hooks for free
+  space, running processes and the copy); `findEnsoExecutable.test.ts` the
+  order; `projectService/__tests__/jvmAot.test.ts` covers the service's calls.
 
 ## Child processes
 
@@ -308,7 +533,9 @@ project's own `log`.
 
 `identityArgs` tries `git var GIT_AUTHOR_IDENT`. If git has no identity (a
 minimal config), commits and notes use `-c` overrides for
-`Enso <noreply@enso.org>`; nothing is written to the user's config.
+`Enso IDE <ide@localhost>`; nothing is written to the user's config. When git
+does resolve an identity (`user.name`/`user.email`, or the environment), commits
+use it and no override is passed.
 
 ### Ignore lines
 

@@ -63,6 +63,7 @@ jobs:
             rust-toolchain.toml
             .github/workflows/engine-changed-files.yml
             .github/workflows/engine-checks-platform.yml
+            .github/workflows/docs-site-build.yml
             .github/actions/**
             .github/workflows/engine-checks.yml
             .github/workflows/engine-pull-request.yml

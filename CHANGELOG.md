@@ -6,6 +6,28 @@
   new-version dialog of builds that cannot update themselves (development builds
   and unsigned macOS) offers release candidates too, and a repository with no
   stable release no longer reports a failed update check.][573]
+- [A fresh installation opens a short Getting Started sample, which reads a
+  file, filters it, totals it by month and charts the totals, with documentation
+  that walks through it one step at a time.][617]
+- [The sample projects a new installation copies to the Samples folder share
+  their input files in one Samples/Data folder and write their results to their
+  own output folder. Each opens with its nodes laid out and commented, and its
+  documentation says which nodes to select to see the results.][607]
+- [A user documentation site, with guides to the IDE and a reference of every
+  standard library component, drawn as the graph editor shows it, at
+  https://jdunkerley.github.io/enso/.][592]
+- [The Help menu, the Enso menu and the other links to the original company's
+  website and community are gone, as are the online documentation links for
+  components (including the F1 shortcut). Local versioning commits use your own
+  git identity, or `Enso IDE <ide@localhost>` when you have none. Settings and
+  About become two buttons at the bottom of the left rail, replacing the menu in
+  the top bar, and both rails now run the full height of the window.][566]
+- [Projects open faster: the collaborative-editing server now runs beside the
+  engine instead of inside it.][593]
+- [The installer includes four sample projects (sales overview, orders and
+  customers, a local SQLite database, text cleaning), copied to the Samples
+  folder on first start. The IDE no longer downloads samples from the
+  internet.][570]
 - [The component browser no longer lists the components of
   Standard.Visualization, the library the IDE uses to prepare visualization
   data.][565]
@@ -57,17 +79,15 @@
   its button names the sources shown, and it opens as you start typing in the
   filter. The Logger box is gone, and the Logs tab always shows the running
   session: earlier sessions open from Activity → Show Logs.][347]
-- Table views no longer require an AG Grid Enterprise license to work. When no
-  `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
-  provides its own equivalents for the Enterprise features the IDE uses —
-  server-driven paging (via the Infinite Row Model), set/multi-value column
-  filters, multi-cell range selection with copy/cut/paste, and the cell and
-  column context menus — instead of running Enterprise code unlicensed behind a
-  watermark. With a licence key configured, behaviour is unchanged.
+- Table views no longer need an AG Grid Enterprise licence. The grid uses AG
+  Grid Community and provides its own equivalents for the Enterprise features
+  the IDE used — server-driven paging (via the Infinite Row Model),
+  set/multi-value column filters, multi-cell range selection with
+  copy/cut/paste, and the cell and column context menus — instead of running
+  Enterprise code unlicensed behind a watermark.
 - [The table grid has been updated to AG Grid 36 (from 32)][37]. Table views
-  keep the same appearance and behaviour, licensed or not — the Community
-  fallback above is unaffected. Internally the IDE now uses AG Grid's own Vue
-  component instead of a local copy of it.
+  keep the same appearance and behaviour. Internally the IDE now uses AG Grid's
+  own Vue component instead of a local copy of it.
 - [The frontend toolchain has been brought up to date][39]: pnpm 12, Vue 3.5.43
   and ESLint 10. No user-visible behaviour changes; the build now fails loudly
   rather than silently skipping a dependency's install scripts, which had been
@@ -405,6 +425,12 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [573]: https://github.com/jdunkerley/enso/pull/573
+[617]: https://github.com/jdunkerley/enso/pull/617
+[607]: https://github.com/jdunkerley/enso/pull/607
+[592]: https://github.com/jdunkerley/enso/pull/592
+[593]: https://github.com/jdunkerley/enso/pull/593
+[566]: https://github.com/jdunkerley/enso/pull/566
+[570]: https://github.com/jdunkerley/enso/pull/570
 [565]: https://github.com/jdunkerley/enso/pull/565
 [552]: https://github.com/jdunkerley/enso/pull/552
 [519]: https://github.com/jdunkerley/enso/pull/519

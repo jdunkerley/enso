@@ -11,7 +11,6 @@
  */
 import * as crypto from 'node:crypto'
 import * as fs from 'node:fs'
-import * as https from 'node:https'
 import * as os from 'node:os'
 import * as pathModule from 'node:path'
 import type * as stream from 'node:stream'
@@ -29,7 +28,6 @@ const logger = console
 export const PACKAGE_METADATA_RELATIVE_PATH = 'package.yaml'
 export const PROJECT_METADATA_RELATIVE_PATH = '.enso/project.json'
 
-const SAMPLES_URL = 'https://github.com/enso-org/project-templates/archive/refs/heads/main.tar.gz'
 const SAMPLES_DIRECTORY_NAME = 'Samples'
 const BUNDLED_PROJECT_SUFFIX = '.enso-project'
 
@@ -514,39 +512,46 @@ export function bumpMetadata(
   }
 }
 
-/** Download project templates GitHub repo into the Samples directory if one not exists. */
-export async function downloadSamples(): Promise<void> {
-  logger.log('Downloading samples.')
-
-  const samplesDirectory = pathModule.join(getProjectsDirectory(), SAMPLES_DIRECTORY_NAME)
-
-  return new Promise((resolve, reject) => {
-    fs.access(samplesDirectory, fs.constants.F_OK, (err) => {
-      if (err == null) {
-        return resolve()
-      }
-      fs.mkdir(samplesDirectory, { recursive: true }, (err) => {
-        if (err != null) {
-          logger.error(err)
-          return reject(err)
-        }
-        https.get(SAMPLES_URL, (redirectResponse) => {
-          const location = redirectResponse.headers.location
-          if (location) {
-            https.get(location, (response) => {
-              response
-                .pipe(
-                  tar.x({
-                    C: samplesDirectory,
-                    strip: 1,
-                  }),
-                )
-                .on('end', () => resolve())
-                .on('error', reject)
-            })
-          }
-        })
-      })
+/**
+ * Copy the sample projects bundled with the application into the `Samples` directory of the
+ * projects directory, unless that directory already exists. Nothing is downloaded.
+ *
+ * The copy is made under a temporary name and renamed, so an interrupted copy leaves no
+ * `Samples` directory behind to stop the next start from trying again.
+ * @param bundledSamples - The directory holding the bundled samples (one sub-directory per
+ * project), or `undefined` when the application has none.
+ * @param projectsDirectory - The directory that stores Enso projects.
+ * @returns `true` if the samples were installed by this call.
+ */
+export async function installSamples(
+  bundledSamples: string | undefined,
+  projectsDirectory: string = getProjectsDirectory(),
+): Promise<boolean> {
+  const samplesDirectory = pathModule.join(projectsDirectory, SAMPLES_DIRECTORY_NAME)
+  if (fs.existsSync(samplesDirectory)) return false
+  if (bundledSamples == null || !fs.existsSync(bundledSamples)) {
+    logger.warn(`No bundled samples to install (looked in '${bundledSamples ?? '<unset>'}').`)
+    return false
+  }
+  logger.log(`Installing bundled samples into '${samplesDirectory}'.`)
+  const staging = pathModule.join(
+    projectsDirectory,
+    `.${SAMPLES_DIRECTORY_NAME}.${process.pid}.tmp`,
+  )
+  try {
+    await fs.promises.rm(staging, { recursive: true, force: true })
+    await fs.promises.mkdir(projectsDirectory, { recursive: true })
+    // The contributor notes in the source `samples/` (what a dev run copies from); the packaged
+    // app's `resources/samples` has none, through electron-builder's filter.
+    const notes = pathModule.resolve(bundledSamples, 'CLAUDE.md')
+    await fs.promises.cp(bundledSamples, staging, {
+      recursive: true,
+      filter: (source) => pathModule.resolve(source) !== notes,
     })
-  })
+    await fs.promises.rename(staging, samplesDirectory)
+  } catch (error) {
+    await fs.promises.rm(staging, { recursive: true, force: true }).catch(() => {})
+    throw error
+  }
+  return true
 }
