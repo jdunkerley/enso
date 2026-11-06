@@ -187,7 +187,8 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   runtime (the one directory under `<root>/runtime/`) and the text of the
   engine's `jvm.options`. The cache is `<userData>/jvm-aot/<key>/enso.aot`
   (`ENSO_JVM_AOT_DIR` replaces `<userData>/jvm-aot`). No runtime (a development
-  build) or a macOS `AppTranslocation/` path: no key, so nothing is trained or
+  build), a macOS `AppTranslocation/` path or a Linux AppImage mount
+  (`/.mount_<random>/`, `isAppImageMount`): no key, so nothing is trained or
   used.
 - **Training** (`trainer.ts`, `driver.ts`): `start()`, called once the window is
   up, trains only when the JVM is the resolved default
@@ -259,14 +260,35 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   where priority is per thread, threads the JVM created before the call keep
   normal priority. Two JVM engines open at once share `use.log`. Any `[warning]`
   from `aot`/`cds` deletes the cache, so a benign warning that recurs would
-  retrain at every launch (none seen so far). The Linux AppImage mounts at a new
-  path each launch, so its key changes every time (PR J of the plan deals with
-  it).
+  retrain at every launch (none seen so far). A Linux AppImage's first launch of
+  a build has no cache (next bullet).
+- **Linux AppImage** (`stableEngine.ts`, Note [The AppImage Engine Is Copied
+  Out]): an AppImage mounts at a new `/tmp/.mount_<random>` at every launch, and
+  the JVM refuses a cache whose module path moved
+  (`shared class paths mismatch`). A symlink at a fixed path does not help,
+  because the native launcher resolves its own executable, so the JVM still sees
+  the mount's paths (experiment X1 of the plan, measured on WSLg; discussion
+  #518). So the IDE runs a copy of the bundle: `stableEnginePath` copies
+  `resources/enso` (`.enso.bundle`, without which the launcher does not find the
+  bundled runtime, `dist/`, `runtime/`: ~1.8 GB, ~10 s on an NVMe disk) to
+  `<userData>/engine/<version>/`, times kept, through a temporary directory
+  renamed into place with a `.complete` file written last that holds a
+  fingerprint of the bundle (the launcher's and `runtime.jar`'s size and mtime,
+  the runtime's name; a dev build keeps its version, so the fingerprint
+  decides). A copy also deletes leftover temporary directories and other
+  versions' copies except the most recently used one (the marker is touched at
+  each use). `readyStableEngine` is the cheap check. Electron (`appImageEngine`
+  in `app/electron-client/src/jvmAotSettings.ts`), when `APPIMAGE` is set and
+  `ENSO_ENGINE_PATH` is not, sets `ENSO_ENGINE_PATH` to a complete copy's
+  launcher before the project service and the cache are created; with none, that
+  launch runs the mounted engine with no cache and copies in the background, so
+  the cache trains from the next launch on. If the copy fails, the AppImage runs
+  the JVM with CDS only, the spec's accepted fallback.
 - **Tests**: `jvmAot/__tests__/` — `key`, `lock`, `driver` (against
   `fakeLanguageServer.ts`), `trainer` (a fake `enso` script that imports the
-  same fake, port band `JVM_AOT_TRAINER_PORT`) and `cache` (a fake trainer and
-  fake timers); `projectService/__tests__/jvmAot.test.ts` covers the service's
-  calls.
+  same fake, port band `JVM_AOT_TRAINER_PORT`), `cache` (a fake trainer and fake
+  timers) and `stableEngine` (a fake bundle in a temp tree);
+  `projectService/__tests__/jvmAot.test.ts` covers the service's calls.
 
 ## Child processes
 

@@ -1,5 +1,9 @@
-/** @file Where the JDK AOT cache lives and when it trains: kept free of `electron` so it can be tested. */
+/**
+ * @file Where the JDK AOT cache lives, when it trains, and which engine a Linux AppImage runs: kept
+ * free of `electron` so it can be tested.
+ */
 import * as path from 'node:path'
+import { readyStableEngine, stableEnginePath } from 'project-manager-shim/jvmAot'
 import { resolveDefaultEngineMode, type EngineSettings } from 'project-manager-shim/projectService'
 
 /** `ENSO_JVM_AOT_DIR` when it is set and not empty, else `<userData>/jvm-aot`. */
@@ -22,4 +26,35 @@ export function isJvmDefaultEngine(
     resolveDefaultEngineMode({ option: engine?.option, environment: env.ENSO_ENGINE_MODE }).mode ===
     'jvm'
   )
+}
+
+/** What a Linux AppImage does about its engine at launch ({@link appImageEngine}). */
+export interface AppImageEngine {
+  /** The copy's launcher, for `ENSO_ENGINE_PATH`, when a complete copy of this build exists. */
+  readonly enginePath?: string
+  /** A copy started in the background, used from the next launch on. */
+  readonly copy?: Promise<string>
+}
+
+/**
+ * Under a Linux AppImage (`APPIMAGE` set) without an `ENSO_ENGINE_PATH` of the user's, the engine
+ * to run is a copy of the bundled one at `<userData>/engine/<version>/`, whose path, unlike the
+ * AppImage's mount, is the same at every launch, so that the JDK AOT cache keeps working
+ * (`project-manager-shim/jvmAot`, `stableEngine.ts`). When there is no complete copy of this
+ * build yet, this launch runs the mounted engine (without an AOT cache) and the copy is made in the
+ * background, so the window does not wait for 1.8 GB to be copied.
+ */
+export async function appImageEngine(
+  env: Readonly<Record<string, string | undefined>>,
+  settings: { readonly resourcesPath: string; readonly userData: string; readonly version: string },
+): Promise<AppImageEngine> {
+  if (!env.APPIMAGE || env.ENSO_ENGINE_PATH) return {}
+  const options = {
+    userData: settings.userData,
+    version: settings.version,
+    bundleRoot: path.join(settings.resourcesPath, 'enso'),
+  }
+  const enginePath = await readyStableEngine(options)
+  if (enginePath != null) return { enginePath }
+  return { copy: stableEnginePath(options) }
 }

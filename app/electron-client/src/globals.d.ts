@@ -74,6 +74,11 @@ declare global {
       // @ts-expect-error The index signature is intentional to disallow unknown env vars.
       readonly ENSO_AI_HARD_CONTEXT_THRESHOLD?: string
 
+      // === Engine ===
+
+      /** Set to a Linux AppImage's copy of its engine (`useAppImageEngineCopy`). */
+      ENSO_ENGINE_PATH?: string
+
       // === Local secrets ===
 
       // @ts-expect-error The index signature is intentional to disallow unknown env vars.

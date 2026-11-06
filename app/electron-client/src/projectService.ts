@@ -7,7 +7,7 @@ import * as readline from 'node:readline'
 import * as url from 'node:url'
 
 import type { Electron } from '@/electron'
-import { isJvmDefaultEngine, jvmAotRootDirectory } from '@/jvmAotSettings'
+import { appImageEngine, isJvmDefaultEngine, jvmAotRootDirectory } from '@/jvmAotSettings'
 import * as paths from '@/paths'
 import { lazyKeyringEntries, SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
 import { UtilityProcessYdocHost, type YdocHostChild } from '@/ydocHost/client'
@@ -172,6 +172,36 @@ function createJvmAotCache(
     ensoExecutable,
     isJvmDefault: () => isJvmDefaultEngine(engine, process.env),
   })
+}
+
+/**
+ * Under a Linux AppImage, run the engine from its copy at `<userData>/engine/<version>/`
+ * (`appImageEngine`): sets `ENSO_ENGINE_PATH`, which `findEnsoExecutable` honours first, when the
+ * copy is complete, and starts the copy otherwise. Called before the project service and the JDK
+ * AOT cache are created, since both find the engine once.
+ */
+export async function useAppImageEngineCopy(
+  electron: Electron,
+  electronIsDev: boolean,
+): Promise<void> {
+  try {
+    const { enginePath, copy } = await appImageEngine(process.env, {
+      resourcesPath: paths.resourcesPath(electron, electronIsDev),
+      userData: app.getPath('userData'),
+      version: app.getVersion(),
+    })
+    if (enginePath != null) {
+      console.info(`Running the AppImage's engine from its copy at ${enginePath}.`)
+      process.env.ENSO_ENGINE_PATH = enginePath
+    }
+    copy?.then(
+      (launcher) =>
+        console.info(`Copied the AppImage's engine to ${launcher}; used from the next launch.`),
+      (error: unknown) => console.warn("Failed to copy the AppImage's engine:", error),
+    )
+  } catch (error) {
+    console.warn("Failed to check the AppImage's engine copy:", error)
+  }
 }
 
 /** Train the JDK AOT cache in the background if it is needed (the JVM is the default engine). */

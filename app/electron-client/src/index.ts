@@ -53,6 +53,7 @@ import {
   handleProjectProtocol,
   setupProjectService,
   startJvmAotCache,
+  useAppImageEngineCopy,
   version,
 } from './projectService.js'
 import { enableAll } from './security.js'
@@ -318,6 +319,8 @@ class App {
       if (this.electron) {
         // Before the server and any engine start, so both see the key.
         await this.initialiseSecretsKey()
+        // Before the project service and the JDK AOT cache find the engine.
+        await useAppImageEngineCopy(this.electron, this.electronIsDev)
         // Note that we want to do all the actions synchronously, so when the window
         // appears, it serves the website immediately.
         await this.startContentServerIfEnabled(args)
