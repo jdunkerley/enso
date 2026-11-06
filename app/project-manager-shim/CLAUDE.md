@@ -200,16 +200,19 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   a stale lock is removed in place, never moved aside and put back, and no
   takeover can land between a holder's token check and its touch or delete (Note
   [Takeovers Are Serialised], #603). A taker that finds the takeover file held
-  gives up; a release retries for 2 s. A takeover file left by a crash is stale
-  by the lock's own rule. `.stale-` asides left by earlier versions are deleted
-  once older than 10 minutes). `EngineTrainer` makes a scratch project with
-  `enso --new` (native, the welcome template) in `<root>/enso-aot-training/`,
-  starts `enso --jvm --server` on it at below-normal priority (`os.setPriority`)
-  with `ENSO_JVM_OPTIONS` adding `-XX:AOTMode=record` and
-  `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a fresh
-  `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`, waits for
-  `/_health` (180 s), and `driveOpen` plays an open over the Language Server's
-  channel sockets (`/channel/{json,vis-control,vis-data}?token=`):
+  gives up; a release retries for 2 s and then leaves its lock. A takeover file
+  is stale when its pid is dead or after 30 s, since it is held for
+  milliseconds. Both files are written under a unique name and hard-linked into
+  place, so neither is ever seen empty (Note [A Lock File Appears Complete]).
+  `.stale-` asides left by earlier versions, and `.new-` files a crash left, are
+  deleted once older than 10 minutes). `EngineTrainer` makes a scratch project
+  with `enso --new` (native, the welcome template) in
+  `<root>/enso-aot-training/`, starts `enso --jvm --server` on it at
+  below-normal priority (`os.setPriority`) with `ENSO_JVM_OPTIONS` adding
+  `-XX:AOTMode=record` and `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a
+  fresh `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`,
+  waits for `/_health` (180 s), and `driveOpen` plays an open over the Language
+  Server's channel sockets (`/channel/{json,vis-control,vis-data}?token=`):
   `session/initProtocolConnection`, `executionContext/create` and `push` of
   `main`, an `attach` of the table visualisation to the node the template's
   metadata shows one for (`welcomeNodeId`), then waits for `executionComplete`

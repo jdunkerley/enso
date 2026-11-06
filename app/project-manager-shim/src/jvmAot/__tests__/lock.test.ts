@@ -2,8 +2,8 @@
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { expect, test } from 'vitest'
-import { acquireTrainingLock, STALE_LOCK_MS } from '../lock.js'
+import { expect, test, vi } from 'vitest'
+import { acquireTrainingLock, STALE_LOCK_MS, STALE_TAKEOVER_MS } from '../lock.js'
 
 test('one holder at a time; a dead holder is taken over', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
@@ -196,6 +196,126 @@ test('a takeover deletes locks moved aside long ago, and keeps recent ones', asy
     expect(release).toBeDefined()
     expect((await fs.readdir(root)).sort()).toEqual(['train.lock', 'train.lock.stale-2-2'])
     await release!()
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a takeover file still being written is held, not stale (review of #603, M1)', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    await deadLock(root)
+    // Created by the exclusive open, its content not written yet.
+    const takeover = path.join(root, 'train.lock.takeover')
+    await fs.writeFile(takeover, '')
+    expect(await acquireTrainingLock(root)).toBeUndefined()
+    expect(await fs.readFile(takeover, 'utf8')).toBe('')
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a file is linked into place complete, and created anyway where links are refused', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    const release = await acquireTrainingLock(root)
+    expect(release).toBeDefined()
+    expect(await fs.readdir(root)).toEqual(['train.lock'])
+    await release!()
+    const refuse = async () => {
+      throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' })
+    }
+    await deadLock(root)
+    const fallback = await acquireTrainingLock(root, { link: refuse })
+    expect(fallback).toBeDefined()
+    expect(await fs.readFile(path.join(root, 'train.lock'), 'utf8')).toMatch(
+      new RegExp(`^${process.pid} `),
+    )
+    expect(await fs.readdir(root)).toEqual(['train.lock'])
+    await fallback!()
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a takeover file older than 30 s is stale even when its pid is alive (review of #603, M2)', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    await deadLock(root)
+    const takeover = path.join(root, 'train.lock.takeover')
+    // A crashed taker's pid, reused by a live process (this one).
+    await fs.writeFile(takeover, `${process.pid} crashed-taker`)
+    expect(await acquireTrainingLock(root)).toBeUndefined()
+    // A minute: long past a takeover's few milliseconds, far short of the lock's ten minutes.
+    expect(STALE_TAKEOVER_MS).toBeLessThan(60_000)
+    const old = new Date(Date.now() - 60_000)
+    await fs.utimes(takeover, old, old)
+    const release = await acquireTrainingLock(root)
+    expect(release).toBeDefined()
+    expect(await fs.readdir(root)).toEqual(['train.lock'])
+    await release!()
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a release that cannot get the takeover file gives up and leaves its lock (M3)', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    const file = path.join(root, 'train.lock')
+    const release = await acquireTrainingLock(root, { releaseAttempts: 2 })
+    expect(release).toBeDefined()
+    const ours = await fs.readFile(file, 'utf8')
+    await fs.writeFile(path.join(root, 'train.lock.takeover'), `${process.pid} another-taker`)
+    await release!()
+    // Not deleted without the takeover file: that would be the check-then-act of #603.
+    expect(await fs.readFile(file, 'utf8')).toBe(ours)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a heartbeat skips while the takeover file is held, and touches the lock after (M3)', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    const file = path.join(root, 'train.lock')
+    const takeover = path.join(root, 'train.lock.takeover')
+    const release = await acquireTrainingLock(root, { heartbeatMs: 20 })
+    expect(release).toBeDefined()
+    const old = new Date(Date.now() - 60_000)
+    await fs.utimes(file, old, old)
+    await fs.writeFile(takeover, `${process.pid} another-taker`)
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect((await fs.stat(file)).mtimeMs).toBe(old.getTime())
+    await fs.rm(takeover)
+    await vi.waitFor(async () =>
+      expect((await fs.stat(file)).mtimeMs).toBeGreaterThan(old.getTime()),
+    )
+    await release!()
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test("no takeover lands between a release's token check and its delete (#603 item 2)", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    const file = path.join(root, 'train.lock')
+    let taker: (() => Promise<void>) | undefined | 'not run' = 'not run'
+    const release = await acquireTrainingLock(root, {
+      beforeReleaseAct: async () => {
+        // The holder has checked that the lock is its own, and stalled: its lock went stale, and
+        // a taker tries now. Unserialised, the taker would replace the lock and the holder's
+        // `rm` would then delete the taker's.
+        const old = new Date(Date.now() - STALE_LOCK_MS - 60_000)
+        await fs.utimes(file, old, old)
+        taker = await acquireTrainingLock(root)
+      },
+    })
+    expect(release).toBeDefined()
+    await release!()
+    expect(taker).toBeUndefined()
+    expect(await fs.readdir(root)).toEqual([])
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
