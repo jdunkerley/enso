@@ -195,14 +195,20 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   there is no cache for the key and no other process holds `<root>/train.lock`
   (`lock.ts`: created exclusively with the pid and a random token, and touched
   every minute; a lock whose pid is dead, or that has not been touched for 10
-  minutes, since pids are reused, is taken over by renaming it aside and
-  checking that what moved is the lock that was inspected, putting it back
-  (`link`, which never replaces a newer lock) when another taker got there
-  first; the heartbeat and the release touch the file only while it holds this
-  acquisition's token, and a takeover deletes asides older than 10 minutes).
-  `EngineTrainer` makes a scratch project with `enso --new` (native, the welcome
-  template) in `<root>/enso-aot-training/`, starts `enso --jvm --server` on it
-  at below-normal priority (`os.setPriority`) with `ENSO_JVM_OPTIONS` adding
+  minutes, since pids are reused, is taken over. A takeover, a heartbeat and a
+  release run only while holding `train.lock.takeover`, created exclusively, so
+  a stale lock is removed in place, never moved aside and put back, and no
+  takeover can land between a holder's token check and its touch or delete (Note
+  [Takeovers Are Serialised], #603). A taker that finds the takeover file held
+  gives up; a release retries for 2 s and then leaves its lock. A takeover file
+  is stale when its pid is dead or after 30 s, since it is held for
+  milliseconds. Both files are written under a unique name and hard-linked into
+  place, so neither is ever seen empty (Note [A Lock File Appears Complete]).
+  `.stale-` asides left by earlier versions, and `.new-` files a crash left, are
+  deleted once older than 10 minutes). `EngineTrainer` makes a scratch project
+  with `enso --new` (native, the welcome template) in
+  `<root>/enso-aot-training/`, starts `enso --jvm --server` on it at
+  below-normal priority (`os.setPriority`) with `ENSO_JVM_OPTIONS` adding
   `-XX:AOTMode=record` and `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a
   fresh `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`,
   waits for `/_health` (180 s), and `driveOpen` plays an open over the Language

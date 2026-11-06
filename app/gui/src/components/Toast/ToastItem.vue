@@ -69,28 +69,59 @@ function onProgressEnd() {
   if (toast.isIn) emit('close')
 }
 
+/**
+ * Counts the collapses started; a toast shown again bumps it, so a collapse under way stops (Note
+ * [A Toast Shown Again While Leaving]).
+ */
+let collapseGeneration = 0
+
 /** Shrink the (already hidden) toast to nothing, so that the toasts below it move up smoothly. */
 function collapse() {
   const element = root.value
   if (element == null) return emit('removed')
+  const generation = ++collapseGeneration
+  const current = () => generation === collapseGeneration
   const { scrollHeight, style } = element
   requestAnimationFrame(() => {
+    if (!current()) return
     style.minHeight = 'initial'
     style.height = `${scrollHeight}px`
     style.transition = `all ${COLLAPSE_MS}ms`
     requestAnimationFrame(() => {
+      if (!current()) return
       style.height = '0'
       style.padding = '0'
       style.margin = '0'
-      setTimeout(() => emit('removed'), COLLAPSE_MS)
+      setTimeout(() => {
+        if (current()) emit('removed')
+      }, COLLAPSE_MS)
     })
   })
 }
 
+/* Note [A Toast Shown Again While Leaving]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The store shows a toast again under the same id while it is still leaving (a project's start-up
+ * toast when its tab is left and re-entered at once, #600). The item is keyed by id, so it is this
+ * same instance: it must leave its `exit` phase, stop a collapse under way (which would ask for its
+ * removal) and undo the collapse's inline styles, and slide in again. A collapse checks its
+ * generation before each step, so a stale one never emits `removed`. The item is fixed rather than
+ * keyed by revision (every update bumps it, and a remount would replay the slide-in on each
+ * progress update) or guarded in the store's `remove` (the item would stay collapsed at height 0).
+ */
 watch(
   () => toast.isIn,
-  (isIn) => {
-    if (!isIn) phase.value = 'exit'
+  (isIn, wasIn) => {
+    if (!isIn) {
+      phase.value = 'exit'
+    } else if (wasIn === false) {
+      collapseGeneration++
+      const style = root.value?.style
+      if (style)
+        for (const key of ['minHeight', 'height', 'transition', 'padding', 'margin'] as const)
+          style[key] = ''
+      phase.value = 'enter'
+    }
   },
   { immediate: true },
 )

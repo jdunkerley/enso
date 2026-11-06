@@ -250,7 +250,9 @@ export class JvmAotCache {
     clearTimeout(this.retrainTimer)
     this.retrainTimer = setTimeout(() => {
       this.retrainTimer = undefined
-      void this.beginTraining()
+      this.beginTraining().catch((error: unknown) =>
+        console.error('JDK AOT cache: training could not start:', error),
+      )
     }, this.settings.retrainDelayMs ?? 60_000)
   }
 

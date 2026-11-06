@@ -33,6 +33,15 @@ describe('toast store', () => {
     expect(store.toasts.value.map((toast) => toast.content)).toEqual(['First'])
   })
 
+  test('showing a toast that is still leaving brings it back (#600)', () => {
+    const store = createToastsStore()
+    store.show('First', { toastId: 'a' })
+    store.dismiss('a')
+    store.show('Again', { toastId: 'a' })
+    expect(store.isActive('a')).toBe(true)
+    expect(store.toasts.value.map((toast) => toast.content)).toEqual(['Again'])
+  })
+
   test(`queues toasts beyond ${TOAST_LIMIT}, and shows them as others are removed`, () => {
     const store = createToastsStore()
     for (const id of [1, 2, 3, 4, 5]) store.show(`Toast ${id}`, { toastId: id })

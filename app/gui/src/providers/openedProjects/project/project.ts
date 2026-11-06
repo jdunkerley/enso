@@ -6,6 +6,7 @@ import {
   type NodeVisualizationConfiguration,
 } from '$/providers/openedProjects/project/executionContext'
 import { createModuleFlusher } from '$/providers/openedProjects/project/flush'
+import { trackStartupFailure } from '$/providers/openedProjects/project/startupFailure'
 import { VisualizationDataRegistry } from '$/providers/openedProjects/project/visualizationDataRegistry'
 import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import { useText } from '$/providers/text'
@@ -176,6 +177,7 @@ export function createProjectStore(
     },
   )
   const executionContext = createExecutionContextForMain()
+  const startupFailure = trackStartupFailure(executionContext)
   const visualizationDataRegistry = new VisualizationDataRegistry(projectModel)
   abort.handleDispose(visualizationDataRegistry)
   const computedValueRegistry = ComputedValueRegistry.WithExecutionContext(
@@ -488,6 +490,7 @@ export function createProjectStore(
     isOnLocalBackend,
     executionContext,
     firstExecution,
+    startupFailure,
     diagnostics,
     moduleProjectPath,
     entryPoint,

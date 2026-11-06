@@ -20,7 +20,10 @@ export type ToastContent =
  * updating one, it keeps its current value, and `null` returns it to the default.
  */
 export interface ToastOptions {
-  /** Showing a toast whose id is already displayed does nothing; use {@link ToastsStore.update}. */
+  /**
+   * Showing a toast whose id is already displayed does nothing; use {@link ToastsStore.update}. One
+   * that is still leaving is shown again.
+   */
   readonly toastId?: ToastId | undefined
   readonly type?: ToastType | null | undefined
   /** Milliseconds until the toast closes by itself, or `false` to keep it. 5 s by default. */
@@ -133,10 +136,21 @@ export function createToastsStore() {
     return toasts.value.find((toast) => toast.id === id)
   }
 
-  /** Show a toast, or queue it while {@link TOAST_LIMIT} toasts are shown. Returns its id. */
+  /**
+   * Show a toast, or queue it while {@link TOAST_LIMIT} toasts are shown. Returns its id. A toast
+   * with this id that is still leaving (dismissed, its exit animation not over) is shown again.
+   */
   function show(content: ToastContent, options: ToastOptions = {}): ToastId {
     const id = options.toastId ?? nextId++
-    if (find(id) != null) return id
+    const existing = find(id)
+    if (existing?.isIn) return id
+    if (existing != null) {
+      toasts.value = toasts.value.map((toast) =>
+        toast === existing ? makeToast(id, content, options) : toast,
+      )
+      emit({ id, status: 'updated' })
+      return id
+    }
     if (toasts.value.length >= TOAST_LIMIT) {
       queue.push({ content, options: { ...options, toastId: id } })
     } else {
@@ -170,6 +184,11 @@ export function createToastsStore() {
     toasts.value = toasts.value.map((toast) =>
       toast.isIn && (id == null || toast.id === id) ? { ...toast, isIn: false } : toast,
     )
+  }
+
+  /** Whether the toast waits for a place, {@link TOAST_LIMIT} toasts being shown. */
+  function isQueued(id: ToastId) {
+    return queue.some((entry) => entry.options.toastId === id)
   }
 
   /** Whether the toast is displayed and not closing. */
@@ -248,7 +267,7 @@ export function createToastsStore() {
     return running
   }
 
-  return { toasts, show, update, dismiss, isActive, remove, onChange, promise }
+  return { toasts, show, update, dismiss, isActive, isQueued, remove, onChange, promise }
 }
 
 /** The app's toasts, reachable from any code: Vue components and stores. */
