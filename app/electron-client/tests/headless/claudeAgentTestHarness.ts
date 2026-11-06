@@ -55,17 +55,26 @@ export class FakeChild extends EventEmitter {
   pushStderr(text: string): void {
     this.stderr.push(text)
   }
-  /** Simulate a crash: push optional stderr, set exit code, emit 'exit' on next microtask. */
+  /**
+   * Emit 'exit' then 'close', as a real child does once its stdio has ended. The watcher waits for
+   * 'close' (bounded by a drain timeout) before it acts on an exit, so a fake that only emitted
+   * 'exit' stalled respawn and the crash-loop guard for the whole timeout.
+   */
+  private exit(code: number | null, signal: NodeJS.Signals | null): void {
+    this.emit('exit', code, signal)
+    this.emit('close', code, signal)
+  }
+  /** Simulate a crash: push optional stderr, set exit code, emit 'exit' and 'close' on next microtask. */
   crash(code: number, stderr?: string): void {
     if (stderr != null) this.stderr.push(stderr)
     this.exitCode = code
-    queueMicrotask(() => this.emit('exit', code, null))
+    queueMicrotask(() => this.exit(code, null))
   }
-  /** Record the kill signal and emit 'exit' on next microtask, mirroring real `child.kill`. */
+  /** Record the kill signal and emit 'exit' and 'close' on next microtask, mirroring real `child.kill`. */
   kill(signal: NodeJS.Signals = 'SIGTERM'): boolean {
     this.killCalls.push(signal)
     this.exitCode = signal === 'SIGTERM' ? 143 : 137
-    queueMicrotask(() => this.emit('exit', this.exitCode, signal))
+    queueMicrotask(() => this.exit(this.exitCode, signal))
     return true
   }
 }

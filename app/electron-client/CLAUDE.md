@@ -744,7 +744,8 @@ Two layers, same directory, different runners — controlled by the `testIgnore`
 rule in `playwright.config.ts`:
 
 - `tests/headless/*.test.ts` — Vitest unit tests for main-process code. No
-  Electron, no DOM. Fast. Run with `corepack pnpm vitest --run tests/headless`.
+  Electron, no DOM. Fast. Run with `corepack pnpm run test:unit` (what CI runs:
+  the GUI checks' "Unit Tests" step, `ci:unit-test`).
 - `tests/*.spec.ts` — Playwright end-to-end tests that launch the packaged
   Electron binary from `dist/ide/` and drive the app from a real user's
   perspective (dashboard → project → graph editor). `electronTest.ts` extends
