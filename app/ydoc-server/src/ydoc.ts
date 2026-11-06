@@ -114,6 +114,14 @@ export function setupGatewayClient(
   console.log(
     `Setting up Gateway Client: docName=${docName}, lsUrl=${lsUrl ?? 'none'}, dataUrl=${dataUrl ?? 'none'}`,
   )
+  // Only the index document exists before a session does. A module document asked for with no
+  // session (a stale reconnect that outran the GUI's index reconnect) is refused before building
+  // one, which would open two sockets to the Language Server only to be torn down.
+  if (lsUrl && docName !== 'index' && !LanguageServerSession.sessions.has(lsUrl)) {
+    console.error(`Document '${docName}' not found: no session for the language server.`)
+    ws.close()
+    return
+  }
   const lsSession = getSessionForUrl(
     lsUrl,
     jsonChannelServer,

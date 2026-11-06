@@ -15,6 +15,8 @@ import { useToasts } from './toasts'
 
 /** A reason given to AbortController when opening, restoring or closing process is being aborted. */
 const PROCESS_ABORTED = 'aborted'
+/** How long the notice that a project's connection was restarted stays up. */
+const RECONNECT_TOAST_MS = 15_000
 
 /** A type of process */
 export type Process = 'opening' | 'closing' | 'restoring'
@@ -167,7 +169,7 @@ export function createOpenedProjectsStore() {
     toasts.show(getText('projectConnectionRestarted'), {
       type: 'warning',
       toastId: `project-connection-restarted-${id}`,
-      autoClose: false,
+      autoClose: RECONNECT_TOAST_MS,
     })
     state.scope.stop()
     project.state = {
@@ -224,6 +226,9 @@ export function createOpenedProjectsStore() {
         console.error(`${process} process interrupted by error.`, { cause: err })
         project.error = Error(`${process} process interrupted by error.`, { cause: err })
         project.nextTask = undefined
+        // A reconnect noted while this opening ran has nothing to reconnect: the next opening
+        // builds fresh stores.
+        project.reconnectPending = false
       }
     }
   }

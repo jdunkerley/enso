@@ -231,3 +231,53 @@ test('dispose kills the child and fails later requests', async () => {
   await expect(host.listen(request(5000))).rejects.toThrow(/disposed/)
   expect(spawn).toHaveBeenCalledOnce()
 })
+
+test('a request during a backoff does not reset the restart limit', async () => {
+  vi.useFakeTimers()
+  try {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { host, spawn, children } = setup()
+    await host.listen(request(4000))
+    // Four quick restarts later the fifth exit is waiting out its 8 s delay.
+    children[0]!.crash()
+    for (const [index, delay] of [1000, 2000, 4000].entries()) {
+      children[index + 1]!.crash()
+      await vi.advanceTimersByTimeAsync(delay)
+    }
+    children[4]!.crash()
+    expect(spawn).toHaveBeenCalledTimes(5)
+    // A request forks at once, but this is still the same crash loop: its exit is the sixth.
+    const pending = host.listen(request(5000))
+    expect(spawn).toHaveBeenCalledTimes(6)
+    await pending
+    children[5]!.crash()
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(spawn).toHaveBeenCalledTimes(6)
+    expect(error.mock.calls.some(([m]) => String(m).includes('not restarted'))).toBe(true)
+    error.mockRestore()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('a close during an in-flight listen wins: nothing is recorded as open', async () => {
+  let release: (() => void) | undefined
+  const { host, children } = setup((r) => {
+    if (r.type === 'listen' && !release) {
+      release = () => children[0]!.emit('message', done(r))
+      return undefined
+    }
+    return done(r)
+  })
+  const listening = host.listen(request(4000))
+  const closing = host.close(4000)
+  release!()
+  await listening
+  await closing
+  // The listener is not recorded as open: a restart does not restore it, and the port is free.
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  children[0]!.crash()
+  error.mockRestore()
+  expect(children).toHaveLength(1)
+  await host.listen(request(4000))
+})
