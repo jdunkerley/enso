@@ -6,20 +6,6 @@ target location), `driveActions.ts`, `assetItems.ts`, `suggestions.ts`,
 accessibility pieces below. The components using them are `../AssetsTable.vue`
 (the table) and `#/pages/dashboard/components/AssetRow.vue` (a row).
 
-## Column widths
-
-`columnWidths.ts` holds the widths the user dragged the columns to, saved in
-`localStorage` (`driveColumnWidths`) and shared by every category; the limits
-and defaults are `COLUMN_WIDTH_LIMITS` in `columnUtils.ts`, and the handle is
-`$/components/ColumnResizeHandle/`. The table lays out from its `<colgroup>`
-(`table-fixed`): every column but Name has a width, and Name, until it is given
-one, takes what the others leave (the table is then `max(100%, sum)` wide, so it
-scrolls sideways only once the columns need more than the panel). A cell clips
-what does not fit. A press on a handle must not start the rubber-band selection,
-so `AssetsTable.vue`'s `preventSelection` skips `[data-column-resize-handle]`;
-each heading cell is named by its heading (`aria-labelledby`), not by its
-content, which would take in the handle's name.
-
 ## The table's accessibility model (#208)
 
 - **An ARIA `grid`, not a `treegrid`.** The listing is flat: opening a directory
@@ -56,3 +42,17 @@ content, which would take in the handle's name.
   the rows, `Mod+X`; select the destination folder (or nothing, for the folder
   being shown), `Mod+V`. `Escape` cancels a pending cut. There is no keyboard
   drag.
+
+## Column widths
+
+`columnWidths.ts` holds the widths the user dragged the columns to, saved in
+`localStorage` (`driveColumnWidths`) and shared by every category; the limits
+and defaults are `COLUMN_WIDTH_LIMITS` in `columnUtils.ts`, and the handle is
+`$/components/ColumnResizeHandle/`. The table lays out from its `<colgroup>`
+(`table-fixed`): every column but Name has a width, and Name, until it is given
+one, takes what the others leave (the table is then `max(100%, sum)` wide, so it
+scrolls sideways only once the columns need more than the panel). A cell clips
+what does not fit. A press on a handle must not start the rubber-band selection,
+so `AssetsTable.vue`'s `preventSelection` skips `[data-column-resize-handle]`;
+each heading cell is named by its heading (`aria-labelledby`), not by its
+content, which would take in the handle's name.

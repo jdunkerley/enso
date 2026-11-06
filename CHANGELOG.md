@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [The Drive's columns can be resized: drag the right edge of a column's
+  heading, or focus it and use the arrow keys. A double click puts the column
+  back to its default width. The widths are remembered, and are the same in
+  every folder and category.][629]
 - [A fresh installation opens a short Getting Started sample, which reads a
   file, filters it, totals it by month and charts the totals, with documentation
   that walks through it one step at a time.][617]
@@ -420,6 +424,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[629]: https://github.com/jdunkerley/enso/pull/629
 [617]: https://github.com/jdunkerley/enso/pull/617
 [607]: https://github.com/jdunkerley/enso/pull/607
 [592]: https://github.com/jdunkerley/enso/pull/592
