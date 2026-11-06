@@ -6,7 +6,7 @@
  */
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { aotKey, enginePaths, isTranslocated, readJvmOptionsText } from './key.js'
+import { aotKey, enginePaths, isAppImageMount, isTranslocated, readJvmOptionsText } from './key.js'
 import { acquireTrainingLock } from './lock.js'
 import { EngineTrainer, type Trainer } from './trainer.js'
 import { aotRejection } from './useLog.js'
@@ -19,8 +19,15 @@ export {
   splitJvmOptions,
 } from '../projectService/jvmOptions.js'
 export { driveOpen, welcomeNodeId } from './driver.js'
-export { aotKey, enginePaths, isTranslocated, readJvmOptionsText } from './key.js'
+export { aotKey, enginePaths, isAppImageMount, isTranslocated, readJvmOptionsText } from './key.js'
 export { acquireTrainingLock } from './lock.js'
+export {
+  readyStableEngine,
+  stableEnginePath,
+  SYSTEM_HOOKS,
+  type StableEngineHooks,
+  type StableEngineOptions,
+} from './stableEngine.js'
 export { EngineTrainer, type Trainer } from './trainer.js'
 export { aotRejection } from './useLog.js'
 
@@ -106,12 +113,15 @@ export class JvmAotCache {
 
   /**
    * The current key's directory: `<root>/<key>`, or `undefined` when there is no cache for this
-   * engine (a development build with no bundled runtime, or a macOS translocated app).
+   * engine (a development build with no bundled runtime, a macOS translocated app, or an engine
+   * in a Linux AppImage's mount).
    */
   keyDirectory(): Promise<string | undefined> {
     this.keyDirectoryPromise ??= (async () => {
       const paths = await enginePaths(this.settings.ensoExecutable)
-      if (paths == null || isTranslocated(paths.engineRoot)) return undefined
+      if (paths == null || isTranslocated(paths.engineRoot) || isAppImageMount(paths.engineRoot)) {
+        return undefined
+      }
       const key = aotKey({
         appVersion: this.settings.appVersion,
         engineRoot: paths.engineRoot,
@@ -250,7 +260,9 @@ export class JvmAotCache {
     clearTimeout(this.retrainTimer)
     this.retrainTimer = setTimeout(() => {
       this.retrainTimer = undefined
-      void this.beginTraining()
+      this.beginTraining().catch((error: unknown) =>
+        console.error('JDK AOT cache: training could not start:', error),
+      )
     }, this.settings.retrainDelayMs ?? 60_000)
   }
 

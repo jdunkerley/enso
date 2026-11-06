@@ -51,15 +51,21 @@ desktop binary (AppImage/DMG/exe + installer).
   within a minute of its start, after 1, 2, 4 and 8 s; after five such restarts
   it waits for the next open or close and logs that (Note [The ydoc Host
   Restarts With A Bounded Backoff] in `client.ts`). Its `error` event (a fatal
-  V8 error) is logged; unhandled it would throw in the main process. A `listen`
-  on a port another open listener holds (one still being restored after a
-  restart) is refused as `EADDRINUSE`, so the shim searches new ports instead of
-  handing that project's GUI to another engine. In the process, `serve.ts`
-  chains one port's requests, so a `close` cannot overtake a restoring `listen`.
-  It prints `ydoc host pid=<pid>` at start; its stdout and stderr go through the
-  main process's console, so they reach the IDE log. `ENSO_YDOC_HOST=engine`
-  puts the server back in the engine for one release (see
-  `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
+  V8 error) is logged; unhandled it would throw in the main process. A request
+  while a backoff is pending forks at once but does not reset the restart count,
+  and a `close` while a `listen` is in flight keeps the port out of the restored
+  set. A `listen` on a port another open listener holds (one still being
+  restored after a restart) is refused as `EADDRINUSE`, so the shim searches new
+  ports instead of handing that project's GUI to another engine. In the process,
+  `serve.ts` chains one port's requests, so a `close` cannot overtake a
+  restoring `listen`. Every `listen` carries the origins the listener accepts
+  (`allowOrigins`, #596): the content server's `https://localhost:<port>` under
+  each loopback name, set by `allowYdocOrigin` from the server's `onListening`
+  (`index.ts`), with or without a window. Keep that call wherever the port is
+  decided, or every page is refused. It prints `ydoc host pid=<pid>` at start;
+  its stdout and stderr go through the main process's console, so they reach the
+  IDE log. `ENSO_YDOC_HOST=engine` puts the server back in the engine for one
+  release (see `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
   `tests/headless/ydocHostClient.test.ts` (against a fake child),
   `tests/headless/ydocHostServe.test.ts`.
 - Installs the bundled sample projects at start-up (`installSamples` in
@@ -201,6 +207,24 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   its JVM launches never pick up the user's cache. An empty value counts as
   unset. The root and the gate are in `src/jvmAotSettings.ts` (tested in
   `tests/headless/jvmAotSettings.test.ts`).
+- `APPIMAGE` (set by the AppImage runtime) — with the JVM as the default engine
+  (`--engine-mode`, `ENSO_ENGINE_MODE`, then the built-in default; nothing
+  happens while it is native), a Linux AppImage runs its engine from a copy at
+  `<userData>/engine/<version>/`, because its mount moves at every launch and
+  the AOT cache would never match (`project-manager-shim/CLAUDE.md`, "JDK AOT
+  cache"). `prepareAppImageEngine` (`projectService.ts`, called in `main()`
+  before the project service is set up) keeps a complete copy's launcher in a
+  module variable and passes it to the project service and the cache; it is
+  never written to `process.env`, which an in-app update's relaunch inherits.
+  Without a complete copy, `startAppImageEngineCopy` (called once the window has
+  loaded) makes one for the next launch, held back by `AfterFirstOpen` until the
+  first open has been answered (or a minute without an open), so that it does
+  not compete with that open for the AppImage's mount; a copy that fails or
+  finds no room is not tried again for that build for a day. A user's own
+  `ENSO_ENGINE_PATH` wins and turns all this off (`appImageEngine` in
+  `src/jvmAotSettings.ts`); one inside `<userData>/engine/` is an earlier IDE's
+  copy inherited through an update's relaunch, and `prepareAppImageEngine`
+  removes it from the environment (`isEngineCopyPath`).
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.
@@ -727,7 +751,8 @@ Two layers, same directory, different runners — controlled by the `testIgnore`
 rule in `playwright.config.ts`:
 
 - `tests/headless/*.test.ts` — Vitest unit tests for main-process code. No
-  Electron, no DOM. Fast. Run with `corepack pnpm vitest --run tests/headless`.
+  Electron, no DOM. Fast. Run with `corepack pnpm run test:unit` (what CI runs:
+  the GUI checks' "Unit Tests" step, `ci:unit-test`).
 - `tests/*.spec.ts` — Playwright end-to-end tests that launch the packaged
   Electron binary from `dist/ide/` and drive the app from a real user's
   perspective (dashboard → project → graph editor). `electronTest.ts` extends
