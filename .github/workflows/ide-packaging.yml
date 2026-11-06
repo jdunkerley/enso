@@ -39,7 +39,7 @@ on:
         type: string
         default: ""
       open_perf_runs:
-        description: Launches per engine.
+        description: Launches per engine (5 for a gate dispatch, as with 3 one hang makes a cell incomplete).
         required: false
         type: string
         default: "5"

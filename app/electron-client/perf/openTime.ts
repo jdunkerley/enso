@@ -819,6 +819,7 @@ async function main() {
     }
     const rejectedIn: number[] = []
     const uncachedIn: number[] = []
+    const uncheckedIn: number[] = []
     for (let run = 1; run <= options.runs; run++) {
       if (Date.now() > deadline) {
         console.warn(
@@ -868,8 +869,15 @@ async function main() {
         uncachedIn.push(run)
         console.warn(`Open time: jvm launch ${run} loaded almost no classes from the AOT cache.`)
       }
+      // No counters of the launch's own JVMs: said, not skipped.
+      if (engine === 'jvm' && cacheUsed === undefined && result.error == null) {
+        uncheckedIn.push(run)
+        console.warn(
+          `Open time: jvm launch ${run} has no hsperf counters; AOT cache use unchecked.`,
+        )
+      }
     }
-    if (prepared != null) shimAot = { ...prepared, rejectedIn, uncachedIn }
+    if (prepared != null) shimAot = { ...prepared, rejectedIn, uncachedIn, uncheckedIn }
     if (options.jvmDiagnostics && engine !== 'native') {
       const {
         stdout,

@@ -153,6 +153,16 @@ describe('gateOutcome', () => {
     expect(gateOutcome(1.5004, 1.2)).toBe('pass')
     expect(gateOutcome(1.606, 1.2)).toBe('fail')
   })
+  test('decides on exactly the printed value, at half-cent doubles', () => {
+    // 1.605 prints as "1.60" (not over the limit), 1.505 as "1.50" (a pass); Math.round says 1.61 and 1.51.
+    expect(
+      gateTable([dispatch('1', 1.605, 1), dispatch('2', 1.605, 1), dispatch('3', 1.605, 1)]),
+    ).toContain('**1.60**')
+    expect(gateOutcome(1.605, 1.2)).toBe('owner decides')
+    expect(gateOutcome(1.2, 1.605)).toBe('owner decides')
+    expect(gateOutcome(1.505, 1.2)).toBe('pass')
+    expect(gateOutcome(1.595, 1.2)).toBe('owner decides')
+  })
   test('a missing value (NaN) is no pass, an infinite one fails', () => {
     expect(gateOutcome(Number.NaN, 1.2)).toBe('fail')
     expect(gateOutcome(Number.POSITIVE_INFINITY, 1.2)).toBe('fail')
@@ -186,6 +196,22 @@ describe('gateTable', () => {
     const table = gateTable([dispatch('101', 1.4, 0.9, 2)])
     expect(table).toContain('1.40 (2/5 launches, native 5/5; incomplete)')
   })
+  test('without a decision the last row is plain and says it is not a gate value', () => {
+    const table = gateTable([dispatch('1', 1.88, 1), dispatch('2', 1.9, 1)])
+    expect(table).not.toContain('Gate value')
+    expect(table).not.toContain('**')
+    expect(table).toContain('(not a gate value)')
+  })
+  test('the gate value is the median of the latest three complete dispatches', () => {
+    const table = gateTable([
+      dispatch('1', 9, 9),
+      dispatch('2', 1.4, 1),
+      dispatch('3', 1.5, 1),
+      dispatch('4', 1.3, 1),
+    ])
+    expect(table).toContain('**1.40**')
+    expect(table).not.toContain('(not a gate value)')
+  })
   test('says when a dispatch has no report, and prints an infinite ratio as such', () => {
     const table = gateTable([
       { name: '1', welcome: {}, library: {} },
@@ -203,6 +229,22 @@ describe('gateDecision', () => {
     expect(gateDecision([dispatch('1', 2, 1), dispatch('2', 2.1, 1), dispatch('3', 1.9, 1)])).toBe(
       'fail',
     )
+  })
+  test('with four dispatches, one incomplete is set aside and the latest three complete decide', () => {
+    const four = [
+      dispatch('1', 2, 1),
+      dispatch('2', 1.4, 1.2, 2),
+      ...three.slice(0, 2),
+      dispatch('5', 1.45, 1.1),
+    ]
+    expect(gateDecision(four)).toBe('pass')
+    // the oldest complete one (2.0) is not among the latest three
+    expect(gateDecision([dispatch('0', 2, 1), ...three])).toBe('pass')
+  })
+  test('four dispatches with only two complete are insufficient', () => {
+    expect(
+      gateDecision([dispatch('1', 1.4, 1, 2), dispatch('2', 1.4, 1, 2), ...three.slice(0, 2)]),
+    ).toBe('insufficient data')
   })
   test('fewer than three dispatches are insufficient data, whatever the ratios', () => {
     expect(gateDecision(three.slice(0, 2))).toBe('insufficient data')

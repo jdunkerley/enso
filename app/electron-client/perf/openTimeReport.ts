@@ -100,20 +100,46 @@ export interface ShimAot {
    * {@link usedAotCache}): the cache was skipped, with or without a warning. Absent in older reports.
    */
   readonly uncachedIn?: readonly number[]
+  /**
+   * `jvm` launches whose cache use could not be checked: no hsperf counters of the launch's own
+   * JVMs (see {@link usedAotCache}). Absent in older reports.
+   */
+  readonly uncheckedIn?: readonly number[]
 }
 
 /** A JVM that used the AOT cache loaded ~18,000 classes from it; one that did not, ~1,500. */
 const CACHED_SHARED_CLASSES = 5000
 
 /**
- * Whether a `jvm` launch's JVMs used the AOT cache, from the hsperf counters its `jvm` marks hold
- * (the engine's JVM has the most shared classes): `undefined` when it has no counters.
+ * Whether a `jvm` launch's JVMs used the AOT cache, judged open by open on each open's own JVMs
+ * (hsperf `jvm` marks): a JVM belongs to the launch when it started after the `launch` mark (a
+ * file left by an earlier launch's JVM that is still alive is older), and to an open when it
+ * started after that open's click and before the next open's. An open is cached when its JVM with
+ * the most shared classes has at least {@link CACHED_SHARED_CLASSES}. The launch is `false` when
+ * any open that has a JVM is not, so a cached second open cannot hide an uncached first; `undefined`
+ * when no open has a JVM with counters (hsperf unavailable: `-XX:-UsePerfData`, an unreadable
+ * temporary directory), which the caller records as unchecked.
  */
 export function usedAotCache(marks: readonly Mark[]): boolean | undefined {
-  const counts = marks.flatMap((m) =>
-    m.k === 'jvm' && typeof m.sharedClasses === 'number' ? m.sharedClasses : [],
+  const launch = marks.find((m) => m.k === 'launch')?.t ?? 0
+  const clicks = (['first', 'second'] as const)
+    .map((tag) => marks.find((m) => m.k === `${tag}:click`)?.t)
+    .filter((t): t is number => t != null)
+    .sort((a, b) => a - b)
+  const jvms = marks.flatMap((m) =>
+    m.k === 'jvm' && typeof m.sharedClasses === 'number' && typeof m.vmStart === 'number' ?
+      [{ start: m.vmStart, shared: m.sharedClasses }]
+    : [],
   )
-  return counts.length === 0 ? undefined : Math.max(...counts) >= CACHED_SHARED_CLASSES
+  const verdicts: boolean[] = []
+  clicks.forEach((click, i) => {
+    const next = clicks[i + 1] ?? Number.POSITIVE_INFINITY
+    const shared = jvms
+      .filter((j) => j.start >= Math.max(launch, click) && j.start < next)
+      .map((j) => j.shared)
+    if (shared.length > 0) verdicts.push(Math.max(...shared) >= CACHED_SHARED_CLASSES)
+  })
+  return verdicts.length === 0 ? undefined : verdicts.every(Boolean)
 }
 
 export interface OpenTimeReport {
@@ -348,7 +374,11 @@ export function describeShimAot(aot: ShimAot): string {
     aot.uncachedIn != null && aot.uncachedIn.length > 0 ?
       `; no classes from the cache in launches ${aot.uncachedIn.join(', ')}`
     : ''
-  return `Shim AOT cache: trained in ${(aot.trainingMs / 1000).toFixed(1)} s, ${mib} MiB, ${rejected}${uncached}.`
+  const unchecked =
+    aot.uncheckedIn != null && aot.uncheckedIn.length > 0 ?
+      `; cache use not checked (no hsperf counters) in launches ${aot.uncheckedIn.join(', ')}`
+    : ''
+  return `Shim AOT cache: trained in ${(aot.trainingMs / 1000).toFixed(1)} s, ${mib} MiB, ${rejected}${uncached}${unchecked}.`
 }
 
 const cell = (value: number | undefined) => (value == null ? '–' : String(Math.round(value)))
@@ -444,6 +474,11 @@ export function regressionWarnings(
   if (report.shimAot?.uncachedIn != null && report.shimAot.uncachedIn.length > 0) {
     warnings.push(
       `jvm: launches ${report.shimAot.uncachedIn.join(', ')} loaded almost no classes from the AOT cache (hsperf sharedClasses), so they ran uncached`,
+    )
+  }
+  if (report.shimAot?.uncheckedIn != null && report.shimAot.uncheckedIn.length > 0) {
+    warnings.push(
+      `jvm: launches ${report.shimAot.uncheckedIn.join(', ')} have no hsperf counters, so whether they used the AOT cache is unknown`,
     )
   }
   // A launch that reached the welcome table but failed later (the second open) still counts in the

@@ -854,9 +854,14 @@ Every launch sets the engine mode as a user would: `ENSO_ENGINE_MODE=native` or
   later ones ran uncached. `uncachedIn` is the JVM's own evidence: the launches
   whose JVMs loaded under 5000 classes from the cache (hsperf `sharedClasses`:
   ~18,000 with it, ~1,500 without), which also catches a cache skipped without a
-  warning (Note [The Shim's AOT Cache Is Prepared Before The Launches]). A
-  baseline report counts for `jvm` only when it has `shimAot`: older `jvm` runs
-  had the harness's own cache. `open-time.md` prints it under the caption.
+  warning (Note [The Shim's AOT Cache Is Prepared Before The Launches]). It is
+  judged open by open, on each open's own JVMs (started after the launch began
+  and after that open's click), so a cached second open cannot hide an uncached
+  first one and an older launch's surviving JVM is ignored; `uncheckedIn` lists
+  the launches with no such counters (hsperf unreadable, or `-XX:-UsePerfData`),
+  with a warning, instead of skipping them silently. A baseline report counts
+  for `jvm` only when it has `shimAot`: older `jvm` runs had the harness's own
+  cache. `open-time.md` prints it under the caption.
 - `jvm-first`: the same variables, with `<out>/jvm-aot` deleted before every
   launch: a user's very first launch. Nothing trains during its open: the shim
   stops a running training when an open starts and restarts it 60 s after the
@@ -905,8 +910,10 @@ three dispatches of the ratio JVM/native, within each dispatch, for
 `welcomeShown` (welcome template) and `libraryShown` (`image` template), both at
 most 1.5 passing and either over 1.6 failing (between: the owner decides), on
 the values as printed. Run a dispatch with
-`open_perf_engines=native,jvm,jvm-first` and `open_perf_template=welcome,image`,
-download both platforms
+`open_perf_engines=native,jvm,jvm-first` and `open_perf_template=welcome,image`
+with `open_perf_runs=5` (the default; keep it: with 3 launches per cell, a
+single hang leaves a cell under the 3 successes it needs and the result is
+"insufficient data"), download both platforms
 (`gh run download <id> --name open-perf-windows --dir <dir>/<id>/windows`, and
 `open-perf-linux`), and
 
@@ -919,13 +926,16 @@ prints, per platform, the per-dispatch ratios with their launch counts
 `jvm-first`. It drops nothing quietly (Note [The Gate Drops Nothing]): a JVM
 launch that never reached the phase ranks as slower than every success (and a
 native one as faster), a cell with fewer than 3 successes is incomplete, and
-without three dispatches whose Windows cells are all complete it prints
-"insufficient data" instead of an outcome. Only Windows has an outcome; Linux
-and macOS are informational. It refuses a dispatch whose `jvm` launches have no
-`shimAot` (made before PR K, with the harness's own cache). The `image`
-template's headline is both marks at once, and a report records it as
-`welcomeShown`, so `libraryShown` falls back to it, for a report of the `image`
-project only.
+without three dispatches whose Windows `jvm` cells are all complete it prints
+"insufficient data" instead of an outcome, and then the last table row is the
+plain median of the ratios, labelled "not a gate value". Given four or more
+dispatches it uses the latest three (the last directories given) whose Windows
+`jvm` cells are complete, and shows the others without using them. Only Windows
+has an outcome; Linux and macOS are informational. It refuses a dispatch whose
+`jvm` launches have no `shimAot` (made before PR K, with the harness's own
+cache). The `image` template's headline is both marks at once, and a report
+records it as `welcomeShown`, so `libraryShown` falls back to it, for a report
+of the `image` project only.
 
 CI uploads `electron-out.log` and `hsperf/` too; by hand, `ide-packaging.yml`
 takes `open_perf_engines`, `open_perf_runs`, `open_perf_budget`,

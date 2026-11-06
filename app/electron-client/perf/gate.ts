@@ -15,7 +15,8 @@
  * Nothing is dropped quietly (Note [The Gate Drops Nothing]): every cell prints its launch counts,
  * a launch that never reached the phase counts against the engine, a cell with fewer than
  * `MIN_LAUNCHES` successes is incomplete, and without three complete dispatches there is no
- * outcome ("insufficient data").
+ * outcome ("insufficient data"). With more than three, the latest three complete ones (the last
+ * `<dir>`s given) are the gate; an incomplete one is set aside, still shown in the table.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -46,7 +47,8 @@ export const GATE_DISPATCHES = 3
  * every success (infinitely slow) and a native one below every success (0), both the conservative
  * way for the ratio; each cell shows `successes/launches` for both engines; a cell under
  * `MIN_LAUNCHES` successes is incomplete; and the outcome needs `GATE_DISPATCHES` dispatches whose
- * Windows cells are all complete.
+ * Windows `jvm` cells are all complete (the latest such; an incomplete one is shown, not used).
+ * Gate dispatches run with 5 launches per cell: with 3, one hang already makes a cell incomplete.
  */
 
 /**
@@ -121,15 +123,17 @@ export function gateValue(ratios: readonly number[]): number {
   return median(ratios) ?? Number.NaN
 }
 
-const round2 = (value: number) => (Number.isFinite(value) ? Math.round(value * 100) / 100 : value)
+/** A value as the table prints it: two decimals. The outcome is decided on this, not on a rounding of its own. */
+export const printed = (value: number): number =>
+  Number.isFinite(value) ? Number(value.toFixed(2)) : value
 
 /**
  * The spec's gate, decided on the values as printed (two decimals). A missing value (`NaN`) fails:
  * no measurement is no pass.
  */
 export function gateOutcome(welcomeValue: number, libraryValue: number): GateOutcome {
-  const welcome = round2(welcomeValue)
-  const library = round2(libraryValue)
+  const welcome = printed(welcomeValue)
+  const library = printed(libraryValue)
   if (Number.isNaN(welcome) || Number.isNaN(library)) return 'fail'
   if (welcome > FAIL_LIMIT || library > FAIL_LIMIT) return 'fail'
   if (welcome <= PASS_LIMIT && library <= PASS_LIMIT) return 'pass'
@@ -172,7 +176,7 @@ const ENGINES: readonly GateEngine[] = ['jvm', 'jvm-first']
 
 function ratioText(value: number | undefined): string {
   if (value == null || Number.isNaN(value)) return '–'
-  return Number.isFinite(value) ? value.toFixed(2) : 'inf (the median launch failed)'
+  return Number.isFinite(value) ? printed(value).toFixed(2) : 'inf (the median launch failed)'
 }
 
 function cellText(cell: GateCell | undefined): string {
@@ -181,8 +185,25 @@ function cellText(cell: GateCell | undefined): string {
   return `${ratioText(cell.ratio)} (${counts}${isComplete(cell) ? '' : '; incomplete'})`
 }
 
-/** A Markdown table: a row per dispatch, then the gate value (median) of each column. */
+/**
+ * The dispatches a gate value is the median of: the latest `GATE_DISPATCHES` (the last ones given)
+ * whose `jvm` welcome and library cells are both complete, so one incomplete dispatch among four
+ * or more is set aside. `undefined` when fewer than that many are complete.
+ */
+export function selectGateDispatches(
+  dispatches: readonly DispatchRatios[],
+): DispatchRatios[] | undefined {
+  const complete = dispatches.filter((d) => isComplete(d.welcome.jvm) && isComplete(d.library.jvm))
+  return complete.length < GATE_DISPATCHES ? undefined : complete.slice(-GATE_DISPATCHES)
+}
+
+/**
+ * A Markdown table: a row per dispatch, then the gate value (median) of each column over the
+ * dispatches {@link selectGateDispatches} picks. Without enough complete dispatches the last row
+ * is the plain median of whatever ratios exist, labelled as not a gate value.
+ */
 export function gateTable(dispatches: readonly DispatchRatios[]): string {
+  const selected = selectGateDispatches(dispatches)
   const columns = [
     ...ENGINES.map((e) => ({ title: `welcome ${e}`, pick: (d: DispatchRatios) => d.welcome[e] })),
     ...ENGINES.map((e) => ({ title: `library ${e}`, pick: (d: DispatchRatios) => d.library[e] })),
@@ -193,22 +214,26 @@ export function gateTable(dispatches: readonly DispatchRatios[]): string {
     ...dispatches.map(
       (d) => `| ${d.name} | ${columns.map((c) => cellText(c.pick(d))).join(' | ')} |`,
     ),
-    `| **Gate value** | ${columns
-      .map((c) => `**${ratioText(gateValue(dispatches.flatMap((d) => c.pick(d)?.ratio ?? [])))}**`)
-      .join(' | ')} |`,
+    selected == null ?
+      `| Median of the ratios above (not a gate value) | ${columns
+        .map((c) => ratioText(gateValue(dispatches.flatMap((d) => c.pick(d)?.ratio ?? []))))
+        .join(' | ')} |`
+    : `| **Gate value** | ${columns
+        .map((c) => `**${ratioText(gateValue(selected.flatMap((d) => c.pick(d)?.ratio ?? [])))}**`)
+        .join(' | ')} |`,
   ].join('\n')
 }
 
 /**
- * The outcome for a platform's dispatches (the `jvm` cells): `insufficient data` unless there are
- * `GATE_DISPATCHES` dispatches whose welcome and library cells are all complete.
+ * The outcome for a platform's dispatches (the `jvm` cells): `insufficient data` unless
+ * {@link selectGateDispatches} finds `GATE_DISPATCHES` dispatches whose welcome and library cells
+ * are complete; with more, the latest complete ones decide.
  */
 export function gateDecision(dispatches: readonly DispatchRatios[]): GateDecision {
-  if (dispatches.length < GATE_DISPATCHES) return 'insufficient data'
-  const cells = dispatches.flatMap((d) => [d.welcome.jvm, d.library.jvm])
-  if (!cells.every(isComplete)) return 'insufficient data'
+  const selected = selectGateDispatches(dispatches)
+  if (selected == null) return 'insufficient data'
   const value = (pick: (d: DispatchRatios) => GateCell | undefined) =>
-    gateValue(dispatches.flatMap((d) => pick(d)?.ratio ?? []))
+    gateValue(selected.flatMap((d) => pick(d)?.ratio ?? []))
   return gateOutcome(
     value((d) => d.welcome.jvm),
     value((d) => d.library.jvm),

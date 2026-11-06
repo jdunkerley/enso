@@ -491,15 +491,47 @@ describe('the jvm baseline', () => {
 })
 
 describe('usedAotCache', () => {
-  const jvmMark = (sharedClasses: number): Mark => ({ k: 'jvm', t: 1, sharedClasses })
-  test('is true when a JVM loaded many classes from the cache', () => {
-    expect(usedAotCache([jvmMark(1500), jvmMark(18_000)])).toBe(true)
+  const jvmMark = (sharedClasses: number, vmStart: number): Mark => ({
+    k: 'jvm',
+    t: vmStart + 10,
+    sharedClasses,
+    vmStart,
   })
-  test('is false when none did', () => {
-    expect(usedAotCache([jvmMark(1500), jvmMark(1400)])).toBe(false)
+  const frame: Mark[] = [
+    { k: 'launch', t: 1000 },
+    { k: 'first:click', t: 2000 },
+    { k: 'second:click', t: 5000 },
+  ]
+  test('is true when the open JVM loaded many classes from the cache', () => {
+    expect(usedAotCache([...frame, jvmMark(18_000, 2100)])).toBe(true)
   })
-  test('is undefined without counters', () => {
-    expect(usedAotCache([{ k: 'launch', t: 1 }])).toBeUndefined()
+  test('is false when it did not', () => {
+    expect(usedAotCache([...frame, jvmMark(1500, 2100), jvmMark(1400, 2150)])).toBe(false)
+  })
+  test('a cached second open does not hide an uncached first open', () => {
+    expect(usedAotCache([...frame, jvmMark(1500, 2100), jvmMark(18_000, 5100)])).toBe(false)
+  })
+  test('a cached first open with an uncached second open is uncached', () => {
+    expect(usedAotCache([...frame, jvmMark(18_000, 2100), jvmMark(1500, 5100)])).toBe(false)
+  })
+  test('a surviving JVM of an earlier launch is ignored', () => {
+    expect(usedAotCache([...frame, jvmMark(18_000, 500), jvmMark(1500, 2100)])).toBe(false)
+    expect(usedAotCache([...frame, jvmMark(1500, 500), jvmMark(18_000, 2100)])).toBe(true)
+  })
+  test('an open without a JVM of its own is not judged', () => {
+    expect(usedAotCache([...frame, jvmMark(18_000, 2100)])).toBe(true)
+  })
+  test('is undefined without counters, or with only a stale JVM', () => {
+    expect(usedAotCache([...frame])).toBeUndefined()
+    expect(usedAotCache([...frame, jvmMark(18_000, 500)])).toBeUndefined()
+  })
+  test('uncheckedIn is printed and warned about', () => {
+    const base = {
+      ...report([3000, 3000, 3000], 'jvm'),
+      shimAot: { trainingMs: 1000, cacheBytes: 1048576, rejectedIn: [], uncheckedIn: [2] },
+    }
+    expect(renderMarkdown(base, undefined)).toContain('cache use not checked')
+    expect(regressionWarnings(base, undefined).join(' ')).toContain('launches 2 have no hsperf')
   })
   test('uncachedIn is printed and warned about', () => {
     const base = {
