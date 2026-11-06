@@ -39,8 +39,13 @@ object BrowserPageGuard extends LazyLogging {
         .filterNot(_.equalsIgnoreCase("none"))
         .map(site => s"Sec-Fetch-Site: $site")
 
-  /** Completes with `403` a request from a web page, and passes the rest on. */
-  val refuseBrowserPages: Directive0 =
+  /** Completes with `403` a request from a web page, and passes the rest on.
+    *
+    * A `def`, not a `val`: this object is initialised while the native image
+    * is built, and a `Directive` held in a field would land in the image heap,
+    * which Native Image refuses for Akka HTTP's classes.
+    */
+  def refuseBrowserPages: Directive0 =
     Directive { inner =>
       extractRequest { request =>
         browserPage(request) match {
