@@ -36,6 +36,7 @@ interface PlaceholderOverrides {
   readonly enterTheNewKeyboardShortcutFor: [actionName: string]
   readonly shortcutAlreadyUsedBy: [actionNames: string]
   readonly shortcutConflictsWith: [actionNames: string]
+  readonly resizeColumnX: [columnName: string]
 
   readonly updateAssetBackendError: [assetTitle: string]
   readonly getFileDetailsBackendError: [fileTitle: string]

@@ -271,7 +271,12 @@ function onDrop(event: DragEvent) {
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
-    <td v-for="column in columns" :key="column" :class="COLUMN_CSS_CLASS[column]">
+    <!-- A cell clips what does not fit the width its column was resized to. -->
+    <td
+      v-for="column in columns"
+      :key="column"
+      :class="[COLUMN_CSS_CLASS[column], 'overflow-hidden text-ellipsis']"
+    >
       <AssetColumnCell :column="column" :item="item" :labels="labels" />
     </td>
   </tr>
