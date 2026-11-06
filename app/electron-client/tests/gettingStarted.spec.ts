@@ -8,9 +8,9 @@ import {
   addBankData,
   addFirstElementToWidgetVector,
   closeWelcome,
+  COLD_PROJECT_TIMEOUT,
   createNewProject,
   fillWidgetText,
-  FIRST_PROJECT_TIMEOUT,
   openComponentBrowser,
   openDropdownInWidget,
   parkMouse,
@@ -34,24 +34,31 @@ const GETTING_STARTED_NODES = [
   'month',
   'dated',
   'totals',
-  'chart',
+  'monthly',
 ]
 
-// A fresh install (every spec has a fresh projects directory) opens the Getting_Started sample:
-// its graph, and the last node's stored chart of the 12 monthly totals.
-test('A fresh install opens the Getting Started sample', async ({ page }) => {
-  await expect(page.getByRole('tab', { name: WELCOME_PROJECT_TAB, exact: true })).toBeVisible({
-    timeout: 60000,
+test.describe('fresh install', () => {
+  // The only spec that lets the app open the welcome project (the fixture turns it off).
+  test.use({ welcomeProject: true })
+
+  // A fresh install (every spec has a fresh projects directory) opens the Getting_Started
+  // sample: its graph, and the last node's stored chart of the 12 monthly totals. The open has a
+  // cold Language Server, hence the long waits.
+  test('A fresh install opens the Getting Started sample', async ({ page }) => {
+    test.setTimeout(COLD_PROJECT_TIMEOUT + 60_000)
+    const tab = page.getByRole('tab', { name: WELCOME_PROJECT_TAB, exact: true })
+    await expect(tab).toBeVisible({ timeout: 60_000 })
+    const nodes = page.locator('.GraphNode')
+    await expect(nodes.first()).toBeVisible({ timeout: COLD_PROJECT_TIMEOUT })
+    for (const binding of GETTING_STARTED_NODES) {
+      const node = nodes.filter({
+        has: page.locator('.binding').getByText(binding, { exact: true }),
+      })
+      await expect(node).toHaveCount(1)
+    }
+    const chart = page.locator('.ScatterplotVisualization')
+    await expect(chart.locator('.scatterPoint')).toHaveCount(12, { timeout: COLD_PROJECT_TIMEOUT })
   })
-  const nodes = page.locator('.GraphNode')
-  await expect(nodes.first()).toBeVisible({ timeout: FIRST_PROJECT_TIMEOUT })
-  for (const binding of GETTING_STARTED_NODES) {
-    const node = nodes.filter({ has: page.locator('.binding').getByText(binding, { exact: true }) })
-    await expect(node).toHaveCount(1)
-  }
-  const chart = page.locator('.ScatterplotVisualization')
-  await expect(chart).toBeVisible({ timeout: FIRST_PROJECT_TIMEOUT })
-  await expect(chart.locator('.scatterPoint')).toHaveCount(12, { timeout: FIRST_PROJECT_TIMEOUT })
 })
 
 // First excercise in Enso Analytics 101

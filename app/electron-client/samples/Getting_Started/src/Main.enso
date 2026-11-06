@@ -9,13 +9,15 @@ import Standard.Visualization
    category, totals them by month, and charts the totals. Select a node and press Space to see its
    value; press Space again to hide it.
 
-   1. Read. Select `orders` to see the file as a table, with one row per order.
+   1. Read. `orders_file` says which file to read: `orders.csv`, in the `Data` folder beside this
+      project. Select `orders` to see the file as a table, with one row per order.
    2. Filter. Select `books` to see only the orders in the Books category. Click `'Books'` on the
       node and type another category, such as `'Games'`, and every later step updates.
-   3. Add a column. Select `dated` to see each order with the month it was placed in.
+   3. Add a column. `month` takes the month, from 1 to 12, out of each order's date, and
+      `dated` adds it to the table: select `dated` to see each order with its month.
    4. Aggregate. Select `totals` to see one row per month, with the total sales of that month.
-   5. Chart. `chart` shows the monthly totals as a Scatter Plot. Use the visualization selector
-      above a node's value to switch between the Table and a chart.
+   5. Chart. `monthly` puts the totals in month order and shows them as a Scatter Plot. Use
+      the visualization selector above a node's value to switch between the Table and a chart.
 
    To add a step of your own, select a node and press Enter, then pick a component to apply to
    its result.
@@ -36,11 +38,11 @@ main =
     ## Step 4: the total sales of each month.
     totals = dated.aggregate ['month'] [..Sum 'total' 'Sales']
     ## Step 5: the totals in month order, shown as a chart.
-    chart = totals.sort ['month']
-    chart
+    monthly = totals.sort ['month']
+    monthly
 
 
 
 #### METADATA ####
-[[{"index":{"value":1426},"size":{"value":48}},"2cb0b7c2-dbed-4d70-a3eb-29dc6e4fbdab"],[{"index":{"value":1557},"size":{"value":57}},"0cb2907c-c8c9-4d07-a086-de074adb1963"],[{"index":{"value":1681},"size":{"value":42}},"bb20a832-dcef-443d-ab14-b7c57a81381e"],[{"index":{"value":1782},"size":{"value":29}},"5c8bcd58-fb37-4162-b3d9-36eb3010c5ee"],[{"index":{"value":1869},"size":{"value":23}},"42faf02b-9b94-4287-9060-fa8f6770a237"],[{"index":{"value":1952},"size":{"value":49}},"5621e03d-1af9-4210-8c06-f2e4290cc1ec"],[{"index":{"value":2074},"size":{"value":21}},"6776c838-4a02-448b-bc35-230b2b95c48a"],[{"index":{"value":2100},"size":{"value":5}},"98b46c64-8573-412d-b093-fa19c198c24e"]]
-{"ide":{"node":{"2cb0b7c2-dbed-4d70-a3eb-29dc6e4fbdab":{"position":{"vector":[-16,16]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"folder"}},"0cb2907c-c8c9-4d07-a086-de074adb1963":{"position":{"vector":[-16,-56]},"cachedAppearance":{"color":"oklch(0.464 0.14 170)","icon":"data_input"}},"bb20a832-dcef-443d-ab14-b7c57a81381e":{"position":{"vector":[-16,-128]},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"preparation"}},"5c8bcd58-fb37-4162-b3d9-36eb3010c5ee":{"position":{"vector":[-16,-200]},"cachedAppearance":{"color":"oklch(0.464 0.14 295)","icon":"time"}},"42faf02b-9b94-4287-9060-fa8f6770a237":{"position":{"vector":[666,-272]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"column_add"}},"5621e03d-1af9-4210-8c06-f2e4290cc1ec":{"position":{"vector":[666,-344]},"cachedAppearance":{"color":"oklch(0.464 0.14 230)","icon":"transform"}},"6776c838-4a02-448b-bc35-230b2b95c48a":{"position":{"vector":[666,-416]},"visualization":{"show":true,"project":{"project":"Builtin"},"name":"Scatter Plot"},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"order"}},"98b46c64-8573-412d-b093-fa19c198c24e":{"position":{"vector":[666,-630]}}},"widget":{},"import":{}}}
+[[{"index":{"value":1638},"size":{"value":48}},"6cc60197-b36b-4fb3-b64e-a3f535dc01d4"],[{"index":{"value":1769},"size":{"value":57}},"046134b6-5b9b-4c7c-8237-49597017b982"],[{"index":{"value":1893},"size":{"value":42}},"e3f03121-1ac3-40a6-b028-5356e23ccf94"],[{"index":{"value":1994},"size":{"value":29}},"aac976a7-bac2-4d68-9863-ebc16d63250e"],[{"index":{"value":2081},"size":{"value":23}},"961d91ef-42ea-4921-9df1-2e12b3b99c86"],[{"index":{"value":2164},"size":{"value":49}},"f5bd4d6a-959f-4a78-943a-ae2d0f6b6161"],[{"index":{"value":2288},"size":{"value":21}},"df75d62c-38ca-40a7-b843-0052be931075"],[{"index":{"value":2314},"size":{"value":7}},"0e1acfe6-e6c0-4cbd-ba34-c61ab59ee193"]]
+{"ide":{"node":{"6cc60197-b36b-4fb3-b64e-a3f535dc01d4":{"position":{"vector":[-16,16]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"folder"}},"046134b6-5b9b-4c7c-8237-49597017b982":{"position":{"vector":[-16,-56]},"cachedAppearance":{"color":"oklch(0.464 0.14 170)","icon":"data_input"}},"e3f03121-1ac3-40a6-b028-5356e23ccf94":{"position":{"vector":[-16,-128]},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"preparation"}},"aac976a7-bac2-4d68-9863-ebc16d63250e":{"position":{"vector":[-16,-200]},"cachedAppearance":{"color":"oklch(0.464 0.14 295)","icon":"time"}},"961d91ef-42ea-4921-9df1-2e12b3b99c86":{"position":{"vector":[-16,-272]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"column_add"}},"f5bd4d6a-959f-4a78-943a-ae2d0f6b6161":{"position":{"vector":[-16,-344]},"cachedAppearance":{"color":"oklch(0.464 0.14 230)","icon":"transform"}},"df75d62c-38ca-40a7-b843-0052be931075":{"position":{"vector":[-16,-416]},"visualization":{"show":true,"project":{"project":"Builtin"},"name":"Scatter Plot"},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"order"}},"0e1acfe6-e6c0-4cbd-ba34-c61ab59ee193":{"position":{"vector":[-16,-630]}}},"widget":{},"import":{}}}

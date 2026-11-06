@@ -12,6 +12,7 @@ import {
   Path,
   ProjectId,
   type AssetDetailsResponse,
+  type DirectoryId,
 } from 'enso-common/src/services/Backend'
 import { newDirectoryId, type LocalBackend } from 'enso-common/src/services/LocalBackend'
 import { platform, Platform } from 'enso-common/src/utilities/detect'
@@ -19,12 +20,19 @@ import { getFileName } from 'enso-common/src/utilities/file'
 import type { NavigationGuardReturn, RouteLocation } from 'vue-router'
 
 export const SAMPLES_DIRECTORY = 'Samples'
+/** The bundled sample a fresh install opens, in `Samples`. */
+export const WELCOME_PROJECT_NAME = 'Getting_Started'
 /**
  * The project a fresh install opens: the bundled `Getting_Started` sample
  * (`app/electron-client/samples`), which the Electron app installs into `Samples` before it
  * loads the dashboard.
  */
-export const LOCAL_WELCOME_PROJECT_RELATIVE_PATH = `${SAMPLES_DIRECTORY}/Getting_Started`
+export const LOCAL_WELCOME_PROJECT_RELATIVE_PATH = `${SAMPLES_DIRECTORY}/${WELCOME_PROJECT_NAME}`
+/**
+ * Set in `localStorage` when the welcome project is opened, so that it opens once: closing it and
+ * starting again lands on the Drive, even before the user has a project of their own.
+ */
+export const WELCOME_PROJECT_OPENED_KEY = 'enso-welcome-project-opened'
 
 type BackendAPI<B extends Backend> = Pick<B, 'rootPath' | 'listDirectory'>
 
@@ -55,16 +63,26 @@ export async function maybeRedirectToTab(to: RouteLocation) {
   if (tab != null) return routeFromTab(tab, to)
 }
 
-/** Get path of the project to auto-open on application launch. */
+/**
+ * Get path of the project to auto-open on application launch: the one named on the command line,
+ * else, on a fresh install, the welcome project (once; see `WELCOME_PROJECT_OPENED_KEY`).
+ * @param openWelcomeProject - `false` when the `--no-welcome-project` flag was given.
+ */
 export async function welcomeProjectPath(
   cliStartupProject: string | undefined,
   { localBackend }: { localBackend: BackendAPI<LocalBackend> | null },
+  openWelcomeProject = true,
 ): Promise<string | undefined> {
   if (cliStartupProject?.startsWith('file:')) return undefined
   // If not file url, we expect this parameter to be a project name
   if (cliStartupProject) return `${localBackend?.rootPath()}/${cliStartupProject}`
-  if (await shouldOpenWelcomeProject(localBackend)) {
-    return `${localBackend?.rootPath()}/${LOCAL_WELCOME_PROJECT_RELATIVE_PATH}`
+  if (
+    openWelcomeProject &&
+    localBackend != null &&
+    (await shouldOpenWelcomeProject(localBackend))
+  ) {
+    window.localStorage.setItem(WELCOME_PROJECT_OPENED_KEY, 'true')
+    return `${localBackend.rootPath()}/${LOCAL_WELCOME_PROJECT_RELATIVE_PATH}`
   }
   return undefined
 }
@@ -87,39 +105,62 @@ export async function maybeRedirectToProject(to: RouteLocation): Promise<Navigat
     : undefined
 
   const initialPath =
-    pathFromOptions ?? (await welcomeProjectPath(config.params.startup.project, backends))
+    pathFromOptions ??
+    (await welcomeProjectPath(
+      config.params.startup.project,
+      backends,
+      config.params.startup.welcomeProject,
+    ))
 
   return initialPath ? { name: 'ensoPath', params: { path: initialPath.split('/') } } : true
 }
 
-async function shouldOpenWelcomeProject(localBackend: Pick<LocalBackend, 'listDirectory'> | null) {
+/**
+ * Whether this is a fresh install: the welcome project was never opened, the Drive was never
+ * browsed, the projects folder holds nothing but `Samples`, and `Samples` holds the welcome
+ * project. A `Samples` folder installed by a build without it (samples are copied only when
+ * `Samples` is missing) is not enough.
+ */
+async function shouldOpenWelcomeProject(localBackend: Pick<LocalBackend, 'listDirectory'>) {
+  if (window.localStorage.getItem(WELCOME_PROJECT_OPENED_KEY)) return false
   const navigatedInDrive =
     window.localStorage.getItem('enso-category-id') ||
     window.localStorage.getItem('enso-current-directory-id')
   if (navigatedInDrive) return false
 
-  const homeDirQuery = {
-    parentId: null,
-    filterBy: null,
-    labels: null,
-    sortExpression: null,
-    sortDirection: null,
-    from: null,
-    pageSize: null,
-    recentProjects: false,
-  }
   const onError = (err: unknown) => {
     console.error('Cannot read user home directory; will skip launching Welcome Project', err)
     return null
   }
-  const localHome =
-    localBackend == null ?
-      { assets: [] }
-    : await localBackend.listDirectory(homeDirQuery).catch(onError)
-  if (localHome == null) return false
-  return !localHome.assets.some((asset) => {
-    return asset.type != AssetType.directory || asset.title != SAMPLES_DIRECTORY
-  })
+  const list = (parentId: DirectoryId | null) =>
+    localBackend
+      .listDirectory({
+        parentId,
+        filterBy: null,
+        labels: null,
+        sortExpression: null,
+        sortDirection: null,
+        from: null,
+        pageSize: null,
+        recentProjects: false,
+      })
+      .catch(onError)
+  const localHome = await list(null)
+  const [samples, ...others] = localHome?.assets ?? []
+  if (
+    samples == null ||
+    others.length > 0 ||
+    samples.type !== AssetType.directory ||
+    samples.title !== SAMPLES_DIRECTORY
+  ) {
+    return false
+  }
+  const inSamples = await list(samples.id)
+  return (
+    inSamples?.assets.some(
+      (asset) => asset.type === AssetType.project && asset.title === WELCOME_PROJECT_NAME,
+    ) ?? false
+  )
 }
 
 async function uploadProjectArchive(
