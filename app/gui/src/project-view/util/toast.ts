@@ -57,6 +57,10 @@ export function useToast(options: UseToastOptions = {}) {
     dismiss() {
       toasts.dismiss(id)
     },
+    /** Whether the toast is displayed (and not closing). */
+    isActive() {
+      return toasts.isActive(id)
+    },
   }
 }
 
