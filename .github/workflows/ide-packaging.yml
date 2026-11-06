@@ -32,8 +32,9 @@ on:
         default: false
       open_perf_engines:
         description: >-
-          The engines to measure, overriding open_perf_jvm: `native`, `jvm` (with an AOT cache),
-          `jvm-nocache`, comma-separated.
+          The engines to measure, overriding open_perf_jvm: `native`; `jvm` (the JVM as a user has
+          it after the first open: the shim's AOT cache, trained before the launches); `jvm-first`
+          (a user's very first launch: no cache yet), comma-separated.
         required: false
         type: string
         default: ""

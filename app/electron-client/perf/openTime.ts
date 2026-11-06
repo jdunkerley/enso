@@ -11,7 +11,6 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { _electron, type ElectronApplication, type Page } from 'playwright'
 import { electronExecutablePath, findEngineLauncher } from '../tests/packagedIde'
-import { createJvmAotCache, measuredJvmToolOptions, type JvmAotCache } from './jvmAotCache'
 import { hsperfDirectory, parseHsperfData, summariseJvmCounters } from './jvmCounters'
 import {
   classifyTemplate,
@@ -25,12 +24,12 @@ import {
   regressionWarnings,
   renderMarkdown,
   type Engine,
-  type JvmAot,
   type LsLogLine,
   type Mark,
   type OpenTag,
   type OpenTimeReport,
   type RunResult,
+  type ShimAot,
   type Template,
 } from './openTimeReport'
 import {
@@ -180,25 +179,6 @@ async function createProject(launcher: string, projectsDir: string, name: string
     projectsDir,
   )
   if (code !== 0) throw new Error(`enso --new ${name} exited with ${code}`)
-}
-
-/**
- * Run a new project to its end with the launcher (`--jvm --run`), so that the JVM exits by itself.
- * The AOT cache training needs that where the IDE ends the engine by killing it (Windows).
- */
-async function runProjectOnJvm(options: Options, env: Record<string, string>): Promise<void> {
-  const launcher = findEngineLauncher(options.exe)
-  if (!launcher) throw new Error(`No engine launcher next to ${options.exe}`)
-  const dir = path.join(options.out, 'aot-training')
-  fs.rmSync(dir, { recursive: true, force: true })
-  await createProject(launcher, dir, 'OpenTimeTraining')
-  const code = await runLauncher(
-    launcher,
-    ['--jvm', '--run', path.join(dir, 'OpenTimeTraining')],
-    dir,
-    env,
-  )
-  if (code !== 0) throw new Error(`enso --jvm --run exited with ${code}`)
 }
 
 async function openProject(
@@ -451,9 +431,9 @@ async function measureLaunch(
     ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
     ENSO_AI_DISABLED: '1',
     ENSO_LOG_DIRECTORY: logDir,
-    // The shim's own JDK AOT cache (`project-manager-shim/jvmAot`) stays out of the measurement
-    // until the harness measures it (PR K of the JVM-by-default plan): an empty directory of the
-    // run's, never the user's `<userData>/jvm-aot`, so `jvm-nocache` is uncached.
+    // The shim's own JDK AOT cache (`project-manager-shim/jvmAot`) is a directory of the run's,
+    // never the user's `<userData>/jvm-aot`. A `jvm` engine points it at `<out>/jvm-aot`
+    // (`jvmEngineEnv`), which the preparation launch fills; native never trains, so it keeps this.
     ENSO_JVM_AOT_DIR: path.join(options.out, 'shim-jvm-aot'),
     // `--engine-log-level debug`: the engine's own log at that level, to split an open (e.g.
     // `AttachVisualizationCmd`, `Starting ExecuteJob`, module loading); slower, so not for medians.
@@ -630,30 +610,94 @@ function readReports(targets: readonly string[]): OpenTimeReport[] {
   })
 }
 
+/* Note [The Shim's AOT Cache Is Prepared Before The Launches]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The harness no longer makes a JDK AOT cache of its own (it used to record, create and check one
+ * by hand, which no user ever had). A `jvm` engine launches the IDE as a user does: the engine
+ * mode is `ENSO_ENGINE_MODE=jvm`, so the shim passes `--jvm`, trains its per-user cache in the
+ * background (`project-manager-shim/jvmAot`) and starts every engine with it. The cache lives in
+ * `ENSO_JVM_AOT_DIR=<out>/jvm-aot`, never the user's. A preparation launch idles on the dashboard
+ * until `<out>/jvm-aot/<key>/enso.aot` exists, which the trainer renames into place when it is
+ * complete, and records how long that took (`trainingMs`) and how big it is. The measured launches
+ * then use the cache; after each, the harness looks that it is still there, as the shim deletes a
+ * cache the JVM rejected. `jvm-first` deletes the directory before every launch instead: a
+ * user's very first launch, which trains in the background while the project opens.
+ */
+const AOT_WAIT_MS = 10 * 60_000
+
+function shimAotDirectory(options: Options): string {
+  return path.join(options.out, 'jvm-aot')
+}
+
+/** The environment of an engine's launches, on top of the harness's own. */
+function engineEnv(engine: Engine, options: Options): Record<string, string> {
+  const jvmOptions =
+    options.jvmOptions.trim() === '' ? {} : { ENSO_JVM_OPTIONS: options.jvmOptions }
+  if (engine === 'native') return { ENSO_ENGINE_MODE: 'native' }
+  return {
+    ENSO_ENGINE_MODE: 'jvm',
+    ENSO_JVM_AOT_DIR: shimAotDirectory(options),
+    ...jvmOptions,
+  }
+}
+
+/** `<root>/<key>/enso.aot`, the shim's cache (`aotKey` names a 16-digit hexadecimal directory). */
+function findShimCache(root: string): string | undefined {
+  try {
+    for (const entry of fs.readdirSync(root)) {
+      const file = path.join(root, entry, 'enso.aot')
+      if (/^[0-9a-f]{16}$/.test(entry) && fs.existsSync(file)) return file
+    }
+  } catch {
+    // No directory yet.
+  }
+  return undefined
+}
+
+/**
+ * One launch that idles on the dashboard until the shim's training has written its cache, and how
+ * long that took.
+ */
+async function prepareShimAot(
+  options: Options,
+  env: Record<string, string>,
+): Promise<{ trainingMs: number; cacheBytes: number }> {
+  fs.rmSync(shimAotDirectory(options), { recursive: true, force: true })
+  const started = Date.now()
+  let found: { trainingMs: number; cacheBytes: number } | undefined
+  const result = await measureLaunch(options, 'jvm', 0, env, [], 'jvm-aot-prepare', async () => {
+    while (Date.now() - started < AOT_WAIT_MS) {
+      const file = findShimCache(shimAotDirectory(options))
+      if (file != null) {
+        found = { trainingMs: Date.now() - started, cacheBytes: fs.statSync(file).size }
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    }
+  })
+  if (found == null) {
+    throw new Error(`no AOT cache within ${AOT_WAIT_MS / 1000} s (${result.error ?? 'no error'})`)
+  }
+  return found
+}
+
 async function main() {
   const options = parseOptions(process.argv.slice(2))
   fs.mkdirSync(options.out, { recursive: true })
   // A project of the harness's own is compared with nothing (`other`).
   const template = options.template === 'welcome' ? await packagedTemplate(options) : 'other'
   const runs: RunResult[] = []
-  let jvmAot: JvmAot | undefined
+  let shimAot: ShimAot | undefined
   for (const engine of options.engines) {
-    // Each engine has its own budget, which a JVM run's AOT preparation counts against.
+    // Each engine has its own budget, which a `jvm` run's cache preparation counts against.
     const deadline = Date.now() + options.budgetMinutes * 60_000
-    let extraEnv: Record<string, string> = {}
+    const extraEnv = engineEnv(engine, options)
+    let prepared: { trainingMs: number; cacheBytes: number } | undefined
     if (engine === 'jvm') {
-      let aot: JvmAotCache
       try {
-        aot = await createJvmAotCache(
-          options.out,
-          options.exe,
-          (env, opens, label, beforeClose) =>
-            measureLaunch(options, 'jvm', 0, env, opens, label, beforeClose),
-          (env) => runProjectOnJvm(options, env),
-          options.jvmOptions,
-        )
+        prepared = await prepareShimAot(options, extraEnv)
       } catch (e) {
-        console.warn(`Open time: no JVM runs, the AOT cache could not be made: ${String(e)}`)
+        console.warn(`Open time: no jvm runs, the shim's AOT cache was not made: ${String(e)}`)
         runs.push({
           engine,
           run: 0,
@@ -664,28 +708,15 @@ async function main() {
         })
         continue
       }
-      if (aot.cache != null) {
-        jvmAot = aot.training
-        extraEnv = {
-          ENSO_ENGINE_ARGS: '--jvm',
-          JAVA_TOOL_OPTIONS: measuredJvmToolOptions(aot.cache),
-        }
-      } else {
-        // Said in the report: these are the numbers of a JVM with no AOT cache.
-        console.warn(`Open time: measuring the JVM without an AOT cache. ${aot.rejection}`)
-        jvmAot = 'uncached'
-        extraEnv = { ENSO_ENGINE_ARGS: '--jvm' }
-      }
-    } else if (engine === 'jvm-nocache') {
-      extraEnv = { ENSO_ENGINE_ARGS: '--jvm' }
     }
     if (engine !== 'native' && options.jvmOptions.trim() !== '') {
       // An experiment (`--jvm-options`, e.g. `-XX:TieredStopAtLevel=1`): engine options, so they
-      // go in `ENSO_JVM_OPTIONS`, which the launcher adds to the JVM it starts. The AOT cache's
-      // training got them too. Said in the log, as the report does not record it.
+      // go in `ENSO_JVM_OPTIONS`, which the launcher adds to the JVM it starts. The shim's training
+      // got them too, through the inherited environment. Said in the log, as the report does not
+      // record it.
       console.warn(`Open time: ${engine} launches with ${options.jvmOptions}`)
-      extraEnv = { ...extraEnv, ENSO_JVM_OPTIONS: options.jvmOptions }
     }
+    const rejectedIn: number[] = []
     for (let run = 1; run <= options.runs; run++) {
       if (Date.now() > deadline) {
         console.warn(
@@ -693,11 +724,21 @@ async function main() {
         )
         break
       }
+      // A user's first launch has no cache yet (and trains one in the background).
+      if (engine === 'jvm-first')
+        fs.rmSync(shimAotDirectory(options), { recursive: true, force: true })
       const { stdout, ...result } = await measureLaunch(options, engine, run, extraEnv)
-      void stdout // Read only by the AOT cache check.
+      void stdout
       console.log(`${engine} ${run}: ${JSON.stringify(result)}`)
       runs.push(result)
+      // The shim deletes a cache the JVM rejected: a missing one is a warning (Note [The Shim's
+      // AOT Cache Is Prepared Before The Launches]).
+      if (prepared != null && findShimCache(shimAotDirectory(options)) == null) {
+        rejectedIn.push(run)
+        console.warn(`Open time: the shim's AOT cache is gone after jvm launch ${run}.`)
+      }
     }
+    if (prepared != null) shimAot = { ...prepared, rejectedIn }
     if (options.jvmDiagnostics && engine !== 'native') {
       const { stdout, ...result } = await measureLaunch(
         options,
@@ -721,7 +762,7 @@ async function main() {
     commit: process.env.GITHUB_SHA ?? null,
     template,
     ...(options.template !== 'welcome' ? { project: options.template } : {}),
-    ...(jvmAot ? { jvmAot } : {}),
+    ...(shimAot ? { shimAot } : {}),
     runs,
   }
   // First: whatever the baseline holds, the measurement is kept (and becomes the next baseline).

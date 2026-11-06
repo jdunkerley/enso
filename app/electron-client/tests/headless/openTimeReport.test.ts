@@ -1,24 +1,17 @@
 /** @file The open-time harness's pure logic: log lines, phases, medians, warnings. */
-import fs from 'node:fs'
-import path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import {
-  aotCreateArguments,
-  aotRejection,
   classifyTemplate,
   credentialFreeEnv,
   developMedians,
   joinJvmOptions,
-  LAUNCHER_JVM_OPTIONS,
   median,
   notMeasured,
   openTimes,
   parseEngines,
-  parseJvmOptionsFile,
   parseLsLogLine,
   regressionWarnings,
   renderMarkdown,
-  splitJvmOptions,
   type Engine,
   type Mark,
   type OpenTimeReport,
@@ -338,92 +331,24 @@ describe('classifyTemplate', () => {
   })
 })
 
-describe('LAUNCHER_JVM_OPTIONS', () => {
-  test('are the options the launcher gives the JVM it starts (Main.launchJvm)', () => {
-    const source = fs.readFileSync(
-      path.resolve(__dirname, '../../../../engine/runner/src/main/java/org/enso/runner/Main.java'),
-      'utf8',
-    )
-    for (const option of LAUNCHER_JVM_OPTIONS) {
-      expect(source).toContain(`commandAndArgs.add("${option}")`)
-    }
+describe("the shim's AOT cache", () => {
+  const shimAot = { trainingMs: 95_400, cacheBytes: 123_456_789, rejectedIn: [] as number[] }
+  test('is printed under the caption: training time, size, rejections', () => {
+    const base = { ...report([3000, 3000, 3000], 'jvm'), shimAot }
+    const markdown = renderMarkdown(base, undefined)
+    expect(markdown).toContain('Shim AOT cache: trained in 95.4 s, 117.7 MiB, never rejected')
+    const rejected = { ...base, shimAot: { ...shimAot, rejectedIn: [2, 4] } }
+    expect(renderMarkdown(rejected, undefined)).toContain('rejected in launches 2, 4')
   })
-})
-
-describe('JVM_OPTIONS_FILE_LINES', () => {
-  const distributionFile = path.resolve(__dirname, '../../../../distribution/engine/jvm.options')
-  test('parseJvmOptionsFile keeps one option per line, without comments and blanks', () => {
-    expect(parseJvmOptionsFile('# c\n-Da=1\r\n\n  -Db=2  \n')).toEqual(['-Da=1', '-Db=2'])
-  })
-  test('the engine package ships the file, and it holds options', () => {
-    const lines = parseJvmOptionsFile(fs.readFileSync(distributionFile, 'utf8'))
-    expect(lines).toContain('--enable-native-access=ALL-UNNAMED,org.enso.language.server')
-  })
-  test('a byte order mark does not make the first line an option', () => {
-    const bom = String.fromCharCode(0xfeff)
-    expect(parseJvmOptionsFile(bom + '# c\n-Da=1\n')).toEqual(['-Da=1'])
-    expect(parseJvmOptionsFile(bom + '-Da=1\n')).toEqual(['-Da=1'])
-  })
-  test('splitJvmOptions follows the launcher: lines when there is a newline, else whitespace', () => {
-    expect(splitJvmOptions('  -Da=1   -Db=2 ')).toEqual(['-Da=1', '-Db=2'])
-    expect(splitJvmOptions('')).toEqual([])
-    expect(splitJvmOptions('-Da=a b\r\n-Db=2\n\n')).toEqual(['-Da=a b', '-Db=2'])
-  })
-  test('the AOT create launch gets the fixed options, the file, the experiment, then the module', () => {
-    expect(
-      aotCreateArguments({
-        config: 'c.aotconf',
-        cache: 'c.aot',
-        component: 'comp',
-        optionsFile: '# x\n--enable-native-access=ALL-UNNAMED\n',
-        jvmOptions: '-Da=1\n-Db=a b',
-      }),
-    ).toEqual([
-      '-XX:AOTMode=create',
-      '-XX:AOTConfiguration=c.aotconf',
-      '-XX:AOTCache=c.aot',
-      ...LAUNCHER_JVM_OPTIONS,
-      '--enable-native-access=ALL-UNNAMED',
-      '-Da=1',
-      '-Db=a b',
-      '--module-path=comp',
-      '-m',
-      'org.enso.runner/org.enso.runner.Main',
-    ])
-  })
-})
-
-describe('aotRejection', () => {
-  test('finds a cds or aot problem, a mismatch, or an unusable cache', () => {
-    expect(aotRejection('[0.1s][warning][cds] shared class paths mismatch')).toContain('mismatch')
-    expect(aotRejection('[0.1s][error][aot] An error has occurred')).toContain('[aot]')
-    expect(aotRejection('Unable to use AOT cache.')).toContain('Unable to use')
-    expect(
-      aotRejection('[0.1s][warning][cds] The AOT cache was created by a different VM'),
-    ).toBeDefined()
-  })
-  test('ignores other output', () => {
-    expect(aotRejection('[LOG] started\n[0.1s][warning][gc] something')).toBeUndefined()
-  })
-  test('ignores info records, which can name a feature of a cache in use as disabled', () => {
-    expect(
-      aotRejection('[0.1s][info][cds] full module graph: disabled\n[0.2s][info][aot] mismatch'),
-    ).toBeUndefined()
-    expect(aotRejection('[0.1s][info][aot] ok\n[0.2s][error][aot] bad')).toContain('[error][aot]')
-  })
-})
-
-describe('JVM cache state', () => {
-  test('is in the table caption and warned about when uncached', () => {
-    const base = { ...report([3000, 3000, 3000], 'jvm'), jvmAot: 'uncached' as const }
-    expect(renderMarkdown(base, undefined)).toContain('uncached')
+  test('a rejected cache is a warning', () => {
+    const base = { ...report([3000, 3000, 3000], 'jvm'), shimAot: { ...shimAot, rejectedIn: [2] } }
     expect(regressionWarnings(base, undefined)).toEqual(
-      expect.arrayContaining([expect.stringContaining('uncached')]),
+      expect.arrayContaining([expect.stringContaining('AOT cache was rejected')]),
     )
+    expect(regressionWarnings({ ...base, shimAot }, undefined)).toEqual([])
   })
-  test('says how the cache was trained', () => {
-    const base = { ...report([3000, 3000, 3000], 'jvm'), jvmAot: 'launcher-trained' as const }
-    expect(renderMarkdown(base, undefined)).toContain('launcher-trained')
+  test('a report without one prints no such line', () => {
+    expect(renderMarkdown(report([3000, 3000, 3000], 'jvm'), undefined)).not.toContain('Shim AOT')
   })
 })
 
@@ -438,12 +363,15 @@ describe('a launch whose second open failed', () => {
 })
 
 describe('parseEngines', () => {
-  test('reads a comma-separated list, the JVM without a cache included', () => {
+  test('reads a comma-separated list, the first-run JVM included', () => {
     expect(parseEngines('native')).toEqual(['native'])
-    expect(parseEngines('native, jvm-nocache,jvm')).toEqual(['native', 'jvm-nocache', 'jvm'])
+    expect(parseEngines('native, jvm,jvm-first')).toEqual(['native', 'jvm', 'jvm-first'])
   })
   test('refuses an unknown engine', () => {
     expect(() => parseEngines('native,graal')).toThrow('Unknown engine: graal')
+  })
+  test('refuses the old jvm-nocache, naming jvm-first', () => {
+    expect(() => parseEngines('native,jvm-nocache')).toThrow(/jvm-nocache.*jvm-first/)
   })
 })
 
@@ -454,17 +382,13 @@ describe('joinJvmOptions', () => {
   })
 })
 
-describe('jvm-nocache', () => {
-  test('has columns of its own beside the cached JVM', () => {
-    const nocache = report([27000, 28000, 27500], 'jvm-nocache')
-    const cached = report([19000, 19500, 18800], 'jvm')
-    const both = {
-      ...nocache,
-      jvmAot: 'ide-trained' as const,
-      runs: [...nocache.runs, ...cached.runs],
-    }
+describe('jvm-first', () => {
+  test('has columns of its own beside the warm JVM', () => {
+    const first = report([27000, 28000, 27500], 'jvm-first')
+    const warm = report([19000, 19500, 18800], 'jvm')
+    const both = { ...first, runs: [...first.runs, ...warm.runs] }
     const markdown = renderMarkdown(both, undefined)
-    expect(markdown).toContain('jvm-nocache first')
+    expect(markdown).toContain('jvm-first first')
     expect(markdown).toContain('jvm first')
     expect(markdown).toContain('27500')
     expect(markdown).toContain('19000')
