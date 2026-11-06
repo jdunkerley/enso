@@ -33,8 +33,8 @@ class RuntimeVisualizationsTest
 
   // === Test Utilities =======================================================
 
-  /** Stops the runtime's thread that sends the next `ExecutionComplete` until
-    * the test releases it.
+  /** Stops the runtime's thread that sends the next `ExecutionComplete` (or,
+    * see [[arm]], another response) until the test releases it.
     *
     * The runtime sends `ExecutionComplete` from the `ExecuteJob` itself, after
     * the end-of-run pass over deferred visualizations and while the job still
@@ -44,12 +44,18 @@ class RuntimeVisualizationsTest
     */
   final class ExecutionCompleteGate {
     @volatile private var armed  = false
+    @volatile private var holdAt: Api.Response => Boolean = isExecutionComplete
     private val reachedLatch     = new CountDownLatch(1)
     private val releasedLatch    = new CountDownLatch(1)
     private val interruptedLatch = new CountDownLatch(1)
 
-    /** Holds the next `ExecutionComplete`. */
-    def arm(): Unit = armed = true
+    /** Holds the next `ExecutionComplete`, or the next response `at`
+      * accepts.
+      */
+    def arm(at: Api.Response => Boolean = isExecutionComplete): Unit = {
+      holdAt = at
+      armed  = true
+    }
 
     /** Waits until an `ExecutionComplete` is held. */
     def awaitReached(): Boolean = reachedLatch.await(30, TimeUnit.SECONDS)
@@ -64,7 +70,7 @@ class RuntimeVisualizationsTest
     private[RuntimeVisualizationsTest] def onResponse(data: ByteBuffer): Unit =
       if (armed) {
         ApiSerde.deserializeApiEnvelope(data.duplicate()) match {
-          case Success(Api.Response(_, Api.ExecutionComplete(_))) =>
+          case Success(response: Api.Response) if holdAt(response) =>
             armed = false
             reachedLatch.countDown()
             try releasedLatch.await(60, TimeUnit.SECONDS)
@@ -78,8 +84,17 @@ class RuntimeVisualizationsTest
       }
   }
 
-  class TestContext(packageName: String, sequentialExecution: Boolean)
-      extends InstrumentTestContext(packageName) {
+  private def isExecutionComplete(response: Api.Response): Boolean =
+    response match {
+      case Api.Response(_, Api.ExecutionComplete(_)) => true
+      case _                                         => false
+    }
+
+  class TestContext(
+    packageName: String,
+    sequentialExecution: Boolean,
+    progressReport: Boolean = false
+  ) extends InstrumentTestContext(packageName) {
 
     val out: ByteArrayOutputStream = new ByteArrayOutputStream()
 
@@ -104,7 +119,10 @@ class RuntimeVisualizationsTest
             (!sequentialExecution).toString
           )
           .option(RuntimeOptions.ENABLE_PROJECT_SUGGESTIONS, "false")
-          .option(RuntimeOptions.ENABLE_PROGRESS_REPORT, "false")
+          .option(
+            RuntimeOptions.ENABLE_PROGRESS_REPORT,
+            progressReport.toString
+          )
           .option(RuntimeOptions.ENABLE_GLOBAL_SUGGESTIONS, "false")
           .option(RuntimeOptions.ENABLE_EXECUTION_TIMER, "false")
           .option(RuntimeServerInfo.ENABLE_OPTION, "true")
@@ -478,9 +496,10 @@ class RuntimeVisualizationsTest
   }
 
   def withContext(
-    sequentialExecution: Boolean = true
+    sequentialExecution: Boolean = true,
+    progressReport: Boolean      = false
   )(f: TestContext => Unit): Unit = {
-    val context = new TestContext("Test", sequentialExecution)
+    val context = new TestContext("Test", sequentialExecution, progressReport)
     try {
       context.init()
       val Some(Api.Response(_, Api.InitializedNotification())) = context.receive
@@ -5846,12 +5865,15 @@ class RuntimeVisualizationsTest
     * execution is not released.
     *
     * @param module the source of `main`'s module, by default `Main.code`
+    * @param holdAt the response to hold the execution at, by default its
+    *               `ExecutionComplete`
     * @return the context id, the request id and the visualization ids
     */
   private def attachWhileTheFirstExecutionIsHeld(
     context: TestContext,
     on: Seq[UUID],
-    module: Option[String] = None
+    module: Option[String]          = None,
+    holdAt: Api.Response => Boolean = isExecutionComplete
   ): (UUID, UUID, Seq[UUID]) = {
     val contents   = module.getOrElse(context.Main.code)
     val mainFile   = context.writeMain(contents)
@@ -5885,7 +5907,7 @@ class RuntimeVisualizationsTest
 
     // Hold the first execution at its ExecutionComplete: its end-of-run pass
     // is over, and it still holds its locks and is still running.
-    context.executionCompleteGate.arm()
+    context.executionCompleteGate.arm(holdAt)
     context.send(
       Api.Request(
         requestId,
@@ -6025,6 +6047,57 @@ class RuntimeVisualizationsTest
       .flatMap(response => visualizationUpdates(Seq(response), visualizationId))
       .nextOption()
     update shouldEqual Some("50")
+  }
+
+  it should "evaluate a deferred visualization from its expression's value, not its progress report" in withContext(
+    sequentialExecution = false,
+    progressReport      = true
+  ) { context =>
+    // #611: with progress reporting on, as in the language server, a binding
+    // reports its (pending) progress before it is computed, through the
+    // callback that also receives computed values. A visualization deferred
+    // before then was evaluated on that report's missing value, failed, and
+    // the failure was logged as a NullPointerException.
+    val idMainX = context.Main.idMainX
+    val (contextId, _, Seq(visualizationId)) =
+      try attachWhileTheFirstExecutionIsHeld(
+        context,
+        Seq(idMainX),
+        // Hold the first execution as `x` is about to be computed.
+        holdAt = {
+          case Api.Response(_, Api.ExpressionUpdates(_, updates)) =>
+            updates.exists(update =>
+              update.expressionId == idMainX &&
+              update.payload.isInstanceOf[Api.ExpressionUpdate.Payload.Pending]
+            )
+          case _ => false
+        }
+      )
+      finally context.executionCompleteGate.release()
+
+    val responses = receiveUntilQuiet(context, 5)
+    responses.collect {
+      case Api.Response(
+            _,
+            failure @ Api.VisualizationExpressionFailed(
+              Api.VisualizationContext(`visualizationId`, _, _),
+              _,
+              _
+            )
+          ) =>
+        failure
+      case Api.Response(
+            _,
+            failure @ Api.VisualizationEvaluationFailed(
+              Api.VisualizationContext(`visualizationId`, _, _),
+              _,
+              _
+            )
+          ) =>
+        failure
+    } shouldBe empty
+    visualizationUpdates(responses, visualizationId) shouldEqual Seq("6")
+    responses should contain(context.executionComplete(contextId))
   }
 
   it should "run one execution for all visualizations attached while an execution is finishing" in withContext(
