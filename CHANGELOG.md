@@ -2,6 +2,11 @@
 
 #### Enso IDE
 
+- [The sample projects now update with each new version of the IDE, unless you
+  have edited them. An edited sample whose new version is available shows an
+  "Update available" badge in the Drive. Reset Sample, in a sample's context
+  menu, and Reset All Samples, in the Samples folder's, put the samples back as
+  installed, keeping your edited copy beside each one.][622]
 - [A fresh installation opens a short Getting Started sample, which reads a
   file, filters it, totals it by month and charts the totals, with documentation
   that walks through it one step at a time.][617]
@@ -420,6 +425,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[622]: https://github.com/jdunkerley/enso/pull/622
 [617]: https://github.com/jdunkerley/enso/pull/617
 [607]: https://github.com/jdunkerley/enso/pull/607
 [592]: https://github.com/jdunkerley/enso/pull/592
