@@ -60,6 +60,8 @@ export interface LockHooks {
   readonly heartbeatMs?: number
   /** Replaces how many times a release tries for the takeover file. */
   readonly releaseAttempts?: number
+  /** Called when a stale takeover file has been seen twice, just before it is removed. */
+  readonly beforeStaleTakeoverRemoval?: () => Promise<void>
   /** Replaces `fs.link` when a file is linked into place. */
   readonly link?: (existing: string, target: string) => Promise<void>
 }
@@ -156,6 +158,8 @@ async function deleteOldStaleLocks(root: string): Promise<void> {
     return
   }
   for (const name of entries) {
+    // The lock's own files only: nothing else in the root is ever deleted here.
+    if (!name.startsWith(LOCK_FILE_NAME)) continue
     if (!name.startsWith(LOCK_FILE_NAME + STALE_INFIX) && !name.includes(NEW_INFIX)) continue
     const file = path.join(root, name)
     try {
@@ -211,8 +215,11 @@ async function withTakeover<T>(
     const seen = await look(takeover)
     if (seen !== undefined) {
       if (isHeld(seen, STALE_TAKEOVER_MS)) return 'busy'
-      // Left by a taker that crashed: delete it if it is still what was seen.
-      if ((await look(takeover))?.content === seen.content) {
+      // Left by a taker that crashed: delete it if it is still what was seen. The time is compared
+      // too: every empty file (a fallback create still unwritten) has the same content.
+      await hooks.beforeStaleTakeoverRemoval?.()
+      const again = await look(takeover)
+      if (again?.content === seen.content && again.mtimeMs === seen.mtimeMs) {
         await fs.rm(takeover, { force: true })
       }
     }
