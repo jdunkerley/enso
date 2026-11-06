@@ -3,8 +3,10 @@
 The sample projects bundled with the IDE. electron-builder ships this folder as
 `resources/samples` (`extraResources` in `electron-builder-config.ts`), and
 `installSamples` (`project-manager-shim`) copies it to `<projects>/Samples` on
-the first start. Everything here is installed except this file (a `filter` in
-`extraResources`); nothing is downloaded.
+the first start. Everything here is installed except this file: the packaged app
+leaves it out with a `filter` in `extraResources`, and a dev run, which copies
+this source folder, with the copy's own filter in `installSamples`. Nothing is
+downloaded.
 
 ## Layout
 

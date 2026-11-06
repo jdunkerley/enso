@@ -541,7 +541,13 @@ export async function installSamples(
   try {
     await fs.promises.rm(staging, { recursive: true, force: true })
     await fs.promises.mkdir(projectsDirectory, { recursive: true })
-    await fs.promises.cp(bundledSamples, staging, { recursive: true })
+    // The contributor notes in the source `samples/` (what a dev run copies from); the packaged
+    // app's `resources/samples` has none, through electron-builder's filter.
+    const notes = pathModule.resolve(bundledSamples, 'CLAUDE.md')
+    await fs.promises.cp(bundledSamples, staging, {
+      recursive: true,
+      filter: (source) => pathModule.resolve(source) !== notes,
+    })
     await fs.promises.rename(staging, samplesDirectory)
   } catch (error) {
     await fs.promises.rm(staging, { recursive: true, force: true }).catch(() => {})

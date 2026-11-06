@@ -1,5 +1,5 @@
 name: Orders_And_Customers
-description: Join orders to customers, cross-tab the spend by segment and category, and write it to Excel.
+description: Join orders to customers, total spend by segment and category, and write it to Excel.
 namespace: local
 version: 0.0.1
 license: Apache-2.0

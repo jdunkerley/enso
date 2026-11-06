@@ -2,10 +2,10 @@
 
 #### Enso IDE
 
-- [The sample projects share their input files in one Samples/Data folder and
-  write their results to their own output folder. Each opens with its nodes laid
-  out and commented, and its description says which nodes to select to see the
-  results.][607]
+- [The sample projects a new installation copies to the Samples folder share
+  their input files in one Samples/Data folder and write their results to their
+  own output folder. Each opens with its nodes laid out and commented, and its
+  documentation says which nodes to select to see the results.][607]
 - [A user documentation site, with guides to the IDE and a reference of every
   standard library component, drawn as the graph editor shows it, at
   https://jdunkerley.github.io/enso/.][592]
