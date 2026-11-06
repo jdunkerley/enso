@@ -141,7 +141,8 @@ describe('without a store', () => {
   })
 })
 
-describe('versioning routes', () => {
+// Real git: on Windows under a full run's load a test here took over vitest's default 5 s (#395).
+describe('versioning routes', { timeout: 30_000 }, () => {
   async function withProject(body: (repo: string, project: string) => Promise<void>) {
     await withTempRepo(
       async (repo) => {
