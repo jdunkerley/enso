@@ -40,32 +40,66 @@ describe('appImageEngine', () => {
     return { resourcesPath, userData: path.join(base, 'userData'), version: '2026.2.0' }
   }
 
-  test('outside an AppImage, or with ENSO_ENGINE_PATH set, nothing changes', async () => {
-    const base = await fs.mkdtemp(path.join(os.tmpdir(), 'appimage-engine-'))
-    try {
-      const app = await fakeApp(base)
-      expect(await appImageEngine({}, app)).toEqual({})
-      expect(
-        await appImageEngine({ APPIMAGE: '/a/Enso.AppImage', ENSO_ENGINE_PATH: '/e/enso' }, app),
-      ).toEqual({})
-      expect(await fs.readdir(base)).not.toContain('userData')
-    } finally {
-      await fs.rm(base, { recursive: true, force: true })
-    }
-  })
-
-  test('the first launch copies in the background; the next one uses the copy', async () => {
+  async function withApp(
+    run: (base: string, app: Awaited<ReturnType<typeof fakeApp>>) => Promise<void>,
+  ) {
     const base = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'appimage-engine-')))
     try {
-      const app = await fakeApp(base)
-      const env = { APPIMAGE: '/a/Enso.AppImage' }
-      const first = await appImageEngine(env, app)
-      expect(first.enginePath).toBeUndefined()
-      const copied = path.join(app.userData, 'engine', '2026.2.0', 'dist', '1.0', 'bin', 'enso')
-      expect(await first.copy).toBe(copied)
-      expect(await appImageEngine(env, app)).toEqual({ enginePath: copied })
+      await run(base, await fakeApp(base))
     } finally {
       await fs.rm(base, { recursive: true, force: true })
     }
-  })
+  }
+
+  const jvm = { option: 'jvm' as const }
+
+  test('outside an AppImage, or with ENSO_ENGINE_PATH set, nothing changes', () =>
+    withApp(async (base, app) => {
+      expect(await appImageEngine({}, app, jvm)).toEqual({})
+      expect(
+        await appImageEngine(
+          { APPIMAGE: '/a/Enso.AppImage', ENSO_ENGINE_PATH: '/e/enso' },
+          app,
+          jvm,
+        ),
+      ).toEqual({})
+      expect(await fs.readdir(base)).not.toContain('userData')
+    }))
+
+  test('while the default engine is native, nothing is copied (no disk used)', () =>
+    withApp(async (base, app) => {
+      const env = { APPIMAGE: '/a/Enso.AppImage' }
+      expect(await appImageEngine(env, app, undefined)).toEqual({})
+      expect(
+        await appImageEngine({ ...env, ENSO_ENGINE_MODE: 'jvm' }, app, { option: 'native' }),
+      ).toEqual({})
+      expect(await fs.readdir(base)).not.toContain('userData')
+    }))
+
+  test('JVM by --engine-mode or ENSO_ENGINE_MODE: the copy starts when asked, and the next launch uses it', () =>
+    withApp(async (_base, app) => {
+      for (const [env, engine] of [
+        [{ APPIMAGE: '/a/Enso.AppImage' }, jvm],
+        [{ APPIMAGE: '/a/Enso.AppImage', ENSO_ENGINE_MODE: 'jvm' }, undefined],
+      ] as const) {
+        await fs.rm(app.userData, { recursive: true, force: true })
+        const first = await appImageEngine(env, app, engine)
+        expect(first.enginePath).toBeUndefined()
+        // Nothing is copied before the window is up and `startCopy` is called.
+        await expect(fs.access(app.userData)).rejects.toThrow()
+        const copied = path.join(app.userData, 'engine', '2026.2.0', 'dist', '1.0', 'bin', 'enso')
+        expect(await first.startCopy?.()).toBe(copied)
+        expect(await appImageEngine(env, app, engine)).toEqual({ enginePath: copied })
+      }
+    }))
+
+  test('the environment is never written: the copy cannot leak into a relaunch', () =>
+    withApp(async (_base, app) => {
+      // An in-app update relaunches the new AppImage with this process's environment, so a copy's
+      // path there would make the new version run the old version's engine.
+      const env = Object.freeze({ APPIMAGE: '/a/Enso.AppImage' })
+      await (await appImageEngine(env, app, jvm)).startCopy?.()
+      expect((await appImageEngine(env, app, jvm)).enginePath).toBeDefined()
+      expect(env).toEqual({ APPIMAGE: '/a/Enso.AppImage' })
+    }))
 })

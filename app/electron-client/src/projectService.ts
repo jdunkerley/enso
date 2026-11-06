@@ -164,7 +164,10 @@ function createJvmAotCache(
   electronIsDev: boolean,
   engine: EngineSettings | undefined,
 ): JvmAotCache | null {
-  const ensoExecutable = findEnsoExecutable(paths.resourcesPath(electron, electronIsDev))
+  const ensoExecutable = findEnsoExecutable(
+    paths.resourcesPath(electron, electronIsDev),
+    appImageEnginePath,
+  )
   if (ensoExecutable == null) return null
   return new JvmAotCache({
     rootDirectory: jvmAotRootDirectory(process.env, app.getPath('userData')),
@@ -175,33 +178,51 @@ function createJvmAotCache(
 }
 
 /**
- * Under a Linux AppImage, run the engine from its copy at `<userData>/engine/<version>/`
- * (`appImageEngine`): sets `ENSO_ENGINE_PATH`, which `findEnsoExecutable` honours first, when the
- * copy is complete, and starts the copy otherwise. Called before the project service and the JDK
- * AOT cache are created, since both find the engine once.
+ * Under a Linux AppImage with the JVM as the default engine, the engine is run from its copy at
+ * `<userData>/engine/<version>/` (`appImageEngine`): its launcher when the copy is complete, given
+ * to the project service and the AOT cache explicitly, never through the environment.
  */
-export async function useAppImageEngineCopy(
+let appImageEnginePath: string | undefined
+/** The copy to make once the window is up, when there is no complete one. */
+let appImageCopy: (() => Promise<string>) | undefined
+
+/**
+ * Decide which engine a Linux AppImage runs (see {@link appImageEnginePath}). Called before the
+ * project service and the JDK AOT cache are created, since both find the engine once.
+ */
+export async function prepareAppImageEngine(
   electron: Electron,
   electronIsDev: boolean,
+  engine: EngineSettings | undefined,
 ): Promise<void> {
   try {
-    const { enginePath, copy } = await appImageEngine(process.env, {
-      resourcesPath: paths.resourcesPath(electron, electronIsDev),
-      userData: app.getPath('userData'),
-      version: app.getVersion(),
-    })
-    if (enginePath != null) {
-      console.info(`Running the AppImage's engine from its copy at ${enginePath}.`)
-      process.env.ENSO_ENGINE_PATH = enginePath
-    }
-    copy?.then(
-      (launcher) =>
-        console.info(`Copied the AppImage's engine to ${launcher}; used from the next launch.`),
-      (error: unknown) => console.warn("Failed to copy the AppImage's engine:", error),
+    const { enginePath, startCopy } = await appImageEngine(
+      process.env,
+      {
+        resourcesPath: paths.resourcesPath(electron, electronIsDev),
+        userData: app.getPath('userData'),
+        version: app.getVersion(),
+      },
+      engine,
     )
+    if (enginePath != null)
+      console.info(`Running the AppImage's engine from its copy at ${enginePath}.`)
+    appImageEnginePath = enginePath
+    appImageCopy = startCopy
   } catch (error) {
     console.warn("Failed to check the AppImage's engine copy:", error)
   }
+}
+
+/** Make the AppImage's engine copy, if one is due; called once the window is up. */
+export function startAppImageEngineCopy(): void {
+  const copy = appImageCopy
+  appImageCopy = undefined
+  copy?.().then(
+    (launcher) =>
+      console.info(`Copied the AppImage's engine to ${launcher}; used from the next launch.`),
+    (error: unknown) => console.warn("Did not copy the AppImage's engine:", error),
+  )
 }
 
 /** Train the JDK AOT cache in the background if it is needed (the JVM is the default engine). */
@@ -225,7 +246,11 @@ export function setupProjectService(
 ): ProjectService {
   extraArgs = args
   jvmAotCache ??= createJvmAotCache(electron, electronIsDev, engine)
-  engineSettings = { ...engine, jvmAot: jvmAotCache ?? undefined }
+  engineSettings = {
+    ...engine,
+    jvmAot: jvmAotCache ?? undefined,
+    ensoExecutable: appImageEnginePath,
+  }
   if (!projectService) {
     projectService = ProjectService.default(
       paths.resourcesPath(electron, electronIsDev),

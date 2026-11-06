@@ -71,6 +71,11 @@ export interface EngineSettings {
    * utility process, or `NodeYdocHost` in the Vite dev server. Without one the engine serves it.
    */
   readonly ydocHost?: YdocHost | undefined
+  /**
+   * The engine's launcher, when the host knows better than the search (a Linux AppImage's copy,
+   * `jvmAot/stableEngine.ts`); a user's `ENSO_ENGINE_PATH` still wins (`findEnsoExecutable`).
+   */
+  readonly ensoExecutable?: string | undefined
 }
 
 /** Parameters for the "create project" endpoint. */
@@ -167,7 +172,7 @@ export class ProjectService {
     extraEnvironment?: () => readonly (readonly [string, string])[],
     engine?: EngineSettings,
   ): ProjectService {
-    const ensoPath = findEnsoExecutable(workDir)
+    const ensoPath = findEnsoExecutable(workDir, engine?.ensoExecutable)
     if (!ensoPath) {
       throw new Error(`${PRODUCT_NAME} executable not found`)
     }

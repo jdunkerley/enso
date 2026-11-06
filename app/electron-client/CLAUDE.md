@@ -196,15 +196,19 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   its JVM launches never pick up the user's cache. An empty value counts as
   unset. The root and the gate are in `src/jvmAotSettings.ts` (tested in
   `tests/headless/jvmAotSettings.test.ts`).
-- `APPIMAGE` (set by the AppImage runtime) — a Linux AppImage runs its engine
-  from a copy at `<userData>/engine/<version>/`, because its mount moves at
-  every launch and the AOT cache would never match
-  (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). `useAppImageEngineCopy`
-  (`projectService.ts`, called in `main()` before the project service is set up)
-  sets `ENSO_ENGINE_PATH` to the copy once it is complete; the first launch of a
-  build copies in the background and runs the mounted engine. An
-  `ENSO_ENGINE_PATH` already set is left alone (`appImageEngine` in
-  `src/jvmAotSettings.ts`).
+- `APPIMAGE` (set by the AppImage runtime) — with the JVM as the default engine
+  (`--engine-mode`, `ENSO_ENGINE_MODE`, then the built-in default; nothing
+  happens while it is native), a Linux AppImage runs its engine from a copy at
+  `<userData>/engine/<version>/`, because its mount moves at every launch and
+  the AOT cache would never match (`project-manager-shim/CLAUDE.md`, "JDK AOT
+  cache"). `prepareAppImageEngine` (`projectService.ts`, called in `main()`
+  before the project service is set up) keeps a complete copy's launcher in a
+  module variable and passes it to the project service and the cache; it is
+  never written to `process.env`, which an in-app update's relaunch inherits.
+  Without a complete copy, `startAppImageEngineCopy` makes one after the window
+  has loaded, for the next launch; a copy that fails or finds no room is not
+  tried again for that build for a day. A user's own `ENSO_ENGINE_PATH` wins and
+  turns all this off (`appImageEngine` in `src/jvmAotSettings.ts`).
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.

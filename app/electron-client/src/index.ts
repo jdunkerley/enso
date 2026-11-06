@@ -51,9 +51,10 @@ import {
   getLocalVersioning,
   getSecretsKeySource,
   handleProjectProtocol,
+  prepareAppImageEngine,
   setupProjectService,
+  startAppImageEngineCopy,
   startJvmAotCache,
-  useAppImageEngineCopy,
   version,
 } from './projectService.js'
 import { enableAll } from './security.js'
@@ -320,7 +321,9 @@ class App {
         // Before the server and any engine start, so both see the key.
         await this.initialiseSecretsKey()
         // Before the project service and the JDK AOT cache find the engine.
-        await useAppImageEngineCopy(this.electron, this.electronIsDev)
+        await prepareAppImageEngine(this.electron, this.electronIsDev, {
+          option: engineModeOption(args),
+        })
         // Note that we want to do all the actions synchronously, so when the window
         // appears, it serves the website immediately.
         await this.startContentServerIfEnabled(args)
@@ -331,6 +334,8 @@ class App {
       await this.loadWindowContent(args)
       // Once the window is up: a JDK AOT training, if one is needed, runs behind the dashboard.
       startJvmAotCache()
+      // After the window too, so that it does not compete with loading it (one build's first launch).
+      startAppImageEngineCopy()
     } catch (err) {
       console.error('Failed to initialize the application, shutting down. Error: ', err)
       this.quit()

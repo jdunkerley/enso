@@ -3,7 +3,12 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
-import { readyStableEngine, stableEnginePath, type StableEngineOptions } from '../stableEngine.js'
+import {
+  readyStableEngine,
+  stableEnginePath,
+  type StableEngineHooks,
+  type StableEngineOptions,
+} from '../stableEngine.js'
 
 let base: string
 let options: StableEngineOptions
@@ -120,4 +125,117 @@ test('other versions go, except the most recently used one', async () => {
   }
   await stableEnginePath(options)
   expect((await fs.readdir(engineDirectory())).sort()).toEqual(['2026.1.0', '2026.2.0'])
+})
+
+test('a rebuilt launcher of the same size, with a new mtime, is copied again', async () => {
+  await stableEnginePath(options)
+  const launcher = path.join(options.bundleRoot, 'dist', '1.0', 'bin', 'enso')
+  const later = new Date('2026-06-01T00:00:00Z')
+  await fs.utimes(launcher, later, later)
+  expect(await readyStableEngine(options)).toBeUndefined()
+})
+
+const GIB = 1024 ** 3
+
+/** Hooks with plenty of space, no engine running and the real copy, counting copies. */
+function hooks(overrides: Partial<StableEngineHooks> = {}): StableEngineHooks & { copies: number } {
+  const counted = {
+    copies: 0,
+    freeBytes: async () => 100 * GIB,
+    isInUse: async () => false,
+    now: () => Date.now(),
+    ...overrides,
+  }
+  const copy =
+    overrides.copy ?? ((from: string, to: string) => fs.cp(from, to, { recursive: true }))
+  return {
+    ...counted,
+    copy: async (from, to) => {
+      counted.copies += 1
+      await copy(from, to)
+    },
+    get copies() {
+      return counted.copies
+    },
+  }
+}
+
+test('a failed copy leaves no temporary directory, and is not retried until a day has passed', async () => {
+  let now = Date.parse('2026-06-01T00:00:00Z')
+  const failing = hooks({
+    now: () => now,
+    copy: async (_from, to) => {
+      await fs.mkdir(path.join(to, 'dist'), { recursive: true })
+      throw new Error('ENOSPC: no space left on device')
+    },
+  })
+  await expect(stableEnginePath(options, failing)).rejects.toThrow(/ENOSPC/)
+  expect(await fs.readdir(engineDirectory())).toEqual(['.failed.json'])
+  await expect(stableEnginePath(options, failing)).rejects.toThrow(/not retried/)
+  expect(failing.copies).toBe(1)
+  now += 25 * 60 * 60 * 1000
+  const working = hooks({ now: () => now })
+  expect(await stableEnginePath(options, working)).toBe(copiedLauncher())
+  expect(working.copies).toBe(1)
+  // A success forgets the failure.
+  expect(await fs.readdir(engineDirectory())).toEqual(['2026.2.0'])
+})
+
+test('a failure of one build does not hold back a new build', async () => {
+  const failing = hooks({
+    copy: async () => {
+      throw new Error('EIO')
+    },
+  })
+  await expect(stableEnginePath(options, failing)).rejects.toThrow(/EIO/)
+  const rebuilt = path.join(base, 'mount-d', 'resources', 'enso')
+  await fakeBundle(rebuilt, 'launcher-2-longer')
+  const working = hooks()
+  await stableEnginePath({ ...options, bundleRoot: rebuilt }, working)
+  expect(working.copies).toBe(1)
+})
+
+test('without room for the bundle plus 1 GiB, nothing is copied and the failure is recorded', async () => {
+  const short = hooks({ freeBytes: async () => GIB })
+  await expect(stableEnginePath(options, short)).rejects.toThrow(/free/)
+  expect(short.copies).toBe(0)
+  await expect(stableEnginePath(options, hooks())).rejects.toThrow(/not retried/)
+})
+
+test('when space is short, other copies go first, then the copy is made', async () => {
+  await stableEnginePath({ ...options, version: '2026.1.0' })
+  const other = path.join(engineDirectory(), '2026.1.0')
+  const tight = hooks({
+    freeBytes: async () =>
+      (
+        (await fs.access(other).then(
+          () => true,
+          () => false,
+        ))
+      ) ?
+        GIB
+      : 2 * GIB,
+  })
+  expect(await stableEnginePath(options, tight)).toBe(copiedLauncher())
+  expect(await fs.readdir(engineDirectory())).toEqual(['2026.2.0'])
+})
+
+test('a copy whose engine is still running is not deleted', async () => {
+  for (const version of ['2026.1.0', '2025.9.0']) {
+    await stableEnginePath({ ...options, version })
+  }
+  const running = path.join(engineDirectory(), '2025.9.0')
+  const old = new Date('2020-01-01T00:00:00Z')
+  await fs.utimes(path.join(running, '.complete'), old, old)
+  await stableEnginePath(options, hooks({ isInUse: async (directory) => directory === running }))
+  expect((await fs.readdir(engineDirectory())).sort()).toEqual(['2025.9.0', '2026.1.0', '2026.2.0'])
+})
+
+test('a stale copy with a read-only directory is replaced', async () => {
+  const stale = path.join(engineDirectory(), '2026.2.0', 'dist', 'locked')
+  await fs.mkdir(stale, { recursive: true })
+  await fs.writeFile(path.join(stale, 'file'), '')
+  await fs.chmod(stale, 0o555)
+  expect(await stableEnginePath(options)).toBe(copiedLauncher())
+  expect(await fs.readFile(copiedLauncher(), 'utf8')).toBe('launcher-1')
 })

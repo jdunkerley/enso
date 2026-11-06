@@ -21,7 +21,13 @@ export {
 export { driveOpen, welcomeNodeId } from './driver.js'
 export { aotKey, enginePaths, isAppImageMount, isTranslocated, readJvmOptionsText } from './key.js'
 export { acquireTrainingLock } from './lock.js'
-export { readyStableEngine, stableEnginePath, type StableEngineOptions } from './stableEngine.js'
+export {
+  readyStableEngine,
+  stableEnginePath,
+  SYSTEM_HOOKS,
+  type StableEngineHooks,
+  type StableEngineOptions,
+} from './stableEngine.js'
 export { EngineTrainer, type Trainer } from './trainer.js'
 export { aotRejection } from './useLog.js'
 

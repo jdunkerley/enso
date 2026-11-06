@@ -60,6 +60,8 @@ test('isTranslocated', () => {
 test('isAppImageMount', () => {
   expect(isAppImageMount('/tmp/.mount_enso-lT6xuLn/resources/enso/dist/1')).toBe(true)
   expect(isAppImageMount('/var/tmp/.mount_x/resources/enso/dist/1')).toBe(true)
+  // `--appimage-extract-and-run` extracts to a directory named after the AppImage's hash.
+  expect(isAppImageMount('/tmp/appimage_extracted_0123abcd/resources/enso/dist/1')).toBe(true)
   expect(isAppImageMount('/home/u/.config/enso/engine/1/dist/1')).toBe(false)
   expect(isAppImageMount('/opt/enso/resources/enso/dist/1')).toBe(false)
 })
