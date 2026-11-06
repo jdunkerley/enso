@@ -256,14 +256,36 @@ describe('useSampleMenuEntries', () => {
     entries.value[0]?.doAction()
     await flushPromises()
     const toasts = useToasts().toasts.value.map((toast) => [toast.type, toast.content])
-    expect(toasts).toContainEqual([
-      'success',
-      'Reset the samples to the bundled version. Your edited copies are kept: ' +
-        'Text_Cleaning_edited_2026_11_06.',
+    expect(toasts).toEqual([
+      ['error', 'Some samples were not reset: Data/orders.csv (EBUSY: resource busy or locked)'],
+      [
+        'info',
+        'Your edited copies of the samples that were reset are kept: ' +
+          'Text_Cleaning_edited_2026_11_06.',
+      ],
     ])
-    expect(toasts).toContainEqual([
-      'error',
-      'Some samples were not reset: Data/orders.csv (EBUSY: resource busy or locked)',
+  })
+
+  test('a Reset All that fails for everything shows only the error', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    resetAllSamples.mockResolvedValue({
+      kept: [],
+      unrenamed: [],
+      failed: [
+        { name: 'Sales_Overview', error: 'EBUSY' },
+        { name: 'Data/orders.csv', error: 'EBUSY' },
+      ],
+    })
+    const entries = await setup(() =>
+      useSampleMenuEntries(
+        () => directory(SAMPLES),
+        () => false,
+      ),
+    )
+    entries.value[0]?.doAction()
+    await flushPromises()
+    expect(useToasts().toasts.value.map((toast) => [toast.type, toast.content])).toEqual([
+      ['error', 'Some samples were not reset: Sales_Overview (EBUSY); Data/orders.csv (EBUSY)'],
     ])
   })
 

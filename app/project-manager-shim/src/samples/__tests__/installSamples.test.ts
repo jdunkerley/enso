@@ -795,6 +795,35 @@ describe('run markers', () => {
     expect(listing(path.join(staging, '.enso'))).toEqual(['project.json'])
   })
 
+  test("a user's file named like a marker outside .enso/ is carried", async () => {
+    const one = path.join(samples, 'One')
+    const staging = path.join(root, 'staging')
+    write(path.join(staging, 'package.yaml'), 'name: One\n')
+    write(path.join(one, 'output', 'run-1.lock'), 'mine')
+    await carryLocalState(one, staging)
+    expect(read(path.join(staging, 'output', 'run-1.lock'))).toBe('mine')
+  })
+
+  test('a marker deleted while the run goes on comes back at the next heartbeat', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      const kept = await markProjectRunning(path.join(samples, 'One'))
+      // Its time is this machine's from the start (a share's clock may differ).
+      expect(Date.now() - fs.statSync(kept.path).mtimeMs).toBeLessThan(10_000)
+      // Another reader judged it stale (after a sleep, say) and deleted it.
+      fs.rmSync(kept.path)
+      vi.advanceTimersByTime(RUN_MARKER_HEARTBEAT_MS)
+      await vi.waitFor(() => {
+        expect(JSON.parse(read(kept.path))).toEqual({ pid: process.pid, host: os.hostname() })
+      })
+      expect(await findLiveRunMarker(path.join(samples, 'One'))).toBe(kept.path)
+      await kept.remove()
+      expect(fs.existsSync(kept.path)).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   test('Ctrl+C or a terminate removes the marker, then exits as the signal would', async () => {
     const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
     for (const [signal, code] of [

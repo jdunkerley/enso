@@ -369,6 +369,7 @@
   "resetSampleUnrenamed": "The edited copy '$0' still has the sample's project name. Rename it in the Drive before you open it.",
   "resetAllSamplesError": "Could not reset the samples",
   "resetAllSamplesFailed": "Some samples were not reset: $0",
+  "resetAllSamplesPartlyKept": "Your edited copies of the samples that were reset are kept: $0.",
   "openInFileBrowserShortcutWindows": "Open in Explorer",
   "openInFileBrowserShortcutMacOs": "Open in Finder",
   "copyIdShortcut": "Copy Id(s)",

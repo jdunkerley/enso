@@ -116,12 +116,15 @@ passes it to the server) installs the samples shipped with the application in
   marker's path). The other side waits too: `openProject` of a project in a
   `Samples` folder counts it as opening and then waits for the changes queued on
   that folder (`samplesSettled`), so an open never meets a half-done update.
+  Opening a sample therefore waits for a queued sync or reset to finish, a whole
+  Reset All included (a hung network share would hold the open with it).
 - **Run markers** (`samples/runMarker.ts`). A headless `--startup.project` run
   takes no single-instance lock, so `runLocalProjectByPath` writes
-  `<project>/.enso/run-<pid>.lock` (`{ pid, host }`), touches it every 30 s,
-  removes it when the run ends and on SIGINT/SIGTERM (`removeOnSignals`, which
-  then exits with 130/143), and the samples treat a project with a live marker
-  as open. A marker is live when touched within 2 minutes, written on this host,
+  `<project>/.enso/run-<pid>.lock` (`{ pid, host }`, with this machine's time),
+  rewrites it every 30 s (so one a reader deleted as stale comes back), removes
+  it when the run ends and on SIGINT/SIGTERM (`removeOnSignals`, which then
+  exits with 130/143), and the samples treat a project with a live marker as
+  open. A marker is live when touched within 2 minutes, written on this host,
   and its pid is not known to be gone (`EPERM`, another user's process, is not
   known either way, so the heartbeat decides); any other marker is deleted when
   read, so a crash or a reused pid blocks nothing for long. An update never

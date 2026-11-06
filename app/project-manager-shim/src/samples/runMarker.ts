@@ -56,25 +56,45 @@ export interface RunMarker {
  */
 export async function markProjectRunning(projectPath: string): Promise<RunMarker> {
   const marker = pathModule.join(markerDirectory(projectPath), `run-${process.pid}.lock`)
-  try {
+  const content = JSON.stringify({ pid: process.pid, host: os.hostname() })
+  /**
+   * (Re)write the marker and give it this machine's time: a marker another reader deleted (after
+   * a sleep made it look stale) comes back, and one on a share whose clock differs is not stale
+   * from birth.
+   */
+  const write = async () => {
     await fs.promises.mkdir(markerDirectory(projectPath), { recursive: true })
-    await fs.promises.writeFile(marker, JSON.stringify({ pid: process.pid, host: os.hostname() }))
+    await fs.promises.writeFile(marker, content)
+    const now = new Date()
+    await fs.promises.utimes(marker, now, now)
+  }
+  try {
+    await write()
   } catch (error) {
     console.warn(`Could not mark '${projectPath}' as running:`, error)
     return { path: marker, remove: async () => {}, removeNow: () => {} }
   }
+  let removed = false
   const heartbeat = setInterval(() => {
-    const now = new Date()
-    fs.promises.utimes(marker, now, now).catch(() => {})
+    write()
+      .then(async () => {
+        // A removal that raced this write must win.
+        if (removed) await fs.promises.rm(marker, { force: true })
+      })
+      .catch((error: unknown) =>
+        console.warn(`Could not refresh the run marker '${marker}':`, error),
+      )
   }, RUN_MARKER_HEARTBEAT_MS)
   heartbeat.unref()
   return {
     path: marker,
     remove: async () => {
+      removed = true
       clearInterval(heartbeat)
       await fs.promises.rm(marker, { force: true }).catch(() => {})
     },
     removeNow: () => {
+      removed = true
       clearInterval(heartbeat)
       try {
         fs.rmSync(marker, { force: true })

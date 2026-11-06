@@ -613,13 +613,19 @@ async function updatePackageYaml(
  * bundle also ships there wins), and its labels.
  */
 export async function carryLocalState(installed: string, staging: string): Promise<void> {
+  const markers = pathModule.resolve(installed, '.enso')
   for (const entry of await fs.promises.readdir(installed)) {
     if (!isHidden(entry) && entry !== OUTPUT_DIRECTORY_NAME) continue
     await fs.promises.cp(pathModule.join(installed, entry), pathModule.join(staging, entry), {
       recursive: true,
       force: true,
-      // A run marker belongs to the folder it was written in, and to the run that wrote it.
-      filter: (source) => !isRunMarkerName(pathModule.basename(source)),
+      // A run marker (only in `.enso/`) belongs to the folder it was written in, and to the run
+      // that wrote it. A user's file of that name elsewhere, in `output/`, is theirs.
+      filter: (source) =>
+        !(
+          pathModule.resolve(pathModule.dirname(source)) === markers &&
+          isRunMarkerName(pathModule.basename(source))
+        ),
     })
   }
   const labels = await readLabels(installed)
