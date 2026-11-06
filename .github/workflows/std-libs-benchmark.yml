@@ -14,6 +14,13 @@ on:
         required: true
         type: boolean
         default: false
+      jvm-options:
+        description: >-
+          JVM options to compare with the defaults (space-separated). When set, the benchmarks run
+          twice in this job, without and then with them, and both reports are uploaded.
+        required: false
+        type: string
+        default: ""
 
 env:
   # Benchmarks always start and end with a clean working tree. Read by `.github/actions/git-clean`.
@@ -26,7 +33,8 @@ jobs:
   benchmark-standard-libraries-graal-vm-ce:
     name: Benchmark Standard Libraries (GraalVM CE)
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    # A run with `jvm-options` runs the benchmarks twice (115 minutes for `Table|Vector`, #585).
+    timeout-minutes: ${{ inputs.jvm-options != '' && 300 || 240 }}
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -44,15 +52,33 @@ jobs:
       # `std-benchmarks/bench` builds the engine distribution first (its annotation processor
       # needs one), with the native runner that `ENSO_LAUNCHER` asks for.
       - name: Run the benchmarks
-        # A hung benchmark otherwise holds the runner for the job's whole 4 hours.
-        timeout-minutes: 150
+        # A hung benchmark otherwise holds the runner for the job's whole 4 hours (5 with two arms).
+        timeout-minutes: ${{ inputs.jvm-options != '' && 280 || 150 }}
         run: |-
+          set -f # the options are split on spaces below, and must not be globbed
+          # The options are pasted into an sbt Scala expression: allow plain characters only.
+          if [ -n "$(printf '%s' "$JVM_OPTIONS" | tr -d 'A-Za-z0-9_=:.,/+ -')" ]; then
+            echo "::error::jvm-options may only contain letters, digits and _ = : . , / + - and spaces"
+            exit 1
+          fi
           task="std-benchmarks/bench"
           if [ -n "$BENCH_NAME" ]; then task="std-benchmarks/benchOnly $BENCH_NAME"; fi
           sbt "-Dbench.compileOnly=$JUST_CHECK" "-Dsbt.server.autostart=false" "$task"
+          # Note [Benchmarks Compare JVM Options In One Job]
+          # Runners vary between dispatches, so the candidate options run after the baseline in
+          # the same job. They are appended to `std-benchmarks`' `javaOptions`, and JMH's forks
+          # inherit the host JVM's input arguments. Check mode writes no report, so it runs once.
+          if [ -n "$JVM_OPTIONS" ] && [ "$JUST_CHECK" != true ]; then
+            mv std-bits/benchmarks/bench-report.xml std-bits/benchmarks/bench-report-baseline.xml
+            opts=""
+            for o in $JVM_OPTIONS; do opts="$opts\"$o\","; done
+            sbt "-Dsbt.server.autostart=false" "set \`std-benchmarks\` / javaOptions ++= Seq(${opts%,})" "$task"
+            mv std-bits/benchmarks/bench-report.xml std-bits/benchmarks/bench-report-candidate.xml
+          fi
         env:
           BENCH_NAME: ${{ inputs.bench-name }}
           JUST_CHECK: ${{ inputs.just-check }}
+          JVM_OPTIONS: ${{ inputs.jvm-options }}
           ENSO_LAUNCHER: native,-ls
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
@@ -62,8 +88,8 @@ jobs:
         if: ${{ !inputs.just-check }}
         uses: actions/upload-artifact@v5
         with:
-          name: benchmark-results.xml
-          path: std-bits/benchmarks/bench-report.xml
+          name: benchmark-results
+          path: std-bits/benchmarks/bench-report*.xml
           if-no-files-found: error
       - name: Clean after
         if: always()

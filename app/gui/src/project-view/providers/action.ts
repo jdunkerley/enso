@@ -375,17 +375,6 @@ const displayableActions = {
     shortcut: commandPaletteBindings.bindings['commandPalette.open'],
   },
 
-  // === Help ===
-
-  'help.whatsNew': { description: "What's new" },
-  'help.community': { description: 'Community' },
-  'help.gettingStarted': { description: 'Getting Started with Enso Analytics' },
-  'help.askAQuestion': { description: 'Ask a question' },
-  'help.componentExamples': { description: 'Component examples' },
-  'help.exampleWorkflows': { description: 'Example workflows' },
-  'help.docs': { description: 'Documentation' },
-  'help.contactUs': { description: 'Contact Us' },
-
   // === Session logs ===
 } satisfies Record<string, DisplayableAction>
 export type DisplayableActionName = keyof typeof displayableActions
@@ -414,9 +403,6 @@ const undisplayableActions = {
 
   // === Graph Editor ===
 
-  'graph.openDocumentation': {
-    shortcut: () => graphBindings.bindings['graph.openDocumentation'],
-  },
   'graph.openComponentBrowser': {
     shortcut: () => graphBindings.bindings['graph.openComponentBrowser'],
   },

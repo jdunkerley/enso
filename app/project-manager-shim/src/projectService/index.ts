@@ -12,13 +12,21 @@ import * as crypto from 'node:crypto'
 import * as path from 'node:path'
 import { getEngineLogDirectory } from '../distributionManager.js'
 import { EngineLogHub } from '../engineLogs/hub.js'
+import type { JvmAotCache } from '../jvmAot/index.js'
 import type { ProjectLifecycleListener } from '../localMetadata/index.js'
 import { withinVersioningTimeout, type LocalVersioning } from '../localVersioning/index.js'
+import {
+  describeEngineMode,
+  liftJvmFlag,
+  resolveEngineMode,
+  type EngineMode,
+  type EngineModeSettings,
+} from './engineMode.js'
 import {
   DEFAULT_YDOC_WAIT_MS,
   EnsoRunner,
   findEnsoExecutable,
-  LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
+  type EngineLaunch,
   type LanguageServerSockets,
   type Runner,
   type Socket,
@@ -30,14 +38,53 @@ import {
   type ProjectMetadata,
   type ProjectRepository,
 } from './projectRepository.js'
-import { timeoutFromEnv } from './timeouts.js'
+import { engineTimeouts } from './timeouts.js'
 import { UUID, type Path } from './types.js'
+import type { YdocHost } from './ydocHost.js'
+
+export {
+  loopbackOrigins,
+  ydocHostKind,
+  type YdocHost,
+  type YdocHostKind,
+  type YdocListenRequest,
+} from './ydocHost.js'
+
+export { resolveDefaultEngineMode } from './engineMode.js'
 
 export interface RunningLanguageServerInfo {
   readonly sockets: LanguageServerSockets
   readonly projectName: string
   readonly projectNormalizedName: string
   readonly projectNamespace: string
+}
+
+/** Where the engine mode may come from besides a project's `package.yaml` (`engineMode.ts`). */
+export interface EngineSettings {
+  /** Electron's `--engine-mode` (or its alias `--jvm`). */
+  readonly option?: EngineMode | undefined
+  /** The raw `ENSO_ENGINE_MODE`; the process environment's when omitted. */
+  readonly environment?: string | undefined
+  /** The per-user JDK AOT cache: its options go to every JVM engine, and opens stop its training. */
+  readonly jvmAot?: JvmAotCache | undefined
+  /**
+   * Where opened projects' ydoc servers run when `ENSO_YDOC_HOST` is `node` (the default): Electron's
+   * utility process, or `NodeYdocHost` in the Vite dev server. Without one the engine serves it.
+   */
+  readonly ydocHost?: YdocHost | undefined
+  /**
+   * The engine's launcher, when the host knows better than the search (a Linux AppImage's copy,
+   * `jvmAot/stableEngine.ts`); a user's `ENSO_ENGINE_PATH` still wins (`findEnsoExecutable`).
+   */
+  readonly ensoExecutable?: string | undefined
+  /** Told when each open starts and is answered (a failure too), like `jvmAot`. */
+  readonly openObserver?: OpenObserver | undefined
+}
+
+/** Hears opens: Electron holds a Linux AppImage's engine copy back until the first is answered. */
+export interface OpenObserver {
+  openStarted(): void
+  openAnswered(): void
 }
 
 /** Parameters for the "create project" endpoint. */
@@ -96,7 +143,28 @@ export class ProjectService {
     private readonly versioning?: LocalVersioning,
     /** Environment variables added to every engine this service starts. */
     private readonly extraEnvironment?: () => readonly (readonly [string, string])[],
+    private readonly engine?: EngineSettings,
   ) {}
+
+  private engineModeSettings(): EngineModeSettings {
+    return {
+      option: this.engine?.option,
+      environment: this.engine?.environment ?? process.env.ENSO_ENGINE_MODE,
+    }
+  }
+
+  /** The AOT cache's options for a JVM engine (`jvmOptions` of its launch), when there is a cache. */
+  private async aotOptions(mode: EngineMode): Promise<Pick<EngineLaunch, 'jvmOptions'>> {
+    const jvmAot = this.engine?.jvmAot
+    if (mode !== 'jvm' || jvmAot == null) return {}
+    try {
+      const jvmOptions = await jvmAot.jvmOptions()
+      return jvmOptions.length > 0 ? { jvmOptions } : {}
+    } catch (error) {
+      this.logger.error('Failed to read the AOT cache:', error)
+      return {}
+    }
+  }
 
   /** Why the last close-commit of each project (by path) failed, until `closeProject` reports it. */
   private readonly versioningWarnings = new Map<string, string>()
@@ -111,28 +179,25 @@ export class ProjectService {
     lifecycle?: ProjectLifecycleListener,
     versioning?: LocalVersioning,
     extraEnvironment?: () => readonly (readonly [string, string])[],
+    engine?: EngineSettings,
   ): ProjectService {
-    const ensoPath = findEnsoExecutable(workDir)
+    const ensoPath = findEnsoExecutable(workDir, engine?.ensoExecutable)
     if (!ensoPath) {
       throw new Error(`${PRODUCT_NAME} executable not found`)
     }
-    // `ENSO_ENGINE_STARTUP_TIMEOUT_MS` lengthens the engine's start-up timeout (30 s): the
-    // open-time harness's JDK AOT training launch, a JVM with no class data sharing at all that
-    // also records every class, does not pass its first health check within 30 s on the Windows
-    // runner, and is killed before it can write its training data.
-    const startupTimeoutMs = timeoutFromEnv(
-      process.env.ENSO_ENGINE_STARTUP_TIMEOUT_MS,
-      LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
-    )
+    // The start-up and terminate timeouts come per launch, from the engine mode's column
+    // (`engineTimeouts`; `ENSO_ENGINE_STARTUP_TIMEOUT_MS` and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS`
+    // override both). `ydocWaitMs` is the fallback for a launch without a mode.
     const runner = new EnsoRunner(ensoPath, {
       ydocWaitMs: DEFAULT_YDOC_WAIT_MS,
-      startupTimeoutMs,
+      ydocHost: engine?.ydocHost,
     })
 
     // Read extra arguments from environment variable
     const envArgs = process.env.ENSO_ENGINE_ARGS
     const envArgsArray = envArgs ? envArgs.split(/\s+/).filter((arg) => arg.length > 0) : []
-    const allExtraArgs = [...envArgsArray, ...extraArgs]
+    const lifted = liftJvmFlag([...envArgsArray, ...extraArgs], engine?.option)
+    const allExtraArgs = lifted.args
 
     return new ProjectService(
       runner,
@@ -141,6 +206,7 @@ export class ProjectService {
       lifecycle,
       versioning,
       extraEnvironment,
+      { ...engine, option: lifted.option },
     )
   }
 
@@ -235,9 +301,16 @@ export class ProjectService {
   async runProject(projectId: UUID, projectsDirectory: Path): Promise<number> {
     const project = await this.getProject(projectId, projectsDirectory, true)
     this.logger.debug(`Running project '${project.path}'`)
+    const mode = await resolveEngineMode(project.path, this.engineModeSettings())
+    const launch: EngineLaunch = {
+      mode,
+      timeouts: engineTimeouts(mode.mode),
+      ...(await this.aotOptions(mode.mode)),
+    }
     const exitCode = await this.runner.runProject(
       project.path,
       this.projectEnvVars(await makeProjectTelemetryKey(projectsDirectory, projectId)),
+      launch,
     )
     this.logger.debug(`Project '${project.path}' finished running`)
     return exitCode
@@ -264,6 +337,8 @@ export class ProjectService {
 
     // The log channel opens before the engine starts, so that its start-up is in the replay buffer.
     const localProjectKey = await makeProjectTelemetryKey(projectsDirectory, projectId)
+    // An open project keeps the engine it has: no second mode line in the middle of its log.
+    const alreadyLogging = this.engineLogs.get(project.path)?.isOpen === true
     const engineLog = this.engineLogs.open({
       projectPath: project.path,
       logDirectory: path.join(getEngineLogDirectory(), localProjectKey),
@@ -272,18 +347,36 @@ export class ProjectService {
 
     // Start the language server
     let sockets: LanguageServerSockets
+    let launch: EngineLaunch | undefined
     const engineArgs = [...this.extraArgs, ...engineLoggingArgs(engineLogging)]
+    // A running AOT training yields to the open (spec, stage 1d "Yielding").
+    const jvmAot = this.engine?.jvmAot
+    jvmAot?.openStarted()
+    this.engine?.openObserver?.openStarted()
     try {
+      const mode = await resolveEngineMode(project.path, this.engineModeSettings())
+      if (!alreadyLogging) engineLog.notice(describeEngineMode(mode))
+      launch = { mode, timeouts: engineTimeouts(mode.mode), ...(await this.aotOptions(mode.mode)) }
       sockets = await this.runner.openProject(
         project.path,
         projectId,
         engineArgs.length > 0 ? engineArgs : undefined,
         this.projectEnvVars(localProjectKey),
         engineLog,
+        launch,
       )
     } catch (error) {
       await engineLog.close()
       throw error
+    } finally {
+      jvmAot?.openAnswered()
+      this.engine?.openObserver?.openAnswered()
+      if (jvmAot != null && (launch?.jvmOptions?.length ?? 0) > 0) {
+        // The JVM has written its warnings by now: a cache it refused is deleted.
+        void jvmAot
+          .checkUseLog()
+          .catch((error: unknown) => this.logger.error('Failed to check the AOT cache:', error))
+      }
     }
 
     // Registered before any rename hook, so a project is saved before its directory moves.

@@ -10,6 +10,7 @@ import {
   type SuggestionId,
   type TypeSuggestionEntry,
 } from '$/providers/openedProjects/suggestionDatabase/entry'
+import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase/groupInfo'
 import { SuggestionUpdateProcessor } from '$/providers/openedProjects/suggestionDatabase/lsUpdate'
 import { proxyRefs } from '$/utils/reactivity'
 import { ExpressionTag } from '@/components/GraphEditor/widgets/WidgetSelection/tags'
@@ -214,17 +215,7 @@ function methodOnTypeKey(selfType: ProjectPath, name: string): string {
   return `${selfType.key()}#${name}`
 }
 
-/**
- * Description of a Component Group.
- *
- * These are groups displayed in the Component Browser. Also, nodes being a call to method from
- * given group will inherit its color.
- */
-export interface GroupInfo {
-  color?: string
-  name: string
-  project: QualifiedName
-}
+export type { GroupInfo } from './groupInfo'
 
 /* Note [The Suggestion Database Is Requested At Connect Time]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

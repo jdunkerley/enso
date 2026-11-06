@@ -108,7 +108,6 @@
   "snowflakeCredentialClientId": "Client ID",
   "snowflakeCredentialClientSecret": "Client Secret",
   "snowflakeCredentialRole": "Role",
-  "snowflakeIntegrationGetHelp": "How to setup OAuth integration for Snowflake?",
   "googleCredentialType": "Google",
   "googleCredentialScopes": "Scopes",
   "googleCredentialScopesEmptyError": "Please select at least one scope for the integration.",
@@ -367,7 +366,6 @@
   "createdAt": "Created at",
   "never": "Never",
   "assetSearchFieldLabel": "Search through items",
-  "userMenuLabel": "Settings menu",
   "infoMenuLabel": "Info menu",
   "assetsTableContextMenuLabel": "Drive context menu",
   "assetsTableLabel": "Drive contents",
@@ -405,6 +403,7 @@
   "profilePictureSettingsCustomEntryAliases": "user profile picture",
   "localSettingsTab": "Local",
   "localSettingsSection": "Local",
+  "localSettingsButtonLabel": "Local settings",
   "localRootPathSettingsInput": "Root Folder",
   "localRootPathButtonSettingsCustomEntryAliases": "reset root folder\nreset root directory",
   "downloadDirectorySettingsInput": "Download Folder",
@@ -626,6 +625,7 @@
   "versioningNotForThisFolder": "This project is outside your projects folder and in no git repository, so no versions are kept for it.",
   "versioningBlocked": "Versions cannot be saved: $0",
   "versioningNotConnected": "Not connected to the project",
+  "projectConnectionRestarted": "The connection to the project was restarted. Changes made in the last few seconds may not have been saved, and the view's selection and undo history were reset.",
   "localVersionsLoading": "Reading the versions status…",
   "localVersionsStatusError": "The versions status could not be read: $0"
 }

@@ -42,6 +42,13 @@ export const test = base.extend<{
    * `test.use({ aiEnabled: true })`.
    */
   aiEnabled: boolean
+  /**
+   * Whether the app opens the Getting_Started sample, as a fresh install does. Default `false`:
+   * every spec starts with a fresh projects directory, and the fixture passes
+   * `--no-welcome-project` so that it does not pay for a project open and close. The spec that
+   * checks the fresh-install landing overrides it with `test.use({ welcomeProject: true })`.
+   */
+  welcomeProject: boolean
   app: ElectronApplication
   page: Page
 }>({
@@ -54,10 +61,14 @@ export const test = base.extend<{
     await use(projectsDir)
   },
   aiEnabled: [false, { option: true }],
+  welcomeProject: [false, { option: true }],
 
   /** Setup for all tests: Create an electron-based app instance. */
-  app: async function ({ projectsDir, testRunId, aiEnabled }, use) {
-    const args = process.env.ENSO_TEST_APP_ARGS?.split(',') ?? []
+  app: async function ({ projectsDir, testRunId, aiEnabled, welcomeProject }, use) {
+    const args = [
+      ...(process.env.ENSO_TEST_APP_ARGS?.split(',') ?? []),
+      ...(welcomeProject ? [] : ['--no-welcome-project']),
+    ]
     const app = await _electron.launch({
       executablePath: electronExecutablePath,
       args,
@@ -80,12 +91,16 @@ export const test = base.extend<{
   },
 })
 
-/** Wait until the app has loaded: the drive, or the welcome project's tab on a first start. */
+/**
+ * The tab of the project a fresh install opens: the bundled `Getting_Started` sample
+ * (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in the GUI's `router/dashboardGuards.ts`). Only a spec
+ * that sets `welcomeProject` sees it.
+ */
+export const WELCOME_PROJECT_TAB = 'Getting_Started'
+
+/** Wait until the app has loaded: the drive (the fixture turns the welcome project off). */
 export async function waitForDashboard(page: Page) {
-  const dashboardReady = page
-    .getByTestId('drive-view')
-    .or(page.getByRole('tab', { name: 'Getting Started with Enso Analytics' }))
-  await expect(dashboardReady.first()).toBeVisible({ timeout: 60000 })
+  await expect(page.getByTestId('drive-view')).toBeVisible({ timeout: 60000 })
 }
 
 /**
@@ -99,7 +114,13 @@ export async function waitForDashboard(page: Page) {
  * standard library is AOT-compiled into the packaged engine, so there is no IR cache to warm.
  * Specs that do not need the visualization should pass `waitForVisualization: false`.
  */
-const FIRST_PROJECT_TIMEOUT = 90000
+export const FIRST_PROJECT_TIMEOUT = 90000
+
+/**
+ * How long to wait for a project the app opens by itself (the welcome project) to show its first
+ * visualization: the project open and a cold Language Server's first execution, with headroom.
+ */
+export const COLD_PROJECT_TIMEOUT = 180_000
 
 /**
  * Create a new Enso project, and wait until its graph is shown and, unless `waitForVisualization`
@@ -117,23 +138,23 @@ export async function createNewProject(
   await expect(tableViz).toContainText('Welcome To Enso!', { timeout: FIRST_PROJECT_TIMEOUT })
 }
 
-/** If welcome project is to be opened, navigate back to the dashboard. */
+/**
+ * Close the welcome project's tab, if it is open. The fixture turns the welcome project off, so
+ * this normally finds nothing: it does not wait for the tab to appear.
+ */
 export async function closeWelcome(page: Page) {
-  const welcomeProjectTab = page.getByRole('tab', { name: 'Getting Started with Enso Analytics' })
-  const loadingIndicator = welcomeProjectTab.locator('.LoadingSpinner')
-  await Promise.race([
-    welcomeProjectTab
-      .waitFor({ state: 'visible', timeout: 0 })
-      .then(() => loadingIndicator.waitFor({ state: 'hidden' })),
-    page.waitForTimeout(3000),
-  ])
-  if (await welcomeProjectTab.isVisible()) {
-    await answerRepositoryPrompt(
-      page,
-      () => welcomeProjectTab.locator('.CloseButton').click(),
-      () => expect(welcomeProjectTab).toHaveCount(0, { timeout: 30_000 }),
-    )
-  }
+  const welcomeProjectTab = page.getByRole('tab', { name: WELCOME_PROJECT_TAB, exact: true })
+  if (!(await welcomeProjectTab.isVisible())) return
+  await expect(welcomeProjectTab.locator('.LoadingSpinner')).toHaveCount(0, {
+    timeout: COLD_PROJECT_TIMEOUT,
+  })
+  await answerRepositoryPrompt(
+    page,
+    // The close button is the tab's sibling (`SelectableTab.vue`), hidden from the a11y tree.
+    () =>
+      page.locator('.SelectableTab', { has: welcomeProjectTab }).locator('.CloseButton').click(),
+    () => expect(welcomeProjectTab).toHaveCount(0, { timeout: 30_000 }),
+  )
 }
 
 /**
@@ -250,14 +271,14 @@ export async function fillWidgetText(
 }
 
 /**
- * Wait for the Samples folder download
- * This function retries to access passed file every 5 sec, fails after 1 min
+ * Wait for a file to appear.
+ * This function retries to access the passed file every 5 sec, fails after 1 min.
  */
-export async function waitForDownload(pathToFile: string): Promise<void> {
+export async function waitForFile(pathToFile: string): Promise<void> {
   const start = Date.now()
   while (true) {
     try {
-      await fs.access(pathToFile) // ✅ file exists
+      await fs.access(pathToFile) // file exists
       return
     } catch {
       if (Date.now() - start > 60_000) {
@@ -266,6 +287,22 @@ export async function waitForDownload(pathToFile: string): Promise<void> {
       await new Promise((r) => setTimeout(r, 5_000))
     }
   }
+}
+
+/**
+ * Put the bank data of the Getting Started exercises (a generated workbook, see `tests/fixtures`)
+ * into `Samples/Data` of the projects directory.
+ *
+ * The IDE copies its bundled samples to `Samples` at start-up and skips that when the directory
+ * exists, so this first waits for a bundled sample to be there. Returns the workbook's path.
+ */
+export async function addBankData(projectsDir: string): Promise<string> {
+  const samples = path.join(projectsDir, 'Samples')
+  await waitForFile(path.join(samples, 'Sales_Overview', 'package.yaml'))
+  const target = path.join(samples, 'Data', 'sample_bank_data.xlsx')
+  await fs.mkdir(path.dirname(target), { recursive: true })
+  await fs.copyFile(path.join(import.meta.dirname, 'fixtures', 'sample_bank_data.xlsx'), target)
+  return target
 }
 
 /** Open drop-down menu in WidgetSelection with given label. */
@@ -375,4 +412,16 @@ export async function showAllComponents(page: Page) {
 /** Find and click + button in an empty Vector Widget inside provided locator. */
 export function addFirstElementToWidgetVector(locator: Locator) {
   return locator.getByRole('list').filter({ hasText: /^$/ }).getByLabel('Add a new item').click()
+}
+
+/**
+ * Leave the mouse where nothing is under it and it is off both rails (the left one runs the
+ * window's full height, so the corner (0, 0) is on it): the empty bottom of the right rail.
+ */
+export async function parkMouse(page: Page): Promise<void> {
+  const { width, height } = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }))
+  await page.mouse.move(width - 24, height - 100)
 }

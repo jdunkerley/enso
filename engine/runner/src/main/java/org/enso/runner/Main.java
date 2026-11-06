@@ -1508,6 +1508,8 @@ public class Main {
     commandAndArgs.add("--sun-misc-unsafe-memory-access=allow");
     commandAndArgs.add("--enable-native-access=org.graalvm.truffle");
     commandAndArgs.add("--add-opens=java.base/java.nio=ALL-UNNAMED");
+    commandAndArgs.addAll(
+        JvmOptions.all(component, System.getenv(JvmOptions.ENVIRONMENT_VARIABLE)));
     if (!component.isDirectory()) {
       throw new IOException("Cannot find " + component + " directory");
     }

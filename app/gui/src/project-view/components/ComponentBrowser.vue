@@ -6,7 +6,6 @@ import {
 } from '$/components/WithCurrentProject.vue'
 import type { NodeId } from '$/providers/openedProjects/graph'
 import type { RequiredImport } from '$/providers/openedProjects/module/imports'
-import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegistry'
 import type { Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { debouncedGetter } from '$/utils/reactivity'
 import { componentBrowserBindings, listBindings } from '@/bindings'
@@ -14,6 +13,7 @@ import ActionButton from '@/components/ActionButton.vue'
 import type { Component } from '@/components/ComponentBrowser/component'
 import ComponentEditor from '@/components/ComponentBrowser/ComponentEditor.vue'
 import ComponentList from '@/components/ComponentBrowser/ComponentList.vue'
+import { returnTypeInfo } from '@/components/ComponentBrowser/returnTypeInfo'
 import { useComponentBrowserInput, type Usage } from '@/components/ComponentBrowser/input'
 import GraphVisualization from '@/components/GraphEditor/GraphVisualization.vue'
 import { useResizeObserver } from '@/composables/events'
@@ -29,7 +29,6 @@ import { tryGetIndex } from '@/util/data/array'
 import type { Opt } from '@/util/data/opt'
 import { Rect } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
-import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
 import * as objects from 'enso-common/src/utilities/data/object'
 import { Ok } from 'enso-common/src/utilities/data/result'
 import type { ComponentInstance } from 'vue'
@@ -268,9 +267,7 @@ const previewedSuggestionTypeInfo = computed(() => {
     : undefined
   const returnType = entry?.returnType(projectNames)
   if (returnType == null) return undefined
-  const parsed = parseAbsoluteProjectPathRaw(returnType)
-  if (parsed.ok) return TypeInfo.fromParsedTypes([parsed.value], [])
-  return undefined
+  return returnTypeInfo(returnType)
 })
 
 const previewDataSource = computed<VisualizationDataSource | undefined>(() => {

@@ -12,5 +12,30 @@ for candidate in "$ENGINE_ROOT"/../../runtime/graalvm-*/bin/java; do
     break
   fi
 done
-exec "$JAVA" --module-path "$COMP_PATH" $JAVA_OPTS -m org.enso.runner/org.enso.runner.Main "$@"
+# The package's jvm.options (engine/runner JvmOptions.java): one JVM option per
+# line, blank lines and # comments skipped. The options go before `-m`, the
+# user's arguments after it, so they are put in "$@" in that order.
+USER_ARGS=$#
+BOM=$(printf '\357\273\277')
+if [ -f "$ENGINE_ROOT/jvm.options" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%"$(printf '\r')"}
+    line=${line#"$BOM"}
+    line=${line#"${line%%[![:space:]]*}"}
+    line=${line%"${line##*[![:space:]]}"}
+    case $line in
+      "" | "#"*) ;;
+      *) set -- "$@" "$line" ;;
+    esac
+  done < "$ENGINE_ROOT/jvm.options"
+fi
+set -- "$@" -m org.enso.runner/org.enso.runner.Main
+# Rotate the user's arguments, which came first, behind the options.
+while [ "$USER_ARGS" -gt 0 ]; do
+  first=$1
+  shift
+  set -- "$@" "$first"
+  USER_ARGS=$((USER_ARGS - 1))
+done
+exec "$JAVA" --module-path "$COMP_PATH" $JAVA_OPTS "$@"
 exit

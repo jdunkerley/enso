@@ -36,6 +36,57 @@ desktop binary (AppImage/DMG/exe + installer).
   serves project assets to the window and refuses paths outside a project. The
   OS deep-link registration (`setAsDefaultProtocolClient`) was removed: there
   are no deep links.
+- Hosts the opened projects' ydoc servers in an Electron **utility process**
+  (`src/ydocHost/`, spec stage 1a of the JVM-by-default plan), not in the
+  engine: `main.ts` (bundled as `ydocHost.mjs` beside `index.mjs`, since
+  `esbuild-plugin-wasm` resolves the WASM file only from `./`) runs
+  `ydoc-server`'s `NodeYdocHost`, one WebSocket listener per opened project,
+  each talking to its engine's Language Server over the channel sockets.
+  `client.ts`'s `UtilityProcessYdocHost` is the shim's `YdocHost` on the main
+  side (`listen`/`close` messages answered by id, `protocol.ts`): forked at
+  start-up (`setupProjectService` calls `start()` under the Node host; forking
+  it on the first open put ~0.4 s on Windows, ~0.2 s on Linux, in front of that
+  project's engine, measured), and killed on `will-quit`. If it exits it is
+  forked again with the open listeners: at once, then, while it keeps dying
+  within a minute of its start, after 1, 2, 4 and 8 s; after five such restarts
+  it waits for the next open or close and logs that (Note [The ydoc Host
+  Restarts With A Bounded Backoff] in `client.ts`). Its `error` event (a fatal
+  V8 error) is logged; unhandled it would throw in the main process. A request
+  while a backoff is pending forks at once but does not reset the restart count,
+  and a `close` while a `listen` is in flight keeps the port out of the restored
+  set. A `listen` on a port another open listener holds (one still being
+  restored after a restart) is refused as `EADDRINUSE`, so the shim searches new
+  ports instead of handing that project's GUI to another engine. In the process,
+  `serve.ts` chains one port's requests, so a `close` cannot overtake a
+  restoring `listen`. Every `listen` carries the origins the listener accepts
+  (`allowOrigins`, #596): the content server's `https://localhost:<port>` under
+  each loopback name, set by `allowYdocOrigin` from the server's `onListening`
+  (`index.ts`), with or without a window. Keep that call wherever the port is
+  decided, or every page is refused. It prints `ydoc host pid=<pid>` at start;
+  its stdout and stderr go through the main process's console, so they reach the
+  IDE log. `ENSO_YDOC_HOST=engine` puts the server back in the engine for one
+  release (see `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
+  `tests/headless/ydocHostClient.test.ts` (against a fake child),
+  `tests/headless/ydocHostServe.test.ts`.
+- Installs the bundled sample projects at start-up (`installSamples` in
+  `project-manager-shim`, called from `onStart`): `samples/` in this package is
+  shipped as `resources/samples` (`extraResources`) and copied to
+  `<projects>/Samples` only when that directory is missing. Nothing is
+  downloaded. `main` waits for the copy (at most 10 s, then loads anyway, and
+  logs a failed copy) before it loads the window, because on a fresh install the
+  dashboard opens `Samples/Getting_Started` once
+  (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in the GUI's
+  `router/dashboardGuards.ts`; `--no-welcome-project` turns it off, and the
+  Playwright fixture passes it unless a spec sets `welcomeProject`). The samples
+  are original and use synthetic data; each is a project that reads the shared
+  `samples/Data` folder (installed as `Samples/Data`) and writes to its own
+  `output/`. Their layout, house style, how to regenerate their stored node
+  positions and how to run them are in `samples/CLAUDE.md` (checked by
+  `tests/headless/samples.test.ts`). They must run on the current engine, so
+  re-run them with `enso --run` after a standard-library change that touches
+  `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
+  Playwright spec adds its own `tests/fixtures/sample_bank_data.xlsx` to
+  `Samples/Data` (`addBankData`).
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).
@@ -131,15 +182,6 @@ handler before assigning `this.client`, so the first attempt always throws and
 the retry recovers. A healthy session shows that warning exactly once and no
 `Request timeout` lines at all. Repeated 15 s timeouts are the real failure.
 
-**Always run `git submodule update --init --recursive` before building.** In
-particular, `app/gui/.dev-env/` is a private submodule which a fresh worktree
-must initialise for the `.env.staging` / `.env.production` symlinks. Init the
-submodules before any IDE build (and before running the e2e suite that loads
-that build).
-
-For testing, always build with `--mode staging`, to not pollute production
-backend and telemetry with test runs.
-
 `watch:linux` / `watch:macos` / `watch:windows` scripts are for local iteration
 once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
 
@@ -150,6 +192,39 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   scripts still set it, but the bundled engine is whatever is in
   `ENSO_BUILD_BACKEND`.
 - `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
+- `ENSO_YDOC_HOST` (`node` | `engine`, default `node`) — where opened projects'
+  ydoc servers run: the utility process above, or (the one-release rollback)
+  inside the engine.
+- `ENSO_ENGINE_MODE` (`native` | `jvm`) — which engine projects get, below
+  `--engine-mode` and a project's `package.yaml` `jvm:` key (see
+  `project-manager-shim/CLAUDE.md`, "Engine mode"). `--engine-mode <mode>` is
+  the command-line form; `--jvm` is its alias.
+- `ENSO_JVM_AOT_DIR` — where the per-user JDK AOT cache lives instead of
+  `<userData>/jvm-aot` (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
+  cache trains in the background, once the window is up, only when the JVM is
+  the default engine; `before-quit` stops a running training. The open-time
+  harness points it at an empty directory of its run (`<out>/shim-jvm-aot`), so
+  its JVM launches never pick up the user's cache. An empty value counts as
+  unset. The root and the gate are in `src/jvmAotSettings.ts` (tested in
+  `tests/headless/jvmAotSettings.test.ts`).
+- `APPIMAGE` (set by the AppImage runtime) — with the JVM as the default engine
+  (`--engine-mode`, `ENSO_ENGINE_MODE`, then the built-in default; nothing
+  happens while it is native), a Linux AppImage runs its engine from a copy at
+  `<userData>/engine/<version>/`, because its mount moves at every launch and
+  the AOT cache would never match (`project-manager-shim/CLAUDE.md`, "JDK AOT
+  cache"). `prepareAppImageEngine` (`projectService.ts`, called in `main()`
+  before the project service is set up) keeps a complete copy's launcher in a
+  module variable and passes it to the project service and the cache; it is
+  never written to `process.env`, which an in-app update's relaunch inherits.
+  Without a complete copy, `startAppImageEngineCopy` (called once the window has
+  loaded) makes one for the next launch, held back by `AfterFirstOpen` until the
+  first open has been answered (or a minute without an open), so that it does
+  not compete with that open for the AppImage's mount; a copy that fails or
+  finds no room is not tried again for that build for a day. A user's own
+  `ENSO_ENGINE_PATH` wins and turns all this off (`appImageEngine` in
+  `src/jvmAotSettings.ts`); one inside `<userData>/engine/` is an earlier IDE's
+  copy inherited through an update's relaunch, and `prepareAppImageEngine`
+  removes it from the environment (`isEngineCopyPath`).
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.
@@ -676,7 +751,8 @@ Two layers, same directory, different runners — controlled by the `testIgnore`
 rule in `playwright.config.ts`:
 
 - `tests/headless/*.test.ts` — Vitest unit tests for main-process code. No
-  Electron, no DOM. Fast. Run with `corepack pnpm vitest --run tests/headless`.
+  Electron, no DOM. Fast. Run with `corepack pnpm run test:unit` (what CI runs:
+  the GUI checks' "Unit Tests" step, `ci:unit-test`).
 - `tests/*.spec.ts` — Playwright end-to-end tests that launch the packaged
   Electron binary from `dist/ide/` and drive the app from a real user's
   perspective (dashboard → project → graph editor). `electronTest.ts` extends
@@ -803,10 +879,17 @@ time) when the first node and the welcome table show and after the extras (Note
 [JVM Counters At Each Phase]). `--jvm-diagnostics` adds one launch per JVM
 engine, outside the medians (`<engine>-diag/`), that traces Truffle's
 compilations (Note [Truffle Diagnostics]), and `--jvm-options` adds JVM options
-to the measured JVM launches, for an experiment. CI uploads `electron-out.log`
-and `hsperf/` too; by hand, `ide-packaging.yml` takes `open_perf_engines`,
-`open_perf_runs`, `open_perf_budget`, `open_perf_diagnostics` and
-`open_perf_jvm_options`.
+to the JVM engines, for an experiment. They are engine options, so they go in
+`ENSO_JVM_OPTIONS` (which the launcher adds to the JVM it starts; see
+`engine/runner/CLAUDE.md`), not `JAVA_TOOL_OPTIONS`, and they apply to the AOT
+training, check and `-XX:AOTMode=create` launches too, since a cache must be
+trained with the options it is used with. The `create` step starts `java`
+itself, so it adds the lines of the package's `jvm.options`
+(`parseJvmOptionsFile`) as well as `LAUNCHER_JVM_OPTIONS`; a unit test reads
+`distribution/engine/jvm.options` so the two cannot drift. Truffle diagnostics
+stay in `JAVA_TOOL_OPTIONS`. CI uploads `electron-out.log` and `hsperf/` too; by
+hand, `ide-packaging.yml` takes `open_perf_engines`, `open_perf_runs`,
+`open_perf_budget`, `open_perf_diagnostics` and `open_perf_jvm_options`.
 
 `--template image` opens, instead of the new-project template, a project whose
 first node calls `Standard.Image` on a PNG in its `data/` and whose second shows

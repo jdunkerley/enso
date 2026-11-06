@@ -9,7 +9,7 @@
 
 import './cjs-shim' // must be imported first
 
-import { appPath, assetsPath } from '@/paths'
+import { appPath, assetsPath, samplesPath } from '@/paths'
 import type { BrowserWindowConstructorOptions, WebPreferences } from 'electron'
 import { PRODUCT_NAME } from 'enso-common/src/constants'
 import {
@@ -21,9 +21,14 @@ import { Path } from 'enso-common/src/utilities/file'
 import { access, constants, readFile, writeFile } from 'node:fs/promises'
 import { join as joinPath } from 'node:path'
 import process from 'node:process'
-import { downloadSamples, runLocalProjectByPath } from 'project-manager-shim'
+import { installSamples, runLocalProjectByPath } from 'project-manager-shim'
 import { shutdownClaudeAgent } from './ai/claudeAgent.js'
-import { parseArgs, withoutDeepLink, withoutInstallerFlags } from './configParser.js'
+import {
+  engineModeOption,
+  parseArgs,
+  withoutDeepLink,
+  withoutInstallerFlags,
+} from './configParser.js'
 import { VERSION } from './contentConfig.js'
 import { printInfo, VERSION_INFO } from './debug.js'
 import { initIpc, registerShortcuts, setChromeOptions } from './electron.js'
@@ -39,12 +44,18 @@ import { setupLogger } from './log.js'
 import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from './menuItems.js'
 import { capitalizeFirstLetter } from './naming.js'
 import {
+  allowYdocOrigin,
+  disposeJvmAotCache,
+  disposeYdocHost,
   getLocalMetadata,
   getLocalSecrets,
   getLocalVersioning,
   getSecretsKeySource,
   handleProjectProtocol,
+  prepareAppImageEngine,
   setupProjectService,
+  startAppImageEngineCopy,
+  startJvmAotCache,
   version,
 } from './projectService.js'
 import { enableAll } from './security.js'
@@ -98,6 +109,25 @@ interface ParsedArguments {
  * The Electron application. It is responsible for starting all the required services, and
  * displaying and managing the app window.
  */
+/** How long the window waits for the bundled samples to be installed before it loads anyway. */
+const SAMPLES_INSTALL_WAIT_MS = 10_000
+
+/** Wait for `promise`, but at most `ms`; call `onTimeout` when the time runs out first. */
+async function waitAtMost(promise: Promise<unknown>, ms: number, onTimeout: () => void) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      onTimeout()
+      resolve()
+    }, ms)
+  })
+  try {
+    await Promise.race([promise, timeout])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 class App {
   window: import('electron').BrowserWindow | null = null
   server: Server | null = null
@@ -106,6 +136,11 @@ class App {
   electron: Electron | undefined = undefined
   electronIsDev: boolean = false
   parsedArguments: ParsedArguments | null = null
+  /**
+   * Settles once the bundled samples are installed (or found already there). The dashboard waits
+   * for it: on a fresh install it opens `Samples/Getting_Started`, which must exist by then.
+   */
+  samplesInstalled: Promise<unknown> = Promise.resolve()
 
   async init() {
     this.electronIsDev =
@@ -164,7 +199,7 @@ class App {
       setChromeOptions(electron)
       enableAll()
 
-      this.onStart(this.electron).catch((err) => {
+      this.onStart(this.electron, this.electronIsDev).catch((err) => {
         console.error(err)
       })
 
@@ -174,6 +209,14 @@ class App {
 
       this.electron.app.on('before-quit', () => {
         shutdownClaudeAgent()
+      })
+
+      this.electron.app.on('before-quit', () => {
+        void disposeJvmAotCache()
+      })
+
+      this.electron.app.on('will-quit', () => {
+        disposeYdocHost()
       })
 
       this.electron.app.on('second-instance', (_event, argv) => {
@@ -212,7 +255,7 @@ class App {
   }
 
   /** Background tasks scheduled on the application startup. */
-  async onStart(electron: Electron | undefined) {
+  async onStart(electron: Electron | undefined, electronIsDev: boolean) {
     const writeVersionInfoPromise = (async () => {
       if (!electron) return
       const userData = electron.app.getPath('userData')
@@ -231,9 +274,12 @@ class App {
       return writeFile(versionInfoPath, JSON.stringify(VERSION_INFO), 'utf8')
     })()
 
-    const downloadSamplesPromise = downloadSamples()
+    const installSamplesPromise = installSamples(samplesPath(electron, electronIsDev))
+    this.samplesInstalled = installSamplesPromise.catch((error: unknown) => {
+      console.error('Failed to install the bundled samples.', error)
+    })
 
-    return Promise.allSettled([writeVersionInfoPromise, downloadSamplesPromise])
+    return Promise.allSettled([writeVersionInfoPromise, installSamplesPromise])
   }
 
   /** Process the command line arguments. */
@@ -302,6 +348,10 @@ class App {
       if (this.electron) {
         // Before the server and any engine start, so both see the key.
         await this.initialiseSecretsKey()
+        // Before the project service and the JDK AOT cache find the engine.
+        await prepareAppImageEngine(this.electron, this.electronIsDev, {
+          option: engineModeOption(args),
+        })
         // Note that we want to do all the actions synchronously, so when the window
         // appears, it serves the website immediately.
         await this.startContentServerIfEnabled(args)
@@ -309,7 +359,20 @@ class App {
       console.log('Starting the application with args', args)
       await this.createWindowIfEnabled(args)
       initIpc(this.window, this.electron, this.electronIsDev)
+      // A fresh install opens a bundled sample, so the samples must be in place first. A copy
+      // that hangs (antivirus, a network drive) must not leave the window blank: after a while
+      // the dashboard loads anyway, and finds no `Getting_Started` to open.
+      await waitAtMost(this.samplesInstalled, SAMPLES_INSTALL_WAIT_MS, () => {
+        console.warn(
+          `The bundled samples were not installed within ${SAMPLES_INSTALL_WAIT_MS} ms; ` +
+            'loading the window without waiting for them.',
+        )
+      })
       await this.loadWindowContent(args)
+      // Once the window is up: a JDK AOT training, if one is needed, runs behind the dashboard.
+      startJvmAotCache()
+      // After the window too, so that it does not compete with loading it (one build's first launch).
+      startAppImageEngineCopy()
     } catch (err) {
       console.error('Failed to initialize the application, shutting down. Error: ', err)
       this.quit()
@@ -337,9 +400,10 @@ class App {
     const backendProfileTime = ['--profiling-time', String(args.debug.profileTime)]
     const backendProfileOpts =
       args.debug.profile ? ['--profiling-path', 'profiling.npss', ...backendProfileTime] : []
-    const backendJvmOpts = args.useJvm ? ['--jvm'] : []
-    const backendOpts = [...backendVerboseOpts, ...backendProfileOpts, ...backendJvmOpts]
-    return setupProjectService(backendOpts, this.electron, this.electronIsDev)
+    const backendOpts = [...backendVerboseOpts, ...backendProfileOpts]
+    return setupProjectService(backendOpts, this.electron, this.electronIsDev, {
+      option: engineModeOption(args),
+    })
   }
 
   /** Start the content server, which will serve the application content (HTML) to the window. */
@@ -349,6 +413,9 @@ class App {
     const serverCfg = new Config({
       dir: assetsPath(this.electron),
       port: args.server.port,
+      // The pages' origin, which the ydoc listeners accept: a window's, or a browser's under
+      // `--no-window` (#596).
+      onListening: allowYdocOrigin,
     })
     const projectService = this.createProjectService(args)
     this.server = await Server.create(
@@ -555,7 +622,9 @@ class App {
         return this.exit(1)
       } else if (projectToOpen) {
         try {
-          const exitCode = await runLocalProjectByPath(Path(projectToOpen))
+          const exitCode = await runLocalProjectByPath(Path(projectToOpen), {
+            option: engineModeOption(args),
+          })
           // Forward exact failure exit code if available (or 0 if no error).
           this.exit(exitCode)
         } catch (error) {

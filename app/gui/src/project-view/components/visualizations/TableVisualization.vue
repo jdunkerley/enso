@@ -1,6 +1,6 @@
 <script lang="ts">
 import AgGridTableView, { commonContextMenuActions } from '@/components/shared/AgGridTableView.vue'
-import { AG_GRID_ENTERPRISE_AVAILABLE } from '@/components/shared/AgGridTableView/agGridLicense'
+
 import {
   useTableVizToolbar,
   type SortModel,
@@ -21,12 +21,11 @@ import type {
   ICellRendererParams,
   IDatasource,
   IGetRowsParams,
-  IServerSideDatasource,
   ITooltipParams,
   MenuItemDef,
   SetFilterValuesFuncParams,
   SortChangedEvent,
-} from 'ag-grid-enterprise'
+} from 'ag-grid-community'
 import {
   computed,
   onMounted,
@@ -60,7 +59,7 @@ import {
   getFilterType,
 } from './TableVisualization/tableVizFilterSetUpUtils'
 import { makeFilterModelList, type GridFilterModel } from './TableVisualization/tableVizFilterUtils'
-import { TableVizStatusBar } from './TableVisualization/TableVizStatusBar'
+
 import {
   formatText,
   getCellValueType,
@@ -153,37 +152,16 @@ export type DataQualityMetricValue =
 export type TextFormatOptions = 'full' | 'partial' | 'off'
 
 /**
- * Whether to show the AG Grid Enterprise bottom Status Bar status bar panel instead of the plain
- * Community-safe top row-count line. The Status Bar is Enterprise-only, so this is `false`
- * whenever no AG Grid Enterprise license is configured, regardless of what the backend requests.
+ * The row counts shown below the grid, or `undefined` when the backend did not ask for a bottom
+ * status bar. `gettingStarted.spec.ts` asserts on them, for a user-facing workflow.
+ *
+ * The filtered line appears only when it differs from the total.
+ *
+ * When this returns a value the template hides the top status bar — otherwise the row count would
+ * be displayed twice.
  */
-export function computeUseBottomStatusBar(data: Data, enterpriseAvailable: boolean): boolean {
-  return (
-    enterpriseAvailable &&
-    typeof data === 'object' &&
-    'use_bottom_status_bar' in data &&
-    Boolean(data.use_bottom_status_bar)
-  )
-}
-
-/**
- * Community stand-in for the Enterprise bottom status bar, or `undefined` when none is needed.
- *
- * `computeUseBottomStatusBar` is deliberately false when unlicensed, because it drives AG Grid's
- * Enterprise-only `statusBar` grid option. The row counts that panel shows are plain information
- * rather than an Enterprise feature, so dropping them silently would be a real loss — it is what
- * `gettingStarted.spec.ts` asserts on, for a user-facing workflow. When the backend asks for the
- * bottom status bar and we cannot mount AG Grid's own panel, the visualization renders this instead.
- *
- * `showFiltered` mirrors `TableVizStatusBar`: the filtered line appears only when it differs from
- * the total.
- *
- * When this returns a value the template hides the top status bar, exactly as it does for the
- * licensed bottom bar — otherwise the row count would be displayed twice.
- */
-export function computeCommunityStatusBar(
+export function computeBottomStatusBar(
   data: Data,
-  enterpriseAvailable: boolean,
   total: number | undefined,
   filtered: number | null,
 ): { total: number | undefined; filtered: number | null; showFiltered: boolean } | undefined {
@@ -191,36 +169,8 @@ export function computeCommunityStatusBar(
     typeof data === 'object' &&
     'use_bottom_status_bar' in data &&
     Boolean(data.use_bottom_status_bar)
-  if (enterpriseAvailable || !requested) return undefined
+  if (!requested) return undefined
   return { total, filtered, showFiltered: filtered != null && filtered !== total }
-}
-
-/**
- * The AG Grid `statusBar` grid option. `undefined` whenever no AG Grid Enterprise license is
- * configured, so the `statusBar` grid option is omitted entirely rather than bound to an empty
- * `{ statusPanels: [] }` — AG Grid's own module-registration validator requires the
- * `@ag-grid-enterprise/status-bar` module for the `statusBar` grid option itself, regardless of
- * whether any status bar panel is actually configured, and warns on every unlicensed table
- * otherwise. When licensed, mirrors `useBottomStatusBar` exactly (unchanged behavior).
- */
-export function computeStatusBar(
-  enterpriseAvailable: boolean,
-  useBottomStatusBar: boolean,
-  total: number | undefined,
-  filtered: number | null,
-) {
-  if (!enterpriseAvailable) return undefined
-  return {
-    statusPanels:
-      useBottomStatusBar ?
-        [
-          {
-            statusPanel: TableVizStatusBar,
-            statusPanelParams: { total, filtered },
-          },
-        ]
-      : [],
-  }
 }
 </script>
 
@@ -352,14 +302,9 @@ const isSSRM = computed(
     props.data.is_using_server_sort_and_filter,
 )
 
-const useBottomStatusBar = computed(() =>
-  computeUseBottomStatusBar(props.data, AG_GRID_ENTERPRISE_AVAILABLE),
-)
-
-const communityStatusBar = computed(() =>
-  computeCommunityStatusBar(
+const bottomStatusBar = computed(() =>
+  computeBottomStatusBar(
     props.data,
-    AG_GRID_ENTERPRISE_AVAILABLE,
     allRowCount.value,
     isSSRM.value ? filteredRowCount.value : null,
   ),
@@ -380,17 +325,8 @@ const refreshDataSource = ref(0)
 const datasource = computed(() => {
   const value = refreshDataSource.value
   if (!isSSRM.value) return false
-  return AG_GRID_ENTERPRISE_AVAILABLE ? createServerSideDatasource() : createInfiniteDatasource()
+  return createInfiniteDatasource()
 })
-
-const statusBar = computed(() =>
-  computeStatusBar(
-    AG_GRID_ENTERPRISE_AVAILABLE,
-    useBottomStatusBar.value,
-    allRowCount.value,
-    isSSRM.value ? filteredRowCount.value : null,
-  ),
-)
 
 const isTableFilteredOrSorted = computed(
   () =>
@@ -638,24 +574,6 @@ interface Response {
   success: boolean
   rowCount: number
 }
-function createServerSideDatasource(): IServerSideDatasource {
-  return {
-    getRows: async (params) => {
-      const server = ssrmServer.value
-      if (server) {
-        const serverResponse = await server.getData(params.request)
-        const response: Response =
-          serverResponse ? serverResponse : { data: [], success: false, rowCount: 0 }
-        if (response.success) {
-          const rows = createRowsForTable(response.data, 0, true)
-          params.success({ rowData: rows, rowCount: response.rowCount })
-        } else {
-          params.fail()
-        }
-      }
-    },
-  }
-}
 
 function createInfiniteDatasource(): IDatasource {
   return {
@@ -669,11 +587,9 @@ function createInfiniteDatasource(): IDatasource {
           const rows = createRowsForTable(response.data, 0, true)
           params.successCallback(rows, response.rowCount)
         } else {
-          // Community's Infinite Row Model has no failed-load visual state to hook into
-          // (unlike Enterprise's SSRM, whose `params.fail()` surfaces a "close and reopen to
-          // retry" message via the loading-cell renderer) and `params.failCallback()` is a
-          // no-op here, so settle the grid to visibly empty rather than leaving it spinning
-          // forever. Full failure-path parity is tracked as Playwright-suite follow-up work.
+          // The Infinite Row Model has no failed-load visual state to hook into and
+          // `params.failCallback()` is a no-op here, so settle the grid to visibly empty rather
+          // than leaving it spinning forever.
           params.successCallback([], 0)
         }
       }
@@ -775,7 +691,7 @@ function toField(
 
   const filterType = valueType ? getFilterType(valueType.constructor, isUsingMultiFilter) : null
 
-  const filterParams = getFilterParams(isSSRM.value, valueType, filterType, getFilterValues)
+  const filterParams = getFilterParams(isSSRM.value, valueType, getFilterValues)
 
   const dataQualityMetrics =
     typeof props.data === 'object' && 'data_quality_metrics' in props.data ?
@@ -833,7 +749,7 @@ function toField(
       showDataQuality: hasDataQualityMetrics,
     },
     cellDataType: cellValueType,
-    autoHeight: cellValueType === 'text' && isSSRM.value && AG_GRID_ENTERPRISE_AVAILABLE,
+
     sortable: valueType?.constructor !== 'Mixed',
   }
   if (valueType && ['Date', 'Date_Time', 'Time'].includes(valueType.constructor)) {
@@ -1302,11 +1218,9 @@ config.setToolbar(
 
 <template>
   <div ref="rootNode" class="TableVisualization" @wheel.stop.passive @pointerdown.stop>
-    <!-- Hidden whenever a bottom status bar is shown — AG Grid's own when licensed, ours when not.
-         Otherwise the unlicensed path would render this row-count line *and* `communityStatusBar`,
-         showing the count twice. Mirrors the licensed layout, which also drops the row-limit
-         selector in favour of the bottom bar. -->
-    <template v-if="!useBottomStatusBar && !communityStatusBar">
+    <!-- Hidden whenever the bottom status bar is shown, which would otherwise show the row count
+         twice. The bottom bar also replaces the row-limit selector. -->
+    <template v-if="!bottomStatusBar">
       <div class="table-visualization-status-bar">
         <select
           v-if="isRowCountSelectorVisible"
@@ -1342,7 +1256,6 @@ config.setToolbar(
         :textFormatOption="textFormatterSelected"
         :datasource="datasource"
         :isServerSideModel="isSSRM"
-        :statusBar="statusBar"
         :gridIdHash="tableVersionHash"
         :getContextMenuItems="getContextMenuItems"
         @sortOrFilterUpdated="checkSortAndFilter"
@@ -1350,10 +1263,10 @@ config.setToolbar(
         @columnMoved="onColumnStateChange"
       />
     </Suspense>
-    <div v-if="communityStatusBar" class="communityStatusBar">
-      <div><b>Total Row Count:</b> {{ communityStatusBar.total }}</div>
-      <div v-if="communityStatusBar.showFiltered">
-        <b>Filtered Row Count:</b> {{ communityStatusBar.filtered }}
+    <div v-if="bottomStatusBar" class="bottomStatusBar">
+      <div><b>Total Row Count:</b> {{ bottomStatusBar.total }}</div>
+      <div v-if="bottomStatusBar.showFiltered">
+        <b>Filtered Row Count:</b> {{ bottomStatusBar.filtered }}
       </div>
     </div>
   </div>
@@ -1367,8 +1280,8 @@ config.setToolbar(
   height: 100%;
 }
 
-/* Community stand-in for AG Grid Enterprise's status bar; see `communityStatusBar`. */
-.communityStatusBar {
+/* The row counts below the grid; see `bottomStatusBar`. */
+.bottomStatusBar {
   flex: none;
   display: flex;
   gap: 16px;

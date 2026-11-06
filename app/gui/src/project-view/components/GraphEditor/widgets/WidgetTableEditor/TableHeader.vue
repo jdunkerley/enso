@@ -1,12 +1,11 @@
 <script lang="ts">
 import GridPopupMenu from '@/components/GridPopupMenu.vue'
-import { AG_GRID_ENTERPRISE_AVAILABLE } from '@/components/shared/AgGridTableView/agGridLicense'
 import {
   resolveGridMenuItems,
   type GridMenuItem,
 } from '@/components/shared/AgGridTableView/gridPopupMenuItems'
 import SvgButton from '@/components/SvgButton.vue'
-import type { IHeaderParams } from 'ag-grid-enterprise'
+import type { IHeaderParams } from 'ag-grid-community'
 import { computed, ref, watch } from 'vue'
 
 /**
@@ -105,10 +104,6 @@ function onMouseRightClick(event: MouseEvent) {
   if (editing.value) return
   event.preventDefault()
   event.stopPropagation()
-  if (AG_GRID_ENTERPRISE_AVAILABLE) {
-    props.showColumnMenuAfterMouseClick(event)
-    return
-  }
   const colDef = props.column.getColDef()
   const rawMainMenuItems = colDef.mainMenuItems
   const rawItems =

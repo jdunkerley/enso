@@ -3,9 +3,16 @@ import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 import postcssNesting from 'postcss-nesting'
 import { findEnsoExecutable } from 'project-manager-shim'
+import { loopbackOrigins, type YdocHost } from 'project-manager-shim/projectService'
 import tailwindcss from 'tailwindcss'
 import tailwindcssNesting from 'tailwindcss/nesting'
-import { defaultClientConditions, defineConfig, type Connect, type Plugin } from 'vite'
+import {
+  defaultClientConditions,
+  defineConfig,
+  type Connect,
+  type Plugin,
+  type ViteDevServer,
+} from 'vite'
 import VueDevTools from 'vite-plugin-vue-devtools'
 import wasm from 'vite-plugin-wasm'
 import tailwindConfig from './tailwind.config'
@@ -15,7 +22,8 @@ const isTestMode = process.env.NODE_ENV === 'test'
 const IS_ELECTRON_DEV_MODE = process.env.ELECTRON_DEV_MODE === 'true'
 
 if (isDevMode) {
-  process.env.ENSO_IDE_YDOC_SERVER_URL ||= 'ws://__HOSTNAME__:5976'
+  // The GUI takes each project's ydoc address from `project/open`; the shim middleware hosts the
+  // ydoc server in this process (`project-manager-shim-middleware`).
   process.env.ENSO_IDE_YDOC_LS_DEBUG ||= 'true'
 }
 
@@ -151,12 +159,54 @@ async function projectManagerShim(): Promise<Plugin> {
   return {
     name: 'project-manager-shim',
     configureServer(server) {
+      projectManagerShimMiddleware.ydocHost = ssrYdocHost(server)
       server.middlewares.use(middleware(server.config.server.host))
     },
     configurePreviewServer(server) {
       server.middlewares.use(middleware(server.config.preview.host))
     },
   }
+}
+
+/**
+ * The ydoc server hosted in the dev server's Node (spec stage 1a of the JVM-by-default plan), as
+ * Electron hosts it in a utility process. `ydoc-server` is loaded through Vite's SSR loader, on the
+ * first open: its compiled `dist/` does not run in plain Node (extensionless imports, and
+ * `rust-ffi`'s WASM import), and the config bundle leaves it external.
+ */
+function ssrYdocHost(server: ViteDevServer): YdocHost {
+  let host: Promise<YdocHost> | undefined
+  const get = () =>
+    (host ??= server
+      .ssrLoadModule('ydoc-server')
+      .then((module) => new (module as typeof import('ydoc-server')).NodeYdocHost())
+      .catch((error: unknown) => {
+        // Not cached: the next open loads it again (a failed SSR transform need not be permanent).
+        host = undefined
+        throw error
+      }))
+  return {
+    listen: async (request) =>
+      (await get()).listen({
+        ...request,
+        allowedOrigins: request.allowedOrigins ?? devServerOrigins(server),
+      }),
+    close: async (port) => (await get()).close(port),
+  }
+}
+
+/**
+ * The origins the dev server's pages are loaded from, whose sockets a ydoc listener accepts (any
+ * other browser origin is refused, #596): the addresses Vite prints, and the port under every
+ * loopback name. Read at each open, once the server is listening. A page opened by the machine's
+ * host name, through `server.origin` or a reverse proxy is refused: add its origin here.
+ */
+function devServerOrigins(server: ViteDevServer): string[] {
+  const urls = [...(server.resolvedUrls?.local ?? []), ...(server.resolvedUrls?.network ?? [])]
+  const address = server.httpServer?.address()
+  const port = typeof address === 'object' && address != null ? address.port : undefined
+  const protocol = server.config.server.https ? 'https:' : 'http:'
+  return [...urls, ...(port != null ? loopbackOrigins(protocol, port) : [])]
 }
 
 /**

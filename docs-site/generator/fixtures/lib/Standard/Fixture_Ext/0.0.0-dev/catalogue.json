@@ -1,0 +1,39 @@
+{
+  "format": 1,
+  "library": "Standard.Fixture_Ext",
+  "version": "0.0.0-dev",
+  "engineVersion": "0.0.0-dev",
+  "sourceHash": "fixture",
+  "entries": [
+    {
+      "type": "module",
+      "module": "Standard.Fixture_Ext.Main",
+      "documentation": "Extensions of the fixture.",
+      "reexports": []
+    },
+    {
+      "type": "module",
+      "module": "Standard.Fixture_Ext.Describe",
+      "reexports": []
+    },
+    {
+      "type": "method",
+      "module": "Standard.Fixture_Ext.Describe",
+      "name": "describe",
+      "arguments": [
+        {
+          "name": "self",
+          "reprType": "Standard.Fixture.Shapes.Shape",
+          "isSuspended": false,
+          "hasDefault": false
+        }
+      ],
+      "selfType": "Standard.Fixture.Shapes.Shape",
+      "returnType": "Standard.Base.Data.Text.Text",
+      "isStatic": false,
+      "documentation": "---\ngroup: Standard.Fixture.Shaping\n---\nDescribes a shape in words.",
+      "annotations": [],
+      "reexports": []
+    }
+  ]
+}

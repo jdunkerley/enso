@@ -9,6 +9,9 @@ https://github.com/jdunkerley/enso/wiki. It moved there from this folder on
 - `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md` — the community files.
   GitHub reads them from this folder.
 
+The user documentation (guides and the Components reference) is the site in
+`docs-site/`, published at https://jdunkerley.github.io/enso/.
+
 ## Reading the wiki
 
 The wiki is a Git repository. Clone it somewhere outside this checkout (a

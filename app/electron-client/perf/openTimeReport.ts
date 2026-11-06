@@ -416,32 +416,23 @@ export function credentialFreeEnv(
   )
 }
 
-/** The options the launcher gives the JVM it starts through JNI (`Main.launchJvm`). */
-export const LAUNCHER_JVM_OPTIONS = [
-  '--sun-misc-unsafe-memory-access=allow',
-  '--enable-native-access=org.graalvm.truffle',
-  '--add-opens=java.base/java.nio=ALL-UNNAMED',
-] as const
-
-const AOT_PROBLEM =
-  /\[(?:error|warning)\]\[(?:aot|cds)[^\]]*\]|mismatch|Unable to use|unable to map|AOT cache.*(?:different|invalid|failed|disabled)/i
+/**
+ * The launcher's fixed JVM options, the lines of a package's `jvm.options`, the launcher's split of
+ * `ENSO_JVM_OPTIONS`, and the arguments of the `java` that creates an AOT cache. The shim trains
+ * its per-user cache with the same, so there is one copy, in the shim.
+ */
+export {
+  LAUNCHER_JVM_OPTIONS,
+  aotCreateArguments,
+  parseJvmOptionsFile,
+  splitJvmOptions,
+} from 'project-manager-shim/jvmAot'
 
 /**
- * The first line of the JVM's output that says the AOT cache could not be used (the JVM reports
- * these as `[cds]` or `[aot]` records, or as a mismatch), or `undefined`.
+ * The first line of the JVM's output that says the AOT cache could not be used, or `undefined`.
+ * The shim reads its engines' `use.log` with the same pattern, so there is one copy, in the shim.
  */
-export function aotRejection(output: string): string | undefined {
-  return output
-    .split(/\r?\n/)
-    .find((line) => !UNIFIED_LOG_INFO.test(line) && AOT_PROBLEM.test(line))
-}
-
-/**
- * A unified-logging record below `warning` (`[0.1s][info][aot] ...`). The check launch logs `aot`
- * and `cds` at `info`, so that its output says what the JVM did with the cache; such a record can
- * name a feature of a cache in use as "disabled".
- */
-const UNIFIED_LOG_INFO = /^(?:\[[^\]]*\])*?\[(?:info|debug|trace)\]\[/
+export { aotRejection } from 'project-manager-shim/jvmAot'
 
 /** The engines named by `--engines` (comma-separated); throws on an unknown one. */
 export function parseEngines(value: string): Engine[] {

@@ -21,12 +21,6 @@ description:
 
 # How to run Electron Package tests
 
-Run `git submodule update --init --recursive` before the build. Without it
-`--mode staging` silently falls back to defaults and the resulting binary fails
-the very first e2e step (login screen never renders, console shows
-`Failed to fetch`).
-
-The ide build should be with staging environment by default (`--mode staging`,
-e.g. `corepack pnpm --filter build-scripts run ide-local --mode staging`). The
+Build the IDE with `corepack pnpm --filter build-scripts run ide-local`. The
 credentials file should be provided by user. If working on a worktree, try to
 copy it from main repo.

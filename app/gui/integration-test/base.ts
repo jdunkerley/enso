@@ -18,22 +18,6 @@ export async function waitForAppLoaded(page: Page) {
   ).toBeVisible({ timeout: 30_000 })
 }
 
-/**
- * The `$config` the page should boot with, injected before any app script runs. Supplied by
- * each Playwright project in `playwright.config.ts` so the AG Grid licence key is set
- * explicitly per project rather than inherited from whatever the build happened to bake in.
- * See `integration-test/CLAUDE.md` for how the licensed/unlicensed projects differ.
- *
- * Empty (the default) means "no override": nothing is injected and the page boots with whatever
- * Vite baked in. It is not a merge — a non-empty value replaces the whole config — so a project
- * that sets this must supply a complete one, as both integration projects do via `loadEnv`.
- *
- * Exported so `playwright.config.ts` can pass it to `defineConfig`'s generic parameter — without
- * that, `appConfig` in a project's `use` block is not a fixture `defineConfig`'s default type
- * parameter knows about, and TypeScript rejects it (#141).
- */
-export type AppConfig = Record<string, string | undefined>
-
 export const test = base.extend<{
   featureFlags: Partial<FeatureFlags>
   /**
@@ -41,7 +25,6 @@ export const test = base.extend<{
    * specs assume `false`. AI specs opt in with `test.use({ aiAvailable: true })`.
    */
   aiAvailable: boolean
-  appConfig: AppConfig
   setupApi: {
     local?: (api: MockLocalApi) => void
     addDefaultProject?: boolean
@@ -57,7 +40,6 @@ export const test = base.extend<{
 }>({
   featureFlags: [{}, { option: true }],
   aiAvailable: [false, { option: true }],
-  appConfig: [{}, { option: true }],
   setupApi: [{}, { option: true }],
   cloudRequests: [
     async ({ page }, use) => {
@@ -83,10 +65,10 @@ export const test = base.extend<{
     setupApi.local?.(api)
     return use(api)
   },
-  drivePage: async ({ page, localApi, featureFlags, aiAvailable, appConfig }, use) => {
+  drivePage: async ({ page, localApi, featureFlags, aiAvailable }, use) => {
     // Only make sure that the local API mock is registered; the spec uses it through `localApi`.
     const _ = { localApi }
-    await registerMocks(page, featureFlags, { aiAvailable, appConfig })
+    await registerMocks(page, featureFlags, { aiAvailable })
     await page.goto('/')
     await waitForAppLoaded(page)
     await use(new DrivePageActions(page, {}))

@@ -12,9 +12,13 @@ export const OptionsSchema = z.object({
   useServer: z.boolean().default(true),
   engineEnabled: z.boolean().default(true),
   useJvm: z.boolean().default(false),
+  /** Which engine to start: no default, since the engine mode's own precedence picks one. */
+  engineMode: z.enum(['native', 'jvm']).optional(),
   startup: z
     .object({
       project: z.string().default(''),
+      /** Whether a fresh install opens the bundled Getting_Started sample. */
+      welcomeProject: z.boolean().default(true),
     })
     .default({}),
   server: z
@@ -50,7 +54,11 @@ export function defaultOptions(): Options {
  * Dotted keys which should be synced to the web application via URL params.
  * Other options are only used by Electron and not passed to the web application.
  */
-export const PASS_TO_WEB: ReadonlySet<string> = new Set(['startup.project', 'engine.ydocUrl'])
+export const PASS_TO_WEB: ReadonlySet<string> = new Set([
+  'startup.project',
+  'startup.welcomeProject',
+  'engine.ydocUrl',
+])
 
 /** Possible values for options. */
 export type OptionValue = string | number | boolean

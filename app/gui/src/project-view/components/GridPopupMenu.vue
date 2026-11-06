@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * A small floating popup rendering a flat `GridMenuItem[]` list — the Community-fallback
- * replacement for AG Grid Enterprise's native context/column menu renderer. Positioning and
- * dismissal mirror `@/components/ContextMenu.vue`.
+ * A small floating popup rendering a flat `GridMenuItem[]` list — the grids' context and column
+ * menus (AG Grid Community has no menu renderer of its own). Positioning and dismissal mirror
+ * `@/components/ContextMenu.vue`.
  */
 import MenuButton from '@/components/MenuButton.vue'
 import MenuPanel from '@/components/MenuPanel.vue'

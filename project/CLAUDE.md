@@ -27,7 +27,10 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   overwritten later in the same indexing process.
   `EngineBundle.librariesNotBundled` names the standard libraries the IDE bundle
   leaves out (and `IRCaches.checkCacheSizes` does not count):
-  `Database_Test_Suite`.
+  `Database_Test_Suite`. `createEnginePackage` also copies
+  `distribution/engine/jvm.options` to the package root (beside `component/`),
+  and `EngineDistributionChecks.afterBuild` fails when it is missing: the
+  launcher (`engine/runner` `JvmOptions`) and the shell launchers read it.
 - `Editions.scala` — Edition-manifest generation (fills in the versions of
   `distribution/edition.template.yaml`).
 - `GatherLicenses.scala` — Drives the legal-review report and checks
@@ -39,7 +42,11 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   startup.
 - `EnsoLint.scala` — Project-wide lint rules invoked as an SBT task.
 - `EnsoProjects.scala` — Shared project-configuration DSL used by `build.sbt`.
-- `SmallJDK.scala` — Builds a trimmed JDK image for the distribution.
+- `SmallJDK.scala` — Builds a trimmed JDK image for the distribution. Its jlink
+  run passes `--generate-cds-archive`, so the image carries
+  `lib/server/classes*.jsa` (`bin/server` on Windows; class-data sharing for the
+  jlinked modules); `checkSharing` runs `java -Xshare:on -version` on it and
+  fails `buildEngineBundle` when the archive does not map.
 - `Dependencies.scala` — Central dependency version catalog.
 - `plugins.sbt` — SBT plugin versions. Pinned to known-good combinations; don't
   bump casually.

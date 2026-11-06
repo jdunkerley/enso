@@ -1,38 +1,24 @@
 <script setup lang="ts">
 import DriveView from '#/layouts/DriveView.vue'
-import HelpBar from '$/components/AppContainer/HelpBar.vue'
 import { useBackends } from '$/providers/backends'
 import { categoryKey, useCategories } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
 import { useDriveLocation } from '$/providers/drive'
 import { useText } from '$/providers/text'
 import { optPx } from '$/utils/dom'
-import ActionMenu from '@/components/ActionMenu.vue'
-import DropdownMenu from '@/components/DropdownMenu.vue'
 import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
 import SizeTransition from '@/components/SizeTransition.vue'
 import SvgButton from '@/components/SvgButton.vue'
-import SvgIcon from '@/components/SvgIcon.vue'
 import { useResizeObserver } from '@/composables/events'
-import { registerHandlers, type DisplayableActionName } from '@/providers/action'
+import { registerHandlers } from '@/providers/action'
 import { Path } from 'enso-common/src/services/Backend'
 import { computed, ref, shallowRef, toRef, toRefs, useTemplateRef } from 'vue'
 import CategoryButton from './CategoryButton.vue'
 import PanelContents from './PanelContents.vue'
+import RailFooter from './RailFooter.vue'
 
 const LEFT_BAR_EXTENSION_TIME_MS = 550
-const ENSO_ICON_MENU_ACTIONS: DisplayableActionName[] = [
-  'help.whatsNew',
-  'help.community',
-  'help.gettingStarted',
-  'help.askAQuestion',
-  'help.componentExamples',
-  'help.exampleWorkflows',
-  'help.docs',
-  'help.contactUs',
-]
-
 const categories = useCategories()
 const containerData = useContainerData()
 const { getText } = useText()
@@ -126,12 +112,15 @@ registerHandlers({
           @click="onAddDirectoryClick"
         />
       </div>
+      <!-- The last of the rail's controls, at its bottom: Settings and About. -->
+      <div class="settings">
+        <RailFooter :extended="leftBarExtended" />
+      </div>
       <div class="shadow" />
     </div>
     <SizeTransition width :duration="250">
       <div v-if="visible" class="sizeWrapper">
         <div ref="content" class="panel" :class="cssClass" :style="widthStyle">
-          <HelpBar />
           <PanelContents
             v-model:fullscreen="fullscreen"
             side="left"
@@ -144,10 +133,6 @@ registerHandlers({
         <div class="shadow" />
       </div>
     </SizeTransition>
-    <DropdownMenu class="ensoIcon">
-      <template #button><SvgIcon name="enso_logo" /></template>
-      <template #menu><ActionMenu :actions="ENSO_ICON_MENU_ACTIONS" /></template>
-    </DropdownMenu>
   </div>
 </template>
 
@@ -155,7 +140,9 @@ registerHandlers({
 .LeftPanel {
   position: relative;
   min-width: 48px;
-  z-index: 1;
+  /* Above the tab bar (`AppContainer`'s `.bar`, 1): the rail runs up through the bar's strip, and
+   * expands over it when the panel is hidden. The same as the right panel, which it never meets. */
+  z-index: 2;
 }
 
 .leftBar {
@@ -165,8 +152,8 @@ registerHandlers({
   position: absolute;
   width: 48px;
   max-width: 48px;
-  height: calc(100% - var(--top-bar-height));
-  margin-top: var(--top-bar-height);
+  /* The rail runs the window's full height, above the top bar's strip. */
+  height: 100%;
   padding: 16px 0;
   background-color: var(--color-dashboard-background);
   display: flex;
@@ -200,6 +187,25 @@ registerHandlers({
     width: calc(100% - 32px);
     height: 1px;
     margin: 0 16px;
+    background-color: rgba(0 0 0 / 0.1);
+  }
+}
+
+/* The Settings and About buttons, below a divider like the one above Add Directory. */
+.settings {
+  width: 100%;
+  margin-top: auto;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 8px;
+
+  &:before {
+    content: '';
+    align-self: stretch;
+    height: 1px;
+    margin: 0 4px;
     background-color: rgba(0 0 0 / 0.1);
   }
 }
@@ -266,15 +272,5 @@ registerHandlers({
     0 18px 85px 0 rgb(0 0 0 / 3%);
   clip-path: polygon(0 0, 100vw 0, 100vw 100%, 0 100%);
   z-index: -1;
-}
-
-.ensoIcon {
-  --icon-size: 32px;
-  --arrow-offset: 12px;
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  padding: 0;
-  z-index: 1;
 }
 </style>

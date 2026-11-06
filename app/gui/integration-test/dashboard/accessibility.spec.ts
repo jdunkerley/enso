@@ -158,14 +158,13 @@ test('asset panel: no new axe violations', async ({ drivePage, localApi }) => {
     })
 })
 
-test('user menu tree', async ({ drivePage }) => {
-  await drivePage.openUserMenu().do(async (page) => {
-    const menu = page.getByTestId('user-menu')
-    await expect(menu).toBeVisible()
-    await expect(menu).toMatchAriaSnapshot(`
-      - dialog "Settings menu":
-        - button /^Settings/
-        - button /^About Enso/
+test('left rail footer tree', async ({ drivePage }) => {
+  await drivePage.do(async (page) => {
+    const footer = page.locator('.RailFooter').locator('visible=true')
+    await expect(footer).toBeVisible()
+    await expect(footer).toMatchAriaSnapshot(`
+      - button "Settings"
+      - button "About Enso"
     `)
   })
 })

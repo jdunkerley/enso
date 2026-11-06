@@ -8,14 +8,12 @@
  * When running dev server, the config variables are grabbed from appropriate .env file.
  */
 const DEFAULT_CONFIG = {
-  HOST: import.meta.env.ENSO_IDE_HOST,
   ENVIRONMENT: import.meta.env.ENSO_IDE_ENVIRONMENT,
   SENTRY_DSN: import.meta.env.ENSO_IDE_SENTRY_DSN,
   VERSION: import.meta.env.ENSO_IDE_VERSION,
   COMMIT_HASH: import.meta.env.ENSO_IDE_COMMIT_HASH,
   GOOGLE_ANALYTICS_TAG: import.meta.env.ENSO_IDE_GOOGLE_ANALYTICS_TAG,
   YDOC_SERVER_URL: import.meta.env.ENSO_IDE_YDOC_SERVER_URL,
-  AG_GRID_LICENSE_KEY: import.meta.env.ENSO_IDE_AG_GRID_LICENSE_KEY,
 } as const
 
 // Undefined env variables are typed as `any`, but we want them to be `string | undefined`.

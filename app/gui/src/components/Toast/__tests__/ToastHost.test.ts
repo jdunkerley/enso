@@ -80,6 +80,42 @@ describe('ToastHost', () => {
     expect(toastElements()).toEqual([])
   })
 
+  test('a toast shown again while it slides out stays, shown (#600)', async () => {
+    const { store, toastElements, animationEnd } = setup()
+    store.show('Again', { toastId: 'a', autoClose: false })
+    await nextTick()
+    store.dismiss('a')
+    await nextTick()
+    const [toast] = toastElements()
+    expect(toast!.className).toContain('slideOut-top-center')
+    store.show('Again', { toastId: 'a', autoClose: false })
+    await nextTick()
+    animationEnd(toast!)
+    await vi.runAllTimersAsync()
+    expect(store.isActive('a')).toBe(true)
+    expect(toastElements()).toHaveLength(1)
+    expect(toastElements()[0]!.className).not.toContain('slideOut')
+    expect(toastElements()[0]!.querySelector('[role="alert"]')?.textContent).toBe('Again')
+  })
+
+  test('a toast shown again while it collapses stays, at its full height (#600)', async () => {
+    const { store, toastElements, animationEnd } = setup()
+    store.show('Again', { toastId: 'a', autoClose: false })
+    await nextTick()
+    store.dismiss('a')
+    await nextTick()
+    const [toast] = toastElements()
+    animationEnd(toast!)
+    // The collapse has started (two animation frames), but not finished.
+    await vi.advanceTimersByTimeAsync(10)
+    store.show('Again', { toastId: 'a', autoClose: false })
+    await nextTick()
+    await vi.runAllTimersAsync()
+    expect(store.isActive('a')).toBe(true)
+    expect(toastElements()).toHaveLength(1)
+    expect(toastElements()[0]!.style.height).toBe('')
+  })
+
   test('closes when the progress bar has run out, which starts once the toast is in', async () => {
     const { store, toastElements, progressBar, animationEnd } = setup()
     store.show('Timed', { autoClose: 1234 })

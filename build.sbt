@@ -303,6 +303,7 @@ buildEngineBundle := Def
       EngineDistributionChecks.afterBuild(root, ensoVersion, log)
       val smallJdk = baseDirectory.value / "target" / "small-jdk"
       SmallJDK.buildSmallJDKForRelease(smallJdk)
+      SmallJDK.checkSharing(smallJdk, log)
       val (os, arch) = packageBuilder.value.localPlatform
       EngineBundle.create(
         bundleRoot = EngineBundle
@@ -2258,6 +2259,7 @@ lazy val `language-server` = (project in file("engine/language-server"))
       "com.github.pureconfig"      %% "pureconfig"           % pureconfigVersion,
       akkaSLF4J,
       akkaTestkit           % Test,
+      akkaStreamTestkit     % Test,
       "com.typesafe.akka"  %% "akka-http-testkit"       % akkaHTTPVersion           % Test,
       "org.scalatest"      %% "scalatest"               % scalatestVersion          % Test,
       "org.scalacheck"     %% "scalacheck"              % scalacheckVersion         % Test,

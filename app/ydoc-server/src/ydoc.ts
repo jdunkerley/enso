@@ -114,6 +114,14 @@ export function setupGatewayClient(
   console.log(
     `Setting up Gateway Client: docName=${docName}, lsUrl=${lsUrl ?? 'none'}, dataUrl=${dataUrl ?? 'none'}`,
   )
+  // Only the index document exists before a session does. A module document asked for with no
+  // session (a stale reconnect that outran the GUI's index reconnect) is refused before building
+  // one, which would open two sockets to the Language Server only to be torn down.
+  if (lsUrl && docName !== 'index' && !LanguageServerSession.sessions.has(lsUrl)) {
+    console.error(`Document '${docName}' not found: no session for the language server.`)
+    ws.close()
+    return
+  }
   const lsSession = getSessionForUrl(
     lsUrl,
     jsonChannelServer,
@@ -125,6 +133,11 @@ export function setupGatewayClient(
   const wsDoc = getSessionDoc(lsSession, docName)
   if (!wsDoc) {
     ws.close()
+    // `getSessionForUrl` retained the session for this connection; with no connection to release
+    // it on close, an unreleased session would never be disposed. Under the Node ydoc host, which
+    // outlives its engines, such a session kept its Language Server client and later took the
+    // modules' write capabilities from the session the GUI uses (#593).
+    void lsSession.release().catch((error) => console.error('Session release failed.\n', error))
     return
   }
 
@@ -188,7 +201,7 @@ function getSessionDoc(lsSession: LanguageServerSession, docName: string) {
 
 /** Subset of WebSocket that can be mocked */
 export interface YjsSocket {
-  binaryType: 'arraybuffer'
+  binaryType: 'arraybuffer' | 'nodebuffer' | 'fragments'
   readonly readyState:
     | typeof WebSocket.CONNECTING
     | typeof WebSocket.OPEN

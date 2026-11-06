@@ -1,0 +1,21 @@
+customer_id,name,segment,country
+C001,Avery Example,Online,UK
+C002,Blake Example,Online,Ireland
+C003,Casey Example,Online,Germany
+C004,Drew Example,Retail,Ireland
+C005,Emery Example,Retail,Ireland
+C006,Finley Example,Online,France
+C007,Gray Example,Retail,UK
+C008,Harper Example,Retail,Germany
+C009,Indy Example,Wholesale,Germany
+C010,Jules Example,Retail,UK
+C011,Kai Example,Online,Germany
+C012,Logan Example,Retail,France
+C013,Morgan Example,Wholesale,France
+C014,Noor Example,Online,Germany
+C015,Oak Example,Wholesale,UK
+C016,Parker Example,Retail,Ireland
+C017,Quinn Example,Online,Ireland
+C018,Reese Example,Retail,Germany
+C019,Sage Example,Online,Germany
+C020,Tate Example,Wholesale,UK

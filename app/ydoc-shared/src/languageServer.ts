@@ -141,6 +141,8 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
   initialized: Promise<LsRpcResult<response.InitProtocolConnection>>
   private clientScope: AbortScope = new AbortScope()
   private initializationScheduled = false
+  private settleInitialized:
+    ((result: LsRpcResult<response.InitProtocolConnection>) => void) | undefined
   private shouldReconnect = true
   private retainCount = 1
   debug = false
@@ -200,6 +202,7 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     if (this.initializationScheduled) return this.initialized
     this.initializationScheduled = true
     this.initialized = new Promise((resolve) => {
+      this.settleInitialized = resolve
       const initialize = () => {
         this.emit('transport/connected', [])
         this.initializationScheduled = false
@@ -533,6 +536,10 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
   /** Like `release()`, but unconditionally disposes the AbortScope. */
   private dispose() {
     this.retainCount = 0
+    // Requests still waiting for initialization would otherwise wait forever.
+    this.settleInitialized?.(
+      Err(new LsRpcError('LanguageServer disposed', 'session/initProtocolConnection', {})),
+    )
     this.clientScope.dispose('Language Server released')
   }
 }

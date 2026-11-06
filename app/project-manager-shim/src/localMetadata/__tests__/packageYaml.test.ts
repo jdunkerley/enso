@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { readPackageLabels, writePackageLabels } from '../packageYaml.js'
+import { readPackageJvmMode, readPackageLabels, writePackageLabels } from '../packageYaml.js'
 import { withTempDirectory } from './testUtils.js'
 
 const PACKAGE = '# A comment\nname: Example\nnamespace: local\nversion: 0.0.1\n'
@@ -50,5 +50,25 @@ describe('package.yaml labels', () => {
       await expect(writePackageLabels(dir, ['a'])).rejects.toThrow(/package\.yaml/)
       expect(await fs.readFile(path.join(dir, 'package.yaml'), 'utf8')).toBe(broken)
       expect((await fs.readdir(dir)).filter((name) => name.includes('.tmp-'))).toEqual([])
+    }))
+})
+
+describe('readPackageJvmMode', () => {
+  test.each([
+    ['jvm: true\n', true],
+    ['jvm: false\n', false],
+    ['', undefined],
+    ['jvm: "yes"\n', undefined],
+    ['jvm: [\n', undefined],
+  ])('%j gives %s', (yamlText, expected) =>
+    withTempDirectory(async (dir) => {
+      await project(dir, `name: P\n${yamlText}`)
+      expect(await readPackageJvmMode(dir)).toBe(expected)
+    }),
+  )
+
+  test('a missing package.yaml gives undefined', () =>
+    withTempDirectory(async (dir) => {
+      expect(await readPackageJvmMode(dir)).toBeUndefined()
     }))
 })

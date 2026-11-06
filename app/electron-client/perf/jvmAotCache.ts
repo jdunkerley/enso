@@ -9,9 +9,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { findBundledJava, findEngineComponent } from '../tests/packagedIde'
 import {
+  aotCreateArguments,
   aotRejection,
   credentialFreeEnv,
-  LAUNCHER_JVM_OPTIONS,
   type OpenTag,
   type RunResult,
 } from './openTimeReport'
@@ -60,7 +60,7 @@ const AOT_LOGGING = '-Xlog:aot=info,cds=info'
  * starting the Language Server after 30 s (run 41509148874: "Language server startup timeout",
  * the engine killed at 30.0 s), so it never exited by itself, wrote no configuration, and every
  * Windows JVM run fell back to a `launcher-trained` cache. The training launch gives the engine
- * 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`, read by `ProjectService.default`).
+ * 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`, read by `engineTimeouts` at each open).
  */
 const TRAINING_STARTUP_TIMEOUT_MS = 180_000
 
@@ -102,11 +102,12 @@ export async function createJvmAotCache(
   exe: string,
   launch: Launch,
   trainDirect: TrainDirect,
+  jvmOptions = '',
 ): Promise<JvmAotCache> {
-  const first = await prepareJvmAotCache(out, exe, launch, trainDirect)
+  const first = await prepareJvmAotCache(out, exe, launch, trainDirect, jvmOptions)
   if (first.cache != null) return first
   console.warn(`Open time: ${first.rejection}; preparing the AOT cache once more.`)
-  return await prepareJvmAotCache(out, exe, launch, trainDirect)
+  return await prepareJvmAotCache(out, exe, launch, trainDirect, jvmOptions)
 }
 
 async function prepareJvmAotCache(
@@ -114,7 +115,12 @@ async function prepareJvmAotCache(
   exe: string,
   launch: Launch,
   trainDirect: TrainDirect,
+  jvmOptions: string,
 ): Promise<JvmAotCache> {
+  // An experiment's options (`--jvm-options`) reach the training, the creation and the check as
+  // they reach the measured launches: a cache must be trained with the options it is used with.
+  const optionsEnv: Record<string, string> =
+    jvmOptions.trim() === '' ? {} : { ENSO_JVM_OPTIONS: jvmOptions }
   const java = findBundledJava(exe)
   const component = findEngineComponent(exe)
   if (!java || !component) throw new Error(`No bundled JDK or engine component next to ${exe}`)
@@ -126,6 +132,7 @@ async function prepareJvmAotCache(
 
   const training = await launch(
     {
+      ...optionsEnv,
       ENSO_ENGINE_ARGS: '--jvm',
       JAVA_TOOL_OPTIONS: `-XX:AOTMode=record -XX:AOTConfiguration=${config} ${AOT_LOGGING}`,
       ENSO_ENGINE_STARTUP_TIMEOUT_MS: String(TRAINING_STARTUP_TIMEOUT_MS),
@@ -144,6 +151,7 @@ async function prepareJvmAotCache(
       `Open time: the IDE training launch wrote no AOT configuration (${training.error ?? 'no error'}); training with the launcher instead.`,
     )
     await trainDirect({
+      ...optionsEnv,
       ENSO_ENGINE_ARGS: '--jvm',
       JAVA_TOOL_OPTIONS: `-XX:AOTMode=record -XX:AOTConfiguration=${config}`,
     })
@@ -154,17 +162,19 @@ async function prepareJvmAotCache(
     )
   }
 
+  // `java` is started here, not through the launcher, so the engine package's `jvm.options` lines
+  // and the experiment's options, which the launcher would add, are added by hand.
+  const optionsFilePath = path.join(path.dirname(component), 'jvm.options')
   const created = spawnSync(
     java,
-    [
-      '-XX:AOTMode=create',
-      `-XX:AOTConfiguration=${config}`,
-      `-XX:AOTCache=${cache}`,
-      ...LAUNCHER_JVM_OPTIONS,
-      `--module-path=${component}`,
-      '-m',
-      'org.enso.runner/org.enso.runner.Main',
-    ],
+    aotCreateArguments({
+      config,
+      cache,
+      component,
+      optionsFile:
+        fs.existsSync(optionsFilePath) ? fs.readFileSync(optionsFilePath, 'utf8') : undefined,
+      jvmOptions,
+    }),
     {
       encoding: 'utf8',
       // The repo types `ProcessEnv` as closed; a spawned process takes any variable.
@@ -183,6 +193,7 @@ async function prepareJvmAotCache(
   // reason (a `[cds]` or `[aot]` record, a mismatch) is found in the output too.
   const check = await launch(
     {
+      ...optionsEnv,
       ENSO_ENGINE_ARGS: '--jvm',
       JAVA_TOOL_OPTIONS: `-XX:AOTMode=on -XX:AOTCache=${cache} ${AOT_LOGGING}`,
     },

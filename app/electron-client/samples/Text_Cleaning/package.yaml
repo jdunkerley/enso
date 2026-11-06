@@ -1,0 +1,8 @@
+name: Text_Cleaning
+description: Tidy names, phone numbers and reference codes in a messy contacts table.
+namespace: local
+version: 0.0.1
+license: Apache-2.0
+author: jdunkerley
+maintainer: jdunkerley
+prefer-local-libraries: true
