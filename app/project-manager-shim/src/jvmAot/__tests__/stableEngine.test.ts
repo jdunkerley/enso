@@ -1,10 +1,12 @@
 /** @file The Linux AppImage's copy of the bundled engine, at a path that survives remounts. */
+import * as childProcess from 'node:child_process'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import {
   readyStableEngine,
+  runningExecutableIn,
   stableEnginePath,
   type StableEngineHooks,
   type StableEngineOptions,
@@ -231,11 +233,45 @@ test('a copy whose engine is still running is not deleted', async () => {
   expect((await fs.readdir(engineDirectory())).sort()).toEqual(['2025.9.0', '2026.1.0', '2026.2.0'])
 })
 
-test('a stale copy with a read-only directory is replaced', async () => {
-  const stale = path.join(engineDirectory(), '2026.2.0', 'dist', 'locked')
-  await fs.mkdir(stale, { recursive: true })
-  await fs.writeFile(path.join(stale, 'file'), '')
-  await fs.chmod(stale, 0o555)
-  expect(await stableEnginePath(options)).toBe(copiedLauncher())
-  expect(await fs.readFile(copiedLauncher(), 'utf8')).toBe('launcher-1')
-})
+// `chmod 0555` on a Windows directory is a no-op, so there the test would pass without the fix.
+test.skipIf(process.platform === 'win32')(
+  'a stale copy with a read-only directory is replaced',
+  async () => {
+    const stale = path.join(engineDirectory(), '2026.2.0', 'dist', 'locked')
+    await fs.mkdir(stale, { recursive: true })
+    await fs.writeFile(path.join(stale, 'file'), '')
+    await fs.chmod(stale, 0o555)
+    expect(await stableEnginePath(options)).toBe(copiedLauncher())
+    expect(await fs.readFile(copiedLauncher(), 'utf8')).toBe('launcher-1')
+  },
+)
+
+// `/proc` is Linux only.
+test.skipIf(process.platform !== 'linux')(
+  'a running executable is found through a symlinked parent of the copy (review of #612, N1)',
+  async () => {
+    const real = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-in-use-'))
+    let running: childProcess.ChildProcess | undefined
+    try {
+      const copy = path.join(real, 'engine', '2026.1.0')
+      await fs.mkdir(path.join(copy, 'bin'), { recursive: true })
+      const launcher = path.join(copy, 'bin', 'java')
+      await fs.copyFile(process.execPath, launcher)
+      await fs.chmod(launcher, 0o755)
+      running = childProcess.spawn(launcher, ['-e', 'setInterval(() => {}, 1000)'], {
+        stdio: 'ignore',
+      })
+      await new Promise((resolve) => running!.once('spawn', resolve))
+      // `<real>/config` as a symlink to the directory holding the copies, as a dotfile manager
+      // makes `~/.config`.
+      const link = path.join(real, 'config')
+      await fs.symlink(path.join(real, 'engine'), link)
+      expect(await runningExecutableIn(path.join(real, 'engine', '2026.1.0'))).toBe(true)
+      expect(await runningExecutableIn(path.join(link, '2026.1.0'))).toBe(true)
+      expect(await runningExecutableIn(path.join(link, '2025.9.0'))).toBe(false)
+    } finally {
+      running?.kill()
+      await fs.rm(real, { recursive: true, force: true })
+    }
+  },
+)

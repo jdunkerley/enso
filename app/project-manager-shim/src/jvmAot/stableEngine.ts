@@ -69,9 +69,11 @@ const GIB = 1024 ** 3
 const RETRY_AFTER_MS = 24 * 60 * 60 * 1000
 
 /** Whether any process's executable (`/proc/<pid>/exe`) is inside `directory`; Linux only. */
-async function runningExecutableIn(directory: string): Promise<boolean> {
+export async function runningExecutableIn(directory: string): Promise<boolean> {
   if (process.platform !== 'linux') return false
-  const prefix = path.resolve(directory) + path.sep
+  // `/proc/<pid>/exe` is a resolved path, so the directory must be too (`~/.config` may be a symlink).
+  const resolved = await fs.realpath(directory).catch(() => path.resolve(directory))
+  const prefix = resolved + path.sep
   let pids: string[]
   try {
     pids = (await fs.readdir('/proc')).filter((name) => /^\d+$/.test(name))
