@@ -1,7 +1,10 @@
 /**
  * @file The runner polls an engine that is still starting often enough to notice it the moment it
  * is ready. The engine is a fake `enso`, a Node script that listens at once but answers `503` to
- * `/_health` for its first 300 ms, counting those early requests.
+ * `/_health` for its first 8 requests, recording when each came. It counts requests, not time: a
+ * window measured in time (the first 300 ms after the process start) held only 3 or 4 polls on a
+ * loaded runner, whose Node start-up ate it. The test asserts the polling interval (the typical gap
+ * between polls), which a loaded machine stretches far less than it shrinks a count.
  *
  * It also holds an open until the engine's ydoc port accepts connections (Note [Open Waits For The
  * Ydoc Port] in `ensoRunner.ts`), with a second fake: it answers the health check at once and
@@ -23,13 +26,14 @@ const args = process.argv.slice(2)
 const value = (flag) => args[args.indexOf(flag) + 1]
 const project = value('--path')
 const port = Number(value('--rpc-port'))
-const started = Date.now()
-let early = 0
+let started = 0
+const early = []
 http
   .createServer((_request, response) => {
-    if (Date.now() - started < 300) {
-      early += 1
-      fs.writeFileSync(project + '.early', String(early))
+    if (started === 0) started = Date.now()
+    if (early.length < 8) {
+      early.push(Date.now() - started)
+      fs.writeFileSync(project + '.early', JSON.stringify(early))
       response.statusCode = 503
       response.end('starting')
     } else response.end('ok')
@@ -109,11 +113,19 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
-test('polls a starting engine several times in its first 300 ms', async () => {
+test('polls a starting engine every 25 ms, not every 250 ms', async () => {
   const project = Path(path.join(root, 'Project'))
   await expect(runner.openProject(project, 'id')).resolves.toBeDefined()
-  const early = Number(await fs.readFile(`${project}.early`, 'utf8').catch(() => '0'))
-  expect(early).toBeGreaterThanOrEqual(5)
+  const recorded = await fs.readFile(`${project}.early`, 'utf8').catch(() => '[]')
+  const times: number[] = JSON.parse(recorded)
+  expect(times).toHaveLength(8)
+  const gaps = times
+    .slice(1)
+    .map((time, i) => time - times[i]!)
+    .sort((a, b) => a - b)
+  // The fast interval is 25 ms plus the request's own time; the slow one is 250 ms. The median gap
+  // sits well between, and one slow poll on a loaded machine does not move it.
+  expect(gaps[Math.floor(gaps.length / 2)]).toBeLessThan(125)
 }, 30_000)
 
 /** Whether a TCP connection to `port` is accepted right now. */
