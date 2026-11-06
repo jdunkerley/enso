@@ -518,6 +518,7 @@ jobs:
             open-perf/*/logs
             open-perf/*/electron-out.log
             open-perf/*/hsperf
+            open-perf/*/rss-*.json
             open-perf/*/open-time.json
             open-perf/*/open-time.md
             open-perf/*/*/marks.json
@@ -525,6 +526,7 @@ jobs:
             open-perf/*/*/logs
             open-perf/*/*/electron-out.log
             open-perf/*/*/hsperf
+            open-perf/*/*/rss-*.json
           if-no-files-found: warn
       - if: failure()
         name: Upload Test Traces
