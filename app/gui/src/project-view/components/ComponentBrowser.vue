@@ -419,6 +419,7 @@ const listsHandler = listBindings.handler({
   <div
     ref="cbRoot"
     class="ComponentBrowser"
+    data-no-save-shortcut
     :style="{ transform, minWidth }"
     :data-self-argument="input.selfArgument"
     tabindex="-1"

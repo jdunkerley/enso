@@ -89,7 +89,7 @@ registerHandlers({
 </script>
 
 <template>
-  <div class="LeftPanel">
+  <div class="LeftPanel" data-panel-side="left">
     <div
       class="leftBar"
       :class="{ expanded: leftBarExtended }"
@@ -123,6 +123,7 @@ registerHandlers({
         <div ref="content" class="panel" :class="cssClass" :style="widthStyle">
           <PanelContents
             v-model:fullscreen="fullscreen"
+            side="left"
             @update:toolbarElement="driveToolbar = $event"
           >
             <DriveView :toolbar="driveToolbar" />
