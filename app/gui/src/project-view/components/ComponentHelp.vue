@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
 import type { SuggestionId } from '$/providers/openedProjects/suggestionDatabase/entry'
+import { suggestionDocumentationUrl } from '$/providers/openedProjects/suggestionDatabase/entry'
 import Breadcrumbs, {
   type Item as Breadcrumb,
 } from '@/components/ComponentHelp/DocsBreadcrumbs.vue'
@@ -10,6 +11,7 @@ import { HistoryStack } from '@/components/ComponentHelp/history'
 import type { Docs, FunctionDocs, TypeDocs } from '@/components/ComponentHelp/ir'
 import { lookupDocumentation, placeholder } from '@/components/ComponentHelp/ir'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import SvgButton from '@/components/SvgButton.vue'
 import { groupColorStyle } from '@/composables/nodeColors'
 import { tryGetIndex } from '@/util/data/array'
 import type { Opt } from '@/util/data/opt'
@@ -85,6 +87,12 @@ const style = computed(() => ({
 
 const icon = computed<IconName>(() => suggestion.value?.iconName ?? 'marketplace')
 
+/** The component's page on the documentation site; nothing for the user's own code. */
+const documentationUrl = computed(() => {
+  const base = $config.DOCS_URL
+  return base && suggestion.value ? suggestionDocumentationUrl(suggestion.value, base) : undefined
+})
+
 const historyStack = new HistoryStack()
 
 // Reset breadcrumbs history when the user selects the entry from the component list.
@@ -125,6 +133,10 @@ function handleBreadcrumbClick(index: number) {
     }
   }
 }
+
+function openDocs(url: string) {
+  window.open(url, '_blank')
+}
 </script>
 
 <template>
@@ -142,6 +154,12 @@ function handleBreadcrumbClick(index: number) {
           @backward="historyStack.backward()"
         />
       </div>
+      <SvgButton
+        v-if="documentationUrl"
+        name="open"
+        title="Open in documentation site"
+        @activate="openDocs(documentationUrl)"
+      />
     </div>
     <h2 v-if="documentation.kind === 'Placeholder'">{{ documentation.text }}</h2>
     <template v-else>
@@ -226,5 +244,9 @@ function handleBreadcrumbClick(index: number) {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
+}
+
+.topBar .SvgButton {
+  flex: 0 0 auto;
 }
 </style>

@@ -70,8 +70,10 @@ more than one tool lives in `tools/build-scripts`
 installer from the checkout, `version` computes the version, `toolchain-check`
 compares a local toolchain with the pins, and the CI commands. CI calls sbt
 directly, with `.github/actions/setup-jvm` providing GraalVM, sbt, flatc and
-GraalPy. `docs/CONTRIBUTING.md` ("Building the IDE") lists the command for each
-build task.
+GraalPy. The wiki's
+[Building and Running](https://github.com/jdunkerley/enso/wiki/Building-and-Running)
+lists the command for each build task, and `tools/build-scripts/CLAUDE.md`
+describes each of those commands.
 
 ## Languages and toolchains
 

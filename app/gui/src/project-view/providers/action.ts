@@ -403,6 +403,9 @@ const undisplayableActions = {
 
   // === Graph Editor ===
 
+  'graph.openDocumentation': {
+    shortcut: () => graphBindings.bindings['graph.openDocumentation'],
+  },
   'graph.openComponentBrowser': {
     shortcut: () => graphBindings.bindings['graph.openComponentBrowser'],
   },

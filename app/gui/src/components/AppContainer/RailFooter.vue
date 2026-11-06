@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
- * @file The two buttons at the bottom of the left rail, under the divider: Settings (the cog) and
- * About (#566). `LeftPanel.vue` mounts it.
+ * @file The three buttons at the bottom of the left rail, under the divider: Settings (the cog),
+ * Documentation (the user documentation site's introduction, in the browser) and About (#566).
+ * `LeftPanel.vue` mounts it.
  *
- * Both are plain rail buttons, labelled when the rail is extended. Their actions, and "Download
+ * All are plain rail buttons, labelled when the rail is extended. Their actions, and "Download
  * app" (only without a local backend, and with no button), are global while this is mounted
  * (`useMenuEntries`): they are in the command palette, and the shortcuts (`Mod+,` for Settings,
- * `Mod+/` for About) work anywhere.
+ * `Mod+/` for About; Documentation has none) work anywhere.
  *
  * There is no account to show or sign out of: the app always runs as the local user.
  */
@@ -32,6 +33,13 @@ const { getText } = useText()
 const toasts = useToasts()
 const modals = useModals()
 
+/** The documentation site's introduction page; no button without a configured site. */
+const documentationUrl = $config.DOCS_URL ? `${$config.DOCS_URL}intro/` : undefined
+
+function openDocumentation() {
+  if (documentationUrl != null) window.open(documentationUrl, '_blank')
+}
+
 /** Show an error toast, and log it. */
 function toastAndLog(message: string) {
   toasts.show(message, { type: 'error' })
@@ -53,6 +61,7 @@ useMenuEntries<MenuEntryAction>(() => [
     },
   },
   { action: 'settings', doAction: () => openSettingsTab() },
+  documentationUrl != null && { action: 'documentation', doAction: openDocumentation },
   { action: 'aboutThisApp', doAction: openAboutModal },
 ])
 </script>
@@ -65,6 +74,14 @@ useMenuEntries<MenuEntryAction>(() => [
       :label="extended ? getText('settingsShortcut') : undefined"
       :title="getText('settingsShortcut')"
       @activate="openSettingsTab()"
+    />
+    <SvgButton
+      v-if="documentationUrl != null"
+      class="RailButton"
+      name="help"
+      :label="extended ? getText('documentationShortcut') : undefined"
+      :title="getText('documentationShortcut')"
+      @activate="openDocumentation()"
     />
     <SvgButton
       class="RailButton"

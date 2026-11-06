@@ -14,6 +14,7 @@ const DEFAULT_CONFIG = {
   COMMIT_HASH: import.meta.env.ENSO_IDE_COMMIT_HASH,
   GOOGLE_ANALYTICS_TAG: import.meta.env.ENSO_IDE_GOOGLE_ANALYTICS_TAG,
   YDOC_SERVER_URL: import.meta.env.ENSO_IDE_YDOC_SERVER_URL,
+  DOCS_URL: import.meta.env.ENSO_IDE_DOCS_URL,
 } as const
 
 // Undefined env variables are typed as `any`, but we want them to be `string | undefined`.
