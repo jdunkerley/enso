@@ -118,6 +118,8 @@ describe('AiMcpServer', () => {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
     expect(config.mcpServers.enso.type).toBe('http')
     expect(config.mcpServers.enso.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp$/)
+    expect(config.mcpServers.enso.headers.Authorization).toMatch(/^Bearer [\w-]{43}$/)
+    if (process.platform !== 'win32') expect(fs.statSync(configPath).mode & 0o077).toBe(0)
     await server.shutdown()
     expect(fs.existsSync(configPath)).toBe(false)
   })
@@ -144,5 +146,64 @@ describe('AiMcpServer', () => {
     await promise
     // Late reply must not throw.
     expect(() => answer(request, { ok: true, value: '42' })).not.toThrow()
+  })
+
+  describe('who may call it (#616)', () => {
+    let server: InstanceType<typeof AiMcpServer>
+    let url: string
+    let authorization: string
+
+    beforeEach(async () => {
+      server = new AiMcpServer(() => null)
+      const config = JSON.parse(fs.readFileSync(await server.start(), 'utf8'))
+      url = config.mcpServers.enso.url
+      authorization = config.mcpServers.enso.headers.Authorization
+    })
+    afterEach(() => server.shutdown())
+
+    /** POST an MCP `initialize`, as the CLI does first, with the given extra headers. */
+    function initialize(headers: Record<string, string>): Promise<Response> {
+      return fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          ...headers,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2025-03-26',
+            capabilities: {},
+            clientInfo: { name: 'test', version: '0' },
+          },
+        }),
+      })
+    }
+
+    test('serves the CLI: the token from the config file, no Origin', async () => {
+      const response = await initialize({ Authorization: authorization })
+      expect(response.status).toBe(200)
+      expect(await response.text()).toContain('"serverInfo"')
+    })
+
+    test('refuses a request without the token', async () => {
+      expect((await initialize({})).status).toBe(401)
+    })
+
+    test('refuses a request with another token', async () => {
+      const wrong = authorization.slice(0, -1) + (authorization.endsWith('A') ? 'B' : 'A')
+      expect((await initialize({ Authorization: wrong })).status).toBe(401)
+      expect((await initialize({ Authorization: 'Bearer x' })).status).toBe(401)
+    })
+
+    test('refuses a request from a web page, even with the token', async () => {
+      for (const origin of ['https://evil.example', 'null', 'http://127.0.0.1']) {
+        const response = await initialize({ Authorization: authorization, Origin: origin })
+        expect(response.status, origin).toBe(403)
+      }
+    })
   })
 })

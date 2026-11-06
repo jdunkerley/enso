@@ -377,6 +377,16 @@ that path is passed to the agent as `--mcp-config <path> --strict-mcp-config`;
 `--strict-mcp-config` makes the CLI ignore any project- or user-level MCP config
 so the session is hermetic. The temp file is deleted on shutdown.
 
+**Who may call it (#616):** loopback is not enough, since any local process and
+any web page in the user's browser can reach the port, and during a turn the
+tool runs Enso code in the open project. The server makes a random bearer token
+at start-up and writes it into the config file
+(`headers: { Authorization: "Bearer …" }`, which the CLI sends on every request;
+the file is created `0600`). A request without it, or with another one, gets
+`401`; a request with any `Origin` header gets `403` (the CLI sends none). Both
+are checked before the MCP transport sees the request — Note [The AI MCP Server
+Checks Its Caller] in `aiMcpServer.ts`.
+
 **Text-only return contract:** the LS evaluates the expression `inFrame` and the
 engine's `VisualizationResult.visualizationResultToBytes` only knows how to
 encode `Text`/`String` values. Wrapping the agent's expression on our side (e.g.
