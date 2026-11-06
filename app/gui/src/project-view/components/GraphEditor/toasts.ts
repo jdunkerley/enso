@@ -39,16 +39,26 @@ export function useImportsAddedOnOpenToast(
  * error diagnostics (`Package containing the module Standard.Base.Main could not be loaded: …`)
  * followed by `executionFailed` with an unhelpful message (`NoSuchElementException`), and never
  * `executionComplete`. That replaces the start-up toast with one that stays, naming the first
- * error diagnostic (or else the failure's message), instead of leaving the start-up toast forever
- * (#600). A start-up failure in a tab that is not active is shown when the tab is, and hidden with
- * it until the user closes it; a later `executionComplete` (the project fixed) dismisses it.
+ * error diagnostic of the latest status (or else the failure's message), instead of leaving the
+ * start-up toast forever (#600). The project store records it from the execution context's
+ * creation (`startupFailure`, `project/startupFailure.ts`), so a failure before this view mounts
+ * is not missed. A start-up failure in a tab that is not active is shown when the tab is, and is
+ * hidden with it (a queued one too) until the user closes it; a later `executionComplete` (the
+ * project fixed) dismisses it. Unmounting the view dismisses both (`useToast`'s scope).
+ *
+ * Not covered: a project whose first execution completes with nothing computed (the issue's stale
+ * `0.0.0-dev` edition, whose imports are "not found") shows no start-up failure; its errors are
+ * the nodes' own.
  */
 /**
  * A composable which sets up several toasts for project management, and creates one for message
  * about user's action error.
  */
 export function useGraphEditorToasts(
-  projectStore: Pick<ProjectStore, 'firstExecution' | 'lsRpcConnection' | 'executionContext'>,
+  projectStore: Pick<
+    ProjectStore,
+    'firstExecution' | 'startupFailure' | 'lsRpcConnection' | 'executionContext'
+  >,
 ) {
   const toastStartup = useToast.info({ autoClose: false })
   const toastStartupFailed = useToast.error({ autoClose: false })
@@ -61,7 +71,6 @@ export function useGraphEditorToasts(
   const STARTUP_MESSAGE = 'Initializing the project. This can take up to one minute.'
   let startup: 'running' | 'done' | { failed: string; shown: boolean } = 'running'
   let active = true
-  let firstError: string | undefined
   const showStartup = () => {
     if (!active) return
     if (startup === 'running') toastStartup.show(STARTUP_MESSAGE)
@@ -79,7 +88,7 @@ export function useGraphEditorToasts(
     active = false
     toastStartup.dismiss()
     // Shown again with the tab, unless the user has closed it.
-    if (typeof startup === 'object' && toastStartupFailed.isActive()) {
+    if (typeof startup === 'object' && toastStartupFailed.isPending()) {
       startup.shown = false
       toastStartupFailed.dismiss()
     }
@@ -89,9 +98,23 @@ export function useGraphEditorToasts(
     startup = 'done'
     toastStartup.dismiss()
   })
-  projectStore.executionContext.on('executionStatus', (diagnostics) => {
-    if (startup === 'running') firstError ??= diagnostics.find((d) => d.kind === 'Error')?.message
-  })
+  watch(
+    () => projectStore.startupFailure,
+    (failed) => {
+      if (failed != null) {
+        if (startup === 'done' || (typeof startup === 'object' && startup.failed === failed)) return
+        startup = { failed, shown: false }
+        toastStartup.dismiss()
+        toastStartupFailed.dismiss()
+        showStartup()
+      } else if (typeof startup === 'object') {
+        // Started after all (the user fixed the edition, say).
+        startup = 'done'
+        toastStartupFailed.dismiss()
+      }
+    },
+    { immediate: true, flush: 'sync' },
+  )
 
   const offTransportClosed = projectStore.lsRpcConnection.on('transport/closed', () =>
     toastConnectionLost.show('Lost connection to Language Server.'),
@@ -107,21 +130,10 @@ export function useGraphEditorToasts(
   projectStore.lsRpcConnection.client.onError((e) =>
     toastLspError.show(`Language server error: ${e}`),
   )
-  projectStore.executionContext.on('executionComplete', () => {
-    toastExecutionFailed.dismiss()
-    // Started after all (the user fixed the edition, say).
-    if (typeof startup === 'object') {
-      startup = 'done'
-      toastStartupFailed.dismiss()
-    }
-  })
+  projectStore.executionContext.on('executionComplete', () => toastExecutionFailed.dismiss())
   projectStore.executionContext.on('executionFailed', (e) => {
-    if (startup === 'running') {
-      startup = { failed: firstError ?? e, shown: false }
-      toastStartup.dismiss()
-      showStartup()
-      return
-    }
+    // Before the project has started, the start-up failure toast says it.
+    if (startup !== 'done') return
     toastExecutionFailed.show(`Execution Failed: ${JSON.stringify(e)}`)
   })
 

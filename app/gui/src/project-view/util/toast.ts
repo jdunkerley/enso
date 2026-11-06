@@ -61,6 +61,10 @@ export function useToast(options: UseToastOptions = {}) {
     isActive() {
       return toasts.isActive(id)
     },
+    /** Whether the toast is displayed or waits for a place. */
+    isPending() {
+      return toasts.isActive(id) || toasts.isQueued(id)
+    },
   }
 }
 

@@ -186,6 +186,11 @@ export function createToastsStore() {
     )
   }
 
+  /** Whether the toast waits for a place, {@link TOAST_LIMIT} toasts being shown. */
+  function isQueued(id: ToastId) {
+    return queue.some((entry) => entry.options.toastId === id)
+  }
+
   /** Whether the toast is displayed and not closing. */
   function isActive(id: ToastId) {
     return find(id)?.isIn === true
@@ -262,7 +267,7 @@ export function createToastsStore() {
     return running
   }
 
-  return { toasts, show, update, dismiss, isActive, remove, onChange, promise }
+  return { toasts, show, update, dismiss, isActive, isQueued, remove, onChange, promise }
 }
 
 /** The app's toasts, reachable from any code: Vue components and stores. */
