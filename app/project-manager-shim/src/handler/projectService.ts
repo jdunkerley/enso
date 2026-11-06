@@ -6,6 +6,7 @@ import type { LocalMetadata } from '../localMetadata/index.js'
 import type { LocalSecrets } from '../localSecrets/index.js'
 import type { LocalVersioning } from '../localVersioning/index.js'
 import { ProjectService } from '../projectService/index.js'
+import type { IsProjectOpen, LocalSamples } from '../samples/index.js'
 import { bodyJson, bodyJsonOrEmpty } from './http.js'
 import { toJSONRPCError, toJSONRPCResult } from './jsonrpc.js'
 
@@ -140,6 +141,32 @@ const LOCAL_SECRETS_ROUTES: Readonly<Record<string, RouteHandler<SecretsContext>
   }),
 }
 
+/** What the {@link SAMPLES_ROUTES} handlers use. */
+interface SamplesContext {
+  readonly samples: LocalSamples
+  readonly getProjectService: () => Promise<ProjectService>
+}
+
+/** Whether a project is open in the project service, by its path with either separator. */
+function isOpenIn(getProjectService: () => Promise<ProjectService>): IsProjectOpen {
+  return async (projectPath) => {
+    const projectService = await getProjectService()
+    return (
+      (await projectService.isProjectRunning(Path(projectPath))) ||
+      (await projectService.isProjectRunning(Path(projectPath.replace(/\//g, '\\'))))
+    )
+  }
+}
+
+/** The routes served by {@link LocalSamples}. The resets refuse an open sample. */
+const SAMPLES_ROUTES: Readonly<Record<string, RouteHandler<SamplesContext>>> = {
+  'samples/status': ({ samples }) => samples.status(),
+  'samples/reset': ({ samples, getProjectService }, body) =>
+    samples.reset(requireString(body, 'name'), isOpenIn(getProjectService)),
+  'samples/reset-all': ({ samples, getProjectService }) =>
+    samples.resetAll(isOpenIn(getProjectService)),
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value != null && !Array.isArray(value)
 }
@@ -254,7 +281,8 @@ async function handleStoreRequest<Store>(
  *
  * The label and Recent routes are served by `localMetadata`, the `versioning/` routes by
  * `localVersioning`, the `secrets/` routes by `localSecrets` (`keyFromEnvironment` says where its key
- * comes from), and the `datalink/` routes by `datalinks.ts`; without their store they answer with an error.
+ * comes from), the `samples/` routes by `localSamples`, and the `datalink/` routes by `datalinks.ts`;
+ * without their store they answer with an error.
  */
 export async function handleProjectServiceRequest(
   request: http.IncomingMessage,
@@ -266,6 +294,7 @@ export async function handleProjectServiceRequest(
   localVersioning?: LocalVersioning,
   localSecrets?: LocalSecrets,
   keyFromEnvironment = false,
+  localSamples?: LocalSamples,
 ): Promise<void> {
   const routeName = requestPath.replace(/^\/api\/project-service\//, '')
   if (request.method === 'POST') {
@@ -302,6 +331,17 @@ export async function handleProjectServiceRequest(
         'Local secrets are not available in this host.',
         headers,
         true,
+      )
+    }
+    if (Object.hasOwn(SAMPLES_ROUTES, routeName)) {
+      return handleStoreRequest(
+        request,
+        response,
+        routeName,
+        (samples, body) => SAMPLES_ROUTES[routeName]!({ samples, getProjectService }, body),
+        localSamples,
+        'The bundled samples are not available in this host.',
+        headers,
       )
     }
     if (Object.hasOwn(DATALINK_ROUTES, routeName)) {

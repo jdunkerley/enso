@@ -13,6 +13,7 @@ import * as portfinder from 'portfinder'
 import type * as vite from 'vite'
 
 import { COOP_COEP_CORP_HEADERS } from 'enso-common/src/constants'
+import type { LocalSamples } from 'project-manager-shim'
 import * as projectManagement from 'project-manager-shim'
 import {
   acceptLocalRequest,
@@ -203,6 +204,7 @@ export class Server {
   private localVersioning: LocalVersioning
   private localSecrets: LocalSecrets | undefined
   private keyFromEnvironment: boolean
+  private localSamples: LocalSamples | undefined
 
   /**
    * Create a simple HTTP server.
@@ -210,6 +212,7 @@ export class Server {
    * @param localVersioning - The git-based versioning of local projects.
    * @param localSecrets - The encrypted local secrets store; without it the `secrets/` routes fail.
    * @param keyFromEnvironment - Whether the secrets key comes from `ENSO_SECRETS_KEY`.
+   * @param localSamples - The bundled samples; without them the `samples/` routes fail.
    */
   constructor(
     public config: Config,
@@ -218,6 +221,7 @@ export class Server {
     localVersioning: LocalVersioning,
     localSecrets?: LocalSecrets,
     keyFromEnvironment = false,
+    localSamples?: LocalSamples,
   ) {
     this.projectsRootDirectory = projectManagement.getProjectsDirectory()
     this.projectService = projectService
@@ -225,6 +229,7 @@ export class Server {
     this.localVersioning = localVersioning
     this.localSecrets = localSecrets
     this.keyFromEnvironment = keyFromEnvironment
+    this.localSamples = localSamples
   }
 
   /** Server constructor. */
@@ -235,6 +240,7 @@ export class Server {
     localVersioning: LocalVersioning,
     localSecrets?: LocalSecrets,
     keyFromEnvironment = false,
+    localSamples?: LocalSamples,
   ): Promise<Server> {
     const localConfig = Object.assign({}, config)
     localConfig.port = await findPort(localConfig.port)
@@ -245,6 +251,7 @@ export class Server {
       localVersioning,
       localSecrets,
       keyFromEnvironment,
+      localSamples,
     )
     await server.run()
     return server
@@ -357,6 +364,7 @@ export class Server {
         this.localVersioning,
         this.localSecrets,
         this.keyFromEnvironment,
+        this.localSamples,
       )
     } else if (request.url?.startsWith('/api/')) {
       const route = new URL(`https://example.com${requestUrl.replace('/api/', '/')}`)

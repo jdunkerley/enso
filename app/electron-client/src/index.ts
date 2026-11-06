@@ -21,7 +21,7 @@ import { Path } from 'enso-common/src/utilities/file'
 import { access, constants, readFile, writeFile } from 'node:fs/promises'
 import { join as joinPath } from 'node:path'
 import process from 'node:process'
-import { installSamples, runLocalProjectByPath } from 'project-manager-shim'
+import { LocalSamples, runLocalProjectByPath } from 'project-manager-shim'
 import { shutdownClaudeAgent } from './ai/claudeAgent.js'
 import {
   engineModeOption,
@@ -134,10 +134,12 @@ class App {
   electronIsDev: boolean = false
   parsedArguments: ParsedArguments | null = null
   /**
-   * Settles once the bundled samples are installed (or found already there). The dashboard waits
+   * Settles once the bundled samples are installed, or checked against the bundle (`LocalSamples.sync`). The dashboard waits
    * for it: on a fresh install it opens `Samples/Getting_Started`, which must exist by then.
    */
   samplesInstalled: Promise<unknown> = Promise.resolve()
+  /** The bundled samples, for the start-up check and the Drive's `samples/` routes. */
+  localSamples: LocalSamples | undefined
 
   async init() {
     this.electronIsDev =
@@ -271,7 +273,9 @@ class App {
       return writeFile(versionInfoPath, JSON.stringify(VERSION_INFO), 'utf8')
     })()
 
-    const installSamplesPromise = installSamples(samplesPath(electron, electronIsDev))
+    this.localSamples = new LocalSamples(samplesPath(electron, electronIsDev))
+    // No project is open yet: the window waits for this, and a second instance exits.
+    const installSamplesPromise = this.localSamples.sync()
     this.samplesInstalled = installSamplesPromise.catch((error: unknown) => {
       console.error('Failed to install the bundled samples.', error)
     })
@@ -413,6 +417,7 @@ class App {
       getLocalVersioning(),
       getLocalSecrets(),
       getSecretsKeySource().fromEnvironment,
+      this.localSamples,
     )
     console.log('Content server started.')
   }

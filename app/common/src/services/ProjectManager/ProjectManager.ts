@@ -29,6 +29,8 @@ import {
   type ProjectState,
   type RecentProjectEntry,
   type RenameProjectParams,
+  type SamplesResetResult,
+  type SamplesStatus,
   type SetProjectLabelsParams,
   type UUID,
   type VersionEntry,
@@ -510,6 +512,25 @@ export class ProjectManager {
   /** Whether local secrets exist and can be unlocked, and where the key comes from. */
   async secretsStatus(): Promise<LocalSecretsStatus> {
     return this.runProjectServiceCommand('secrets/status', {})
+  }
+
+  /** The bundled samples' states. */
+  async samplesStatus(): Promise<SamplesStatus> {
+    const status: SamplesStatus = await this.runProjectServiceCommand('samples/status', {})
+    return {
+      directory: normalizeSlashes(status.directory),
+      samples: status.samples.map((sample) => ({ ...sample, path: normalizeSlashes(sample.path) })),
+    }
+  }
+
+  /** Put the bundled sample `name` back as bundled, keeping an edited copy beside it. */
+  async resetSample(name: string): Promise<SamplesResetResult> {
+    return this.runProjectServiceCommand('samples/reset', { name })
+  }
+
+  /** Put every bundled sample and `Data/` file back as bundled, keeping edited copies. */
+  async resetAllSamples(): Promise<SamplesResetResult> {
+    return this.runProjectServiceCommand('samples/reset-all', {})
   }
 
   /** Whether the project at `path` is versioned, has unsaved changes, and its last version. */

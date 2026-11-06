@@ -207,7 +207,7 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
         to: 'enso',
         filter: ['!**.tar.gz', '!**.zip'],
       },
-      // The sample projects, copied to `<projects>/Samples` on first start (`installSamples`).
+      // The sample projects, copied to `<projects>/Samples` on first start (`LocalSamples`).
       // Keep `to` in step with `samplesPath` in `src/paths.ts`. `samples/CLAUDE.md` is for
       // contributors, not for the user's projects folder.
       { from: 'samples/', to: 'samples', filter: ['**/*', '!CLAUDE.md'] },

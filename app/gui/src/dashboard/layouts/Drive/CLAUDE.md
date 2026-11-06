@@ -2,9 +2,21 @@
 
 The drive's composables and helpers (#91): `driveView.ts` (the shown-versus-
 target location), `driveActions.ts`, `assetItems.ts`, `suggestions.ts`,
-`drag.ts` and `autoScroll.ts` (drag and drop), `pressPropagation.ts`, and the
-accessibility pieces below. The components using them are `../AssetsTable.vue`
-(the table) and `#/pages/dashboard/components/AssetRow.vue` (a row).
+`drag.ts` and `autoScroll.ts` (drag and drop), `pressPropagation.ts`,
+`samples.ts`, and the accessibility pieces below. The components using them are
+`../AssetsTable.vue` (the table) and `#/pages/dashboard/components/AssetRow.vue`
+(a row).
+
+`samples.ts` is the bundled samples (`<projects>/Samples`): the shim's
+`samples/status` (query options in `$/utils/samplesQuery.ts`) says which project
+rows are bundled samples and which have an update. `ProjectNameColumn.vue` shows
+the "Update available" badge (`data-testid="sample-update-badge"`), and
+`AssetContextMenu.vue` adds Reset Sample to a sample and Reset All Samples to
+the `Samples` folder (`useSampleMenuEntries`), disabled with a tooltip while the
+sample, or any project under `Samples`, is open. A host without samples (the
+Vite dev server) answers with an error, read as no samples. The Playwright mock
+is `integration-test/mock/localSamples.ts` (no samples unless a spec adds them);
+the spec is `dashboard/localSamples.spec.ts`.
 
 ## The table's accessibility model (#208)
 

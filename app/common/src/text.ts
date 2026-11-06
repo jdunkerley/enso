@@ -86,6 +86,10 @@ interface PlaceholderOverrides {
   readonly dragAnnouncementDroppedOn: [assets: string, targetName: string]
   readonly dragAnnouncementDropped: [assets: string]
   readonly dragAnnouncementCancelled: [assets: string]
+  readonly resetSampleDone: [sampleName: string]
+  readonly resetSampleKept: [sampleName: string, keptName: string]
+  readonly resetAllSamplesKept: [keptNames: string]
+  readonly resetSampleError: [sampleName: string]
 }
 
 // This is intentionally unused. This line throws an error if `PlaceholderOverrides` ever becomes

@@ -13,6 +13,7 @@ import { createVersioning, withTempRepo } from '../../localVersioning/__tests__/
 import type { LocalVersioning } from '../../localVersioning/index.js'
 import type { Runner } from '../../projectService/ensoRunner.js'
 import { ProjectService } from '../../projectService/index.js'
+import { LocalSamples } from '../../samples/index.js'
 import { handleProjectServiceRequest } from '../projectService.js'
 
 let root: string
@@ -22,9 +23,17 @@ let store: LocalMetadata | undefined
 let versioning: LocalVersioning | undefined
 let secrets: LocalSecrets | undefined
 let keyFromEnvironment = false
+let samples: LocalSamples | undefined
 let running = false
+/** The paths `isProjectRunning` was asked about. */
+const runningAsked: string[] = []
 /** The only part of the runner these routes use. */
-const runner: Partial<Runner> = { isProjectRunning: () => Promise.resolve(running) }
+const runner: Partial<Runner> = {
+  isProjectRunning: (projectPath) => {
+    runningAsked.push(projectPath)
+    return Promise.resolve(running)
+  },
+}
 const projectService = new ProjectService(runner as Runner, [])
 
 beforeEach(async () => {
@@ -34,7 +43,9 @@ beforeEach(async () => {
     logger: { warn: vi.fn() },
   })
   running = false
+  runningAsked.length = 0
   keyFromEnvironment = false
+  samples = undefined
   secrets = new LocalSecrets({
     filePath: path.join(root, 'secrets.json'),
     getKey: () => Buffer.alloc(32, 7),
@@ -51,6 +62,7 @@ beforeEach(async () => {
       versioning,
       secrets,
       keyFromEnvironment,
+      samples,
     )
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -486,6 +498,52 @@ describe('secrets routes', () => {
     secrets = undefined
     expect((await call('secrets/list', {})).error).toMatchObject({
       message: expect.stringContaining('Local secrets are not available in this host.'),
+    })
+  })
+})
+
+describe('samples routes', () => {
+  async function setUpSamples() {
+    const bundled = path.join(root, 'bundle')
+    await fs.mkdir(path.join(bundled, 'One', 'src'), { recursive: true })
+    await fs.writeFile(path.join(bundled, 'One', 'package.yaml'), 'name: One\n')
+    await fs.writeFile(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 1\n')
+    const projects = path.join(root, 'projects')
+    samples = new LocalSamples(bundled, projects)
+    await samples.sync()
+    return path.join(projects, 'Samples')
+  }
+
+  test('status, reset and reset-all', async () => {
+    const directory = await setUpSamples()
+    await fs.writeFile(path.join(directory, 'One', 'src', 'Main.enso'), 'main = 2\n')
+    expect((await call('samples/status', {})).result).toEqual({
+      directory: directory.replace(/\\/g, '/'),
+      samples: [{ name: 'One', path: expect.stringMatching(/\/One$/), state: 'edited' }],
+    })
+    const reset = (await call('samples/reset', { name: 'One' })).result as { kept: string[] }
+    expect(reset.kept).toEqual([expect.stringMatching(/^One_edited_\d{4}_\d\d_\d\d$/)])
+    expect(await fs.readFile(path.join(directory, 'One', 'src', 'Main.enso'), 'utf8')).toBe(
+      'main = 1\n',
+    )
+    expect((await call('samples/reset-all', {})).result).toEqual({ kept: [] })
+  })
+
+  test('the resets refuse an open sample, asking by either separator', async () => {
+    const directory = await setUpSamples()
+    running = true
+    expect((await call('samples/reset', { name: 'One' })).error).toMatchObject({
+      message: expect.stringContaining('is open'),
+    })
+    expect((await call('samples/reset-all', {})).error).toMatchObject({
+      message: expect.stringContaining('is open'),
+    })
+    expect(runningAsked).toContain(`${directory}/One`.replace(/\\/g, '/'))
+  })
+
+  test('without a store, the routes answer with a JSON-RPC error', async () => {
+    expect((await call('samples/status', {})).error).toMatchObject({
+      message: expect.stringContaining('not available'),
     })
   })
 })

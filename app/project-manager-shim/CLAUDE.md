@@ -48,17 +48,65 @@ project-service request with the same message. The `ProjectService` tests skip
 without one; GUI CI on Linux gives them develop's engine distribution artifact
 (`.github/workflows/gui-checks.yml`).
 
-## Sample projects
+## Sample projects (`src/samples/`)
 
-`installSamples(bundledDir)` (`projectManagement.ts`) copies the samples shipped
-with the application into `<projects>/Samples` when that directory does not
-exist, and does nothing otherwise, so a user's edits and deletions are never
-undone. It copies to `.Samples.<pid>.tmp` and renames, so an interrupted copy
-cannot leave a half-filled `Samples` that blocks later starts. Nothing is
-downloaded (the old `downloadSamples` fetched an unpinned upstream branch on
-every start). The top-level `CLAUDE.md` of the bundle is not copied: a dev run
-copies the source `samples/`, whose contributor notes the packaged app leaves
-out. Test: `src/__tests__/installSamples.test.ts`.
+`LocalSamples` (Electron creates one with the bundle, `resources/samples`, and
+passes it to the server) installs the samples shipped with the application in
+`<projects>/Samples` and keeps them up to date. Nothing is downloaded (the old
+`downloadSamples` fetched an unpinned upstream branch on every start).
+
+- **First start** (`sync`, when `Samples` is missing): the whole bundle is
+  copied to `.Samples.<pid>.tmp` with a manifest, `Samples/.samples.json`, and
+  renamed into place, so an interrupted copy leaves no half-filled `Samples`.
+  The bundle's top-level `CLAUDE.md` is not copied: a dev run copies the source
+  `samples/`, whose contributor notes the packaged app leaves out.
+- **The manifest** (`{ version: 1, samples, data }`) records, for each sample (a
+  bundle folder with a `package.yaml`) and each `Data/` file, the content hash
+  it was installed with, or `null` when that is unknown. A sample's hash
+  (`hashSample`) covers its files by relative path, but not hidden ones (the
+  IDE's `.enso/`), not `output/` (what the sample writes) and not
+  `package.yaml`'s `labels` (the Drive writes them), so none of those counts as
+  an edit.
+- **Every later start** compares the bundle (B), the manifest (M) and the disk
+  (D) for each sample and `Data/` file (`compareSample`, whose test lists every
+  case): not on disk and not in the manifest, it is copied in (a new sample, or
+  an install from before manifests); not on disk but in the manifest, the user
+  deleted it and it stays deleted (Reset brings it back); D = B is current; D =
+  M, M ≠ B is unedited with a changed bundle and is replaced, keeping its
+  `.enso/`, its `output/` files and its labels; otherwise it is edited and left
+  alone, with an update when M ≠ B. **A copy the manifest has no record of** (an
+  install from before manifests, whose samples read the old per-sample `data/`)
+  that differs from the bundle is recorded as `null`: edited, with an update,
+  never overwritten. Only the current bundle is known, so an old sample that was
+  never edited counts as edited too.
+- **Changes are staged and renamed** (`.<name>.<pid>.tmp` beside the target; a
+  replaced folder goes aside as `.<name>.<pid>.old` first, since a rename over a
+  folder is not one step on Windows). The next start removes what an interrupted
+  change left, moving an `.old` back when its target is missing. All of a
+  `LocalSamples`' operations are serialised (`serialised`, keyed by the
+  `Samples` folder), and the manifest is written with `writeJsonAtomic`.
+- **An open project is never changed**: `sync` takes an `isOpen`, and leaves an
+  open sample's update for a later start. At start-up nothing is open, since the
+  window waits for the check (at most 10 s) and a second instance exits.
+- **Reset** (`reset(name)`, `resetAll()`): a sample that differs from the bundle
+  is renamed to `<Name>_edited_<yyyy>_<mm>_<dd>` (then `_2`, `_3`, ...) beside
+  it, with that name in its `package.yaml` too, and a fresh copy is installed; a
+  `Data/` file that differs is kept as `<name>_edited_<date><ext>`. The date
+  uses underscores because a project name allows only letters, digits and `_`.
+  `resetAll` covers every bundled sample and `Data/` file and nothing else, and
+  changes nothing when a sample is open. Both record the bundle's hashes.
+- **Routes** (POST to `/api/project-service/samples/*`, served by
+  `handler/projectService.ts` from the `LocalSamples` passed to
+  `handleProjectServiceRequest` after `keyFromEnvironment`): `status` (each
+  bundled sample's `name`, `path` and `state`: `current`, `edited`,
+  `updateAvailable` or `missing`, and the `Samples` `directory`, all with `/`),
+  `reset` `{ name }` and `reset-all`, which answer `{ kept }`. The resets refuse
+  a sample the project service has running. The Vite middleware has no
+  `LocalSamples`, so under `dev:vite` the routes fail and the Drive shows no
+  sample actions.
+
+Tests: `src/samples/__tests__/installSamples.test.ts` and the `samples routes`
+in `handler/__tests__/projectService.test.ts`.
 
 ## Scope
 

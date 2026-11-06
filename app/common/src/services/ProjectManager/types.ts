@@ -287,6 +287,28 @@ export type LocalSecretsStatus = (
   | { readonly state: 'wrong' }
 ) & { readonly keyFromEnvironment: boolean }
 
+/**
+ * A bundled sample's state in `<projects>/Samples`: as bundled, edited by the user, edited with a
+ * changed bundle to reset to, or deleted (reset brings it back).
+ */
+export type SampleState = 'current' | 'edited' | 'updateAvailable' | 'missing'
+
+/** The bundled samples, and where they are installed. */
+export interface SamplesStatus {
+  /** `<projects>/Samples`. */
+  readonly directory: Path
+  readonly samples: readonly {
+    readonly name: string
+    readonly path: Path
+    readonly state: SampleState
+  }[]
+}
+
+/** What a reset of samples did: the names its edited copies were kept under. */
+export interface SamplesResetResult {
+  readonly kept: readonly string[]
+}
+
 /** What is known about a local project's versioning. */
 export interface VersioningStatus {
   readonly git: boolean
