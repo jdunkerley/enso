@@ -44,6 +44,7 @@ import { setupLogger } from './log.js'
 import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from './menuItems.js'
 import { capitalizeFirstLetter } from './naming.js'
 import {
+  allowYdocOrigin,
   disposeJvmAotCache,
   disposeYdocHost,
   getLocalMetadata,
@@ -368,6 +369,9 @@ class App {
     const serverCfg = new Config({
       dir: assetsPath(this.electron),
       port: args.server.port,
+      // The pages' origin, which the ydoc listeners accept: a window's, or a browser's under
+      // `--no-window` (#596).
+      onListening: allowYdocOrigin,
     })
     const projectService = this.createProjectService(args)
     this.server = await Server.create(

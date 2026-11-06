@@ -17,6 +17,7 @@ import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { defaultSecretsFilePath, encodeKey, LocalSecrets } from 'project-manager-shim/localSecrets'
 import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
 import {
+  loopbackOrigins,
   ProjectService,
   ydocHostKind,
   type EngineSettings,
@@ -64,6 +65,14 @@ function forkYdocHost(): YdocHostChild {
 function getYdocHost(): UtilityProcessYdocHost {
   ydocHost ??= new UtilityProcessYdocHost(forkYdocHost)
   return ydocHost
+}
+
+/**
+ * Let the window, loaded from `https://localhost:<port>`, open the ydoc listeners' sockets; any
+ * other browser origin is refused (#596).
+ */
+export function allowYdocOrigin(port: number): void {
+  getYdocHost().allowOrigins(loopbackOrigins('https:', port))
 }
 
 /** Stop the ydoc server's utility process, if it was started. */

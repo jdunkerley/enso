@@ -43,6 +43,7 @@ import { UUID, type Path } from './types.js'
 import type { YdocHost } from './ydocHost.js'
 
 export {
+  loopbackOrigins,
   ydocHostKind,
   type YdocHost,
   type YdocHostKind,

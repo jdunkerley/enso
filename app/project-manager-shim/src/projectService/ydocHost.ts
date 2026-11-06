@@ -26,6 +26,20 @@ export interface YdocListenRequest {
   readonly host: string
   readonly port: number
   readonly languageServer: { readonly host: string; readonly port: number; readonly token: string }
+  /**
+   * The browser origins whose pages may connect (`ydoc-server`, Note [The ydoc Listener Checks
+   * Origin]): absent or empty, any socket from a browser page is refused. The shim leaves it out;
+   * the {@link YdocHost} adds its app's own origins (the Electron window's, the dev server's).
+   */
+  readonly allowedOrigins?: readonly string[] | undefined
+}
+
+/** The loopback names a page of the app can be loaded from. */
+const LOOPBACK_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]']
+
+/** The origins of a server on this machine's loopback, under each loopback name. */
+export function loopbackOrigins(protocol: 'http:' | 'https:', port: number): string[] {
+  return LOOPBACK_HOSTNAMES.map((hostname) => `${protocol}//${hostname}:${port}`)
 }
 
 /**

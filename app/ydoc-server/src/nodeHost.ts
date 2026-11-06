@@ -2,6 +2,7 @@
 import { WebSocketServer, type WebSocket } from 'ws'
 import { docName } from './auth'
 import { nodeByteBufferClass } from './nodeByteBuffer'
+import { originAllowed } from './origin'
 import { remoteChannelServer, type LanguageServerChannelAddress } from './remoteChannelServer'
 import { setupGatewayClient } from './ydoc'
 import type { JavaByteBuffer } from './YjsBinaryChannel'
@@ -10,6 +11,11 @@ export interface YdocListenRequest {
   readonly host: string
   readonly port: number
   readonly languageServer: LanguageServerChannelAddress
+  /**
+   * The browser origins whose pages may connect: the app's own window (Note [The ydoc Listener
+   * Checks Origin]). Absent or empty, every handshake that carries an `Origin` is refused.
+   */
+  readonly allowedOrigins?: readonly string[] | undefined
 }
 
 interface Listener {
@@ -39,7 +45,17 @@ export class NodeYdocHost {
     const binary = remoteChannelServer<JavaByteBuffer>(request.languageServer, 'binary')
     const visControl = remoteChannelServer<string>(request.languageServer, 'vis-control')
     const visData = remoteChannelServer<JavaByteBuffer>(request.languageServer, 'vis-data')
-    const server = new WebSocketServer({ host: request.host, port: request.port })
+    const allowedOrigins = request.allowedOrigins ?? []
+    const server = new WebSocketServer({
+      host: request.host,
+      port: request.port,
+      // Refused before the upgrade, with `403`: Note [The ydoc Listener Checks Origin].
+      verifyClient: ({ origin }: { origin: string | undefined }, done) => {
+        if (originAllowed(origin, allowedOrigins)) return done(true)
+        console.warn(`Refused a ydoc socket on port ${request.port} from origin ${origin}.`)
+        done(false, 403, 'Forbidden')
+      },
+    })
     server.on('connection', (socket, httpRequest) => {
       const url = new URL(httpRequest.url ?? '/', `ws://${request.host}:${request.port}`)
       const doc = docName(url.pathname)
