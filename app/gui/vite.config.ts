@@ -198,7 +198,8 @@ function ssrYdocHost(server: ViteDevServer): YdocHost {
 /**
  * The origins the dev server's pages are loaded from, whose sockets a ydoc listener accepts (any
  * other browser origin is refused, #596): the addresses Vite prints, and the port under every
- * loopback name. Read at each open, once the server is listening.
+ * loopback name. Read at each open, once the server is listening. A page opened by the machine's
+ * host name, through `server.origin` or a reverse proxy is refused: add its origin here.
  */
 function devServerOrigins(server: ViteDevServer): string[] {
   const urls = [...(server.resolvedUrls?.local ?? []), ...(server.resolvedUrls?.network ?? [])]

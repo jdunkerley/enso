@@ -58,10 +58,14 @@ desktop binary (AppImage/DMG/exe + installer).
   restored after a restart) is refused as `EADDRINUSE`, so the shim searches new
   ports instead of handing that project's GUI to another engine. In the process,
   `serve.ts` chains one port's requests, so a `close` cannot overtake a
-  restoring `listen`. It prints `ydoc host pid=<pid>` at start; its stdout and
-  stderr go through the main process's console, so they reach the IDE log.
-  `ENSO_YDOC_HOST=engine` puts the server back in the engine for one release
-  (see `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
+  restoring `listen`. Every `listen` carries the origins the listener accepts
+  (`allowOrigins`, #596): the content server's `https://localhost:<port>` under
+  each loopback name, set by `allowYdocOrigin` from the server's `onListening`
+  (`index.ts`), with or without a window. Keep that call wherever the port is
+  decided, or every page is refused. It prints `ydoc host pid=<pid>` at start;
+  its stdout and stderr go through the main process's console, so they reach the
+  IDE log. `ENSO_YDOC_HOST=engine` puts the server back in the engine for one
+  release (see `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
   `tests/headless/ydocHostClient.test.ts` (against a fake child),
   `tests/headless/ydocHostServe.test.ts`.
 - Installs the bundled sample projects at start-up (`installSamples` in

@@ -369,6 +369,9 @@ class App {
     const serverCfg = new Config({
       dir: assetsPath(this.electron),
       port: args.server.port,
+      // The pages' origin, which the ydoc listeners accept: a window's, or a browser's under
+      // `--no-window` (#596).
+      onListening: allowYdocOrigin,
     })
     const projectService = this.createProjectService(args)
     this.server = await Server.create(
@@ -497,7 +500,6 @@ class App {
     const address = new URL('https://localhost')
     address.port = this.serverPort(args).toString()
     address.search = searchParams.toString()
-    allowYdocOrigin(this.serverPort(args))
     console.log(`Loading the window address '${address.toString()}'.`)
     if (process.env.ELECTRON_DEV_MODE === 'true') {
       // Vite takes a while to be `import`ed, so the first load almost always fails.

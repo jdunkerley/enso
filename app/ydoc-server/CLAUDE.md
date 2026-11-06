@@ -124,11 +124,16 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   ydoc Listener Checks Origin] in `src/origin.ts`). A handshake whose `Origin`
   is not in the listen request's `allowedOrigins` gets `403`; one without
   `Origin` (a Node client) is accepted. The hosts fill the list: Electron's
-  `UtilityProcessYdocHost.allowOrigins` with the window's
-  `https://localhost:<port>` under each loopback name (set when the window is
-  loaded), `dev:vite`'s `ssrYdocHost` with the dev server's own addresses. No
-  list refuses every browser page. Not covered: the engine-hosted server
-  (`ENSO_YDOC_HOST=engine`), and other local processes, which can omit `Origin`.
+  `UtilityProcessYdocHost.allowOrigins` with the content server's
+  `https://localhost:<port>` under each loopback name (set by the server's
+  `onListening` once it listens, so `--no-window`, where a browser loads the
+  pages, works too), `dev:vite`'s `ssrYdocHost` with the dev server's own
+  addresses (its port under each loopback name, and Vite's `resolvedUrls`). A
+  dev server opened by the machine's host name, through `server.origin` or a
+  reverse proxy is refused: add the origin to `devServerOrigins` in
+  `gui/vite.config.ts`. No list refuses every browser page. Not covered: the
+  engine-hosted server (`ENSO_YDOC_HOST=engine`), and other local processes,
+  which can omit `Origin`.
 - **A socket for a document its session does not hold is refused before the
   upgrade** (#601, Note [An Unknown Document Is Refused Before The Upgrade] in
   `src/nodeHost.ts`): `404` for a module doc the `ls=` session does not hold (or
@@ -136,7 +141,7 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   `y-websocket` resets its backoff when a socket opens, so upgrading and then
   closing made a stale client retry every ~100 ms (91 attempts in 10 s,
   measured); refused before the upgrade it backs off (7 in 10 s). The
-  engine-hosted server still upgrades and closes.
+  engine-hosted server still upgrades and closes (#614).
 - **One session opens two `json` sockets**, not one: `YjsServerTransport` hands
   the Language Server a proxy channel (for the GUI) and a backend channel (the
   ydoc server's own). The Language Server must accept both.
