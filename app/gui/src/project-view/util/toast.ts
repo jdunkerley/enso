@@ -57,6 +57,14 @@ export function useToast(options: UseToastOptions = {}) {
     dismiss() {
       toasts.dismiss(id)
     },
+    /** Whether the toast is displayed (and not closing). */
+    isActive() {
+      return toasts.isActive(id)
+    },
+    /** Whether the toast is displayed or waits for a place. */
+    isPending() {
+      return toasts.isActive(id) || toasts.isQueued(id)
+    },
   }
 }
 
