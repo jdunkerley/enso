@@ -4,11 +4,12 @@
 
 - [The sample projects now update with each new version of the IDE, unless you
   have edited them; opening a sample does not count as an edit. An edited sample
-  with a newer version shows an "Update available" badge in the Drive. Reset
-  Sample, in a sample's context menu, replaces it with this version's sample,
-  and Reset All Samples, in the Samples folder's, does so for every sample and
-  for the shared files in Samples/Data. Your edited copies are kept beside
-  them.][622]
+  with a newer version shows an "Update available" pill in the Drive: click it,
+  or choose Update Sample in the sample's context menu, to update it, or press
+  Update All in the Samples folder's toolbar to update every sample that has a
+  newer version. If you keep versions of your projects, your edited sample is
+  saved in its version history first; otherwise it is kept beside the new one as
+  a dated copy.][622]
 - [A fresh installation opens a short Getting Started sample, which reads a
   file, filters it, totals it by month and charts the totals, with documentation
   that walks through it one step at a time.][617]

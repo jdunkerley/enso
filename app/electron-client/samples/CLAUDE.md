@@ -11,15 +11,17 @@ Nothing is downloaded.
 **A change here reaches existing installs.** Every start compares the bundle
 with the manifest the install wrote (`Samples/.samples.json`): a sample the user
 has not edited is replaced by the new version, an edited one keeps the user's
-version and gets an "Update available" badge in the Drive, whose Reset Sample
-(and Reset All Samples, on the `Samples` folder) installs the new version and
-keeps the edited copy as `<Name>_edited_<yyyy>_<mm>_<dd>`. A new sample or
-`Data/` file is copied in. So renaming a sample installs it again under the new
-name and leaves the old folder as the user's, and changing a `Data/` file
-changes it for every sample that reads it. Only a sample's code counts: the
-`#### METADATA ####` trailer of `.enso` files is left out of the comparison (the
-IDE rewrites it whenever a sample is opened), so a change to the stored layout
-alone does not update installs; it arrives with the next change to the code. See
+version and gets an "Update available" pill in the Drive. The pill, Update
+Sample in its context menu, and Update All in the `Samples` folder's toolbar
+install the new version: in a repository with local versioning, the user's
+version is saved in version history first; otherwise the edited copy is kept as
+`<Name>_edited_<yyyy>_<mm>_<dd>`. A new sample or `Data/` file is copied in. So
+renaming a sample installs it again under the new name and leaves the old folder
+as the user's, and changing a `Data/` file changes it for every sample that
+reads it. Only a sample's code counts: the `#### METADATA ####` trailer of
+`.enso` files is left out of the comparison (the IDE rewrites it whenever a
+sample is opened), so a change to the stored layout alone does not update
+installs; it arrives with the next change to the code. See
 `app/project-manager-shim/CLAUDE.md` ("Sample projects").
 
 ## Layout

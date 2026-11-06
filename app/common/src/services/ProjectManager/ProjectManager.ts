@@ -29,8 +29,8 @@ import {
   type ProjectState,
   type RecentProjectEntry,
   type RenameProjectParams,
-  type SamplesResetResult,
   type SamplesStatus,
+  type SamplesUpdateResult,
   type SetProjectLabelsParams,
   type UUID,
   type VersionEntry,
@@ -523,14 +523,17 @@ export class ProjectManager {
     }
   }
 
-  /** Put the bundled sample `name` back as bundled, keeping an edited copy beside it. */
-  async resetSample(name: string): Promise<SamplesResetResult> {
-    return this.runProjectServiceCommand('samples/reset', { name })
+  /**
+   * Update the bundled sample `name` to this version's bundle; its edits are kept in version
+   * history, or as a copy beside it.
+   */
+  async updateSample(name: string): Promise<SamplesUpdateResult> {
+    return this.runProjectServiceCommand('samples/update', { name })
   }
 
-  /** Put every bundled sample and `Data/` file back as bundled, keeping edited copies. */
-  async resetAllSamples(): Promise<SamplesResetResult> {
-    return this.runProjectServiceCommand('samples/reset-all', {})
+  /** Update every bundled sample that has an update, as {@link updateSample} does. */
+  async updateAllSamples(): Promise<SamplesUpdateResult> {
+    return this.runProjectServiceCommand('samples/update-all', {})
   }
 
   /** Whether the project at `path` is versioned, has unsaved changes, and its last version. */

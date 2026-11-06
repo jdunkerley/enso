@@ -89,8 +89,8 @@ desktop binary (AppImage/DMG/exe + installer).
   `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
   Playwright spec adds its own `tests/fixtures/sample_bank_data.xlsx` to
   `Samples/Data` (`addBankData`). `tests/samples.spec.ts` checks that opening a
-  sample is not an edit, the manifest, the badge and Reset Sample against the
-  real shim.
+  sample is not an edit, the manifest, and the "Update available" pill (outside
+  version control, so the edited copy is kept) against the real shim.
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).

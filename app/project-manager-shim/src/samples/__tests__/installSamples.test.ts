@@ -20,6 +20,7 @@ import {
   samplesSettled,
   Unreadable,
   type SamplesManifest,
+  type SamplesUpdateResult,
 } from '../index.js'
 
 let root: string
@@ -42,6 +43,19 @@ function manifest(): SamplesManifest {
 }
 
 const NOW = new Date(2026, 10, 6, 12)
+
+/** What an update did, with nothing where `fields` say nothing. */
+function updateResult(fields: Partial<SamplesUpdateResult>): SamplesUpdateResult {
+  return {
+    updated: [],
+    versioned: [],
+    kept: [],
+    unrenamed: [],
+    fellBack: [],
+    failed: [],
+    ...fields,
+  }
+}
 
 beforeEach(() => {
   vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -241,8 +255,20 @@ describe('installSamples: later starts', () => {
     expect(status).toEqual({
       directory: samples.replace(/\\/g, '/'),
       samples: [
-        { name: 'One', path: `${samples}/One`.replace(/\\/g, '/'), state: 'edited' },
-        { name: 'Two', path: `${samples}/Two`.replace(/\\/g, '/'), state: 'current' },
+        {
+          name: 'One',
+          path: `${samples}/One`.replace(/\\/g, '/'),
+          state: 'edited',
+          route: 'copy',
+          copyName: expect.stringMatching(/^One_edited_\d{4}_\d\d_\d\d$/),
+        },
+        {
+          name: 'Two',
+          path: `${samples}/Two`.replace(/\\/g, '/'),
+          state: 'current',
+          route: null,
+          copyName: null,
+        },
       ],
     })
   })
@@ -295,6 +321,15 @@ describe('installSamples: later starts', () => {
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
     expect(listing(path.join(samples, 'Data'))).toEqual(['rows.csv'])
     expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 1\n')
+  })
+
+  // A first install whose rename failed, and whose clean-up then failed too (both on a lock).
+  test("clear a failed first install's staging folder beside Samples, and nothing else", async () => {
+    write(path.join(projects, '.Samples.4242.tmp', 'One', 'package.yaml'), 'name: One\n')
+    write(path.join(projects, '.Samples.mine', 'keep.txt'), 'mine')
+    write(path.join(projects, '.Other.4242.tmp', 'keep.txt'), 'mine')
+    await installSamples(bundled, projects)
+    expect(listing(projects)).toEqual(['.Other.4242.tmp', '.Samples.mine', 'Samples'])
   })
 
   test('replace a manifest that cannot be read, taking unknown copies as edited', async () => {
@@ -358,7 +393,7 @@ describe('installSamples: an install from before manifests', () => {
   })
 })
 
-describe('reset', () => {
+describe('update, outside version control', () => {
   let local: LocalSamples
   beforeEach(async () => {
     local = new LocalSamples(bundled, projects)
@@ -371,12 +406,15 @@ describe('reset', () => {
     write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
     // The bundle is read once per `LocalSamples`; a new version is a new one.
     local = new LocalSamples(bundled, projects)
-
-    expect(await local.reset('One', undefined, NOW)).toEqual({
-      kept: ['One_edited_2026_11_06'],
-      unrenamed: [],
-      failed: [],
+    expect((await local.status()).samples[0]).toMatchObject({
+      state: 'updateAvailable',
+      route: 'copy',
+      copyName: expect.stringMatching(/^One_edited_\d{4}_\d\d_\d\d$/),
     })
+
+    expect(await local.update('One', { now: NOW })).toEqual(
+      updateResult({ updated: ['One'], kept: ['One_edited_2026_11_06'] }),
+    )
     const kept = path.join(samples, 'One_edited_2026_11_06')
     expect(read(path.join(kept, 'src', 'Main.enso'))).toBe('main = 99\n')
     expect(read(path.join(kept, 'package.yaml'))).toBe('name: One_edited_2026_11_06\n')
@@ -384,15 +422,17 @@ describe('reset', () => {
     expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 10\n')
     expect(fs.existsSync(path.join(samples, 'One', '.enso'))).toBe(false)
     expect(manifest().samples['One']).toBe(await hashSample(path.join(bundled, 'One')))
-    expect((await local.status()).samples[0]?.state).toBe('current')
+    expect((await local.status()).samples[0]).toMatchObject({
+      state: 'current',
+      route: null,
+      copyName: null,
+    })
 
     // The same day again: `_2`.
     write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 98\n')
-    expect(await local.reset('One', undefined, NOW)).toEqual({
-      kept: ['One_edited_2026_11_06_2'],
-      unrenamed: [],
-      failed: [],
-    })
+    expect(await local.update('One', { now: NOW })).toEqual(
+      updateResult({ updated: ['One'], kept: ['One_edited_2026_11_06_2'] }),
+    )
     expect(listing(samples)).toEqual([
       '.samples.json',
       'Data',
@@ -404,86 +444,85 @@ describe('reset', () => {
   })
 
   test('keeps no copy of an unedited sample', async () => {
-    expect(await local.reset('Two', undefined, NOW)).toEqual({
-      kept: [],
-      unrenamed: [],
-      failed: [],
-    })
+    expect(await local.update('Two', { now: NOW })).toEqual(updateResult({ updated: ['Two'] }))
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
   })
 
   test('brings back a deleted sample', async () => {
     fs.rmSync(path.join(samples, 'Two'), { recursive: true })
-    expect(await local.reset('Two', undefined, NOW)).toEqual({
-      kept: [],
-      unrenamed: [],
-      failed: [],
-    })
+    expect(await local.update('Two', { now: NOW })).toEqual(updateResult({ updated: ['Two'] }))
     expect(read(path.join(samples, 'Two', 'src', 'Main.enso'))).toBe('main = 2\n')
   })
 
   test('refuses an open sample, and one that is not bundled', async () => {
     write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
-    await expect(local.reset('One', async () => true, NOW)).rejects.toThrow(/is open/)
+    await expect(local.update('One', { isOpen: async () => true, now: NOW })).rejects.toThrow(
+      /is open/,
+    )
     expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 99\n')
-    await expect(local.reset('Mine', undefined, NOW)).rejects.toThrow(/not a bundled sample/)
+    await expect(local.update('Mine', { now: NOW })).rejects.toThrow(/not a bundled sample/)
   })
 })
 
-describe('resetAll', () => {
+describe('updateAll, outside version control', () => {
   let local: LocalSamples
   beforeEach(async () => {
     local = new LocalSamples(bundled, projects)
     await local.sync()
   })
 
-  test('resets every sample and Data file, keeping edited copies and leaving the rest', async () => {
+  test('updates only the samples with an update, keeping edited copies', async () => {
     write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
-    fs.rmSync(path.join(samples, 'Two'), { recursive: true })
+    write(path.join(samples, 'Two', 'src', 'Main.enso'), 'main = 22\n')
     write(path.join(samples, 'Data', 'rows.csv'), 'mine\n')
-    write(path.join(samples, 'Data', 'extra.csv'), 'extra\n')
-    write(path.join(samples, 'Mine', 'package.yaml'), 'name: Mine\n')
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    write(path.join(bundled, 'Data', 'rows.csv'), 'a,b\n3,4\n')
+    local = new LocalSamples(bundled, projects)
 
-    expect(await local.resetAll(undefined, NOW)).toEqual({
-      kept: ['One_edited_2026_11_06', 'Data/rows_edited_2026_11_06.csv'],
-      unrenamed: [],
-      failed: [],
-    })
-    expect(listing(samples)).toEqual([
-      '.samples.json',
-      'Data',
-      'Mine',
-      'One',
-      'One_edited_2026_11_06',
-      'Two',
-    ])
-    expect(listing(path.join(samples, 'Data'))).toEqual([
-      'extra.csv',
-      'rows.csv',
-      'rows_edited_2026_11_06.csv',
-    ])
-    expect(read(path.join(samples, 'Data', 'rows.csv'))).toBe('a,b\n1,2\n')
-    expect(read(path.join(samples, 'Data', 'rows_edited_2026_11_06.csv'))).toBe('mine\n')
-    expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 1\n')
+    expect(await local.updateAll({ now: NOW })).toEqual(
+      updateResult({ updated: ['One'], kept: ['One_edited_2026_11_06'] }),
+    )
+    // Two (edited, with no update) and the edited Data file are left alone.
+    expect(read(path.join(samples, 'Two', 'src', 'Main.enso'))).toBe('main = 22\n')
+    expect(read(path.join(samples, 'Data', 'rows.csv'))).toBe('mine\n')
+    expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 10\n')
     expect((await local.status()).samples.map((sample) => sample.state)).toEqual([
       'current',
-      'current',
+      'edited',
     ])
   })
 
-  test('changes nothing while a sample is open', async () => {
+  test('with no update, changes nothing', async () => {
     write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
-    await expect(local.resetAll(async (p) => p.endsWith('/Two'), NOW)).rejects.toThrow(
-      /'Two' is open/,
-    )
+    expect(await local.updateAll({ now: NOW })).toEqual(updateResult({}))
+    expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
+  })
+
+  test('changes nothing while a sample it would update is open', async () => {
+    write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
+    write(path.join(samples, 'Two', 'src', 'Main.enso'), 'main = 22\n')
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    write(path.join(bundled, 'Two', 'src', 'Main.enso'), 'main = 20\n')
+    local = new LocalSamples(bundled, projects)
+    await expect(
+      local.updateAll({ isOpen: async (p) => p.endsWith('/Two'), now: NOW }),
+    ).rejects.toThrow(/'Two' is open/)
     expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 99\n')
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
   })
 
+  test('ignores an open sample with no update', async () => {
+    write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    local = new LocalSamples(bundled, projects)
+    expect(
+      await local.updateAll({ isOpen: async (p) => p.endsWith('/Two'), now: NOW }),
+    ).toMatchObject({ updated: ['One'] })
+  })
+
   test('works when Samples is gone', async () => {
     fs.rmSync(samples, { recursive: true })
-    expect(await local.resetAll(undefined, NOW)).toEqual({ kept: [], unrenamed: [], failed: [] })
-    expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
+    expect(await local.updateAll({ now: NOW })).toEqual(updateResult({}))
   })
 })
 
@@ -528,7 +567,7 @@ describe('what cannot be read', () => {
       : (stat as (...args: unknown[]) => Promise<fs.Stats>)(p, ...rest)) as typeof fs.promises.stat)
   }
 
-  test('a Data file that cannot be read (EACCES) is never overwritten; Reset All keeps it', async () => {
+  test('a Data file that cannot be read (EACCES) is never overwritten', async () => {
     const rows = path.join(samples, 'Data', 'rows.csv')
     write(rows, 'mine\n')
     write(path.join(bundled, 'Data', 'rows.csv'), 'a,b\n3,4\n')
@@ -541,16 +580,9 @@ describe('what cannot be read', () => {
     )
     await installSamples(bundled, projects)
     expect(read(rows)).toBe('mine\n')
-
-    expect(await new LocalSamples(bundled, projects).resetAll(undefined, NOW)).toMatchObject({
-      kept: ['Data/rows_edited_2026_11_06.csv'],
-    })
-    vi.restoreAllMocks()
-    expect(read(path.join(samples, 'Data', 'rows_edited_2026_11_06.csv'))).toBe('mine\n')
-    expect(read(rows)).toBe('a,b\n3,4\n')
   })
 
-  test('a folder where a Data file should be (EISDIR) is left alone; Reset All keeps it', async () => {
+  test('a folder where a Data file should be (EISDIR) is left alone', async () => {
     const rows = path.join(samples, 'Data', 'rows.csv')
     fs.rmSync(rows)
     write(path.join(rows, 'inside.txt'), 'x')
@@ -560,13 +592,9 @@ describe('what cannot be read', () => {
     )
     await installSamples(bundled, projects)
     expect(fs.statSync(rows).isDirectory()).toBe(true)
-
-    await new LocalSamples(bundled, projects).resetAll(undefined, NOW)
-    expect(read(path.join(samples, 'Data', 'rows_edited_2026_11_06.csv', 'inside.txt'))).toBe('x')
-    expect(read(rows)).toBe('a,b\n1,2\n')
   })
 
-  test('an unreadable sample is reported as such, the others still are, and Reset keeps it', async () => {
+  test('an unreadable sample is reported as such, the others still are, and Update keeps it', async () => {
     const one = path.join(samples, 'One')
     failStat(one, 'EACCES')
     write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
@@ -578,11 +606,9 @@ describe('what cannot be read', () => {
       'unreadable',
       'current',
     ])
-    expect(await local.reset('One', undefined, NOW)).toEqual({
-      kept: ['One_edited_2026_11_06'],
-      unrenamed: [],
-      failed: [],
-    })
+    expect(await local.update('One', { now: NOW })).toEqual(
+      updateResult({ updated: ['One'], kept: ['One_edited_2026_11_06'] }),
+    )
     vi.restoreAllMocks()
     expect(read(path.join(samples, 'One_edited_2026_11_06', 'src', 'Main.enso'))).toBe('main = 1\n')
     expect(read(path.join(one, 'src', 'Main.enso'))).toBe('main = 10\n')
@@ -630,18 +656,16 @@ describe('open samples', () => {
     await installSamples(bundled, projects)
   })
 
-  test('a sample another process runs (its run marker) is neither updated nor reset', async () => {
+  test('a sample another process runs (its run marker) is not updated', async () => {
     const one = path.join(samples, 'One')
     const marker = await markProjectRunning(one)
     write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
     const local = new LocalSamples(bundled, projects)
     expect(await local.sync()).toMatchObject({ updated: [], updateAvailable: ['One'] })
-    await expect(local.reset('One', undefined, NOW)).rejects.toThrow(
+    await expect(local.update('One', { now: NOW })).rejects.toThrow(
       /being run by another Enso process/,
     )
-    await expect(local.resetAll(undefined, NOW)).rejects.toThrow(
-      /being run by another Enso process/,
-    )
+    await expect(local.updateAll({ now: NOW })).rejects.toThrow(/being run by another Enso process/)
     expect(read(path.join(one, 'src', 'Main.enso'))).toBe('main = 1\n')
     await marker.remove()
     expect(await local.sync()).toMatchObject({ updated: ['One'] })
@@ -680,7 +704,7 @@ describe('a manifest from a newer version', () => {
       'edited',
       'missing',
     ])
-    await expect(local.reset('One', undefined, NOW)).rejects.toThrow(/newer version/)
+    await expect(local.update('One', { now: NOW })).rejects.toThrow(/newer version/)
   })
 })
 
@@ -720,10 +744,10 @@ describe('a rename that fails', () => {
     expect(await installSamples(bundled, projects)).toMatchObject({ updated: ['One'] })
   })
 
-  test('during a reset puts the edited sample back, with its name', async () => {
+  test('during Update Sample puts the edited sample back, with its name', async () => {
     write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
     failRename((from, to) => path.basename(from).startsWith('.One.') && path.basename(to) === 'One')
-    await expect(new LocalSamples(bundled, projects).reset('One', undefined, NOW)).rejects.toThrow(
+    await expect(new LocalSamples(bundled, projects).update('One', { now: NOW })).rejects.toThrow(
       'EBUSY',
     )
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
@@ -735,11 +759,13 @@ describe('a rename that fails', () => {
     write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
     failRename((_from, to) => path.basename(to) === 'package.yaml')
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(await new LocalSamples(bundled, projects).reset('One', undefined, NOW)).toEqual({
-      kept: ['One_edited_2026_11_06'],
-      unrenamed: ['One_edited_2026_11_06'],
-      failed: [],
-    })
+    expect(await new LocalSamples(bundled, projects).update('One', { now: NOW })).toEqual(
+      updateResult({
+        updated: ['One'],
+        kept: ['One_edited_2026_11_06'],
+        unrenamed: ['One_edited_2026_11_06'],
+      }),
+    )
     expect(read(path.join(samples, 'One_edited_2026_11_06', 'package.yaml'))).toBe('name: One\n')
     expect(listing(path.join(samples, 'One_edited_2026_11_06'))).toEqual([
       'output',
@@ -799,9 +825,9 @@ describe('run markers', () => {
     expect(await findLiveRunMarker(path.join(samples, 'One'))).toBeNull()
   })
 
-  test('a reset blocked by a marker names the marker', async () => {
+  test('an update blocked by a marker names the marker', async () => {
     writeMarker('run-123.lock', { pid: process.pid, host: os.hostname() })
-    await expect(new LocalSamples(bundled, projects).reset('One', undefined, NOW)).rejects.toThrow(
+    await expect(new LocalSamples(bundled, projects).update('One', { now: NOW })).rejects.toThrow(
       marker('run-123.lock'),
     )
   })
@@ -884,10 +910,13 @@ describe('a sample opened while it is changed', () => {
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
   })
 
-  test('is not reset: the check is made again just before the rename', async () => {
+  test('is not changed by Update Sample: the check is made again just before the rename', async () => {
     write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
     await expect(
-      new LocalSamples(bundled, projects).reset('One', opensMeanwhile('One'), NOW),
+      new LocalSamples(bundled, projects).update('One', {
+        isOpen: opensMeanwhile('One'),
+        now: NOW,
+      }),
     ).rejects.toThrow(SampleBusyError)
     expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 99\n')
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
@@ -910,42 +939,43 @@ describe('a sample opened while it is changed', () => {
   })
 })
 
-describe('a Reset All that fails part way', () => {
-  test('reports and records what it did reset', async () => {
+describe('an Update All that fails part way', () => {
+  test('reports and records what it did update', async () => {
     await installSamples(bundled, projects)
     write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
-    write(path.join(samples, 'Data', 'rows.csv'), 'mine\n')
-    const recordedData = manifest().data['rows.csv']
+    write(path.join(samples, 'Two', 'src', 'Main.enso'), 'main = 22\n')
+    const recordedTwo = manifest().samples['Two']
     write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    write(path.join(bundled, 'Two', 'src', 'Main.enso'), 'main = 20\n')
     const rename = fileOps.rename
     vi.spyOn(fileOps, 'rename').mockImplementation((from, to) =>
-      path.basename(from) === 'rows.csv' ?
-        Promise.reject(new Error('EBUSY: rows.csv is open in another program'))
+      path.basename(from) === 'Two' ?
+        Promise.reject(new Error('EBUSY: Two is open in another program'))
       : rename(from, to),
     )
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(await new LocalSamples(bundled, projects).resetAll(undefined, NOW)).toEqual({
-      kept: ['One_edited_2026_11_06'],
-      unrenamed: [],
-      failed: [{ name: 'Data/rows.csv', error: 'EBUSY: rows.csv is open in another program' }],
-    })
+    expect(await new LocalSamples(bundled, projects).updateAll({ now: NOW })).toEqual(
+      updateResult({
+        updated: ['One'],
+        kept: ['One_edited_2026_11_06'],
+        failed: [{ name: 'Two', error: 'EBUSY: Two is open in another program' }],
+      }),
+    )
     expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 10\n')
-    expect(read(path.join(samples, 'Data', 'rows.csv'))).toBe('mine\n')
+    expect(read(path.join(samples, 'Two', 'src', 'Main.enso'))).toBe('main = 22\n')
     expect(manifest().samples['One']).toBe(await hashSample(path.join(bundled, 'One')))
-    expect(manifest().data['rows.csv']).toBe(recordedData)
+    expect(manifest().samples['Two']).toBe(recordedTwo)
   })
 })
 
 describe('a file where a sample should be', () => {
-  test('is kept by a reset, with no warning about its name', async () => {
+  test('is kept by Update Sample, with no warning about its name', async () => {
     await installSamples(bundled, projects)
     fs.rmSync(path.join(samples, 'One'), { recursive: true })
     write(path.join(samples, 'One'), 'not a project')
-    expect(await new LocalSamples(bundled, projects).reset('One', undefined, NOW)).toEqual({
-      kept: ['One_edited_2026_11_06'],
-      unrenamed: [],
-      failed: [],
-    })
+    expect(await new LocalSamples(bundled, projects).update('One', { now: NOW })).toEqual(
+      updateResult({ updated: ['One'], kept: ['One_edited_2026_11_06'] }),
+    )
     expect(read(path.join(samples, 'One_edited_2026_11_06'))).toBe('not a project')
     expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 1\n')
   })

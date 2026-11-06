@@ -1183,14 +1183,14 @@ export class LocalBackend extends backend.Backend {
     return this.projectManager.samplesStatus()
   }
 
-  /** Put the bundled sample `name` back as bundled; an edited copy is kept beside it. */
-  resetSample(name: string) {
-    return this.projectManager.resetSample(name)
+  /** Update the bundled sample `name`; its edits are kept in version history or as a copy. */
+  updateSample(name: string) {
+    return this.projectManager.updateSample(name)
   }
 
-  /** Put every bundled sample and `Data/` file back as bundled; edited copies are kept. */
-  resetAllSamples() {
-    return this.projectManager.resetAllSamples()
+  /** Update every bundled sample that has an update. */
+  updateAllSamples() {
+    return this.projectManager.updateAllSamples()
   }
 
   /** Only projects can carry labels locally. */

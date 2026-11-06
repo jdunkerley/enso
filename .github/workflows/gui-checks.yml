@@ -253,7 +253,9 @@ jobs:
       - name: 🧪 Unit Tests
         # The runner's TEMP is in its 8.3 form (`C:\Users\RUNNER~1\...`), while git and `realpath`
         # answer the long one, so tests comparing a temporary path with what those report fail.
-        # `runner.temp` is a long path.
+        # `runner.temp` is a long path. The trade-off: these tests no longer see an 8.3 path, so a
+        # product bug that only such a path triggers would pass here. Users' project paths do not
+        # normally take that form; a test that needs it should build one itself.
         env:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}

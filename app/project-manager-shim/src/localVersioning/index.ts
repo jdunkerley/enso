@@ -305,6 +305,12 @@ export interface LocalVersioningOptions {
   readonly consent: VersioningConsent
 }
 
+/**
+ * {@link LocalVersioning.replaceAsVersion} could not save the project's current state as a version,
+ * and so changed nothing.
+ */
+export class VersionSaveError extends Error {}
+
 /** The message of the error thrown for an operation on a repository that is not enabled. */
 export function notEnabledMessage(repoRoot: string): string {
   return `Versioning is not enabled for the repository at ${repoRoot}.`
@@ -887,6 +893,106 @@ export class LocalVersioning {
       if (restored.id != null) return { id: restored.id }
       // Restoring the latest version changes nothing, so there is nothing new to commit.
       return { id }
+    })
+  }
+
+  /**
+   * Whether a change to the project at `projectPath` can be recorded in version history: git is
+   * installed, the project is in a repository, the user has enabled versioning for it, and it is
+   * not in the middle of a merge or the like. The check the IDE's version history makes.
+   */
+  async isVersioned(projectPath: string): Promise<boolean> {
+    if ((await findGit()) == null) return false
+    const repoRoot = await findRepoRoot(projectPath).catch(() => null)
+    if (repoRoot == null) return false
+    return exclusive(repoRoot, async () => {
+      if (!(await this.consent.isEnabled(repoRoot))) return false
+      return (await blockedReason(repoRoot)) == null
+    })
+  }
+
+  /**
+   * Replace the project's files as a new version, under the repository's lock:
+   *
+   * 1. Its uncommitted changes are saved as their own version, `messages.before`. When that fails,
+   *    or leaves anything unsaved, or the project has no version at all afterwards, nothing has
+   *    been changed and a {@link VersionSaveError} is thrown.
+   * 2. `replace` is given the absolute paths of the project's files in that version (every file but
+   *    its `.enso` folder and what git ignores), and changes the work tree.
+   * 3. The result is saved as `messages.after`.
+   *
+   * When step 2 or 3 fails, the project is put back as the version from step 1 (as `restore` does,
+   * plus a `clean` of what `replace` added), and the error says that version holds the user's work.
+   * What git ignores, and the `.enso` folder, are never touched by this method.
+   */
+  async replaceAsVersion(
+    projectPath: string,
+    replace: (files: readonly string[]) => Promise<void>,
+    messages: { readonly before: string; readonly after: string },
+  ): Promise<{ readonly before: string; readonly after: string | null }> {
+    const saveFailed = (error: unknown) =>
+      new VersionSaveError(
+        lockMessage(error) ??
+          (error instanceof CommandError ? error.stderr.trim() || error.message : null) ??
+          (error instanceof Error ? error.message : String(error)),
+        { cause: error },
+      )
+    if ((await findGit()) == null) throw new VersionSaveError('git is not installed.')
+    const repoRoot = await findRepoRoot(projectPath).catch(() => null)
+    if (repoRoot == null) throw new VersionSaveError(`${projectPath} is not in a git repository.`)
+    return exclusive(repoRoot, async () => {
+      const run = (args: readonly string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
+      let relative: string
+      let before: string
+      let files: string[]
+      try {
+        await this.assertEnabledIn(repoRoot)
+        relative = await repoRelative(repoRoot, projectPath)
+        await this.commitIn(repoRoot, [projectPath], messages.before)
+        const unsaved = await run([
+          'status',
+          '--porcelain=v1',
+          '--untracked-files=all',
+          '--',
+          ...projectPathspecs(relative),
+        ])
+        if (unsaved.trim() !== '') throw new Error('Not every change could be saved as a version.')
+        before = (await run(['rev-parse', '--verify', 'HEAD'])).trim()
+        files = (await run(['ls-files', '-z', '--cached', '--', ...projectPathspecs(relative)]))
+          .split('\0')
+          .filter((file) => file !== '')
+        if (files.length === 0) throw new Error('The project has no saved version.')
+      } catch (error) {
+        throw saveFailed(error)
+      }
+      try {
+        await replace(files.map((file) => path.join(repoRoot, ...file.split('/'))))
+        const after = await this.commitIn(repoRoot, [projectPath], messages.after)
+        return { before, after: after.id }
+      } catch (error) {
+        try {
+          await run([
+            'restore',
+            `--source=${before}`,
+            '--staged',
+            '--worktree',
+            '--',
+            ...projectPathspecs(relative),
+          ])
+          await run(['clean', '-f', '-d', '-q', '--', ...projectPathspecs(relative)])
+        } catch (restoreError) {
+          console.error(`Failed to put ${projectPath} back as version ${before}:`, restoreError)
+        }
+        const reason =
+          lockMessage(error) ??
+          (error instanceof CommandError ? error.stderr.trim() || error.message : null) ??
+          (error instanceof Error ? error.message : String(error))
+        throw new Error(
+          `The change failed; your work was saved as the version '${messages.before}' and can be ` +
+            `restored from the list. (${reason})`,
+          { cause: error },
+        )
+      }
     })
   }
 

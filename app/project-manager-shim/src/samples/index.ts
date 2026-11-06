@@ -5,13 +5,15 @@
  * content hash of each sample and of each `Data/` file as installed. Every later start compares
  * the bundle, the manifest and the disk (see {@link compareSample}): what was never installed is
  * copied in, an unedited sample whose bundle changed is updated, and an edited one is left alone
- * and reported as having an update. Reset puts a sample (or all of them, `Data/` included) back to
- * the bundle, keeping an edited copy beside it as `<Name>_edited_<yyyy>_<mm>_<dd>`.
+ * and reported as having an update. Update Sample (and Update All, for every sample with an update)
+ * replaces a sample with its bundle: in a versioned repository as a new version, its edited state
+ * saved as the version before; otherwise keeping the edited copy beside it as
+ * `<Name>_edited_<yyyy>_<mm>_<dd>`.
  *
  * Every change is staged next to its target and renamed into place, so an interrupted start never
  * leaves a half-copied sample; leftovers of one are cleared by the next start. Only "no such file"
  * means missing: anything that cannot be read is {@link Unreadable}, never overwritten, and kept as
- * an edited copy by a reset.
+ * an edited copy by an update.
  */
 import * as crypto from 'node:crypto'
 import * as fs from 'node:fs'
@@ -19,6 +21,7 @@ import * as pathModule from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import * as yaml from 'yaml'
 import { renameWithRetry, serialised, writeJsonAtomic } from '../localMetadata/jsonFile.js'
+import { VersionSaveError, type LocalVersioning } from '../localVersioning/index.js'
 import { getProjectsDirectory } from '../projectManagement.js'
 import { findLiveRunMarker, isRunMarkerName } from './runMarker.js'
 
@@ -89,7 +92,7 @@ export type DiskHash = string | undefined | Unreadable
  * - `edited`: changed by the user; the bundle has not changed since it was installed.
  * - `updateAvailable`: changed by the user (or not yet updated, while open), and the bundle has
  *   changed since.
- * - `missing`: installed once and deleted since. Reset brings it back.
+ * - `missing`: installed once and deleted since; left deleted.
  * - `unreadable`: there, but could not be read; left alone.
  */
 export type SampleState = 'current' | 'edited' | 'updateAvailable' | 'missing' | 'unreadable'
@@ -100,7 +103,21 @@ export interface SampleStatus {
   /** The sample's folder, with `/` separators. */
   readonly path: string
   readonly state: SampleState
+  /**
+   * How an update would treat the user's edits (see {@link LocalSamples.update}): `version` saves
+   * them in version history, `copy` keeps them as {@link copyName}; `null` when the sample is not
+   * edited, or not there.
+   */
+  readonly route: SampleRoute | null
+  /** The name the edited copy would be kept under, on the `copy` route. */
+  readonly copyName: string | null
 }
+
+/**
+ * How an update keeps an edited sample: `version`, as the version before the update in its
+ * repository's history; `copy`, as an `_edited_` copy beside it.
+ */
+export type SampleRoute = 'version' | 'copy'
 
 /** The bundled samples' states, for the Drive. */
 export interface SamplesStatus {
@@ -121,8 +138,18 @@ export interface SamplesSyncResult {
   readonly updateAvailable: readonly string[]
 }
 
-/** What a reset did. */
-export interface SamplesResetResult {
+/** A sample, and why something failed for it. */
+export interface SampleFailure {
+  readonly name: string
+  readonly error: string
+}
+
+/** What an update of samples did. */
+export interface SamplesUpdateResult {
+  /** The samples updated. */
+  readonly updated: readonly string[]
+  /** Those updated as a new version, their edited state saved as the version before. */
+  readonly versioned: readonly string[]
   /** The names the edited copies were kept under, beside the originals. */
   readonly kept: readonly string[]
   /**
@@ -130,8 +157,34 @@ export interface SamplesResetResult {
    * the sample's: the user should rename them.
    */
   readonly unrenamed: readonly string[]
-  /** What Reset All could not reset (samples by name, `Data/` files as `Data/<file>`), and why. */
-  readonly failed: readonly { readonly name: string; readonly error: string }[]
+  /**
+   * Versioned samples whose edited state could not be saved as a version (a lock, a git error):
+   * they were kept as an edited copy instead, and why.
+   */
+  readonly fellBack: readonly SampleFailure[]
+  /** What Update All could not update, and why. */
+  readonly failed: readonly SampleFailure[]
+}
+
+/** What the samples need of local versioning. */
+export type SampleVersioning = Pick<LocalVersioning, 'isVersioned' | 'replaceAsVersion'>
+
+/** The context of a change to samples. */
+export interface SampleChangeOptions {
+  /** Whether a sample is open; an open one is never changed. */
+  readonly isOpen?: IsProjectOpen | undefined
+  /** Without it, every edited sample is kept as an edited copy. */
+  readonly versioning?: SampleVersioning | undefined
+  /** The date of the kept copies' names. */
+  readonly now?: Date | undefined
+}
+
+/** The message of the version saved before a sample is updated. */
+export const BEFORE_UPDATE_MESSAGE = 'Saved before updating the sample'
+
+/** The message of the version a sample is updated as. */
+export function updatedMessage(name: string): string {
+  return `Updated sample ${name}`
 }
 
 /** A sample is open, opening or marked as run by another process, so it must not be changed. */
@@ -169,7 +222,7 @@ export function compareSample(
   if (disk instanceof Unreadable) return { action: 'keep', record: recorded, state: 'unreadable' }
   if (disk === undefined) {
     // Never installed (new in this version, or an install from before manifests): copy it in. One
-    // the manifest knows was installed and then deleted by the user, who can Reset to restore it.
+    // the manifest knows was installed and then deleted by the user, and stays deleted.
     return recorded === undefined ?
         { action: 'install', record: bundle, state: 'current' }
       : { action: 'keep', record: recorded, state: 'missing' }
@@ -656,10 +709,7 @@ function editedCopyPath(path: string, now: Date, isFile: boolean): string {
  * Move a sample aside as its edited copy, renamed in its `package.yaml` too. `renamed` is false
  * when the `package.yaml` could not be changed: the copy then has the sample's name.
  */
-async function keepEditedSample(
-  path: string,
-  now: Date,
-): Promise<{ readonly name: string; readonly renamed: boolean }> {
+async function keepEditedSample(path: string, now: Date): Promise<KeptCopy> {
   const kept = editedCopyPath(path, now, false)
   await fileOps.rename(path, kept)
   const name = pathModule.basename(kept)
@@ -680,6 +730,102 @@ function toSlashes(path: string): string {
 
 function describe(hash: DiskHash): string {
   return hash instanceof Unreadable ? String(hash.error) : String(hash)
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+// ===============
+// === Updates ===
+// ===============
+
+/** An edited sample kept beside the original, and whether its `package.yaml` has its new name. */
+interface KeptCopy {
+  readonly name: string
+  readonly renamed: boolean
+}
+
+/**
+ * How one sample was updated: `fresh` when nothing of the user's was there to keep, `versioned`
+ * when its state was saved in version history, `kept` when it was kept as an edited copy
+ * (`fellBack` is why it was not saved as a version instead, if it was meant to be).
+ */
+type UpdateOutcome =
+  | { readonly kind: 'fresh' | 'versioned' }
+  | { readonly kind: 'kept'; readonly kept: KeptCopy; readonly fellBack: string | null }
+
+function resultOf(
+  done: readonly { readonly name: string; readonly outcome: UpdateOutcome }[],
+  failed: readonly SampleFailure[],
+): SamplesUpdateResult {
+  const versioned: string[] = []
+  const kept: string[] = []
+  const unrenamed: string[] = []
+  const fellBack: SampleFailure[] = []
+  for (const { name, outcome } of done) {
+    if (outcome.kind === 'versioned') versioned.push(name)
+    if (outcome.kind !== 'kept') continue
+    kept.push(outcome.kept.name)
+    if (!outcome.kept.renamed) unrenamed.push(outcome.kept.name)
+    if (outcome.fellBack != null) fellBack.push({ name, error: outcome.fellBack })
+  }
+  return { updated: done.map(({ name }) => name), versioned, kept, unrenamed, fellBack, failed }
+}
+
+/** Whether the sample at `target` is in a versioned repository; `false` when that is unknown. */
+async function isVersioned(
+  versioning: SampleVersioning | undefined,
+  target: string,
+): Promise<boolean> {
+  if (versioning == null) return false
+  try {
+    return await versioning.isVersioned(target)
+  } catch (error) {
+    logger.warn(`Samples: could not tell whether '${target}' is versioned:`, error)
+    return false
+  }
+}
+
+/**
+ * Make the sample at `target` the bundle `source`, in place: remove `files` (the sample's files in
+ * its last version), copy the bundle in, and keep its labels. What `files` does not name (the
+ * IDE's `.enso/`, what git ignores) is left as it is, and so is the user's copy of a file the
+ * bundle ships in `output/`.
+ */
+async function replaceInPlace(
+  source: string,
+  target: string,
+  files: readonly string[],
+  check: () => Promise<void>,
+): Promise<void> {
+  await check()
+  const labels = await readLabels(target)
+  for (const file of files) await fs.promises.rm(file, { force: true })
+  await removeEmptyFolders(target)
+  await fs.promises.cp(source, target, {
+    recursive: true,
+    force: true,
+    filter: (_, destination) => {
+      const relative = toSlashes(pathModule.relative(target, destination))
+      // The user's copy of a file the bundle ships in `output/` wins, as on a quiet update.
+      return !(
+        isLocalState(relative) &&
+        fs.statSync(destination, { throwIfNoEntry: false })?.isFile() === true
+      )
+    },
+  })
+  if (labels != null) await updatePackageYaml(target, { labels })
+}
+
+/** Remove the empty folders under `directory`, but not hidden ones (the IDE's `.enso/`). */
+async function removeEmptyFolders(directory: string): Promise<void> {
+  for (const entry of await fs.promises.readdir(directory, { withFileTypes: true })) {
+    if (!entry.isDirectory() || isHidden(entry.name)) continue
+    const path = pathModule.join(directory, entry.name)
+    await removeEmptyFolders(path)
+    if ((await fs.promises.readdir(path)).length === 0) await fs.promises.rmdir(path)
+  }
 }
 
 // ===================
@@ -764,8 +910,33 @@ export class LocalSamples {
         await this.installAll(bundle)
         return { installed: true, copied: [], updated: [], updateAvailable: [] }
       }
-      return this.update(bundle, isOpen)
+      await this.clearFailedInstalls()
+      return this.bringUpToDate(bundle, isOpen)
     })
+  }
+
+  /**
+   * Remove what a first install that failed left beside `Samples`: its staging folder
+   * (`.Samples.<pid>.tmp`), when removing it after the failure failed too. `Samples` exists, so no
+   * install is still using one.
+   */
+  private async clearFailedInstalls(): Promise<void> {
+    const parent = pathModule.dirname(this.samplesDirectory)
+    let names: string[]
+    try {
+      names = await fs.promises.readdir(parent)
+    } catch {
+      return
+    }
+    for (const name of names) {
+      const match = LEFTOVER_REGEX.exec(name)
+      if (match?.groups?.['name'] !== SAMPLES_DIRECTORY_NAME || match.groups['kind'] !== 'tmp') {
+        continue
+      }
+      await fs.promises
+        .rm(pathModule.join(parent, name), { recursive: true, force: true })
+        .catch((error: unknown) => logger.warn(`Samples: could not remove '${name}':`, error))
+    }
   }
 
   /** Copy the whole bundle to `Samples`, with its manifest. */
@@ -796,7 +967,7 @@ export class LocalSamples {
   }
 
   /** Bring an existing `Samples` up to date with the bundle. */
-  private async update(bundle: Bundle, isOpen: IsProjectOpen): Promise<SamplesSyncResult> {
+  private async bringUpToDate(bundle: Bundle, isOpen: IsProjectOpen): Promise<SamplesSyncResult> {
     const nothing = { installed: false, copied: [], updated: [], updateAvailable: [] }
     const manifest = await readSamplesManifest(this.samplesDirectory)
     if (manifest === NEWER_MANIFEST) {
@@ -892,7 +1063,7 @@ export class LocalSamples {
    * match the manifest's cache are not read again. A sample that cannot be checked is
    * `unreadable`, and the others are still reported.
    */
-  status(): Promise<SamplesStatus> {
+  status(versioning?: SampleVersioning): Promise<SamplesStatus> {
     return this.serialised(async () => {
       const directory = toSlashes(this.samplesDirectory)
       const bundle = await this.readBundle()
@@ -900,13 +1071,15 @@ export class LocalSamples {
       const manifest = await readSamplesManifest(this.samplesDirectory)
       const newer = manifest === NEWER_MANIFEST
       const hasher = new FileHasher(newer ? {} : manifest?.files)
+      const now = new Date()
       const samples: SampleStatus[] = []
       for (const name of bundle.samples.keys()) {
         const target = this.samplePath(name)
         const bundleHash = bundle.hashes.samples[name]!
         let state: SampleState
+        let disk: DiskHash
         try {
-          const disk = await hashSample(target, hasher, name)
+          disk = await hashSample(target, hasher, name)
           if (newer) {
             // A newer app's records cannot be read: say only whether it is as bundled.
             state =
@@ -929,142 +1102,172 @@ export class LocalSamples {
         } catch (error) {
           logger.warn(`Samples: could not check '${target}':`, error)
           state = 'unreadable'
+          disk = new Unreadable(error)
         }
-        samples.push({ name, path: toSlashes(target), state })
+        const route = await this.routeOf(target, disk, bundleHash, versioning)
+        samples.push({
+          name,
+          path: toSlashes(target),
+          state,
+          route,
+          copyName:
+            route === 'copy' ? pathModule.basename(editedCopyPath(target, now, false)) : null,
+        })
       }
       return { directory, samples }
     })
+  }
+
+  /** How {@link updateSample} would keep the sample at `target`; `null` when nothing is kept. */
+  private async routeOf(
+    target: string,
+    disk: DiskHash,
+    bundleHash: string,
+    versioning: SampleVersioning | undefined,
+  ): Promise<SampleRoute | null> {
+    if (disk === undefined || disk === bundleHash) return null
+    if (disk instanceof Unreadable) return 'copy'
+    return (await isVersioned(versioning, target)) ? 'version' : 'copy'
   }
 
   /** Refuse to change samples whose manifest a newer version of the app wrote. */
   private async requireOwnManifest(): Promise<SamplesManifest | null> {
     const manifest = await readSamplesManifest(this.samplesDirectory)
     if (manifest === NEWER_MANIFEST) {
-      throw new Error('The samples were installed by a newer version of Enso; reset them there.')
+      throw new Error('The samples were installed by a newer version of Enso; update them there.')
     }
     return manifest
   }
 
   /**
-   * Put the sample `name` back to the bundle. A copy that differs from the bundle, or cannot be
-   * read, is kept beside it as `<name>_edited_<date>`, then `_2` and so on.
+   * Replace the sample `name` with the bundle. A copy that differs from it, or cannot be read, is
+   * the user's, and is kept: in a versioned repository (`options.versioning`) its state is saved as
+   * a version first and the sample is updated in place as the next one; otherwise, or when that
+   * first version cannot be saved, it is kept beside it as `<name>_edited_<date>`, then `_2` and so
+   * on, and a fresh copy is installed.
    * @throws {Error} when the sample is not bundled, or is open or opening.
    */
-  reset(
-    name: string,
-    isOpen: IsProjectOpen = async () => false,
-    now = new Date(),
-  ): Promise<SamplesResetResult> {
+  update(name: string, options: SampleChangeOptions = {}): Promise<SamplesUpdateResult> {
     return this.serialised(async () => {
       const bundle = await this.readBundle()
       const source = bundle?.samples.get(name)
       if (bundle == null || source == null) throw new Error(`'${name}' is not a bundled sample.`)
-      const check = () => this.requireNotBusy(name, isOpen, 'resetting it')
+      const isOpen = options.isOpen ?? (async () => false)
+      const check = () => this.requireNotBusy(name, isOpen, 'updating it')
       await check()
       const manifest = await this.requireOwnManifest()
-      const kept = await this.resetSample(name, source, bundle, manifest, now, check)
+      const outcome = await this.updateSample(name, source, bundle, manifest, options, check)
       await this.record(
         { samples: { [name]: bundle.hashes.samples[name]! } },
         withoutPrefix(manifest?.files, `${name}/`),
       )
-      return {
-        kept: kept ? [kept.name] : [],
-        unrenamed: kept && !kept.renamed ? [kept.name] : [],
-        failed: [],
-      }
+      return resultOf([{ name, outcome }], [])
     })
   }
 
   /**
-   * Put every bundled sample and `Data/` file back to the bundle, keeping each edited (or
-   * unreadable) copy beside the original. Samples and files that are not bundled are left alone.
-   * One that fails (a file another program holds) is reported in `failed`; the others are still
-   * reset, and their copies reported and recorded.
-   * @throws {Error} when a bundled sample is open or opening; nothing is changed then.
+   * {@link update} every sample with an update (`updateAvailable` in {@link status}), and no
+   * other. One that fails is reported in `failed`; the others are still updated, and recorded.
+   * @throws {Error} when a sample it would update is open or opening; nothing is changed then.
    */
-  resetAll(
-    isOpen: IsProjectOpen = async () => false,
-    now = new Date(),
-  ): Promise<SamplesResetResult> {
+  updateAll(options: SampleChangeOptions = {}): Promise<SamplesUpdateResult> {
     return this.serialised(async () => {
       const bundle = await this.readBundle()
       if (bundle == null) throw new Error('There are no bundled samples.')
-      const doing = 'resetting the samples'
-      for (const name of bundle.samples.keys()) await this.requireNotBusy(name, isOpen, doing)
-      const manifest = fs.existsSync(this.samplesDirectory) ? await this.requireOwnManifest() : null
-      await fs.promises.mkdir(this.samplesDirectory, { recursive: true })
-      const kept: string[] = []
-      const unrenamed: string[] = []
-      const failed: { name: string; error: string }[] = []
+      if (!fs.existsSync(this.samplesDirectory)) return resultOf([], [])
+      const manifest = await this.requireOwnManifest()
+      const hasher = new FileHasher(manifest?.files)
+      const names: string[] = []
+      for (const name of bundle.samples.keys()) {
+        const comparison = compareSample(
+          bundle.hashes.samples[name]!,
+          await hashSample(this.samplePath(name), hasher, name),
+          recordedHash(manifest?.samples ?? {}, name),
+        )
+        if (comparison.state === 'updateAvailable' || comparison.action === 'update') {
+          names.push(name)
+        }
+      }
+      const isOpen = options.isOpen ?? (async () => false)
+      const doing = 'updating the samples'
+      for (const name of names) await this.requireNotBusy(name, isOpen, doing)
+      const done: { readonly name: string; readonly outcome: UpdateOutcome }[] = []
+      const failed: SampleFailure[] = []
       const samples: Record<string, RecordedHash> = {}
-      const data: Record<string, RecordedHash> = {}
-      for (const [name, source] of bundle.samples) {
+      let files = manifest?.files
+      for (const name of names) {
         try {
           const check = () => this.requireNotBusy(name, isOpen, doing)
-          const copy = await this.resetSample(name, source, bundle, manifest, now, check)
-          if (copy != null) kept.push(copy.name)
-          if (copy != null && !copy.renamed) unrenamed.push(copy.name)
+          const source = bundle.samples.get(name)!
+          const outcome = await this.updateSample(name, source, bundle, manifest, options, check)
+          done.push({ name, outcome })
           samples[name] = bundle.hashes.samples[name]!
+          files = withoutPrefix(files, `${name}/`)
         } catch (error) {
-          logger.error(`Samples: could not reset '${name}':`, error)
-          failed.push({ name, error: error instanceof Error ? error.message : String(error) })
+          logger.error(`Samples: could not update '${name}':`, error)
+          failed.push({ name, error: errorMessage(error) })
         }
       }
-      const hasher = new FileHasher(manifest?.files)
-      for (const [file, source] of bundle.data) {
-        const target = this.dataPath(file)
-        const key = `${SAMPLES_DATA_DIRECTORY_NAME}/${file}`
-        try {
-          const disk = await hashDataFile(target, hasher, key)
-          if (disk !== bundle.hashes.data[file]) {
-            if (disk !== undefined) {
-              // Edited, or unreadable: either way it is the user's, and is kept.
-              const copy = editedCopyPath(target, now, true)
-              await fileOps.rename(target, copy)
-              kept.push(
-                `${SAMPLES_DATA_DIRECTORY_NAME}/${toSlashes(pathModule.relative(this.dataPath(''), copy))}`,
-              )
-            }
-            await replaceWith(source, target)
-          }
-          data[file] = bundle.hashes.data[file]!
-        } catch (error) {
-          logger.error(`Samples: could not reset '${target}':`, error)
-          failed.push({ name: key, error: error instanceof Error ? error.message : String(error) })
-        }
-      }
-      await this.record({ samples, data }, {})
-      return { kept, unrenamed, failed }
+      await this.record({ samples }, files ?? {})
+      return resultOf(done, failed)
     })
   }
 
-  /** Reset one sample (see {@link reset}); returns the edited copy, if one was kept. */
-  private async resetSample(
+  /** Update one sample (see {@link update}). */
+  private async updateSample(
     name: string,
     source: string,
     bundle: Bundle,
     manifest: SamplesManifest | null,
-    now: Date,
-    /** Throws when the sample may not be changed; asked again just before each rename. */
+    options: SampleChangeOptions,
+    /** Throws when the sample may not be changed; asked again just before each change. */
     check: () => Promise<void>,
-  ): Promise<{ readonly name: string; readonly renamed: boolean } | null> {
+  ): Promise<UpdateOutcome> {
     const target = this.samplePath(name)
+    const bundleHash = bundle.hashes.samples[name]!
     const disk = await hashSample(target, new FileHasher(manifest?.files), name)
     if (disk === undefined) {
       await replaceWith(source, target, check)
-      return null
+      return { kind: 'fresh' }
     }
-    if (disk === bundle.hashes.samples[name]) {
+    if (disk === bundleHash) {
       // Already as bundled: refresh it, keeping its id, outputs and labels.
       await replaceWith(source, target, async (staging) => {
         await carryLocalState(target, staging)
         await check()
       })
-      return null
+      return { kind: 'fresh' }
     }
     // Edited, or unreadable: either way it is the user's, and is kept.
+    let fellBack: string | null = null
+    if ((await this.routeOf(target, disk, bundleHash, options.versioning)) === 'version') {
+      try {
+        await options.versioning!.replaceAsVersion(
+          target,
+          (files) => replaceInPlace(source, target, files, check),
+          { before: BEFORE_UPDATE_MESSAGE, after: updatedMessage(name) },
+        )
+        return { kind: 'versioned' }
+      } catch (error) {
+        if (!(error instanceof VersionSaveError)) throw error
+        logger.warn(`Samples: could not save '${name}' as a version; keeping a copy:`, error)
+        fellBack = error.message
+      }
+    }
+    const kept = await this.keepAndReplace(name, source, options.now ?? new Date(), check)
+    return { kind: 'kept', kept, fellBack }
+  }
+
+  /** Keep the sample `name` as an edited copy, and install the bundle in its place. */
+  private async keepAndReplace(
+    name: string,
+    source: string,
+    now: Date,
+    check: () => Promise<void>,
+  ): Promise<KeptCopy> {
+    const target = this.samplePath(name)
     const staging = await stage(source, target)
-    let kept: { readonly name: string; readonly renamed: boolean }
+    let kept: KeptCopy
     try {
       await check()
       kept = await keepEditedSample(target, now)

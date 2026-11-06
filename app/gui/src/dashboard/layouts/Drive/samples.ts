@@ -1,11 +1,14 @@
 /**
  * @file The bundled samples in the drive (`<projects>/Samples`): which rows are samples, which
- * have an update (an edited sample whose bundle changed), and the two resets. The shim does the
- * work (`project-manager-shim/src/samples`); a host without it (the browser dev server without a
- * bundle) answers with an error, and the drive then treats no row as a sample.
+ * have an update (an edited sample whose bundle changed), and the updates: Update Sample (the
+ * "Update available" pill and the context menu) and Update All (the toolbar, in `Samples`). The
+ * shim does the work (`project-manager-shim/src/samples`); a host without it (the browser dev
+ * server without a bundle) answers with an error, and the drive then treats no row as a sample.
  */
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
+import UpdateSamplesModal from '#/layouts/Drive/UpdateSamplesModal.vue'
 import { useBackends } from '$/providers/backends'
+import { useModals } from '$/providers/modals'
 import { useOpenedProjects } from '$/providers/openedProjects'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
@@ -15,7 +18,9 @@ import {
   AssetType,
   BackendType,
   extractTypeAndPath,
+  IS_OPENING_OR_OPENED,
   type AnyAsset,
+  type DirectoryId,
 } from 'enso-common/src/services/Backend'
 import type { SamplesStatus } from 'enso-common/src/services/ProjectManager/types'
 import { computed } from 'vue'
@@ -55,47 +60,57 @@ export function useSamples() {
     return path == null ? null : (byPath.value.get(path) ?? null)
   }
 
-  /** Whether a row is the `Samples` folder. */
-  const isSamplesDirectory = (asset: AnyAsset): boolean => {
-    if (asset.type !== AssetType.directory || status.value == null) return false
-    if (status.value.samples.length === 0) return false
-    return assetPath(asset) === comparablePath(status.value.directory)
+  /** Whether the folder `id` is the `Samples` folder. */
+  const isSamplesDirectoryId = (id: DirectoryId): boolean => {
+    if (status.value == null || status.value.samples.length === 0) return false
+    return assetPath({ id }) === comparablePath(status.value.directory)
   }
 
-  return { status, sampleOf, isSamplesDirectory }
+  /** The samples with an update. */
+  const withUpdates = computed(() =>
+    (status.value?.samples ?? []).filter((sample) => sample.state === 'updateAvailable'),
+  )
+
+  return { status, sampleOf, isSamplesDirectoryId, withUpdates }
 }
 
-/** Whether an asset row's project has an update: an edited sample whose bundle changed. */
-export function useSampleUpdateAvailable(asset: () => AnyAsset) {
+/** The bundled sample a project row is, if it has an update (an edited sample whose bundle changed). */
+export function useSampleWithUpdate(asset: () => AnyAsset) {
   const { sampleOf } = useSamples()
-  return computed(() => sampleOf(asset())?.state === 'updateAvailable')
-}
-
-/** Whether a project opened by this app is one of the bundled samples (or under `Samples`). */
-export function useOpenSamples() {
-  const openedProjects = useOpenedProjects()
-  const { status } = useSamples()
   return computed(() => {
-    const directory = status.value && comparablePath(status.value.directory)
-    if (directory == null) return false
-    for (const project of openedProjects.listProjects()) {
-      if (project.state.status === 'not-opened' && project.nextTask == null) continue
-      const path = assetPath(project.state.info)
-      if (path != null && path.startsWith(`${directory}/`)) return true
-    }
-    return false
+    const sample = sampleOf(asset())
+    return sample?.state === 'updateAvailable' ? sample : null
   })
 }
 
-/** The two resets: one sample, and every sample with `Data/`. Each tells what it kept. */
-export function useResetSamples() {
+/** Whether a project row is open or opening, which keeps a sample from being updated. */
+export function isOpenOrOpening(asset: AnyAsset): boolean {
+  return asset.type === AssetType.project && IS_OPENING_OR_OPENED[asset.projectState.type]
+}
+
+/** The paths of the projects this app has open or opening, with `/` separators. */
+function useOpenProjectPaths() {
+  const openedProjects = useOpenedProjects()
+  return computed(() => {
+    const paths = new Set<string>()
+    for (const project of openedProjects.listProjects()) {
+      if (project.state.status === 'not-opened' && project.nextTask == null) continue
+      const path = assetPath(project.state.info)
+      if (path != null) paths.add(path)
+    }
+    return paths
+  })
+}
+
+/** Update Sample and Update All, unconfirmed. Each says what it did in toasts. */
+export function useUpdateSamples() {
   const backends = useBackends()
   const queryClient = useQueryClient()
   const toasts = useToasts()
   const toastAndLog = useToastAndLog()
   const { getText } = useText()
 
-  /** Refetch the samples' states and the listings, after a reset (or a failed one). */
+  /** Refetch the samples' states and the listings, after an update (or a failed one). */
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: SAMPLES_STATUS_QUERY_KEY }),
@@ -103,100 +118,150 @@ export function useResetSamples() {
     ])
   }
 
-  /** Warn about kept copies that still have their sample's project name. */
-  const warnUnrenamed = (unrenamed: readonly string[]) => {
-    for (const copy of unrenamed) {
-      toasts.show(getText('resetSampleUnrenamed', copy), { type: 'warning' })
+  /** Warn about kept copies that still have their sample's name, and versions not saved. */
+  const warn = (result: {
+    readonly unrenamed: readonly string[]
+    readonly fellBack: readonly { readonly name: string; readonly error: string }[]
+  }) => {
+    for (const { name, error } of result.fellBack) {
+      toasts.show(getText('updateSampleFellBack', name, error), { type: 'warning' })
+    }
+    for (const copy of result.unrenamed) {
+      toasts.show(getText('updateSampleUnrenamed', copy), { type: 'warning' })
     }
   }
 
-  /** Reset the sample `name`, and say what was kept. */
-  const resetSample = async (name: string) => {
+  /** Update the sample `name`, and say how its edits were kept. */
+  const updateSample = async (name: string) => {
     const backend = backends.localBackend
     if (backend == null) return
     try {
-      const { kept, unrenamed } = await backend.resetSample(name)
+      const result = await backend.updateSample(name)
+      const kept = result.kept[0]
       toasts.show(
-        kept[0] != null ?
-          getText('resetSampleKept', name, kept[0])
-        : getText('resetSampleDone', name),
+        kept != null ? getText('updateSampleKept', name, kept)
+        : result.versioned.length > 0 ? getText('updateSampleVersioned', name)
+        : getText('updateSampleDone', name),
         { type: 'success' },
       )
-      warnUnrenamed(unrenamed)
+      warn(result)
     } catch (error) {
-      toastAndLog('resetSampleError', error, name)
+      toastAndLog('updateSampleError', error, name)
     } finally {
       await refresh()
     }
   }
 
-  /** Reset every sample and `Data/` file, and say what was kept. */
-  const resetAllSamples = async () => {
+  /** Update every sample with an update, and say how their edits were kept. */
+  const updateAllSamples = async () => {
     const backend = backends.localBackend
     if (backend == null) return
     try {
-      const { kept, unrenamed, failed } = await backend.resetAllSamples()
-      if (failed.length === 0) {
-        toasts.show(
-          kept.length > 0 ?
-            getText('resetAllSamplesKept', kept.join(', '))
-          : getText('resetAllSamplesDone'),
-          { type: 'success' },
-        )
+      const result = await backend.updateAllSamples()
+      // Where the edits went, in one toast with what was updated.
+      const kept = [
+        ...(result.versioned.length > 0 ?
+          [getText('updateAllSamplesVersioned', result.versioned.join(', '))]
+        : []),
+        ...(result.kept.length > 0 ?
+          [getText('updateAllSamplesKept', result.kept.join(', '))]
+        : []),
+      ]
+      if (result.failed.length === 0) {
+        const done = getText('updateAllSamplesDone', result.updated.join(', '))
+        toasts.show([done, ...kept].join(' '), { type: 'success' })
       } else {
-        // Not "Reset the samples": some, perhaps all, were not. Say what failed, and what was kept.
-        const failures = failed.map(({ name, error }) => `${name} (${error})`).join('; ')
-        toastAndLog(null, getText('resetAllSamplesFailed', failures))
-        if (kept.length > 0) {
-          toasts.show(getText('resetAllSamplesPartlyKept', kept.join(', ')), { type: 'info' })
-        }
+        // Not "Updated the samples": some, perhaps all, were not. Say what failed.
+        const failures = result.failed.map(({ name, error }) => `${name} (${error})`).join('; ')
+        toastAndLog(null, getText('updateAllSamplesFailed', failures))
+        if (kept.length > 0) toasts.show(kept.join(' '), { type: 'info' })
       }
-      warnUnrenamed(unrenamed)
+      warn(result)
     } catch (error) {
-      toastAndLog('resetAllSamplesError', error)
+      toastAndLog('updateAllSamplesError', error)
     } finally {
       await refresh()
     }
   }
 
-  return { resetSample, resetAllSamples }
+  return { updateSample, updateAllSamples }
 }
 
 /**
- * The context menu's sample entries for `asset`: Reset Sample on a bundled sample, Reset All
- * Samples on the `Samples` folder. Each is disabled, with a tooltip saying why, while a sample it
- * would change is open.
+ * Update Sample and Update All, each after a confirmation that says how every sample's edits
+ * will be kept. A sample with no edits of the user's is updated without one.
+ */
+export function useConfirmedSampleUpdates() {
+  const modals = useModals()
+  const { updateSample, updateAllSamples } = useUpdateSamples()
+
+  /** Update `sample`, asking first when it has edits to keep. */
+  const confirmUpdateSample = (sample: SampleEntry) => {
+    if (sample.route == null) {
+      void updateSample(sample.name)
+      return
+    }
+    modals.open(UpdateSamplesModal, {
+      samples: [sample],
+      onConfirm: () => updateSample(sample.name),
+    })
+  }
+
+  /** Update the samples with an update, `samples`, after asking. */
+  const confirmUpdateAll = (samples: readonly SampleEntry[]) => {
+    modals.open(UpdateSamplesModal, { samples, onConfirm: updateAllSamples })
+  }
+
+  return { confirmUpdateSample, confirmUpdateAll }
+}
+
+/**
+ * The context menu's entry for `asset`: Update Sample on a bundled sample, disabled, with a
+ * tooltip saying why, while it is open.
  */
 export function useSampleMenuEntries(asset: () => AnyAsset, isRunningProject: () => boolean) {
   const { getText } = useText()
   const samples = useSamples()
-  const openSamples = useOpenSamples()
-  const { resetSample, resetAllSamples } = useResetSamples()
+  const { confirmUpdateSample } = useConfirmedSampleUpdates()
   return computed((): ContextMenuEntry[] => {
-    const entries: ContextMenuEntry[] = []
     const sample = samples.sampleOf(asset())
-    if (sample != null) {
-      const isOpen = isRunningProject()
-      entries.push({
-        action: 'resetSample',
+    if (sample == null) return []
+    const isOpen = isRunningProject()
+    return [
+      {
+        action: 'updateSample',
         isDisabled: isOpen,
-        tooltip: isOpen ? getText('resetSampleOpenTooltip') : undefined,
+        tooltip: isOpen ? getText('updateSampleOpenTooltip') : undefined,
         doAction: () => {
-          void resetSample(sample.name)
+          confirmUpdateSample(sample)
         },
-      })
-    }
-    if (samples.isSamplesDirectory(asset())) {
-      const isOpen = openSamples.value
-      entries.push({
-        action: 'resetAllSamples',
-        isDisabled: isOpen,
-        tooltip: isOpen ? getText('resetAllSamplesOpenTooltip') : undefined,
-        doAction: () => {
-          void resetAllSamples()
-        },
-      })
-    }
-    return entries
+      },
+    ]
   })
+}
+
+/**
+ * The toolbar's Update All button in the folder `directoryId`: shown only in `Samples`, disabled,
+ * with a tooltip saying why, when no sample has an update or one that has is open.
+ */
+export function useUpdateAllButton(directoryId: () => DirectoryId) {
+  const { getText } = useText()
+  const samples = useSamples()
+  const openPaths = useOpenProjectPaths()
+  const { confirmUpdateAll } = useConfirmedSampleUpdates()
+  const isShown = computed(() => samples.isSamplesDirectoryId(directoryId()))
+  const disabledReason = computed(() => {
+    const toUpdate = samples.withUpdates.value
+    if (toUpdate.length === 0) return getText('updateAllSamplesNoneTooltip')
+    const isOpen = toUpdate.some((sample) => openPaths.value.has(comparablePath(sample.path)))
+    return isOpen ? getText('updateAllSamplesOpenTooltip') : null
+  })
+  return {
+    isShown,
+    isDisabled: computed(() => disabledReason.value != null),
+    tooltip: computed(() => disabledReason.value ?? getText('updateAllSamplesTooltip')),
+    run: () => {
+      confirmUpdateAll(samples.withUpdates.value)
+    },
+  }
 }

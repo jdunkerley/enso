@@ -145,6 +145,8 @@ const LOCAL_SECRETS_ROUTES: Readonly<Record<string, RouteHandler<SecretsContext>
 interface SamplesContext {
   readonly samples: LocalSamples
   readonly getProjectService: () => Promise<ProjectService>
+  /** Without it, every edited sample is kept as an edited copy. */
+  readonly versioning: LocalVersioning | undefined
 }
 
 /** Whether a project is open or opening in the project service, by its path. */
@@ -152,13 +154,16 @@ function isOpenIn(getProjectService: () => Promise<ProjectService>): IsProjectOp
   return async (projectPath) => (await getProjectService()).isProjectOpenOrOpening(projectPath)
 }
 
-/** The routes served by {@link LocalSamples}. The resets refuse an open sample. */
+/** The routes served by {@link LocalSamples}. The updates refuse an open sample. */
 const SAMPLES_ROUTES: Readonly<Record<string, RouteHandler<SamplesContext>>> = {
-  'samples/status': ({ samples }) => samples.status(),
-  'samples/reset': ({ samples, getProjectService }, body) =>
-    samples.reset(requireString(body, 'name'), isOpenIn(getProjectService)),
-  'samples/reset-all': ({ samples, getProjectService }) =>
-    samples.resetAll(isOpenIn(getProjectService)),
+  'samples/status': ({ samples, versioning }) => samples.status(versioning),
+  'samples/update': ({ samples, getProjectService, versioning }, body) =>
+    samples.update(requireString(body, 'name'), {
+      isOpen: isOpenIn(getProjectService),
+      versioning,
+    }),
+  'samples/update-all': ({ samples, getProjectService, versioning }) =>
+    samples.updateAll({ isOpen: isOpenIn(getProjectService), versioning }),
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -332,7 +337,11 @@ export async function handleProjectServiceRequest(
         request,
         response,
         routeName,
-        (samples, body) => SAMPLES_ROUTES[routeName]!({ samples, getProjectService }, body),
+        (samples, body) =>
+          SAMPLES_ROUTES[routeName]!(
+            { samples, getProjectService, versioning: localVersioning },
+            body,
+          ),
         localSamples,
         'The bundled samples are not available in this host.',
         headers,

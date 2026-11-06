@@ -289,7 +289,7 @@ export type LocalSecretsStatus = (
 
 /**
  * A bundled sample's state in `<projects>/Samples`: as bundled, edited by the user, edited with a
- * changed bundle to reset to, or deleted (reset brings it back).
+ * changed bundle to update to, deleted, or unreadable.
  */
 export type SampleState = 'current' | 'edited' | 'updateAvailable' | 'missing' | 'unreadable'
 
@@ -301,15 +301,27 @@ export interface SamplesStatus {
     readonly name: string
     readonly path: Path
     readonly state: SampleState
+    /**
+     * How an update keeps the user's edits: in version history (`version`), or as the copy
+     * `copyName` (`copy`); `null` when there are none.
+     */
+    readonly route: 'version' | 'copy' | null
+    readonly copyName: string | null
   }[]
 }
 
-/** What a reset of samples did: the names its edited copies were kept under. */
-export interface SamplesResetResult {
+/** What an update of samples did. */
+export interface SamplesUpdateResult {
+  readonly updated: readonly string[]
+  /** Samples updated as a new version, their edits saved as the version before. */
+  readonly versioned: readonly string[]
+  /** The names edited copies were kept under. */
   readonly kept: readonly string[]
   /** Kept copies whose `package.yaml` still has the sample's name: the user should rename them. */
   readonly unrenamed: readonly string[]
-  /** What Reset All could not reset (samples by name, `Data/` files as `Data/<file>`), and why. */
+  /** Versioned samples whose edits could not be saved as a version, so a copy was kept; and why. */
+  readonly fellBack: readonly { readonly name: string; readonly error: string }[]
+  /** What Update All could not update, and why. */
   readonly failed: readonly { readonly name: string; readonly error: string }[]
 }
 

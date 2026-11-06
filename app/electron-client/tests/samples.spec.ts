@@ -1,7 +1,8 @@
 /**
  * @file The bundled samples against the real shim: the first start writes the manifest, opening a
- * sample is not an edit, an edited sample whose bundle changed has the "Update available" badge,
- * and Reset Sample keeps the edited copy beside a fresh one (`project-manager-shim/src/samples`).
+ * sample is not an edit, an edited sample whose bundle changed has the "Update available" pill,
+ * and updating it from the pill (outside version control) keeps the edited copy beside a fresh
+ * one (`project-manager-shim/src/samples`).
  */
 import fs from 'node:fs/promises'
 import pathModule from 'node:path'
@@ -81,7 +82,7 @@ test.describe('opening a sample', () => {
   })
 })
 
-test('An edited sample whose bundle changed can be reset, keeping the edit', async ({
+test('An edited sample whose bundle changed is updated from its pill, keeping the edit', async ({
   page,
   projectsDir,
 }) => {
@@ -106,8 +107,9 @@ test('An edited sample whose bundle changed can be reset, keeping the edit', asy
   await expect(assetRow(page, 'Text_Cleaning').getByTestId('sample-update-badge')).toHaveCount(0)
 
   const kept = `Sales_Overview_edited_${dateStamp()}`
-  await row.click({ button: 'right' })
-  await page.getByRole('button', { name: 'Reset Sample' }).click()
+  await row.getByTestId('sample-update-badge').click()
+  await expect(page.getByRole('alertdialog')).toContainText(`kept as '${kept}'`)
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Update' }).click()
   await expect(page.getByText(`Your edited copy is kept as '${kept}'`)).toBeVisible()
   await expect(row.getByTestId('sample-update-badge')).toHaveCount(0)
   await expect(assetRow(page, kept)).toBeVisible()

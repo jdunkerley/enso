@@ -9,14 +9,37 @@ target location), `driveActions.ts`, `assetItems.ts`, `suggestions.ts`,
 
 `samples.ts` is the bundled samples (`<projects>/Samples`): the shim's
 `samples/status` (query options in `$/utils/samplesQuery.ts`) says which project
-rows are bundled samples and which have an update. `ProjectNameColumn.vue` shows
-the "Update available" badge (`data-testid="sample-update-badge"`), and
-`AssetContextMenu.vue` adds Reset Sample to a sample and Reset All Samples to
-the `Samples` folder (`useSampleMenuEntries`), disabled with a tooltip while the
-sample, or any project under `Samples`, is open. A host without samples (the
-Vite dev server) answers with an error, read as no samples. The Playwright mock
-is `integration-test/mock/localSamples.ts` (no samples unless a spec adds them);
-the spec is `dashboard/localSamples.spec.ts`.
+rows are bundled samples, which have an update, and how an update would keep
+each one's edits (`route`: in version history, or as the copy `copyName`). The
+user-facing word is "Update", never "Reset" (owner's ruling on #622):
+
+- **The pill.** `ProjectNameColumn.vue` shows "Update available" on a sample
+  with an update, as a `Button` (`testId="sample-update-badge"`, an `aria-label`
+  naming the sample, a focus ring) that binds `STOP_PRESS_PROPAGATION`, so a
+  press neither selects nor opens the row. It is disabled, with a tooltip, while
+  the project is open or opening (`isOpenOrOpening`, the context menu's test).
+- **Update Sample** in a sample's context menu (`useSampleMenuEntries`,
+  `AssetContextMenu.vue`), disabled the same way. The pill and the entry both go
+  through `useConfirmedSampleUpdates`: a sample with edits of the user's
+  (`route` not `null`) is updated only after `UpdateSamplesModal.vue` says how
+  they are kept ("Your current version stays in version history", or "Your
+  edited copy will be kept as …"); one with none is updated at once.
+- **Update All** in the toolbar (`DriveBarToolbar.vue`, `useUpdateAllButton`,
+  `testId="update-all-samples"`), shown only while the current folder is the
+  installed `Samples`; disabled, with a tooltip, when no sample has an update or
+  one that has is open. Its confirmation lists each sample with an update and
+  its route; the shim updates exactly those (`samples/update-all`).
+- **Toasts** (`useUpdateSamples`) say what happened: updated, the previous
+  version in version history, or the copy kept; a warning for a copy kept
+  because the version could not be saved (`fellBack`) and for a copy still named
+  as its sample (`unrenamed`); for Update All, what failed.
+
+There is no Reset All: a user who wants a sample's original back restores it
+from version history. A host without samples (the Vite dev server) answers with
+an error, read as no samples. The Playwright mock is
+`integration-test/mock/localSamples.ts` (no samples unless a spec adds them;
+`route: 'version'` makes one versioned); the spec is
+`dashboard/localSamples.spec.ts`.
 
 ## The table's accessibility model (#208)
 

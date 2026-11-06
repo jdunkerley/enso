@@ -504,43 +504,57 @@ describe('secrets routes', () => {
 })
 
 describe('samples routes', () => {
+  /** `One` installed and edited, with a new bundle: it has an update. */
   async function setUpSamples() {
     const bundled = path.join(root, 'bundle')
     await fs.mkdir(path.join(bundled, 'One', 'src'), { recursive: true })
     await fs.writeFile(path.join(bundled, 'One', 'package.yaml'), 'name: One\n')
     await fs.writeFile(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 1\n')
     const projects = path.join(root, 'projects')
+    await new LocalSamples(bundled, projects).sync()
+    const directory = path.join(projects, 'Samples')
+    await fs.writeFile(path.join(directory, 'One', 'src', 'Main.enso'), 'main = 2\n')
+    await fs.writeFile(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
     samples = new LocalSamples(bundled, projects)
-    await samples.sync()
-    return path.join(projects, 'Samples')
+    return directory
   }
 
-  test('status, reset and reset-all', async () => {
+  test('status, update and update-all', async () => {
     const directory = await setUpSamples()
-    await fs.writeFile(path.join(directory, 'One', 'src', 'Main.enso'), 'main = 2\n')
     expect((await call('samples/status', {})).result).toEqual({
       directory: directory.replace(/\\/g, '/'),
-      samples: [{ name: 'One', path: expect.stringMatching(/\/One$/), state: 'edited' }],
+      samples: [
+        {
+          name: 'One',
+          path: expect.stringMatching(/\/One$/),
+          state: 'updateAvailable',
+          route: 'copy',
+          copyName: expect.stringMatching(/^One_edited_\d{4}_\d\d_\d\d$/),
+        },
+      ],
     })
-    const reset = (await call('samples/reset', { name: 'One' })).result as { kept: string[] }
-    expect(reset.kept).toEqual([expect.stringMatching(/^One_edited_\d{4}_\d\d_\d\d$/)])
+    const update = (await call('samples/update', { name: 'One' })).result as { kept: string[] }
+    expect(update.kept).toEqual([expect.stringMatching(/^One_edited_\d{4}_\d\d_\d\d$/)])
     expect(await fs.readFile(path.join(directory, 'One', 'src', 'Main.enso'), 'utf8')).toBe(
-      'main = 1\n',
+      'main = 10\n',
     )
-    expect((await call('samples/reset-all', {})).result).toEqual({
+    expect((await call('samples/update-all', {})).result).toEqual({
+      updated: [],
+      versioned: [],
       kept: [],
       unrenamed: [],
+      fellBack: [],
       failed: [],
     })
   })
 
-  test('the resets refuse an open sample', async () => {
+  test('the updates refuse an open sample', async () => {
     const directory = await setUpSamples()
     running = true
-    expect((await call('samples/reset', { name: 'One' })).error).toMatchObject({
+    expect((await call('samples/update', { name: 'One' })).error).toMatchObject({
       message: expect.stringContaining('is open'),
     })
-    expect((await call('samples/reset-all', {})).error).toMatchObject({
+    expect((await call('samples/update-all', {})).error).toMatchObject({
       message: expect.stringContaining('is open'),
     })
     expect(runningAsked).toContain(`${directory}/One`.replace(/\\/g, '/'))
