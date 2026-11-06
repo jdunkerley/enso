@@ -117,13 +117,29 @@ describe('Sample projects', () => {
       electronBuilder.Platform.LINUX,
       electronBuilder.Platform.MAC,
     ]) {
-      expect(configFor(platform).extraResources).toContainEqual({ from: 'samples/', to: 'samples' })
+      // `samples/CLAUDE.md` is for contributors, so it is left out of the package.
+      expect(configFor(platform).extraResources).toContainEqual({
+        from: 'samples/',
+        to: 'samples',
+        filter: ['**/*', '!CLAUDE.md'],
+      })
     }
   })
 
-  test('are each a project with a Main module', () => {
+  test('are each a project with a Main module, beside the shared Data folder', () => {
     const samples = path.join(__dirname, '..', '..', 'samples')
-    const projects = fs.readdirSync(samples)
+    const entries = fs.readdirSync(samples, { withFileTypes: true })
+    // Everything shipped is a directory, apart from the contributor notes left out above.
+    expect(entries.filter((entry) => !entry.isDirectory()).map((entry) => entry.name)).toEqual([
+      'CLAUDE.md',
+    ])
+    // `Data/` holds the inputs the samples share (`Samples/Data`); it is a folder, not a project.
+    const data = path.join(samples, 'Data')
+    expect(fs.existsSync(path.join(data, 'package.yaml'))).toBe(false)
+    expect(fs.readdirSync(data).length).toBeGreaterThan(0)
+    const projects = entries
+      .filter((entry) => entry.isDirectory() && entry.name !== 'Data')
+      .map((entry) => entry.name)
     expect(projects.length).toBeGreaterThan(0)
     for (const project of projects) {
       expect(fs.existsSync(path.join(samples, project, 'package.yaml'))).toBe(true)
