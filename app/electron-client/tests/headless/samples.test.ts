@@ -15,6 +15,8 @@ const samples = fs
   .filter((entry) => entry.isDirectory() && entry.name !== DATA_DIRECTORY)
   .map((entry) => entry.name)
 
+/** The sample a fresh install opens. */
+const WELCOME_SAMPLE = 'Getting_Started'
 const METADATA_MARKER = '\n#### METADATA ####\n'
 const MAX_LINE_LENGTH = 100
 /** How a sample names one of the shared inputs: relative to `Samples`, not to the project. */
@@ -183,6 +185,33 @@ describe('bundled samples', () => {
 
   test.each(samples)('%s keeps no data of its own', (sample) => {
     expect(fs.existsSync(path.join(samplesDirectory, sample, 'data'))).toBe(false)
+  })
+
+  // A fresh install opens it (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in the GUI's
+  // `router/dashboardGuards.ts`), so it must be bundled, and it shows its result as a chart.
+  test(`${WELCOME_SAMPLE}, the sample a fresh install opens, ends on a chart`, () => {
+    expect(samples).toContain(WELCOME_SAMPLE)
+    const main = readMain(WELCOME_SAMPLE)
+    const trailer = main.slice(main.indexOf(METADATA_MARKER) + METADATA_MARKER.length)
+    const [idMap, ideMetadata] = trailer.split('\n')
+    const result = mainBody(WELCOME_SAMPLE).result
+    const source = code(WELCOME_SAMPLE)
+    // The node returned by `main`: the id of the span of its expression in the id map.
+    const line = new RegExp(`^ {4}${result} = (.+)$`, 'm').exec(source)!
+    const offset = line.index + line[0].indexOf(line[1]!)
+    const spans = JSON.parse(idMap!) as [
+      { index: { value: number }; size: { value: number } },
+      string,
+    ][]
+    const id = spans.find(
+      ([span]) => span.index.value === offset && span.size.value === line[1]!.length,
+    )?.[1]
+    expect(id, `no id for the expression of '${result}'`).toBeDefined()
+    const node = JSON.parse(ideMetadata!).ide.node[id!] as {
+      visualization?: { name?: string; show?: boolean }
+    }
+    expect(node.visualization?.show).toBe(true)
+    expect(node.visualization?.name).toBe('Scatter Plot')
   })
 
   test('Samples/Data holds every file the samples read, and nothing else', () => {

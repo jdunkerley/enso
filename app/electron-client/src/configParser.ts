@@ -39,6 +39,10 @@ const OPTIONS_META: Readonly<Record<string, { flag: string; description: string 
     flag: '--startup.project <name>',
     description: 'Project to open or create at startup',
   },
+  'startup.welcomeProject': {
+    flag: '--no-welcome-project',
+    description: 'Do not open the Getting_Started sample on a fresh install',
+  },
   'server.port': {
     flag: '--server.port',
     description: 'Port to use (fallbacks to next available if busy)',

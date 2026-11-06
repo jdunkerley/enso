@@ -109,6 +109,25 @@ interface ParsedArguments {
  * The Electron application. It is responsible for starting all the required services, and
  * displaying and managing the app window.
  */
+/** How long the window waits for the bundled samples to be installed before it loads anyway. */
+const SAMPLES_INSTALL_WAIT_MS = 10_000
+
+/** Wait for `promise`, but at most `ms`; call `onTimeout` when the time runs out first. */
+async function waitAtMost(promise: Promise<unknown>, ms: number, onTimeout: () => void) {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      onTimeout()
+      resolve()
+    }, ms)
+  })
+  try {
+    await Promise.race([promise, timeout])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 class App {
   window: import('electron').BrowserWindow | null = null
   server: Server | null = null
@@ -117,6 +136,11 @@ class App {
   electron: Electron | undefined = undefined
   electronIsDev: boolean = false
   parsedArguments: ParsedArguments | null = null
+  /**
+   * Settles once the bundled samples are installed (or found already there). The dashboard waits
+   * for it: on a fresh install it opens `Samples/Getting_Started`, which must exist by then.
+   */
+  samplesInstalled: Promise<unknown> = Promise.resolve()
 
   async init() {
     this.electronIsDev =
@@ -251,6 +275,9 @@ class App {
     })()
 
     const installSamplesPromise = installSamples(samplesPath(electron, electronIsDev))
+    this.samplesInstalled = installSamplesPromise.catch((error: unknown) => {
+      console.error('Failed to install the bundled samples.', error)
+    })
 
     return Promise.allSettled([writeVersionInfoPromise, installSamplesPromise])
   }
@@ -332,6 +359,15 @@ class App {
       console.log('Starting the application with args', args)
       await this.createWindowIfEnabled(args)
       initIpc(this.window, this.electron, this.electronIsDev)
+      // A fresh install opens a bundled sample, so the samples must be in place first. A copy
+      // that hangs (antivirus, a network drive) must not leave the window blank: after a while
+      // the dashboard loads anyway, and finds no `Getting_Started` to open.
+      await waitAtMost(this.samplesInstalled, SAMPLES_INSTALL_WAIT_MS, () => {
+        console.warn(
+          `The bundled samples were not installed within ${SAMPLES_INSTALL_WAIT_MS} ms; ` +
+            'loading the window without waiting for them.',
+        )
+      })
       await this.loadWindowContent(args)
       // Once the window is up: a JDK AOT training, if one is needed, runs behind the dashboard.
       startJvmAotCache()

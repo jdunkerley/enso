@@ -18,6 +18,17 @@ Data/                    the shared inputs: installed as <projects>/Samples/Data
   output/                what the sample writes (only a sample that writes; holds README.txt)
 ```
 
+`Getting_Started` is the sample a fresh install opens, once: the dashboard opens
+it when the projects folder holds nothing but `Samples`, `Samples` holds it, the
+Drive was never browsed and it was never opened this way before (a
+`localStorage` key); see `app/gui/src/router/dashboardGuards.ts`. The
+`--no-welcome-project` flag turns it off, and the Playwright fixture passes it
+except in the spec that checks the landing. Keep it short, its docblock a
+step-by-step walk through the graph, and its last node shown as a chart (the
+headless test checks the stored Scatter Plot). Renaming it means changing
+`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` and the welcome tab name in
+`tests/electronTest.ts`.
+
 `Data/` is not a project (it has no `package.yaml`), so the Drive lists it as a
 plain folder. Every file in it is read by some sample, and every file a sample
 reads is in it (`tests/headless/samples.test.ts`). The data is synthetic.

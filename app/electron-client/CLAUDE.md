@@ -72,13 +72,19 @@ desktop binary (AppImage/DMG/exe + installer).
   `project-manager-shim`, called from `onStart`): `samples/` in this package is
   shipped as `resources/samples` (`extraResources`) and copied to
   `<projects>/Samples` only when that directory is missing. Nothing is
-  downloaded. The samples are original and use synthetic data; each is a project
-  that reads the shared `samples/Data` folder (installed as `Samples/Data`) and
-  writes to its own `output/`. Their layout, house style, how to regenerate
-  their stored node positions and how to run them are in `samples/CLAUDE.md`
-  (checked by `tests/headless/samples.test.ts`). They must run on the current
-  engine, so re-run them with `enso --run` after a standard-library change that
-  touches `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
+  downloaded. `main` waits for the copy (at most 10 s, then loads anyway, and
+  logs a failed copy) before it loads the window, because on a fresh install the
+  dashboard opens `Samples/Getting_Started` once
+  (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in the GUI's
+  `router/dashboardGuards.ts`; `--no-welcome-project` turns it off, and the
+  Playwright fixture passes it unless a spec sets `welcomeProject`). The samples
+  are original and use synthetic data; each is a project that reads the shared
+  `samples/Data` folder (installed as `Samples/Data`) and writes to its own
+  `output/`. Their layout, house style, how to regenerate their stored node
+  positions and how to run them are in `samples/CLAUDE.md` (checked by
+  `tests/headless/samples.test.ts`). They must run on the current engine, so
+  re-run them with `enso --run` after a standard-library change that touches
+  `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
   Playwright spec adds its own `tests/fixtures/sample_bank_data.xlsx` to
   `Samples/Data` (`addBankData`).
 - Streams the open project's engine log to the window
