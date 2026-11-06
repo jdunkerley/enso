@@ -10,8 +10,19 @@ import { errorCode } from '../localMetadata/jsonFile.js'
 
 /** The lock file's name. */
 export const LOCK_FILE_NAME = 'train.lock'
-/** A lock moved aside by a takeover is `<lock>.stale-<pid>-<time>` until it is deleted. */
+/**
+ * The file a process creates exclusively before it may inspect, take over, touch or release the
+ * lock (Note [Takeovers Are Serialised]).
+ */
+export const TAKEOVER_SUFFIX = '.takeover'
+/**
+ * Earlier versions moved a stale lock aside to `<lock>.stale-<pid>-<time>`; such files left by a
+ * crash are still cleaned up.
+ */
 const STALE_INFIX = '.stale-'
+/** How often, and how many times, a release waits for a takeover under way to finish. */
+const RELEASE_RETRY_MS = 50
+const RELEASE_ATTEMPTS = 40
 
 /** How often a holder touches the lock. */
 const HEARTBEAT_MS = 60_000
@@ -21,11 +32,10 @@ const HEARTBEAT_MS = 60_000
  */
 export const STALE_LOCK_MS = 10 * 60_000
 
-/** Test hooks: called between a taker's inspection of a stale lock and its takeover. */
+/** Test hooks. */
 export interface LockHooks {
+  /** Called while holding the takeover file, between the inspection of a stale lock and its removal. */
   readonly beforeTakeover?: () => Promise<void>
-  /** Replaces `fs.link` when a takeover puts back a lock it should not have moved. */
-  readonly link?: (existing: string, target: string) => Promise<void>
 }
 
 /** Whether a process with `pid` exists (`EPERM`: it does, owned by someone else). */
@@ -102,53 +112,61 @@ async function deleteOldStaleLocks(root: string): Promise<void> {
   }
 }
 
-/**
- * Take a stale lock seen as `seen`: move whatever is at `file` aside, and keep it moved only if
- * it is the lock that was seen. Another taker may have taken over in between, and then what the
- * rename moved is that taker's fresh lock: it is put back (unless something is there by then),
- * and this taker gives up. Returns whether the stale lock is gone and the lock may be created.
+/* Note [Takeovers Are Serialised]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Only the process that has created `<lock>.takeover` exclusively (`wx`) may look at a lock it
+ * did not just create and then change it: remove a stale lock, touch its own (the heartbeat) or
+ * delete its own (the release). It deletes the takeover file when done. So:
+ *
+ * - A stale lock is removed in place (`rm`, then `wx` create), never moved aside and put back:
+ *   the earlier rename, check and `link` back left a gap with no lock file, in which a third
+ *   process could create its own, and the restored owner then trained without a lock (#603).
+ * - A heartbeat or release checks the token and acts with no takeover able to land in between, so
+ *   it never touches or deletes a new holder's lock (#603).
+ *
+ * A process that finds the takeover file held gives up: a taker, because another one is at work
+ * (and whoever wins trains); a heartbeat, until its next tick; a release retries for up to two
+ * seconds, then leaves its lock to go stale. A takeover file is stale by the lock's own rule (a
+ * dead pid, or untouched for {@link STALE_LOCK_MS}), and such a file, left by a crash, is deleted
+ * if it still holds what was seen. That check and delete are not atomic, but racing on it needs a
+ * crashed taker and two new ones within microseconds, and the worst outcome is one duplicate
+ * training, which cannot corrupt the cache (each training writes its own `.tmp` and renames it).
+ * Creating a lock where there is none needs no takeover file: `wx` decides that alone.
  */
-async function takeOver(file: string, seen: Seen, hooks: LockHooks): Promise<boolean> {
-  const aside = `${file}${STALE_INFIX}${process.pid}-${Date.now()}-${crypto.randomUUID()}`
-  try {
-    await fs.rename(file, aside)
-  } catch (error) {
-    // Another taker moved it first.
-    if (errorCode(error) === 'ENOENT') return false
-    throw error
-  }
-  const moved = await look(aside)
-  if (moved != null && moved.content === seen.content && moved.mtimeMs === seen.mtimeMs) {
-    await fs.rm(aside, { force: true }).catch(() => undefined)
-    return true
-  }
-  // Not the stale lock: put it back without replacing anything that is there now.
-  try {
-    await (hooks.link ?? fs.link)(aside, file)
-  } catch (error) {
-    if (errorCode(error) === 'EEXIST') {
-      // Another lock is there now and stands; the moved one is a duplicate of nothing.
-      await fs.rm(aside, { force: true }).catch(() => undefined)
-      return false
+/**
+ * Run `act` holding `<file>.takeover` (Note [Takeovers Are Serialised]). Returns its result, or
+ * `busy` when another process holds the takeover file.
+ */
+async function withTakeover<T>(file: string, act: () => Promise<T>): Promise<T | 'busy'> {
+  const takeover = file + TAKEOVER_SUFFIX
+  const content = `${process.pid} ${crypto.randomUUID()}`
+  if (!(await createLock(takeover, content))) {
+    const seen = await look(takeover)
+    if (seen !== undefined) {
+      if (isHeld(seen)) return 'busy'
+      // Left by a taker that crashed: delete it if it is still what was seen.
+      if ((await look(takeover))?.content === seen.content) {
+        await fs.rm(takeover, { force: true })
+      }
     }
-    // No hard links here (FAT, some network or synced folders) or a refusal (`EPERM` from an
-    // antivirus): the moved lock is live, so it must not be deleted. Rename it back while nothing
-    // is in its place; otherwise leave it aside, where the stale-aside clean-up finds it later.
-    if ((await look(file)) === undefined) {
-      await fs.rename(aside, file).catch(() => undefined)
-    }
-    return false
+    if (!(await createLock(takeover, content))) return 'busy'
   }
-  await fs.rm(aside, { force: true }).catch(() => undefined)
-  return false
+  try {
+    return await act()
+  } finally {
+    if ((await look(takeover).catch(() => undefined))?.content === content) {
+      await fs.rm(takeover, { force: true }).catch(() => undefined)
+    }
+  }
 }
 
 /**
  * Take the training lock in `root`: create `<root>/train.lock` with this pid and a fresh token,
  * taking over a lock whose pid is not alive, that is unreadable, or that has not been touched for
- * {@link STALE_LOCK_MS} (see `takeOver`). Returns the function that releases it, or `undefined`
- * when another process holds it. The heartbeat and the release touch the file only while it holds
- * this acquisition's token, so a holder whose lock was taken over never touches the new holder's.
+ * {@link STALE_LOCK_MS}, under the takeover file (Note [Takeovers Are Serialised]). Returns the
+ * function that releases it, or `undefined` when another process holds it or is taking it over.
+ * The heartbeat and the release touch the file only while it holds this acquisition's token, and
+ * only under the takeover file, so a holder whose lock was taken over never touches the new one.
  */
 export async function acquireTrainingLock(
   root: string,
@@ -158,34 +176,49 @@ export async function acquireTrainingLock(
   const file = path.join(root, LOCK_FILE_NAME)
   const content = `${process.pid} ${crypto.randomUUID()}`
   const ours = async () => (await look(file))?.content === content
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (await createLock(file, content)) {
-      const heartbeat = setInterval(() => {
-        void (async () => {
-          if (!(await ours())) return
-          const now = new Date()
-          await fs.utimes(file, now, now)
-        })().catch(() => undefined)
-      }, HEARTBEAT_MS)
-      heartbeat.unref()
-      let released = false
-      return async () => {
-        if (released) return
-        released = true
-        clearInterval(heartbeat)
-        if (await ours().catch(() => false)) await fs.rm(file, { force: true })
+  const holding = () => {
+    const heartbeat = setInterval(() => {
+      void withTakeover(file, async () => {
+        if (!(await ours())) return
+        const now = new Date()
+        await fs.utimes(file, now, now)
+      }).catch(() => undefined)
+    }, HEARTBEAT_MS)
+    heartbeat.unref()
+    let released = false
+    return async () => {
+      if (released) return
+      released = true
+      clearInterval(heartbeat)
+      for (let attempt = 0; attempt < RELEASE_ATTEMPTS; attempt++) {
+        const result = await withTakeover(file, async () => {
+          if (await ours()) await fs.rm(file, { force: true })
+        }).catch(() => undefined)
+        if (result !== 'busy') return
+        await new Promise((resolve) => setTimeout(resolve, RELEASE_RETRY_MS))
       }
     }
+  }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (await createLock(file, content)) return holding()
     const seen = await look(file)
     if (seen === undefined) continue
     if (isHeld(seen)) return undefined
-    await hooks.beforeTakeover?.()
-    await deleteOldStaleLocks(root)
-    if (!(await takeOver(file, seen, hooks))) {
-      // Someone else took it over: whoever holds it now is live.
+    const result = await withTakeover(file, async () => {
+      // Looked at again under the takeover file: what was seen may have been taken over already.
       const now = await look(file)
-      if (now != null && isHeld(now)) return undefined
-    }
+      if (now !== undefined) {
+        if (isHeld(now)) return false
+        await hooks.beforeTakeover?.()
+        await fs.rm(file, { force: true })
+      }
+      await deleteOldStaleLocks(root)
+      // `wx` still: a new process may create the lock in the moment it is gone, and then holds it.
+      return createLock(file, content)
+    })
+    if (result === true) return holding()
+    // Another taker is at work, or the lock is held now: either way someone live has it.
+    return undefined
   }
   return undefined
 }

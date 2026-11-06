@@ -78,23 +78,82 @@ async function deadLock(root: string): Promise<string> {
   return file
 }
 
-test('two takers of a stale lock interleaved: the later rename finds a fresh lock and gives up', async () => {
+test('a taker that finds a takeover under way gives up, and the lock is never missing (#603)', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
   try {
     const file = await deadLock(root)
-    let second: (() => Promise<void>) | undefined
-    // A has inspected the stale lock; before A moves it, B takes it over completely.
+    let second: (() => Promise<void>) | undefined = undefined
+    let lockDuringTakeover: string | undefined
+    // A has taken the takeover file and inspected the stale lock; B (and C) try now.
     const first = await acquireTrainingLock(root, {
       beforeTakeover: async () => {
         second = await acquireTrainingLock(root)
+        lockDuringTakeover = await fs.readFile(file, 'utf8')
+        expect(await acquireTrainingLock(root)).toBeUndefined()
       },
     })
-    expect(second).toBeDefined()
-    expect(first).toBeUndefined()
-    // B's lock is in place (A put it back), and nothing was left aside.
-    const held = await fs.readFile(file, 'utf8')
-    expect(held).toMatch(new RegExp(`^${process.pid} `))
+    expect(second).toBeUndefined()
+    expect(first).toBeDefined()
+    // The stale lock was still in place while A worked; nothing was moved aside.
+    expect(lockDuringTakeover).toBe('999999 dead-token')
+    expect(await fs.readFile(file, 'utf8')).toMatch(new RegExp(`^${process.pid} `))
     expect((await fs.readdir(root)).sort()).toEqual(['train.lock'])
+    await first!()
+    expect(await fs.readdir(root)).toEqual([])
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a takeover file left by a dead taker does not block takeovers (#603)', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    await deadLock(root)
+    await fs.writeFile(path.join(root, 'train.lock.takeover'), '999999 crashed-taker')
+    const release = await acquireTrainingLock(root)
+    expect(release).toBeDefined()
+    expect((await fs.readdir(root)).sort()).toEqual(['train.lock'])
+    await release!()
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a live takeover file, recently touched, makes a taker give up (#603)', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    await deadLock(root)
+    const takeover = path.join(root, 'train.lock.takeover')
+    await fs.writeFile(takeover, `${process.pid} another-taker`)
+    expect(await acquireTrainingLock(root)).toBeUndefined()
+    // Neither file was touched.
+    expect(await fs.readFile(path.join(root, 'train.lock'), 'utf8')).toBe('999999 dead-token')
+    expect(await fs.readFile(takeover, 'utf8')).toBe(`${process.pid} another-taker`)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test("a release while its stale lock is being taken over leaves the taker's lock (#603)", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    const file = path.join(root, 'train.lock')
+    const first = await acquireTrainingLock(root)
+    expect(first).toBeDefined()
+    // The first holder stalled; its lock went stale, and a taker is part-way through.
+    const old = new Date(Date.now() - STALE_LOCK_MS - 60_000)
+    await fs.utimes(file, old, old)
+    let releasing: Promise<void> | undefined
+    const second = await acquireTrainingLock(root, {
+      beforeTakeover: async () => {
+        // The first holder wakes up and releases, between the taker's check and its act.
+        releasing = first!()
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      },
+    })
+    await releasing
+    expect(second).toBeDefined()
+    expect(await fs.readFile(file, 'utf8')).toMatch(new RegExp(`^${process.pid} `))
     await second!()
     expect(await fs.readdir(root)).toEqual([])
   } finally {
@@ -137,35 +196,6 @@ test('a takeover deletes locks moved aside long ago, and keeps recent ones', asy
     expect(release).toBeDefined()
     expect((await fs.readdir(root)).sort()).toEqual(['train.lock', 'train.lock.stale-2-2'])
     await release!()
-  } finally {
-    await fs.rm(root, { recursive: true, force: true })
-  }
-})
-
-test('a takeover that cannot link the live lock back renames it back instead of deleting it', async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
-  try {
-    const file = await deadLock(root)
-    let second: (() => Promise<void>) | undefined
-    let secondsLock = ''
-    const refuse = async () => {
-      throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' })
-    }
-    const first = await acquireTrainingLock(root, {
-      beforeTakeover: async () => {
-        second = await acquireTrainingLock(root)
-        secondsLock = await fs.readFile(file, 'utf8')
-      },
-      // A file system without hard links, or an antivirus refusing it.
-      link: refuse,
-    })
-    expect(second).toBeDefined()
-    expect(first).toBeUndefined()
-    // The live lock survives, in its place.
-    expect(await fs.readFile(file, 'utf8')).toBe(secondsLock)
-    expect((await fs.readdir(root)).sort()).toEqual(['train.lock'])
-    await second!()
-    expect(await fs.readdir(root)).toEqual([])
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
