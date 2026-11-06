@@ -3,7 +3,11 @@ import ActionButton from '@/components/ActionButton.vue'
 import WithFullscreenMode from '@/components/WithFullscreenMode.vue'
 import { useTemplateRef, watchEffect } from 'vue'
 
-defineProps<{ containerStyle?: Record<string, string> }>()
+defineProps<{
+  containerStyle?: Record<string, string>
+  /** Which side panel this is; marks the content for `saveShortcutInScope` (`@/util/saveShortcutScope`). */
+  side?: 'left' | 'right'
+}>()
 const emit = defineEmits<{ 'update:toolbarElement': [toolbarElement: HTMLElement] }>()
 
 const fullscreen = defineModel<boolean>('fullscreen', { required: true })
@@ -19,7 +23,7 @@ watchEffect(() => {
 
 <template>
   <WithFullscreenMode v-model="fullscreen">
-    <div :style="containerStyle" class="contentInner">
+    <div :style="containerStyle" class="contentInner" :data-panel-side="side">
       <div class="toolbar">
         <div ref="toolbarElement" class="componentToolbar" />
         <ActionButton class="toolbarButton" action="panel.fullscreen" />
