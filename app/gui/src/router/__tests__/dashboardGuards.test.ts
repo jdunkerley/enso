@@ -27,9 +27,21 @@ test('a fresh install opens the local welcome project', async () => {
   expect(await welcomeProjectPath(undefined, mockBackends())).toBe(LOCAL_WELCOME_PROJECT)
 })
 
+test('the welcome project is the bundled Getting_Started sample', () => {
+  // The sample is `app/electron-client/samples/Getting_Started`, installed into `Samples`.
+  expect(LOCAL_WELCOME_PROJECT_RELATIVE_PATH).toBe('Samples/Getting_Started')
+})
+
+test('a local home holding only the installed Samples opens the welcome project', async () => {
+  const home = [{ type: AssetType.directory, title: 'Samples' }]
+  expect(await welcomeProjectPath(undefined, mockBackends(home))).toBe(LOCAL_WELCOME_PROJECT)
+})
+
 test('a local home with more than Samples opens nothing', async () => {
   const home = [{ type: AssetType.project, title: 'Mine' }]
   expect(await welcomeProjectPath(undefined, mockBackends(home))).toBeUndefined()
+  const withSamples = [{ type: AssetType.directory, title: 'Samples' }, ...home]
+  expect(await welcomeProjectPath(undefined, mockBackends(withSamples))).toBeUndefined()
 })
 
 test('a project named on the command line opens from the local root', async () => {

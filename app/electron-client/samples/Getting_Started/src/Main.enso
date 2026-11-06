@@ -1,0 +1,46 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+## Getting Started
+
+   Welcome to Enso. Each box in the graph is a node: one step of the work, whose result flows
+   along the lines into the next step. This sample reads a file of orders, keeps the orders of one
+   category, totals them by month, and charts the totals. Select a node and press Space to see its
+   value; press Space again to hide it.
+
+   1. Read. Select `orders` to see the file as a table, with one row per order.
+   2. Filter. Select `books` to see only the orders in the Books category. Click `'Books'` on the
+      node and type another category, such as `'Games'`, and every later step updates.
+   3. Add a column. Select `dated` to see each order with the month it was placed in.
+   4. Aggregate. Select `totals` to see one row per month, with the total sales of that month.
+   5. Chart. `chart` shows the monthly totals as a Scatter Plot. Use the visualization selector
+      above a node's value to switch between the Table and a chart.
+
+   To add a step of your own, select a node and press Enter, then pick a component to apply to
+   its result.
+
+   The data is `orders.csv` in the shared `Samples/Data` folder, found relative to this project,
+   so the sample only runs from its place in `Samples`. The data is synthetic.
+main =
+    ## The orders file in the shared Samples/Data folder.
+    orders_file = enso_project.root.parent / 'Data' / 'orders.csv'
+    ## Step 1: one row per order, with its date, category and total.
+    orders = Data.read orders_file (..Delimited headers=..Has_Headers)
+    ## Step 2: only the orders in the Books category.
+    books = orders.filter 'category' (..Equal 'Books')
+    ## The month of each order, from 1 to 12.
+    month = (books.at 'order_date').month
+    ## Step 3: the orders, with their month.
+    dated = books.set month 'month'
+    ## Step 4: the total sales of each month.
+    totals = dated.aggregate ['month'] [..Sum 'total' 'Sales']
+    ## Step 5: the totals in month order, shown as a chart.
+    chart = totals.sort ['month']
+    chart
+
+
+
+#### METADATA ####
+[[{"index":{"value":1426},"size":{"value":48}},"2cb0b7c2-dbed-4d70-a3eb-29dc6e4fbdab"],[{"index":{"value":1557},"size":{"value":57}},"0cb2907c-c8c9-4d07-a086-de074adb1963"],[{"index":{"value":1681},"size":{"value":42}},"bb20a832-dcef-443d-ab14-b7c57a81381e"],[{"index":{"value":1782},"size":{"value":29}},"5c8bcd58-fb37-4162-b3d9-36eb3010c5ee"],[{"index":{"value":1869},"size":{"value":23}},"42faf02b-9b94-4287-9060-fa8f6770a237"],[{"index":{"value":1952},"size":{"value":49}},"5621e03d-1af9-4210-8c06-f2e4290cc1ec"],[{"index":{"value":2074},"size":{"value":21}},"6776c838-4a02-448b-bc35-230b2b95c48a"],[{"index":{"value":2100},"size":{"value":5}},"98b46c64-8573-412d-b093-fa19c198c24e"]]
+{"ide":{"node":{"2cb0b7c2-dbed-4d70-a3eb-29dc6e4fbdab":{"position":{"vector":[-16,16]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"folder"}},"0cb2907c-c8c9-4d07-a086-de074adb1963":{"position":{"vector":[-16,-56]},"cachedAppearance":{"color":"oklch(0.464 0.14 170)","icon":"data_input"}},"bb20a832-dcef-443d-ab14-b7c57a81381e":{"position":{"vector":[-16,-128]},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"preparation"}},"5c8bcd58-fb37-4162-b3d9-36eb3010c5ee":{"position":{"vector":[-16,-200]},"cachedAppearance":{"color":"oklch(0.464 0.14 295)","icon":"time"}},"42faf02b-9b94-4287-9060-fa8f6770a237":{"position":{"vector":[666,-272]},"cachedAppearance":{"color":"oklch(0.464 0.14 275)","icon":"column_add"}},"5621e03d-1af9-4210-8c06-f2e4290cc1ec":{"position":{"vector":[666,-344]},"cachedAppearance":{"color":"oklch(0.464 0.14 230)","icon":"transform"}},"6776c838-4a02-448b-bc35-230b2b95c48a":{"position":{"vector":[666,-416]},"visualization":{"show":true,"project":{"project":"Builtin"},"name":"Scatter Plot"},"cachedAppearance":{"color":"oklch(0.464 0.14 325)","icon":"order"}},"98b46c64-8573-412d-b093-fa19c198c24e":{"position":{"vector":[666,-630]}}},"widget":{},"import":{}}}

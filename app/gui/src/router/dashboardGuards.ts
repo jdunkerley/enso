@@ -19,6 +19,11 @@ import { getFileName } from 'enso-common/src/utilities/file'
 import type { NavigationGuardReturn, RouteLocation } from 'vue-router'
 
 export const SAMPLES_DIRECTORY = 'Samples'
+/**
+ * The project a fresh install opens: the bundled `Getting_Started` sample
+ * (`app/electron-client/samples`), which the Electron app installs into `Samples` before it
+ * loads the dashboard.
+ */
 export const LOCAL_WELCOME_PROJECT_RELATIVE_PATH = `${SAMPLES_DIRECTORY}/Getting_Started`
 
 type BackendAPI<B extends Backend> = Pick<B, 'rootPath' | 'listDirectory'>

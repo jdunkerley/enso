@@ -1,4 +1,7 @@
-/** @file A series of tests designed for testing 'Getting Started with Enso Analytics'. */
+/**
+ * @file The first start: a fresh install opens the bundled Getting_Started sample. Then the
+ * exercises of 'Getting Started with Enso Analytics', each in a new project.
+ */
 
 import { expect } from 'playwright/test'
 import {
@@ -7,6 +10,7 @@ import {
   closeWelcome,
   createNewProject,
   fillWidgetText,
+  FIRST_PROJECT_TIMEOUT,
   openComponentBrowser,
   openDropdownInWidget,
   parkMouse,
@@ -17,9 +21,38 @@ import {
   test,
   visualizeData,
   waitForDashboard,
+  WELCOME_PROJECT_TAB,
 } from './electronTest'
 
 test.skip(SKIP_ON_WINDOWS_CI, SKIP_ON_WINDOWS_CI_REASON)
+
+/** The nodes of `samples/Getting_Started`, in order. */
+const GETTING_STARTED_NODES = [
+  'orders_file',
+  'orders',
+  'books',
+  'month',
+  'dated',
+  'totals',
+  'chart',
+]
+
+// A fresh install (every spec has a fresh projects directory) opens the Getting_Started sample:
+// its graph, and the last node's stored chart of the 12 monthly totals.
+test('A fresh install opens the Getting Started sample', async ({ page }) => {
+  await expect(page.getByRole('tab', { name: WELCOME_PROJECT_TAB, exact: true })).toBeVisible({
+    timeout: 60000,
+  })
+  const nodes = page.locator('.GraphNode')
+  await expect(nodes.first()).toBeVisible({ timeout: FIRST_PROJECT_TIMEOUT })
+  for (const binding of GETTING_STARTED_NODES) {
+    const node = nodes.filter({ has: page.locator('.binding').getByText(binding, { exact: true }) })
+    await expect(node).toHaveCount(1)
+  }
+  const chart = page.locator('.ScatterplotVisualization')
+  await expect(chart).toBeVisible({ timeout: FIRST_PROJECT_TIMEOUT })
+  await expect(chart.locator('.scatterPoint')).toHaveCount(12, { timeout: FIRST_PROJECT_TIMEOUT })
+})
 
 // First excercise in Enso Analytics 101
 test('Exercise 1', async ({ page, projectsDir }) => {

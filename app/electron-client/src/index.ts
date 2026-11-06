@@ -114,6 +114,11 @@ class App {
   electron: Electron | undefined = undefined
   electronIsDev: boolean = false
   parsedArguments: ParsedArguments | null = null
+  /**
+   * Settles once the bundled samples are installed (or found already there). The dashboard waits
+   * for it: on a fresh install it opens `Samples/Getting_Started`, which must exist by then.
+   */
+  samplesInstalled: Promise<unknown> = Promise.resolve()
 
   async init() {
     this.electronIsDev =
@@ -248,6 +253,7 @@ class App {
     })()
 
     const installSamplesPromise = installSamples(samplesPath(electron, electronIsDev))
+    this.samplesInstalled = installSamplesPromise.catch(() => {})
 
     return Promise.allSettled([writeVersionInfoPromise, installSamplesPromise])
   }
@@ -325,6 +331,8 @@ class App {
       console.log('Starting the application with args', args)
       await this.createWindowIfEnabled(args)
       initIpc(this.window, this.electron, this.electronIsDev)
+      // A fresh install opens a bundled sample, so the samples must be in place first.
+      await this.samplesInstalled
       await this.loadWindowContent(args)
       // Once the window is up: a JDK AOT training, if one is needed, runs behind the dashboard.
       startJvmAotCache()

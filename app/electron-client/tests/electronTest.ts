@@ -80,11 +80,18 @@ export const test = base.extend<{
   },
 })
 
+/**
+ * The tab of the project a fresh install opens: the bundled `Getting_Started` sample
+ * (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in the GUI's `router/dashboardGuards.ts`). Every spec
+ * starts with a fresh projects directory, so every spec sees it.
+ */
+export const WELCOME_PROJECT_TAB = 'Getting_Started'
+
 /** Wait until the app has loaded: the drive, or the welcome project's tab on a first start. */
 export async function waitForDashboard(page: Page) {
   const dashboardReady = page
     .getByTestId('drive-view')
-    .or(page.getByRole('tab', { name: 'Getting Started with Enso Analytics' }))
+    .or(page.getByRole('tab', { name: WELCOME_PROJECT_TAB, exact: true }))
   await expect(dashboardReady.first()).toBeVisible({ timeout: 60000 })
 }
 
@@ -99,7 +106,7 @@ export async function waitForDashboard(page: Page) {
  * standard library is AOT-compiled into the packaged engine, so there is no IR cache to warm.
  * Specs that do not need the visualization should pass `waitForVisualization: false`.
  */
-const FIRST_PROJECT_TIMEOUT = 90000
+export const FIRST_PROJECT_TIMEOUT = 90000
 
 /**
  * Create a new Enso project, and wait until its graph is shown and, unless `waitForVisualization`
@@ -119,7 +126,7 @@ export async function createNewProject(
 
 /** If welcome project is to be opened, navigate back to the dashboard. */
 export async function closeWelcome(page: Page) {
-  const welcomeProjectTab = page.getByRole('tab', { name: 'Getting Started with Enso Analytics' })
+  const welcomeProjectTab = page.getByRole('tab', { name: WELCOME_PROJECT_TAB, exact: true })
   const loadingIndicator = welcomeProjectTab.locator('.LoadingSpinner')
   await Promise.race([
     welcomeProjectTab
@@ -130,7 +137,9 @@ export async function closeWelcome(page: Page) {
   if (await welcomeProjectTab.isVisible()) {
     await answerRepositoryPrompt(
       page,
-      () => welcomeProjectTab.locator('.CloseButton').click(),
+      // The close button is the tab's sibling (`SelectableTab.vue`), hidden from the a11y tree.
+      () =>
+        page.locator('.SelectableTab', { has: welcomeProjectTab }).locator('.CloseButton').click(),
       () => expect(welcomeProjectTab).toHaveCount(0, { timeout: 30_000 }),
     )
   }
