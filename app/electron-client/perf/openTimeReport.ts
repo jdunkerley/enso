@@ -55,6 +55,18 @@ export interface Mark {
   readonly [extra: string]: unknown
 }
 
+/** The memory of the engine's processes and of the ydoc host, in kilobytes (`processRss.ts`). */
+export interface RssSample {
+  readonly engineKb: number
+  readonly ydocKb: number
+}
+
+/** First open only: when the headline showed, and 30 s later. */
+export interface RunRss {
+  readonly atWelcome: RssSample
+  readonly after30s: RssSample
+}
+
 export interface RunResult {
   readonly engine: Engine
   readonly run: number
@@ -63,6 +75,8 @@ export interface RunResult {
   /** The phases and extras a successful launch did not record, first and second open together. */
   readonly notMeasured: readonly (Phase | Extra)[]
   readonly error?: string
+  /** Sampled on the first open of the launch; absent when a sample failed. */
+  readonly rss?: RunRss
 }
 
 /**
@@ -211,6 +225,8 @@ export interface EngineSummary {
   readonly launches: number
   readonly first: OpenTimes
   readonly second: OpenTimes
+  /** The median of each RSS sample over the launches that have one; `undefined` when none do. */
+  readonly rss?: RunRss
   /** The fastest and slowest first open's headline, `undefined` when none reached it. */
   readonly range?: { readonly min: number; readonly max: number }
 }
@@ -229,17 +245,35 @@ export function summarise(report: OpenTimeReport): EngineSummary[] {
       return out
     }
     const headlines = runs.flatMap((r) => r.first[HEADLINE] ?? [])
+    const rss = summariseRss(runs)
     return {
       engine,
       succeeded: headlines.length,
       launches: runs.length,
       first: medians((r) => r.first),
       second: medians((r) => r.second),
+      ...(rss ? { rss } : {}),
       ...(headlines.length > 0 ?
         { range: { min: Math.min(...headlines), max: Math.max(...headlines) } }
       : {}),
     }
   })
+}
+
+function summariseRss(runs: readonly RunResult[]): RunRss | undefined {
+  const samples = runs.flatMap((r) => r.rss ?? [])
+  if (samples.length === 0) return undefined
+  const m = (pick: (r: RunRss) => number) => median(samples.map(pick))!
+  return {
+    atWelcome: {
+      engineKb: m((r) => r.atWelcome.engineKb),
+      ydocKb: m((r) => r.atWelcome.ydocKb),
+    },
+    after30s: {
+      engineKb: m((r) => r.after30s.engineKb),
+      ydocKb: m((r) => r.after30s.ydocKb),
+    },
+  }
 }
 
 /** develop's first-open medians for one engine, pooled over `reports` of its runs. */
@@ -291,6 +325,26 @@ export function describeShimAot(aot: ShimAot): string {
 
 const cell = (value: number | undefined) => (value == null ? '–' : String(Math.round(value)))
 
+/** The RSS medians, in MiB: one row per engine that has samples; empty when none has. */
+function rssTable(summaries: readonly EngineSummary[]): string[] {
+  const rows = summaries.flatMap((s) => {
+    if (s.rss == null) return []
+    const mib = (kb: number) => String(Math.round(kb / 1024))
+    return [
+      `| ${s.engine} | ${mib(s.rss.atWelcome.engineKb)} | ${mib(s.rss.after30s.engineKb)} | ${mib(s.rss.atWelcome.ydocKb)} | ${mib(s.rss.after30s.ydocKb)} |`,
+    ]
+  })
+  if (rows.length === 0) return []
+  return [
+    'Resident memory, MiB, medians of the first open (engine: the launcher and the JVM or native image under it; ydoc: the utility process).',
+    '',
+    '| Engine | Engine at welcome table | Engine 30 s later | Ydoc host at welcome table | Ydoc host 30 s later |',
+    '| --- | ---: | ---: | ---: | ---: |',
+    ...rows,
+    '',
+  ]
+}
+
 /** The medians as a Markdown table, with develop's first-open medians when there is a baseline. */
 export function renderMarkdown(report: OpenTimeReport, baseline: Baseline): string {
   const ours = summarise(report)
@@ -324,6 +378,7 @@ export function renderMarkdown(report: OpenTimeReport, baseline: Baseline): stri
     `| ${header.map((_, i) => (i === 0 ? '---' : '---:')).join(' | ')} |`,
     ...rows,
     '',
+    ...rssTable(ours),
   ].join('\n')
 }
 

@@ -28,10 +28,13 @@ import {
   type Mark,
   type OpenTag,
   type OpenTimeReport,
+  type RssSample,
   type RunResult,
+  type RunRss,
   type ShimAot,
   type Template,
 } from './openTimeReport'
+import { engineRssKb, listProcesses, processRssKb } from './processRss'
 import {
   parseTemplateName,
   projectTemplate,
@@ -191,6 +194,7 @@ async function openProject(
   extrasMs: number,
   snapshot: (phase: string) => void,
   project: ProjectTemplate | undefined,
+  sampleRss: (phase: RssPhase) => Promise<void>,
 ) {
   const row = page.getByTestId('drive-view').getByText(name, { exact: true })
   await row.waitFor({ state: 'visible', timeout: 60_000 })
@@ -218,6 +222,8 @@ async function openProject(
   marks.add(`${tag}:welcomeShown`)
   if (project != null) marks.add(`${tag}:libraryShown`)
   snapshot(`${tag}-welcomeShown`)
+  // Only the first open (Note [RSS Is Sampled On The First Open]).
+  if (tag === 'first') await sampleRss('welcomeShown')
   if (cdp) {
     const { profile: cpuProfile } = await cdp.send('Profiler.stop')
     fs.writeFileSync(path.join(dir, `${tag}.cpuprofile`), JSON.stringify(cpuProfile))
@@ -227,7 +233,26 @@ async function openProject(
     await measureExtras(page, tag, marks, dir, extrasMs)
     snapshot(`${tag}-extras`)
   }
+  if (tag === 'first') {
+    const welcome = marks.list.find((m) => m.k === 'first:welcomeShown')!.t
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.max(0, welcome + RSS_LATER_MS - Date.now())),
+    )
+    await sampleRss('welcomeShown+30s')
+  }
 }
+
+/* Note [RSS Is Sampled On The First Open]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * RSS is reported, not gated (the plan's owner answer 3), for native against the JVM: the engine's
+ * processes (the launcher, the native image or `java` under it, and their children; `processRss.ts`)
+ * and the ydoc host's utility process (its pid is in the `ydoc host pid=` line of the output), at
+ * the headline and 30 s later. Only the first open, and the 30 s are waited out before the project
+ * closes, so the second open of such a launch starts later than the others': its numbers are not
+ * comparable with a launch that did not wait, and the headline is the first open's anyway.
+ */
+type RssPhase = 'welcomeShown' | 'welcomeShown+30s'
+const RSS_LATER_MS = 30_000
 
 /* Note [JVM Counters At Each Phase]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -445,6 +470,22 @@ async function measureLaunch(
   let app: ElectronApplication | undefined
   let page: Page | undefined
   let error: string | undefined
+  const sampleRss = async (phase: RssPhase) => {
+    try {
+      const electronPid = app?.process().pid
+      const ydocPid = Number(/ydoc host pid=(\d+)/.exec(stdoutLines.join(' '))?.[1])
+      if (electronPid == null) return
+      const processes = await listProcesses()
+      marks.add('rss', {
+        phase,
+        engineKb: engineRssKb(processes, electronPid),
+        ydocKb: Number.isFinite(ydocPid) ? processRssKb(processes, ydocPid) : -1,
+      })
+    } catch (e) {
+      // Not worth a failed launch: the report just has no RSS for it.
+      console.warn(`Open time: no RSS sample at ${phase}: ${String(e)}`)
+    }
+  }
   // A native engine has a JVM only for a library's Java (a guest JVM, Note [A Project That Uses A
   // Library With Java Code] in `projectTemplates.ts`), so the welcome template's native launches
   // have no counters to copy.
@@ -501,6 +542,7 @@ async function measureLaunch(
         options.extrasMs,
         snapshot,
         project,
+        sampleRss,
       )
       await closeProject(page, names[tag])
       await page.waitForTimeout(2000)
@@ -542,16 +584,32 @@ async function measureLaunch(
     opens.includes('second') ?
       openTimes(marks.list, 'second', logOf(logs, marks.list, 'second'))
     : null
+  const rss = runRss(marks.list)
   return {
     engine,
     run,
     first,
     second,
+    ...(rss ? { rss } : {}),
     // Recorded, never silent: the report warns about every phase or extra a launch missed.
     notMeasured: [...new Set([...notMeasured(first), ...(second ? notMeasured(second) : [])])],
     ...(error ? { error } : {}),
     stdout: stdoutLines.join('\n'),
   }
+}
+
+/** The launch's two RSS samples, or `undefined` when either is missing or the ydoc pid was not seen. */
+function runRss(marks: readonly Mark[]): RunRss | undefined {
+  const sample = (phase: RssPhase): RssSample | undefined => {
+    const mark = marks.find((m) => m.k === 'rss' && m.phase === phase)
+    if (mark == null || typeof mark.engineKb !== 'number' || typeof mark.ydocKb !== 'number') {
+      return undefined
+    }
+    return mark.ydocKb < 0 ? undefined : { engineKb: mark.engineKb, ydocKb: mark.ydocKb }
+  }
+  const atWelcome = sample('welcomeShown')
+  const after30s = sample('welcomeShown+30s')
+  return atWelcome && after30s ? { atWelcome, after30s } : undefined
 }
 
 /** `<data dir>/cache/ir/local`, where the engine keeps a project's IR cache. */

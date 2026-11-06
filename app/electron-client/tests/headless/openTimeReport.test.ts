@@ -12,6 +12,7 @@ import {
   parseLsLogLine,
   regressionWarnings,
   renderMarkdown,
+  summarise,
   type Engine,
   type Mark,
   type OpenTimeReport,
@@ -392,5 +393,61 @@ describe('jvm-first', () => {
     expect(markdown).toContain('jvm first')
     expect(markdown).toContain('27500')
     expect(markdown).toContain('19000')
+  })
+})
+
+describe('RSS', () => {
+  const withRss = (
+    engine: Engine,
+    values: readonly (readonly [number, number, number, number] | undefined)[],
+  ): OpenTimeReport => {
+    const base = report(
+      values.map(() => 3000),
+      engine,
+    )
+    return {
+      ...base,
+      runs: base.runs.map((r, i) => {
+        const v = values[i]
+        return v == null ? r : (
+            {
+              ...r,
+              rss: {
+                atWelcome: { engineKb: v[0], ydocKb: v[1] },
+                after30s: { engineKb: v[2], ydocKb: v[3] },
+              },
+            }
+          )
+      }),
+    }
+  }
+  test('summarise takes the median of each sample, over the launches that have one', () => {
+    const r = withRss('jvm', [
+      [1000, 100, 1200, 110],
+      [3000, 300, 3200, 310],
+      [2000, 200, 2200, 210],
+      undefined,
+    ])
+    expect(summarise(r)[0]!.rss).toEqual({
+      atWelcome: { engineKb: 2000, ydocKb: 200 },
+      after30s: { engineKb: 2200, ydocKb: 210 },
+    })
+  })
+  test('a report without samples has none', () => {
+    expect(summarise(report([3000, 3000, 3000]))[0]!.rss).toBeUndefined()
+  })
+  test('open-time.md has an RSS table in MiB, a row per engine', () => {
+    const native = withRss('native', [[102_400, 51_200, 204_800, 61_440]])
+    const both = {
+      ...native,
+      runs: [...native.runs, ...withRss('jvm', [[1_048_576, 51_200, 1_048_576, 51_200]]).runs],
+    }
+    const markdown = renderMarkdown(both, undefined)
+    expect(markdown).toContain('| Engine | Engine at welcome table | Engine 30 s later |')
+    expect(markdown).toContain('| native | 100 | 200 | 50 | 60 |')
+    expect(markdown).toContain('| jvm | 1024 | 1024 | 50 | 50 |')
+  })
+  test('no samples, no table', () => {
+    expect(renderMarkdown(report([3000, 3000, 3000]), undefined)).not.toContain('RSS')
   })
 })
