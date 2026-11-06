@@ -82,9 +82,19 @@ engine started without one refuses every channel socket (`403`; an unknown kind
 is `404`). Also refused with `403`, before the token is looked at: a peer that
 is not on loopback (the connection's own remote address, never
 `X-Forwarded-For`; needs `remote-address-attribute = on`, set in
-`application-ls.conf`) and a handshake with an `Origin` header. A blank token is
-no token. Inbound messages for a handler that has not subscribed yet are kept
-(the newest 1024 per channel). See Note [The Channel Socket].
+`application-ls.conf`) and a handshake from a web page (an `Origin` header, or a
+`Sec-Fetch-Site` other than `none`). A blank token is no token. Inbound messages
+for a handler that has not subscribed yet are kept (the newest 1024 per
+channel). See Note [The Channel Socket].
+
+**The RPC port refuses web pages.** The HTTP routes that change state,
+`POST /refactoring/renameProject` and `POST /_idle/reset`, answer `403` to a
+request with an `Origin` header or a `Sec-Fetch-Site` other than `none`, before
+the body is read: a cross-site `text/plain` form `POST` needs no CORS preflight
+(#613). Their caller, the shim's Node `fetch`, sends neither (it does send
+`Sec-Fetch-Mode: cors`, which is not looked at). One helper, `BrowserPageGuard`,
+serves these routes and the channel sockets; see Note [The RPC Port Refuses Web
+Pages]. A new state-changing route takes `refuseBrowserPages` too.
 
 A session opens **two** `json` sockets (the ydoc server's proxy channel for the
 GUI and its backend channel); each socket is its own channel and controller. The

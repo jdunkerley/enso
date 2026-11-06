@@ -55,9 +55,11 @@ final class YjsChannelEndpoint(
   // token travels in a cleartext query string, so a wildcard `--interface` must
   // not expose it; the peer is the connection's own remote-address
   // attribute, never `X-Forwarded-For`, which the client controls, so an absent
-  // header refuses too), and a handshake carrying an `Origin` header (browsers
-  // always send one, the Node ydoc host never does). Text frames carry strings
-  // and binary frames `ByteBuffer`s, as the in-process channels do.
+  // header refuses too), and a handshake from a web page: an `Origin` header
+  // (browsers always send one, the Node ydoc host never does) or a
+  // `Sec-Fetch-Site` header (Note [The RPC Port Refuses Web Pages]). Text
+  // frames carry strings and binary frames `ByteBuffer`s, as the in-process
+  // channels do.
 
   private val expectedToken: Option[String] = token.filter(_.nonEmpty)
 
@@ -86,9 +88,12 @@ final class YjsChannelEndpoint(
     presented: Option[String]
   ): Option[String] =
     if (!fromLoopback(request)) Some("the peer is not on loopback")
-    else if (request.headers.exists(_.is("origin"))) Some("an Origin header")
-    else if (!authorised(presented)) Some("a missing or wrong token")
-    else None
+    else
+      BrowserPageGuard
+        .browserPage(request)
+        .orElse(
+          Option.when(!authorised(presented))("a missing or wrong token")
+        )
 
   private def fromLoopback(request: HttpRequest): Boolean =
     request

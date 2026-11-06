@@ -11,6 +11,7 @@ import io.circe._
 import io.circe.generic.semiauto._
 import io.circe.parser._
 import org.enso.jsonrpc._
+import org.enso.languageserver.http.server.BrowserPageGuard.refuseBrowserPages
 import org.enso.languageserver.refactoring.RefactoringApi
 import org.enso.languageserver.requesthandler.refactoring.RenameProjectHandler
 
@@ -50,7 +51,8 @@ class RenameProjectEndpoint(
 
   private val renameProject = {
     path("refactoring" / "renameProject") {
-      post {
+      // Note [The RPC Port Refuses Web Pages]: before the body is read.
+      (post & refuseBrowserPages) {
         entity(as[String]) { body =>
           if (ReadinessMonitor.isReady) {
             handleRenameProject(body)
