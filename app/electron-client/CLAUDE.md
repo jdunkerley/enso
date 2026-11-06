@@ -205,10 +205,15 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   before the project service is set up) keeps a complete copy's launcher in a
   module variable and passes it to the project service and the cache; it is
   never written to `process.env`, which an in-app update's relaunch inherits.
-  Without a complete copy, `startAppImageEngineCopy` makes one after the window
-  has loaded, for the next launch; a copy that fails or finds no room is not
-  tried again for that build for a day. A user's own `ENSO_ENGINE_PATH` wins and
-  turns all this off (`appImageEngine` in `src/jvmAotSettings.ts`).
+  Without a complete copy, `startAppImageEngineCopy` (called once the window has
+  loaded) makes one for the next launch, held back by `AfterFirstOpen` until the
+  first open has been answered (or a minute without an open), since it slowed
+  the first open down when it ran alongside it; a copy that fails or finds no
+  room is not tried again for that build for a day. A user's own
+  `ENSO_ENGINE_PATH` wins and turns all this off (`appImageEngine` in
+  `src/jvmAotSettings.ts`); one inside `<userData>/engine/` is an earlier IDE's
+  copy inherited through an update's relaunch, and `prepareAppImageEngine`
+  removes it from the environment (`isEngineCopyPath`).
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.

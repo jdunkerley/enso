@@ -37,9 +37,20 @@ export interface AppImageEngine {
 }
 
 /**
+ * Whether `enginePath` is inside one of this IDE's own engine copies (`<userData>/engine/`). Such
+ * an `ENSO_ENGINE_PATH` is not the user's: an earlier IDE that put its copy in the environment
+ * passed it on to the relaunch after an in-app update, where it would run the old version's engine.
+ */
+export function isEngineCopyPath(enginePath: string, userData: string): boolean {
+  const relative = path.relative(path.join(userData, 'engine'), enginePath)
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
+}
+
+/**
  * Under a Linux AppImage (`APPIMAGE` set), with the JVM as the default engine (the AOT cache is
  * what the copy is for) and no `ENSO_ENGINE_PATH` of the user's, the engine to run is a copy of
- * the bundled one at `<userData>/engine/<version>/`, whose path, unlike the AppImage's mount, is
+ * the bundled one at `<userData>/engine/<version>/` (an `ENSO_ENGINE_PATH` inside
+ * `<userData>/engine/` is inherited, not the user's: {@link isEngineCopyPath}), whose path, unlike the AppImage's mount, is
  * the same at every launch (`project-manager-shim/jvmAot`, `stableEngine.ts`). When there is no
  * complete copy of this build yet, this launch runs the mounted engine (without an AOT cache) and
  * `startCopy` makes the copy in the background, so the window does not wait for 1.8 GB.
@@ -52,7 +63,9 @@ export async function appImageEngine(
   settings: { readonly resourcesPath: string; readonly userData: string; readonly version: string },
   engine: EngineSettings | undefined,
 ): Promise<AppImageEngine> {
-  if (!env.APPIMAGE || env.ENSO_ENGINE_PATH || !isJvmDefaultEngine(engine, env)) return {}
+  const usersEngine =
+    env.ENSO_ENGINE_PATH && !isEngineCopyPath(env.ENSO_ENGINE_PATH, settings.userData)
+  if (!env.APPIMAGE || usersEngine || !isJvmDefaultEngine(engine, env)) return {}
   const options = {
     userData: settings.userData,
     version: settings.version,

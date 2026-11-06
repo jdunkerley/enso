@@ -9,6 +9,7 @@ import { describe, expect, test, vi } from 'vitest'
 import {
   AfterFirstOpen,
   appImageEngine,
+  isEngineCopyPath,
   isJvmDefaultEngine,
   jvmAotRootDirectory,
 } from '../../src/jvmAotSettings'
@@ -69,6 +70,23 @@ describe('appImageEngine', () => {
         ),
       ).toEqual({})
       expect(await fs.readdir(base)).not.toContain('userData')
+    }))
+
+  test("an ENSO_ENGINE_PATH inherited from an earlier IDE (its own copy) is not the user's", () =>
+    withApp(async (_base, app) => {
+      // An in-app update's relaunch inherits the old process's environment: an earlier IDE that put
+      // its copy there would make this version run the old version's engine.
+      const old = path.join(app.userData, 'engine', '2026.1.0', 'dist', '1.0', 'bin', 'enso')
+      expect(isEngineCopyPath(old, app.userData)).toBe(true)
+      expect(isEngineCopyPath(path.join(app.userData, 'engine'), app.userData)).toBe(false)
+      expect(isEngineCopyPath(path.join(app.userData, 'engines', 'enso'), app.userData)).toBe(false)
+      expect(isEngineCopyPath('/opt/enso/bin/enso', app.userData)).toBe(false)
+      const env = { APPIMAGE: '/a/Enso.AppImage', ENSO_ENGINE_PATH: old }
+      const first = await appImageEngine(env, app, jvm)
+      expect(first.enginePath).toBeUndefined()
+      const copied = path.join(app.userData, 'engine', '2026.2.0', 'dist', '1.0', 'bin', 'enso')
+      expect(await first.startCopy?.()).toBe(copied)
+      expect(await appImageEngine(env, app, jvm)).toEqual({ enginePath: copied })
     }))
 
   test('while the default engine is native, nothing is copied (no disk used)', () =>

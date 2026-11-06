@@ -293,15 +293,20 @@ in `app/electron-client/src/projectService.ts` and passes it to the
     (`/proc/<pid>/exe`; an engine left by a crashed IDE).
   - **Wiring**: Electron (`appImageEngine` in
     `app/electron-client/src/jvmAotSettings.ts`), when `APPIMAGE` is set and
-    `ENSO_ENGINE_PATH` is not, passes a complete copy's launcher as
-    `EngineSettings.ensoExecutable` (and to `findEnsoExecutable`'s `preferred`
-    for the cache) before the project service and the cache are created. It is
-    never put in the environment: an in-app update relaunches the new AppImage
-    with the old process's environment, which would make the new version run the
-    old version's copy. With no complete copy, that launch runs the mounted
-    engine with no cache and starts the copy once the window is up, so the cache
-    trains from the next launch on. If the copy cannot be made, the AppImage
-    runs the JVM with CDS only, the spec's accepted fallback.
+    `ENSO_ENGINE_PATH` is not (one inside `<userData>/engine/` is not the user's
+    but an earlier IDE's copy, inherited through an update's relaunch:
+    `prepareAppImageEngine` drops it, `isEngineCopyPath`), passes a complete
+    copy's launcher as `EngineSettings.ensoExecutable` (and to
+    `findEnsoExecutable`'s `preferred` for the cache) before the project service
+    and the cache are created. It is never put in the environment: an in-app
+    update relaunches the new AppImage with the old process's environment, which
+    would make the new version run the old version's copy. With no complete
+    copy, that launch runs the mounted engine with no cache and starts the copy
+    once the first open has been answered (`EngineSettings.openObserver`; or a
+    minute after the window loaded with no open, never while one is in flight),
+    since a copy running alongside the first open slowed it down in WSL; the
+    cache trains from the next launch on. If the copy cannot be made, the
+    AppImage runs the JVM with CDS only, the spec's accepted fallback.
 - **Tests**: `jvmAot/__tests__/` — `key`, `lock`, `driver` (against
   `fakeLanguageServer.ts`), `trainer` (a fake `enso` script that imports the
   same fake, port band `JVM_AOT_TRAINER_PORT`), `cache` (a fake trainer and fake

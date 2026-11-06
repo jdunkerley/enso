@@ -10,6 +10,7 @@ import type { Electron } from '@/electron'
 import {
   AfterFirstOpen,
   appImageEngine,
+  isEngineCopyPath,
   isJvmDefaultEngine,
   jvmAotRootDirectory,
 } from '@/jvmAotSettings'
@@ -202,12 +203,20 @@ export async function prepareAppImageEngine(
   electronIsDev: boolean,
   engine: EngineSettings | undefined,
 ): Promise<void> {
+  const userData = app.getPath('userData')
+  const inherited = process.env.ENSO_ENGINE_PATH
+  if (inherited && isEngineCopyPath(inherited, userData)) {
+    // Not the user's: an earlier IDE's copy, passed on by an in-app update's relaunch. Dropped so
+    // that neither `findEnsoExecutable` nor the engines this process starts run it.
+    console.info(`Ignoring the inherited ENSO_ENGINE_PATH ${inherited}: an IDE engine copy.`)
+    Reflect.deleteProperty(process.env, 'ENSO_ENGINE_PATH')
+  }
   try {
     const { enginePath, startCopy } = await appImageEngine(
       process.env,
       {
         resourcesPath: paths.resourcesPath(electron, electronIsDev),
-        userData: app.getPath('userData'),
+        userData,
         version: app.getVersion(),
       },
       engine,
