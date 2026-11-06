@@ -3,10 +3,12 @@
 #### Enso IDE
 
 - [The sample projects now update with each new version of the IDE, unless you
-  have edited them. An edited sample whose new version is available shows an
-  "Update available" badge in the Drive. Reset Sample, in a sample's context
-  menu, and Reset All Samples, in the Samples folder's, put the samples back as
-  installed, keeping your edited copy beside each one.][622]
+  have edited them; opening a sample does not count as an edit. An edited sample
+  with a newer version shows an "Update available" badge in the Drive. Reset
+  Sample, in a sample's context menu, replaces it with this version's sample,
+  and Reset All Samples, in the Samples folder's, does so for every sample and
+  for the shared files in Samples/Data. Your edited copies are kept beside
+  them.][622]
 - [A fresh installation opens a short Getting Started sample, which reads a
   file, filters it, totals it by month and charts the totals, with documentation
   that walks through it one step at a time.][617]

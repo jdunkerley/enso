@@ -59,54 +59,91 @@ passes it to the server) installs the samples shipped with the application in
   copied to `.Samples.<pid>.tmp` with a manifest, `Samples/.samples.json`, and
   renamed into place, so an interrupted copy leaves no half-filled `Samples`.
   The bundle's top-level `CLAUDE.md` is not copied: a dev run copies the source
-  `samples/`, whose contributor notes the packaged app leaves out.
-- **The manifest** (`{ version: 1, samples, data }`) records, for each sample (a
-  bundle folder with a `package.yaml`) and each `Data/` file, the content hash
-  it was installed with, or `null` when that is unknown. A sample's hash
-  (`hashSample`) covers its files by relative path, but not hidden ones (the
-  IDE's `.enso/`), not `output/` (what the sample writes) and not
-  `package.yaml`'s `labels` (the Drive writes them), so none of those counts as
-  an edit.
+  `samples/`, whose contributor notes the packaged app leaves out. Deleting the
+  whole `Samples` folder therefore reinstalls every sample at the next start.
+- **The manifest** (`{ version: 1, samples, data, files }`) records, for each
+  sample (a bundle folder with a `package.yaml`) and each `Data/` file, the
+  content hash it was installed with, or `null` when that is unknown. A sample's
+  hash (`hashSample`) covers its files by relative path, but not hidden ones
+  (the IDE's `.enso/`), not `output/` (what the sample writes), not
+  `package.yaml`'s `labels` (the Drive writes them) and, for `.enso` files, only
+  the code above `#### METADATA ####`, with line endings normalised
+  (`ensoCodeForHash`): opening a sample makes the IDE rewrite its metadata (node
+  positions, widget and visualisation state), and that is not an edit. An update
+  still replaces the whole file, metadata included.
+- **Hashing is cheap and never reads a file whole without need**: other files
+  are hashed as a stream, so their size is no limit, and `files` caches each
+  disk file's `size`, `mtimeMs` and hash (`FileHasher`), so a file whose size
+  and time are unchanged is not read again. `sync` rewrites the cache; `status`
+  only reads it. The bundle is hashed once per `LocalSamples`.
+- **Only "no such file" means missing** (`ENOENT`, `ENOTDIR`). Anything else
+  (`EACCES`, `EBUSY`, a folder where a file should be, a file that vanishes
+  while it is read) makes the copy `Unreadable`: it is never overwritten, the
+  start-up check logs it and moves on to the next sample, `status` reports it as
+  `unreadable` and still reports the others, and a reset keeps it as an edited
+  copy before installing the bundle.
 - **Every later start** compares the bundle (B), the manifest (M) and the disk
   (D) for each sample and `Data/` file (`compareSample`, whose test lists every
   case): not on disk and not in the manifest, it is copied in (a new sample, or
   an install from before manifests); not on disk but in the manifest, the user
   deleted it and it stays deleted (Reset brings it back); D = B is current; D =
   M, M ≠ B is unedited with a changed bundle and is replaced, keeping its
-  `.enso/`, its `output/` files and its labels; otherwise it is edited and left
-  alone, with an update when M ≠ B. **A copy the manifest has no record of** (an
-  install from before manifests, whose samples read the old per-sample `data/`)
-  that differs from the bundle is recorded as `null`: edited, with an update,
-  never overwritten. Only the current bundle is known, so an old sample that was
-  never edited counts as edited too.
+  `.enso/`, its `output/` files (the user's copy of a file the bundle also ships
+  there wins) and its labels; otherwise it is edited and left alone, with an
+  update when M ≠ B. **A copy the manifest has no record of** (an install from
+  before manifests, whose samples read the old per-sample `data/`) that differs
+  from the bundle is recorded as `null`: edited, with an update, never
+  overwritten. Only the current bundle is known, so an old sample that was never
+  edited counts as edited too. An edited `Data/` file whose bundle changed is
+  kept with no sign in the Drive; Reset All Samples replaces it.
+- **A manifest from a newer version** (a `version` above 1, after a downgrade)
+  is never rewritten: `sync` changes nothing and logs it, `status` reports only
+  whether each sample is as bundled, and the resets refuse.
 - **Changes are staged and renamed** (`.<name>.<pid>.tmp` beside the target; a
   replaced folder goes aside as `.<name>.<pid>.old` first, since a rename over a
-  folder is not one step on Windows). The next start removes what an interrupted
-  change left, moving an `.old` back when its target is missing. All of a
-  `LocalSamples`' operations are serialised (`serialised`, keyed by the
-  `Samples` folder), and the manifest is written with `writeJsonAtomic`.
-- **An open project is never changed**: `sync` takes an `isOpen`, and leaves an
-  open sample's update for a later start. At start-up nothing is open, since the
-  window waits for the check (at most 10 s) and a second instance exits.
-- **Reset** (`reset(name)`, `resetAll()`): a sample that differs from the bundle
-  is renamed to `<Name>_edited_<yyyy>_<mm>_<dd>` (then `_2`, `_3`, ...) beside
-  it, with that name in its `package.yaml` too, and a fresh copy is installed; a
-  `Data/` file that differs is kept as `<name>_edited_<date><ext>`. The date
-  uses underscores because a project name allows only letters, digits and `_`.
-  `resetAll` covers every bundled sample and `Data/` file and nothing else, and
-  changes nothing when a sample is open. Both record the bundle's hashes.
+  folder is not one step on Windows; a failed rename puts it back). The next
+  start removes what an interrupted change left, moving an `.old` back when its
+  target is missing. All of a `LocalSamples`' operations are serialised
+  (`serialised`, keyed by the `Samples` folder), and the manifest and a
+  `package.yaml` are written to a temporary file and renamed into place.
+- **An open or opening project is never changed.** `sync` and the resets take an
+  `isOpen`, which Electron answers with `ProjectService.isProjectOpenOrOpening`
+  (from the moment `openProject` starts on a project, through the runner's
+  loading and running projects, paths compared whatever their separators and, on
+  Windows, case). The start-up check runs while the window waits (at most 10 s),
+  so a user can open a sample before it ends; that sample's update is left for a
+  later start. A headless `--startup.project` run takes no single-instance lock,
+  so `runLocalProjectByPath` writes a run marker,
+  `<project>/.enso/run-<pid>.lock` (`samples/runMarker.ts`), and a sample with a
+  marker whose process is alive is treated as open too. What remains is the
+  moment between the check and the rename.
+- **Reset** (`reset(name)`, `resetAll()`): a sample that differs from the
+  bundle, or cannot be read, is renamed to `<Name>_edited_<yyyy>_<mm>_<dd>`
+  (then `_2`, `_3`, ...) beside it, with that name in its `package.yaml` too,
+  and a fresh copy is installed; a `Data/` file that differs is kept as
+  `<name>_edited_<date><ext>`. The date uses underscores because a project name
+  allows only letters, digits and `_`. A copy whose `package.yaml` cannot be
+  renamed is still kept, and is reported in `unrenamed` (the Drive tells the
+  user to rename it). `resetAll` covers every bundled sample and `Data/` file
+  and nothing else, and changes nothing when a sample is open. Both record the
+  bundle's hashes. **A reset does not tell local versioning**: it does not call
+  `commitMove`, so in a versioned repository the history stays on the sample's
+  path, which now holds the fresh copy, and the `_edited_` copy starts with
+  none.
 - **Routes** (POST to `/api/project-service/samples/*`, served by
   `handler/projectService.ts` from the `LocalSamples` passed to
   `handleProjectServiceRequest` after `keyFromEnvironment`): `status` (each
   bundled sample's `name`, `path` and `state`: `current`, `edited`,
-  `updateAvailable` or `missing`, and the `Samples` `directory`, all with `/`),
-  `reset` `{ name }` and `reset-all`, which answer `{ kept }`. The resets refuse
-  a sample the project service has running. The Vite middleware has no
-  `LocalSamples`, so under `dev:vite` the routes fail and the Drive shows no
-  sample actions.
+  `updateAvailable`, `missing` or `unreadable`, and the `Samples` `directory`,
+  all with `/`), `reset` `{ name }` and `reset-all`, which answer
+  `{ kept, unrenamed }`. The resets refuse a sample the project service has open
+  or opening. The Vite middleware has no `LocalSamples`, so under `dev:vite` the
+  routes fail and the Drive shows no sample actions.
 
-Tests: `src/samples/__tests__/installSamples.test.ts` and the `samples routes`
-in `handler/__tests__/projectService.test.ts`.
+Tests: `src/samples/__tests__/installSamples.test.ts`, the `samples routes` in
+`handler/__tests__/projectService.test.ts`,
+`projectService/__tests__/openOrOpening.test.ts` and the run marker in
+`__tests__/runProjects.test.ts`.
 
 ## Scope
 

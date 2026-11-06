@@ -147,15 +147,9 @@ interface SamplesContext {
   readonly getProjectService: () => Promise<ProjectService>
 }
 
-/** Whether a project is open in the project service, by its path with either separator. */
+/** Whether a project is open or opening in the project service, by its path. */
 function isOpenIn(getProjectService: () => Promise<ProjectService>): IsProjectOpen {
-  return async (projectPath) => {
-    const projectService = await getProjectService()
-    return (
-      (await projectService.isProjectRunning(Path(projectPath))) ||
-      (await projectService.isProjectRunning(Path(projectPath.replace(/\//g, '\\'))))
-    )
-  }
+  return async (projectPath) => (await getProjectService()).isProjectOpenOrOpening(projectPath)
 }
 
 /** The routes served by {@link LocalSamples}. The resets refuse an open sample. */

@@ -366,6 +366,7 @@
   "resetAllSamplesDone": "Reset the samples to the bundled version.",
   "resetAllSamplesKept": "Reset the samples to the bundled version. Your edited copies are kept: $0.",
   "resetSampleError": "Could not reset '$0'",
+  "resetSampleUnrenamed": "The edited copy '$0' still has the sample's project name. Rename it in the Drive before you open it.",
   "resetAllSamplesError": "Could not reset the samples",
   "openInFileBrowserShortcutWindows": "Open in Explorer",
   "openInFileBrowserShortcutMacOs": "Open in Finder",

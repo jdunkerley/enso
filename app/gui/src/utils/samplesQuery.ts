@@ -9,6 +9,13 @@ import type { SamplesStatus } from 'enso-common/src/services/ProjectManager/type
 
 export const SAMPLES_STATUS_QUERY_KEY = [BackendType.local, 'samplesStatus'] as const
 
+/**
+ * How long a status stays fresh. Every project row of the Drive uses it, and a sample's state
+ * changes only through an edit, a reset (which refetches it) or a new version, so it need not be
+ * asked for at each mount or focus.
+ */
+export const SAMPLES_STATUS_STALE_TIME_MS = 60_000
+
 /** The query of the bundled samples' states on `backend`; disabled without one. */
 export function samplesStatusQueryOptions(backend: LocalBackend | null | undefined) {
   return {
@@ -23,5 +30,6 @@ export function samplesStatusQueryOptions(backend: LocalBackend | null | undefin
       }
     },
     enabled: backend != null,
+    staleTime: SAMPLES_STATUS_STALE_TIME_MS,
   }
 }

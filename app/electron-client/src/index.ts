@@ -22,6 +22,7 @@ import { access, constants, readFile, writeFile } from 'node:fs/promises'
 import { join as joinPath } from 'node:path'
 import process from 'node:process'
 import { LocalSamples, runLocalProjectByPath } from 'project-manager-shim'
+import type { ProjectService } from 'project-manager-shim/projectService'
 import { shutdownClaudeAgent } from './ai/claudeAgent.js'
 import {
   engineModeOption,
@@ -140,6 +141,8 @@ class App {
   samplesInstalled: Promise<unknown> = Promise.resolve()
   /** The bundled samples, for the start-up check and the Drive's `samples/` routes. */
   localSamples: LocalSamples | undefined
+  /** The project service, once the server has started; the samples check asks it what is open. */
+  projectService: ProjectService | undefined
 
   async init() {
     this.electronIsDev =
@@ -274,8 +277,11 @@ class App {
     })()
 
     this.localSamples = new LocalSamples(samplesPath(electron, electronIsDev))
-    // No project is open yet: the window waits for this, and a second instance exits.
-    const installSamplesPromise = this.localSamples.sync()
+    // The window waits for this, but only so long: a project the user opens meanwhile (or one
+    // still opening) is not updated, and neither is one a headless run has marked.
+    const installSamplesPromise = this.localSamples.sync(
+      async (path) => (await this.projectService?.isProjectOpenOrOpening(path)) ?? false,
+    )
     this.samplesInstalled = installSamplesPromise.catch((error: unknown) => {
       console.error('Failed to install the bundled samples.', error)
     })
@@ -410,6 +416,7 @@ class App {
       port: args.server.port,
     })
     const projectService = this.createProjectService(args)
+    this.projectService = projectService
     this.server = await Server.create(
       serverCfg,
       projectService,

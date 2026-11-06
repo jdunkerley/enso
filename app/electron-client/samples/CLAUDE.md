@@ -16,7 +16,10 @@ version and gets an "Update available" badge in the Drive, whose Reset Sample
 keeps the edited copy as `<Name>_edited_<yyyy>_<mm>_<dd>`. A new sample or
 `Data/` file is copied in. So renaming a sample installs it again under the new
 name and leaves the old folder as the user's, and changing a `Data/` file
-changes it for every sample that reads it. See
+changes it for every sample that reads it. Only a sample's code counts: the
+`#### METADATA ####` trailer of `.enso` files is left out of the comparison (the
+IDE rewrites it whenever a sample is opened), so a change to the stored layout
+alone does not update installs; it arrives with the next change to the code. See
 `app/project-manager-shim/CLAUDE.md` ("Sample projects").
 
 ## Layout

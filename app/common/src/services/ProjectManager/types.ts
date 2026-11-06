@@ -291,7 +291,7 @@ export type LocalSecretsStatus = (
  * A bundled sample's state in `<projects>/Samples`: as bundled, edited by the user, edited with a
  * changed bundle to reset to, or deleted (reset brings it back).
  */
-export type SampleState = 'current' | 'edited' | 'updateAvailable' | 'missing'
+export type SampleState = 'current' | 'edited' | 'updateAvailable' | 'missing' | 'unreadable'
 
 /** The bundled samples, and where they are installed. */
 export interface SamplesStatus {
@@ -307,6 +307,8 @@ export interface SamplesStatus {
 /** What a reset of samples did: the names its edited copies were kept under. */
 export interface SamplesResetResult {
   readonly kept: readonly string[]
+  /** Kept copies whose `package.yaml` still has the sample's name: the user should rename them. */
+  readonly unrenamed: readonly string[]
 }
 
 /** What is known about a local project's versioning. */

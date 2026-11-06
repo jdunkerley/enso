@@ -4,10 +4,14 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   compareSample,
+  ensoCodeForHash,
+  fileOps,
   hashSample,
   installSamples,
   LocalSamples,
+  markProjectRunning,
   readSamplesManifest,
+  Unreadable,
   type SamplesManifest,
 } from '../index.js'
 
@@ -132,6 +136,15 @@ describe('installSamples: later starts', () => {
   })
 
   test('change nothing when nothing changed', async () => {
+    // The first check records the files' hashes for the next ones.
+    await installSamples(bundled, projects)
+    expect(Object.keys(manifest().files ?? {}).sort()).toEqual([
+      'Data/rows.csv',
+      'One/package.yaml',
+      'One/src/Main.enso',
+      'Two/package.yaml',
+      'Two/src/Main.enso',
+    ])
     const before = read(path.join(samples, '.samples.json'))
     expect(await installSamples(bundled, projects)).toEqual({
       installed: false,
@@ -289,7 +302,7 @@ describe('installSamples: an install from before manifests', () => {
     expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe("main = 'data/rows.csv'\n")
     expect(fs.existsSync(path.join(samples, 'One', 'data', 'rows.csv'))).toBe(true)
     expect(read(path.join(samples, 'Data', 'rows.csv'))).toBe('a,b\n1,2\n')
-    expect(manifest()).toEqual({
+    expect(manifest()).toMatchObject({
       version: 1,
       samples: {
         // Matches no bundle this version knows: taken as edited, never overwritten.
@@ -328,8 +341,13 @@ describe('reset', () => {
     write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
     write(path.join(samples, 'One', '.enso', 'project.json'), '{"id":"one-id"}')
     write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    // The bundle is read once per `LocalSamples`; a new version is a new one.
+    local = new LocalSamples(bundled, projects)
 
-    expect(await local.reset('One', undefined, NOW)).toEqual({ kept: ['One_edited_2026_11_06'] })
+    expect(await local.reset('One', undefined, NOW)).toEqual({
+      kept: ['One_edited_2026_11_06'],
+      unrenamed: [],
+    })
     const kept = path.join(samples, 'One_edited_2026_11_06')
     expect(read(path.join(kept, 'src', 'Main.enso'))).toBe('main = 99\n')
     expect(read(path.join(kept, 'package.yaml'))).toBe('name: One_edited_2026_11_06\n')
@@ -341,7 +359,10 @@ describe('reset', () => {
 
     // The same day again: `_2`.
     write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 98\n')
-    expect(await local.reset('One', undefined, NOW)).toEqual({ kept: ['One_edited_2026_11_06_2'] })
+    expect(await local.reset('One', undefined, NOW)).toEqual({
+      kept: ['One_edited_2026_11_06_2'],
+      unrenamed: [],
+    })
     expect(listing(samples)).toEqual([
       '.samples.json',
       'Data',
@@ -353,13 +374,13 @@ describe('reset', () => {
   })
 
   test('keeps no copy of an unedited sample', async () => {
-    expect(await local.reset('Two', undefined, NOW)).toEqual({ kept: [] })
+    expect(await local.reset('Two', undefined, NOW)).toEqual({ kept: [], unrenamed: [] })
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
   })
 
   test('brings back a deleted sample', async () => {
     fs.rmSync(path.join(samples, 'Two'), { recursive: true })
-    expect(await local.reset('Two', undefined, NOW)).toEqual({ kept: [] })
+    expect(await local.reset('Two', undefined, NOW)).toEqual({ kept: [], unrenamed: [] })
     expect(read(path.join(samples, 'Two', 'src', 'Main.enso'))).toBe('main = 2\n')
   })
 
@@ -387,6 +408,7 @@ describe('resetAll', () => {
 
     expect(await local.resetAll(undefined, NOW)).toEqual({
       kept: ['One_edited_2026_11_06', 'Data/rows_edited_2026_11_06.csv'],
+      unrenamed: [],
     })
     expect(listing(samples)).toEqual([
       '.samples.json',
@@ -421,7 +443,260 @@ describe('resetAll', () => {
 
   test('works when Samples is gone', async () => {
     fs.rmSync(samples, { recursive: true })
-    expect(await local.resetAll(undefined, NOW)).toEqual({ kept: [] })
+    expect(await local.resetAll(undefined, NOW)).toEqual({ kept: [], unrenamed: [] })
     expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
+  })
+})
+
+describe('the code of an .enso file', () => {
+  const MAIN = 'main =\n    1\n'
+  const WITH_METADATA = `${MAIN}\n\n\n#### METADATA ####\n[[{"index":{"value":7}}],"{}"]\n`
+
+  test('leaves out the METADATA section and the line endings', () => {
+    expect(ensoCodeForHash(WITH_METADATA)).toBe(ensoCodeForHash(`${MAIN}\n\n`))
+    expect(ensoCodeForHash(WITH_METADATA.replace(/\n/g, '\r\n'))).toBe(
+      ensoCodeForHash(WITH_METADATA),
+    )
+    expect(ensoCodeForHash(MAIN)).not.toBe(ensoCodeForHash('main =\n    2\n'))
+  })
+
+  test('so rewritten metadata is not an edit, and an update replaces the whole file', async () => {
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), WITH_METADATA)
+    await installSamples(bundled, projects)
+    const main = path.join(samples, 'One', 'src', 'Main.enso')
+    // What opening the sample in the IDE does: new node positions and widget state, CRLF.
+    write(main, WITH_METADATA.replace('"value":7', '"value":8').replace(/\n/g, '\r\n'))
+    expect((await new LocalSamples(bundled, projects).status()).samples[0]?.state).toBe('current')
+
+    // An update brings the new code and the new METADATA.
+    const updated = WITH_METADATA.replace('1\n', '10\n').replace('"value":7', '"value":9')
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), updated)
+    expect(await installSamples(bundled, projects)).toMatchObject({ updated: ['One'] })
+    expect(read(main)).toBe(updated)
+  })
+})
+
+describe('what cannot be read', () => {
+  beforeEach(async () => {
+    await installSamples(bundled, projects)
+  })
+
+  function failStat(target: string, code: string) {
+    const stat = fs.promises.stat
+    vi.spyOn(fs.promises, 'stat').mockImplementation(((p: fs.PathLike, ...rest: unknown[]) =>
+      path.resolve(String(p)) === path.resolve(target) ?
+        Promise.reject(Object.assign(new Error(`${code}: ${String(p)}`), { code }))
+      : (stat as (...args: unknown[]) => Promise<fs.Stats>)(p, ...rest)) as typeof fs.promises.stat)
+  }
+
+  test('a Data file that cannot be read (EACCES) is never overwritten; Reset All keeps it', async () => {
+    const rows = path.join(samples, 'Data', 'rows.csv')
+    write(rows, 'mine\n')
+    write(path.join(bundled, 'Data', 'rows.csv'), 'a,b\n3,4\n')
+    failStat(rows, 'EACCES')
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // No manifest record either: the case that took the install branch before.
+    fs.writeFileSync(
+      path.join(samples, '.samples.json'),
+      JSON.stringify({ ...manifest(), data: {} }),
+    )
+    await installSamples(bundled, projects)
+    expect(read(rows)).toBe('mine\n')
+
+    expect(await new LocalSamples(bundled, projects).resetAll(undefined, NOW)).toMatchObject({
+      kept: ['Data/rows_edited_2026_11_06.csv'],
+    })
+    vi.restoreAllMocks()
+    expect(read(path.join(samples, 'Data', 'rows_edited_2026_11_06.csv'))).toBe('mine\n')
+    expect(read(rows)).toBe('a,b\n3,4\n')
+  })
+
+  test('a folder where a Data file should be (EISDIR) is left alone; Reset All keeps it', async () => {
+    const rows = path.join(samples, 'Data', 'rows.csv')
+    fs.rmSync(rows)
+    write(path.join(rows, 'inside.txt'), 'x')
+    fs.writeFileSync(
+      path.join(samples, '.samples.json'),
+      JSON.stringify({ ...manifest(), data: {} }),
+    )
+    await installSamples(bundled, projects)
+    expect(fs.statSync(rows).isDirectory()).toBe(true)
+
+    await new LocalSamples(bundled, projects).resetAll(undefined, NOW)
+    expect(read(path.join(samples, 'Data', 'rows_edited_2026_11_06.csv', 'inside.txt'))).toBe('x')
+    expect(read(rows)).toBe('a,b\n1,2\n')
+  })
+
+  test('an unreadable sample is reported as such, the others still are, and Reset keeps it', async () => {
+    const one = path.join(samples, 'One')
+    failStat(one, 'EACCES')
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    write(path.join(bundled, 'Two', 'src', 'Main.enso'), 'main = 20\n')
+    const local = new LocalSamples(bundled, projects)
+    expect(await local.sync()).toMatchObject({ updated: ['Two'] })
+    expect(read(path.join(one, 'src', 'Main.enso'))).toBe('main = 1\n')
+    expect((await local.status()).samples.map((sample) => sample.state)).toEqual([
+      'unreadable',
+      'current',
+    ])
+    expect(await local.reset('One', undefined, NOW)).toEqual({
+      kept: ['One_edited_2026_11_06'],
+      unrenamed: [],
+    })
+    vi.restoreAllMocks()
+    expect(read(path.join(samples, 'One_edited_2026_11_06', 'src', 'Main.enso'))).toBe('main = 1\n')
+    expect(read(path.join(one, 'src', 'Main.enso'))).toBe('main = 10\n')
+  })
+
+  test('a large file is hashed as a stream, not read whole', async () => {
+    const readFile = fs.promises.readFile
+    vi.spyOn(fs.promises, 'readFile').mockImplementation(((p: fs.PathLike, ...rest: unknown[]) =>
+      String(p).endsWith('.csv') ?
+        Promise.reject(
+          Object.assign(new RangeError('File size is greater than 2 GiB'), {
+            code: 'ERR_FS_FILE_TOO_LARGE',
+          }),
+        )
+      : (readFile as (...args: unknown[]) => Promise<unknown>)(
+          p,
+          ...rest,
+        )) as typeof fs.promises.readFile)
+    write(path.join(bundled, 'Data', 'rows.csv'), 'a,b\n3,4\n')
+    expect(await new LocalSamples(bundled, projects).sync()).toMatchObject({
+      updated: ['Data/rows.csv'],
+    })
+  })
+
+  test('a file whose size and time did not change is not read again', async () => {
+    await installSamples(bundled, projects)
+    const readFile = vi.spyOn(fs.promises, 'readFile')
+    await new LocalSamples(bundled, projects).status()
+    const paths = readFile.mock.calls.map(([p]) => path.resolve(String(p)))
+    expect(paths).not.toContain(path.resolve(samples, 'One', 'src', 'Main.enso'))
+    expect(paths).toContain(path.resolve(bundled, 'One', 'src', 'Main.enso'))
+  })
+
+  test('compareSample keeps an unreadable copy and its record', () => {
+    expect(compareSample('B', new Unreadable(new Error('EACCES')), 'A')).toEqual({
+      action: 'keep',
+      record: 'A',
+      state: 'unreadable',
+    })
+  })
+})
+
+describe('open samples', () => {
+  beforeEach(async () => {
+    await installSamples(bundled, projects)
+  })
+
+  test('a sample another process runs (its run marker) is neither updated nor reset', async () => {
+    const one = path.join(samples, 'One')
+    const unmark = await markProjectRunning(one)
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    const local = new LocalSamples(bundled, projects)
+    expect(await local.sync()).toMatchObject({ updated: [], updateAvailable: ['One'] })
+    await expect(local.reset('One', undefined, NOW)).rejects.toThrow(/is open/)
+    await expect(local.resetAll(undefined, NOW)).rejects.toThrow(/is open/)
+    expect(read(path.join(one, 'src', 'Main.enso'))).toBe('main = 1\n')
+    await unmark()
+    expect(await local.sync()).toMatchObject({ updated: ['One'] })
+  })
+
+  test('a marker left by a process that has gone is ignored', async () => {
+    write(path.join(samples, 'One', '.enso', 'run-999999999.lock'), '')
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    expect(await installSamples(bundled, projects)).toMatchObject({ updated: ['One'] })
+  })
+})
+
+describe('a manifest from a newer version', () => {
+  beforeEach(async () => {
+    await installSamples(bundled, projects)
+    fs.rmSync(path.join(samples, 'Two'), { recursive: true })
+    fs.writeFileSync(path.join(samples, '.samples.json'), JSON.stringify({ version: 2 }))
+  })
+
+  test('is left alone, and so are the samples', async () => {
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    const local = new LocalSamples(bundled, projects)
+    expect(await local.sync()).toEqual({
+      installed: false,
+      copied: [],
+      updated: [],
+      updateAvailable: [],
+    })
+    expect(read(path.join(samples, '.samples.json'))).toBe('{"version":2}')
+    expect(fs.existsSync(path.join(samples, 'Two'))).toBe(false)
+    expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 1\n')
+    expect((await local.status()).samples.map((sample) => sample.state)).toEqual([
+      'edited',
+      'missing',
+    ])
+    await expect(local.reset('One', undefined, NOW)).rejects.toThrow(/newer version/)
+  })
+})
+
+describe('local state on update', () => {
+  test("the user's copy of a file the bundle ships in output/ wins", async () => {
+    await installSamples(bundled, projects)
+    write(path.join(samples, 'One', 'output', 'README.txt'), 'my notes\n')
+    write(path.join(bundled, 'One', 'output', 'README.txt'), 'new outputs\n')
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    expect(await installSamples(bundled, projects)).toMatchObject({ updated: ['One'] })
+    expect(read(path.join(samples, 'One', 'output', 'README.txt'))).toBe('my notes\n')
+  })
+})
+
+describe('a rename that fails', () => {
+  beforeEach(async () => {
+    await installSamples(bundled, projects)
+  })
+
+  function failRename(when: (from: string, to: string) => boolean) {
+    const rename = fileOps.rename
+    vi.spyOn(fileOps, 'rename').mockImplementation((from, to) =>
+      when(from, to) ? Promise.reject(new Error('EBUSY: rename')) : rename(from, to),
+    )
+  }
+
+  test('during an update leaves the sample as it was, and the next start tries again', async () => {
+    write(path.join(bundled, 'One', 'src', 'Main.enso'), 'main = 10\n')
+    const recorded = manifest().samples['One']
+    failRename((from) => path.basename(from).endsWith('.tmp'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await new LocalSamples(bundled, projects).sync()).toMatchObject({ updated: [] })
+    expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 1\n')
+    expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
+    expect(manifest().samples['One']).toBe(recorded)
+    vi.mocked(fileOps.rename).mockRestore()
+    expect(await installSamples(bundled, projects)).toMatchObject({ updated: ['One'] })
+  })
+
+  test('during a reset puts the edited sample back, with its name', async () => {
+    write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
+    failRename((from, to) => path.basename(from).startsWith('.One.') && path.basename(to) === 'One')
+    await expect(new LocalSamples(bundled, projects).reset('One', undefined, NOW)).rejects.toThrow(
+      'EBUSY',
+    )
+    expect(listing(samples)).toEqual(['.samples.json', 'Data', 'One', 'Two'])
+    expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 99\n')
+    expect(read(path.join(samples, 'One', 'package.yaml'))).toBe('name: One\n')
+  })
+
+  test("of the edited copy's package.yaml is reported, and the copy is still kept", async () => {
+    write(path.join(samples, 'One', 'src', 'Main.enso'), 'main = 99\n')
+    failRename((_from, to) => path.basename(to) === 'package.yaml')
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(await new LocalSamples(bundled, projects).reset('One', undefined, NOW)).toEqual({
+      kept: ['One_edited_2026_11_06'],
+      unrenamed: ['One_edited_2026_11_06'],
+    })
+    expect(read(path.join(samples, 'One_edited_2026_11_06', 'package.yaml'))).toBe('name: One\n')
+    expect(listing(path.join(samples, 'One_edited_2026_11_06'))).toEqual([
+      'output',
+      'package.yaml',
+      'src',
+    ])
   })
 })

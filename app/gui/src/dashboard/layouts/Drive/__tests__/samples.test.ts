@@ -54,8 +54,12 @@ let resetAllSamples: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   samplesStatus = vi.fn(() => Promise.resolve(STATUS))
-  resetSample = vi.fn(() => Promise.resolve({ kept: ['Sales_Overview_edited_2026_11_06'] }))
-  resetAllSamples = vi.fn(() => Promise.resolve({ kept: [] }))
+  resetSample = vi.fn(() =>
+    Promise.resolve({ kept: ['Sales_Overview_edited_2026_11_06'], unrenamed: [] as string[] }),
+  )
+  resetAllSamples = vi.fn(() =>
+    Promise.resolve({ kept: [] as string[], unrenamed: [] as string[] }),
+  )
   fake.localBackend = { samplesStatus, resetSample, resetAllSamples }
   fake.openedProjects = shallowReactive([])
 })
@@ -212,6 +216,29 @@ describe('useSampleMenuEntries', () => {
     expect(useToasts().toasts.value.map((toast) => toast.content)).toContain(
       "Could not reset 'Sales_Overview': The sample 'Sales_Overview' is open.",
     )
+  })
+
+  test("a kept copy that keeps the sample's name is a warning", async () => {
+    const copy = 'Sales_Overview_edited_2026_11_06'
+    resetSample.mockResolvedValue({ kept: [copy], unrenamed: [copy] })
+    const entries = await setup(() =>
+      useSampleMenuEntries(
+        () => project(`${SAMPLES}/Sales_Overview`),
+        () => false,
+      ),
+    )
+    entries.value[0]?.doAction()
+    await flushPromises()
+    const warning = useToasts().toasts.value.find((toast) => toast.type === 'warning')
+    expect(warning?.content).toBe(
+      `The edited copy '${copy}' still has the sample's project name. Rename it in the Drive ` +
+        'before you open it.',
+    )
+  })
+
+  test('the samples status is not fetched again for each row', async () => {
+    await setup(() => [useSamples(), useSamples(), useSamples()])
+    expect(samplesStatus).toHaveBeenCalledOnce()
   })
 
   test('other rows have no sample entries', async () => {

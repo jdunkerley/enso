@@ -48,7 +48,7 @@ test('an edited sample with an update has a badge, and Reset Sample resets it', 
   await drivePage.driveTable
     .doubleClickRow('Samples')
     .do(async () => {
-      await expect(badge('Sales_Overview')).toHaveText(TEXT.sampleUpdateAvailable)
+      await expect(badge('Sales_Overview')).toContainText(TEXT.sampleUpdateAvailable)
       await expect(badge('Text_Cleaning')).toHaveCount(0)
       await expect(badge('My_Sample')).toHaveCount(0)
     })

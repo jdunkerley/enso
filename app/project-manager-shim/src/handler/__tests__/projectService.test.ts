@@ -526,10 +526,10 @@ describe('samples routes', () => {
     expect(await fs.readFile(path.join(directory, 'One', 'src', 'Main.enso'), 'utf8')).toBe(
       'main = 1\n',
     )
-    expect((await call('samples/reset-all', {})).result).toEqual({ kept: [] })
+    expect((await call('samples/reset-all', {})).result).toEqual({ kept: [], unrenamed: [] })
   })
 
-  test('the resets refuse an open sample, asking by either separator', async () => {
+  test('the resets refuse an open sample', async () => {
     const directory = await setUpSamples()
     running = true
     expect((await call('samples/reset', { name: 'One' })).error).toMatchObject({

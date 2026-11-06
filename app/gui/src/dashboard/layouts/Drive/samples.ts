@@ -103,18 +103,26 @@ export function useResetSamples() {
     ])
   }
 
+  /** Warn about kept copies that still have their sample's project name. */
+  const warnUnrenamed = (unrenamed: readonly string[]) => {
+    for (const copy of unrenamed) {
+      toasts.show(getText('resetSampleUnrenamed', copy), { type: 'warning' })
+    }
+  }
+
   /** Reset the sample `name`, and say what was kept. */
   const resetSample = async (name: string) => {
     const backend = backends.localBackend
     if (backend == null) return
     try {
-      const { kept } = await backend.resetSample(name)
+      const { kept, unrenamed } = await backend.resetSample(name)
       toasts.show(
         kept[0] != null ?
           getText('resetSampleKept', name, kept[0])
         : getText('resetSampleDone', name),
         { type: 'success' },
       )
+      warnUnrenamed(unrenamed)
     } catch (error) {
       toastAndLog('resetSampleError', error, name)
     } finally {
@@ -127,13 +135,14 @@ export function useResetSamples() {
     const backend = backends.localBackend
     if (backend == null) return
     try {
-      const { kept } = await backend.resetAllSamples()
+      const { kept, unrenamed } = await backend.resetAllSamples()
       toasts.show(
         kept.length > 0 ?
           getText('resetAllSamplesKept', kept.join(', '))
         : getText('resetAllSamplesDone'),
         { type: 'success' },
       )
+      warnUnrenamed(unrenamed)
     } catch (error) {
       toastAndLog('resetAllSamplesError', error)
     } finally {

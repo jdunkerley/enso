@@ -66,6 +66,7 @@ function onClick(event: MouseEvent) {
     >
       <Badge variant="outline" color="accent" size="small" icon="restore">
         {{ getText('sampleUpdateAvailable') }}
+        <span class="sr-only">{{ getText('sampleUpdateAvailableDescription') }}</span>
       </Badge>
     </span>
   </div>
