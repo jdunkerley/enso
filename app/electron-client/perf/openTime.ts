@@ -387,7 +387,11 @@ async function ensureWindowSize(app: ElectronApplication, page: Page, marks: Mar
 }
 
 async function closeProject(page: Page, name: string) {
-  await page.getByRole('tab', { name }).locator('.CloseButton').click()
+  // The close button is a sibling of the `role="tab"` button, inside the same `.SelectableTab`.
+  await page
+    .locator('.SelectableTab', { has: page.getByRole('tab', { name }) })
+    .locator('.CloseButton')
+    .click()
   // "Keep versions of your projects with git?" may ask first (see `answerRepositoryPrompt`).
   const prompt = page.getByTestId('repository-prompt')
   await prompt
@@ -433,6 +437,8 @@ async function measureLaunch(
 ): Promise<RunResult & { readonly stdout: string }> {
   const dir = path.join(options.out, label)
   fs.rmSync(dir, { recursive: true, force: true })
+  // A launch with no opens (the AOT preparation) creates no project, so nothing else makes it.
+  fs.mkdirSync(dir, { recursive: true })
   const projectsDir = path.join(dir, 'projects')
   const logDir = path.join(dir, 'logs')
   const launcher = findEngineLauncher(options.exe)
