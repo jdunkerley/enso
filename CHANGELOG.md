@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [A fresh installation opens a short Getting Started sample, which reads a
+  file, filters it, totals it by month and charts the totals, with documentation
+  that walks through it one step at a time.][617]
 - [The sample projects a new installation copies to the Samples folder share
   their input files in one Samples/Data folder and write their results to their
   own output folder. Each opens with its nodes laid out and commented, and its
@@ -417,6 +420,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[617]: https://github.com/jdunkerley/enso/pull/617
 [607]: https://github.com/jdunkerley/enso/pull/607
 [592]: https://github.com/jdunkerley/enso/pull/592
 [593]: https://github.com/jdunkerley/enso/pull/593
