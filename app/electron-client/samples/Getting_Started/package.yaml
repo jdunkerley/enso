@@ -1,5 +1,5 @@
 name: Getting_Started
-description: A first look at Enso - read orders, keep the Books orders, total them by month and chart them.
+description: A first look at Enso. Read orders, keep one category, total it by month, chart it.
 namespace: local
 version: 0.0.1
 license: Apache-2.0
