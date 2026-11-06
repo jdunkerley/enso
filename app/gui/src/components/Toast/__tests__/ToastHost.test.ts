@@ -95,7 +95,7 @@ describe('ToastHost', () => {
     expect(store.isActive('a')).toBe(true)
     expect(toastElements()).toHaveLength(1)
     expect(toastElements()[0]!.className).not.toContain('slideOut')
-    expect(toastElements()[0]!.querySelector('[role="alert"]')?.textContent).toBe('Again')
+    expect(toastElements()[0]!.querySelector('[role="status"]')?.textContent).toBe('Again')
   })
 
   test('a toast shown again while it collapses stays, at its full height (#600)', async () => {
