@@ -55,6 +55,8 @@ export class UtilityProcessYdocHost implements YdocHost {
   /** The listeners the process has confirmed and that have not been closed since, by port. */
   private readonly open = new Map<number, YdocListenRequest>()
   private nextId = 1
+  /** How many times each port was closed: a `listen` answered after a `close` must not record it. */
+  private readonly closes = new Map<number, number>()
   /** When the current process was forked. */
   private forkedAt = 0
   /** Quick exits in a row (each within `RESTART_WINDOW_MS` of its fork). */
@@ -84,8 +86,12 @@ export class UtilityProcessYdocHost implements YdocHost {
       ...request,
       allowedOrigins: request.allowedOrigins ?? this.allowedOrigins,
     }
+    const closes = this.closes.get(request.port) ?? 0
     await this.send({ type: 'listen', id: this.nextId++, request: withOrigins })
-    this.open.set(request.port, withOrigins)
+    // A `close` sent while this was in flight reaches the process after the listen (it handles one
+    // port's requests in order), so it stopped this listener: recording it would resurrect it at the
+    // next restart.
+    if ((this.closes.get(request.port) ?? 0) === closes) this.open.set(request.port, withOrigins)
   }
 
   /**
@@ -99,6 +105,7 @@ export class UtilityProcessYdocHost implements YdocHost {
   /** Stop the listener on `port` in the utility process. */
   async close(port: number): Promise<void> {
     this.open.delete(port)
+    this.closes.set(port, (this.closes.get(port) ?? 0) + 1)
     await this.send({ type: 'close', id: this.nextId++, port })
   }
 
@@ -130,9 +137,12 @@ export class UtilityProcessYdocHost implements YdocHost {
     })
   }
 
-  /** Fork for a request: the restarts start over. */
+  /**
+   * Fork for a request. The restarts start over, unless a backoff is pending: that is the same crash
+   * loop, and a request must not hand it a fresh limit.
+   */
   private forkOnRequest(): YdocHostChild {
-    this.quickExits = 0
+    if (this.restartTimer === undefined) this.quickExits = 0
     return this.fork()
   }
 
