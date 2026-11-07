@@ -9,6 +9,7 @@ import {
   type IdentifierOrOperatorIdentifier,
   type QualifiedName,
 } from '@/util/qualifiedName'
+import { apiPath, isConversion, type ApiPathEntry } from 'enso-common/src/docsSite/apiPath'
 import type {
   SuggestionEntryArgument,
   SuggestionEntryScope,
@@ -208,3 +209,76 @@ export function entryHasOwner(entry: SuggestionEntry): entry is SuggestionEntry 
 }
 
 export { isRequiredArgument } from './argument'
+
+/** The fully qualified name of a module or type, spelling the project's own module `Main`. */
+function qualifiedPath(path: ProjectPath): string | undefined {
+  return path.project && `${path.project}.${path.path ?? 'Main'}`
+}
+
+/**
+ * The documentation root with exactly one trailing slash, or nothing for an empty or missing
+ * setting (`$config.DOCS_URL`), which switches the links off.
+ */
+export function documentationBase(configured: string | undefined): string | undefined {
+  const trimmed = configured?.trim().replace(/\/+$/, '')
+  return trimmed ? `${trimmed}/` : undefined
+}
+
+/**
+ * The documentation site's page for `entry` (`<base>api/<apiPath>/`), or nothing for what the site
+ * has no page for: the user's own code, functions and locals, and conversions (listed on their
+ * target type's page).
+ * @param base The site's documentation root; a missing trailing slash is added.
+ */
+export function suggestionDocumentationUrl(
+  entry: SuggestionEntry,
+  base: string,
+): string | undefined {
+  const root = documentationBase(base)
+  if (root == null) return
+  try {
+    return pageUrl(entry, root)
+  } catch {
+    // `apiPath` refuses an entry with no usable module or owner: no page, not a broken panel.
+    return
+  }
+}
+
+function pageUrl(entry: SuggestionEntry, root: string): string | undefined {
+  if (!entry.definedIn.project?.startsWith('Standard.')) return
+  if (
+    entry.kind === SuggestionKind.Method &&
+    isConversion({ name: entry.name, isStatic: entry.selfType == null, arguments: entry.arguments })
+  )
+    return
+  const module = qualifiedPath(entry.definedIn)
+  if (module == null) return
+  let pathEntry: ApiPathEntry
+  switch (entry.kind) {
+    case SuggestionKind.Module:
+      pathEntry = { kind: 'module', module }
+      break
+    case SuggestionKind.Type:
+      pathEntry = { kind: 'type', module, name: entry.name }
+      break
+    case SuggestionKind.Constructor:
+      pathEntry = {
+        kind: 'constructor',
+        module,
+        name: entry.name,
+        owner: qualifiedPath(entry.memberOf),
+      }
+      break
+    case SuggestionKind.Method:
+      pathEntry = {
+        kind: 'method',
+        module,
+        name: entry.name,
+        owner: qualifiedPath(entry.memberOf),
+      }
+      break
+    default:
+      return
+  }
+  return `${root}api/${apiPath(pathEntry)}/`
+}

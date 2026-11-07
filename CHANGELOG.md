@@ -23,6 +23,10 @@
   git identity, or `Enso IDE <ide@localhost>` when you have none. Settings and
   About become two buttons at the bottom of the left rail, replacing the menu in
   the top bar, and both rails now run the full height of the window.][566]
+- [F1 on a component, a new button in the component help panel and a new
+  Documentation button in the left rail (also in the command palette) open the
+  user documentation site: the component's page, or the site's
+  introduction.][626]
 - [Projects open faster: the collaborative-editing server now runs beside the
   engine instead of inside it.][593]
 - [The installer includes four sample projects (sales overview, orders and
@@ -425,6 +429,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[626]: https://github.com/jdunkerley/enso/pull/626
 [574]: https://github.com/jdunkerley/enso/pull/574
 [617]: https://github.com/jdunkerley/enso/pull/617
 [607]: https://github.com/jdunkerley/enso/pull/607
