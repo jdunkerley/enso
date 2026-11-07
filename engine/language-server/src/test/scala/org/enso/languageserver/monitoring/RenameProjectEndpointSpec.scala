@@ -3,9 +3,11 @@ package org.enso.languageserver.monitoring
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.headers.{HttpOrigin, Origin, RawHeader}
 import akka.http.scaladsl.model.{
+  ContentType,
   ContentTypes,
   HttpEntity,
   HttpRequest,
+  MediaTypes,
   StatusCodes
 }
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
@@ -85,6 +87,38 @@ class RenameProjectEndpointSpec
               Api.RenameProject("local", "Old_Name", "New_Name")
             ) =>
       }
+    }
+
+    "rename when Sec-Fetch-Site is none (the user typed the URL)" in {
+      initialise()
+      val (e, runtime) = endpoint()
+      Post(
+        "/refactoring/renameProject",
+        HttpEntity(ContentTypes.`application/json`, body)
+      ).withHeaders(RawHeader("Sec-Fetch-Site", "none")) ~> e.route ~> check {
+        status shouldBe StatusCodes.OK
+      }
+      runtime.expectMsgPF() { case Api.Request(_, _: Api.RenameProject) => }
+    }
+
+    "refuse a body that is not JSON, even with no Origin (old browsers)" in {
+      initialise()
+      val (e, runtime) = endpoint()
+      // A `text/plain` form POST from a browser that sends neither `Origin`
+      // nor `Sec-Fetch-Site` (Firefox before 70).
+      formPost() ~> e.route ~> check {
+        status shouldBe StatusCodes.UnsupportedMediaType
+      }
+      Post(
+        "/refactoring/renameProject",
+        HttpEntity(
+          ContentType(MediaTypes.`application/x-www-form-urlencoded`),
+          body
+        )
+      ) ~> e.route ~> check {
+        status shouldBe StatusCodes.UnsupportedMediaType
+      }
+      runtime.expectNoMessage(200.millis)
     }
 
     "refuse a cross-site POST before it reaches the runtime" in {

@@ -1,7 +1,7 @@
 package org.enso.languageserver.monitoring
 
 import akka.actor.{ActorRef, ActorRefFactory}
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{MediaTypes, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
@@ -52,15 +52,24 @@ class RenameProjectEndpoint(
   private val renameProject = {
     path("refactoring" / "renameProject") {
       // Note [The RPC Port Refuses Web Pages]: before the body is read.
-      (post & refuseBrowserPages) {
-        entity(as[String]) { body =>
-          if (ReadinessMonitor.isReady) {
-            handleRenameProject(body)
-          } else {
-            complete(
-              StatusCodes.InternalServerError,
-              Json.obj("error" -> Json.fromString("Not initialized")).noSpaces
-            )
+      (post & refuseBrowserPages & extractRequestEntity) { requestEntity =>
+        // Only JSON (#613 review). A browser sends any other type of body
+        // only after a CORS preflight, which this server never answers, so
+        // even a browser that sends no `Origin` cannot post here.
+        if (
+          requestEntity.contentType.mediaType != MediaTypes.`application/json`
+        ) {
+          complete(StatusCodes.UnsupportedMediaType)
+        } else {
+          entity(as[String]) { body =>
+            if (ReadinessMonitor.isReady) {
+              handleRenameProject(body)
+            } else {
+              complete(
+                StatusCodes.InternalServerError,
+                Json.obj("error" -> Json.fromString("Not initialized")).noSpaces
+              )
+            }
           }
         }
       }

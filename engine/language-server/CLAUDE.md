@@ -95,6 +95,9 @@ the body is read: a cross-site `text/plain` form `POST` needs no CORS preflight
 `Sec-Fetch-Mode: cors`, which is not looked at). One helper, `BrowserPageGuard`,
 serves these routes and the channel sockets; see Note [The RPC Port Refuses Web
 Pages]. A new state-changing route takes `refuseBrowserPages` too.
+`renameProject` also answers `415` to a body that is not `application/json`,
+which a browser sends only after a CORS preflight (never answered here), so even
+an old browser that sends no `Origin` cannot post it.
 
 A session opens **two** `json` sockets (the ydoc server's proxy channel for the
 GUI and its backend channel); each socket is its own channel and controller. The
