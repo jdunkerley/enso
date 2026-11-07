@@ -129,6 +129,7 @@ function focusInputOnTextEvent(event: KeyboardEvent) {
   <div
     v-if="visible"
     class="CommandPalette"
+    data-no-save-shortcut
     @click.stop="close"
     @keydown="focusInputOnTextEvent"
     @keydown.enter.stop

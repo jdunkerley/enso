@@ -11,7 +11,6 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { _electron, type ElectronApplication, type Page } from 'playwright'
 import { electronExecutablePath, findEngineLauncher } from '../tests/packagedIde'
-import { createJvmAotCache, measuredJvmToolOptions, type JvmAotCache } from './jvmAotCache'
 import { hsperfDirectory, parseHsperfData, summariseJvmCounters } from './jvmCounters'
 import {
   classifyTemplate,
@@ -24,15 +23,19 @@ import {
   parseLsLogLine,
   regressionWarnings,
   renderMarkdown,
+  usedAotCache,
   type Engine,
-  type JvmAot,
   type LsLogLine,
   type Mark,
   type OpenTag,
   type OpenTimeReport,
+  type RssSample,
   type RunResult,
+  type RunRss,
+  type ShimAot,
   type Template,
 } from './openTimeReport'
+import { engineProcesses, listProcesses, processRssKb } from './processRss'
 import {
   parseTemplateName,
   projectTemplate,
@@ -182,25 +185,6 @@ async function createProject(launcher: string, projectsDir: string, name: string
   if (code !== 0) throw new Error(`enso --new ${name} exited with ${code}`)
 }
 
-/**
- * Run a new project to its end with the launcher (`--jvm --run`), so that the JVM exits by itself.
- * The AOT cache training needs that where the IDE ends the engine by killing it (Windows).
- */
-async function runProjectOnJvm(options: Options, env: Record<string, string>): Promise<void> {
-  const launcher = findEngineLauncher(options.exe)
-  if (!launcher) throw new Error(`No engine launcher next to ${options.exe}`)
-  const dir = path.join(options.out, 'aot-training')
-  fs.rmSync(dir, { recursive: true, force: true })
-  await createProject(launcher, dir, 'OpenTimeTraining')
-  const code = await runLauncher(
-    launcher,
-    ['--jvm', '--run', path.join(dir, 'OpenTimeTraining')],
-    dir,
-    env,
-  )
-  if (code !== 0) throw new Error(`enso --jvm --run exited with ${code}`)
-}
-
 async function openProject(
   page: Page,
   name: string,
@@ -211,6 +195,7 @@ async function openProject(
   extrasMs: number,
   snapshot: (phase: string) => void,
   project: ProjectTemplate | undefined,
+  sampleRss: (phase: RssPhase) => Promise<void>,
 ) {
   const row = page.getByTestId('drive-view').getByText(name, { exact: true })
   await row.waitFor({ state: 'visible', timeout: 60_000 })
@@ -238,6 +223,8 @@ async function openProject(
   marks.add(`${tag}:welcomeShown`)
   if (project != null) marks.add(`${tag}:libraryShown`)
   snapshot(`${tag}-welcomeShown`)
+  // Only the first open (Note [RSS Is Sampled On The First Open]).
+  if (tag === 'first') await sampleRss('welcomeShown')
   if (cdp) {
     const { profile: cpuProfile } = await cdp.send('Profiler.stop')
     fs.writeFileSync(path.join(dir, `${tag}.cpuprofile`), JSON.stringify(cpuProfile))
@@ -247,7 +234,38 @@ async function openProject(
     await measureExtras(page, tag, marks, dir, extrasMs)
     snapshot(`${tag}-extras`)
   }
+  if (tag === 'first') {
+    const welcome = marks.list.find((m) => m.k === 'first:welcomeShown')!.t
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.max(0, welcome + RSS_LATER_MS - Date.now())),
+    )
+    await sampleRss('welcomeShown+30s')
+  }
 }
+
+/* Note [RSS Is Sampled On The First Open]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * RSS is reported, not gated (the plan's owner answer 3), for native against the JVM: the engine's
+ * processes (the launcher, the native image or `java` under it, and their children; `processRss.ts`)
+ * and the ydoc host's utility process (its pid is in the `ydoc host pid=` line of the output), at
+ * the headline and 30 s later. Only the first open, and the 30 s are waited out before the project
+ * closes, so the second open of such a launch starts later than the others': its numbers are not
+ * comparable with a launch that did not wait, and the headline is the first open's anyway.
+ *
+ * Which processes were summed is written to `rss-<phase>.json` (pid, parent, KiB, command line), so
+ * a surprising figure can be explained afterwards. (The first Windows numbers, ~1.2 GiB for native
+ * against ~0.4 on Linux, were the whole IDE: Playwright's `process()` is a launcher there, its child
+ * the real main process, which matched by name; the IDE binary is now excluded by path.) A process that is not found is no sample, never 0 KiB. The ydoc host's pid is the
+ * last `ydoc host pid=` line, as the host is forked again if it dies.
+ *
+ * The first sample is taken right after the headline, before the extras. On Windows its query (a
+ * PowerShell `Get-CimInstance`) competes with them: `welcomeShown` to `cbEntries` was ~1.3 s in the
+ * sampled first open against ~0.75 s in the second (dispatch 42163352009), so the first open's
+ * extras read ~0.5 s slow there; the sampling time is in the `rss` mark (`ms`). The extras are not
+ * gated and the headline is taken before the sample.
+ */
+type RssPhase = 'welcomeShown' | 'welcomeShown+30s'
+const RSS_LATER_MS = 30_000
 
 /* Note [JVM Counters At Each Phase]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -382,7 +400,11 @@ async function ensureWindowSize(app: ElectronApplication, page: Page, marks: Mar
 }
 
 async function closeProject(page: Page, name: string) {
-  await page.getByRole('tab', { name }).locator('.CloseButton').click()
+  // The close button is a sibling of the `role="tab"` button, inside the same `.SelectableTab`.
+  await page
+    .locator('.SelectableTab', { has: page.getByRole('tab', { name }) })
+    .locator('.CloseButton')
+    .click()
   // "Keep versions of your projects with git?" may ask first (see `answerRepositoryPrompt`).
   const prompt = page.getByTestId('repository-prompt')
   await prompt
@@ -425,9 +447,11 @@ async function measureLaunch(
   opens: readonly OpenTag[] = ['first', 'second'],
   label = `${engine}-${run}`,
   beforeClose: () => Promise<void> = async () => {},
-): Promise<RunResult & { readonly stdout: string }> {
+): Promise<RunResult & { readonly stdout: string; readonly cacheUsed?: boolean }> {
   const dir = path.join(options.out, label)
   fs.rmSync(dir, { recursive: true, force: true })
+  // A launch with no opens (the AOT preparation) creates no project, so nothing else makes it.
+  fs.mkdirSync(dir, { recursive: true })
   const projectsDir = path.join(dir, 'projects')
   const logDir = path.join(dir, 'logs')
   const launcher = findEngineLauncher(options.exe)
@@ -451,9 +475,9 @@ async function measureLaunch(
     ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
     ENSO_AI_DISABLED: '1',
     ENSO_LOG_DIRECTORY: logDir,
-    // The shim's own JDK AOT cache (`project-manager-shim/jvmAot`) stays out of the measurement
-    // until the harness measures it (PR K of the JVM-by-default plan): an empty directory of the
-    // run's, never the user's `<userData>/jvm-aot`, so `jvm-nocache` is uncached.
+    // The shim's own JDK AOT cache (`project-manager-shim/jvmAot`) is a directory of the run's,
+    // never the user's `<userData>/jvm-aot`. A `jvm` engine points it at `<out>/jvm-aot`
+    // (`engineEnv`), which the preparation launch fills; native never trains, so it keeps this.
     ENSO_JVM_AOT_DIR: path.join(options.out, 'shim-jvm-aot'),
     // `--engine-log-level debug`: the engine's own log at that level, to split an open (e.g.
     // `AttachVisualizationCmd`, `Starting ExecuteJob`, module loading); slower, so not for medians.
@@ -465,6 +489,39 @@ async function measureLaunch(
   let app: ElectronApplication | undefined
   let page: Page | undefined
   let error: string | undefined
+  const sampleRss = async (phase: RssPhase) => {
+    try {
+      const electronPid = app?.process().pid
+      const ydocPids = [...stdoutLines.join('\n').matchAll(/ydoc host pid=(\d+)/g)]
+      const ydocPid = Number(ydocPids.at(-1)?.[1])
+      if (electronPid == null) return
+      const began = Date.now()
+      const processes = await listProcesses()
+      const engine = engineProcesses(processes, electronPid, options.exe)
+      const ydoc = Number.isFinite(ydocPid) ? processes.find((p) => p.pid === ydocPid) : undefined
+      fs.writeFileSync(
+        path.join(dir, `rss-${phase.replace('+', '-')}.json`),
+        JSON.stringify({ electronPid, ydocPid, engine, ydoc: ydoc ?? null }, null, 1),
+      )
+      const engineKb = engine.length === 0 ? undefined : engine.reduce((n, p) => n + p.rssKb, 0)
+      const ydocKb = ydocPid ? processRssKb(processes, ydocPid) : undefined
+      // -1: no sample (`runRss`).
+      marks.add('rss', {
+        phase,
+        engineKb: engineKb ?? -1,
+        ydocKb: ydocKb ?? -1,
+        ms: Date.now() - began,
+      })
+      if (engineKb == null || ydocKb == null) {
+        console.warn(
+          `Open time: no RSS at ${phase}: ${engineKb == null ? 'no engine process' : 'no ydoc host'} found (see rss-*.json).`,
+        )
+      }
+    } catch (e) {
+      // Not worth a failed launch: the report just has no RSS for it.
+      console.warn(`Open time: no RSS sample at ${phase}: ${String(e)}`)
+    }
+  }
   // A native engine has a JVM only for a library's Java (a guest JVM, Note [A Project That Uses A
   // Library With Java Code] in `projectTemplates.ts`), so the welcome template's native launches
   // have no counters to copy.
@@ -521,6 +578,7 @@ async function measureLaunch(
         options.extrasMs,
         snapshot,
         project,
+        sampleRss,
       )
       await closeProject(page, names[tag])
       await page.waitForTimeout(2000)
@@ -562,16 +620,36 @@ async function measureLaunch(
     opens.includes('second') ?
       openTimes(marks.list, 'second', logOf(logs, marks.list, 'second'))
     : null
+  const rss = runRss(marks.list)
+  const cacheUsed = usedAotCache(marks.list)
   return {
     engine,
     run,
     first,
     second,
+    ...(rss ? { rss } : {}),
     // Recorded, never silent: the report warns about every phase or extra a launch missed.
     notMeasured: [...new Set([...notMeasured(first), ...(second ? notMeasured(second) : [])])],
     ...(error ? { error } : {}),
     stdout: stdoutLines.join('\n'),
+    ...(cacheUsed === undefined ? {} : { cacheUsed }),
   }
+}
+
+/** The launch's two RSS samples, or `undefined` when either is missing or the ydoc pid was not seen. */
+function runRss(marks: readonly Mark[]): RunRss | undefined {
+  const sample = (phase: RssPhase): RssSample | undefined => {
+    const mark = marks.find((m) => m.k === 'rss' && m.phase === phase)
+    if (mark == null || typeof mark.engineKb !== 'number' || typeof mark.ydocKb !== 'number') {
+      return undefined
+    }
+    return mark.ydocKb < 0 || mark.engineKb < 0 ?
+        undefined
+      : { engineKb: mark.engineKb, ydocKb: mark.ydocKb }
+  }
+  const atWelcome = sample('welcomeShown')
+  const after30s = sample('welcomeShown+30s')
+  return atWelcome && after30s ? { atWelcome, after30s } : undefined
 }
 
 /** `<data dir>/cache/ir/local`, where the engine keeps a project's IR cache. */
@@ -630,30 +708,97 @@ function readReports(targets: readonly string[]): OpenTimeReport[] {
   })
 }
 
+/* Note [The Shim's AOT Cache Is Prepared Before The Launches]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The harness no longer makes a JDK AOT cache of its own (it used to record, create and check one
+ * by hand, which no user ever had). A `jvm` engine launches the IDE as a user does: the engine
+ * mode is `ENSO_ENGINE_MODE=jvm`, so the shim passes `--jvm`, trains its per-user cache in the
+ * background (`project-manager-shim/jvmAot`) and starts every engine with it. The cache lives in
+ * `ENSO_JVM_AOT_DIR=<out>/jvm-aot`, never the user's. A preparation launch idles on the dashboard
+ * until `<out>/jvm-aot/<key>/enso.aot` exists, which the trainer renames into place when it is
+ * complete, and records how long that took (`trainingMs`) and how big it is. The measured launches
+ * then use the cache; after each, the harness looks that it is still there, as the shim deletes a
+ * cache the JVM rejected. `jvm-first` deletes the directory before every launch instead: a
+ * user's very first launch. Nothing trains during its open: the shim stops a running training when
+ * an open starts (`openStarted`) and restarts it 60 s after the last open was answered, so the
+ * background training and the RSS samples stay clear of the measured open as long as
+ * `welcomeShown` is under 30 s after `openAnswered` (~12 s on Windows).
+ */
+const AOT_WAIT_MS = 10 * 60_000
+
+function shimAotDirectory(options: Options): string {
+  return path.join(options.out, 'jvm-aot')
+}
+
+/** The environment of an engine's launches, on top of the harness's own. */
+function engineEnv(engine: Engine, options: Options): Record<string, string> {
+  const jvmOptions =
+    options.jvmOptions.trim() === '' ? {} : { ENSO_JVM_OPTIONS: options.jvmOptions }
+  if (engine === 'native') return { ENSO_ENGINE_MODE: 'native' }
+  return {
+    ENSO_ENGINE_MODE: 'jvm',
+    ENSO_JVM_AOT_DIR: shimAotDirectory(options),
+    ...jvmOptions,
+  }
+}
+
+/** `<root>/<key>/enso.aot`, the shim's cache (`aotKey` names a 16-digit hexadecimal directory). */
+function findShimCache(root: string): string | undefined {
+  try {
+    for (const entry of fs.readdirSync(root)) {
+      const file = path.join(root, entry, 'enso.aot')
+      if (/^[0-9a-f]{16}$/.test(entry) && fs.existsSync(file)) return file
+    }
+  } catch {
+    // No directory yet.
+  }
+  return undefined
+}
+
+/**
+ * One launch that idles on the dashboard until the shim's training has written its cache, and how
+ * long that took.
+ */
+async function prepareShimAot(
+  options: Options,
+  env: Record<string, string>,
+): Promise<{ trainingMs: number; cacheBytes: number }> {
+  fs.rmSync(shimAotDirectory(options), { recursive: true, force: true })
+  const started = Date.now()
+  let found: { trainingMs: number; cacheBytes: number } | undefined
+  const result = await measureLaunch(options, 'jvm', 0, env, [], 'jvm-aot-prepare', async () => {
+    while (Date.now() - started < AOT_WAIT_MS) {
+      const file = findShimCache(shimAotDirectory(options))
+      if (file != null) {
+        found = { trainingMs: Date.now() - started, cacheBytes: fs.statSync(file).size }
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    }
+  })
+  if (found == null) {
+    throw new Error(`no AOT cache within ${AOT_WAIT_MS / 1000} s (${result.error ?? 'no error'})`)
+  }
+  return found
+}
+
 async function main() {
   const options = parseOptions(process.argv.slice(2))
   fs.mkdirSync(options.out, { recursive: true })
   // A project of the harness's own is compared with nothing (`other`).
   const template = options.template === 'welcome' ? await packagedTemplate(options) : 'other'
   const runs: RunResult[] = []
-  let jvmAot: JvmAot | undefined
+  let shimAot: ShimAot | undefined
   for (const engine of options.engines) {
-    // Each engine has its own budget, which a JVM run's AOT preparation counts against.
+    // Each engine has its own budget, which a `jvm` run's cache preparation counts against.
     const deadline = Date.now() + options.budgetMinutes * 60_000
-    let extraEnv: Record<string, string> = {}
+    const extraEnv = engineEnv(engine, options)
+    let prepared: { trainingMs: number; cacheBytes: number } | undefined
     if (engine === 'jvm') {
-      let aot: JvmAotCache
       try {
-        aot = await createJvmAotCache(
-          options.out,
-          options.exe,
-          (env, opens, label, beforeClose) =>
-            measureLaunch(options, 'jvm', 0, env, opens, label, beforeClose),
-          (env) => runProjectOnJvm(options, env),
-          options.jvmOptions,
-        )
+        prepared = await prepareShimAot(options, extraEnv)
       } catch (e) {
-        console.warn(`Open time: no JVM runs, the AOT cache could not be made: ${String(e)}`)
+        console.warn(`Open time: no jvm runs, the shim's AOT cache was not made: ${String(e)}`)
         runs.push({
           engine,
           run: 0,
@@ -664,28 +809,17 @@ async function main() {
         })
         continue
       }
-      if (aot.cache != null) {
-        jvmAot = aot.training
-        extraEnv = {
-          ENSO_ENGINE_ARGS: '--jvm',
-          JAVA_TOOL_OPTIONS: measuredJvmToolOptions(aot.cache),
-        }
-      } else {
-        // Said in the report: these are the numbers of a JVM with no AOT cache.
-        console.warn(`Open time: measuring the JVM without an AOT cache. ${aot.rejection}`)
-        jvmAot = 'uncached'
-        extraEnv = { ENSO_ENGINE_ARGS: '--jvm' }
-      }
-    } else if (engine === 'jvm-nocache') {
-      extraEnv = { ENSO_ENGINE_ARGS: '--jvm' }
     }
     if (engine !== 'native' && options.jvmOptions.trim() !== '') {
       // An experiment (`--jvm-options`, e.g. `-XX:TieredStopAtLevel=1`): engine options, so they
-      // go in `ENSO_JVM_OPTIONS`, which the launcher adds to the JVM it starts. The AOT cache's
-      // training got them too. Said in the log, as the report does not record it.
+      // go in `ENSO_JVM_OPTIONS`, which the launcher adds to the JVM it starts. The shim's training
+      // got them too, through the inherited environment. Said in the log, as the report does not
+      // record it.
       console.warn(`Open time: ${engine} launches with ${options.jvmOptions}`)
-      extraEnv = { ...extraEnv, ENSO_JVM_OPTIONS: options.jvmOptions }
     }
+    const rejectedIn: number[] = []
+    const uncachedIn: number[] = []
+    const uncheckedIn: number[] = []
     for (let run = 1; run <= options.runs; run++) {
       if (Date.now() > deadline) {
         console.warn(
@@ -693,13 +827,63 @@ async function main() {
         )
         break
       }
-      const { stdout, ...result } = await measureLaunch(options, engine, run, extraEnv)
-      void stdout // Read only by the AOT cache check.
+      // A user's first launch has no cache yet. On Windows the previous launch's JVM can still hold
+      // `enso.aot` mapped, so the delete is retried; if it still fails the launch is recorded as
+      // failed, not the whole report lost.
+      if (engine === 'jvm-first') {
+        try {
+          fs.rmSync(shimAotDirectory(options), {
+            recursive: true,
+            force: true,
+            maxRetries: 8,
+            retryDelay: 500,
+          })
+        } catch (e) {
+          console.warn(
+            `Open time: jvm-first launch ${run} skipped, the cache is locked: ${String(e)}`,
+          )
+          runs.push({
+            engine,
+            run,
+            first: {},
+            second: null,
+            notMeasured: [],
+            error: `could not delete the AOT cache: ${String(e)}`,
+          })
+          continue
+        }
+      }
+      const { stdout, cacheUsed, ...result } = await measureLaunch(options, engine, run, extraEnv)
+      void stdout
       console.log(`${engine} ${run}: ${JSON.stringify(result)}`)
       runs.push(result)
+      // The shim deletes a cache the JVM rejected: a missing one is a warning (Note [The Shim's
+      // AOT Cache Is Prepared Before The Launches]).
+      if (prepared != null && findShimCache(shimAotDirectory(options)) == null) {
+        rejectedIn.push(run)
+        console.warn(`Open time: the shim's AOT cache is gone after jvm launch ${run}.`)
+      }
+      // Evidence from the JVM itself: a cache that was skipped without a warning shows as almost
+      // no shared classes (`usedAotCache`).
+      if (engine === 'jvm' && cacheUsed === false) {
+        uncachedIn.push(run)
+        console.warn(`Open time: jvm launch ${run} loaded almost no classes from the AOT cache.`)
+      }
+      // No counters of the launch's own JVMs: said, not skipped.
+      if (engine === 'jvm' && cacheUsed === undefined && result.error == null) {
+        uncheckedIn.push(run)
+        console.warn(
+          `Open time: jvm launch ${run} has no hsperf counters; AOT cache use unchecked.`,
+        )
+      }
     }
+    if (prepared != null) shimAot = { ...prepared, rejectedIn, uncachedIn, uncheckedIn }
     if (options.jvmDiagnostics && engine !== 'native') {
-      const { stdout, ...result } = await measureLaunch(
+      const {
+        stdout,
+        cacheUsed: _cacheUsed,
+        ...result
+      } = await measureLaunch(
         options,
         engine,
         0,
@@ -721,7 +905,7 @@ async function main() {
     commit: process.env.GITHUB_SHA ?? null,
     template,
     ...(options.template !== 'welcome' ? { project: options.template } : {}),
-    ...(jvmAot ? { jvmAot } : {}),
+    ...(shimAot ? { shimAot } : {}),
     runs,
   }
   // First: whatever the baseline holds, the measurement is kept (and becomes the next baseline).

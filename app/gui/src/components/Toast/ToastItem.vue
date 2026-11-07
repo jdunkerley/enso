@@ -24,6 +24,17 @@ const isRunning = ref(false)
 const isControlled = computed(
   () => (toast.progress != null && toast.progress !== 0) || toast.autoClose === false,
 )
+/**
+ * Errors and warnings interrupt (`alert`); progress, info and success are announced politely
+ * (`status`), so that a save that updates its toast in place is not announced twice assertively.
+ * The message is keyed by its role: a toast that turns from progress into an error is remounted, as
+ * a live region's role changing in place is often not announced.
+ */
+const messageRole = computed(() =>
+  !toast.isIn ? undefined
+  : toast.type === 'error' || toast.type === 'warning' ? 'alert'
+  : 'status',
+)
 const progress = computed(() => toast.progress ?? 0)
 const isProgressHidden = computed(
   () => toast.hideProgressBar || (isControlled.value && progress.value === 0),
@@ -156,7 +167,7 @@ const iconPath = computed(() => (toast.type === 'default' ? undefined : ICON_PAT
     @click="toast.closeOnClick && emit('close')"
     @animationend="onAnimationEnd"
   >
-    <div :role="toast.isIn ? 'alert' : undefined" class="body">
+    <div :key="messageRole" :role="messageRole" class="body">
       <div v-if="toast.isLoading" class="icon">
         <div class="spinner" />
       </div>

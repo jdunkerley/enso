@@ -5,8 +5,8 @@
  *
  * Toasts are 320px wide, top centre by default, sliding in and out, at most three at once, with a
  * close button, a progress bar that pauses on hover and while the window is unfocused, and
- * `role="alert"` on the message. A click in a container never dismisses a dialog
- * (`data-ignore-click-outside`).
+ * `role="alert"` on the message of an error or a warning, `role="status"` on the others. A click in
+ * a container never dismisses a dialog (`data-ignore-click-outside`).
  */
 import { useToasts, type ToastPosition, type ToastsStore } from '$/providers/toasts'
 import { computed } from 'vue'
