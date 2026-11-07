@@ -41,6 +41,9 @@ public class YdocHandshakeTest {
   @After
   public void tearDown() throws Exception {
     if (ydoc != null) {
+      // Let the callbacks of the sockets the test has just closed run first: closing the context
+      // under them prints "Context execution was cancelled" traces that look like a failure.
+      Thread.sleep(1_000);
       ydoc.close();
     }
     executor.shutdownNow();

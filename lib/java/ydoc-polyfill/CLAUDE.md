@@ -23,8 +23,6 @@ Web/Node API polyfills (WebSocket, timers, crypto, zlib, URL, …) that let the
   status before the `101` (thrown as a `RequestException`), and anything else
   (`true`, `false`, a throw) refuses with `500` (Note [The Engine-Hosted
   Listener Refuses Before The Upgrade], #614).
-- A socket callback that reaches a closed JS context (the server shutting down
-  while a socket opens or closes) is dropped with a debug log, not thrown.
 
 ## Parser functions
 

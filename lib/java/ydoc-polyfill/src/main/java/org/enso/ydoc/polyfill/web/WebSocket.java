@@ -28,7 +28,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.enso.ydoc.polyfill.Arguments;
-import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.io.ByteSequence;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
@@ -486,19 +485,7 @@ final class WebSocket implements ProxyExecutable {
     }
 
     private void handleCallback(Runnable code) {
-      executor.execute(
-          () -> {
-            try {
-              code.run();
-            } catch (PolyglotException e) {
-              // A callback queued before the context closed (the server shutting down while a
-              // socket opens or closes) has nothing left to tell; it is not an error.
-              if (!e.isCancelled()) {
-                throw e;
-              }
-              log.debug("Dropped a socket callback: the JS context was closed", e);
-            }
-          });
+      executor.execute(code);
     }
   }
 }
