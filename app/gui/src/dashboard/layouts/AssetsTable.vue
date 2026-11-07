@@ -56,6 +56,7 @@ import {
   useUploadFiles,
 } from '#/layouts/Drive/driveActions'
 import { useEditDatalink } from '#/layouts/Drive/datalinkActions'
+import { useColumnWidths } from '#/layouts/Drive/columnWidths'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useRovingTabStop } from '#/layouts/Drive/rovingTabStop'
 import { STOP_PRESS_AND_POINTER_PROPAGATION } from '#/layouts/Drive/pressPropagation'
@@ -64,12 +65,14 @@ import AssetRow from '#/pages/dashboard/components/AssetRow.vue'
 import {
   COLUMN_CSS_CLASS,
   COLUMN_ICONS,
+  COLUMN_WIDTH_LIMITS,
   DEFAULT_ENABLED_COLUMNS,
   getColumnList,
 } from '#/pages/dashboard/components/column/columnUtils'
 import ColumnHeading from '#/pages/dashboard/components/columnHeading/ColumnHeading.vue'
 import DriveLabel from '#/components/labels/DriveLabel.vue'
 import Button from '$/components/Button/Button.vue'
+import ColumnResizeHandle from '$/components/ColumnResizeHandle/ColumnResizeHandle.vue'
 import DragModal from '$/components/Drive/DragModal.vue'
 import Scroller from '$/components/Scroller/Scroller.vue'
 import SelectionBrush, { type OnDragParams } from '$/components/SelectionBrush/SelectionBrush.vue'
@@ -125,6 +128,7 @@ import {
   onUpdated,
   ref,
   shallowRef,
+  useId,
   watch,
 } from 'vue'
 
@@ -186,6 +190,13 @@ function toggleColumn(column: Column) {
   else newColumns.add(column)
   enabledColumns.value = newColumns
 }
+
+const columnWidths = useColumnWidths()
+/**
+ * The prefix of the column headings' ids. Each heading cell is named by its heading alone: named from
+ * its content, it would take in the name of its resize handle too.
+ */
+const headingIdPrefix = useId()
 
 const sortInfo = shallowRef<SortInfo<AssetSortExpression> | null>(null)
 function setSortInfo(value: SortInfo<AssetSortExpression> | null) {
@@ -812,6 +823,8 @@ let dragSelectionRange: DragSelectionInfo | null = null
 function preventSelection(event: PointerEvent) {
   const { target } = event
   if (target instanceof HTMLElement) {
+    // A drag of a column's resize handle resizes the column.
+    if (target.closest('[data-column-resize-handle]') != null) return true
     const row = target.closest('tr')
     return Boolean(row?.dataset.selected === 'true')
   }
@@ -1146,10 +1159,7 @@ const isLoadingRow = computed(
             @focusout="onRootFocusOut"
           >
             <div class="flex h-full w-full min-w-full flex-col" @contextmenu="onContextMenu">
-              <div
-                class="flex h-full w-min min-w-full grow flex-col px-1"
-                @drop="onRowDrop($event, null)"
-              >
+              <div class="flex h-full w-full grow flex-col px-1" @drop="onRowDrop($event, null)">
                 <Scroller
                   ref="scroller"
                   scrollbar
@@ -1159,15 +1169,27 @@ const isLoadingRow = computed(
                   shadowStartClass="top-8"
                   @scroll.capture="fetchNextPageIfAtEnd"
                 >
-                  <!-- `max-w-[calc(100cqw_-_0.5rem)]` keeps it from shifting while scrolled
-                  horizontally. -->
+                  <!-- The columns have the widths of the `<col>`s; the one without a width takes
+                  what the others leave. -->
                   <table
                     role="grid"
                     aria-multiselectable="true"
                     :aria-label="getText('assetsTableLabel')"
                     :aria-rowcount="assetsPages.hasNextPage.value ? -1 : assets.length + 1"
-                    class="isolate max-w-[calc(100cqw_-_0.5rem)] table-fixed border-collapse rounded-rows"
+                    class="isolate table-fixed border-collapse rounded-rows"
+                    :style="{ width: columnWidths.tableWidth(columns) }"
                   >
+                    <colgroup>
+                      <col
+                        v-for="column in columns"
+                        :key="column"
+                        :style="
+                          columnWidths.widthOf(column) != null ?
+                            { width: `${columnWidths.widthOf(column)}px` }
+                          : undefined
+                        "
+                      />
+                    </colgroup>
                     <thead
                       class="sticky top-0 isolate z-1 bg-dashboard before:absolute before:-inset-1 before:bottom-0 before:bg-dashboard"
                     >
@@ -1175,13 +1197,23 @@ const isLoadingRow = computed(
                         <th
                           v-for="column in columns"
                           :key="column"
-                          :class="COLUMN_CSS_CLASS[column]"
+                          :class="[COLUMN_CSS_CLASS[column], column !== Column.name && 'relative']"
+                          :aria-labelledby="`${headingIdPrefix}-${column}`"
                         >
                           <ColumnHeading
+                            :id="`${headingIdPrefix}-${column}`"
                             :column="column"
                             :sortInfo="sortInfo"
                             :hideColumn="hideColumn"
                             :setSortInfo="setSortInfo"
+                          />
+                          <ColumnResizeHandle
+                            :label="getText('resizeColumnX', getText(`${column}ColumnName`))"
+                            :width="columnWidths.widthOf(column)"
+                            :limits="COLUMN_WIDTH_LIMITS[column]"
+                            @resize="columnWidths.setWidth(column, $event)"
+                            @resizeEnd="columnWidths.persist()"
+                            @reset="columnWidths.resetWidth(column)"
                           />
                         </th>
                       </tr>

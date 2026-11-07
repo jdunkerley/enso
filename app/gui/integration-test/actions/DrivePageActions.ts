@@ -288,32 +288,41 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
           await expect(nonAssetRows).toHaveText(/This folder is empty/)
         })
       },
-      /** Toggle a column's visibility. */
+      /**
+       * Toggle a column's visibility: the button named after the column, in its heading while it
+       * shows, or in the bar of hidden columns. (By role: a heading cell is labelled by its heading's
+       * text too, so `getByLabel` would find it as well.)
+       */
       get toggleColumn() {
         return {
-          /** Toggle visibility for the "modified" column. */
+          /** Show the "modified" column. Its heading's hide button is named "Hide column". */
           modified() {
             return self.step('Toggle "modified" column', (page) =>
-              page.getByLabel(TEXT.modifiedColumnName).click(),
+              page
+                .getByTestId('extra-columns')
+                .getByRole('button', { name: TEXT.modifiedColumnName, exact: true })
+                .click(),
             )
           },
           /** Toggle visibility for the "labels" column. */
           labels() {
             return self.step('Toggle "labels" column', (page) =>
               // Exact: each row's "Manage Labels" button contains the name too.
-              page.getByLabel(TEXT.labelsColumnName, { exact: true }).click(),
+              page.getByRole('button', { name: TEXT.labelsColumnName, exact: true }).click(),
             )
           },
           /** Toggle visibility for the "accessed by projects" column. */
           accessedByProjects() {
             return self.step('Toggle "accessed by projects" column', (page) =>
-              page.getByLabel(TEXT.accessedByProjectsColumnName).click(),
+              page
+                .getByRole('button', { name: TEXT.accessedByProjectsColumnName, exact: true })
+                .click(),
             )
           },
           /** Toggle visibility for the "accessed data" column. */
           accessedData() {
             return self.step('Toggle "accessed data" column', (page) =>
-              page.getByLabel(TEXT.accessedDataColumnName).click(),
+              page.getByRole('button', { name: TEXT.accessedDataColumnName, exact: true }).click(),
             )
           },
         }
