@@ -372,19 +372,22 @@ the scope where the AI's new node would land — exactly the same scope the
 generated `body` will see, so every in-scope binding listed in the prompt is
 referenceable by name (and one call can stitch several of them together, e.g.
 `(cards.join leader_order on=["Set"]).column_names.to_json`). The server writes
-a temporary JSON config file (`<tmpdir>/enso-claude-mcp-<pid>-<uuid>.json`) and
-that path is passed to the agent as `--mcp-config <path> --strict-mcp-config`;
+a JSON config file (`<userData>/enso-claude-mcp-<pid>-<uuid>.json`) and that
+path is passed to the agent as `--mcp-config <path> --strict-mcp-config`;
 `--strict-mcp-config` makes the CLI ignore any project- or user-level MCP config
-so the session is hermetic. The temp file is deleted on shutdown.
+so the session is hermetic. The file is deleted on shutdown.
 
 **Who may call it (#616):** loopback is not enough, since any local process and
 any web page in the user's browser can reach the port, and during a turn the
 tool runs Enso code in the open project. The server makes a random bearer token
 at start-up and writes it into the config file
-(`headers: { Authorization: "Bearer …" }`, which the CLI sends on every request;
-the file is created `0600`). A request without it, or with another one, gets
-`401`; a request with any `Origin` header gets `403` (the CLI sends none). Both
-are checked before the MCP transport sees the request — Note [The AI MCP Server
+(`headers: { Authorization: "Bearer …" }`, which the CLI sends on every
+request). The file lives in the app's `userData` (per-user on every OS; a
+Windows `TEMP` can be shared), is created new (`wx`) with mode `0600`, and is
+deleted first thing in `shutdown()`. A request without the token, or with
+another one, gets `401`; a request with any `Origin` header gets `403` (the CLI
+sends none). Both are checked before the MCP transport sees the request, and
+refusals are logged at the 1st, 10th, 100th, … only — Note [The AI MCP Server
 Checks Its Caller] in `aiMcpServer.ts`.
 
 **Text-only return contract:** the LS evaluates the expression `inFrame` and the

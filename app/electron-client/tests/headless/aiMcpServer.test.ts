@@ -2,6 +2,9 @@
 import type { AiToolCallReply, AiToolCallRequest } from 'enso-common/src/ai'
 import { EventEmitter } from 'node:events'
 import * as fs from 'node:fs'
+import * as net from 'node:net'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const ipcEmitter = new EventEmitter()
@@ -12,7 +15,17 @@ const ipcRemoveListener = vi.fn((channel: string, listener: (...args: unknown[])
   ipcEmitter.off(channel, listener),
 )
 
+// The app's `userData`, where the MCP config goes (Note [The AI MCP Server Checks Its Caller]).
+const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-mcp-user-data-'))
+
+// Wrapped so a test can see how the config file is opened.
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return { ...actual, writeFileSync: vi.fn(actual.writeFileSync) }
+})
+
 vi.mock('electron', () => ({
+  app: { getPath: (name: string) => (name === 'userData' ? userData : os.tmpdir()) },
   ipcMain: { handle: vi.fn(), on: ipcOn, removeListener: ipcRemoveListener },
 }))
 
@@ -111,10 +124,12 @@ describe('AiMcpServer', () => {
     if (!reply.ok) expect(reply.error).toMatch(/timed out after 30000ms/)
   })
 
-  test('start writes the temp config file; shutdown removes it', async () => {
+  test('start writes the config file in userData; shutdown removes it', async () => {
     const server = new AiMcpServer(() => null)
     const configPath = await server.start()
     expect(fs.existsSync(configPath)).toBe(true)
+    // Not the temporary directory, which on Windows can be shared (#616 review).
+    expect(path.dirname(configPath)).toBe(userData)
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
     expect(config.mcpServers.enso.type).toBe('http')
     expect(config.mcpServers.enso.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp$/)
@@ -146,6 +161,37 @@ describe('AiMcpServer', () => {
     await promise
     // Late reply must not throw.
     expect(() => answer(request, { ok: true, value: '42' })).not.toThrow()
+  })
+
+  test('shutdown deletes the config file at once, before open connections close', async () => {
+    const server = new AiMcpServer(() => null)
+    const configPath = await server.start()
+    const { port } = new URL(JSON.parse(fs.readFileSync(configPath, 'utf8')).mcpServers.enso.url)
+    // A connection the client keeps open makes `close()` wait for it.
+    const socket = net.connect(Number(port), '127.0.0.1')
+    await new Promise<void>((resolve) => socket.once('connect', () => resolve()))
+    const closed = server.shutdown()
+    expect(fs.existsSync(configPath)).toBe(false)
+    socket.destroy()
+    await closed
+  })
+
+  test('a config file is never written over an existing one', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-mcp-wx-'))
+    const write = vi.mocked(fs.writeFileSync)
+    write.mockClear()
+    const server = new AiMcpServer(() => null, directory)
+    try {
+      await server.start()
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining(directory),
+        expect.any(String),
+        expect.objectContaining({ flag: 'wx', mode: 0o600 }),
+      )
+    } finally {
+      await server.shutdown()
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
   })
 
   describe('who may call it (#616)', () => {
@@ -197,6 +243,19 @@ describe('AiMcpServer', () => {
       const wrong = authorization.slice(0, -1) + (authorization.endsWith('A') ? 'B' : 'A')
       expect((await initialize({ Authorization: wrong })).status).toBe(401)
       expect((await initialize({ Authorization: 'Bearer x' })).status).toBe(401)
+    })
+
+    test('logs refusals rate-limited: the 1st and the 10th of 12', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      try {
+        for (let i = 0; i < 12; i++) expect((await initialize({})).status).toBe(401)
+        expect(warn.mock.calls.map((call) => String(call[0]))).toEqual([
+          '[AI MCP] refused a request: missing or wrong token (1 so far).',
+          '[AI MCP] refused a request: missing or wrong token (10 so far).',
+        ])
+      } finally {
+        warn.mockRestore()
+      }
     })
 
     test('refuses a request from a web page, even with the token', async () => {
