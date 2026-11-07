@@ -222,10 +222,10 @@ function onDragEnd() {
 }
 
 function onDragLeave(event: DragEvent) {
+  // No `relatedTarget`: the drag left the window.
   if (
-    event.relatedTarget instanceof Node &&
-    event.currentTarget instanceof Node &&
-    !event.currentTarget.contains(event.relatedTarget)
+    !(event.relatedTarget instanceof Node) ||
+    (event.currentTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget))
   ) {
     isDraggedOver.value = false
     driveStore.setDragTargetAssetId(null)
@@ -284,4 +284,4 @@ function onDrop(event: DragEvent) {
   </tr>
 </template>
 
-<style src="./driveRowFocusRing.css" />
+<style scoped src="./driveRowFocusRing.css" />

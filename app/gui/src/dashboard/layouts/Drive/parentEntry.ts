@@ -59,3 +59,22 @@ export function arrowKeyIndex(
       Math.max(minIndex, oldIndex - 1)
     : Math.max(minIndex, Math.min(count - 1, oldIndex + 1))
 }
+
+/**
+ * The fractional asset index at a vertical position of the rubber-band selection. `viewportY` is
+ * measured from the top of the scrolling root, whose sticky heading row covers the first
+ * `rowHeight` pixels; it is clamped below the heading (and to the root's height) while still in
+ * viewport coordinates, then converted to content coordinates with `scrollTop`, and only then are
+ * the heading and the parent-folder entry (which scrolls away with the rows) subtracted.
+ */
+export function rubberBandAssetIndex(
+  viewportY: number,
+  scrollTop: number,
+  viewportHeight: number,
+  rowHeight: number,
+  hasParentEntry: boolean,
+) {
+  const clampedY = Math.min(Math.max(rowHeight, viewportY), viewportHeight + rowHeight)
+  const rowsAboveAssetsPx = rowHeight * (hasParentEntry ? 2 : 1)
+  return Math.max(0, (clampedY + scrollTop - rowsAboveAssetsPx) / rowHeight)
+}

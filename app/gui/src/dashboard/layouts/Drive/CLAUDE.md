@@ -71,15 +71,29 @@ the `v-for` of the assets, so it stays first whatever the sort.
   asset reaches it (`arrowKeyIndex`), ArrowDown leaves it, and Shift+Arrow never
   extends a selection onto it. In the roving tab stop it is the key
   `PARENT_ENTRY_KEY`, so with nothing selected or focused it is the grid's tab
-  stop. The asset rows' `aria-rowindex` and the table's `aria-rowcount` count it
-  while it shows; the rubber-band selection skips its height.
+  stop. Moving to another folder forgets it as the remembered tab stop and
+  keyboard anchor (`forgetTabStop`), unless the focus is on it (Enter on it
+  keeps it focused in the folder above). The asset rows' `aria-rowindex` and the
+  table's `aria-rowcount` count it while it shows.
+- **Rubber band.** `rubberBandAssetIndex` turns a position of the band into an
+  asset index: it clamps the position below the sticky heading in viewport
+  coordinates, adds the `Scroller` content's `scrollTop` (the rows scroll there,
+  not in the table's root), and only then subtracts the heading and the entry,
+  which scrolls away with the rows.
 - **Drops.** It takes the drops a directory row takes, through the same
   `dropInto` (`paste` with `move`, or an upload of dropped files), into the
   parent folder; it shows the same `selected` highlight while a drag is over it,
-  holding a drag over it for two seconds opens the parent, and the drop is
-  announced as "into the parent folder" (destination `{ type: 'parent' }`).
+  and the drop is announced as "into the parent folder" (destination
+  `{ type: 'parent' }`). Holding a drag over it for two seconds opens the
+  parent; the entry stays mounted, so when its target changes under a drag it
+  restarts the delay (`useDragDelayAction`'s `restart`) and a held drag keeps
+  climbing until the category's root, where the entry is gone. Its highlight and
+  pending open clear on any `dragend` or `drop` in the document, and on a
+  `dragleave` with no `relatedTarget` (the drag left the window); `AssetRow.vue`
+  clears its highlight on such a `dragleave` too.
 - The keyboard focus ring is shared with `AssetRow.vue` through
-  `driveRowFocusRing.css` (the `DriveRow` class).
+  `driveRowFocusRing.css` (the `DriveRow` class), scoped in both
+  (`<style scoped src>`).
 
 ## The table's accessibility model (#208)
 

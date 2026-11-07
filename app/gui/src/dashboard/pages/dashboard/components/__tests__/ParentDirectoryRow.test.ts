@@ -1,12 +1,13 @@
 /**
  * @file The drive table's parent-folder entry (#640): its `..` name and accessible name, opening on
- * a double click, no selection, no context menu, empty cells beside the name, and drops.
+ * a double click, no selection, no context menu, empty cells beside the name, drops, its drop
+ * highlight, and holding a drag over it to keep climbing.
  */
 import { Column } from '#/pages/dashboard/components/column/columnUtils'
 import { useText } from '$/providers/text'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
-import { beforeAll, describe, expect, test, vi } from 'vitest'
-import { defineComponent, h } from 'vue'
+import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
+import { defineComponent, h, nextTick, reactive } from 'vue'
 import ParentDirectoryRow from '../ParentDirectoryRow.vue'
 
 const { getText } = useText()
@@ -16,11 +17,22 @@ beforeAll(() => {
   Element.prototype.scrollIntoView = () => {}
 })
 
-/** The row inside a table, where a `<tr>` belongs. */
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+/** The row inside a table, where a `<tr>` belongs. `props` may be changed afterwards. */
 function inTable(props: Record<string, unknown>) {
   return defineComponent({
-    render: () => h('table', [h('tbody', [h(ParentDirectoryRow, props as never)])]),
+    render: () => h('table', [h('tbody', [h(ParentDirectoryRow, { ...props } as never)])]),
   })
+}
+
+/** A drag event carrying files, which the entry accepts. */
+function fileDragEvent(type: string, relatedTarget: EventTarget | null = null) {
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, relatedTarget })
+  Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], items: [] } })
+  return event
 }
 
 async function setup(overrides: Record<string, unknown> = {}) {
@@ -30,21 +42,21 @@ async function setup(overrides: Record<string, unknown> = {}) {
     open: vi.fn(),
     onEntryDrop: vi.fn(),
   }
-  const { wrapper } = await mountWithProviders(
-    inTable({
-      columns: [Column.name, Column.modified, Column.labels],
-      isKeyboardSelected: false,
-      isTabStop: false,
-      isOpening: false,
-      ...handlers,
-      ...overrides,
-    }),
-  )
+  const props = reactive<Record<string, unknown>>({
+    targetId: 'directory-parent',
+    columns: [Column.name, Column.modified, Column.labels],
+    isKeyboardSelected: false,
+    isTabStop: false,
+    isOpening: false,
+    ...handlers,
+    ...overrides,
+  })
+  const { wrapper } = await mountWithProviders(inTable(props))
   const row = (wrapper.element as HTMLElement).querySelector<HTMLTableRowElement>(
     '[data-testid="parent-directory-row"]',
   )
   if (row == null) throw new Error('The parent-folder entry is not rendered.')
-  return { row, ...handlers }
+  return { row, props, ...handlers }
 }
 
 describe('ParentDirectoryRow', () => {
@@ -104,6 +116,43 @@ describe('ParentDirectoryRow', () => {
     row.dispatchEvent(event)
     expect(onEntryDrop).toHaveBeenCalledTimes(1)
     expect(event.defaultPrevented).toBe(true)
+  })
+
+  test('is highlighted while a drag is over it, until the drag ends anywhere', async () => {
+    const { row } = await setup()
+    row.dispatchEvent(fileDragEvent('dragenter'))
+    await nextTick()
+    expect(row.classList.contains('selected')).toBe(true)
+    // A drag cancelled elsewhere: only the document hears its end.
+    document.body.dispatchEvent(new Event('dragend', { bubbles: true }))
+    await nextTick()
+    expect(row.classList.contains('selected')).toBe(false)
+    row.dispatchEvent(fileDragEvent('dragenter'))
+    await nextTick()
+    expect(row.classList.contains('selected')).toBe(true)
+    // Leaving the window: no related target.
+    row.dispatchEvent(fileDragEvent('dragleave', null))
+    await nextTick()
+    expect(row.classList.contains('selected')).toBe(false)
+  })
+
+  test('held under a drag, opens the parent, and then the next one up', async () => {
+    vi.useFakeTimers()
+    const { row, props, open } = await setup()
+    row.dispatchEvent(fileDragEvent('dragenter'))
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(open).toHaveBeenCalledTimes(1)
+    // The drive moved up: the entry, still under the drag, now opens the folder above that.
+    props.targetId = 'directory-grandparent'
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(open).toHaveBeenCalledTimes(2)
+    // Once the drag ends, moving on does not open anything more.
+    document.body.dispatchEvent(new Event('drop', { bubbles: true }))
+    props.targetId = 'directory-root'
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(4000)
+    expect(open).toHaveBeenCalledTimes(2)
   })
 
   test('shows a spinner instead of its icon while the parent folder opens', async () => {

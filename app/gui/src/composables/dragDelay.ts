@@ -12,6 +12,13 @@ export interface DragDelayHandlers {
   readonly onDragEnter: (event: DragEvent) => void
   readonly onDragLeave: (event: DragEvent) => void
   readonly onDrop: (event: DragEvent) => void
+  /**
+   * Start the delay again while the drag stays over the target: for a target that stays mounted
+   * when its action navigates (the drive's parent-folder entry), so that holding on keeps acting.
+   */
+  readonly restart: () => void
+  /** Stop the delay without acting. */
+  readonly cancel: () => void
 }
 
 /** Call `callback` once a drag has stayed over the target for `delayMs`. */
@@ -50,5 +57,10 @@ export function useDragDelayAction(
     },
     onDragLeave,
     onDrop: onDragLeave,
+    restart: () => {
+      cancel()
+      handle = setTimeout(() => callback?.(), delayMs)
+    },
+    cancel,
   }
 }

@@ -8,7 +8,11 @@
  * It is not an asset: it is never selected (and so has no `aria-selected`), has no context menu,
  * cannot be dragged, and its other cells are empty. It is a drop target like a directory's row:
  * dropped rows move into the parent folder, dropped files upload there, and assets held over it for
- * two seconds open it. Like a row, it is reached with the arrow keys and can be the grid's tab stop.
+ * two seconds open it. The entry stays mounted when that opens a folder that has an entry of its
+ * own, so a drag still held over it climbs on, one level every two seconds, until the category's
+ * root, where the entry is gone. Its highlight clears when the drag ends anywhere (Escape, a drop
+ * elsewhere, leaving the window). Like a row, it is reached with the arrow keys and can be the
+ * grid's tab stop.
  */
 import { ASSET_ROWS } from '#/layouts/Drive/drag'
 import { useTabStopContents } from '#/layouts/Drive/rovingTabStop'
@@ -19,10 +23,13 @@ import { useDragDelayAction } from '$/composables/dragDelay'
 import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
 import { twMerge } from '$/utils/style/tailwindMerge'
+import { useEventListener } from '@vueuse/core'
 import { onMounted, onUpdated, ref, watch } from 'vue'
 
 const props = defineProps<{
   columns: readonly Column[]
+  /** The folder the entry opens; it changes when the drive moves to another folder. */
+  targetId: string
   /** Whether the arrow keys moved to the entry, so that it takes the focus. */
   isKeyboardSelected: boolean
   /** Whether the entry is the grid's one tab stop. */
@@ -68,6 +75,26 @@ onUpdated(focusIfKeyboardSelected)
 
 const dragDelay = useDragDelayAction(() => props.open())
 
+/** Forget a drag over the entry: no highlight, no pending open. */
+function endDrag() {
+  isDraggedOver.value = false
+  dragDelay.cancel()
+}
+
+// Holding a drag over the entry opened the folder above, and the entry (still under the pointer)
+// now opens the next one up: start the delay again, so that holding on keeps climbing.
+watch(
+  () => props.targetId,
+  () => {
+    if (isDraggedOver.value) dragDelay.restart()
+  },
+)
+
+// `dragend` fires only on the drag's source, and `dragleave` may not come at all (a drag cancelled
+// with Escape over the entry): any drag ending anywhere ends this one.
+useEventListener(document, 'dragend', endDrag, { capture: true })
+useEventListener(document, 'drop', endDrag, { capture: true })
+
 /** Accept dragged rows (none of them can be the parent folder) and files. */
 function acceptDrag(event: DragEvent) {
   if (ASSET_ROWS.lookup(event) != null || event.dataTransfer?.types.includes('Files') === true) {
@@ -83,10 +110,10 @@ function onDragEnter(event: DragEvent) {
 }
 
 function onDragLeave(event: DragEvent) {
+  // No `relatedTarget`: the drag left the window.
   if (
-    event.relatedTarget instanceof Node &&
-    event.currentTarget instanceof Node &&
-    !event.currentTarget.contains(event.relatedTarget)
+    !(event.relatedTarget instanceof Node) ||
+    (event.currentTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget))
   ) {
     isDraggedOver.value = false
   }
@@ -132,7 +159,6 @@ function onContextMenu(event: MouseEvent) {
     @contextmenu="onContextMenu"
     @dragenter="onDragEnter"
     @dragover="acceptDrag"
-    @dragend="isDraggedOver = false"
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
@@ -158,4 +184,4 @@ function onContextMenu(event: MouseEvent) {
   </tr>
 </template>
 
-<style src="./driveRowFocusRing.css" />
+<style scoped src="./driveRowFocusRing.css" />

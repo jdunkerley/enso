@@ -3,6 +3,7 @@ import {
   arrowKeyIndex,
   PARENT_ENTRY_INDEX,
   parentEntryDirectoryId,
+  rubberBandAssetIndex,
   type ParentEntryState,
 } from '#/layouts/Drive/parentEntry'
 import { DirectoryId } from 'enso-common/src/services/Backend'
@@ -72,5 +73,33 @@ describe('arrowKeyIndex', () => {
 
   test('stays on the entry in an empty folder', () => {
     expect(arrowKeyIndex(PARENT_ENTRY_INDEX, 'down', 0, true, false)).toBe(PARENT_ENTRY_INDEX)
+  })
+})
+
+describe('rubberBandAssetIndex', () => {
+  const ROW = 36
+  const HEIGHT = 360
+
+  test('counts from the first asset, below the heading', () => {
+    expect(rubberBandAssetIndex(ROW, 0, HEIGHT, ROW, false)).toBe(0)
+    expect(rubberBandAssetIndex(ROW * 3, 0, HEIGHT, ROW, false)).toBe(2)
+  })
+
+  test('skips the parent-folder entry while it is in view', () => {
+    expect(rubberBandAssetIndex(ROW, 0, HEIGHT, ROW, true)).toBe(0)
+    expect(rubberBandAssetIndex(ROW * 2, 0, HEIGHT, ROW, true)).toBe(0)
+    expect(rubberBandAssetIndex(ROW * 3, 0, HEIGHT, ROW, true)).toBe(1)
+  })
+
+  test('scrolled, the row just below the heading is an asset, not the entry', () => {
+    // Scrolled by 10 rows: the entry and assets 0-8 are above the heading; asset 9 is right below.
+    const scrollTop = ROW * 10
+    expect(Math.floor(rubberBandAssetIndex(ROW + 4, scrollTop, HEIGHT, ROW, true))).toBe(9)
+    expect(Math.floor(rubberBandAssetIndex(ROW + 4, scrollTop, HEIGHT, ROW, false))).toBe(10)
+  })
+
+  test('clamps a position above the heading or below the root', () => {
+    expect(rubberBandAssetIndex(-50, 0, HEIGHT, ROW, true)).toBe(0)
+    expect(rubberBandAssetIndex(HEIGHT * 3, 0, HEIGHT, ROW, false)).toBe(HEIGHT / ROW)
   })
 })

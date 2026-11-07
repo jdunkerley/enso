@@ -70,6 +70,7 @@ import {
   PARENT_ENTRY_KEY,
   PARENT_ENTRY_NAVIGATION_SOURCE,
   parentEntryDirectoryId,
+  rubberBandAssetIndex,
 } from '#/layouts/Drive/parentEntry'
 import { useRovingTabStop } from '#/layouts/Drive/rovingTabStop'
 import { STOP_PRESS_AND_POINTER_PROPAGATION } from '#/layouts/Drive/pressPropagation'
@@ -687,9 +688,28 @@ function onParentEntryClick(event: MouseEvent) {
   selectionStartIndex = null
 }
 
+/** Whether the keyboard focus is on the parent-folder entry. */
+function isParentEntryFocused() {
+  return (
+    document.activeElement instanceof Element &&
+    document.activeElement.closest('[data-testid="parent-directory-row"]') != null
+  )
+}
+
+// Moving to another folder forgets the entry as the remembered tab stop and keyboard anchor, so
+// that the new folder's selection is where Tab and Enter go. Not while the focus is on the entry
+// (Enter on it, which keeps it focused in the folder above), nor when the entry is still there.
+watch(currentDirectoryId, () => {
+  if (parentEntryId.value != null && isParentEntryFocused()) return
+  rovingTabStop.forgetTabStop(PARENT_ENTRY_KEY)
+  if (mostRecentlySelectedIndex === PARENT_ENTRY_INDEX) mostRecentlySelectedIndex = null
+  if (keyboardSelectedIndex.value === PARENT_ENTRY_INDEX) keyboardSelectedIndex.value = null
+})
+
 // The keyboard cannot stay on an entry that is gone.
 watch(parentEntryId, (id) => {
   if (id != null) return
+  rovingTabStop.forgetTabStop(PARENT_ENTRY_KEY)
   if (mostRecentlySelectedIndex === PARENT_ENTRY_INDEX) mostRecentlySelectedIndex = null
   if (keyboardSelectedIndex.value === PARENT_ENTRY_INDEX) keyboardSelectedIndex.value = null
 })
@@ -927,27 +947,33 @@ function onSelectionDrag({ event, rectangle }: OnDragParams) {
   if (scrollContainer == null) return
   const rect = scrollContainer.getBoundingClientRect()
   const overlapsHorizontally = rect.right > rectangle.left && rect.left < rectangle.right
-  // The rows above the first asset's: the heading's, and the parent-folder entry's while it shows.
-  const rowsAboveAssetsPx = ROW_HEIGHT_PX * (1 + parentEntryRows.value)
-  const selectionTop = Math.max(0, rectangle.top - rect.top - rowsAboveAssetsPx)
-  const selectionBottom = Math.max(
-    0,
-    Math.min(rect.height, rectangle.bottom - rect.top - rowsAboveAssetsPx),
+  const hasParentEntry = parentEntryRows.value !== 0
+  // The rows scroll in the `Scroller`'s content, not in the root, which stays put.
+  const scrollTop = scrollerContent.value?.scrollTop ?? scrollContainer.scrollTop
+  const topIndex = rubberBandAssetIndex(
+    rectangle.top - rect.top,
+    scrollTop,
+    rect.height,
+    ROW_HEIGHT_PX,
+    hasParentEntry,
+  )
+  const bottomIndex = rubberBandAssetIndex(
+    rectangle.bottom - rect.top,
+    scrollTop,
+    rect.height,
+    ROW_HEIGHT_PX,
+    hasParentEntry,
   )
   const range = dragSelectionRange
   if (!overlapsHorizontally) {
     dragSelectionRange = null
   } else if (range == null) {
-    const topIndex = (selectionTop + scrollContainer.scrollTop) / ROW_HEIGHT_PX
-    const bottomIndex = (selectionBottom + scrollContainer.scrollTop) / ROW_HEIGHT_PX
     dragSelectionRange = {
       initialIndex: rectangle.signedHeight < 0 ? bottomIndex : topIndex,
       start: Math.floor(topIndex),
       end: Math.ceil(bottomIndex),
     }
   } else {
-    const topIndex = (selectionTop + scrollContainer.scrollTop) / ROW_HEIGHT_PX
-    const bottomIndex = (selectionBottom + scrollContainer.scrollTop) / ROW_HEIGHT_PX
     const endIndex = rectangle.signedHeight < 0 ? topIndex : bottomIndex
     dragSelectionRange = {
       initialIndex: range.initialIndex,
@@ -1324,6 +1350,7 @@ const isLoadingRow = computed(
                     <tbody class="isolate">
                       <ParentDirectoryRow
                         v-if="parentEntryId != null"
+                        :targetId="parentEntryId"
                         :columns="columns"
                         :isKeyboardSelected="keyboardSelectedIndex === PARENT_ENTRY_INDEX"
                         :isTabStop="rovingTabStop.index.value === 0"
