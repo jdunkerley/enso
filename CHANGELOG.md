@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [The Drive's columns can be resized: drag the right edge of a column's
+  heading, or focus it and use the arrow keys. A double click puts the column
+  back to its default width. The widths are remembered, and are the same in
+  every folder and category.][629]
 - [The sample projects now update with each new version of the IDE, unless you
   have edited them; opening a sample does not count as an edit. An edited sample
   with a newer version shows an "Update available" pill in the Drive: click it,
@@ -437,6 +441,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[629]: https://github.com/jdunkerley/enso/pull/629
 [622]: https://github.com/jdunkerley/enso/pull/622
 [573]: https://github.com/jdunkerley/enso/pull/573
 [574]: https://github.com/jdunkerley/enso/pull/574

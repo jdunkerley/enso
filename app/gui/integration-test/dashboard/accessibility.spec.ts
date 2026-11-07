@@ -46,14 +46,18 @@ test.describe('three rows', () => {
             - columnheader "Sort by name":
               - button "Sort by name":
                 - text: Name
+              - separator "Resize the Name column"
             - columnheader "Sort by modification date":
               - button "Hide column"
               - button "Modified"
+              - separator "Resize the Modified column"
             - columnheader "Sort by creation date":
               - button "Hide column"
               - button "Created at"
+              - separator "Resize the Created at column"
             - columnheader "Labels Labels":
               - button "Labels"
+              - separator "Resize the Labels column"
       `)
       })
       .driveTable.clickRow('Folder')
@@ -85,9 +89,19 @@ test.describe('three rows', () => {
         for (const [index, row] of (await rows.all()).entries()) {
           await expect(row).toHaveAttribute('aria-rowindex', String(index + 2))
         }
-        // The row focused last is the one tab stop; the controls in the other rows are out of the
-        // Tab sequence too.
-        await expect(table.locator('[tabindex="0"]')).toHaveCount(1)
+        // The row focused last is the one tab stop of the body; the controls in the other rows are
+        // out of the Tab sequence too. (The heading row's controls, its sort and hide buttons and its
+        // column resize handles, are tab stops of their own.)
+        const body = table.getByRole('rowgroup').nth(1)
+        await expect(body.locator('[tabindex="0"]')).toHaveCount(1)
+        // The heading row's own tab stops: one resize handle per column.
+        const header = table.getByRole('rowgroup').first()
+        const handles = header.getByRole('separator')
+        await expect(handles).toHaveCount(4)
+        for (const handle of await handles.all()) {
+          await expect(handle).toHaveAttribute('tabindex', '0')
+        }
+        await expect(header.locator('[tabindex]:not([tabindex="-1"])')).toHaveCount(4)
         await expect(rows.nth(0)).toHaveAttribute('tabindex', '0')
         await expect(rows.nth(0)).toBeFocused()
 
@@ -117,7 +131,7 @@ test.describe('three rows', () => {
           'tabindex',
           '-1',
         )
-        await expect(table.locator('[tabindex="0"]')).toHaveCount(1)
+        await expect(body.locator('[tabindex="0"]')).toHaveCount(1)
       })
   })
 })

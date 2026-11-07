@@ -16,7 +16,7 @@ import { ASSET_ROWS } from '#/layouts/Drive/drag'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useTabStopContents } from '#/layouts/Drive/rovingTabStop'
 import AssetColumnCell from '#/pages/dashboard/components/column/AssetColumnCell.vue'
-import { COLUMN_CSS_CLASS, type Column } from '#/pages/dashboard/components/column/columnUtils'
+import { Column, COLUMN_CSS_CLASS } from '#/pages/dashboard/components/column/columnUtils'
 import { directoryNavigationSource } from '#/pages/dashboard/components/column/nameColumn'
 import { useDragDelayAction } from '$/composables/dragDelay'
 import { useDriveLocation } from '$/providers/drive'
@@ -271,7 +271,14 @@ function onDrop(event: DragEvent) {
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
-    <td v-for="column in columns" :key="column" :class="COLUMN_CSS_CLASS[column]">
+    <!-- A cell clips what does not fit the width its column was resized to. The name cell does
+    not need to (its contents shrink to fit, and its column is never narrower than they can be), and
+    must not: it could clip the focus ring of its state button. -->
+    <td
+      v-for="column in columns"
+      :key="column"
+      :class="[COLUMN_CSS_CLASS[column], column !== Column.name && 'overflow-hidden text-ellipsis']"
+    >
       <AssetColumnCell :column="column" :item="item" :labels="labels" />
     </td>
   </tr>

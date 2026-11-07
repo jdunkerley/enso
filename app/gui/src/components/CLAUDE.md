@@ -70,6 +70,15 @@ inside it (`keepFocusOnBackdropPress`), and Escape in a `ComboBox` whose list is
 still fading out closes the dialog or popover around it, as it does once the
 list has gone.
 
+`ColumnResizeHandle/` is a table column's resize handle: a focusable `separator`
+on the heading cell's right edge, dragged (the pointer is captured, text
+selection is off and the drag's click stays in the handle), stepped with the
+arrow keys (10px, 50px with Shift) and reset with Enter, Home or a double click.
+It ignores keys with Ctrl, Alt or Meta held. It only reports widths (`resize` on
+each move or key, `resizeEnd` when a drag or key is done, `reset`); the table
+owns them. A press on it still reaches the document, so open popovers and menus
+close. The drive's table uses it.
+
 Forms and inputs are #79's.
 
 **Toasts and programmatic modals are global stores**, not components you mount:

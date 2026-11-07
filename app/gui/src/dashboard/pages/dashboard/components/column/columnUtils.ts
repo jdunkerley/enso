@@ -1,5 +1,6 @@
 /** @file Types and constants related to `Column`s. */
 import { isRecentCategory, type CategoryType } from '$/providers/category'
+import { clampWidth, type WidthLimits } from '$/utils/columnResize'
 import type { Icon } from '@/util/iconMetadata/iconName'
 import * as z from 'zod'
 
@@ -37,20 +38,24 @@ export const COLUMN_ICONS: Readonly<Record<Column, Icon>> = {
   [Column.size]: 'metadata',
 }
 
-const COLUMN_CSS_CLASSES =
-  'text-left bg-clip-padding last:border-r-0 last:rounded-r-full last:w-full'
-const NORMAL_COLUMN_CSS_CLASSES = `px-cell-x py max-w-96 ${COLUMN_CSS_CLASSES}`
+const COLUMN_CSS_CLASSES = 'text-left bg-clip-padding last:border-r-0 last:rounded-r-full'
+const NORMAL_COLUMN_CSS_CLASSES = `px-cell-x py rounded-rows-have-level ${COLUMN_CSS_CLASSES}`
 
-/** CSS classes for every column. */
+/**
+ * CSS classes for every column. The name column is sticky, a little in from the left; its `before:`
+ * covers that gap, so that the other columns do not show through it while scrolled sideways. The
+ * widths are not here: they are the table's `<col>`s, set from
+ * {@link COLUMN_WIDTH_LIMITS} and the user's resizing.
+ */
 export const COLUMN_CSS_CLASS: Readonly<Record<Column, string>> = {
-  [Column.name]: `z-10 sticky left-1 bg-dashboard rounded-rows-skip-level min-w-80 max-w-80 h-full p-0 border-l-0 after:absolute after:right-0 after:top-0 after:bottom-0 after:border-r-[1.5px] after:border-primary/5 ${COLUMN_CSS_CLASSES}`,
-  [Column.modified]: `min-w-drive-modified-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
-  [Column.createdAt]: `min-w-drive-created-at-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
-  [Column.labels]: `min-w-drive-labels-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
-  [Column.accessedByProjects]: `min-w-drive-accessed-by-projects-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
-  [Column.accessedData]: `min-w-drive-accessed-data-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
-  [Column.path]: `min-w-drive-path-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
-  [Column.size]: `min-w-drive-size-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
+  [Column.name]: `z-10 sticky left-1 bg-dashboard rounded-rows-skip-level h-full p-0 border-l-0 after:absolute after:right-0 after:top-0 after:bottom-0 after:border-r-[1.5px] after:border-primary/5 before:absolute before:-left-1 before:inset-y-0 before:w-1 before:bg-dashboard ${COLUMN_CSS_CLASSES}`,
+  [Column.modified]: NORMAL_COLUMN_CSS_CLASSES,
+  [Column.createdAt]: NORMAL_COLUMN_CSS_CLASSES,
+  [Column.labels]: NORMAL_COLUMN_CSS_CLASSES,
+  [Column.accessedByProjects]: NORMAL_COLUMN_CSS_CLASSES,
+  [Column.accessedData]: NORMAL_COLUMN_CSS_CLASSES,
+  [Column.path]: NORMAL_COLUMN_CSS_CLASSES,
+  [Column.size]: NORMAL_COLUMN_CSS_CLASSES,
 }
 
 /**
@@ -95,3 +100,83 @@ const readEnabledColumns = z
 // `LocalStorage` wants a schema whose input is its output.
 // eslint-disable-next-line no-restricted-syntax
 export const enabledColumnsSchema = readEnabledColumns as z.ZodType<readonly Column[]>
+
+/** The limits of a column's width, and its width until the user resizes it. */
+export interface ColumnWidthLimits extends WidthLimits {
+  /** The default width in pixels, or `null` for the column that fills the remaining space. */
+  readonly defaultWidth: number | null
+}
+
+/**
+ * The name column's minimum: wider than its cells' own minimum (`min-w-48`), so that a badge after
+ * the name still leaves some of the name.
+ */
+const NAME_MIN_WIDTH_PX = 240
+const NAME_MAX_WIDTH_PX = 1200
+/** The minimum of the date columns, which fits their headings' hide and sort icons. */
+const DATE_MIN_WIDTH_PX = 128
+const DATE_DEFAULT_WIDTH_PX = 133
+const TEXT_MIN_WIDTH_PX = 96
+const TEXT_DEFAULT_WIDTH_PX = 240
+/** Room for several labels before they are cut off. */
+const LABELS_DEFAULT_WIDTH_PX = 300
+const SIZE_MIN_WIDTH_PX = 80
+const SIZE_DEFAULT_WIDTH_PX = 96
+const MAX_WIDTH_PX = 800
+
+/**
+ * The widths of the columns, in pixels. The name column fills what the others leave; every other
+ * minimum fits the column's heading.
+ */
+export const COLUMN_WIDTH_LIMITS: Readonly<Record<Column, ColumnWidthLimits>> = {
+  [Column.name]: { min: NAME_MIN_WIDTH_PX, max: NAME_MAX_WIDTH_PX, defaultWidth: null },
+  [Column.modified]: {
+    min: DATE_MIN_WIDTH_PX,
+    max: MAX_WIDTH_PX,
+    defaultWidth: DATE_DEFAULT_WIDTH_PX,
+  },
+  [Column.createdAt]: {
+    min: DATE_MIN_WIDTH_PX,
+    max: MAX_WIDTH_PX,
+    defaultWidth: DATE_DEFAULT_WIDTH_PX,
+  },
+  [Column.labels]: {
+    min: TEXT_MIN_WIDTH_PX,
+    max: MAX_WIDTH_PX,
+    defaultWidth: LABELS_DEFAULT_WIDTH_PX,
+  },
+  [Column.path]: { min: TEXT_MIN_WIDTH_PX, max: MAX_WIDTH_PX, defaultWidth: TEXT_DEFAULT_WIDTH_PX },
+  [Column.accessedByProjects]: {
+    min: TEXT_MIN_WIDTH_PX,
+    max: MAX_WIDTH_PX,
+    defaultWidth: TEXT_DEFAULT_WIDTH_PX,
+  },
+  [Column.accessedData]: {
+    min: TEXT_MIN_WIDTH_PX,
+    max: MAX_WIDTH_PX,
+    defaultWidth: TEXT_DEFAULT_WIDTH_PX,
+  },
+  [Column.size]: { min: SIZE_MIN_WIDTH_PX, max: MAX_WIDTH_PX, defaultWidth: SIZE_DEFAULT_WIDTH_PX },
+}
+
+/** The widths the user has given columns, in pixels; a column not listed has its default width. */
+export type SavedColumnWidths = Readonly<Partial<Record<Column, number>>>
+
+/**
+ * The schema of the saved column widths. A column that no longer exists, or a value that is not a
+ * width, is dropped; a width outside its column's limits is brought inside them.
+ */
+const readColumnWidths = z.record(z.string(), z.unknown()).transform((saved) => {
+  const widths: Partial<Record<Column, number>> = {}
+  for (const column of Object.values(Column)) {
+    const width = saved[column]
+    if (typeof width === 'number' && Number.isFinite(width)) {
+      widths[column] = clampWidth(width, COLUMN_WIDTH_LIMITS[column])
+    }
+  }
+  return widths
+})
+
+// `LocalStorage` wants a schema whose input is its output.
+// eslint-disable-next-line no-restricted-syntax
+export const columnWidthsSchema = readColumnWidths as z.ZodType<SavedColumnWidths>

@@ -390,6 +390,7 @@
   "copyIdShortcut": "Copy Id(s)",
   "manageLabels": "Manage Labels",
   "hideColumn": "Hide column",
+  "resizeColumnX": "Resize the $0 column",
   "types": "Types",
   "type": "Type",
   "timestamp": "Timestamp",
