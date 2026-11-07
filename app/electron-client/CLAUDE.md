@@ -102,12 +102,25 @@ desktop binary (AppImage/DMG/exe + installer).
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts` — `manual` for
   dev builds, and for unsigned macOS, which cannot replace itself; an unpackaged
   run or a Linux build outside an AppImage is also `manual` at run time
-  (`resolveUpdateMode`). Manual mode never touches `electron-updater`. The
+  (`resolveUpdateMode`). Manual mode never touches `electron-updater`: the GUI
+  (`app/gui/src/versionChecker/`) compares semver versions itself, and with the
+  setting on lists `/releases` and offers the newest release or rc, never a
+  nightly (auto mode matches the current version's channel, so an `rc` install
+  sees only `rc` tags, while a stable install takes the feed's first entry). The
   "Include prerelease versions" setting sets `allowPrerelease` for each check;
   because `electron-updater` then matches only tags of the current version's
   channel (an `rc` install sees only `rc` tags), a prerelease check that finds
-  nothing is followed by a stable-only check (`/releases/latest`), whose failure
-  counts as no update. Don't set `channel` instead: it enables `allowDowngrade`.
+  nothing **or throws** is followed by a stable-only check (`/releases/latest`).
+  The check is an error only when both fail (the prerelease error is shown,
+  unless it only said nothing was published). "No stable release" is no update,
+  not an error: on github.com the stable request does not answer 404 for it (the
+  fork answers a redirect to a page that gives 406, thrown as
+  `ERR_UPDATER_INVALID_RELEASE_FEED` or `ERR_UPDATER_LATEST_VERSION_NOT_FOUND`),
+  so those codes (and the no-published ones) are confirmed with the GitHub API's
+  own `/releases/latest` 404 (`confirmNoStableRelease`, cached for an hour)
+  rather than read from the message. A prerelease failure followed by a
+  confirmed "no stable release" is `none` with a `console.warn`. Don't set
+  `channel` instead: it enables `allowDowngrade`.
 - Holds the local secrets master key (`src/secretsKey.ts`, wired in
   `projectService.ts`). Sources, in order: `ENSO_SECRETS_KEY`, then the keychain
   item service `Enso`, account `secrets-key`, through `@napi-rs/keyring`. At

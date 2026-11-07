@@ -14,19 +14,21 @@ import type { UpdateStatus } from 'enso-common/src/updater'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { isNewerRelease } from '../versionChecker'
 
-const getLatestRelease = vi.fn<() => Promise<object | null>>(async () => ({
-  // GitHub's field names.
-  /* eslint-disable camelcase */
-  tag_name: '2099.1.1',
-  published_at: '2099-01-01T00:00:00Z',
-  html_url: 'https://github.com/enso-org/enso/releases/tag/2099.1.1',
-  assets: [],
-  /* eslint-enable camelcase */
-}))
-const getDownloadUrl = vi.fn(async () => 'https://example.com/enso.exe')
+const getLatestRelease = vi.fn<(includePrereleases?: boolean) => Promise<object | null>>(
+  async () => ({
+    // GitHub's field names.
+    /* eslint-disable camelcase */
+    tag_name: '2099.1.1',
+    published_at: '2099-01-01T00:00:00Z',
+    html_url: 'https://github.com/enso-org/enso/releases/tag/2099.1.1',
+    assets: [],
+    /* eslint-enable camelcase */
+  }),
+)
+const downloadUrlOf = vi.fn((_release: unknown) => 'https://example.com/enso.exe' as string | null)
 vi.mock('$/utils/github', () => ({
-  getLatestRelease: () => getLatestRelease(),
-  getDownloadUrl: () => getDownloadUrl(),
+  getLatestRelease: (include?: boolean) => getLatestRelease(include),
+  downloadUrlOf: (release: unknown) => downloadUrlOf(release),
   RELEASES_REPOSITORY: 'jdunkerley/enso',
 }))
 const openInNewBrowserTab = vi.fn()
@@ -118,7 +120,7 @@ describe('automatic updates', () => {
     await vi.waitFor(() => expect(button(getText('restartToUpdate'))).not.toBeUndefined())
     await userEvent.setup().click(button(getText('restartToUpdate'))!)
     expect(updater.quitAndInstall).toHaveBeenCalled()
-    expect(getDownloadUrl).not.toHaveBeenCalled()
+    expect(downloadUrlOf).not.toHaveBeenCalled()
   })
 
   test('passes the prerelease setting to the check', async () => {
@@ -243,7 +245,7 @@ describe('automatic updates, in more detail', () => {
       'https://github.com/jdunkerley/enso/releases/tag/2026.2.0',
     )
     expect(getLatestRelease).not.toHaveBeenCalled()
-    expect(getDownloadUrl).not.toHaveBeenCalled()
+    expect(downloadUrlOf).not.toHaveBeenCalled()
   })
 
   test('an empty release date shows no parentheses', async () => {
@@ -265,6 +267,40 @@ describe('automatic updates, in more detail', () => {
     await vi.waitFor(() =>
       expect(download).toHaveBeenCalledWith({ url: 'https://example.com/enso.exe' }),
     )
+  })
+})
+
+describe('manual mode and the prerelease setting', () => {
+  test('looks for the latest stable release by default', async () => {
+    getLatestRelease.mockClear()
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(getLatestRelease).toHaveBeenCalled())
+    expect(getLatestRelease).toHaveBeenCalledWith(false)
+  })
+
+  test('includes prereleases when the setting is on, and downloads that release', async () => {
+    setIncludePrereleases(true)
+    getLatestRelease.mockClear()
+    downloadUrlOf.mockClear()
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    expect(getLatestRelease).toHaveBeenCalledWith(true)
+    await userEvent.setup().click(button(getText('download'))!)
+    await vi.waitFor(() =>
+      expect(download).toHaveBeenCalledWith({ url: 'https://example.com/enso.exe' }),
+    )
+    // The release the dialog showed, not a new fetch.
+    // eslint-disable-next-line camelcase
+    expect(downloadUrlOf).toHaveBeenCalledWith(expect.objectContaining({ tag_name: '2099.1.1' }))
+    expect(getLatestRelease).toHaveBeenCalledTimes(1)
+  })
+
+  test('turning prereleases on looks again, with them', async () => {
+    getLatestRelease.mockClear()
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(getLatestRelease).toHaveBeenCalledWith(false))
+    setIncludePrereleases(true)
+    await vi.waitFor(() => expect(getLatestRelease).toHaveBeenCalledWith(true))
   })
 })
 
@@ -308,6 +344,17 @@ describe('isNewerRelease', () => {
     expect(isNewerRelease('2026.1.1-rc.10', '2026.1.1-rc.9')).toBe(true)
     expect(isNewerRelease('2026.1.1-rc.2', '2026.1.1')).toBe(false)
     expect(isNewerRelease('2025.1.1', '2026.1.1-rc.2')).toBe(false)
+  })
+  test('nor a nightly release, to an rc or a release build', () => {
+    expect(isNewerRelease('2026.2.0-nightly.2026.11.1', '2026.1.1-rc.2')).toBe(false)
+    expect(isNewerRelease('2026.2.0-nightly.2026.11.1', '2026.1.1')).toBe(false)
+    expect(isNewerRelease('2026.2.0-rc.1', '2026.1.1')).toBe(true)
+  })
+  test('prerelease ordering: rcs are ordered among themselves and below their release', () => {
+    expect(isNewerRelease('2026.2.0-rc.1', '2026.1.1-rc.5')).toBe(true)
+    expect(isNewerRelease('2026.1.1-rc.2', '2026.1.1-rc.10')).toBe(false)
+    expect(isNewerRelease('2026.1.1-rc.1', '2026.1.1-rc.1')).toBe(false)
+    expect(isNewerRelease('2026.1.1-rc.3', '2026.1.1')).toBe(false)
   })
   test('nor anything to a development or nightly build, or a tag that is not a version', () => {
     expect(isNewerRelease('2026.1.2', '2026.1.1-nightly.2026.10.22')).toBe(false)
