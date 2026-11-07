@@ -2,9 +2,42 @@
 
 The drive's composables and helpers (#91): `driveView.ts` (the shown-versus-
 target location), `driveActions.ts`, `assetItems.ts`, `suggestions.ts`,
-`drag.ts` and `autoScroll.ts` (drag and drop), `pressPropagation.ts`, and the
-accessibility pieces below. The components using them are `../AssetsTable.vue`
-(the table) and `#/pages/dashboard/components/AssetRow.vue` (a row).
+`drag.ts` and `autoScroll.ts` (drag and drop), `pressPropagation.ts`,
+`parentEntry.ts` (the parent-folder entry, below), and the accessibility pieces
+below. The components using them are `../AssetsTable.vue` (the table),
+`#/pages/dashboard/components/AssetRow.vue` (a row) and
+`#/pages/dashboard/components/ParentDirectoryRow.vue` (the parent-folder entry).
+
+## The parent-folder entry (#640)
+
+Inside a folder below its category's root, the table's first body row is a `..`
+entry ("Parent folder", test id `parent-directory-row`) that opens the folder
+above. `parentEntryDirectoryId` decides when it shows: not at a category's root,
+not in Recent, not while the query (as typed or as debounced) has text, and not
+before the shown folder's details (its `parentId`) have loaded. It is outside
+the `v-for` of the assets, so it stays first whatever the sort.
+
+- **Not an asset.** It is never selected (no `aria-selected`), renamed, dragged,
+  deleted or labelled, has no context menu (its `contextmenu` is swallowed so
+  the table's does not open), and its other cells are empty. A click clears the
+  selection.
+- **Opening.** A double click, Enter or Space opens the parent through
+  `driveView.navigate` with `PARENT_ENTRY_NAVIGATION_SOURCE`, so its icon
+  becomes a spinner until the parent is shown.
+- **Keyboard.** In `AssetsTable.vue`'s keyboard model it is index
+  `PARENT_ENTRY_INDEX` (`-1`), before the first asset: ArrowUp from the first
+  asset reaches it (`arrowKeyIndex`), ArrowDown leaves it, and Shift+Arrow never
+  extends a selection onto it. In the roving tab stop it is the key
+  `PARENT_ENTRY_KEY`, so with nothing selected or focused it is the grid's tab
+  stop. The asset rows' `aria-rowindex` and the table's `aria-rowcount` count it
+  while it shows; the rubber-band selection skips its height.
+- **Drops.** It takes the drops a directory row takes, through the same
+  `dropInto` (`paste` with `move`, or an upload of dropped files), into the
+  parent folder; it shows the same `selected` highlight while a drag is over it,
+  holding a drag over it for two seconds opens the parent, and the drop is
+  announced as "into the parent folder" (destination `{ type: 'parent' }`).
+- The keyboard focus ring is shared with `AssetRow.vue` through
+  `driveRowFocusRing.css` (the `DriveRow` class).
 
 ## The table's accessibility model (#208)
 
@@ -15,7 +48,8 @@ accessibility pieces below. The components using them are `../AssetsTable.vue`
   that is not there. The `<table>` carries `role="grid"`,
   `aria-multiselectable`, an `aria-label` and `aria-rowcount` (`-1` while more
   pages may load); the header row is `aria-rowindex="1"` and each asset row its
-  index + 2. Rows keep `aria-selected`. The page objects find the table with
+  index + 2 (index + 3 while the parent-folder entry, at 2, shows). Asset rows
+  keep `aria-selected`. The page objects find the table with
   `getByRole('grid')`.
 - **One tab stop** (`rovingTabStop.ts`): the row focused last has
   `tabindex="0"`, falling back to the first selected row, then the first row;

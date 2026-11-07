@@ -33,11 +33,16 @@ function locateAssetRows(page: Page) {
   return locateAssetsTable(page).getByTestId('asset-row')
 }
 
-/** Find assets table placeholder rows. */
+/** Find assets table placeholder rows (not the assets' rows, nor the parent-folder entry). */
 function locateNonAssetRows(page: Page) {
   return locateAssetsTable(page).locator(
-    'tbody tr:not([data-testid="asset-row"]):not([data-testid="dummy-row"])',
+    'tbody tr:not([data-testid="asset-row"]):not([data-testid="dummy-row"]):not([data-testid="parent-directory-row"])',
   )
+}
+
+/** Find the parent-folder entry, the `..` row at the top of a folder's listing. */
+function locateParentDirectoryRow(page: Page) {
+  return locateAssetsTable(page).getByTestId('parent-directory-row')
 }
 
 /** Find a radio button that navigates to specified drive category. */
@@ -188,6 +193,33 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
         return self.step(`Double dlick drive table row '${row}'`, async (page) => {
           await getRow(page, row).dblclick({ position: ASSET_ROW_SAFE_POSITION })
         })
+      },
+      /** Interact with the parent-folder entry (it need not be shown). */
+      withParentDirectoryRow(callback: LocatorCallback<Context>) {
+        return self.step('Interact with the parent-folder entry', (page, context) =>
+          callback(locateParentDirectoryRow(page), context),
+        )
+      },
+      /** Double click the parent-folder entry, to open the folder above. */
+      doubleClickParentDirectoryRow() {
+        return self.step('Double click the parent-folder entry', async (page) => {
+          await locateParentDirectoryRow(page).dblclick({ position: ASSET_ROW_SAFE_POSITION })
+        })
+      },
+      /** Drag a row onto the parent-folder entry. */
+      dragRowToParentDirectoryRow(from: number | string) {
+        return self.step(
+          `Drag drive table row '${from}' to the parent-folder entry`,
+          async (page) => {
+            const fromRow = getRow(page, from)
+            await fromRow.click()
+            await fromRow.dragTo(locateParentDirectoryRow(page), {
+              sourcePosition: ASSET_ROW_SAFE_POSITION,
+              targetPosition: ASSET_ROW_SAFE_POSITION,
+            })
+            await parkMouse(page)
+          },
+        )
       },
       /** Interact with the set of all rows in the Drive table. */
       withRows(

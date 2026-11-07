@@ -84,6 +84,7 @@ interface PlaceholderOverrides {
   readonly dragAnnouncementStarted: [assets: string]
   readonly dragAnnouncementDroppedInto: [assets: string, directoryTitle: string]
   readonly dragAnnouncementDroppedHere: [assets: string]
+  readonly dragAnnouncementDroppedIntoParent: [assets: string]
   readonly dragAnnouncementDroppedOn: [assets: string, targetName: string]
   readonly dragAnnouncementDropped: [assets: string]
   readonly dragAnnouncementCancelled: [assets: string]

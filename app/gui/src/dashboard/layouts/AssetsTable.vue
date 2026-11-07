@@ -15,6 +15,11 @@
  * the listing rather than expanding, so it is not a `treegrid`), multi-selectable, with one tab
  * stop that roves with the focus (`Drive/rovingTabStop.ts`) and row positions; drags of rows are
  * announced in a live region (`Drive/dragAnnouncements.ts`).
+ *
+ * Inside a folder below its category's root, the first row is the parent-folder entry
+ * (`Drive/parentEntry.ts`, `ParentDirectoryRow.vue`): it opens the folder above, takes drops to
+ * move assets there, and is reached with the arrow keys at keyboard index `PARENT_ENTRY_INDEX`, but
+ * is never selected.
  */
 import { Column, enabledColumnsSchema } from '#/pages/dashboard/components/column/columnUtils'
 import LocalStorage from '$/utils/LocalStorage'
@@ -58,10 +63,19 @@ import {
 import { useEditDatalink } from '#/layouts/Drive/datalinkActions'
 import { useColumnWidths } from '#/layouts/Drive/columnWidths'
 import { useDriveView } from '#/layouts/Drive/driveView'
+import type { TableDropDestination } from '#/layouts/Drive/dragAnnouncements'
+import {
+  arrowKeyIndex,
+  PARENT_ENTRY_INDEX,
+  PARENT_ENTRY_KEY,
+  PARENT_ENTRY_NAVIGATION_SOURCE,
+  parentEntryDirectoryId,
+} from '#/layouts/Drive/parentEntry'
 import { useRovingTabStop } from '#/layouts/Drive/rovingTabStop'
 import { STOP_PRESS_AND_POINTER_PROPAGATION } from '#/layouts/Drive/pressPropagation'
 import { SUGGESTIONS_FOR_TYPE, useSuggestions, type Suggestion } from '#/layouts/Drive/suggestions'
 import AssetRow from '#/pages/dashboard/components/AssetRow.vue'
+import ParentDirectoryRow from '#/pages/dashboard/components/ParentDirectoryRow.vue'
 import {
   COLUMN_CSS_CLASS,
   COLUMN_ICONS,
@@ -313,6 +327,31 @@ watch([isFetching, () => assetsPages.data.value], fetchNextPageIfAtEnd, { flush:
 watch([currentDirectoryId, assets], ([parentId, items]) => assetItems.setItems(parentId, items), {
   immediate: true,
 })
+
+// === The parent-folder entry ===
+
+/** The folder the parent-folder entry opens, or `null` when there is no entry. */
+const parentEntryId = computed(() =>
+  parentEntryDirectoryId({
+    isRecent: isRecentCategory(category.value),
+    // The listing follows the debounced query, the columns the query as typed: either is a search.
+    isSearching: query.query !== '' || debouncedQuery.value.query !== '',
+    currentDirectoryId: currentDirectoryId.value,
+    categoryRootId:
+      categories.categoryDirectoryId(category.value) ?? location.value.rootDirectoryId,
+    parentId: driveView.shownDetails.value?.parentId,
+  }),
+)
+/** How many rows the entry adds before the assets' rows: 1 while it is shown, else 0. */
+const parentEntryRows = computed(() => (parentEntryId.value == null ? 0 : 1))
+
+function openParentDirectory() {
+  const parentId = parentEntryId.value
+  if (parentId == null) return
+  driveView.navigate(PARENT_ENTRY_NAVIGATION_SOURCE, () => {
+    drive.currentDirectory = parentId
+  })
+}
 
 watch(
   () => categoryKey(category.value),
@@ -614,15 +653,46 @@ function setMostRecentlySelectedIndex(index: number | null, isKeyboard = false) 
   keyboardSelectedIndex.value = isKeyboard ? index : null
 }
 
-/** The grid's one tab stop: the row focused last (or the first selected, or the first). */
+/**
+ * The grid's one tab stop: the row focused last (or the first selected, or the first). Its keys are
+ * the body's rows, the parent-folder entry first while it is shown.
+ */
 const rovingTabStop = useRovingTabStop(
-  () => assets.value.map((asset) => asset.id),
-  (id) => driveStore.selectedIds.has(id),
+  (): readonly (AnyAsset['id'] | typeof PARENT_ENTRY_KEY)[] => {
+    const ids = assets.value.map((asset) => asset.id)
+    return parentEntryId.value == null ? ids : [PARENT_ENTRY_KEY, ...ids]
+  },
+  (id) => id !== PARENT_ENTRY_KEY && driveStore.selectedIds.has(id),
+)
+/** The tab stop's keyboard index: an asset's index, or `PARENT_ENTRY_INDEX`; `null` for none. */
+const tabStopKeyboardIndex = computed(() =>
+  rovingTabStop.index.value === -1 ? null : rovingTabStop.index.value - parentEntryRows.value,
 )
 
 function onRowFocus(item: AnyAsset) {
   rovingTabStop.setTabStop(item.id)
 }
+
+/** Focus entering the parent-folder entry makes it the tab stop, and where the keyboard acts. */
+function onParentEntryFocus() {
+  rovingTabStop.setTabStop(PARENT_ENTRY_KEY)
+  mostRecentlySelectedIndex = PARENT_ENTRY_INDEX
+}
+
+/** A click on the parent-folder entry clears the selection: the entry itself cannot be selected. */
+function onParentEntryClick(event: MouseEvent) {
+  event.stopPropagation()
+  driveStore.setSelectedAssets([])
+  setMostRecentlySelectedIndex(PARENT_ENTRY_INDEX)
+  selectionStartIndex = null
+}
+
+// The keyboard cannot stay on an entry that is gone.
+watch(parentEntryId, (id) => {
+  if (id != null) return
+  if (mostRecentlySelectedIndex === PARENT_ENTRY_INDEX) mostRecentlySelectedIndex = null
+  if (keyboardSelectedIndex.value === PARENT_ENTRY_INDEX) keyboardSelectedIndex.value = null
+})
 
 /**
  * Where the keyboard acts from: the row selected last, or, with none (after Escape, or on tabbing
@@ -632,10 +702,11 @@ function keyboardAnchorIndex() {
   if (mostRecentlySelectedIndex != null) return mostRecentlySelectedIndex
   const isRowFocused =
     document.activeElement instanceof Element &&
-    document.activeElement.closest('[data-testid="asset-row"]') != null &&
+    document.activeElement.closest(
+      '[data-testid="asset-row"], [data-testid="parent-directory-row"]',
+    ) != null &&
     root.value?.contains(document.activeElement) === true
-  const tabStopIndex = rovingTabStop.index.value
-  return isRowFocused && tabStopIndex !== -1 ? tabStopIndex : null
+  return isRowFocused ? tabStopKeyboardIndex.value : null
 }
 
 /**
@@ -657,7 +728,15 @@ function onKeyDown(event: KeyboardEvent) {
   if (isTextInputFocused && isEventTextInputEvent) return
   const { selectedAssets } = driveStore.state
   const prevIndex = keyboardAnchorIndex()
-  const item = prevIndex == null ? null : assets.value[prevIndex]
+  const hasParentEntry = parentEntryId.value != null
+  const isOnParentEntry = hasParentEntry && prevIndex === PARENT_ENTRY_INDEX
+  const item = prevIndex == null || isOnParentEntry ? null : assets.value[prevIndex]
+  if (isOnParentEntry && (event.key === 'Enter' || (event.key === ' ' && !event.ctrlKey))) {
+    event.preventDefault()
+    event.stopPropagation()
+    openParentDirectory()
+    return
+  }
   if (selectedAssets.length === 1 && item != null) {
     switch (event.key) {
       case 'Enter':
@@ -709,16 +788,20 @@ function onKeyDown(event: KeyboardEvent) {
     case 'ArrowDown': {
       if (!event.shiftKey) selectionStartIndex = null
       const oldIndex = prevIndex ?? 0
-      const index =
-        event.key === 'ArrowUp' ?
-          Math.max(0, oldIndex - 1)
-        : Math.min(assets.value.length - 1, oldIndex + 1)
+      const index = arrowKeyIndex(
+        oldIndex,
+        event.key === 'ArrowUp' ? 'up' : 'down',
+        assets.value.length,
+        hasParentEntry,
+        event.shiftKey,
+      )
       setMostRecentlySelectedIndex(index, true)
       if (event.shiftKey) {
         event.preventDefault()
         event.stopPropagation()
-        // On Windows, Ctrl+Shift+Arrow behaves the same as Shift+Arrow.
-        if (selectionStartIndex == null) selectionStartIndex = prevIndex ?? 0
+        // On Windows, Ctrl+Shift+Arrow behaves the same as Shift+Arrow. A range never starts on the
+        // parent-folder entry, which cannot be selected.
+        if (selectionStartIndex == null) selectionStartIndex = Math.max(0, prevIndex ?? 0)
         const startIndex = Math.min(index, selectionStartIndex)
         const endIndex = Math.max(index, selectionStartIndex) + 1
         driveStore.setSelectedAssets(assets.value.slice(startIndex, endIndex))
@@ -729,8 +812,13 @@ function onKeyDown(event: KeyboardEvent) {
       } else if (index !== prevIndex) {
         event.preventDefault()
         event.stopPropagation()
-        const newItem = assets.value[index]
-        if (newItem != null) driveStore.setSelectedAssets([newItem])
+        if (index === PARENT_ENTRY_INDEX) {
+          // The entry takes the focus, but not the selection.
+          driveStore.setSelectedAssets([])
+        } else {
+          const newItem = assets.value[index]
+          if (newItem != null) driveStore.setSelectedAssets([newItem])
+        }
         selectionStartIndex = null
       } else {
         // The arrow key leaves this container: let it propagate, for `navigator2D` to move to
@@ -839,10 +927,12 @@ function onSelectionDrag({ event, rectangle }: OnDragParams) {
   if (scrollContainer == null) return
   const rect = scrollContainer.getBoundingClientRect()
   const overlapsHorizontally = rect.right > rectangle.left && rect.left < rectangle.right
-  const selectionTop = Math.max(0, rectangle.top - rect.top - ROW_HEIGHT_PX)
+  // The rows above the first asset's: the heading's, and the parent-folder entry's while it shows.
+  const rowsAboveAssetsPx = ROW_HEIGHT_PX * (1 + parentEntryRows.value)
+  const selectionTop = Math.max(0, rectangle.top - rect.top - rowsAboveAssetsPx)
   const selectionBottom = Math.max(
     0,
-    Math.min(rect.height, rectangle.bottom - rect.top - ROW_HEIGHT_PX),
+    Math.min(rect.height, rectangle.bottom - rect.top - rowsAboveAssetsPx),
   )
   const range = dragSelectionRange
   if (!overlapsHorizontally) {
@@ -901,7 +991,10 @@ function onRowClick(asset: AnyAsset, event: MouseEvent) {
   event.stopPropagation()
   const newIndex = assets.value.findIndex((otherAsset) => otherAsset.id === asset.id)
   const getRange = () => {
-    if (mostRecentlySelectedIndex == null) return [asset]
+    // A range from the parent-folder entry, which cannot be selected, is the clicked asset alone.
+    if (mostRecentlySelectedIndex == null || mostRecentlySelectedIndex === PARENT_ENTRY_INDEX) {
+      return [asset]
+    }
     const startIndex = Math.min(mostRecentlySelectedIndex, newIndex)
     const endIndex = Math.max(mostRecentlySelectedIndex, newIndex) + 1
     return assets.value.slice(startIndex, endIndex)
@@ -986,12 +1079,25 @@ function onRowDragStart(event: DragEvent, asset: AnyAsset) {
 }
 
 function onRowDrop(event: DragEvent, item: AnyAsset | null = null) {
+  if (item?.type === AssetType.directory) {
+    dropInto(event, item.id, { type: 'directory', title: item.title })
+  } else {
+    dropInto(event, currentDirectoryId.value, { type: 'current' })
+  }
+}
+
+function onParentEntryDrop(event: DragEvent) {
+  const parentId = parentEntryId.value
+  if (parentId != null) dropInto(event, parentId, { type: 'parent' })
+}
+
+/** Move the dragged rows into `directoryId`, or upload the dropped files there. */
+function dropInto(event: DragEvent, directoryId: DirectoryId, destination: TableDropDestination) {
   if (isRecentCategory(category.value)) {
     dragAnnouncements.rejected()
     return
   }
   endAutoScroll()
-  const directoryId = item?.type === AssetType.directory ? item.id : currentDirectoryId.value
   const payload = ASSET_ROWS.lookup(event)
   const items = payload?.items ?? []
 
@@ -1002,12 +1108,7 @@ function onRowDrop(event: DragEvent, item: AnyAsset | null = null) {
     const moved = items
       .filter(({ asset }) => asset.parentId !== directoryId)
       .map(({ asset }) => asset)
-    dragAnnouncements.droppedInTable(
-      moved,
-      item?.type === AssetType.directory ?
-        { type: 'directory', title: item.title }
-      : { type: 'current' },
-    )
+    dragAnnouncements.droppedInTable(moved, destination)
     void paste({
       fromCategory: payload.category,
       toCategory: category.value,
@@ -1175,7 +1276,9 @@ const isLoadingRow = computed(
                     role="grid"
                     aria-multiselectable="true"
                     :aria-label="getText('assetsTableLabel')"
-                    :aria-rowcount="assetsPages.hasNextPage.value ? -1 : assets.length + 1"
+                    :aria-rowcount="
+                      assetsPages.hasNextPage.value ? -1 : assets.length + 1 + parentEntryRows
+                    "
                     class="isolate table-fixed border-collapse rounded-rows"
                     :style="{ width: columnWidths.tableWidth(columns) }"
                   >
@@ -1219,6 +1322,17 @@ const isLoadingRow = computed(
                       </tr>
                     </thead>
                     <tbody class="isolate">
+                      <ParentDirectoryRow
+                        v-if="parentEntryId != null"
+                        :columns="columns"
+                        :isKeyboardSelected="keyboardSelectedIndex === PARENT_ENTRY_INDEX"
+                        :isTabStop="rovingTabStop.index.value === 0"
+                        :isOpening="driveView.isNavigatingFrom(PARENT_ENTRY_NAVIGATION_SOURCE)"
+                        :onEntryFocus="onParentEntryFocus"
+                        :onEntryClick="onParentEntryClick"
+                        :open="openParentDirectory"
+                        :onEntryDrop="onParentEntryDrop"
+                      />
                       <AssetRow
                         v-for="(item, index) in assets"
                         :key="item.id + item.virtualParentsPath"
@@ -1226,8 +1340,8 @@ const isLoadingRow = computed(
                         :columns="columns"
                         :labels="labels"
                         :isKeyboardSelected="keyboardSelectedIndex === index"
-                        :isTabStop="rovingTabStop.index.value === index"
-                        :rowIndex="index + 2"
+                        :isTabStop="rovingTabStop.index.value === index + parentEntryRows"
+                        :rowIndex="index + 2 + parentEntryRows"
                         :onRowFocus="onRowFocus"
                         :isDeleting="deletingIds.has(item.id)"
                         :isUpdating="updatingIds.has(item.id)"
@@ -1239,7 +1353,8 @@ const isLoadingRow = computed(
                         :onRowDrop="onRowDrop"
                         :openContextMenu="openContextMenu"
                       />
-                      <tr class="hidden h-row first:table-row">
+                      <!-- Shown when no asset is listed (the parent-folder entry may still be). -->
+                      <tr v-if="assets.length === 0" class="h-row">
                         <td :colspan="columns.length" class="h-table-row bg-transparent">
                           <Text class="px-cell-x placeholder" disableLineHeightCompensation>
                             {{ emptyText }}

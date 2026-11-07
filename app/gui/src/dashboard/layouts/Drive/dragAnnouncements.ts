@@ -22,6 +22,8 @@ export type TableDropDestination =
   | { readonly type: 'current' }
   /** A directory row: the rows move into it. */
   | { readonly type: 'directory'; readonly title: string }
+  /** The parent-folder entry (`parentEntry.ts`): the rows move up into the folder above. */
+  | { readonly type: 'parent' }
 
 /**
  * The live region's text through one drag at a time. Call `started` on `dragstart`, `droppedInTable`
@@ -83,11 +85,20 @@ export function useDragAnnouncements() {
         return
       }
       const what = describe(moved)
-      announce(
-        destination.type === 'directory' ?
-          getText('dragAnnouncementDroppedInto', what, destination.title)
-        : getText('dragAnnouncementDroppedHere', what),
-      )
+      switch (destination.type) {
+        case 'directory': {
+          announce(getText('dragAnnouncementDroppedInto', what, destination.title))
+          break
+        }
+        case 'parent': {
+          announce(getText('dragAnnouncementDroppedIntoParent', what))
+          break
+        }
+        case 'current': {
+          announce(getText('dragAnnouncementDroppedHere', what))
+          break
+        }
+      }
     },
     /** The table refused the drop (the trash and the recent projects take no moves). */
     rejected() {
