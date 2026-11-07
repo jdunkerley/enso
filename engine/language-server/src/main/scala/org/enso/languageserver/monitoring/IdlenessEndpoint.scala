@@ -13,6 +13,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.enso.jsonrpc._
+import org.enso.languageserver.http.server.BrowserPageGuard.refuseBrowserPages
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -33,8 +34,9 @@ class IdlenessEndpoint(
     idlenessProbe
 
   private val idlenessProbe = {
+    // Note [The RPC Port Refuses Web Pages]
     path("_idle" / "reset") {
-      post {
+      (post & refuseBrowserPages) {
         resetIdleness()
       }
     } ~

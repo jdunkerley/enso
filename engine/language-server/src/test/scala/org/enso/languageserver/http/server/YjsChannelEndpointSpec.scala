@@ -1,7 +1,12 @@
 package org.enso.languageserver.http.server
 
 import akka.http.scaladsl.model.{AttributeKeys, RemoteAddress, StatusCodes}
-import akka.http.scaladsl.model.headers.{`X-Forwarded-For`, HttpOrigin, Origin}
+import akka.http.scaladsl.model.headers.{
+  `X-Forwarded-For`,
+  HttpOrigin,
+  Origin,
+  RawHeader
+}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.http.scaladsl.model.ws.Message
 import akka.http.scaladsl.model.ws.BinaryMessage
@@ -218,6 +223,17 @@ class YjsChannelEndpointSpec
       loopbackWS("/channel/json?token=t0k", WSProbe().flow)
         .addHeader(
           Origin(HttpOrigin("http://localhost:5173"))
+        ) ~> e.route ~> check {
+        status shouldBe StatusCodes.Forbidden
+      }
+      connected("json").isEmpty shouldBe true
+    }
+
+    "refuse a handshake that a web page made, by Sec-Fetch-Site (#613)" in {
+      val (e, connected) = endpoint(Some("t0k"))
+      loopbackWS("/channel/json?token=t0k", WSProbe().flow)
+        .addHeader(
+          RawHeader("Sec-Fetch-Site", "cross-site")
         ) ~> e.route ~> check {
         status shouldBe StatusCodes.Forbidden
       }
