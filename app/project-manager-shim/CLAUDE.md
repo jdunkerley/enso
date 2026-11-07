@@ -158,22 +158,30 @@ passes it to the server) installs the samples shipped with the application in
     stays), copies the bundle in (the user's copy of a file the bundle ships in
     `output/` wins), puts the labels back, records the manifest, and commits
     `Updated sample <Name>`, with `Samples/.samples.json` when the repository
-    tracks it (an untracked manifest is never added). No `_edited_` copy. If the
-    first commit fails for any reason (an `index.lock`, a git error), the work
-    tree has not changed: it throws `VersionSaveError`, and the sample falls
-    back to the copy route, reported in `fellBack` with git's message. If
-    anything after it fails, the work tree is put back as that commit
-    (`restore --source=<commit> --staged --worktree` and `clean -f -d`, as
-    `restore` does, never `reset --hard`, never `-x`), the manifest is written
-    back as it was, and the error says the user's work is in the version
-    `Saved before updating the sample`.
+    tracks it (an untracked manifest is never added, and neither is one outside
+    the sample's repository, as when the sample is a repository of its own). No
+    `_edited_` copy. The files it hands over are under the sample's path as the
+    IDE knows it, not git's spelling of the repository's path (another case on
+    Windows, a junction or symbolic link, macOS's `/private/var`), so the checks
+    after it compare like with like. If the first commit fails for any reason
+    (an `index.lock`, a git error), the work tree has not changed: it throws
+    `VersionSaveError`, and the sample falls back to the copy route, reported in
+    `fellBack` with git's message. If anything after it fails, the work tree is
+    put back as that commit (`restore --source=<commit> --staged --worktree`, as
+    `restore` does, never `reset --hard`, and `clean -f -d` of only the paths
+    the bundle ships, never `-x`, so an untracked file the user saved meanwhile
+    stays), the manifest is written back as it was, and the error says the
+    user's work is in the version `Saved before updating the sample`.
   - **A file git ignores is never overwritten silently.** It is in no version.
     When the bundle ships a file that exists in the sample with other content
     and git ignores it (`LocalVersioning.ignoredPaths`, `git check-ignore`), the
     sample takes the copy route: `status` lists those files in `ignoredChanges`
     (the confirmation says why), and the update reports them in `fellBack`.
-    `replaceInPlace` checks again before it changes anything and throws if such
-    a file is there.
+    `replaceAsVersion` asks git again under the lock, before anything is saved
+    (`protect`), so a refusal adds no version however often it is retried; and
+    `replaceInPlace` checks once more, before it changes anything, for any
+    changed file that is not in the saved version (ignored, or written
+    meanwhile), and throws saying so.
   - **`copy`** otherwise (and for an unreadable sample): it is renamed to
     `<Name>_edited_<yyyy>_<mm>_<dd>` (then `_2`, `_3`, ...) beside it, with that
     name in its `package.yaml` too, and a fresh copy is installed. The date uses

@@ -316,6 +316,69 @@ describe('a versioned update keeps what is the user’s', () => {
   })
 })
 
+describe('the repository reached in another way', () => {
+  const gitIn = (cwd: string, ...args: string[]) =>
+    runCommand('git', args, { cwd }).then(({ stdout }) => stdout.trim())
+
+  test('a sample that is its own repository is updated, without the manifest beside it', async () => {
+    await withVersionedSamples(async () => {
+      const one = path.join(samples, 'One')
+      await gitIn(one, 'init', '-q', '-b', 'main')
+      await gitIn(one, 'config', 'user.name', 'Tester')
+      await gitIn(one, 'config', 'user.email', 'tester@example.com')
+      await versioning.enable(one)
+      await gitIn(one, 'add', '-A')
+      await gitIn(one, 'commit', '-q', '-m', 'Its own')
+      editOneAndChangeBundle()
+      const result = await new LocalSamples(bundled, projects).update('One', {
+        versioning,
+        now: NOW,
+      })
+      expect(result).toMatchObject({ versioned: ['One'], kept: [], fellBack: [] })
+      expect((await gitIn(one, 'log', '--format=%s')).split('\n')).toEqual([
+        'Updated sample One',
+        BEFORE,
+        'Its own',
+      ])
+      expect(read(path.join(one, 'src', 'Main.enso'))).toBe('main = 100\n')
+      expect(await gitIn(one, 'status', '--porcelain')).toBe('')
+    })
+  })
+
+  // The IDE's path to the projects is not git's: git answers the real path, in its own case.
+  test.each([
+    ['a junction or symbolic link', true],
+    ['the path in other case (Windows)', false],
+  ])('through %s, a sample is updated as a version', async (_, viaLink) => {
+    if (!viaLink && process.platform !== 'win32') return
+    await withVersionedSamples(async () => {
+      let other: string
+      if (viaLink) {
+        other = path.join(path.dirname(projects), 'link')
+        fs.symlinkSync(projects, other, process.platform === 'win32' ? 'junction' : 'dir')
+      } else {
+        other = projects.toLowerCase()
+        expect(other).not.toBe(projects)
+      }
+      editOneAndChangeBundle()
+      write(path.join(samples, 'One', 'output', 'result.csv'), 'mine\n')
+      const local = new LocalSamples(bundled, other)
+      expect(
+        (await local.status({ versioning, now: NOW })).samples.find(
+          (sample) => sample.name === 'One',
+        ),
+      ).toMatchObject({ route: 'version', ignoredChanges: [] })
+      expect(await local.update('One', { versioning, now: NOW })).toMatchObject({
+        versioned: ['One'],
+        fellBack: [],
+      })
+      expect(await subjects('Samples/One')).toEqual(['Updated sample One', BEFORE, 'Installed'])
+      expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 100\n')
+      expect(read(path.join(samples, 'One', 'output', 'result.csv'))).toBe('mine\n')
+    })
+  })
+})
+
 describe('the samples manifest in a versioned repository', () => {
   test('is saved with the update when the repository tracks it', async () => {
     await withVersionedSamples(async () => {

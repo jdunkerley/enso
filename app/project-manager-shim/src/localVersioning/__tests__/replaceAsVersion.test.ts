@@ -168,6 +168,79 @@ describe('replaceAsVersion', () => {
   })
 })
 
+describe('replaceAsVersion before it saves anything', () => {
+  test('an ignored file it would overwrite refuses it, and retries add no version', async () => {
+    await withProject(async (root, project, versioning) => {
+      await writeFiles(root, { 'P/src/Main.enso': 'main = 2\n', 'P/data.bak': 'mine\n' })
+      const replace = vi.fn(async () => {})
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await expect(
+          versioning.replaceAsVersion(project, replace, MESSAGES, {
+            protect: [path.join(project, 'data.bak'), path.join(project, 'src', 'Main.enso')],
+          }),
+        ).rejects.toThrow(/git ignores changed files the update would replace: data\.bak$/)
+      }
+      expect(replace).not.toHaveBeenCalled()
+      expect(await git(root, 'log', '--format=%s')).toBe('Initial')
+    })
+  })
+
+  test('a failure cleans only what it may have written, not a file the user saved meanwhile', async () => {
+    await withProject(async (root, project, versioning) => {
+      await writeFiles(root, { 'P/src/Main.enso': 'main = 2\n' })
+      const written = path.join(project, 'src', 'New.enso')
+      await expect(
+        versioning.replaceAsVersion(
+          project,
+          async () => {
+            await writeFiles(root, { 'P/src/New.enso': 'new\n', 'P/late.txt': 'the user\n' })
+            throw new Error('disk full')
+          },
+          MESSAGES,
+          { writes: [written] },
+        ),
+      ).rejects.toThrow(/disk full/)
+      expect(await exists(written)).toBe(false)
+      expect(await fs.readFile(path.join(project, 'late.txt'), 'utf8')).toBe('the user\n')
+    })
+  })
+
+  test("the files it gives are under the project path as given, not git's spelling of it", async () => {
+    await withProject(async (root, _project, versioning) => {
+      const link = path.join(path.dirname(root), 'link')
+      await fs.symlink(root, link, process.platform === 'win32' ? 'junction' : 'dir')
+      await writeFiles(root, { 'P/src/Main.enso': 'main = 2\n' })
+      const given: string[] = []
+      await versioning.replaceAsVersion(
+        path.join(link, 'P'),
+        async (files) => {
+          given.push(...files)
+        },
+        MESSAGES,
+      )
+      expect(given.sort()).toEqual(
+        [path.join(link, 'P', 'package.yaml'), path.join(link, 'P', 'src', 'Main.enso')].sort(),
+      )
+    })
+  })
+
+  test('an alsoCommit path outside the repository is left out', async () => {
+    await withProject(async (root, project, versioning) => {
+      await git(project, 'init', '-q', '-b', 'main')
+      await git(project, 'config', 'user.name', 'Tester')
+      await git(project, 'config', 'user.email', 'tester@example.com')
+      await versioning.enable(project)
+      await git(project, 'add', '-A')
+      await git(project, 'commit', '-q', '-m', 'Own')
+      await writeFiles(root, { 'P/src/Main.enso': 'main = 2\n', 'outside.json': '1\n' })
+      await versioning.replaceAsVersion(project, async () => {}, MESSAGES, {
+        alsoCommit: [path.join(root, 'outside.json')],
+      })
+      expect(await git(project, 'log', '--format=%s')).toBe('Before\nOwn')
+    })
+  })
+})
+
 describe('ignoredPaths', () => {
   test('names the paths git ignores, not tracked ones', async () => {
     await withProject(async (root, project, versioning) => {

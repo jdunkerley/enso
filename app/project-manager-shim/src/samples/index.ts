@@ -865,7 +865,12 @@ async function replaceInPlace(
   const unversioned = (await changedBundleFiles(source, target)).filter(
     (file) => !versioned.has(pathModule.resolve(target, ...file.split('/'))),
   )
-  if (unversioned.length > 0) throw new Error(ignoredChangesMessage(unversioned))
+  if (unversioned.length > 0) {
+    // Ignored, or written after the version was saved: either way in no version.
+    throw new Error(
+      `changed files that are not in the saved version would be replaced: ${unversioned.join(', ')}`,
+    )
+  }
   const labels = await readLabels(target)
   for (const file of replaced) await fs.promises.rm(file, { force: true })
   await removeEmptiedFolders(target, replaced)
@@ -1346,6 +1351,11 @@ export class LocalSamples {
     if (route === 'version') {
       const manifestPath = pathModule.join(this.samplesDirectory, SAMPLES_MANIFEST_NAME)
       const manifestBefore = await fs.promises.readFile(manifestPath).catch(() => null)
+      const underTarget = (file: string) => pathModule.join(target, ...file.split('/'))
+      // What the update would overwrite, for the check under the repository's lock, and what it
+      // may write, the only files a failure cleans.
+      const protect = (await changedBundleFiles(source, target)).map(underTarget)
+      const writes = (await listFiles(source)).map(underTarget)
       try {
         await options.versioning!.replaceAsVersion(
           target,
@@ -1359,7 +1369,7 @@ export class LocalSamples {
           },
           { before: BEFORE_UPDATE_MESSAGE, after: updatedMessage(name) },
           // Asked under the repository's lock, so a sample opened meanwhile gets no version saved.
-          { beforeSave: check, alsoCommit: [manifestPath] },
+          { beforeSave: check, protect, writes, alsoCommit: [manifestPath] },
         )
         return { kind: 'versioned' }
       } catch (error) {
