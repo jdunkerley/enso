@@ -23,7 +23,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.enso.cli.task.TaskProgress;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -41,6 +44,11 @@ public class HttpDownloadTimeoutTest {
 
   private static ServerSocket silentServer;
   private static HttpServer answeringServer;
+  private static ExecutorService answeringExecutor;
+
+  /** `/fast` answers only once this is released: after `/slow`'s timeout has been seen. */
+  private static volatile CountDownLatch fastMayAnswer = new CountDownLatch(0);
+
   private static final List<Socket> acceptedSockets = new CopyOnWriteArrayList<>();
 
   @BeforeClass
@@ -62,12 +70,28 @@ public class HttpDownloadTimeoutTest {
     acceptor.setDaemon(true);
     acceptor.start();
 
-    // `/slow` answers too late for a short timeout, `/fast` answers in time.
+    // `/slow` answers too late for a short timeout; `/fast` answers when the test lets it.
     answeringServer =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-    answeringServer.setExecutor(Executors.newCachedThreadPool());
-    answeringServer.createContext("/slow", exchange -> answerAfter(exchange, 5_000));
-    answeringServer.createContext("/fast", exchange -> answerAfter(exchange, 800));
+    answeringExecutor =
+        Executors.newCachedThreadPool(
+            runnable -> {
+              var thread = new Thread(runnable, "answering-http-server");
+              thread.setDaemon(true);
+              return thread;
+            });
+    answeringServer.setExecutor(answeringExecutor);
+    answeringServer.createContext("/slow", exchange -> answerAfter(exchange, 10_000));
+    answeringServer.createContext(
+        "/fast",
+        exchange -> {
+          try {
+            fastMayAnswer.await(20, TimeUnit.SECONDS);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+          answerAfter(exchange, 0);
+        });
     answeringServer.start();
   }
 
@@ -88,6 +112,7 @@ public class HttpDownloadTimeoutTest {
   @AfterClass
   public static void stopSilentServer() throws IOException {
     answeringServer.stop(0);
+    answeringExecutor.shutdownNow();
     silentServer.close();
     for (var socket : acceptedSockets) {
       socket.close();
@@ -194,15 +219,15 @@ public class HttpDownloadTimeoutTest {
 
   @Test(timeout = 30_000)
   public void aServerIsAskedAgainOnceTheMemoryEnds() throws InterruptedException {
-    HTTPDownload$.MODULE$.unresponsiveServerMemory_$eq(Duration.ofMillis(300));
+    HTTPDownload$.MODULE$.unresponsiveServerMemory_$eq(Duration.ofSeconds(2));
     var timeout = Duration.ofMillis(500);
     assertTrue("The first fetch fails", fetch(silentUri("/a"), timeout).isFailure());
 
     var refused = fetch(silentUri("/b"), timeout);
-    assertThat(
-        refused.failed().get().getMessage(), containsString("will be asked again in about 1 s"));
+    assertThat(refused.failed().get().getMessage(), containsString("will be asked again in about"));
 
-    Thread.sleep(400);
+    // Well past the 2 s memory.
+    Thread.sleep(2_500);
     var start = System.nanoTime();
     var asked = fetch(silentUri("/c"), timeout);
     var waited = Duration.ofNanos(System.nanoTime() - start);
@@ -215,8 +240,9 @@ public class HttpDownloadTimeoutTest {
 
   @Test(timeout = 30_000)
   public void anAnswerFromTheServerForgetsThatItTimedOut() throws Exception {
-    // Both requests pass the check before either finishes: `/slow` times out first and the server
-    // is remembered, then `/fast` is answered, which forgets it.
+    // Both requests pass the check before either finishes. `/slow` times out and the server is
+    // remembered; only then is `/fast` let answer, which forgets it.
+    fastMayAnswer = new CountDownLatch(1);
     var slow =
         HTTPDownload.fetchString(
             HTTPRequestBuilder.fromURI(answeringUri("/slow"))
@@ -232,6 +258,7 @@ public class HttpDownloadTimeoutTest {
             Option.empty(),
             StandardCharsets.UTF_8);
     assertTrue("`/slow` times out", TaskProgress.waitForTask(slow).isFailure());
+    fastMayAnswer.countDown();
     assertTrue("`/fast` is answered", TaskProgress.waitForTask(fast).isSuccess());
 
     var again = fetch(answeringUri("/fast"), Duration.ofSeconds(10));
