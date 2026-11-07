@@ -118,12 +118,21 @@ jobs:
           path: |
             **/.eslintcache
             **/node_modules/.vite
+            !**/node_modules/.vite/vitest
+          # vitest's results (`node_modules/.vite/vitest`) are excluded on purpose: its sequencer runs
+          # the files that failed last time first, so a cached failure would be rerun first for ever.
           # eslint's `.eslintcache` is keyed only on file content + eslint config, not on the
           # tsconfigs that typed linting depends on. Fold those into the Actions cache key so a
           # tsconfig change starts a fresh eslint cache instead of reusing stale results.
           key: ${{ runner.os }}-gui-lint-${{ hashFiles('eslint.config.mjs', 'tsconfig.json', 'app/gui/tsconfig*.json') }}-${{ github.run_id }}
           restore-keys: |
             ${{ runner.os }}-gui-lint-${{ hashFiles('eslint.config.mjs', 'tsconfig.json', 'app/gui/tsconfig*.json') }}
+
+      # Caches saved before the exclusion above still hold vitest's results, and `restore-keys` can
+      # bring them back, so drop them here too.
+      - name: 🧹 Drop cached vitest results
+        shell: bash
+        run: find . -type d -path '*/node_modules/.vite/vitest' -prune -exec rm -rf {} +
 
       # Next Tasks are depend on Typecheck, because we build libraries at this stage
       - name: ⚙️ Compile
@@ -214,6 +223,7 @@ jobs:
           path: |
             **/.eslintcache
             **/node_modules/.vite
+            !**/node_modules/.vite/vitest
 
   playwright:
     name: 🎭 Playwright Tests

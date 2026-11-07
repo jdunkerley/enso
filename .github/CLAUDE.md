@@ -75,6 +75,12 @@ settings. Every workflow is hand-written YAML (build simplification;
 
 ## Conventions
 
+- **Never cache vitest's results** (`**/node_modules/.vite/vitest`). Its
+  sequencer runs the files that failed last time first, so a failure saved into
+  a PR's cache makes that file run first on every later run, at t=0 while the
+  other packages are still collecting, and fail again under the load (#628, six
+  runs). `gui-checks.yml` excludes the directory from both cache `path` lists
+  and deletes any restored copy.
 - **Keep the aggregator names verbatim:** "Engine Required Checks", "GUI
   Required Checks", "IDE Required Checks", "WASM Required Checks". They are what
   a reviewer (or a ruleset) looks for.

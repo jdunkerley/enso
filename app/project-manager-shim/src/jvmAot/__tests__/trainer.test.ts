@@ -143,40 +143,48 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
-test('a training writes the cache and removes the configuration and scratch directory', async () => {
-  const output = path.join(root, 'key dir', 'enso.aot')
-  await (await trainer()).train(output, new AbortController().signal)
-  expect(await fs.readFile(output, 'utf8')).toBe('cache')
-  expect(await exists(`${output}.tmp`)).toBe(false)
-  expect(await exists(`${output}.aotconf`)).toBe(false)
-  expect(await exists(path.join(root, 'scratch'))).toBe(false)
-})
+test(
+  'a training writes the cache and removes the configuration and scratch directory',
+  { timeout: 30_000 },
+  async () => {
+    const output = path.join(root, 'key dir', 'enso.aot')
+    await (await trainer()).train(output, new AbortController().signal)
+    expect(await fs.readFile(output, 'utf8')).toBe('cache')
+    expect(await exists(`${output}.tmp`)).toBe(false)
+    expect(await exists(`${output}.aotconf`)).toBe(false)
+    expect(await exists(path.join(root, 'scratch'))).toBe(false)
+  },
+)
 
-test('the engine records with --jvm, a token and no ydoc port; java creates as the launcher would', async () => {
-  vi.stubEnv('ENSO_JVM_OPTIONS', '-Dinherited=1')
-  const output = path.join(root, 'key dir', 'enso.aot')
-  await (await trainer()).train(output, new AbortController().signal)
-  const engine = await recorded()
-  expect(engine.args.slice(0, 2)).toEqual(['--jvm', '--server'])
-  expect(engine.args[engine.args.indexOf('--path') + 1]).toBe(path.join(root, 'scratch', 'Train'))
-  expect(engine.jvmOptions).toBe(
-    `-Dinherited=1\n-XX:AOTMode=record\n-XX:AOTConfiguration=${output}.aotconf`,
-  )
-  expect(engine.token).toMatch(/^[0-9a-f]{64}$/)
-  expect(engine.ydocPort).toBeNull()
-  const java = JSON.parse(await fs.readFile(javaRecordFile(), 'utf8')) as { args: string[] }
-  expect(java.args).toEqual([
-    '-XX:AOTMode=create',
-    `-XX:AOTConfiguration=${output}.aotconf`,
-    `-XX:AOTCache=${output}.tmp`,
-    ...LAUNCHER_JVM_OPTIONS,
-    '-Dfrom.file=1',
-    '-Dinherited=1',
-    `--module-path=${path.join(bundle, 'enso', 'dist', '1.0', 'component')}`,
-    '-m',
-    'org.enso.runner/org.enso.runner.Main',
-  ])
-})
+test(
+  'the engine records with --jvm, a token and no ydoc port; java creates as the launcher would',
+  { timeout: 30_000 },
+  async () => {
+    vi.stubEnv('ENSO_JVM_OPTIONS', '-Dinherited=1')
+    const output = path.join(root, 'key dir', 'enso.aot')
+    await (await trainer()).train(output, new AbortController().signal)
+    const engine = await recorded()
+    expect(engine.args.slice(0, 2)).toEqual(['--jvm', '--server'])
+    expect(engine.args[engine.args.indexOf('--path') + 1]).toBe(path.join(root, 'scratch', 'Train'))
+    expect(engine.jvmOptions).toBe(
+      `-Dinherited=1\n-XX:AOTMode=record\n-XX:AOTConfiguration=${output}.aotconf`,
+    )
+    expect(engine.token).toMatch(/^[0-9a-f]{64}$/)
+    expect(engine.ydocPort).toBeNull()
+    const java = JSON.parse(await fs.readFile(javaRecordFile(), 'utf8')) as { args: string[] }
+    expect(java.args).toEqual([
+      '-XX:AOTMode=create',
+      `-XX:AOTConfiguration=${output}.aotconf`,
+      `-XX:AOTCache=${output}.tmp`,
+      ...LAUNCHER_JVM_OPTIONS,
+      '-Dfrom.file=1',
+      '-Dinherited=1',
+      `--module-path=${path.join(bundle, 'enso', 'dist', '1.0', 'component')}`,
+      '-m',
+      'org.enso.runner/org.enso.runner.Main',
+    ])
+  },
+)
 
 test('an abort during the drive kills the engine and leaves no files', async () => {
   vi.stubEnv('FAKE_NEVER_COMPLETE', '1')
@@ -197,13 +205,17 @@ test('an abort during the drive kills the engine and leaves no files', async () 
   expect(await exists(path.join(root, 'scratch'))).toBe(false)
 })
 
-test('an engine that exits 1 fails the training and leaves no cache', async () => {
-  vi.stubEnv('FAKE_EXIT_CODE', '1')
-  const output = path.join(root, 'key', 'enso.aot')
-  await expect((await trainer()).train(output, new AbortController().signal)).rejects.toThrow(
-    /exited with 1/,
-  )
-  expect(await exists(output)).toBe(false)
-  expect(await exists(`${output}.tmp`)).toBe(false)
-  expect(await exists(javaRecordFile())).toBe(false)
-})
+test(
+  'an engine that exits 1 fails the training and leaves no cache',
+  { timeout: 30_000 },
+  async () => {
+    vi.stubEnv('FAKE_EXIT_CODE', '1')
+    const output = path.join(root, 'key', 'enso.aot')
+    await expect((await trainer()).train(output, new AbortController().signal)).rejects.toThrow(
+      /exited with 1/,
+    )
+    expect(await exists(output)).toBe(false)
+    expect(await exists(`${output}.tmp`)).toBe(false)
+    expect(await exists(javaRecordFile())).toBe(false)
+  },
+)
