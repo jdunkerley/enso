@@ -42,11 +42,13 @@ const COLUMN_CSS_CLASSES = 'text-left bg-clip-padding last:border-r-0 last:round
 const NORMAL_COLUMN_CSS_CLASSES = `px-cell-x py rounded-rows-have-level ${COLUMN_CSS_CLASSES}`
 
 /**
- * CSS classes for every column. The widths are not here: they are the table's `<col>`s, set from
+ * CSS classes for every column. The name column is sticky, a little in from the left; its `before:`
+ * covers that gap, so that the other columns do not show through it while scrolled sideways. The
+ * widths are not here: they are the table's `<col>`s, set from
  * {@link COLUMN_WIDTH_LIMITS} and the user's resizing.
  */
 export const COLUMN_CSS_CLASS: Readonly<Record<Column, string>> = {
-  [Column.name]: `z-10 sticky left-1 bg-dashboard rounded-rows-skip-level h-full p-0 border-l-0 after:absolute after:right-0 after:top-0 after:bottom-0 after:border-r-[1.5px] after:border-primary/5 ${COLUMN_CSS_CLASSES}`,
+  [Column.name]: `z-10 sticky left-1 bg-dashboard rounded-rows-skip-level h-full p-0 border-l-0 after:absolute after:right-0 after:top-0 after:bottom-0 after:border-r-[1.5px] after:border-primary/5 before:absolute before:-left-1 before:inset-y-0 before:w-1 before:bg-dashboard ${COLUMN_CSS_CLASSES}`,
   [Column.modified]: NORMAL_COLUMN_CSS_CLASSES,
   [Column.createdAt]: NORMAL_COLUMN_CSS_CLASSES,
   [Column.labels]: NORMAL_COLUMN_CSS_CLASSES,
