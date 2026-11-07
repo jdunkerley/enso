@@ -134,9 +134,11 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   `gui/vite.config.ts`. No list refuses every browser page. The engine-hosted
   server (`ENSO_YDOC_HOST=engine`) makes the same check since #614, with the
   host's `allowedOrigins()` passed in `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS`.
-  GraalJS has no `URL`, so `originOf` falls back to `parseOrigin` there, which
-  refuses anything it does not recognise. Not covered: other local processes,
-  which can omit `Origin` (#615).
+  GraalJS has no `URL`, so `originOf` falls back to `parseOrigin` there: `http`
+  and `https` only, canonical hosts only (dotted-quad IPv4, `[::1]`, no `xn--`),
+  and anything it does not recognise is refused. `origin.test.ts` holds it to
+  `URL`'s answers over the #628 review's adversarial cases. Not covered: other
+  local processes, which can omit `Origin` (#615).
 - **A socket for a document its session does not hold is refused before the
   upgrade** (#601, Note [An Unknown Document Is Refused Before The Upgrade] in
   `src/handshake.ts`): `404` for a module doc the `ls=` session does not hold

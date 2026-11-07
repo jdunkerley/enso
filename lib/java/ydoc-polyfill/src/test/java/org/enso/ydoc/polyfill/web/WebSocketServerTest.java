@@ -94,29 +94,35 @@ public class WebSocketServerTest extends ExecutorSetup {
    */
   static int handshakeStatus(int port, String target, String origin) throws IOException {
     try (var socket = new Socket("localhost", port)) {
-      socket.setSoTimeout(10_000);
-      var request =
-          "GET "
-              + target
-              + " HTTP/1.1\r\n"
-              + "Host: localhost:"
-              + port
-              + "\r\n"
-              + "Upgrade: websocket\r\n"
-              + "Connection: Upgrade\r\n"
-              + "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
-              + "Sec-WebSocket-Version: 13\r\n"
-              + (origin == null ? "" : "Origin: " + origin + "\r\n")
-              + "\r\n";
-      socket.getOutputStream().write(request.getBytes(StandardCharsets.US_ASCII));
-      socket.getOutputStream().flush();
-      var reader =
-          new BufferedReader(
-              new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
-      var statusLine = reader.readLine();
-      Assert.assertNotNull("No response to the handshake for " + target, statusLine);
-      return Integer.parseInt(statusLine.split(" ")[1]);
+      return handshakeStatus(socket, port, target, origin);
     }
+  }
+
+  /** {@link #handshakeStatus(int, String, String)} on a socket the caller keeps open. */
+  static int handshakeStatus(Socket socket, int port, String target, String origin)
+      throws IOException {
+    socket.setSoTimeout(10_000);
+    var request =
+        "GET "
+            + target
+            + " HTTP/1.1\r\n"
+            + "Host: localhost:"
+            + port
+            + "\r\n"
+            + "Upgrade: websocket\r\n"
+            + "Connection: Upgrade\r\n"
+            + "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+            + "Sec-WebSocket-Version: 13\r\n"
+            + (origin == null ? "" : "Origin: " + origin + "\r\n")
+            + "\r\n";
+    socket.getOutputStream().write(request.getBytes(StandardCharsets.US_ASCII));
+    socket.getOutputStream().flush();
+    var reader =
+        new BufferedReader(
+            new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+    var statusLine = reader.readLine();
+    Assert.assertNotNull("No response to the handshake for " + target, statusLine);
+    return Integer.parseInt(statusLine.split(" ")[1]);
   }
 
   /** Note [The Engine-Hosted Listener Refuses Before The Upgrade] (#614). */
@@ -138,6 +144,8 @@ public class WebSocketServerTest extends ExecutorSetup {
                 return {status: 403, reason: 'Forbidden'};
             if (url.pathname === '/missing') return {status: 404};
             if (url.pathname === '/bad') return {status: 400, reason: 'Bad'};
+            // Not `ws`'s boolean contract: only undefined or null accepts.
+            if (url.pathname === '/true') return true;
             return undefined;
         };
         let wss = new WebSocketServer({host: 'localhost', port: port, verifyClient});
@@ -165,6 +173,22 @@ public class WebSocketServerTest extends ExecutorSetup {
     Assert.assertEquals(400, handshakeStatus(port, "/bad", null));
     // A check that fails refuses too.
     Assert.assertEquals(500, handshakeStatus(port, "/throws", null));
+    // So does an answer in another form, `true` included.
+    Assert.assertEquals(500, handshakeStatus(port, "/true", null));
+
+    // An accepted socket that stays open goes on to `open` and `onconnect`.
+    try (var kept = new Socket("localhost", port)) {
+      Assert.assertEquals(101, handshakeStatus(kept, port, "/kept?ls=x", null));
+      var deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+      var reached = false;
+      while (!reached && System.nanoTime() < deadline) {
+        for (var i = 0; i < connected.length(); i++) {
+          reached |= "/kept".equals(connected.get(i));
+        }
+        if (!reached) Thread.sleep(50);
+      }
+      Assert.assertTrue("The accepted socket did not reach onconnect", reached);
+    }
 
     // No refused socket reaches `onconnect`. (Whether an accepted one does depends on the race
     // between its `open` and this test closing it, so only the refused ones are checked.)
@@ -174,7 +198,7 @@ public class WebSocketServerTest extends ExecutorSetup {
       if (path != null) {
         Assert.assertTrue(
             "A refused socket reached onconnect: " + path,
-            path.equals("/accepted") || path.equals("/accepted-page"));
+            path.equals("/accepted") || path.equals("/accepted-page") || path.equals("/kept"));
       }
     }
   }

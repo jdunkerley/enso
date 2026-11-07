@@ -28,6 +28,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.enso.ydoc.polyfill.Arguments;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.io.ByteSequence;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
@@ -424,10 +425,15 @@ final class WebSocket implements ProxyExecutable {
      * `ws`'s `verifyClient` lets the Node ydoc host refuse a handshake with a status before the
      * upgrade (#605: a foreign `Origin`, 403; #608: an unknown document, 404). The server's
      * `verifyClient(url, origin)` (`url` as `onconnect` gets it, `origin` null when absent) plays
-     * that part here: it runs on the JS executor, as every JS callback does, while Helidon's thread waits for it, and
-     * returns nothing to accept or `{status, reason}` to refuse. A refusal is thrown as a
-     * `RequestException`, which Helidon answers with that status instead of `101`. A failing
-     * `verifyClient` refuses too (500): a check that cannot run must not let the socket in.
+     * that part here. It runs on the JS executor, as every JS callback does, while Helidon's
+     * thread waits for it.
+     *
+     * Its contract differs from `ws`'s, which takes a boolean: only `undefined` or `null` accepts.
+     * `{status, reason}` refuses with that status (`reason` optional), thrown as a
+     * `RequestException`, which Helidon answers instead of `101`. Anything else refuses with 500:
+     * `true` and `false` alike, any value without a numeric `status`, and a `verifyClient` that
+     * throws. A check that cannot run, or answers in a form it does not understand, must not let
+     * the socket in.
      */
     private void refuseIfNotVerified(HttpPrologue prologue, Headers headers) {
       var verify = verifier;
@@ -480,7 +486,19 @@ final class WebSocket implements ProxyExecutable {
     }
 
     private void handleCallback(Runnable code) {
-      executor.execute(code);
+      executor.execute(
+          () -> {
+            try {
+              code.run();
+            } catch (PolyglotException e) {
+              // A callback queued before the context closed (the server shutting down while a
+              // socket opens or closes) has nothing left to tell; it is not an error.
+              if (!e.isCancelled()) {
+                throw e;
+              }
+              log.debug("Dropped a socket callback: the JS context was closed", e);
+            }
+          });
     }
   }
 }
