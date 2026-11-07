@@ -733,6 +733,17 @@ export class EnsoRunner implements Runner {
         // Each engine gets its own token, which the Language Server requires of a channel socket.
         const token = newChannelToken()
         const nodeHost = ydocHostKind() === 'node' ? this.options.ydocHost : undefined
+        // Under `engine`, the engine's listener checks `Origin` against the app's origins, which
+        // the host knows (Note [The Engine-Hosted Listener Checks Origin] in `Ydoc.java`).
+        const engineYdocEnv =
+          nodeHost ?
+            {}
+          : {
+              LANGUAGE_SERVER_YDOC_PORT: ydocPort.toString(),
+              LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS: (
+                this.options.ydocHost?.allowedOrigins?.() ?? []
+              ).join(','),
+            }
         if (nodeHost) {
           try {
             await nodeHost.listen({
@@ -774,7 +785,7 @@ export class EnsoRunner implements Runner {
 
         const env = {
           ...process.env,
-          ...(nodeHost ? {} : { LANGUAGE_SERVER_YDOC_PORT: ydocPort.toString() }),
+          ...engineYdocEnv,
           LANGUAGE_SERVER_CHANNEL_TOKEN: token,
           ...jvmOptionsEnv(launch),
           ...(extraEnv ? Object.fromEntries(extraEnv) : {}),
