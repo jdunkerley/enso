@@ -21,6 +21,11 @@ caches and visualizations.
   computed or, failing that, from the cache, which keeps only bindings' values;
   so it must look at the computed value, or one on a non-binding expression is
   never sent (#546).
+- With progress reporting on (as in the language server, but off in most
+  instrument tests), the computed-value callback also receives a binding's
+  progress reports, which carry no value. They must only update the node's
+  pending state, never feed a visualization (Note [A Progress Report Is Not A
+  Computed Value], #611).
 - Not every command needs a job: `StartBackgroundProcessingCmd` calls
   `JobControlPlane.startBackgroundJobs()` directly. Before adding a `Job`
   subclass, check something will actually submit it.

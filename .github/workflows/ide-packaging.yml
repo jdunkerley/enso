@@ -32,13 +32,14 @@ on:
         default: false
       open_perf_engines:
         description: >-
-          The engines to measure, overriding open_perf_jvm: `native`, `jvm` (with an AOT cache),
-          `jvm-nocache`, comma-separated.
+          The engines to measure, overriding open_perf_jvm: `native`; `jvm` (the JVM as a user has
+          it after the first open: the shim's AOT cache, trained before the launches); `jvm-first`
+          (a user's very first launch: no cache yet), comma-separated.
         required: false
         type: string
         default: ""
       open_perf_runs:
-        description: Launches per engine.
+        description: Launches per engine (5 for a gate dispatch, as with 3 one hang makes a cell incomplete).
         required: false
         type: string
         default: "5"
@@ -517,6 +518,7 @@ jobs:
             open-perf/*/logs
             open-perf/*/electron-out.log
             open-perf/*/hsperf
+            open-perf/*/rss-*.json
             open-perf/*/open-time.json
             open-perf/*/open-time.md
             open-perf/*/*/marks.json
@@ -524,6 +526,7 @@ jobs:
             open-perf/*/*/logs
             open-perf/*/*/electron-out.log
             open-perf/*/*/hsperf
+            open-perf/*/*/rss-*.json
           if-no-files-found: warn
       - if: failure()
         name: Upload Test Traces

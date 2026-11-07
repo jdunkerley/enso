@@ -85,7 +85,7 @@ function projectIcon(project: Project): Icon | undefined {
 </script>
 
 <template>
-  <div class="TabBar">
+  <div class="TabBar" data-no-save-shortcut>
     <div class="tabs" role="tablist">
       <!-- The tab's `aria-label` (its tooltip, else its label) replaces the name its content would
         give it, so a changed tab says so there and the ● is hidden from assistive technology. -->

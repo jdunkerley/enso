@@ -2,6 +2,15 @@
 
 #### Enso IDE
 
+- [The "Include prerelease versions" setting now applies in every build: the
+  new-version dialog of builds that cannot update themselves (development builds
+  and unsigned macOS) offers release candidates too, and a repository with no
+  stable release no longer reports a failed update check.][573]
+- [Saving a version is easier: Ctrl/Cmd+S works from the code editor and the
+  documentation panel too, a toast shows while it saves, and it says so when
+  there is nothing to save. A comment given while a save is running is added to
+  it, or, if that save has already committed, saved in a second version right
+  after.][574]
 - [A fresh installation opens a short Getting Started sample, which reads a
   file, filters it, totals it by month and charts the totals, with documentation
   that walks through it one step at a time.][617]
@@ -420,6 +429,8 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[573]: https://github.com/jdunkerley/enso/pull/573
+[574]: https://github.com/jdunkerley/enso/pull/574
 [617]: https://github.com/jdunkerley/enso/pull/617
 [607]: https://github.com/jdunkerley/enso/pull/607
 [592]: https://github.com/jdunkerley/enso/pull/592

@@ -672,6 +672,313 @@ describe('save', () => {
   })
 })
 
+describe('save progress and joined saves', () => {
+  test('a loading toast shows while the save runs, and the outcome replaces it', async () => {
+    const gate = deferred<FlushOutcome>()
+    const { toasts, store } = setup()
+    store.watchProject(PROJECT, () => gate.promise)
+    const saving = store.save(PROJECT)
+    await vi.waitFor(() => expect(toasts.toasts.value).toHaveLength(1))
+    expect(toasts.toasts.value[0]).toMatchObject({ isLoading: true, content: 'Saving a version…' })
+    gate.resolve({ kind: 'flushed' })
+    await saving
+    expect(toasts.toasts.value).toHaveLength(1)
+    expect(toasts.toasts.value[0]).toMatchObject({
+      isLoading: false,
+      type: 'success',
+      content: 'Version saved',
+    })
+  })
+
+  test('a failed write replaces the loading toast by the error', async () => {
+    const { toasts, store } = setup()
+    store.watchProject(PROJECT, async () => ({ kind: 'declined', reason: 'changed on disk' }))
+    await store.save(PROJECT)
+    expect(toasts.toasts.value).toHaveLength(1)
+    expect(toasts.toasts.value[0]).toMatchObject({ isLoading: false, type: 'error' })
+  })
+
+  test('a comment of a save that joins before the commit is added to the running one', async () => {
+    const gate = deferred<FlushOutcome>()
+    const { backend, toasts, store } = setup()
+    store.watchProject(PROJECT, () => gate.promise)
+    const first = store.save(PROJECT, 'First')
+    const second = store.save(PROJECT, 'Second')
+    const third = store.save(PROJECT, 'Second')
+    gate.resolve({ kind: 'flushed' })
+    await Promise.all([first, second, third])
+    expect(backend.commitVersion).toHaveBeenCalledOnce()
+    expect(backend.commitVersion).toHaveBeenCalledWith(PROJECT, 'First; Second')
+    expect(toasts.toasts.value.some((t) => t.type === 'warning')).toBe(false)
+  })
+
+  test('a comment joining a save without one becomes its comment; a blank one adds nothing', async () => {
+    const gate = deferred<FlushOutcome>()
+    const { backend, toasts, store } = setup()
+    store.watchProject(PROJECT, () => gate.promise)
+    const first = store.save(PROJECT)
+    const second = store.save(PROJECT, 'Late')
+    const third = store.save(PROJECT, '  ')
+    gate.resolve({ kind: 'flushed' })
+    await Promise.all([first, second, third])
+    expect(backend.commitVersion).toHaveBeenCalledWith(PROJECT, 'Late')
+    expect(toasts.toasts.value.some((t) => t.type === 'warning')).toBe(false)
+  })
+
+  test('a comment is not added twice, but only a whole part counts as held', async () => {
+    const gate = deferred<FlushOutcome>()
+    const { backend, store } = setup()
+    store.watchProject(PROJECT, () => gate.promise)
+    const first = store.save(PROJECT, 'Fixed the filter')
+    const second = store.save(PROJECT, 'Fix')
+    const third = store.save(PROJECT, 'Fixed the filter')
+    gate.resolve({ kind: 'flushed' })
+    await Promise.all([first, second, third])
+    expect(backend.commitVersion).toHaveBeenCalledWith(PROJECT, 'Fixed the filter; Fix')
+  })
+
+  test('a save asked for once the commit is requested is queued, not joined', async () => {
+    const commits = [deferred<{ id: string | null }>(), deferred<{ id: string | null }>()]
+    const commitVersion = vi.fn(() => commits[commitVersion.mock.calls.length - 1]!.promise)
+    const flushes: string[] = []
+    const { backend, toasts, store } = setup({ commitVersion })
+    store.watchProject(PROJECT, async () => {
+      flushes.push('flush')
+      return { kind: 'flushed' }
+    })
+    const first = store.save(PROJECT, 'First')
+    await vi.waitFor(() => expect(commitVersion).toHaveBeenCalledTimes(1))
+    const second = store.save(PROJECT, 'Later edit')
+    const third = store.save(PROJECT, 'Another')
+    const fourth = store.save(PROJECT, 'Later edit')
+    // Still the first commit: nothing else starts beside it.
+    await Promise.resolve()
+    expect(commitVersion).toHaveBeenCalledTimes(1)
+    expect(flushes).toHaveLength(1)
+    commits[0]!.resolve({ id: 'a'.repeat(40) })
+    await first
+    await vi.waitFor(() => expect(commitVersion).toHaveBeenCalledTimes(2))
+    expect(flushes).toHaveLength(2)
+    commits[1]!.resolve({ id: 'b'.repeat(40) })
+    await Promise.all([second, third, fourth])
+    expect(backend.commitVersion).toHaveBeenNthCalledWith(1, PROJECT, 'First')
+    expect(backend.commitVersion).toHaveBeenNthCalledWith(2, PROJECT, 'Later edit; Another')
+    expect(toasts.toasts.value.some((t) => t.type === 'warning')).toBe(false)
+  })
+
+  test('a queued follow-up that finds nothing changed is silent, unless it carries a comment', async () => {
+    for (const comment of ['', 'My note']) {
+      localStorage.clear()
+      const first = deferred<{ id: string | null }>()
+      const commitVersion = vi
+        .fn()
+        .mockImplementationOnce(() => first.promise)
+        .mockResolvedValueOnce({ id: null })
+      const { toasts, store } = setup({ commitVersion })
+      store.watchProject(PROJECT, FLUSHED)
+      const saving = store.save(PROJECT)
+      await vi.waitFor(() => expect(commitVersion).toHaveBeenCalledTimes(1))
+      const followUp = store.save(PROJECT, comment)
+      first.resolve({ id: 'a'.repeat(40) })
+      await Promise.all([saving, followUp])
+      expect(commitVersion).toHaveBeenCalledTimes(2)
+      const shown = toasts.toasts.value.filter((t) => t.isIn).map((t) => t.content)
+      expect(shown).toEqual(
+        comment === '' ?
+          ['Version saved']
+        : ['Version saved', 'Nothing has changed since the last version'],
+      )
+    }
+  })
+
+  test('a queued save is made, and the slot is freed, although the save before it rejected', async () => {
+    const first = deferred<{ id: string | null }>()
+    const commitVersion = vi
+      .fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockResolvedValue({ id: 'b'.repeat(40) })
+    const { toasts, store } = setup({ commitVersion })
+    // The first save cannot even report its outcome: it rejects (the toast store throws twice).
+    const boom = () => {
+      throw new Error('boom')
+    }
+    vi.spyOn(toasts, 'update').mockImplementationOnce(boom).mockImplementationOnce(boom)
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
+    const running = store.save(PROJECT, 'First')
+    const rejected = expect(running).rejects.toThrow('boom')
+    await vi.waitFor(() => expect(commitVersion).toHaveBeenCalledTimes(1))
+    const queued = store.save(PROJECT, 'Queued')
+    first.resolve({ id: 'a'.repeat(40) })
+    await rejected
+    await queued
+    expect(commitVersion).toHaveBeenCalledTimes(2)
+    expect(commitVersion).toHaveBeenLastCalledWith(PROJECT, 'Queued')
+    await store.save(PROJECT, 'After')
+    expect(commitVersion).toHaveBeenCalledTimes(3)
+  })
+
+  test('closing the project while a follow-up with a comment is queued says it was not saved', async () => {
+    for (const comment of ['', 'My note']) {
+      const first = deferred<{ id: string | null }>()
+      const commitVersion = vi.fn(() => first.promise)
+      const { toasts, store } = setup({ commitVersion })
+      store.watchProject(PROJECT, FLUSHED)
+      await store.refresh(PROJECT)
+      const running = store.save(PROJECT)
+      await vi.waitFor(() => expect(commitVersion).toHaveBeenCalledTimes(1))
+      const queued = store.save(PROJECT, comment)
+      store.unwatchProject(PROJECT)
+      first.resolve({ id: 'a'.repeat(40) })
+      await Promise.all([running, queued])
+      expect(commitVersion).toHaveBeenCalledTimes(1)
+      const warnings = toasts.toasts.value.filter((t) => t.type === 'warning').map((t) => t.content)
+      expect(warnings).toEqual(
+        comment === '' ? [] : ['The project was closed before your comment could be saved'],
+      )
+    }
+  })
+
+  test('each save shows its own progress and result, also one right after another', async () => {
+    const gate = deferred<FlushOutcome>()
+    const { toasts, store } = setup({
+      commitVersion: vi
+        .fn()
+        .mockResolvedValueOnce({ id: 'a'.repeat(40) })
+        .mockResolvedValueOnce({ id: null }),
+    })
+    store.watchProject(PROJECT, () => gate.promise)
+    const first = store.save(PROJECT)
+    gate.resolve({ kind: 'flushed' })
+    await first
+    expect(toasts.toasts.value.map((t) => t.content)).toEqual(['Version saved'])
+    const gate2 = deferred<FlushOutcome>()
+    store.watchProject(PROJECT, () => gate2.promise)
+    const second = store.save(PROJECT)
+    await vi.waitFor(() => expect(toasts.toasts.value).toHaveLength(2))
+    expect(toasts.toasts.value.map((t) => [t.isLoading, t.content])).toEqual([
+      [false, 'Version saved'],
+      [true, 'Saving a version…'],
+    ])
+    gate2.resolve({ kind: 'flushed' })
+    await second
+    expect(toasts.toasts.value.map((t) => t.content)).toEqual([
+      'Version saved',
+      'Nothing has changed since the last version',
+    ])
+  })
+})
+
+describe('saveFromShortcut', () => {
+  const messages = (toasts: ReturnType<typeof setup>['toasts']) =>
+    toasts.toasts.value.map((t) => [t.type, t.content])
+
+  test('saves when there are changes', async () => {
+    const { backend, store } = setup({
+      versioningStatus: vi.fn(async () => status({ changed: true })),
+    })
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
+    expect(store.saveFromShortcut(PROJECT, false)).toBe(true)
+    await vi.waitFor(() => expect(backend.commitVersion).toHaveBeenCalledOnce())
+  })
+
+  test('with a comment, opens the dialog', async () => {
+    const { modals, store } = setup({
+      versioningStatus: vi.fn(async () => status({ changed: true })),
+    })
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
+    expect(store.saveFromShortcut(PROJECT, true)).toBe(true)
+    expect(modals.stack.value).toHaveLength(1)
+  })
+
+  test.each([false, true])(
+    'nothing to save (comment: %s): a hint, no save, no dialog',
+    async (c) => {
+      const { backend, modals, toasts, store } = setup()
+      store.watchProject(PROJECT, FLUSHED)
+      await store.refresh(PROJECT)
+      expect(store.saveFromShortcut(PROJECT, c)).toBe(true)
+      expect(messages(toasts)).toEqual([['info', 'Nothing has changed since the last version']])
+      expect(backend.commitVersion).not.toHaveBeenCalled()
+      expect(modals.stack.value).toHaveLength(0)
+    },
+  )
+
+  test('before the first read: the key is taken, and nothing is said', () => {
+    const { backend, toasts, store } = setup({
+      versioningStatus: vi.fn(() => new Promise<VersioningStatus>(() => {})),
+    })
+    store.watchProject(PROJECT, FLUSHED)
+    expect(store.saveFromShortcut(PROJECT, false)).toBe(true)
+    expect(toasts.toasts.value).toHaveLength(0)
+    expect(backend.commitVersion).not.toHaveBeenCalled()
+  })
+
+  test('git known, status unread (a read failed): a hint that it is not ready, shown once', async () => {
+    const versioningStatus = vi
+      .fn()
+      .mockResolvedValueOnce(status({ changed: true }))
+      .mockRejectedValue(new Error('boom'))
+    const { toasts, store } = setup({ versioningStatus })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
+    await store.refresh(PROJECT)
+    expect(store.statusOf(PROJECT)).toBeUndefined()
+    expect(store.saveFromShortcut(PROJECT, false)).toBe(true)
+    expect(store.saveFromShortcut(PROJECT, false)).toBe(true)
+    expect(messages(toasts)).toEqual([
+      ['info', "Versions are not ready yet: the project's status is still being read"],
+    ])
+  })
+
+  test('the first read failed: the hint that it is not ready, not silence', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { toasts, store } = setup({ versioningStatus: vi.fn().mockRejectedValue(new Error('x')) })
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
+    expect(store.saveFromShortcut(PROJECT, false)).toBe(true)
+    expect(messages(toasts)).toEqual([
+      ['info', "Versions are not ready yet: the project's status is still being read"],
+    ])
+  })
+
+  test('a repeated key shows its hint once', async () => {
+    const { toasts, store } = setup()
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
+    for (let i = 0; i < 4; i++) store.saveFromShortcut(PROJECT, i % 2 === 0)
+    expect(messages(toasts)).toEqual([['info', 'Nothing has changed since the last version']])
+  })
+
+  test('blocked: git’s message', async () => {
+    const { toasts, store } = setup({
+      versioningStatus: vi.fn(async () =>
+        status({ changed: true, blocked: 'A merge is in progress.' }),
+      ),
+    })
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
+    expect(store.saveFromShortcut(PROJECT, false)).toBe(true)
+    expect(messages(toasts)).toEqual([
+      ['error', 'Versions cannot be saved: A merge is in progress.'],
+    ])
+  })
+
+  test('without git, or for a project not watched: the key is not used', async () => {
+    const { toasts, store } = setup({
+      versioningStatus: vi.fn(async () => status({ git: false, repoRoot: null, enabled: false })),
+    })
+    expect(store.saveFromShortcut(PROJECT, false)).toBe(false)
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
+    expect(store.saveFromShortcut(PROJECT, false)).toBe(false)
+    expect(toasts.toasts.value).toHaveLength(0)
+  })
+})
+
 describe('showCloseWarning', () => {
   test('is a warning toast with the project and git’s message', () => {
     const { toasts, store } = setup()

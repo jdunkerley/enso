@@ -8,10 +8,11 @@ import { reactive } from 'vue'
 import ChangedIndicator from '../ChangedIndicator.vue'
 
 const PROJECT = newProjectId(Path('/root/P'))
-const current = reactive({ enabled: true, changed: true, known: true })
+const current = reactive({ enabled: true, changed: true, known: true, git: true })
 
 vi.mock('$/providers/localVersioning', () => ({
   useLocalVersioning: () => ({
+    hasVersioning: () => current.git && current.enabled,
     statusOf: () =>
       current.known ?
         {
@@ -27,6 +28,7 @@ vi.mock('$/providers/localVersioning', () => ({
   }),
 }))
 
+const slot = () => document.querySelector('[data-testid="project-changed-slot"]')
 const dot = () => document.querySelector('[data-testid="project-changed-indicator"]')
 
 describe('ChangedIndicator', () => {
@@ -61,5 +63,29 @@ describe('ChangedIndicator', () => {
     current.known = false
     await mountWithProviders(ChangedIndicator, { props: { projectId: PROJECT, mode: 'local' } })
     expect(dot()).toBeNull()
+  })
+
+  test('keeps its space while there is no dot, for a local project whose versions are kept', async () => {
+    current.enabled = true
+    current.changed = false
+    current.known = true
+    current.git = true
+    const { setProps } = await mountWithProviders(ChangedIndicator, {
+      props: { projectId: PROJECT, mode: 'local' },
+    })
+    expect(dot()).toBeNull()
+    expect(slot()).not.toBeNull()
+    current.changed = true
+    await flushPromises()
+    expect(slot()).not.toBeNull()
+    expect(dot()).not.toBeNull()
+    current.known = false
+    await flushPromises()
+    expect(slot()).not.toBeNull()
+    await setProps({ mode: 'cloud' })
+    expect(slot()).toBeNull()
+    current.git = false
+    await setProps({ mode: 'local' })
+    expect(slot()).toBeNull()
   })
 })
