@@ -120,6 +120,13 @@ none, because the fake engines of the tests have no ydoc server
 (`healthPolling.test.ts` has the one that does). Under the Node ydoc host (next
 section) there is no wait: the listener is up before the engine is spawned.
 
+The health checks, the ydoc polls and the startup timeout read the time and
+schedule through a `StartupClock` (`EnsoRunner`'s `startupClock` option, the
+real clock by default). Tests of that schedule replace it and assert the delays
+the runner asks for, never real elapsed time: a fake engine is a separate Node
+process whose start-up a loaded CI runner stretches unpredictably (Note
+[Start-Up Tests Read The Schedule] in `healthPolling.test.ts`).
+
 ## ydoc host (`projectService/ydocHost.ts`)
 
 An opened project's ydoc server runs in one of two places, chosen per open by
