@@ -111,6 +111,11 @@ export interface SampleStatus {
   readonly route: SampleRoute | null
   /** The name the edited copy would be kept under, on the `copy` route. */
   readonly copyName: string | null
+  /**
+   * Files of a versioned sample that git ignores and an update would overwrite: they are in no
+   * version, so the sample takes the `copy` route. Empty otherwise.
+   */
+  readonly ignoredChanges: readonly string[]
 }
 
 /**
@@ -167,7 +172,10 @@ export interface SamplesUpdateResult {
 }
 
 /** What the samples need of local versioning. */
-export type SampleVersioning = Pick<LocalVersioning, 'isVersioned' | 'replaceAsVersion'>
+export type SampleVersioning = Pick<
+  LocalVersioning,
+  'isVersioned' | 'ignoredPaths' | 'replaceAsVersion'
+>
 
 /** The context of a change to samples. */
 export interface SampleChangeOptions {
@@ -788,10 +796,60 @@ async function isVersioned(
 }
 
 /**
+ * The files the bundle `source` ships (relative, with `/`, local state left out) whose copy at
+ * `target` exists and differs from it: what copying the bundle over `target` would overwrite.
+ */
+async function changedBundleFiles(source: string, target: string): Promise<string[]> {
+  const changed: string[] = []
+  for (const file of await listFiles(source)) {
+    if (isLocalState(file)) continue
+    const destination = pathModule.join(target, ...file.split('/'))
+    let theirs: Buffer
+    try {
+      theirs = await fs.promises.readFile(destination)
+    } catch {
+      continue
+    }
+    const ours = await fs.promises.readFile(pathModule.join(source, ...file.split('/')))
+    if (!theirs.equals(ours)) changed.push(file)
+  }
+  return changed
+}
+
+/**
+ * The files of the sample at `target` that git ignores and that updating it to `source` would
+ * overwrite with different content. They are in no version, so such a sample is not updated in
+ * place: it is kept as a copy. Empty without versioning.
+ */
+async function ignoredChanges(
+  versioning: SampleVersioning | undefined,
+  source: string,
+  target: string,
+): Promise<string[]> {
+  if (versioning == null) return []
+  const changed = await changedBundleFiles(source, target)
+  const ignored = new Set(
+    await versioning.ignoredPaths(
+      target,
+      changed.map((file) => pathModule.join(target, ...file.split('/'))),
+    ),
+  )
+  return changed.filter((file) => ignored.has(pathModule.join(target, ...file.split('/'))))
+}
+
+/** The message of a sample kept as a copy because git ignores files an update would overwrite. */
+function ignoredChangesMessage(files: readonly string[]): string {
+  return `git ignores changed files the update would replace: ${files.join(', ')}`
+}
+
+/**
  * Make the sample at `target` the bundle `source`, in place: remove `files` (the sample's files in
- * its last version), copy the bundle in, and keep its labels. What `files` does not name (the
- * IDE's `.enso/`, what git ignores) is left as it is, and so is the user's copy of a file the
- * bundle ships in `output/`.
+ * its last version) but its local state (`output/`), copy the bundle in, and keep its labels.
+ * What `files` does not name (the IDE's `.enso/`, what git ignores, the user's `output/`) is left
+ * as it is: the user's copy of a file the bundle ships in `output/` wins, and a file outside
+ * `files` that the bundle would overwrite with other content makes it throw before anything is
+ * changed (it is in no version). Folders that held only removed files are removed; others,
+ * empty ones of the user's included, are left.
  */
 async function replaceInPlace(
   source: string,
@@ -800,9 +858,17 @@ async function replaceInPlace(
   check: () => Promise<void>,
 ): Promise<void> {
   await check()
+  const replaced = files.filter(
+    (file) => !isLocalState(toSlashes(pathModule.relative(target, file))),
+  )
+  const versioned = new Set(replaced.map((file) => pathModule.resolve(file)))
+  const unversioned = (await changedBundleFiles(source, target)).filter(
+    (file) => !versioned.has(pathModule.resolve(target, ...file.split('/'))),
+  )
+  if (unversioned.length > 0) throw new Error(ignoredChangesMessage(unversioned))
   const labels = await readLabels(target)
-  for (const file of files) await fs.promises.rm(file, { force: true })
-  await removeEmptyFolders(target)
+  for (const file of replaced) await fs.promises.rm(file, { force: true })
+  await removeEmptiedFolders(target, replaced)
   await fs.promises.cp(source, target, {
     recursive: true,
     force: true,
@@ -818,13 +884,20 @@ async function replaceInPlace(
   if (labels != null) await updatePackageYaml(target, { labels })
 }
 
-/** Remove the empty folders under `directory`, but not hidden ones (the IDE's `.enso/`). */
-async function removeEmptyFolders(directory: string): Promise<void> {
-  for (const entry of await fs.promises.readdir(directory, { withFileTypes: true })) {
-    if (!entry.isDirectory() || isHidden(entry.name)) continue
-    const path = pathModule.join(directory, entry.name)
-    await removeEmptyFolders(path)
-    if ((await fs.promises.readdir(path)).length === 0) await fs.promises.rmdir(path)
+/** Remove the folders under `root` that held `removed` files and are now empty, innermost first. */
+async function removeEmptiedFolders(root: string, removed: readonly string[]): Promise<void> {
+  const folders = new Set<string>()
+  for (const file of removed) {
+    let folder = pathModule.dirname(pathModule.resolve(file))
+    while (folder.startsWith(pathModule.resolve(root) + pathModule.sep)) {
+      folders.add(folder)
+      folder = pathModule.dirname(folder)
+    }
+  }
+  // The longest paths are the innermost folders.
+  for (const folder of [...folders].sort((a, b) => b.length - a.length)) {
+    const entries = await fs.promises.readdir(folder).catch(() => null)
+    if (entries?.length === 0) await fs.promises.rmdir(folder)
   }
 }
 
@@ -1063,7 +1136,9 @@ export class LocalSamples {
    * match the manifest's cache are not read again. A sample that cannot be checked is
    * `unreadable`, and the others are still reported.
    */
-  status(versioning?: SampleVersioning): Promise<SamplesStatus> {
+  status(
+    options: { readonly versioning?: SampleVersioning | undefined; readonly now?: Date } = {},
+  ): Promise<SamplesStatus> {
     return this.serialised(async () => {
       const directory = toSlashes(this.samplesDirectory)
       const bundle = await this.readBundle()
@@ -1071,7 +1146,7 @@ export class LocalSamples {
       const manifest = await readSamplesManifest(this.samplesDirectory)
       const newer = manifest === NEWER_MANIFEST
       const hasher = new FileHasher(newer ? {} : manifest?.files)
-      const now = new Date()
+      const now = options.now ?? new Date()
       const samples: SampleStatus[] = []
       for (const name of bundle.samples.keys()) {
         const target = this.samplePath(name)
@@ -1104,7 +1179,14 @@ export class LocalSamples {
           state = 'unreadable'
           disk = new Unreadable(error)
         }
-        const route = await this.routeOf(target, disk, bundleHash, versioning)
+        const source = bundle.samples.get(name)!
+        const { route, ignored } = await this.routeOf(
+          source,
+          target,
+          disk,
+          bundleHash,
+          options.versioning,
+        )
         samples.push({
           name,
           path: toSlashes(target),
@@ -1112,22 +1194,36 @@ export class LocalSamples {
           route,
           copyName:
             route === 'copy' ? pathModule.basename(editedCopyPath(target, now, false)) : null,
+          ignoredChanges: ignored,
         })
       }
       return { directory, samples }
     })
   }
 
-  /** How {@link updateSample} would keep the sample at `target`; `null` when nothing is kept. */
+  /**
+   * How {@link updateSample} would keep the sample at `target` (`null` when nothing is kept), and
+   * the files git ignores that keep a versioned sample from the `version` route.
+   */
   private async routeOf(
+    source: string,
     target: string,
     disk: DiskHash,
     bundleHash: string,
     versioning: SampleVersioning | undefined,
-  ): Promise<SampleRoute | null> {
-    if (disk === undefined || disk === bundleHash) return null
-    if (disk instanceof Unreadable) return 'copy'
-    return (await isVersioned(versioning, target)) ? 'version' : 'copy'
+  ): Promise<{ readonly route: SampleRoute | null; readonly ignored: string[] }> {
+    if (disk === undefined || disk === bundleHash) return { route: null, ignored: [] }
+    if (disk instanceof Unreadable || !(await isVersioned(versioning, target))) {
+      return { route: 'copy', ignored: [] }
+    }
+    let ignored: string[]
+    try {
+      ignored = await ignoredChanges(versioning, source, target)
+    } catch (error) {
+      logger.warn(`Samples: could not tell which files of '${target}' git ignores:`, error)
+      return { route: 'copy', ignored: [] }
+    }
+    return { route: ignored.length > 0 ? 'copy' : 'version', ignored }
   }
 
   /** Refuse to change samples whose manifest a newer version of the app wrote. */
@@ -1240,19 +1336,45 @@ export class LocalSamples {
     }
     // Edited, or unreadable: either way it is the user's, and is kept.
     let fellBack: string | null = null
-    if ((await this.routeOf(target, disk, bundleHash, options.versioning)) === 'version') {
+    const { route, ignored } = await this.routeOf(
+      source,
+      target,
+      disk,
+      bundleHash,
+      options.versioning,
+    )
+    if (route === 'version') {
+      const manifestPath = pathModule.join(this.samplesDirectory, SAMPLES_MANIFEST_NAME)
+      const manifestBefore = await fs.promises.readFile(manifestPath).catch(() => null)
       try {
         await options.versioning!.replaceAsVersion(
           target,
-          (files) => replaceInPlace(source, target, files, check),
+          async (files) => {
+            await replaceInPlace(source, target, files, check)
+            // Recorded before the version is saved, so a tracked manifest is saved with it.
+            await this.record(
+              { samples: { [name]: bundleHash } },
+              withoutPrefix(manifest?.files, `${name}/`),
+            )
+          },
           { before: BEFORE_UPDATE_MESSAGE, after: updatedMessage(name) },
+          // Asked under the repository's lock, so a sample opened meanwhile gets no version saved.
+          { beforeSave: check, alsoCommit: [manifestPath] },
         )
         return { kind: 'versioned' }
       } catch (error) {
-        if (!(error instanceof VersionSaveError)) throw error
+        if (!(error instanceof VersionSaveError)) {
+          // The sample is back as it was; so is its record.
+          if (manifestBefore != null) {
+            await fs.promises.writeFile(manifestPath, manifestBefore).catch(() => {})
+          }
+          throw error
+        }
         logger.warn(`Samples: could not save '${name}' as a version; keeping a copy:`, error)
         fellBack = error.message
       }
+    } else if (ignored.length > 0) {
+      fellBack = ignoredChangesMessage(ignored)
     }
     const kept = await this.keepAndReplace(name, source, options.now ?? new Date(), check)
     return { kind: 'kept', kept, fellBack }

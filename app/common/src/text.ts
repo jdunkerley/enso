@@ -90,6 +90,7 @@ interface PlaceholderOverrides {
   readonly updateSampleTitle: [sampleName: string]
   readonly updateSampleIntro: [sampleName: string]
   readonly updateSampleRouteCopy: [keptName: string]
+  readonly updateSampleRouteIgnored: [files: string]
   readonly updateSampleDone: [sampleName: string]
   readonly updateSampleVersioned: [sampleName: string]
   readonly updateSampleKept: [sampleName: string, keptName: string]

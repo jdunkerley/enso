@@ -307,6 +307,11 @@ export interface SamplesStatus {
      */
     readonly route: 'version' | 'copy' | null
     readonly copyName: string | null
+    /**
+     * Files of a versioned sample that git ignores and an update would overwrite: they are in no
+     * version, so the sample is kept as a copy instead. Empty otherwise.
+     */
+    readonly ignoredChanges: readonly string[]
   }[]
 }
 

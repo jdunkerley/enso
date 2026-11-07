@@ -23,7 +23,9 @@ user-facing word is "Update", never "Reset" (owner's ruling on #622):
   through `useConfirmedSampleUpdates`: a sample with edits of the user's
   (`route` not `null`) is updated only after `UpdateSamplesModal.vue` says how
   they are kept ("Your current version stays in version history", or "Your
-  edited copy will be kept as …"); one with none is updated at once.
+  edited copy will be kept as …", and, for a versioned sample whose ignored
+  files the update would overwrite, why it is a copy: `ignoredChanges`); one
+  with none is updated at once.
 - **Update All** in the toolbar (`DriveBarToolbar.vue`, `useUpdateAllButton`,
   `testId="update-all-samples"`), shown only while the current folder is the
   installed `Samples`; disabled, with a tooltip, when no sample has an update or
@@ -34,12 +36,18 @@ user-facing word is "Update", never "Reset" (owner's ruling on #622):
   because the version could not be saved (`fellBack`) and for a copy still named
   as its sample (`unrenamed`); for Update All, what failed.
 
-There is no Reset All: a user who wants a sample's original back restores it
-from version history. A host without samples (the Vite dev server) answers with
-an error, read as no samples. The Playwright mock is
-`integration-test/mock/localSamples.ts` (no samples unless a spec adds them;
-`route: 'version'` makes one versioned); the spec is
-`dashboard/localSamples.spec.ts`.
+There is no Reset All. A sample's original comes back three ways: Update Sample
+on it (any sample, for every user); its version history, when versioning is on;
+and, for a deleted sample or a changed or deleted `Samples/Data` file (which
+have no row to act on), renaming or deleting the `Samples` folder, which the
+next start reinstalls whole. The pill and the dialog read the samples' states
+again when the Drive enters `Samples` and before a confirmation opens
+(`useUpdateAllButton`, `useConfirmedSampleUpdates`), so the route and copy name
+shown are current; with nothing left to update, Update All says so instead of
+asking. A host without samples (the Vite dev server) answers with an error, read
+as no samples. The Playwright mock is `integration-test/mock/localSamples.ts`
+(no samples unless a spec adds them; `route: 'version'` makes one versioned);
+the spec is `dashboard/localSamples.spec.ts`.
 
 ## The table's accessibility model (#208)
 

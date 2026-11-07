@@ -94,8 +94,11 @@ whether you [keep versions](../local-versioning/index.md) of your projects:
 - **With versions:** Enso first saves your current sample as a version, then
   updates the sample in place and saves that as a new version. Your edited
   version stays in the sample's version history, where you can look at it or
-  restore it. Files that git ignores, and Enso's own `.enso` folder, are left as
-  they are.
+  restore it. What the sample wrote into its `output` folder, Enso's own `.enso`
+  folder and the files that git ignores are left as they are. If the new version
+  would replace a file that git ignores and that you have changed, that file is
+  in no version, so Enso keeps a copy of the sample instead (as without
+  versions) and says why.
 - **Without versions:** Enso keeps your edited sample beside the new one, under
   a name like `Sales_Overview_edited_2026_11_06`, and installs the new version
   in its place.
@@ -108,7 +111,12 @@ greyed out.
 ## Get a fresh copy
 
 To get a sample as it came with Enso, use **Update Sample** on it, or, if you
-keep versions, restore an earlier version from its history. To get every sample
-back, close any open sample, then rename or delete the `Samples` folder and
-restart Enso. It installs a new `Samples` folder. If you only renamed the old
-one, it stays where it is, so your edits are kept beside the fresh copies.
+keep versions, restore an earlier version from its history.
+
+A sample you deleted, or a file you changed or deleted in `Samples/Data`, does
+not come back by itself. To get it back, close any open sample, then rename or
+delete the `Samples` folder and restart Enso: it installs a fresh `Samples`
+folder, with every sample and every data file. If you only renamed the old one,
+it stays where it is, so your edits are kept beside the fresh copies. If you
+keep versions and the repository holds the `Samples` folder, you can also get a
+deleted sample's files back from the repository with git.

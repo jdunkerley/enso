@@ -156,7 +156,7 @@ function isOpenIn(getProjectService: () => Promise<ProjectService>): IsProjectOp
 
 /** The routes served by {@link LocalSamples}. The updates refuse an open sample. */
 const SAMPLES_ROUTES: Readonly<Record<string, RouteHandler<SamplesContext>>> = {
-  'samples/status': ({ samples, versioning }) => samples.status(versioning),
+  'samples/status': ({ samples, versioning }) => samples.status({ versioning }),
   'samples/update': ({ samples, getProjectService, versioning }, body) =>
     samples.update(requireString(body, 'name'), {
       isOpen: isOpenIn(getProjectService),

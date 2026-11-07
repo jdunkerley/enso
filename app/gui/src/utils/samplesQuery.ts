@@ -11,8 +11,9 @@ export const SAMPLES_STATUS_QUERY_KEY = [BackendType.local, 'samplesStatus'] as 
 
 /**
  * How long a status stays fresh. Every project row of the Drive uses it, and a sample's state
- * changes only through an edit, a reset (which refetches it) or a new version, so it need not be
- * asked for at each mount or focus.
+ * changes only through an edit, an update (which refetches it) or a new version, so it need not be
+ * asked for at each mount or focus. The Drive asks again when it enters `Samples` and before it
+ * asks to confirm an update, so the route and copy name it shows are current.
  */
 export const SAMPLES_STATUS_STALE_TIME_MS = 60_000
 

@@ -912,23 +912,54 @@ export class LocalVersioning {
   }
 
   /**
+   * Of `paths` (inside the project at `projectPath`), those git ignores in its repository. A
+   * tracked file is never ignored. Empty when there is no git or no repository.
+   */
+  async ignoredPaths(projectPath: string, paths: readonly string[]): Promise<readonly string[]> {
+    if (paths.length === 0 || (await findGit()) == null) return []
+    const repoRoot = await findRepoRoot(projectPath).catch(() => null)
+    if (repoRoot == null) return []
+    return exclusive(repoRoot, async () => {
+      const relatives = await Promise.all(paths.map((p) => repoRelative(repoRoot, p)))
+      const output = await runGit(repoRoot, ['check-ignore', '-z', '--stdin'], {
+        queueKey: repoRoot,
+        input: relatives.map((relative) => `${relative}\0`).join(''),
+      }).catch((error: unknown) => {
+        // Exit code 1: none of them is ignored.
+        if (error instanceof CommandError && error.code === 1) return ''
+        throw error
+      })
+      const ignored = new Set(output.split('\0').filter((line) => line !== ''))
+      return paths.filter((_, index) => ignored.has(relatives[index]!))
+    })
+  }
+
+  /**
    * Replace the project's files as a new version, under the repository's lock:
    *
-   * 1. Its uncommitted changes are saved as their own version, `messages.before`. When that fails,
-   *    or leaves anything unsaved, or the project has no version at all afterwards, nothing has
-   *    been changed and a {@link VersionSaveError} is thrown.
-   * 2. `replace` is given the absolute paths of the project's files in that version (every file but
+   * 1. `options.beforeSave` runs first; whatever it throws is thrown as it is, with nothing done.
+   * 2. The project's uncommitted changes are saved as their own version, `messages.before`. When
+   *    that fails, or leaves anything unsaved, or the project has no version at all afterwards, a
+   *    {@link VersionSaveError} is thrown. The work tree is unchanged then, although a version may
+   *    have been saved (when only the check after it failed).
+   * 3. `replace` is given the absolute paths of the project's files in that version (every file but
    *    its `.enso` folder and what git ignores), and changes the work tree.
-   * 3. The result is saved as `messages.after`.
+   * 4. The result is saved as `messages.after`, together with those of `options.alsoCommit` that
+   *    the repository tracks (an untracked one is never added).
    *
-   * When step 2 or 3 fails, the project is put back as the version from step 1 (as `restore` does,
-   * plus a `clean` of what `replace` added), and the error says that version holds the user's work.
-   * What git ignores, and the `.enso` folder, are never touched by this method.
+   * When step 3 or 4 fails, the project is put back as the version from step 2 (as `restore` does,
+   * plus a `clean` of what `replace` added, which leaves ignored files alone), and the error says
+   * that version holds the user's work. This method itself never touches what git ignores, nor the
+   * `.enso` folder; what `replace` writes is its caller's responsibility.
    */
   async replaceAsVersion(
     projectPath: string,
     replace: (files: readonly string[]) => Promise<void>,
     messages: { readonly before: string; readonly after: string },
+    options: {
+      readonly beforeSave?: (() => Promise<void>) | undefined
+      readonly alsoCommit?: readonly string[] | undefined
+    } = {},
   ): Promise<{ readonly before: string; readonly after: string | null }> {
     const saveFailed = (error: unknown) =>
       new VersionSaveError(
@@ -942,6 +973,7 @@ export class LocalVersioning {
     if (repoRoot == null) throw new VersionSaveError(`${projectPath} is not in a git repository.`)
     return exclusive(repoRoot, async () => {
       const run = (args: readonly string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
+      await options.beforeSave?.()
       let relative: string
       let before: string
       let files: string[]
@@ -967,7 +999,13 @@ export class LocalVersioning {
       }
       try {
         await replace(files.map((file) => path.join(repoRoot, ...file.split('/'))))
-        const after = await this.commitIn(repoRoot, [projectPath], messages.after)
+        const tracked: string[] = []
+        for (const extra of options.alsoCommit ?? []) {
+          const extraRelative = await repoRelative(repoRoot, extra)
+          if ((await run(['ls-files', '--cached', '--', literal(extraRelative)])).trim() !== '')
+            tracked.push(extra)
+        }
+        const after = await this.commitIn(repoRoot, [projectPath, ...tracked], messages.after)
         return { before, after: after.id }
       } catch (error) {
         try {

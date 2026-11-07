@@ -261,6 +261,7 @@ describe('installSamples: later starts', () => {
           state: 'edited',
           route: 'copy',
           copyName: expect.stringMatching(/^One_edited_\d{4}_\d\d_\d\d$/),
+          ignoredChanges: [],
         },
         {
           name: 'Two',
@@ -268,6 +269,7 @@ describe('installSamples: later starts', () => {
           state: 'current',
           route: null,
           copyName: null,
+          ignoredChanges: [],
         },
       ],
     })
@@ -426,6 +428,7 @@ describe('update, outside version control', () => {
       state: 'current',
       route: null,
       copyName: null,
+      ignoredChanges: [],
     })
 
     // The same day again: `_2`.

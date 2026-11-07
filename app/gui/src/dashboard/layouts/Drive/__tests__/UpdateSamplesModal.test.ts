@@ -21,6 +21,7 @@ const sample = (name: string, route: SampleEntry['route']): SampleEntry =>
     state: 'updateAvailable',
     route,
     copyName: route === 'copy' ? `${name}_edited_2026_11_06` : null,
+    ignoredChanges: [],
   }) as SampleEntry
 
 /** The text of `element`, with its white space collapsed. */
@@ -61,6 +62,17 @@ describe('UpdateSamplesModal', () => {
     expect(routes).toEqual([
       "Sales_Overview: Your edited copy will be kept as 'Sales_Overview_edited_2026_11_06'.",
       'Orders: Your current version stays in version history.',
+    ])
+  })
+
+  test('says why a versioned sample is kept as a copy', async () => {
+    const { routes } = await ask([
+      { ...sample('Sales_Overview', 'copy'), ignoredChanges: ['data/x.csv'] },
+    ])
+    expect(routes).toEqual([
+      "Your edited copy will be kept as 'Sales_Overview_edited_2026_11_06'. It is not saved in " +
+        'version history, because git ignores files of it that the update would replace: ' +
+        'data/x.csv.',
     ])
   })
 })

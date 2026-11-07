@@ -35,8 +35,13 @@ function routeText(sample: SampleEntry) {
   switch (sample.route) {
     case 'version':
       return getText('updateSampleRouteVersion')
-    case 'copy':
-      return getText('updateSampleRouteCopy', sample.copyName ?? `${sample.name}_edited`)
+    case 'copy': {
+      const copy = getText('updateSampleRouteCopy', sample.copyName ?? `${sample.name}_edited`)
+      // A versioned sample whose ignored files the update would overwrite: say why it is a copy.
+      return sample.ignoredChanges.length > 0 ?
+          `${copy} ${getText('updateSampleRouteIgnored', sample.ignoredChanges.join(', '))}`
+        : copy
+    }
     case null:
       return getText('updateSampleRouteNone')
   }

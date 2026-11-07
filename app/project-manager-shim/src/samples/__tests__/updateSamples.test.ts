@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { runCommand } from '../../childProcess/runCommand.js'
 import { versioningFor, withTempRepo } from '../../localVersioning/__tests__/testRepo.js'
 import type { LocalVersioning } from '../../localVersioning/index.js'
-import { hashSample, LocalSamples, type SamplesManifest } from '../index.js'
+import { hashSample, LocalSamples, SampleBusyError, type SamplesManifest } from '../index.js'
 
 // Every test runs dozens of real git processes, which take seconds on Windows (see
 // `localVersioning.test.ts`, #395).
@@ -87,7 +87,7 @@ describe('a sample in a versioned repository', () => {
   test('is reported as updated by a new version', async () => {
     await withVersionedSamples(async () => {
       editOneAndChangeBundle()
-      const status = await new LocalSamples(bundled, projects).status(versioning)
+      const status = await new LocalSamples(bundled, projects).status({ versioning, now: NOW })
       expect(status.samples.find((sample) => sample.name === 'One')).toMatchObject({
         state: 'updateAvailable',
         route: 'version',
@@ -127,7 +127,7 @@ describe('a sample in a versioned repository', () => {
       expect(await git('status', '--porcelain', '--', 'Samples/One')).toBe('')
       // The manifest records the new bundle: the update is gone.
       expect(manifest().samples['One']).toBe(await hashSample(path.join(bundled, 'One')))
-      const status = await local.status(versioning)
+      const status = await local.status({ versioning, now: NOW })
       expect(status.samples.find((sample) => sample.name === 'One')?.state).not.toBe(
         'updateAvailable',
       )
@@ -206,7 +206,9 @@ describe('a sample in a versioned repository', () => {
       await versioning.disable(projects)
       const local = new LocalSamples(bundled, projects)
       expect(
-        (await local.status(versioning)).samples.find((sample) => sample.name === 'One'),
+        (await local.status({ versioning, now: NOW })).samples.find(
+          (sample) => sample.name === 'One',
+        ),
       ).toMatchObject({ route: 'copy', copyName: 'One_edited_2026_11_06' })
       expect(await local.update('One', { versioning, now: NOW })).toMatchObject({
         versioned: [],
@@ -214,6 +216,127 @@ describe('a sample in a versioned repository', () => {
         fellBack: [],
       })
       expect(await subjects('Samples/One')).toEqual(['Installed'])
+    })
+  })
+})
+
+describe('a versioned update keeps what is the user’s', () => {
+  test('output/ is left as it is, tracked or not, as on the other routes', async () => {
+    await withVersionedSamples(async () => {
+      editOneAndChangeBundle()
+      write(path.join(bundled, 'One', 'output', 'README.txt'), 'outputs\n')
+      write(path.join(samples, 'One', 'output', 'result.csv'), 'mine\n')
+      write(path.join(samples, 'One', 'output', 'README.txt'), 'my notes\n')
+      await git('add', '-A')
+      await git('commit', '-q', '-m', 'My run')
+      write(path.join(samples, 'One', 'output', 'later.csv'), 'later\n')
+      const result = await new LocalSamples(bundled, projects).update('One', {
+        versioning,
+        now: NOW,
+      })
+      expect(result).toMatchObject({ versioned: ['One'], kept: [] })
+      const output = path.join(samples, 'One', 'output')
+      expect(read(path.join(output, 'result.csv'))).toBe('mine\n')
+      expect(read(path.join(output, 'later.csv'))).toBe('later\n')
+      // The user's copy of a file the bundle ships there wins.
+      expect(read(path.join(output, 'README.txt'))).toBe('my notes\n')
+      expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 100\n')
+      expect(await git('status', '--porcelain', '--', 'Samples/One')).toBe('')
+    })
+  })
+
+  test('a changed file git ignores that the bundle ships makes it a copy, and says why', async () => {
+    await withVersionedSamples(async () => {
+      editOneAndChangeBundle()
+      write(path.join(projects, '.gitignore'), '**/.enso/\n*.bak\n*.csv\n')
+      await git('add', '-A')
+      await git('commit', '-q', '-m', 'Ignore CSV files')
+      write(path.join(bundled, 'One', 'data', 'x.csv'), 'bundled\n')
+      write(path.join(samples, 'One', 'data', 'x.csv'), 'mine\n')
+      const local = new LocalSamples(bundled, projects)
+      expect(
+        (await local.status({ versioning, now: NOW })).samples.find(
+          (sample) => sample.name === 'One',
+        ),
+      ).toMatchObject({
+        state: 'updateAvailable',
+        route: 'copy',
+        copyName: 'One_edited_2026_11_06',
+        ignoredChanges: ['data/x.csv'],
+      })
+      const result = await local.update('One', { versioning, now: NOW })
+      expect(result).toMatchObject({
+        versioned: [],
+        kept: ['One_edited_2026_11_06'],
+        fellBack: [{ name: 'One', error: expect.stringContaining('data/x.csv') }],
+      })
+      expect(read(path.join(samples, 'One_edited_2026_11_06', 'data', 'x.csv'))).toBe('mine\n')
+      expect(read(path.join(samples, 'One', 'data', 'x.csv'))).toBe('bundled\n')
+      // No version was saved or made.
+      expect(await subjects('Samples/One')).toEqual(['Ignore CSV files', 'Installed'])
+    })
+  })
+
+  test('an ignored file that is as the bundle ships it is no reason to make a copy', async () => {
+    await withVersionedSamples(async () => {
+      editOneAndChangeBundle()
+      write(path.join(projects, '.gitignore'), '**/.enso/\n*.bak\n*.csv\n')
+      write(path.join(bundled, 'One', 'data', 'x.csv'), 'same\n')
+      write(path.join(samples, 'One', 'data', 'x.csv'), 'same\n')
+      const result = await new LocalSamples(bundled, projects).update('One', {
+        versioning,
+        now: NOW,
+      })
+      expect(result).toMatchObject({ versioned: ['One'], kept: [], fellBack: [] })
+    })
+  })
+
+  test("only folders it emptied are removed, not the user's empty ones", async () => {
+    await withVersionedSamples(async () => {
+      editOneAndChangeBundle()
+      write(path.join(samples, 'One', 'src', 'old', 'Old.enso'), 'old = 1\n')
+      fs.mkdirSync(path.join(samples, 'One', 'empty'))
+      await new LocalSamples(bundled, projects).update('One', { versioning, now: NOW })
+      expect(fs.existsSync(path.join(samples, 'One', 'src', 'old'))).toBe(false)
+      expect(fs.existsSync(path.join(samples, 'One', 'empty'))).toBe(true)
+    })
+  })
+
+  test('a sample opened just before its version is saved is not changed, and no version is saved', async () => {
+    await withVersionedSamples(async () => {
+      editOneAndChangeBundle()
+      let asked = 0
+      const isOpen = async (p: string) => p.endsWith('/One') && asked++ > 0
+      await expect(
+        new LocalSamples(bundled, projects).update('One', { versioning, isOpen, now: NOW }),
+      ).rejects.toThrow(SampleBusyError)
+      expect(await subjects('Samples/One')).toEqual(['Installed'])
+      expect(read(path.join(samples, 'One', 'src', 'Mine.enso'))).toBe('mine = 1\n')
+    })
+  })
+})
+
+describe('the samples manifest in a versioned repository', () => {
+  test('is saved with the update when the repository tracks it', async () => {
+    await withVersionedSamples(async () => {
+      editOneAndChangeBundle()
+      await new LocalSamples(bundled, projects).update('One', { versioning, now: NOW })
+      expect((await git('show', '--name-only', '--format=', 'HEAD')).split('\n')).toContain(
+        'Samples/.samples.json',
+      )
+      expect(await git('status', '--porcelain', '--', 'Samples/.samples.json')).toBe('')
+    })
+  })
+
+  test('is left alone, untracked, when the repository does not track it', async () => {
+    await withVersionedSamples(async () => {
+      await git('rm', '-q', '--cached', 'Samples/.samples.json')
+      await git('commit', '-q', '-m', 'Untrack the manifest')
+      editOneAndChangeBundle()
+      await new LocalSamples(bundled, projects).update('One', { versioning, now: NOW })
+      expect(await git('show', '--name-only', '--format=', 'HEAD')).not.toContain('.samples.json')
+      expect(await git('ls-files', '--', 'Samples/.samples.json')).toBe('')
+      expect(manifest().samples['One']).toBe(await hashSample(path.join(bundled, 'One')))
     })
   })
 })

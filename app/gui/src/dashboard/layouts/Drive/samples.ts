@@ -23,7 +23,7 @@ import {
   type DirectoryId,
 } from 'enso-common/src/services/Backend'
 import type { SamplesStatus } from 'enso-common/src/services/ProjectManager/types'
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useToastAndLog } from './driveActions'
 
 /** One bundled sample, as the shim reports it. */
@@ -167,7 +167,10 @@ export function useUpdateSamples() {
           [getText('updateAllSamplesKept', result.kept.join(', '))]
         : []),
       ]
-      if (result.failed.length === 0) {
+      if (result.updated.length === 0 && result.failed.length === 0) {
+        // Already up to date (another window's Update All, say).
+        toasts.show(getText('updateAllSamplesNothing'), { type: 'info' })
+      } else if (result.failed.length === 0) {
         const done = getText('updateAllSamplesDone', result.updated.join(', '))
         toasts.show([done, ...kept].join(' '), { type: 'success' })
       } else {
@@ -193,22 +196,37 @@ export function useUpdateSamples() {
  */
 export function useConfirmedSampleUpdates() {
   const modals = useModals()
+  const queryClient = useQueryClient()
+  const toasts = useToasts()
+  const { getText } = useText()
   const { updateSample, updateAllSamples } = useUpdateSamples()
 
+  /** The samples' states, asked for again now: the confirmation names the current routes. */
+  const currentSamples = async (): Promise<readonly SampleEntry[]> => {
+    await queryClient.refetchQueries({ queryKey: SAMPLES_STATUS_QUERY_KEY })
+    return queryClient.getQueryData<SamplesStatus | null>(SAMPLES_STATUS_QUERY_KEY)?.samples ?? []
+  }
+
   /** Update `sample`, asking first when it has edits to keep. */
-  const confirmUpdateSample = (sample: SampleEntry) => {
-    if (sample.route == null) {
-      void updateSample(sample.name)
+  const confirmUpdateSample = async (sample: SampleEntry) => {
+    const current = (await currentSamples()).find(({ name }) => name === sample.name) ?? sample
+    if (current.route == null) {
+      await updateSample(current.name)
       return
     }
     modals.open(UpdateSamplesModal, {
-      samples: [sample],
-      onConfirm: () => updateSample(sample.name),
+      samples: [current],
+      onConfirm: () => updateSample(current.name),
     })
   }
 
-  /** Update the samples with an update, `samples`, after asking. */
-  const confirmUpdateAll = (samples: readonly SampleEntry[]) => {
+  /** Update every sample with an update, after asking; say so when there is none. */
+  const confirmUpdateAll = async () => {
+    const samples = (await currentSamples()).filter(({ state }) => state === 'updateAvailable')
+    if (samples.length === 0) {
+      toasts.show(getText('updateAllSamplesNothing'), { type: 'info' })
+      return
+    }
     modals.open(UpdateSamplesModal, { samples, onConfirm: updateAllSamples })
   }
 
@@ -233,7 +251,7 @@ export function useSampleMenuEntries(asset: () => AnyAsset, isRunningProject: ()
         isDisabled: isOpen,
         tooltip: isOpen ? getText('updateSampleOpenTooltip') : undefined,
         doAction: () => {
-          confirmUpdateSample(sample)
+          void confirmUpdateSample(sample)
         },
       },
     ]
@@ -249,7 +267,14 @@ export function useUpdateAllButton(directoryId: () => DirectoryId) {
   const samples = useSamples()
   const openPaths = useOpenProjectPaths()
   const { confirmUpdateAll } = useConfirmedSampleUpdates()
+  const queryClient = useQueryClient()
   const isShown = computed(() => samples.isSamplesDirectoryId(directoryId()))
+  // Entering `Samples` asks for the states again, so its pills and this button are current.
+  watch(isShown, (shown, wasShown) => {
+    if (shown && !wasShown) {
+      void queryClient.invalidateQueries({ queryKey: SAMPLES_STATUS_QUERY_KEY })
+    }
+  })
   const disabledReason = computed(() => {
     const toUpdate = samples.withUpdates.value
     if (toUpdate.length === 0) return getText('updateAllSamplesNoneTooltip')
@@ -260,8 +285,6 @@ export function useUpdateAllButton(directoryId: () => DirectoryId) {
     isShown,
     isDisabled: computed(() => disabledReason.value != null),
     tooltip: computed(() => disabledReason.value ?? getText('updateAllSamplesTooltip')),
-    run: () => {
-      confirmUpdateAll(samples.withUpdates.value)
-    },
+    run: () => confirmUpdateAll(),
   }
 }

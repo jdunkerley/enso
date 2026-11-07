@@ -101,6 +101,10 @@ test('An edited sample whose bundle changed is updated from its pill, keeping th
   manifest.samples['Sales_Overview'] = 'f'.repeat(64)
   await fs.writeFile(manifestPath, JSON.stringify(manifest))
 
+  // The samples' states were read when the dashboard loaded, before the edit: load it again, so
+  // the test does not rely on the Drive asking again when it enters `Samples`.
+  await page.reload()
+  await waitForDashboard(page)
   await assetRow(page, 'Samples').dblclick()
   const row = assetRow(page, 'Sales_Overview')
   await expect(row.getByTestId('sample-update-badge')).toBeVisible()

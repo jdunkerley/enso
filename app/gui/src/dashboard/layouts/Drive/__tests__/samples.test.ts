@@ -12,7 +12,7 @@ import type {
   SamplesUpdateResult,
 } from 'enso-common/src/services/ProjectManager/types'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { defineComponent, shallowReactive } from 'vue'
+import { defineComponent, ref, shallowReactive } from 'vue'
 import {
   useSampleMenuEntries,
   useSamples,
@@ -45,6 +45,7 @@ const SALES: SampleEntry = {
   state: 'updateAvailable',
   route: 'copy',
   copyName: 'Sales_Overview_edited_2026_11_06',
+  ignoredChanges: [],
 } as SampleEntry
 const ORDERS: SampleEntry = {
   name: 'Orders_And_Customers',
@@ -52,6 +53,7 @@ const ORDERS: SampleEntry = {
   state: 'updateAvailable',
   route: 'version',
   copyName: null,
+  ignoredChanges: [],
 } as SampleEntry
 const TEXT_CLEANING: SampleEntry = {
   name: 'Text_Cleaning',
@@ -59,6 +61,7 @@ const TEXT_CLEANING: SampleEntry = {
   state: 'edited',
   route: 'copy',
   copyName: 'Text_Cleaning_edited_2026_11_06',
+  ignoredChanges: [],
 } as SampleEntry
 const GETTING_STARTED: SampleEntry = {
   name: 'Getting_Started',
@@ -66,6 +69,7 @@ const GETTING_STARTED: SampleEntry = {
   state: 'current',
   route: null,
   copyName: null,
+  ignoredChanges: [],
 } as SampleEntry
 const STATUS = {
   directory: SAMPLES,
@@ -150,7 +154,8 @@ async function setup<T>(use: () => T): Promise<T> {
 const toastContents = () => useToasts().toasts.value.map((toast) => [toast.type, toast.content])
 
 /** The update confirmation on the modal stack. */
-function confirmation() {
+async function confirmation() {
+  await flushPromises()
   const entry = useModals().stack.value.at(-1)
   expect(entry?.component).toBe(UpdateSamplesModal)
   return entry?.props as { samples: readonly SampleEntry[]; onConfirm: () => Promise<void> }
@@ -214,7 +219,7 @@ describe('Update Sample', () => {
     ])
     entries.value[0]?.doAction()
     expect(updateSample).not.toHaveBeenCalled()
-    const asked = confirmation()
+    const asked = await confirmation()
     expect(asked.samples).toEqual([SALES])
     await asked.onConfirm()
     expect(updateSample).toHaveBeenCalledExactlyOnceWith('Sales_Overview')
@@ -223,7 +228,8 @@ describe('Update Sample', () => {
       "Updated 'Sales_Overview'. Your edited copy is kept as 'Sales_Overview_edited_2026_11_06'.",
     ])
     // The listing and the pills are refreshed.
-    expect(samplesStatus).toHaveBeenCalledTimes(2)
+    // Asked again before the confirmation, and after the update.
+    expect(samplesStatus).toHaveBeenCalledTimes(3)
   })
 
   test('says when the previous version is in version history', async () => {
@@ -232,7 +238,7 @@ describe('Update Sample', () => {
     )
     const entries = await menuFor(ORDERS)
     entries.value[0]?.doAction()
-    await confirmation().onConfirm()
+    await (await confirmation()).onConfirm()
     expect(toastContents()).toEqual([
       [
         'success',
@@ -251,7 +257,7 @@ describe('Update Sample', () => {
     )
     const entries = await menuFor(ORDERS)
     entries.value[0]?.doAction()
-    await confirmation().onConfirm()
+    await (await confirmation()).onConfirm()
     expect(toastContents()).toEqual([
       [
         'success',
@@ -288,7 +294,7 @@ describe('Update Sample', () => {
     updateSample.mockRejectedValue(new Error("The sample 'Sales_Overview' is open."))
     const entries = await menuFor(SALES)
     entries.value[0]?.doAction()
-    await confirmation().onConfirm()
+    await (await confirmation()).onConfirm()
     expect(toastContents()).toContainEqual([
       'error',
       "Could not update 'Sales_Overview': The sample 'Sales_Overview' is open.",
@@ -302,7 +308,7 @@ describe('Update Sample', () => {
     )
     const entries = await menuFor(SALES)
     entries.value[0]?.doAction()
-    await confirmation().onConfirm()
+    await (await confirmation()).onConfirm()
     const warning = useToasts().toasts.value.find((toast) => toast.type === 'warning')
     expect(warning?.content).toBe(
       `The edited copy '${copy}' still has the sample's project name. Rename it in the Drive ` +
@@ -337,8 +343,8 @@ describe('Update All', () => {
     const button = await setup(() => useUpdateAllButton(() => directoryId(SAMPLES)))
     expect(button.isDisabled.value).toBe(false)
     expect(button.tooltip.value).toBe('Update every sample that has a newer version')
-    button.run()
-    const asked = confirmation()
+    void button.run()
+    const asked = await confirmation()
     expect(asked.samples.map((sample) => sample.name)).toEqual([
       'Sales_Overview',
       'Orders_And_Customers',
@@ -386,11 +392,55 @@ describe('Update All', () => {
       }),
     )
     const button = await setup(() => useUpdateAllButton(() => directoryId(SAMPLES)))
-    button.run()
-    await confirmation().onConfirm()
+    void button.run()
+    await (await confirmation()).onConfirm()
     expect(toastContents()).toEqual([
       ['error', 'Some samples were not updated: Sales_Overview (EBUSY: resource busy or locked)'],
       ['info', 'Your edited copies are kept: Orders_And_Customers_edited_2026_11_06.'],
     ])
+  })
+
+  test('with nothing left to update, says so and asks nothing', async () => {
+    const button = await setup(() => useUpdateAllButton(() => directoryId(SAMPLES)))
+    // Another window updated them meanwhile: the states asked for again have no update.
+    samplesStatus.mockResolvedValue({ directory: SAMPLES, samples: [TEXT_CLEANING] })
+    await button.run()
+    await flushPromises()
+    expect(useModals().stack.value).toEqual([])
+    expect(updateAllSamples).not.toHaveBeenCalled()
+    expect(toastContents()).toEqual([['info', 'Nothing to update: every sample is up to date.']])
+  })
+
+  test('that updated nothing says so, not "Updated the samples: ."', async () => {
+    updateAllSamples.mockResolvedValue(result({}))
+    const button = await setup(() => useUpdateAllButton(() => directoryId(SAMPLES)))
+    void button.run()
+    await (await confirmation()).onConfirm()
+    expect(toastContents()).toEqual([['info', 'Nothing to update: every sample is up to date.']])
+  })
+
+  test('entering the Samples folder asks for the states again', async () => {
+    const folder = ref(directoryId('C:/projects'))
+    await setup(() => useUpdateAllButton(() => folder.value))
+    const asked = samplesStatus.mock.calls.length
+    folder.value = directoryId(SAMPLES)
+    await flushPromises()
+    expect(samplesStatus.mock.calls.length).toBe(asked + 1)
+  })
+})
+
+describe('the confirmation names the current route', () => {
+  test('the states are asked for again before it opens', async () => {
+    const entries = await setup(() =>
+      useSampleMenuEntries(
+        () => project(SALES.path),
+        () => false,
+      ),
+    )
+    // Versioning was turned on since the states were read.
+    const versioned = { ...SALES, route: 'version', copyName: null } as SampleEntry
+    samplesStatus.mockResolvedValue({ directory: SAMPLES, samples: [versioned] })
+    entries.value[0]?.doAction()
+    expect((await confirmation()).samples).toEqual([versioned])
   })
 })

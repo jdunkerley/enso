@@ -141,24 +141,39 @@ passes it to the server) installs the samples shipped with the application in
   one as bundled is refreshed (keeping `.enso/`, `output/` and labels). An
   edited one (it differs from the bundle) is kept, by one of two routes, decided
   per sample (`status` reports it as `route`, with the `copyName` the copy route
-  would use, for the Drive's confirmation):
+  would use and the `ignoredChanges` below, for the Drive's confirmation;
+  `status` takes a `now`, as the updates do, so tests never depend on today's
+  date):
   - **`version`**, when `LocalVersioning.isVersioned` says the sample's
     repository is enabled and usable (git installed, consent given, no merge in
     progress; the check the version history makes).
-    `LocalVersioning.replaceAsVersion` runs under the repository's lock: it
-    commits the sample's uncommitted changes as
-    `Saved before updating the sample` (`BEFORE_UPDATE_MESSAGE`), checks that
-    nothing is left unsaved and that the sample has a version, then removes the
-    files git tracks in it (not `.enso/`, not what git ignores), copies the
-    bundle in (the user's copy of a file the bundle ships in `output/` wins),
-    puts the labels back, and commits `Updated sample <Name>`. No `_edited_`
-    copy. If the first commit fails for any reason (an `index.lock`, a git
-    error), nothing has changed: it throws `VersionSaveError`, and the sample
-    falls back to the copy route, reported in `fellBack` with git's message. If
+    `LocalVersioning.replaceAsVersion` runs under the repository's lock: it asks
+    the open-sample check again first (`beforeSave`, so a sample opened
+    meanwhile fails with `SampleBusyError` and no version is saved), commits the
+    sample's uncommitted changes as `Saved before updating the sample`
+    (`BEFORE_UPDATE_MESSAGE`), checks that nothing is left unsaved and that the
+    sample has a version, then removes the files git tracks in it except its
+    `output/` (not `.enso/`, not what git ignores, not the user's results),
+    removes the folders that held only those files (a user's empty folder
+    stays), copies the bundle in (the user's copy of a file the bundle ships in
+    `output/` wins), puts the labels back, records the manifest, and commits
+    `Updated sample <Name>`, with `Samples/.samples.json` when the repository
+    tracks it (an untracked manifest is never added). No `_edited_` copy. If the
+    first commit fails for any reason (an `index.lock`, a git error), the work
+    tree has not changed: it throws `VersionSaveError`, and the sample falls
+    back to the copy route, reported in `fellBack` with git's message. If
     anything after it fails, the work tree is put back as that commit
-    (`restore --source=<commit> --staged --worktree` and `clean`, as `restore`
-    does, never `reset --hard`), and the error says the user's work is in the
-    version `Saved before updating the sample`.
+    (`restore --source=<commit> --staged --worktree` and `clean -f -d`, as
+    `restore` does, never `reset --hard`, never `-x`), the manifest is written
+    back as it was, and the error says the user's work is in the version
+    `Saved before updating the sample`.
+  - **A file git ignores is never overwritten silently.** It is in no version.
+    When the bundle ships a file that exists in the sample with other content
+    and git ignores it (`LocalVersioning.ignoredPaths`, `git check-ignore`), the
+    sample takes the copy route: `status` lists those files in `ignoredChanges`
+    (the confirmation says why), and the update reports them in `fellBack`.
+    `replaceInPlace` checks again before it changes anything and throws if such
+    a file is there.
   - **`copy`** otherwise (and for an unreadable sample): it is renamed to
     `<Name>_edited_<yyyy>_<mm>_<dd>` (then `_2`, `_3`, ...) beside it, with that
     name in its `package.yaml` too, and a fresh copy is installed. The date uses
@@ -179,15 +194,22 @@ passes it to the server) installs the samples shipped with the application in
   update, a deleted sample and `Data/` files are left alone. It refuses when one
   of those samples is open, before changing anything; one that fails part way is
   reported in `failed`, and the rest are still updated and recorded. There is no
-  Reset All any more: the owner's ruling (#622) is that a user who wants an
-  original sample back restores it from version history.
+  Reset All any more (owner's ruling, #622). A sample's original comes back
+  through Update Sample (any sample) or its version history; a deleted sample or
+  `Data/` file only by renaming or deleting the `Samples` folder, which the next
+  start reinstalls whole.
+- **One process at a time.** The repository lock and `serialised` order the
+  changes of one process only. A second process on the same projects folder (a
+  dev server, an `ENSO_TEST` instance) can change the same sample at the same
+  time; the single-instance lock keeps two IDEs apart, and this predates the
+  updates.
 - **Routes** (POST to `/api/project-service/samples/*`, served by
   `handler/projectService.ts` from the `LocalSamples` passed to
   `handleProjectServiceRequest` after `keyFromEnvironment`, with the host's
   `LocalVersioning`): `status` (each bundled sample's `name`, `path`, `state`:
   `current`, `edited`, `updateAvailable`, `missing` or `unreadable`, `route` and
-  `copyName`, and the `Samples` `directory`, all with `/`), `update` `{ name }`
-  and `update-all`, which answer
+  `copyName`, `ignoredChanges`, and the `Samples` `directory`, all with `/`),
+  `update` `{ name }` and `update-all`, which answer
   `{ updated, versioned, kept, unrenamed, fellBack, failed }`. The updates
   refuse a sample the project service has open or opening. The Vite middleware
   has no `LocalSamples`, so under `dev:vite` the routes fail and the Drive shows
@@ -195,7 +217,9 @@ passes it to the server) installs the samples shipped with the application in
 
 Tests: `src/samples/__tests__/installSamples.test.ts`, the version route with
 real git in `src/samples/__tests__/updateSamples.test.ts` (30 s per test, as in
-`localVersioning.test.ts`), the `samples routes` in
+`localVersioning.test.ts`), the guards of `replaceAsVersion` (each of which a
+mutation turns a test red) in
+`localVersioning/__tests__/replaceAsVersion.test.ts`, the `samples routes` in
 `handler/__tests__/projectService.test.ts`,
 `projectService/__tests__/openOrOpening.test.ts` (with the wait on `Samples`)
 and the run marker in `__tests__/runProjects.test.ts`.
@@ -582,8 +606,8 @@ neither committed nor unstaged.
 - `src/localVersioning/index.ts`: `LocalVersioning` (constructed with a
   `VersioningConsent`) with `status`, `init`, `enable`, `disable`, `commit`,
   `commitIfEnabled`, `log`, `fileAt`, `setComment`, `restore`, `exportAt`,
-  `commitMove`, `isVersioned` and `replaceAsVersion` (the samples' version
-  route, see "Sample projects"), and the lookup `repositoryOf`.
+  `commitMove`, `isVersioned`, `ignoredPaths` and `replaceAsVersion` (the
+  samples' version route, see "Sample projects"), and the lookup `repositoryOf`.
 - `src/localVersioning/consent.ts`: `VersioningConsent`, the persisted record of
   enabled repositories (see _Consent_ below).
 - `src/localVersioning/git.ts`: `findGit`, `runGit`, `findRepoRoot`,
@@ -771,7 +795,8 @@ stays staged).
 `localVersioning.test.ts` runs real git, dozens of processes per test. On
 Windows a test takes 1–5 s on an idle machine, so the file sets
 `vi.setConfig({ testTimeout: 30_000 })`, and so do the other files that run real
-git: `handler/__tests__/filesystemVersioning.test.ts`,
+git: `replaceAsVersion.test.ts`,
+`handler/__tests__/filesystemVersioning.test.ts`,
 `samples/__tests__/updateSamples.test.ts`, and the `versioning routes` block of
 `handler/__tests__/projectService.test.ts` (`{ timeout: 30_000 }`): under load,
 vitest's default 5 s failed a different handful of tests each run (#395). A

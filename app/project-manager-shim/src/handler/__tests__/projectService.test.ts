@@ -530,6 +530,7 @@ describe('samples routes', () => {
           state: 'updateAvailable',
           route: 'copy',
           copyName: expect.stringMatching(/^One_edited_\d{4}_\d\d_\d\d$/),
+          ignoredChanges: [],
         },
       ],
     })

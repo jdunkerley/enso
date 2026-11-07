@@ -17,6 +17,8 @@ export interface MockSample {
   state: SampleState
   /** How an update keeps its edits: in version history, or as a copy (the default). */
   route?: 'version' | 'copy'
+  /** Files git ignores that keep a versioned sample a copy (`route` is then `copy`). */
+  ignoredChanges?: readonly string[]
 }
 
 /** The mocked samples. Change it in `setupApi.local`, before the page loads. */
@@ -83,6 +85,7 @@ export async function registerSamplesRoutes(page: Page, state: MockSamples) {
             path: posix.join(state.directory, sample.name),
             route,
             copyName: route === 'copy' ? mockCopyName(sample.name) : null,
+            ignoredChanges: sample.ignoredChanges ?? [],
           }
         }),
       })),

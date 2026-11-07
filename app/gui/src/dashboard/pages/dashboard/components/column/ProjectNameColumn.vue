@@ -39,7 +39,8 @@ const { confirmUpdateSample } = useConfirmedSampleUpdates()
 const isOpen = computed(() => isOpenOrOpening(item))
 
 function updateSample() {
-  if (sampleWithUpdate.value != null && !isOpen.value) confirmUpdateSample(sampleWithUpdate.value)
+  if (sampleWithUpdate.value == null || isOpen.value) return
+  return confirmUpdateSample(sampleWithUpdate.value)
 }
 
 function onKeyDown(event: KeyboardEvent) {
