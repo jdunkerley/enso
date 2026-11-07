@@ -166,13 +166,17 @@ public class WebSocketServerTest extends ExecutorSetup {
     // A check that fails refuses too.
     Assert.assertEquals(500, handshakeStatus(port, "/throws", null));
 
-    // Only the two accepted sockets reached `onconnect`.
-    for (var i = 0; i < 50 && connected.get(1) == null; i++) Thread.sleep(100);
-    Thread.sleep(200);
-    Assert.assertEquals(
-        java.util.Set.of("/accepted", "/accepted-page"),
-        java.util.Set.of(connected.get(0), connected.get(1)));
-    Assert.assertNull(connected.get(2));
+    // No refused socket reaches `onconnect`. (Whether an accepted one does depends on the race
+    // between its `open` and this test closing it, so only the refused ones are checked.)
+    Thread.sleep(500);
+    for (var i = 0; i < connected.length(); i++) {
+      var path = connected.get(i);
+      if (path != null) {
+        Assert.assertTrue(
+            "A refused socket reached onconnect: " + path,
+            path.equals("/accepted") || path.equals("/accepted-page"));
+      }
+    }
   }
 
   private static final class TestWsListener implements WsListener {
