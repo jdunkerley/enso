@@ -41,5 +41,8 @@ test('Documentation opens the documentation site’s introduction', async ({ dri
   await railButton(page, TEXT.documentationShortcut).click()
   const opened = () =>
     page.evaluate(() => (window as unknown as { openedUrls: string[] }).openedUrls)
-  await expect.poll(opened).toEqual(['https://jdunkerley.github.io/enso/docs/intro/'])
+  const base = await page.evaluate(
+    () => (window as unknown as { $config: { DOCS_URL: string } }).$config.DOCS_URL,
+  )
+  await expect.poll(opened).toEqual([`${base.replace(/\/+$/, '')}/intro/`])
 })

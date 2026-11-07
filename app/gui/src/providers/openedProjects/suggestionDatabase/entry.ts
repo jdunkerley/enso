@@ -9,7 +9,7 @@ import {
   type IdentifierOrOperatorIdentifier,
   type QualifiedName,
 } from '@/util/qualifiedName'
-import { apiPath, type ApiPathEntry } from 'enso-common/src/docsSite/apiPath'
+import { apiPath, isConversion, type ApiPathEntry } from 'enso-common/src/docsSite/apiPath'
 import type {
   SuggestionEntryArgument,
   SuggestionEntryScope,
@@ -216,15 +216,41 @@ function qualifiedPath(path: ProjectPath): string | undefined {
 }
 
 /**
+ * The documentation root with exactly one trailing slash, or nothing for an empty or missing
+ * setting (`$config.DOCS_URL`), which switches the links off.
+ */
+export function documentationBase(configured: string | undefined): string | undefined {
+  const trimmed = configured?.trim().replace(/\/+$/, '')
+  return trimmed ? `${trimmed}/` : undefined
+}
+
+/**
  * The documentation site's page for `entry` (`<base>api/<apiPath>/`), or nothing for what the site
- * does not document: the user's own code, and the entities that are not library members.
- * @param base The site's documentation root, with its trailing slash (`$config.DOCS_URL`).
+ * has no page for: the user's own code, functions and locals, and conversions (listed on their
+ * target type's page).
+ * @param base The site's documentation root; a missing trailing slash is added.
  */
 export function suggestionDocumentationUrl(
   entry: SuggestionEntry,
   base: string,
 ): string | undefined {
+  const root = documentationBase(base)
+  if (root == null) return
+  try {
+    return pageUrl(entry, root)
+  } catch {
+    // `apiPath` refuses an entry with no usable module or owner: no page, not a broken panel.
+    return
+  }
+}
+
+function pageUrl(entry: SuggestionEntry, root: string): string | undefined {
   if (!entry.definedIn.project?.startsWith('Standard.')) return
+  if (
+    entry.kind === SuggestionKind.Method &&
+    isConversion({ name: entry.name, isStatic: entry.selfType == null, arguments: entry.arguments })
+  )
+    return
   const module = qualifiedPath(entry.definedIn)
   if (module == null) return
   let pathEntry: ApiPathEntry
@@ -254,5 +280,5 @@ export function suggestionDocumentationUrl(
     default:
       return
   }
-  return `${base}api/${apiPath(pathEntry)}/`
+  return `${root}api/${apiPath(pathEntry)}/`
 }

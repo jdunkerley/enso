@@ -2,6 +2,7 @@
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
 import type { SuggestionId } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { suggestionDocumentationUrl } from '$/providers/openedProjects/suggestionDatabase/entry'
+import { useText } from '$/providers/text'
 import Breadcrumbs, {
   type Item as Breadcrumb,
 } from '@/components/ComponentHelp/DocsBreadcrumbs.vue'
@@ -22,6 +23,7 @@ import { EditorView } from '@codemirror/view'
 import { computed, watch } from 'vue'
 
 const props = defineProps<{ selectedEntry: SuggestionId | undefined; aiMode?: boolean }>()
+const { getText } = useText()
 const emit = defineEmits<{ 'update:selectedEntry': [value: SuggestionId | undefined] }>()
 
 const { suggestionDb: db, projectNames } = useCurrentProject()
@@ -157,7 +159,7 @@ function openDocs(url: string) {
       <SvgButton
         v-if="documentationUrl"
         name="open"
-        title="Open in documentation site"
+        :title="getText('openInDocumentationSite')"
         @activate="openDocs(documentationUrl)"
       />
     </div>

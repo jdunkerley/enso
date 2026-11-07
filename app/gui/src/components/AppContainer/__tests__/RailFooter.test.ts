@@ -104,6 +104,15 @@ describe('RailFooter', () => {
     open.mockRestore()
   })
 
+  test('a site root without its trailing slash still opens the introduction', async () => {
+    ;($config as { DOCS_URL?: string }).DOCS_URL = DOCS_URL.slice(0, -1)
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    await mountFooter()
+    documentationButton().click()
+    expect(open).toHaveBeenCalledExactlyOnceWith(`${DOCS_URL}intro/`, '_blank')
+    open.mockRestore()
+  })
+
   test('without a configured site there is no Documentation button or action', async () => {
     ;($config as { DOCS_URL?: string }).DOCS_URL = undefined
     await mountFooter()

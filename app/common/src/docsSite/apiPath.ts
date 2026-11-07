@@ -22,6 +22,19 @@ export interface ApiPathEntry {
   readonly owner?: string | undefined
 }
 
+/**
+ * A conversion (`Target.from that`): the language server's `SuggestionJson.isConversion`. The
+ * site's generator lists conversions on their target type's page and gives them no page of their
+ * own, so the IDE links to none.
+ */
+export function isConversion(entry: {
+  readonly name: string
+  readonly isStatic: boolean
+  readonly arguments: readonly { readonly name: string }[]
+}): boolean {
+  return entry.name === 'from' && !entry.isStatic && entry.arguments[0]?.name === 'that'
+}
+
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 /**

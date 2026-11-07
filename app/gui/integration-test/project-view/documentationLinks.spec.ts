@@ -6,7 +6,13 @@ import type { Page } from 'integration-test/base'
 import { expect, test } from 'integration-test/base'
 import * as locate from './locate'
 
-const PAGE = 'https://jdunkerley.github.io/enso/docs/api/Standard.Base/Data/read/'
+/** `Data.read`'s page, under the documentation root the app is configured with. */
+async function dataReadPage(page: Page) {
+  const base = await page.evaluate(
+    () => (window as unknown as { $config: { DOCS_URL: string } }).$config.DOCS_URL,
+  )
+  return `${base.replace(/\/+$/, '')}/api/Standard.Base/Data/read/`
+}
 
 /** Record the URLs the app opens, instead of opening a window. */
 async function recordOpenedUrls(page: Page) {
@@ -41,7 +47,7 @@ test('F1 opens the selected component’s page on the documentation site', async
   await recordOpenedUrls(page)
   await locate.graphNodeIcon(locate.graphNodeByBinding(page, 'data')).click()
   await page.keyboard.press('F1')
-  await expect.poll(() => openedUrls(page)).toEqual([PAGE])
+  await expect.poll(() => openedUrls(page)).toEqual([await dataReadPage(page)])
 })
 
 test('F1 on the user’s own component opens nothing', async ({ editorPage, page }) => {
@@ -50,7 +56,8 @@ test('F1 on the user’s own component opens nothing', async ({ editorPage, page
   // `final = Main.func1 prod`: defined in the project.
   await locate.graphNodeIcon(locate.graphNodeByBinding(page, 'final')).click()
   await page.keyboard.press('F1')
-  await page.waitForTimeout(300)
+  // The handler reports why there is no page; by then it has not opened anything.
+  await expect(page.getByTestId('toast-host')).toContainText('Unable to show node documentation')
   expect(await openedUrls(page)).toEqual([])
 })
 
@@ -60,5 +67,5 @@ test('the component help panel has a button to the page', async ({ editorPage, p
   await locate.graphNodeIcon(locate.graphNodeByBinding(page, 'data')).click()
   await page.getByRole('tab', { name: 'Component help' }).click()
   await page.getByRole('button', { name: 'Open in documentation site' }).click()
-  await expect.poll(() => openedUrls(page)).toEqual([PAGE])
+  await expect.poll(() => openedUrls(page)).toEqual([await dataReadPage(page)])
 })

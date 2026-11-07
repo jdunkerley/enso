@@ -9,6 +9,7 @@ import {
   documentationData,
   ensoMarkdownParser,
   extractMetadata,
+  isConversion as isConversionEntry,
   prerenderMarkdown,
   type ApiPathEntry,
   type DocumentationData,
@@ -121,7 +122,7 @@ export function isFunctionPage(
 
 /** `SuggestionJson.isConversion`: `from`, not static, first argument `that`. */
 function isConversion(entry: CatalogueEntry & { type: 'method' }): boolean {
-  return entry.name === 'from' && !entry.isStatic && entry.arguments[0]?.name === 'that'
+  return isConversionEntry(entry)
 }
 
 function metadataOf(documentation: string | undefined): DocumentationMetadata | undefined {

@@ -13,6 +13,7 @@
  */
 import { openAboutModal } from '$/components/AboutModal/aboutModal'
 import { useMenuEntries, type MenuEntryAction } from '$/composables/menuEntries'
+import { documentationBase } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { useBackends } from '$/providers/backends'
 import { useContainerData } from '$/providers/container'
 import { useModals } from '$/providers/modals'
@@ -34,7 +35,8 @@ const toasts = useToasts()
 const modals = useModals()
 
 /** The documentation site's introduction page; no button without a configured site. */
-const documentationUrl = $config.DOCS_URL ? `${$config.DOCS_URL}intro/` : undefined
+const documentationRoot = documentationBase($config.DOCS_URL)
+const documentationUrl = documentationRoot != null ? `${documentationRoot}intro/` : undefined
 
 function openDocumentation() {
   if (documentationUrl != null) window.open(documentationUrl, '_blank')

@@ -1,12 +1,19 @@
-import { suggestionDocumentationUrl } from '$/providers/openedProjects/suggestionDatabase/entry'
 import {
+  documentationBase,
+  suggestionDocumentationUrl,
+} from '$/providers/openedProjects/suggestionDatabase/entry'
+import {
+  makeArgument,
   makeConstructor,
   makeFunction,
   makeMethod,
   makeModule,
   makeModuleMethod,
+  makeStaticMethod,
   makeType,
 } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
+import { ProjectPath } from '@/util/projectPath'
+import type { QualifiedName } from '@/util/qualifiedName'
 import { expect, test } from 'vitest'
 
 const BASE = 'https://jdunkerley.github.io/enso/docs/'
@@ -47,4 +54,45 @@ test.each([
   [makeFunction('Standard.Base.Main', 'local_function'), undefined],
 ])('%#', (entry, url) => {
   expect(suggestionDocumentationUrl(entry, BASE)).toBe(url)
+})
+
+test('a conversion has no page: the site lists it on the target type', () => {
+  const conversion = makeMethod('Standard.Base.Data.Hashset.Hashset.from', {
+    args: [makeArgument('that')],
+  })
+  expect(suggestionDocumentationUrl(conversion, BASE)).toBeUndefined()
+  // A static `from` (a plain constructor-like method) does have a page.
+  const staticFrom = makeStaticMethod('Standard.Base.Data.Hashset.Hashset.from', {
+    args: [makeArgument('that')],
+  })
+  expect(suggestionDocumentationUrl(staticFrom, BASE)).toBe(
+    `${BASE}api/Standard.Base/Data/Hashset/Hashset.from/`,
+  )
+})
+
+test('a base without its trailing slash still gives the page', () => {
+  const entry = makeModuleMethod('Standard.Base.Data.read')
+  expect(suggestionDocumentationUrl(entry, BASE.slice(0, -1))).toBe(
+    `${BASE}api/Standard.Base/Data/read/`,
+  )
+  expect(suggestionDocumentationUrl(entry, `${BASE}//`)).toBe(`${BASE}api/Standard.Base/Data/read/`)
+})
+
+test('an empty base switches the links off', () => {
+  expect(documentationBase(undefined)).toBeUndefined()
+  expect(documentationBase('')).toBeUndefined()
+  expect(documentationBase('  ')).toBeUndefined()
+  expect(
+    suggestionDocumentationUrl(makeModuleMethod('Standard.Base.Data.read'), ''),
+  ).toBeUndefined()
+})
+
+test('an entry apiPath cannot place has no page, and does not throw', () => {
+  // A module with too few segments: `apiPath` refuses it.
+  const odd = {
+    ...makeModule('Standard.Table.Table'),
+    definedIn: ProjectPath.create('Standard' as QualifiedName, undefined),
+  }
+  expect(() => suggestionDocumentationUrl(odd, BASE)).not.toThrow()
+  expect(suggestionDocumentationUrl(odd, BASE)).toBeUndefined()
 })
