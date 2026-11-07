@@ -51,6 +51,13 @@ export interface YdocHost {
   listen(request: YdocListenRequest): Promise<void>
   /** Stop the listener on `port`; a port with none is ignored. */
   close(port: number): Promise<void>
+  /**
+   * The origins it adds to a listen request that names none (its app's own). Under
+   * `ENSO_YDOC_HOST=engine` the shim passes them to the engine's listener instead, which refuses
+   * every browser page without them (`LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS`, Note [The
+   * Engine-Hosted Listener Checks Origin] in `lib/java/ydoc-server`'s `Ydoc.java`).
+   */
+  allowedOrigins?(): readonly string[]
 }
 
 /**

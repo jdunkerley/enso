@@ -192,6 +192,7 @@ function ssrYdocHost(server: ViteDevServer): YdocHost {
         allowedOrigins: request.allowedOrigins ?? devServerOrigins(server),
       }),
     close: async (port) => (await get()).close(port),
+    allowedOrigins: () => devServerOrigins(server),
   }
 }
 

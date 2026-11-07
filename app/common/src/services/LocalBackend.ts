@@ -1178,6 +1178,21 @@ export class LocalBackend extends backend.Backend {
     return this.projectManager.secretsStatus()
   }
 
+  /** The bundled samples' states in `<projects>/Samples`. */
+  samplesStatus() {
+    return this.projectManager.samplesStatus()
+  }
+
+  /** Update the bundled sample `name`; its edits are kept in version history or as a copy. */
+  updateSample(name: string) {
+    return this.projectManager.updateSample(name)
+  }
+
+  /** Update every bundled sample that has an update. */
+  updateAllSamples() {
+    return this.projectManager.updateAllSamples()
+  }
+
   /** Only projects can carry labels locally. */
   override supportsLabels(assetType: backend.AssetType) {
     return assetType === backend.AssetType.project

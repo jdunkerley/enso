@@ -68,25 +68,29 @@ desktop binary (AppImage/DMG/exe + installer).
   release (see `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
   `tests/headless/ydocHostClient.test.ts` (against a fake child),
   `tests/headless/ydocHostServe.test.ts`.
-- Installs the bundled sample projects at start-up (`installSamples` in
-  `project-manager-shim`, called from `onStart`): `samples/` in this package is
-  shipped as `resources/samples` (`extraResources`) and copied to
-  `<projects>/Samples` only when that directory is missing. Nothing is
-  downloaded. `main` waits for the copy (at most 10 s, then loads anyway, and
-  logs a failed copy) before it loads the window, because on a fresh install the
-  dashboard opens `Samples/Getting_Started` once
-  (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in the GUI's
-  `router/dashboardGuards.ts`; `--no-welcome-project` turns it off, and the
-  Playwright fixture passes it unless a spec sets `welcomeProject`). The samples
-  are original and use synthetic data; each is a project that reads the shared
-  `samples/Data` folder (installed as `Samples/Data`) and writes to its own
-  `output/`. Their layout, house style, how to regenerate their stored node
+- Installs the bundled sample projects at start-up and keeps them up to date
+  (`LocalSamples.sync` in `project-manager-shim`, called from `onStart`; the
+  same `LocalSamples` serves the Drive's `samples/` routes through `server.ts`):
+  `samples/` in this package is shipped as `resources/samples`
+  (`extraResources`) and copied to `<projects>/Samples` when that directory is
+  missing; later starts update unedited samples and copy in new ones (see
+  `project-manager-shim/CLAUDE.md`, "Sample projects"). Nothing is downloaded.
+  `main` waits for the check (at most 10 s, then loads anyway, and logs a
+  failure) before it loads the window, because on a fresh install the dashboard
+  opens `Samples/Getting_Started` once (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in
+  the GUI's `router/dashboardGuards.ts`; `--no-welcome-project` turns it off,
+  and the Playwright fixture passes it unless a spec sets `welcomeProject`). The
+  samples are original and use synthetic data; each is a project that reads the
+  shared `samples/Data` folder (installed as `Samples/Data`) and writes to its
+  own `output/`. Their layout, house style, how to regenerate their stored node
   positions and how to run them are in `samples/CLAUDE.md` (checked by
   `tests/headless/samples.test.ts`). They must run on the current engine, so
   re-run them with `enso --run` after a standard-library change that touches
   `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
   Playwright spec adds its own `tests/fixtures/sample_bank_data.xlsx` to
-  `Samples/Data` (`addBankData`).
+  `Samples/Data` (`addBankData`). `tests/samples.spec.ts` checks that opening a
+  sample is not an edit, the manifest, and the "Update available" pill (outside
+  version control, so the edited copy is kept) against the real shim.
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).
@@ -386,10 +390,23 @@ the scope where the AI's new node would land — exactly the same scope the
 generated `body` will see, so every in-scope binding listed in the prompt is
 referenceable by name (and one call can stitch several of them together, e.g.
 `(cards.join leader_order on=["Set"]).column_names.to_json`). The server writes
-a temporary JSON config file (`<tmpdir>/enso-claude-mcp-<pid>-<uuid>.json`) and
-that path is passed to the agent as `--mcp-config <path> --strict-mcp-config`;
+a JSON config file (`<userData>/enso-claude-mcp-<pid>-<uuid>.json`) and that
+path is passed to the agent as `--mcp-config <path> --strict-mcp-config`;
 `--strict-mcp-config` makes the CLI ignore any project- or user-level MCP config
-so the session is hermetic. The temp file is deleted on shutdown.
+so the session is hermetic. The file is deleted on shutdown.
+
+**Who may call it (#616):** loopback is not enough, since any local process and
+any web page in the user's browser can reach the port, and during a turn the
+tool runs Enso code in the open project. The server makes a random bearer token
+at start-up and writes it into the config file
+(`headers: { Authorization: "Bearer …" }`, which the CLI sends on every
+request). The file lives in the app's `userData` (per-user on every OS; a
+Windows `TEMP` can be shared), is created new (`wx`) with mode `0600`, and is
+deleted first thing in `shutdown()`. A request without the token, or with
+another one, gets `401`; a request with any `Origin` header gets `403` (the CLI
+sends none). Both are checked before the MCP transport sees the request, and
+refusals are logged at the 1st, 10th, 100th, … only — Note [The AI MCP Server
+Checks Its Caller] in `aiMcpServer.ts`.
 
 **Text-only return contract:** the LS evaluates the expression `inFrame` and the
 engine's `VisualizationResult.visualizationResultToBytes` only knows how to

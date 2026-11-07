@@ -6,7 +6,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createProject } from '../localMetadata/__tests__/testUtils.js'
 import type { EngineLaunch, Runner } from '../projectService/ensoRunner.js'
 import { Path, UUID } from '../projectService/types.js'
-import { runLocalProjectByUuid } from '../runProjects.js'
+import { runLocalProjectByPath, runLocalProjectByUuid } from '../runProjects.js'
+import { findLiveRunMarker } from '../samples/runMarker.js'
 
 let root: string
 let launches: (EngineLaunch | undefined)[]
@@ -51,4 +52,19 @@ test('the run takes --engine-mode', async () => {
 test('without the option the run is native, from the default', async () => {
   await runLocalProjectByUuid(UUID('id-1'), Path(root), undefined, fakeRunner())
   expect(launches.at(-1)?.mode).toEqual({ mode: 'native', source: 'default' })
+})
+
+test('a run by path marks the project as running while it runs', async () => {
+  const project = path.join(root, 'P')
+  const markedDuringRun: boolean[] = []
+  const runner: Runner = {
+    ...fakeRunner(),
+    runProject: async () => {
+      markedDuringRun.push((await findLiveRunMarker(project)) != null)
+      return 0
+    },
+  }
+  expect(await runLocalProjectByPath(Path(project), undefined, runner)).toBe(0)
+  expect(markedDuringRun).toEqual([true])
+  expect((await findLiveRunMarker(project)) != null).toBe(false)
 })

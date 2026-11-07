@@ -2,8 +2,8 @@
 /**
  * @file The drive's toolbar: the buttons creating assets (a project, a folder, a datalink, which
  * opens the datalink dialog on the modal stack; a secret, in the desktop app), uploading and
- * downloading, the count of cut or copied assets, and the search bar. In Recent, only the count and
- * the search bar.
+ * downloading, Update All in the bundled `Samples` folder, the count of cut or copied assets, and
+ * the search bar. In Recent, only the count and the search bar.
  */
 import AssetSearchBar from '#/layouts/AssetSearchBar.vue'
 import { useNewDatalink } from '#/layouts/Drive/datalinkActions'
@@ -15,6 +15,7 @@ import {
   useUploadFiles,
 } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
+import { useUpdateAllButton } from '#/layouts/Drive/samples'
 import NewSecretToast from '$/secrets/NewSecretToast.vue'
 import UpsertSecretModal from '$/secrets/UpsertSecretModal.vue'
 import Button from '$/components/Button/Button.vue'
@@ -98,6 +99,7 @@ function openNewSecret() {
       ),
   })
 }
+const updateAll = useUpdateAllButton(() => currentDirectoryId.value)
 const newProject = useMutationCallback({
   mutationKey: ['newProject'],
   mutationFn: async () => await newProjectRaw({}, currentDirectoryId.value),
@@ -181,6 +183,17 @@ function downloadFiles() {
           @press="downloadFiles"
         />
       </div>
+      <Button
+        v-if="updateAll.isShown.value"
+        variant="outline"
+        icon="refresh"
+        :isDisabled="updateAll.isDisabled.value"
+        :tooltip="updateAll.tooltip.value"
+        testId="update-all-samples"
+        @press="updateAll.run"
+      >
+        {{ getText('updateAllSamples') }}
+      </Button>
     </ButtonGroup>
     <PasteStatus v-if="effectivePasteData" :pasteData="effectivePasteData" />
     <AssetSearchBar :backend="backend" :query="query" :setQuery="setQuery" />

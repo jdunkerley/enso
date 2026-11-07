@@ -28,7 +28,6 @@ const logger = console
 export const PACKAGE_METADATA_RELATIVE_PATH = 'package.yaml'
 export const PROJECT_METADATA_RELATIVE_PATH = '.enso/project.json'
 
-const SAMPLES_DIRECTORY_NAME = 'Samples'
 const BUNDLED_PROJECT_SUFFIX = '.enso-project'
 
 /** Metadata for a newly imported project. */
@@ -510,48 +509,4 @@ export function bumpMetadata(
     projectRoot: Path(projectRoot),
     parentDirectory,
   }
-}
-
-/**
- * Copy the sample projects bundled with the application into the `Samples` directory of the
- * projects directory, unless that directory already exists. Nothing is downloaded.
- *
- * The copy is made under a temporary name and renamed, so an interrupted copy leaves no
- * `Samples` directory behind to stop the next start from trying again.
- * @param bundledSamples - The directory holding the bundled samples (one sub-directory per
- * project), or `undefined` when the application has none.
- * @param projectsDirectory - The directory that stores Enso projects.
- * @returns `true` if the samples were installed by this call.
- */
-export async function installSamples(
-  bundledSamples: string | undefined,
-  projectsDirectory: string = getProjectsDirectory(),
-): Promise<boolean> {
-  const samplesDirectory = pathModule.join(projectsDirectory, SAMPLES_DIRECTORY_NAME)
-  if (fs.existsSync(samplesDirectory)) return false
-  if (bundledSamples == null || !fs.existsSync(bundledSamples)) {
-    logger.warn(`No bundled samples to install (looked in '${bundledSamples ?? '<unset>'}').`)
-    return false
-  }
-  logger.log(`Installing bundled samples into '${samplesDirectory}'.`)
-  const staging = pathModule.join(
-    projectsDirectory,
-    `.${SAMPLES_DIRECTORY_NAME}.${process.pid}.tmp`,
-  )
-  try {
-    await fs.promises.rm(staging, { recursive: true, force: true })
-    await fs.promises.mkdir(projectsDirectory, { recursive: true })
-    // The contributor notes in the source `samples/` (what a dev run copies from); the packaged
-    // app's `resources/samples` has none, through electron-builder's filter.
-    const notes = pathModule.resolve(bundledSamples, 'CLAUDE.md')
-    await fs.promises.cp(bundledSamples, staging, {
-      recursive: true,
-      filter: (source) => pathModule.resolve(source) !== notes,
-    })
-    await fs.promises.rename(staging, samplesDirectory)
-  } catch (error) {
-    await fs.promises.rm(staging, { recursive: true, force: true }).catch(() => {})
-    throw error
-  }
-  return true
 }

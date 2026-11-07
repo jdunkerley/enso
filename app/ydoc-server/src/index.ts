@@ -13,8 +13,10 @@ import { docName } from './auth'
 import { deserializeIdMap } from './serialization'
 import { setupGatewayClient, WSSharedDoc, YjsConnection, type YjsSocket } from './ydoc'
 
+export { documentRefusal, unknownDocument } from './handshake'
 export { InspectManager } from './inspect.js'
 export { NodeYdocHost, type YdocListenRequest } from './nodeHost'
+export { originAllowed } from './origin'
 export { deserializeIdMap, docName, setupGatewayClient, WSSharedDoc, YjsConnection, type YjsSocket }
 
 /** @param customLogger Optional external logger to use for all debug logs. */

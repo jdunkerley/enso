@@ -17,6 +17,12 @@ Web/Node API polyfills (WebSocket, timers, crypto, zlib, URL, …) that let the
   sets the session) only after, so a socket handed over on `upgrade` cannot send
   yet; a send there was silently lost (#214). Any new per-connection callback
   that needs the session must wait for `open` too.
+- `WebSocketServer`'s `verifyClient(url, origin)` runs from `onHttpUpgrade`, on
+  the executor, while Helidon's thread waits. Unlike `ws`'s boolean contract,
+  only `undefined` or `null` accepts; `{status, reason}` refuses with that
+  status before the `101` (thrown as a `RequestException`), and anything else
+  (`true`, `false`, a throw) refuses with `500` (Note [The Engine-Hosted
+  Listener Refuses Before The Upgrade], #614).
 
 ## Parser functions
 
