@@ -212,6 +212,26 @@ describe('gateTable', () => {
     expect(table).toContain('**1.40**')
     expect(table).not.toContain('(not a gate value)')
   })
+  test('marks which dispatches decide the gate and why the others are set aside', () => {
+    const rows = gateTable([
+      dispatch('1', 9, 9),
+      dispatch('2', 1.4, 1, 2),
+      dispatch('3', 1.4, 1),
+      dispatch('4', 1.5, 1),
+      dispatch('5', 1.3, 1),
+    ]).split(String.fromCharCode(10))
+    const row = (name: string) => rows.find((r) => r.startsWith(`| ${name} |`))
+    expect(row('1')).toContain('| set aside: older than the latest 3 complete dispatches |')
+    expect(row('2')).toContain('| set aside: incomplete')
+    for (const name of ['3', '4', '5']) expect(row(name)?.endsWith('| used |')).toBe(true)
+  })
+  test('without enough complete dispatches none is used, and the table says so', () => {
+    const rows = gateTable([dispatch('1', 1.4, 1), dispatch('2', 1.4, 1, 2)]).split(
+      String.fromCharCode(10),
+    )
+    expect(rows.find((r) => r.startsWith('| 1 |'))).toContain('not used: fewer than 3 complete')
+    expect(rows.find((r) => r.startsWith('| 2 |'))).toContain('set aside: incomplete')
+  })
   test('says when a dispatch has no report, and prints an infinite ratio as such', () => {
     const table = gateTable([
       { name: '1', welcome: {}, library: {} },
@@ -240,6 +260,16 @@ describe('gateDecision', () => {
     expect(gateDecision(four)).toBe('pass')
     // the oldest complete one (2.0) is not among the latest three
     expect(gateDecision([dispatch('0', 2, 1), ...three])).toBe('pass')
+  })
+  test('older complete outliers do not decide: only the latest three do', () => {
+    // Over all six dispatches the median would be (1.5 + 9) / 2 = 5.25, a fail.
+    const old = [dispatch('a', 9, 9), dispatch('b', 9, 9), dispatch('c', 9, 9)]
+    expect(gateDecision([...old, ...three])).toBe('pass')
+  })
+  test('older incomplete dispatches do not decide either, whatever their ratios', () => {
+    // Their ratios are over the fail limit; counted, the median would be (1.5 + 2) / 2.
+    const old = [dispatch('a', 2, 2, 2), dispatch('b', 2, 2, 2), dispatch('c', 2, 2, 2)]
+    expect(gateDecision([...old, ...three])).toBe('pass')
   })
   test('four dispatches with only two complete are insufficient', () => {
     expect(

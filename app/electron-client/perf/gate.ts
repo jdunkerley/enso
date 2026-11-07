@@ -197,6 +197,20 @@ export function selectGateDispatches(
   return complete.length < GATE_DISPATCHES ? undefined : complete.slice(-GATE_DISPATCHES)
 }
 
+/** Whether a dispatch decides the gate, and if not why not (the table's last column). */
+function useText(
+  d: DispatchRatios,
+  dispatches: readonly DispatchRatios[],
+  selected: readonly DispatchRatios[] | undefined,
+): string {
+  if (!isComplete(d.welcome.jvm) || !isComplete(d.library.jvm)) {
+    return 'set aside: incomplete (a jvm cell has too few launches or no report)'
+  }
+  if (selected == null) return `not used: fewer than ${GATE_DISPATCHES} complete dispatches`
+  if (selected.includes(d)) return 'used'
+  return `set aside: older than the latest ${GATE_DISPATCHES} complete dispatches`
+}
+
 /**
  * A Markdown table: a row per dispatch, then the gate value (median) of each column over the
  * dispatches {@link selectGateDispatches} picks. Without enough complete dispatches the last row
@@ -209,18 +223,19 @@ export function gateTable(dispatches: readonly DispatchRatios[]): string {
     ...ENGINES.map((e) => ({ title: `library ${e}`, pick: (d: DispatchRatios) => d.library[e] })),
   ]
   return [
-    `| Dispatch | ${columns.map((c) => c.title).join(' | ')} |`,
-    `| --- | ${columns.map(() => '---:').join(' | ')} |`,
+    `| Dispatch | ${columns.map((c) => c.title).join(' | ')} | Gate |`,
+    `| --- | ${columns.map(() => '---:').join(' | ')} | --- |`,
     ...dispatches.map(
-      (d) => `| ${d.name} | ${columns.map((c) => cellText(c.pick(d))).join(' | ')} |`,
+      (d) =>
+        `| ${d.name} | ${columns.map((c) => cellText(c.pick(d))).join(' | ')} | ${useText(d, dispatches, selected)} |`,
     ),
     selected == null ?
       `| Median of the ratios above (not a gate value) | ${columns
         .map((c) => ratioText(gateValue(dispatches.flatMap((d) => c.pick(d)?.ratio ?? []))))
-        .join(' | ')} |`
+        .join(' | ')} | |`
     : `| **Gate value** | ${columns
         .map((c) => `**${ratioText(gateValue(selected.flatMap((d) => c.pick(d)?.ratio ?? [])))}**`)
-        .join(' | ')} |`,
+        .join(' | ')} | |`,
   ].join('\n')
 }
 

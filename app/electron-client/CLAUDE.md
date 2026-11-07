@@ -938,12 +938,14 @@ without three dispatches whose Windows `jvm` cells are all complete it prints
 "insufficient data" instead of an outcome, and then the last table row is the
 plain median of the ratios, labelled "not a gate value". Given four or more
 dispatches it uses the latest three (the last directories given) whose Windows
-`jvm` cells are complete, and shows the others without using them. Only Windows
-has an outcome; Linux and macOS are informational. It refuses a dispatch whose
-`jvm` launches have no `shimAot` (made before PR K, with the harness's own
-cache). The `image` template's headline is both marks at once, and a report
-records it as `welcomeShown`, so `libraryShown` falls back to it, for a report
-of the `image` project only.
+`jvm` cells are complete, and shows the others without using them: the last
+column of the table says which rows were used and why each other was set aside
+(incomplete, or older than the latest three). Only Windows has an outcome; Linux
+and macOS are informational. It refuses a dispatch whose `jvm` launches have no
+`shimAot` (made before PR K, with the harness's own cache). The `image`
+template's headline is both marks at once, and a report records it as
+`welcomeShown`, so `libraryShown` falls back to it, for a report of the `image`
+project only.
 
 CI uploads `electron-out.log` and `hsperf/` too; by hand, `ide-packaging.yml`
 takes `open_perf_engines`, `open_perf_runs`, `open_perf_budget`,
