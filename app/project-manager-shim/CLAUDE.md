@@ -795,18 +795,30 @@ new one as an alias (`will not add file alias`). So (#641):
 - Only where `core.ignorecase` is set (asked once per repository), `commitIn`
   first drops from the index the project's files that are on disk under another
   case (`unstageCaseRenames`, using `spellingsOnDisk` from `src/fileCase.ts`),
-  so `add -A` adds them under the disk's spelling; and when the index then
-  stages a file of `HEAD` under another case (two staged names that differ only
-  in case, `hasCaseAliases`), it commits through a temporary index (`HEAD` plus
-  the index's entries for the paths, `commitStaged`) instead of
-  `git commit -- <paths>`. A change the user staged elsewhere is still left out.
+  so `add -A` adds them under the disk's spelling, then `add -f`s those
+  spellings (they were tracked, so one an ignore rule matches stays tracked);
+  and when the index then stages a file of `HEAD` under another case (two staged
+  names that differ only in case, `hasCaseAliases`), it commits through a
+  temporary index (`HEAD` plus the index's entries for the paths,
+  `commitStaged`) instead of `git commit -- <paths>`. A change the user staged
+  elsewhere is still left out.
 - `restore` (and `replaceAsVersion`'s put-back) restores the index, then the
   work tree (`restoreInPlace`), never `--staged --worktree` in one step: that
   wrote the renamed file under its old name and then deleted it as the new name,
   the same file. The files the version does not have are then `clean`ed by name
   (a case alias counts as tracked, so it is kept) with their emptied folders,
   and `matchSpelling` renames what the disk kept under another case to the
-  index's spelling, so the next commit records no rename the user never made.
+  index's spelling, so the next commit records no rename the user never made
+  (only where `core.ignorecase` is set). A left-over file git now ignores stays
+  on disk (no `-x`). If the work-tree step fails (a file held open on Windows),
+  the index is reset to `HEAD` for the project, so no half-restore stays staged.
+  `clean`'s paths go in batches of at most 24,000 characters (it has no
+  `--pathspec-from-file`).
+- Names are compared by one folding (`foldCase`, lower case): narrower than
+  NTFS's or APFS's, so a name it misses is at worst not matched, never matched
+  to another file; where several entries fold alike, the one the path opens
+  (same `dev`/`ino`) is taken. No Unicode normalisation (macOS NFD names are not
+  matched, which is safe).
 - The samples' update (`changedBundleFiles`) names a bundle file by the spelling
   it has on disk, so the check for changed files outside the saved version
   matches it to the file git tracks, and `replaceInPlace` renames a folder kept

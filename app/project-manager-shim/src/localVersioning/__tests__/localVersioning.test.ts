@@ -9,7 +9,7 @@ import {
   VERSIONING_TIMEOUT_MESSAGE,
   VERSIONING_TIMEOUT_MS,
 } from '../index.js'
-import { versioningFor, withTempRepo, writeFiles } from './testRepo.js'
+import { ignoresCaseIn, versioningFor, withTempRepo, writeFiles } from './testRepo.js'
 
 // Every test here runs dozens of real git processes; on Windows (process start-up, virus scanning
 // of the new files) a test takes 1–5 s unloaded, and vitest's default 5 s timeout failed several
@@ -1278,6 +1278,55 @@ describe('a restore that fails after saving', () => {
       const [latest] = await versioning.log(a)
       expect(latest?.comment).toBe('Saved before restore')
       expect(await versioning.fileAt(a, latest!.id, 'src/Main.enso')).toBe('unsaved\n')
+    })
+  })
+
+  test('of the work tree leaves no half-restore staged', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      const v1 = (await versioning.commit([a], 'one')).id!
+      await writeFiles(root, { 'A/src/Main.enso': 'unsaved\n', 'A/src/New.enso': 'new\n' })
+      const real = vi.mocked(runGit).getMockImplementation()!
+      // The index is restored, then the work tree fails (on Windows: a file held open).
+      vi.mocked(runGit).mockImplementation((cwd, args, options) =>
+        args[0] === 'restore' && args.includes('--worktree') ?
+          Promise.reject(new Error('locked'))
+        : real(cwd, args, options),
+      )
+      try {
+        await expect(versioning.restore(a, v1)).rejects.toThrow(/Saved before restore.*locked/)
+      } finally {
+        vi.mocked(runGit).mockImplementation(real)
+      }
+      expect(await git(root, 'diff', '--cached', '--name-only', '--', 'A')).toBe('')
+      expect(await fs.readFile(path.join(a, 'src', 'Main.enso'), 'utf8')).toBe('unsaved\n')
+    })
+  })
+})
+
+describe('a folder renamed by case only', () => {
+  test('keeps a file tracked despite an ignore rule tracked, under the new name', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      // `*.bak` is ignored (`init`); this one was tracked before the rule, or added by force.
+      await writeFiles(root, { 'A/Data/x.csv': 'x', 'A/Data/keep.bak': 'keep' })
+      await git(root, 'add', '-f', '--', 'A/Data/keep.bak')
+      await versioning.commit([a], 'one')
+      await fs.rename(path.join(a, 'Data'), path.join(a, 'data.tmp'))
+      await fs.rename(path.join(a, 'data.tmp'), path.join(a, 'data'))
+      await versioning.commit([a], 'two')
+      const tracked = (await git(root, 'ls-tree', '-r', '--name-only', 'HEAD', '--', 'A')).split(
+        '\n',
+      )
+      if (await ignoresCaseIn(root)) {
+        expect(tracked).toContain('A/data/keep.bak')
+        expect(tracked).toContain('A/data/x.csv')
+        expect(tracked).not.toContain('A/Data/x.csv')
+        expect(await git(root, 'status', '--porcelain', '--', 'A')).toBe('')
+      } else {
+        // A folder moved on a file system that respects case: an ignored file is not followed.
+        expect(tracked).toContain('A/data/x.csv')
+      }
     })
   })
 })
