@@ -41,7 +41,11 @@ function manifest(): SamplesManifest {
 }
 
 /** A projects folder in a versioned repository, with the samples installed and committed. */
-async function withVersionedSamples(body: () => Promise<void>) {
+async function withVersionedSamples(
+  body: () => Promise<void>,
+  /** More bundle files, relative path to content. */
+  bundleFiles: Readonly<Record<string, string>> = {},
+) {
   await withTempRepo(
     async (dir) => {
       root = path.dirname(dir)
@@ -53,6 +57,9 @@ async function withVersionedSamples(body: () => Promise<void>) {
       write(path.join(bundled, 'Two', 'package.yaml'), 'name: Two\n')
       write(path.join(bundled, 'Two', 'src', 'Main.enso'), 'main = 2\n')
       write(path.join(bundled, 'Data', 'rows.csv'), 'a,b\n')
+      for (const [file, content] of Object.entries(bundleFiles)) {
+        write(path.join(bundled, ...file.split('/')), content)
+      }
       versioning = versioningFor(projects)
       await versioning.init(projects)
       await git('config', 'user.name', 'Tester')
@@ -421,6 +428,87 @@ describe('updateAll', () => {
       })
       expect(read(path.join(samples, 'Two', 'src', 'Main.enso'))).toBe('main = 22\n')
       expect(read(path.join(samples, 'One', 'src', 'Main.enso'))).toBe('main = 100\n')
+    })
+  })
+})
+
+describe('a file the bundle renames by case only', () => {
+  /** Whether the file system under `dir` finds a file under another case (Windows, macOS). */
+  function ignoresCase(dir: string): boolean {
+    write(path.join(dir, 'CaseProbe.txt'), '')
+    const found = fs.existsSync(path.join(dir, 'caseprobe.txt'))
+    fs.rmSync(path.join(dir, 'CaseProbe.txt'))
+    return found
+  }
+  /** Ship `One/data/sales.csv`, with new content, where the bundle had `One/Data/Sales.csv`. */
+  function renameInBundle() {
+    fs.rmSync(path.join(bundled, 'One', 'Data'), { recursive: true })
+    write(path.join(bundled, 'One', 'data', 'sales.csv'), 'new\n')
+  }
+  const tracked = async (revision: string) =>
+    (await git('ls-tree', '-r', '--name-only', revision, '--', 'Samples/One')).split('\n')
+  const withRenamedFile = (body: () => Promise<void>) =>
+    withVersionedSamples(body, { 'One/Data/Sales.csv': 'old\n' })
+
+  test('an edited sample is updated as a version that records the bundle’s names', async () => {
+    await withRenamedFile(async () => {
+      const one = path.join(samples, 'One')
+      write(path.join(one, 'src', 'Main.enso'), 'main = 2\n')
+      // Ignored by git, so the folder it is in stays.
+      write(path.join(one, 'Data', 'mine.bak'), 'mine\n')
+      renameInBundle()
+      const local = new LocalSamples(bundled, projects)
+      expect(await local.update('One', { versioning, now: NOW })).toMatchObject({
+        versioned: ['One'],
+        kept: [],
+        failed: [],
+      })
+      expect(await subjects('Samples/One')).toEqual(['Updated sample One', BEFORE, 'Installed'])
+      expect(await tracked('HEAD')).toContain('Samples/One/data/sales.csv')
+      expect(await tracked('HEAD')).not.toContain('Samples/One/Data/Sales.csv')
+      expect(await git('show', 'HEAD~1:Samples/One/Data/Sales.csv')).toBe('old')
+      expect(await git('show', 'HEAD~1:Samples/One/src/Main.enso')).toBe('main = 2')
+      expect(read(path.join(one, 'data', 'sales.csv'))).toBe('new\n')
+      if (ignoresCase(root)) {
+        // One folder, under the bundle's name, with the user's file still in it.
+        expect(fs.readdirSync(one)).toContain('data')
+        expect(fs.readdirSync(one)).not.toContain('Data')
+        expect(fs.readdirSync(path.join(one, 'data')).sort()).toEqual(['mine.bak', 'sales.csv'])
+      } else {
+        expect(fs.readdirSync(path.join(one, 'Data'))).toEqual(['mine.bak'])
+        expect(fs.readdirSync(path.join(one, 'data'))).toEqual(['sales.csv'])
+      }
+      expect(await git('status', '--porcelain', '--', 'Samples/One')).toBe('')
+    })
+  })
+
+  test('an unedited sample updated at start-up is saved under the bundle’s names', async () => {
+    await withRenamedFile(async () => {
+      renameInBundle()
+      await new LocalSamples(bundled, projects).sync()
+      const one = path.join(samples, 'One')
+      expect(fs.readdirSync(path.join(one, 'data'))).toEqual(['sales.csv'])
+      await versioning.commit([one], 'Saved')
+      expect(await tracked('HEAD')).toContain('Samples/One/data/sales.csv')
+      expect(await tracked('HEAD')).not.toContain('Samples/One/Data/Sales.csv')
+      expect(await git('status', '--porcelain', '--', 'Samples/One')).toBe('')
+    })
+  })
+
+  test('the copy route installs, and a version then saves, the bundle’s names', async () => {
+    await withRenamedFile(async () => {
+      const one = path.join(samples, 'One')
+      write(path.join(one, 'src', 'Main.enso'), 'main = 2\n')
+      renameInBundle()
+      // No versioning given: the copy route.
+      expect(await new LocalSamples(bundled, projects).update('One', { now: NOW })).toMatchObject({
+        kept: ['One_edited_2026_11_06'],
+      })
+      expect(fs.readdirSync(one)).not.toContain('Data')
+      expect(fs.readdirSync(path.join(one, 'data'))).toEqual(['sales.csv'])
+      await versioning.commit([one], 'Saved')
+      expect(await tracked('HEAD')).toContain('Samples/One/data/sales.csv')
+      expect(await tracked('HEAD')).not.toContain('Samples/One/Data/Sales.csv')
     })
   })
 })

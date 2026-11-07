@@ -10,6 +10,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { CommandError } from '../childProcess/runCommand.js'
+import { foldCase, matchSpelling, spellingsOnDisk } from '../fileCase.js'
 import type { VersioningConsent } from './consent.js'
 import { findGit, findRepoRoot, identityArgs, repositoryKey, runGit } from './git.js'
 export { VersioningConsent, type VersioningConsentOptions } from './consent.js'
@@ -178,6 +179,230 @@ function excludeEnso(relative: string): string {
 /** The pathspecs of the project at `relative`, without its `.enso` folder. */
 function projectPathspecs(relative: string): readonly string[] {
   return [literal(relative), excludeEnso(relative)]
+}
+
+/**
+ * Run `commit` (a `git commit` without paths) on what the index stages for `pathspecs` and
+ * nothing else, through a temporary index: `HEAD` with those paths as the index has them. Unlike
+ * `git commit -- <paths>`, which adds the paths from the work tree again, it commits a rename by
+ * case that the index stages: where git ignores case, `git commit -- <paths>` keeps `HEAD`'s name
+ * for the file or refuses the new one as an alias of it. The index itself is not changed.
+ */
+async function commitStaged(
+  repoRoot: string,
+  pathspecs: readonly string[],
+  commit: readonly string[],
+): Promise<void> {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'enso-commit-'))
+  try {
+    const env = { GIT_INDEX_FILE: path.join(directory, 'index') }
+    const temporary = (args: readonly string[], input?: string) =>
+      runGit(repoRoot, args, { queueKey: repoRoot, env, ...(input != null ? { input } : {}) })
+    await temporary(['read-tree', 'HEAD'])
+    await temporary(['rm', '-r', '-q', '--cached', '--ignore-unmatch', '--', ...pathspecs])
+    const staged = await runGit(repoRoot, ['ls-files', '-s', '-z', '--', ...pathspecs], {
+      queueKey: repoRoot,
+    })
+    if (staged !== '') await temporary(['update-index', '-z', '--index-info'], staged)
+    await temporary(commit)
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+}
+
+/** Whether the repository at `repoRoot` ignores case (`core.ignorecase`, as on Windows and macOS). */
+async function ignoresCase(repoRoot: string): Promise<boolean> {
+  const known = ignoresCaseByRepository.get(repoRoot)
+  if (known != null) return known
+  try {
+    const ignores =
+      (
+        await runGit(repoRoot, ['config', '--bool', 'core.ignorecase'], { queueKey: repoRoot })
+      ).trim() === 'true'
+    ignoresCaseByRepository.set(repoRoot, ignores)
+    return ignores
+  } catch (error) {
+    // Exit code 1: not set, which is an answer. Anything else is asked again next time.
+    if (error instanceof CommandError && error.code === 1) {
+      ignoresCaseByRepository.set(repoRoot, false)
+    }
+    return false
+  }
+}
+
+/**
+ * {@link ignoresCase} of each repository git has answered for: git sets it once, when it creates
+ * one.
+ */
+const ignoresCaseByRepository = new Map<string, boolean>()
+
+/**
+ * In a repository that ignores case, drop from its index the files of the projects at `relatives`
+ * that are on disk under another case: git takes such a file for the one it tracks and keeps the
+ * index's name, so without this `add` would never record a rename by case only. Returns their
+ * spellings on disk, which the caller adds back with `add -f` after its `add -A`: they were
+ * tracked, and a file tracked despite an ignore rule must stay tracked under its new name.
+ *
+ * A failure here is logged, leaves the index as it was, and returns none. A failure of the
+ * caller's `add` after it leaves the old names out of the index (a staged deletion beside an
+ * untracked file, nothing lost); the next commit adds them again.
+ */
+async function unstageCaseRenames(
+  repoRoot: string,
+  relatives: readonly string[],
+): Promise<readonly string[]> {
+  const run = (args: readonly string[], input?: string) =>
+    runGit(repoRoot, args, { queueKey: repoRoot, ...(input != null ? { input } : {}) })
+  try {
+    const cached = (
+      await run(['ls-files', '-z', '--cached', '--', ...relatives.flatMap(projectPathspecs)])
+    )
+      .split('\0')
+      .filter((file) => file !== '')
+    const spellings = await spellingsOnDisk(repoRoot, cached)
+    const renamed = cached.filter((file) => {
+      const onDisk = spellings.get(file)
+      return onDisk != null && onDisk !== file
+    })
+    if (renamed.length === 0) return []
+    await run(
+      ['rm', '--cached', '-q', '--pathspec-from-file=-', '--pathspec-file-nul'],
+      renamed.map((file) => `${literal(file)}\0`).join(''),
+    )
+    return renamed.map((file) => spellings.get(file)!)
+  } catch (error) {
+    console.warn(`Could not record files renamed by case in ${repoRoot}:`, error)
+    return []
+  }
+}
+
+/**
+ * Whether two of `files` differ only in case: where git ignores case, a file of `HEAD` the index
+ * stages under another case, which `git commit -- <paths>` cannot commit (see
+ * {@link commitStaged}).
+ */
+function hasCaseAliases(files: readonly string[]): boolean {
+  const seen = new Set<string>()
+  for (const file of files) {
+    const folded = foldCase(file)
+    if (seen.has(folded)) return true
+    seen.add(folded)
+  }
+  return false
+}
+
+/** The files the index has for the project at `relative`, repository-relative. */
+async function indexedFiles(
+  run: (args: readonly string[]) => Promise<string>,
+  relative: string,
+): Promise<string[]> {
+  return (await run(['ls-files', '-z', '--cached', '--', ...projectPathspecs(relative)]))
+    .split('\0')
+    .filter((file) => file !== '')
+}
+
+/**
+ * Rename the files and folders of the project at `relative` (at `projectPath` on disk) that a file
+ * system ignoring case keeps under another case than the index's, to the index's spelling.
+ */
+async function matchIndexSpelling(
+  run: (args: readonly string[]) => Promise<string>,
+  repoRoot: string,
+  projectPath: string,
+  relative: string,
+): Promise<void> {
+  if (!(await ignoresCase(repoRoot))) return
+  const files = await indexedFiles(run, relative)
+  await matchSpelling(
+    projectPath,
+    files.map((file) => (relative === '.' ? file : file.slice(relative.length + 1))),
+  )
+}
+
+/**
+ * Put the project at `relative` (at `projectPath` on disk) back as it is in commit `source`: its
+ * index, then its work tree, then, with `removeLeftOver`, the files the index had that `source`
+ * has not (as `restore --staged --worktree` would delete them, and their emptied folders). Such a
+ * file that git now ignores is left on disk (`clean` without `-x`), so the project is then as in
+ * `source` but for it. When the work tree cannot be restored (a file another program holds open,
+ * on Windows), the index is reset to `HEAD` for the project before the error is thrown, so no
+ * half-restore stays staged.
+ *
+ * Not one `restore --staged --worktree`: where the file system ignores case, a file renamed by
+ * case since `source` is one file under both names, and git deletes it as the old name after
+ * writing it as the new one. Here it is written, kept (git sees it as tracked), and given back the
+ * index's spelling.
+ */
+async function restoreInPlace(
+  run: (args: readonly string[]) => Promise<string>,
+  repoRoot: string,
+  projectPath: string,
+  relative: string,
+  source: string,
+  options: { readonly removeLeftOver: boolean },
+): Promise<void> {
+  const pathspecs = projectPathspecs(relative)
+  const before = await indexedFiles(run, relative)
+  await run(['restore', `--source=${source}`, '--staged', '--', ...pathspecs])
+  try {
+    await run(['restore', `--source=${source}`, '--worktree', '--', ...pathspecs])
+  } catch (error) {
+    await run(['reset', '-q', '--', ...pathspecs]).catch((resetError: unknown) =>
+      console.error(`Failed to reset the index for ${relative}:`, resetError),
+    )
+    throw error
+  }
+  if (options.removeLeftOver) {
+    const restored = new Set(await indexedFiles(run, relative))
+    const leftOver = before.filter((file) => !restored.has(file))
+    // `clean` removes only untracked files: never one the index has under another case.
+    for (const batch of byLength(leftOver.map(literal), MAX_ARGUMENTS_LENGTH)) {
+      await run(['clean', '-f', '-q', '--', ...batch])
+    }
+    for (const file of leftOver) {
+      const inProject = relative === '.' ? file : file.slice(relative.length + 1)
+      await removeEmptyFolders(projectPath, path.join(projectPath, ...inProject.split('/')))
+    }
+  }
+  await matchIndexSpelling(run, repoRoot, projectPath, relative)
+}
+
+/**
+ * The most characters of paths given to one git command line: `clean` takes no
+ * `--pathspec-from-file`, and Windows limits a command line to 32,767 characters.
+ */
+const MAX_ARGUMENTS_LENGTH = 24_000
+
+/** `items` in order, in batches of at most `maxLength` characters (an item longer is alone). */
+function byLength(items: readonly string[], maxLength: number): string[][] {
+  const batches: string[][] = []
+  let batch: string[] = []
+  let length = 0
+  for (const item of items) {
+    if (batch.length > 0 && length + item.length + 1 > maxLength) {
+      batches.push(batch)
+      batch = []
+      length = 0
+    }
+    batch.push(item)
+    length += item.length + 1
+  }
+  if (batch.length > 0) batches.push(batch)
+  return batches
+}
+
+/** Remove the folders above `file` up to `root` (excluded) while they are empty. */
+async function removeEmptyFolders(root: string, file: string): Promise<void> {
+  const top = path.resolve(root)
+  let folder = path.dirname(path.resolve(file))
+  while (folder.startsWith(top + path.sep)) {
+    try {
+      await fs.rmdir(folder)
+    } catch {
+      return
+    }
+    folder = path.dirname(folder)
+  }
 }
 
 /** `p` relative to `repoRoot` (resolving links first), with `/` separators; `.` for the root. */
@@ -575,8 +800,17 @@ export class LocalVersioning {
         if ((await exists(paths[i]!)) || (await isTracked(relative))) toAdd.push(relative)
       }
       if (toAdd.length === 0) return { id: null }
+      const ignoreCase = await ignoresCase(repoRoot)
+      const renamed = ignoreCase ? await unstageCaseRenames(repoRoot, toAdd) : []
       // `add` rejects an exclude pathspec that matches an ignored folder, so unstage `.enso` afterwards.
       await run(['add', '-A', '--', ...toAdd.map(literal)])
+      // Tracked before, so tracked still, even where an ignore rule matches them.
+      if (renamed.length > 0) {
+        await runGit(repoRoot, ['add', '-f', '--pathspec-from-file=-', '--pathspec-file-nul'], {
+          queueKey: repoRoot,
+          input: renamed.map((file) => `${literal(file)}\0`).join(''),
+        })
+      }
       await run([
         'reset',
         '--quiet',
@@ -587,15 +821,13 @@ export class LocalVersioning {
       for (const relative of toAdd) if (await isTracked(relative)) relatives.push(relative)
       if (relatives.length === 0) return { id: null }
       const pathspecs = [...relatives.map(literal), ...relatives.map(excludeEnso)]
-      const unchanged = await run(['diff', '--cached', '--quiet', '--', ...pathspecs]).then(
-        () => true,
-        (error: unknown) => {
-          if (error instanceof CommandError && error.code === 1) return false
-          throw error
-        },
+      const staged = (
+        await run(['diff', '--cached', '--name-only', '--no-renames', '-z', '--', ...pathspecs])
       )
-      if (unchanged) return { id: null }
-      await run([
+        .split('\0')
+        .filter((file) => file !== '')
+      if (staged.length === 0) return { id: null }
+      const commit = [
         ...(await identityArgs(repoRoot)),
         ...AUTOMATIC,
         'commit',
@@ -603,9 +835,10 @@ export class LocalVersioning {
         '-m',
         message,
         ...(trailers.length > 0 ? ['-m', trailers.join('\n')] : []),
-        '--',
-        ...pathspecs,
-      ])
+      ]
+      if (ignoreCase && hasHead && hasCaseAliases(staged))
+        await commitStaged(repoRoot, pathspecs, commit)
+      else await run([...commit, '--', ...pathspecs])
       // Still under the lock, so HEAD is this commit.
       return { id: (await run(['rev-parse', 'HEAD'])).trim() }
     } catch (error) {
@@ -844,14 +1077,7 @@ export class LocalVersioning {
       }
       try {
         if (!moved) {
-          await run([
-            'restore',
-            `--source=${id}`,
-            '--staged',
-            '--worktree',
-            '--',
-            ...projectPathspecs(relative),
-          ])
+          await restoreInPlace(run, repoRoot, projectPath, relative, id, { removeLeftOver: true })
         } else {
           // The version is from before a move: its files were at another path. Everything at the
           // current path is tracked (the commit above), so drop it from the index, read the old
@@ -869,6 +1095,7 @@ export class LocalVersioning {
             await run(['read-tree', `--prefix=${relative}/`, source])
             await run(['restore', '--worktree', '--', ...projectPathspecs(relative)])
             await run(['clean', '-f', '-d', '-q', '--', ...projectPathspecs(relative)])
+            await matchIndexSpelling(run, repoRoot, projectPath, relative)
           } catch (error) {
             // Put the index back as the commit above left it, so no deletion stays staged.
             await run(['reset', '-q', '--', ...projectPathspecs(relative)]).catch(
@@ -1041,14 +1268,9 @@ export class LocalVersioning {
         return { before, after: after.id }
       } catch (error) {
         try {
-          await run([
-            'restore',
-            `--source=${before}`,
-            '--staged',
-            '--worktree',
-            '--',
-            ...projectPathspecs(relative),
-          ])
+          await restoreInPlace(run, repoRoot, projectPath, relative, before, {
+            removeLeftOver: false,
+          })
           // Only what `replace` may have written, when known: an untracked file the user saved
           // meanwhile stays.
           const cleaned =

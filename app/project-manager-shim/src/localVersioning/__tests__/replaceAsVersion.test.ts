@@ -252,3 +252,65 @@ describe('ignoredPaths', () => {
     })
   })
 })
+
+describe('replaceAsVersion of a rename by case only', () => {
+  /** Rename `P/Data/Sales.csv` to `P/data/sales.csv`, with new content, as an update does. */
+  async function renameByCase(project: string) {
+    await fs.rm(path.join(project, 'Data'), { recursive: true })
+    await writeFiles(project, { 'data/sales.csv': 'new\n' })
+  }
+  const withSales = (
+    body: (root: string, project: string, versioning: LocalVersioning) => Promise<void>,
+  ) =>
+    withProject(async (root, project, versioning) => {
+      await writeFiles(root, { 'P/Data/Sales.csv': 'old\n' })
+      await git(root, 'add', '-A')
+      await git(root, 'commit', '-q', '-m', 'Sales')
+      await writeFiles(root, { 'P/src/Main.enso': 'main = 2\n' })
+      await body(root, project, versioning)
+    })
+
+  test('is saved as a version under the new names', async () => {
+    await withSales(async (root, project, versioning) => {
+      await versioning.replaceAsVersion(project, () => renameByCase(project), MESSAGES)
+      const tracked = async (revision: string) =>
+        (await git(root, 'ls-tree', '-r', '--name-only', revision, '--', 'P')).split('\n')
+      expect(await tracked('HEAD')).toEqual([
+        'P/data/sales.csv',
+        'P/package.yaml',
+        'P/src/Main.enso',
+      ])
+      expect(await tracked('HEAD~1')).toEqual([
+        'P/Data/Sales.csv',
+        'P/package.yaml',
+        'P/src/Main.enso',
+      ])
+      expect(await git(root, 'show', 'HEAD:P/data/sales.csv')).toBe('new')
+      expect(await git(root, 'status', '--porcelain', '--', 'P')).toBe('')
+    })
+  })
+
+  test('that fails after it is staged is put back under the old names, nothing lost', async () => {
+    await withSales(async (root, project, versioning) => {
+      // The branch cannot be moved, so the commit fails once the index has the rename.
+      const lock = path.join(root, '.git', 'refs', 'heads', 'main.lock')
+      await expect(
+        versioning.replaceAsVersion(
+          project,
+          async () => {
+            await renameByCase(project)
+            await fs.writeFile(lock, '')
+          },
+          MESSAGES,
+        ),
+      ).rejects.toThrow(/saved as the version 'Before'/)
+      await fs.rm(lock)
+      expect(await fs.readdir(project)).toContain('Data')
+      expect(await fs.readdir(project)).not.toContain('data')
+      expect(await fs.readdir(path.join(project, 'Data'))).toEqual(['Sales.csv'])
+      expect(await fs.readFile(path.join(project, 'Data', 'Sales.csv'), 'utf8')).toBe('old\n')
+      expect(await fs.readFile(path.join(project, 'src', 'Main.enso'), 'utf8')).toBe('main = 2\n')
+      expect(await git(root, 'status', '--porcelain', '--', 'P')).toBe('')
+    })
+  })
+})

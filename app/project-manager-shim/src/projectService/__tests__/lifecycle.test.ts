@@ -94,7 +94,9 @@ describe('ProjectService lifecycle notifications', () => {
   })
 })
 
-describe('versioning on close', () => {
+// Real git, dozens of processes per test: vitest's default 5 s is not enough on a loaded Windows
+// machine (see `localVersioning.test.ts`, #395).
+describe('versioning on close', { timeout: 30_000 }, () => {
   const git = (cwd: string, ...args: string[]) =>
     runCommand('git', args, { cwd }).then(({ stdout }) => stdout.trim())
   let versioning: LocalVersioning
