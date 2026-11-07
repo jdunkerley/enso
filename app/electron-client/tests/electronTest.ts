@@ -42,6 +42,13 @@ export const test = base.extend<{
    * `test.use({ aiEnabled: true })`.
    */
   aiEnabled: boolean
+  /**
+   * Whether the app opens the Getting_Started sample, as a fresh install does. Default `false`:
+   * every spec starts with a fresh projects directory, and the fixture passes
+   * `--no-welcome-project` so that it does not pay for a project open and close. The spec that
+   * checks the fresh-install landing overrides it with `test.use({ welcomeProject: true })`.
+   */
+  welcomeProject: boolean
   app: ElectronApplication
   page: Page
 }>({
@@ -54,10 +61,14 @@ export const test = base.extend<{
     await use(projectsDir)
   },
   aiEnabled: [false, { option: true }],
+  welcomeProject: [false, { option: true }],
 
   /** Setup for all tests: Create an electron-based app instance. */
-  app: async function ({ projectsDir, testRunId, aiEnabled }, use) {
-    const args = process.env.ENSO_TEST_APP_ARGS?.split(',') ?? []
+  app: async function ({ projectsDir, testRunId, aiEnabled, welcomeProject }, use) {
+    const args = [
+      ...(process.env.ENSO_TEST_APP_ARGS?.split(',') ?? []),
+      ...(welcomeProject ? [] : ['--no-welcome-project']),
+    ]
     const app = await _electron.launch({
       executablePath: electronExecutablePath,
       args,
@@ -80,12 +91,16 @@ export const test = base.extend<{
   },
 })
 
-/** Wait until the app has loaded: the drive, or the welcome project's tab on a first start. */
+/**
+ * The tab of the project a fresh install opens: the bundled `Getting_Started` sample
+ * (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in the GUI's `router/dashboardGuards.ts`). Only a spec
+ * that sets `welcomeProject` sees it.
+ */
+export const WELCOME_PROJECT_TAB = 'Getting_Started'
+
+/** Wait until the app has loaded: the drive (the fixture turns the welcome project off). */
 export async function waitForDashboard(page: Page) {
-  const dashboardReady = page
-    .getByTestId('drive-view')
-    .or(page.getByRole('tab', { name: 'Getting Started with Enso Analytics' }))
-  await expect(dashboardReady.first()).toBeVisible({ timeout: 60000 })
+  await expect(page.getByTestId('drive-view')).toBeVisible({ timeout: 60000 })
 }
 
 /**
@@ -99,7 +114,13 @@ export async function waitForDashboard(page: Page) {
  * standard library is AOT-compiled into the packaged engine, so there is no IR cache to warm.
  * Specs that do not need the visualization should pass `waitForVisualization: false`.
  */
-const FIRST_PROJECT_TIMEOUT = 90000
+export const FIRST_PROJECT_TIMEOUT = 90000
+
+/**
+ * How long to wait for a project the app opens by itself (the welcome project) to show its first
+ * visualization: the project open and a cold Language Server's first execution, with headroom.
+ */
+export const COLD_PROJECT_TIMEOUT = 180_000
 
 /**
  * Create a new Enso project, and wait until its graph is shown and, unless `waitForVisualization`
@@ -117,23 +138,23 @@ export async function createNewProject(
   await expect(tableViz).toContainText('Welcome To Enso!', { timeout: FIRST_PROJECT_TIMEOUT })
 }
 
-/** If welcome project is to be opened, navigate back to the dashboard. */
+/**
+ * Close the welcome project's tab, if it is open. The fixture turns the welcome project off, so
+ * this normally finds nothing: it does not wait for the tab to appear.
+ */
 export async function closeWelcome(page: Page) {
-  const welcomeProjectTab = page.getByRole('tab', { name: 'Getting Started with Enso Analytics' })
-  const loadingIndicator = welcomeProjectTab.locator('.LoadingSpinner')
-  await Promise.race([
-    welcomeProjectTab
-      .waitFor({ state: 'visible', timeout: 0 })
-      .then(() => loadingIndicator.waitFor({ state: 'hidden' })),
-    page.waitForTimeout(3000),
-  ])
-  if (await welcomeProjectTab.isVisible()) {
-    await answerRepositoryPrompt(
-      page,
-      () => welcomeProjectTab.locator('.CloseButton').click(),
-      () => expect(welcomeProjectTab).toHaveCount(0, { timeout: 30_000 }),
-    )
-  }
+  const welcomeProjectTab = page.getByRole('tab', { name: WELCOME_PROJECT_TAB, exact: true })
+  if (!(await welcomeProjectTab.isVisible())) return
+  await expect(welcomeProjectTab.locator('.LoadingSpinner')).toHaveCount(0, {
+    timeout: COLD_PROJECT_TIMEOUT,
+  })
+  await answerRepositoryPrompt(
+    page,
+    // The close button is the tab's sibling (`SelectableTab.vue`), hidden from the a11y tree.
+    () =>
+      page.locator('.SelectableTab', { has: welcomeProjectTab }).locator('.CloseButton').click(),
+    () => expect(welcomeProjectTab).toHaveCount(0, { timeout: 30_000 }),
+  )
 }
 
 /**

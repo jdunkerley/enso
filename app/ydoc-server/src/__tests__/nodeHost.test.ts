@@ -164,10 +164,12 @@ test('a data parameter opens the binary channel', async () => {
   await vi.waitFor(() => expect(ls.urls).toContain('/channel/binary?token=t'))
 })
 
-test('a socket without a document is closed', async () => {
+test('a socket without a document is refused', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   const bad = new WebSocket(`ws://127.0.0.1:${port}/nowhere`)
   guis.push(bad)
-  await closed(bad)
+  await expect(new Promise((_, reject) => bad.once('error', reject))).rejects.toThrow('400')
+  warn.mockRestore()
 })
 
 test('the LS going away closes the GUI sockets', async () => {
@@ -350,4 +352,77 @@ describe('Origin of a GUI socket (#596)', () => {
     await expect(handshakeStatus(undefined)).resolves.toBe(101)
     warn.mockRestore()
   })
+})
+
+describe('a socket for a document the session does not hold (#601)', () => {
+  /** The status a handshake to `doc` is answered with: 101 when it is upgraded. */
+  function handshakeStatus(doc: string, query = `ls=ws://127.0.0.1:${ls.port}`): Promise<number> {
+    const gui = new WebSocket(`ws://127.0.0.1:${port}/project/${doc}?${query}`)
+    guis.push(gui)
+    return new Promise((resolve, reject) => {
+      gui.once('upgrade', (response) => resolve(response.statusCode ?? 0))
+      gui.once('unexpected-response', (_request, response) => resolve(response.statusCode ?? 0))
+      gui.once('error', reject)
+    })
+  }
+
+  test('is refused with 404 before the upgrade, so y-websocket backs off', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    // No session yet: a module doc cannot be one it lists, and none is started for it.
+    await expect(handshakeStatus('00000000-0000-0000-0000-000000000001')).resolves.toBe(404)
+    expect(LanguageServerSession.sessions.size).toBe(0)
+    // A session that does not hold it.
+    await firstMessage(connectGui('index'))
+    await expect(handshakeStatus('00000000-0000-0000-0000-000000000001')).resolves.toBe(404)
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('not found in language server session'),
+    )
+    warn.mockRestore()
+  })
+
+  test('a document the session holds is upgraded', async () => {
+    await firstMessage(connectGui('index'))
+    const session = LanguageServerSession.sessions.get(`ws://127.0.0.1:${ls.port}`)!
+    // The visualization subdoc is held from the session's start.
+    const held = [...session.docs.keys()].find((guid) => guid !== 'index')!
+    await expect(handshakeStatus(held)).resolves.toBe(101)
+  })
+
+  test('no document or no ls= parameter is refused with 400', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await expect(handshakeStatus('index', 'data=x')).resolves.toBe(400)
+    await expect(handshakeStatus('index', 'ls=')).resolves.toBe(400)
+    await expect(handshakeStatus('not a doc!')).resolves.toBe(400)
+    warn.mockRestore()
+  })
+})
+
+test('a request target that is not a path is refused with 400, and the host stays up', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  for (const target of ['//', 'http://']) {
+    const status = await new Promise<string>((resolve, reject) => {
+      const socket = net.connect(port, '127.0.0.1', () =>
+        socket.write(
+          [
+            `GET ${target} HTTP/1.1`,
+            `Host: 127.0.0.1:${port}`,
+            'Upgrade: websocket',
+            'Connection: Upgrade',
+            'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+            'Sec-WebSocket-Version: 13',
+            '',
+            '',
+          ].join('\r\n'),
+        ),
+      )
+      socket.once('data', (data) => {
+        resolve(String(data).split('\r\n')[0]!)
+        socket.destroy()
+      })
+      socket.once('error', reject)
+    })
+    expect(status, target).toMatch(/^HTTP\/1\.1 400/)
+  }
+  warn.mockRestore()
+  await firstMessage(connectGui('index'))
 })

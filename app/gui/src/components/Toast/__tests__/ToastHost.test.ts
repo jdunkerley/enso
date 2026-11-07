@@ -31,13 +31,23 @@ function setup() {
 }
 
 describe('ToastHost', () => {
-  test('renders a toast with its message as an alert, an icon and a close button', async () => {
+  test('announces errors and warnings as alerts, the other toasts politely', async () => {
+    const { store, toastElements } = setup()
+    store.show('Broken', { type: 'error' })
+    store.show('Careful', { type: 'warning' })
+    store.show('Working', { isLoading: true })
+    await nextTick()
+    const roles = toastElements().map((t) => t.querySelector('.body')?.getAttribute('role'))
+    expect(roles).toEqual(['alert', 'alert', 'status'])
+  })
+
+  test('renders a toast with its message as a status, an icon and a close button', async () => {
     const { store, toastElements } = setup()
     store.show('Saved', { type: 'success' })
     await nextTick()
     const [toast] = toastElements()
     expect(toast).toBeDefined()
-    expect(toast!.querySelector('[role="alert"]')?.textContent).toBe('Saved')
+    expect(toast!.querySelector('[role="status"]')?.textContent).toBe('Saved')
     expect(toast!.querySelector('svg.icon-success')).not.toBeNull()
     expect(toast!.querySelector('button[aria-label="close"]')).not.toBeNull()
     expect(toast!.classList).toContain('bg-selected-frame')
@@ -62,7 +72,7 @@ describe('ToastHost', () => {
     const [toast] = toastElements()
     toast!.querySelector('button')!.click()
     await nextTick()
-    expect(toast!.querySelector('[role="alert"]')).toBeNull()
+    expect(toast!.querySelector('[role="status"]')).toBeNull()
     expect(toast!.className).toContain('slideOut-top-center')
     animationEnd(toast!)
     await vi.runAllTimersAsync()
@@ -85,7 +95,7 @@ describe('ToastHost', () => {
     expect(store.isActive('a')).toBe(true)
     expect(toastElements()).toHaveLength(1)
     expect(toastElements()[0]!.className).not.toContain('slideOut')
-    expect(toastElements()[0]!.querySelector('[role="alert"]')?.textContent).toBe('Again')
+    expect(toastElements()[0]!.querySelector('[role="status"]')?.textContent).toBe('Again')
   })
 
   test('a toast shown again while it collapses stays, at its full height (#600)', async () => {

@@ -1,10 +1,14 @@
-/** @file A series of tests designed for testing 'Getting Started with Enso Analytics'. */
+/**
+ * @file The first start: a fresh install opens the bundled Getting_Started sample. Then the
+ * exercises of 'Getting Started with Enso Analytics', each in a new project.
+ */
 
 import { expect } from 'playwright/test'
 import {
   addBankData,
   addFirstElementToWidgetVector,
   closeWelcome,
+  COLD_PROJECT_TIMEOUT,
   createNewProject,
   fillWidgetText,
   openComponentBrowser,
@@ -17,9 +21,45 @@ import {
   test,
   visualizeData,
   waitForDashboard,
+  WELCOME_PROJECT_TAB,
 } from './electronTest'
 
 test.skip(SKIP_ON_WINDOWS_CI, SKIP_ON_WINDOWS_CI_REASON)
+
+/** The nodes of `samples/Getting_Started`, in order. */
+const GETTING_STARTED_NODES = [
+  'orders_file',
+  'orders',
+  'books',
+  'month',
+  'dated',
+  'totals',
+  'monthly',
+]
+
+test.describe('fresh install', () => {
+  // The only spec that lets the app open the welcome project (the fixture turns it off).
+  test.use({ welcomeProject: true })
+
+  // A fresh install (every spec has a fresh projects directory) opens the Getting_Started
+  // sample: its graph, and the last node's stored chart of the 12 monthly totals. The open has a
+  // cold Language Server, hence the long waits.
+  test('A fresh install opens the Getting Started sample', async ({ page }) => {
+    test.setTimeout(COLD_PROJECT_TIMEOUT + 60_000)
+    const tab = page.getByRole('tab', { name: WELCOME_PROJECT_TAB, exact: true })
+    await expect(tab).toBeVisible({ timeout: 60_000 })
+    const nodes = page.locator('.GraphNode')
+    await expect(nodes.first()).toBeVisible({ timeout: COLD_PROJECT_TIMEOUT })
+    for (const binding of GETTING_STARTED_NODES) {
+      const node = nodes.filter({
+        has: page.locator('.binding').getByText(binding, { exact: true }),
+      })
+      await expect(node).toHaveCount(1)
+    }
+    const chart = page.locator('.ScatterplotVisualization')
+    await expect(chart.locator('.scatterPoint')).toHaveCount(12, { timeout: COLD_PROJECT_TIMEOUT })
+  })
+})
 
 // First excercise in Enso Analytics 101
 test('Exercise 1', async ({ page, projectsDir }) => {

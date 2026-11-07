@@ -72,14 +72,21 @@ desktop binary (AppImage/DMG/exe + installer).
   `project-manager-shim`, called from `onStart`): `samples/` in this package is
   shipped as `resources/samples` (`extraResources`) and copied to
   `<projects>/Samples` only when that directory is missing. Nothing is
-  downloaded. The samples are original and use synthetic data; each is a project
-  (`package.yaml`, `src/Main.enso`, `data/`; `Main.enso` must
-  `import Standard.Visualization`, or the Language Server cannot run the nodes'
-  visualizations and widget queries: `tests/headless/samples.test.ts`) that must
-  run on the current engine, so re-run them with `enso --run` after a
-  standard-library change that touches `Data.read`, the table API, or
-  `Standard.SQLite`. The Getting Started Playwright spec adds its own
-  `tests/fixtures/sample_bank_data.xlsx` to `Samples/Data` (`addBankData`).
+  downloaded. `main` waits for the copy (at most 10 s, then loads anyway, and
+  logs a failed copy) before it loads the window, because on a fresh install the
+  dashboard opens `Samples/Getting_Started` once
+  (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in the GUI's
+  `router/dashboardGuards.ts`; `--no-welcome-project` turns it off, and the
+  Playwright fixture passes it unless a spec sets `welcomeProject`). The samples
+  are original and use synthetic data; each is a project that reads the shared
+  `samples/Data` folder (installed as `Samples/Data`) and writes to its own
+  `output/`. Their layout, house style, how to regenerate their stored node
+  positions and how to run them are in `samples/CLAUDE.md` (checked by
+  `tests/headless/samples.test.ts`). They must run on the current engine, so
+  re-run them with `enso --run` after a standard-library change that touches
+  `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
+  Playwright spec adds its own `tests/fixtures/sample_bank_data.xlsx` to
+  `Samples/Data` (`addBankData`).
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).
@@ -745,7 +752,8 @@ Two layers, same directory, different runners — controlled by the `testIgnore`
 rule in `playwright.config.ts`:
 
 - `tests/headless/*.test.ts` — Vitest unit tests for main-process code. No
-  Electron, no DOM. Fast. Run with `corepack pnpm vitest --run tests/headless`.
+  Electron, no DOM. Fast. Run with `corepack pnpm run test:unit` (what CI runs:
+  the GUI checks' "Unit Tests" step, `ci:unit-test`).
 - `tests/*.spec.ts` — Playwright end-to-end tests that launch the packaged
   Electron binary from `dist/ide/` and drive the app from a real user's
   perspective (dashboard → project → graph editor). `electronTest.ts` extends

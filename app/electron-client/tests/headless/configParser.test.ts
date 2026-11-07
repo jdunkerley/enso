@@ -1,5 +1,10 @@
 import { engineModeOption, parseArgs, withoutDeepLink, withoutInstallerFlags } from '@/configParser'
-import { defaultOptions, PASS_TO_WEB } from 'enso-common/src/options'
+import {
+  buildWebAppURLSearchParamsFromArgs,
+  defaultOptions,
+  parseWebAppOptionsFromSearchParams,
+  PASS_TO_WEB,
+} from 'enso-common/src/options'
 import { expect, test } from 'vitest'
 
 test('there are no authentication options', () => {
@@ -41,4 +46,16 @@ test('--engine-mode, and --jvm as its alias', () => {
   expect(engineModeOption(parseArgs(['--jvm', '--engine-mode', 'native']))).toBe('native')
   expect(engineModeOption(parseArgs([]))).toBeUndefined()
   expect(() => parseArgs(['--engine-mode', 'graal'])).toThrow()
+})
+
+test('--no-welcome-project reaches the web app, and the default opens the welcome project', () => {
+  expect(parseArgs([]).startup.welcomeProject).toBe(true)
+  const args = parseArgs(['--no-welcome-project'])
+  expect(args.startup.welcomeProject).toBe(false)
+  const params = buildWebAppURLSearchParamsFromArgs(args)
+  expect(params.get('startup.welcomeProject')).toBe('false')
+  expect(parseWebAppOptionsFromSearchParams(params).startup.welcomeProject).toBe(false)
+  expect(buildWebAppURLSearchParamsFromArgs(parseArgs([])).has('startup.welcomeProject')).toBe(
+    false,
+  )
 })

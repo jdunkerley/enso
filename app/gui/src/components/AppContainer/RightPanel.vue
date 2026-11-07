@@ -118,6 +118,7 @@ registerHandlers({
           <PanelContents
             v-slot="{ toolbarElement }"
             v-model:fullscreen="data.fullscreen"
+            side="right"
             :containerStyle="CONTAINER_STYLE"
           >
             <ErrorBoundary onlyRenderErrors :resetKeys="[data.displayedTab]">

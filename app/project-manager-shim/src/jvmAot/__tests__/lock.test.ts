@@ -320,3 +320,76 @@ test("no takeover lands between a release's token check and its delete (#603 ite
     await fs.rm(root, { recursive: true, force: true })
   }
 })
+
+test('a lock and a takeover file are linked into place, never created in place', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    const linked: { target: string; whole: boolean; absent: boolean }[] = []
+    const link = async (existing: string, target: string) => {
+      const content = await fs.readFile(existing, 'utf8')
+      const absent = await fs.access(target).then(
+        () => false,
+        () => true,
+      )
+      linked.push({ target: path.basename(target), whole: /^\d+ \S+$/.test(content), absent })
+      await fs.link(existing, target)
+    }
+    const release = await acquireTrainingLock(root, { link })
+    expect(release).toBeDefined()
+    // Complete when it appears, and the name was free: a plain `wx` create would never call this.
+    expect(linked).toEqual([{ target: 'train.lock', whole: true, absent: true }])
+    await release!()
+    // The release takes the takeover file, linked the same way.
+    expect(linked.map((entry) => entry.target)).toEqual(['train.lock', 'train.lock.takeover'])
+    expect(linked.every((entry) => entry.whole && entry.absent)).toBe(true)
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test('where links are refused, an empty takeover file replaced while it was judged stale is not removed (review of #610, N2b)', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    await deadLock(root)
+    const takeover = path.join(root, 'train.lock.takeover')
+    // A crashed taker's: empty, and older than the 5 s of a write in progress.
+    await fs.writeFile(takeover, '')
+    const old = new Date(Date.now() - 20_000)
+    await fs.utimes(takeover, old, old)
+    const refuse = async () => {
+      throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' })
+    }
+    const result = await acquireTrainingLock(root, {
+      link: refuse,
+      // Another taker, in the same moment, replaces it with its own, empty for a moment.
+      beforeStaleTakeoverRemoval: async () => {
+        await fs.rm(takeover)
+        await fs.writeFile(takeover, '')
+      },
+    })
+    expect(result).toBeUndefined()
+    expect(await fs.readFile(takeover, 'utf8')).toBe('')
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})
+
+test("a takeover deletes only the lock's own old files, not other files with .new- in the name (review of #610, N4)", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aot-lock-'))
+  try {
+    await deadLock(root)
+    const ours = path.join(root, 'train.lock.new-1-x')
+    const other = path.join(root, 'cache.new-1-x')
+    await fs.writeFile(ours, '1 x')
+    await fs.writeFile(other, 'data')
+    const old = new Date(Date.now() - STALE_LOCK_MS - 60_000)
+    await fs.utimes(ours, old, old)
+    await fs.utimes(other, old, old)
+    const release = await acquireTrainingLock(root)
+    expect(release).toBeDefined()
+    expect((await fs.readdir(root)).sort()).toEqual(['cache.new-1-x', 'train.lock'])
+    await release!()
+  } finally {
+    await fs.rm(root, { recursive: true, force: true })
+  }
+})

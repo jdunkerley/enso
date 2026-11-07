@@ -43,6 +43,17 @@ describe('installSamples', () => {
     expect(fs.readdirSync(projects)).toEqual(['Samples'])
   })
 
+  // In a dev run the bundled directory is the source `samples/`, whose contributor notes are kept
+  // out of the packaged app by electron-builder's filter; the copy leaves them out too.
+  test('leaves out the top-level CLAUDE.md, and only that one', async () => {
+    fs.writeFileSync(path.join(bundled, 'CLAUDE.md'), '# samples')
+    fs.writeFileSync(path.join(bundled, 'One', 'CLAUDE.md'), '# one')
+    expect(await installSamples(bundled, projects)).toBe(true)
+    const samples = path.join(projects, 'Samples')
+    expect(fs.readdirSync(samples).sort()).toEqual(['One', 'Two'])
+    expect(fs.existsSync(path.join(samples, 'One', 'CLAUDE.md'))).toBe(true)
+  })
+
   test('copies only once: a second start, and a changed copy, are left alone', async () => {
     expect(await installSamples(bundled, projects)).toBe(true)
     const edited = path.join(projects, 'Samples', 'One', 'src', 'Main.enso')
