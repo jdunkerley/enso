@@ -8,10 +8,22 @@ import org.enso.cli.task.{
 }
 
 import java.net.URI
-import java.net.http.{HttpClient, HttpHeaders, HttpResponse}
+import java.net.http.{
+  HttpClient,
+  HttpConnectTimeoutException,
+  HttpHeaders,
+  HttpResponse,
+  HttpTimeoutException
+}
 import java.nio.charset.{Charset, StandardCharsets}
 import java.nio.file.{Files, Path}
-import java.util.concurrent.{CompletableFuture, Executors}
+import java.time.Duration
+import java.util.concurrent.{
+  CompletableFuture,
+  CompletionException,
+  ConcurrentHashMap,
+  Executors
+}
 import scala.util.{Failure, Success}
 
 /** Contains utility functions for fetching data using the HTTP(S) protocol. */
@@ -20,6 +32,58 @@ object HTTPDownload {
 
   /** Determines how many redirects are taken until an error is thrown. */
   val maximumRedirects: Int = 20
+
+  /* Note [A Download Waits For An Answer Only So Long]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * `HttpClient` waits forever by default, both to connect and for an answer.
+   * A library repository that accepts the connection and never answers then
+   * blocks the import that resolves the library, so the project's first
+   * execution never ends: the Language Server reports neither the failure nor
+   * completion, and the IDE says "Initializing the project" for good (#600).
+   * So the client gives up connecting after [[ConnectTimeout]], and a GET
+   * request gives up waiting for the response to start after its response
+   * timeout ([[HTTPRequestBuilder.DefaultResponseTimeout]]). The failure then
+   * reaches the user like any other failed download: the import's error names
+   * the library and says the server did not respond. The response timeout
+   * covers only the wait for the response headers, so a large download whose
+   * body takes longer is not cut short. A POST (a library upload) has none,
+   * since its answer comes only after the whole body is sent.
+   */
+
+  /** How long a request waits for the connection to the server. */
+  val ConnectTimeout: Duration = Duration.ofSeconds(30)
+
+  /* Note [An Unresponsive Server Is Not Asked Again At Once]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Resolving a project's imports asks the repository for one library after
+   * another, and the first execution asks again for those that failed. With a
+   * server that does not answer, each of those requests would wait for the
+   * whole timeout (measured: 96 s before a project importing two libraries
+   * said why it could not start). So a server that timed out is remembered for
+   * [[UnresponsiveServerMemory]]: a request to it in that time fails at once,
+   * saying that the server did not respond to an earlier request. Any answer
+   * from the server forgets it, and so does the end of that time, so a server
+   * that comes back is asked again.
+   */
+
+  /** How long a server that timed out is not asked again. */
+  val UnresponsiveServerMemory: Duration = Duration.ofMinutes(2)
+
+  /** A server that timed out: when, and how long the request had waited. */
+  private case class Unresponsive(sinceNanos: Long, waited: String)
+
+  /** Servers that timed out, by scheme and authority. */
+  private val unresponsiveServers =
+    new ConcurrentHashMap[String, Unresponsive]()
+
+  /** Forgets the servers that timed out; for tests. */
+  private[http] def forgetUnresponsiveServers(): Unit =
+    unresponsiveServers.clear()
+
+  private def serverOf(request: HTTPRequest): String = {
+    val uri = request.requestImpl.uri()
+    s"${uri.getScheme}://${uri.getRawAuthority}"
+  }
 
   /** Fetches the `request` and tries to decode is as a [[String]].
     *
@@ -67,9 +131,7 @@ object HTTPDownload {
         }
       })
       .exceptionally(ex => {
-        taskProgress.setComplete(
-          Failure(HTTPException(s"Server responded with: [${ex.getMessage}]."))
-        )
+        taskProgress.setComplete(Failure(describeFailure(request, ex)))
         null
       })
     taskProgress
@@ -79,14 +141,99 @@ object HTTPDownload {
     request: HTTPRequest,
     bodyHandler: HttpResponse.BodyHandler[T]
   ): CompletableFuture[HttpResponse[T]] = {
-    val vThreadExecutor = Executors.newVirtualThreadPerTaskExecutor()
-    val httpClient = HttpClient
-      .newBuilder()
-      .followRedirects(HttpClient.Redirect.NORMAL)
-      .executor(vThreadExecutor)
-      .build()
-    httpClient.sendAsync(request.requestImpl, bodyHandler)
+    // Note [An Unresponsive Server Is Not Asked Again At Once]
+    val server = serverOf(request)
+    val remembered = Option(unresponsiveServers.get(server)).filter { u =>
+      System.nanoTime() - u.sinceNanos < UnresponsiveServerMemory.toNanos
+    }
+    remembered match {
+      case Some(unresponsive) =>
+        logger.debug(
+          "Not requesting [{}]: [{}] did not respond to an earlier request.",
+          request.uri,
+          server
+        )
+        CompletableFuture.failedFuture(
+          HTTPException(
+            s"The server at [$server] did not respond within " +
+            s"${unresponsive.waited} to an earlier request, so " +
+            s"[${request.uri}] was not requested."
+          )
+        )
+      case None =>
+        val vThreadExecutor = Executors.newVirtualThreadPerTaskExecutor()
+        val httpClient = HttpClient
+          .newBuilder()
+          .followRedirects(HttpClient.Redirect.NORMAL)
+          .connectTimeout(ConnectTimeout)
+          .executor(vThreadExecutor)
+          .build()
+        httpClient
+          .sendAsync(request.requestImpl, bodyHandler)
+          .whenComplete { (_, failure) =>
+            if (failure == null) unresponsiveServers.remove(server)
+            else
+              timeoutWaited(request, failure).foreach { waited =>
+                unresponsiveServers.put(
+                  server,
+                  Unresponsive(System.nanoTime(), waited)
+                )
+              }
+          }
+    }
   }
+
+  /** The error a failed request completes its task with. A timeout says what
+    * did not happen in time (Note [A Download Waits For An Answer Only So
+    * Long]); anything else keeps the client's message.
+    */
+  private def describeFailure(
+    request: HTTPRequest,
+    failure: Throwable
+  ): HTTPException =
+    unwrap(failure) match {
+      case ours: HTTPException => ours
+      case _: HttpConnectTimeoutException =>
+        HTTPException(
+          s"Could not connect to [${request.uri}] within " +
+          s"${describeDuration(ConnectTimeout)}."
+        )
+      case _: HttpTimeoutException =>
+        HTTPException(
+          s"The server at [${request.uri}] did not respond within " +
+          s"${timeoutWaited(request, failure).getOrElse("the time allowed")}."
+        )
+      case _ =>
+        HTTPException(s"Server responded with: [${failure.getMessage}].")
+    }
+
+  /** How long the request waited, if it failed because it timed out. */
+  private def timeoutWaited(
+    request: HTTPRequest,
+    failure: Throwable
+  ): Option[String] =
+    unwrap(failure) match {
+      case _: HttpConnectTimeoutException =>
+        Some(describeDuration(ConnectTimeout))
+      case _: HttpTimeoutException =>
+        Some(
+          request.requestImpl
+            .timeout()
+            .map[String](describeDuration)
+            .orElse("the time allowed")
+        )
+      case _ => None
+    }
+
+  private def unwrap(failure: Throwable): Throwable = failure match {
+    case wrapped: CompletionException if wrapped.getCause != null =>
+      wrapped.getCause
+    case other => other
+  }
+
+  private def describeDuration(duration: Duration): String =
+    if (duration.toMillis % 1000 == 0) s"${duration.toSeconds} seconds"
+    else s"${duration.toMillis} ms"
 
   private def convertHeaders(
     headers: HttpHeaders
@@ -156,9 +303,7 @@ object HTTPDownload {
         }
       })
       .exceptionally(ex => {
-        taskProgress.setComplete(
-          Failure(HTTPException(s"Server responded with: [${ex.getMessage}]."))
-        )
+        taskProgress.setComplete(Failure(describeFailure(request, ex)))
         null
       })
     taskProgress
