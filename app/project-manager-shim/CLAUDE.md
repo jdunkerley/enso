@@ -167,11 +167,12 @@ passes it to the server) installs the samples shipped with the application in
     (an `index.lock`, a git error), the work tree has not changed: it throws
     `VersionSaveError`, and the sample falls back to the copy route, reported in
     `fellBack` with git's message. If anything after it fails, the work tree is
-    put back as that commit (`restore --source=<commit> --staged --worktree`, as
-    `restore` does, never `reset --hard`, and `clean -f -d` of only the paths
-    the bundle ships, never `-x`, so an untracked file the user saved meanwhile
-    stays), the manifest is written back as it was, and the error says the
-    user's work is in the version `Saved before updating the sample`.
+    put back as that commit (`restore --source=<commit> --staged`, then
+    `--worktree`, as `restore` does, never `reset --hard`, and `clean -f -d` of
+    only the paths the bundle ships, never `-x`, so an untracked file the user
+    saved meanwhile stays), the manifest is written back as it was, and the
+    error says the user's work is in the version
+    `Saved before updating the sample`.
   - **A file git ignores is never overwritten silently.** It is in no version.
     When the bundle ships a file that exists in the sample with other content
     and git ignores it (`LocalVersioning.ignoredPaths`, `git check-ignore`), the
@@ -783,6 +784,34 @@ the old path's tree (`rm --cached`, `read-tree --prefix`, `restore --worktree`,
 if a step still fails, the index is reset to `HEAD` for the project (no deletion
 stays staged).
 
+### Renames by case only
+
+On a file system that ignores case (Windows, macOS; git's `core.ignorecase`),
+`Data/Sales.csv` and `data/sales.csv` are one file, and git keeps whichever
+spelling its index has: `add -A` never records a rename by case, and
+`git commit -- <paths>` re-adds the paths under `HEAD`'s spelling or refuses the
+new one as an alias (`will not add file alias`). So (#641):
+
+- Only where `core.ignorecase` is set (asked once per repository), `commitIn`
+  first drops from the index the project's files that are on disk under another
+  case (`unstageCaseRenames`, using `spellingsOnDisk` from `src/fileCase.ts`),
+  so `add -A` adds them under the disk's spelling; and when the index then
+  stages a file of `HEAD` under another case (two staged names that differ only
+  in case, `hasCaseAliases`), it commits through a temporary index (`HEAD` plus
+  the index's entries for the paths, `commitStaged`) instead of
+  `git commit -- <paths>`. A change the user staged elsewhere is still left out.
+- `restore` (and `replaceAsVersion`'s put-back) restores the index, then the
+  work tree (`restoreInPlace`), never `--staged --worktree` in one step: that
+  wrote the renamed file under its old name and then deleted it as the new name,
+  the same file. The files the version does not have are then `clean`ed by name
+  (a case alias counts as tracked, so it is kept) with their emptied folders,
+  and `matchSpelling` renames what the disk kept under another case to the
+  index's spelling, so the next commit records no rename the user never made.
+- The samples' update (`changedBundleFiles`) names a bundle file by the spelling
+  it has on disk, so the check for changed files outside the saved version
+  matches it to the file git tracks, and `replaceInPlace` renames a folder kept
+  under the old case (one holding a file git ignores) to the bundle's name.
+
 ### Timeouts and robustness
 
 - The close hook and `commitMove` bound **all** their git work — the repository
@@ -812,10 +841,11 @@ Windows a test takes 1–5 s on an idle machine, so the file sets
 `vi.setConfig({ testTimeout: 30_000 })`, and so do the other files that run real
 git: `replaceAsVersion.test.ts`,
 `handler/__tests__/filesystemVersioning.test.ts`,
-`samples/__tests__/updateSamples.test.ts`, and the `versioning routes` block of
-`handler/__tests__/projectService.test.ts` (`{ timeout: 30_000 }`): under load,
-vitest's default 5 s failed a different handful of tests each run (#395). A
-vitest timeout can be reported as `STACK_TRACE_ERROR` (the placeholder error
+`samples/__tests__/updateSamples.test.ts`, the `versioning on close` block of
+`projectService/__tests__/lifecycle.test.ts`, and the `versioning routes` block
+of `handler/__tests__/projectService.test.ts` (`{ timeout: 30_000 }`): under
+load, vitest's default 5 s failed a different handful of tests each run (#395).
+A vitest timeout can be reported as `STACK_TRACE_ERROR` (the placeholder error
 vitest builds the timeout from), so read that as "timed out", not as an error in
 the code. A timed-out test's body also keeps running into the next test, so look
 at the first failure, not the ones after it.

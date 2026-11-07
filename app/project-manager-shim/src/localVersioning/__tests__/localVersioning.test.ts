@@ -466,6 +466,32 @@ describe('restore and exportAt', () => {
     })
   })
 
+  test('restore across a rename by case brings the old names back, losing nothing', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      await writeFiles(root, { 'A/Data/Sales.csv': 'old' })
+      const v1 = (await versioning.commit([a], 'one')).id!
+      await fs.rm(path.join(a, 'Data'), { recursive: true })
+      await writeFiles(root, { 'A/data/sales.csv': 'new', 'A/extra/z.csv': 'z' })
+      await versioning.commit([a], 'two')
+      const tracked = async () =>
+        (await git(root, 'ls-tree', '-r', '--name-only', 'HEAD', '--', 'A')).split('\n')
+      expect(await tracked()).toContain('A/data/sales.csv')
+
+      await versioning.restore(a, v1)
+
+      expect(await tracked()).toContain('A/Data/Sales.csv')
+      expect(await tracked()).not.toContain('A/data/sales.csv')
+      expect(await fs.readdir(a)).toContain('Data')
+      expect(await fs.readdir(a)).not.toContain('data')
+      // A folder that held only files the version does not have goes with them.
+      expect(await fs.readdir(a)).not.toContain('extra')
+      expect(await fs.readdir(path.join(a, 'Data'))).toEqual(['Sales.csv'])
+      expect(await fs.readFile(path.join(a, 'Data', 'Sales.csv'), 'utf8')).toBe('old')
+      expect(await git(root, 'status', '--porcelain', '--', 'A')).toBe('')
+    })
+  })
+
   test('restore and exportAt reject bad ids and other projects versions', async () => {
     await withRepo(async (root, versioning) => {
       const { a } = await twoVersionsAndEdit(root, versioning)

@@ -20,6 +20,7 @@ import * as fs from 'node:fs'
 import * as pathModule from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import * as yaml from 'yaml'
+import { matchSpelling, spellingsOnDisk } from '../fileCase.js'
 import { renameWithRetry, serialised, writeJsonAtomic } from '../localMetadata/jsonFile.js'
 import { VersionSaveError, type LocalVersioning } from '../localVersioning/index.js'
 import { getProjectsDirectory } from '../projectManagement.js'
@@ -798,6 +799,9 @@ async function isVersioned(
 /**
  * The files the bundle `source` ships (relative, with `/`, local state left out) whose copy at
  * `target` exists and differs from it: what copying the bundle over `target` would overwrite.
+ * Each is spelled as on disk, where a file system that ignores case finds the bundle's file under
+ * another case (`Data/Sales.csv` for the bundle's `data/sales.csv`), so it names the file git
+ * tracks.
  */
 async function changedBundleFiles(source: string, target: string): Promise<string[]> {
   const changed: string[] = []
@@ -813,7 +817,8 @@ async function changedBundleFiles(source: string, target: string): Promise<strin
     const ours = await fs.promises.readFile(pathModule.join(source, ...file.split('/')))
     if (!theirs.equals(ours)) changed.push(file)
   }
-  return changed
+  const spellings = await spellingsOnDisk(target, changed)
+  return changed.map((file) => spellings.get(file) ?? file)
 }
 
 /**
@@ -849,7 +854,9 @@ function ignoredChangesMessage(files: readonly string[]): string {
  * as it is: the user's copy of a file the bundle ships in `output/` wins, and a file outside
  * `files` that the bundle would overwrite with other content makes it throw before anything is
  * changed (it is in no version). Folders that held only removed files are removed; others,
- * empty ones of the user's included, are left.
+ * empty ones of the user's included, are left. On a file system that ignores case, a folder left
+ * under another case than the bundle's (it holds a file of the user's) is renamed to the bundle's
+ * spelling, so the sample ends with the bundle's names.
  */
 async function replaceInPlace(
   source: string,
@@ -886,6 +893,10 @@ async function replaceInPlace(
       )
     },
   })
+  await matchSpelling(
+    target,
+    (await listFiles(source)).filter((file) => !isLocalState(file)),
+  )
   if (labels != null) await updatePackageYaml(target, { labels })
 }
 
