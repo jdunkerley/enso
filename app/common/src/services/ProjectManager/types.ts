@@ -287,6 +287,49 @@ export type LocalSecretsStatus = (
   | { readonly state: 'wrong' }
 ) & { readonly keyFromEnvironment: boolean }
 
+/**
+ * A bundled sample's state in `<projects>/Samples`: as bundled, edited by the user, edited with a
+ * changed bundle to update to, deleted, or unreadable.
+ */
+export type SampleState = 'current' | 'edited' | 'updateAvailable' | 'missing' | 'unreadable'
+
+/** The bundled samples, and where they are installed. */
+export interface SamplesStatus {
+  /** `<projects>/Samples`. */
+  readonly directory: Path
+  readonly samples: readonly {
+    readonly name: string
+    readonly path: Path
+    readonly state: SampleState
+    /**
+     * How an update keeps the user's edits: in version history (`version`), or as the copy
+     * `copyName` (`copy`); `null` when there are none.
+     */
+    readonly route: 'version' | 'copy' | null
+    readonly copyName: string | null
+    /**
+     * Files of a versioned sample that git ignores and an update would overwrite: they are in no
+     * version, so the sample is kept as a copy instead. Empty otherwise.
+     */
+    readonly ignoredChanges: readonly string[]
+  }[]
+}
+
+/** What an update of samples did. */
+export interface SamplesUpdateResult {
+  readonly updated: readonly string[]
+  /** Samples updated as a new version, their edits saved as the version before. */
+  readonly versioned: readonly string[]
+  /** The names edited copies were kept under. */
+  readonly kept: readonly string[]
+  /** Kept copies whose `package.yaml` still has the sample's name: the user should rename them. */
+  readonly unrenamed: readonly string[]
+  /** Versioned samples whose edits could not be saved as a version, so a copy was kept; and why. */
+  readonly fellBack: readonly { readonly name: string; readonly error: string }[]
+  /** What Update All could not update, and why. */
+  readonly failed: readonly { readonly name: string; readonly error: string }[]
+}
+
 /** What is known about a local project's versioning. */
 export interface VersioningStatus {
   readonly git: boolean

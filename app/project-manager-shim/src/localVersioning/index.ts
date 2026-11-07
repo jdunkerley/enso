@@ -305,6 +305,12 @@ export interface LocalVersioningOptions {
   readonly consent: VersioningConsent
 }
 
+/**
+ * {@link LocalVersioning.replaceAsVersion} could not save the project's current state as a version,
+ * and so changed nothing.
+ */
+export class VersionSaveError extends Error {}
+
 /** The message of the error thrown for an operation on a repository that is not enabled. */
 export function notEnabledMessage(repoRoot: string): string {
   return `Versioning is not enabled for the repository at ${repoRoot}.`
@@ -887,6 +893,182 @@ export class LocalVersioning {
       if (restored.id != null) return { id: restored.id }
       // Restoring the latest version changes nothing, so there is nothing new to commit.
       return { id }
+    })
+  }
+
+  /**
+   * Whether a change to the project at `projectPath` can be recorded in version history: git is
+   * installed, the project is in a repository, the user has enabled versioning for it, and it is
+   * not in the middle of a merge or the like. The check the IDE's version history makes.
+   */
+  async isVersioned(projectPath: string): Promise<boolean> {
+    if ((await findGit()) == null) return false
+    const repoRoot = await findRepoRoot(projectPath).catch(() => null)
+    if (repoRoot == null) return false
+    return exclusive(repoRoot, async () => {
+      if (!(await this.consent.isEnabled(repoRoot))) return false
+      return (await blockedReason(repoRoot)) == null
+    })
+  }
+
+  /**
+   * Of `paths` (inside the project at `projectPath`), those git ignores in its repository. A
+   * tracked file is never ignored. Empty when there is no git or no repository.
+   */
+  async ignoredPaths(projectPath: string, paths: readonly string[]): Promise<readonly string[]> {
+    if (paths.length === 0 || (await findGit()) == null) return []
+    const repoRoot = await findRepoRoot(projectPath).catch(() => null)
+    if (repoRoot == null) return []
+    return exclusive(repoRoot, () => this.ignoredPathsIn(repoRoot, paths))
+  }
+
+  /** {@link ignoredPaths} without the lock. */
+  private async ignoredPathsIn(repoRoot: string, paths: readonly string[]): Promise<string[]> {
+    if (paths.length === 0) return []
+    const relatives = await Promise.all(paths.map((p) => repoRelative(repoRoot, p)))
+    const output = await runGit(repoRoot, ['check-ignore', '-z', '--stdin'], {
+      queueKey: repoRoot,
+      input: relatives.map((relative) => `${relative}\0`).join(''),
+    }).catch((error: unknown) => {
+      // Exit code 1: none of them is ignored.
+      if (error instanceof CommandError && error.code === 1) return ''
+      throw error
+    })
+    const ignored = new Set(output.split('\0').filter((line) => line !== ''))
+    return paths.filter((_, index) => ignored.has(relatives[index]!))
+  }
+
+  /**
+   * Replace the project's files as a new version, under the repository's lock:
+   *
+   * 1. `options.beforeSave` runs first; whatever it throws is thrown as it is, with nothing done.
+   *    Then, if git ignores any of `options.protect` (the files `replace` would overwrite, which
+   *    are in no version then), a {@link VersionSaveError} is thrown, with nothing done either.
+   * 2. The project's uncommitted changes are saved as their own version, `messages.before`. When
+   *    that fails, or leaves anything unsaved, or the project has no version at all afterwards, a
+   *    {@link VersionSaveError} is thrown. The work tree is unchanged then, although a version may
+   *    have been saved (when only the check after it failed).
+   * 3. `replace` is given the absolute paths of the project's files in that version (every file but
+   *    its `.enso` folder and what git ignores), under `projectPath` as given (whatever git's
+   *    spelling of the repository's path), and changes the work tree.
+   * 4. The result is saved as `messages.after`, together with those of `options.alsoCommit` that
+   *    the repository tracks (an untracked one, or one outside the repository, is left out).
+   *
+   * When step 3 or 4 fails, the project is put back as the version from step 2 (as `restore` does,
+   * plus a `clean` of what `replace` added: of `options.writes` when given, else of everything
+   * untracked in the project; ignored files are never cleaned), and the error says that version
+   * holds the user's work. This method itself never touches what git ignores, nor the `.enso`
+   * folder; what `replace` writes is its caller's responsibility.
+   */
+  async replaceAsVersion(
+    projectPath: string,
+    replace: (files: readonly string[]) => Promise<void>,
+    messages: { readonly before: string; readonly after: string },
+    options: {
+      readonly beforeSave?: (() => Promise<void>) | undefined
+      readonly protect?: readonly string[] | undefined
+      readonly writes?: readonly string[] | undefined
+      readonly alsoCommit?: readonly string[] | undefined
+    } = {},
+  ): Promise<{ readonly before: string; readonly after: string | null }> {
+    const saveFailed = (error: unknown) =>
+      error instanceof VersionSaveError ? error : (
+        new VersionSaveError(
+          lockMessage(error) ??
+            (error instanceof CommandError ? error.stderr.trim() || error.message : null) ??
+            (error instanceof Error ? error.message : String(error)),
+          { cause: error },
+        )
+      )
+    if ((await findGit()) == null) throw new VersionSaveError('git is not installed.')
+    const repoRoot = await findRepoRoot(projectPath).catch(() => null)
+    if (repoRoot == null) throw new VersionSaveError(`${projectPath} is not in a git repository.`)
+    return exclusive(repoRoot, async () => {
+      const run = (args: readonly string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
+      await options.beforeSave?.()
+      let relative: string
+      let before: string
+      let files: string[]
+      try {
+        await this.assertEnabledIn(repoRoot)
+        relative = await repoRelative(repoRoot, projectPath)
+        const ignored = await this.ignoredPathsIn(repoRoot, options.protect ?? [])
+        if (ignored.length > 0) {
+          const names = ignored.map((p) => path.relative(projectPath, p).split(path.sep).join('/'))
+          throw new VersionSaveError(
+            `git ignores changed files the update would replace: ${names.join(', ')}`,
+          )
+        }
+        await this.commitIn(repoRoot, [projectPath], messages.before)
+        const unsaved = await run([
+          'status',
+          '--porcelain=v1',
+          '--untracked-files=all',
+          '--',
+          ...projectPathspecs(relative),
+        ])
+        if (unsaved.trim() !== '') throw new Error('Not every change could be saved as a version.')
+        before = (await run(['rev-parse', '--verify', 'HEAD'])).trim()
+        files = (await run(['ls-files', '-z', '--cached', '--', ...projectPathspecs(relative)]))
+          .split('\0')
+          .filter((file) => file !== '')
+        if (files.length === 0) throw new Error('The project has no saved version.')
+      } catch (error) {
+        throw saveFailed(error)
+      }
+      /** A repository-relative path of the project's, under `projectPath` as given. */
+      const underProject = (file: string) =>
+        path.join(
+          projectPath,
+          ...(relative === '.' ? file : file.slice(relative.length + 1)).split('/'),
+        )
+      try {
+        await replace(files.map(underProject))
+        const tracked: string[] = []
+        for (const extra of options.alsoCommit ?? []) {
+          const extraRelative = await repoRelative(repoRoot, extra)
+          // A sample that is its own repository: the manifest beside it is outside.
+          if (
+            extraRelative === '..' ||
+            extraRelative.startsWith('../') ||
+            path.isAbsolute(extraRelative)
+          )
+            continue
+          if ((await run(['ls-files', '--cached', '--', literal(extraRelative)])).trim() !== '')
+            tracked.push(extra)
+        }
+        const after = await this.commitIn(repoRoot, [projectPath, ...tracked], messages.after)
+        return { before, after: after.id }
+      } catch (error) {
+        try {
+          await run([
+            'restore',
+            `--source=${before}`,
+            '--staged',
+            '--worktree',
+            '--',
+            ...projectPathspecs(relative),
+          ])
+          // Only what `replace` may have written, when known: an untracked file the user saved
+          // meanwhile stays.
+          const cleaned =
+            options.writes != null ?
+              (await Promise.all(options.writes.map((p) => repoRelative(repoRoot, p)))).map(literal)
+            : projectPathspecs(relative)
+          if (cleaned.length > 0) await run(['clean', '-f', '-d', '-q', '--', ...cleaned])
+        } catch (restoreError) {
+          console.error(`Failed to put ${projectPath} back as version ${before}:`, restoreError)
+        }
+        const reason =
+          lockMessage(error) ??
+          (error instanceof CommandError ? error.stderr.trim() || error.message : null) ??
+          (error instanceof Error ? error.message : String(error))
+        throw new Error(
+          `The change failed; your work was saved as the version '${messages.before}' and can be ` +
+            `restored from the list. (${reason})`,
+          { cause: error },
+        )
+      }
     })
   }
 

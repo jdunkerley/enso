@@ -29,11 +29,38 @@ const LOAD_HEALTHCHECK_INTERVAL = 250
 const LOAD_HEALTHCHECK_FAST_INTERVAL = 25
 const LOAD_HEALTHCHECK_FAST_PERIOD_MS = 1000
 
+/**
+ * A project path in a form that compares equal however it was written: resolved, with `/`, and in
+ * lower case on Windows.
+ */
+export function comparableProjectPath(projectPath: string): string {
+  const resolved = path.resolve(projectPath).replace(/\\/g, '/')
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved
+}
+
 /** The delay before the next start-up health check, `elapsedMs` after the engine was spawned. */
 export function loadHealthcheckDelay(elapsedMs: number): number {
   return elapsedMs < LOAD_HEALTHCHECK_FAST_PERIOD_MS ?
       LOAD_HEALTHCHECK_FAST_INTERVAL
     : LOAD_HEALTHCHECK_INTERVAL
+}
+
+/** What a timer of an engine's start-up is for. */
+export type StartupTimer = 'healthCheck' | 'ydocPoll' | 'startupTimeout'
+
+/**
+ * The clock of an engine's start-up: its health checks, the wait for its ydoc port and its startup
+ * timeout all read the time and schedule through it. Tests replace it to observe the schedule the
+ * runner asks for, which a loaded machine cannot distort the way it stretches real time.
+ */
+export interface StartupClock {
+  now(): number
+  schedule(timer: StartupTimer, callback: () => void, delayMs: number): void
+}
+
+const REAL_STARTUP_CLOCK: StartupClock = {
+  now: () => Date.now(),
+  schedule: (_timer, callback, delayMs) => void setTimeout(callback, delayMs),
 }
 /* Note [Open Waits For The Ydoc Port]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,6 +126,11 @@ export interface Runner {
   ): Promise<LanguageServerSockets>
   closeProject(projectPath: Path): Promise<void>
   isProjectRunning(projectPath: Path): Promise<boolean>
+  /**
+   * Whether the project at `projectPath` is open or loading, comparing paths with
+   * `comparableProjectPath`. Optional: without it, `isProjectRunning` is asked.
+   */
+  isProjectOpenOrOpening?(projectPath: string): Promise<boolean>
   /**
    * Whether any engine this runner started is still alive: an opened project (loading included)
    * or a `--run`. Each holds the environment it was started with, such as the secrets key.
@@ -268,6 +300,7 @@ class OpenedProject {
     private readonly startupTimeoutMs: number,
     private readonly ydocWaitMs: number,
     private readonly terminateMs: number,
+    private readonly clock: StartupClock,
   ) {
     this.loaded = this.loadedDeferred.promise
     this.loadedDeferred.promise.catch(() => undefined)
@@ -294,6 +327,7 @@ class OpenedProject {
     startupTimeoutMs: number,
     ydocWaitMs: number,
     terminateMs: number,
+    clock: StartupClock = REAL_STARTUP_CLOCK,
   ) {
     const sockets = {
       jsonSocket: { host: '127.0.0.1', port: jsonPort },
@@ -307,6 +341,7 @@ class OpenedProject {
       startupTimeoutMs,
       ydocWaitMs,
       terminateMs,
+      clock,
     )
     // Surface synchronous spawn failures (bad executable path, etc.) to the caller.
     await project.watcher.firstSpawn
@@ -401,7 +436,8 @@ class OpenedProject {
     const handle = this.watcher.current
     let resolved = false
     let passedHealth = false
-    const startedAt = Date.now()
+    const clock = this.clock
+    const startedAt = clock.now()
 
     // Over once this attempt has an answer, or its engine is gone: a health check of the port after
     // that could be answered by another engine, and must not count as this one starting.
@@ -423,22 +459,26 @@ class OpenedProject {
         return
       }
       // Not using setInterval to not pile slow-responding healthchecks.
-      setTimeout(healthCheck, loadHealthcheckDelay(Date.now() - startedAt))
+      clock.schedule('healthCheck', healthCheck, loadHealthcheckDelay(clock.now() - startedAt))
     }
-    setTimeout(healthCheck, loadHealthcheckDelay(0))
+    clock.schedule('healthCheck', healthCheck, loadHealthcheckDelay(0))
 
     // Timeout if server doesn't start (skip timeout in debug mode)
     const javaToolOptions = process.env.JAVA_TOOL_OPTIONS
     const isDebugMode = javaToolOptions?.includes('jdwp')
     if (!isDebugMode) {
-      setTimeout(() => {
-        if (resolved || passedHealth || this.closed) return
-        resolved = true
-        // SIGKILL the *specific* child this routine was waiting on. `onUnexpectedExit` decides
-        // whether to respawn: not while the project is still opening, by default after.
-        handle?.child.kill('SIGKILL')
-        deferred.reject(new Error('Language server startup timeout'))
-      }, this.startupTimeoutMs)
+      clock.schedule(
+        'startupTimeout',
+        () => {
+          if (resolved || passedHealth || this.closed) return
+          resolved = true
+          // SIGKILL the *specific* child this routine was waiting on. `onUnexpectedExit` decides
+          // whether to respawn: not while the project is still opening, by default after.
+          handle?.child.kill('SIGKILL')
+          deferred.reject(new Error('Language server startup timeout'))
+        },
+        this.startupTimeoutMs,
+      )
     }
   }
 
@@ -526,10 +566,12 @@ class OpenedProject {
 
   /** Wait, for at most `ydocWaitMs`, until the ydoc port accepts a connection (Note [Open Waits For The Ydoc Port]). */
   private async waitForYdocPort(over: () => boolean): Promise<void> {
-    const deadline = Date.now() + this.ydocWaitMs
-    while (!over() && Date.now() < deadline) {
+    const deadline = this.clock.now() + this.ydocWaitMs
+    while (!over() && this.clock.now() < deadline) {
       if (await acceptsConnections(this.sockets.ydocSocket)) return
-      await new Promise((resolve) => setTimeout(resolve, YDOC_POLL_INTERVAL))
+      await new Promise<void>((resolve) =>
+        this.clock.schedule('ydocPoll', resolve, YDOC_POLL_INTERVAL),
+      )
     }
   }
 
@@ -560,7 +602,8 @@ export class EnsoRunner implements Runner {
    * engine's ydoc port to accept connections (0, the default, does not wait: an engine that has no
    * ydoc server, as the fakes of the tests, would only delay its open). `ydocHost` serves the ydoc
    * server outside the engine when `ENSO_YDOC_HOST` is `node` (the default); without one, the engine
-   * serves it, as under `ENSO_YDOC_HOST=engine`.
+   * serves it, as under `ENSO_YDOC_HOST=engine`. `startupClock` replaces the real clock of every
+   * engine's start-up, for tests.
    */
   constructor(
     private ensoPath: Path,
@@ -569,6 +612,7 @@ export class EnsoRunner implements Runner {
       readonly startupTimeoutMs?: number
       readonly ydocWaitMs?: number
       readonly ydocHost?: YdocHost | undefined
+      readonly startupClock?: StartupClock
     } = {},
   ) {}
 
@@ -703,6 +747,17 @@ export class EnsoRunner implements Runner {
         // Each engine gets its own token, which the Language Server requires of a channel socket.
         const token = newChannelToken()
         const nodeHost = ydocHostKind() === 'node' ? this.options.ydocHost : undefined
+        // Under `engine`, the engine's listener checks `Origin` against the app's origins, which
+        // the host knows (Note [The Engine-Hosted Listener Checks Origin] in `Ydoc.java`).
+        const engineYdocEnv =
+          nodeHost ?
+            {}
+          : {
+              LANGUAGE_SERVER_YDOC_PORT: ydocPort.toString(),
+              LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS: (
+                this.options.ydocHost?.allowedOrigins?.() ?? []
+              ).join(','),
+            }
         if (nodeHost) {
           try {
             await nodeHost.listen({
@@ -744,7 +799,7 @@ export class EnsoRunner implements Runner {
 
         const env = {
           ...process.env,
-          ...(nodeHost ? {} : { LANGUAGE_SERVER_YDOC_PORT: ydocPort.toString() }),
+          ...engineYdocEnv,
           LANGUAGE_SERVER_CHANNEL_TOKEN: token,
           ...jvmOptionsEnv(launch),
           ...(extraEnv ? Object.fromEntries(extraEnv) : {}),
@@ -775,6 +830,7 @@ export class EnsoRunner implements Runner {
             // The Ydoc Port]).
             nodeHost ? 0 : (launch?.timeouts.ydocWaitMs ?? this.options.ydocWaitMs ?? 0),
             launch?.timeouts.terminateMs ?? terminateTimeoutMs(),
+            this.options.startupClock,
           )
         } catch (error) {
           await closeListener()
@@ -827,6 +883,14 @@ export class EnsoRunner implements Runner {
   /** Checks if a project's language server is currently running. */
   async isProjectRunning(projectPath: Path): Promise<boolean> {
     return this.runningProjects.has(projectPath)
+  }
+
+  /** Whether the project at `projectPath` is open or loading, whatever the path's separators. */
+  async isProjectOpenOrOpening(projectPath: string): Promise<boolean> {
+    const key = comparableProjectPath(projectPath)
+    return [...this.runningProjects.keys(), ...this.loadingProjects.keys()].some(
+      (path) => comparableProjectPath(path) === key,
+    )
   }
 
   /** Whether any opened (or opening) project or `--run` process is alive. */

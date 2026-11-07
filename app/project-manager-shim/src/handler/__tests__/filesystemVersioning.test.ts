@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises'
 import type * as http from 'node:http'
 import * as path from 'node:path'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { runCommand } from '../../childProcess/runCommand.js'
 import {
   versioningFor,
@@ -10,6 +10,10 @@ import {
 } from '../../localVersioning/__tests__/testRepo.js'
 import type { LocalVersioning } from '../../localVersioning/index.js'
 import { handleFilesystemCommand } from '../filesystem.js'
+
+// Real git, as in `localVersioning.test.ts`: on Windows under a full run's load a test here took
+// over vitest's default 5 s (#395, seen again when the shim's tests started running on Windows CI).
+vi.setConfig({ testTimeout: 30_000 })
 
 const REQUEST = {} as http.IncomingMessage
 const git = (cwd: string, ...args: string[]) =>

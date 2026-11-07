@@ -49,17 +49,188 @@ when there is none, and fails the first project-service request with the same
 message. The `ProjectService` tests skip without one; GUI CI on Linux gives them
 develop's engine distribution artifact (`.github/workflows/gui-checks.yml`).
 
-## Sample projects
+## Sample projects (`src/samples/`)
 
-`installSamples(bundledDir)` (`projectManagement.ts`) copies the samples shipped
-with the application into `<projects>/Samples` when that directory does not
-exist, and does nothing otherwise, so a user's edits and deletions are never
-undone. It copies to `.Samples.<pid>.tmp` and renames, so an interrupted copy
-cannot leave a half-filled `Samples` that blocks later starts. Nothing is
-downloaded (the old `downloadSamples` fetched an unpinned upstream branch on
-every start). The top-level `CLAUDE.md` of the bundle is not copied: a dev run
-copies the source `samples/`, whose contributor notes the packaged app leaves
-out. Test: `src/__tests__/installSamples.test.ts`.
+`LocalSamples` (Electron creates one with the bundle, `resources/samples`, and
+passes it to the server) installs the samples shipped with the application in
+`<projects>/Samples` and keeps them up to date. Nothing is downloaded (the old
+`downloadSamples` fetched an unpinned upstream branch on every start).
+
+- **First start** (`sync`, when `Samples` is missing): the whole bundle is
+  copied to `.Samples.<pid>.tmp` with a manifest, `Samples/.samples.json`, and
+  renamed into place, so an interrupted copy leaves no half-filled `Samples`. If
+  that rename fails and removing the staging folder fails too (both on a lock),
+  a later start removes `.Samples.<pid>.tmp` from the projects folder once
+  `Samples` exists (`clearFailedInstalls`). The bundle's top-level `CLAUDE.md`
+  is not copied: a dev run copies the source `samples/`, whose contributor notes
+  the packaged app leaves out. Deleting the whole `Samples` folder therefore
+  reinstalls every sample at the next start.
+- **The manifest** (`{ version: 1, samples, data, files }`) records, for each
+  sample (a bundle folder with a `package.yaml`) and each `Data/` file, the
+  content hash it was installed with, or `null` when that is unknown. A sample's
+  hash (`hashSample`) covers its files by relative path, but not hidden ones
+  (the IDE's `.enso/`), not `output/` (what the sample writes), not
+  `package.yaml`'s `labels` (the Drive writes them) and, for `.enso` files, only
+  the code above `#### METADATA ####`, with line endings normalised
+  (`ensoCodeForHash`): opening a sample makes the IDE rewrite its metadata (node
+  positions, widget and visualisation state), and that is not an edit. An update
+  still replaces the whole file, metadata included.
+- **Hashing is cheap and never reads a file whole without need**: other files
+  are hashed as a stream, so their size is no limit, and `files` caches each
+  disk file's `size`, `mtimeMs` and hash (`FileHasher`), so a file whose size
+  and time are unchanged is not read again. `sync` rewrites the cache; `status`
+  only reads it. The bundle is hashed once per `LocalSamples`.
+- **Only "no such file" means missing** (`ENOENT`, `ENOTDIR`). Anything else
+  (`EACCES`, `EBUSY`, a folder where a file should be, a file that vanishes
+  while it is read) makes the copy `Unreadable`: it is never overwritten, the
+  start-up check logs it and moves on to the next sample, `status` reports it as
+  `unreadable` and still reports the others, and an update keeps it as an edited
+  copy before installing the bundle (never through version history).
+- **Every later start** compares the bundle (B), the manifest (M) and the disk
+  (D) for each sample and `Data/` file (`compareSample`, whose test lists every
+  case): not on disk and not in the manifest, it is copied in (a new sample, or
+  an install from before manifests); not on disk but in the manifest, the user
+  deleted it and it stays deleted (Update Sample would bring it back, but a
+  deleted sample has no row to start it from; deleting the whole `Samples`
+  folder reinstalls everything); D = B is current; D = M, M ≠ B is unedited with
+  a changed bundle and is replaced, keeping its `.enso/`, its `output/` files
+  (the user's copy of a file the bundle also ships there wins) and its labels;
+  otherwise it is edited and left alone, with an update when M ≠ B. **A copy the
+  manifest has no record of** (an install from before manifests, whose samples
+  read the old per-sample `data/`) that differs from the bundle is recorded as
+  `null`: edited, with an update, never overwritten. Only the current bundle is
+  known, so an old sample that was never edited counts as edited too. An edited
+  `Data/` file whose bundle changed is kept with no sign in the Drive, and
+  nothing replaces it.
+- **A manifest from a newer version** (a `version` above 1, after a downgrade)
+  is never rewritten: `sync` changes nothing and logs it, `status` reports only
+  whether each sample is as bundled, and the updates refuse.
+- **Changes are staged and renamed** (`.<name>.<pid>.tmp` beside the target; a
+  replaced folder goes aside as `.<name>.<pid>.old` first, since a rename over a
+  folder is not one step on Windows; a failed rename puts it back). The next
+  start removes what an interrupted change left, moving an `.old` back when its
+  target is missing. All of a `LocalSamples`' operations are serialised
+  (`serialised`, keyed by the `Samples` folder), and the manifest and a
+  `package.yaml` are written to a temporary file and renamed into place.
+- **An open or opening project is never changed.** `sync` and the updates take
+  an `isOpen`, which Electron answers with
+  `ProjectService.isProjectOpenOrOpening` (from the moment `openProject` starts
+  on a project, through the runner's loading and running projects, paths
+  compared whatever their separators and, on Windows, case). They ask before a
+  change and again just before its rename (after the user's `output/` has been
+  copied, which can take a while); a sample found busy is a `SampleBusyError`,
+  whose message says why (open, or the run marker's path). The other side waits
+  too: `openProject` of a project in a `Samples` folder counts it as opening and
+  then waits for the changes queued on that folder (`samplesSettled`), so an
+  open never meets a half-done update. Opening a sample therefore waits for a
+  queued sync or update to finish, a whole Update All included (a hung network
+  share would hold the open with it).
+- **Run markers** (`samples/runMarker.ts`). A headless `--startup.project` run
+  takes no single-instance lock, so `runLocalProjectByPath` writes
+  `<project>/.enso/run-<pid>.lock` (`{ pid, host }`, with this machine's time),
+  rewrites it every 30 s (so one a reader deleted as stale comes back), removes
+  it when the run ends and on SIGINT/SIGTERM (`removeOnSignals`, which then
+  exits with 130/143), and the samples treat a project with a live marker as
+  open. A marker is live when touched within 2 minutes, written on this host,
+  and its pid is not known to be gone (`EPERM`, another user's process, is not
+  known either way, so the heartbeat decides); any other marker is deleted when
+  read, so a crash or a reused pid blocks nothing for long. An update never
+  carries a marker into the new copy.
+- **Update Sample** (`update(name, { isOpen, versioning, now })`) replaces a
+  sample with its bundle. Nothing of the user's: a missing sample is copied in,
+  one as bundled is refreshed (keeping `.enso/`, `output/` and labels). An
+  edited one (it differs from the bundle) is kept, by one of two routes, decided
+  per sample (`status` reports it as `route`, with the `copyName` the copy route
+  would use and the `ignoredChanges` below, for the Drive's confirmation;
+  `status` takes a `now`, as the updates do, so tests never depend on today's
+  date):
+  - **`version`**, when `LocalVersioning.isVersioned` says the sample's
+    repository is enabled and usable (git installed, consent given, no merge in
+    progress; the check the version history makes).
+    `LocalVersioning.replaceAsVersion` runs under the repository's lock: it asks
+    the open-sample check again first (`beforeSave`, so a sample opened
+    meanwhile fails with `SampleBusyError` and no version is saved), commits the
+    sample's uncommitted changes as `Saved before updating the sample`
+    (`BEFORE_UPDATE_MESSAGE`), checks that nothing is left unsaved and that the
+    sample has a version, then removes the files git tracks in it except its
+    `output/` (not `.enso/`, not what git ignores, not the user's results),
+    removes the folders that held only those files (a user's empty folder
+    stays), copies the bundle in (the user's copy of a file the bundle ships in
+    `output/` wins), puts the labels back, records the manifest, and commits
+    `Updated sample <Name>`, with `Samples/.samples.json` when the repository
+    tracks it (an untracked manifest is never added, and neither is one outside
+    the sample's repository, as when the sample is a repository of its own). No
+    `_edited_` copy. The files it hands over are under the sample's path as the
+    IDE knows it, not git's spelling of the repository's path (another case on
+    Windows, a junction or symbolic link, macOS's `/private/var`), so the checks
+    after it compare like with like. If the first commit fails for any reason
+    (an `index.lock`, a git error), the work tree has not changed: it throws
+    `VersionSaveError`, and the sample falls back to the copy route, reported in
+    `fellBack` with git's message. If anything after it fails, the work tree is
+    put back as that commit (`restore --source=<commit> --staged --worktree`, as
+    `restore` does, never `reset --hard`, and `clean -f -d` of only the paths
+    the bundle ships, never `-x`, so an untracked file the user saved meanwhile
+    stays), the manifest is written back as it was, and the error says the
+    user's work is in the version `Saved before updating the sample`.
+  - **A file git ignores is never overwritten silently.** It is in no version.
+    When the bundle ships a file that exists in the sample with other content
+    and git ignores it (`LocalVersioning.ignoredPaths`, `git check-ignore`), the
+    sample takes the copy route: `status` lists those files in `ignoredChanges`
+    (the confirmation says why), and the update reports them in `fellBack`.
+    `replaceAsVersion` asks git again under the lock, before anything is saved
+    (`protect`), so a refusal adds no version however often it is retried; and
+    `replaceInPlace` checks once more, before it changes anything, for any
+    changed file that is not in the saved version (ignored, or written
+    meanwhile), and throws saying so.
+  - **`copy`** otherwise (and for an unreadable sample): it is renamed to
+    `<Name>_edited_<yyyy>_<mm>_<dd>` (then `_2`, `_3`, ...) beside it, with that
+    name in its `package.yaml` too, and a fresh copy is installed. The date uses
+    underscores because a project name allows only letters, digits and `_`. A
+    copy whose `package.yaml` cannot be renamed is still kept, and is reported
+    in `unrenamed` (the Drive tells the user to rename it); a file where a
+    sample's folder should be has no `package.yaml` and is not reported. **This
+    route does not tell local versioning**: it does not call `commitMove`, so in
+    a versioned repository whose versioning is off the history stays on the
+    sample's path, and the `_edited_` copy starts with none.
+
+  Either way the manifest then records the bundle's hash, so the sample no
+  longer has an update.
+
+- **Update All** (`updateAll(...)`) updates, as above, every sample whose state
+  is `updateAvailable` (an edited sample whose bundle changed, or an unedited
+  one the next start would update) and no other: an edited sample with no
+  update, a deleted sample and `Data/` files are left alone. It refuses when one
+  of those samples is open, before changing anything; one that fails part way is
+  reported in `failed`, and the rest are still updated and recorded. There is no
+  Reset All any more (owner's ruling, #622). A sample's original comes back
+  through Update Sample (any sample) or its version history; a deleted sample or
+  `Data/` file only by renaming or deleting the `Samples` folder, which the next
+  start reinstalls whole.
+- **One process at a time.** The repository lock and `serialised` order the
+  changes of one process only. A second process on the same projects folder (a
+  dev server, an `ENSO_TEST` instance) can change the same sample at the same
+  time; the single-instance lock keeps two IDEs apart, and this predates the
+  updates.
+- **Routes** (POST to `/api/project-service/samples/*`, served by
+  `handler/projectService.ts` from the `LocalSamples` passed to
+  `handleProjectServiceRequest` after `keyFromEnvironment`, with the host's
+  `LocalVersioning`): `status` (each bundled sample's `name`, `path`, `state`:
+  `current`, `edited`, `updateAvailable`, `missing` or `unreadable`, `route` and
+  `copyName`, `ignoredChanges`, and the `Samples` `directory`, all with `/`),
+  `update` `{ name }` and `update-all`, which answer
+  `{ updated, versioned, kept, unrenamed, fellBack, failed }`. The updates
+  refuse a sample the project service has open or opening. The Vite middleware
+  has no `LocalSamples`, so under `dev:vite` the routes fail and the Drive shows
+  no sample actions.
+
+Tests: `src/samples/__tests__/installSamples.test.ts`, the version route with
+real git in `src/samples/__tests__/updateSamples.test.ts` (30 s per test, as in
+`localVersioning.test.ts`), the guards of `replaceAsVersion` (each of which a
+mutation turns a test red) in
+`localVersioning/__tests__/replaceAsVersion.test.ts`, the `samples routes` in
+`handler/__tests__/projectService.test.ts`,
+`projectService/__tests__/openOrOpening.test.ts` (with the wait on `Samples`)
+and the run marker in `__tests__/runProjects.test.ts`.
 
 ## Scope
 
@@ -120,6 +291,13 @@ none, because the fake engines of the tests have no ydoc server
 (`healthPolling.test.ts` has the one that does). Under the Node ydoc host (next
 section) there is no wait: the listener is up before the engine is spawned.
 
+The health checks, the ydoc polls and the startup timeout read the time and
+schedule through a `StartupClock` (`EnsoRunner`'s `startupClock` option, the
+real clock by default). Tests of that schedule replace it and assert the delays
+the runner asks for, never real elapsed time: a fake engine is a separate Node
+process whose start-up a loaded CI runner stretches unpredictably (Note
+[Start-Up Tests Read The Schedule] in `healthPolling.test.ts`).
+
 ## ydoc host (`projectService/ydocHost.ts`)
 
 An opened project's ydoc server runs in one of two places, chosen per open by
@@ -138,8 +316,11 @@ An opened project's ydoc server runs in one of two places, chosen per open by
   (`app/electron-client/src/ydocHost/`), `dev:vite`'s is `NodeYdocHost` itself.
 - `engine` — the one-release rollback (removed with the engine-hosted server, PR
   M of the JVM-by-default plan): the engine gets `LANGUAGE_SERVER_YDOC_PORT` and
-  serves ydoc in GraalJS, as before. A runner without a host (the tests' fakes,
-  headless runs) behaves the same way.
+  serves ydoc in GraalJS, as before. It also gets
+  `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS`, the host's `allowedOrigins()`
+  comma-separated (empty without a host, so every browser page is refused;
+  #614). A runner without a host (the tests' fakes, headless runs) behaves the
+  same way.
 
 Either way every engine start gets `LANGUAGE_SERVER_CHANNEL_TOKEN`
 (`newChannelToken`, 32 random bytes as hex, fresh per open; a respawn keeps its
@@ -406,6 +587,15 @@ Rules worth keeping:
   bare `fs.rename`. On Windows, real-time virus scanning holds a file it has
   just seen written for about a second, and a rename over it fails with `EPERM`
   meanwhile; the helper retries `EPERM`/`EACCES`/`EBUSY` for up to 5 s (#275).
+  The same goes for a folder: Windows refuses to rename one while another
+  process has any file in it open, and a virus scanner opens the files of a
+  folder just filled. On CI's Windows runners, under `%TEMP%`, a bare rename of
+  a folder inside one that had just been renamed into place failed with `EPERM`
+  in a sizeable share of attempts (each lock gone within milliseconds); the same
+  steps elsewhere on the disk never failed, and a rerun on a developer machine
+  gave no failures at all, so how often it happens depends on the machine and
+  its scanner. `installAll`'s rename of the staged `Samples` uses the helper for
+  this reason, and a test that renames such a folder itself retries too (#622).
 - A corrupt or newer `labels.json`/`recent.json` is renamed to
   `<name>.corrupt-<ts>`/`<name>.newer-<ts>` and treated as empty. A corrupt
   `project.json` is never moved: that would cost the project its UUID.
@@ -431,7 +621,8 @@ neither committed nor unstaged.
 - `src/localVersioning/index.ts`: `LocalVersioning` (constructed with a
   `VersioningConsent`) with `status`, `init`, `enable`, `disable`, `commit`,
   `commitIfEnabled`, `log`, `fileAt`, `setComment`, `restore`, `exportAt`,
-  `commitMove`, and the lookup `repositoryOf`.
+  `commitMove`, `isVersioned`, `ignoredPaths` and `replaceAsVersion` (the
+  samples' version route, see "Sample projects"), and the lookup `repositoryOf`.
 - `src/localVersioning/consent.ts`: `VersioningConsent`, the persisted record of
   enabled repositories (see _Consent_ below).
 - `src/localVersioning/git.ts`: `findGit`, `runGit`, `findRepoRoot`,
@@ -618,12 +809,16 @@ stays staged).
 
 `localVersioning.test.ts` runs real git, dozens of processes per test. On
 Windows a test takes 1–5 s on an idle machine, so the file sets
-`vi.setConfig({ testTimeout: 30_000 })`: under load, vitest's default 5 s failed
-a different handful of tests each run (#395). A vitest timeout can be reported
-as `STACK_TRACE_ERROR` (the placeholder error vitest builds the timeout from),
-so read that as "timed out", not as an error in the code. A timed-out test's
-body also keeps running into the next test, so look at the first failure, not
-the ones after it.
+`vi.setConfig({ testTimeout: 30_000 })`, and so do the other files that run real
+git: `replaceAsVersion.test.ts`,
+`handler/__tests__/filesystemVersioning.test.ts`,
+`samples/__tests__/updateSamples.test.ts`, and the `versioning routes` block of
+`handler/__tests__/projectService.test.ts` (`{ timeout: 30_000 }`): under load,
+vitest's default 5 s failed a different handful of tests each run (#395). A
+vitest timeout can be reported as `STACK_TRACE_ERROR` (the placeholder error
+vitest builds the timeout from), so read that as "timed out", not as an error in
+the code. A timed-out test's body also keeps running into the next test, so look
+at the first failure, not the ones after it.
 
 ### Known limitations
 

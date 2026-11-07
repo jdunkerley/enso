@@ -58,3 +58,8 @@ language server share.
 - Anywhere a Java-native rewrite is possible, see
   [Runtime-Roadmap](https://github.com/jdunkerley/enso/wiki/Runtime-Roadmap):
   we're migrating Scala → Java.
+- `downloader/`'s GET requests time out (30 s to connect, 30 s for the response
+  to start) and a server that timed out is not asked again for two minutes
+  (Notes in `HTTPDownload.scala`). Without them, a library repository that never
+  answers kept a project "Initializing" for good (#600). A POST (library upload)
+  has no response timeout.

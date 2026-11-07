@@ -2,6 +2,11 @@ package org.enso.ydoc.polyfill.web;
 
 import io.helidon.webclient.websocket.WsClient;
 import io.helidon.websocket.WsListener;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import org.enso.ydoc.polyfill.ExecutorSetup;
@@ -81,6 +86,121 @@ public class WebSocketServerTest extends ExecutorSetup {
     Assert.assertTrue((boolean) res.get(0));
     Assert.assertEquals("/hello", res.get(1));
     Assert.assertEquals("foo=bar", res.get(2));
+  }
+
+  /**
+   * The status a WebSocket handshake for {@code target} gets, sent raw so that {@code Origin} can
+   * be set (or left out) as a browser would.
+   */
+  static int handshakeStatus(int port, String target, String origin) throws IOException {
+    try (var socket = new Socket("localhost", port)) {
+      return handshakeStatus(socket, port, target, origin);
+    }
+  }
+
+  /** {@link #handshakeStatus(int, String, String)} on a socket the caller keeps open. */
+  static int handshakeStatus(Socket socket, int port, String target, String origin)
+      throws IOException {
+    socket.setSoTimeout(10_000);
+    var request =
+        "GET "
+            + target
+            + " HTTP/1.1\r\n"
+            + "Host: localhost:"
+            + port
+            + "\r\n"
+            + "Upgrade: websocket\r\n"
+            + "Connection: Upgrade\r\n"
+            + "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+            + "Sec-WebSocket-Version: 13\r\n"
+            + (origin == null ? "" : "Origin: " + origin + "\r\n")
+            + "\r\n";
+    socket.getOutputStream().write(request.getBytes(StandardCharsets.US_ASCII));
+    socket.getOutputStream().flush();
+    var reader =
+        new BufferedReader(
+            new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+    var statusLine = reader.readLine();
+    Assert.assertNotNull("No response to the handshake for " + target, statusLine);
+    return Integer.parseInt(statusLine.split(" ")[1]);
+  }
+
+  /** Note [The Engine-Hosted Listener Refuses Before The Upgrade] (#614). */
+  @Test
+  public void verifyClientRefusesBeforeTheUpgrade() throws Exception {
+    var port = TimedLock.freePort();
+    var seen = new AtomicReferenceArray<>(new Object[4]);
+    var connected = new AtomicReferenceArray<>(new Object[8]);
+
+    var code =
+        """
+        let count = 0;
+        const verifyClient = (url, origin) => {
+            seen.set(0, url.pathname);
+            seen.set(1, url.searchParams.get('ls'));
+            seen.set(2, origin);
+            if (url.pathname === '/throws') throw new Error('verifyClient failed');
+            if (origin != null && origin !== 'https://localhost:1234')
+                return {status: 403, reason: 'Forbidden'};
+            if (url.pathname === '/missing') return {status: 404};
+            if (url.pathname === '/bad') return {status: 400, reason: 'Bad'};
+            // Not `ws`'s boolean contract: only undefined or null accepts.
+            if (url.pathname === '/true') return true;
+            return undefined;
+        };
+        let wss = new WebSocketServer({host: 'localhost', port: port, verifyClient});
+        wss.onconnect = (ws, url) => connected.set(count++, url.pathname);
+        wss.start();
+        """;
+
+    context.getBindings("js").putMember("port", port);
+    context.getBindings("js").putMember("seen", seen);
+    context.getBindings("js").putMember("connected", connected);
+    CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
+
+    // A Node client (no Origin) and the app's own page are upgraded.
+    Assert.assertEquals(101, handshakeStatus(port, "/accepted?ls=x", null));
+    Assert.assertEquals("/accepted", seen.get(0));
+    Assert.assertEquals("x", seen.get(1));
+    Assert.assertNull(seen.get(2));
+    Assert.assertEquals(
+        101, handshakeStatus(port, "/accepted-page?ls=x", "https://localhost:1234"));
+    Assert.assertEquals("https://localhost:1234", seen.get(2));
+
+    // Refused with the status `verifyClient` names, before the upgrade.
+    Assert.assertEquals(403, handshakeStatus(port, "/refused?ls=x", "https://evil.example"));
+    Assert.assertEquals(404, handshakeStatus(port, "/missing?ls=x", null));
+    Assert.assertEquals(400, handshakeStatus(port, "/bad", null));
+    // A check that fails refuses too.
+    Assert.assertEquals(500, handshakeStatus(port, "/throws", null));
+    // So does an answer in another form, `true` included.
+    Assert.assertEquals(500, handshakeStatus(port, "/true", null));
+
+    // An accepted socket that stays open goes on to `open` and `onconnect`.
+    try (var kept = new Socket("localhost", port)) {
+      Assert.assertEquals(101, handshakeStatus(kept, port, "/kept?ls=x", null));
+      var deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+      var reached = false;
+      while (!reached && System.nanoTime() < deadline) {
+        for (var i = 0; i < connected.length(); i++) {
+          reached |= "/kept".equals(connected.get(i));
+        }
+        if (!reached) Thread.sleep(50);
+      }
+      Assert.assertTrue("The accepted socket did not reach onconnect", reached);
+    }
+
+    // No refused socket reaches `onconnect`. (Whether an accepted one does depends on the race
+    // between its `open` and this test closing it, so only the refused ones are checked.)
+    Thread.sleep(500);
+    for (var i = 0; i < connected.length(); i++) {
+      var path = connected.get(i);
+      if (path != null) {
+        Assert.assertTrue(
+            "A refused socket reached onconnect: " + path,
+            path.equals("/accepted") || path.equals("/accepted-page") || path.equals("/kept"));
+      }
+    }
   }
 
   private static final class TestWsListener implements WsListener {

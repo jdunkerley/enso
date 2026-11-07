@@ -22,6 +22,7 @@ const value = (flag) => args[args.indexOf(flag) + 1]
 fs.writeFileSync(value('--path') + '.env.json', JSON.stringify({
   LANGUAGE_SERVER_YDOC_PORT: process.env.LANGUAGE_SERVER_YDOC_PORT,
   LANGUAGE_SERVER_CHANNEL_TOKEN: process.env.LANGUAGE_SERVER_CHANNEL_TOKEN,
+  LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS: process.env.LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS,
 }))
 if (process.env.FAKE_ENSO_FAIL === '1') process.exit(1)
 http.createServer((_q, r) => r.end('OK')).listen(Number(value('--rpc-port')), '127.0.0.1')
@@ -49,6 +50,7 @@ const seenEnv = async (project: string) =>
   JSON.parse(await fs.readFile(`${project}.env.json`, 'utf8')) as {
     LANGUAGE_SERVER_YDOC_PORT?: string
     LANGUAGE_SERVER_CHANNEL_TOKEN?: string
+    LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS?: string
   }
 
 /** Whether any engine has started in the test's root (each fake writes `<project>.env.json`). */
@@ -90,6 +92,7 @@ test('node: the host listens on the ydoc port before the engine starts, with the
   const sockets = await runner.openProject(Path(p), 'id-n')
   const seen = await seenEnv(p)
   expect(seen.LANGUAGE_SERVER_YDOC_PORT).toBeUndefined()
+  expect(seen.LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS).toBeUndefined()
   expect(seen.LANGUAGE_SERVER_CHANNEL_TOKEN).toMatch(/^[0-9a-f]{64}$/)
   expect(calls).toEqual([
     `listen 127.0.0.1:${sockets.ydocSocket.port} ls=127.0.0.1:${sockets.jsonSocket.port} token=${seen.LANGUAGE_SERVER_CHANNEL_TOKEN}`,
@@ -145,6 +148,28 @@ test('engine: the engine gets the ydoc port and a token, and the host is not use
   await runner.closeProject(Path(p))
   expect(host.listen).not.toHaveBeenCalled()
   expect(host.close).not.toHaveBeenCalled()
+})
+
+test("engine: the engine's listener gets the host's origins (#614)", async () => {
+  vi.stubEnv('ENSO_YDOC_HOST', 'engine')
+  const origins = ['https://localhost:5000', 'https://127.0.0.1:5000']
+  const runner = new EnsoRunner(await fakeEnso(root), {
+    firstPort: YDOC_HOST_PORT,
+    ydocHost: { listen: vi.fn(), close: vi.fn(), allowedOrigins: () => origins },
+  })
+  const p = path.join(root, 'O')
+  await runner.openProject(Path(p), 'id-o')
+  expect((await seenEnv(p)).LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS).toBe(origins.join(','))
+  await runner.closeProject(Path(p))
+})
+
+test('engine: a host without origins gives the listener none, so it refuses every page', async () => {
+  vi.stubEnv('ENSO_YDOC_HOST', 'engine')
+  const runner = new EnsoRunner(await fakeEnso(root), { firstPort: YDOC_HOST_PORT })
+  const p = path.join(root, 'P')
+  await runner.openProject(Path(p), 'id-p')
+  expect((await seenEnv(p)).LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS).toBe('')
+  await runner.closeProject(Path(p))
 })
 
 test('without a host (node or not) the engine serves ydoc, as before', async () => {

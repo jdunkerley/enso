@@ -5,6 +5,7 @@ import { getFileSystemEntry } from './handler/index.js'
 import type { Runner } from './projectService/ensoRunner.js'
 import { EnsoRunner, findEnsoExecutable } from './projectService/ensoRunner.js'
 import { ProjectService, type EngineSettings } from './projectService/index.js'
+import { markProjectRunning, removeOnSignals } from './samples/runMarker.js'
 
 function getWorkDir() {
   if (process.env.NODE_ENV === 'development') {
@@ -53,16 +54,28 @@ export async function runLocalProjectByUuid(
   }
 }
 
-/** Run a local project by path. */
+/**
+ * Run a local project by path. While it runs, the project carries a run marker, so an IDE started
+ * meanwhile does not update it if it is a bundled sample. `runner` is for tests.
+ */
 export async function runLocalProjectByPath(
   projectPath: Path,
   engine?: EngineSettings,
+  runner?: Runner,
 ): Promise<number> {
   const directoryId = Path(dirname(projectPath))
   const project = await getFileSystemEntry(projectPath)
   if (project.type !== 'ProjectEntry') {
     throw new Error(`The path '${projectPath}' does not point to a project.`)
   }
-  const exitCode = await runLocalProjectByUuid(project.metadata.id as UUID, directoryId, engine)
-  return exitCode
+  // An IDE started meanwhile must not update a bundled sample this process runs.
+  const marker = await markProjectRunning(projectPath)
+  // Ctrl+C or a terminate would otherwise leave the marker behind.
+  const stopListening = removeOnSignals(marker)
+  try {
+    return await runLocalProjectByUuid(project.metadata.id as UUID, directoryId, engine, runner)
+  } finally {
+    stopListening()
+    await marker.remove()
+  }
 }
