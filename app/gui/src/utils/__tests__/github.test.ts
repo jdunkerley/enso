@@ -81,3 +81,73 @@ test.each([
   expect(fetchMock).toHaveBeenCalledTimes(2)
   expect(await getDownloadUrl()).toBeNull()
 })
+
+/** A release with the given tag, as GitHub lists them. */
+function tagged(tag: string, extra: object = {}) {
+  /* eslint-disable camelcase */
+  return {
+    ...RELEASE,
+    tag_name: tag,
+    assets: ['exe', 'dmg', 'AppImage'].map((ext) => ({
+      browser_download_url: `https://example.com/${tag}.${ext}`,
+    })),
+    ...extra,
+  }
+  /* eslint-enable camelcase */
+}
+
+test('with prereleases: the newest by version, not by listing order, over all releases', async () => {
+  // GitHub lists by creation date: the rc of the next release is older than the patch here.
+  fetchMock.mockResolvedValue(
+    Response.json([
+      tagged('2026.1.1-rc.2'),
+      tagged('2026.1.1-rc.10'),
+      tagged('2026.1.0'),
+      tagged('not-a-version'),
+    ]),
+  )
+  expect((await getLatestRelease(true))?.tag_name).toBe('2026.1.1-rc.10')
+  expect(fetchMock.mock.calls[0]?.[0]).toMatch(/\/repos\/jdunkerley\/enso\/releases\?/)
+  expect(await getDownloadUrl(true)).toMatch(/^https:\/\/example\.com\/2026\.1\.1-rc\.10\./)
+})
+
+test('with prereleases: a release is newer than its own rcs, and drafts are ignored', async () => {
+  fetchMock.mockResolvedValue(
+    Response.json([
+      tagged('2026.1.1-rc.3'),
+      tagged('2026.1.1'),
+      tagged('2099.1.1', { draft: true }),
+    ]),
+  )
+  expect((await getLatestRelease(true))?.tag_name).toBe('2026.1.1')
+})
+
+test('with prereleases: nightlies are not offered, as in auto mode', async () => {
+  fetchMock.mockResolvedValue(
+    Response.json([tagged('2026.3.0-nightly.2026.11.1'), tagged('2026.1.1-rc.2')]),
+  )
+  expect((await getLatestRelease(true))?.tag_name).toBe('2026.1.1-rc.2')
+})
+
+test('with prereleases: no release (404) or none that is a version is null', async () => {
+  fetchMock.mockResolvedValueOnce(Response.json({ message: 'Not Found' }, { status: 404 }))
+  expect(await getLatestRelease(true)).toBeNull()
+  localStorage.clear()
+  fetchMock.mockResolvedValueOnce(Response.json([tagged('nightly')]))
+  expect(await getLatestRelease(true)).toBeNull()
+})
+
+test('with prereleases: a body that is not a list of releases is a quiet error', async () => {
+  fetchMock.mockResolvedValue(Response.json({ foo: 1 }))
+  await expect(getLatestRelease(true)).rejects.toBeInstanceOf(ReleaseCheckError)
+})
+
+test('the stable and the prerelease answers are cached apart', async () => {
+  fetchMock.mockImplementation(async (url) =>
+    Response.json(String(url).includes('/latest') ? tagged('2026.1.0') : [tagged('2026.2.0-rc.1')]),
+  )
+  expect((await getLatestRelease(false))?.tag_name).toBe('2026.1.0')
+  expect((await getLatestRelease(true))?.tag_name).toBe('2026.2.0-rc.1')
+  expect((await getLatestRelease(false))?.tag_name).toBe('2026.1.0')
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+})

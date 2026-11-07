@@ -99,10 +99,8 @@ the first second and every 250 ms after (Note [Start-up Health Polling] in
 
 An engine that has not passed `/_health` within the start-up limit is killed.
 `ENSO_ENGINE_STARTUP_TIMEOUT_MS` and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS` override
-both columns (the open-time harness's JDK AOT training launch needs it on
-Windows, where a `--jvm` engine with no class data sharing, recording its
-classes, takes longer, and writes its training data as it exits). A runner
-called without a launch (tests) keeps the native values.
+both columns (the shim's own AOT training launch gets longer limits of its own).
+A runner called without a launch (tests) keeps the native values.
 
 `project/open` is also answered only once the engine's ydoc port accepts a
 connection (`EnsoRunner`'s `ydocWaitMs`, per launch from the mode's column,
@@ -168,12 +166,12 @@ the `EngineLaunch` that `Runner.openProject`/`runProject` take. `--new`,
 The engine log panel's first line is `Engine mode: <mode> (<source>)`
 (`EngineLogChannel.notice`, a `stderr` line before any session).
 
-A `--jvm` in `ENSO_ENGINE_ARGS` (the open-time harness uses it) is lifted into
-the `jvm` option by `ProjectService.default` (`liftJvmFlag`): the log names
-`--engine-mode`, the JVM limits apply, and a project's `jvm: false` still wins.
-Headless `--startup.project` runs take `--engine-mode` too
-(`runLocalProjectByPath`'s `engine`). Re-opening an open project writes no
-second mode line.
+A `--jvm` in `ENSO_ENGINE_ARGS` (a developer back door; the open-time harness
+sets `ENSO_ENGINE_MODE` instead) is lifted into the `jvm` option by
+`ProjectService.default` (`liftJvmFlag`): the log names `--engine-mode`, the JVM
+limits apply, and a project's `jvm: false` still wins. Headless
+`--startup.project` runs take `--engine-mode` too (`runLocalProjectByPath`'s
+`engine`). Re-opening an open project writes no second mode line.
 
 ## JDK AOT cache (`src/jvmAot/`)
 
@@ -241,7 +239,8 @@ in `app/electron-client/src/projectService.ts` and passes it to the
     attaches as it connects, and so does the driver.
   - JEP 514's one-step `-XX:AOTCacheOutput=` fails: its forked child JVM lacks
     the JNI-started JVM's modules (`jdk.internal.vm.ci`), hence record, then
-    create with `java`, as the open-time harness does.
+    create with `java`, as the open-time harness once did before it measured
+    this cache.
 - **Yielding**: `ProjectService.openProject` calls `openStarted()` before the
   engine starts (any mode) and `openAnswered()` after the answer, a failure
   included. An open kills a running training (on Windows with `taskkill /T`, so
@@ -256,15 +255,13 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   key's "last used"; without a log, `enso.aot`'s. `AOTMode` stays `auto`, so a
   cache the JVM refuses costs only its benefit. After such an open
   `checkUseLog()` deletes the cache when `use.log` has a line `aotRejection`
-  (`useLog.ts`, also the open-time harness's) matches; it retrains at the next
-  launch.
+  (`useLog.ts`) matches; it retrains at the next launch.
 - **`ENSO_JVM_OPTIONS`** is built by `jvmOptionsValue`
   (`projectService/jvmOptions.ts`, which also holds `LAUNCHER_JVM_OPTIONS`,
-  `parseJvmOptionsFile` and `aotCreateArguments`; the open-time harness
-  re-exports them, so there is one copy): an inherited value is split as the
-  launcher splits it (lines if it has a newline, else whitespace) and the shim's
-  options follow one per line; a single option gets a trailing newline, so that
-  the launcher reads it as a line and a space in its path survives.
+  `parseJvmOptionsFile` and `aotCreateArguments`): an inherited value is split
+  as the launcher splits it (lines if it has a newline, else whitespace) and the
+  shim's options follow one per line; a single option gets a trailing newline,
+  so that the launcher reads it as a line and a space in its path survives.
 - **Known limits**: `os.setPriority` lowers the launcher's process; on Linux,
   where priority is per thread, threads the JVM created before the call keep
   normal priority. Two JVM engines open at once share `use.log`. Any `[warning]`

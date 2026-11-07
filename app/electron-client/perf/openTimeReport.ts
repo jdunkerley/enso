@@ -39,11 +39,11 @@ export const HEADLINE: Phase = 'welcomeShown'
 /** Milliseconds from the click on the project's row. */
 export type OpenTimes = Partial<Record<Phase | Extra, number>>
 /**
- * `native` is the native image, `jvm` the bundled JDK with the harness's AOT cache, `jvm-nocache`
- * the bundled JDK with no AOT cache of ours (the JDK's own CDS archive still applies): what
- * `--jvm` gives a user.
+ * `native` is the native image. `jvm` is the engine as a user has it after the first open: the
+ * bundled JDK with the shim's own AOT cache, trained before the measured launches. `jvm-first` is
+ * a user's very first launch: the same, with the cache deleted before each launch.
  */
-export type Engine = 'native' | 'jvm' | 'jvm-nocache'
+export type Engine = 'native' | 'jvm' | 'jvm-first'
 /** The first open of a launch is cold; the second opens another project in the same session. */
 export type OpenTag = 'first' | 'second'
 
@@ -55,6 +55,18 @@ export interface Mark {
   readonly [extra: string]: unknown
 }
 
+/** The memory of the engine's processes and of the ydoc host, in kilobytes (`processRss.ts`). */
+export interface RssSample {
+  readonly engineKb: number
+  readonly ydocKb: number
+}
+
+/** First open only: when the headline showed, and 30 s later. */
+export interface RunRss {
+  readonly atWelcome: RssSample
+  readonly after30s: RssSample
+}
+
 export interface RunResult {
   readonly engine: Engine
   readonly run: number
@@ -63,6 +75,8 @@ export interface RunResult {
   /** The phases and extras a successful launch did not record, first and second open together. */
   readonly notMeasured: readonly (Phase | Extra)[]
   readonly error?: string
+  /** Sampled on the first open of the launch; absent when a sample failed. */
+  readonly rss?: RunRss
 }
 
 /**
@@ -72,20 +86,69 @@ export interface RunResult {
 export type Template = 'core' | 'full' | 'other'
 
 /**
- * How the JVM runs got their AOT cache: `ide-trained` by a launch of the IDE, `launcher-trained` by
- * `enso --jvm --run` of an empty project (it never loads the Language Server, so its numbers are
- * pessimistic and not comparable with `ide-trained` ones), `uncached` when the JVM could not use
- * the cache it was given, so the numbers are those of a JVM with no AOT cache.
+ * The shim's AOT cache (`project-manager-shim/jvmAot`) as the `jvm` runs had it: how long the
+ * preparation launch took until `enso.aot` existed, its size, and the (1-based) launches after
+ * which the cache was gone, which is what the shim does with a cache the JVM rejects.
  */
-export type JvmAot = 'ide-trained' | 'launcher-trained' | 'uncached'
+export interface ShimAot {
+  readonly trainingMs: number
+  readonly cacheBytes: number
+  /** Launches after which the shim had deleted the cache. */
+  readonly rejectedIn: readonly number[]
+  /**
+   * Launches whose JVMs loaded almost no classes from the cache (hsperf `sharedClasses`, see
+   * {@link usedAotCache}): the cache was skipped, with or without a warning. Absent in older reports.
+   */
+  readonly uncachedIn?: readonly number[]
+  /**
+   * `jvm` launches whose cache use could not be checked: no hsperf counters of the launch's own
+   * JVMs (see {@link usedAotCache}). Absent in older reports.
+   */
+  readonly uncheckedIn?: readonly number[]
+}
+
+/** A JVM that used the AOT cache loaded ~18,000 classes from it; one that did not, ~1,500. */
+const CACHED_SHARED_CLASSES = 5000
+
+/**
+ * Whether a `jvm` launch's JVMs used the AOT cache, judged open by open on each open's own JVMs
+ * (hsperf `jvm` marks): a JVM belongs to the launch when it started after the `launch` mark (a
+ * file left by an earlier launch's JVM that is still alive is older), and to an open when it
+ * started after that open's click and before the next open's. An open is cached when its JVM with
+ * the most shared classes has at least {@link CACHED_SHARED_CLASSES}. The launch is `false` when
+ * any open that has a JVM is not, so a cached second open cannot hide an uncached first; `undefined`
+ * when no open has a JVM with counters (hsperf unavailable: `-XX:-UsePerfData`, an unreadable
+ * temporary directory), which the caller records as unchecked.
+ */
+export function usedAotCache(marks: readonly Mark[]): boolean | undefined {
+  const launch = marks.find((m) => m.k === 'launch')?.t ?? 0
+  const clicks = (['first', 'second'] as const)
+    .map((tag) => marks.find((m) => m.k === `${tag}:click`)?.t)
+    .filter((t): t is number => t != null)
+    .sort((a, b) => a - b)
+  const jvms = marks.flatMap((m) =>
+    m.k === 'jvm' && typeof m.sharedClasses === 'number' && typeof m.vmStart === 'number' ?
+      [{ start: m.vmStart, shared: m.sharedClasses }]
+    : [],
+  )
+  const verdicts: boolean[] = []
+  clicks.forEach((click, i) => {
+    const next = clicks[i + 1] ?? Number.POSITIVE_INFINITY
+    const shared = jvms
+      .filter((j) => j.start >= Math.max(launch, click) && j.start < next)
+      .map((j) => j.shared)
+    if (shared.length > 0) verdicts.push(Math.max(...shared) >= CACHED_SHARED_CLASSES)
+  })
+  return verdicts.length === 0 ? undefined : verdicts.every(Boolean)
+}
 
 export interface OpenTimeReport {
   readonly version: 1
   readonly platform: string
   readonly commit: string | null
   readonly template: Template
-  /** Present when the report has JVM runs. */
-  readonly jvmAot?: JvmAot
+  /** Present when the report has `jvm` runs. */
+  readonly shimAot?: ShimAot
   /**
    * The harness's own project (`--template`, `projectTemplates.ts`) when it was not the new-project
    * template; the headline is then that project's library table, not the welcome table.
@@ -208,6 +271,8 @@ export interface EngineSummary {
   readonly launches: number
   readonly first: OpenTimes
   readonly second: OpenTimes
+  /** The median of each RSS sample over the launches that have one; `undefined` when none do. */
+  readonly rss?: RunRss
   /** The fastest and slowest first open's headline, `undefined` when none reached it. */
   readonly range?: { readonly min: number; readonly max: number }
 }
@@ -226,17 +291,35 @@ export function summarise(report: OpenTimeReport): EngineSummary[] {
       return out
     }
     const headlines = runs.flatMap((r) => r.first[HEADLINE] ?? [])
+    const rss = summariseRss(runs)
     return {
       engine,
       succeeded: headlines.length,
       launches: runs.length,
       first: medians((r) => r.first),
       second: medians((r) => r.second),
+      ...(rss ? { rss } : {}),
       ...(headlines.length > 0 ?
         { range: { min: Math.min(...headlines), max: Math.max(...headlines) } }
       : {}),
     }
   })
+}
+
+function summariseRss(runs: readonly RunResult[]): RunRss | undefined {
+  const samples = runs.flatMap((r) => r.rss ?? [])
+  if (samples.length === 0) return undefined
+  const m = (pick: (r: RunRss) => number) => median(samples.map(pick))!
+  return {
+    atWelcome: {
+      engineKb: m((r) => r.atWelcome.engineKb),
+      ydocKb: m((r) => r.atWelcome.ydocKb),
+    },
+    after30s: {
+      engineKb: m((r) => r.after30s.engineKb),
+      ydocKb: m((r) => r.after30s.ydocKb),
+    },
+  }
 }
 
 /** develop's first-open medians for one engine, pooled over `reports` of its runs. */
@@ -263,9 +346,10 @@ export interface Develop {
 export function developMedians(report: OpenTimeReport, baseline: Baseline): Develop[] {
   const reports = baselineReports(report, baseline).slice(0, BASELINE_RUNS)
   return [...new Set(report.runs.map((r) => r.engine))].flatMap((engine) => {
-    // JVM numbers are comparable only when the cache was made the same way.
+    // `jvm` numbers are comparable only when made through the shim's cache (`shimAot`); an older
+    // report's `jvm` had the harness's own cache (`jvmAot`), or none.
     const summaries = reports
-      .filter((b) => engine !== 'jvm' || b.jvmAot === report.jvmAot)
+      .filter((b) => engine !== 'jvm' || b.shimAot != null)
       .flatMap(
         (b) => summarise(b).find((s) => s.engine === engine && s.succeeded >= MIN_SUCCESSFUL) ?? [],
       )
@@ -279,7 +363,45 @@ export function developMedians(report: OpenTimeReport, baseline: Baseline): Deve
   })
 }
 
+/** The `shimAot` line of `open-time.md`. */
+export function describeShimAot(aot: ShimAot): string {
+  const mib = (aot.cacheBytes / 1024 / 1024).toFixed(1)
+  const rejected =
+    aot.rejectedIn.length === 0 ?
+      'never rejected'
+    : `rejected in launches ${aot.rejectedIn.join(', ')}`
+  const uncached =
+    aot.uncachedIn != null && aot.uncachedIn.length > 0 ?
+      `; no classes from the cache in launches ${aot.uncachedIn.join(', ')}`
+    : ''
+  const unchecked =
+    aot.uncheckedIn != null && aot.uncheckedIn.length > 0 ?
+      `; cache use not checked (no hsperf counters) in launches ${aot.uncheckedIn.join(', ')}`
+    : ''
+  return `Shim AOT cache: trained in ${(aot.trainingMs / 1000).toFixed(1)} s, ${mib} MiB, ${rejected}${uncached}${unchecked}.`
+}
+
 const cell = (value: number | undefined) => (value == null ? '–' : String(Math.round(value)))
+
+/** The RSS medians, in MiB: one row per engine that has samples; empty when none has. */
+function rssTable(summaries: readonly EngineSummary[], platform: string): string[] {
+  const rows = summaries.flatMap((s) => {
+    if (s.rss == null) return []
+    const mib = (kb: number) => String(Math.round(kb / 1024))
+    return [
+      `| ${s.engine} | ${mib(s.rss.atWelcome.engineKb)} | ${mib(s.rss.after30s.engineKb)} | ${mib(s.rss.atWelcome.ydocKb)} | ${mib(s.rss.after30s.ydocKb)} |`,
+    ]
+  })
+  if (rows.length === 0) return []
+  return [
+    `${platform === 'win32' ? 'Working set' : 'Resident memory'}, MiB, medians of the first open (engine: the launcher and the JVM or native image under it; ydoc: the utility process).`,
+    '',
+    '| Engine | Engine at welcome table | Engine 30 s later | Ydoc host at welcome table | Ydoc host 30 s later |',
+    '| --- | ---: | ---: | ---: | ---: |',
+    ...rows,
+    '',
+  ]
+}
 
 /** The medians as a Markdown table, with develop's first-open medians when there is a baseline. */
 export function renderMarkdown(report: OpenTimeReport, baseline: Baseline): string {
@@ -307,12 +429,14 @@ export function renderMarkdown(report: OpenTimeReport, baseline: Baseline): stri
     )
     .join('; ')
   return [
-    `Medians, ${report.platform}, ${report.template} template${report.commit ? ` at \`${report.commit.slice(0, 10)}\`` : ''} (${counts})${report.jvmAot ? `; JVM AOT cache: ${report.jvmAot}` : ''}${report.project ? `; project \`${report.project}\`: the headline is its library's table` : ''}.`,
+    `Medians, ${report.platform}, ${report.template} template${report.commit ? ` at \`${report.commit.slice(0, 10)}\`` : ''} (${counts})${report.project ? `; project \`${report.project}\`: the headline is its library's table` : ''}.`,
     '',
+    ...(report.shimAot ? [describeShimAot(report.shimAot), ''] : []),
     `| ${header.join(' | ')} |`,
     `| ${header.map((_, i) => (i === 0 ? '---' : '---:')).join(' | ')} |`,
     ...rows,
     '',
+    ...rssTable(ours, report.platform),
   ].join('\n')
 }
 
@@ -342,9 +466,19 @@ export function regressionWarnings(
       warnings.push(`${engine}: not measured in some launches: ${[...missing].join(', ')}`)
     }
   }
-  if (report.jvmAot === 'uncached') {
+  if (report.shimAot != null && report.shimAot.rejectedIn.length > 0) {
     warnings.push(
-      'jvm: the JVM could not use the AOT cache, so the JVM numbers are those of an uncached JVM',
+      `jvm: the shim's AOT cache was rejected (and deleted) after launches ${report.shimAot.rejectedIn.join(', ')}; that launch and the later ones ran uncached`,
+    )
+  }
+  if (report.shimAot?.uncachedIn != null && report.shimAot.uncachedIn.length > 0) {
+    warnings.push(
+      `jvm: launches ${report.shimAot.uncachedIn.join(', ')} loaded almost no classes from the AOT cache (hsperf sharedClasses), so they ran uncached`,
+    )
+  }
+  if (report.shimAot?.uncheckedIn != null && report.shimAot.uncheckedIn.length > 0) {
+    warnings.push(
+      `jvm: launches ${report.shimAot.uncheckedIn.join(', ')} have no hsperf counters, so whether they used the AOT cache is unknown`,
     )
   }
   // A launch that reached the welcome table but failed later (the second open) still counts in the
@@ -416,29 +550,16 @@ export function credentialFreeEnv(
   )
 }
 
-/**
- * The launcher's fixed JVM options, the lines of a package's `jvm.options`, the launcher's split of
- * `ENSO_JVM_OPTIONS`, and the arguments of the `java` that creates an AOT cache. The shim trains
- * its per-user cache with the same, so there is one copy, in the shim.
- */
-export {
-  LAUNCHER_JVM_OPTIONS,
-  aotCreateArguments,
-  parseJvmOptionsFile,
-  splitJvmOptions,
-} from 'project-manager-shim/jvmAot'
-
-/**
- * The first line of the JVM's output that says the AOT cache could not be used, or `undefined`.
- * The shim reads its engines' `use.log` with the same pattern, so there is one copy, in the shim.
- */
-export { aotRejection } from 'project-manager-shim/jvmAot'
-
 /** The engines named by `--engines` (comma-separated); throws on an unknown one. */
 export function parseEngines(value: string): Engine[] {
   return value.split(',').map((e) => {
     const engine = e.trim()
-    if (engine !== 'native' && engine !== 'jvm' && engine !== 'jvm-nocache') {
+    if (engine === 'jvm-nocache') {
+      throw new Error(
+        "The engine jvm-nocache is gone: `jvm` is now the shim's own AOT cache, and `jvm-first` is a user's first launch, with no cache yet",
+      )
+    }
+    if (engine !== 'native' && engine !== 'jvm' && engine !== 'jvm-first') {
       throw new Error(`Unknown engine: ${engine}`)
     }
     return engine
