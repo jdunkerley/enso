@@ -58,8 +58,8 @@ AOT-ready; any other library loads its Java in the guest JVM. See Note
 
 Both come after the fixed list and before `--module-path`/`-m`. Keep
 `JvmOptions` Native-Image friendly (plain `java.io`/`java.nio` only): it runs in
-the `enso` native image. The open-time harness reads the same file when it
-starts `java` itself (`app/electron-client/perf/jvmAotCache.ts`).
+the `enso` native image. The shim's AOT trainer reads the same file when it
+starts `java` itself (`app/project-manager-shim/src/jvmAot/trainer.ts`).
 
 Rules for an option line (in the file or in `ENSO_JVM_OPTIONS`):
 

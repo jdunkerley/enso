@@ -1,24 +1,19 @@
 /** @file The open-time harness's pure logic: log lines, phases, medians, warnings. */
-import fs from 'node:fs'
-import path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import {
-  aotCreateArguments,
-  aotRejection,
   classifyTemplate,
   credentialFreeEnv,
   developMedians,
   joinJvmOptions,
-  LAUNCHER_JVM_OPTIONS,
   median,
   notMeasured,
   openTimes,
   parseEngines,
-  parseJvmOptionsFile,
   parseLsLogLine,
   regressionWarnings,
   renderMarkdown,
-  splitJvmOptions,
+  summarise,
+  usedAotCache,
   type Engine,
   type Mark,
   type OpenTimeReport,
@@ -338,92 +333,24 @@ describe('classifyTemplate', () => {
   })
 })
 
-describe('LAUNCHER_JVM_OPTIONS', () => {
-  test('are the options the launcher gives the JVM it starts (Main.launchJvm)', () => {
-    const source = fs.readFileSync(
-      path.resolve(__dirname, '../../../../engine/runner/src/main/java/org/enso/runner/Main.java'),
-      'utf8',
-    )
-    for (const option of LAUNCHER_JVM_OPTIONS) {
-      expect(source).toContain(`commandAndArgs.add("${option}")`)
-    }
+describe("the shim's AOT cache", () => {
+  const shimAot = { trainingMs: 95_400, cacheBytes: 123_456_789, rejectedIn: [] as number[] }
+  test('is printed under the caption: training time, size, rejections', () => {
+    const base = { ...report([3000, 3000, 3000], 'jvm'), shimAot }
+    const markdown = renderMarkdown(base, undefined)
+    expect(markdown).toContain('Shim AOT cache: trained in 95.4 s, 117.7 MiB, never rejected')
+    const rejected = { ...base, shimAot: { ...shimAot, rejectedIn: [2, 4] } }
+    expect(renderMarkdown(rejected, undefined)).toContain('rejected in launches 2, 4')
   })
-})
-
-describe('JVM_OPTIONS_FILE_LINES', () => {
-  const distributionFile = path.resolve(__dirname, '../../../../distribution/engine/jvm.options')
-  test('parseJvmOptionsFile keeps one option per line, without comments and blanks', () => {
-    expect(parseJvmOptionsFile('# c\n-Da=1\r\n\n  -Db=2  \n')).toEqual(['-Da=1', '-Db=2'])
-  })
-  test('the engine package ships the file, and it holds options', () => {
-    const lines = parseJvmOptionsFile(fs.readFileSync(distributionFile, 'utf8'))
-    expect(lines).toContain('--enable-native-access=ALL-UNNAMED,org.enso.language.server')
-  })
-  test('a byte order mark does not make the first line an option', () => {
-    const bom = String.fromCharCode(0xfeff)
-    expect(parseJvmOptionsFile(bom + '# c\n-Da=1\n')).toEqual(['-Da=1'])
-    expect(parseJvmOptionsFile(bom + '-Da=1\n')).toEqual(['-Da=1'])
-  })
-  test('splitJvmOptions follows the launcher: lines when there is a newline, else whitespace', () => {
-    expect(splitJvmOptions('  -Da=1   -Db=2 ')).toEqual(['-Da=1', '-Db=2'])
-    expect(splitJvmOptions('')).toEqual([])
-    expect(splitJvmOptions('-Da=a b\r\n-Db=2\n\n')).toEqual(['-Da=a b', '-Db=2'])
-  })
-  test('the AOT create launch gets the fixed options, the file, the experiment, then the module', () => {
-    expect(
-      aotCreateArguments({
-        config: 'c.aotconf',
-        cache: 'c.aot',
-        component: 'comp',
-        optionsFile: '# x\n--enable-native-access=ALL-UNNAMED\n',
-        jvmOptions: '-Da=1\n-Db=a b',
-      }),
-    ).toEqual([
-      '-XX:AOTMode=create',
-      '-XX:AOTConfiguration=c.aotconf',
-      '-XX:AOTCache=c.aot',
-      ...LAUNCHER_JVM_OPTIONS,
-      '--enable-native-access=ALL-UNNAMED',
-      '-Da=1',
-      '-Db=a b',
-      '--module-path=comp',
-      '-m',
-      'org.enso.runner/org.enso.runner.Main',
-    ])
-  })
-})
-
-describe('aotRejection', () => {
-  test('finds a cds or aot problem, a mismatch, or an unusable cache', () => {
-    expect(aotRejection('[0.1s][warning][cds] shared class paths mismatch')).toContain('mismatch')
-    expect(aotRejection('[0.1s][error][aot] An error has occurred')).toContain('[aot]')
-    expect(aotRejection('Unable to use AOT cache.')).toContain('Unable to use')
-    expect(
-      aotRejection('[0.1s][warning][cds] The AOT cache was created by a different VM'),
-    ).toBeDefined()
-  })
-  test('ignores other output', () => {
-    expect(aotRejection('[LOG] started\n[0.1s][warning][gc] something')).toBeUndefined()
-  })
-  test('ignores info records, which can name a feature of a cache in use as disabled', () => {
-    expect(
-      aotRejection('[0.1s][info][cds] full module graph: disabled\n[0.2s][info][aot] mismatch'),
-    ).toBeUndefined()
-    expect(aotRejection('[0.1s][info][aot] ok\n[0.2s][error][aot] bad')).toContain('[error][aot]')
-  })
-})
-
-describe('JVM cache state', () => {
-  test('is in the table caption and warned about when uncached', () => {
-    const base = { ...report([3000, 3000, 3000], 'jvm'), jvmAot: 'uncached' as const }
-    expect(renderMarkdown(base, undefined)).toContain('uncached')
+  test('a rejected cache is a warning', () => {
+    const base = { ...report([3000, 3000, 3000], 'jvm'), shimAot: { ...shimAot, rejectedIn: [2] } }
     expect(regressionWarnings(base, undefined)).toEqual(
-      expect.arrayContaining([expect.stringContaining('uncached')]),
+      expect.arrayContaining([expect.stringContaining('AOT cache was rejected')]),
     )
+    expect(regressionWarnings({ ...base, shimAot }, undefined)).toEqual([])
   })
-  test('says how the cache was trained', () => {
-    const base = { ...report([3000, 3000, 3000], 'jvm'), jvmAot: 'launcher-trained' as const }
-    expect(renderMarkdown(base, undefined)).toContain('launcher-trained')
+  test('a report without one prints no such line', () => {
+    expect(renderMarkdown(report([3000, 3000, 3000], 'jvm'), undefined)).not.toContain('Shim AOT')
   })
 })
 
@@ -438,12 +365,15 @@ describe('a launch whose second open failed', () => {
 })
 
 describe('parseEngines', () => {
-  test('reads a comma-separated list, the JVM without a cache included', () => {
+  test('reads a comma-separated list, the first-run JVM included', () => {
     expect(parseEngines('native')).toEqual(['native'])
-    expect(parseEngines('native, jvm-nocache,jvm')).toEqual(['native', 'jvm-nocache', 'jvm'])
+    expect(parseEngines('native, jvm,jvm-first')).toEqual(['native', 'jvm', 'jvm-first'])
   })
   test('refuses an unknown engine', () => {
     expect(() => parseEngines('native,graal')).toThrow('Unknown engine: graal')
+  })
+  test('refuses the old jvm-nocache, naming jvm-first', () => {
+    expect(() => parseEngines('native,jvm-nocache')).toThrow(/jvm-nocache.*jvm-first/)
   })
 })
 
@@ -454,19 +384,163 @@ describe('joinJvmOptions', () => {
   })
 })
 
-describe('jvm-nocache', () => {
-  test('has columns of its own beside the cached JVM', () => {
-    const nocache = report([27000, 28000, 27500], 'jvm-nocache')
-    const cached = report([19000, 19500, 18800], 'jvm')
-    const both = {
-      ...nocache,
-      jvmAot: 'ide-trained' as const,
-      runs: [...nocache.runs, ...cached.runs],
-    }
+describe('jvm-first', () => {
+  test('has columns of its own beside the warm JVM', () => {
+    const first = report([27000, 28000, 27500], 'jvm-first')
+    const warm = report([19000, 19500, 18800], 'jvm')
+    const both = { ...first, runs: [...first.runs, ...warm.runs] }
     const markdown = renderMarkdown(both, undefined)
-    expect(markdown).toContain('jvm-nocache first')
+    expect(markdown).toContain('jvm-first first')
     expect(markdown).toContain('jvm first')
     expect(markdown).toContain('27500')
     expect(markdown).toContain('19000')
+  })
+})
+
+describe('RSS', () => {
+  const withRss = (
+    engine: Engine,
+    values: readonly (readonly [number, number, number, number] | undefined)[],
+  ): OpenTimeReport => {
+    const base = report(
+      values.map(() => 3000),
+      engine,
+    )
+    return {
+      ...base,
+      runs: base.runs.map((r, i) => {
+        const v = values[i]
+        return v == null ? r : (
+            {
+              ...r,
+              rss: {
+                atWelcome: { engineKb: v[0], ydocKb: v[1] },
+                after30s: { engineKb: v[2], ydocKb: v[3] },
+              },
+            }
+          )
+      }),
+    }
+  }
+  test('summarise takes the median of each sample, over the launches that have one', () => {
+    const r = withRss('jvm', [
+      [1000, 100, 1200, 110],
+      [3000, 300, 3200, 310],
+      [2000, 200, 2200, 210],
+      undefined,
+    ])
+    expect(summarise(r)[0]!.rss).toEqual({
+      atWelcome: { engineKb: 2000, ydocKb: 200 },
+      after30s: { engineKb: 2200, ydocKb: 210 },
+    })
+  })
+  test('a report without samples has none', () => {
+    expect(summarise(report([3000, 3000, 3000]))[0]!.rss).toBeUndefined()
+  })
+  test('open-time.md has an RSS table in MiB, a row per engine', () => {
+    const native = withRss('native', [[102_400, 51_200, 204_800, 61_440]])
+    const both = {
+      ...native,
+      runs: [...native.runs, ...withRss('jvm', [[1_048_576, 51_200, 1_048_576, 51_200]]).runs],
+    }
+    const markdown = renderMarkdown(both, undefined)
+    expect(markdown).toContain('| Engine | Engine at welcome table | Engine 30 s later |')
+    expect(markdown).toContain('| native | 100 | 200 | 50 | 60 |')
+    expect(markdown).toContain('| jvm | 1024 | 1024 | 50 | 50 |')
+  })
+  test('no samples, no table', () => {
+    expect(renderMarkdown(report([3000, 3000, 3000]), undefined)).not.toContain('Resident memory')
+  })
+})
+
+describe('RSS caption', () => {
+  test('says working set on Windows, resident memory elsewhere', () => {
+    const win = {
+      ...report([3000, 3000, 3000], 'jvm'),
+      platform: 'win32',
+      runs: report([3000], 'jvm').runs.map((r) => ({
+        ...r,
+        rss: { atWelcome: { engineKb: 1, ydocKb: 1 }, after30s: { engineKb: 1, ydocKb: 1 } },
+      })),
+    }
+    expect(renderMarkdown(win, undefined)).toContain('Working set, MiB')
+    expect(renderMarkdown({ ...win, platform: 'linux' }, undefined)).toContain(
+      'Resident memory, MiB',
+    )
+  })
+})
+
+describe('the jvm baseline', () => {
+  const shimAot = { trainingMs: 1000, cacheBytes: 1, rejectedIn: [] as number[] }
+  const current = { ...report([9000, 9000, 9000], 'jvm'), shimAot }
+  test('pools only reports made through the shim cache', () => {
+    const old = report([20_000, 20_000, 20_000], 'jvm')
+    const fresh = { ...report([8000, 8000, 8000], 'jvm'), shimAot }
+    const medians = developMedians(current, [old, fresh])
+    expect(medians).toHaveLength(1)
+    expect(medians[0]!.reports).toBe(1)
+    expect(medians[0]!.first.welcomeShown).toBe(8000)
+  })
+  test('an old report alone is no baseline', () => {
+    expect(developMedians(current, [report([20_000, 20_000, 20_000], 'jvm')])).toEqual([])
+  })
+  test('native is still compared with every report', () => {
+    const native = { ...report([4000, 4000, 4000], 'native'), shimAot }
+    expect(developMedians(native, [report([4000, 4000, 4000], 'native')])).toHaveLength(1)
+  })
+})
+
+describe('usedAotCache', () => {
+  const jvmMark = (sharedClasses: number, vmStart: number): Mark => ({
+    k: 'jvm',
+    t: vmStart + 10,
+    sharedClasses,
+    vmStart,
+  })
+  const frame: Mark[] = [
+    { k: 'launch', t: 1000 },
+    { k: 'first:click', t: 2000 },
+    { k: 'second:click', t: 5000 },
+  ]
+  test('is true when the open JVM loaded many classes from the cache', () => {
+    expect(usedAotCache([...frame, jvmMark(18_000, 2100)])).toBe(true)
+  })
+  test('is false when it did not', () => {
+    expect(usedAotCache([...frame, jvmMark(1500, 2100), jvmMark(1400, 2150)])).toBe(false)
+  })
+  test('a cached second open does not hide an uncached first open', () => {
+    expect(usedAotCache([...frame, jvmMark(1500, 2100), jvmMark(18_000, 5100)])).toBe(false)
+  })
+  test('a cached first open with an uncached second open is uncached', () => {
+    expect(usedAotCache([...frame, jvmMark(18_000, 2100), jvmMark(1500, 5100)])).toBe(false)
+  })
+  test('a surviving JVM of an earlier launch is ignored', () => {
+    expect(usedAotCache([...frame, jvmMark(18_000, 500), jvmMark(1500, 2100)])).toBe(false)
+    expect(usedAotCache([...frame, jvmMark(1500, 500), jvmMark(18_000, 2100)])).toBe(true)
+  })
+  test('an open without a JVM of its own is not judged', () => {
+    expect(usedAotCache([...frame, jvmMark(18_000, 2100)])).toBe(true)
+  })
+  test('is undefined without counters, or with only a stale JVM', () => {
+    expect(usedAotCache([...frame])).toBeUndefined()
+    expect(usedAotCache([...frame, jvmMark(18_000, 500)])).toBeUndefined()
+  })
+  test('uncheckedIn is printed and warned about', () => {
+    const base = {
+      ...report([3000, 3000, 3000], 'jvm'),
+      shimAot: { trainingMs: 1000, cacheBytes: 1048576, rejectedIn: [], uncheckedIn: [2] },
+    }
+    expect(renderMarkdown(base, undefined)).toContain('cache use not checked')
+    expect(regressionWarnings(base, undefined).join(' ')).toContain('launches 2 have no hsperf')
+  })
+  test('uncachedIn is printed and warned about', () => {
+    const base = {
+      ...report([3000, 3000, 3000], 'jvm'),
+      shimAot: { trainingMs: 1000, cacheBytes: 1048576, rejectedIn: [], uncachedIn: [2] },
+    }
+    expect(renderMarkdown(base, undefined)).toContain('no classes from the cache in launches 2')
+    expect(regressionWarnings(base, undefined)).toEqual([
+      expect.stringContaining('loaded almost no classes'),
+    ])
   })
 })
