@@ -29,6 +29,15 @@ const LOAD_HEALTHCHECK_INTERVAL = 250
 const LOAD_HEALTHCHECK_FAST_INTERVAL = 25
 const LOAD_HEALTHCHECK_FAST_PERIOD_MS = 1000
 
+/**
+ * A project path in a form that compares equal however it was written: resolved, with `/`, and in
+ * lower case on Windows.
+ */
+export function comparableProjectPath(projectPath: string): string {
+  const resolved = path.resolve(projectPath).replace(/\\/g, '/')
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved
+}
+
 /** The delay before the next start-up health check, `elapsedMs` after the engine was spawned. */
 export function loadHealthcheckDelay(elapsedMs: number): number {
   return elapsedMs < LOAD_HEALTHCHECK_FAST_PERIOD_MS ?
@@ -117,6 +126,11 @@ export interface Runner {
   ): Promise<LanguageServerSockets>
   closeProject(projectPath: Path): Promise<void>
   isProjectRunning(projectPath: Path): Promise<boolean>
+  /**
+   * Whether the project at `projectPath` is open or loading, comparing paths with
+   * `comparableProjectPath`. Optional: without it, `isProjectRunning` is asked.
+   */
+  isProjectOpenOrOpening?(projectPath: string): Promise<boolean>
   /**
    * Whether any engine this runner started is still alive: an opened project (loading included)
    * or a `--run`. Each holds the environment it was started with, such as the secrets key.
@@ -869,6 +883,14 @@ export class EnsoRunner implements Runner {
   /** Checks if a project's language server is currently running. */
   async isProjectRunning(projectPath: Path): Promise<boolean> {
     return this.runningProjects.has(projectPath)
+  }
+
+  /** Whether the project at `projectPath` is open or loading, whatever the path's separators. */
+  async isProjectOpenOrOpening(projectPath: string): Promise<boolean> {
+    const key = comparableProjectPath(projectPath)
+    return [...this.runningProjects.keys(), ...this.loadingProjects.keys()].some(
+      (path) => comparableProjectPath(path) === key,
+    )
   }
 
   /** Whether any opened (or opening) project or `--run` process is alive. */

@@ -10,6 +10,12 @@ on:
           passes the self-hosted macOS runner's; the WASM build and report merge stay on Linux.
         type: string
         default: '["ubuntu-latest"]'
+      windows-shim-tests:
+        description: >-
+          Also run the project-manager-shim unit tests on Windows (`shim-windows`). The macOS run
+          passes false: the pull request's own run already has them.
+        type: boolean
+        default: true
 
 # Cancel in-progress workflows if a new one is started
 concurrency:
@@ -224,6 +230,46 @@ jobs:
             **/.eslintcache
             **/node_modules/.vite
             !**/node_modules/.vite/vitest
+
+  # The shim renames, locks and spawns in the user's folders, and Windows refuses things Linux
+  # allows (a folder with a file open in it cannot be renamed, #622), so its unit tests also run
+  # there. It needs no WASM parser: no shim dependency reaches `ydoc-shared`, so the install skips
+  # the lifecycle scripts and compiles only the workspace packages the shim imports.
+  shim-windows:
+    name: 🪟 Project Manager Shim Tests (Windows)
+    if: ${{ inputs.windows-shim-tests }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        name: ⎔ Setup Node
+        with:
+          node-version-file: .node-version
+          cache: "pnpm"
+
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "project-manager-shim..."
+
+      - name: ⚙️ Compile the shim's workspace dependencies
+        run: pnpm --filter "project-manager-shim^..." run compile
+
+      - name: 🧪 Unit Tests
+        # The runner's TEMP is in its 8.3 form (`C:\Users\RUNNER~1\...`), while git and `realpath`
+        # answer the long one, so tests comparing a temporary path with what those report fail.
+        # `runner.temp` is a long path. The trade-off: these tests no longer see an 8.3 path, so a
+        # product bug that only such a path triggers would pass here. Users' project paths do not
+        # normally take that form; a test that needs it should build one itself.
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: pnpm --filter project-manager-shim run test:unit
 
   playwright:
     name: 🎭 Playwright Tests

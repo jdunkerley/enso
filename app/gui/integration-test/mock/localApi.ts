@@ -33,6 +33,7 @@ import type { Page, WebSocketRoute } from 'playwright'
 import { YjsChannel } from 'ydoc-channel'
 import { WSSharedDoc, YjsConnection, type YjsSocket } from 'ydoc-server'
 import { toJSONRPCError, toJSONRPCResult } from './jsonRpc'
+import { createMockSamples, registerSamplesRoutes } from './localSamples'
 import {
   createMockVersioning,
   registerVersioningRoutes,
@@ -294,6 +295,9 @@ export async function mockLocalApi(page: Page) {
       addProject(options)
     },
   }
+
+  /** The mocked bundled samples (`mock/localSamples.ts`). */
+  const samples = createMockSamples(ROOT_PATH)
 
   type FileEntryOptions = {
     path: Path
@@ -915,6 +919,7 @@ export async function mockLocalApi(page: Page) {
     })
 
     await registerVersioningRoutes(page, versioningContext, { ...SAVE_ROUTES, ...HISTORY_ROUTES })
+    await registerSamplesRoutes(page, samples)
 
     await page.route('/api/root-directory-path', async (route, request) => {
       called('getRootDirectory', {})
@@ -1236,6 +1241,8 @@ data: ${JSON.stringify(data)}
     addRecentProject,
     /** The mocked git versioning: change it in `setupApi.local`, before the page loads. */
     versioning,
+    /** The mocked bundled samples: change them in `setupApi.local`, before the page loads. */
+    samples,
     /** The paths in the Recent list, newest first, whether or not a project is still there. */
     recentProjectPaths: () => recentProjects.map((entry) => entry.path),
   } as const

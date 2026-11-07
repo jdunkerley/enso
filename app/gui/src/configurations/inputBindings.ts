@@ -78,6 +78,7 @@ const BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
       icon: 'history',
       category: 'fileManagement',
     },
+    updateSample: { bindings: [], rebindable: false, icon: 'refresh', category: 'fileManagement' },
     // These should not appear in any menus.
     closeModal: { bindings: ['Escape'], rebindable: false, category: 'other' },
     cancelEditName: { bindings: ['Escape'], rebindable: false, category: 'editing' },
