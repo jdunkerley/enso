@@ -90,7 +90,10 @@ object ProgramExecutionSupport {
     }
 
     val onComputedValueCallback: Consumer[ExpressionValue] = { value =>
-      if (callStack.isEmpty) {
+      if (callStack.isEmpty && value.isProgressUpdate) {
+        // Note [A Progress Report Is Not A Computed Value]
+        sendExpressionUpdate(contextId, executionFrame.syncState, value)
+      } else if (callStack.isEmpty) {
         logger.trace("ON_COMPUTED {}", value.getExpressionId)
 
         value.getValue match {
@@ -123,6 +126,19 @@ object ProgramExecutionSupport {
         )
       }
     }
+
+    /* Note [A Progress Report Is Not A Computed Value]
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     * With progress reporting on (the language server turns it on), the
+     * computed-value callback also receives the progress reports of a binding
+     * that is about to be computed: `ExecutionCallbacks.findCachedResult`
+     * reports one, with no value, as soon as it misses the cache. Such a
+     * report only updates the node's pending state. Treated as a computed
+     * value, it handed `null` to a deferred visualization of that very
+     * expression, which then failed (and `typeOfValue(null)` threw a
+     * `NullPointerException` while logging it) before the real value was
+     * computed (#611).
+     */
 
     val callablesCallback: Consumer[ExpressionCall] = fun =>
       if (callStack.headOption.exists(_.expressionId == fun.getExpressionId)) {
@@ -737,7 +753,7 @@ object ProgramExecutionSupport {
         allPending.flatMap { unevaluated =>
           val value = computed
             .filter(_.getExpressionId == unevaluated.expressionId)
-            .map(_.getValue)
+            .flatMap(computedValue => Option(computedValue.getValue))
             .filter(v => !VisualizationResult.isInterruptedException(v))
             .orElse(Option(immutable.get(unevaluated.expressionId)))
           value.map((unevaluated, _))

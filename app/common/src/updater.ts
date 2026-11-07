@@ -1,5 +1,8 @@
 /** @file Types shared by the Electron updater and the GUI's update dialog. */
 
+/** The GitHub repository whose releases are the update feed (`owner/repo`). */
+export const UPDATE_REPOSITORY = 'jdunkerley/enso'
+
 /** `auto`: the app updates itself. `manual`: it only links to the download (dev, unsigned macOS, …). */
 export type UpdateMode = 'auto' | 'manual'
 
