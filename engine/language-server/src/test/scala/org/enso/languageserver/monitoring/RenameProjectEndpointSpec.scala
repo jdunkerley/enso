@@ -18,6 +18,8 @@ import org.enso.polyglot.runtime.Runtime.Api
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.nio.charset.StandardCharsets
+
 import scala.concurrent.duration._
 
 /** The rename route refuses web pages (#613). See Note [The RPC Port Refuses
@@ -99,6 +101,31 @@ class RenameProjectEndpointSpec
         status shouldBe StatusCodes.OK
       }
       runtime.expectMsgPF() { case Api.Request(_, _: Api.RenameProject) => }
+    }
+
+    "rename with a JSON content type that has parameters or other case" in {
+      initialise()
+      for (
+        header <- Seq(
+          "application/json; charset=utf-8",
+          "application/json;charset=UTF-8",
+          "Application/JSON",
+          "APPLICATION/JSON; Charset=UTF-8"
+        )
+      ) {
+        val (e, runtime) = endpoint()
+        val contentType: ContentType = ContentType.parse(header) match {
+          case Right(parsed) => parsed
+          case Left(errors)  => fail(s"Akka HTTP cannot parse $header: $errors")
+        }
+        Post(
+          "/refactoring/renameProject",
+          HttpEntity(contentType, body.getBytes(StandardCharsets.UTF_8))
+        ) ~> e.route ~> check {
+          withClue(header)(status shouldBe StatusCodes.OK)
+        }
+        runtime.expectMsgPF() { case Api.Request(_, _: Api.RenameProject) => }
+      }
     }
 
     "refuse a body that is not JSON, even with no Origin (old browsers)" in {
