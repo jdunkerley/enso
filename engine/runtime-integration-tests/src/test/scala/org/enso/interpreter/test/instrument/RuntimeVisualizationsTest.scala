@@ -33,21 +33,23 @@ class RuntimeVisualizationsTest
 
   // === Test Utilities =======================================================
 
-  /** Stops the runtime's thread that sends the next `ExecutionComplete` (or,
-    * see [[arm]], another response) until the test releases it.
+  /** Stops the runtime's thread that sends the next response it is armed for
+    * (by default `ExecutionComplete`) until the test releases it.
     *
-    * The runtime sends `ExecutionComplete` from the `ExecuteJob` itself, after
-    * the end-of-run pass over deferred visualizations and while the job still
-    * holds its locks and is still registered as running. Holding it there
-    * gives a test the window between that pass and the end of the job,
+    * The runtime sends its responses from the `ExecuteJob`'s own thread, while
+    * the job holds its locks and is still registered as running. Holding
+    * `ExecutionComplete`, which comes after the end-of-run pass over deferred
+    * visualizations, gives a test the window between that pass and the end of
+    * the job; holding an expression's pending update (with progress reporting
+    * on), the window just before that expression is computed. Either way,
     * deterministically.
     */
-  final class ExecutionCompleteGate {
-    @volatile private var armed  = false
+  final class ExecutionGate {
+    @volatile private var armed                           = false
     @volatile private var holdAt: Api.Response => Boolean = isExecutionComplete
-    private val reachedLatch     = new CountDownLatch(1)
-    private val releasedLatch    = new CountDownLatch(1)
-    private val interruptedLatch = new CountDownLatch(1)
+    private val reachedLatch                              = new CountDownLatch(1)
+    private val releasedLatch                             = new CountDownLatch(1)
+    private val interruptedLatch                          = new CountDownLatch(1)
 
     /** Holds the next `ExecutionComplete`, or the next response `at`
       * accepts.
@@ -57,10 +59,10 @@ class RuntimeVisualizationsTest
       armed  = true
     }
 
-    /** Waits until an `ExecutionComplete` is held. */
+    /** Waits until the response armed for is held. */
     def awaitReached(): Boolean = reachedLatch.await(30, TimeUnit.SECONDS)
 
-    /** Lets the held `ExecutionComplete` (and anything after it) through. */
+    /** Lets the held response (and anything after it) through. */
     def release(): Unit = releasedLatch.countDown()
 
     /** Waits until the held job was interrupted, i.e. aborted. */
@@ -145,10 +147,10 @@ class RuntimeVisualizationsTest
     }
 
     /** Holds the runtime's next `ExecutionComplete` while armed. */
-    val executionCompleteGate = new ExecutionCompleteGate
+    val executionGate = new ExecutionGate
 
     /** The emulator's transport, with the runtime's responses passing
-      * through [[executionCompleteGate]] first.
+      * through [[executionGate]] first.
       */
     private def gatedServerTransport: MessageTransport = { (uri, peer) =>
       val endpoint =
@@ -159,7 +161,7 @@ class RuntimeVisualizationsTest
           override def sendText(text: String): Unit =
             endpoint.sendText(text)
           override def sendBinary(data: ByteBuffer): Unit = {
-            executionCompleteGate.onResponse(data)
+            executionGate.onResponse(data)
             endpoint.sendBinary(data)
           }
           override def sendPing(data: ByteBuffer): Unit =
@@ -5858,8 +5860,9 @@ class RuntimeVisualizationsTest
       new String(dataUpdated, StandardCharsets.UTF_8) shouldEqual "[]"
   }
 
-  /** Pushes `main` with its `ExecutionComplete` held (so after its end-of-run
-    * pass, while it still runs and holds its locks), attaches one
+  /** Pushes `main` with its execution held at `holdAt` (by default its
+    * `ExecutionComplete`, so after its end-of-run pass; in any case while it
+    * still runs and holds its locks), attaches one
     * visualization per expression in `on`, and waits until the scheduler has
     * decided what to do with each `ExecuteJob` the attaches ask for. The held
     * execution is not released.
@@ -5905,9 +5908,10 @@ class RuntimeVisualizationsTest
       Api.Response(Some(requestId), Api.OpenFileResponse)
     )
 
-    // Hold the first execution at its ExecutionComplete: its end-of-run pass
-    // is over, and it still holds its locks and is still running.
-    context.executionCompleteGate.arm(holdAt)
+    // Hold the first execution at `holdAt` (by default its ExecutionComplete,
+    // after its end-of-run pass): it still holds its locks and is still
+    // running.
+    context.executionGate.arm(holdAt)
     context.send(
       Api.Request(
         requestId,
@@ -5921,7 +5925,7 @@ class RuntimeVisualizationsTest
         )
       )
     )
-    context.executionCompleteGate.awaitReached() shouldBe true
+    context.executionGate.awaitReached() shouldBe true
 
     // The scheduler logs, at trace level, what it did with the ExecuteJob an
     // attach asks for: submitted it, or found a duplicate of it running. The
@@ -6011,7 +6015,7 @@ class RuntimeVisualizationsTest
     // ExecuteJob. That job must run, although an equal one is still running.
     val (_, _, Seq(visualizationId)) =
       try attachWhileTheFirstExecutionIsHeld(context, Seq(context.Main.idMainX))
-      finally context.executionCompleteGate.release()
+      finally context.executionGate.release()
 
     val update = Iterator
       .continually(context.receiveWithTimeout(20))
@@ -6038,7 +6042,7 @@ class RuntimeVisualizationsTest
         Seq(idMainResult),
         Some(metadata.appendToCode(context.Main.text))
       )
-      finally context.executionCompleteGate.release()
+      finally context.executionGate.release()
 
     val update = Iterator
       .continually(context.receiveWithTimeout(20))
@@ -6073,7 +6077,7 @@ class RuntimeVisualizationsTest
           case _ => false
         }
       )
-      finally context.executionCompleteGate.release()
+      finally context.executionGate.release()
 
     val responses = receiveUntilQuiet(context, 5)
     responses.collect {
@@ -6108,7 +6112,7 @@ class RuntimeVisualizationsTest
         context,
         Seq(context.Main.idMainX, context.Main.idMainZ)
       )
-      finally context.executionCompleteGate.release()
+      finally context.executionGate.release()
 
     val responses = receiveUntilQuiet(context, 5)
     visualizationUpdates(responses, visualizationIds(0)) shouldEqual Seq("6")
@@ -6136,8 +6140,8 @@ class RuntimeVisualizationsTest
           )
         )
       )
-      context.executionCompleteGate.awaitInterrupted() shouldBe true
-    } finally context.executionCompleteGate.release()
+      context.executionGate.awaitInterrupted() shouldBe true
+    } finally context.executionGate.release()
 
     val responses = receiveUntilQuiet(context, 5)
     responses should contain(
@@ -6156,8 +6160,8 @@ class RuntimeVisualizationsTest
       context.send(
         Api.Request(requestId, Api.DestroyContextRequest(contextId))
       )
-      context.executionCompleteGate.awaitInterrupted() shouldBe true
-    } finally context.executionCompleteGate.release()
+      context.executionGate.awaitInterrupted() shouldBe true
+    } finally context.executionGate.release()
 
     val responses = receiveUntilQuiet(context, 5)
     val destroyed = responses.indexOf(
