@@ -40,6 +40,10 @@ export function useRovingTabStop<Key>(
     setTabStop(key: Key) {
       lastFocusedKey.value = key
     },
+    /** Forget the row focused last, if it is `key`: the tab stop falls back to the selection. */
+    forgetTabStop(key: Key) {
+      if (lastFocusedKey.value === key) lastFocusedKey.value = null
+    },
   }
 }
 
