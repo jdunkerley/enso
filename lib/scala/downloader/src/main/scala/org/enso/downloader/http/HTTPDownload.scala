@@ -63,11 +63,28 @@ object HTTPDownload {
    * [[UnresponsiveServerMemory]]: a request to it in that time fails at once,
    * saying that the server did not respond to an earlier request. Any answer
    * from the server forgets it, and so does the end of that time, so a server
-   * that comes back is asked again.
+   * that comes back is asked again. The message says how long until then.
+   *
+   * Two consequences to keep in mind before changing a timeout:
+   * - A server that is alive but slow, taking longer than the response
+   *   timeout to answer one request, blocks every request to its host for the
+   *   whole [[UnresponsiveServerMemory]], although it would have answered. So
+   *   the response timeout also decides when a host is shut out.
+   * - The key is the host of the URL that was requested. `HttpClient` follows
+   *   redirects itself and a timeout exception does not say which URL timed
+   *   out, so when a request is redirected to another host that stalls (a
+   *   GitHub release asset served from `objects.githubusercontent.com`, say),
+   *   it is the original host that is remembered and named in the message.
+   *   Keying on the final host would mean following redirects by hand; library
+   *   repositories, the case of #600, do not redirect.
    */
 
   /** How long a server that timed out is not asked again. */
   val UnresponsiveServerMemory: Duration = Duration.ofMinutes(2)
+
+  /** [[UnresponsiveServerMemory]], unless a test shortens it. */
+  @volatile private[http] var unresponsiveServerMemory: Duration =
+    UnresponsiveServerMemory
 
   /** A server that timed out: when, and how long the request had waited. */
   private case class Unresponsive(sinceNanos: Long, waited: String)
@@ -144,7 +161,7 @@ object HTTPDownload {
     // Note [An Unresponsive Server Is Not Asked Again At Once]
     val server = serverOf(request)
     val remembered = Option(unresponsiveServers.get(server)).filter { u =>
-      System.nanoTime() - u.sinceNanos < UnresponsiveServerMemory.toNanos
+      System.nanoTime() - u.sinceNanos < unresponsiveServerMemory.toNanos
     }
     remembered match {
       case Some(unresponsive) =>
@@ -156,8 +173,8 @@ object HTTPDownload {
         CompletableFuture.failedFuture(
           HTTPException(
             s"The server at [$server] did not respond within " +
-            s"${unresponsive.waited} to an earlier request, so " +
-            s"[${request.uri}] was not requested."
+            s"${unresponsive.waited}; it will be asked again in about " +
+            s"${secondsUntilRetry(unresponsive)} s."
           )
         )
       case None =>
@@ -183,11 +200,17 @@ object HTTPDownload {
     }
   }
 
+  private def secondsUntilRetry(unresponsive: Unresponsive): Long = {
+    val left = unresponsiveServerMemory.toNanos -
+      (System.nanoTime() - unresponsive.sinceNanos)
+    Math.max(1L, Math.ceil(left / 1e9).toLong)
+  }
+
   /** The error a failed request completes its task with. A timeout says what
     * did not happen in time (Note [A Download Waits For An Answer Only So
     * Long]); anything else keeps the client's message.
     */
-  private def describeFailure(
+  private[http] def describeFailure(
     request: HTTPRequest,
     failure: Throwable
   ): HTTPException =

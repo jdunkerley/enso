@@ -2,23 +2,30 @@ package org.enso.downloader.http;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.junit.Assert.assertTrue;
 
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
+import java.net.http.HttpConnectTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
 import org.enso.cli.task.TaskProgress;
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -33,6 +40,7 @@ import scala.Option;
 public class HttpDownloadTimeoutTest {
 
   private static ServerSocket silentServer;
+  private static HttpServer answeringServer;
   private static final List<Socket> acceptedSockets = new CopyOnWriteArrayList<>();
 
   @BeforeClass
@@ -53,10 +61,33 @@ public class HttpDownloadTimeoutTest {
             "silent-http-server");
     acceptor.setDaemon(true);
     acceptor.start();
+
+    // `/slow` answers too late for a short timeout, `/fast` answers in time.
+    answeringServer =
+        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+    answeringServer.setExecutor(Executors.newCachedThreadPool());
+    answeringServer.createContext("/slow", exchange -> answerAfter(exchange, 5_000));
+    answeringServer.createContext("/fast", exchange -> answerAfter(exchange, 800));
+    answeringServer.start();
+  }
+
+  private static void answerAfter(com.sun.net.httpserver.HttpExchange exchange, long millis)
+      throws IOException {
+    try {
+      Thread.sleep(millis);
+      var body = "ok".getBytes(StandardCharsets.UTF_8);
+      exchange.sendResponseHeaders(200, body.length);
+      exchange.getResponseBody().write(body);
+    } catch (InterruptedException | IOException e) {
+      // The client gave up: nothing to answer.
+    } finally {
+      exchange.close();
+    }
   }
 
   @AfterClass
   public static void stopSilentServer() throws IOException {
+    answeringServer.stop(0);
     silentServer.close();
     for (var socket : acceptedSockets) {
       socket.close();
@@ -66,6 +97,23 @@ public class HttpDownloadTimeoutTest {
   @Before
   public void forgetUnresponsiveServers() {
     HTTPDownload$.MODULE$.forgetUnresponsiveServers();
+  }
+
+  @After
+  public void restoreUnresponsiveServerMemory() {
+    HTTPDownload$.MODULE$.unresponsiveServerMemory_$eq(HTTPDownload.UnresponsiveServerMemory());
+  }
+
+  private static scala.util.Try<APIResponse> fetch(URI uri, Duration timeout) {
+    return TaskProgress.waitForTask(
+        HTTPDownload.fetchString(
+            HTTPRequestBuilder.fromURI(uri).withResponseTimeout(timeout).GET(),
+            Option.empty(),
+            StandardCharsets.UTF_8));
+  }
+
+  private static URI answeringUri(String path) {
+    return URI.create("http://127.0.0.1:" + answeringServer.getAddress().getPort() + path);
   }
 
   private static URI silentUri(String path) {
@@ -140,8 +188,66 @@ public class HttpDownloadTimeoutTest {
     assertTrue("The second fetch fails", second.isFailure());
     assertThat("The second fetch does not wait again", waited, lessThan(Duration.ofSeconds(1)));
     var message = second.failed().get().getMessage();
-    assertThat(message, containsString("did not respond within 2 seconds to an earlier request"));
-    assertThat(message, containsString("/Standard/Table/manifest.yaml"));
+    assertThat(message, containsString("did not respond within 2 seconds"));
+    assertThat(message, containsString("will be asked again in about 120 s"));
+  }
+
+  @Test(timeout = 30_000)
+  public void aServerIsAskedAgainOnceTheMemoryEnds() throws InterruptedException {
+    HTTPDownload$.MODULE$.unresponsiveServerMemory_$eq(Duration.ofMillis(300));
+    var timeout = Duration.ofMillis(500);
+    assertTrue("The first fetch fails", fetch(silentUri("/a"), timeout).isFailure());
+
+    var refused = fetch(silentUri("/b"), timeout);
+    assertThat(
+        refused.failed().get().getMessage(), containsString("will be asked again in about 1 s"));
+
+    Thread.sleep(400);
+    var start = System.nanoTime();
+    var asked = fetch(silentUri("/c"), timeout);
+    var waited = Duration.ofNanos(System.nanoTime() - start);
+    assertTrue("The fetch after the memory ends fails", asked.isFailure());
+    assertThat("It was sent and waited", waited, greaterThanOrEqualTo(Duration.ofMillis(400)));
+    var message = asked.failed().get().getMessage();
+    assertThat(message, containsString("did not respond within 500 ms"));
+    assertThat(message, not(containsString("asked again")));
+  }
+
+  @Test(timeout = 30_000)
+  public void anAnswerFromTheServerForgetsThatItTimedOut() throws Exception {
+    // Both requests pass the check before either finishes: `/slow` times out first and the server
+    // is remembered, then `/fast` is answered, which forgets it.
+    var slow =
+        HTTPDownload.fetchString(
+            HTTPRequestBuilder.fromURI(answeringUri("/slow"))
+                .withResponseTimeout(Duration.ofMillis(300))
+                .GET(),
+            Option.empty(),
+            StandardCharsets.UTF_8);
+    var fast =
+        HTTPDownload.fetchString(
+            HTTPRequestBuilder.fromURI(answeringUri("/fast"))
+                .withResponseTimeout(Duration.ofSeconds(10))
+                .GET(),
+            Option.empty(),
+            StandardCharsets.UTF_8);
+    assertTrue("`/slow` times out", TaskProgress.waitForTask(slow).isFailure());
+    assertTrue("`/fast` is answered", TaskProgress.waitForTask(fast).isSuccess());
+
+    var again = fetch(answeringUri("/fast"), Duration.ofSeconds(10));
+    assertTrue("The server is asked again and answers", again.isSuccess());
+  }
+
+  @Test
+  public void aConnectTimeoutSaysTheConnectionWasNotMade() {
+    var request = HTTPRequestBuilder.fromURI(silentUri("/manifest.yaml")).GET();
+    var error =
+        HTTPDownload$.MODULE$.describeFailure(
+            request, new HttpConnectTimeoutException("HTTP connect timed out"));
+    assertThat(
+        error.getMessage(),
+        containsString(
+            "Could not connect to [" + silentUri("/manifest.yaml") + "] within 30 seconds"));
   }
 
   @Test
