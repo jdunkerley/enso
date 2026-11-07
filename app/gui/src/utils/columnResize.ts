@@ -19,13 +19,15 @@ export function clampWidth(width: number, limits: WidthLimits): number {
 /**
  * What a key pressed on a column's resize handle does: the column's new width (Left and Right
  * arrows, by {@link RESIZE_STEP_PX}, or {@link RESIZE_LARGE_STEP_PX} with Shift), `'reset'` to its
- * default width (Enter and Home), or `null` for a key the handle leaves alone.
+ * default width (Enter and Home), or `null` for a key the handle leaves alone, which includes every
+ * key pressed with Ctrl, Alt or Meta.
  */
 export function widthForKey(
-  event: Pick<KeyboardEvent, 'key' | 'shiftKey'>,
+  event: Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'key' | 'metaKey' | 'shiftKey'>,
   width: number,
   limits: WidthLimits,
 ): number | 'reset' | null {
+  if (event.ctrlKey || event.altKey || event.metaKey) return null
   const step = event.shiftKey ? RESIZE_LARGE_STEP_PX : RESIZE_STEP_PX
   switch (event.key) {
     case 'ArrowLeft':

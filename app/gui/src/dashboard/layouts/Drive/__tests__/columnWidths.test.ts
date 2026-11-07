@@ -23,9 +23,23 @@ describe('useColumnWidths', () => {
     expect(widths.widthOf(Column.labels)).toBe(COLUMN_WIDTH_LIMITS[Column.labels].max)
   })
 
+  test('changes a width at once, and saves it only when asked', () => {
+    const widths = useColumnWidths()
+    widths.setWidth(Column.createdAt, 210)
+    widths.setWidth(Column.createdAt, 220)
+    expect(widths.widthOf(Column.createdAt)).toBe(220)
+    expect(LocalStorage.getInstance().get('driveColumnWidths')).toBeUndefined()
+    widths.persist()
+    expect(LocalStorage.getInstance().get('driveColumnWidths')).toEqual({ createdAt: 220 })
+  })
+
   test('saves the widths, so that a later drive starts with them', () => {
-    useColumnWidths().setWidth(Column.createdAt, 210)
-    useColumnWidths().setWidth(Column.name, 300)
+    const first = useColumnWidths()
+    first.setWidth(Column.createdAt, 210)
+    first.persist()
+    const second = useColumnWidths()
+    second.setWidth(Column.name, 300)
+    second.persist()
     const later = useColumnWidths()
     expect(later.widthOf(Column.createdAt)).toBe(210)
     expect(later.widthOf(Column.name)).toBe(300)
@@ -39,6 +53,7 @@ describe('useColumnWidths', () => {
     const widths = useColumnWidths()
     widths.setWidth(Column.modified, 200)
     widths.setWidth(Column.name, 300)
+    widths.persist()
     widths.resetWidth(Column.name)
     expect(widths.widthOf(Column.name)).toBeNull()
     expect(widths.widthOf(Column.modified)).toBe(200)

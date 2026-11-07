@@ -20,8 +20,9 @@ declare module '$/utils/LocalStorage' {
 LocalStorage.registerKey('driveColumnWidths', { schema: columnWidthsSchema })
 
 /**
- * The drive table's column widths: each column's saved width, or its default. They are saved in
- * `localStorage` (`driveColumnWidths`) as they change, and shared by every category. The name column
+ * The drive table's column widths: each column's saved width, or its default. A new width shows at
+ * once, and is saved in `localStorage` (`driveColumnWidths`) by {@link persist}, once a drag ends;
+ * a reset is saved at once. The widths are shared by every category. The name column
  * has no default width: it fills the space the other columns leave (never less than its minimum),
  * until the user gives it a width of its own.
  */
@@ -29,8 +30,9 @@ export function useColumnWidths() {
   const localStorage = LocalStorage.getInstance()
   const saved = shallowRef<SavedColumnWidths>(localStorage.get('driveColumnWidths') ?? {})
 
-  const save = (widths: SavedColumnWidths) => {
-    saved.value = widths
+  /** Save the widths as they are now. */
+  const persist = () => {
+    const widths = saved.value
     if (Object.keys(widths).length === 0) localStorage.delete('driveColumnWidths')
     else localStorage.set('driveColumnWidths', widths)
   }
@@ -39,14 +41,15 @@ export function useColumnWidths() {
   const widthOf = (column: Column): number | null =>
     saved.value[column] ?? COLUMN_WIDTH_LIMITS[column].defaultWidth
 
-  /** Give the column a width, brought inside its limits. */
+  /** Give the column a width, brought inside its limits. It is saved by the next {@link persist}. */
   const setWidth = (column: Column, width: number) => {
-    save({ ...saved.value, [column]: clampWidth(width, COLUMN_WIDTH_LIMITS[column]) })
+    saved.value = { ...saved.value, [column]: clampWidth(width, COLUMN_WIDTH_LIMITS[column]) }
   }
 
   /** Return the column to its default width. */
   const resetWidth = (column: Column) => {
-    save(omit(saved.value, column))
+    saved.value = omit(saved.value, column)
+    persist()
   }
 
   /**
@@ -64,5 +67,5 @@ export function useColumnWidths() {
     return fills ? `max(100%, ${sum}px)` : `${sum}px`
   }
 
-  return { widthOf, setWidth, resetWidth, tableWidth }
+  return { widthOf, setWidth, resetWidth, persist, tableWidth }
 }

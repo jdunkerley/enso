@@ -57,6 +57,39 @@ describe('ColumnResizeHandle', () => {
     expect(seen).toEqual(['ArrowDown', 'Tab'])
   })
 
+  test('ignores the keys with Ctrl, Alt or Meta held, and lets them through', () => {
+    const { wrapper, handle } = mountHandle()
+    const seen: string[] = []
+    document.body.addEventListener('keydown', (event) => seen.push(event.key))
+    for (const modifier of ['ctrlKey', 'altKey', 'metaKey'] as const) {
+      handle.element.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', [modifier]: true, bubbles: true }),
+      )
+    }
+    expect(wrapper.emitted('resize')).toBeUndefined()
+    expect(seen).toHaveLength(3)
+  })
+
+  test('reports the end of a resize once: after a drag, and after each key', async () => {
+    const { wrapper, handle } = mountHandle()
+    await handle.trigger('pointerdown', { button: 0, clientX: 500, pointerId: 1 })
+    await handle.trigger('pointermove', { clientX: 510, pointerId: 1 })
+    await handle.trigger('pointermove', { clientX: 520, pointerId: 1 })
+    expect(wrapper.emitted('resizeEnd')).toBeUndefined()
+    await handle.trigger('pointerup', { clientX: 520, pointerId: 1 })
+    expect(wrapper.emitted('resizeEnd')).toHaveLength(1)
+    await handle.trigger('keydown', { key: 'ArrowRight' })
+    expect(wrapper.emitted('resizeEnd')).toHaveLength(2)
+  })
+
+  test('lets a press reach the document, so that open popovers and menus close', async () => {
+    const { handle } = mountHandle()
+    const presses: EventTarget[] = []
+    document.addEventListener('pointerdown', (event) => presses.push(event.target!))
+    await handle.trigger('pointerdown', { button: 0, clientX: 500, pointerId: 1 })
+    expect(presses).toEqual([handle.element])
+  })
+
   test('follows a drag of the pointer from the width it started at', async () => {
     const { wrapper, handle } = mountHandle()
     await handle.trigger('pointerdown', { button: 0, clientX: 500, pointerId: 1 })

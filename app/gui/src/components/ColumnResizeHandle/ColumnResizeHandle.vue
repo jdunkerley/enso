@@ -17,8 +17,10 @@ const { label, width, limits } = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  /** The column's new width, inside its limits. */
+  /** The column's new width, inside its limits: on each move of a drag, and on each key. */
   resize: [width: number]
+  /** A drag, or a key, has finished resizing the column: the time to save its width. */
+  resizeEnd: []
   /** The column should go back to its default width. */
   reset: []
 }>()
@@ -56,9 +58,9 @@ function setDragStyles(isDragging: boolean) {
 
 function onPointerDown(event: PointerEvent) {
   if (event.button !== 0) return
-  // Neither start a text selection nor reach the table's selection brush.
+  // No text selection. The press still reaches the document, so that open popovers and menus close
+  // as for a press anywhere else; the table's selection brush skips it (`preventSelection`).
   event.preventDefault()
-  event.stopPropagation()
   try {
     handle.value?.setPointerCapture(event.pointerId)
   } catch {
@@ -78,6 +80,7 @@ function endDrag() {
   if (drag.value == null) return
   drag.value = null
   setDragStyles(false)
+  emit('resizeEnd')
 }
 
 function onKeyDown(event: KeyboardEvent) {
@@ -86,8 +89,12 @@ function onKeyDown(event: KeyboardEvent) {
   // The table's own keys (arrows move the selection, Enter opens it) must not act too.
   event.preventDefault()
   event.stopPropagation()
-  if (result === 'reset') emit('reset')
-  else emit('resize', result)
+  if (result === 'reset') {
+    emit('reset')
+  } else {
+    emit('resize', result)
+    emit('resizeEnd')
+  }
 }
 
 onBeforeUnmount(endDrag)

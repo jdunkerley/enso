@@ -1212,6 +1212,7 @@ const isLoadingRow = computed(
                             :width="columnWidths.widthOf(column)"
                             :limits="COLUMN_WIDTH_LIMITS[column]"
                             @resize="columnWidths.setWidth(column, $event)"
+                            @resizeEnd="columnWidths.persist()"
                             @reset="columnWidths.resetWidth(column)"
                           />
                         </th>

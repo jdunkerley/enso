@@ -94,6 +94,14 @@ test.describe('three rows', () => {
         // column resize handles, are tab stops of their own.)
         const body = table.getByRole('rowgroup').nth(1)
         await expect(body.locator('[tabindex="0"]')).toHaveCount(1)
+        // The heading row's own tab stops: one resize handle per column.
+        const header = table.getByRole('rowgroup').first()
+        const handles = header.getByRole('separator')
+        await expect(handles).toHaveCount(4)
+        for (const handle of await handles.all()) {
+          await expect(handle).toHaveAttribute('tabindex', '0')
+        }
+        await expect(header.locator('[tabindex]:not([tabindex="-1"])')).toHaveCount(4)
         await expect(rows.nth(0)).toHaveAttribute('tabindex', '0')
         await expect(rows.nth(0)).toBeFocused()
 

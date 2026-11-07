@@ -105,14 +105,19 @@ export interface ColumnWidthLimits extends WidthLimits {
   readonly defaultWidth: number | null
 }
 
-/** The name column's minimum: the width its cells draw at (`min-w-48`). */
-const NAME_MIN_WIDTH_PX = 192
+/**
+ * The name column's minimum: wider than its cells' own minimum (`min-w-48`), so that a badge after
+ * the name still leaves some of the name.
+ */
+const NAME_MIN_WIDTH_PX = 240
 const NAME_MAX_WIDTH_PX = 1200
 /** The minimum of the date columns, which fits their headings' hide and sort icons. */
 const DATE_MIN_WIDTH_PX = 128
 const DATE_DEFAULT_WIDTH_PX = 133
 const TEXT_MIN_WIDTH_PX = 96
 const TEXT_DEFAULT_WIDTH_PX = 240
+/** Room for several labels before they are cut off. */
+const LABELS_DEFAULT_WIDTH_PX = 300
 const SIZE_MIN_WIDTH_PX = 80
 const SIZE_DEFAULT_WIDTH_PX = 96
 const MAX_WIDTH_PX = 800
@@ -136,7 +141,7 @@ export const COLUMN_WIDTH_LIMITS: Readonly<Record<Column, ColumnWidthLimits>> = 
   [Column.labels]: {
     min: TEXT_MIN_WIDTH_PX,
     max: MAX_WIDTH_PX,
-    defaultWidth: TEXT_DEFAULT_WIDTH_PX,
+    defaultWidth: LABELS_DEFAULT_WIDTH_PX,
   },
   [Column.path]: { min: TEXT_MIN_WIDTH_PX, max: MAX_WIDTH_PX, defaultWidth: TEXT_DEFAULT_WIDTH_PX },
   [Column.accessedByProjects]: {
