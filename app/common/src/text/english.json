@@ -354,7 +354,7 @@
   "goForwardShortcut": "Go Forward",
   "aboutThisAppShortcut": "About Enso",
   "documentationShortcut": "Documentation",
-  "openInDocumentationSite": "Open in documentation site",
+  "viewOnDocsSite": "View on docs site ↗",
   "goToLocalSettingsShortcut": "Local Settings",
   "goToKeyboardShortcutsSettingsShortcut": "Keyboard Shortcuts Settings",
   "openInFileBrowserShortcut": "Open in File Browser",

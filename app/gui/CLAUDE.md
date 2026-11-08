@@ -46,9 +46,10 @@ packaged app, overridable at run time by the same variable in the process
 environment (`app/electron-client/src/guiConfig.ts`; its key list must cover
 every key of `$config`). **`ENSO_IDE_DOCS_URL`** (`$config.DOCS_URL`) is the
 documentation site's root, `https://jdunkerley.github.io/enso/docs/` by default
-(a missing trailing slash is added). The rail's Documentation button and
-command, F1 on a component and the help panel's button open pages under it. An
-**empty** value, at build or run time, hides all of them.
+(a missing trailing slash is added). The rail's Documentation button and command
+and the component help panel's "View on docs site" link open pages under it (F1
+opens the help panel, not the site). An **empty** value, at build or run time,
+hides all of them.
 
 ## TypeScript path aliases
 

@@ -16,7 +16,6 @@ import {
 } from '$/providers/openedProjects/module/imports'
 import { provideNodeExecution } from '$/providers/openedProjects/project/nodeExecution'
 import type { SuggestionId, Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
-import { suggestionDocumentationUrl } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { useLocalVersioning } from '$/providers/localVersioning'
 import { useRightPanelData } from '$/providers/rightPanel'
 import { saveShortcutInScope } from '@/util/saveShortcutScope'
@@ -35,6 +34,7 @@ import ContextMenuTrigger from '@/components/ContextMenuTrigger.vue'
 import GraphEdges from '@/components/GraphEditor/GraphEdges.vue'
 import GraphNodes from '@/components/GraphEditor/GraphNodes.vue'
 import { performCollapse, prepareCollapsedInfo } from '@/components/GraphEditor/collapsing'
+import { helpActionHandlers } from '@/components/GraphEditor/helpActions'
 import { useGraphEditorClipboard } from '@/components/GraphEditor/graphClipboard'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import { selectionActionHandlers } from '@/components/GraphEditor/selectionActions'
@@ -263,10 +263,7 @@ const blockedDescription = () => {
 }
 
 const actionHandlers = registerHandlers({
-  'graphEditor.showHelp': {
-    action: () => rightPanel.toggleTab('help'),
-    toggled: computed(() => rightPanel.tab === 'help'),
-  },
+  ...helpActionHandlers(rightPanel),
   'graph.renameProject': toggledAction(projectNameEdited),
   'graph.addComponent': {
     action: (ctx) => {
@@ -367,16 +364,6 @@ const actionHandlers = registerHandlers({
     },
   },
   'graph.pasteNode': { action: createNodesFromClipboard },
-  'graph.openDocumentation': {
-    action: () => {
-      const result = tryGetSelectionDocUrl()
-      if (!result.ok) {
-        toasts.userActionFailed.reportError(result.error, 'Unable to show node documentation')
-        return
-      }
-      window.open(result.value, '_blank')
-    },
-  },
   'graph.deleteSelectedEdge': {
     enabled: () =>
       nodeSelection.selectedEdge != null &&
@@ -455,16 +442,6 @@ const { globalEventRegistry } = useGlobalEventRegistry()
 useEventConditional(globalEventRegistry, 'keydown', isActive, (e) => {
   return graphBindingsHandler(e) || graphNavigator.keyboardEvents.keydown(e)
 })
-
-function tryGetSelectionDocUrl() {
-  const selected = nodeSelection.tryGetSingleSelectedNode()
-  if (!selected.ok) return selected
-  const base = $config.DOCS_URL
-  const suggestion = graphStore.db.getNodeMainSuggestion(selected.value)
-  const documentation = base && suggestion && suggestionDocumentationUrl(suggestion, base)
-  if (!documentation) return Err('No external documentation available for selected component')
-  return Ok(documentation)
-}
 
 const { handleClick } = useDoubleClick(
   (e: MouseEvent) => {

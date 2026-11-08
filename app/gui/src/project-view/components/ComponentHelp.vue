@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
 import type { SuggestionId } from '$/providers/openedProjects/suggestionDatabase/entry'
-import { suggestionDocumentationUrl } from '$/providers/openedProjects/suggestionDatabase/entry'
-import { useText } from '$/providers/text'
+import { entryIsCallable } from '$/providers/openedProjects/suggestionDatabase/entry'
 import Breadcrumbs, {
   type Item as Breadcrumb,
 } from '@/components/ComponentHelp/DocsBreadcrumbs.vue'
 import DocsHeader from '@/components/ComponentHelp/DocsHeader.vue'
 import DocsList from '@/components/ComponentHelp/DocsList.vue'
+import DocsSignature from '@/components/ComponentHelp/DocsSignature.vue'
+import DocsSiteLink from '@/components/ComponentHelp/DocsSiteLink.vue'
 import { HistoryStack } from '@/components/ComponentHelp/history'
 import type { Docs, FunctionDocs, TypeDocs } from '@/components/ComponentHelp/ir'
 import { lookupDocumentation, placeholder } from '@/components/ComponentHelp/ir'
+import { entrySignature } from '@/components/ComponentHelp/signature'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
-import SvgButton from '@/components/SvgButton.vue'
 import { groupColorStyle } from '@/composables/nodeColors'
 import { tryGetIndex } from '@/util/data/array'
 import type { Opt } from '@/util/data/opt'
@@ -23,7 +24,6 @@ import { EditorView } from '@codemirror/view'
 import { computed, watch } from 'vue'
 
 const props = defineProps<{ selectedEntry: SuggestionId | undefined; aiMode?: boolean }>()
-const { getText } = useText()
 const emit = defineEmits<{ 'update:selectedEntry': [value: SuggestionId | undefined] }>()
 
 const { suggestionDb: db, projectNames } = useCurrentProject()
@@ -89,10 +89,12 @@ const style = computed(() => ({
 
 const icon = computed<IconName>(() => suggestion.value?.iconName ?? 'marketplace')
 
-/** The component's page on the documentation site; nothing for the user's own code. */
-const documentationUrl = computed(() => {
-  const base = $config.DOCS_URL
-  return base && suggestion.value ? suggestionDocumentationUrl(suggestion.value, base) : undefined
+/** The signature of a function, constructor or method, drawn as the docs site draws it. */
+const signature = computed(() => {
+  const entry = suggestion.value
+  return entry && entryIsCallable(entry) ?
+      entrySignature(entry, entry.returnType(projectNames.value))
+    : undefined
 })
 
 const historyStack = new HistoryStack()
@@ -135,10 +137,6 @@ function handleBreadcrumbClick(index: number) {
     }
   }
 }
-
-function openDocs(url: string) {
-  window.open(url, '_blank')
-}
 </script>
 
 <template>
@@ -156,16 +154,12 @@ function openDocs(url: string) {
           @backward="historyStack.backward()"
         />
       </div>
-      <SvgButton
-        v-if="documentationUrl"
-        name="open"
-        :title="getText('openInDocumentationSite')"
-        @activate="openDocs(documentationUrl)"
-      />
+      <DocsSiteLink :entry="suggestion" />
     </div>
     <h2 v-if="documentation.kind === 'Placeholder'">{{ documentation.text }}</h2>
     <template v-else>
       <div class="markdownDocs">
+        <DocsSignature v-if="signature" :signature="signature" :icon="icon" :color="color" />
         <span v-if="documentation.documentation.length == 0">No documentation available.</span>
         <MarkdownEditor
           v-else
@@ -203,10 +197,10 @@ function openDocs(url: string) {
   --enso-docs-method-name-color: #1f71d3;
   --enso-docs-types-header-color: #1f71d3;
   --enso-docs-background-color: var(--background-color);
-  --enso-docs-text-color: rbga(0, 0, 0, 0.6);
+  --enso-docs-text-color: var(--docs-text);
   font-family: var(--font-sans);
-  font-size: 12px;
-  line-height: 160%;
+  font-size: var(--docs-font-size);
+  line-height: var(--docs-line-height);
   color: var(--enso-docs-text-color);
   background-color: var(--enso-docs-background-color);
   padding: 4px 4px var(--doc-panel-bottom-clip, 0) 4px;
@@ -221,7 +215,16 @@ function openDocs(url: string) {
 }
 
 .markdownDocs {
-  margin: 4px 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 8px 0;
+}
+
+.markdownDocs > :not(.DocsSignature) {
+  align-self: stretch;
 }
 
 .tags {
@@ -246,9 +249,5 @@ function openDocs(url: string) {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-}
-
-.topBar .SvgButton {
-  flex: 0 0 auto;
 }
 </style>

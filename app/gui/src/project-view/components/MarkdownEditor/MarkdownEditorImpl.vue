@@ -232,8 +232,9 @@ defineExpose({
     flex-grow: 1;
 
     opacity: 1;
-    color: black;
-    font-size: 12px;
+    color: var(--docs-text);
+    font-size: var(--docs-font-size);
+    line-height: var(--docs-line-height);
   }
 }
 </style>
@@ -241,25 +242,84 @@ defineExpose({
 <!--suppress CssUnusedSymbol -->
 <style module>
 /* === Syntax styles === */
+/* The docs site's look, from the `--docs-*` tokens in `assets/base.css`. */
 
-.heading1 {
-  font-weight: 700;
-  font-size: 20px;
-  line-height: 1.75;
-}
-
-.heading2 {
-  font-weight: 700;
-  font-size: 16px;
-  line-height: 1.75;
-}
-
+.heading1,
+.heading2,
 .heading3,
 .heading4,
 .heading5,
 .heading6 {
-  font-size: 14px;
-  line-height: 2;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.heading1 {
+  font-size: var(--docs-h1-size);
+}
+
+.heading2 {
+  font-size: var(--docs-h2-size);
+}
+
+.heading3 {
+  font-size: var(--docs-h3-size);
+}
+
+.heading4,
+.heading5,
+.heading6 {
+  font-size: var(--docs-h4-size);
+}
+
+/* Heading lines (`decoration/blocks.ts`) are spaced as blocks. Padding, not margin: CodeMirror
+ * measures its lines' boxes. */
+:global(.cm-line.cm-heading) {
+  padding-top: var(--docs-heading-space-above);
+  padding-bottom: var(--docs-heading-space-below);
+}
+:global(.cm-line.cm-heading:first-child) {
+  padding-top: 0;
+}
+:global(.cm-line.cm-heading3),
+:global(.cm-line.cm-heading4),
+:global(.cm-line.cm-heading5),
+:global(.cm-line.cm-heading6) {
+  padding-top: calc(var(--docs-heading-space-above) * 0.75);
+}
+
+/* Code blocks: one dark box over the fence lines and the code. */
+:global(.cm-line.cm-codeBlock) {
+  background-color: var(--docs-code-block-bg);
+  color: var(--docs-code-block-text);
+  padding: 0 var(--docs-code-block-padding) !important;
+  font-family: var(--font-mono);
+  font-size: var(--docs-code-font-size);
+  font-weight: 400;
+  line-height: 1.45;
+  caret-color: var(--docs-code-block-text);
+}
+:global(.cm-line.cm-codeBlock-first) {
+  border-top-left-radius: var(--docs-code-radius);
+  border-top-right-radius: var(--docs-code-radius);
+  padding-top: calc(var(--docs-code-block-padding) / 2) !important;
+  margin-top: 0.5em;
+}
+:global(.cm-line.cm-codeBlock-last) {
+  border-bottom-left-radius: var(--docs-code-radius);
+  border-bottom-right-radius: var(--docs-code-radius);
+  padding-bottom: calc(var(--docs-code-block-padding) / 2) !important;
+  margin-bottom: 0.75em;
+}
+/* The page-wide dark mode inverts everything (#105); the site keeps code blocks dark in both modes. */
+:global(.theme-dark .cm-line.cm-codeBlock) {
+  filter: invert(90%) hue-rotate(180deg) brightness(1.2);
+}
+
+:global(.cm-line.cm-blockquote) {
+  border-left: 0.25em solid var(--docs-blockquote-border);
+  padding-left: 1em !important;
+  color: var(--docs-blockquote-text);
 }
 
 .processingInstruction {
@@ -285,8 +345,18 @@ defineExpose({
   font-feature-settings: var(--font-mono-readonly-feature-settings);
 }
 
+/* Inline code, outside code blocks. */
+:global(.cm-line:not(.cm-codeBlock)) .monospace {
+  font-size: var(--docs-code-font-size);
+  font-weight: 400;
+  background-color: var(--docs-code-bg);
+  border: 1px solid var(--docs-code-border);
+  border-radius: var(--docs-code-radius);
+  padding: 0.1em 0.2em;
+}
+
 .url {
-  color: royalblue;
+  color: var(--docs-link);
 }
 
 /* === View-mode === */
@@ -305,13 +375,11 @@ defineExpose({
     display: none;
   }
 
+  /* Underlined, as on the site, so colour is not a link's only mark. */
   a {
     cursor: pointer;
-    color: blue;
-
-    &:hover {
-      text-decoration: underline;
-    }
+    color: var(--docs-link);
+    text-decoration: underline;
   }
 
   .list:not(*) {
