@@ -35,7 +35,7 @@ in #650). Executors read both.
 - The warm-up loads the default template's imports (spec decision 3), builds a
   table, filters, aggregates and sorts it, and prepares a table visualization of
   the result, in a throwaway context on a temporary copy of the default template
-  under the system temporary directory, which is deleted afterwards. (Task 5
+  under the system temporary directory, which is deleted afterwards. (Task 6
   lists the imports; decision 4 below.)
 - The engine prints `STANDBY READY <ms>` on stderr and
   `standby: warm-up done in N ms` once the warm-up is over.
@@ -121,8 +121,12 @@ that implements it says so in its body.
    through the new system property `enso.context.workingDirectory` that
    `ContextFactory` applies. `EnsoContext.checkWorkingDirectory` compares
    against the context's working directory, so it then compares against the
-   parent of `--path`. Relative paths in Enso code resolve as they did when the
-   process's working directory was the project's parent.
+   parent of `--path`. The JVM's own working directory cannot follow, so Task 2
+   makes relative `File`s, `File.current_directory` and `Process.run`'s default
+   directory resolve against the context's working directory whenever it is not
+   the process's. A spare-served project then behaves like a normal one, with
+   the known differences that Task 2 lists (Java code given a raw relative
+   string, and the text of a relative `File`).
 4. **The warm-up's imports.** Decision 3 lists Standard.Base, Standard.Table and
    Standard.Visualization, but the default template
    (`lib/scala/pkg/src/main/resources/default/src/Main.enso`) also imports
@@ -136,7 +140,11 @@ that implements it says so in its body.
    or `-XX:SharedArchiveFile=` in its options). The IDE's cache is trained on a
    Language Server boot (`jvmAot/trainer.ts`), so it already archives those
    classes, and the classes it lacks (~4,800 lambda classes) cannot be preloaded
-   by name. Task 7 measures that claim and records it in PR 1.
+   by name. Task 9 measures that claim and records it in PR 1. The cache is
+   detected only from the options the launcher gives the JVM (`jvm.options` and
+   `ENSO_JVM_OPTIONS`, `JvmOptions.all`). A cache passed through
+   `JAVA_TOOL_OPTIONS` is not detected and only causes needless preloading; the
+   IDE never passes it that way.
 6. **The engine's own messages before the line** (the warm-up's failure,
    `standby: warm-up done …`, `STANDBY READY …`) are stderr lines. Logging is
    not set up before the line, because the Language Server sets it up itself and
@@ -150,10 +158,18 @@ that implements it says so in its body.
    level), the AOT cache's JVM options, the stable extra environment (the
    secrets key, which is never logged or stored unhashed) and the inherited
    `ENSO_JVM_OPTIONS`. The per-open arguments (`--server …`, the engine-logging
-   `--vm.D` options) travel in the line, which re-applies them. A finished AOT
-   training refreshes the spare (`JvmAotCacheSettings.onTrained`), so a cache
-   that appears later does not leave a stale spare to be discarded at the next
-   open.
+   `--vm.D` options) travel in the line, which re-applies them.
+
+   No spare is started while an AOT training runs (a first launch without a
+   cache), so the two do not compete. A training that ends, trained or failed,
+   refreshes the spare (`JvmAotCacheSettings.onTrainingEnded`), so the spare
+   starts with the new cache instead of being discarded at the next open.
+
+   Rotating or resetting the secrets key refreshes the spare too
+   (`SecretsActionOptions.afterKeyChange`). The spare holds the old key in its
+   environment, and the rotation's "no engine running" check
+   (`ROTATE_BLOCKED_BY_PROJECTS`) does not count it.
+
 9. **"No project is open"** ignores a project whose close has begun: the 2 s
    rule starts the next spare while the old engine may still be stopping.
 10. **No spare** while the extra arguments hold `--profiling-path` (its value is
@@ -162,8 +178,11 @@ that implements it says so in its body.
 11. **The measurement's "wait for `STANDBY READY` (or 15 s)"** means whichever
     comes first. The "open during the warm-up" question is settled with the
     system property `enso.standby.abandonWarmUp`, measured by two extra harness
-    engines. Abandoning becomes the default only if it is faster by at least 150
-    ms in the pooled median and faster in at least 2 of the 3 rounds.
+    engines, beside a cold `jvm`. If waiting for the warm-up (`jvm-spare-early`)
+    is slower than a cold start (`jvm`) in the pooled first-open median,
+    abandoning becomes the default regardless. Otherwise it becomes the default
+    only if it is faster than waiting by at least 150 ms in the pooled median
+    and faster in at least 2 of the 3 rounds.
 12. **The GUI's "sent on load and on change"** is tested where the sending
     lives, a composable test (`spareEngineSync.test.ts`). `localTab.test.ts`
     tests that the switch persists and that the section is hidden when the
@@ -181,6 +200,9 @@ that implements it says so in its body.
 | `engine/common/src/main/java/org/enso/common/ProcessEnvironment.java`                                                                             | Create             | Environment variables, with the values a standby engine was handed after start           |
 | `engine/common/src/test/java/org/enso/common/ProcessEnvironmentTest.java`                                                                         | Create             | Its test                                                                                 |
 | `engine/runtime-integration-tests/src/test/java/org/enso/interpreter/test/WorkingDirectoryCheckTest.java`                                         | Create             | The check passes against the context's working directory, and still fails on a wrong one |
+| `engine/runtime/src/main/java/org/enso/interpreter/runtime/system/System.java`                                                                    | Modify             | `working_directory_override`; `create_process` starts in the context's working directory |
+| `distribution/lib/Standard/Base/0.0.0-dev/src/Internal/Runtime_Helpers.enso`, `System/Internal/File_Helpers.enso`, `System/File.enso`             | Modify             | Relative files and `File.current_directory` follow the context's working directory       |
+| `engine/runtime-integration-tests/src/test/java/org/enso/interpreter/test/ContextWorkingDirectoryTest.java`                                       | Create             | Their test                                                                               |
 | `engine/runner/src/main/java/org/enso/runner/Main.java`                                                                                           | Modify             | `--standby`, `ProcessEnvironment` in `setupLoggingContext`, `launch` package-private     |
 | `engine/runtime-instrument-common/src/main/java/org/enso/interpreter/instrument/telemetry/ProgressTimingCollector.java`                           | Modify             | Read the project ids through `ProcessEnvironment`                                        |
 | `engine/language-server/src/main/scala/org/enso/languageserver/boot/config/ApplicationConfig.scala`                                               | Modify             | Fall back to a fresh `ConfigFactory.systemProperties()`                                  |
@@ -204,14 +226,15 @@ that implements it says so in its body.
 | `app/project-manager-shim/src/projectService/ensoRunner.ts`                                                                               | Modify          | `startSpare`, `stopSpare`, `spareAvailableAgain`, `hasProjectsInUse`; `openProject` takes the spare  |
 | `app/project-manager-shim/src/projectService/index.ts`                                                                                    | Modify          | `setSpareEngine`, `refreshSpare`, `stopSpareEngine`; the key, the after-close delay                  |
 | `app/project-manager-shim/src/handler/projectService.ts`                                                                                  | Modify          | `POST /api/project-service/engine/setSpare`                                                          |
-| `app/project-manager-shim/src/jvmAot/index.ts`                                                                                            | Modify          | `onTrained`                                                                                          |
+| `app/project-manager-shim/src/jvmAot/index.ts`                                                                                            | Modify          | `isTraining`, `onTrainingEnded`                                                                      |
+| `app/electron-client/src/secretsKey.ts`, `src/electron.ts`, `tests/headless/secretsKey.test.ts`                                           | Modify          | `afterKeyChange`: a rotation or reset refreshes the spare                                            |
 | `app/project-manager-shim/src/projectService/__tests__/fakeSpareEngine.ts`                                                                | Create          | The fake `enso` with `--standby`                                                                     |
 | `…/__tests__/spareEngine.test.ts`, `spareOpen.test.ts`, `spareService.test.ts`                                                            | Create          | Tests                                                                                                |
-| `…/__tests__/testPorts.ts`                                                                                                                | Modify          | Two more port bands                                                                                  |
+| `…/__tests__/testPorts.ts`                                                                                                                | Modify          | One more port band                                                                                   |
 | `app/project-manager-shim/src/handler/__tests__/projectService.test.ts`, `jvmAot/__tests__/cache.test.ts`                                 | Modify          | Tests                                                                                                |
 | `app/common/src/services/ProjectManager/ProjectManager.ts`, `types.ts`, `app/common/src/services/LocalBackend.ts`                         | Modify          | `setSpareEngine`                                                                                     |
 | `app/common/src/services/ProjectManager/__tests__/ProjectManager.spareEngine.test.ts`                                                     | Create          | Test                                                                                                 |
-| `app/electron-client/src/projectService.ts`, `src/index.ts`                                                                               | Modify          | Quit, `onTrained`                                                                                    |
+| `app/electron-client/src/projectService.ts`, `src/index.ts`                                                                               | Modify          | Quit, `onTrainingEnded`, `refreshSpareEngine`                                                        |
 | `app/gui/src/providers/spareEngineSettings.ts`                                                                                            | Create          | The store, and `engineRunsOnJvm`                                                                     |
 | `app/gui/src/composables/spareEngineSync.ts` (+ test)                                                                                     | Create          | Sends the setting                                                                                    |
 | `app/gui/src/dashboard/layouts/Settings/EngineSettingsSection.vue`                                                                        | Create          | The switch                                                                                           |
@@ -446,7 +469,230 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 2: Per-open variables handed after start
+### Task 2: Relative paths and processes follow the context's working directory
+
+A normal engine runs in the project's parent, so its JVM resolves relative paths
+there. A spare's process runs in the system temporary directory, and its working
+directory cannot be changed once the JVM runs (`Utils.adjustCwdToProject`
+explains why). Without this task a project served by a spare would resolve
+`File.new "data/x.csv"` (which is `java.nio.file.Path.of`, relative to the
+process's directory: `File_Helpers.get_file`) and `File.current_directory`
+against the temporary directory. `Process.run` without a directory would start
+there too. This task makes all three follow the context's working directory,
+which Task 1 lets the runner set to the project's parent. A normal engine's
+context directory is its process directory, so nothing changes for it, and the
+new builtin says so by answering `Nothing`.
+
+Known differences that remain, stated in PR 1 and in `engine/runner/CLAUDE.md`:
+
+- In a spare-served project a relative `File` is made absolute when it is
+  created, so its text shows the full path.
+- Java code handed a relative path string directly still resolves it against the
+  process's directory. That covers user code through `polyglot java import`, and
+  the std-bits helpers only when given a raw relative string; Enso's own callers
+  pass a `File`'s path, which is now absolute.
+- `DiskSpaceGetter` falls back to `user.dir` only when there is no project,
+  which never happens in a Language Server.
+
+The places that use the process's directory were found with
+`grep -rn "user.dir\|ProcessBuilder\|getCurrentWorkingDirectory\|Java_Path.of" engine/runtime/src/main std-bits distribution/lib/Standard`.
+Besides the three above, `Java_Path.of` appears only on paths taken from
+exceptions about files that are already absolute (`File.enso`'s
+`_replace_create_directories_*`).
+
+**Files:**
+
+- Modify:
+  `engine/runtime/src/main/java/org/enso/interpreter/runtime/system/System.java`
+  (a new builtin; `create_process`)
+- Modify:
+  `distribution/lib/Standard/Base/0.0.0-dev/src/Internal/Runtime_Helpers.enso`
+- Modify:
+  `distribution/lib/Standard/Base/0.0.0-dev/src/System/Internal/File_Helpers.enso`
+  (`get_file`)
+- Modify: `distribution/lib/Standard/Base/0.0.0-dev/src/System/File.enso`
+  (`current_directory`)
+- Test:
+  `engine/runtime-integration-tests/src/test/java/org/enso/interpreter/test/ContextWorkingDirectoryTest.java`
+
+**Interfaces:**
+
+- Consumes: `ContextFactory.workingDirectory` (Task 1); the polyglot
+  `Context.Builder.currentWorkingDirectory` it sets.
+- Produces: the builtin `System.working_directory_override`, which returns the
+  context's working directory as `Text` when it differs from the process's
+  (`user.dir`) and `Nothing` otherwise. Also
+  `Runtime_Helpers.working_directory_override`.
+
+- [ ] **Step 1: Write the failing test**
+
+```java
+package org.enso.interpreter.test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+
+import java.nio.file.Path;
+import java.util.List;
+import org.enso.test.utils.ContextUtils;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
+/**
+ * A standby engine's process runs in the temporary directory; its context's working directory is
+ * the project's parent (`ContextFactory.workingDirectory`). Relative files, the current directory
+ * and processes started without a directory must follow the context, as they follow the process
+ * in a normal engine.
+ */
+public class ContextWorkingDirectoryTest {
+  @Rule public TemporaryFolder tmp = new TemporaryFolder();
+
+  private static final String CODE =
+      """
+      from Standard.Base import all
+      import Standard.Base.System.Platform
+      import Standard.Base.System.Process
+
+      main =
+          relative = File.new "data/a.csv" . path
+          current = File.current_directory . absolute . normalize . path
+          pwd = if Platform.os == Platform.OS.Windows then Process.run "cmd" ["/c", "cd"] else Process.run "pwd"
+          [relative, current, pwd.stdout.trim]
+      """;
+
+  /** `main`'s three texts, in a context whose working directory is `dir` (the process's when null). */
+  private static List<String> run(Path dir) {
+    var builder = ContextUtils.newBuilder("enso");
+    if (dir != null) {
+      builder = builder.withModifiedContext(b -> b.currentWorkingDirectory(dir));
+    }
+    try (var ctx = builder.build()) {
+      var result = ctx.evalModule(CODE);
+      return List.of(
+          result.getArrayElement(0).asString(),
+          result.getArrayElement(1).asString(),
+          result.getArrayElement(2).asString());
+    }
+  }
+
+  @Test
+  public void relativePathsAndProcessesFollowTheContextsWorkingDirectory() throws Exception {
+    var dir = tmp.newFolder("context-cwd").toPath().toRealPath();
+    assertNotEquals(dir, Path.of("").toRealPath());
+    var texts = run(dir);
+    assertEquals(dir.resolve("data").resolve("a.csv").toString(), texts.get(0));
+    assertEquals(dir.toString(), texts.get(1));
+    assertEquals(dir, Path.of(texts.get(2)).toRealPath());
+  }
+
+  @Test
+  public void aNormalContextIsUnchanged() throws Exception {
+    var texts = run(null);
+    assertEquals(Path.of("data", "a.csv").toString(), texts.get(0));
+    assertEquals(Path.of("").toAbsolutePath().normalize().toString(), texts.get(1));
+    assertEquals(Path.of("").toRealPath(), Path.of(texts.get(2)).toRealPath());
+  }
+}
+```
+
+- [ ] **Step 2: Run it to see it fail**
+
+Run:
+`sbt -Dsbt.server.forcestart=true "runtime-integration-tests/testOnly org.enso.interpreter.test.ContextWorkingDirectoryTest"`
+Expected: `relativePathsAndProcessesFollowTheContextsWorkingDirectory` FAILS:
+the first text is `data/a.csv` (relative) and the process prints the process's
+directory. `aNormalContextIsUnchanged` PASSES.
+
+- [ ] **Step 3: Implement**
+
+In `System.java`, add after `nanoTime()`:
+
+```java
+  @Builtin.Method(
+      description =
+          "The context's working directory when it is not the process's (a standby engine), else"
+              + " Nothing: relative local paths resolve against it.")
+  @Builtin.Specialize
+  @SuppressWarnings("generic-enso-builtin-type")
+  @CompilerDirectives.TruffleBoundary
+  public static Object workingDirectoryOverride(EnsoContext ctx) {
+    var context = ctx.getCurrentWorkingDirectory().getAbsoluteFile().normalize().getPath();
+    var process = java.nio.file.Path.of("").toAbsolutePath().normalize();
+    return process.equals(java.nio.file.Path.of(context)) ? ctx.getNothing() : Text.create(context);
+  }
+```
+
+In `create_process`, after the `if (ctx.getNothing() != cwdOrNothing) { … }`
+block, add an `else`:
+
+```java
+      } else {
+        // The context's working directory: a standby engine's process runs elsewhere (Note
+        // [Standby Mode] in engine/runner `Standby`). In a normal engine they are the same.
+        pb.directory(ctx.getCurrentWorkingDirectory());
+      }
+```
+
+In `Runtime_Helpers.enso`, after `is_unix = @Builtin_Method "System.is_unix"`:
+
+```
+working_directory_override = @Builtin_Method "System.working_directory_override"
+```
+
+In `File_Helpers.enso`, add `import project.Internal.Runtime_Helpers` with the
+imports and replace `get_file`:
+
+```
+## The builtin that returns a File instance for a given path. A relative path
+   resolves against the context's working directory when that is not the
+   process's (a standby engine, whose process runs elsewhere); it is then made
+   absolute. In a normal engine the path is kept as given.
+get_file path:Text =
+    java_path = Java_Path.of path
+    override = Runtime_Helpers.working_directory_override
+    resolved = if override.is_nothing || java_path.isAbsolute then java_path else
+        Java_Path.of override . resolve java_path
+    File.Value resolved
+```
+
+(Keep the existing doc comment's first line if it differs; the rest of the
+comment is new.)
+
+In `File.enso`, change `current_directory`'s body from
+`File.Value (Java_Path.of ".")` to:
+
+```
+        File_Helpers.get_file "."
+```
+
+- [ ] **Step 4: Run the tests to see them pass**
+
+Run:
+`sbt -Dsbt.server.forcestart=true "runtime-integration-tests/testOnly org.enso.interpreter.test.ContextWorkingDirectoryTest" "runtime-integration-tests/testOnly org.enso.interpreter.test.WorkingDirectoryCheckTest"`
+Expected: 2 + 2 tests PASS. Then run the Base tests that cover files and
+processes, from `test/` (root CLAUDE.md: the working directory must be the
+project's parent):
+
+```bash
+wsl -e bash -lc '. ~/.enso-toolchain.sh && set -e && cd ~/jvm-standby && git pull --ff-only /mnt/c/Repos/Enso/ide jvm-warm-engine-1-standby && sbt -Dsbt.server.forcestart=true buildEngineDistribution && cd test && JAVA_TOOL_OPTIONS="-enableassertions" ../built-distribution/enso-engine-*/enso-*/bin/enso --no-ir-caches --run "$PWD/Base_Tests" "File|Process" 2>&1 | tail -5'
+```
+
+Expected: `0 tests failed`, and a log as long as develop's for the same filter
+(a filter that matches nothing also says 0 failed). The WSL clone is made in
+Task 7 Step 5; run that step's clone command first if it does not exist yet.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add engine/runtime/src/main/java/org/enso/interpreter/runtime/system/System.java distribution/lib/Standard/Base/0.0.0-dev/src/Internal/Runtime_Helpers.enso distribution/lib/Standard/Base/0.0.0-dev/src/System/Internal/File_Helpers.enso distribution/lib/Standard/Base/0.0.0-dev/src/System/File.enso engine/runtime-integration-tests/src/test/java/org/enso/interpreter/test/ContextWorkingDirectoryTest.java
+git commit -m "Engine: relative paths and processes follow the context's working directory (#518)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
+```
+
+### Task 3: Per-open variables handed after start
 
 **Files:**
 
@@ -581,8 +827,10 @@ public final class ProcessEnvironment {
 
 In `Main.java`, add `import org.enso.common.ProcessEnvironment;` and in
 `setupLoggingContext` replace every `System.getenv(` with
-`ProcessEnvironment.get(`. There are eight calls, all of the form
-`System.getenv(LanguageServerApi.ENSO_..._ENV_NAME)`.
+`ProcessEnvironment.get(`: all ten calls there, each of the form
+`System.getenv(LanguageServerApi.ENSO_..._ENV_NAME)`. Check with
+`sed -n '/private void setupLoggingContext/,/^  }/p' engine/runner/src/main/java/org/enso/runner/Main.java | grep -c "System.getenv"`,
+which must print `0` afterwards.
 
 In `ProgressTimingCollector.java`, add
 `import org.enso.common.ProcessEnvironment;` and replace the four
@@ -619,7 +867,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 3: The argument line
+### Task 4: The argument line
 
 **Files:**
 
@@ -633,7 +881,7 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 
 **Interfaces:**
 
-- Consumes: `ProcessEnvironment.PROPERTY_PREFIX` (Task 2).
+- Consumes: `ProcessEnvironment.PROPERTY_PREFIX` (Task 3).
 - Produces: `record StandbyRequest(List<String> args, Map<String, String> env)`,
   `static StandbyRequest parse(String line)` (throws
   `IllegalArgumentException`), `void applyEnvironment()`,
@@ -1010,7 +1258,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 4: The standby wait
+### Task 5: The standby wait
 
 **Files:**
 
@@ -1019,7 +1267,7 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 
 **Interfaces:**
 
-- Consumes: `StandbyRequest.parse` (Task 3).
+- Consumes: `StandbyRequest.parse` (Task 4).
 - Produces: `final class Standby` with
   `static final String READY = "STANDBY READY"`,
   `WARM_UP_PROPERTY = "enso.standby.warmUp"`,
@@ -1031,7 +1279,7 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
   `StandbyRequest awaitRequest(InputStream in) throws IOException, InterruptedException`
   (returns `null` when stdin closes first),
   `static String readLine(InputStream in) throws IOException`.
-  `static Standby create(File component)` is added in Task 6, once the warm-up
+  `static Standby create(File component)` is added in Task 7, once the warm-up
   and the preloader exist.
 
 - [ ] **Step 1: Write the failing test**
@@ -1369,7 +1617,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 5: The warm-up
+### Task 6: The warm-up
 
 **Files:**
 
@@ -1377,14 +1625,14 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 
 **Interfaces:**
 
-- Consumes: `Standby.WarmUp` (Task 4), `ContextFactory.workingDirectory` (Task
+- Consumes: `Standby.WarmUp` (Task 5), `ContextFactory.workingDirectory` (Task
   1).
 - Produces: `final class StandbyWarmUp implements Standby.WarmUp`,
   `StandbyWarmUp()`, `static final String MAIN_SOURCE`,
   `static final String PROJECT_NAME = "Warm_Up"`.
 
 The warm-up is exercised end to end by
-`StandbyProcessTest.theWarmUpFinishesWithoutAFailure` (Task 7, with a built
+`StandbyProcessTest.aWarmedUpStandbyOpensTheProject` (Task 8, with a built
 distribution) and by the measurement of Part 3. A unit test would have to
 compile the standard library from source inside sbt, which takes minutes and
 needs the std-bits built, so there is none.
@@ -1568,7 +1816,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 6: Preloading, from a generated list
+### Task 7: Preloading, from a generated list
 
 **Files:**
 
@@ -1583,8 +1831,8 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 **Interfaces:**
 
 - Consumes: `JvmOptions.all(File componentDir, String environmentValue)` and
-  `JvmOptions.ENVIRONMENT_VARIABLE` (existing), `Standby.Preload` (Task 4),
-  `StandbyWarmUp` (Task 5).
+  `JvmOptions.ENVIRONMENT_VARIABLE` (existing), `Standby.Preload` (Task 5),
+  `StandbyWarmUp` (Task 6).
 - Produces: `StandbyPreloader(List<String> jvmOptions)`,
   `StandbyPreloader(List<String> jvmOptions, List<String> names, ClassLoader loader)`,
   `String preload(BooleanSupplier abandoned)`,
@@ -1674,6 +1922,10 @@ import java.util.function.BooleanSupplier;
  * ({@link #RESOURCE}) is generated by `tools/standby-preload/generate.mjs` from a boot without an
  * AOT cache. With a cache it is skipped: the IDE's cache is trained on a Language Server boot, so it
  * already holds these classes, and the ones it does not (lambda classes) cannot be named.
+ *
+ * <p>The cache is seen only in the options the launcher gives the JVM (`jvm.options` and
+ * `ENSO_JVM_OPTIONS`). One passed through `JAVA_TOOL_OPTIONS` is not seen, and only costs a
+ * needless preload; the IDE passes its cache in `ENSO_JVM_OPTIONS`.
  */
 final class StandbyPreloader {
   static final String RESOURCE = "/org/enso/runner/standby-preload.txt";
@@ -1853,7 +2105,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 7: `--standby` in `Main`
+### Task 8: `--standby` in `Main`
 
 **Files:**
 
@@ -1864,7 +2116,7 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 **Interfaces:**
 
 - Consumes: `Standby.create`, `Standby.awaitRequest`,
-  `StandbyRequest.applyEnvironment` (Tasks 3, 4, 6),
+  `StandbyRequest.applyEnvironment` (Tasks 4, 5, 7),
   `ContextFactory.WORKING_DIRECTORY_PROPERTY` (Task 1).
 - Produces: the CLI option `--standby` (`Main.STANDBY_OPTION = "standby"`).
   `Main.launch(String[])` becomes package-private.
@@ -1891,6 +2143,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.ServerSocket;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.WebSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -1898,6 +2152,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.junit.Rule;
@@ -1906,7 +2162,8 @@ import org.junit.rules.TemporaryFolder;
 
 /**
  * `enso --standby` as the project service runs it: the process's working directory is not the
- * project's parent, the line arrives on stdin, and the Language Server then answers `/_health`.
+ * project's parent, the line arrives on stdin, and the Language Server then answers `/_health` and
+ * a JSON-RPC session, with the warm-up off and, in one process, after a full warm-up.
  */
 public class StandbyProcessTest {
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
@@ -2012,12 +2269,12 @@ public class StandbyProcessTest {
     return project;
   }
 
-  private static String line(Path project, int port) {
+  private static String line(Path project, int port, String rootId) {
     var args =
         List.of(
             "--server",
             "--root-id",
-            UUID.randomUUID().toString(),
+            rootId,
             "--project-id",
             UUID.randomUUID().toString(),
             "--path",
@@ -2032,16 +2289,79 @@ public class StandbyProcessTest {
         + "],\"env\":{\"LANGUAGE_SERVER_CHANNEL_TOKEN\":\"standby-test\",\"ENSO_LOCAL_PROJECT_ID\":\"standby-test-key\"}}\n";
   }
 
-  @Test(timeout = 300_000)
-  public void theLineStartsALanguageServer() throws Exception {
-    var enso = launcher();
-    assumeTrue("no built-distribution: build one with `sbt buildEngineDistribution`", enso != null);
+  /**
+   * `session/initProtocolConnection` on the JSON-RPC socket, as the GUI's first call; its answer.
+   * `/_health` passes while the Language Server still initialises, and a socket opened then is
+   * dropped (`jvmAot/driver.ts` in the shim), so a failed attempt is retried once a second.
+   */
+  private static String initProtocolConnection(int port) throws Exception {
+    var client = HttpClient.newHttpClient();
+    var end = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+    Exception last = null;
+    while (System.nanoTime() < end) {
+      var answer = new CompletableFuture<String>();
+      var message = new StringBuilder();
+      try {
+        var socket =
+            client
+                .newWebSocketBuilder()
+                .buildAsync(
+                    URI.create("ws://127.0.0.1:" + port + "/"),
+                    new WebSocket.Listener() {
+                      @Override
+                      public CompletionStage<?> onText(
+                          WebSocket ws, CharSequence data, boolean lastPart) {
+                        message.append(data);
+                        if (lastPart) {
+                          var text = message.toString();
+                          message.setLength(0);
+                          if (text.contains("\"id\":0")) {
+                            answer.complete(text);
+                          }
+                        }
+                        ws.request(1);
+                        return null;
+                      }
+
+                      @Override
+                      public void onError(WebSocket ws, Throwable error) {
+                        answer.completeExceptionally(error);
+                      }
+
+                      @Override
+                      public CompletionStage<?> onClose(WebSocket ws, int code, String reason) {
+                        answer.completeExceptionally(new IOException("closed: " + code));
+                        return null;
+                      }
+                    })
+                .get(10, TimeUnit.SECONDS);
+        socket.sendText(
+            "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"session/initProtocolConnection\","
+                + "\"params\":{\"clientId\":\""
+                + UUID.randomUUID()
+                + "\"}}",
+            true);
+        var reply = answer.get(30, TimeUnit.SECONDS);
+        socket.sendClose(WebSocket.NORMAL_CLOSURE, "done");
+        return reply;
+      } catch (Exception e) {
+        last = e;
+        Thread.sleep(1000);
+      }
+    }
+    throw new AssertionError("no answer to session/initProtocolConnection", last);
+  }
+
+  /**
+   * Hand `engine` the line for a fresh project, and check that its Language Server answers
+   * `/_health`, opens the project (the content roots name the line's root id) and stops on a newline.
+   */
+  private void serveProject(Engine engine) throws Exception {
     var project = project();
     var port = freePort();
-    var engine = start(enso, false);
-    engine.waitFor(Standby.READY, 120);
+    var rootId = UUID.randomUUID().toString();
     var stdin = engine.process().getOutputStream();
-    stdin.write(line(project, port).getBytes(StandardCharsets.UTF_8));
+    stdin.write(line(project, port, rootId).getBytes(StandardCharsets.UTF_8));
     stdin.flush();
     var end = System.nanoTime() + TimeUnit.SECONDS.toNanos(120);
     while (!healthy(port)) {
@@ -2049,6 +2369,9 @@ public class StandbyProcessTest {
       assertTrue("the engine exited: " + engine.stderr(), engine.process().isAlive());
       Thread.sleep(250);
     }
+    var reply = initProtocolConnection(port);
+    assertTrue(reply, reply.contains("\"result\""));
+    assertTrue("the project is a content root: " + reply, reply.contains(rootId));
     assertFalse(engine.stderr().toString(), engine.said("unexpected working directory"));
     stdin.write('\n');
     stdin.flush();
@@ -2057,16 +2380,24 @@ public class StandbyProcessTest {
   }
 
   @Test(timeout = 300_000)
-  public void theWarmUpFinishesWithoutAFailure() throws Exception {
+  public void theLineStartsALanguageServer() throws Exception {
+    var enso = launcher();
+    assumeTrue("no built-distribution: build one with `sbt buildEngineDistribution`", enso != null);
+    var engine = start(enso, false);
+    engine.waitFor(Standby.READY, 120);
+    serveProject(engine);
+  }
+
+  @Test(timeout = 480_000)
+  public void aWarmedUpStandbyOpensTheProject() throws Exception {
     var enso = launcher();
     assumeTrue("no built-distribution: build one with `sbt buildEngineDistribution`", enso != null);
     var engine = start(enso, true);
     engine.waitFor(Standby.READY, 240);
     assertTrue(engine.stderr().toString(), engine.said("standby: warm-up done in "));
     assertFalse(engine.stderr().toString(), engine.said("warm-up failed"));
-    engine.process().getOutputStream().close();
-    assertTrue(engine.process().waitFor(60, TimeUnit.SECONDS));
-    assertEquals(0, engine.process().exitValue());
+    // The same process: the warm-up's context is gone, and the project's opens as usual.
+    serveProject(engine);
   }
 
   @Test(timeout = 300_000)
@@ -2096,14 +2427,14 @@ public class StandbyProcessTest {
 }
 ```
 
-- [ ] **Step 2: Run it to see it fail (WSL, with the distribution of Task 6)**
+- [ ] **Step 2: Run it to see it fail (WSL, with the distribution of Task 7)**
 
 ```bash
 wsl -e bash -lc '. ~/.enso-toolchain.sh && set -e && cd ~/jvm-standby && git pull --ff-only /mnt/c/Repos/Enso/ide jvm-warm-engine-1-standby && export ENSO_DATA_DIRECTORY=$HOME/standby-data && sbt -Dsbt.server.forcestart=true buildEngineDistribution "engine-runner/testOnly org.enso.runner.StandbyProcessTest"'
 ```
 
-Expected: the 4 tests FAIL: the engine prints `Unrecognized option: --standby`
-and exits 1.
+Expected: the 4 tests FAIL (the last fails without its message): the engine
+prints `Unrecognized option: --standby` and exits 1.
 
 - [ ] **Step 3: Implement**
 
@@ -2216,7 +2547,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 8: The AOT cache check, docs, and PR 1
+### Task 9: The AOT cache check, docs, and PR 1
 
 **Files:**
 
@@ -2224,7 +2555,7 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
   (`--jvm`)")
 
 - [ ] **Step 1: Measure what the AOT cache leaves to preloading (WSL, the
-      distribution of Task 7)**
+      distribution of Task 8)**
 
 Decision 5 claims that a cache trained on a Language Server boot already holds
 the named classes of such a boot. Check it the way the shim makes its cache
@@ -2279,12 +2610,29 @@ arguments. A closed stdin before the line exits with 0.
   line arrives instead of waiting for it.
 - The preload list (`src/main/resources/org/enso/runner/standby-preload.txt`) is
   generated: run a Language Server boot without an AOT cache with
-  `ENSO_JVM_OPTIONS=-Xlog:class+load=info:file=<log>`, then
+  `JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=<log>` (the shell launcher of
+  `built-distribution/` does not read `ENSO_JVM_OPTIONS`), then
   `node tools/standby-preload/generate.mjs <log> <the list>`. Classes that have
   gone are skipped at run time; regenerate it when a release's count drops
   noticeably (the standby line says `preloaded N of M classes`). It is skipped
-  when the JVM runs with an AOT cache, which already holds those classes.
-- Tests: `StandbyRequestTest`, `StandbyTest`, `StandbyPreloaderTest`, and
+  when the JVM runs with an AOT cache, which already holds those classes. The
+  cache is seen only in `jvm.options` and `ENSO_JVM_OPTIONS` (`JvmOptions.all`);
+  one given through `JAVA_TOOL_OPTIONS` is not seen and only causes a needless
+  preload.
+- **The process's working directory is the temporary directory**, and the JVM's
+  cannot be changed once it runs. Enso therefore resolves against the context's
+  working directory (the project's parent), not the process's, wherever it can:
+  `File_Helpers.get_file` (every relative local `File`, made absolute when the
+  two differ), `File.current_directory`, and `Process.run` without a directory
+  (`System.create_process`); the builtin `System.working_directory_override`
+  says when they differ. Known differences from a normal engine: a relative
+  `File` shows its absolute path, and Java code handed a raw relative string
+  (user code through `polyglot java import`) resolves it against the temporary
+  directory. Any new engine or std-bits code that resolves a path against the
+  process (`user.dir`, `Path.of` of a relative string, a `ProcessBuilder`
+  without a directory) must go through the context's working directory instead.
+- Tests: `StandbyRequestTest`, `StandbyTest`, `StandbyPreloaderTest`,
+  `ContextWorkingDirectoryTest` (runtime-integration-tests), and
   `StandbyProcessTest`, which needs `built-distribution/` and is skipped without
   it.
 ```
@@ -2295,7 +2643,7 @@ Run Prettier on it from the worktree:
 - [ ] **Step 3: Run the formatting and the whole runner suite (WSL)**
 
 ```bash
-wsl -e bash -lc '. ~/.enso-toolchain.sh && set -e && cd ~/jvm-standby && git pull --ff-only /mnt/c/Repos/Enso/ide jvm-warm-engine-1-standby && export ENSO_DATA_DIRECTORY=$HOME/standby-data && sbt -Dsbt.server.forcestart=true "javafmtCheckAll; scalafmtCheckAll" "engine-runner/test" "engine-common/test" "language-server/testOnly org.enso.languageserver.boot.config.ApplicationConfigTest" "runtime-integration-tests/testOnly org.enso.interpreter.test.WorkingDirectoryCheckTest"'
+wsl -e bash -lc '. ~/.enso-toolchain.sh && set -e && cd ~/jvm-standby && git pull --ff-only /mnt/c/Repos/Enso/ide jvm-warm-engine-1-standby && export ENSO_DATA_DIRECTORY=$HOME/standby-data && sbt -Dsbt.server.forcestart=true "javafmtCheckAll; scalafmtCheckAll" "engine-runner/test" "engine-common/test" "language-server/testOnly org.enso.languageserver.boot.config.ApplicationConfigTest" "runtime-integration-tests/testOnly org.enso.interpreter.test.WorkingDirectoryCheckTest org.enso.interpreter.test.ContextWorkingDirectoryTest"'
 ```
 
 Expected: all PASS. Then build the native launcher on Windows once
@@ -2319,10 +2667,13 @@ Write the body to `<scratch>/pr1-body.md`. It says what the PR adds (the
 `--standby` mode, the working directory through the context,
 `ProcessEnvironment`, `ApplicationConfig`'s fresh system properties, the
 generated preload list). It lists decisions 1, 2, 3, 5 and 6 of this plan, gives
-the Task 8 Step 1 counts, and says the mode is invisible until PR 2 passes
-`--standby`. It also says what was not verified: `gatherLicenses` and
-`bloopInstall` (untouched), and the native image beyond `--standby`'s refusal.
-It ends with `Refs #518` and the generated-with lines. Then:
+the Task 9 Step 1 counts, and says the mode is invisible until PR 2 passes
+`--standby`. It lists Task 2's known differences of a spare-served project (a
+relative `File` shows its absolute path; Java code handed a raw relative string
+resolves it against the temporary directory). It also says what was not
+verified: `gatherLicenses` and `bloopInstall` (untouched), and the native image
+beyond `--standby`'s refusal. It ends with `Refs #518` and the generated-with
+lines. Then:
 
 ```bash
 gh pr create --base develop --head jvm-warm-engine-1-standby --title "Engine: a standby mode for a warm spare engine (#518)" --label "CI: No changelog needed" --body-file <scratch>/pr1-body.md
@@ -2346,7 +2697,7 @@ git -C /c/Repos/Enso/ide worktree add -b jvm-warm-engine-2-spare /c/Repos/Enso/i
 Run `corepack pnpm install` in the worktree first. Commands below run from
 `/c/Repos/Enso/ide/.claude/worktrees/jvm-spare`.
 
-### Task 9: `SpareEngine`
+### Task 10: `SpareEngine`
 
 **Files:**
 
@@ -2376,32 +2727,29 @@ Run `corepack pnpm install` in the worktree first. Commands below run from
     `stop(reason: string): void`, `clearFailure(): void`
 - Produces (tests): `fakeSpareEnso(directory: string): Promise<Path>`,
   `spareEvents(log: string): Promise<SpareEvent[]>`,
-  `isAlive(pid: number): boolean`, `SPARE_ENGINE_PORT`, `SPARE_OPEN_PORT`.
+  `isAlive(pid: number): boolean`, `SPARE_OPEN_PORT`.
 
-- [ ] **Step 1: Add the port bands**
+- [ ] **Step 1: Add a port band**
 
-In `testPorts.ts`, change `FIRST_BAND_START` and its comment, and add two bands
-at the end:
+Only `spareOpen.test.ts` starts engines on ports (`spareEngine.test.ts`'s fake
+spares listen on none). The ten 2,000-wide bands fill 9,000 to 29,000, so the
+eleventh goes below them: 7,000 to 8,000, half a band wide, which stays clear of
+Vite's 5173 and the common 8080. Add at the end of `testPorts.ts`:
 
 ```ts
 /**
- * Low enough that twelve bands end at 29,000, below the default and the ephemeral ranges. A
- * thirteenth band needs this lowered again (or the bands narrowed).
+ * `spareOpen.test.ts`: below the first band, half a band wide (7,000 to 8,000), clear of Vite's
+ * 5173 and of 8080.
  */
-const FIRST_BAND_START = 5_000;
-```
-
-```ts
-/** `spareEngine.test.ts`. */
-export const SPARE_ENGINE_PORT = randomPortInBand(10);
-/** `spareOpen.test.ts`. */
-export const SPARE_OPEN_PORT = randomPortInBand(11);
+export const SPARE_OPEN_PORT = 7_000 + crypto.randomInt(1_000 - BAND_HEADROOM);
 ```
 
 In `app/project-manager-shim/CLAUDE.md` ("Tests that start engines"), change
 "The bands are 2,000 ports wide and ten of them end at 29,000; an eleventh needs
-the first band's start lowered." to "The bands are 2,000 ports wide and twelve
-of them end at 29,000; a thirteenth needs the first band's start lowered."
+the first band's start lowered." to "The bands are 2,000 ports wide and ten of
+them end at 29,000; an eleventh, `spareOpen.test.ts`'s, is 7,000 to 8,000 (clear
+of 5173 and 8080). Another needs the first band's start lowered, or a gap found
+the same way."
 
 - [ ] **Step 2: Write the fake engine**
 
@@ -2998,7 +3346,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 10: `EnsoRunner` takes the spare
+### Task 11: `EnsoRunner` takes the spare
 
 **Files:**
 
@@ -3010,7 +3358,7 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 **Interfaces:**
 
 - Consumes: `SpareEngine`, `LINE_VARIABLES`, `standbyLine`, `spareNotice`,
-  `TakeResult` (Task 9).
+  `TakeResult` (Task 10).
 - Produces:
   - `EngineLaunch.spareKey?: string`
   - `EngineLogSink.notice?(text: string): void`
@@ -3435,7 +3783,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 11: `ProjectService` decides when a spare is wanted
+### Task 12: `ProjectService` decides when a spare is wanted
 
 **Files:**
 
@@ -3447,9 +3795,11 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 **Interfaces:**
 
 - Consumes: `Runner.startSpare`, `stopSpare`, `spareAvailableAgain`,
-  `hasProjectsInUse`, `EngineLaunch.spareKey`, `SpareRequest` (Task 10);
-  `spawnKey` (Task 9); `resolveDefaultEngineMode` (existing); `ydocHostKind`
+  `hasProjectsInUse`, `EngineLaunch.spareKey`, `SpareRequest` (Task 11);
+  `spawnKey` (Task 10); `resolveDefaultEngineMode` (existing); `ydocHostKind`
   (existing).
+- Produces also: `JvmAotCache.isTraining(): boolean`, added in this task's Step
+  3 so that the service compiles; Task 14 tests it with the cache's own tests.
 - Produces: `SPARE_AFTER_CLOSE_MS = 2000` (exported),
   `EngineSettings.spareAfterCloseMs?: number`,
   `ProjectService.setSpareEngine(enabled: boolean): Promise<{ readonly engineMode: EngineMode }>`,
@@ -3646,7 +3996,30 @@ test("quitting stops the spare and starts no other", async () => {
   expect(starts).toHaveLength(1);
   expect(stops).toEqual(["quitting", "quitting"]);
 });
+
+test("no spare while the AOT cache trains; the refresh after it starts one", async () => {
+  let training = true;
+  // The parts of `JvmAotCache` the service uses, for a first launch whose cache is training.
+  const jvmAot = {
+    isTraining: () => training,
+    jvmOptions: async () => [] as readonly string[],
+    openStarted: () => {},
+    openAnswered: () => {},
+    checkUseLog: async () => {},
+  } as unknown as JvmAotCache;
+  const s = service({ option: "jvm", jvmAot });
+  await s.setSpareEngine(true);
+  expect(starts).toEqual([]);
+  expect(stops).toEqual(["the AOT cache is training"]);
+  training = false;
+  // What Electron's `onTrainingEnded` does.
+  await s.refreshSpare();
+  expect(starts).toHaveLength(1);
+});
 ```
+
+Add `import type { JvmAotCache } from "../../jvmAot/index.js";` to the test's
+imports.
 
 - [ ] **Step 2: Run it to see it fail**
 
@@ -3673,6 +4046,16 @@ import { ydocHostKind, type YdocHost } from "./ydocHost.js";
 
 (The existing `import type { YdocHost } from './ydocHost.js'` becomes the line
 above.)
+
+In `app/project-manager-shim/src/jvmAot/index.ts`, add to `class JvmAotCache`
+after `openAnswered()`:
+
+```ts
+  /** Whether a training is starting or running (a launch without a cache): no spare meanwhile. */
+  isTraining(): boolean {
+    return this.training != null || this.starting != null
+  }
+```
 
 Add to `interface EngineSettings`:
 
@@ -3755,6 +4138,9 @@ In `class ProjectService`, after `readonly engineLogs = new EngineLogHub()`:
       return 'the engine is native'
     }
     if (ydocHostKind() !== 'node') return 'ENSO_YDOC_HOST=engine'
+    // A first launch trains the AOT cache in the background: a spare would compete with it, and
+    // be discarded at the next open for the new cache. `onTrainingEnded` refreshes it.
+    if (this.engine?.jvmAot?.isTraining() === true) return 'the AOT cache is training'
     // `--profiling-path` takes a relative path, and a standby engine refuses relative paths.
     if (this.extraArgs.includes('--profiling-path')) return 'profiling is on'
     const inUse =
@@ -3851,14 +4237,14 @@ Expected: all PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/project-manager-shim/src/projectService/index.ts app/project-manager-shim/src/projectService/__tests__/spareService.test.ts
+git add app/project-manager-shim/src/projectService/index.ts app/project-manager-shim/src/jvmAot/index.ts app/project-manager-shim/src/projectService/__tests__/spareService.test.ts
 git commit -m "Project service: a spare engine while no project is open (#518)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 12: `engine/setSpare` and its clients
+### Task 13: `engine/setSpare` and its clients
 
 **Files:**
 
@@ -3872,7 +4258,7 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 
 **Interfaces:**
 
-- Consumes: `ProjectService.setSpareEngine` (Task 11).
+- Consumes: `ProjectService.setSpareEngine` (Task 12).
 - Produces: `POST /api/project-service/engine/setSpare` `{ enabled: boolean }` →
   `{ engineMode }`;
   `interface SpareEngineStatus { readonly engineMode: 'native' | 'jvm' }` in
@@ -4020,78 +4406,194 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 13: Electron — quit, and a finished AOT training
+### Task 14: Electron — quit, the AOT training, and a new secrets key
 
 **Files:**
 
 - Modify: `app/project-manager-shim/src/jvmAot/index.ts` (`JvmAotCacheSettings`,
-  the training's success branch)
+  the training's handlers)
 - Test: `app/project-manager-shim/src/jvmAot/__tests__/cache.test.ts`
+- Modify: `app/electron-client/src/secretsKey.ts` (`SecretsActionOptions`,
+  `rotateSecretsKey`, `resetSecrets`)
+- Test: `app/electron-client/tests/headless/secretsKey.test.ts`
 - Modify: `app/electron-client/src/projectService.ts` (`createJvmAotCache`, new
-  `stopSpareEngine`)
+  `stopSpareEngine` and `refreshSpareEngine`)
+- Modify: `app/electron-client/src/electron.ts` (the `secrets.rotate` and
+  `secrets.reset` handlers)
 - Modify: `app/electron-client/src/index.ts` (`before-quit`)
 
 **Interfaces:**
 
-- Consumes: `ProjectService.refreshSpare`, `ProjectService.stopSpareEngine`
-  (Task 11).
-- Produces: `JvmAotCacheSettings.onTrained?: () => void`;
-  `export async function stopSpareEngine(): Promise<void>` in Electron's
-  `projectService.ts`.
+- Consumes: `ProjectService.refreshSpare`, `ProjectService.stopSpareEngine`, and
+  `JvmAotCache.isTraining` (all Task 12).
+- Produces:
+  - `JvmAotCacheSettings.onTrainingEnded?: () => void`, told when a training has
+    finished (the cache written) or failed, but not when an open aborted it;
+  - `SecretsActionOptions.afterKeyChange?: () => Promise<void>`;
+  - `export async function stopSpareEngine(): Promise<void>` and
+    `export async function refreshSpareEngine(): Promise<void>` in Electron's
+    `projectService.ts`.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
 
 Append to `jvmAot/__tests__/cache.test.ts`:
 
 ```ts
-test("a finished training is announced, so the spare engine can start with the cache", async () => {
+test("a training is reported while it runs, and its end is announced", async () => {
   const trainer = new FakeTrainer();
-  const onTrained = vi.fn();
-  await trained(trainer, cache(trainer, { onTrained }));
-  expect(onTrained).toHaveBeenCalledOnce();
+  const onTrainingEnded = vi.fn();
+  const created = cache(trainer, { onTrainingEnded });
+  expect(created.isTraining()).toBe(false);
+  await created.start();
+  expect(created.isTraining()).toBe(true);
+  await trainer.runs[0]!.finish();
+  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledOnce());
+  await vi.waitFor(() => expect(created.isTraining()).toBe(false));
 });
 
-test("a failed training is not announced", async () => {
-  const trainer = new FakeTrainer();
-  const onTrained = vi.fn();
-  const created = cache(trainer, { onTrained });
-  await created.start();
-  trainer.runs[0]!.fail();
-  await vi.waitFor(async () =>
-    expect(await exists(path.join(root, "train.lock"))).toBe(false),
-  );
-  expect(onTrained).not.toHaveBeenCalled();
+test("a failed training is announced too; one an open stopped is not", async () => {
+  const failing = new FakeTrainer();
+  const failed = vi.fn();
+  const first = cache(failing, { onTrainingEnded: failed });
+  await first.start();
+  failing.runs[0]!.fail();
+  await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce());
+
+  const stopped = new FakeTrainer();
+  const aborted = vi.fn();
+  const second = cache(stopped, { onTrainingEnded: aborted });
+  await second.start();
+  second.openStarted();
+  await vi.waitFor(() => expect(second.isTraining()).toBe(false));
+  expect(aborted).not.toHaveBeenCalled();
 });
 ```
 
-- [ ] **Step 2: Run it to see it fail**
+In `tests/headless/secretsKey.test.ts`, add inside
+`describe('while a project is running', …)`:
+
+```ts
+test("a refused rotation or reset leaves the spare engine alone", async () => {
+  const afterKeyChange = vi.fn(async () => {});
+  const options = {
+    keySource,
+    store,
+    hasRunningProjects: async () => true,
+    afterKeyChange,
+  };
+  await expect(rotateSecretsKey(options)).rejects.toThrow();
+  await expect(resetSecrets(options)).rejects.toThrow();
+  expect(afterKeyChange).not.toHaveBeenCalled();
+});
+```
+
+and inside `describe('with no project running', …)`:
+
+```ts
+test("a rotation and a reset each refresh the spare engine, which holds the old key", async () => {
+  const afterKeyChange = vi.fn(async () => {});
+  const options = {
+    keySource,
+    store,
+    hasRunningProjects: async () => false,
+    afterKeyChange,
+  };
+  await rotateSecretsKey(options);
+  expect(afterKeyChange).toHaveBeenCalledOnce();
+  await resetSecrets(options);
+  expect(afterKeyChange).toHaveBeenCalledTimes(2);
+});
+```
+
+- [ ] **Step 2: Run them to see them fail**
 
 Run:
 `corepack pnpm --filter project-manager-shim exec vitest run src/jvmAot/__tests__/cache.test.ts`
-Expected: FAIL, `expected "spy" to be called once, but got 0 times`.
+and
+`corepack pnpm --filter enso exec vitest run tests/headless/secretsKey.test.ts`
+Expected: FAIL. `onTrainingEnded` is never called, and `afterKeyChange` is not
+called after a rotation (`expected "spy" to be called once, but got 0 times`).
 
 - [ ] **Step 3: Implement**
 
 In `JvmAotCacheSettings`:
 
 ```ts
-  /** Told when a training has written the cache: a spare engine is restarted to use it. */
-  readonly onTrained?: () => void
+  /**
+   * Told when a training has ended, with the cache written or failed, but not when an open stopped
+   * it: no spare engine starts while one runs (`isTraining`), so it is refreshed then.
+   */
+  readonly onTrainingEnded?: () => void
 ```
 
-In `tryBeginTraining`, in the success handler, after `console.info(\`JDK AOT
-cache: trained in …\`)`:
+In `tryBeginTraining` the callback goes in two places: the success handler,
+after the `console.info` of `JDK AOT cache: trained in …`, and the failure
+handler's `else` branch, the one that sets `this.wanted = false` after a real
+failure. The training must no longer count as running when the callback runs, so
+move `this.training = undefined` out of the `.finally` into both places, before
+the call:
 
 ```ts
-this.settings.onTrained?.();
+this.training = undefined;
+this.settings.onTrainingEnded?.();
+```
+
+The abort branch sets `this.training = undefined` too, without the call. The
+`.finally` keeps releasing the lock.
+
+In `secretsKey.ts`, add to `SecretsActionOptions`:
+
+```ts
+  /**
+   * After the key changed (or a change failed part way): the spare engine holds the key it was
+   * started with, and `hasRunningProjects` does not count it, so it is refreshed.
+   */
+  readonly afterKeyChange?: () => Promise<void>
+```
+
+and change the two actions:
+
+```ts
+/** `secrets.rotate`: rotate the key, unless an engine is running. */
+export function rotateSecretsKey(options: SecretsActionOptions): Promise<void> {
+  return queued(async () => {
+    if (await options.hasRunningProjects())
+      throw new Error(ROTATE_BLOCKED_BY_PROJECTS);
+    try {
+      await options.keySource.rotate(options.store);
+    } finally {
+      await options.afterKeyChange?.();
+    }
+  });
+}
+
+/**
+ * `secrets.reset`: delete the file and the key, then create a new key, unless an engine is running
+ * or the keychain could not be read.
+ */
+export function resetSecrets(options: SecretsActionOptions): Promise<void> {
+  return queued(async () => {
+    if (await options.hasRunningProjects())
+      throw new Error(RESET_BLOCKED_BY_PROJECTS);
+    // Before the file goes: a keychain that could not be read may hold the right key.
+    options.keySource.assertKeychainReadable();
+    try {
+      await options.store.reset();
+      await options.keySource.forget();
+      await options.keySource.initialise();
+    } finally {
+      await options.afterKeyChange?.();
+    }
+  });
+}
 ```
 
 In Electron's `projectService.ts`, in `createJvmAotCache`'s
 `new JvmAotCache({ ... })`, add:
 
 ```ts
-    // A spare engine started before the cache existed would be discarded at the next open.
-    onTrained: () => void projectService?.refreshSpare(),
+    // No spare engine starts while the cache trains (`isTraining`); once it has, one is wanted.
+    onTrainingEnded: () => void projectService?.refreshSpare(),
 ```
 
 and after `disposeJvmAotCache`:
@@ -4101,7 +4603,16 @@ and after `disposeJvmAotCache`:
 export async function stopSpareEngine(): Promise<void> {
   await projectService?.stopSpareEngine();
 }
+
+/** Start or replace the spare engine for the current settings (a new secrets key). */
+export async function refreshSpareEngine(): Promise<void> {
+  await projectService?.refreshSpare();
+}
 ```
+
+In `electron.ts`, import `refreshSpareEngine` from `@/projectService` with the
+others, and add `afterKeyChange: refreshSpareEngine,` to the options of both
+`resetSecrets({ … })` and `rotateSecretsKey({ … })`.
 
 In `app/electron-client/src/index.ts`, import `stopSpareEngine` with
 `disposeJvmAotCache`, and change the handler:
@@ -4115,47 +4626,40 @@ this.electron.app.on("before-quit", () => {
 
 - [ ] **Step 4: Run the tests and the typecheck**
 
-Run:
-`corepack pnpm --filter project-manager-shim exec vitest run src/jvmAot/__tests__/cache.test.ts`
-and `corepack pnpm --filter enso run typecheck` Expected: PASS, no type errors.
+Run the two commands of Step 2, then `corepack pnpm --filter enso run typecheck`
+and
+`corepack pnpm --filter project-manager-shim exec vitest run src/projectService/__tests__/spareService.test.ts`.
+Expected: PASS, no type errors.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/project-manager-shim/src/jvmAot/index.ts app/project-manager-shim/src/jvmAot/__tests__/cache.test.ts app/electron-client/src/projectService.ts app/electron-client/src/index.ts
-git commit -m "Electron: stop the spare engine on quit, restart it with a new AOT cache (#518)
+git add app/project-manager-shim/src/jvmAot/index.ts app/project-manager-shim/src/jvmAot/__tests__/cache.test.ts app/electron-client/src/secretsKey.ts app/electron-client/tests/headless/secretsKey.test.ts app/electron-client/src/projectService.ts app/electron-client/src/electron.ts app/electron-client/src/index.ts
+git commit -m "Electron: the spare engine stops on quit, waits for the AOT training, follows a new secrets key (#518)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 14: The GUI setting
+### Task 15: The GUI setting's store and its sync
 
 **Files:**
 
 - Create: `app/gui/src/providers/spareEngineSettings.ts`
 - Create: `app/gui/src/composables/spareEngineSync.ts`
 - Test: `app/gui/src/composables/__tests__/spareEngineSync.test.ts`
-- Create: `app/gui/src/dashboard/layouts/Settings/EngineSettingsSection.vue`
-- Modify: `app/gui/src/dashboard/layouts/Settings/tabs.ts`,
-  `app/gui/src/App.vue`, `app/common/src/text/english.json`
-- Test: `app/gui/src/dashboard/layouts/Settings/__tests__/localTab.test.ts`
-- Modify: `app/gui/integration-test/mock/localApi.ts`
-- Create: `app/gui/integration-test/dashboard/spareEngineSettings.spec.ts`
+- Modify: `app/gui/src/App.vue`
 
 **Interfaces:**
 
-- Consumes: `LocalBackend.setSpareEngine` (Task 12).
+- Consumes: `LocalBackend.setSpareEngine` (Task 13).
 - Produces: `spareEngineSettingsStore`,
   `usePreStartEngine(): ComputedRef<boolean>`,
   `setPreStartEngine(preStart: boolean): void`, `engineRunsOnJvm: Ref<boolean>`
   (`$/providers/spareEngineSettings`), and `useSpareEngineSync(): void`
-  (`$/composables/spareEngineSync`). Text ids: `engineSettingsSection`,
-  `engineSettingsCustomEntryAliases`, `preStartEngineSetting`,
-  `preStartEngineSettingDescription`. Mock:
-  `api.spareEngine = { engineMode, requests }`.
+  (`$/composables/spareEngineSync`).
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Write the failing test**
 
 `app/gui/src/composables/__tests__/spareEngineSync.test.ts`:
 
@@ -4239,60 +4743,11 @@ test("nothing is sent without a local backend", async () => {
 });
 ```
 
-In `localTab.test.ts`, add inside `describe('the Local settings tab', ...)`
-after the Engine logs test:
-
-```ts
-test("the Engine section is hidden unless projects get the JVM engine", async () => {
-  const { engineRunsOnJvm } = await import("$/providers/spareEngineSettings");
-  engineRunsOnJvm.value = false;
-  await openLocalTab();
-  expect(document.body.textContent).toContain(getText("mapsSettingsSection"));
-  expect(document.body.textContent).not.toContain(
-    getText("preStartEngineSetting"),
-  );
-});
-
-test("the Engine section has the pre-start switch, on by default, and keeps a change", async () => {
-  const { engineRunsOnJvm, setPreStartEngine, spareEngineSettingsStore } =
-    await import("$/providers/spareEngineSettings");
-  engineRunsOnJvm.value = true;
-  await openLocalTab();
-  expect(document.body.textContent).toContain(getText("engineSettingsSection"));
-  expect(document.body.textContent).toContain(
-    getText("preStartEngineSettingDescription"),
-  );
-  expect(spareEngineSettingsStore.getState().preStart).toBe(true);
-  const user = userEvent.setup();
-  await user.click(
-    required(
-      [
-        ...document.querySelectorAll<HTMLElement>(
-          '[role="switch"], input[type="checkbox"]',
-        ),
-      ].find((element) =>
-        element
-          .closest("label")
-          ?.textContent.includes(getText("preStartEngineSetting")),
-      ),
-    ),
-  );
-  await flushPromises();
-  expect(spareEngineSettingsStore.getState().preStart).toBe(false);
-  expect(localStorage.getItem("enso-spare-engine-settings")).toContain(
-    '"preStart":false',
-  );
-  setPreStartEngine(true);
-  engineRunsOnJvm.value = false;
-});
-```
-
-- [ ] **Step 2: Run them to see them fail**
+- [ ] **Step 2: Run it to see it fail**
 
 Run:
-`corepack pnpm --filter enso-gui exec vitest run src/composables/__tests__/spareEngineSync.test.ts src/dashboard/layouts/Settings/__tests__/localTab.test.ts`
-Expected: FAIL, `Failed to resolve import "$/composables/spareEngineSync"` and
-`"$/providers/spareEngineSettings"`.
+`corepack pnpm --filter enso-gui exec vitest run src/composables/__tests__/spareEngineSync.test.ts`
+Expected: FAIL, `Failed to resolve import "$/composables/spareEngineSync"`.
 
 - [ ] **Step 3: Implement**
 
@@ -4391,6 +4846,109 @@ export function useSpareEngineSync() {
 }
 ```
 
+In `app/gui/src/App.vue`, import `useSpareEngineSync` from
+`$/composables/spareEngineSync` and call it after `useSecretsKeyReminder()`:
+
+```ts
+useSecretsKeyReminder();
+useSpareEngineSync();
+```
+
+- [ ] **Step 4: Run it to see it pass**
+
+Run:
+`corepack pnpm --filter enso-gui exec vitest run src/composables/__tests__/spareEngineSync.test.ts`
+and `corepack pnpm --filter enso-gui run typecheck` Expected: 4 tests PASS, no
+type errors.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app/gui/src/providers/spareEngineSettings.ts app/gui/src/composables/spareEngineSync.ts app/gui/src/composables/__tests__/spareEngineSync.test.ts app/gui/src/App.vue
+git commit -m "GUI: the pre-start setting, sent to the project service (#518)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
+```
+
+### Task 16: Settings → Local → Engine
+
+**Files:**
+
+- Create: `app/gui/src/dashboard/layouts/Settings/EngineSettingsSection.vue`
+- Modify: `app/gui/src/dashboard/layouts/Settings/tabs.ts`,
+  `app/common/src/text/english.json`
+- Test: `app/gui/src/dashboard/layouts/Settings/__tests__/localTab.test.ts`
+- Modify: `app/gui/integration-test/mock/localApi.ts`
+- Create: `app/gui/integration-test/dashboard/spareEngineSettings.spec.ts`
+
+**Interfaces:**
+
+- Consumes: `engineRunsOnJvm`, `usePreStartEngine`, `setPreStartEngine`,
+  `spareEngineSettingsStore` (Task 15).
+- Produces: text ids `engineSettingsSection`,
+  `engineSettingsCustomEntryAliases`, `preStartEngineSetting`,
+  `preStartEngineSettingDescription`; mock
+  `api.spareEngine = { engineMode, requests }`.
+
+- [ ] **Step 1: Write the failing test**
+
+In `localTab.test.ts`, add inside `describe('the Local settings tab', ...)`
+after the Engine logs test:
+
+```ts
+test("the Engine section is hidden unless projects get the JVM engine", async () => {
+  const { engineRunsOnJvm } = await import("$/providers/spareEngineSettings");
+  engineRunsOnJvm.value = false;
+  await openLocalTab();
+  expect(document.body.textContent).toContain(getText("mapsSettingsSection"));
+  expect(document.body.textContent).not.toContain(
+    getText("preStartEngineSetting"),
+  );
+});
+
+test("the Engine section has the pre-start switch, on by default, and keeps a change", async () => {
+  const { engineRunsOnJvm, setPreStartEngine, spareEngineSettingsStore } =
+    await import("$/providers/spareEngineSettings");
+  engineRunsOnJvm.value = true;
+  await openLocalTab();
+  expect(document.body.textContent).toContain(getText("engineSettingsSection"));
+  expect(document.body.textContent).toContain(
+    getText("preStartEngineSettingDescription"),
+  );
+  expect(spareEngineSettingsStore.getState().preStart).toBe(true);
+  const user = userEvent.setup();
+  await user.click(
+    required(
+      [
+        ...document.querySelectorAll<HTMLElement>(
+          '[role="switch"], input[type="checkbox"]',
+        ),
+      ].find((element) =>
+        element
+          .closest("label")
+          ?.textContent.includes(getText("preStartEngineSetting")),
+      ),
+    ),
+  );
+  await flushPromises();
+  expect(spareEngineSettingsStore.getState().preStart).toBe(false);
+  expect(localStorage.getItem("enso-spare-engine-settings")).toContain(
+    '"preStart":false',
+  );
+  setPreStartEngine(true);
+  engineRunsOnJvm.value = false;
+});
+```
+
+- [ ] **Step 2: Run it to see it fail**
+
+Run:
+`corepack pnpm --filter enso-gui exec vitest run src/dashboard/layouts/Settings/__tests__/localTab.test.ts`
+Expected: the two new tests FAIL: the Local tab has no Engine section.
+
+- [ ] **Step 3: Implement**
+
 `app/gui/src/dashboard/layouts/Settings/EngineSettingsSection.vue`:
 
 ```vue
@@ -4464,14 +5022,6 @@ In `app/common/src/text/english.json`, add after
   "engineSettingsCustomEntryAliases": "engine\npre-start\nprestart\nspare\nstart\nfaster\nmemory",
   "preStartEngineSetting": "Pre-start the engine",
   "preStartEngineSettingDescription": "Starts the engine in the background while you are on the dashboard, so projects open faster. Uses about 0.5–0.8 GB of memory while no project is open.",
-```
-
-In `app/gui/src/App.vue`, import `useSpareEngineSync` from
-`$/composables/spareEngineSync` and call it after `useSecretsKeyReminder()`:
-
-```ts
-useSecretsKeyReminder();
-useSpareEngineSync();
 ```
 
 In `app/gui/integration-test/mock/localApi.ts`:
@@ -4579,27 +5129,26 @@ test.describe("with the JVM engine", () => {
 
 Run:
 
-- `corepack pnpm --filter enso-gui exec vitest run src/composables/__tests__/spareEngineSync.test.ts src/dashboard/layouts/Settings/__tests__/localTab.test.ts`
+- `corepack pnpm --filter enso-gui exec vitest run src/dashboard/layouts/Settings/__tests__/localTab.test.ts src/composables/__tests__/spareEngineSync.test.ts`
 - `cd app/gui && corepack pnpm run test:integration integration-test/dashboard/spareEngineSettings.spec.ts integration-test/dashboard/localModeSettings.spec.ts integration-test/dashboard/accessibility.spec.ts`
 - `corepack pnpm --filter enso-gui run typecheck` and
   `corepack pnpm --filter enso-gui run lint`
 
-Expected: all PASS. If `accessibility.spec.ts` fails because the settings
-baseline gained the new section, no: with the mock's default `native` the
-section is absent, so the baseline must not change. A failure there is a real
-regression.
+Expected: all PASS. `accessibility.spec.ts`'s settings baseline must not change:
+the mock answers `native` by default, so the section is absent there. A failure
+in it is a real regression.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/gui/src/providers/spareEngineSettings.ts app/gui/src/composables/spareEngineSync.ts app/gui/src/composables/__tests__/spareEngineSync.test.ts app/gui/src/dashboard/layouts/Settings/EngineSettingsSection.vue app/gui/src/dashboard/layouts/Settings/tabs.ts app/gui/src/App.vue app/common/src/text/english.json app/gui/src/dashboard/layouts/Settings/__tests__/localTab.test.ts app/gui/integration-test/mock/localApi.ts app/gui/integration-test/dashboard/spareEngineSettings.spec.ts
+git add app/gui/src/dashboard/layouts/Settings/EngineSettingsSection.vue app/gui/src/dashboard/layouts/Settings/tabs.ts app/common/src/text/english.json app/gui/src/dashboard/layouts/Settings/__tests__/localTab.test.ts app/gui/integration-test/mock/localApi.ts app/gui/integration-test/dashboard/spareEngineSettings.spec.ts
 git commit -m "GUI: Settings → Local → Engine, Pre-start the engine (#518)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 15: The packaged-IDE Playwright spec
+### Task 17: The packaged-IDE Playwright spec
 
 **Files:**
 
@@ -4610,7 +5159,11 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 **Interfaces:**
 
 - Consumes: the `Spare engine: ready …` and `Spare engine: used …` log lines
-  (Task 9).
+  (Task 10), the engine log's `Engine: pre-started spare used` notice (Task 11),
+  and the AOT cache's `JDK AOT cache: trained in …` line, after which a spare
+  may start (Task 14). The Logs panel opens with the dock's
+  `action:graph.toggleLogs` button and shows `engine-log-panel`, as in
+  `app/gui/integration-test/project-view/engineLogs.spec.ts`.
 - Produces: the fixture option `spareEngine: boolean` (default `false`). Without
   it every spec runs with `ENSO_SPARE_ENGINE=0`.
 
@@ -4658,7 +5211,9 @@ test.use({ spareEngine: true });
 
 test("an open uses the spare engine", async ({ app, page }) => {
   test.skip(SKIP_ON_WINDOWS_CI, SKIP_ON_WINDOWS_CI_REASON);
-  test.setTimeout(300_000);
+  // A fresh profile has no AOT cache: the JVM default trains one first (minutes), and no spare
+  // starts until that training has ended (`isTraining`, `onTrainingEnded`).
+  test.setTimeout(900_000);
   const output: string[] = [];
   app
     .process()
@@ -4669,6 +5224,11 @@ test("an open uses the spare engine", async ({ app, page }) => {
   const said = (text: string) => output.join("").includes(text);
   await waitForDashboard(page);
   await expect
+    .poll(() => said("JDK AOT cache: trained in") || said("training failed"), {
+      timeout: 600_000,
+    })
+    .toBe(true);
+  await expect
     .poll(() => said("Spare engine: started"), { timeout: 60_000 })
     .toBe(true);
   await expect
@@ -4678,6 +5238,15 @@ test("an open uses the spare engine", async ({ app, page }) => {
   await expect
     .poll(() => said("Spare engine: used"), { timeout: 60_000 })
     .toBe(true);
+  // The project's engine log says so too (the shim's notice, `spareNotice`).
+  await page
+    .getByTestId("bottomDockButtons")
+    .getByTestId("action:graph.toggleLogs")
+    .click();
+  await expect(page.getByTestId("engine-log-panel")).toContainText(
+    "Engine: pre-started spare used",
+    { timeout: 30_000 },
+  );
 });
 ```
 
@@ -4704,7 +5273,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 16: Docs, changelog, PR 2
+### Task 18: Docs, changelog, PR 2
 
 **Files:**
 
@@ -4730,12 +5299,16 @@ started with `--standby` (engine/runner CLAUDE.md, "Standby mode"; spec
 - **Who decides:** `ProjectService.refreshSpare` (one decision at a time). No
   spare until the GUI's first `engine/setSpare`, nor with the setting off,
   `ENSO_SPARE_ENGINE=0`, a native default engine, `ENSO_YDOC_HOST=engine`, a
-  `--profiling-path` in the extra arguments, or a project open or opening (one
+  `--profiling-path` in the extra arguments, an AOT training running
+  (`JvmAotCache.isTraining`, a first launch), or a project open or opening (one
   whose close has begun does not count, `hasProjectsInUse`). A native open stops
   the spare. `stopSpareEngine` (Electron's `before-quit`) stops it for good.
 - **When:** at the first `engine/setSpare`; after a close, once the closing
   engine has exited or `SPARE_AFTER_CLOSE_MS` (2 s) has passed; after a failed
-  open; and when the AOT cache finishes training (`onTrained`).
+  open; when an AOT training ends, trained or failed (`onTrainingEnded`); and
+  after the secrets key is rotated or reset (`afterKeyChange` in Electron's
+  `secretsKey.ts`). The spare holds the old key and `hasRunningProjects` does
+  not count it, so a rotation is not refused for it; the refresh replaces it.
 - **The spawn key** (`spawnKey`, a SHA-256 hash) covers the mode, the service's
   extra arguments, the AOT options, the extra environment (the secrets key, so
   it is hashed and never logged) and `ENSO_JVM_OPTIONS`. Every JVM open carries
@@ -4892,15 +5465,12 @@ git -C /c/Repos/Enso/ide fetch origin develop
 git -C /c/Repos/Enso/ide worktree add -b jvm-warm-engine-3-measure /c/Repos/Enso/ide/.claude/worktrees/jvm-measure origin/develop
 ```
 
-### Task 17: The report knows spare engines
+### Task 19: The report knows spare engines
 
 **Files:**
 
 - Modify: `app/electron-client/perf/openTimeReport.ts`
-- Create: `app/electron-client/perf/cpuAffinity.ts`
-- Create: `app/electron-client/perf/poolReports.ts`
-- Test: `app/electron-client/tests/headless/openTimeReport.test.ts`,
-  `cpuAffinity.test.ts`, `poolReports.test.ts`
+- Test: `app/electron-client/tests/headless/openTimeReport.test.ts`
 
 **Interfaces:**
 
@@ -4914,48 +5484,8 @@ git -C /c/Repos/Enso/ide worktree add -b jvm-warm-engine-3-measure /c/Repos/Enso
   - `spareTable(report: OpenTimeReport): string`,
     `ratioTable(report: OpenTimeReport): string`,
     `cpusLine(report: OpenTimeReport): string`
-- Produces (`cpuAffinity.ts`): `bitCount(mask: bigint): number`,
-  `parseTaskset(output: string): number | undefined`,
-  `parseWindowsAffinity(output: string): number | undefined`,
-  `cpuAffinity(pid: number): Promise<number | undefined>`.
-- Produces (`poolReports.ts`):
-  `poolReports(reports: readonly OpenTimeReport[]): OpenTimeReport`.
 
-- [ ] **Step 1: Write the failing tests**
-
-`tests/headless/cpuAffinity.test.ts`:
-
-```ts
-/** @file Reading how many CPUs a process may run on. */
-import { describe, expect, test } from "vitest";
-import {
-  bitCount,
-  parseTaskset,
-  parseWindowsAffinity,
-} from "../../perf/cpuAffinity";
-
-describe("cpuAffinity", () => {
-  test("counts the bits of a mask", () => {
-    expect(bitCount(0xffn)).toBe(8);
-    expect(bitCount(0xfn)).toBe(4);
-    expect(bitCount(0xffffffffn)).toBe(32);
-  });
-
-  test("reads taskset's output", () => {
-    expect(parseTaskset("pid 123's current affinity mask: ff\n")).toBe(8);
-    expect(
-      parseTaskset("pid 1's current affinity mask: ffffffff,ffffffff"),
-    ).toBe(64);
-    expect(parseTaskset("taskset: failed")).toBeUndefined();
-  });
-
-  test("reads PowerShell's decimal mask", () => {
-    expect(parseWindowsAffinity("255\r\n")).toBe(8);
-    expect(parseWindowsAffinity("4294967295")).toBe(32);
-    expect(parseWindowsAffinity("Get-Process : Cannot find")).toBeUndefined();
-  });
-});
-```
+- [ ] **Step 1: Write the failing test**
 
 Append to `tests/headless/openTimeReport.test.ts` (add
 `isSpareEngine, parseSpareOutput, spareRun, spareTable, ratioTable, cpusLine` to
@@ -5044,111 +5574,13 @@ describe("spare engines", () => {
 });
 ```
 
-`tests/headless/poolReports.test.ts`:
-
-```ts
-/** @file Pooling the reports of several rounds. */
-import { describe, expect, test } from "vitest";
-import type { OpenTimeReport } from "../../perf/openTimeReport";
-import { poolReports } from "../../perf/poolReports";
-
-const report = (headlines: number[], platform = "win32"): OpenTimeReport => ({
-  version: 1,
-  platform,
-  commit: null,
-  template: "core",
-  runs: headlines.map((welcomeShown, i) => ({
-    engine: "jvm",
-    run: i + 1,
-    first: { welcomeShown },
-    second: null,
-    notMeasured: [],
-  })),
-});
-
-describe("poolReports", () => {
-  test("keeps every launch, numbered by round", () => {
-    const pooled = poolReports([report([1, 2]), report([3])]);
-    expect(pooled.runs.map((r) => [r.run, r.first.welcomeShown])).toEqual([
-      [101, 1],
-      [102, 2],
-      [201, 3],
-    ]);
-  });
-
-  test("refuses reports of different platforms or templates", () => {
-    expect(() => poolReports([report([1]), report([2], "linux")])).toThrow(
-      /different/,
-    );
-    expect(() => poolReports([])).toThrow(/no reports/);
-  });
-});
-```
-
-- [ ] **Step 2: Run them to see them fail**
+- [ ] **Step 2: Run it to see it fail**
 
 Run:
-`corepack pnpm --filter enso exec vitest run tests/headless/cpuAffinity.test.ts tests/headless/openTimeReport.test.ts tests/headless/poolReports.test.ts`
-Expected: FAIL, unresolved imports (`../../perf/cpuAffinity`, `poolReports`,
-`isSpareEngine`).
+`corepack pnpm --filter enso exec vitest run tests/headless/openTimeReport.test.ts`
+Expected: FAIL, `isSpareEngine` and the other new names are not exported.
 
 - [ ] **Step 3: Implement**
-
-`perf/cpuAffinity.ts`:
-
-```ts
-/**
- * @file How many logical CPUs a process may run on (its affinity mask), so that a run pinned to 4
- * or 8 CPUs can be checked from its report (`app/electron-client/CLAUDE.md`, "Open-time harness").
- * Children inherit the mask, so the IDE's main process stands for the engine too.
- */
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const run = promisify(execFile);
-
-/** The number of set bits. */
-export function bitCount(mask: bigint): number {
-  let count = 0;
-  for (let m = mask; m > 0n; m >>= 1n) count += Number(m & 1n);
-  return count;
-}
-
-/** `taskset -p <pid>`: `pid 123's current affinity mask: ff` (groups of 32 bits, comma-separated). */
-export function parseTaskset(output: string): number | undefined {
-  const match = /affinity mask:\s*([0-9a-f,]+)/i.exec(output);
-  return match
-    ? bitCount(BigInt(`0x${match[1]!.replace(/,/g, "")}`))
-    : undefined;
-}
-
-/** `(Get-Process -Id <pid>).ProcessorAffinity.ToInt64()`: a decimal mask. */
-export function parseWindowsAffinity(output: string): number | undefined {
-  const text = output.trim();
-  return /^\d+$/.test(text) ? bitCount(BigInt(text)) : undefined;
-}
-
-/** The number of CPUs `pid` may run on; `undefined` when it cannot be read (or on macOS). */
-export async function cpuAffinity(pid: number): Promise<number | undefined> {
-  try {
-    if (process.platform === "win32") {
-      const { stdout } = await run("powershell.exe", [
-        "-NoProfile",
-        "-Command",
-        `(Get-Process -Id ${pid}).ProcessorAffinity.ToInt64()`,
-      ]);
-      return parseWindowsAffinity(stdout);
-    }
-    if (process.platform === "linux") {
-      const { stdout } = await run("taskset", ["-p", String(pid)]);
-      return parseTaskset(stdout);
-    }
-  } catch {
-    // Not worth a failed launch: the report just has no CPU count.
-  }
-  return undefined;
-}
-```
 
 In `perf/openTimeReport.ts`:
 
@@ -5316,6 +5748,185 @@ export function cpusLine(report: OpenTimeReport): string {
 the file; `spareTable` and `ratioTable` go after `summarise` and `cell` are
 defined.)
 
+- [ ] **Step 4: Run it to see it pass**
+
+Run:
+`corepack pnpm --filter enso exec vitest run tests/headless/openTimeReport.test.ts tests/headless/gate.test.ts`
+Expected: all PASS; `gate.test.ts` is unchanged (the gate keeps `jvm` and
+`jvm-first`).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app/electron-client/perf/openTimeReport.ts app/electron-client/tests/headless/openTimeReport.test.ts
+git commit -m "Open-time report: spare engines, ratios over native, CPUs (#518)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
+```
+
+### Task 20: Pinned CPUs and pooled rounds
+
+**Files:**
+
+- Create: `app/electron-client/perf/cpuAffinity.ts`
+- Create: `app/electron-client/perf/poolReports.ts`
+- Test: `app/electron-client/tests/headless/cpuAffinity.test.ts`,
+  `poolReports.test.ts`
+
+**Interfaces:**
+
+- Consumes: `renderMarkdown` (existing), `ratioTable`, `spareTable`, `cpusLine`
+  (Task 19).
+- Produces (`cpuAffinity.ts`): `bitCount(mask: bigint): number`,
+  `parseTaskset(output: string): number | undefined`,
+  `parseWindowsAffinity(output: string): number | undefined`,
+  `cpuAffinity(pid: number): Promise<number | undefined>`.
+- Produces (`poolReports.ts`):
+  `poolReports(reports: readonly OpenTimeReport[]): OpenTimeReport`.
+
+- [ ] **Step 1: Write the failing tests**
+
+`tests/headless/cpuAffinity.test.ts`:
+
+```ts
+/** @file Reading how many CPUs a process may run on. */
+import { describe, expect, test } from "vitest";
+import {
+  bitCount,
+  parseTaskset,
+  parseWindowsAffinity,
+} from "../../perf/cpuAffinity";
+
+describe("cpuAffinity", () => {
+  test("counts the bits of a mask", () => {
+    expect(bitCount(0xffn)).toBe(8);
+    expect(bitCount(0xfn)).toBe(4);
+    expect(bitCount(0xffffffffn)).toBe(32);
+  });
+
+  test("reads taskset's output", () => {
+    expect(parseTaskset("pid 123's current affinity mask: ff\n")).toBe(8);
+    expect(
+      parseTaskset("pid 1's current affinity mask: ffffffff,ffffffff"),
+    ).toBe(64);
+    expect(parseTaskset("taskset: failed")).toBeUndefined();
+  });
+
+  test("reads PowerShell's decimal mask", () => {
+    expect(parseWindowsAffinity("255\r\n")).toBe(8);
+    expect(parseWindowsAffinity("4294967295")).toBe(32);
+    expect(parseWindowsAffinity("Get-Process : Cannot find")).toBeUndefined();
+  });
+});
+```
+
+`tests/headless/poolReports.test.ts`:
+
+```ts
+/** @file Pooling the reports of several rounds. */
+import { describe, expect, test } from "vitest";
+import type { OpenTimeReport } from "../../perf/openTimeReport";
+import { poolReports } from "../../perf/poolReports";
+
+const report = (headlines: number[], platform = "win32"): OpenTimeReport => ({
+  version: 1,
+  platform,
+  commit: null,
+  template: "core",
+  runs: headlines.map((welcomeShown, i) => ({
+    engine: "jvm",
+    run: i + 1,
+    first: { welcomeShown },
+    second: null,
+    notMeasured: [],
+  })),
+});
+
+describe("poolReports", () => {
+  test("keeps every launch, numbered by round", () => {
+    const pooled = poolReports([report([1, 2]), report([3])]);
+    expect(pooled.runs.map((r) => [r.run, r.first.welcomeShown])).toEqual([
+      [101, 1],
+      [102, 2],
+      [201, 3],
+    ]);
+  });
+
+  test("refuses reports of different platforms or templates", () => {
+    expect(() => poolReports([report([1]), report([2], "linux")])).toThrow(
+      /different/,
+    );
+    expect(() => poolReports([])).toThrow(/no reports/);
+  });
+});
+```
+
+- [ ] **Step 2: Run them to see them fail**
+
+Run:
+`corepack pnpm --filter enso exec vitest run tests/headless/cpuAffinity.test.ts tests/headless/poolReports.test.ts`
+Expected: FAIL, unresolved imports (`../../perf/cpuAffinity`,
+`../../perf/poolReports`).
+
+- [ ] **Step 3: Implement**
+
+`perf/cpuAffinity.ts`:
+
+```ts
+/**
+ * @file How many logical CPUs a process may run on (its affinity mask), so that a run pinned to 4
+ * or 8 CPUs can be checked from its report (`app/electron-client/CLAUDE.md`, "Open-time harness").
+ * Children inherit the mask, so the IDE's main process stands for the engine too.
+ */
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const run = promisify(execFile);
+
+/** The number of set bits. */
+export function bitCount(mask: bigint): number {
+  let count = 0;
+  for (let m = mask; m > 0n; m >>= 1n) count += Number(m & 1n);
+  return count;
+}
+
+/** `taskset -p <pid>`: `pid 123's current affinity mask: ff` (groups of 32 bits, comma-separated). */
+export function parseTaskset(output: string): number | undefined {
+  const match = /affinity mask:\s*([0-9a-f,]+)/i.exec(output);
+  return match
+    ? bitCount(BigInt(`0x${match[1]!.replace(/,/g, "")}`))
+    : undefined;
+}
+
+/** `(Get-Process -Id <pid>).ProcessorAffinity.ToInt64()`: a decimal mask. */
+export function parseWindowsAffinity(output: string): number | undefined {
+  const text = output.trim();
+  return /^\d+$/.test(text) ? bitCount(BigInt(text)) : undefined;
+}
+
+/** The number of CPUs `pid` may run on; `undefined` when it cannot be read (or on macOS). */
+export async function cpuAffinity(pid: number): Promise<number | undefined> {
+  try {
+    if (process.platform === "win32") {
+      const { stdout } = await run("powershell.exe", [
+        "-NoProfile",
+        "-Command",
+        `(Get-Process -Id ${pid}).ProcessorAffinity.ToInt64()`,
+      ]);
+      return parseWindowsAffinity(stdout);
+    }
+    if (process.platform === "linux") {
+      const { stdout } = await run("taskset", ["-p", String(pid)]);
+      return parseTaskset(stdout);
+    }
+  } catch {
+    // Not worth a failed launch: the report just has no CPU count.
+  }
+  return undefined;
+}
+```
+
 `perf/poolReports.ts`:
 
 ```ts
@@ -5392,21 +6003,21 @@ if (!process.env.VITEST) main(process.argv.slice(2));
 - [ ] **Step 4: Run them to see them pass**
 
 Run:
-`corepack pnpm --filter enso exec vitest run tests/headless/cpuAffinity.test.ts tests/headless/openTimeReport.test.ts tests/headless/poolReports.test.ts tests/headless/gate.test.ts`
-Expected: all PASS; `gate.test.ts` is unchanged (the gate keeps `jvm` and
-`jvm-first`).
+`corepack pnpm --filter enso exec vitest run tests/headless/cpuAffinity.test.ts tests/headless/poolReports.test.ts`
+and `corepack pnpm --filter enso run typecheck` Expected: 3 + 2 tests PASS, no
+type errors.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/electron-client/perf/openTimeReport.ts app/electron-client/perf/cpuAffinity.ts app/electron-client/perf/poolReports.ts app/electron-client/tests/headless/openTimeReport.test.ts app/electron-client/tests/headless/cpuAffinity.test.ts app/electron-client/tests/headless/poolReports.test.ts
-git commit -m "Open-time report: spare engines, ratios over native, CPUs, pooled rounds (#518)
+git add app/electron-client/perf/cpuAffinity.ts app/electron-client/perf/poolReports.ts app/electron-client/tests/headless/cpuAffinity.test.ts app/electron-client/tests/headless/poolReports.test.ts
+git commit -m "Open-time harness: read the pinned CPUs, pool rounds (#518)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 18: The harness runs the spare engines
+### Task 21: The harness runs the spare engines
 
 **Files:**
 
@@ -5416,7 +6027,7 @@ Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 **Interfaces:**
 
 - Consumes: `isSpareEngine`, `spareRun`, `spareTable`, `ratioTable`, `cpusLine`
-  (Task 17), `cpuAffinity` (Task 17).
+  (Task 19), `cpuAffinity` (Task 20).
 - Produces: `perf:open --engines …,jvm-spare,jvm-spare-early,jvm-spare-abandon`;
   marks `<open>:spareWait` (`{ ready }`), `<open>:spareUsed` (`{ used }`), `rss`
   with `phase: 'spareIdle'`.
@@ -5590,7 +6201,7 @@ Run: `corepack pnpm --filter enso run typecheck` and
 
 - [ ] **Step 3: A smoke run**
 
-Build `dist/ide` from this worktree (`ide-local`, as in Task 15). Then:
+Build `dist/ide` from this worktree (`ide-local`, as in Task 17). Then:
 
 ```bash
 corepack pnpm --filter enso run perf:open --out <scratch>/perf-smoke --runs 1 --engines native,jvm-spare --budget-minutes 20
@@ -5610,7 +6221,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01W2j2Zioa1Myqz64zpZjcvN"
 ```
 
-### Task 19: Measure at 8 CPUs, settle the open question, PR 3
+### Task 22: Measure at 8 CPUs, settle the open question, PR 3
 
 **Files:**
 
@@ -5641,7 +6252,7 @@ foreach ($cpus in @(@{ n = 8; mask = 'FF' }, @{ n = 4; mask = 'F' }, @{ n = 32; 
 }
 foreach ($round in 1..3) {
   $dir = "$out\cpu8\early\r$round"
-  cmd /c "start `"`" /affinity FF /wait /b corepack pnpm --filter enso run perf:open --out $dir --runs 2 --engines jvm-spare-early,jvm-spare-abandon --budget-minutes 40"
+  cmd /c "start `"`" /affinity FF /wait /b corepack pnpm --filter enso run perf:open --out $dir --runs 2 --engines jvm,jvm-spare-early,jvm-spare-abandon --budget-minutes 40"
 }
 ```
 
@@ -5656,15 +6267,23 @@ corepack pnpm --filter enso exec vite-node perf/poolReports.ts -- $(ls -d /c/Rep
 ```
 
 Expected: six pooled reports with ≥ 5 successful launches per engine (6
-attempted), plus the early/abandon one.
+attempted), plus the cold/early/abandon one.
 
 - [ ] **Step 3: Settle the open question**
 
 From `cpu8-early.md` and the per-round `open-time.md` files, compare the first
-open's `welcomeShown` medians of `jvm-spare-early` and `jvm-spare-abandon`.
-Abandoning wins only if its pooled median is lower by at least 150 ms and it is
-lower in at least 2 of the 3 rounds (decision 11). If it wins, change
-`Standby.create`:
+open's `welcomeShown` medians of `jvm` (a cold start), `jvm-spare-early`
+(waiting for the warm-up) and `jvm-spare-abandon`, in this order (decision 11):
+
+1. If `jvm-spare-early`'s pooled median is higher than `jvm`'s, waiting for the
+   warm-up loses to a cold start, and the spec promises an open during the
+   warm-up is "never longer than a cold start". Abandoning becomes the default
+   regardless of the margin over waiting; say so, with both medians, in the PR.
+2. Otherwise abandoning becomes the default only if its pooled median is lower
+   than `jvm-spare-early`'s by at least 150 ms and it is lower in at least 2 of
+   the 3 rounds.
+
+If abandoning becomes the default, change `Standby.create`:
 
 ```java
         Boolean.parseBoolean(System.getProperty(ABANDON_PROPERTY, "true")));
@@ -5737,7 +6356,8 @@ Write the body to `<scratch>/pr3-body.md`. It covers:
   table), with the 4 and 32 CPU ratios beside them;
 - the spare's idle memory (MiB), the warm-up's duration and the process CPU at
   ready;
-- the early-against-abandon comparison and the decision taken;
+- the comparison of a cold start, waiting for the warm-up and abandoning it, and
+  the decision taken;
 - whether the re-gate's 1.5 is met at 8 CPUs.
 
 It names the other open-time changes in flight that the re-gate also counts (the
@@ -5763,54 +6383,62 @@ clone cleanup").
 
 **Spec coverage.**
 
-- Engine standby mode, steps 1-6: Tasks 4, 5, 6 and 7.
-- The working-directory change: Tasks 1 and 7.
-- Isolation (the context is closed, then deleted): Task 5.
-- Failure (warm-up throws): Task 4 test.
+- Engine standby mode, steps 1-6: Tasks 5, 6, 7 and 8.
+- The working-directory change: Tasks 1 and 8; relative paths and processes
+  following it, so a spare-served project behaves like a normal one: Task 2.
+- Isolation (the context is closed, then deleted): Task 6.
+- Failure (warm-up throws): Task 5 test.
 - Steps 2-3 on a background thread, and the line waiting for the warm-up:
-  Task 4.
+  Task 5.
 - Project-service manager:
-  - when a spare exists: Task 11;
-  - starting with the spawn key and the temporary directory: Tasks 9 and 10;
-  - after a close: Task 11;
-  - the take on `project/open`, and a spare still warming up: Task 10;
-  - respawns: Task 10 test;
-  - failure without a retry loop: Tasks 9 and 11;
-  - settings change: Task 11 (setting, key);
-  - quit: Tasks 11 and 13;
-  - logging: Tasks 9 and 10.
-- The setting: Task 14. `engine/setSpare`: Task 12. `ENSO_SPARE_ENGINE`:
-  Task 11.
-- Error-handling table: covered by Tasks 4, 9, 10 and 11.
+  - when a spare exists: Task 12;
+  - starting with the spawn key and the temporary directory: Tasks 10 and 11;
+  - after a close: Task 12;
+  - the take on `project/open`, and a spare still warming up: Task 11;
+  - respawns: Task 11 test;
+  - failure without a retry loop: Tasks 10 and 12;
+  - settings change: Task 12 (setting, key);
+  - quit: Tasks 12 and 14;
+  - no spare during an AOT training, and a refresh after a new secrets key:
+    Tasks 12 and 14;
+  - logging: Tasks 10 and 11.
+- The setting: Tasks 15 and 16. `engine/setSpare`: Task 13. `ENSO_SPARE_ENGINE`:
+  Task 12.
+- Error-handling table: covered by Tasks 5, 10, 11 and 12.
 - Testing section:
-  - engine: Tasks 1, 4 and 7;
-  - project service: Tasks 9, 10 and 11;
-  - GUI: Task 14;
-  - Playwright: Task 15, with other specs at `ENSO_SPARE_ENGINE=0`.
+  - engine: Tasks 1, 2, 5 and 8 (the argument line with and without the warm-up,
+    then a JSON-RPC session);
+  - project service: Tasks 10, 11 and 12;
+  - GUI: Tasks 15 and 16;
+  - Playwright: Task 17 (stdout and the engine log), with other specs at
+    `ENSO_SPARE_ENGINE=0`.
 - Measurement (`jvm-spare`, 8 CPUs, idle memory, warm-up duration and CPU,
-  interleaving, ≥ 5 runs): Tasks 17, 18 and 19.
-- Open questions: the preload list in Tasks 6 and 8; open during the warm-up in
-  Tasks 4, 18 and 19.
-- Rollout and labels: Tasks 8, 16 and 19.
+  interleaving, ≥ 5 runs): Tasks 19, 20, 21 and 22.
+- Open questions: the preload list in Tasks 7 and 9; open during the warm-up in
+  Tasks 5, 21 and 22.
+- Rollout and labels: Tasks 9, 18 and 22.
 
 **Placeholder scan.**
 
-- `NNN` in Task 16 is the PR number, obtained in that same step from
+- `NNN` in Task 18 is the PR number, obtained in that same step from
   `gh pr create`.
 - `<scratch>` is the executing agent's scratch folder.
-- The preload list is generated by a command in Task 6.
+- The preload list is generated by a command in Task 7.
 - No step defers code.
 
 **Type consistency.**
 
 - `SpareRequest`, `EngineLaunch.spareKey`, `startSpare`, `stopSpare`,
-  `spareAvailableAgain` and `hasProjectsInUse` match between Tasks 10, 11
+  `spareAvailableAgain` and `hasProjectsInUse` match between Tasks 11, 12
   and 13.
 - `TakeResult.kind` is `'taken' | 'none'` everywhere.
-- `spareNotice` texts match the tests of Tasks 9 and 10.
+- `spareNotice` texts match the tests of Tasks 10 and 11.
 - `Standby.create`, `StandbyRequest.parse`/`applyEnvironment` and
-  `ContextFactory.WORKING_DIRECTORY_PROPERTY` match between Tasks 1, 3, 4, 6
-  and 7.
+  `ContextFactory.WORKING_DIRECTORY_PROPERTY` match between Tasks 1, 4, 5, 7
+  and 8.
 - `engineRunsOnJvm`, `setPreStartEngine` and `spareEngineSettingsStore` match
-  between Task 14's files and tests.
-- `SpareRun`, `spareRun` and `isSpareEngine` match between Tasks 17 and 18.
+  between Tasks 15 and 16.
+- `isTraining`, `onTrainingEnded` and `afterKeyChange` match between Tasks 12,
+  14 and 18.
+- `SpareRun`, `spareRun` and `isSpareEngine` match between Tasks 19 and 21;
+  `cpuAffinity` between Tasks 20 and 21.
