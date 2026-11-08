@@ -520,6 +520,23 @@ public final class ExecutionService {
   }
 
   /**
+   * Checks whether the module at a given path already has the given text: the text it was, or is
+   * being, compiled from, or that its edits made. A module whose file has not been read yet has no
+   * text, so does not have it.
+   *
+   * @param path the module path.
+   * @param contents the text to compare with.
+   * @return {@code true} if the module exists and its text is {@code contents}.
+   */
+  public boolean hasModuleSources(File path, String contents) {
+    return context
+        .getModuleForFile(path)
+        .map(Module::getLiteralSource)
+        .map(text -> text.toString().equals(contents))
+        .orElse(false);
+  }
+
+  /**
    * Resets a module to use on-disk sources.
    *
    * @param path the module path.

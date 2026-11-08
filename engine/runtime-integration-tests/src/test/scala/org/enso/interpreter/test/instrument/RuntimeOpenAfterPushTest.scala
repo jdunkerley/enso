@@ -102,14 +102,26 @@ class RuntimeOpenAfterPushTest
   private var idResult: UUID      = _
   private var code: String        = _
   private var changedCode: String = _
+  private var largeCode: String   = _
+  private var largeChanged: String = _
 
-  private def withIds(metadata: Metadata, value: Int): String =
+  private def withIds(
+    metadata: Metadata,
+    value: Int,
+    rest: String = ""
+  ): String =
     metadata.appendToCode(
       s"""main =
          |    x = $value
          |    x
-         |""".stripMargin.linesIterator.mkString("\n")
+         |""".stripMargin.linesIterator.mkString("\n") + rest
     )
+
+  /** Methods enough to keep the module compiling for a while after it has
+    * read its text, so that an open can arrive in the middle.
+    */
+  private val manyMethods: String =
+    (1 to 3000).map(i => s"\nf$i x = x + $i").mkString
 
   private val visualizationCode =
     new Metadata("from Standard.Base import to_text\n\n").appendToCode(
@@ -131,6 +143,10 @@ class RuntimeOpenAfterPushTest
     // The module as a client that edited it might open it: the same length,
     // so the expression ids in the metadata still point at `x`.
     changedCode = withIds(metadata, 43)
+    // The same module with a few thousand more methods, which take long
+    // enough to compile for the open to arrive while they compile.
+    largeCode    = withIds(metadata, 42, manyMethods)
+    largeChanged = withIds(metadata, 43, manyMethods)
     context     = new TestContext("Test")
     context.writeInSrcDir("Visualization", visualizationCode)
     context.init()
@@ -204,6 +220,21 @@ class RuntimeOpenAfterPushTest
     */
   private def pushBeforeOpen(): (UUID, Api.ExpressionType) = {
     context.writeMain(code)
+    val (contextId, requestId) = startPush()
+    val pushed                 = receiveUntilExecutionComplete(contextId)
+    pushed should contain(
+      Api.Response(requestId, Api.PushContextResponse(contextId))
+    )
+    pushed.last shouldEqual context.executionComplete(contextId)
+    val integer = valueOf(pushed, idResult).flatMap(_.expressionType)
+    integer should not be empty
+    (contextId, integer.get)
+  }
+
+  /** Creates a context and pushes `main`, without waiting for the push to
+    * finish. Returns the context id and the push's request id.
+    */
+  private def startPush(): (UUID, UUID) = {
     val contextId = UUID.randomUUID()
     val requestId = UUID.randomUUID()
     context.send(Api.Request(requestId, Api.CreateContextRequest(contextId)))
@@ -223,14 +254,58 @@ class RuntimeOpenAfterPushTest
         )
       )
     )
-    val pushed = receiveUntilExecutionComplete(contextId)
-    pushed should contain(
-      Api.Response(requestId, Api.PushContextResponse(contextId))
+    (contextId, requestId)
+  }
+
+  /** Pushes `main` of the large module and waits until its compilation has
+    * read the module's text, so that it is compiling from that text.
+    */
+  private def pushLargeAndWaitForCompilation(): UUID = {
+    context.writeMain(largeCode)
+    val (contextId, _) = startPush()
+    val deadline       = System.currentTimeMillis() + 60000
+    def hasReadText: Boolean =
+      context.languageContext
+        .findModule(moduleName)
+        .filter(_.getLiteralSource != null)
+        .isPresent
+    while (!hasReadText && System.currentTimeMillis() < deadline) {
+      Thread.sleep(1)
+    }
+    withClue("the compilation never read the module: ") {
+      mainModule.getLiteralSource should not be null
+    }
+    withClue("the module compiled before the open could be sent: ") {
+      mainModule.needsCompilation() shouldBe true
+    }
+    contextId
+  }
+
+  /** Sends an open and receives messages until its answer. Returns whether
+    * the module still needed compiling when the answer arrived, and the
+    * messages that came before it.
+    */
+  private def openDuringCompilation(
+    contents: String
+  ): (Boolean, List[Api.Response]) = {
+    val requestId = UUID.randomUUID()
+    context.send(
+      Api.Request(
+        requestId,
+        Api.OpenFileRequest(context.pkg.mainFile, contents)
+      )
     )
-    pushed.last shouldEqual context.executionComplete(contextId)
-    val integer = valueOf(pushed, idResult).flatMap(_.expressionType)
-    integer should not be empty
-    (contextId, integer.get)
+    val before = List.newBuilder[Api.Response]
+    var stillCompiling: Option[Boolean] = None
+    while (stillCompiling.isEmpty) {
+      context.receiveWithTimeout(120) match {
+        case Some(Api.Response(Some(`requestId`), Api.OpenFileResponse)) =>
+          stillCompiling = Some(mainModule.needsCompilation())
+        case Some(r) => before += r
+        case None    => fail("Timed out waiting for the open")
+      }
+    }
+    (stillCompiling.get, before.result())
   }
 
   private def open(contents: String): Unit = {
@@ -378,6 +453,40 @@ class RuntimeOpenAfterPushTest
     withClue("the module was compiled again: ") {
       (mainModule.getIr eq compiled) shouldBe true
     }
+  }
+
+  it should "answer an open with the text a module is compiling from without waiting for the compilation" in {
+    val contextId = pushLargeAndWaitForCompilation()
+
+    // The client opens the module with the text on disk, which the running
+    // compilation read. Its answer must not wait for the compilation's write
+    // lock: in the IDE the module's graph waits for this answer.
+    val (stillCompiling, before) = openDuringCompilation(largeCode)
+    withClue("the open waited for the compilation: ") {
+      stillCompiling shouldBe true
+    }
+    before should not contain context.executionComplete(contextId)
+
+    // The open changed nothing: the push finishes and the program runs.
+    val pushed = before ++ receiveUntilExecutionComplete(contextId)
+    pushed.last shouldEqual context.executionComplete(contextId)
+    valueOf(pushed, idResult).flatMap(_.expressionType) should not be empty
+    mainModule.needsCompilation() shouldBe false
+    visualizeResult(contextId) shouldEqual "42"
+  }
+
+  it should "apply an open with other text than a compiling module's after the compilation" in {
+    val contextId = pushLargeAndWaitForCompilation()
+
+    // Other text must not replace the module's under the compilation, so the
+    // open still waits for it.
+    val (stillCompiling, before) = openDuringCompilation(largeChanged)
+    stillCompiling shouldBe true // reset by the open, after the compilation
+
+    val pushed = before ++ receiveUntilExecutionComplete(contextId)
+    pushed.last shouldEqual context.executionComplete(contextId)
+    recompute(contextId)
+    visualizeResult(contextId) shouldEqual "43"
   }
 
   it should "recompile a module opened with contents other than those it was compiled from" in {
