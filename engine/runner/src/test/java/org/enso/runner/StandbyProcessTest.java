@@ -26,6 +26,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Stream;
+import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -41,6 +42,17 @@ import org.junit.rules.TemporaryFolder;
  */
 public class StandbyProcessTest {
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
+
+  private final List<Process> started = new ArrayList<>();
+
+  /** A test that failed leaves its engine running: stop it, and the JVM under `cmd /c`. */
+  @After
+  public void stopEngines() {
+    for (var process : started) {
+      process.descendants().forEach(ProcessHandle::destroyForcibly);
+      process.destroyForcibly();
+    }
+  }
 
   /** `built-distribution/enso-engine-*\/enso-*\/bin/enso(.bat)` above the working directory. */
   private static File launcher() throws IOException {
@@ -164,6 +176,7 @@ public class StandbyProcessTest {
     builder.environment().put("JAVA_TOOL_OPTIONS", "-Djava.io.tmpdir=" + temporary);
     builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
     var process = builder.start();
+    started.add(process);
     var stderr = Collections.synchronizedList(new ArrayList<String>());
     var reader =
         new Thread(

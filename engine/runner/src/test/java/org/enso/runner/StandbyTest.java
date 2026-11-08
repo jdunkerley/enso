@@ -13,15 +13,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class StandbyTest {
+  @Rule public final TemporaryFolder tmp = new TemporaryFolder();
+
   private static final String LINE = "{\"args\":[\"--server\"]}\n";
 
   private final ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
@@ -164,5 +169,17 @@ public class StandbyTest {
   public void aBadLineIsRefused() {
     var standby = new Standby(Standby.NO_WARM_UP, abandoned -> "x", err, false);
     assertThrows(IllegalArgumentException.class, () -> standby.awaitRequest(in("[1]\n")));
+  }
+
+  @Test
+  public void unreadableJvmOptionsMeanNoPreloading() throws Exception {
+    var component = tmp.newFolder("component");
+    // Not UTF-8: `JvmOptions.fromFile` cannot read it.
+    Files.write(
+        tmp.getRoot().toPath().resolve(JvmOptions.FILE_NAME),
+        new byte[] {(byte) 0xC3, (byte) 0x28});
+    var preload = Standby.preloadFor(component, null, err);
+    assertEquals("preloading skipped: the JVM options could not be read", preload.run(() -> false));
+    assertTrue(err(), err().contains("standby: warning: cannot read the JVM options"));
   }
 }

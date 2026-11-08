@@ -8,6 +8,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.BooleanSupplier;
 
@@ -99,14 +100,27 @@ final class Standby {
         Boolean.parseBoolean(System.getProperty(WARM_UP_PROPERTY, "true"))
             ? new StandbyWarmUp()
             : NO_WARM_UP;
-    var preloader =
-        new StandbyPreloader(
-            JvmOptions.all(component, System.getenv(JvmOptions.ENVIRONMENT_VARIABLE)));
     return new Standby(
         warmUp,
-        preloader::preload,
+        preloadFor(component, System.getenv(JvmOptions.ENVIRONMENT_VARIABLE), System.err),
         System.err,
         Boolean.parseBoolean(System.getProperty(ABANDON_PROPERTY, "false")));
+  }
+
+  /**
+   * The preloading for the JVM options of {@code component}'s `jvm.options` and {@code
+   * environmentValue}. Options that cannot be read are no reason to stop a standby engine: it
+   * preloads nothing then, and says why.
+   */
+  static Preload preloadFor(File component, String environmentValue, PrintStream err) {
+    List<String> jvmOptions;
+    try {
+      jvmOptions = JvmOptions.all(component, environmentValue);
+    } catch (RuntimeException e) {
+      err.println("standby: warning: cannot read the JVM options, no preloading: " + e);
+      return abandoned -> "preloading skipped: the JVM options could not be read";
+    }
+    return new StandbyPreloader(jvmOptions)::preload;
   }
 
   /**

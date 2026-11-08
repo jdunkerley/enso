@@ -110,6 +110,7 @@ public class Main {
   private static final String EXECUTION_ENVIRONMENT_OPTION = "execution-environment";
   private static final String WARNINGS_LIMIT = "warnings-limit";
   private static final String SYSTEM_PROPERTY = "vm.D";
+  private static final String STANDBY_OPTION = "standby";
 
   private static final String DEFAULT_MAIN_METHOD_NAME = "main";
 
@@ -494,6 +495,14 @@ public class Main {
             .numberOfArgs(1)
             .build();
 
+    var standbyOption =
+        cliOptionBuilder()
+            .longOpt(STANDBY_OPTION)
+            .desc(
+                "Starts the engine, warms it up, and waits for one line of JSON on stdin: the"
+                    + " arguments to run with. Used by the IDE's spare engine; needs --jvm.")
+            .build();
+
     var options = new Options();
     options
         .addOption(help)
@@ -510,6 +519,7 @@ public class Main {
         .addOption(newProjectAuthorNameOpt)
         .addOption(newProjectAuthorEmailOpt)
         .addOption(lsOption)
+        .addOption(standbyOption)
         .addOption(lsNativeOption)
         .addOption(lsProfilingPathOption)
         .addOption(lsProfilingTimeOption)
@@ -1618,7 +1628,9 @@ public class Main {
             .getOrElse(() -> defaultLogLevel);
     var hasJVMOption = line.hasOption(JVM_OPTION);
     setupLoggingContext(line);
-    if (line.hasOption(LANGUAGE_SERVER_OPTION)) {
+    // A standby engine becomes a Language Server: it sets up no logging of its own either (Note
+    // [Standby Mode] in `Standby`).
+    if (line.hasOption(LANGUAGE_SERVER_OPTION) || line.hasOption(STANDBY_OPTION)) {
       // Setup application-ls.conf as the default config file
       // https://github.com/lightbend/config?tab=readme-ov-file#standard-behavior
       // Language Server will also set up logging on its own.
@@ -1675,7 +1687,45 @@ public class Main {
         }
       }
     }
+    if (line.hasOption(STANDBY_OPTION)) {
+      runStandby(component);
+      return;
+    }
     handleLaunch(originalCwdOrNull, line, logLevel, logMasking[0]);
+  }
+
+  /**
+   * `--standby` (Note [Standby Mode] in {@link Standby}): warm up, read the argument line, and
+   * launch with it as if it had been the command line.
+   */
+  private void runStandby(File component)
+      throws IOException, InterruptedException, URISyntaxException {
+    if (HostEnsoUtils.isAot()) {
+      throw exitFail("--" + STANDBY_OPTION + " runs only on the JVM: add --" + JVM_OPTION + ".");
+    }
+    StandbyRequest request;
+    try {
+      // `System.in` itself, not a reader over it or a new stream on the descriptor: the line is
+      // read
+      // a byte at a time, and the Language Server reads its shutdown line from `System.in` later.
+      request = Standby.create(component).awaitRequest(System.in);
+    } catch (IllegalArgumentException e) {
+      throw exitFail("standby: " + e.getMessage());
+    }
+    if (request == null) {
+      throw exitSuccess();
+    }
+    var args = request.args().toArray(new String[0]);
+    var projectPath = preprocessArguments(args).getOptionValue(LanguageServerApi.ROOT_PATH_OPTION);
+    if (projectPath == null || !Path.of(projectPath).isAbsolute()) {
+      throw exitFail("standby: the argument line needs an absolute --path.");
+    }
+    request.applyEnvironment();
+    var parent = Path.of(projectPath).normalize().getParent();
+    if (parent != null) {
+      System.setProperty(ContextFactory.WORKING_DIRECTORY_PROPERTY, parent.toString());
+    }
+    launch(args);
   }
 
   final CommandLine preprocessArguments(String... args) {

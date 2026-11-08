@@ -97,3 +97,13 @@ boot's classes change a lot. Preloading is skipped when `jvm.options` or
 `ENSO_JVM_OPTIONS` carry `-XX:AOTCache=` or `-XX:SharedArchiveFile=` (the cache
 holds the classes); a cache passed through `JAVA_TOOL_OPTIONS` is not seen and
 only costs a needless preload.
+
+`Main` handles `--standby` in `runStandby`: `Standby.awaitRequest(System.in)`
+(the same stream object the Language Server later reads its shutdown line from;
+never a reader or a fresh stream over the descriptor), then the line's `--path`
+must be absolute, its variables are applied, the context's working directory
+becomes the project's parent, and `launch` runs again with the line's arguments.
+A `jvm.options` that cannot be read only turns preloading off
+(`Standby.preloadFor` logs a warning). `StandbyProcessTest` runs the real
+`built-distribution/` (`sbt buildEngineDistribution`) and is skipped without
+one; it covers no warm-up, a full warm-up and a warm-up abandoned mid-run.
