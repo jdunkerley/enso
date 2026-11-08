@@ -90,8 +90,14 @@ class EditionManagerTest
       val dm       = makeDistributionManager(withProviders = false)
       val cacheDir = dm.paths.cachedEditions
       Files.createDirectories(cacheDir)
-      Files.writeString(cacheDir.resolve("0.0.0-dev.yaml"), "engine-version: 0.0.0-dev\n")
-      Files.writeString(cacheDir.resolve("2025.1.1.yaml"), "engine-version: 2025.1.1\n")
+      Files.writeString(
+        cacheDir.resolve("0.0.0-dev.yaml"),
+        "engine-version: 0.0.0-dev\n"
+      )
+      Files.writeString(
+        cacheDir.resolve("2025.1.1.yaml"),
+        "engine-version: 2025.1.1\n"
+      )
       val home = makeLanguageHome("2026.1.1-dev")
 
       for (updating <- Seq(false, true)) {
@@ -114,7 +120,10 @@ class EditionManagerTest
       val dm       = makeDistributionManager(withProviders = false)
       val cacheDir = dm.paths.cachedEditions
       Files.createDirectories(cacheDir)
-      Files.writeString(cacheDir.resolve("0.0.0-dev.yaml"), "engine-version: 9.9.9\n")
+      Files.writeString(
+        cacheDir.resolve("0.0.0-dev.yaml"),
+        "engine-version: 9.9.9\n"
+      )
       val manager =
         EditionManager(dm, Some(makeLanguageHome("0.0.0-dev")))
       val resolved = manager

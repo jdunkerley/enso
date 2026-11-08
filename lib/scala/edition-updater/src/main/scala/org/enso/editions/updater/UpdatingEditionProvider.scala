@@ -27,7 +27,7 @@ class UpdatingEditionProvider(
     actualSearchPaths,
     EditionManager.ignoredCachedEditions(cachePath)
   )
-  private val updater  = new EditionUpdater(cachePath, sources)
+  private val updater = new EditionUpdater(cachePath, sources)
 
   /** @inheritdoc */
   override def findEditionForName(

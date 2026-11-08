@@ -426,12 +426,18 @@ class RuntimeComponentsTest
     )
     // Everything until the runtime has been quiet for a while.
     val responses =
-      Iterator.continually(context.receive(20)).takeWhile(_.isDefined).flatten.toList
+      Iterator
+        .continually(context.receive(20))
+        .takeWhile(_.isDefined)
+        .flatten
+        .toList
 
     val failures = responses.collect {
       case Api.Response(None, failure: Api.LibraryLoadFailed) => failure
     }
-    failures.map(f => (f.namespace, f.name, f.version, f.kind)) shouldEqual List(
+    failures.map(f =>
+      (f.namespace, f.name, f.version, f.kind)
+    ) shouldEqual List(
       ("Unknown", "Library", None, Api.LibraryLoadFailed.NotInEdition)
     )
     failures.head.message should include("Unknown.Library")

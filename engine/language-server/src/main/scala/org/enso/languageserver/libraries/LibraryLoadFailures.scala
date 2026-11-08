@@ -12,10 +12,7 @@ import org.enso.polyglot.runtime.Runtime.Api
   * It subscribes to the event stream when it starts, so it must be created
   * before the runtime starts loading libraries (`MainModule` does).
   */
-class LibraryLoadFailures
-    extends Actor
-    with LazyLogging
-    with UnhandledLogging {
+class LibraryLoadFailures extends Actor with LazyLogging with UnhandledLogging {
 
   override def preStart(): Unit =
     context.system.eventStream.subscribe(self, classOf[Api.LibraryLoadFailed])
