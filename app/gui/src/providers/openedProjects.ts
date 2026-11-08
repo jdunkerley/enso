@@ -132,6 +132,20 @@ export function createOpenedProjectsStore() {
     for (const id of projects.keys()) closeProject(id, undefined, { offer: false })
   }
 
+  /**
+   * Close the project and open it again, for a change the engine reads only when it starts (such as
+   * the project's edition). The close saves a version as any close does; the repository question
+   * is not asked. Resolves once the project is opening again.
+   */
+  async function restartProject(id: ProjectId) {
+    const project = projects.get(id)
+    if (project == null) return
+    const info = project.state.info
+    closeProject(id, undefined, { offer: false })
+    await waitForProcess(project)
+    openProject(info)
+  }
+
   /** Rename a running project. */
   async function renameProject(id: ProjectId, newName: string) {
     const project = projects.get(id)
@@ -331,6 +345,7 @@ export function createOpenedProjectsStore() {
     renameProject,
     restoreProject,
     reconnectProject,
+    restartProject,
     get,
     listProjects,
     isProjectOpening,

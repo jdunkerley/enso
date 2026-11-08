@@ -459,6 +459,17 @@ export class LocalBackend extends backend.Backend {
     return this.projectManager.commitVersion(backend.extractTypeAndPath(projectId).path, message)
   }
 
+  /** Save a version of the project if its repository is enabled (`null` id when none was saved). */
+  commitVersionIfEnabled(
+    projectId: backend.ProjectId,
+    message: string,
+  ): Promise<{ readonly id: string | null }> {
+    return this.projectManager.commitVersionIfEnabled(
+      backend.extractTypeAndPath(projectId).path,
+      message,
+    )
+  }
+
   /**
    * Return asset details.
    * @throws {Error} An error if a non-successful status code (not 200-299) was received.

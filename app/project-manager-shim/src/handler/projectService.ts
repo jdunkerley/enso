@@ -72,6 +72,10 @@ const LOCAL_VERSIONING_ROUTES: Readonly<Record<string, RouteHandler<VersioningCo
       message.trim() === '' ? 'Saved' : message,
     )
   },
+  // An automatic save before a change the IDE makes itself (an edition switch): nothing when the
+  // repository is not enabled, as for the save on close.
+  'versioning/commit-if-enabled': ({ versioning }, body) =>
+    versioning.commitIfEnabled([requireString(body, 'path')], requireString(body, 'message')),
   'versioning/log': async ({ versioning }, body) => ({
     versions: await versioning.log(requireString(body, 'path')),
   }),

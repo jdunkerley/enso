@@ -11,6 +11,7 @@ import { ErrorCode } from 'ydoc-shared/languageServer'
 import type {
   ContextId,
   LibraryComponentGroup,
+  LibraryLoadFailure,
   Path,
   Uuid,
   response,
@@ -104,6 +105,10 @@ main =
 
 let mainFileOverride: string | undefined
 let mockPublicTypes: { name: string; library: string }[] = []
+let mockLoadFailures: LibraryLoadFailure[] = []
+let mockEditionCheck: response.CheckEditionSwitch | undefined
+/** The editions `editions/setParentEdition` was asked to set, in order. */
+export const mockParentEditionsSet: string[] = []
 
 /** Serve `code` as the mock project's `Main.enso` until {@link restoreMockMainFile}. */
 export function setMockMainFile(code: string) {
@@ -115,10 +120,25 @@ export function setMockPublicTypes(types: { name: string; library: string }[]) {
   mockPublicTypes = types
 }
 
-/** Serve the standard mock `Main.enso` and no declared types again. */
+/**
+ * Answer `library/listLoadFailures` with `failures`, and `editions/checkSwitch` with `check`, until
+ * {@link restoreMockMainFile}.
+ */
+export function setMockLibraryLoadFailures(
+  failures: LibraryLoadFailure[],
+  check?: response.CheckEditionSwitch,
+) {
+  mockLoadFailures = failures
+  mockEditionCheck = check
+}
+
+/** Serve the standard mock `Main.enso`, no declared types and no load failures again. */
 export function restoreMockMainFile() {
   mainFileOverride = undefined
   mockPublicTypes = []
+  mockLoadFailures = []
+  mockEditionCheck = undefined
+  mockParentEditionsSet.length = 0
 }
 
 const fileTree = {
@@ -486,6 +506,19 @@ export const mockLSHandler = async (
       return { componentGroups: placeholderGroups() } satisfies response.GetComponentGroups
     case 'library/listPublicTypes':
       return { publicTypes: mockPublicTypes } satisfies response.ListLibraryPublicTypes
+    case 'library/listLoadFailures':
+      return { failures: mockLoadFailures } satisfies response.ListLibraryLoadFailures
+    case 'editions/checkSwitch':
+      return (mockEditionCheck ?? {
+        current: null,
+        target: 'mock-edition',
+        resolves: true,
+        changes: [],
+        stillMissing: [],
+      }) satisfies response.CheckEditionSwitch
+    case 'editions/setParentEdition':
+      mockParentEditionsSet.push(String((params as { newEditionName?: unknown }).newEditionName))
+      return { needsRestart: true } satisfies response.SetParentEdition
     case 'capability/acquire':
       return {}
     case 'file/list': {

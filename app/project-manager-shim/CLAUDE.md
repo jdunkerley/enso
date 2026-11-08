@@ -629,10 +629,12 @@ neither committed nor unstaged.
 - `src/localVersioning/git.ts`: `findGit`, `runGit`, `findRepoRoot`,
   `repositoryKey`, `identityArgs` (see _Identity fallback_ below).
 - Routes (POST to `/api/project-service/versioning/*`): `status`, `init`,
-  `enable`, `disable`, `enable-if-inside`, `commit`, `log`, `file-at`,
-  `restore`, `duplicate-at`, `set-comment`. `enableIfInside(repoRoot, rootPath)`
-  enables a repository whose root is the GUI's local root or inside it,
-  comparing `repositoryKey`s (real paths), unless the user opted out of it. See
+  `enable`, `disable`, `enable-if-inside`, `commit`, `commit-if-enabled` (the
+  close hook's `commitIfEnabled`, for a version the IDE saves before changing a
+  project itself, such as an edition switch), `log`, `file-at`, `restore`,
+  `duplicate-at`, `set-comment`. `enableIfInside(repoRoot, rootPath)` enables a
+  repository whose root is the GUI's local root or inside it, comparing
+  `repositoryKey`s (real paths), unless the user opted out of it. See
   `handler/projectService.ts` for request/response shapes. `commit` with an
   empty or whitespace-only `message` saves as `Saved`. The `restore` route (not
   `LocalVersioning.restore`) refuses a running project.

@@ -283,3 +283,18 @@ while it flushes and commits. A save asked for while one runs joins it, its
 comment appended, until the commit is requested; after that it is queued as one
 save to make next (later edits, the queued comments), never joined. See the
 design, `docs/superpowers/specs/2026-10-16-local-git-versioning-design.md`.
+
+`saveIfEnabled` saves a version quietly before a change the IDE makes to a
+project itself (the edition switch of #600, `versioning/commit-if-enabled`):
+nothing when the project's versions are not kept, and a rejection, which stops
+the change, when the version cannot be saved.
+
+## Unresolved libraries and the edition switch
+
+A project's libraries that the engine could not load (`library/loadFailed`,
+`library/listLoadFailures`, kept as the project store's `libraryLoadFailures`)
+get one toast per project, following the start-up toast's per-tab rules; when
+`editions/checkSwitch` says the bundled edition would load them, it offers
+"Switch and reopen" (save a version, `editions/setParentEdition`,
+`openedProjects.restartProject`). See Note [The Edition Switch] in
+`project-view/components/GraphEditor/editionSwitch.ts`.

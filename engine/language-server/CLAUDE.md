@@ -54,6 +54,12 @@ catalogues) use
 back to the default edition as the runtime does; never `.get` the project's own
 edition there.
 
+`editions/checkSwitch` (`EditionsCheckSwitchHandler`) says whether replacing the
+project's parent edition (by the bundled one, by default) would let the failed
+libraries and `Standard.Base` load without a download, keeping the project's own
+`libraries` overrides; it writes nothing (Note [Checking An Edition Switch]).
+The GUI then calls `editions/setParentEdition` and reopens.
+
 ## Suggestions database snapshot
 
 `search/getSuggestionsDatabase` is answered only after the runtime has

@@ -38,6 +38,7 @@ function fakeProject() {
     executionContext: markRaw(executionContext),
     lsRpcConnection: markRaw(lsRpcConnection),
     startupFailure: trackStartupFailure(executionContext as never),
+    libraryLoadFailures: [] as { library: string | null }[],
   })
   return { project, executionContext, complete }
 }
@@ -202,5 +203,17 @@ test('unmounting the view while it is active dismisses its start-up toasts', asy
   await nextTick()
   expect(shown()).toEqual(['The project could not be started: Boom'])
   failed.unmount()
+  expect(shown()).toEqual([])
+})
+
+test('a start-up failure is not shown while a failed library is named (#600)', async () => {
+  const { project, executionContext } = fakeProject()
+  mountProjectView(project)
+  executionContext.emit('executionFailed', ['NoSuchElementException'])
+  await nextTick()
+  expect(shown()).toEqual(['The project could not be started: NoSuchElementException'])
+  // The libraries' own toast (`editionSwitch.ts`) says why.
+  project.libraryLoadFailures = [{ library: 'Standard.Base' }]
+  await nextTick()
   expect(shown()).toEqual([])
 })
