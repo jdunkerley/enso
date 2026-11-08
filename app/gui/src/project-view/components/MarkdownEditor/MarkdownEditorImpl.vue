@@ -231,6 +231,8 @@ defineExpose({
    * backgrounds too (CodeMirror draws it below the text by default). */
   & :deep(.cm-selectionLayer) {
     z-index: 1 !important;
+    /* Above the text, it must let clicks and drags through to the text. */
+    pointer-events: none;
   }
   & :deep(.cm-selectionBackground) {
     background: var(--docs-selection) !important;

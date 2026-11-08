@@ -61,3 +61,30 @@ test('the component help shows a doc comment’s result tables as tables', async
   await expect(tables).toHaveCount(2)
   await expect(tables.nth(1).locator('th')).toHaveText(['Name', 'Count'])
 })
+
+test('clicking inside a selection in a code block collapses it there', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage.toggleDocsAssetPanel()
+  const docs = page.getByTestId('documentation-editor-content')
+  await expect(docs.locator('.cm-line')).toExist()
+  await docs.focus()
+  await page.keyboard.press('ControlOrMeta+A')
+  await page.keyboard.press(DELETE_KEY)
+  await docs.fill('Text\n\n```\nselected_word code line\n```\n\nAfter')
+  // The code line: the block's second line, after the opening fence.
+  const line = docs.locator('.cm-line.cm-codeBlock').nth(1)
+  await expect(line).toHaveText('selected_word code line')
+  await line.getByText('selected_word code line').dblclick({ position: { x: 20, y: 5 } })
+  const selection = locate.rightDock(page).locator('.cm-selectionBackground')
+  await expect(selection).toHaveCount(1)
+  // A click inside the selection reaches the text, and puts the cursor there.
+  const box = (await selection.boundingBox())!
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await expect(selection).toHaveCount(0)
+  await page.keyboard.type('X')
+  // The X lands inside the word, which is not replaced.
+  await expect(line).toHaveText(/^s[a-z_]*X[a-z_]* code line$/)
+  expect((await line.textContent())!.replace('X', '')).toBe('selected_word code line')
+})
