@@ -57,6 +57,16 @@ public final class ContextFactory {
   private String runtimerServerKey;
   private boolean enableDebugServer;
 
+  /**
+   * The system property a standby engine sets to its project's parent once it knows the project
+   * (engine/runner `Standby`, Note [Standby Mode]): the context's working directory, which
+   * `EnsoContext.checkWorkingDirectory` compares with the project's parent and against which Enso
+   * resolves relative paths, as it did when the process ran in the project's parent.
+   */
+  public static final String WORKING_DIRECTORY_PROPERTY = "enso.context.workingDirectory";
+
+  private String workingDirectory;
+
   private ContextFactory() {}
 
   public static ContextFactory create() {
@@ -180,6 +190,15 @@ public final class ContextFactory {
     return this;
   }
 
+  /**
+   * The context's working directory, instead of the process's; {@link #WORKING_DIRECTORY_PROPERTY}
+   * when not given.
+   */
+  public ContextFactory workingDirectory(String workingDirectory) {
+    this.workingDirectory = workingDirectory;
+    return this;
+  }
+
   public Context build() {
     if (executionEnvironment != null) {
       options.put("enso.ExecutionEnvironment", executionEnvironment);
@@ -217,6 +236,14 @@ public final class ContextFactory {
             .out(out)
             .err(err)
             .in(in);
+
+    var cwd =
+        workingDirectory != null
+            ? workingDirectory
+            : System.getProperty(WORKING_DIRECTORY_PROPERTY);
+    if (cwd != null) {
+      builder.currentWorkingDirectory(java.nio.file.Path.of(cwd).toAbsolutePath());
+    }
 
     if (checkForWarnings != null) {
       builder.option(DebugServerInfo.METHOD_BREAKPOINT_OPTION, checkForWarnings);
