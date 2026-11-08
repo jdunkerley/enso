@@ -1,5 +1,6 @@
 package org.enso.languageserver.boot.config
 
+import com.typesafe.config.ConfigFactory
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -26,5 +27,26 @@ class ApplicationConfigTest extends AnyFlatSpec with Matchers {
     config.toString should not include "hunter2-token"
     config.toString should include("redacted")
     config.copy(channelToken = None).toString should not include "redacted"
+  }
+
+  it should "read the ydoc port and the channel token a standby engine set after start" in {
+    // engine/runner `StandbyRequest.applyEnvironment` sets these, then invalidates the caches.
+    sys.props("language-server.ydoc.port")     = "4567"
+    sys.props("language-server.channel-token") = "standby-token"
+    ConfigFactory.invalidateCaches()
+    try {
+      val config = ApplicationConfig.load()
+      config.ydoc.port shouldBe sys.env
+        .get("LANGUAGE_SERVER_YDOC_PORT")
+        .map(_.toInt)
+        .orElse(Some(4567))
+      config.channelToken shouldBe sys.env
+        .get("LANGUAGE_SERVER_CHANNEL_TOKEN")
+        .orElse(Some("standby-token"))
+    } finally {
+      sys.props -= "language-server.ydoc.port"
+      sys.props -= "language-server.channel-token"
+      ConfigFactory.invalidateCaches()
+    }
   }
 }
