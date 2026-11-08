@@ -605,12 +605,6 @@ public class Main {
             ? nil()
             : join(new Contact(authorName, authorEmail), nil());
 
-    var edition = DefaultEdition.getDefaultEdition();
-    if (LOGGER.isTraceEnabled()) {
-      var baseEdition = edition.parent().getOrElse(() -> "<no-base>");
-      LOGGER.trace("Creating a new project " + name + " based on edition [" + baseEdition + "].");
-    }
-
     var template =
         templateOption.map(
             (n) ->
@@ -620,15 +614,44 @@ public class Main {
                           throw exitFail("Unknown project template name: '" + n + "'.");
                         }));
 
+    createProject(
+        root,
+        name,
+        normalizedNameOption,
+        template.getOrElse(() -> Template.Default$.MODULE$),
+        authors);
+    throw exitSuccess();
+  }
+
+  /**
+   * Creates a project from a template, with the default edition (`--new`, and the standby warm-up).
+   *
+   * @param root root path of the new project
+   * @param name the project name
+   * @param normalizedName the normalized name, if not derived from the name
+   * @param template the template to copy
+   * @param authors the authors and maintainers
+   */
+  static void createProject(
+      File root,
+      String name,
+      scala.Option<String> normalizedName,
+      Template template,
+      scala.collection.immutable.List<Contact> authors) {
+    var edition = DefaultEdition.getDefaultEdition();
+    if (LOGGER.isTraceEnabled()) {
+      var baseEdition = edition.parent().getOrElse(() -> "<no-base>");
+      LOGGER.trace("Creating a new project " + name + " based on edition [" + baseEdition + "].");
+    }
     PackageManager$.MODULE$
         .Default()
         .create(
             root,
             name,
             "local",
-            normalizedNameOption,
+            normalizedName,
             "0.0.1",
-            template.getOrElse(() -> Template.Default$.MODULE$),
+            template,
             scala.Option.apply(edition),
             authors,
             nil(),
@@ -638,7 +661,11 @@ public class Main {
             Option$.MODULE$.empty(),
             false,
             false);
-    throw exitSuccess();
+  }
+
+  /** A project with no authors, whose normalized name is derived from the name. */
+  static void createProject(File root, String name, Template template) {
+    createProject(root, name, Option$.MODULE$.empty(), template, nil());
   }
 
   /**
