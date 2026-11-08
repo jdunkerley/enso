@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [When the connection to a project restarts, edits that had not been saved yet
+  are put back, along with the selection, the open code panel and an open
+  component browser. If the file changed in the meantime, it is kept and you are
+  offered your version instead.][654]
 - [Inside a folder, the Drive's first row is a `..` entry that takes you up to
   the parent folder: double click it, or reach it with the arrow keys and press
   Enter. Drop files or folders on it to move them up a level.][642]
@@ -444,6 +448,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[654]: https://github.com/jdunkerley/enso/pull/654
 [642]: https://github.com/jdunkerley/enso/pull/642
 [629]: https://github.com/jdunkerley/enso/pull/629
 [622]: https://github.com/jdunkerley/enso/pull/622
