@@ -82,6 +82,9 @@ public class StandbyProcessTest {
     return enso;
   }
 
+  /** The line's `LANGUAGE_SERVER_CHANNEL_TOKEN`. */
+  private static final String CHANNEL_TOKEN = "standby-test";
+
   private static String json(String text) {
     return "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
   }
@@ -230,12 +233,16 @@ public class StandbyProcessTest {
     var quoted = args.stream().map(StandbyProcessTest::json).toList();
     return "{\"args\":["
         + String.join(",", quoted)
-        + "],\"env\":{\"LANGUAGE_SERVER_CHANNEL_TOKEN\":\"standby-test\","
+        + "],\"env\":{\"LANGUAGE_SERVER_CHANNEL_TOKEN\":\""
+        + CHANNEL_TOKEN
+        + "\","
         + "\"ENSO_LOCAL_PROJECT_ID\":\"standby-test-key\"}}\n";
   }
 
   /**
-   * `session/initProtocolConnection` on the JSON-RPC socket, as the GUI's first call; its answer.
+   * `session/initProtocolConnection` on the JSON-RPC channel socket, as the GUI's first call; its
+   * answer. The socket is the ydoc server's (`/channel/json`, Note [The Channel Socket] in
+   * `YjsChannelEndpoint`), so an answer also shows that the line's channel token was applied.
    * `/_health` passes while the Language Server still initialises, and a socket opened then is
    * dropped (`jvmAot/driver.ts` in the shim), so a failed attempt is retried once a second.
    */
@@ -251,7 +258,7 @@ public class StandbyProcessTest {
             client
                 .newWebSocketBuilder()
                 .buildAsync(
-                    URI.create("ws://127.0.0.1:" + port + "/"),
+                    URI.create("ws://127.0.0.1:" + port + "/channel/json?token=" + CHANNEL_TOKEN),
                     new WebSocket.Listener() {
                       @Override
                       public CompletionStage<?> onText(
