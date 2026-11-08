@@ -9,6 +9,8 @@ import { type Events, stringUnionToArray } from '@/util/data/observable'
 import type { MethodPointer } from '@/util/methodPointer'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { computed, effectScope, markRaw, reactive, ref, type Ref, watch } from 'vue'
+import { WebsocketProvider } from 'y-websocket'
+import { xxHash128 } from 'ydoc-shared/ast/ffi'
 import { SourceDocument } from 'ydoc-shared/ast/sourceDocument'
 import {
   defaultLocalOrigin,
@@ -19,6 +21,14 @@ import {
 import * as Y from 'yjs'
 import type { ProjectNameStore } from '../projectNames'
 import type { SuggestionDbStore } from '../suggestionDatabase'
+import {
+  applySavedAsts,
+  type CarryOverDecision,
+  countTextChanges,
+  decideCarryOver,
+  type ModuleSnapshot,
+  saveAsts,
+} from './carryOver'
 import {
   type AbstractImport,
   addImports,
@@ -45,6 +55,18 @@ import { whenReadyOnce } from './openImportCheck'
  * load takes 13-25 s on that runner.
  */
 const AST_LOAD_TIMEOUT_MS = 75_000
+
+/**
+ * How many of the module's own texts since the last update from the server are remembered for a
+ * session replacement ({@link ModuleSnapshot}). A text older than that is forgotten, and a new
+ * session that loads it asks the user instead of restoring.
+ */
+const OWN_TEXTS_LIMIT = 500
+
+/** The hash a {@link ModuleSnapshot}'s `ownTexts` are made with. */
+export function hashModuleText(text: string): string {
+  return xxHash128(text)
+}
 
 /**
  * Module Store
@@ -130,12 +152,47 @@ export async function createModuleStore(
           root.value = undefined
         }
       })
+      const stopRecording = recordOwnTexts(moduleModel.value?.doc.ydoc)
       onCleanup(() => {
+        stopRecording()
         module.unobserve(handle)
         source.clear()
       })
     }
   })
+
+  /**
+   * Record the texts the module goes through since the last update from the server, for a session
+   * replacement (`carryOverSnapshot`). An update from the server is a transaction whose origin is
+   * the module doc's `WebsocketProvider`; it starts the record again. The module doc was loaded
+   * from the server before it is observed, so its text then is the first. `afterTransaction` comes
+   * after the transaction's observers, so `source` already has its text.
+   */
+  const ownTexts = new Set<string>()
+  function recordOwnTexts(ydoc: Y.Doc | undefined): () => void {
+    ownTexts.clear()
+    if (ydoc == null) return () => {}
+    let lastText: string | undefined
+    const record = (fromServer: boolean) => {
+      const text = source.text
+      if (!fromServer && text === lastText) return
+      lastText = text
+      if (fromServer) ownTexts.clear()
+      else if (ownTexts.size >= OWN_TEXTS_LIMIT) {
+        const oldest = ownTexts.values().next()
+        if (!oldest.done) ownTexts.delete(oldest.value)
+      }
+      ownTexts.add(hashModuleText(text))
+    }
+    const afterTransaction = (transaction: Y.Transaction) =>
+      record(transaction.origin instanceof WebsocketProvider)
+    record(true)
+    ydoc.on('afterTransaction', afterTransaction)
+    return () => {
+      ydoc.off('afterTransaction', afterTransaction)
+      ownTexts.clear()
+    }
+  }
 
   await astLoaded.wait(AST_LOAD_TIMEOUT_MS)
   if (root.value == null) {
@@ -368,6 +425,51 @@ export async function createModuleStore(
       }
     }
 
+    /**
+     * The module as it is now, to carry over a replacement of its ydoc server session (see
+     * {@link ModuleSnapshot}).
+     */
+    function carryOverSnapshot(): ModuleSnapshot | undefined {
+      const rootValue = root.value
+      if (rootValue == null) return undefined
+      return {
+        path: FILE_NAME,
+        text: source.text,
+        ownTexts: new Set(ownTexts),
+        asts: saveAsts(rootValue),
+      }
+    }
+
+    /** What to do with a snapshot taken from the module's previous session (`decideCarryOver`). */
+    function carryOverDecision(snapshot: ModuleSnapshot): CarryOverDecision {
+      return decideCarryOver(snapshot, source.text, hashModuleText)
+    }
+
+    /**
+     * Put a snapshot taken from the module's previous session back, as one undoable edit: its text,
+     * unless `withText` is false, and its node metadata and ids where they apply.
+     * @returns the number of changes made: separate text changes, and nodes changed.
+     */
+    function applyCarryOver(snapshot: ModuleSnapshot, { withText }: { withText: boolean }): number {
+      const before = source.text
+      let changes = 0
+      const result = edit(
+        (editedModule) => {
+          const editedRoot = editedModule.root()
+          if (editedRoot == null) return Err('The module has no root.')
+          if (withText) editedModule.syncToCode(snapshot.text)
+          const newRoot = editedModule.root()
+          if (newRoot == null) return Err('The module has no root.')
+          const textMatches = newRoot.code() === snapshot.text
+          changes = applySavedAsts(newRoot, snapshot.asts, textMatches)
+          return Ok()
+        },
+        { logPreamble: 'Cannot restore the changes made before the connection was restarted.' },
+      )
+      if (!result.ok) return 0
+      return changes + countTextChanges(before, source.text)
+    }
+
     /** The imports added when the module was opened, for the graph editor's notice. */
     const importsAddedOnOpen = ref<RequiredImport[]>([])
     whenReadyOnce(
@@ -414,6 +516,9 @@ export async function createModuleStore(
         addMissingImports,
         addDetectedImports,
         importsAddedOnOpen,
+        carryOverSnapshot,
+        carryOverDecision,
+        applyCarryOver,
         undoManager,
         stopCapturingUndo,
       }),

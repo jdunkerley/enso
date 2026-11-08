@@ -91,6 +91,11 @@ pages outside it (the authentication pages, for example); never mount a second
 one on a page that has one. A dialog opened by its own trigger stays a local
 `<Dialog>`.
 
+`ProjectReconnect/FileChangedToast.vue` is the content of the toast
+`reconnectProject` (`$/providers/openedProjects`) shows when a module's file
+changed while its ydoc session was replaced (#604): Keep the file, or Restore my
+version.
+
 ## Rules
 
 - **Styles live in `variants.ts`.** Each primitive renders the `variants.ts`

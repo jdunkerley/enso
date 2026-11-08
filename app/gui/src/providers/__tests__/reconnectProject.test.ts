@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   initializeProject: vi.fn(),
   closeProject: vi.fn(),
   toasts: [] as { content: unknown; options: Record<string, unknown> }[],
+  dismissed: [] as unknown[],
 }))
 vi.mock('../openedProjects/projectStates', () => ({
   useProjectStates: () => mocks,
@@ -16,6 +17,7 @@ vi.mock('../toasts', () => ({
   useToasts: () => ({
     show: (content: unknown, options: Record<string, unknown> = {}) =>
       mocks.toasts.push({ content, options }),
+    dismiss: (id: unknown) => mocks.dismissed.push(id),
   }),
 }))
 vi.mock('../text', () => ({
@@ -195,5 +197,111 @@ describe('reconnecting an opened project', () => {
     expect(autoClose).toEqual(expect.any(Number))
     expect(autoClose as number).toBeGreaterThanOrEqual(10_000)
     expect(autoClose as number).toBeLessThanOrEqual(20_000)
+  })
+})
+
+describe('carrying a project over a session replacement (#604)', () => {
+  const snapshot = { path: 'Main.enso', text: 'mine', ownTexts: new Set<string>(), asts: [] }
+
+  /** A module store whose new session loaded a text that leads to `decision`. */
+  function moduleWith(decision: 'unchanged' | 'restore' | 'conflict', changes = 2) {
+    return {
+      carryOverSnapshot: vi.fn(() => snapshot),
+      carryOverDecision: vi.fn(() => decision),
+      applyCarryOver: vi.fn(() => changes),
+    }
+  }
+
+  async function reconnected(
+    name: string,
+    newModule: ReturnType<typeof moduleWith>,
+    view?: Record<string, unknown>,
+  ) {
+    const id = name as ProjectId
+    const info = { mode: 'local', id, title: name }
+    const oldModule = moduleWith('unchanged')
+    const modules = [oldModule, newModule]
+    mocks.openProject.mockReset()
+    mocks.initializeProject.mockReset()
+    mocks.toasts.length = 0
+    mocks.openProject.mockImplementation(async () => ({
+      ok: true,
+      value: { status: 'opened', info, runningId: id, scope: effectScope() },
+    }))
+    mocks.initializeProject.mockImplementation(async (state: { scope: EffectScope }) => ({
+      ok: true,
+      value: {
+        status: 'initialized',
+        info,
+        runningId: id,
+        scope: state.scope,
+        module: modules.shift(),
+      },
+    }))
+    const store = createOpenedProjectsStore()
+    store.openProject(info as never)
+    await vi.waitFor(() => expect(store.get(id)?.state.status).toBe('initialized'))
+    if (view != null) store.registerViewCarryOver(id, () => view as never)
+    store.reconnectProject(id)
+    await vi.waitFor(() => expect(mocks.initializeProject).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(store.get(id)?.state.status).toBe('initialized'))
+    expect(oldModule.carryOverSnapshot).toHaveBeenCalledTimes(1)
+    return { store, id }
+  }
+
+  test('edits that never reached the file are put back, text and all, and the user is told', async () => {
+    const module = moduleWith('restore', 3)
+    await reconnected('c1', module)
+    expect(module.carryOverDecision).toHaveBeenCalledWith(snapshot)
+    expect(module.applyCarryOver).toHaveBeenCalledWith(snapshot, { withText: true })
+    expect(mocks.toasts.map((toast) => toast.content)).toEqual([
+      'projectConnectionRestarted',
+      'projectChangesRestored 3',
+    ])
+  })
+
+  test('when the new session has the text, only the metadata is merged', async () => {
+    const module = moduleWith('unchanged', 1)
+    await reconnected('c2', module)
+    expect(module.applyCarryOver).toHaveBeenCalledWith(snapshot, { withText: false })
+    expect(mocks.toasts.at(-1)!.content).toBe('projectChangeRestored')
+  })
+
+  test('nothing to put back shows no second notice', async () => {
+    const module = moduleWith('unchanged', 0)
+    await reconnected('c3', module)
+    expect(mocks.toasts).toHaveLength(1)
+  })
+
+  test('a file changed by another route is kept, and the user may restore their version', async () => {
+    const module = moduleWith('conflict')
+    await reconnected('c4', module)
+    expect(module.applyCarryOver).not.toHaveBeenCalled()
+    const prompt = mocks.toasts.at(-1)!
+    expect(prompt.options.autoClose).toBe(false)
+    const { props } = prompt.content as { props: { onKeep: () => void; onRestore: () => void } }
+
+    props.onRestore()
+
+    expect(module.applyCarryOver).toHaveBeenCalledWith(snapshot, { withText: true })
+    expect(mocks.dismissed).toContain(prompt.options.toastId)
+    expect(mocks.toasts.at(-1)!.content).toBe('projectChangesRestored 2')
+  })
+
+  test('keeping the file changes nothing', async () => {
+    const module = moduleWith('conflict')
+    await reconnected('c5', module)
+    const prompt = mocks.toasts.at(-1)!
+    const { props } = prompt.content as { props: { onKeep: () => void } }
+    props.onKeep()
+    expect(module.applyCarryOver).not.toHaveBeenCalled()
+    expect(mocks.dismissed).toContain(prompt.options.toastId)
+  })
+
+  test('the view’s state goes to the next view once', async () => {
+    const view = { selection: ['n1'], dockOpen: true, componentBrowser: undefined }
+    const { store, id } = await reconnected('c6', moduleWith('unchanged', 0), view)
+    expect(store.takeViewCarryOver(id)).toEqual(view)
+    expect(store.takeViewCarryOver(id)).toBeUndefined()
   })
 })

@@ -18,6 +18,7 @@ import {
 import { proxyRefs, type ToValue } from '$/utils/reactivity'
 import type { Filter, SelfArg } from '@/components/ComponentBrowser/filtering'
 import { isAiAssignment, readAiPrompt } from '@/components/GraphEditor/aiNode'
+import type { CarriedComponentBrowserInput } from '@/components/GraphEditor/viewCarryOver'
 import { Ast } from '@/util/ast'
 import { selfArgSeparator } from '@/util/ast/abstract'
 import { nodeDocumentationText } from '@/util/ast/node'
@@ -369,6 +370,35 @@ export function useComponentBrowserInput(
     return { text: expression, textOffset: 0, sourceNodeIdentifier: undefined }
   }
 
+  /** The input as a session replacement carries it over (`viewCarryOver.ts`). */
+  function capture(): CarriedComponentBrowserInput {
+    return {
+      text: text.value,
+      selection: { from: selection.value.from, to: selection.value.to },
+      mode: selectedMode.value,
+      selfArgument: sourceNodeIdentifier.value,
+    }
+  }
+
+  /**
+   * Put back an input carried over a session replacement, after {@link reset}. The mode is set as
+   * it was, not picked: it does not become the default for later Component Browsers. A mode the
+   * usage locks, or AI while the agent is unavailable, is kept as {@link reset} chose it.
+   */
+  function restore(saved: CarriedComponentBrowserInput) {
+    if (!modeLocked.value && (saved.mode !== 'aiPrompt' || toValue(aiAvailable))) {
+      selectedMode.value = saved.mode
+    }
+    const selfArgument = saved.selfArgument
+    sourceNodeIdentifier.value =
+      selfArgument != null && Ast.isIdentifier(selfArgument) ? selfArgument : undefined
+    text.value = saved.text
+    selection.value =
+      Range.tryFromBounds(saved.selection.from, saved.selection.to)?.clip(
+        Range.fromStartAndLength(0, saved.text.length),
+      ) ?? Range.emptyAt(saved.text.length)
+  }
+
   function applySourceNode(text: string) {
     return sourceNodeIdentifier.value ?
         `${sourceNodeIdentifier.value}${selfArgSeparator(text)}${text}`
@@ -394,6 +424,8 @@ export function useComponentBrowserInput(
     selection,
     /** Re-initializes the input for given usage. */
     reset,
+    capture,
+    restore,
     /** Apply given suggested entry to the input. It will switch mode to code editing. */
     applySuggestion,
     /** Switch to code edit mode with input as-is */

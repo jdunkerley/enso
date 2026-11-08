@@ -1,3 +1,5 @@
+import FileChangedToast from '$/components/ProjectReconnect/FileChangedToast.vue'
+import type { ViewCarryOver } from '@/components/GraphEditor/viewCarryOver'
 import { assert } from '@/util/assert'
 import { createGlobalState } from '@vueuse/core'
 import {
@@ -8,8 +10,13 @@ import {
 } from 'enso-common/src/services/Backend'
 import { Err, Ok, type Result, type ResultError } from 'enso-common/src/utilities/data/result'
 import { effectScope, shallowReactive } from 'vue'
+import type { ModuleSnapshot } from './openedProjects/module/carryOver'
 import type { ProjectInfo, RunningProjectInfo } from './openedProjects/projectInfo'
-import { useProjectStates, type ProjectState } from './openedProjects/projectStates'
+import {
+  useProjectStates,
+  type Initialized,
+  type ProjectState,
+} from './openedProjects/projectStates'
 import { useText } from './text'
 import { useToasts } from './toasts'
 
@@ -17,6 +24,20 @@ import { useToasts } from './toasts'
 const PROCESS_ABORTED = 'aborted'
 /** How long the notice that a project's connection was restarted stays up. */
 const RECONNECT_TOAST_MS = 15_000
+
+/** How long the notice that unsaved changes were put back after a reconnect stays up. */
+const RESTORED_TOAST_MS = 8_000
+
+/**
+ * What a replacement of a project's ydoc server session carries over to its next stores and view
+ * ({@link OpenedProjectsStore.reconnectProject}).
+ */
+export interface SessionCarryOver {
+  /** The module as the old stores had it; put back once the new ones have loaded it. */
+  module?: ModuleSnapshot | undefined
+  /** The view's state as the old view had it; taken by the new view as it mounts. */
+  view?: ViewCarryOver | undefined
+}
 
 /** A type of process */
 export type Process = 'opening' | 'closing' | 'restoring'
@@ -40,6 +61,8 @@ export interface Project {
    * ({@link OpenedProjectsStore.reconnectProject}).
    */
   reconnectPending?: boolean
+  /** What the last session replacement carries over, until it is put back. */
+  carryOver?: SessionCarryOver | undefined
 }
 
 /**
@@ -57,6 +80,8 @@ export function createOpenedProjectsStore() {
   const toasts = useToasts()
   const { getText } = useText()
   const projectReadyCallbacks: ((project: Project) => void)[] = []
+  /** Each mounted project view's capture of its state, for a session replacement. */
+  const viewCaptures = new Map<ProjectId, () => ViewCarryOver>()
 
   /** Open project. */
   function openProject(info: ProjectInfo) {
@@ -121,6 +146,7 @@ export function createOpenedProjectsStore() {
       return
     }
     if (!offer) closingWithoutOffer.add(id)
+    project.carryOver = undefined
     void performProcess(project, 'closing').finally(() => closingWithoutOffer.delete(id))
   }
 
@@ -146,8 +172,11 @@ export function createOpenedProjectsStore() {
    * session they were made with was replaced (Note [A New Server Session] in `ydoc-shared`'s
    * `yjsModel.ts`), so their Language Server session and execution context are gone. The old
    * stores' scope is stopped, which closes their sockets; the project is not opened in the backend
-   * again. Edits that had not reached a live session before then are lost with the old stores, and
-   * so is the project view's own state (selection, undo history, open panels): the user is told.
+   * again. What the old stores and view had is carried over ({@link SessionCarryOver}): the module's
+   * edits that never reached the file are put back once the new stores have loaded it, unless the
+   * file changed by some other route, when the user chooses (`restoreCarriedModule`); the view's
+   * selection, open dock and component browser come back when the new view mounts. Undo history
+   * is not carried (it refers to the old docs); the user is told.
    *
    * A project still opening (or reopening) gets the reconnect when its opening finishes: the store
    * that asks may be the one being made, and a session replaced while it is made must not be
@@ -166,6 +195,8 @@ export function createOpenedProjectsStore() {
     if (state.status !== 'initialized') return
     project.reconnectPending = false
     console.warn(`The ydoc server of project ${state.info.title} was replaced; reconnecting.`)
+    project.carryOver = captureCarryOver(state)
+    toasts.dismiss(fileChangedToastId(id))
     toasts.show(getText('projectConnectionRestarted'), {
       type: 'warning',
       toastId: `project-connection-restarted-${id}`,
@@ -179,6 +210,101 @@ export function createOpenedProjectsStore() {
       scope: effectScope(),
     }
     void performProcess(project, 'opening')
+  }
+
+  /**
+   * What an initialized project's stores and view have now, for its next stores. A capture that
+   * fails loses only itself: the reconnect goes on without it.
+   */
+  function captureCarryOver(state: Initialized): SessionCarryOver {
+    const carryOver: SessionCarryOver = {}
+    try {
+      carryOver.module = state.module.carryOverSnapshot()
+    } catch (error) {
+      console.error('Could not keep the module for the reconnect.', error)
+    }
+    try {
+      carryOver.view = viewCaptures.get(state.info.id)?.()
+    } catch (error) {
+      console.error('Could not keep the state of the project view for the reconnect.', error)
+    }
+    return carryOver
+  }
+
+  function fileChangedToastId(id: ProjectId) {
+    return `project-file-changed-${id}`
+  }
+
+  function showRestored(id: ProjectId, changes: number) {
+    if (changes === 0) return
+    toasts.show(
+      changes === 1 ? getText('projectChangeRestored') : getText('projectChangesRestored', changes),
+      { type: 'success', toastId: `project-changes-restored-${id}`, autoClose: RESTORED_TOAST_MS },
+    )
+  }
+
+  /**
+   * Put back the module a session replacement carried over, now that the project's new stores have
+   * loaded it (`openedProjects/module/carryOver.ts` has the rules). When the file changed by some
+   * other route, the file is kept and a toast offers the carried version instead.
+   */
+  function restoreCarriedModule(project: Project) {
+    const snapshot = project.carryOver?.module
+    const state = project.state
+    if (snapshot == null || state.status !== 'initialized') return
+    project.carryOver = { ...project.carryOver, module: undefined }
+    const id = state.info.id
+    try {
+      const decision = state.module.carryOverDecision(snapshot)
+      if (decision !== 'conflict') {
+        showRestored(
+          id,
+          state.module.applyCarryOver(snapshot, { withText: decision === 'restore' }),
+        )
+        return
+      }
+      console.warn(
+        `${snapshot.path} of project ${state.info.title} changed while it reconnected; keeping the file.`,
+      )
+      const toastId = fileChangedToastId(id)
+      toasts.show(
+        {
+          component: FileChangedToast,
+          props: {
+            file: snapshot.path,
+            onKeep: () => toasts.dismiss(toastId),
+            onRestore: () => {
+              toasts.dismiss(toastId)
+              // Only into the stores the choice was offered for.
+              if (project.state !== state) return
+              showRestored(id, state.module.applyCarryOver(snapshot, { withText: true }))
+            },
+          },
+        },
+        { type: 'warning', toastId, autoClose: false },
+      )
+    } catch (error) {
+      console.error('Could not put back the changes made before the reconnect.', error)
+    }
+  }
+
+  /**
+   * Register a mounted project view's capture of its state, for a session replacement of the
+   * project. Returns the function that unregisters it.
+   */
+  function registerViewCarryOver(id: ProjectId, capture: () => ViewCarryOver): () => void {
+    viewCaptures.set(id, capture)
+    return () => {
+      if (viewCaptures.get(id) === capture) viewCaptures.delete(id)
+    }
+  }
+
+  /** Take the view state a session replacement carried over for the project's new view, if any. */
+  function takeViewCarryOver(id: ProjectId): ViewCarryOver | undefined {
+    const project = projects.get(id)
+    const view = project?.carryOver?.view
+    if (project?.carryOver != null) project.carryOver = { ...project.carryOver, view: undefined }
+    return view
   }
 
   /** Perform a process across mulitple project states until finished or errored. */
@@ -215,6 +341,7 @@ export function createOpenedProjectsStore() {
         const promise = PROCESS_STEPS[process](project.state, abort.signal)
         project.nextTask = promise ? { abort, promise, process } : undefined
       } while (project.nextTask != null)
+      restoreCarriedModule(project)
       if (project.reconnectPending) {
         if (project.state.status === 'initialized') reconnectProject(project.state.info.id)
         else project.reconnectPending = false
@@ -227,8 +354,9 @@ export function createOpenedProjectsStore() {
         project.error = Error(`${process} process interrupted by error.`, { cause: err })
         project.nextTask = undefined
         // A reconnect noted while this opening ran has nothing to reconnect: the next opening
-        // builds fresh stores.
+        // builds fresh stores. What the last one carried over has no stores to go to either.
         project.reconnectPending = false
+        project.carryOver = undefined
       }
     }
   }
@@ -331,6 +459,8 @@ export function createOpenedProjectsStore() {
     renameProject,
     restoreProject,
     reconnectProject,
+    registerViewCarryOver,
+    takeViewCarryOver,
     get,
     listProjects,
     isProjectOpening,
