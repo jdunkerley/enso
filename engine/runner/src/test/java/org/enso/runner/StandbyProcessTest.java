@@ -384,14 +384,25 @@ public class StandbyProcessTest {
     return tree(engine.temporary()).stream().filter(p -> p.startsWith("enso-standby-")).toList();
   }
 
-  /** The new paths in the data directory that are not library IR caches. */
+  /** The new paths in the data directory that are not library IR caches or their locks. */
   private static List<String> notLibraryCaches(Engine engine) throws IOException {
     var written = new ArrayList<>(tree(engine.data()));
     written.removeAll(engine.dataBefore());
     // The folders above the caches; `local` is where the warm-up's project cache was.
-    var parents = List.of("cache", "cache/ir", "cache/ir/local", "cache/ir/Standard");
+    var parents = List.of("cache", "cache/ir", "cache/ir/local", "cache/ir/Standard", "lock");
     return written.stream()
-        .filter(p -> !parents.contains(p) && !p.startsWith("cache/ir/Standard/"))
+        .filter(
+            p ->
+                !parents.contains(p)
+                    && !p.startsWith("cache/ir/Standard/")
+                    && !p.startsWith("lock/cached-library-"))
+        .toList();
+  }
+
+  /** What is left of the warm-up's project IR cache in the data directory. */
+  private static List<String> warmUpCache(Engine engine) throws IOException {
+    return tree(engine.data()).stream()
+        .filter(p -> p.startsWith("cache/ir/local/" + StandbyWarmUp.PROJECT_NAME))
         .toList();
   }
 
@@ -430,7 +441,8 @@ public class StandbyProcessTest {
     assertTrue(engine.stderr().toString(), done != null);
     assertFalse(engine.stderr().toString(), engine.said("warm-up failed"));
     assertEquals("the warm-up's project is deleted", List.of(), warmUpFolders(engine));
-    assertEquals("the warm-up wrote only library caches", List.of(), notLibraryCaches(engine));
+    // The Language Server writes its logs there by now: only the warm-up's cache is looked for.
+    assertEquals("the warm-up's IR cache is deleted", List.of(), warmUpCache(engine));
     // Whether the line came while `main` still ran is up to the machine: had `main` finished
     // first, the warm-up simply ended, and the abandon path was not exercised.
     assumeTrue(
