@@ -42,9 +42,13 @@ class EditionsCheckSwitchHandler(
   import context.dispatcher
 
   private def requestStage: Receive = {
-    case Request(EditionsCheckSwitch, id, EditionsCheckSwitch.Params(edition)) =>
+    case Request(
+          EditionsCheckSwitch,
+          id,
+          EditionsCheckSwitch.Params(edition)
+        ) =>
       implicit val timeout: Timeout = Timeout(10.seconds)
-      val target = edition.getOrElse(BuildVersion.currentEdition)
+      val target                    = edition.getOrElse(BuildVersion.currentEdition)
       (loadFailures ? LibraryLoadFailures.GetFailures)
         .mapTo[LibraryLoadFailures.Failures]
         .flatMap { failures =>
@@ -75,10 +79,10 @@ class EditionsCheckSwitchHandler(
     target: String,
     failed: Seq[LibraryName]
   ): EditionsCheckSwitch.Result = {
-    val config = editionReferenceResolver.getCurrentProjectConfig.get
-    val raw     = config.edition.getOrElse(DefaultEdition.getDefaultEdition)
-    val names   = (failed :+ LibraryName("Standard", "Base")).distinct
-    val switched = raw.copy(parent = Some(target))
+    val config      = editionReferenceResolver.getCurrentProjectConfig.get
+    val raw         = config.edition.getOrElse(DefaultEdition.getDefaultEdition)
+    val names       = (failed :+ LibraryName("Standard", "Base")).distinct
+    val switched    = raw.copy(parent = Some(target))
     val preferLocal = config.preferLocalLibraries
     val resolver    = LibraryResolver(localLibraryProvider)
     def versionIn(edition: Editions.ResolvedEdition)(name: LibraryName) =

@@ -24,9 +24,12 @@ trait CheckSwitchHelpers { self: BaseServerTest =>
         }
         """)
     val response = client.expectSomeJson(timeout = defaultTimeout)
-    response.hcursor.downField("result").focus.getOrElse(
-      throw new AssertionError(s"No result in $response")
-    )
+    response.hcursor
+      .downField("result")
+      .focus
+      .getOrElse(
+        throw new AssertionError(s"No result in $response")
+      )
   }
 }
 
@@ -112,8 +115,9 @@ class EditionsCheckSwitchPinnedLibraryTest
   override protected def customEdition: Option[Editions.RawEdition] =
     Some(
       Editions.Raw.Edition.make(
-        parent       = Some("no-such-edition"),
-        repositories = Seq(Editions.Repository("pinned", "http://localhost:1/")),
+        parent = Some("no-such-edition"),
+        repositories =
+          Seq(Editions.Repository("pinned", "http://localhost:1/")),
         libraries = Seq(
           Editions.Raw.PublishedLibrary(
             LibraryName("Standard", "Base"),
