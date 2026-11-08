@@ -9,7 +9,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
 import java.net.HttpURLConnection;
 import java.net.ServerSocket;
 import java.net.URI;
@@ -124,8 +123,10 @@ public class StandbyProcessTest {
    *
    * @param data its `ENSO_DATA_DIRECTORY`
    * @param temporary its `java.io.tmpdir`, where the warm-up makes its project
+   * @param reader the thread that collects {@code stderr}
    */
-  private record Engine(Process process, List<String> stderr, Path data, Path temporary) {
+  private record Engine(
+      Process process, List<String> stderr, Path data, Path temporary, Thread reader) {
     boolean said(String text) {
       synchronized (stderr) {
         return stderr.stream().anyMatch(line -> line.contains(text));
@@ -136,6 +137,15 @@ public class StandbyProcessTest {
       synchronized (stderr) {
         return stderr.stream().filter(line -> line.contains(text)).findFirst().orElse(null);
       }
+    }
+
+    /** The exit code, once the process has exited and all its stderr is collected. */
+    int exitCode(long seconds) throws InterruptedException {
+      assertTrue(
+          "still running after " + seconds + " s: " + stderr,
+          process.waitFor(seconds, TimeUnit.SECONDS));
+      reader.join(TimeUnit.SECONDS.toMillis(10));
+      return process.exitValue();
     }
 
     void waitFor(String text, long seconds) throws InterruptedException {
@@ -198,7 +208,7 @@ public class StandbyProcessTest {
             });
     reader.setDaemon(true);
     reader.start();
-    return new Engine(process, stderr, data, temporary);
+    return new Engine(process, stderr, data, temporary, reader);
   }
 
   private Path project() throws IOException {
@@ -323,13 +333,61 @@ public class StandbyProcessTest {
     assertFalse(engine.stderr().toString(), engine.said("unexpected working directory"));
     stdin.write('\n');
     stdin.flush();
-    assertTrue(engine.process().waitFor(60, TimeUnit.SECONDS));
-    assertEquals(0, engine.process().exitValue());
+    assertEquals(engine.stderr().toString(), 0, engine.exitCode(60));
   }
 
   /** The warm-up's temporary project folders (`enso-standby-*`) that are still there. */
   private static List<String> warmUpFolders(Engine engine) throws IOException {
     return tree(engine.temporary()).stream().filter(p -> p.startsWith("enso-standby-")).toList();
+  }
+
+  /**
+   * The stack of the engine's warm-up thread (`jcmd <pid> Thread.print`), or {@code ""} when it is
+   * not there (yet).
+   */
+  private static String warmUpStack(Engine engine) {
+    var windows = System.getProperty("os.name").toLowerCase().contains("windows");
+    var jcmd = Path.of(System.getProperty("java.home"), "bin", windows ? "jcmd.exe" : "jcmd");
+    assertTrue("no " + jcmd, Files.isExecutable(jcmd));
+    // On Windows the process is `cmd /c enso.bat`, and the JVM is its child.
+    var jvm =
+        Stream.concat(Stream.of(engine.process().toHandle()), engine.process().descendants())
+            .filter(
+                h ->
+                    h.info()
+                        .command()
+                        .map(c -> Path.of(c).getFileName().toString().matches("java(\\.exe)?"))
+                        .orElse(false))
+            .findFirst();
+    if (jvm.isEmpty()) {
+      return "";
+    }
+    try {
+      var dump =
+          new ProcessBuilder(jcmd.toString(), Long.toString(jvm.get().pid()), "Thread.print")
+              .redirectErrorStream(true)
+              .start();
+      var text = new String(dump.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+      dump.waitFor();
+      return Stream.of(text.split("\\R\\R"))
+          .filter(block -> block.startsWith("\"enso-standby-warm-up\""))
+          .findFirst()
+          .orElse("");
+    } catch (IOException e) {
+      return "";
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return "";
+    }
+  }
+
+  /**
+   * Whether a warm-up stack is inside {@link StandbyWarmUp#run()}'s use of its context: looking up
+   * or running `main` (not building or closing the context).
+   */
+  private static boolean runsEnsoCode(String stack) {
+    return stack.contains("org.enso.runner.StandbyWarmUp.run")
+        && (stack.contains("org.enso.polyglot.") || stack.contains("org.graalvm.polyglot.Value."));
   }
 
   @Test(timeout = 300_000)
@@ -360,22 +418,11 @@ public class StandbyProcessTest {
   @Test(timeout = 480_000)
   public void aLineDuringTheWarmUpAbandonsIt() throws Exception {
     var engine = start(true, true);
-    // The warm-up's project has compiled: its IR cache is in the data directory, and its `main`
-    // runs for a while yet (seconds; the table operations and the visualization).
-    engine.waitUntil(
-        () -> {
-          try {
-            return tree(engine.data()).stream()
-                .anyMatch(
-                    p ->
-                        p.startsWith("cache/ir/local/" + StandbyWarmUp.PROJECT_NAME + "/")
-                            && p.endsWith("/Main.ir"));
-          } catch (IOException | UncheckedIOException e) {
-            return false;
-          }
-        },
-        "IR cache of the warm-up's project",
-        240);
+    // The warm-up runs Enso code: its context is up, and it compiles or runs its `Main`, which
+    // takes seconds yet. No file or log line marks that moment reliably (the project's IR cache is
+    // written asynchronously, late when the libraries' caches are written too), so the stack of
+    // the warm-up's thread does.
+    engine.waitUntil(() -> runsEnsoCode(warmUpStack(engine)), "warm-up running Enso code", 240);
     serveProject(engine);
     var done = engine.lineWith("standby: warm-up done in ");
     assertTrue(engine.stderr().toString(), done != null && done.contains("preloading abandoned"));
@@ -388,8 +435,7 @@ public class StandbyProcessTest {
   public void stdinClosedBeforeTheLineExitsWithZero() throws Exception {
     var engine = start(false, false);
     engine.process().getOutputStream().close();
-    assertTrue(engine.process().waitFor(120, TimeUnit.SECONDS));
-    assertEquals(engine.stderr().toString(), 0, engine.process().exitValue());
+    assertEquals(engine.stderr().toString(), 0, engine.exitCode(120));
   }
 
   @Test(timeout = 300_000)
@@ -400,8 +446,7 @@ public class StandbyProcessTest {
         "{\"args\":[\"--server\",\"--path\",\"Relative_Project\",\"--rpc-port\",\"1\"]}\n"
             .getBytes(StandardCharsets.UTF_8));
     stdin.flush();
-    assertTrue(engine.process().waitFor(120, TimeUnit.SECONDS));
-    assertEquals(1, engine.process().exitValue());
+    assertEquals(engine.stderr().toString(), 1, engine.exitCode(120));
     assertTrue(engine.stderr().toString(), engine.said("needs an absolute --path"));
   }
 }

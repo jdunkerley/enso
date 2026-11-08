@@ -1706,8 +1706,8 @@ public class Main {
     StandbyRequest request;
     try {
       // `System.in` itself, not a reader over it or a new stream on the descriptor: the line is
-      // read
-      // a byte at a time, and the Language Server reads its shutdown line from `System.in` later.
+      // read a byte at a time, and the Language Server reads its shutdown line from `System.in`
+      // later.
       request = Standby.create(component).awaitRequest(System.in);
     } catch (IllegalArgumentException e) {
       throw exitFail("standby: " + e.getMessage());
