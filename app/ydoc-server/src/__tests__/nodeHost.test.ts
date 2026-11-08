@@ -221,27 +221,49 @@ test('the GUI reconnects to a restarted LS and gets a fresh working session', as
 // #646: the Language Server's WebSocket keep-alive dropped an idle channel socket now and then
 // (without a close frame, so `1006`), and the session carried on without it: attaches written to a
 // dead `vis-control` channel never reached the runtime, so nothing ever executed. A lost channel of
-// any kind now ends the session for its GUI, as a lost JSON channel does.
+// any kind now ends its session, as a lost JSON channel does (Note [A Lost Channel Ends The
+// Session] in `languageServerSession.ts`).
 describe.each(['vis-control', 'vis-data', 'binary'])(
   'the LS dropping the %s channel (#646)',
   (kind) => {
-    test('closes the GUI sockets, and the GUI reconnects to a fresh session', async () => {
-      const lsName = `ws://127.0.0.1:${ls.port}`
+    const lsName = () => `ws://127.0.0.1:${ls.port}`
+
+    /** Open a GUI, drop its session's `kind` channel, and reconnect to a fresh session. */
+    async function dropAndReconnect() {
       const gui = connectGui('index', 'gui-data-646')
       await firstMessage(gui)
       await vi.waitFor(() => expect(ls.open(kind)).toHaveLength(1))
-      const dropped = LanguageServerSession.sessions.get(lsName)
+      const dropped = LanguageServerSession.sessions.get(lsName())
       expect(dropped).toBeDefined()
       // An abrupt end, as the keep-alive failure was: no close frame.
       ls.open(kind)[0]!.socket.terminate()
       await vi.waitFor(() => expect(gui.readyState).toBe(WebSocket.CLOSED), { timeout: 5000 })
       const again = connectGui('index', 'gui-data-646')
       await firstMessage(again)
-      const fresh = LanguageServerSession.sessions.get(lsName)
+      const fresh = LanguageServerSession.sessions.get(lsName())
       expect(fresh).toBeDefined()
       expect(fresh).not.toBe(dropped)
-      // The fresh session has its own working channel of that kind.
-      await vi.waitFor(() => expect(ls.open(kind)).toHaveLength(1))
+      // The dropped session's channels are all gone: only the fresh session's are open.
+      await vi.waitFor(() => {
+        expect(ls.open('json')).toHaveLength(JSON_SOCKETS)
+        expect(ls.open('binary')).toHaveLength(1)
+        expect(ls.open('vis-control')).toHaveLength(1)
+        expect(ls.open('vis-data')).toHaveLength(1)
+      })
+      return { dropped: dropped!, fresh: fresh!, again }
+    }
+
+    test('closes the GUI sockets, and the GUI reconnects to a fresh session', async () => {
+      await dropAndReconnect()
+    })
+
+    test('a late channel end of the replaced session leaves the fresh one working', async () => {
+      const { dropped, fresh, again } = await dropAndReconnect()
+      // Another channel of the old session ending only now (its socket was slow to close).
+      dropped.channelLost()
+      await settle()
+      expect(LanguageServerSession.sessions.get(lsName())).toBe(fresh)
+      expect(again.readyState).toBe(WebSocket.OPEN)
     })
   },
 )

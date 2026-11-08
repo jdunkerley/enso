@@ -82,7 +82,9 @@ export function remoteChannelServer<T>(
       })
       socket.on('close', (code) => {
         if (closedByChannel) return
-        // An abrupt end shows as `1006`: `ws` reports a reset connection as a close, not an error.
+        // Also logged, once per channel, when the Language Server shuts down normally: a warning, so
+        // that the end of one channel while the others live on (#646) is not missed. An abrupt end
+        // shows as `1006`: `ws` reports a reset connection as a close, not an error.
         if (opened) console.warn(`The Language Server ended the ${kind} channel (${code}).`)
         const report = () => {
           if (closedByChannel) return

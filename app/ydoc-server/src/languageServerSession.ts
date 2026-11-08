@@ -126,6 +126,19 @@ export class LanguageServerSession {
     this.control = new YjsChannel<string>(this.indexDoc.doc, YDOC_CONTROL_CHANNEL)
     this.control.subscribe((raw) => void this.handleControlMessage(raw))
 
+    // Note [A Lost Channel Ends The Session]
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // A session needs all of its channels to the Language Server, and none of them reconnects: a
+    // session that lost one would carry on half dead. Without `vis-control` the GUI's attaches never
+    // reach the runtime, so nothing executes and the project waits for ever (#646); without
+    // `binary` the GUI's data session is gone. So when the Language Server ends one of this
+    // session's channels (its JSON channels: `setupClient`; its visualization channels: here; its
+    // data channel: `setupGatewayClient`), `channelLost` gives the session up and closes its GUI
+    // sockets. The GUI reconnects to a fresh session with fresh channels, whose id makes it rebuild
+    // its stores. It is this session's own, guarded `unregister`, so a late end of a session that
+    // was already replaced never evicts its replacement.
+    this.visualizationBridge.onLanguageServerEndClosed(() => this.channelLost())
+
     this.setupClient()
   }
 
@@ -350,6 +363,21 @@ export class LanguageServerSession {
     })
     const results = await Promise.all(flushes)
     return results.find((result) => !result.ok) ?? Ok()
+  }
+
+  /**
+   * The Language Server ended one of this session's channels: give the session up and close its GUI
+   * sockets (Note [A Lost Channel Ends The Session]). Does nothing once the session is disposed,
+   * since disposing closes the channels itself.
+   */
+  channelLost(): void {
+    if (this.disposed) return
+    this.unregister()
+    for (const doc of this.docs.values()) {
+      for (const conn of doc.conns.keys()) {
+        if (typeof conn !== 'string') conn.ws.close()
+      }
+    }
   }
 
   /** TODO: Add docs */

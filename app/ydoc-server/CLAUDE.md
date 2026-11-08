@@ -151,19 +151,21 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
 - **One session opens two `json` sockets**, not one: `YjsServerTransport` hands
   the Language Server a proxy channel (for the GUI) and a backend channel (the
   ydoc server's own). The Language Server must accept both.
-- **An LS restart takes the GUI sockets with it.** When a channel socket of any
-  kind closes without the ydoc side having closed it, the listener gives up its
-  sessions (a reconnecting GUI socket gets a fresh one) and closes every GUI
-  socket it holds; the GUI reconnects, as after an engine restart when the
-  server lived in the engine. Every kind, not only `json`: no channel
-  reconnects, and a session that lost `vis-control` sent its attaches nowhere,
-  so the project never executed (#646, Note [A Lost Channel Ends The Session] in
-  `src/nodeHost.ts`). The session's own `YjsServerTransport` closes too when the
-  Language Server ends either of its channels (Note [The Language Server Ends A
-  Channel] in `ydoc-shared/src/util/net/YjsTransport.ts`), so the session gives
-  up its URL at once. Before that, a session outlived the engine's restart, sent
-  into dead channels for ~75 s and then took `src/Main.enso`'s write capability
-  from the GUI's new session (#593).
+- **An LS restart takes the GUI sockets with it.** When a `json` socket closes
+  without the ydoc side having closed it, the listener closes every GUI socket
+  it holds and the session goes with them; the GUI reconnects, as after an
+  engine restart when the server lived in the engine. The end of any other
+  channel (`vis-control`, `vis-data`, `binary`) ends its own session the same
+  way (`LanguageServerSession.channelLost`: its guarded `unregister`, then its
+  GUI sockets closed): no channel reconnects, and a session that lost
+  `vis-control` sent its attaches nowhere, so the project never executed (#646,
+  Note [A Lost Channel Ends The Session] in `src/languageServerSession.ts`). The
+  session's own `YjsServerTransport` closes too when the Language Server ends
+  either of its channels (Note [The Language Server Ends A Channel] in
+  `ydoc-shared/src/util/net/YjsTransport.ts`), so the session gives up its URL
+  at once. Before that, a session outlived the engine's restart, sent into dead
+  channels for ~75 s and then took `src/Main.enso`'s write capability from the
+  GUI's new session (#593).
 - **A new session makes the GUI rebuild its project stores.** When the Node host
   restarts, the Language Server keeps running, but the GUI's JSON session over
   the old proxy socket ends with the process (and the Language Server destroys
