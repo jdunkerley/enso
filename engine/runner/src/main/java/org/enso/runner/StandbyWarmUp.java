@@ -33,6 +33,9 @@ final class StandbyWarmUp implements Standby.WarmUp {
   /** The stderr line printed once the warm-up's context runs Enso code. */
   static final String RUNNING = "standby: warm-up running";
 
+  /** The stderr line printed once the warm-up's `main` has returned (not when it was cancelled). */
+  static final String FINISHED = "standby: warm-up finished";
+
   /** The default template's imports (Standard.Database and Standard.Examples included). */
   static final String MAIN_SOURCE =
       """
@@ -123,6 +126,7 @@ final class StandbyWarmUp implements Standby.WarmUp {
           throw new IllegalStateException("the warm-up project has no main");
         }
         var result = main.get().execute();
+        System.err.println(FINISHED);
         if (!result.isString()) {
           throw new IllegalStateException("the warm-up returned " + result);
         }
@@ -136,9 +140,12 @@ final class StandbyWarmUp implements Standby.WarmUp {
         }
       }
     } finally {
-      deleteRecursively(directory);
-      if (projectIrCache != null && Files.exists(projectIrCache)) {
-        deleteRecursively(projectIrCache);
+      try {
+        deleteRecursively(directory);
+      } finally {
+        if (projectIrCache != null && Files.exists(projectIrCache)) {
+          deleteRecursively(projectIrCache);
+        }
       }
     }
   }

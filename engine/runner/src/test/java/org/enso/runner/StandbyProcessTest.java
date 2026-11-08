@@ -3,6 +3,7 @@ package org.enso.runner;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
 import java.io.BufferedReader;
@@ -25,6 +26,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Stream;
 import org.junit.After;
@@ -363,10 +365,16 @@ public class StandbyProcessTest {
    * newline.
    */
   private void serveProject(Engine engine) throws Exception {
+    serveProject(engine, () -> {});
+  }
+
+  /** {@link #serveProject(Engine)}, running {@code beforeLine} just before the line is written. */
+  private void serveProject(Engine engine, Runnable beforeLine) throws Exception {
     var project = project();
     var port = freePort();
     var rootId = UUID.randomUUID().toString();
     var stdin = engine.process().getOutputStream();
+    beforeLine.run();
     stdin.write(line(project, port, rootId).getBytes(StandardCharsets.UTF_8));
     stdin.flush();
     engine.waitUntil(() -> healthy(port), "/_health", 120);
@@ -377,6 +385,14 @@ public class StandbyProcessTest {
     stdin.write('\n');
     stdin.flush();
     assertEquals(engine.stderr().toString(), 0, engine.exitCode(60));
+    // All of stdout is read now. The warm-up's thread ends before the Language Server starts, so
+    // any log line of it came before the line.
+    assertEquals(
+        "the warm-up's log lines",
+        List.of(),
+        engine.chattyStdout().stream()
+            .filter(line -> line.contains("[" + Standby.WARM_UP_THREAD + "]"))
+            .toList());
   }
 
   /** The warm-up's temporary project folders (`enso-standby-*`) that are still there. */
@@ -422,6 +438,7 @@ public class StandbyProcessTest {
     var done = engine.lineWith("standby: warm-up done in ");
     assertTrue(engine.stderr().toString(), done != null && done.contains(", preloaded "));
     assertTrue(engine.stderr().toString(), engine.said(StandbyWarmUp.RUNNING));
+    assertTrue(engine.stderr().toString(), engine.said(StandbyWarmUp.FINISHED));
     assertFalse(engine.stderr().toString(), engine.said("warm-up failed"));
     assertFalse(engine.stderr().toString(), engine.said("warm-up abandoned"));
     assertEquals("the warm-up's project is deleted", List.of(), warmUpFolders(engine));
@@ -436,19 +453,23 @@ public class StandbyProcessTest {
     // The warm-up's context runs Enso code: compiling and running its `main` takes seconds yet.
     engine.waitFor(StandbyWarmUp.RUNNING, 240);
     assertEquals("log lines before the line", List.of(), engine.chattyStdout());
-    serveProject(engine);
+    var finishedBeforeTheLine = new AtomicBoolean();
+    serveProject(engine, () -> finishedBeforeTheLine.set(engine.said(StandbyWarmUp.FINISHED)));
     var done = engine.lineWith("standby: warm-up done in ");
     assertTrue(engine.stderr().toString(), done != null);
     assertFalse(engine.stderr().toString(), engine.said("warm-up failed"));
     assertEquals("the warm-up's project is deleted", List.of(), warmUpFolders(engine));
     // The Language Server writes its logs there by now: only the warm-up's cache is looked for.
     assertEquals("the warm-up's IR cache is deleted", List.of(), warmUpCache(engine));
-    // Whether the line came while `main` still ran is up to the machine: had `main` finished
-    // first, the warm-up simply ended, and the abandon path was not exercised.
-    assumeTrue(
-        "the warm-up finished before the line arrived: " + engine.stderr(),
-        engine.said("standby: warm-up abandoned"));
+    // `main` takes seconds after RUNNING, but a slow machine may have finished it before the line
+    // was written: then the abandon path cannot run, and only that skips the test. A `main` that
+    // finishes after the line (the cancel did not stop it, or the abandon was ignored) fails it.
+    assumeFalse(
+        "the warm-up finished before the line was written: " + engine.stderr(),
+        finishedBeforeTheLine.get());
     assertTrue(engine.stderr().toString(), done.contains("preloading abandoned"));
+    assertTrue(engine.stderr().toString(), engine.said("standby: warm-up abandoned"));
+    assertFalse(engine.stderr().toString(), engine.said(StandbyWarmUp.FINISHED));
   }
 
   @Test(timeout = 300_000)

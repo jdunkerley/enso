@@ -49,8 +49,9 @@ import org.slf4j.LoggerFactory;
  * must be the project's. Until then the root logger's level is WARN (`quietLogging`), so that the
  * logging backend's default does not print the warm-up's DEBUG events on stdout. Before the line
  * the engine writes these stderr lines (and `standby: warm-up running` once the warm-up's context
- * runs Enso code), which the shim echoes and summarises in the opened project's engine log. A warm-up that throws is reported there
- * as `standby: warning: warm-up failed: …` and the engine still reaches standby.
+ * runs Enso code, `standby: warm-up finished` once its `main` has returned), which the shim echoes
+ * and summarises in the opened project's engine log. A warm-up that throws is reported there as
+ * `standby: warning: warm-up failed: …` and the engine still reaches standby.
  *
  * Only the process carries over from the warm-up: HotSpot's compiled code, loaded classes and the
  * IR caches it read. The warm-up's context is closed before the Language Server's is created.
@@ -59,6 +60,9 @@ import org.slf4j.LoggerFactory;
 final class Standby {
   /** The stderr line the project service waits for. */
   static final String READY = "STANDBY READY";
+
+  /** The thread the warm-up and the preloading run on. */
+  static final String WARM_UP_THREAD = "enso-standby-warm-up";
 
   /** {@code false} skips the warm-up (tests that only need the Language Server). */
   static final String WARM_UP_PROPERTY = "enso.standby.warmUp";
@@ -176,7 +180,7 @@ final class Standby {
                 finished.countDown();
               }
             },
-            "enso-standby-warm-up");
+            WARM_UP_THREAD);
     thread.setDaemon(true);
     thread.start();
     var line = readLine(in);
