@@ -1,4 +1,5 @@
 import FileChangedToast from '$/components/ProjectReconnect/FileChangedToast.vue'
+import RestoredToast from '$/components/ProjectReconnect/RestoredToast.vue'
 import type { ViewCarryOver } from '@/components/GraphEditor/viewCarryOver'
 import { assert } from '@/util/assert'
 import { createGlobalState } from '@vueuse/core'
@@ -10,7 +11,7 @@ import {
 } from 'enso-common/src/services/Backend'
 import { Err, Ok, type Result, type ResultError } from 'enso-common/src/utilities/data/result'
 import { effectScope, shallowReactive } from 'vue'
-import type { ModuleSnapshot } from './openedProjects/module/carryOver'
+import { rebaseTextChange, type ModuleSnapshot } from './openedProjects/module/carryOver'
 import type { ProjectInfo, RunningProjectInfo } from './openedProjects/projectInfo'
 import {
   useProjectStates,
@@ -18,7 +19,7 @@ import {
   type ProjectState,
 } from './openedProjects/projectStates'
 import { useText } from './text'
-import { useToasts } from './toasts'
+import { useToasts, type ToastContent, type ToastOptions } from './toasts'
 
 /** A reason given to AbortController when opening, restoring or closing process is being aborted. */
 const PROCESS_ABORTED = 'aborted'
@@ -37,6 +38,19 @@ export interface SessionCarryOver {
   module?: ModuleSnapshot | undefined
   /** The view's state as the old view had it; taken by the new view as it mounts. */
   view?: ViewCarryOver | undefined
+  /** Choices the user had not made yet when the session was replaced; offered again. */
+  conflicts?: readonly PendingConflict[] | undefined
+}
+
+/**
+ * A choice offered to the user: the module's file changed underneath while the project
+ * reconnected, so it was kept, and `snapshot`'s text (the user's version) waits. "My version" is
+ * the change from `base`, the text the module had when the choice was first offered, to the
+ * snapshot's text.
+ */
+export interface PendingConflict {
+  readonly snapshot: ModuleSnapshot
+  readonly base: string
 }
 
 /** A type of process */
@@ -63,6 +77,8 @@ export interface Project {
   reconnectPending?: boolean
   /** What the last session replacement carries over, until it is put back. */
   carryOver?: SessionCarryOver | undefined
+  /** The choices offered for the current stores, the first one shown ({@link PendingConflict}). */
+  conflicts?: PendingConflict[] | undefined
 }
 
 /**
@@ -147,6 +163,8 @@ export function createOpenedProjectsStore() {
     }
     if (!offer) closingWithoutOffer.add(id)
     project.carryOver = undefined
+    project.conflicts = undefined
+    toasts.dismiss(fileChangedToastId(id))
     void performProcess(project, 'closing').finally(() => closingWithoutOffer.delete(id))
   }
 
@@ -195,7 +213,9 @@ export function createOpenedProjectsStore() {
     if (state.status !== 'initialized') return
     project.reconnectPending = false
     console.warn(`The ydoc server of project ${state.info.title} was replaced; reconnecting.`)
-    project.carryOver = captureCarryOver(state)
+    // A choice still open is carried over too, and offered again once the new stores have loaded.
+    project.carryOver = { ...captureCarryOver(state), conflicts: project.conflicts }
+    project.conflicts = undefined
     toasts.dismiss(fileChangedToastId(id))
     toasts.show(getText('projectConnectionRestarted'), {
       type: 'warning',
@@ -235,57 +255,135 @@ export function createOpenedProjectsStore() {
     return `project-file-changed-${id}`
   }
 
-  function showRestored(id: ProjectId, changes: number) {
+  /** Show a toast, or update it in place if it is showing. */
+  function showOrUpdate(content: ToastContent, options: ToastOptions & { toastId: string }) {
+    if (toasts.isActive(options.toastId))
+      toasts.update(options.toastId, { ...options, render: content })
+    else toasts.show(content, options)
+  }
+
+  /**
+   * Tell the user how many changes were put back. When the module's text was put back (`text`,
+   * from the loaded file's to the restored one), the toast offers Undo: the file may have been
+   * reverted on purpose while the connection was down. Undo takes back only that change, keeping
+   * edits made since, unless they are in the same places.
+   */
+  function showRestored(
+    project: Project,
+    state: Initialized,
+    changes: number,
+    text?: { readonly from: string; readonly to: string },
+  ) {
     if (changes === 0) return
-    toasts.show(
-      changes === 1 ? getText('projectChangeRestored') : getText('projectChangesRestored', changes),
-      { type: 'success', toastId: `project-changes-restored-${id}`, autoClose: RESTORED_TOAST_MS },
+    const toastId = `project-changes-restored-${state.info.id}`
+    const message =
+      changes === 1 ? getText('projectChangeRestored') : getText('projectChangesRestored', changes)
+    const onUndo =
+      text == null ? undefined : (
+        () => {
+          toasts.dismiss(toastId)
+          if (project.state !== state) return
+          const reverted = rebaseTextChange(text.to, text.from, state.module.source.text)
+          if (reverted == null || !state.module.replaceText(reverted).ok) {
+            toasts.show(getText('projectRestoreUndoFailed'), { type: 'warning' })
+          }
+        }
+      )
+    showOrUpdate(
+      { component: RestoredToast, props: { message, onUndo } },
+      { type: 'success', toastId, autoClose: RESTORED_TOAST_MS },
     )
   }
 
   /**
-   * Put back the module a session replacement carried over, now that the project's new stores have
-   * loaded it (`openedProjects/module/carryOver.ts` has the rules). When the file changed by some
-   * other route, the file is kept and a toast offers the carried version instead.
+   * Put back what a session replacement carried over for the module, now that the project's new
+   * stores have loaded it (`openedProjects/module/carryOver.ts` has the rules). When the file
+   * changed by some other route, the file is kept and the user is offered their version
+   * ({@link offerNextConflict}), after any choice carried over from before.
    */
   function restoreCarriedModule(project: Project) {
-    const snapshot = project.carryOver?.module
+    const carryOver = project.carryOver
     const state = project.state
-    if (snapshot == null || state.status !== 'initialized') return
-    project.carryOver = { ...project.carryOver, module: undefined }
-    const id = state.info.id
-    try {
-      const decision = state.module.carryOverDecision(snapshot)
-      if (decision !== 'conflict') {
-        showRestored(
-          id,
-          state.module.applyCarryOver(snapshot, { withText: decision === 'restore' }),
-        )
+    if (carryOver == null || state.status !== 'initialized') return
+    project.carryOver = { view: carryOver.view }
+    const conflicts = [...(carryOver.conflicts ?? [])]
+    const snapshot = carryOver.module
+    if (snapshot != null) {
+      try {
+        const loaded = state.module.source.text
+        const decision = state.module.carryOverDecision(snapshot)
+        if (decision === 'conflict') {
+          console.warn(
+            `${snapshot.path} of project ${state.info.title} changed while it reconnected; keeping the file.`,
+          )
+          conflicts.push({ snapshot, base: loaded })
+        } else {
+          const restoredText = decision === 'restore' ? snapshot.text : undefined
+          const changes = state.module.applyCarryOver(snapshot, { text: restoredText })
+          showRestored(
+            project,
+            state,
+            changes,
+            restoredText != null ? { from: loaded, to: restoredText } : undefined,
+          )
+        }
+      } catch (error) {
+        console.error('Could not put back the changes made before the reconnect.', error)
+      }
+    }
+    // A choice whose version the module now has needs no asking.
+    const current = state.module.source.text
+    project.conflicts = conflicts.filter((conflict) => conflict.snapshot.text !== current)
+    offerNextConflict(project, state)
+  }
+
+  /**
+   * Offer the first of the project's pending choices ({@link PendingConflict}): keep the file, or
+   * restore the user's version. Restoring applies the change from the choice's base to the user's
+   * version on top of the module as it is then, so edits made meanwhile are kept; if they are in
+   * the same places, the choice is asked again, saying that the user's version replaces them
+   * (`replaces`).
+   */
+  function offerNextConflict(project: Project, state: Initialized, replaces = false) {
+    const toastId = fileChangedToastId(state.info.id)
+    const conflict = project.conflicts?.[0]
+    if (conflict == null || project.state !== state) {
+      toasts.dismiss(toastId)
+      return
+    }
+    const isCurrent = () => project.state === state && project.conflicts?.[0] === conflict
+    const done = () => {
+      project.conflicts?.shift()
+      toasts.dismiss(toastId)
+      offerNextConflict(project, state)
+    }
+    const onRestore = () => {
+      // Only into the stores, and for the choice, that it was offered for.
+      if (!isCurrent()) return
+      const current = state.module.source.text
+      const merged = rebaseTextChange(conflict.base, conflict.snapshot.text, current)
+      if (merged == null && !replaces) {
+        offerNextConflict(project, state, true)
         return
       }
-      console.warn(
-        `${snapshot.path} of project ${state.info.title} changed while it reconnected; keeping the file.`,
-      )
-      const toastId = fileChangedToastId(id)
-      toasts.show(
-        {
-          component: FileChangedToast,
-          props: {
-            file: snapshot.path,
-            onKeep: () => toasts.dismiss(toastId),
-            onRestore: () => {
-              toasts.dismiss(toastId)
-              // Only into the stores the choice was offered for.
-              if (project.state !== state) return
-              showRestored(id, state.module.applyCarryOver(snapshot, { withText: true }))
-            },
-          },
-        },
-        { type: 'warning', toastId, autoClose: false },
-      )
-    } catch (error) {
-      console.error('Could not put back the changes made before the reconnect.', error)
+      try {
+        const text = merged ?? conflict.snapshot.text
+        showRestored(project, state, state.module.applyCarryOver(conflict.snapshot, { text }))
+      } catch (error) {
+        console.error('Could not restore the changes made before the reconnect.', error)
+      }
+      done()
     }
+    const onKeep = () => {
+      if (isCurrent()) done()
+    }
+    showOrUpdate(
+      {
+        component: FileChangedToast,
+        props: { file: conflict.snapshot.path, replaces, onKeep, onRestore },
+      },
+      { type: 'warning', toastId, autoClose: false },
+    )
   }
 
   /**
@@ -341,7 +439,13 @@ export function createOpenedProjectsStore() {
         const promise = PROCESS_STEPS[process](project.state, abort.signal)
         project.nextTask = promise ? { abort, promise, process } : undefined
       } while (project.nextTask != null)
-      restoreCarriedModule(project)
+      if (project.state.status === 'initialized') {
+        restoreCarriedModule(project)
+      } else {
+        // An opening that failed has no stores to put anything into; a later one starts afresh.
+        project.carryOver = undefined
+        project.conflicts = undefined
+      }
       if (project.reconnectPending) {
         if (project.state.status === 'initialized') reconnectProject(project.state.info.id)
         else project.reconnectPending = false
@@ -357,6 +461,7 @@ export function createOpenedProjectsStore() {
         // builds fresh stores. What the last one carried over has no stores to go to either.
         project.reconnectPending = false
         project.carryOver = undefined
+        project.conflicts = undefined
       }
     }
   }

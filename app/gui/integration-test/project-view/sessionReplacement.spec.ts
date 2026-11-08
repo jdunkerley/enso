@@ -5,6 +5,7 @@
 import { expect, test, type Page } from 'integration-test/base'
 import { restoreMockMainFile, setMockMainFile } from 'integration-test/mock/lsHandler'
 import { TEXT } from '../actions'
+import { DELETE_KEY } from './keyboard'
 import * as locate from './locate'
 
 test.afterEach(restoreMockMainFile)
@@ -110,4 +111,53 @@ test('keeping the file leaves it as it is', async ({ editorPage, page, localApi 
   await expect(prompt).toBeHidden()
   await expect(locate.graphNodeByBinding(page, 'changed')).toHaveCount(1)
   await expect(nodeWithText(page, 'foo')).toHaveCount(0)
+})
+
+test('the restore is an undo step of its own, and its toast can undo it', async ({
+  editorPage,
+  page,
+  localApi,
+}) => {
+  await editorPage
+  const nodesCount = await createNode(page, 'foo')
+  localApi.replaceServerSession()
+  await expectReconnected(page)
+  const restored = page.getByTestId('changes-restored-toast')
+  await expect(restored).toBeVisible()
+  const deleted = locate.graphNodeByBinding(page, 'final')
+  await deleted.locator('.grab-handle').click()
+  await page.keyboard.press(DELETE_KEY)
+  await expect(deleted).toHaveCount(0)
+
+  await page.keyboard.press('ControlOrMeta+Z')
+
+  await expect(deleted).toHaveCount(1)
+  await expect(nodeWithText(page, 'foo')).toHaveCount(1)
+
+  await restored.getByRole('button', { name: TEXT.projectRestoreUndo }).click()
+
+  await expect(nodeWithText(page, 'foo')).toHaveCount(0)
+  await expect(locate.graphNode(page)).toHaveCount(nodesCount - 1)
+})
+
+test('a choice still open when the session is replaced again is offered again', async ({
+  editorPage,
+  page,
+  localApi,
+}) => {
+  await editorPage
+  await createNode(page, 'foo')
+  setMockMainFile('from Standard.Base import all\n\nmain =\n    changed = 1\n')
+  localApi.replaceServerSession()
+  await expectReconnected(page)
+  const prompt = page.getByTestId('file-changed-toast')
+  await expect(prompt).toBeVisible()
+
+  localApi.replaceServerSession()
+
+  await expect(prompt).toBeVisible()
+  await prompt.getByRole('button', { name: TEXT.projectFileRestoreMine }).click()
+  await expect(prompt).toBeHidden()
+  await expect(nodeWithText(page, 'foo')).toHaveCount(1)
+  await expect(locate.graphNodeByBinding(page, 'changed')).toHaveCount(0)
 })

@@ -27,6 +27,8 @@ import {
   countTextChanges,
   decideCarryOver,
   type ModuleSnapshot,
+  OwnTexts,
+  recordOwnTexts,
   saveAsts,
 } from './carryOver'
 import {
@@ -152,7 +154,17 @@ export async function createModuleStore(
           root.value = undefined
         }
       })
-      const stopRecording = recordOwnTexts(moduleModel.value?.doc.ydoc)
+      // An update from the server is a transaction whose origin is the module doc's provider.
+      const ydoc = moduleModel.value?.doc.ydoc
+      const stopRecording =
+        ydoc != null ?
+          recordOwnTexts(
+            ydoc,
+            () => source.text,
+            ownTexts,
+            (origin) => origin instanceof WebsocketProvider,
+          )
+        : () => {}
       onCleanup(() => {
         stopRecording()
         module.unobserve(handle)
@@ -161,38 +173,8 @@ export async function createModuleStore(
     }
   })
 
-  /**
-   * Record the texts the module goes through since the last update from the server, for a session
-   * replacement (`carryOverSnapshot`). An update from the server is a transaction whose origin is
-   * the module doc's `WebsocketProvider`; it starts the record again. The module doc was loaded
-   * from the server before it is observed, so its text then is the first. `afterTransaction` comes
-   * after the transaction's observers, so `source` already has its text.
-   */
-  const ownTexts = new Set<string>()
-  function recordOwnTexts(ydoc: Y.Doc | undefined): () => void {
-    ownTexts.clear()
-    if (ydoc == null) return () => {}
-    let lastText: string | undefined
-    const record = (fromServer: boolean) => {
-      const text = source.text
-      if (!fromServer && text === lastText) return
-      lastText = text
-      if (fromServer) ownTexts.clear()
-      else if (ownTexts.size >= OWN_TEXTS_LIMIT) {
-        const oldest = ownTexts.values().next()
-        if (!oldest.done) ownTexts.delete(oldest.value)
-      }
-      ownTexts.add(hashModuleText(text))
-    }
-    const afterTransaction = (transaction: Y.Transaction) =>
-      record(transaction.origin instanceof WebsocketProvider)
-    record(true)
-    ydoc.on('afterTransaction', afterTransaction)
-    return () => {
-      ydoc.off('afterTransaction', afterTransaction)
-      ownTexts.clear()
-    }
-  }
+  /** The texts the module went through since the last update from the server (`OwnTexts`). */
+  const ownTexts = new OwnTexts(OWN_TEXTS_LIMIT, hashModuleText)
 
   await astLoaded.wait(AST_LOAD_TIMEOUT_MS)
   if (root.value == null) {
@@ -435,7 +417,7 @@ export async function createModuleStore(
       return {
         path: FILE_NAME,
         text: source.text,
-        ownTexts: new Set(ownTexts),
+        ownTexts: ownTexts.snapshot(),
         asts: saveAsts(rootValue),
       }
     }
@@ -446,18 +428,24 @@ export async function createModuleStore(
     }
 
     /**
-     * Put a snapshot taken from the module's previous session back, as one undoable edit: its text,
-     * unless `withText` is false, and its node metadata and ids where they apply.
+     * Put a snapshot taken from the module's previous session back, as one undoable edit of its
+     * own: the module's text becomes `text` (unless it is `undefined`), and the snapshot's node
+     * metadata and ids are merged where they apply.
      * @returns the number of changes made: separate text changes, and nodes changed.
      */
-    function applyCarryOver(snapshot: ModuleSnapshot, { withText }: { withText: boolean }): number {
+    function applyCarryOver(
+      snapshot: ModuleSnapshot,
+      { text }: { text: string | undefined },
+    ): number {
       const before = source.text
       let changes = 0
+      // Its own undo step: not merged with an edit made just before, or just after.
+      stopCapturingUndo()
       const result = edit(
         (editedModule) => {
           const editedRoot = editedModule.root()
           if (editedRoot == null) return Err('The module has no root.')
-          if (withText) editedModule.syncToCode(snapshot.text)
+          if (text != null && text !== editedRoot.code()) editedModule.syncToCode(text)
           const newRoot = editedModule.root()
           if (newRoot == null) return Err('The module has no root.')
           const textMatches = newRoot.code() === snapshot.text
@@ -466,8 +454,23 @@ export async function createModuleStore(
         },
         { logPreamble: 'Cannot restore the changes made before the connection was restarted.' },
       )
+      stopCapturingUndo()
       if (!result.ok) return 0
       return changes + countTextChanges(before, source.text)
+    }
+
+    /** Make the module's text `text`, as one undoable edit of its own. */
+    function replaceText(text: string): Result {
+      stopCapturingUndo()
+      const result = edit(
+        (editedModule) => {
+          editedModule.syncToCode(text)
+          return Ok()
+        },
+        { logPreamble: 'Cannot undo the restored changes.' },
+      )
+      stopCapturingUndo()
+      return result
     }
 
     /** The imports added when the module was opened, for the graph editor's notice. */
@@ -519,6 +522,7 @@ export async function createModuleStore(
         carryOverSnapshot,
         carryOverDecision,
         applyCarryOver,
+        replaceText,
         undoManager,
         stopCapturingUndo,
       }),

@@ -94,7 +94,9 @@ one on a page that has one. A dialog opened by its own trigger stays a local
 `ProjectReconnect/FileChangedToast.vue` is the content of the toast
 `reconnectProject` (`$/providers/openedProjects`) shows when a module's file
 changed while its ydoc session was replaced (#604): Keep the file, or Restore my
-version.
+version (Replace with my version, when edits made since are in the same places).
+`ProjectReconnect/RestoredToast.vue` says how many changes were put back, with
+Undo when the text was.
 
 ## Rules
 

@@ -46,6 +46,22 @@ the new stores have loaded the module (text `D_new`), `decideCarryOver`:
 - anything else → `conflict`: the file is kept, and `FileChangedToast` offers
   "Restore my version" (the same edit).
 
+The rest of the flow is in `reconnectProject`'s neighbours in
+`$/providers/openedProjects`:
+
+- A restored text gets its own undo step (`stopCapturingUndo` before and after
+  the edit), and its toast (`RestoredToast`) offers Undo: the file may have been
+  reverted on purpose while the host was down. Undo takes back only the restored
+  change (`rebaseTextChange` from `T_old` to `D_new` onto the current text), and
+  says so when later edits are in the same places.
+- An open choice is a `PendingConflict` (the snapshot, and `base`, the text it
+  was offered over). Restoring applies the change from `base` to `T_old` on top
+  of the current text, so edits made while the toast was open survive; if they
+  are in the same places, the toast asks again ("Replace with my version").
+  Choices queue on `Project.conflicts`, one toast at a time. A session replaced
+  while one is open carries it over and offers it again after the next load.
+- An opening that ends without initialized stores drops what was carried over.
+
 The design on #604 compared `D_new` with the last server text only; that took
 edits that had reached the file before the last unsynced ones for a conflict,
 hence the set. When the text is `T_old`, the same text parses to the same tree,

@@ -1,8 +1,9 @@
 /** @file What a module carries over a replacement of its ydoc server session, and how it is put back. */
 import { equalityDeep } from 'lib0/function'
 import { type Ast, type MutableAst, type NodeMetadataFields, printWithSpans } from 'ydoc-shared/ast'
-import { textChangeToEdits } from 'ydoc-shared/util/data/text'
+import { applyTextEdits, textChangeToEdits } from 'ydoc-shared/util/data/text'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
+import type * as Y from 'yjs'
 
 /**
  * The node metadata a session replacement carries over: what the user set on a node. The cached
@@ -71,6 +72,91 @@ export function decideCarryOver(
 /** The number of separate text changes between two texts. */
 export function countTextChanges(before: string, after: string): number {
   return textChangeToEdits(before, after).length
+}
+
+/**
+ * Apply the change from `base` to `mine` on top of `theirs`, another change of `base`: the
+ * three-way merge of the two. `undefined` when the two changes touch the same part of `base`
+ * (overlapping, or adjacent, ranges), so that neither is lost without asking.
+ */
+export function rebaseTextChange(base: string, mine: string, theirs: string): string | undefined {
+  if (theirs === base) return mine
+  if (mine === base || mine === theirs) return theirs
+  const myEdits = textChangeToEdits(base, mine)
+  const theirEdits = textChangeToEdits(base, theirs)
+  for (const a of myEdits) {
+    for (const b of theirEdits) {
+      if (a.from <= b.to && b.from <= a.to) return undefined
+    }
+  }
+  return applyTextEdits(base, [...myEdits, ...theirEdits])
+}
+
+/**
+ * The texts a module went through since the last update from the server, as hashes, for its
+ * {@link ModuleSnapshot}'s `ownTexts`. An update from the server starts the record again with its
+ * text; past `limit`, the oldest texts are forgotten (a new session that loads one of them then
+ * asks the user instead of restoring).
+ */
+export class OwnTexts {
+  private readonly hashes = new Set<string>()
+  private lastText: string | undefined
+
+  /** Make a record that keeps at most `limit` texts, hashed with `hash`. */
+  constructor(
+    private readonly limit: number,
+    private readonly hash: (text: string) => string,
+  ) {}
+
+  /** Record the module's text after a transaction; `fromServer` when the server's update made it. */
+  record(text: string, fromServer: boolean) {
+    if (!fromServer && text === this.lastText) return
+    this.lastText = text
+    if (fromServer) this.hashes.clear()
+    const hashed = this.hash(text)
+    // Re-adding moves it to the end, so the oldest one is the one dropped.
+    this.hashes.delete(hashed)
+    if (this.hashes.size >= this.limit) {
+      const oldest = this.hashes.values().next()
+      if (!oldest.done) this.hashes.delete(oldest.value)
+    }
+    this.hashes.add(hashed)
+  }
+
+  /** Forget every text recorded. */
+  clear() {
+    this.hashes.clear()
+    this.lastText = undefined
+  }
+
+  /** The recorded hashes, as a snapshot keeps them. */
+  snapshot(): ReadonlySet<string> {
+    return new Set(this.hashes)
+  }
+}
+
+/**
+ * Keep `record` up to date with a module doc: its current `text()` now (the doc was loaded from the
+ * server before it is observed, so that counts as the server's), then after every transaction,
+ * `fromServer` when the transaction's origin is the server's (`isFromServer`). `afterTransaction`
+ * comes after the transaction's observers, so a text derived from the doc by an observer is
+ * already up to date. Returns the function that stops recording.
+ */
+export function recordOwnTexts(
+  ydoc: Y.Doc,
+  text: () => string,
+  record: OwnTexts,
+  isFromServer: (origin: unknown) => boolean,
+): () => void {
+  record.clear()
+  record.record(text(), true)
+  const afterTransaction = (transaction: Y.Transaction) =>
+    record.record(text(), isFromServer(transaction.origin))
+  ydoc.on('afterTransaction', afterTransaction)
+  return () => {
+    ydoc.off('afterTransaction', afterTransaction)
+    record.clear()
+  }
 }
 
 function carriedMetadata(ast: Ast): CarriedNodeMetadata | undefined {

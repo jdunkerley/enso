@@ -65,6 +65,7 @@ interface PlaceholderOverrides {
   readonly versioningBlocked: [reason: string]
   readonly projectChangesRestored: [count: number]
   readonly projectFileChangedOnReconnect: [file: string]
+  readonly projectFileChangedOverlapping: [file: string]
   readonly engineLogsHistoryFailed: [message: string]
   readonly engineLogsDownloadFailed: [message: string]
   readonly engineLogsSessionUnlisted: [name: string]

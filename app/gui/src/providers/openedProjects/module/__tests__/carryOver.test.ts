@@ -2,11 +2,15 @@
 import { Ast } from '@/util/ast'
 import { describe, expect, test } from 'vitest'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
+import * as Y from 'yjs'
 import {
   applySavedAsts,
   type CarryOverTarget,
   decideCarryOver,
+  OwnTexts,
   planCarryOver,
+  rebaseTextChange,
+  recordOwnTexts,
   saveAsts,
   type SavedAst,
 } from '../carryOver'
@@ -167,5 +171,80 @@ describe('putting saved ASTs back into a module', () => {
     keptNode!.setExternalId(nodesOf(before)[0]!.externalId)
     expect(applySavedAsts(after, saved, false)).toBe(1)
     expect(keptNode!.nodeMetadata.get('position')).toEqual({ x: 7, y: 7 })
+  })
+})
+
+describe('rebasing my change onto text changed since', () => {
+  const base = 'a\nb\nc\nd\n'
+
+  test.each([
+    ['nothing changed since', 'a\nB\nc\nd\n', base, 'a\nB\nc\nd\n'],
+    ['the text is already mine', 'a\nB\nc\nd\n', 'a\nB\nc\nd\n', 'a\nB\nc\nd\n'],
+    ['I changed nothing', base, 'a\nb\nc\nD\n', 'a\nb\nc\nD\n'],
+    ['the changes are apart', 'a\nB\nc\nd\n', 'a\nb\nc\nD\n', 'a\nB\nc\nD\n'],
+    ['a line was added since', 'A\nb\nc\nd\n', 'a\nb\nc\nd\ne\n', 'A\nb\nc\nd\ne\n'],
+  ])('when %s, both changes are kept', (_, mine, theirs, merged) => {
+    expect(rebaseTextChange(base, mine, theirs)).toBe(merged)
+  })
+
+  test.each([
+    ['the same place changed differently', 'a\nB\nc\nd\n', 'a\nbee\nc\nd\n'],
+    ['text was added right next to my change', 'a\nB\nc\nd\n', 'a\nbX\nc\nd\n'],
+  ])('when %s, nothing is merged', (_, mine, theirs) => {
+    expect(rebaseTextChange(base, mine, theirs)).toBeUndefined()
+  })
+})
+
+describe('recording the texts a module went through', () => {
+  test('a text from the server starts the record again', () => {
+    const record = new OwnTexts(10, hash)
+    record.record('v1', true)
+    record.record('v2', false)
+    record.record('v3', false)
+    expect([...record.snapshot()]).toEqual(['#v1', '#v2', '#v3'])
+    record.record('s1', true)
+    record.record('v4', false)
+    expect([...record.snapshot()]).toEqual(['#s1', '#v4'])
+  })
+
+  test('past the limit the oldest texts are forgotten', () => {
+    const record = new OwnTexts(3, hash)
+    record.record('s', true)
+    for (const text of ['v1', 'v2', 'v3', 'v4']) record.record(text, false)
+    expect([...record.snapshot()]).toEqual(['#v2', '#v3', '#v4'])
+  })
+
+  test('a text the module comes back to counts as recent', () => {
+    const record = new OwnTexts(3, hash)
+    record.record('s', true)
+    record.record('v1', false)
+    record.record('s', false)
+    record.record('v2', false)
+    expect([...record.snapshot()]).toEqual(['#v1', '#s', '#v2'])
+  })
+
+  test('a doc’s transactions are recorded with their origin', () => {
+    const doc = new Y.Doc()
+    const text = doc.getText('code')
+    const server = {}
+    const record = new OwnTexts(10, hash)
+    const stop = recordOwnTexts(
+      doc,
+      () => text.toString(),
+      record,
+      (origin) => origin === server,
+    )
+    expect([...record.snapshot()]).toEqual(['#'])
+
+    doc.transact(() => text.insert(0, 'local'), 'local:userAction')
+    expect([...record.snapshot()]).toEqual(['#', '#local'])
+
+    doc.transact(() => text.insert(0, 'server '), server)
+    expect([...record.snapshot()]).toEqual(['#server local'])
+
+    doc.transact(() => text.insert(text.length, '!'))
+    stop()
+    doc.transact(() => text.insert(text.length, '?'))
+    expect([...record.snapshot()]).toEqual([])
   })
 })
