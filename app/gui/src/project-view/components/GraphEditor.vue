@@ -35,6 +35,7 @@ import ContextMenuTrigger from '@/components/ContextMenuTrigger.vue'
 import GraphEdges from '@/components/GraphEditor/GraphEdges.vue'
 import GraphNodes from '@/components/GraphEditor/GraphNodes.vue'
 import { performCollapse, prepareCollapsedInfo } from '@/components/GraphEditor/collapsing'
+import { helpActionHandlers } from '@/components/GraphEditor/helpActions'
 import { useGraphEditorClipboard } from '@/components/GraphEditor/graphClipboard'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import type {
@@ -268,10 +269,7 @@ const blockedDescription = () => {
 }
 
 const actionHandlers = registerHandlers({
-  'graphEditor.showHelp': {
-    action: () => rightPanel.toggleTab('help'),
-    toggled: computed(() => rightPanel.tab === 'help'),
-  },
+  ...helpActionHandlers(rightPanel),
   'graph.renameProject': toggledAction(projectNameEdited),
   'graph.addComponent': {
     action: (ctx) => {

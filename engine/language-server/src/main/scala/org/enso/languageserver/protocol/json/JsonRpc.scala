@@ -87,6 +87,7 @@ object JsonRpc {
     .registerRequest(EditionsListDefinedComponents)
     .registerRequest(LibraryListLocal)
     .registerRequest(LibraryListPublicTypes)
+    .registerRequest(LibraryListLoadFailures)
     .registerRequest(LibraryCreate)
     .registerRequest(LibraryGetMetadata)
     .registerRequest(LibrarySetMetadata)
@@ -117,5 +118,6 @@ object JsonRpc {
     .registerNotification(WaitingForStandardInput)
     .registerNotification(SuggestionsDatabaseUpdates)
     .registerNotification(ProjectRenamed)
+    .registerNotification(LibraryLoadFailed)
     .finalized()
 }

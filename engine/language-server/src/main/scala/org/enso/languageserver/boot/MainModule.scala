@@ -268,9 +268,7 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
     */
   lazy val libraryCatalogues = new InstalledCatalogues(() =>
     InstalledLibraries.find(
-      editionReferenceResolver
-        .resolveEdition(EditionReference.CurrentProjectEdition)
-        .get,
+      editionReferenceResolver.resolveCurrentProjectEditionOrDefault().get,
       editionReferenceResolver.getCurrentProjectConfig.get.preferLocalLibraries,
       libraryConfig.localLibraryProvider,
       libraryConfig.publishedLibraryCache
@@ -414,6 +412,10 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
     "local-library-manager"
   )
 
+  // Created before the runtime starts, so it hears every failure.
+  val libraryLoadFailures =
+    LibraryLoadFailures.start(system, Some("library-load-failures"))
+
   val libraryConfig = LibraryConfig(
     localLibraryManager      = localLibraryManager,
     editionReferenceResolver = editionReferenceResolver,
@@ -427,7 +429,8 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
       resourceManager,
       Some(languageHome),
       new CompilerBasedDependencyExtractor(logLevel)
-    )
+    ),
+    loadFailures = libraryLoadFailures
   )
 
   val pingHandlerProps =

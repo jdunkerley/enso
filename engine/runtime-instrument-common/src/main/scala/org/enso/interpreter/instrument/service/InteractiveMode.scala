@@ -48,6 +48,23 @@ private class InteractiveMode(endpoint: Endpoint)
   }
 
   /** @inheritdoc */
+  override def libraryLoadFailed(
+    libraryName: LibraryName,
+    libraryVersion: Option[LibraryVersion],
+    kind: String,
+    message: String
+  ): Unit =
+    sendMessage(
+      Api.LibraryLoadFailed(
+        namespace = libraryName.namespace,
+        name      = libraryName.name,
+        version   = libraryVersion.map(_.toString),
+        kind      = kind,
+        message   = message
+      )
+    )
+
+  /** @inheritdoc */
   override def serializeModule(module: QualifiedName): Unit =
     endpoint.sendToSelf(
       Api.Request(Api.SerializeModule(module))

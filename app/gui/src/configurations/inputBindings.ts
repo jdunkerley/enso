@@ -107,6 +107,7 @@ const BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
       category: 'navigation',
     },
     aboutThisApp: { bindings: ['Mod+/'], icon: 'enso_logo', category: 'help' },
+    documentation: { bindings: [], icon: 'help', category: 'help' },
     goToLocalSettings: {
       bindings: [],
       icon: SETTINGS_TAB_ICONS[SettingsTabType.local],

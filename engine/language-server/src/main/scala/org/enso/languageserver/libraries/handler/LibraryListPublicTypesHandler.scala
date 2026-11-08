@@ -7,7 +7,6 @@ import org.enso.jsonrpc.{Id, Request, ResponseError, ResponseResult}
 import org.enso.languageserver.libraries.LibraryApi._
 import org.enso.languageserver.libraries.{
   BlockingOperation,
-  EditionReference,
   EditionReferenceResolver,
   LibraryPublicType,
   LocalLibraryManagerFailureMapper
@@ -36,9 +35,8 @@ class LibraryListPublicTypesHandler(
     case Request(LibraryListPublicTypes, id, _) =>
       BlockingOperation
         .run {
-          val edition = editionReferenceResolver
-            .resolveEdition(EditionReference.CurrentProjectEdition)
-            .get
+          val edition =
+            editionReferenceResolver.resolveCurrentProjectEditionOrDefault().get
           val preferLocal =
             editionReferenceResolver.getCurrentProjectConfig.get.preferLocalLibraries
           LibraryPublicType.list(

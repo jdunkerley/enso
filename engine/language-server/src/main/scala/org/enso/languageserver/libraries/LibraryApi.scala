@@ -159,6 +159,33 @@ object LibraryApi {
       }
   }
 
+  case object LibraryListLoadFailures
+      extends Method("library/listLoadFailures") { self =>
+
+    case class Result(failures: Seq[LibraryLoadFailures.LibraryLoadFailure])
+
+    implicit val hasParams: HasParams.Aux[this.type, Unused.type] =
+      new HasParams[this.type] {
+        type Params = Unused.type
+      }
+
+    implicit val hasResult: HasResult.Aux[this.type, self.Result] =
+      new HasResult[this.type] {
+        type Result = self.Result
+      }
+  }
+
+  case object LibraryLoadFailed extends Method("library/loadFailed") {
+    self =>
+
+    type Params = LibraryLoadFailures.LibraryLoadFailure
+
+    implicit val hasParams: HasParams.Aux[this.type, self.Params] =
+      new HasParams[this.type] {
+        type Params = self.Params
+      }
+  }
+
   case object LibraryCreate extends Method("library/create") { self =>
 
     case class Params(

@@ -374,4 +374,73 @@ class RuntimeComponentsTest
     context.consumeOut shouldEqual List()
   }
 
+  it should "report a library it cannot load once, however often it is imported" in {
+    val contextId  = UUID.randomUUID()
+    val requestId  = UUID.randomUUID()
+    val moduleName = "Enso_Test.Test.Main"
+
+    context.writeInSrcDir(
+      "Other",
+      """import Unknown.Library
+        |
+        |other = 1
+        |""".stripMargin.linesIterator.mkString("\n")
+    )
+    val metadata = new Metadata
+    val code =
+      """import Unknown.Library
+        |import Enso_Test.Test.Other
+        |
+        |main = 42
+        |""".stripMargin.linesIterator.mkString("\n")
+    val contents = metadata.appendToCode(code)
+    val mainFile = context.writeMain(contents)
+
+    // create context
+    context.send(Api.Request(requestId, Api.CreateContextRequest(contextId)))
+    context.receive shouldEqual Some(
+      Api.Response(requestId, Api.CreateContextResponse(contextId))
+    )
+
+    // open file
+    context.send(
+      Api.Request(requestId, Api.OpenFileRequest(mainFile, contents))
+    )
+    context.receive shouldEqual Some(
+      Api.Response(Some(requestId), Api.OpenFileResponse)
+    )
+
+    // push main
+    context.send(
+      Api.Request(
+        requestId,
+        Api.PushContextRequest(
+          contextId,
+          Api.StackItem.ExplicitCall(
+            Api.MethodPointer(moduleName, "Main", "main"),
+            None,
+            Vector()
+          )
+        )
+      )
+    )
+    // Everything until the runtime has been quiet for a while.
+    val responses =
+      Iterator
+        .continually(context.receive(20))
+        .takeWhile(_.isDefined)
+        .flatten
+        .toList
+
+    val failures = responses.collect {
+      case Api.Response(None, failure: Api.LibraryLoadFailed) => failure
+    }
+    failures.map(f =>
+      (f.namespace, f.name, f.version, f.kind)
+    ) shouldEqual List(
+      ("Unknown", "Library", None, Api.LibraryLoadFailed.NotInEdition)
+    )
+    failures.head.message should include("Unknown.Library")
+  }
+
 }

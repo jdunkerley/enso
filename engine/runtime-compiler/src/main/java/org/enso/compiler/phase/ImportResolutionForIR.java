@@ -293,7 +293,7 @@ abstract class ImportResolverForIR
       LibraryName libraryName, String moduleName) throws IOException {
     var compiler = this.getCompiler();
     var repo = compiler.packageRepository();
-    var foundLib = repo.ensurePackageIsLoaded(libraryName);
+    var foundLib = repo.ensurePackageIsLoadedForImport(libraryName);
     if (foundLib.isRight()) {
       var moduleOption = compiler.getModule(moduleName);
       if (moduleOption.isDefined()) {

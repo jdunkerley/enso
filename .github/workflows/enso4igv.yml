@@ -49,7 +49,7 @@ jobs:
             target/build/x86_64-unknown-linux-musl/release/libenso_parser.so
 
   build_mac_arm_parser:
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 45
 
     steps:

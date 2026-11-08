@@ -13,9 +13,9 @@ only Dashboard-specific code.
 - `pages/` — Route-level parts: the drive's rows, cells, column headings and
   drive bar are under `pages/dashboard/`. The `dashboard` route itself renders
   `$/components/DashboardPage.vue`, which holds the dashboard's global shortcuts
-  and mounts `AppContainer.vue`. (The Settings and About buttons, #83 and #566,
-  are `$/components/AppContainer/RailFooter.vue`, at the bottom of the left
-  rail.)
+  and mounts `AppContainer.vue`. (The Settings, Documentation and About buttons,
+  #83 and #566, are `$/components/AppContainer/RailFooter.vue`, at the bottom of
+  the left rail.)
 - `layouts/` — The drive (#91): `DriveView.vue` (mounted by `LeftPanel.vue`)
   provides the drive store and its view state and holds `AssetsTable.vue`, the
   search bar and the context menus; `layouts/Drive/` has its composables

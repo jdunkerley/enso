@@ -46,6 +46,11 @@
   git identity, or `Enso IDE <ide@localhost>` when you have none. Settings and
   About become two buttons at the bottom of the left rail, replacing the menu in
   the top bar, and both rails now run the full height of the window.][566]
+- [The component help panel looks like the user documentation site's pages
+  (headings, the component's signature, inline code and dark code blocks), and
+  links to the component's page there ("View on docs site"); F1 opens the panel
+  on the selected component. A new Documentation button in the left rail (also
+  in the command palette) opens the site's introduction.][626]
 - [Projects open faster: the collaborative-editing server now runs beside the
   engine instead of inside it.][593]
 - [The installer includes four sample projects (sales overview, orders and
@@ -449,6 +454,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [654]: https://github.com/jdunkerley/enso/pull/654
+[626]: https://github.com/jdunkerley/enso/pull/626
 [642]: https://github.com/jdunkerley/enso/pull/642
 [629]: https://github.com/jdunkerley/enso/pull/629
 [622]: https://github.com/jdunkerley/enso/pull/622

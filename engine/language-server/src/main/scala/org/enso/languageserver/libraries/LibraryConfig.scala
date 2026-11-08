@@ -13,6 +13,7 @@ import org.enso.librarymanager.published.PublishedLibraryCache
   * @param localLibraryProvider an instance of local library provider
   * @param publishedLibraryCache an instance of published library cache
   * @param installerConfig configuration for the library installer
+  * @param loadFailures the [[LibraryLoadFailures]] collector
   */
 case class LibraryConfig(
   localLibraryManager: ActorRef,
@@ -20,5 +21,6 @@ case class LibraryConfig(
   editionManager: EditionManager,
   localLibraryProvider: LocalLibraryProvider,
   publishedLibraryCache: PublishedLibraryCache,
-  installerConfig: LibraryInstallerConfig
+  installerConfig: LibraryInstallerConfig,
+  loadFailures: ActorRef
 )

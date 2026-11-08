@@ -26,6 +26,22 @@ trait NotificationHandler extends ProgressReporter with LockUserInterface {
     location: Path
   ): Unit
 
+  /** Called when a library could not be loaded. Called once per library: the
+    * package repository remembers the failure (Note [A Failed Library Is
+    * Remembered] in `DefaultPackageRepository`).
+    *
+    * @param libraryName    name of the library
+    * @param libraryVersion the version the edition selected, if known
+    * @param kind           one of the `Api.LibraryLoadFailed` kinds
+    * @param message        a description of the failure
+    */
+  def libraryLoadFailed(
+    libraryName: LibraryName,
+    libraryVersion: Option[LibraryVersion],
+    kind: String,
+    message: String
+  ): Unit
+
   /** A request to serialize the module.
     *
     * @param moduleName qualified module name
@@ -51,6 +67,16 @@ object NotificationHandler {
       location: Path
     ): Unit = {
       // Library notifications are deliberately ignored in text mode.
+    }
+
+    /** @inheritdoc */
+    override def libraryLoadFailed(
+      libraryName: LibraryName,
+      libraryVersion: Option[LibraryVersion],
+      kind: String,
+      message: String
+    ): Unit = {
+      // The import's compile error reports the failure in text mode.
     }
 
     /** @inheritdoc */
@@ -86,6 +112,15 @@ object NotificationHandler {
       location: Path
     ): Unit = for (listener <- listeners)
       listener.addedLibrary(libraryName, libraryVersion, location)
+
+    /** @inheritdoc */
+    override def libraryLoadFailed(
+      libraryName: LibraryName,
+      libraryVersion: Option[LibraryVersion],
+      kind: String,
+      message: String
+    ): Unit = for (listener <- listeners)
+      listener.libraryLoadFailed(libraryName, libraryVersion, kind, message)
 
     /** @inheritdoc */
     def serializeModule(module: QualifiedName): Unit =

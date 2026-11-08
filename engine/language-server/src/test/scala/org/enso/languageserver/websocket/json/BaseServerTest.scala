@@ -375,6 +375,9 @@ abstract class BaseServerTest
       )
     )
 
+    val libraryLoadFailures =
+      LibraryLoadFailures.start(system)
+
     val libraryConfig = LibraryConfig(
       localLibraryManager      = localLibraryManager,
       editionReferenceResolver = editionReferenceResolver,
@@ -388,7 +391,8 @@ abstract class BaseServerTest
         resourceManager,
         Some(languageHome),
         new CompilerBasedDependencyExtractor(logLevel = Level.WARN)
-      )
+      ),
+      loadFailures = libraryLoadFailures
     )
 
     new TestJsonConnectionControllerFactory(
