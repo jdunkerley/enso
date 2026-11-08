@@ -1,0 +1,182 @@
+package org.enso.runner;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+import java.util.function.BooleanSupplier;
+
+/* Note [Standby Mode]
+ * ~~~~~~~~~~~~~~~~~~~
+ * `enso --jvm --standby` is the IDE's spare engine (spec
+ * `docs/superpowers/specs/2026-11-08-jvm-warm-engine-design.md`). The project service starts it while
+ * the user is on the dashboard, before any project is known. On a background thread it warms up
+ * (`StandbyWarmUp`: a throwaway context runs the default template's imports on a temporary project)
+ * and preloads classes (`StandbyPreloader`), then prints `standby: warm-up done in N ms, …` and
+ * `STANDBY READY <ms from process start>` on stderr. Meanwhile the main thread reads one line from
+ * stdin: `{"args":[...],"env":{...}}` (`StandbyRequest`), the arguments `project/open` would have
+ * passed and the open's own variables. It waits for the warm-up to end (unless
+ * `enso.standby.abandonWarmUp` is true, which cancels it), then hands the line to `Main`, which
+ * applies the variables, sets the context's working directory to the parent of `--path`
+ * (`ContextFactory.WORKING_DIRECTORY_PROPERTY`; relative paths are refused), and calls `Main.launch`
+ * with the arguments: from then on the process is an ordinary Language Server, which shuts down on
+ * the next stdin line as always. If stdin closes before a line arrives, the process exits with 0.
+ *
+ * Two things a normal engine gets from its spawn arrive late here, and both are handed over without
+ * changing the Language Server's boot:
+ *
+ * - The working directory. The process was started before the project was known, so its own working
+ *   directory is not the project's parent. The context's is (the property above), and the runtime
+ *   resolves relative file paths and starts processes against the context's working directory, not
+ *   the process's (`System.java` and `File_Helpers.enso` in the standard library). In a normal
+ *   engine the two are the same.
+ * - The per-open variables (the channel token, the ydoc port, the project and session ids). A JVM
+ *   cannot change its own environment, so `StandbyRequest.applyEnvironment` sets each as the system
+ *   property it is also read through: the configuration's own property for the Language Server's
+ *   settings, `enso.env.<NAME>` for those read through `ProcessEnvironment`.
+ *
+ * Nothing sets up logging before the line: the Language Server does that itself, and its session log
+ * must be the project's. Before the line the engine only writes these stderr lines, which the shim
+ * echoes and summarises in the opened project's engine log. A warm-up that throws is reported there
+ * as `standby: warning: warm-up failed: …` and the engine still reaches standby.
+ *
+ * Only the process carries over from the warm-up: HotSpot's compiled code, loaded classes and the
+ * IR caches it read. The warm-up's context is closed before the Language Server's is created.
+ */
+/** The standby mode's wait: warm up in the background, read the argument line. */
+final class Standby {
+  /** The stderr line the project service waits for. */
+  static final String READY = "STANDBY READY";
+
+  /** {@code false} skips the warm-up (tests that only need the Language Server). */
+  static final String WARM_UP_PROPERTY = "enso.standby.warmUp";
+
+  /** {@code true} abandons a running warm-up as soon as the line arrives. */
+  static final String ABANDON_PROPERTY = "enso.standby.abandonWarmUp";
+
+  /** The warm-up: run on the background thread; cancelled from the reading thread. */
+  interface WarmUp {
+    void run() throws Exception;
+
+    void cancel();
+  }
+
+  /** The preloading, after the warm-up; its result is a phrase for the log line. */
+  interface Preload {
+    String run(BooleanSupplier abandoned);
+  }
+
+  static final WarmUp NO_WARM_UP =
+      new WarmUp() {
+        @Override
+        public void run() {}
+
+        @Override
+        public void cancel() {}
+      };
+
+  private final WarmUp warmUp;
+  private final Preload preload;
+  private final PrintStream err;
+  private final boolean abandonOnLine;
+  private volatile boolean abandoned;
+
+  Standby(WarmUp warmUp, Preload preload, PrintStream err, boolean abandonOnLine) {
+    this.warmUp = warmUp;
+    this.preload = preload;
+    this.err = err;
+    this.abandonOnLine = abandonOnLine;
+  }
+
+  /**
+   * Start the warm-up, and read the argument line.
+   *
+   * @return the request, once the warm-up is over; {@code null} when stdin closed first
+   * @throws IllegalArgumentException when the line is not a valid request
+   */
+  StandbyRequest awaitRequest(InputStream in) throws IOException, InterruptedException {
+    var finished = new CountDownLatch(1);
+    var thread =
+        new Thread(
+            () -> {
+              try {
+                prepare();
+              } finally {
+                finished.countDown();
+              }
+            },
+            "enso-standby-warm-up");
+    thread.setDaemon(true);
+    thread.start();
+    var line = readLine(in);
+    if (line == null) {
+      return null;
+    }
+    var request = StandbyRequest.parse(line);
+    if (abandonOnLine) {
+      abandoned = true;
+      warmUp.cancel();
+    }
+    finished.await();
+    return request;
+  }
+
+  private void prepare() {
+    var started = System.nanoTime();
+    try {
+      warmUp.run();
+    } catch (Throwable t) {
+      if (abandoned) {
+        err.println("standby: warm-up abandoned");
+      } else {
+        err.println("standby: warning: warm-up failed: " + t);
+      }
+    }
+    String preloaded;
+    try {
+      preloaded = abandoned ? "preloading abandoned" : preload.run(() -> abandoned);
+    } catch (Throwable t) {
+      preloaded = "preloading failed: " + t;
+    }
+    var ms = (System.nanoTime() - started) / 1_000_000;
+    var cpu = ProcessHandle.current().info().totalCpuDuration().map(Duration::toMillis).orElse(-1L);
+    err.println(
+        "standby: warm-up done in " + ms + " ms, " + preloaded + ", process CPU " + cpu + " ms");
+    err.println(READY + " " + sinceProcessStart());
+    err.flush();
+  }
+
+  /** Milliseconds since this process started (the `enso` launcher, which hosts the JVM). */
+  static long sinceProcessStart() {
+    return ProcessHandle.current()
+        .info()
+        .startInstant()
+        .map(start -> Duration.between(start, Instant.now()).toMillis())
+        .orElse(-1L);
+  }
+
+  /**
+   * One line, read a byte at a time so that nothing after it is consumed: the Language Server reads
+   * its shutdown line from the same stdin later.
+   *
+   * @return the line without its line break, or {@code null} when the stream ends first
+   */
+  static String readLine(InputStream in) throws IOException {
+    var bytes = new ByteArrayOutputStream();
+    while (true) {
+      int b = in.read();
+      if (b < 0) {
+        return null;
+      }
+      if (b == '\n') {
+        var line = bytes.toString(StandardCharsets.UTF_8);
+        return line.endsWith("\r") ? line.substring(0, line.length() - 1) : line;
+      }
+      bytes.write(b);
+    }
+  }
+}
