@@ -70,7 +70,10 @@ public class WorkingDirectoryCheckTest {
         .build();
   }
 
-  /** Whether initialising `ctx` reported the unexpected working directory (a warning, or with -ea an error). */
+  /**
+   * Whether initialising `ctx` reported the unexpected working directory (a warning, or with -ea an
+   * error).
+   */
   private boolean complains(Context ctx) {
     try {
       ctx.initialize(LanguageInfo.ID);

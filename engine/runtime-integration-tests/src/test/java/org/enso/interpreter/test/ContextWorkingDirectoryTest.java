@@ -14,8 +14,8 @@ import org.junit.rules.TemporaryFolder;
 /**
  * A standby engine's process runs in the temporary directory; its context's working directory is
  * the project's parent (`ContextFactory.workingDirectory`). Relative files, the current directory
- * and processes started without a directory must follow the context, as they follow the process
- * in a normal engine.
+ * and processes started without a directory must follow the context, as they follow the process in
+ * a normal engine.
  */
 public class ContextWorkingDirectoryTest {
   @Rule public TemporaryFolder tmp = new TemporaryFolder();
@@ -34,9 +34,9 @@ public class ContextWorkingDirectoryTest {
       """;
 
   /**
-   * `main`'s three texts, in a context whose working directory is `dir` (the process's when
-   * null). `standby` sets the property a standby engine sets (`Main.runStandby`), which is what
-   * makes the context's directory count.
+   * `main`'s three texts, in a context whose working directory is `dir` (the process's when null).
+   * `standby` sets the property a standby engine sets (`Main.runStandby`), which is what makes the
+   * context's directory count.
    */
   private static List<String> run(Path dir, boolean standby) {
     var builder = ContextUtils.newBuilder("enso");
