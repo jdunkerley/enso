@@ -227,6 +227,22 @@ defineExpose({
     padding-right: 0;
   }
 
+  /* The selection is drawn above the text, translucent, so that it shows on code blocks' opaque
+   * backgrounds too (CodeMirror draws it below the text by default). */
+  & :deep(.cm-selectionLayer) {
+    z-index: 1 !important;
+  }
+  & :deep(.cm-selectionBackground) {
+    background: var(--docs-selection) !important;
+  }
+  /* The caret inverts what is under it: dark on text, light on a code block. */
+  & :deep(.cm-cursorLayer) {
+    mix-blend-mode: difference;
+  }
+  & :deep(.cm-cursor) {
+    border-left-color: #fff;
+  }
+
   /*noinspection CssUnusedSymbol*/
   & :deep(.cm-editor) {
     flex-grow: 1;
@@ -288,32 +304,49 @@ defineExpose({
   padding-top: calc(var(--docs-heading-space-above) * 0.75);
 }
 
-/* Code blocks: one dark box over the fence lines and the code. */
+/* Code blocks: one dark box over the fence lines and the code. The fence lines keep one code line's
+ * height whether their markup shows (the cursor in the block) or not, so the text below never jumps;
+ * shown empty, they are the box's top and bottom padding. The space outside the box is a transparent
+ * border, not a margin: CodeMirror measures its lines' border boxes. */
 :global(.cm-line.cm-codeBlock) {
+  --code-block-gap: 0.5em;
   background-color: var(--docs-code-block-bg);
+  background-clip: padding-box;
   color: var(--docs-code-block-text);
   padding: 0 var(--docs-code-block-padding) !important;
   font-family: var(--font-mono);
   font-size: var(--docs-code-font-size);
   font-weight: 400;
   line-height: 1.45;
-  caret-color: var(--docs-code-block-text);
+}
+:global(.cm-line.cm-codeBlock-first),
+:global(.cm-line.cm-codeBlock-last) {
+  /* Lines are border boxes. */
+  min-height: calc(1.45em + var(--code-block-gap));
 }
 :global(.cm-line.cm-codeBlock-first) {
-  border-top-left-radius: var(--docs-code-radius);
-  border-top-right-radius: var(--docs-code-radius);
-  padding-top: calc(var(--docs-code-block-padding) / 2) !important;
-  margin-top: 0.5em;
+  border-top: var(--code-block-gap) solid transparent;
+  /* The inner corner, inside the transparent border, keeps the token's radius. */
+  border-top-left-radius: var(--docs-code-radius)
+    calc(var(--docs-code-radius) + var(--code-block-gap));
+  border-top-right-radius: var(--docs-code-radius)
+    calc(var(--docs-code-radius) + var(--code-block-gap));
 }
 :global(.cm-line.cm-codeBlock-last) {
-  border-bottom-left-radius: var(--docs-code-radius);
-  border-bottom-right-radius: var(--docs-code-radius);
-  padding-bottom: calc(var(--docs-code-block-padding) / 2) !important;
-  margin-bottom: 0.75em;
+  border-bottom: var(--code-block-gap) solid transparent;
+  border-bottom-left-radius: var(--docs-code-radius)
+    calc(var(--docs-code-radius) + var(--code-block-gap));
+  border-bottom-right-radius: var(--docs-code-radius)
+    calc(var(--docs-code-radius) + var(--code-block-gap));
 }
 /* The page-wide dark mode inverts everything (#105); the site keeps code blocks dark in both modes. */
 :global(.theme-dark .cm-line.cm-codeBlock) {
   filter: invert(90%) hue-rotate(180deg) brightness(1.2);
+}
+
+/* A table's own width must not widen the editor: it scrolls inside its share of the width. */
+:global(.cm-table-editor) {
+  contain: inline-size;
 }
 
 :global(.cm-line.cm-blockquote) {

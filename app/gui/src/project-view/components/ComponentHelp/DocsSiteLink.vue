@@ -30,6 +30,7 @@ function open(href: string) {
     :href="url"
     target="_blank"
     rel="noopener noreferrer"
+    :aria-label="getText('viewOnDocsSiteLabel')"
     @click.prevent="open(url)"
     v-text="getText('viewOnDocsSite')"
   />
@@ -45,5 +46,11 @@ function open(href: string) {
   text-decoration: underline;
   text-underline-offset: 2px;
   margin-right: 4px;
+  border-radius: 2px;
+
+  &:focus-visible {
+    outline: 2px solid var(--docs-link);
+    outline-offset: 2px;
+  }
 }
 </style>

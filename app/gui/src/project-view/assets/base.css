@@ -53,9 +53,10 @@
   --docs-heading-space-above: 1.25em;
   --docs-heading-space-below: 0.4em;
   --docs-text: #1c1e21;
+  --docs-selection: rgb(70 130 230 / 0.35);
   --docs-link: #006b8a;
-  /** Inline code: Infima's `code`. */
-  --docs-code-font-size: 0.9em;
+  /** Inline code: Infima's `code`, at the text's size (Infima: 0.9em) as Neon's x-height is small. */
+  --docs-code-font-size: 1em;
   --docs-code-bg: #f6f7f8;
   --docs-code-border: rgb(0 0 0 / 0.1);
   --docs-code-radius: 0.4em;
@@ -63,6 +64,10 @@
   --docs-code-block-bg: #292d3e;
   --docs-code-block-text: #bfc7d5;
   --docs-code-block-padding: 12px;
+  /** Tables: Infima's, with half its cell padding. */
+  --docs-table-border: #dadde1;
+  --docs-table-stripe: rgb(0 0 0 / 0.03);
+  --docs-table-cell-padding: 0.35em 0.6em;
   /** Quotes: Infima's blockquote. */
   --docs-blockquote-border: #dadde1;
   --docs-blockquote-text: #444950;

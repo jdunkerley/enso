@@ -12,6 +12,7 @@ import DocsSiteLink from '@/components/ComponentHelp/DocsSiteLink.vue'
 import { HistoryStack } from '@/components/ComponentHelp/history'
 import type { Docs, FunctionDocs, TypeDocs } from '@/components/ComponentHelp/ir'
 import { lookupDocumentation, placeholder } from '@/components/ComponentHelp/ir'
+import { resultTablesAsTables } from '@/components/ComponentHelp/resultTables'
 import { entrySignature } from '@/components/ComponentHelp/signature'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { groupColorStyle } from '@/composables/nodeColors'
@@ -43,7 +44,11 @@ function syncMarkdownDocumentation(view: EditorView) {
     (docs) => {
       if (docs.kind !== 'Placeholder') {
         view.dispatch({
-          changes: { from: 0, to: view.state.doc.length, insert: docs.documentation },
+          changes: {
+            from: 0,
+            to: view.state.doc.length,
+            insert: resultTablesAsTables(docs.documentation),
+          },
         })
       }
     },

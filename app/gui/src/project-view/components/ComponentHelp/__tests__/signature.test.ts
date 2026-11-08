@@ -37,3 +37,21 @@ test('the signature drops `self` and marks optional arguments, as the docs site 
     'read(path: Text = Missing_Argument.throw "path", format: File_Format = Auto_Detect, action: ~Any) -> Any',
   )
 })
+
+test('a callable with no arguments but `self` has an empty argument list', () => {
+  const entry = makeModuleMethod('Standard.Base.Data.Text.Text.to_text', {
+    args: [makeArgument('self', 'Standard.Base.Data.Text.Text')],
+  })
+  const signature = entrySignature(entry, 'Standard.Base.Data.Text.Text')
+  expect(signature.params).toEqual([])
+  expect(signature.label).toBe('to_text() -> Text')
+})
+
+test('a callable with no arguments at all', () => {
+  const signature = entrySignature(
+    makeModuleMethod('Standard.Base.Main.pi'),
+    'Standard.Base.Any.Any',
+  )
+  expect(signature.params).toEqual([])
+  expect(signature.label).toBe('pi() -> Any')
+})

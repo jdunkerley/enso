@@ -266,3 +266,14 @@ test('Block lines: headings, code blocks and quotes', () => {
     { line: 8, class: 'cm-blockquote' },
   ])
 })
+
+test('Table decoration: a GFM table is replaced by the table widget', () => {
+  const markdown = 'Text\n\n| Name | Count |\n|------|-------|\n| John | 1     |\n\nAfter'
+  const tables = decorations(markdown, (from, to, deco) => {
+    const widget = deco.spec.widget
+    if (widget && 'props' in widget && widget.props.parsed?.name === 'Table') {
+      return markdown.slice(from, to)
+    }
+  })
+  expect(tables).toEqual(['| Name | Count |\n|------|-------|\n| John | 1     |'])
+})

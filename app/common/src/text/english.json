@@ -355,6 +355,7 @@
   "aboutThisAppShortcut": "About Enso",
   "documentationShortcut": "Documentation",
   "viewOnDocsSite": "View on docs site ↗",
+  "viewOnDocsSiteLabel": "View on docs site (opens in the browser)",
   "goToLocalSettingsShortcut": "Local Settings",
   "goToKeyboardShortcutsSettingsShortcut": "Keyboard Shortcuts Settings",
   "openInFileBrowserShortcut": "Open in File Browser",

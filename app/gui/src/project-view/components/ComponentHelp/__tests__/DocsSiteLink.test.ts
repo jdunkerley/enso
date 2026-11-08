@@ -29,6 +29,9 @@ test('a standard library component links to its page, opened in the browser', as
   })
   const anchor = link()
   expect(anchor?.textContent).toBe(getText('viewOnDocsSite'))
+  // The accessible name has no arrow glyph.
+  expect(anchor?.getAttribute('aria-label')).toBe(getText('viewOnDocsSiteLabel'))
+  expect(anchor?.getAttribute('aria-label')).not.toContain('↗')
   expect(anchor?.href).toBe(`${DOCS_URL}api/Standard.Base/Data/read/`)
   await userEvent.click(anchor!)
   expect(open).toHaveBeenCalledWith(`${DOCS_URL}api/Standard.Base/Data/read/`, '_blank')
