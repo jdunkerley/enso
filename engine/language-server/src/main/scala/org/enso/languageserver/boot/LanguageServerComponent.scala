@@ -38,6 +38,7 @@ class LanguageServerComponent(config: LanguageServerConfig, logLevel: Level)
 
   /** @inheritdoc */
   override def start(): Future[ComponentStarted.type] = {
+    StartupWarmUp.start(classOf[MainModule].getClassLoader)
     logger.info("Starting Language Server...")
     val sampler = startSampling(config)
     logger.trace("Started [{}]", sampler.getClass.getName)

@@ -120,6 +120,10 @@ The LS uses Akka. Each client maintains an actor per concern (session,
 suggestions, text, etc.). The runtime runs on its own thread(s) via Truffle.
 Don't block Akka receivers on runtime calls — dispatch via `ask` / futures.
 
+At startup `StartupWarmUp` reads the jar manifests and sets up the default SSL
+context on a background thread, ahead of Akka doing both on the main thread
+(Note [Startup Warm-Up]).
+
 ## Running standalone
 
 ```
