@@ -103,7 +103,10 @@ export class VisualizationBridge {
     vis: Visualizations,
     control: YjsChannel<string>,
     data: YjsChannel<Uint8Array>,
-    private readonly languageServerEnds: readonly { close(): void }[] = [],
+    private readonly languageServerEnds: readonly {
+      close(): void
+      onClose?(handler: () => void): unknown
+    }[] = [],
   ) {
     this.vis = vis
     this.control = control
@@ -247,6 +250,15 @@ export class VisualizationBridge {
     const owned = new Uint8Array(payload.byteLength)
     owned.set(payload)
     this.vis.recordResponse(rid, owned)
+  }
+
+  /**
+   * Call `handler` when one of the Language Server's ends of the channels closes: by
+   * {@link close}, or because the Language Server ended it (Note [A Lost Channel Ends The
+   * Session] in `languageServerSession.ts`).
+   */
+  onLanguageServerEndClosed(handler: () => void): void {
+    for (const end of this.languageServerEnds) end.onClose?.(handler)
   }
 
   /** Unsubscribe from observers and channels. Idempotent. */
