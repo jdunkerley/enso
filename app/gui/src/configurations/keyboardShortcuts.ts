@@ -65,6 +65,7 @@ export function scopesOverlap(a: ShortcutScope, b: ShortcutScope) {
 const DASHBOARD_APP_ACTIONS: ReadonlySet<DashboardBindingKey> = new Set<DashboardBindingKey>([
   'settings',
   'aboutThisApp',
+  'documentation',
   'downloadApp',
   'goBack',
   'goForward',

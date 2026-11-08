@@ -38,6 +38,19 @@ toasts, the About dialog, the tooltips). The `dashboard` route renders
 `src/components/DashboardPage.vue`, which holds the dashboard's global shortcuts
 and mounts `AppContainer.vue`.
 
+## Run-time configuration (`$config`)
+
+`src/config.ts` is the `$config` object. Each value is an `ENSO_IDE_<NAME>`
+variable, baked in at build time from `.env` (and `.env.<mode>`), and, in the
+packaged app, overridable at run time by the same variable in the process
+environment (`app/electron-client/src/guiConfig.ts`; its key list must cover
+every key of `$config`). **`ENSO_IDE_DOCS_URL`** (`$config.DOCS_URL`) is the
+documentation site's root, `https://jdunkerley.github.io/enso/docs/` by default
+(a missing trailing slash is added). The rail's Documentation button and command
+and the component help panel's "View on docs site" link open pages under it (F1
+opens the help panel, not the site). An **empty** value, at build or run time,
+hides all of them.
+
 ## TypeScript path aliases
 
 Defined in `vite.config.ts`:

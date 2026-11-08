@@ -82,13 +82,37 @@ const sync = (text: WatchSource<string | undefined>) => (view: EditorView) => {
 </template>
 
 <style scoped>
+/* The docs site's tables (Infima), from the `--docs-table-*` tokens: bordered cells, a bold header
+ * row over a heavier rule, striped rows. A table wider than the editor scrolls inside itself. */
+table {
+  display: block;
+  max-width: 100%;
+  width: max-content;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0.25em 0 0.75em;
+}
+thead tr {
+  border-bottom: 2px solid var(--docs-table-border);
+}
 .cell {
-  border: 1px solid #dddddd;
+  border: 1px solid var(--docs-table-border);
+  padding: var(--docs-table-cell-padding);
+  vertical-align: top;
+  text-align: left;
+}
+th.cell {
+  font-weight: 700;
 }
 .tableBody .row:nth-of-type(even) {
-  background-color: #f3f3f3;
+  background-color: var(--docs-table-stripe);
 }
 :deep(.cm-line) {
-  padding-right: 6px;
+  padding-right: 0;
+}
+/* Cells wrap between words, never inside one: a table too wide for that scrolls. */
+.cell :deep(.cm-lineWrapping) {
+  word-break: normal;
+  overflow-wrap: normal;
 }
 </style>

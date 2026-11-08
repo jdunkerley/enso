@@ -15,8 +15,9 @@ Stylesheets, fonts and icons for the project view (the graph editor).
   `icons.svg`: `corepack pnpm --filter enso-gui run generate-icons`. It fails on
   a duplicate id; `util/iconMetadata/__tests__/stdlibIconTags.test.ts` checks
   that every standard library `icon:` tag names a real icon.
-- `base.css` — design tokens (`--font-sans`, `--font-code`, `--font-mono`,
-  colours) and the `@font-face` imports from the `font-*.css` files.
+- `base.css` — design tokens (`--font-sans`, `--font-code`, `--font-mono`, the
+  documentation look `--docs-*`, colours) and the `@font-face` imports from the
+  `font-*.css` files.
 - `font-*.css` — one `@font-face` file per family; the font files and their
   licence notices live in `public/font-*/`. Give every `src` a `format()` and
   every face a `font-display` (`block` for M PLUS 1, which drives text

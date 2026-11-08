@@ -18,7 +18,12 @@ export { groupColor, groupColorVar } from '@/util/groupColors'
 export { isIconName, type Icon } from '@/util/iconMetadata/iconName'
 export { projectPathKey } from '@/util/projectPathKey'
 export type { QualifiedName } from '@/util/qualifiedName'
-export { apiPath, memberSegment, type ApiPathEntry } from 'enso-common/src/docsSite/apiPath'
+export {
+  apiPath,
+  isConversion,
+  memberSegment,
+  type ApiPathEntry,
+} from 'enso-common/src/docsSite/apiPath'
 export { ensoMarkdownParser } from 'ydoc-shared/ast/ensoMarkdown'
 export { prerenderMarkdown } from 'ydoc-shared/ast/prerenderMarkdown'
 export type {

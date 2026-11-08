@@ -87,6 +87,8 @@ const hasOverflow = computed(() => {
   display: flex;
   gap: 2px;
   align-items: end;
+  /* A block's space below it, as on the docs site. */
+  padding-bottom: 0.75em;
 }
 
 .Tags {
