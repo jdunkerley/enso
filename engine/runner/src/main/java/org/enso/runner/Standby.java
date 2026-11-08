@@ -1,6 +1,7 @@
 package org.enso.runner;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -90,6 +91,22 @@ final class Standby {
     this.preload = preload;
     this.err = err;
     this.abandonOnLine = abandonOnLine;
+  }
+
+  /** The standby of `enso --standby`: the real warm-up and preloader, and the two properties. */
+  static Standby create(File component) {
+    WarmUp warmUp =
+        Boolean.parseBoolean(System.getProperty(WARM_UP_PROPERTY, "true"))
+            ? new StandbyWarmUp()
+            : NO_WARM_UP;
+    var preloader =
+        new StandbyPreloader(
+            JvmOptions.all(component, System.getenv(JvmOptions.ENVIRONMENT_VARIABLE)));
+    return new Standby(
+        warmUp,
+        preloader::preload,
+        System.err,
+        Boolean.parseBoolean(System.getProperty(ABANDON_PROPERTY, "false")));
   }
 
   /**

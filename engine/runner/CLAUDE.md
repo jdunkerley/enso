@@ -82,3 +82,18 @@ involved: they read `jvm.options` on their own (`enso` with the same rules;
 leading and trailing spaces and quotes each line, so `^ % ! & | < >` and spaces
 survive literally; it does not support a byte order mark, a double quote or a
 single quote in an option). They do not read `ENSO_JVM_OPTIONS`.
+
+## Standby mode (`--standby`)
+
+The IDE's spare engine; the design is in Note [Standby Mode] in `Standby.java`
+and the spec `docs/superpowers/specs/2026-11-08-jvm-warm-engine-design.md`.
+`StandbyPreloader` loads (without initialising) the classes listed in
+`src/main/resources/org/enso/runner/standby-preload.txt`, the ones a Language
+Server boot loads. The list is generated, not written: boot a Language Server
+from a distribution built without an AOT cache, with
+`JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=<log>`, then run
+`node tools/standby-preload/generate.mjs <log> <list>`. Regenerate it when a
+boot's classes change a lot. Preloading is skipped when `jvm.options` or
+`ENSO_JVM_OPTIONS` carry `-XX:AOTCache=` or `-XX:SharedArchiveFile=` (the cache
+holds the classes); a cache passed through `JAVA_TOOL_OPTIONS` is not seen and
+only costs a needless preload.
