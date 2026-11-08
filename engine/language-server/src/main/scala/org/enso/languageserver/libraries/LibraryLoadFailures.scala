@@ -1,6 +1,6 @@
 package org.enso.languageserver.libraries
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.scalalogging.LazyLogging
 import org.enso.languageserver.util.UnhandledLogging
 import org.enso.polyglot.runtime.Runtime.Api
@@ -9,13 +9,12 @@ import org.enso.polyglot.runtime.Runtime.Api
   * (`Api.LibraryLoadFailed`), so that `library/listLoadFailures` can answer a
   * client that connects after the notifications went out.
   *
-  * It subscribes to the event stream when it starts, so it must be created
-  * before the runtime starts loading libraries (`MainModule` does).
+  * Create it with [[LibraryLoadFailures.start]], which subscribes it to the
+  * event stream before returning, before the runtime starts loading libraries
+  * (`MainModule` does): a subscription in `preStart` would run on the actor's
+  * own thread, possibly after the first failures were published.
   */
 class LibraryLoadFailures extends Actor with LazyLogging with UnhandledLogging {
-
-  override def preStart(): Unit =
-    context.system.eventStream.subscribe(self, classOf[Api.LibraryLoadFailed])
 
   override def receive: Receive = collecting(Vector())
 
@@ -74,4 +73,11 @@ object LibraryLoadFailures {
 
   /** Creates a configuration object to create [[LibraryLoadFailures]]. */
   def props(): Props = Props(new LibraryLoadFailures)
+
+  /** Creates the collector and subscribes it to the runtime's failures. */
+  def start(system: ActorSystem, name: Option[String] = None): ActorRef = {
+    val actor = name.fold(system.actorOf(props()))(system.actorOf(props(), _))
+    system.eventStream.subscribe(actor, classOf[Api.LibraryLoadFailed])
+    actor
+  }
 }

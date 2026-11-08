@@ -91,7 +91,10 @@ object EditionManager {
    * the runtime and the language server fall back to the bundled edition,
    * which is what such a project needs. A development build still finds its
    * own `0.0.0-dev` in the language home first, and other cached editions
-   * are used as before.
+   * are used as before. A development engine run without a language home that
+   * relied on a hand-placed `<data>/editions/0.0.0-dev.yaml` now falls back to
+   * its default edition too; put such a file on `ENSO_EDITION_PATH` instead,
+   * which is still searched.
    */
   private[updater] def ignoredCachedEditions(
     cachePath: Path

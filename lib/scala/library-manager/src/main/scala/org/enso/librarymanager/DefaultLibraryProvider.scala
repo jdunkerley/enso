@@ -70,15 +70,10 @@ class DefaultLibraryProvider(
       localLibraryProvider
         .findLibrary(libraryName)
         .map(ResolvedLibrary(libraryName, LibraryVersion.Local, _))
-        .toRight {
-          ResolvingLibraryProvider.Error.NotResolved(
-            LibraryResolutionError(
-              s"Edition configuration forces to use the local version, but " +
-              s"the `$libraryName` library is not present among local " +
-              s"libraries."
-            )
-          )
-        }
+        // The edition asks for the local copy, which may yet be created.
+        .toRight(
+          ResolvingLibraryProvider.Error.RequestedLocalLibraryDoesNotExist
+        )
 
     case version @ LibraryVersion.Published(semver, repository) =>
       publishedLibraryProvider

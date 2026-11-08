@@ -376,7 +376,7 @@ abstract class BaseServerTest
     )
 
     val libraryLoadFailures =
-      system.actorOf(LibraryLoadFailures.props())
+      LibraryLoadFailures.start(system)
 
     val libraryConfig = LibraryConfig(
       localLibraryManager      = localLibraryManager,
