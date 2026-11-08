@@ -24,6 +24,9 @@ component browser, the documentation panel and the widgets.
   real entry (Note [Catalogue Entries In The Suggestions Database] in the
   language server's `SuggestionsHandler`). It behaves like any entry; spec 3 of
   the library system shows a download badge from it.
+  `suggestionDocumentationUrl` gives an entry's page on the documentation site
+  (`apiPath` from `enso-common`, the function the site's generator uses);
+  nothing for entries outside the `Standard.*` libraries.
 - `documentation.ts` — parses an entry's documentation (front matter: icon,
   group, aliases, `private`, …).
 - `mockSuggestion.ts` — test entries, built through the update processor.

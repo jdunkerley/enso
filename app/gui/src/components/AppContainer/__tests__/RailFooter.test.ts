@@ -1,6 +1,6 @@
 /**
- * @file The rail footer (#83, #566), at the bottom of the left rail: the Settings and About
- * buttons, whose actions are global; no account, notifications or offline notice, no cloud-only
+ * @file The rail footer (#83, #566), at the bottom of the left rail: the Settings, Documentation
+ * and About buttons, whose actions are global; no account, notifications or offline notice, no cloud-only
  * buttons.
  */
 import { useAboutModal } from '$/components/AboutModal/aboutModal'
@@ -49,12 +49,15 @@ const button = (name: string) =>
   must(document.querySelector<HTMLElement>(`button[aria-label="${name}"]`))
 const settingsButton = () => button(getText('settingsShortcut'))
 const aboutButton = () => button(getText('aboutThisAppShortcut'))
+const documentationButton = () => button(getText('documentationShortcut'))
+const DOCS_URL = 'https://docs.example.test/docs/'
 const actionNames = () =>
   useActionsStore()
     .findActions('')
     .map((action) => action.name)
 
 beforeEach(() => {
+  ;($config as { DOCS_URL?: string }).DOCS_URL = DOCS_URL
   openSettingsTab.mockClear()
   localBackend.value = {}
 })
@@ -65,13 +68,14 @@ afterEach(() => {
 })
 
 describe('RailFooter', () => {
-  test('two buttons, Settings above About, and nothing else', async () => {
+  test('three buttons, Settings, Documentation and About, and nothing else', async () => {
     await mountFooter()
     const buttons = [...document.querySelectorAll('button')]
-    expect(buttons).toEqual([settingsButton(), aboutButton()])
+    expect(buttons).toEqual([settingsButton(), documentationButton(), aboutButton()])
     // The cog is the `settings` icon; About has the `info` icon.
     expect(settingsButton().querySelector('use')?.getAttribute('href')).toContain('settings')
     expect(aboutButton().querySelector('use')?.getAttribute('href')).toContain('info')
+    expect(documentationButton().querySelector('use')?.getAttribute('href')).toContain('help')
     expect(document.body.textContent).not.toContain('Ada Lovelace')
   })
 
@@ -83,6 +87,37 @@ describe('RailFooter', () => {
     await mountFooter({ extended: true })
     expect(textOf(settingsButton())).toBe(getText('settingsShortcut'))
     expect(textOf(aboutButton())).toBe(getText('aboutThisAppShortcut'))
+    expect(textOf(documentationButton())).toBe(getText('documentationShortcut'))
+  })
+
+  test('Documentation opens the site’s introduction in the browser, and is an action', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    await mountFooter()
+    documentationButton().click()
+    expect(open).toHaveBeenCalledExactlyOnceWith(`${DOCS_URL}intro/`, '_blank')
+    open.mockClear()
+    const action = useActionsStore()
+      .findActions('')
+      .find((action) => action.name === getText('documentationShortcut'))
+    action?.doAction()
+    expect(open).toHaveBeenCalledExactlyOnceWith(`${DOCS_URL}intro/`, '_blank')
+    open.mockRestore()
+  })
+
+  test('a site root without its trailing slash still opens the introduction', async () => {
+    ;($config as { DOCS_URL?: string }).DOCS_URL = DOCS_URL.slice(0, -1)
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    await mountFooter()
+    documentationButton().click()
+    expect(open).toHaveBeenCalledExactlyOnceWith(`${DOCS_URL}intro/`, '_blank')
+    open.mockRestore()
+  })
+
+  test('without a configured site there is no Documentation button or action', async () => {
+    ;($config as { DOCS_URL?: string }).DOCS_URL = undefined
+    await mountFooter()
+    expect(document.querySelectorAll('button')).toHaveLength(2)
+    expect(actionNames()).not.toContain(getText('documentationShortcut'))
   })
 
   test('Settings and About act; there is no menu', async () => {
@@ -104,6 +139,8 @@ describe('RailFooter', () => {
     await user.keyboard('{Enter}')
     expect(openSettingsTab).toHaveBeenCalledOnce()
     await user.tab()
+    expect(document.activeElement).toBe(documentationButton())
+    await user.tab()
     expect(document.activeElement).toBe(aboutButton())
     await user.keyboard('{Enter}')
     expect(useAboutModal().isOpen.value).toBe(true)
@@ -117,7 +154,7 @@ describe('RailFooter', () => {
     await mountFooter()
     expect(actionNames()).toContain(getText('downloadAppShortcut'))
     // Still no button for it.
-    expect(document.querySelectorAll('button')).toHaveLength(2)
+    expect(document.querySelectorAll('button')).toHaveLength(3)
   })
 
   test('local mode: no "Upgrade Plan" or "Logout", in the rail or the actions', async () => {

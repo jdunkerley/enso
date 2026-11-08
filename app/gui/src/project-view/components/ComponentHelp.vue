@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
 import type { SuggestionId } from '$/providers/openedProjects/suggestionDatabase/entry'
+import { entryIsCallable } from '$/providers/openedProjects/suggestionDatabase/entry'
 import Breadcrumbs, {
   type Item as Breadcrumb,
 } from '@/components/ComponentHelp/DocsBreadcrumbs.vue'
 import DocsHeader from '@/components/ComponentHelp/DocsHeader.vue'
 import DocsList from '@/components/ComponentHelp/DocsList.vue'
+import DocsSignature from '@/components/ComponentHelp/DocsSignature.vue'
+import DocsSiteLink from '@/components/ComponentHelp/DocsSiteLink.vue'
 import { HistoryStack } from '@/components/ComponentHelp/history'
 import type { Docs, FunctionDocs, TypeDocs } from '@/components/ComponentHelp/ir'
 import { lookupDocumentation, placeholder } from '@/components/ComponentHelp/ir'
+import { resultTablesAsTables } from '@/components/ComponentHelp/resultTables'
+import { entrySignature } from '@/components/ComponentHelp/signature'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { groupColorStyle } from '@/composables/nodeColors'
 import { tryGetIndex } from '@/util/data/array'
@@ -39,7 +44,11 @@ function syncMarkdownDocumentation(view: EditorView) {
     (docs) => {
       if (docs.kind !== 'Placeholder') {
         view.dispatch({
-          changes: { from: 0, to: view.state.doc.length, insert: docs.documentation },
+          changes: {
+            from: 0,
+            to: view.state.doc.length,
+            insert: resultTablesAsTables(docs.documentation),
+          },
         })
       }
     },
@@ -84,6 +93,14 @@ const style = computed(() => ({
 }))
 
 const icon = computed<IconName>(() => suggestion.value?.iconName ?? 'marketplace')
+
+/** The signature of a function, constructor or method, drawn as the docs site draws it. */
+const signature = computed(() => {
+  const entry = suggestion.value
+  return entry && entryIsCallable(entry) ?
+      entrySignature(entry, entry.returnType(projectNames.value))
+    : undefined
+})
 
 const historyStack = new HistoryStack()
 
@@ -142,10 +159,12 @@ function handleBreadcrumbClick(index: number) {
           @backward="historyStack.backward()"
         />
       </div>
+      <DocsSiteLink :entry="suggestion" />
     </div>
     <h2 v-if="documentation.kind === 'Placeholder'">{{ documentation.text }}</h2>
     <template v-else>
       <div class="markdownDocs">
+        <DocsSignature v-if="signature" :signature="signature" :icon="icon" :color="color" />
         <span v-if="documentation.documentation.length == 0">No documentation available.</span>
         <MarkdownEditor
           v-else
@@ -183,10 +202,10 @@ function handleBreadcrumbClick(index: number) {
   --enso-docs-method-name-color: #1f71d3;
   --enso-docs-types-header-color: #1f71d3;
   --enso-docs-background-color: var(--background-color);
-  --enso-docs-text-color: rbga(0, 0, 0, 0.6);
+  --enso-docs-text-color: var(--docs-text);
   font-family: var(--font-sans);
-  font-size: 12px;
-  line-height: 160%;
+  font-size: var(--docs-font-size);
+  line-height: var(--docs-line-height);
   color: var(--enso-docs-text-color);
   background-color: var(--enso-docs-background-color);
   padding: 4px 4px var(--doc-panel-bottom-clip, 0) 4px;
@@ -201,7 +220,16 @@ function handleBreadcrumbClick(index: number) {
 }
 
 .markdownDocs {
-  margin: 4px 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 8px 0;
+}
+
+.markdownDocs > :not(.DocsSignature) {
+  align-self: stretch;
 }
 
 .tags {

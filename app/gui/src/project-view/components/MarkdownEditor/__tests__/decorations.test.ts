@@ -232,3 +232,48 @@ test.each([
       ],
   )
 })
+
+/** The classes of each line's decoration, by line number. */
+function lineClasses(source: string) {
+  return decorations(source, (from, _to, deco) => {
+    if (
+      deco.spec.class?.startsWith('cm-heading') ||
+      /cm-(codeBlock|blockquote)/.test(deco.spec.class ?? '')
+    ) {
+      return { line: source.slice(0, from).split('\n').length, class: deco.spec.class }
+    }
+  })
+}
+
+test('Block lines: headings, code blocks and quotes', () => {
+  const markdown = [
+    '# Title',
+    'Text',
+    '## Arguments',
+    '### Example',
+    '```',
+    'code',
+    '```',
+    '> Quoted',
+  ].join('\n')
+  expect(lineClasses(markdown)).toEqual([
+    { line: 1, class: 'cm-heading cm-heading1' },
+    { line: 3, class: 'cm-heading cm-heading2' },
+    { line: 4, class: 'cm-heading cm-heading3' },
+    { line: 5, class: 'cm-codeBlock cm-codeBlock-first' },
+    { line: 6, class: 'cm-codeBlock' },
+    { line: 7, class: 'cm-codeBlock cm-codeBlock-last' },
+    { line: 8, class: 'cm-blockquote' },
+  ])
+})
+
+test('Table decoration: a GFM table is replaced by the table widget', () => {
+  const markdown = 'Text\n\n| Name | Count |\n|------|-------|\n| John | 1     |\n\nAfter'
+  const tables = decorations(markdown, (from, to, deco) => {
+    const widget = deco.spec.widget
+    if (widget && 'props' in widget && widget.props.parsed?.name === 'Table') {
+      return markdown.slice(from, to)
+    }
+  })
+  expect(tables).toEqual(['| Name | Count |\n|------|-------|\n| John | 1     |'])
+})

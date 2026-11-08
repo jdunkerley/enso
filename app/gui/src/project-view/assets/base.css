@@ -33,6 +33,46 @@
   --color-error: rgb(234 67 53);
 }
 
+/******************************************************************************
+ *** Documentation: the component help panel and the documentation editor.  ***
+ *** The docs site's look (docs-site/: Docusaurus's Infima theme and its   ***
+ *** Prism "palenight" code blocks), at the panel's size: the site's type   ***
+ *** scale is 16px text with 3x/2x/1.5x headings; a ~400px panel takes 12px ***
+ *** text with 2x/1.54x/1.23x headings. Dark mode is the page-wide invert   ***
+ *** filter (#105); code blocks are inverted back, as the site keeps them   ***
+ *** dark in both modes.                                                    ***
+ ******************************************************************************/
+:root {
+  --docs-font-size: 12px;
+  --docs-line-height: 1.65;
+  --docs-h1-size: 2em;
+  --docs-h2-size: 1.54em;
+  --docs-h3-size: 1.23em;
+  --docs-h4-size: 1em;
+  /** Space above and below a heading, in its own em (the site: 40px/20px on a 32px h2). */
+  --docs-heading-space-above: 1.25em;
+  --docs-heading-space-below: 0.4em;
+  --docs-text: #1c1e21;
+  --docs-selection: rgb(70 130 230 / 0.35);
+  --docs-link: #006b8a;
+  /** Inline code: Infima's `code`, at the text's size (Infima: 0.9em) as Neon's x-height is small. */
+  --docs-code-font-size: 1em;
+  --docs-code-bg: #f6f7f8;
+  --docs-code-border: rgb(0 0 0 / 0.1);
+  --docs-code-radius: 0.4em;
+  /** Code blocks: Prism's palenight. */
+  --docs-code-block-bg: #292d3e;
+  --docs-code-block-text: #bfc7d5;
+  --docs-code-block-padding: 12px;
+  /** Tables: Infima's, with half its cell padding. */
+  --docs-table-border: #dadde1;
+  --docs-table-stripe: rgb(0 0 0 / 0.03);
+  --docs-table-cell-padding: 0.35em 0.6em;
+  /** Quotes: Infima's blockquote. */
+  --docs-blockquote-border: #dadde1;
+  --docs-blockquote-text: #444950;
+}
+
 /*********************************
  *** Node graph core variables ***
  *********************************/

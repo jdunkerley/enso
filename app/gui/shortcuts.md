@@ -103,3 +103,4 @@ Shortcuts are designed to work well with both the mouse and the touchpad.
 | <kbd>Shift</kbd> + <kbd>Space</kbd> | Toggle visualization fullscreen mode.                             |
 | <kbd>Escape</kbd>                   | Exit visualization fullscreen mode.                               |
 | <kbd>Meta</kbd> + <kbd>Space</kbd>  | Cycle visualizations of the selected component.                   |
+| <kbd>F1</kbd>                       | Open the component help for the selected component                |

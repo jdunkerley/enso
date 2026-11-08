@@ -1,3 +1,4 @@
+import { blockLineDecoratorExt } from '@/components/MarkdownEditor/codemirror/decoration/blocks'
 import { cursorDecoratorExt } from '@/components/MarkdownEditor/codemirror/decoration/editingAtCursor'
 import {
   decorateImageWithClass,
@@ -26,6 +27,7 @@ export function markdownDecorators(): Extension {
     ]),
     linkDecoratorExt(),
     listDecoratorExt(),
+    blockLineDecoratorExt(),
     cursorDecoratorExt(),
     markdownLinkEditPopup(),
   ]
