@@ -136,6 +136,22 @@ class SerdeSpec extends AnyFlatSpec with Matchers {
     val e2 = ApiSerde.deserializeApiEnvelope(e1).get
 
     libLoaded should equal(e2)
+
+    for (version <- Seq(None, Some("0.0.0-dev"))) {
+      val loadFailed =
+        Api.Response(
+          None,
+          Api.LibraryLoadFailed(
+            "Standard",
+            "Base",
+            version,
+            Api.LibraryLoadFailed.DownloadFailed,
+            "HTTP 502"
+          )
+        )
+      val f1 = ApiSerde.serialize(loadFailed)
+      ApiSerde.deserializeApiEnvelope(f1).get should equal(loadFailed)
+    }
   }
 
   it should "serialize and deserialize Module suggestion" in {

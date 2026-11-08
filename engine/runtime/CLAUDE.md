@@ -83,6 +83,12 @@ and links the required Graal/Truffle background reading.
 - **A library's bindings cache is read once per context**, by
   `TruffleCompilerContext.libraryBindings`, which import resolution and module
   loading share; see Note [One Bindings Cache Read Per Library].
+- **A library that fails to load is remembered.** `DefaultPackageRepository`
+  keeps the first resolution or loading failure of each library until
+  `shutdown`, so later imports get the same error without resolving (or
+  downloading) again, and reports it once through
+  `NotificationHandler.libraryLoadFailed` (in the IDE, `Api.LibraryLoadFailed`
+  to the language server). See Note [A Failed Library Is Remembered].
 
 ## Language Server integration
 

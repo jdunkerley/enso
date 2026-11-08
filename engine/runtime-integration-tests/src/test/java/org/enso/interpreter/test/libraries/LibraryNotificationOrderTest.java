@@ -22,6 +22,7 @@ import org.enso.test.utils.ProjectUtils;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import scala.Option;
 
 /**
  * The package repository must register a library before it announces it (Note [Package Registered
@@ -49,6 +50,10 @@ public final class LibraryNotificationOrderTest {
         missing.add(name.qualifiedName());
       }
     }
+
+    @Override
+    public void libraryLoadFailed(
+        LibraryName name, Option<LibraryVersion> version, String kind, String message) {}
 
     @Override
     public void serializeModule(QualifiedName moduleName) {}

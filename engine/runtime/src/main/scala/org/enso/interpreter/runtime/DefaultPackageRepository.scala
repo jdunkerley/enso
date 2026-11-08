@@ -15,6 +15,7 @@ import org.enso.librarymanager.published.repository.LibraryManifest
 import org.enso.librarymanager.resolved.LibraryRoot
 import org.enso.librarymanager.ResolvingLibraryProvider
 import org.enso.logger.masking.MaskedPath
+import org.enso.polyglot.runtime.Runtime.Api
 import org.enso.pkg.{
   Component,
   ComponentGroup,
@@ -116,6 +117,13 @@ private class DefaultPackageRepository(
     : collection.mutable.Map[LibraryName, ComponentGroups] = {
     collection.mutable.LinkedHashMap(builtinsName -> ComponentGroups.empty)
   }
+
+  /** The libraries that could not be loaded, with the error each import of
+    * them gets. Note [A Failed Library Is Remembered].
+    */
+  private val failedPackages
+    : collection.concurrent.Map[LibraryName, PackageRepository.Error] =
+    collection.concurrent.TrieMap()
 
   /** The libraries whose dependencies `getLibraryBindings` has loaded. */
   private val dependenciesLoaded: collection.mutable.Set[LibraryName] =
@@ -449,44 +457,114 @@ private class DefaultPackageRepository(
     libraryName: LibraryName
   ): Either[PackageRepository.Error, Unit] =
     if (loadedPackages.contains(libraryName)) Right(())
-    else {
-      logger.trace(s"Resolving library $libraryName.")
-      val resolvedLibrary =
-        libraryProvider
-          .findLibrary(libraryName)
-          .left
-          .map {
-            case ResolvingLibraryProvider.Error.NotResolved(details) =>
-              PackageRepository.Error.PackageCouldNotBeResolved(details)
-            case ResolvingLibraryProvider.Error.DownloadFailed(_, reason) =>
-              PackageRepository.Error.PackageDownloadFailed(reason)
-            case ResolvingLibraryProvider.Error.RequestedLocalLibraryDoesNotExist =>
-              PackageRepository.Error.PackageLoadingError(
-                "The local library has not been found on the local " +
-                "libraries search paths."
-              )
-          }
-      resolvedLibrary match {
-        case Left(error) =>
-          logger.warn(s"Resolution failed with [$error].", error)
-        case Right(resolved) =>
-          logger.debug(
-            s"Found library ${resolved.toString(HostEnsoUtils.isAot())} " +
-            s"at [${MaskedPath(resolved.root.location).applyMasking()}]."
-          )
+    else
+      failedPackages.get(libraryName) match {
+        // Note [A Failed Library Is Remembered]
+        case Some(error) => Left(error)
+        case None        => resolveAndLoadPackage(libraryName)
       }
 
-      this.synchronized {
-        // We check again inside of the monitor, in case that some other
-        // thread has just added this library.
-        if (loadedPackages.contains(libraryName)) Right(())
-        else
-          resolvedLibrary
-            .flatMap { library =>
-              loadPackage(library.name, library.version, library.root)
-            }
-            .flatMap(resolveComponentGroups)
-      }
+  private def resolveAndLoadPackage(
+    libraryName: LibraryName
+  ): Either[PackageRepository.Error, Unit] = {
+    logger.trace(s"Resolving library $libraryName.")
+    val resolvedLibrary =
+      libraryProvider
+        .findLibrary(libraryName)
+        .left
+        .map {
+          case ResolvingLibraryProvider.Error.NotResolved(details) =>
+            Failed(
+              PackageRepository.Error.PackageCouldNotBeResolved(details),
+              None,
+              Api.LibraryLoadFailed.NotInEdition,
+              details.getMessage
+            )
+          case ResolvingLibraryProvider.Error.DownloadFailed(version, reason) =>
+            Failed(
+              PackageRepository.Error.PackageDownloadFailed(reason),
+              Some(version),
+              Api.LibraryLoadFailed.DownloadFailed,
+              reason.getMessage
+            )
+          case ResolvingLibraryProvider.Error.RequestedLocalLibraryDoesNotExist =>
+            val message = "The local library has not been found on the " +
+              "local libraries search paths."
+            Failed(
+              PackageRepository.Error.PackageLoadingError(message),
+              Some(LibraryVersion.Local),
+              Api.LibraryLoadFailed.LocalMissing,
+              message
+            )
+        }
+    resolvedLibrary match {
+      case Left(failed) =>
+        logger.warn(s"Resolution failed with [${failed.error}].")
+      case Right(resolved) =>
+        logger.debug(
+          s"Found library ${resolved.toString(HostEnsoUtils.isAot())} " +
+          s"at [${MaskedPath(resolved.root.location).applyMasking()}]."
+        )
+    }
+
+    this.synchronized {
+      // We check again inside of the monitor, in case that some other
+      // thread has just added this library.
+      if (loadedPackages.contains(libraryName)) Right(())
+      else
+        resolvedLibrary
+          .flatMap { library =>
+            loadPackage(library.name, library.version, library.root).left
+              .map { error =>
+                Failed(
+                  error,
+                  Some(library.version),
+                  Api.LibraryLoadFailed.LoadingError,
+                  error.toString
+                )
+              }
+          }
+          .left
+          .map(rememberFailure(libraryName, _))
+          .flatMap(resolveComponentGroups)
+    }
+  }
+
+  /** A library that could not be loaded, with what the language server is
+    * told about it.
+    */
+  private case class Failed(
+    error: PackageRepository.Error,
+    version: Option[LibraryVersion],
+    kind: String,
+    message: String
+  )
+
+  /* Note [A Failed Library Is Remembered]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * A library that cannot be resolved or loaded fails the same way for every
+   * module that imports it. Without a memory, each import would resolve it
+   * again, and a library missing from the caches would be downloaded again
+   * every time: a project of N modules on an unreachable repository made N
+   * identical failed requests (#600). So the first failure is kept for the
+   * lifetime of the repository (until `shutdown`), later imports get the same
+   * error, and the notification handler hears of each library once, which is
+   * what lets the language server tell the IDE which libraries are missing.
+   */
+  private def rememberFailure(
+    libraryName: LibraryName,
+    failed: Failed
+  ): PackageRepository.Error =
+    failedPackages.putIfAbsent(libraryName, failed.error) match {
+      case Some(earlier) => earlier
+      case None =>
+        notificationHandler.libraryLoadFailed(
+          libraryName,
+          failed.version,
+          failed.kind,
+          failed.message
+        )
+        failed.error
     }
 
   /** @inheritdoc */
@@ -717,6 +795,7 @@ private class DefaultPackageRepository(
     loadedModules.clear()
     loadedComponents.clear()
     dependenciesLoaded.clear()
+    failedPackages.clear()
     // Note [One Bindings Cache Read Per Library] in TruffleCompilerContext.
     context.getCompiler.context match {
       case truffle: TruffleCompilerContext => truffle.clearLibraryBindings()

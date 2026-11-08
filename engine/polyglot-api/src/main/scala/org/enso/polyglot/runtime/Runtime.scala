@@ -1473,6 +1473,42 @@ object Runtime {
       location: File
     ) extends ApiNotification
 
+    /** Signals that an imported library could not be loaded. Sent once per
+      * library for the lifetime of the runtime context: a later import of the
+      * same library fails with the same error without trying again.
+      *
+      * @param namespace namespace of the library
+      * @param name name of the library
+      * @param version the version the edition selected, if it got that far
+      * @param kind why it failed: one of the [[LibraryLoadFailed]] kinds
+      * @param message a human-readable description of the failure
+      */
+    @named("libraryLoadFailed")
+    final case class LibraryLoadFailed(
+      namespace: String,
+      name: String,
+      version: Option[String],
+      kind: String,
+      message: String
+    ) extends ApiNotification
+
+    object LibraryLoadFailed {
+
+      /** The edition does not define the library. */
+      val NotInEdition = "NotInEdition"
+
+      /** The library was neither installed nor bundled, and downloading it
+        * failed.
+        */
+      val DownloadFailed = "DownloadFailed"
+
+      /** The edition asks for the local copy, and there is none. */
+      val LocalMissing = "LocalMissing"
+
+      /** The library was found but could not be loaded. */
+      val LoadingError = "LoadingError"
+    }
+
     /** A notification containing updates on the progress of long-running tasks.
       *
       * @param payload the actual update contained within this notification

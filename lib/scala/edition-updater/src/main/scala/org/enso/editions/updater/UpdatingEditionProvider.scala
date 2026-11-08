@@ -23,7 +23,10 @@ class UpdatingEditionProvider(
 
   private val actualSearchPaths = (searchPaths ++ List(cachePath)).distinct
 
-  private val provider = new FileSystemEditionProvider(actualSearchPaths)
+  private val provider = new FileSystemEditionProvider(
+    actualSearchPaths,
+    EditionManager.ignoredCachedEditions(cachePath)
+  )
   private val updater  = new EditionUpdater(cachePath, sources)
 
   /** @inheritdoc */
@@ -31,7 +34,8 @@ class UpdatingEditionProvider(
     name: String
   ): Either[EditionLoadingError, Editions.Raw.Edition] =
     provider.findEditionForName(name) match {
-      case Left(EditionNotFound(_)) =>
+      case Left(EditionNotFound(_))
+          if !EditionManager.IgnoredCachedEditionNames.contains(name) =>
         updater.downloadEdition(name)
         provider.findEditionForName(name)
       case Left(otherError) => Left(otherError)

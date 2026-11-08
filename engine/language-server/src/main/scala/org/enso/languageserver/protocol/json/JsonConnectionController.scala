@@ -30,7 +30,7 @@ import org.enso.languageserver.io.InputOutputApi._
 import org.enso.languageserver.io.OutputKind.{StandardError, StandardOutput}
 import org.enso.languageserver.io.{InputOutputApi, InputOutputProtocol}
 import org.enso.languageserver.libraries.LibraryApi._
-import org.enso.languageserver.libraries.LibraryConfig
+import org.enso.languageserver.libraries.{LibraryConfig, LibraryLoadFailures}
 import org.enso.languageserver.libraries.handler._
 import org.enso.languageserver.monitoring.MonitoringApi.{InitialPing, Ping}
 import org.enso.languageserver.monitoring.MonitoringProtocol
@@ -315,6 +315,8 @@ class JsonConnectionController(
 
     context.system.eventStream
       .subscribe(self, classOf[Api.ProgressNotification])
+    context.system.eventStream
+      .subscribe(self, classOf[Api.LibraryLoadFailed])
   }
 
   private def initialised(
@@ -462,6 +464,12 @@ class JsonConnectionController(
         )
       )
 
+    case failure: Api.LibraryLoadFailed =>
+      webActor ! Notification(
+        LibraryLoadFailed,
+        LibraryLoadFailures.toJson(failure)
+      )
+
     case Api.ProgressNotification(payload) =>
       val translated: Notification[_, _] =
         translateProgressNotification(payload)
@@ -593,6 +601,11 @@ class JsonConnectionController(
           libraryConfig.editionReferenceResolver,
           libraryConfig.localLibraryProvider,
           libraryConfig.publishedLibraryCache
+        ),
+      LibraryListLoadFailures -> LibraryListLoadFailuresHandler
+        .props(
+          libraryConfig.editionReferenceResolver,
+          libraryConfig.loadFailures
         ),
       LibraryGetMetadata -> LibraryGetMetadataHandler
         .props(

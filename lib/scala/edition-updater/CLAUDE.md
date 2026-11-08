@@ -14,6 +14,11 @@ Locates editions on disk and, if asked, downloads new ones (sbt project
 - `EditionManager.apply` defaults to `updating = false`. The language server
   passes `true` (for `editions/listAvailable`), and so does the runner's
   `DependencyPreinstaller`.
+- Both providers ignore a cached `0.0.0-dev.yaml` in `<data>/editions` (and the
+  updating one never downloads it): that name belongs to development builds,
+  which bundle their own, so a cached copy is stale. The project then falls back
+  to the bundled edition. Other cached editions are used. Note [A Cached
+  Development Edition Is Ignored] in `EditionManager`.
 - `EditionUpdater` logs a failed source as a warning and carries on, so being
   offline means fewer editions, not an error.
 
