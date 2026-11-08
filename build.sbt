@@ -3768,7 +3768,8 @@ lazy val `engine-runner` = project
         "org.graalvm.polyglot" % "polyglot"    % graalMavenPackagesVersion,
         "org.graalvm.sdk"      % "nativeimage" % graalMavenPackagesVersion,
         "org.graalvm.sdk"      % "word"        % graalMavenPackagesVersion,
-        "commons-cli"          % "commons-cli" % commonsCliVersion
+        "commons-cli"          % "commons-cli" % commonsCliVersion,
+        "com.typesafe"         % "config"      % typesafeConfigVersion
       ),
     Compile / internalModuleDependencies := Seq(
       (`cli` / Compile / exportedModule).value,
