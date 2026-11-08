@@ -34,7 +34,9 @@ class LibraryListLoadFailuresHandler(
 
   import context.dispatcher
 
-  private case class Result(failures: Seq[LibraryLoadFailures.LibraryLoadFailure])
+  private case class Result(
+    failures: Seq[LibraryLoadFailures.LibraryLoadFailure]
+  )
 
   private def requestStage: Receive = {
     case Request(LibraryListLoadFailures, id, _) =>
@@ -53,7 +55,12 @@ class LibraryListLoadFailuresHandler(
       val libraries = (loadFailures ? LibraryLoadFailures.GetFailures)
         .mapTo[LibraryLoadFailures.Failures]
       Future
-        .sequence(Seq(edition.map(_.toSeq), libraries.map(_.failures.map(LibraryLoadFailures.toJson))))
+        .sequence(
+          Seq(
+            edition.map(_.toSeq),
+            libraries.map(_.failures.map(LibraryLoadFailures.toJson))
+          )
+        )
         .map(parts => Result(parts.flatten)) pipeTo self
 
       context.become(responseStage(id, sender()))
