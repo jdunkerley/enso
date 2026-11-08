@@ -2,6 +2,7 @@ package org.enso.languageserver.boot
 
 import com.typesafe.scalalogging.LazyLogging
 
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.jar.Manifest
 import javax.net.ssl.SSLContext
 
@@ -42,14 +43,23 @@ object StartupWarmUp extends LazyLogging {
    * way, as it did before.
    */
 
-  /** Starts the warm-up on a daemon thread and returns at once.
+  private val started = new AtomicBoolean(false)
+
+  /** Starts the warm-up on a daemon thread and returns at once. Only the first
+    * call in a process does anything: a restart of the server
+    * (`LanguageServerComponent.restart`) finds both caches already filled.
     *
     * @param classLoader the class loader the `ActorSystem` is given
+    * @return whether this call started the warm-up
     */
-  def start(classLoader: ClassLoader): Unit = {
-    val thread = new Thread(() => run(classLoader), "ls-startup-warm-up")
-    thread.setDaemon(true)
-    thread.start()
+  def start(classLoader: ClassLoader): Boolean = {
+    val first = started.compareAndSet(false, true)
+    if (first) {
+      val thread = new Thread(() => run(classLoader), "ls-startup-warm-up")
+      thread.setDaemon(true)
+      thread.start()
+    }
+    first
   }
 
   /** Does the warm-up on the calling thread. */
@@ -59,7 +69,12 @@ object StartupWarmUp extends LazyLogging {
         classLoader.getResources("META-INF/MANIFEST.MF").asScala.toVector
       manifests.reverseIterator.foreach { url =>
         try Using.resource(url.openStream())(new Manifest(_))
-        catch { case NonFatal(_) => () }
+        catch {
+          case NonFatal(error) =>
+            // `ManifestInfo` will meet the same failure and handle it; the
+            // warm-up only loses this jar's head start.
+            logger.trace(s"Reading the manifest [$url] failed.", error)
+        }
       }
     } catch {
       case NonFatal(error) =>
