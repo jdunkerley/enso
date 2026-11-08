@@ -1,12 +1,23 @@
 <script setup lang="ts">
 /**
  * @file The name cell of a project: its state button (`ProjectIcon.vue`) and its name, which turns
- * into a form while it is renamed. A double click opens the project, when the user may run it.
+ * into a form while it is renamed, then an "Update available" pill on an edited bundled sample
+ * whose bundle changed, a button that updates it after a confirmation (disabled while the project
+ * is open). A double click opens the project, when the user may run it.
  */
 import { useDriveView } from '#/layouts/Drive/driveView'
+import { STOP_PRESS_PROPAGATION } from '#/layouts/Drive/pressPropagation'
+import {
+  isOpenOrOpening,
+  useConfirmedSampleUpdates,
+  useSampleWithUpdate,
+} from '#/layouts/Drive/samples'
 import ProjectIcon from '#/pages/dashboard/components/ProjectIcon.vue'
+import Badge from '$/components/Badge/Badge.vue'
+import Button from '$/components/Button/Button.vue'
 import EditableSpan from '$/components/EditableSpan/EditableSpan.vue'
 import { useContainerData } from '$/providers/container'
+import { useText } from '$/providers/text'
 import { isDoubleClick } from '$/utils/event'
 import { twMerge } from '$/utils/style/tailwindMerge'
 import type { ProjectAsset } from 'enso-common/src/services/Backend'
@@ -22,6 +33,15 @@ const container = useContainerData()
 const driveView = useDriveView()
 const backend = computed(() => driveView.location.backend)
 const { isEditingName, setIsEditing, doRename, schema } = useNameCell(() => item)
+const { getText } = useText()
+const sampleWithUpdate = useSampleWithUpdate(() => item)
+const { confirmUpdateSample } = useConfirmedSampleUpdates()
+const isOpen = computed(() => isOpenOrOpening(item))
+
+function updateSample() {
+  if (sampleWithUpdate.value == null || isOpen.value) return
+  return confirmUpdateSample(sampleWithUpdate.value)
+}
 
 function onKeyDown(event: KeyboardEvent) {
   if (isEditingName.value && isOnMacOS() && event.key === 'Enter') event.stopPropagation()
@@ -52,5 +72,30 @@ function onClick(event: MouseEvent) {
       :onSubmit="doRename"
       :onCancel="() => setIsEditing(false)"
     />
+    <Button
+      v-if="sampleWithUpdate != null && !isEditingName"
+      variant="custom"
+      size="custom"
+      rounded="full"
+      class="flex-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+      testId="sample-update-badge"
+      :aria-label="getText('updateSampleLabel', sampleWithUpdate.name)"
+      :isDisabled="isOpen"
+      :tooltip="
+        isOpen ? getText('updateSampleOpenTooltip') : getText('sampleUpdateAvailableDescription')
+      "
+      v-bind="STOP_PRESS_PROPAGATION"
+      @press="updateSample"
+    >
+      <Badge
+        variant="outline"
+        color="accent"
+        size="small"
+        icon="refresh"
+        class="transition-colors group-hover:bg-hover-bg"
+      >
+        {{ getText('sampleUpdateAvailable') }}
+      </Badge>
+    </Button>
   </div>
 </template>

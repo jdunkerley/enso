@@ -71,6 +71,12 @@ export class YjsBinaryChannel extends YjsChannel<JavaByteBuffer, Uint8Array> {
   >()
 
   /**
+   * Set when the channel closed because the last connection holding it let go, rather than because
+   * the Language Server ended it.
+   */
+  releasedByAll = false
+
+  /**
    * @param doc - The Yjs document for CRDT-based message synchronization
    * @param channelName - Unique identifier for this channel
    * @param server - Language Server callbacks to notify on connection
@@ -115,7 +121,10 @@ export class YjsBinaryChannel extends YjsChannel<JavaByteBuffer, Uint8Array> {
       if (released) return
       released = true
       entry.refs -= 1
-      if (entry.refs === 0) entry.channel.close()
+      if (entry.refs === 0) {
+        entry.channel.releasedByAll = true
+        entry.channel.close()
+      }
     }
     return { channel: entry.channel, release }
   }

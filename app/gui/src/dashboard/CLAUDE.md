@@ -27,8 +27,9 @@ only Dashboard-specific code.
   Buttons inside a row bind `STOP_PRESS_PROPAGATION`
   (`layouts/Drive/pressPropagation.ts`), so that a press on them does not reach
   the row. The table is an ARIA `grid` with one roving tab stop, and drags of
-  rows are announced in a live region (#208); `layouts/Drive/CLAUDE.md` has the
-  model. `layouts/Settings/` is the settings page.
+  rows are announced in a live region (#208); inside a folder its first row is
+  the `..` parent-folder entry (#640). `layouts/Drive/CLAUDE.md` has the model.
+  `layouts/Settings/` is the settings page.
 - `components/` — The drive's `ContextMenu.vue`. Shared primitives are in
   `src/components/`.
 - `modals/` — `CaptureKeyboardShortcutModal.vue`. The drive's other dialogs are

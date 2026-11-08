@@ -15,6 +15,7 @@ import { EngineLogHub } from '../engineLogs/hub.js'
 import type { JvmAotCache } from '../jvmAot/index.js'
 import type { ProjectLifecycleListener } from '../localMetadata/index.js'
 import { withinVersioningTimeout, type LocalVersioning } from '../localVersioning/index.js'
+import { samplesSettled } from '../samples/index.js'
 import {
   describeEngineMode,
   liftJvmFlag,
@@ -23,6 +24,7 @@ import {
   type EngineModeSettings,
 } from './engineMode.js'
 import {
+  comparableProjectPath,
   DEFAULT_YDOC_WAIT_MS,
   EnsoRunner,
   findEnsoExecutable,
@@ -39,7 +41,7 @@ import {
   type ProjectRepository,
 } from './projectRepository.js'
 import { engineTimeouts } from './timeouts.js'
-import { UUID, type Path } from './types.js'
+import { Path, UUID } from './types.js'
 import type { YdocHost } from './ydocHost.js'
 
 export {
@@ -168,6 +170,8 @@ export class ProjectService {
 
   /** Why the last close-commit of each project (by path) failed, until `closeProject` reports it. */
   private readonly versioningWarnings = new Map<string, string>()
+  /** The projects `openProject` is working on, by {@link comparableProjectPath}, with a count. */
+  private readonly openingProjects = new Map<string, number>()
 
   /** The engine logs of the open projects, served by `GET /api/engine-logs/stream`. */
   readonly engineLogs = new EngineLogHub()
@@ -329,7 +333,26 @@ export class ProjectService {
     this.logger.debug('Opening project', projectId)
 
     const project = await this.getProject(projectId, projectsDirectory, true)
+    const openingKey = comparableProjectPath(project.path)
+    this.openingProjects.set(openingKey, (this.openingProjects.get(openingKey) ?? 0) + 1)
+    try {
+      // Counted as opening first, so a samples change still queued sees it and leaves it alone.
+      await samplesSettled(project.path)
+      return await this.openFoundProject(project, projectId, projectsDirectory, engineLogging)
+    } finally {
+      const count = (this.openingProjects.get(openingKey) ?? 1) - 1
+      if (count > 0) this.openingProjects.set(openingKey, count)
+      else this.openingProjects.delete(openingKey)
+    }
+  }
 
+  /** The rest of {@link openProject}, once the project is found. */
+  private async openFoundProject(
+    project: Project,
+    projectId: UUID,
+    projectsDirectory: Path,
+    engineLogging: EngineLoggingOptions | undefined,
+  ): Promise<OpenProject> {
     // Update the lastOpened timestamp
     const openTime = toRfc3339(new Date())
     const updatedProject = { ...project, lastOpened: openTime }
@@ -529,6 +552,18 @@ export class ProjectService {
   /** Whether the project at `projectPath` is running. */
   async isProjectRunning(projectPath: Path): Promise<boolean> {
     return this.runner.isProjectRunning(projectPath)
+  }
+
+  /**
+   * Whether the project at `projectPath` is open or still opening, comparing paths whatever their
+   * separators (and case, on Windows). A project that is must not be changed on disk.
+   */
+  async isProjectOpenOrOpening(projectPath: string): Promise<boolean> {
+    if (this.openingProjects.has(comparableProjectPath(projectPath))) return true
+    if (this.runner.isProjectOpenOrOpening != null) {
+      return this.runner.isProjectOpenOrOpening(projectPath)
+    }
+    return this.runner.isProjectRunning(Path(projectPath))
   }
 
   /** Renames a project. */

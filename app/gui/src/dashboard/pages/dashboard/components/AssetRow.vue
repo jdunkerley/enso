@@ -16,7 +16,7 @@ import { ASSET_ROWS } from '#/layouts/Drive/drag'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useTabStopContents } from '#/layouts/Drive/rovingTabStop'
 import AssetColumnCell from '#/pages/dashboard/components/column/AssetColumnCell.vue'
-import { COLUMN_CSS_CLASS, type Column } from '#/pages/dashboard/components/column/columnUtils'
+import { Column, COLUMN_CSS_CLASS } from '#/pages/dashboard/components/column/columnUtils'
 import { directoryNavigationSource } from '#/pages/dashboard/components/column/nameColumn'
 import { useDragDelayAction } from '$/composables/dragDelay'
 import { useDriveLocation } from '$/providers/drive'
@@ -222,10 +222,10 @@ function onDragEnd() {
 }
 
 function onDragLeave(event: DragEvent) {
+  // No `relatedTarget`: the drag left the window.
   if (
-    event.relatedTarget instanceof Node &&
-    event.currentTarget instanceof Node &&
-    !event.currentTarget.contains(event.relatedTarget)
+    !(event.relatedTarget instanceof Node) ||
+    (event.currentTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget))
   ) {
     isDraggedOver.value = false
     driveStore.setDragTargetAssetId(null)
@@ -253,7 +253,7 @@ function onDrop(event: DragEvent) {
     :data-id="item.id"
     :class="
       twMerge(
-        'AssetRow h-table-row rounded-full transition-all ease-in-out rounded-rows-child',
+        'AssetRow DriveRow h-table-row rounded-full transition-all ease-in-out rounded-rows-child',
         visibility,
         (isDraggedOver || isSelected) && 'selected',
       )
@@ -271,41 +271,17 @@ function onDrop(event: DragEvent) {
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
-    <td v-for="column in columns" :key="column" :class="COLUMN_CSS_CLASS[column]">
+    <!-- A cell clips what does not fit the width its column was resized to. The name cell does
+    not need to (its contents shrink to fit, and its column is never narrower than they can be), and
+    must not: it could clip the focus ring of its state button. -->
+    <td
+      v-for="column in columns"
+      :key="column"
+      :class="[COLUMN_CSS_CLASS[column], column !== Column.name && 'overflow-hidden text-ellipsis']"
+    >
       <AssetColumnCell :column="column" :item="item" :labels="labels" />
     </td>
   </tr>
 </template>
 
-<style scoped>
-/*
- * The focus ring of a row reached with the keyboard. An outline on the row would be hidden under the
- * sticky name cell, so each cell draws its part of a pill-shaped ring as an inset shadow.
- */
-.AssetRow:focus-visible > td {
-  --ring: var(--color-primary);
-  box-shadow:
-    inset 0 2px 0 0 var(--ring),
-    inset 0 -2px 0 0 var(--ring);
-}
-
-.AssetRow:focus-visible > td:first-child {
-  border-top-left-radius: 9999px;
-  border-bottom-left-radius: 9999px;
-  box-shadow:
-    inset 2px 0 0 0 var(--ring),
-    inset 0 2px 0 0 var(--ring),
-    inset 0 -2px 0 0 var(--ring);
-}
-
-.AssetRow:focus-visible > td:last-child {
-  box-shadow:
-    inset -2px 0 0 0 var(--ring),
-    inset 0 2px 0 0 var(--ring),
-    inset 0 -2px 0 0 var(--ring);
-}
-
-.AssetRow:focus-visible > td:only-child {
-  box-shadow: inset 0 0 0 2px var(--ring);
-}
-</style>
+<style scoped src="./driveRowFocusRing.css" />

@@ -152,8 +152,9 @@ use:
 
 A `data-testid` is a contract: keep it on the equivalent element. The ones the
 page objects rely on include `drive-view`, `asset-row`, `asset-row-name`,
-`dummy-row`, `context-menu`, `modal-dialog`, `right-panel`, `asset-search-bar`,
-`directory-row-navigate-button` and `toast-host`.
+`dummy-row`, `parent-directory-row`, `context-menu`, `modal-dialog`,
+`right-panel`, `asset-search-bar`, `directory-row-navigate-button` and
+`toast-host`.
 
 ## Port parity checklist
 
@@ -199,6 +200,9 @@ description and ticks it off. The flake baseline it compares against is
 - Local versioning is mocked in `mock/localVersioning.ts` (state,
   `versioning/status`), with each feature's routes in `mock/versioning/`. Git is
   absent by default; a spec opts in through `setupApi.local`.
+- The bundled samples' routes (`samples/*`) are mocked in
+  `mock/localSamples.ts`: there are none by default; a spec adds them to
+  `api.samples` in `setupApi.local` (see `dashboard/localSamples.spec.ts`).
 - Avoid `page.waitForTimeout` — prefer role-based `toBeVisible` / `toHaveText`
   assertions.
 - **Never leave the cursor on the dashboard's left bar.** It expands over the

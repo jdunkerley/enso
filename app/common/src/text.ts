@@ -36,6 +36,7 @@ interface PlaceholderOverrides {
   readonly enterTheNewKeyboardShortcutFor: [actionName: string]
   readonly shortcutAlreadyUsedBy: [actionNames: string]
   readonly shortcutConflictsWith: [actionNames: string]
+  readonly resizeColumnX: [columnName: string]
 
   readonly updateAssetBackendError: [assetTitle: string]
   readonly getFileDetailsBackendError: [fileTitle: string]
@@ -83,9 +84,25 @@ interface PlaceholderOverrides {
   readonly dragAnnouncementStarted: [assets: string]
   readonly dragAnnouncementDroppedInto: [assets: string, directoryTitle: string]
   readonly dragAnnouncementDroppedHere: [assets: string]
+  readonly dragAnnouncementDroppedIntoParent: [assets: string]
   readonly dragAnnouncementDroppedOn: [assets: string, targetName: string]
   readonly dragAnnouncementDropped: [assets: string]
   readonly dragAnnouncementCancelled: [assets: string]
+  readonly updateSampleLabel: [sampleName: string]
+  readonly updateSampleTitle: [sampleName: string]
+  readonly updateSampleIntro: [sampleName: string]
+  readonly updateSampleRouteCopy: [keptName: string]
+  readonly updateSampleRouteIgnored: [files: string]
+  readonly updateSampleDone: [sampleName: string]
+  readonly updateSampleVersioned: [sampleName: string]
+  readonly updateSampleKept: [sampleName: string, keptName: string]
+  readonly updateSampleFellBack: [sampleName: string, reason: string]
+  readonly updateSampleError: [sampleName: string]
+  readonly updateSampleUnrenamed: [keptName: string]
+  readonly updateAllSamplesDone: [sampleNames: string]
+  readonly updateAllSamplesVersioned: [sampleNames: string]
+  readonly updateAllSamplesKept: [keptNames: string]
+  readonly updateAllSamplesFailed: [failures: string]
 }
 
 // This is intentionally unused. This line throws an error if `PlaceholderOverrides` ever becomes

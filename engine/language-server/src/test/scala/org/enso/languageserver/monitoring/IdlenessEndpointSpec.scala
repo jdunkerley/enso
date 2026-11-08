@@ -2,6 +2,7 @@ package org.enso.languageserver.monitoring
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.{HttpOrigin, Origin, RawHeader}
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.testkit.{RouteTestTimeout, ScalatestRouteTest}
 import org.enso.languageserver.TestClock
@@ -85,6 +86,52 @@ class IdlenessEndpointSpec
         status shouldEqual StatusCodes.OK
         responseAs[String] shouldEqual s"""{"idle_time_sec":0}"""
       }
+  }
+
+  it should "refuse a reset from a web page (#613)" in withEndpoint {
+    (clock, _, endpoint) =>
+      idleFor(clock, endpoint, 1L)
+      Post("/_idle/reset").addHeader(
+        Origin(HttpOrigin("https://evil.example"))
+      ) ~> endpoint.route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+      Post("/_idle/reset").addHeader(
+        RawHeader("Sec-Fetch-Site", "cross-site")
+      ) ~> endpoint.route ~> check {
+        status shouldEqual StatusCodes.Forbidden
+      }
+      Get("/_idle") ~> endpoint.route ~> check {
+        responseAs[String] shouldEqual s"""{"idle_time_sec":1}"""
+      }
+  }
+
+  it should "reset for a caller without Origin, as Node's fetch sends it" in withEndpoint {
+    (clock, _, endpoint) =>
+      idleFor(clock, endpoint, 1L)
+      Post("/_idle/reset").addHeader(
+        RawHeader("Sec-Fetch-Mode", "cors")
+      ) ~> endpoint.route ~> check {
+        status shouldEqual StatusCodes.OK
+      }
+      Get("/_idle") ~> endpoint.route ~> check {
+        responseAs[String] shouldEqual s"""{"idle_time_sec":0}"""
+      }
+  }
+
+  /** Let the monitor start, then move its clock on by `seconds`. */
+  private def idleFor(
+    clock: TestClock,
+    endpoint: IdlenessEndpoint,
+    seconds: Long
+  ): Unit = {
+    Get("/_idle") ~> endpoint.route ~> check {
+      responseAs[String] shouldEqual s"""{"idle_time_sec":0}"""
+    }
+    clock.moveTimeForward(seconds)
+    Get("/_idle") ~> endpoint.route ~> check {
+      responseAs[String] shouldEqual s"""{"idle_time_sec":$seconds}"""
+    }
   }
 
   def withEndpoint(

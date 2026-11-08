@@ -1,7 +1,7 @@
 /**
  * @file The Drive bar's New secret button: there with the desktop app's secrets API and a local
  * backend, absent without; it opens the secret dialog, and a created secret's `secret://` path is
- * shown in a toast with a Copy action.
+ * shown in a toast with a Copy action. And its Update All button, shown in the `Samples` folder.
  */
 import ModalHost from '$/components/ModalHost/ModalHost.vue'
 import { useModals } from '$/providers/modals'
@@ -10,13 +10,14 @@ import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { h } from 'vue'
+import { computed, h, ref } from 'vue'
 import DriveBarToolbar from '../DriveBarToolbar.vue'
 
 const fake = vi.hoisted(() => ({
   createSecret: vi.fn(),
   show: vi.fn(),
   hasBackend: true,
+  updateAll: null,
 }))
 
 vi.mock('$/providers/backends', async () => {
@@ -50,10 +51,23 @@ vi.mock('#/layouts/Drive/driveActions', () => ({
 }))
 vi.mock('#/layouts/Drive/datalinkActions', () => ({ useNewDatalink: () => vi.fn() }))
 vi.mock('#/layouts/AssetSearchBar.vue', () => ({ default: { render: () => null } }))
+vi.mock('#/layouts/Drive/samples', () => ({ useUpdateAllButton: () => fake.updateAll }))
+
+const updateAllShown = ref(false)
+const updateAllDisabled = ref(false)
+const runUpdateAll = vi.fn()
 
 const { getText } = useText()
 
 beforeEach(() => {
+  updateAllShown.value = false
+  updateAllDisabled.value = false
+  fake.updateAll = {
+    isShown: updateAllShown,
+    isDisabled: updateAllDisabled,
+    tooltip: computed(() => (updateAllDisabled.value ? 'Every sample is up to date' : 'Update')),
+    run: runUpdateAll,
+  }
   fake.hasBackend = true
   fake.createSecret.mockResolvedValue('local:x')
   vi.stubGlobal('api', { ...window.api, secrets: {} })
@@ -143,5 +157,30 @@ describe('DriveBarToolbar New secret', () => {
     await mountToolbar()
     await createSecretInDialog(userEvent.setup())
     await vi.waitFor(() => expect(fake.show).toHaveBeenCalledWith('no key', { type: 'error' }))
+  })
+})
+
+describe('DriveBarToolbar Update All', () => {
+  const updateAllButton = () =>
+    document.querySelector<HTMLElement>('[data-testid="update-all-samples"]')
+
+  test('is absent outside the Samples folder', async () => {
+    await mountToolbar()
+    expect(updateAllButton()).toBeNull()
+  })
+
+  test('is there in the Samples folder, and runs the update', async () => {
+    updateAllShown.value = true
+    await mountToolbar()
+    expect(updateAllButton()?.textContent.trim()).toBe(getText('updateAllSamples'))
+    await userEvent.setup().click(required(updateAllButton()))
+    expect(runUpdateAll).toHaveBeenCalledOnce()
+  })
+
+  test('is disabled when no sample has an update', async () => {
+    updateAllShown.value = true
+    updateAllDisabled.value = true
+    await mountToolbar()
+    expect(required(updateAllButton()).hasAttribute('disabled')).toBe(true)
   })
 })

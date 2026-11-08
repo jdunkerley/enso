@@ -131,26 +131,37 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   addresses (its port under each loopback name, and Vite's `resolvedUrls`). A
   dev server opened by the machine's host name, through `server.origin` or a
   reverse proxy is refused: add the origin to `devServerOrigins` in
-  `gui/vite.config.ts`. No list refuses every browser page. Not covered: the
-  engine-hosted server (`ENSO_YDOC_HOST=engine`), and other local processes,
-  which can omit `Origin`.
+  `gui/vite.config.ts`. No list refuses every browser page. The engine-hosted
+  server (`ENSO_YDOC_HOST=engine`) makes the same check since #614, with the
+  host's `allowedOrigins()` passed in `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS`.
+  GraalJS has no `URL`, so `originOf` falls back to `parseOrigin` there: `http`
+  and `https` only, canonical hosts only (dotted-quad IPv4, `[::1]`, no `xn--`),
+  and anything it does not recognise is refused. `origin.test.ts` holds it to
+  `URL`'s answers over the #628 review's adversarial cases. Not covered: other
+  local processes, which can omit `Origin` (#615).
 - **A socket for a document its session does not hold is refused before the
   upgrade** (#601, Note [An Unknown Document Is Refused Before The Upgrade] in
-  `src/nodeHost.ts`): `404` for a module doc the `ls=` session does not hold (or
-  a session that does not exist yet), `400` with no doc or no `ls=`.
+  `src/handshake.ts`): `404` for a module doc the `ls=` session does not hold
+  (or a session that does not exist yet), `400` with no doc or no `ls=`.
   `y-websocket` resets its backoff when a socket opens, so upgrading and then
   closing made a stale client retry every ~100 ms (91 attempts in 10 s,
   measured); refused before the upgrade it backs off (7 in 10 s). The
-  engine-hosted server still upgrades and closes (#614).
+  engine-hosted server refuses the same way since #614 (`documentRefusal`,
+  through the polyfill's `verifyClient`).
 - **One session opens two `json` sockets**, not one: `YjsServerTransport` hands
   the Language Server a proxy channel (for the GUI) and a backend channel (the
   ydoc server's own). The Language Server must accept both.
 - **An LS restart takes the GUI sockets with it.** When a `json` socket closes
   without the ydoc side having closed it, the listener closes every GUI socket
   it holds and the session goes with them; the GUI reconnects, as after an
-  engine restart when the server lived in the engine. The session's own
-  `YjsServerTransport` closes too when the Language Server ends either of its
-  channels (Note [The Language Server Ends A Channel] in
+  engine restart when the server lived in the engine. The end of any other
+  channel (`vis-control`, `vis-data`, `binary`) ends its own session the same
+  way (`LanguageServerSession.channelLost`: its guarded `unregister`, then its
+  GUI sockets closed): no channel reconnects, and a session that lost
+  `vis-control` sent its attaches nowhere, so the project never executed (#646,
+  Note [A Lost Channel Ends The Session] in `src/languageServerSession.ts`). The
+  session's own `YjsServerTransport` closes too when the Language Server ends
+  either of its channels (Note [The Language Server Ends A Channel] in
   `ydoc-shared/src/util/net/YjsTransport.ts`), so the session gives up its URL
   at once. Before that, a session outlived the engine's restart, sent into dead
   channels for ~75 s and then took `src/Main.enso`'s write capability from the

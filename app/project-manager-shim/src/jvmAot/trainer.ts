@@ -25,8 +25,7 @@ import { enginePaths, readJvmOptionsText } from './key.js'
  * `NoClassDefFoundError: jdk/vm/ci/services/Services`, leaving only the `.config` (2026-11-05). So
  * the training engine records (`-XX:AOTMode=record -XX:AOTConfiguration=`), and the bundled `java`
  * then creates the cache with the options the launcher gives its JVM (`aotCreateArguments`), as
- * the open-time harness has done since it made its own caches (`perf/jvmAotCache.ts` in
- * `app/electron-client`).
+ * the open-time harness did when it made its own caches (it now measures this one instead).
  */
 
 /** Trains a cache into `output`; rejects (with an `AbortError` on `signal`) and leaves no file on failure. */

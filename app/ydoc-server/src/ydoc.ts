@@ -150,9 +150,16 @@ export function setupGatewayClient(
       YjsBinaryChannel.acquire(lsSession.indexDoc.doc, dataUrl, binaryChannelServer, byteBuffer)
     : undefined
 
+  // Note [A Lost Channel Ends The Session] in `languageServerSession.ts`.
+  // The handler goes with this connection: a long-lived channel must not collect one per socket.
+  const stopWatchingData = dataSocket?.channel.onClose(() => {
+    if (!dataSocket.channel.releasedByAll) lsSession.channelLost()
+  })
+
   const connection = new YjsConnection(ws, wsDoc)
   connection.once('close', async () => {
     try {
+      stopWatchingData?.()
       dataSocket?.release()
       await lsSession.release()
       if (LanguageServerSession.sessions.size === 0) {

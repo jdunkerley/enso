@@ -218,6 +218,71 @@ test('the GUI reconnects to a restarted LS and gets a fresh working session', as
   }
 })
 
+// #646: the Language Server's WebSocket keep-alive dropped an idle channel socket now and then
+// (without a close frame, so `1006`), and the session carried on without it: attaches written to a
+// dead `vis-control` channel never reached the runtime, so nothing ever executed. A lost channel of
+// any kind now ends its session, as a lost JSON channel does (Note [A Lost Channel Ends The
+// Session] in `languageServerSession.ts`).
+describe.each(['vis-control', 'vis-data', 'binary'])(
+  'the LS dropping the %s channel (#646)',
+  (kind) => {
+    const lsName = () => `ws://127.0.0.1:${ls.port}`
+
+    /** The dropped session's channels are all gone: only the fresh session's are open. */
+    async function onlyFreshChannelsOpen() {
+      await vi.waitFor(() => {
+        expect(ls.open('json')).toHaveLength(JSON_SOCKETS)
+        expect(ls.open('binary')).toHaveLength(1)
+        expect(ls.open('vis-control')).toHaveLength(1)
+        expect(ls.open('vis-data')).toHaveLength(1)
+      })
+    }
+
+    /**
+     * Open a GUI, drop its session's `kind` channel, and reconnect to a fresh session. With `hold`,
+     * the dropped session is retained once more, so that it is replaced but not yet disposed.
+     */
+    async function dropAndReconnect(hold = false) {
+      const gui = connectGui('index', 'gui-data-646')
+      await firstMessage(gui)
+      await vi.waitFor(() => expect(ls.open(kind)).toHaveLength(1))
+      const dropped = LanguageServerSession.sessions.get(lsName())
+      expect(dropped).toBeDefined()
+      if (hold) dropped!.retain()
+      // An abrupt end, as the keep-alive failure was: no close frame.
+      ls.open(kind)[0]!.socket.terminate()
+      await vi.waitFor(() => expect(gui.readyState).toBe(WebSocket.CLOSED), { timeout: 5000 })
+      const again = connectGui('index', 'gui-data-646')
+      await firstMessage(again)
+      const fresh = LanguageServerSession.sessions.get(lsName())
+      expect(fresh).toBeDefined()
+      expect(fresh).not.toBe(dropped)
+      if (!hold) await onlyFreshChannelsOpen()
+      return { dropped: dropped!, fresh: fresh!, again }
+    }
+
+    test('closes the GUI sockets, and the GUI reconnects to a fresh session', async () => {
+      await dropAndReconnect()
+    })
+
+    test('a late channel end of the replaced session leaves the fresh one working', async () => {
+      // The old session is still alive (a GUI socket of it slow to close), so a late end of
+      // another of its channels reaches `channelLost` past its `disposed` check.
+      const { dropped, fresh, again } = await dropAndReconnect(true)
+      try {
+        dropped.channelLost()
+        await settle()
+        expect(LanguageServerSession.sessions.get(lsName())).toBe(fresh)
+        expect(again.readyState).toBe(WebSocket.OPEN)
+      } finally {
+        await dropped.release()
+      }
+      await onlyFreshChannelsOpen()
+      expect(LanguageServerSession.sessions.get(lsName())).toBe(fresh)
+    })
+  },
+)
+
 // The four socket races found on the engine-hosted server (JVM + GraalJS), tested again on this
 // transport: each runs its cycle 50 times.
 const CYCLES = 50

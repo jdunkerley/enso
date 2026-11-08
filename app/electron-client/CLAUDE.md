@@ -68,25 +68,29 @@ desktop binary (AppImage/DMG/exe + installer).
   release (see `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
   `tests/headless/ydocHostClient.test.ts` (against a fake child),
   `tests/headless/ydocHostServe.test.ts`.
-- Installs the bundled sample projects at start-up (`installSamples` in
-  `project-manager-shim`, called from `onStart`): `samples/` in this package is
-  shipped as `resources/samples` (`extraResources`) and copied to
-  `<projects>/Samples` only when that directory is missing. Nothing is
-  downloaded. `main` waits for the copy (at most 10 s, then loads anyway, and
-  logs a failed copy) before it loads the window, because on a fresh install the
-  dashboard opens `Samples/Getting_Started` once
-  (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in the GUI's
-  `router/dashboardGuards.ts`; `--no-welcome-project` turns it off, and the
-  Playwright fixture passes it unless a spec sets `welcomeProject`). The samples
-  are original and use synthetic data; each is a project that reads the shared
-  `samples/Data` folder (installed as `Samples/Data`) and writes to its own
-  `output/`. Their layout, house style, how to regenerate their stored node
+- Installs the bundled sample projects at start-up and keeps them up to date
+  (`LocalSamples.sync` in `project-manager-shim`, called from `onStart`; the
+  same `LocalSamples` serves the Drive's `samples/` routes through `server.ts`):
+  `samples/` in this package is shipped as `resources/samples`
+  (`extraResources`) and copied to `<projects>/Samples` when that directory is
+  missing; later starts update unedited samples and copy in new ones (see
+  `project-manager-shim/CLAUDE.md`, "Sample projects"). Nothing is downloaded.
+  `main` waits for the check (at most 10 s, then loads anyway, and logs a
+  failure) before it loads the window, because on a fresh install the dashboard
+  opens `Samples/Getting_Started` once (`LOCAL_WELCOME_PROJECT_RELATIVE_PATH` in
+  the GUI's `router/dashboardGuards.ts`; `--no-welcome-project` turns it off,
+  and the Playwright fixture passes it unless a spec sets `welcomeProject`). The
+  samples are original and use synthetic data; each is a project that reads the
+  shared `samples/Data` folder (installed as `Samples/Data`) and writes to its
+  own `output/`. Their layout, house style, how to regenerate their stored node
   positions and how to run them are in `samples/CLAUDE.md` (checked by
   `tests/headless/samples.test.ts`). They must run on the current engine, so
   re-run them with `enso --run` after a standard-library change that touches
   `Data.read`, the table API, or `Standard.SQLite`. The Getting Started
   Playwright spec adds its own `tests/fixtures/sample_bank_data.xlsx` to
-  `Samples/Data` (`addBankData`).
+  `Samples/Data` (`addBankData`). `tests/samples.spec.ts` checks that opening a
+  sample is not an edit, the manifest, and the "Update available" pill (outside
+  version control, so the edited copy is kept) against the real shim.
 - Streams the open project's engine log to the window
   (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
   from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).
@@ -102,12 +106,25 @@ desktop binary (AppImage/DMG/exe + installer).
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts` — `manual` for
   dev builds, and for unsigned macOS, which cannot replace itself; an unpackaged
   run or a Linux build outside an AppImage is also `manual` at run time
-  (`resolveUpdateMode`). Manual mode never touches `electron-updater`. The
+  (`resolveUpdateMode`). Manual mode never touches `electron-updater`: the GUI
+  (`app/gui/src/versionChecker/`) compares semver versions itself, and with the
+  setting on lists `/releases` and offers the newest release or rc, never a
+  nightly (auto mode matches the current version's channel, so an `rc` install
+  sees only `rc` tags, while a stable install takes the feed's first entry). The
   "Include prerelease versions" setting sets `allowPrerelease` for each check;
   because `electron-updater` then matches only tags of the current version's
   channel (an `rc` install sees only `rc` tags), a prerelease check that finds
-  nothing is followed by a stable-only check (`/releases/latest`), whose failure
-  counts as no update. Don't set `channel` instead: it enables `allowDowngrade`.
+  nothing **or throws** is followed by a stable-only check (`/releases/latest`).
+  The check is an error only when both fail (the prerelease error is shown,
+  unless it only said nothing was published). "No stable release" is no update,
+  not an error: on github.com the stable request does not answer 404 for it (the
+  fork answers a redirect to a page that gives 406, thrown as
+  `ERR_UPDATER_INVALID_RELEASE_FEED` or `ERR_UPDATER_LATEST_VERSION_NOT_FOUND`),
+  so those codes (and the no-published ones) are confirmed with the GitHub API's
+  own `/releases/latest` 404 (`confirmNoStableRelease`, cached for an hour)
+  rather than read from the message. A prerelease failure followed by a
+  confirmed "no stable release" is `none` with a `console.warn`. Don't set
+  `channel` instead: it enables `allowDowngrade`.
 - Holds the local secrets master key (`src/secretsKey.ts`, wired in
   `projectService.ts`). Sources, in order: `ENSO_SECRETS_KEY`, then the keychain
   item service `Enso`, account `secrets-key`, through `@napi-rs/keyring`. At
@@ -203,10 +220,11 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   `<userData>/jvm-aot` (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
   cache trains in the background, once the window is up, only when the JVM is
   the default engine; `before-quit` stops a running training. The open-time
-  harness points it at an empty directory of its run (`<out>/shim-jvm-aot`), so
-  its JVM launches never pick up the user's cache. An empty value counts as
-  unset. The root and the gate are in `src/jvmAotSettings.ts` (tested in
-  `tests/headless/jvmAotSettings.test.ts`).
+  harness points it at a directory of its run (`<out>/jvm-aot` for the JVM
+  engines, `<out>/shim-jvm-aot` for native, which never trains) and measures
+  that cache (see "Open-time harness"), so its launches never pick up the
+  user's. An empty value counts as unset. The root and the gate are in
+  `src/jvmAotSettings.ts` (tested in `tests/headless/jvmAotSettings.test.ts`).
 - `APPIMAGE` (set by the AppImage runtime) — with the JVM as the default engine
   (`--engine-mode`, `ENSO_ENGINE_MODE`, then the built-in default; nothing
   happens while it is native), a Linux AppImage runs its engine from a copy at
@@ -372,10 +390,23 @@ the scope where the AI's new node would land — exactly the same scope the
 generated `body` will see, so every in-scope binding listed in the prompt is
 referenceable by name (and one call can stitch several of them together, e.g.
 `(cards.join leader_order on=["Set"]).column_names.to_json`). The server writes
-a temporary JSON config file (`<tmpdir>/enso-claude-mcp-<pid>-<uuid>.json`) and
-that path is passed to the agent as `--mcp-config <path> --strict-mcp-config`;
+a JSON config file (`<userData>/enso-claude-mcp-<pid>-<uuid>.json`) and that
+path is passed to the agent as `--mcp-config <path> --strict-mcp-config`;
 `--strict-mcp-config` makes the CLI ignore any project- or user-level MCP config
-so the session is hermetic. The temp file is deleted on shutdown.
+so the session is hermetic. The file is deleted on shutdown.
+
+**Who may call it (#616):** loopback is not enough, since any local process and
+any web page in the user's browser can reach the port, and during a turn the
+tool runs Enso code in the open project. The server makes a random bearer token
+at start-up and writes it into the config file
+(`headers: { Authorization: "Bearer …" }`, which the CLI sends on every
+request). The file lives in the app's `userData` (per-user on every OS; a
+Windows `TEMP` can be shared), is created new (`wx`) with mode `0600`, and is
+deleted first thing in `shutdown()`. A request without the token, or with
+another one, gets `401`; a request with any `Origin` header gets `403` (the CLI
+sends none). Both are checked before the MCP transport sees the request, and
+refusals are logged at the 1st, 10th, 100th, … only — Note [The AI MCP Server
+Checks Its Caller] in `aiMcpServer.ts`.
 
 **Text-only return contract:** the LS evaluates the expression `inFrame` and the
 engine's `VisualizationResult.visualizationResultToBytes` only knows how to
@@ -784,7 +815,7 @@ section 2). It is not a Playwright Test run: it drives Electron through
 `playwright`'s `_electron` and is started with
 
 ```
-corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm-nocache,jvm] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics] [--jvm-options <opts>] [--template welcome|image]
+corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm,jvm-first] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics] [--jvm-options <opts>] [--template welcome|image]
 ```
 
 It needs a built `dist/ide/` (or `--exe`), and under Linux a display
@@ -844,52 +875,111 @@ any variable named `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_KEY` or
 measurement is not changed by them. Still unset the credentials in the shell
 before a manual run.
 
-`--engines jvm` runs the engine on the bundled JDK instead of the native image
-(`ENSO_ENGINE_ARGS=--jvm`). It first builds a JDK AOT cache under `<out>/aot/`
-(`perf/jvmAotCache.ts`: a training launch, `-XX:AOTMode=create` with the
-bundle's `java`, then a launch with `-XX:AOTMode=on` that checks the JVM accepts
-it: with `on` a JVM that cannot use the cache fails to start, and so does every
-measured launch). So a JVM run takes several minutes longer than a native one.
-The report says how the cache was made (`jvmAot`): `ide-trained` (the training
-is a launch of the IDE), `launcher-trained` (when the IDE training launch wrote
-no training file, it is `enso --jvm --run` of an empty project: it never loads
-the Language Server or `project/open` classes, so those JVM numbers are
-pessimistic and not comparable with `ide-trained` ones) or `uncached` (the JVM
-refused the cache; the numbers are those of a JVM with no AOT cache, and the
-report warns). `LAUNCHER_JVM_OPTIONS` copies the options of `Main.launchJvm`; a
-unit test fails when they drift. The training and check launches keep their own
-directories (`jvm-aot-train/`, `jvm-aot-check/`, with the JVM's `aot` and `cds`
-records at `info` in `electron-out.log`), and a launch that fails saves
-`failed.png`. On Windows the IDE training launch was always `launcher-trained`,
-for two reasons. The recording JVM, which has no class data sharing at all (the
-bundled runtime has no default CDS archive), had not passed its first health
-check after 30 s, so the project service killed it; the training launch now
-gives it 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`; Note [The Training Launch
-Needs A Longer Start-up Timeout]). And the JVM writes the file as it exits,
-which takes seconds, while the harness closed the IDE right after the project
-and so killed it; the training launch now waits for the file (Note [The Training
-File Is Written After The Project Closes]). Both Notes are in
-`perf/jvmAotCache.ts`.
+Every launch sets the engine mode as a user would: `ENSO_ENGINE_MODE=native` or
+`jvm` (`engineEnv` in `perf/openTime.ts`), so the shim decides whether to pass
+`--jvm`, and which timeouts apply. The engines are:
 
-`--engines jvm-nocache` is the JVM with no AOT cache of ours, what `--jvm` gives
-a user, so `native,jvm-nocache,jvm` measures what the cache is worth. Every JVM
-launch copies the JVM's performance counters (`hsperf/`: class loading, linking
-and initialisation time, classes from the AOT cache, HotSpot compiler and GC
-time) when the first node and the welcome table show and after the extras (Note
-[JVM Counters At Each Phase]). `--jvm-diagnostics` adds one launch per JVM
-engine, outside the medians (`<engine>-diag/`), that traces Truffle's
-compilations (Note [Truffle Diagnostics]), and `--jvm-options` adds JVM options
-to the JVM engines, for an experiment. They are engine options, so they go in
-`ENSO_JVM_OPTIONS` (which the launcher adds to the JVM it starts; see
-`engine/runner/CLAUDE.md`), not `JAVA_TOOL_OPTIONS`, and they apply to the AOT
-training, check and `-XX:AOTMode=create` launches too, since a cache must be
-trained with the options it is used with. The `create` step starts `java`
-itself, so it adds the lines of the package's `jvm.options`
-(`parseJvmOptionsFile`) as well as `LAUNCHER_JVM_OPTIONS`; a unit test reads
-`distribution/engine/jvm.options` so the two cannot drift. Truffle diagnostics
-stay in `JAVA_TOOL_OPTIONS`. CI uploads `electron-out.log` and `hsperf/` too; by
-hand, `ide-packaging.yml` takes `open_perf_engines`, `open_perf_runs`,
-`open_perf_budget`, `open_perf_diagnostics` and `open_perf_jvm_options`.
+- `native`: the native image.
+- `jvm`: the JVM as a user has it after the first open. The shim's own AOT cache
+  (`project-manager-shim/CLAUDE.md`, "JDK AOT cache") lives in
+  `ENSO_JVM_AOT_DIR=<out>/jvm-aot`, never the user's. Before the measured
+  launches one preparation launch (`jvm-aot-prepare/`) idles on the dashboard
+  until `<out>/jvm-aot/<key>/enso.aot` exists (polled every second, 10 minutes
+  at most; the trainer renames the file into place when complete). The report's
+  `shimAot` records `trainingMs` (launch to file), `cacheBytes`, and
+  `rejectedIn`, the launches after which the cache was gone, which is what the
+  shim does with a cache the JVM rejected: a warning, and that launch and the
+  later ones ran uncached. `uncachedIn` is the JVM's own evidence: the launches
+  whose JVMs loaded under 5000 classes from the cache (hsperf `sharedClasses`:
+  ~18,000 with it, ~1,500 without), which also catches a cache skipped without a
+  warning (Note [The Shim's AOT Cache Is Prepared Before The Launches]). It is
+  judged open by open, on each open's own JVMs (started after the launch began
+  and after that open's click), so a cached second open cannot hide an uncached
+  first one and an older launch's surviving JVM is ignored; `uncheckedIn` lists
+  the launches with no such counters (hsperf unreadable, or `-XX:-UsePerfData`),
+  with a warning, instead of skipping them silently. A baseline report counts
+  for `jvm` only when it has `shimAot`: older `jvm` runs had the harness's own
+  cache. `open-time.md` prints it under the caption.
+- `jvm-first`: the same variables, with `<out>/jvm-aot` deleted before every
+  launch: a user's very first launch. Nothing trains during its open: the shim
+  stops a running training when an open starts and restarts it 60 s after the
+  open was answered (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). A
+  delete that fails (a JVM of the last launch still holding `enso.aot` on
+  Windows) is retried, then the launch is recorded as failed.
+
+`jvm-nocache` is gone (`parseEngines` says so, naming `jvm-first`), and with it
+the harness's own recorded-and-created cache (`perf/jvmAotCache.ts`): the
+numbers are of the cache users get. On a runner the AOT preparation counts
+against the engine's `--budget-minutes`. Every JVM launch copies the JVM's
+performance counters (`hsperf/`: class loading, linking and initialisation time,
+classes from the AOT cache, HotSpot compiler and GC time) when the first node
+and the welcome table show and after the extras (Note [JVM Counters At Each
+Phase]). `--jvm-diagnostics` adds one launch per JVM engine, outside the medians
+(`<engine>-diag/`), that traces Truffle's compilations (Note [Truffle
+Diagnostics]), and `--jvm-options` adds JVM options to the JVM engines, for an
+experiment. They are engine options, so they go in `ENSO_JVM_OPTIONS` (which the
+launcher adds to the JVM it starts; see `engine/runner/CLAUDE.md`), not
+`JAVA_TOOL_OPTIONS`; the shim's training inherits the variable, so the cache is
+trained with the options it is used with. Truffle diagnostics stay in
+`JAVA_TOOL_OPTIONS`.
+
+**RSS** is reported, not gated. On the first open of every launch the harness
+sums the memory of the engine's processes (the launcher, the native image or
+`java` under it, and their children: descendants of the Electron process named
+`enso`, `enso.exe`, `java` or `java.exe`, never Electron's own `--type=` helpers
+and any process running the IDE's own binary, which on Windows includes the real
+main process under Playwright's launcher) and of the ydoc host's utility process
+(its pid is the last `ydoc host pid=` line of the output), at `welcomeShown` and
+30 s later (`perf/processRss.ts`: `ps -axo` on Linux and macOS,
+`Get-CimInstance Win32_Process` on Windows, whose working set is the figure).
+`open-time.md` prints the medians in MiB, a row per engine (`rss` in
+`open-time.json`; "Working set" on Windows, which is not Linux's resident set,
+so compare engines within a platform). A process that is not found is no sample,
+never 0 KiB, and is warned about. Each launch directory has
+`rss-welcomeShown.json` and `rss-welcomeShown-30s.json` listing the processes
+that were summed (pid, parent, KiB, command line). The sample is taken before
+the extras and its PowerShell query costs the first open's extras about 0.5 s on
+Windows (Note [RSS Is Sampled On The First Open]). The 30 s are waited out
+before the project closes, so the second open of such a launch starts later; see
+Note [RSS Is Sampled On The First Open].
+
+**The gate** (`perf/gate.ts`) is the JVM-by-default plan's: the median over
+three dispatches of the ratio JVM/native, within each dispatch, for
+`welcomeShown` (welcome template) and `libraryShown` (`image` template), both at
+most 1.5 passing and either over 1.6 failing (between: the owner decides), on
+the values as printed. Run a dispatch with
+`open_perf_engines=native,jvm,jvm-first` and `open_perf_template=welcome,image`
+with `open_perf_runs=5` (the default; keep it: with 3 launches per cell, a
+single hang leaves a cell under the 3 successes it needs and the result is
+"insufficient data"), download both platforms
+(`gh run download <id> --name open-perf-windows --dir <dir>/<id>/windows`, and
+`open-perf-linux`), and
+
+```
+corepack pnpm --filter enso exec vite-node perf/gate.ts -- <dir>/<id1> <dir>/<id2> <dir>/<id3>
+```
+
+prints, per platform, the per-dispatch ratios with their launch counts
+(`successes/launches` for the JVM, and native's) and the gate value of `jvm` and
+`jvm-first`. It drops nothing quietly (Note [The Gate Drops Nothing]): a JVM
+launch that never reached the phase ranks as slower than every success (and a
+native one as faster), a cell with fewer than 3 successes is incomplete, and
+without three dispatches whose Windows `jvm` cells are all complete it prints
+"insufficient data" instead of an outcome, and then the last table row is the
+plain median of the ratios, labelled "not a gate value". Given four or more
+dispatches it uses the latest three (the last directories given) whose Windows
+`jvm` cells are complete, and shows the others without using them: the last
+column of the table says which rows were used and why each other was set aside
+(incomplete, or older than the latest three). Only Windows has an outcome; Linux
+and macOS are informational. It refuses a dispatch whose `jvm` launches have no
+`shimAot` (made before PR K, with the harness's own cache). The `image`
+template's headline is both marks at once, and a report records it as
+`welcomeShown`, so `libraryShown` falls back to it, for a report of the `image`
+project only.
+
+CI uploads `electron-out.log` and `hsperf/` too; by hand, `ide-packaging.yml`
+takes `open_perf_engines`, `open_perf_runs`, `open_perf_budget`,
+`open_perf_diagnostics` and `open_perf_jvm_options`.
 
 `--template image` opens, instead of the new-project template, a project whose
 first node calls `Standard.Image` on a PNG in its `data/` and whose second shows
@@ -904,9 +994,10 @@ launches copy the guest JVM's counters too. `ide-packaging.yml` takes it as
 `tests/packagedIde.ts` holds where the packaged app, its engine launcher, its
 `java` and its engine component are; the Playwright specs, `globalSetup.ts` and
 the harness share it. The harness's pure logic (`perf/openTimeReport.ts`, and
-`perf/jvmCounters.ts`, which reads the copied counters into `jvm` marks) has
-unit tests: `corepack pnpm --filter enso exec vitest --run tests/headless`. CI
-runs the harness in `ide-packaging.yml` (Note [Open Time In CI]).
+`perf/jvmCounters.ts`, which reads the copied counters into `jvm` marks;
+`perf/processRss.ts`; `perf/gate.ts`) has unit tests:
+`corepack pnpm --filter enso exec vitest --run tests/headless`. CI runs the
+harness in `ide-packaging.yml` (Note [Open Time In CI]).
 
 **`guiConnected` is when the socket opened, not when it was created** (Note [The
 GUI Is Connected When Its Socket Is Open] in `perf/openTimeReport.ts`). It used

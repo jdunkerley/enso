@@ -10,6 +10,7 @@ import { useExportArchive, useMutationCallback, useNewProject } from '#/layouts/
 import { canDownloadAsset } from '#/layouts/Drive/downloadEntry'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useGlobalContextMenuEntries } from '#/layouts/Drive/globalContextMenuEntries'
+import { useSampleMenuEntries } from '#/layouts/Drive/samples'
 import ManageLabelsModal from '#/components/labels/ManageLabelsModal.vue'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { useCopy } from '$/components/Button/copy'
@@ -104,6 +105,11 @@ const globalContextMenuEntries = useGlobalContextMenuEntries({
   directoryId: () => (canAddToThisDirectory.value ? (asset.id as backendModule.DirectoryId) : null),
   doPaste: (id) => doPaste(id),
 })
+
+const sampleEntries = useSampleMenuEntries(
+  () => asset,
+  () => isRunningProject.value,
+)
 
 const systemApi = window.api?.system
 
@@ -203,6 +209,7 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
         void editDatalink(asset)
       },
     },
+    ...sampleEntries.value,
     asset.type === backendModule.AssetType.project && {
       action: 'duplicate',
       doAction: () => {

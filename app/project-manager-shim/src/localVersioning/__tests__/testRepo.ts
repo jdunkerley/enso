@@ -58,3 +58,17 @@ export function createVersioning(userDataDirectory: string): LocalVersioning {
 export function versioningFor(repoDir: string): LocalVersioning {
   return createVersioning(path.join(path.dirname(repoDir), 'userData'))
 }
+
+/** Whether the file system under `dir` finds a file under another case (Windows, macOS). */
+export async function ignoresCaseIn(dir: string): Promise<boolean> {
+  const probe = path.join(dir, 'CaseProbe.txt')
+  await fs.writeFile(probe, '')
+  try {
+    return await fs.access(path.join(dir, 'caseprobe.txt')).then(
+      () => true,
+      () => false,
+    )
+  } finally {
+    await fs.rm(probe)
+  }
+}

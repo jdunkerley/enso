@@ -49,6 +49,18 @@ describe('useRovingTabStop', () => {
   })
 })
 
+describe('forgetTabStop', () => {
+  test('forgets the row focused last only when it is that row', () => {
+    const tabStop = useRovingTabStop(['entry', 'a', 'b'], (key) => key === 'b')
+    tabStop.setTabStop('entry')
+    expect(tabStop.index.value).toBe(0)
+    tabStop.forgetTabStop('a')
+    expect(tabStop.index.value).toBe(0)
+    tabStop.forgetTabStop('entry')
+    expect(tabStop.index.value).toBe(2)
+  })
+})
+
 describe('useTabStopContents', () => {
   let scope: EffectScope | undefined
 

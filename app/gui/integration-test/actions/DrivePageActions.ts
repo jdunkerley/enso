@@ -33,11 +33,16 @@ function locateAssetRows(page: Page) {
   return locateAssetsTable(page).getByTestId('asset-row')
 }
 
-/** Find assets table placeholder rows. */
+/** Find assets table placeholder rows (not the assets' rows, nor the parent-folder entry). */
 function locateNonAssetRows(page: Page) {
   return locateAssetsTable(page).locator(
-    'tbody tr:not([data-testid="asset-row"]):not([data-testid="dummy-row"])',
+    'tbody tr:not([data-testid="asset-row"]):not([data-testid="dummy-row"]):not([data-testid="parent-directory-row"])',
   )
+}
+
+/** Find the parent-folder entry, the `..` row at the top of a folder's listing. */
+function locateParentDirectoryRow(page: Page) {
+  return locateAssetsTable(page).getByTestId('parent-directory-row')
 }
 
 /** Find a radio button that navigates to specified drive category. */
@@ -189,6 +194,33 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
           await getRow(page, row).dblclick({ position: ASSET_ROW_SAFE_POSITION })
         })
       },
+      /** Interact with the parent-folder entry (it need not be shown). */
+      withParentDirectoryRow(callback: LocatorCallback<Context>) {
+        return self.step('Interact with the parent-folder entry', (page, context) =>
+          callback(locateParentDirectoryRow(page), context),
+        )
+      },
+      /** Double click the parent-folder entry, to open the folder above. */
+      doubleClickParentDirectoryRow() {
+        return self.step('Double click the parent-folder entry', async (page) => {
+          await locateParentDirectoryRow(page).dblclick({ position: ASSET_ROW_SAFE_POSITION })
+        })
+      },
+      /** Drag a row onto the parent-folder entry. */
+      dragRowToParentDirectoryRow(from: number | string) {
+        return self.step(
+          `Drag drive table row '${from}' to the parent-folder entry`,
+          async (page) => {
+            const fromRow = getRow(page, from)
+            await fromRow.click()
+            await fromRow.dragTo(locateParentDirectoryRow(page), {
+              sourcePosition: ASSET_ROW_SAFE_POSITION,
+              targetPosition: ASSET_ROW_SAFE_POSITION,
+            })
+            await parkMouse(page)
+          },
+        )
+      },
       /** Interact with the set of all rows in the Drive table. */
       withRows(
         callback: (
@@ -288,32 +320,41 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
           await expect(nonAssetRows).toHaveText(/This folder is empty/)
         })
       },
-      /** Toggle a column's visibility. */
+      /**
+       * Toggle a column's visibility: the button named after the column, in its heading while it
+       * shows, or in the bar of hidden columns. (By role: a heading cell is labelled by its heading's
+       * text too, so `getByLabel` would find it as well.)
+       */
       get toggleColumn() {
         return {
-          /** Toggle visibility for the "modified" column. */
+          /** Show the "modified" column. Its heading's hide button is named "Hide column". */
           modified() {
             return self.step('Toggle "modified" column', (page) =>
-              page.getByLabel(TEXT.modifiedColumnName).click(),
+              page
+                .getByTestId('extra-columns')
+                .getByRole('button', { name: TEXT.modifiedColumnName, exact: true })
+                .click(),
             )
           },
           /** Toggle visibility for the "labels" column. */
           labels() {
             return self.step('Toggle "labels" column', (page) =>
               // Exact: each row's "Manage Labels" button contains the name too.
-              page.getByLabel(TEXT.labelsColumnName, { exact: true }).click(),
+              page.getByRole('button', { name: TEXT.labelsColumnName, exact: true }).click(),
             )
           },
           /** Toggle visibility for the "accessed by projects" column. */
           accessedByProjects() {
             return self.step('Toggle "accessed by projects" column', (page) =>
-              page.getByLabel(TEXT.accessedByProjectsColumnName).click(),
+              page
+                .getByRole('button', { name: TEXT.accessedByProjectsColumnName, exact: true })
+                .click(),
             )
           },
           /** Toggle visibility for the "accessed data" column. */
           accessedData() {
             return self.step('Toggle "accessed data" column', (page) =>
-              page.getByLabel(TEXT.accessedDataColumnName).click(),
+              page.getByRole('button', { name: TEXT.accessedDataColumnName, exact: true }).click(),
             )
           },
         }

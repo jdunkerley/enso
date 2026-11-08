@@ -16,6 +16,7 @@ import * as electronBuilder from 'electron-builder'
 import yargs from 'yargs'
 
 import * as common from 'enso-common/src/constants'
+import { UPDATE_REPOSITORY } from 'enso-common/src/updater'
 
 import computeHashes from './tasks/computeHashes'
 import { run, signArchives } from './tasks/signArchivesMacOs'
@@ -25,6 +26,8 @@ import * as fileAssociations from './fileAssociations'
 import os from 'node:os'
 import path from 'node:path'
 import BUILD_INFO from './buildInfo'
+
+const [PUBLISH_OWNER, PUBLISH_REPO] = UPDATE_REPOSITORY.split('/') as [string, string]
 
 // =============
 // === Types ===
@@ -207,7 +210,7 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
         to: 'enso',
         filter: ['!**.tar.gz', '!**.zip'],
       },
-      // The sample projects, copied to `<projects>/Samples` on first start (`installSamples`).
+      // The sample projects, copied to `<projects>/Samples` on first start (`LocalSamples`).
       // Keep `to` in step with `samplesPath` in `src/paths.ts`. `samples/CLAUDE.md` is for
       // contributors, not for the user's projects folder.
       { from: 'samples/', to: 'samples', filter: ['**/*', '!CLAUDE.md'] },
@@ -374,7 +377,11 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
     // The update feed baked into the app (`app-update.yml`) and written as `latest*.yml`.
     // electron-builder never uploads: `tools/build-scripts`' `release upload-ide` does (see
     // `buildPackage`).
-    publish: { provider: 'github', owner: 'jdunkerley', repo: 'enso' },
+    publish: {
+      provider: 'github',
+      owner: PUBLISH_OWNER,
+      repo: PUBLISH_REPO,
+    },
   }
 }
 
