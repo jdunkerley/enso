@@ -46,6 +46,7 @@ import { selectionActionHandlers } from '@/components/GraphEditor/selectionActio
 import { createSelectionAlignmentHandlers } from '@/components/GraphEditor/selectionAlignment'
 import { useGraphTidy } from '@/components/GraphEditor/tidy/useGraphTidy'
 import { useGraphEditorToasts, useImportsAddedOnOpenToast } from '@/components/GraphEditor/toasts'
+import { useUnresolvedLibrariesToast } from '@/components/GraphEditor/editionSwitch'
 import { uploadedExpression, Uploader, type UploadResult } from '@/components/GraphEditor/upload'
 import {
   DATA_READ_FORMAT_WIDGET_QUERY,
@@ -188,6 +189,9 @@ const graphMissing = computed(() => module.value.root != null && !graphStore.cur
 // === Toasts ===
 
 const toasts = useGraphEditorToasts(projectStore)
+useUnresolvedLibrariesToast(projectStore, {
+  saveVersion: (comment) => localVersioning.saveIfEnabled(projectStore.assetId, comment),
+})
 useImportsAddedOnOpenToast(module, projectNames)
 
 // === Selection ===

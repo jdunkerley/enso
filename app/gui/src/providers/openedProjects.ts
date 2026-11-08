@@ -176,6 +176,36 @@ export function createOpenedProjectsStore() {
     for (const id of projects.keys()) closeProject(id, undefined, { offer: false })
   }
 
+  /**
+   * Close the project and open it again, for a change the engine reads only when it starts (such as
+   * the project's edition). The close saves a version as any close does; the repository question
+   * is not asked. Resolves once the project is open again.
+   * @throws {Error} when the project could not be closed or opened again.
+   */
+  async function restartProject(id: ProjectId) {
+    const project = projects.get(id)
+    if (project == null) throw new Error('The project is not open.')
+    const info = project.state.info
+    // Read afresh after each wait: the processes change the state meanwhile.
+    const status = (): ProjectState['status'] => project.state.status
+    closeProject(id, undefined, { offer: false })
+    await waitForProcess(project)
+    if (project.error != null || status() !== 'not-opened') {
+      throw new Error(`The project could not be closed: ${describeError(project.error)}`)
+    }
+    openProject(info)
+    await waitForProcess(project)
+    if (project.error != null || status() !== 'initialized') {
+      throw new Error(`The project could not be opened: ${describeError(project.error)}`)
+    }
+  }
+
+  /** The message of a process's error, or a placeholder when there is none. */
+  function describeError(error: Project['error']): string {
+    if (error == null) return 'it is in an unexpected state'
+    return error instanceof Error ? error.message : error.message()
+  }
+
   /** Rename a running project. */
   async function renameProject(id: ProjectId, newName: string) {
     const project = projects.get(id)
@@ -566,6 +596,7 @@ export function createOpenedProjectsStore() {
     reconnectProject,
     registerViewCarryOver,
     takeViewCarryOver,
+    restartProject,
     get,
     listProjects,
     isProjectOpening,

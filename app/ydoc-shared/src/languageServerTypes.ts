@@ -313,6 +313,28 @@ export interface LibraryPublicType {
   library: string
 }
 
+/** Why the runtime could not load a library, or (`EditionNotFound`) resolve the project's edition. */
+export type LibraryLoadFailureKind =
+  'NotInEdition' | 'DownloadFailed' | 'LocalMissing' | 'LoadingError' | 'EditionNotFound'
+
+/** A library the runtime could not load (`library/loadFailed`, `library/listLoadFailures`). */
+export interface LibraryLoadFailure {
+  /** The library's qualified name, e.g. `Standard.Table`; `null` for `EditionNotFound`. */
+  library: string | null
+  /** The version the edition selected; for `EditionNotFound`, the project's edition name. */
+  version: string | null
+  kind: LibraryLoadFailureKind
+  message: string
+}
+
+/** A library's version before and after an edition switch (`editions/checkSwitch`). */
+export interface LibraryVersionChange {
+  library: string
+  /** `null` when the current edition does not resolve or does not define the library. */
+  from: string | null
+  to: string
+}
+
 export interface VisualizationConfiguration {
   /** An execution context of the visualization. */
   executionContextId: ContextId
@@ -350,6 +372,7 @@ export type Notifications = {
   'file/event': (param: { path: Path; kind: FileEventKind }) => void
   'file/rootAdded': (param: object) => void
   'file/rootRemoved': (param: object) => void
+  'library/loadFailed': (param: LibraryLoadFailure) => void
   'refactoring/projectRenamed': (param: {
     oldNormalizedName: string
     newNormalizedName: string
@@ -441,6 +464,25 @@ export namespace response {
 
   export interface ListLibraryPublicTypes {
     publicTypes: LibraryPublicType[]
+  }
+
+  export interface ListLibraryLoadFailures {
+    failures: LibraryLoadFailure[]
+  }
+
+  /** Whether switching the project's parent edition would let it load its libraries. */
+  export interface CheckEditionSwitch {
+    /** The project's parent edition now, if it names one. */
+    current: string | null
+    target: string
+    /** Every library checked (the failed ones and `Standard.Base`) loads without a download. */
+    resolves: boolean
+    changes: LibraryVersionChange[]
+    stillMissing: string[]
+  }
+
+  export interface SetParentEdition {
+    needsRestart?: boolean | null
   }
 
   export interface RenameSymbol {

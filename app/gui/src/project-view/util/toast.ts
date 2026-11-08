@@ -1,4 +1,4 @@
-import { useToasts, type ToastOptions, type ToastType } from '$/providers/toasts'
+import { useToasts, type ToastContent, type ToastOptions, type ToastType } from '$/providers/toasts'
 import type { ResultError } from 'enso-common/src/utilities/data/result'
 import { onScopeDispose } from 'vue'
 
@@ -43,7 +43,7 @@ export function useToast(options: UseToastOptions = {}) {
 
   return {
     /** Show or update toast. */
-    show(content: string) {
+    show(content: ToastContent) {
       if (toasts.isActive(id)) toasts.update(id, { ...toastOptions, render: content })
       else toasts.show(content, { ...toastOptions, toastId: id })
     },

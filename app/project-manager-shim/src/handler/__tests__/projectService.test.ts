@@ -203,6 +203,30 @@ describe('versioning routes', { timeout: 30_000 }, () => {
     })
   })
 
+  test('commit-if-enabled saves a version only once the repository is enabled', async () => {
+    await withTempRepo(
+      async (repo) => {
+        const project = await createProject(path.join(repo, 'P'), 'id-1')
+        const commit = async () =>
+          (
+            (
+              await call('versioning/commit-if-enabled', {
+                path: project,
+                message: 'Before switching edition to 2026.1.1',
+              })
+            ).result as { id: string | null }
+          ).id
+        expect(await commit()).toBeNull()
+        await versioning!.enable(repo)
+        expect(await commit()).toMatch(/^[0-9a-f]{40}$/)
+        expect((await call('versioning/log', { path: project })).result).toMatchObject({
+          versions: [{ comment: 'Before switching edition to 2026.1.1' }],
+        })
+      },
+      { init: true },
+    )
+  })
+
   test('enable and disable switch consent for a repository', async () => {
     await withTempRepo(
       async (repo) => {

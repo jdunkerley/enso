@@ -82,6 +82,7 @@ object JsonRpc {
     .registerRequest(EditionsResolve)
     .registerRequest(EditionsGetProjectSettings)
     .registerRequest(EditionsSetParentEdition)
+    .registerRequest(EditionsCheckSwitch)
     .registerRequest(EditionsSetLocalLibrariesPreference)
     .registerRequest(EditionsListDefinedLibraries)
     .registerRequest(EditionsListDefinedComponents)

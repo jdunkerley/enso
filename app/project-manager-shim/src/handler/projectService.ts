@@ -4,7 +4,7 @@ import type * as http from 'node:http'
 import * as datalinkFiles from '../datalinks.js'
 import type { LocalMetadata } from '../localMetadata/index.js'
 import type { LocalSecrets } from '../localSecrets/index.js'
-import type { LocalVersioning } from '../localVersioning/index.js'
+import { withinVersioningTimeout, type LocalVersioning } from '../localVersioning/index.js'
 import { ProjectService } from '../projectService/index.js'
 import type { IsProjectOpen, LocalSamples } from '../samples/index.js'
 import { bodyJson, bodyJsonOrEmpty } from './http.js'
@@ -72,6 +72,13 @@ const LOCAL_VERSIONING_ROUTES: Readonly<Record<string, RouteHandler<VersioningCo
       message.trim() === '' ? 'Saved' : message,
     )
   },
+  // An automatic save before a change the IDE makes itself (an edition switch): nothing when the
+  // repository is not enabled, as for the save on close.
+  // Bounded as the close hook's is: a repository that hangs must not hang the switch.
+  'versioning/commit-if-enabled': ({ versioning }, body) =>
+    withinVersioningTimeout(
+      versioning.commitIfEnabled([requireString(body, 'path')], requireString(body, 'message')),
+    ),
   'versioning/log': async ({ versioning }, body) => ({
     versions: await versioning.log(requireString(body, 'path')),
   }),

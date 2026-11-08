@@ -6,6 +6,12 @@
   are put back, along with the selection, the open code panel and an open
   component browser. If the file changed in the meantime, it is kept and you are
   offered your version instead.][654]
+- [A project whose libraries cannot be loaded now says which ones, in a message
+  of its own. If the edition installed with the IDE has them, the message offers
+  to switch the project to it: Switch and reopen saves a version of the project
+  first (if you keep versions), changes its edition and opens it again. A
+  project whose edition is not installed, and so runs on the installed one, gets
+  the same offer.][655]
 - [Inside a folder, the Drive's first row is a `..` entry that takes you up to
   the parent folder: double click it, or reach it with the arrow keys and press
   Enter. Drop files or folders on it to move them up a level.][642]
@@ -454,6 +460,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [654]: https://github.com/jdunkerley/enso/pull/654
+[655]: https://github.com/jdunkerley/enso/pull/655
 [626]: https://github.com/jdunkerley/enso/pull/626
 [642]: https://github.com/jdunkerley/enso/pull/642
 [629]: https://github.com/jdunkerley/enso/pull/629

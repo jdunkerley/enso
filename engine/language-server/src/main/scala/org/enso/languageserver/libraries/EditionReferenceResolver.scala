@@ -49,6 +49,12 @@ class EditionReferenceResolver(
   def resolveEdition(name: String): Try[Editions.ResolvedEdition] =
     resolveEdition(NamedEdition(name))
 
+  /** Resolves a raw edition's parents. */
+  def resolveRawEdition(
+    edition: Editions.RawEdition
+  ): Try[Editions.ResolvedEdition] =
+    editionResolver.resolve(edition).toTry
+
   /** Resolves the current project's edition, or, if it cannot be resolved
     * (its edition file is not installed, say), the default edition, as the
     * runtime does (`DefaultPackageRepository.initializeRepository`). So the

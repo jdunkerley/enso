@@ -673,5 +673,19 @@
   "projectRestoreUndo": "Undo",
   "projectRestoreUndoFailed": "The restored changes could not be undone this way: the code has changed in the same places since. Use Ctrl+Z instead.",
   "localVersionsLoading": "Reading the versions status…",
-  "localVersionsStatusError": "The versions status could not be read: $0"
+  "localVersionsStatusError": "The versions status could not be read: $0",
+  "librariesNotLoaded": "This project's libraries could not be loaded: $0.",
+  "libraryNotInEdition": "$0 (not defined in the edition)",
+  "libraryDownloadFailed": "$0 $1 (download failed: $2)",
+  "libraryLocalMissing": "$0 (no local copy)",
+  "libraryLoadingError": "$0 $1 (could not be loaded: $2)",
+  "editionNotInstalled": "This project uses edition $0, which is not installed. It is running on $1 meanwhile.",
+  "editionSwitchOffer": "Switch it to the installed edition $0?",
+  "editionSwitchChecking": "Checking whether the installed edition has these libraries…",
+  "librariesInstallOrRemove": "Install these libraries, or remove their imports: $0.",
+  "editionSwitchAndReopen": "Switch and reopen",
+  "editionSwitching": "Switching…",
+  "editionSwitchVersionComment": "Before switching edition to $0",
+  "editionSwitchFailed": "Could not switch the edition: $0",
+  "editionSwitchReopenFailed": "The project's edition was changed to $0, but the project could not be reopened ($1). Close it and open it again to use the new edition."
 }

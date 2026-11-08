@@ -73,6 +73,19 @@ describe('ProjectManager versioning methods', () => {
     ])
   })
 
+  it('commitVersionIfEnabled', async () => {
+    nextResult = { id: null }
+    expect(await manager().commitVersionIfEnabled(project, 'Before switching')).toEqual({
+      id: null,
+    })
+    expect(calls).toEqual([
+      {
+        url: '/api/project-service/versioning/commit-if-enabled',
+        body: { path: project, message: 'Before switching' },
+      },
+    ])
+  })
+
   it('listVersions', async () => {
     nextResult = { versions: [] }
     expect(await manager().listVersions(project)).toEqual({ versions: [] })

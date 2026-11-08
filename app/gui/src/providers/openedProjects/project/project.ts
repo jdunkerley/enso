@@ -6,6 +6,7 @@ import {
   type NodeVisualizationConfiguration,
 } from '$/providers/openedProjects/project/executionContext'
 import { createModuleFlusher } from '$/providers/openedProjects/project/flush'
+import { trackLibraryLoadFailures } from '$/providers/openedProjects/project/libraryLoadFailures'
 import { trackStartupFailure } from '$/providers/openedProjects/project/startupFailure'
 import { VisualizationDataRegistry } from '$/providers/openedProjects/project/visualizationDataRegistry'
 import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
@@ -178,6 +179,7 @@ export function createProjectStore(
   )
   const executionContext = createExecutionContextForMain()
   const startupFailure = trackStartupFailure(executionContext)
+  const libraryLoadFailures = trackLibraryLoadFailures(lsRpcConnection)
   const visualizationDataRegistry = new VisualizationDataRegistry(projectModel)
   abort.handleDispose(visualizationDataRegistry)
   const computedValueRegistry = ComputedValueRegistry.WithExecutionContext(
@@ -491,6 +493,11 @@ export function createProjectStore(
     executionContext,
     firstExecution,
     startupFailure,
+    libraryLoadFailures,
+    /** The project's id in the opened projects (and the backend): `id` may be a running id. */
+    assetId: projectAssetId,
+    /** Close the project and open it again (`openedProjects.restartProject`). */
+    restart: () => openedProjects.restartProject(projectAssetId),
     diagnostics,
     moduleProjectPath,
     entryPoint,

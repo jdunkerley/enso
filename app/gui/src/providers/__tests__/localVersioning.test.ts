@@ -54,6 +54,9 @@ function setup(backendOverrides: Partial<LocalVersioningBackend> = {}) {
     commitVersion: vi.fn(async (_id: ProjectId, _message: string) => ({
       id: 'a'.repeat(40) as string | null,
     })),
+    commitVersionIfEnabled: vi.fn(async (_id: ProjectId, _message: string) => ({
+      id: null as string | null,
+    })),
     ...backendOverrides,
   }
   const modals = createModalsStore()
@@ -987,5 +990,36 @@ describe('showCloseWarning', () => {
       type: 'warning',
       content: "'Sales' was closed, but its version could not be saved: index.lock exists",
     })
+  })
+})
+
+describe('saveIfEnabled (before an edition switch, #600)', () => {
+  test('writes the modules, then saves through the if-enabled route, with no toast', async () => {
+    const { backend, store, toasts } = setup()
+    const flush = vi.fn(FLUSHED)
+    store.watchProject(PROJECT, flush)
+    await store.saveIfEnabled(PROJECT, 'Before switching edition to 2026.1.1')
+    expect(flush).toHaveBeenCalledOnce()
+    expect(backend.commitVersionIfEnabled).toHaveBeenCalledExactlyOnceWith(
+      PROJECT,
+      'Before switching edition to 2026.1.1',
+    )
+    expect(backend.commitVersion).not.toHaveBeenCalled()
+    expect(toasts.toasts.value).toEqual([])
+    store.unwatchProject(PROJECT)
+  })
+
+  test('rejects when the modules could not be written, saving nothing', async () => {
+    const { backend, store } = setup()
+    store.watchProject(PROJECT, async () => ({ kind: 'declined', reason: 'not connected' }))
+    await expect(store.saveIfEnabled(PROJECT, 'x')).rejects.toThrow('not connected')
+    expect(backend.commitVersionIfEnabled).not.toHaveBeenCalled()
+    store.unwatchProject(PROJECT)
+  })
+
+  test('does nothing for a project it does not watch', async () => {
+    const { backend, store } = setup()
+    await store.saveIfEnabled(PROJECT, 'x')
+    expect(backend.commitVersionIfEnabled).not.toHaveBeenCalled()
   })
 })
