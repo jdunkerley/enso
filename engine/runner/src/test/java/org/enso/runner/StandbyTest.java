@@ -80,10 +80,11 @@ public class StandbyTest {
     }
   }
 
-  /** Waits, up to 10 s, until {@code thread} is parked without a timeout. */
+  /** Waits, up to 10 s, until {@code thread} is parked (the wait for the warm-up has a limit). */
   private static void awaitParked(Thread thread) throws InterruptedException {
     var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-    while (thread.getState() != Thread.State.WAITING) {
+    while (thread.getState() != Thread.State.WAITING
+        && thread.getState() != Thread.State.TIMED_WAITING) {
       assertTrue("the reading thread never started waiting", System.nanoTime() < deadline);
       Thread.onSpinWait();
       Thread.yield();
