@@ -56,6 +56,7 @@ exit code = @Builtin_Method "System.exit"
 nano_time = @Builtin_Method "System.nano_time"
 os = @Builtin_Method "System.os"
 is_unix = @Builtin_Method "System.is_unix"
+working_directory_override = @Builtin_Method "System.working_directory_override"
 
 resource_bracket ~constructor ~destructor ~action = @Builtin_Method "Resource.bracket"
 resource_finalize res = @Builtin_Method "Managed_Resource.finalize"

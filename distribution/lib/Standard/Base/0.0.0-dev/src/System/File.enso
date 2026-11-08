@@ -163,7 +163,7 @@ type File
        ```
     current_directory : File
     current_directory =
-        File.Value (Java_Path.of ".")
+        File_Helpers.get_file "."
 
     ## ---
        aliases: [home directory]
