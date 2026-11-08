@@ -500,7 +500,8 @@ public class Main {
             .longOpt(STANDBY_OPTION)
             .desc(
                 "Starts the engine, warms it up, and waits for one line of JSON on stdin: the"
-                    + " arguments to run with. Used by the IDE's spare engine; needs --jvm.")
+                    + " arguments to run with. Used by the IDE's spare engine; runs only on the JVM"
+                    + " (--jvm with the native launcher).")
             .build();
 
     var options = new Options();
@@ -1703,6 +1704,7 @@ public class Main {
     if (HostEnsoUtils.isAot()) {
       throw exitFail("--" + STANDBY_OPTION + " runs only on the JVM: add --" + JVM_OPTION + ".");
     }
+    var restoreLogging = Standby.quietLogging(System.err);
     StandbyRequest request;
     try {
       // `System.in` itself, not a reader over it or a new stream on the descriptor: the line is
@@ -1716,15 +1718,37 @@ public class Main {
       throw exitSuccess();
     }
     var args = request.args().toArray(new String[0]);
-    var projectPath = preprocessArguments(args).getOptionValue(LanguageServerApi.ROOT_PATH_OPTION);
+    var line = preprocessArguments(args);
+    // The line is a Language Server's, as `project/open` passes it: a line that would run
+    // something else, or start another standby or JVM, is refused.
+    if (!line.hasOption(LANGUAGE_SERVER_OPTION)
+        || Stream.of(STANDBY_OPTION, JVM_OPTION, IN_PROJECT_OPTION, RUN_OPTION)
+            .anyMatch(line::hasOption)) {
+      throw exitFail(
+          "standby: the argument line must start a Language Server (--"
+              + LANGUAGE_SERVER_OPTION
+              + "), without --"
+              + STANDBY_OPTION
+              + ", --"
+              + JVM_OPTION
+              + ", --"
+              + IN_PROJECT_OPTION
+              + " or --"
+              + RUN_OPTION
+              + ".");
+    }
+    var projectPath = line.getOptionValue(LanguageServerApi.ROOT_PATH_OPTION);
     if (projectPath == null || !Path.of(projectPath).isAbsolute()) {
       throw exitFail("standby: the argument line needs an absolute --path.");
     }
-    request.applyEnvironment();
     var parent = Path.of(projectPath).normalize().getParent();
-    if (parent != null) {
-      System.setProperty(ContextFactory.WORKING_DIRECTORY_PROPERTY, parent.toString());
+    if (parent == null) {
+      throw exitFail("standby: --path cannot be a filesystem root.");
     }
+    request.applyEnvironment();
+    System.setProperty(ContextFactory.WORKING_DIRECTORY_PROPERTY, parent.toString());
+    // The Language Server sets up its own logging from here.
+    restoreLogging.run();
     launch(args);
   }
 

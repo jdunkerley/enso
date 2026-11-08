@@ -11,6 +11,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import org.enso.common.ContextFactory;
+import org.enso.distribution.DistributionManager;
+import org.enso.distribution.Environment;
 import org.enso.pkg.Template;
 import org.enso.polyglot.PolyglotContext;
 import org.graalvm.polyglot.Context;
@@ -20,11 +22,16 @@ import org.graalvm.polyglot.Context;
  * template in a fresh folder under the system temporary directory, whose `Main` imports the
  * template's libraries, builds a table, filters, aggregates and sorts it, and prepares a table
  * visualization of the result. The context is closed and the folder deleted afterwards, also when
- * the warm-up fails or is cancelled. The libraries' IR caches are read from the usual data
- * directory, as an open would.
+ * the warm-up fails or is cancelled. The libraries' IR caches are read from (and, when missing,
+ * written to) the usual data directory, as an open would; the project's own IR cache, which the
+ * compiler writes there too ({@code cache/ir/local/<PROJECT_NAME>}), is deleted with the folder.
  */
 final class StandbyWarmUp implements Standby.WarmUp {
-  static final String PROJECT_NAME = "Warm_Up";
+  /** Reserved: no user project is likely to share its IR cache folder ({@link #run()}). */
+  static final String PROJECT_NAME = "Enso_Standby_Warm_Up";
+
+  /** The stderr line printed once the warm-up's context runs Enso code. */
+  static final String RUNNING = "standby: warm-up running";
 
   /** The default template's imports (Standard.Database and Standard.Examples included). */
   static final String MAIN_SOURCE =
@@ -49,20 +56,28 @@ final class StandbyWarmUp implements Standby.WarmUp {
       """;
 
   private final Path temporaryParent;
+  private final Path projectIrCache;
   private final AtomicReference<Context> running = new AtomicReference<>();
   private final CountDownLatch cancelClosed = new CountDownLatch(1);
   private volatile boolean cancelled;
 
   StandbyWarmUp() {
-    this(null);
+    this(
+        null,
+        new DistributionManager(new Environment() {})
+            .LocallyInstalledDirectories().irCacheDirectory());
   }
 
   /**
    * @param temporaryParent where the temporary project folder goes; {@code null} for the system
    *     temporary directory
+   * @param irCacheDirectory the IR cache directory the compiler writes project caches to (as {@code
+   *     ModuleCache} computes it); {@code null} when nothing is to be deleted there
    */
-  StandbyWarmUp(Path temporaryParent) {
+  StandbyWarmUp(Path temporaryParent, Path irCacheDirectory) {
     this.temporaryParent = temporaryParent;
+    this.projectIrCache =
+        irCacheDirectory == null ? null : irCacheDirectory.resolve("local").resolve(PROJECT_NAME);
   }
 
   @Override
@@ -100,6 +115,7 @@ final class StandbyWarmUp implements Standby.WarmUp {
         if (cancelled) {
           return;
         }
+        System.err.println(RUNNING);
         var module =
             new PolyglotContext(context).getTopScope().getModule("local." + PROJECT_NAME + ".Main");
         var main = module.getMethod(module.getAssociatedType(), "main");
@@ -121,6 +137,9 @@ final class StandbyWarmUp implements Standby.WarmUp {
       }
     } finally {
       deleteRecursively(directory);
+      if (projectIrCache != null && Files.exists(projectIrCache)) {
+        deleteRecursively(projectIrCache);
+      }
     }
   }
 

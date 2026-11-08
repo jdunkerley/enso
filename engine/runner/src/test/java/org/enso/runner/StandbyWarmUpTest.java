@@ -28,7 +28,7 @@ public class StandbyWarmUpTest {
   @Test
   public void aCancelBeforeTheRunSkipsTheWarmUp() throws Exception {
     var parent = temporary.newFolder().toPath();
-    var warmUp = new StandbyWarmUp(parent);
+    var warmUp = new StandbyWarmUp(parent, null);
     warmUp.cancel();
     warmUp.run();
     assertEquals("no project was made", List.of(), children(parent));
@@ -37,7 +37,7 @@ public class StandbyWarmUpTest {
   @Test
   public void aSecondCancelIsHarmless() throws Exception {
     var parent = temporary.newFolder().toPath();
-    var warmUp = new StandbyWarmUp(parent);
+    var warmUp = new StandbyWarmUp(parent, null);
     warmUp.cancel();
     warmUp.cancel();
     warmUp.run();

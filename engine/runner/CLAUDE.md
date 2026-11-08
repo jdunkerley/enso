@@ -100,10 +100,16 @@ only costs a needless preload.
 
 `Main` handles `--standby` in `runStandby`: `Standby.awaitRequest(System.in)`
 (the same stream object the Language Server later reads its shutdown line from;
-never a reader or a fresh stream over the descriptor), then the line's `--path`
-must be absolute, its variables are applied, the context's working directory
-becomes the project's parent, and `launch` runs again with the line's arguments.
-A `jvm.options` that cannot be read only turns preloading off
-(`Standby.preloadFor` logs a warning). `StandbyProcessTest` runs the real
-`built-distribution/` (`sbt buildEngineDistribution`) and is skipped without
-one; it covers no warm-up, a full warm-up and a warm-up abandoned mid-run.
+never a reader or a fresh stream over the descriptor), then the line must start
+a Language Server (`--server`, no `--standby`, `--jvm`, `--in-project` or
+`--run`), its `--path` must be absolute and not a filesystem root, its variables
+are applied, the context's working directory becomes the project's parent, and
+`launch` runs again with the line's arguments. Until the line the root logger's
+level is WARN (`Standby.quietLogging`; no appender is installed). A
+`jvm.options` that cannot be read only turns preloading off
+(`Standby.preloadFor` logs a warning). The warm-up's project is
+`local.Enso_Standby_Warm_Up`; the IR cache the compiler writes for it under
+`<data>/cache/ir/local/` is deleted with its folder. `StandbyProcessTest` runs
+the real `built-distribution/` (`sbt buildEngineDistribution`) and is skipped
+without one; it covers no warm-up, a full warm-up and a warm-up abandoned
+mid-run.

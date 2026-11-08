@@ -8,6 +8,7 @@ import static org.junit.Assume.assumeTrue;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.ServerSocket;
@@ -119,14 +120,21 @@ public class StandbyProcessTest {
   }
 
   /**
-   * A started standby engine, its stderr collected line by line.
+   * A started standby engine, its stdout and stderr collected line by line.
    *
    * @param data its `ENSO_DATA_DIRECTORY`
+   * @param dataBefore what {@code data} held before the process started
    * @param temporary its `java.io.tmpdir`, where the warm-up makes its project
-   * @param reader the thread that collects {@code stderr}
+   * @param readers the threads that collect {@code stdout} and {@code stderr}
    */
   private record Engine(
-      Process process, List<String> stderr, Path data, Path temporary, Thread reader) {
+      Process process,
+      List<String> stdout,
+      List<String> stderr,
+      Path data,
+      List<String> dataBefore,
+      Path temporary,
+      List<Thread> readers) {
     boolean said(String text) {
       synchronized (stderr) {
         return stderr.stream().anyMatch(line -> line.contains(text));
@@ -139,17 +147,35 @@ public class StandbyProcessTest {
       }
     }
 
-    /** The exit code, once the process has exited and all its stderr is collected. */
+    /** The DEBUG, INFO or TRACE log lines on stdout so far. */
+    List<String> chattyStdout() {
+      synchronized (stdout) {
+        return stdout.stream()
+            .filter(line -> line.matches(".*\\b(TRACE|DEBUG|INFO)\\b.*"))
+            .toList();
+      }
+    }
+
+    /** The exit code, once the process has exited and all its output is collected. */
     int exitCode(long seconds) throws InterruptedException {
       assertTrue(
           "still running after " + seconds + " s: " + stderr,
           process.waitFor(seconds, TimeUnit.SECONDS));
-      reader.join(TimeUnit.SECONDS.toMillis(10));
+      for (var reader : readers) {
+        reader.join(TimeUnit.SECONDS.toMillis(10));
+        assertFalse("output still open after the exit: " + reader.getName(), reader.isAlive());
+      }
       return process.exitValue();
     }
 
     void waitFor(String text, long seconds) throws InterruptedException {
-      waitUntil(() -> said(text), "'" + text + "'", seconds);
+      var end = System.nanoTime() + TimeUnit.SECONDS.toNanos(seconds);
+      while (!said(text)) {
+        assertTrue(
+            "no '" + text + "' within " + seconds + " s: " + stderr, System.nanoTime() < end);
+        assertTrue("the engine exited: " + stderr, process.isAlive());
+        Thread.sleep(50);
+      }
     }
 
     void waitUntil(BooleanSupplier condition, String what, long seconds)
@@ -163,15 +189,36 @@ public class StandbyProcessTest {
     }
   }
 
+  /** A daemon thread that adds each line of {@code stream} to {@code lines}. */
+  private static Thread collect(String name, InputStream stream, List<String> lines) {
+    var reader =
+        new Thread(
+            () -> {
+              try (var in =
+                  new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = in.readLine()) != null) {
+                  lines.add(line);
+                }
+              } catch (IOException e) {
+                lines.add("read failed: " + e);
+              }
+            },
+            name);
+    reader.setDaemon(true);
+    reader.start();
+    return reader;
+  }
+
   /**
    * Start `enso --standby` in a folder that is not the project's parent, with its own data
    * directory and temporary directory.
    */
   private Engine start(boolean warmUp, boolean abandon) throws IOException {
     var enso = requireLauncher();
-    var elsewhere = tmp.newFolder("elsewhere");
-    var data = tmp.newFolder("data").toPath();
-    var temporary = tmp.newFolder("temporary").toPath();
+    var elsewhere = tmp.newFolder();
+    var data = tmp.newFolder().toPath();
+    var temporary = tmp.newFolder().toPath();
     var command = new ArrayList<String>();
     if (enso.getName().endsWith(".bat")) {
       command.addAll(List.of("cmd", "/c"));
@@ -187,28 +234,24 @@ public class StandbyProcessTest {
     var builder = new ProcessBuilder(command).directory(elsewhere);
     builder.environment().put("ENSO_DATA_DIRECTORY", data.toString());
     // `java.io.tmpdir` is read at JVM start, so it cannot be a `--vm.D`.
-    builder.environment().put("JAVA_TOOL_OPTIONS", "-Djava.io.tmpdir=" + temporary);
-    builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+    var toolOptions = builder.environment().get("JAVA_TOOL_OPTIONS");
+    builder
+        .environment()
+        .put(
+            "JAVA_TOOL_OPTIONS",
+            (toolOptions == null || toolOptions.isBlank() ? "" : toolOptions + " ")
+                + "-Djava.io.tmpdir="
+                + temporary);
+    var dataBefore = tree(data);
     var process = builder.start();
     started.add(process);
+    var stdout = Collections.synchronizedList(new ArrayList<String>());
     var stderr = Collections.synchronizedList(new ArrayList<String>());
-    var reader =
-        new Thread(
-            () -> {
-              try (var lines =
-                  new BufferedReader(
-                      new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = lines.readLine()) != null) {
-                  stderr.add(line);
-                }
-              } catch (IOException e) {
-                stderr.add("read failed: " + e);
-              }
-            });
-    reader.setDaemon(true);
-    reader.start();
-    return new Engine(process, stderr, data, temporary, reader);
+    var readers =
+        List.of(
+            collect("engine stdout", process.getInputStream(), stdout),
+            collect("engine stderr", process.getErrorStream(), stderr));
+    return new Engine(process, stdout, stderr, data, dataBefore, temporary, readers);
   }
 
   private Path project() throws IOException {
@@ -341,76 +384,37 @@ public class StandbyProcessTest {
     return tree(engine.temporary()).stream().filter(p -> p.startsWith("enso-standby-")).toList();
   }
 
-  /**
-   * The stack of the engine's warm-up thread (`jcmd <pid> Thread.print`), or {@code ""} when it is
-   * not there (yet).
-   */
-  private static String warmUpStack(Engine engine) {
-    var windows = System.getProperty("os.name").toLowerCase().contains("windows");
-    var jcmd = Path.of(System.getProperty("java.home"), "bin", windows ? "jcmd.exe" : "jcmd");
-    assertTrue("no " + jcmd, Files.isExecutable(jcmd));
-    // On Windows the process is `cmd /c enso.bat`, and the JVM is its child.
-    var jvm =
-        Stream.concat(Stream.of(engine.process().toHandle()), engine.process().descendants())
-            .filter(
-                h ->
-                    h.info()
-                        .command()
-                        .map(c -> Path.of(c).getFileName().toString().matches("java(\\.exe)?"))
-                        .orElse(false))
-            .findFirst();
-    if (jvm.isEmpty()) {
-      return "";
-    }
-    try {
-      var dump =
-          new ProcessBuilder(jcmd.toString(), Long.toString(jvm.get().pid()), "Thread.print")
-              .redirectErrorStream(true)
-              .start();
-      var text = new String(dump.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-      dump.waitFor();
-      return Stream.of(text.split("\\R\\R"))
-          .filter(block -> block.startsWith("\"enso-standby-warm-up\""))
-          .findFirst()
-          .orElse("");
-    } catch (IOException e) {
-      return "";
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return "";
-    }
-  }
-
-  /**
-   * Whether a warm-up stack is inside {@link StandbyWarmUp#run()}'s use of its context: looking up
-   * or running `main` (not building or closing the context).
-   */
-  private static boolean runsEnsoCode(String stack) {
-    return stack.contains("org.enso.runner.StandbyWarmUp.run")
-        && (stack.contains("org.enso.polyglot.") || stack.contains("org.graalvm.polyglot.Value."));
+  /** The new paths in the data directory that are not library IR caches. */
+  private static List<String> notLibraryCaches(Engine engine) throws IOException {
+    var written = new ArrayList<>(tree(engine.data()));
+    written.removeAll(engine.dataBefore());
+    // The folders above the caches; `local` is where the warm-up's project cache was.
+    var parents = List.of("cache", "cache/ir", "cache/ir/local", "cache/ir/Standard");
+    return written.stream()
+        .filter(p -> !parents.contains(p) && !p.startsWith("cache/ir/Standard/"))
+        .toList();
   }
 
   @Test(timeout = 300_000)
   public void theLineStartsALanguageServer() throws Exception {
     var engine = start(false, false);
     engine.waitFor(Standby.READY, 120);
-    System.out.println("data directory at READY, no warm-up: " + tree(engine.data()));
+    assertEquals(List.of(), engine.chattyStdout());
     serveProject(engine);
   }
 
   @Test(timeout = 480_000)
   public void aWarmedUpStandbyOpensTheProject() throws Exception {
     var engine = start(true, false);
-    var before = tree(engine.data());
     engine.waitFor(Standby.READY, 240);
+    assertEquals("log lines before READY", List.of(), engine.chattyStdout());
     var done = engine.lineWith("standby: warm-up done in ");
     assertTrue(engine.stderr().toString(), done != null && done.contains(", preloaded "));
+    assertTrue(engine.stderr().toString(), engine.said(StandbyWarmUp.RUNNING));
     assertFalse(engine.stderr().toString(), engine.said("warm-up failed"));
     assertFalse(engine.stderr().toString(), engine.said("warm-up abandoned"));
     assertEquals("the warm-up's project is deleted", List.of(), warmUpFolders(engine));
-    var after = new ArrayList<>(tree(engine.data()));
-    after.removeAll(before);
-    System.out.println("data directory written before READY by the warm-up: " + after);
+    assertEquals("the warm-up wrote only library caches", List.of(), notLibraryCaches(engine));
     // The same process: the warm-up's context is gone, and the project's opens as usual.
     serveProject(engine);
   }
@@ -418,17 +422,21 @@ public class StandbyProcessTest {
   @Test(timeout = 480_000)
   public void aLineDuringTheWarmUpAbandonsIt() throws Exception {
     var engine = start(true, true);
-    // The warm-up runs Enso code: its context is up, and it compiles or runs its `Main`, which
-    // takes seconds yet. No file or log line marks that moment reliably (the project's IR cache is
-    // written asynchronously, late when the libraries' caches are written too), so the stack of
-    // the warm-up's thread does.
-    engine.waitUntil(() -> runsEnsoCode(warmUpStack(engine)), "warm-up running Enso code", 240);
+    // The warm-up's context runs Enso code: compiling and running its `main` takes seconds yet.
+    engine.waitFor(StandbyWarmUp.RUNNING, 240);
+    assertEquals("log lines before the line", List.of(), engine.chattyStdout());
     serveProject(engine);
     var done = engine.lineWith("standby: warm-up done in ");
-    assertTrue(engine.stderr().toString(), done != null && done.contains("preloading abandoned"));
-    assertTrue(engine.stderr().toString(), engine.said("standby: warm-up abandoned"));
+    assertTrue(engine.stderr().toString(), done != null);
     assertFalse(engine.stderr().toString(), engine.said("warm-up failed"));
     assertEquals("the warm-up's project is deleted", List.of(), warmUpFolders(engine));
+    assertEquals("the warm-up wrote only library caches", List.of(), notLibraryCaches(engine));
+    // Whether the line came while `main` still ran is up to the machine: had `main` finished
+    // first, the warm-up simply ended, and the abandon path was not exercised.
+    assumeTrue(
+        "the warm-up finished before the line arrived: " + engine.stderr(),
+        engine.said("standby: warm-up abandoned"));
+    assertTrue(engine.stderr().toString(), done.contains("preloading abandoned"));
   }
 
   @Test(timeout = 300_000)
@@ -438,15 +446,39 @@ public class StandbyProcessTest {
     assertEquals(engine.stderr().toString(), 0, engine.exitCode(120));
   }
 
-  @Test(timeout = 300_000)
-  public void aRelativePathIsRefused() throws Exception {
+  /**
+   * Start an engine, hand it {@code args} (a JSON array) and expect exit 1 with {@code message}.
+   */
+  private void refused(String args, String message) throws Exception {
     var engine = start(false, false);
     var stdin = engine.process().getOutputStream();
-    stdin.write(
-        "{\"args\":[\"--server\",\"--path\",\"Relative_Project\",\"--rpc-port\",\"1\"]}\n"
-            .getBytes(StandardCharsets.UTF_8));
+    stdin.write(("{\"args\":" + args + "}\n").getBytes(StandardCharsets.UTF_8));
     stdin.flush();
     assertEquals(engine.stderr().toString(), 1, engine.exitCode(120));
-    assertTrue(engine.stderr().toString(), engine.said("needs an absolute --path"));
+    assertTrue(engine.stderr().toString(), engine.said(message));
+  }
+
+  @Test(timeout = 300_000)
+  public void aRelativePathIsRefused() throws Exception {
+    refused(
+        "[\"--server\",\"--path\",\"Relative_Project\",\"--rpc-port\",\"1\"]",
+        "needs an absolute --path");
+  }
+
+  @Test(timeout = 300_000)
+  public void aFilesystemRootIsRefused() throws Exception {
+    var root = tmp.getRoot().toPath().toAbsolutePath().getRoot().toString();
+    refused(
+        "[\"--server\",\"--path\"," + json(root) + ",\"--rpc-port\",\"1\"]",
+        "--path cannot be a filesystem root");
+  }
+
+  @Test(timeout = 300_000)
+  public void aLineThatIsNotALanguageServerIsRefused() throws Exception {
+    var project = json(project().toString());
+    refused("[\"--run\"," + project + "]", "must start a Language Server");
+    refused(
+        "[\"--server\",\"--standby\",\"--path\"," + project + ",\"--rpc-port\",\"1\"]",
+        "must start a Language Server");
   }
 }

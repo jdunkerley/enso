@@ -11,6 +11,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.BooleanSupplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /* Note [Standby Mode]
  * ~~~~~~~~~~~~~~~~~~~
@@ -24,7 +26,9 @@ import java.util.function.BooleanSupplier;
  * passed and the open's own variables. It waits for the warm-up to end (unless
  * `enso.standby.abandonWarmUp` is true, which cancels it), then hands the line to `Main`, which
  * applies the variables, sets the context's working directory to the parent of `--path`
- * (`ContextFactory.WORKING_DIRECTORY_PROPERTY`; relative paths are refused), and calls `Main.launch`
+ * (`ContextFactory.WORKING_DIRECTORY_PROPERTY`; relative paths and a filesystem root are refused,
+ * and so is a line that does not start a Language Server or carries `--standby`, `--jvm`,
+ * `--in-project` or `--run`), and calls `Main.launch`
  * with the arguments: from then on the process is an ordinary Language Server, which shuts down on
  * the next stdin line as always. If stdin closes before a line arrives, the process exits with 0.
  *
@@ -42,8 +46,10 @@ import java.util.function.BooleanSupplier;
  *   settings, `enso.env.<NAME>` for those read through `ProcessEnvironment`.
  *
  * Nothing sets up logging before the line: the Language Server does that itself, and its session log
- * must be the project's. Before the line the engine only writes these stderr lines, which the shim
- * echoes and summarises in the opened project's engine log. A warm-up that throws is reported there
+ * must be the project's. Until then the root logger's level is WARN (`quietLogging`), so that the
+ * logging backend's default does not print the warm-up's DEBUG events on stdout. Before the line
+ * the engine writes these stderr lines (and `standby: warm-up running` once the warm-up's context
+ * runs Enso code), which the shim echoes and summarises in the opened project's engine log. A warm-up that throws is reported there
  * as `standby: warning: warm-up failed: …` and the engine still reaches standby.
  *
  * Only the process carries over from the warm-up: HotSpot's compiled code, loaded classes and the
@@ -121,6 +127,36 @@ final class Standby {
       return abandoned -> "preloading skipped: the JVM options could not be read";
     }
     return new StandbyPreloader(jvmOptions)::preload;
+  }
+
+  /**
+   * Raise the logging threshold to WARN until the argument line has been taken. Nothing sets up
+   * logging before the line (the Language Server does that itself, Note [Standby Mode]), and the
+   * backend's default (logback without a configuration) prints every DEBUG event of the warm-up on
+   * stdout. Only the root logger's level changes; no appender is installed. Logback is not a module
+   * the runner reads, so its API is called reflectively; with another backend nothing changes.
+   *
+   * @return puts the previous level back
+   */
+  static Runnable quietLogging(PrintStream err) {
+    var root = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+    try {
+      var loader = root.getClass().getClassLoader();
+      var levelClass = Class.forName("ch.qos.logback.classic.Level", true, loader);
+      var getLevel = root.getClass().getMethod("getLevel");
+      var setLevel = root.getClass().getMethod("setLevel", levelClass);
+      var previous = getLevel.invoke(root);
+      setLevel.invoke(root, levelClass.getField("WARN").get(null));
+      return () -> {
+        try {
+          setLevel.invoke(root, previous);
+        } catch (ReflectiveOperationException e) {
+          err.println("standby: warning: could not restore the log level: " + e);
+        }
+      };
+    } catch (ReflectiveOperationException | LinkageError e) {
+      return () -> {};
+    }
   }
 
   /**
