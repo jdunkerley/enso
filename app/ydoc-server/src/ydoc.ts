@@ -151,13 +151,15 @@ export function setupGatewayClient(
     : undefined
 
   // Note [A Lost Channel Ends The Session] in `languageServerSession.ts`.
-  dataSocket?.channel.onClose(() => {
+  // The handler goes with this connection: a long-lived channel must not collect one per socket.
+  const stopWatchingData = dataSocket?.channel.onClose(() => {
     if (!dataSocket.channel.releasedByAll) lsSession.channelLost()
   })
 
   const connection = new YjsConnection(ws, wsDoc)
   connection.once('close', async () => {
     try {
+      stopWatchingData?.()
       dataSocket?.release()
       await lsSession.release()
       if (LanguageServerSession.sessions.size === 0) {

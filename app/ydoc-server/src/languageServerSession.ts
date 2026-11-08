@@ -132,9 +132,10 @@ export class LanguageServerSession {
     // session that lost one would carry on half dead. Without `vis-control` the GUI's attaches never
     // reach the runtime, so nothing executes and the project waits for ever (#646); without
     // `binary` the GUI's data session is gone. So when the Language Server ends one of this
-    // session's channels (its JSON channels: `setupClient`; its visualization channels: here; its
-    // data channel: `setupGatewayClient`), `channelLost` gives the session up and closes its GUI
-    // sockets. The GUI reconnects to a fresh session with fresh channels, whose id makes it rebuild
+    // session's visualization channels (here) or its data channel (`setupGatewayClient`),
+    // `channelLost` gives the session up and closes its GUI sockets. The end of a JSON channel takes
+    // the same path in two halves: `setupClient` unregisters the session, and the Node host's
+    // `dropClients` closes the GUI sockets. The GUI reconnects to a fresh session with fresh channels, whose id makes it rebuild
     // its stores. It is this session's own, guarded `unregister`, so a late end of a session that
     // was already replaced never evicts its replacement.
     this.visualizationBridge.onLanguageServerEndClosed(() => this.channelLost())
