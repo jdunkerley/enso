@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [Inside a folder, the Drive's first row is a `..` entry that takes you up to
+  the parent folder: double click it, or reach it with the arrow keys and press
+  Enter. Drop files or folders on it to move them up a level.][642]
 - [The Drive's columns can be resized: drag the right edge of a column's
   heading, or focus it and use the arrow keys. A double click puts the column
   back to its default width. The widths are remembered, and are the same in
@@ -441,6 +444,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[642]: https://github.com/jdunkerley/enso/pull/642
 [629]: https://github.com/jdunkerley/enso/pull/629
 [622]: https://github.com/jdunkerley/enso/pull/622
 [573]: https://github.com/jdunkerley/enso/pull/573

@@ -222,10 +222,10 @@ function onDragEnd() {
 }
 
 function onDragLeave(event: DragEvent) {
+  // No `relatedTarget`: the drag left the window.
   if (
-    event.relatedTarget instanceof Node &&
-    event.currentTarget instanceof Node &&
-    !event.currentTarget.contains(event.relatedTarget)
+    !(event.relatedTarget instanceof Node) ||
+    (event.currentTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget))
   ) {
     isDraggedOver.value = false
     driveStore.setDragTargetAssetId(null)
@@ -253,7 +253,7 @@ function onDrop(event: DragEvent) {
     :data-id="item.id"
     :class="
       twMerge(
-        'AssetRow h-table-row rounded-full transition-all ease-in-out rounded-rows-child',
+        'AssetRow DriveRow h-table-row rounded-full transition-all ease-in-out rounded-rows-child',
         visibility,
         (isDraggedOver || isSelected) && 'selected',
       )
@@ -284,35 +284,4 @@ function onDrop(event: DragEvent) {
   </tr>
 </template>
 
-<style scoped>
-/*
- * The focus ring of a row reached with the keyboard. An outline on the row would be hidden under the
- * sticky name cell, so each cell draws its part of a pill-shaped ring as an inset shadow.
- */
-.AssetRow:focus-visible > td {
-  --ring: var(--color-primary);
-  box-shadow:
-    inset 0 2px 0 0 var(--ring),
-    inset 0 -2px 0 0 var(--ring);
-}
-
-.AssetRow:focus-visible > td:first-child {
-  border-top-left-radius: 9999px;
-  border-bottom-left-radius: 9999px;
-  box-shadow:
-    inset 2px 0 0 0 var(--ring),
-    inset 0 2px 0 0 var(--ring),
-    inset 0 -2px 0 0 var(--ring);
-}
-
-.AssetRow:focus-visible > td:last-child {
-  box-shadow:
-    inset -2px 0 0 0 var(--ring),
-    inset 0 2px 0 0 var(--ring),
-    inset 0 -2px 0 0 var(--ring);
-}
-
-.AssetRow:focus-visible > td:only-child {
-  box-shadow: inset 0 0 0 2px var(--ring);
-}
-</style>
+<style scoped src="./driveRowFocusRing.css" />

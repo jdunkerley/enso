@@ -58,6 +58,14 @@ describe('useDragAnnouncements', () => {
     expect(spoken(announcements)).toBe(getText('dragAnnouncementDroppedHere', "'File'"))
   })
 
+  test('says a drop on the parent-folder entry moves into the parent folder', () => {
+    const announcements = useDragAnnouncements()
+    announcements.started([FILE])
+    announcements.droppedInTable([FILE], { type: 'parent' })
+    announcements.ended('move')
+    expect(spoken(announcements)).toBe("Dropped 'File' into the parent folder.")
+  })
+
   test('counts only the assets that move', () => {
     const announcements = useDragAnnouncements()
     announcements.started([FILE, PROJECT])
