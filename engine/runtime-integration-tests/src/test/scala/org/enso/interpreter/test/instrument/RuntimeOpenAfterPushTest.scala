@@ -281,13 +281,12 @@ class RuntimeOpenAfterPushTest
     contextId
   }
 
-  /** Sends an open and receives messages until its answer. Returns whether
-    * the module still needed compiling when the answer arrived, and the
+  /** Sends an open and receives messages until its answer. Returns the
     * messages that came before it.
     */
   private def openDuringCompilation(
     contents: String
-  ): (Boolean, List[Api.Response]) = {
+  ): List[Api.Response] = {
     val requestId = UUID.randomUUID()
     context.send(
       Api.Request(
@@ -295,17 +294,17 @@ class RuntimeOpenAfterPushTest
         Api.OpenFileRequest(context.pkg.mainFile, contents)
       )
     )
-    val before                          = List.newBuilder[Api.Response]
-    var stillCompiling: Option[Boolean] = None
-    while (stillCompiling.isEmpty) {
+    val before   = List.newBuilder[Api.Response]
+    var answered = false
+    while (!answered) {
       context.receiveWithTimeout(120) match {
         case Some(Api.Response(Some(`requestId`), Api.OpenFileResponse)) =>
-          stillCompiling = Some(mainModule.needsCompilation())
+          answered = true
         case Some(r) => before += r
         case None    => fail("Timed out waiting for the open")
       }
     }
-    (stillCompiling.get, before.result())
+    before.result()
   }
 
   private def open(contents: String): Unit = {
@@ -460,12 +459,18 @@ class RuntimeOpenAfterPushTest
 
     // The client opens the module with the text on disk, which the running
     // compilation read. Its answer must not wait for the compilation's write
-    // lock: in the IDE the module's graph waits for this answer.
-    val (stillCompiling, before) = openDuringCompilation(largeCode)
-    withClue("the open waited for the compilation: ") {
-      stillCompiling shouldBe true
+    // lock: in the IDE the module's graph waits for this answer. So it
+    // arrives before the push's execution, which starts only once the
+    // compilation is done, has sent anything.
+    val before = openDuringCompilation(largeCode)
+    val fromExecution = before.collect {
+      case r @ Api.Response(None, Api.ExpressionUpdates(`contextId`, _)) => r
+      case r @ Api.Response(None, Api.ExecutionComplete(`contextId`))    => r
+      case r @ Api.Response(None, Api.ExecutionFailed(`contextId`, _))   => r
     }
-    before should not contain context.executionComplete(contextId)
+    withClue("the open waited for the compilation: ") {
+      fromExecution shouldBe empty
+    }
 
     // The open changed nothing: the push finishes and the program runs.
     val pushed = before ++ receiveUntilExecutionComplete(contextId)
@@ -480,8 +485,7 @@ class RuntimeOpenAfterPushTest
 
     // Other text must not replace the module's under the compilation, so the
     // open still waits for it.
-    val (stillCompiling, before) = openDuringCompilation(largeChanged)
-    stillCompiling shouldBe true // reset by the open, after the compilation
+    val before = openDuringCompilation(largeChanged)
 
     // Once the compilation is done, the open and the push's execution both
     // wait only for the read compilation lock, so either can finish first.
