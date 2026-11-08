@@ -6,11 +6,6 @@
 # JDK 25 warns about these modules' restricted method calls; a later JDK makes them errors.
 --enable-native-access=ALL-UNNAMED,org.enso.language.server
 
-# Let C2 compile the engine's own Java, not Graal-as-JIT (JVMCI). Truffle guest code still
-# compiles through libgraal. Opens a project faster: 0.63 s at 4 CPUs, 0.15 s at 32 (open-time
-# measurements, #518). The CI peak guard (std-libs-benchmark, Table|Vector, runs 42435500911 and
-# 42435507266) showed no systematic regression (median -1%). Three sorting rechecks (runs
-# 42487383592, 42487394178, 42487404756) found no benchmark over 25% worse in all three
-# (table_sort_ints: +32%, +48%, -1%). The text of this file is part of the IDE's AOT cache key,
-# so the cache retrains.
+# C2 compiles the engine's own Java, not Graal-as-JIT (JVMCI), which opens a project faster.
+# Truffle guest code still compiles through libgraal. See #518.
 -XX:-UseJVMCICompiler
