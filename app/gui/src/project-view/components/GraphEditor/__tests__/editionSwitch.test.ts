@@ -189,3 +189,35 @@ test('the toast hides with its tab, and one the user closed stays closed', async
   await nextTick()
   expect(shownToast()).toBeDefined()
 })
+
+test('a reopen that fails after the edition was written says so, and stops spinning', async () => {
+  const { project, saveVersion } = fakeProject()
+  project.restart.mockRejectedValueOnce(new Error('The project could not be opened: no engine'))
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  mountProjectView(project, saveVersion)
+  project.libraryLoadFailures = [TABLE]
+  await settle()
+  await shownToast()?.onSwitch()
+  expect(project.lsRpcConnection.setParentEdition).toHaveBeenCalledOnce()
+  expect(shownToast()).toMatchObject({ busy: false })
+  const texts = useToasts().toasts.value.map((toast) => String(toast.content))
+  expect(texts).toContain(
+    "The project's edition was changed to 2026.1.1-dev, but the project could not be reopened " +
+      '(The project could not be opened: no engine). Close it and open it again to use the new edition.',
+  )
+})
+
+test.each([
+  ['an empty answer', () => Promise.resolve(Ok(null))],
+  ['a rejected request', () => Promise.reject(new Error('socket closed'))],
+])('%s from editions/checkSwitch offers nothing', async (_name, answer) => {
+  const { project, saveVersion } = fakeProject()
+  project.lsRpcConnection.checkEditionSwitch.mockImplementation(answer as never)
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+  mountProjectView(project, saveVersion)
+  project.libraryLoadFailures = [EDITION]
+  await settle()
+  expect(shownToast()).toMatchObject({ check: { resolves: false, target: '' } })
+  await shownToast()?.onSwitch()
+  expect(saveVersion).not.toHaveBeenCalled()
+})

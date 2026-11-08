@@ -19,7 +19,7 @@ const edition: LibraryLoadFailure = {
 }
 
 /** A connection whose listing answers `listed` when `answer` is called. */
-function fakeConnection(listed: LibraryLoadFailure[] | 'error') {
+function fakeConnection(listed: LibraryLoadFailure[] | 'error' | 'malformed') {
   const events = new ObservableV2<{ 'library/loadFailed': (f: LibraryLoadFailure) => void }>()
   let answer!: () => void
   const listing = new Promise<void>((resolve) => (answer = resolve))
@@ -28,6 +28,7 @@ function fakeConnection(listed: LibraryLoadFailure[] | 'error') {
       events.on(event, listener),
     listLibraryLoadFailures: vi.fn(async () => {
       await listing
+      if (listed === 'malformed') return Ok(null as never)
       return listed === 'error' ?
           Err(new LsRpcError('Method not found', 'library/listLoadFailures', {}))
         : Ok({ failures: listed })
@@ -69,4 +70,14 @@ test('a listing that fails leaves what the notifications said', async () => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   await answer()
   expect(failures.value).toEqual([table])
+})
+
+test('a malformed listing (an Ok with no result) lists nothing, and rejects nothing', async () => {
+  const { connection, notify, answer } = fakeConnection('malformed')
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const failures = trackLibraryLoadFailures(connection as never)
+  notify(table)
+  await answer()
+  expect(failures.value).toEqual([table])
+  expect(warn).toHaveBeenCalled()
 })

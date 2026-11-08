@@ -109,6 +109,8 @@ let mockLoadFailures: LibraryLoadFailure[] = []
 let mockEditionCheck: response.CheckEditionSwitch | undefined
 /** The editions `editions/setParentEdition` was asked to set, in order. */
 export const mockParentEditionsSet: string[] = []
+/** How often `library/listLoadFailures` was asked: once by each project store that connects. */
+export const mockLoadFailureListings = { count: 0 }
 
 /** Serve `code` as the mock project's `Main.enso` until {@link restoreMockMainFile}. */
 export function setMockMainFile(code: string) {
@@ -139,6 +141,7 @@ export function restoreMockMainFile() {
   mockLoadFailures = []
   mockEditionCheck = undefined
   mockParentEditionsSet.length = 0
+  mockLoadFailureListings.count = 0
 }
 
 const fileTree = {
@@ -507,6 +510,7 @@ export const mockLSHandler = async (
     case 'library/listPublicTypes':
       return { publicTypes: mockPublicTypes } satisfies response.ListLibraryPublicTypes
     case 'library/listLoadFailures':
+      mockLoadFailureListings.count += 1
       return { failures: mockLoadFailures } satisfies response.ListLibraryLoadFailures
     case 'editions/checkSwitch':
       return (mockEditionCheck ?? {

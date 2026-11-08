@@ -88,6 +88,7 @@ interface PlaceholderOverrides {
   readonly librariesInstallOrRemove: [libraries: string]
   readonly editionSwitchVersionComment: [edition: string]
   readonly editionSwitchFailed: [reason: string]
+  readonly editionSwitchReopenFailed: [edition: string, reason: string]
 
   readonly dragAnnouncementOneAsset: [assetTitle: string]
   readonly dragAnnouncementAssets: [count: number]

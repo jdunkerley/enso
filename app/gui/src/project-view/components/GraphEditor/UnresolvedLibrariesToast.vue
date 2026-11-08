@@ -49,7 +49,7 @@ const changes = computed(() =>
 <template>
   <div class="flex flex-col gap-2" data-testid="unresolved-libraries-toast">
     <Text v-if="editionMissing">
-      {{ getText('editionNotInstalled', editionMissing.version ?? '', check?.target ?? '…') }}
+      {{ getText('editionNotInstalled', editionMissing.version ?? '', check?.target || '…') }}
     </Text>
     <Text v-if="libraries.length > 0">
       {{ getText('librariesNotLoaded', libraries.map(describe).join(', ')) }}

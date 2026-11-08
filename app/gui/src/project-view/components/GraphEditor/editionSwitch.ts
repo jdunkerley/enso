@@ -3,9 +3,22 @@ import type { ProjectStore } from '$/providers/openedProjects/project'
 import { useText } from '$/providers/text'
 import UnresolvedLibrariesToast from '@/components/GraphEditor/UnresolvedLibrariesToast.vue'
 import { useToast } from '@/util/toast'
+import { Err } from 'enso-common/src/utilities/data/result'
 import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { markRaw, onActivated, onDeactivated, watch } from 'vue'
 import type { LibraryLoadFailure, response } from 'ydoc-shared/languageServerTypes'
+
+/** Whether a `editions/checkSwitch` answer has the expected shape. */
+function isCheck(value: unknown): value is response.CheckEditionSwitch {
+  return (
+    typeof value === 'object' &&
+    value != null &&
+    'resolves' in value &&
+    typeof value.resolves === 'boolean' &&
+    'target' in value &&
+    typeof value.target === 'string'
+  )
+}
 
 /** What the edition switch needs besides the project store. */
 export interface EditionSwitchDependencies {
@@ -41,6 +54,7 @@ export function useUnresolvedLibrariesToast(
   const errorToast = useToast.error({ autoClose: false })
   const warningToast = useToast.warning({ autoClose: false })
   const switchFailedToast = useToast.error()
+  const reopenFailedToast = useToast.error({ autoClose: false, outliveScope: true })
 
   let failures: readonly LibraryLoadFailure[] = []
   let check: response.CheckEditionSwitch | undefined
@@ -80,7 +94,11 @@ export function useUnresolvedLibrariesToast(
 
   async function requestCheck() {
     const request = ++checkRequest
-    const result = await project.lsRpcConnection.checkEditionSwitch()
+    // A malformed answer (a mocked or older Language Server) is a failed check.
+    const result = await project.lsRpcConnection
+      .checkEditionSwitch()
+      .then((answer) => (answer.ok && !isCheck(answer.value) ? Err('no answer') : answer))
+      .catch((error: unknown) => Err(error))
     if (request !== checkRequest) return
     if (!result.ok) {
       console.warn('Could not check an edition switch:', result.error.message())
@@ -96,14 +114,22 @@ export function useUnresolvedLibrariesToast(
     const target = check.target
     busy = true
     render()
+    let editionWritten = false
     try {
       await deps.saveVersion(getText('editionSwitchVersionComment', target))
       const written = await project.lsRpcConnection.setParentEdition(target)
       if (!written.ok) throw new Error(written.error.message())
+      editionWritten = true
       await project.restart()
     } catch (error) {
       console.error('Could not switch the edition:', error)
-      switchFailedToast.show(getText('editionSwitchFailed', getMessageOrToString(error)))
+      const reason = getMessageOrToString(error)
+      if (editionWritten) {
+        // The close may already have stopped this view's scope: this toast outlives it.
+        reopenFailedToast.show(getText('editionSwitchReopenFailed', target, reason))
+      } else {
+        switchFailedToast.show(getText('editionSwitchFailed', reason))
+      }
       busy = false
       render()
     }

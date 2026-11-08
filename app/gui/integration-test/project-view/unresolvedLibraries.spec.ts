@@ -6,6 +6,7 @@
  */
 import { expect, test } from 'integration-test/base'
 import {
+  mockLoadFailureListings,
   mockParentEditionsSet,
   restoreMockMainFile,
   setMockLibraryLoadFailures,
@@ -57,13 +58,20 @@ test.describe('when the installed edition has the libraries', () => {
     )
     await expect(toast).toContainText('Switch it to the installed edition 2026.1.1-dev?')
     await expect(toast).toContainText('Standard.Base 0.0.0-dev → 2026.1.1-dev')
+    const listingsBefore = mockLoadFailureListings.count
+    expect(listingsBefore).toBeGreaterThan(0)
+    const calls = localApi.trackCalls()
     await toast.getByTestId('edition-switch-button').click()
     await expect.poll(() => mockParentEditionsSet).toEqual(['2026.1.1-dev'])
     expect(localApi.versioning.commits[0]).toEqual([
       MOCK_PROJECT_PATH,
       'Before switching edition to 2026.1.1-dev',
     ])
-    // Reopened: the graph is back (the mock still reports the failure, so the toast is too).
+    // Reopened: the project was closed and opened in the backend, and a new project store
+    // connected and asked for the failures again.
+    await expect.poll(() => calls.closeProject.length).toBe(1)
+    await expect.poll(() => calls.openProject.length).toBe(1)
+    await expect.poll(() => mockLoadFailureListings.count).toBeGreaterThan(listingsBefore)
     await expect(page.locator('.GraphNode').first()).toBeVisible()
   })
 })
