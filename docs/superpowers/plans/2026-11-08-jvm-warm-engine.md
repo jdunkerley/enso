@@ -479,9 +479,13 @@ explains why). Without this task a project served by a spare would resolve
 process's directory: `File_Helpers.get_file`) and `File.current_directory`
 against the temporary directory. `Process.run` without a directory would start
 there too. This task makes all three follow the context's working directory,
-which Task 1 lets the runner set to the project's parent. A normal engine's
-context directory is its process directory, so nothing changes for it, and the
-new builtin says so by answering `Nothing`.
+which Task 1 lets the runner set to the project's parent. The new builtin
+decides by whether a standby engine set the context's working directory, that is
+whether the `enso.context.workingDirectory` property
+(`ContextFactory.WORKING_DIRECTORY_PROPERTY`, Task 1) is present. It does not
+compare paths, since symlinks, 8.3 names or letter case could make a normal
+engine's two directories compare unequal. A normal engine never has the
+property, so the builtin answers `Nothing` and nothing changes for it.
 
 Known differences that remain, stated in PR 1 and in `engine/runner/CLAUDE.md`:
 
@@ -493,6 +497,10 @@ Known differences that remain, stated in PR 1 and in `engine/runner/CLAUDE.md`:
   pass a `File`'s path, which is now absolute.
 - `DiskSpaceGetter` falls back to `user.dir` only when there is no project,
   which never happens in a Language Server.
+- `File.resolve_local_file` takes `is_absolute` from `get_file`'s result, so in
+  a spare a relative path counts as absolute and skips the branch that resolves
+  it against a cloud project's parent directory. That branch is not reached in
+  the local-only IDE, which has no cloud projects, so this is harmless here.
 
 The places that use the process's directory were found with
 `grep -rn "user.dir\|ProcessBuilder\|getCurrentWorkingDirectory\|Java_Path.of" engine/runtime/src/main std-bits distribution/lib/Standard`.
@@ -520,8 +528,8 @@ exceptions about files that are already absolute (`File.enso`'s
 - Consumes: `ContextFactory.workingDirectory` (Task 1); the polyglot
   `Context.Builder.currentWorkingDirectory` it sets.
 - Produces: the builtin `System.working_directory_override`, which returns the
-  context's working directory as `Text` when it differs from the process's
-  (`user.dir`) and `Nothing` otherwise. Also
+  context's working directory as `Text` when the `enso.context.workingDirectory`
+  property is set (a standby engine), and `Nothing` otherwise. Also
   `Runtime_Helpers.working_directory_override`.
 
 - [ ] **Step 1: Write the failing test**
@@ -534,6 +542,7 @@ import static org.junit.Assert.assertNotEquals;
 
 import java.nio.file.Path;
 import java.util.List;
+import org.enso.common.ContextFactory;
 import org.enso.test.utils.ContextUtils;
 import org.junit.Rule;
 import org.junit.Test;
@@ -561,11 +570,18 @@ public class ContextWorkingDirectoryTest {
           [relative, current, pwd.stdout.trim]
       """;
 
-  /** `main`'s three texts, in a context whose working directory is `dir` (the process's when null). */
-  private static List<String> run(Path dir) {
+  /**
+   * `main`'s three texts, in a context whose working directory is `dir` (the process's when
+   * null). `standby` sets the property a standby engine sets (`Main.runStandby`), which is what
+   * makes the context's directory count.
+   */
+  private static List<String> run(Path dir, boolean standby) {
     var builder = ContextUtils.newBuilder("enso");
     if (dir != null) {
       builder = builder.withModifiedContext(b -> b.currentWorkingDirectory(dir));
+    }
+    if (standby) {
+      System.setProperty(ContextFactory.WORKING_DIRECTORY_PROPERTY, dir.toString());
     }
     try (var ctx = builder.build()) {
       var result = ctx.evalModule(CODE);
@@ -573,6 +589,8 @@ public class ContextWorkingDirectoryTest {
           result.getArrayElement(0).asString(),
           result.getArrayElement(1).asString(),
           result.getArrayElement(2).asString());
+    } finally {
+      System.clearProperty(ContextFactory.WORKING_DIRECTORY_PROPERTY);
     }
   }
 
@@ -580,7 +598,7 @@ public class ContextWorkingDirectoryTest {
   public void relativePathsAndProcessesFollowTheContextsWorkingDirectory() throws Exception {
     var dir = tmp.newFolder("context-cwd").toPath().toRealPath();
     assertNotEquals(dir, Path.of("").toRealPath());
-    var texts = run(dir);
+    var texts = run(dir, true);
     assertEquals(dir.resolve("data").resolve("a.csv").toString(), texts.get(0));
     assertEquals(dir.toString(), texts.get(1));
     assertEquals(dir, Path.of(texts.get(2)).toRealPath());
@@ -588,10 +606,19 @@ public class ContextWorkingDirectoryTest {
 
   @Test
   public void aNormalContextIsUnchanged() throws Exception {
-    var texts = run(null);
+    var texts = run(null, false);
     assertEquals(Path.of("data", "a.csv").toString(), texts.get(0));
     assertEquals(Path.of("").toAbsolutePath().normalize().toString(), texts.get(1));
     assertEquals(Path.of("").toRealPath(), Path.of(texts.get(2)).toRealPath());
+  }
+
+  @Test
+  public void aWorkingDirectoryWithoutTheStandbyPropertyChangesNoFile() throws Exception {
+    // A context given a directory by something other than a standby engine (as the warm-up's is):
+    // files keep their relative path, as in a normal engine.
+    var dir = tmp.newFolder("not-standby").toPath().toRealPath();
+    var texts = run(dir, false);
+    assertEquals(Path.of("data", "a.csv").toString(), texts.get(0));
   }
 }
 ```
@@ -602,7 +629,7 @@ Run:
 `sbt -Dsbt.server.forcestart=true "runtime-integration-tests/testOnly org.enso.interpreter.test.ContextWorkingDirectoryTest"`
 Expected: `relativePathsAndProcessesFollowTheContextsWorkingDirectory` FAILS:
 the first text is `data/a.csv` (relative) and the process prints the process's
-directory. `aNormalContextIsUnchanged` PASSES.
+directory. The other two PASS.
 
 - [ ] **Step 3: Implement**
 
@@ -611,17 +638,24 @@ In `System.java`, add after `nanoTime()`:
 ```java
   @Builtin.Method(
       description =
-          "The context's working directory when it is not the process's (a standby engine), else"
-              + " Nothing: relative local paths resolve against it.")
+          "The context's working directory when a standby engine set it, else Nothing: relative"
+              + " local paths then resolve against it.")
   @Builtin.Specialize
   @SuppressWarnings("generic-enso-builtin-type")
   @CompilerDirectives.TruffleBoundary
   public static Object workingDirectoryOverride(EnsoContext ctx) {
-    var context = ctx.getCurrentWorkingDirectory().getAbsoluteFile().normalize().getPath();
-    var process = java.nio.file.Path.of("").toAbsolutePath().normalize();
-    return process.equals(java.nio.file.Path.of(context)) ? ctx.getNothing() : Text.create(context);
+    // Whether a standby engine set it (Note [Standby Mode] in engine/runner `Standby`), not a
+    // comparison of paths: symlinks, 8.3 names or letter case could make a normal engine's
+    // context and process directories compare unequal.
+    if (java.lang.System.getProperty(ContextFactory.WORKING_DIRECTORY_PROPERTY) == null) {
+      return ctx.getNothing();
+    }
+    return Text.create(ctx.getCurrentWorkingDirectory().getAbsoluteFile().normalize().getPath());
   }
 ```
+
+Add `import org.enso.common.ContextFactory;` to `System.java`'s imports (the
+runtime module already `requires org.enso.engine.common`).
 
 In `create_process`, after the `if (ctx.getNothing() != cwdOrNothing) { … }`
 block, add an `else`:
@@ -670,9 +704,9 @@ In `File.enso`, change `current_directory`'s body from
 
 Run:
 `sbt -Dsbt.server.forcestart=true "runtime-integration-tests/testOnly org.enso.interpreter.test.ContextWorkingDirectoryTest" "runtime-integration-tests/testOnly org.enso.interpreter.test.WorkingDirectoryCheckTest"`
-Expected: 2 + 2 tests PASS. Then run the Base tests that cover files and
-processes, from `test/` (root CLAUDE.md: the working directory must be the
-project's parent):
+Expected: all `ContextWorkingDirectoryTest` and `WorkingDirectoryCheckTest`
+tests PASS. Then run the Base tests that cover files and processes, from `test/`
+(root CLAUDE.md: the working directory must be the project's parent):
 
 ```bash
 wsl -e bash -lc '. ~/.enso-toolchain.sh && set -e && cd ~/jvm-standby && git pull --ff-only /mnt/c/Repos/Enso/ide jvm-warm-engine-1-standby && sbt -Dsbt.server.forcestart=true buildEngineDistribution && cd test && JAVA_TOOL_OPTIONS="-enableassertions" ../built-distribution/enso-engine-*/enso-*/bin/enso --no-ir-caches --run "$PWD/Base_Tests" "File|Process" 2>&1 | tail -5'
@@ -2622,15 +2656,19 @@ arguments. A closed stdin before the line exits with 0.
 - **The process's working directory is the temporary directory**, and the JVM's
   cannot be changed once it runs. Enso therefore resolves against the context's
   working directory (the project's parent), not the process's, wherever it can:
-  `File_Helpers.get_file` (every relative local `File`, made absolute when the
-  two differ), `File.current_directory`, and `Process.run` without a directory
-  (`System.create_process`); the builtin `System.working_directory_override`
-  says when they differ. Known differences from a normal engine: a relative
-  `File` shows its absolute path, and Java code handed a raw relative string
-  (user code through `polyglot java import`) resolves it against the temporary
-  directory. Any new engine or std-bits code that resolves a path against the
-  process (`user.dir`, `Path.of` of a relative string, a `ProcessBuilder`
-  without a directory) must go through the context's working directory instead.
+  `File_Helpers.get_file` (every relative local `File`, made absolute in a
+  standby engine), `File.current_directory`, and `Process.run` without a
+  directory (`System.create_process`). The builtin
+  `System.working_directory_override` answers the context's directory only when
+  the `enso.context.workingDirectory` property is set, never by comparing paths.
+  Known differences from a normal engine: a relative `File` shows its absolute
+  path; Java code handed a raw relative string (user code through
+  `polyglot java import`) resolves it against the temporary directory; and
+  `File.resolve_local_file` sees a relative path as absolute, so it skips the
+  cloud-project branch (never reached in the local-only IDE). Any new engine or
+  std-bits code that resolves a path against the process (`user.dir`, `Path.of`
+  of a relative string, a `ProcessBuilder` without a directory) must go through
+  the context's working directory instead.
 - Tests: `StandbyRequestTest`, `StandbyTest`, `StandbyPreloaderTest`,
   `ContextWorkingDirectoryTest` (runtime-integration-tests), and
   `StandbyProcessTest`, which needs `built-distribution/` and is skipped without
