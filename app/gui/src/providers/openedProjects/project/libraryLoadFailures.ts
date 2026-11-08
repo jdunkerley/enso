@@ -34,16 +34,22 @@ export function trackLibraryLoadFailures(
     ]
   }
   connection.on('library/loadFailed', (failure) => add([failure]))
-  void connection.listLibraryLoadFailures().then((result) => {
-    if (!result.ok) {
-      console.warn('Could not list the libraries that failed to load:', result.error.message())
-      return
-    }
-    // A notification that arrived meanwhile is newer than the listing's copy of the same library.
-    const listed = result.value.failures.filter(
-      (f) => !failures.value.some((known) => sameSubject(known, f)),
+  void connection
+    .listLibraryLoadFailures()
+    .then((result) => {
+      if (!result.ok) {
+        console.warn('Could not list the libraries that failed to load:', result.error.message())
+        return
+      }
+      // A notification that arrived meanwhile is newer than the listing's copy of the same library.
+      const listed = result.value.failures.filter(
+        (f) => !failures.value.some((known) => sameSubject(known, f)),
+      )
+      add(listed)
+    })
+    // A malformed answer (a mocked or older Language Server) lists nothing.
+    .catch((error: unknown) =>
+      console.warn('Could not list the libraries that failed to load:', error),
     )
-    add(listed)
-  })
   return failures
 }
