@@ -9,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.net.HttpURLConnection;
 import java.net.ServerSocket;
 import java.net.URI;
@@ -352,25 +353,22 @@ public class StandbyProcessTest {
   @Test(timeout = 480_000)
   public void aLineDuringTheWarmUpAbandonsIt() throws Exception {
     var engine = start(true, true);
-    // The warm-up has written its `Main` and is about to compile and run it.
+    // The warm-up's project has compiled: its IR cache is in the data directory, and its `main`
+    // runs for a while yet (seconds; the table operations and the visualization).
     engine.waitUntil(
         () -> {
-          try (Stream<Path> found = Files.walk(engine.temporary(), 4)) {
-            return found.anyMatch(
-                p -> {
-                  try {
-                    return p.endsWith(Path.of(StandbyWarmUp.PROJECT_NAME, "src", "Main.enso"))
-                        && Files.readString(p).equals(StandbyWarmUp.MAIN_SOURCE);
-                  } catch (IOException e) {
-                    return false;
-                  }
-                });
-          } catch (IOException e) {
+          try {
+            return tree(engine.data()).stream()
+                .anyMatch(
+                    p ->
+                        p.startsWith("cache/ir/local/" + StandbyWarmUp.PROJECT_NAME + "/")
+                            && p.endsWith("/Main.ir"));
+          } catch (IOException | UncheckedIOException e) {
             return false;
           }
         },
-        "warm-up project",
-        120);
+        "IR cache of the warm-up's project",
+        240);
     serveProject(engine);
     var done = engine.lineWith("standby: warm-up done in ");
     assertTrue(engine.stderr().toString(), done != null && done.contains("preloading abandoned"));
