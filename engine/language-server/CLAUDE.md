@@ -41,6 +41,19 @@ a warning in the log, an undecodable or duplicate entry likewise (the rest of
 the library's entries still go in), and a library declaring `catalogue: false`
 in its `package.yaml` (Visualization) is skipped quietly.
 
+## Library load failures
+
+The runtime sends `Api.LibraryLoadFailed` once per library it cannot load.
+`JsonConnectionController` forwards it to its client as `library/loadFailed`;
+`LibraryLoadFailures` (an actor `MainModule` creates before the runtime starts)
+keeps them for `library/listLoadFailures`, which also starts with an
+`EditionNotFound` entry when the project's edition does not resolve. The
+listings that need the project's edition (`library/listPublicTypes`, the
+catalogues) use
+`EditionReferenceResolver.resolveCurrentProjectEditionOrDefault`, which falls
+back to the default edition as the runtime does; never `.get` the project's own
+edition there.
+
 ## Suggestions database snapshot
 
 `search/getSuggestionsDatabase` is answered only after the runtime has

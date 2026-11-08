@@ -1947,6 +1947,9 @@ class RuntimeVisualizationsTest
         Api.Response(requestId, Api.VisualizationAttached()),
         Api.Response(Api.ModuleNotFound("Test.Undefined"))
       )
+      // A module looked up by name is not an import: no library is reported.
+      // Note [A Failed Library Is Remembered] in `DefaultPackageRepository`.
+      context.receiveNone shouldEqual None
   }
 
   it should "be able to use external libraries if they are needed by the visualization" in withContext() {

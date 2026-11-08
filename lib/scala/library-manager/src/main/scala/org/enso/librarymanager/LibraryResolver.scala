@@ -78,8 +78,9 @@ case class LibraryResolver(
         case None =>
           Left(
             LibraryResolutionError(
-              s"The library `$libraryName` is not defined within " +
-              s"the edition $edition."
+              // Not the edition itself: its `toString` lists every library,
+              // and this message reaches the IDE (`library/loadFailed`).
+              s"The library `$libraryName` is not defined within the edition."
             )
           )
       }
