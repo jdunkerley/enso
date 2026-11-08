@@ -99,10 +99,10 @@ class RuntimeOpenAfterPushTest
    * source, so with the same text a later test would load the module from the
    * cache instead of compiling it, and nothing would be queued to serialise.
    */
-  private var idResult: UUID      = _
-  private var code: String        = _
-  private var changedCode: String = _
-  private var largeCode: String   = _
+  private var idResult: UUID       = _
+  private var code: String         = _
+  private var changedCode: String  = _
+  private var largeCode: String    = _
   private var largeChanged: String = _
 
   private def withIds(
@@ -147,7 +147,7 @@ class RuntimeOpenAfterPushTest
     // enough to compile for the open to arrive while they compile.
     largeCode    = withIds(metadata, 42, manyMethods)
     largeChanged = withIds(metadata, 43, manyMethods)
-    context     = new TestContext("Test")
+    context      = new TestContext("Test")
     context.writeInSrcDir("Visualization", visualizationCode)
     context.init()
     val Some(Api.Response(_, Api.InitializedNotification())) = context.receive
@@ -295,7 +295,7 @@ class RuntimeOpenAfterPushTest
         Api.OpenFileRequest(context.pkg.mainFile, contents)
       )
     )
-    val before = List.newBuilder[Api.Response]
+    val before                          = List.newBuilder[Api.Response]
     var stillCompiling: Option[Boolean] = None
     while (stillCompiling.isEmpty) {
       context.receiveWithTimeout(120) match {
@@ -483,8 +483,12 @@ class RuntimeOpenAfterPushTest
     val (stillCompiling, before) = openDuringCompilation(largeChanged)
     stillCompiling shouldBe true // reset by the open, after the compilation
 
-    val pushed = before ++ receiveUntilExecutionComplete(contextId)
-    pushed.last shouldEqual context.executionComplete(contextId)
+    // Once the compilation is done, the open and the push's execution both
+    // wait only for the read compilation lock, so either can finish first.
+    if (!before.contains(context.executionComplete(contextId))) {
+      val pushed = receiveUntilExecutionComplete(contextId)
+      pushed.last shouldEqual context.executionComplete(contextId)
+    }
     recompute(contextId)
     visualizeResult(contextId) shouldEqual "43"
   }
