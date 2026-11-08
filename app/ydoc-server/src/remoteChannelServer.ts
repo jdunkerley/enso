@@ -80,8 +80,10 @@ export function remoteChannelServer<T>(
           console.error(`Channel ${kind} to the Language Server failed:`, error)
         }
       })
-      socket.on('close', () => {
+      socket.on('close', (code) => {
         if (closedByChannel) return
+        // An abrupt end shows as `1006`: `ws` reports a reset connection as a close, not an error.
+        if (opened) console.warn(`The Language Server ended the ${kind} channel (${code}).`)
         const report = () => {
           if (closedByChannel) return
           channel.close()
