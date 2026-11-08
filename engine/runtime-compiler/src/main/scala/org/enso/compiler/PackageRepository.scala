@@ -29,6 +29,13 @@ trait PackageRepository {
     libraryName: LibraryName
   ): Either[PackageRepository.Error, Unit]
 
+  /** [[ensurePackageIsLoaded]] for an import of the library: a repository may
+    * report the failure of this one to the user, and not of other lookups.
+    */
+  def ensurePackageIsLoadedForImport(
+    libraryName: LibraryName
+  ): Either[PackageRepository.Error, Unit] = ensurePackageIsLoaded(libraryName)
+
   /** Checks if the library has already been loaded */
   def isPackageLoaded(libraryName: LibraryName): Boolean
 

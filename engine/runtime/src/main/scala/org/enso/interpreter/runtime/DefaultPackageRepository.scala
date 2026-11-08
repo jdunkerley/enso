@@ -58,12 +58,16 @@ import org.slf4j.LoggerFactory
   * @param context             the language context
   * @param builtins            the builtins module
   * @param notificationHandler a notification handler
+  * @param preferLocalLibraries whether the project prefers local libraries, so
+  *                            that a library missing from the edition may yet
+  *                            appear among them
   */
 private class DefaultPackageRepository(
   libraryProvider: ResolvingLibraryProvider,
   context: EnsoContext,
   builtins: Builtins,
-  notificationHandler: NotificationHandler
+  notificationHandler: NotificationHandler,
+  preferLocalLibraries: Boolean
 ) extends PackageRepository {
   type TFile = TruffleFile
 
@@ -121,8 +125,13 @@ private class DefaultPackageRepository(
   /** The libraries that could not be loaded, with the error each import of
     * them gets. Note [A Failed Library Is Remembered].
     */
-  private val failedPackages
-    : collection.concurrent.Map[LibraryName, PackageRepository.Error] =
+  private val failedPackages: collection.concurrent.Map[LibraryName, Failed] =
+    collection.concurrent.TrieMap()
+
+  /** The failures reported to the notification handler, the last one of each
+    * library. Note [A Failed Library Is Remembered].
+    */
+  private val reportedFailures: collection.concurrent.Map[LibraryName, Failed] =
     collection.concurrent.TrieMap()
 
   /** The libraries whose dependencies `getLibraryBindings` has loaded. */
@@ -456,16 +465,35 @@ private class DefaultPackageRepository(
   override def ensurePackageIsLoaded(
     libraryName: LibraryName
   ): Either[PackageRepository.Error, Unit] =
+    ensureLoaded(libraryName, fromImport = false)
+
+  /** @inheritdoc */
+  override def ensurePackageIsLoadedForImport(
+    libraryName: LibraryName
+  ): Either[PackageRepository.Error, Unit] =
+    ensureLoaded(libraryName, fromImport = true)
+
+  /** Note [A Failed Library Is Remembered].
+    *
+    * @param fromImport whether an import asks for the library; only then is a
+    *                   failure reported to the notification handler
+    */
+  private def ensureLoaded(
+    libraryName: LibraryName,
+    fromImport: Boolean
+  ): Either[PackageRepository.Error, Unit] =
     if (loadedPackages.contains(libraryName)) Right(())
     else
       failedPackages.get(libraryName) match {
-        // Note [A Failed Library Is Remembered]
-        case Some(error) => Left(error)
-        case None        => resolveAndLoadPackage(libraryName)
+        case Some(failed) =>
+          if (fromImport) report(libraryName, failed)
+          Left(failed.error)
+        case None => resolveAndLoadPackage(libraryName, fromImport)
       }
 
   private def resolveAndLoadPackage(
-    libraryName: LibraryName
+    libraryName: LibraryName,
+    fromImport: Boolean
   ): Either[PackageRepository.Error, Unit] = {
     logger.trace(s"Resolving library $libraryName.")
     val resolvedLibrary =
@@ -525,8 +553,11 @@ private class DefaultPackageRepository(
               }
           }
           .left
-          .map(rememberFailure(libraryName, _))
-          .flatMap(resolveComponentGroups)
+          .map(rememberFailure(libraryName, fromImport, _))
+          .flatMap { pkg =>
+            reportedFailures.remove(libraryName)
+            resolveComponentGroups(pkg)
+          }
     }
   }
 
@@ -542,30 +573,59 @@ private class DefaultPackageRepository(
 
   /* Note [A Failed Library Is Remembered]
    * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   * A library that cannot be resolved or loaded fails the same way for every
-   * module that imports it. Without a memory, each import would resolve it
-   * again, and a library missing from the caches would be downloaded again
-   * every time: a project of N modules on an unreachable repository made N
-   * identical failed requests (#600). So the first failure is kept for the
-   * lifetime of the repository (until `shutdown`), later imports get the same
-   * error, and the notification handler hears of each library once, which is
-   * what lets the language server tell the IDE which libraries are missing.
+   * A library that the edition does not define, or that cannot be downloaded,
+   * fails the same way for every module that imports it. Without a memory,
+   * each import would resolve it again, and a library missing from the caches
+   * would be downloaded again every time: a project of N modules on an
+   * unreachable repository made N identical failed requests (#600). So those
+   * two failures (`NotInEdition`, `DownloadFailed`) are kept for the lifetime
+   * of the repository (until `shutdown`, so a reopened project tries again),
+   * and later lookups get the same error. A missing local library and one that
+   * could not be loaded from disk are cheap to try and can be fixed while the
+   * project is open (the library created, or its files repaired), so they are
+   * tried again on every lookup; so is a library the edition does not define in
+   * a project that prefers local libraries, which may yet create one.
+   *
+   * Only a failure an import meets is reported to the notification handler,
+   * once per library and failure (again only if it changes, or after the
+   * library loaded): the language server tells the IDE which libraries the
+   * project's code could not load. Other lookups (a module asked for by name,
+   * such as a visualization's, a cache's dependencies, service discovery) fail
+   * quietly, as before; their callers report their own errors.
    */
   private def rememberFailure(
     libraryName: LibraryName,
+    fromImport: Boolean,
     failed: Failed
-  ): PackageRepository.Error =
-    failedPackages.putIfAbsent(libraryName, failed.error) match {
-      case Some(earlier) => earlier
-      case None =>
-        notificationHandler.libraryLoadFailed(
-          libraryName,
-          failed.version,
-          failed.kind,
-          failed.message
-        )
-        failed.error
+  ): PackageRepository.Error = {
+    val remembered = failed.kind match {
+      case Api.LibraryLoadFailed.DownloadFailed => true
+      // A project that prefers local libraries may yet get one of that name.
+      case Api.LibraryLoadFailed.NotInEdition => !preferLocalLibraries
+      case _                                  => false
     }
+    val kept =
+      if (remembered)
+        failedPackages.putIfAbsent(libraryName, failed).getOrElse(failed)
+      else failed
+    if (fromImport) report(libraryName, kept)
+    kept.error
+  }
+
+  private def report(libraryName: LibraryName, failed: Failed): Unit = {
+    val same = reportedFailures.get(libraryName).exists { earlier =>
+      earlier.kind == failed.kind && earlier.message == failed.message
+    }
+    if (!same) {
+      reportedFailures.put(libraryName, failed)
+      notificationHandler.libraryLoadFailed(
+        libraryName,
+        failed.version,
+        failed.kind,
+        failed.message
+      )
+    }
+  }
 
   /** @inheritdoc */
   def isPackageLoaded(libraryName: LibraryName): Boolean = {
@@ -796,6 +856,7 @@ private class DefaultPackageRepository(
     loadedComponents.clear()
     dependenciesLoaded.clear()
     failedPackages.clear()
+    reportedFailures.clear()
     // Note [One Bindings Cache Read Per Library] in TruffleCompilerContext.
     context.getCompiler.context match {
       case truffle: TruffleCompilerContext => truffle.clearLibraryBindings()
@@ -890,7 +951,8 @@ private object DefaultPackageRepository {
       resolvingLibraryProvider,
       context,
       builtins,
-      notificationHandler
+      notificationHandler,
+      projectPackage.exists(_.getConfig().preferLocalLibraries)
     )
   }
 }

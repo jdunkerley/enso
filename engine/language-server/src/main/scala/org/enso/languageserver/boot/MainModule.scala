@@ -414,7 +414,7 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
 
   // Created before the runtime starts, so it hears every failure.
   val libraryLoadFailures =
-    system.actorOf(LibraryLoadFailures.props(), "library-load-failures")
+    LibraryLoadFailures.start(system, Some("library-load-failures"))
 
   val libraryConfig = LibraryConfig(
     localLibraryManager      = localLibraryManager,
