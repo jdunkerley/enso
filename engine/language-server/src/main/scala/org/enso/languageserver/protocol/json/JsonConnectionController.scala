@@ -582,6 +582,13 @@ class JsonConnectionController(
         ),
       EditionsResolve -> EditionsResolveHandler
         .props(libraryConfig.editionReferenceResolver),
+      EditionsCheckSwitch -> EditionsCheckSwitchHandler
+        .props(
+          libraryConfig.editionReferenceResolver,
+          libraryConfig.localLibraryProvider,
+          libraryConfig.publishedLibraryCache,
+          libraryConfig.loadFailures
+        ),
       EditionsSetParentEdition -> EditionsSetParentEditionHandler
         .props(requestTimeout, projectSettingsManager),
       EditionsSetLocalLibrariesPreference -> EditionsSetProjectLocalLibrariesPreferenceHandler

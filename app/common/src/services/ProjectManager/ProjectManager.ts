@@ -582,6 +582,17 @@ export class ProjectManager {
     return this.runProjectServiceCommand('versioning/commit', { path, message })
   }
 
+  /**
+   * Save the project's current state as a version if its repository is enabled, as the save on
+   * close does. `id` is `null` when nothing was saved (not enabled, no git, nothing changed).
+   */
+  async commitVersionIfEnabled(
+    path: Path,
+    message: string,
+  ): Promise<{ readonly id: string | null }> {
+    return this.runProjectServiceCommand('versioning/commit-if-enabled', { path, message })
+  }
+
   /** The project's saved versions, newest first. */
   async listVersions(path: Path): Promise<{ readonly versions: readonly VersionEntry[] }> {
     return this.runProjectServiceCommand('versioning/log', { path })

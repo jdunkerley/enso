@@ -439,6 +439,21 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     return this.request('library/listPublicTypes', {})
   }
 
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#librarylistloadfailures) */
+  listLibraryLoadFailures(): Promise<LsRpcResult<response.ListLibraryLoadFailures>> {
+    return this.request('library/listLoadFailures', {})
+  }
+
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#editionscheckswitch) */
+  checkEditionSwitch(edition?: string): Promise<LsRpcResult<response.CheckEditionSwitch>> {
+    return this.request('editions/checkSwitch', edition != null ? { edition } : {})
+  }
+
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#editionssetparentedition) */
+  setParentEdition(newEditionName: string): Promise<LsRpcResult<response.SetParentEdition>> {
+    return this.request('editions/setParentEdition', { newEditionName })
+  }
+
   /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#refactoringrenamesymbol) */
   renameSymbol(
     module: string,

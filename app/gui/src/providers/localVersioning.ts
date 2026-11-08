@@ -53,6 +53,7 @@ export type LocalVersioningBackend = Pick<
   | 'initVersioning'
   | 'enableVersioning'
   | 'commitVersion'
+  | 'commitVersionIfEnabled'
 >
 
 /** What the store works with; the app's are {@link useLocalVersioning}'s, tests pass their own. */
@@ -557,6 +558,25 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     }
   }
 
+  /**
+   * Save a version before a change the app makes to the project itself (an edition switch), as the
+   * save on close does: the open modules are written first, and nothing is saved, nor asked, when
+   * the project's versions are not kept. Rejects when the version could not be saved (the
+   * repository blocked, say), so the caller can leave its change unmade.
+   */
+  async function saveIfEnabled(projectId: ProjectId, comment: string): Promise<void> {
+    const project = watched.get(projectId)
+    const backend = deps.localBackend()
+    if (project == null || backend == null) return
+    const written = await project.flush()
+    if (written.kind === 'declined') throw new Error(written.reason)
+    try {
+      await backend.commitVersionIfEnabled(projectId, comment)
+    } finally {
+      await refresh(projectId)
+    }
+  }
+
   /** Open the "Save a version" dialog, whose Save saves with its comment. */
   function askToSave(projectId: ProjectId) {
     deps.modals.open(SaveVersionModal, {
@@ -631,6 +651,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     offerRepository,
     resetPrompts,
     save,
+    saveIfEnabled,
     askToSave,
     canSave,
     saveFromShortcut,

@@ -46,9 +46,10 @@ export function useImportsAddedOnOpenToast(
  * hidden with it (a queued one too) until the user closes it; a later `executionComplete` (the
  * project fixed) dismisses it. Unmounting the view dismisses both (`useToast`'s scope).
  *
- * Not covered: a project whose first execution completes with nothing computed (the issue's stale
- * `0.0.0-dev` edition, whose imports are "not found") shows no start-up failure; its errors are
- * the nodes' own.
+ * A library the runtime could not load is reported by name whether the first execution fails or
+ * completes with nothing computed (the issue's stale edition): `useUnresolvedLibrariesToast`
+ * (Note [The Edition Switch]) shows it, and while it has a library to name, the generic start-up
+ * failure is not shown.
  */
 /**
  * A composable which sets up several toasts for project management, and creates one for message
@@ -58,7 +59,8 @@ export function useGraphEditorToasts(
   projectStore: Pick<
     ProjectStore,
     'firstExecution' | 'startupFailure' | 'lsRpcConnection' | 'executionContext'
-  >,
+  > &
+    Partial<Pick<ProjectStore, 'libraryLoadFailures'>>,
 ) {
   const toastStartup = useToast.info({ autoClose: false })
   const toastStartupFailed = useToast.error({ autoClose: false })
@@ -71,10 +73,13 @@ export function useGraphEditorToasts(
   const STARTUP_MESSAGE = 'Initializing the project. This can take up to one minute.'
   let startup: 'running' | 'done' | { failed: string; shown: boolean } = 'running'
   let active = true
+  // The libraries' own toast names the cause (Note [The Edition Switch]).
+  const librariesNamed = () =>
+    projectStore.libraryLoadFailures?.some((failure) => failure.library != null) ?? false
   const showStartup = () => {
     if (!active) return
     if (startup === 'running') toastStartup.show(STARTUP_MESSAGE)
-    else if (typeof startup === 'object' && !startup.shown) {
+    else if (typeof startup === 'object' && !startup.shown && !librariesNamed()) {
       startup.shown = true
       toastStartupFailed.show(`The project could not be started: ${startup.failed}`)
     }
@@ -92,6 +97,11 @@ export function useGraphEditorToasts(
       startup.shown = false
       toastStartupFailed.dismiss()
     }
+  })
+  watch(librariesNamed, (named) => {
+    if (!named || typeof startup !== 'object' || !toastStartupFailed.isPending()) return
+    startup.shown = false
+    toastStartupFailed.dismiss()
   })
   projectStore.firstExecution.then(() => {
     if (startup !== 'running') return

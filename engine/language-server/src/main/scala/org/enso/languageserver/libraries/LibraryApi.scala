@@ -77,6 +77,32 @@ object LibraryApi {
       }
   }
 
+  case object EditionsCheckSwitch extends Method("editions/checkSwitch") {
+    self =>
+
+    /** @param edition the edition to switch to; the bundled one if absent */
+    case class Params(edition: Option[String])
+
+    case class VersionChange(library: String, from: Option[String], to: String)
+
+    case class Result(
+      current: Option[String],
+      target: String,
+      resolves: Boolean,
+      changes: Seq[VersionChange],
+      stillMissing: Seq[String]
+    )
+
+    implicit val hasParams: HasParams.Aux[this.type, self.Params] =
+      new HasParams[this.type] {
+        type Params = self.Params
+      }
+    implicit val hasResult: HasResult.Aux[this.type, self.Result] =
+      new HasResult[this.type] {
+        type Result = self.Result
+      }
+  }
+
   case object EditionsSetLocalLibrariesPreference
       extends Method("editions/setProjectLocalLibrariesPreference") { self =>
 
