@@ -116,8 +116,10 @@ public final class System {
         var tPath = ctx.getPublicTruffleFile(path);
         pb.directory(tPath);
       } else {
-        // The context's working directory: a standby engine's process runs elsewhere (Note
-        // [Standby Mode] in engine/runner `Standby`). In a normal engine they are the same.
+        // Always the context's working directory, deliberately, unlike `get_file`, which looks
+        // at the override only when it is set: in a normal engine the context's directory is the
+        // process's, so this changes nothing there, and a standby engine's process runs elsewhere
+        // (Note [Standby Mode] in engine/runner `Standby`).
         pb.directory(ctx.getCurrentWorkingDirectory());
       }
 

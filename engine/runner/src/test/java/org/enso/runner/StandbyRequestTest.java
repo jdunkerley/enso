@@ -1,6 +1,7 @@
 package org.enso.runner;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -56,6 +57,44 @@ public class StandbyRequestTest {
             "{\"args\":[],\"args\":[]}")) {
       assertThrows(line, IllegalArgumentException.class, () -> StandbyRequest.parse(line));
     }
+  }
+
+  private static final String SECRET = "SECRET-518";
+
+  @Test
+  public void errorsNeverEchoAValue() {
+    var lines =
+        List.of(
+            "{\"args\":[\"" + SECRET,
+            "{\"args\":[\"" + SECRET + "\\q\"]}",
+            "{\"args\":[\"" + SECRET + "\\u00",
+            "{\"args\":[\"" + SECRET + "\\u00zz\"]}",
+            "{\"args\":[\"" + SECRET + "\\u+041\"]}",
+            "{\"args\":[\"" + SECRET + "\u0001\"]}",
+            "{\"args\":[\"" + SECRET + "\"]} " + SECRET,
+            "{\"args\":[" + SECRET + "]}",
+            "{\"args\":[],\"env\":{\"LANGUAGE_SERVER_CHANNEL_TOKEN\":" + SECRET + "}}",
+            "{\"args\":[],\"env\":{\"LANGUAGE_SERVER_CHANNEL_TOKEN\":\"" + SECRET);
+    for (var line : lines) {
+      var e = assertThrows(line, IllegalArgumentException.class, () -> StandbyRequest.parse(line));
+      assertFalse(line + " -> " + e.getMessage(), e.getMessage().contains(SECRET));
+    }
+  }
+
+  @Test
+  public void theReasonIsNamed() {
+    var e =
+        assertThrows(
+            IllegalArgumentException.class, () -> StandbyRequest.parse("{\"args\":[\"" + SECRET));
+    assertTrue(e.getMessage(), e.getMessage().startsWith("unterminated string at character "));
+    var signed =
+        assertThrows(
+            IllegalArgumentException.class, () -> StandbyRequest.parse("{\"args\":[\"\\u+041\"]}"));
+    assertTrue(signed.getMessage(), signed.getMessage().startsWith("bad \\u escape"));
+    var shortEscape =
+        assertThrows(
+            IllegalArgumentException.class, () -> StandbyRequest.parse("{\"args\":[\"\\u00"));
+    assertTrue(shortEscape.getMessage(), shortEscape.getMessage().startsWith("short \\u escape"));
   }
 
   @Test

@@ -1738,12 +1738,29 @@ public class Main {
               + ".");
     }
     var projectPath = line.getOptionValue(LanguageServerApi.ROOT_PATH_OPTION);
-    if (projectPath == null || !Path.of(projectPath).isAbsolute()) {
+    Path path;
+    try {
+      path = projectPath == null ? null : Path.of(projectPath);
+    } catch (InvalidPathException e) {
+      throw exitFail("standby: the argument line's --path is not a valid path.");
+    }
+    if (path == null || !path.isAbsolute()) {
       throw exitFail("standby: the argument line needs an absolute --path.");
     }
-    var parent = Path.of(projectPath).normalize().getParent();
+    var parent = path.normalize().getParent();
     if (parent == null) {
       throw exitFail("standby: --path cannot be a filesystem root.");
+    }
+    // The configuration (`application-ls.conf`, `${?NAME}`) prefers the environment to the
+    // property the line's value is set as: an inherited variable would win silently.
+    for (var name : request.env().keySet()) {
+      if (StandbyRequest.CONFIG_PROPERTIES.containsKey(name) && System.getenv(name) != null) {
+        throw exitFail(
+            "standby: "
+                + name
+                + " is set in the standby engine's environment and would override the line's"
+                + " value; start the standby engine without it.");
+      }
     }
     request.applyEnvironment();
     System.setProperty(ContextFactory.WORKING_DIRECTORY_PROPERTY, parent.toString());

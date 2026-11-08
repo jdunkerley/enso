@@ -124,11 +124,16 @@ final class StandbyJson {
           if (pos + 4 > text.length()) {
             throw error("short \\u escape");
           }
-          try {
-            sb.append((char) Integer.parseInt(text.substring(pos, pos + 4), 16));
-          } catch (NumberFormatException ex) {
-            throw error("bad \\u escape");
+          var code = 0;
+          for (var i = 0; i < 4; i++) {
+            // Not `Integer.parseInt`, which accepts a sign: "+041" would pass as four digits.
+            var digit = Character.digit(text.charAt(pos + i), 16);
+            if (digit < 0) {
+              throw error("bad \\u escape");
+            }
+            code = code * 16 + digit;
           }
+          sb.append((char) code);
           pos += 4;
         }
         default -> throw error("bad escape");

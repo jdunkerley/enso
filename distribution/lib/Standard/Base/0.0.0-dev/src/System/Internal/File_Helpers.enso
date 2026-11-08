@@ -20,9 +20,10 @@ polyglot java import java.time.ZonedDateTime as Java_ZonedDateTime
 polyglot java import java.time.ZoneOffset as Java_ZoneOffset
 
 ## The builtin that returns a File instance for a given path. A relative path
-   resolves against the context's working directory when that is not the
-   process's (a standby engine, whose process runs elsewhere); it is then made
-   absolute. In a normal engine the path is kept as given.
+   resolves against the context's working directory when a standby engine set
+   the context's working directory (the `enso.context.workingDirectory`
+   property; its process runs elsewhere); it is then made absolute. Otherwise
+   the path is kept as given.
 get_file path:Text =
     java_path = Java_Path.of path
     resolved = case Runtime_Helpers.working_directory_override of

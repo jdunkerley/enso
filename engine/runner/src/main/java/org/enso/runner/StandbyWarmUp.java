@@ -2,11 +2,13 @@ package org.enso.runner;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.PrintStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -112,6 +114,7 @@ final class StandbyWarmUp implements Standby.WarmUp {
               .out(OutputStream.nullOutputStream())
               .build();
       running.set(context);
+      Throwable primary = null;
       try {
         // A cancel that came before `running` was set did not see the context: stop here. One
         // that comes after closes it, and `execute` throws.
@@ -130,10 +133,23 @@ final class StandbyWarmUp implements Standby.WarmUp {
         if (!result.isString()) {
           throw new IllegalStateException("the warm-up returned " + result);
         }
+      } catch (Throwable t) {
+        primary = t;
+        throw t;
       } finally {
         var still = running.getAndSet(null);
         if (still != null) {
-          still.close();
+          // `close(true)`: after a failure a guest thread may still be inside, which `close()`
+          // refuses with an exception that would hide the failure and leave the context open.
+          try {
+            still.close(true);
+          } catch (RuntimeException e) {
+            if (primary != null) {
+              primary.addSuppressed(e);
+            } else {
+              System.err.println("standby: warning: could not close the warm-up's context: " + e);
+            }
+          }
         } else {
           // `cancel` took the context: its files are open until its close is over.
           cancelClosed.await();
@@ -167,26 +183,63 @@ final class StandbyWarmUp implements Standby.WarmUp {
   }
 
   private static void deleteRecursively(Path directory) {
+    deleteRecursively(directory, System.err);
+  }
+
+  /**
+   * Delete {@code directory} and everything under it, as much as can be deleted: a file that cannot
+   * be (one still open on Windows) is skipped, and one warning line names how many were left and
+   * the first failure.
+   *
+   * @return how many files and folders could not be deleted
+   */
+  static int deleteRecursively(Path directory, PrintStream err) {
+    var failures = new ArrayList<IOException>();
     try {
       Files.walkFileTree(
           directory,
           new SimpleFileVisitor<>() {
             @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                throws IOException {
-              Files.deleteIfExists(file);
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+              delete(file);
               return FileVisitResult.CONTINUE;
             }
 
             @Override
-            public FileVisitResult postVisitDirectory(Path dir, IOException exc)
-                throws IOException {
-              Files.deleteIfExists(dir);
+            public FileVisitResult visitFileFailed(Path file, IOException exc) {
+              failures.add(exc);
               return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
+              if (exc != null) {
+                failures.add(exc);
+              }
+              delete(dir);
+              return FileVisitResult.CONTINUE;
+            }
+
+            private void delete(Path path) {
+              try {
+                Files.deleteIfExists(path);
+              } catch (IOException e) {
+                failures.add(e);
+              }
             }
           });
     } catch (IOException e) {
-      System.err.println("standby: could not delete " + directory + ": " + e);
+      failures.add(e);
     }
+    if (!failures.isEmpty()) {
+      err.println(
+          "standby: warning: could not delete "
+              + failures.size()
+              + " path(s) under "
+              + directory
+              + ", the first: "
+              + failures.get(0));
+    }
+    return failures.size();
   }
 }

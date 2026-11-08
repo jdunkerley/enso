@@ -108,7 +108,12 @@ filesystem root. `env` accepts only `LANGUAGE_SERVER_YDOC_PORT` and
 properties) and `ENSO_LOCAL_PROJECT_ID` and `ENSO_LOCAL_PROJECT_SESSION_ID` (set
 as `enso.env.<NAME>`, read through `org.enso.common.ProcessEnvironment`). Any
 code that reads one of those four from the environment must read it the same
-way. It then sets the context's working directory
+way. The spare's spawn environment must not carry
+`LANGUAGE_SERVER_CHANNEL_TOKEN` or `LANGUAGE_SERVER_YDOC_PORT` (the
+configuration prefers the environment, so the engine refuses a line that sets
+one of them while it is inherited); only the four names go in the line, and
+everything else (the secrets key, other variables) goes in the spawn
+environment. It then sets the context's working directory
 (`enso.context.workingDirectory`, applied by `ContextFactory`) to the parent of
 `--path` and calls `launch` with the arguments. A closed stdin before the line
 exits with 0.
@@ -150,8 +155,25 @@ exits with 0.
   std-bits code that resolves a path against the process (`user.dir`, `Path.of`
   of a relative string, a `ProcessBuilder` without a directory) must go through
   the context's working directory instead.
-- Tests: `StandbyRequestTest`, `StandbyTest`, `StandbyPreloaderTest`,
-  `ContextWorkingDirectoryTest` (runtime-integration-tests), and
-  `StandbyProcessTest`, which runs the real `built-distribution/`
-  (`sbt buildEngineDistribution`) and is skipped without one; it covers no
-  warm-up, a full warm-up and a warm-up abandoned mid-run.
+- A warm-up still running 60 s after the line is cancelled
+  (`standby: warm-up abandoned after 60 s`), and a bad line cancels a running
+  warm-up and waits for it before the process exits, so its folder is deleted.
+  The warm-up's folder and cache are deleted file by file: what cannot be (a
+  file still open on Windows) is left, with one warning line.
+- Tests:
+  - `StandbyRequestTest` (`StandbyRequest`, `StandbyJson`): the grammar; errors
+    never echo a value (a sentinel in each malformed form).
+  - `StandbyTest`: the wait (the line before and after the warm-up, abandon, the
+    60 s limit, a bad line stopping a running warm-up, stdin closed first,
+    `readLine` leaving the rest of stdin), and an unreadable `jvm.options`.
+  - `StandbyPreloaderTest`: the list and the AOT-cache skip.
+  - `StandbyWarmUpTest`: a cancel before the run, and deletion that goes on past
+    an undeletable file.
+  - `ContextWorkingDirectoryTest` (runtime-integration-tests): the context's
+    working directory.
+  - `StandbyProcessTest` runs the real `built-distribution/` (CI's JVM tests
+    build one with `buildEngineDistributionNoIndex`; skipped without one): no
+    warm-up, a full warm-up (only library caches written, no log lines on
+    stdout), a warm-up abandoned mid-run, stdin closed first, and the refused
+    lines (relative path, filesystem root, not a `--server` line, an inherited
+    channel token).

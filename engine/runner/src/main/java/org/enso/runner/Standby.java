@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,8 @@ import org.slf4j.LoggerFactory;
  * `STANDBY READY <ms from process start>` on stderr. Meanwhile the main thread reads one line from
  * stdin: `{"args":[...],"env":{...}}` (`StandbyRequest`), the arguments `project/open` would have
  * passed and the open's own variables. It waits for the warm-up to end (unless
- * `enso.standby.abandonWarmUp` is true, which cancels it), then hands the line to `Main`, which
+ * `enso.standby.abandonWarmUp` is true, which cancels it; a warm-up still running 60 s after the
+ * line is cancelled too, and a bad line cancels it before the process exits), then hands the line to `Main`, which
  * applies the variables, sets the context's working directory to the parent of `--path`
  * (`ContextFactory.WORKING_DIRECTORY_PROPERTY`; relative paths and a filesystem root are refused,
  * and so is a line that does not start a Language Server or carries `--standby`, `--jvm`,
@@ -95,21 +97,35 @@ final class Standby {
   private final Preload preload;
   private final PrintStream err;
   private final boolean abandonOnLine;
+  private final Duration lineWait;
   private volatile boolean abandoned;
 
+  /** How long a warm-up may still run once the line has arrived, before it is abandoned. */
+  static final Duration LINE_WAIT = Duration.ofSeconds(60);
+
   Standby(WarmUp warmUp, Preload preload, PrintStream err, boolean abandonOnLine) {
+    this(warmUp, preload, err, abandonOnLine, LINE_WAIT);
+  }
+
+  Standby(
+      WarmUp warmUp, Preload preload, PrintStream err, boolean abandonOnLine, Duration lineWait) {
     this.warmUp = warmUp;
     this.preload = preload;
     this.err = err;
     this.abandonOnLine = abandonOnLine;
+    this.lineWait = lineWait;
   }
 
   /** The standby of `enso --standby`: the real warm-up and preloader, and the two properties. */
   static Standby create(File component) {
-    WarmUp warmUp =
-        Boolean.parseBoolean(System.getProperty(WARM_UP_PROPERTY, "true"))
-            ? new StandbyWarmUp()
-            : NO_WARM_UP;
+    WarmUp warmUp = NO_WARM_UP;
+    if (Boolean.parseBoolean(System.getProperty(WARM_UP_PROPERTY, "true"))) {
+      try {
+        warmUp = new StandbyWarmUp();
+      } catch (RuntimeException | LinkageError e) {
+        System.err.println("standby: warning: no warm-up, its setup failed: " + e);
+      }
+    }
     return new Standby(
         warmUp,
         preloadFor(component, System.getenv(JvmOptions.ENVIRONMENT_VARIABLE), System.err),
@@ -187,13 +203,32 @@ final class Standby {
     if (line == null) {
       return null;
     }
-    var request = StandbyRequest.parse(line);
-    if (abandonOnLine) {
-      abandoned = true;
-      warmUp.cancel();
+    StandbyRequest request;
+    try {
+      request = StandbyRequest.parse(line);
+    } catch (IllegalArgumentException e) {
+      // The process exits on a bad line: stop the warm-up first, so that its folder is deleted.
+      abandon();
+      finished.await();
+      throw e;
     }
-    finished.await();
+    if (abandonOnLine) {
+      abandon();
+    }
+    // A warm-up that hangs must not hold the open for good.
+    if (!finished.await(lineWait.toMillis(), TimeUnit.MILLISECONDS)) {
+      var ms = lineWait.toMillis();
+      err.println(
+          "standby: warm-up abandoned after " + (ms % 1000 == 0 ? ms / 1000 + " s" : ms + " ms"));
+      abandon();
+      finished.await();
+    }
     return request;
+  }
+
+  private void abandon() {
+    abandoned = true;
+    warmUp.cancel();
   }
 
   private void prepare() {

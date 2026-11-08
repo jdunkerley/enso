@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -217,6 +218,12 @@ public class StandbyProcessTest {
    * directory and temporary directory.
    */
   private Engine start(boolean warmUp, boolean abandon) throws IOException {
+    return start(warmUp, abandon, Map.of());
+  }
+
+  /** {@link #start(boolean, boolean)} with {@code environment} added to the engine's. */
+  private Engine start(boolean warmUp, boolean abandon, Map<String, String> environment)
+      throws IOException {
     var enso = requireLauncher();
     var elsewhere = tmp.newFolder();
     var data = tmp.newFolder().toPath();
@@ -235,6 +242,9 @@ public class StandbyProcessTest {
             Standby.ABANDON_PROPERTY + "=" + abandon));
     var builder = new ProcessBuilder(command).directory(elsewhere);
     builder.environment().put("ENSO_DATA_DIRECTORY", data.toString());
+    // The line carries these; inherited, they would make the engine refuse it.
+    StandbyRequest.CONFIG_PROPERTIES.keySet().forEach(builder.environment()::remove);
+    builder.environment().putAll(environment);
     // `java.io.tmpdir` is read at JVM start, so it cannot be a `--vm.D`.
     var toolOptions = builder.environment().get("JAVA_TOOL_OPTIONS");
     builder
@@ -513,5 +523,20 @@ public class StandbyProcessTest {
     refused(
         "[\"--server\",\"--standby\",\"--path\"," + project + ",\"--rpc-port\",\"1\"]",
         "must start a Language Server");
+  }
+
+  @Test(timeout = 300_000)
+  public void anInheritedChannelTokenIsRefused() throws Exception {
+    var inherited = "inherited-token-518";
+    var engine = start(false, false, Map.of("LANGUAGE_SERVER_CHANNEL_TOKEN", inherited));
+    var stdin = engine.process().getOutputStream();
+    stdin.write(
+        line(project(), freePort(), UUID.randomUUID().toString()).getBytes(StandardCharsets.UTF_8));
+    stdin.flush();
+    assertEquals(engine.stderr().toString(), 1, engine.exitCode(120));
+    assertTrue(
+        engine.stderr().toString(),
+        engine.said("standby: LANGUAGE_SERVER_CHANNEL_TOKEN is set in the standby engine's"));
+    assertFalse("the value is not echoed", engine.said(inherited));
   }
 }

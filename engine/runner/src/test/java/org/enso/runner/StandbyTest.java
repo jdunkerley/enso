@@ -2,6 +2,7 @@ package org.enso.runner;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -14,6 +15,7 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -163,6 +165,26 @@ public class StandbyTest {
   public void stdinClosedFirstGivesNoRequest() throws Exception {
     var standby = new Standby(Standby.NO_WARM_UP, abandoned -> "x", err, false);
     assertNull(standby.awaitRequest(in("")));
+  }
+
+  @Test(timeout = 30_000)
+  public void aWarmUpStillRunningAfterTheWaitIsAbandoned() throws Exception {
+    var gate = new Gate();
+    var standby = new Standby(gate, abandoned -> "x", err, false, Duration.ofMillis(200));
+    assertNotNull(standby.awaitRequest(in(LINE)));
+    assertTrue("cancelled", gate.cancelled.get());
+    assertTrue(err(), err().contains("standby: warm-up abandoned after 200 ms"));
+    assertTrue(err(), err().contains(", preloading abandoned, "));
+  }
+
+  @Test(timeout = 30_000)
+  public void aBadLineStopsTheRunningWarmUpBeforeItIsRefused() {
+    var gate = new Gate();
+    var standby = new Standby(gate, abandoned -> "x", err, false);
+    assertThrows(IllegalArgumentException.class, () -> standby.awaitRequest(in("[1]\n")));
+    assertTrue("cancelled", gate.cancelled.get());
+    // The warm-up's thread had ended: it prints this line last.
+    assertTrue(err(), err().contains(Standby.READY));
   }
 
   @Test
