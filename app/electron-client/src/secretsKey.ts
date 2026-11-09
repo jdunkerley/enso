@@ -307,6 +307,11 @@ export interface SecretsActionOptions {
   readonly store: LocalSecrets
   /** Whether any engine is running; see `ProjectService.hasRunningProjects`. */
   readonly hasRunningProjects: () => Promise<boolean>
+  /**
+   * After the key changed (or a change failed part way): the spare engine holds the key it was
+   * started with, and `hasRunningProjects` does not count it, so it is refreshed.
+   */
+  readonly afterKeyChange?: () => Promise<void>
 }
 
 let secretsActionQueue: Promise<unknown> = Promise.resolve()
@@ -325,7 +330,11 @@ function queued<T>(action: () => Promise<T>): Promise<T> {
 export function rotateSecretsKey(options: SecretsActionOptions): Promise<void> {
   return queued(async () => {
     if (await options.hasRunningProjects()) throw new Error(ROTATE_BLOCKED_BY_PROJECTS)
-    await options.keySource.rotate(options.store)
+    try {
+      await options.keySource.rotate(options.store)
+    } finally {
+      await options.afterKeyChange?.()
+    }
   })
 }
 
@@ -338,9 +347,13 @@ export function resetSecrets(options: SecretsActionOptions): Promise<void> {
     if (await options.hasRunningProjects()) throw new Error(RESET_BLOCKED_BY_PROJECTS)
     // Before the file goes: a keychain that could not be read may hold the right key.
     options.keySource.assertKeychainReadable()
-    await options.store.reset()
-    await options.keySource.forget()
-    await options.keySource.initialise()
+    try {
+      await options.store.reset()
+      await options.keySource.forget()
+      await options.keySource.initialise()
+    } finally {
+      await options.afterKeyChange?.()
+    }
   })
 }
 

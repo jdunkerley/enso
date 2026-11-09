@@ -400,23 +400,25 @@ wanted unless, in this order: quitting (`stopSpareEngine`, for good), the
 setting is off, `ENSO_SPARE_ENGINE=0`, the default engine
 (`resolveDefaultEngineMode`) is native, `ENSO_YDOC_HOST=engine`, the AOT cache
 is training (`JvmAotCache.isTraining`: from its launch check until a cache is
-made, a killed training waiting to restart included; Electron refreshes when it
-ends), `--profiling-path` is among the extra arguments (a relative path, which
-standby refuses), a project is opening, or a project is in use. An unwanted
-spare is stopped with that reason, except for an opening project, which takes
-the spare or stops it itself. The refresh runs on `setSpareEngine`, after a
-failed open (once it no longer counts as opening), and after a close, once the
-closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2 s,
-`EngineSettings.spareAfterCloseMs`, an `unref`'d timer) has passed, whichever is
-first. A native open stops the spare.
+made, a killed training waiting to restart included; Electron refreshes after
+`start()` and when `onTrainingEnded` says a training finished or failed, not
+when an open stopped it), `--profiling-path` is among the extra arguments (a
+relative path, which standby refuses), a project is opening, or a project is in
+use. An unwanted spare is stopped with that reason, except for an opening
+project, which takes the spare or stops it itself. The refresh runs on
+`setSpareEngine`, after a failed open (once it no longer counts as opening), and
+after a close, once the closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2
+s, `EngineSettings.spareAfterCloseMs`, an `unref`'d timer) has passed, whichever
+is first. A native open stops the spare.
 
 - **No spare beside an open.** `openProject` counts itself (`opensInFlight`,
   `opensStarted`) from its first line, before any await. The decision to start
   is made after the refresh's last await (the AOT options, then the runner's
   `hasProjectsInUse`), with nothing awaited before `startSpare`: a quit, an open
-  in flight, or any open started since the refresh began means no spare. A spare
-  whose start failed is tried again (`spareAvailableAgain`) only by the refresh
-  after a close, and only when that refresh starts one.
+  in flight, any open started since the refresh began, or an AOT training that
+  began meanwhile means no spare. A spare whose start failed is tried again
+  (`spareAvailableAgain`) only by the refresh after a close, and only when that
+  refresh starts one.
 - **The key** (`spareKeyFor`): mode, the service's extra arguments, the AOT
   options, the extra environment (the secrets key) and `ENSO_JVM_OPTIONS`. A JVM
   open computes it from the same inputs, so with the same settings it takes the
@@ -484,11 +486,17 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   other's cache at every launch) and deletes older ones; it only ever deletes
   directories named like a key (16 hex digits), since `ENSO_JVM_AOT_DIR` may
   name a directory holding other things. A failed training (not an abort) leaves
-  no `enso.aot` and is not retried until the next launch. `dispose()`
-  (Electron's `before-quit`) aborts a running training before it awaits
-  anything, which kills its engine or `java` at once; the `.tmp` and `.aotconf`
-  such a quit can leave are deleted by the next `start()`. Three things measured
-  on the Windows bundle shaped this (Notes in `driver.ts` and `trainer.ts`):
+  no `enso.aot` and is not retried until the next launch. While another process
+  holds the lock, the cache tries again every `retrainDelayMs` (60 s) and stays
+  `isTraining` until that process's cache appears (or it gets the lock and
+  trains itself); a lock that cannot be taken at all (an error) counts as a
+  failed training. A finished or failed training, and a cache found made by
+  another process, call `onTrainingEnded` (Electron refreshes the spare engine).
+  `dispose()` (Electron's `before-quit`) aborts a running training before it
+  awaits anything, which kills its engine or `java` at once; the `.tmp` and
+  `.aotconf` such a quit can leave are deleted by the next `start()`. Three
+  things measured on the Windows bundle shaped this (Notes in `driver.ts` and
+  `trainer.ts`):
   - `/_health` passes while the Language Server is still initialising, and a
     channel socket opened then is dropped (`1006`): the driver reconnects once a
     second until the session is initialised (a `403` fails at once).

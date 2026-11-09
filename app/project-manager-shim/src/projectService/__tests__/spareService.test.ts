@@ -340,3 +340,20 @@ test('a close while the AOT cache is still wanted starts no spare; the refresh a
   await s.refreshSpare()
   expect(starts).toHaveLength(1)
 })
+
+test('a training that begins while a refresh waits for the AOT options means no spare', async () => {
+  const options = heldOptions()
+  let training = false
+  const s = service({
+    option: 'jvm',
+    jvmAot: fakeAot({ isTraining: () => training, jvmOptions: options.jvmOptions }),
+  })
+  const refresh = s.setSpareEngine(true)
+  // Past its settings checks, waiting for the AOT options, when `JvmAotCache.start()` runs.
+  await options.reached.promise
+  training = true
+  options.release.resolve([])
+  await refresh
+  expect(starts).toEqual([])
+  expect(stops).toEqual(['the AOT cache is training'])
+})

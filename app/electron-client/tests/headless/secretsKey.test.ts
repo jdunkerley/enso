@@ -679,6 +679,19 @@ describe('rotation', () => {
       expect([...keyring.items.keys()]).toEqual(['secrets-key'])
       expect(await fs.readFile(file, 'utf8')).toBe(before)
     })
+
+    test('a refused rotation or reset leaves the spare engine alone', async () => {
+      const afterKeyChange = vi.fn(async () => {})
+      const options = {
+        keySource,
+        store,
+        hasRunningProjects: async () => true,
+        afterKeyChange,
+      }
+      await expect(rotateSecretsKey(options)).rejects.toThrow()
+      await expect(resetSecrets(options)).rejects.toThrow()
+      expect(afterKeyChange).not.toHaveBeenCalled()
+    })
   })
 
   describe('with no project running', () => {
@@ -696,6 +709,34 @@ describe('rotation', () => {
       expect(keySource.current()).not.toBeNull()
       expect(keySource.current()).not.toEqual(oldKey)
       expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    })
+
+    test('a rotation and a reset each refresh the spare engine, which holds the old key', async () => {
+      const afterKeyChange = vi.fn(async () => {})
+      const options = {
+        keySource,
+        store,
+        hasRunningProjects: async () => false,
+        afterKeyChange,
+      }
+      await rotateSecretsKey(options)
+      expect(afterKeyChange).toHaveBeenCalledOnce()
+      await resetSecrets(options)
+      expect(afterKeyChange).toHaveBeenCalledTimes(2)
+    })
+
+    test('a rotation that fails part way refreshes the spare engine too', async () => {
+      const afterKeyChange = vi.fn(async () => {})
+      vi.spyOn(keySource, 'rotate').mockRejectedValueOnce(new Error('The keychain went away.'))
+      await expect(
+        rotateSecretsKey({
+          keySource,
+          store,
+          hasRunningProjects: async () => false,
+          afterKeyChange,
+        }),
+      ).rejects.toThrow('The keychain went away.')
+      expect(afterKeyChange).toHaveBeenCalledOnce()
     })
   })
 })

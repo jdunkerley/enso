@@ -189,6 +189,8 @@ function createJvmAotCache(
     appVersion: app.getVersion(),
     ensoExecutable,
     isJvmDefault: () => isJvmDefaultEngine(engine, process.env),
+    // No spare engine starts while the cache trains (`isTraining`); once it has, one is wanted.
+    onTrainingEnded: () => void projectService?.refreshSpare(),
   })
 }
 
@@ -257,16 +259,38 @@ export function startAppImageEngineCopy(): void {
   })
 }
 
-/** Train the JDK AOT cache in the background if it is needed (the JVM is the default engine). */
+/**
+ * Train the JDK AOT cache in the background if it is needed (the JVM is the default engine).
+ *
+ * The GUI may have asked for a spare engine before this runs. `start()` counts as training from its
+ * first line (`isTraining`), so the refresh right after it stops a spare started meanwhile, and the
+ * one after it has settled starts one when no training followed (a cache was there, or there is no
+ * cache for this engine); a training's end refreshes it too (`onTrainingEnded`).
+ */
 export function startJvmAotCache(): void {
-  jvmAotCache?.start().catch((error: unknown) => {
-    console.error('Failed to start the JDK AOT cache:', error)
-  })
+  if (jvmAotCache == null) return
+  jvmAotCache
+    .start()
+    .catch((error: unknown) => {
+      console.error('Failed to start the JDK AOT cache:', error)
+    })
+    .finally(() => void projectService?.refreshSpare())
+  void projectService?.refreshSpare()
 }
 
 /** Stop a running AOT training. */
 export async function disposeJvmAotCache(): Promise<void> {
   await jvmAotCache?.dispose()
+}
+
+/** Stop the spare engine (quit). It also exits by itself when its stdin closes. */
+export async function stopSpareEngine(): Promise<void> {
+  await projectService?.stopSpareEngine()
+}
+
+/** Start or replace the spare engine for the current settings (a new secrets key). */
+export async function refreshSpareEngine(): Promise<void> {
+  await projectService?.refreshSpare()
 }
 
 /** Setup the project service.*/

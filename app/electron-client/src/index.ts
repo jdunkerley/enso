@@ -57,6 +57,7 @@ import {
   setupProjectService,
   startAppImageEngineCopy,
   startJvmAotCache,
+  stopSpareEngine,
   version,
 } from './projectService.js'
 import { enableAll } from './security.js'
@@ -218,6 +219,7 @@ class App {
 
       this.electron.app.on('before-quit', () => {
         void disposeJvmAotCache()
+        void stopSpareEngine()
       })
 
       this.electron.app.on('will-quit', () => {

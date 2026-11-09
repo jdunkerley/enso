@@ -139,8 +139,10 @@ desktop binary (AppImage/DMG/exe + installer).
   rotation a crash interrupted (Note [Crash-Safe Key Rotation] in
   `secretsKey.ts`). Rotate and reset both refuse while any engine runs
   (`ProjectService.hasRunningProjects`), since each engine holds the key it was
-  started with, and run one at a time. Status comes from the shim's
-  `secrets/status` route, not IPC. Use
+  started with, and run one at a time. The spare engine (which they do not
+  count) holds the old key too, so each refreshes it afterwards
+  (`afterKeyChange`, in a `finally`; not when refused). Status comes from the
+  shim's `secrets/status` route, not IPC. Use
   `new Entry('Enso', account, { linux: { store: 'secret-service' } })`, never
   `Entry.withTarget` (in 2.1.2 constructing one wipes an existing Windows
   credential), and without the pinned Linux store the default falls back to the
@@ -219,12 +221,13 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
 - `ENSO_JVM_AOT_DIR` — where the per-user JDK AOT cache lives instead of
   `<userData>/jvm-aot` (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
   cache trains in the background, once the window is up, only when the JVM is
-  the default engine; `before-quit` stops a running training. The open-time
-  harness points it at a directory of its run (`<out>/jvm-aot` for the JVM
-  engines, `<out>/shim-jvm-aot` for native, which never trains) and measures
-  that cache (see "Open-time harness"), so its launches never pick up the
-  user's. An empty value counts as unset. The root and the gate are in
-  `src/jvmAotSettings.ts` (tested in `tests/headless/jvmAotSettings.test.ts`).
+  the default engine; `before-quit` stops a running training (and the spare
+  engine, `stopSpareEngine`). The open-time harness points it at a directory of
+  its run (`<out>/jvm-aot` for the JVM engines, `<out>/shim-jvm-aot` for native,
+  which never trains) and measures that cache (see "Open-time harness"), so its
+  launches never pick up the user's. An empty value counts as unset. The root
+  and the gate are in `src/jvmAotSettings.ts` (tested in
+  `tests/headless/jvmAotSettings.test.ts`).
 - `APPIMAGE` (set by the AppImage runtime) — with the JVM as the default engine
   (`--engine-mode`, `ENSO_ENGINE_MODE`, then the built-in default; nothing
   happens while it is native), a Linux AppImage runs its engine from a copy at

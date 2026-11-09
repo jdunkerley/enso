@@ -41,6 +41,11 @@ export interface JvmAotCacheSettings {
   readonly isJvmDefault: () => boolean
   /** How long after the last open was answered a killed training restarts: 60 s. */
   readonly retrainDelayMs?: number
+  /**
+   * Told when a training has ended, with the cache written or failed, but not when an open stopped
+   * it: no spare engine starts while one runs (`isTraining`), so it is refreshed then.
+   */
+  readonly onTrainingEnded?: () => void
 }
 
 const CACHE_FILE = 'enso.aot'
@@ -168,15 +173,31 @@ export class JvmAotCache {
     const directory = await this.keyDirectory()
     if (directory == null) return
     const cache = path.join(directory, CACHE_FILE)
-    const release = await acquireTrainingLock(this.settings.rootDirectory)
+    let release: (() => Promise<void>) | undefined
+    try {
+      release = await acquireTrainingLock(this.settings.rootDirectory)
+    } catch (error) {
+      // Like a failed training: not tried again until the next launch, and the spare is free to go.
+      this.wanted = false
+      console.error(
+        'JDK AOT cache: could not take the training lock; trying again at the next launch:',
+        error,
+      )
+      this.announceEnded()
+      return
+    }
     if (release == null) {
-      console.info('JDK AOT cache: another IDE process is training it.')
+      console.info('JDK AOT cache: another IDE process is training it; checking again later.')
+      this.scheduleRetrain()
       return
     }
     // Another process may have finished while this one waited; or an open started meanwhile.
     if ((await exists(cache)) || this.disposed || this.opensInFlight > 0) {
-      if (await exists(cache)) this.wanted = false
       await release()
+      if (await exists(cache)) {
+        this.wanted = false
+        if (!this.disposed) this.announceEnded()
+      }
       return
     }
     const controller = new AbortController()
@@ -188,24 +209,39 @@ export class JvmAotCache {
         async () => {
           this.wanted = false
           console.info(`JDK AOT cache: trained in ${Date.now() - started} ms.`)
+          this.training = undefined
+          this.announceEnded()
           await this.deleteOtherKeys(directory)
         },
         (error: unknown) => {
           if (isAbortError(error)) {
+            this.training = undefined
             console.info('JDK AOT cache: training stopped.')
           } else {
             // Not retried after every open: a failure that repeats would cost a JVM start, an
             // open and a cache creation each time. The next launch tries again.
             this.wanted = false
             console.error('JDK AOT cache: training failed; trying again at the next launch:', error)
+            this.training = undefined
+            this.announceEnded()
           }
         },
       )
       .finally(async () => {
-        this.training = undefined
         await release().catch(() => undefined)
       })
     this.training = { controller, done }
+  }
+
+  /**
+   * Tell `onTrainingEnded`, once `isTraining` says so: a training being started counts as one, so
+   * from within it the call waits for that to settle.
+   */
+  private announceEnded(): void {
+    const announce = () => this.settings.onTrainingEnded?.()
+    const starting = this.starting
+    if (starting != null) void starting.then(announce, announce)
+    else announce()
   }
 
   /** A training's files that an interrupted one (a quit) can leave: `.tmp` and `.aotconf`. */
@@ -263,6 +299,14 @@ export class JvmAotCache {
   /** An open was answered: restart training `retrainDelayMs` after the last one, if still needed. */
   openAnswered(): void {
     this.opensInFlight = Math.max(0, this.opensInFlight - 1)
+    this.scheduleRetrain()
+  }
+
+  /**
+   * Try training again `retrainDelayMs` from now, if it is still needed and no open is in flight
+   * (the last open's answer schedules it then).
+   */
+  private scheduleRetrain(): void {
     if (this.opensInFlight > 0 || !this.wanted || this.disposed) return
     clearTimeout(this.retrainTimer)
     this.retrainTimer = setTimeout(() => {
@@ -325,11 +369,14 @@ export class JvmAotCache {
     this.disposed = true
     clearTimeout(this.retrainTimer)
     this.retrainTimer = undefined
-    this.training?.controller.abort()
+    // Held here: a stopped training clears `training` before its lock is released (`done`).
+    const running = this.training
+    running?.controller.abort()
     // A training being started checks `disposed` once it has the lock.
     await this.starting
-    const training = this.training
-    training?.controller.abort()
-    await training?.done
+    const started = this.training
+    started?.controller.abort()
+    await running?.done
+    await started?.done
   }
 }

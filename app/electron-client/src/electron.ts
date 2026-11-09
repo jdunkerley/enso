@@ -2,7 +2,12 @@ import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
 import { resolveLogFileToReveal } from '@/logFileReveal'
 import * as paths from '@/paths'
-import { getLocalSecrets, getSecretsKeySource, hasRunningProjects } from '@/projectService'
+import {
+  getLocalSecrets,
+  getSecretsKeySource,
+  hasRunningProjects,
+  refreshSpareEngine,
+} from '@/projectService'
 import { resetSecrets, rotateSecretsKey } from '@/secretsKey'
 import { initUpdaterIpc } from '@/updaterIpc'
 import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from 'electron'
@@ -83,6 +88,7 @@ export function initIpc(
       keySource: getSecretsKeySource(),
       store: getLocalSecrets(),
       hasRunningProjects,
+      afterKeyChange: refreshSpareEngine,
     }),
   )
   ipcMain.handle(Channel.secretsRotate, () =>
@@ -90,6 +96,7 @@ export function initIpc(
       keySource: getSecretsKeySource(),
       store: getLocalSecrets(),
       hasRunningProjects,
+      afterKeyChange: refreshSpareEngine,
     }),
   )
   ipcMain.on(Channel.error, (_event, data) => {

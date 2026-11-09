@@ -246,15 +246,19 @@ export class ProjectService {
       : await runner.hasRunningProjects()
     // Decided after the last await, with nothing awaited before `startSpare`: an open that started
     // at any point of this decision (it is counted from its first line) means no spare, and so
-    // does a quit.
+    // does a quit, and so does an AOT training that `JvmAotCache.start()` began meanwhile (its end
+    // refreshes the spare).
     const lateReason =
       this.spareStopped ? 'quitting'
       : this.opensInFlight > 0 || this.opensStarted !== opensBefore ? 'a project is opening'
       : inUse ? 'a project is open'
+      : this.engine?.jvmAot?.isTraining() === true ? 'the AOT cache is training'
       : undefined
     if (lateReason != null) {
       // A failed spare is tried again only once nothing is in use; the next close allows it again.
-      if (lateReason !== 'quitting') this.spareRetryAllowed = false
+      if (lateReason === 'a project is opening' || lateReason === 'a project is open') {
+        this.spareRetryAllowed = false
+      }
       // An opening project takes a running spare or stops it itself (`EnsoRunner.openProject`).
       if (lateReason !== 'a project is opening') await runner.stopSpare(lateReason)
       return
