@@ -266,6 +266,11 @@ export class JvmAotCache {
     }, this.settings.retrainDelayMs ?? 60_000)
   }
 
+  /** Whether a training is starting or running (a launch without a cache): no spare meanwhile. */
+  isTraining(): boolean {
+    return this.training != null || this.starting != null
+  }
+
   /**
    * The options for a JVM engine: the cache and its use log (one option each, the log's path
    * quoted, so a `:` in a Windows path does not end the option; ruling 2 of the plan), or `[]` (no

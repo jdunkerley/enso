@@ -1,21 +1,23 @@
 /**
  * @file An open takes a spare whose key matches and writes it the line; a key that differs means an
  * ordinary spawn; a crash after the take respawns an ordinary engine. The engine is
- * `fakeSpareEngine.ts`.
+ * `fakeSpareEngine.ts`. Through the service, an open with the spare's settings takes it.
  */
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { createProject } from '../../localMetadata/__tests__/testUtils.js'
 import {
   EnsoRunner,
   type EngineLaunch,
   type EngineLogSink,
   type StartupClock,
 } from '../ensoRunner.js'
+import { ProjectService } from '../index.js'
 import { SPARE_WARM_UP_LIMIT_MS } from '../spareEngine.js'
 import { ENGINE_TIMEOUTS } from '../timeouts.js'
-import { Path } from '../types.js'
+import { Path, UUID } from '../types.js'
 import { fakeSpareEnso, isAlive, spareEvents } from './fakeSpareEngine.js'
 import { SPARE_OPEN_PORT } from './testPorts.js'
 
@@ -260,4 +262,59 @@ test('a closing project is no longer in use', async () => {
   await fs.writeFile(release, '')
   await closing
   expect(await runner.hasRunningProjects()).toBe(false)
+})
+
+describe('through the service', () => {
+  let secretsKey: string
+  let hosted: EnsoRunner
+  let service: ProjectService
+
+  beforeEach(async () => {
+    vi.stubEnv('ENSO_LOG_DIRECTORY', path.join(root, 'logs'))
+    vi.stubEnv('ENSO_SPARE_ENGINE', '')
+    vi.stubEnv('ENSO_YDOC_HOST', '')
+    vi.stubEnv('ENSO_ENGINE_MODE', '')
+    secretsKey = 'key-a'
+    // A ydoc host that only says yes: the open then waits for no ydoc port the fake lacks.
+    hosted = new EnsoRunner(await fakeSpareEnso(root), {
+      firstPort: SPARE_OPEN_PORT,
+      ydocHost: { listen: async () => {}, close: async () => {} },
+    })
+    const quiet: Console = { ...console, debug: () => {} }
+    service = new ProjectService(
+      hosted,
+      ['--log-level', 'info'],
+      quiet,
+      undefined,
+      undefined,
+      () => [['ENSO_SECRETS_KEY', secretsKey]],
+      { option: 'jvm' },
+    )
+    await createProject(path.join(root, 'S'), 'id-s')
+  })
+
+  afterEach(async () => {
+    await service.stopSpareEngine()
+    await hosted.stopSpare('test over')
+  })
+
+  test('an open with the settings the spare was started with takes it; a changed setting does not', async () => {
+    const project = path.join(root, 'S')
+    await service.setSpareEngine(true)
+    await vi.waitFor(() => expect(hosted.spareState).toBe('ready'), { timeout: 10_000 })
+    expect((await spareEvents(log))[0]?.env?.ENSO_SECRETS_KEY).toBe('key-a')
+    // With engine logging of its own, which travels in the line.
+    await service.openProject(UUID('id-s'), Path(root), { sqlQueries: true })
+    expect(await exists(`${project}.spawned.json`)).toBe(false)
+    const line = JSON.parse(await fs.readFile(`${project}.line.json`, 'utf8'))
+    expect(line.args).toContain('--vm.D')
+    await service.closeProject(UUID('id-s'), Path(root))
+
+    // The close starts the next spare; the key changes before any refresh has seen it.
+    await vi.waitFor(() => expect(hosted.spareState).toBe('ready'), { timeout: 10_000 })
+    secretsKey = 'key-b'
+    await service.openProject(UUID('id-s'), Path(root))
+    expect(await exists(`${project}.spawned.json`)).toBe(true)
+    await service.closeProject(UUID('id-s'), Path(root))
+  }, 30_000)
 })

@@ -391,8 +391,32 @@ engine/runner CLAUDE.md, "Standby mode"). `EnsoRunner` owns one `SpareEngine`
 - `hasProjectsInUse` (loading or running, not counting a project whose close has
   begun) is what the service asks before starting the next spare.
 
-Tests: `__tests__/spareEngine.test.ts` and `__tests__/spareOpen.test.ts`, with
-the fake engine `__tests__/fakeSpareEngine.ts`.
+**When the service wants one** (`ProjectService.refreshSpare`, decisions one at
+a time on a queue). None until the GUI's first `setSpareEngine` (the setting,
+`engine/setSpare`); then a spare is wanted unless, in this order: quitting
+(`stopSpareEngine`, for good), the setting is off, `ENSO_SPARE_ENGINE=0`, the
+default engine (`resolveDefaultEngineMode`) is native, `ENSO_YDOC_HOST=engine`,
+the AOT cache is training (`JvmAotCache.isTraining`; Electron refreshes when it
+ends), `--profiling-path` is among the extra arguments (a relative path, which
+standby refuses), or a project is in use. An unwanted spare is stopped with that
+reason. The refresh runs on `setSpareEngine`, after a failed open, and after a
+close, once the closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2 s,
+`EngineSettings.spareAfterCloseMs`) has passed, whichever is first (that also
+lets a spare whose start failed be tried again, `spareAvailableAgain`). A native
+open stops the spare.
+
+- **The key** (`spareKeyFor`): mode, the service's extra arguments, the AOT
+  options, the extra environment (the secrets key) and `ENSO_JVM_OPTIONS`. A JVM
+  open computes it from the same inputs, so with the same settings it takes the
+  spare; its own engine logging (`--vm.D`) and the line variables travel in the
+  line and are not part of it. Engine mode, log level and `ENSO_ENGINE_ARGS`
+  change only at launch, so a changed input (a rotated secrets key, a new AOT
+  cache) is caught by the key at the take, which stops the stale spare.
+
+Tests: `__tests__/spareEngine.test.ts`, `__tests__/spareOpen.test.ts` (with the
+service, `through the service`) and `__tests__/spareService.test.ts` (the
+decisions, with a recording runner), with the fake engine
+`__tests__/fakeSpareEngine.ts`.
 
 ## JDK AOT cache (`src/jvmAot/`)
 
