@@ -356,6 +356,44 @@ limits apply, and a project's `jvm: false` still wins. Headless
 `--startup.project` runs take `--engine-mode` too (`runLocalProjectByPath`'s
 `engine`). Re-opening an open project writes no second mode line.
 
+## Spare engine (`projectService/spareEngine.ts`)
+
+A JVM engine started with `--standby` while no project is open (spec
+`docs/superpowers/specs/2026-11-08-jvm-warm-engine-design.md`; engine side in
+engine/runner CLAUDE.md, "Standby mode"). `EnsoRunner` owns one `SpareEngine`
+(`startSpare`, `stopSpare`, `spareAvailableAgain`, `spareState`, `sparePid`).
+
+- **The take.** An open whose `EngineLaunch` has a `spareKey` takes a spare
+  started with the same key, on its first attempt only; a spare with another key
+  is stopped, and the open spawns as before. The open's log gets one
+  `Engine: pre-started spare used (…)` or `Engine: no pre-started spare (…)`
+  line (`EngineLogSink.notice`); an open without a key leaves the spare alone
+  and says nothing. Under an engine-hosted ydoc server with allowed origins
+  there is no spare (the line cannot carry them).
+- **The line.** The spare gets `{"args":[...],"env":{...}}` on stdin: the open's
+  arguments from `--server` on (never `--jvm`, which the engine refuses there),
+  and in `env` only the four `LINE_VARIABLES` (channel token, ydoc port under an
+  engine-hosted ydoc server, project id and session id). Everything else, the
+  secrets key included, is in the spare's spawn environment, which never carries
+  a line variable or `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS` (`spareSpawnEnv`;
+  the engine exits 1 on an inherited one). The line holds the token: it is never
+  logged.
+- **Stderr.** `take()` stops reading the spare's stderr; `OpenedProject`
+  attaches its reader in microtasks of the same turn (its spawner hands the
+  spare over), so nothing may be awaited between the take and
+  `OpenedProject.create`.
+- **Timeouts.** A spare taken while still warming up gets
+  `SPARE_WARM_UP_LIMIT_MS` (60 s, when the engine abandons a warm-up) on top of
+  the startup limit, for that engine only.
+- **Failure.** A taken spare that exits or times out before its health check
+  makes the open try again with an ordinary engine (and a second notice line). A
+  respawn after the open is always an ordinary spawn.
+- `hasProjectsInUse` (loading or running, not counting a project whose close has
+  begun) is what the service asks before starting the next spare.
+
+Tests: `__tests__/spareEngine.test.ts` and `__tests__/spareOpen.test.ts`, with
+the fake engine `__tests__/fakeSpareEngine.ts`.
+
 ## JDK AOT cache (`src/jvmAot/`)
 
 A JVM engine starts faster with a JDK AOT cache (JEP 483/514). A cache records

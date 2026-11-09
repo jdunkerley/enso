@@ -1,11 +1,14 @@
 /**
  * @file A fake `enso` for the spare-engine tests. Without `--standby` it is an engine as in the
  * other tests: it records its arguments in `<project>.spawned.json`, answers the health check on
- * `--rpc-port` and exits on a stdin line. With `--standby` it appends `start` to `SPARE_LOG`
- * (exiting with 3 at once when `SPARE_DIES=1`), prints `STANDBY READY 42` after `READY_DELAY_MS`,
- * reads one line, records it in `<project>.line.json` and becomes such an engine; stdin closing
+ * `--rpc-port` and exits on a stdin line (once the file `EXIT_AFTER_FILE` names exists, if set).
+ * With `--standby` it appends `start` (with some of its environment) to `SPARE_LOG` (exiting with 3
+ * at once when `SPARE_DIES=1`), prints `STANDBY READY 42` after `READY_DELAY_MS`, reads one line,
+ * records it in `<project>.line.json`, prints `fake engine: line taken` on stderr and becomes such
+ * an engine; stdin closing
  * first appends `stdin-closed` and exits with 0, as the real one does. `SPARE_IGNORES_STDIN=1` makes
- * it ignore stdin closing (only a kill ends it), `READY_SPLIT=1` write the ready line in two chunks.
+ * it ignore stdin closing (only a kill ends it), `READY_SPLIT=1` write the ready line in two chunks,
+ * `SPARE_REFUSES_LINE=1` exit with 1 on its line, as the real one does on a line it refuses.
  */
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -20,14 +23,23 @@ const event = (data) => log && fs.appendFileSync(log, JSON.stringify({ ...data, 
 function serve(args) {
   const value = (flag) => args[args.indexOf(flag) + 1]
   http.createServer((_q, r) => r.end('OK')).listen(Number(value('--rpc-port')), '127.0.0.1')
-  process.stdin.on('data', () => setTimeout(() => process.exit(0), Number(process.env.EXIT_DELAY_MS ?? '0')))
+  const release = process.env.EXIT_AFTER_FILE
+  const exitWhenReleased = () => {
+    if (release == null || fs.existsSync(release)) process.exit(0)
+    setTimeout(exitWhenReleased, 20)
+  }
+  process.stdin.on('data', exitWhenReleased)
 }
 if (!spawnArgs.includes('--standby')) {
   const value = (flag) => spawnArgs[spawnArgs.indexOf(flag) + 1]
   fs.writeFileSync(value('--path') + '.spawned.json', JSON.stringify({ args: spawnArgs, pid: process.pid }))
   serve(spawnArgs)
 } else {
-  event({ event: 'start', args: spawnArgs, cwd: process.cwd(), jvmOptions: process.env.ENSO_JVM_OPTIONS ?? null })
+  const envOf = (name) => process.env[name] ?? null
+  const env = Object.fromEntries(
+    ['LANGUAGE_SERVER_CHANNEL_TOKEN', 'LANGUAGE_SERVER_YDOC_PORT', 'ENSO_LOCAL_PROJECT_ID', 'ENSO_SECRETS_KEY'].map((name) => [name, envOf(name)]),
+  )
+  event({ event: 'start', args: spawnArgs, cwd: process.cwd(), jvmOptions: process.env.ENSO_JVM_OPTIONS ?? null, env })
   if (process.env.SPARE_DIES === '1') process.exit(3)
   const ready = () => {
     if (process.env.READY_SPLIT !== '1') return process.stderr.write('STANDBY READY 42\\n')
@@ -50,10 +62,12 @@ if (!spawnArgs.includes('--standby')) {
     if (newline < 0) return
     process.stdin.off('data', onData)
     process.stdin.off('end', onEnd)
+    if (process.env.SPARE_REFUSES_LINE === '1') process.exit(1)
     const line = JSON.parse(buffered.slice(0, newline))
     const value = (flag) => line.args[line.args.indexOf(flag) + 1]
     fs.writeFileSync(value('--path') + '.line.json', JSON.stringify({ ...line, pid: process.pid, spawnArgs }))
     event({ event: 'taken' })
+    process.stderr.write('fake engine: line taken\\n')
     serve(line.args)
   }
   process.stdin.on('data', onData)
@@ -68,6 +82,8 @@ export interface SpareEvent {
   readonly args?: readonly string[]
   readonly cwd?: string
   readonly jvmOptions?: string | null
+  /** Some variables of its spawn environment, `null` when unset. */
+  readonly env?: Readonly<Record<string, string | null>>
 }
 
 /** Write the fake executable: a `.bat` on Windows (as the runner expects), a script elsewhere. */

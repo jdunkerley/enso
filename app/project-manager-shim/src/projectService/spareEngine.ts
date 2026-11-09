@@ -90,6 +90,13 @@ export function spareNotice(result: TakeResult, now: number): string {
   return `Engine: pre-started spare used (started ${age} s before the open, ${ready})`
 }
 
+/**
+ * How long a spare's warm-up may still run after the line: the engine cancels it then (engine/runner
+ * CLAUDE.md, "Standby mode"), so an open that takes a spare still warming up waits this much longer
+ * for its engine to start.
+ */
+export const SPARE_WARM_UP_LIMIT_MS = 60_000
+
 /** How long a stopped spare may take to exit by itself before its process tree is killed. */
 export const SPARE_STOP_GRACE_MS = 10_000
 
