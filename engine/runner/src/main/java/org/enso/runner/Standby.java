@@ -24,9 +24,10 @@ import org.slf4j.LoggerFactory;
  * and preloads classes (`StandbyPreloader`), then prints `standby: warm-up done in N ms, …` and
  * `STANDBY READY <ms from process start>` on stderr. Meanwhile the main thread reads one line from
  * stdin: `{"args":[...],"env":{...}}` (`StandbyRequest`), the arguments `project/open` would have
- * passed and the open's own variables. It waits for the warm-up to end (unless
- * `enso.standby.abandonWarmUp` is true, which cancels it; a warm-up still running 60 s after the
- * line is cancelled too, and a bad line or stdin closing first cancels it before the process
+ * passed and the open's own variables. It cancels a warm-up still running (unless
+ * `enso.standby.abandonWarmUp` is false, which waits for it: abandoning is the default since
+ * #659, as waiting made an open slower than a cold start; a warm-up still running 60 s after the
+ * line is cancelled even then, and a bad line or stdin closing first cancels it before the process
  * exits), then hands the line to `Main`, which applies the variables, sets the context's working
  * directory to the parent of `--path` (`ContextFactory.WORKING_DIRECTORY_PROPERTY`; relative paths
  * and a filesystem root are refused, and so is a line that does not start a Language Server or
@@ -150,7 +151,7 @@ final class Standby {
         warmUp,
         preloadFor(component, System.getenv(JvmOptions.ENVIRONMENT_VARIABLE), System.err),
         System.err,
-        Boolean.parseBoolean(System.getProperty(ABANDON_PROPERTY, "false")));
+        Boolean.parseBoolean(System.getProperty(ABANDON_PROPERTY, "true")));
   }
 
   /**

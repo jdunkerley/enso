@@ -967,8 +967,10 @@ engines are:
   60 s more). `jvm-spare-abandon`: the same with
   `ENSO_ENGINE_ARGS=--vm.D enso.standby.abandonWarmUp=true` (not given to the
   preparation launch), which cancels the warm-up when the open's line arrives
-  (the spec's open question). Were abandoning made the engine's default,
-  `jvm-spare-early` would measure that default.
+  (the spec's open question). Since #659 abandoning is the engine's default, so
+  `jvm-spare-early` measures that default too and the two engines run the same
+  policy; an open that waits for the warm-up takes
+  `--vm.D enso.standby.abandonWarmUp=false`.
 
 Every spare launch records `<open>:spareUsed` marks: `used`, whether the shim
 logged `Spare engine: used (…)` during that open, and from that line `ready`

@@ -125,8 +125,10 @@ exits with 0.
   cache the compiler writes for it under `<data>/cache/ir/local/` is deleted
   with its folder after the warm-up.
 - `--vm.D enso.standby.warmUp=false` skips the warm-up (tests);
-  `--vm.D enso.standby.abandonWarmUp=true` cancels a running warm-up when the
-  line arrives instead of waiting for it.
+  `--vm.D enso.standby.abandonWarmUp=false` waits for a running warm-up when the
+  line arrives instead of cancelling it, which is the default since #659
+  (measured at 8 CPUs, an open that waited for the warm-up was slower than a
+  cold start; one that cancelled it was faster).
 - The preload list (`src/main/resources/org/enso/runner/standby-preload.txt`) is
   generated: run a Language Server boot without an AOT cache with
   `JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=<log>` (the shell launcher of
