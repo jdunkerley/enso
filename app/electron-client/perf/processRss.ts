@@ -13,6 +13,8 @@ export interface ProcessInfo {
   readonly ppid: number
   /** Resident set (Linux, macOS) or working set (Windows), in kilobytes. */
   readonly rssKb: number
+  /** Private bytes (memory not shared with other processes), in kilobytes; read on Windows only. */
+  readonly privateKb?: number
   /** The full command line; may be empty when the system does not show it. */
   readonly command: string
 }
@@ -35,11 +37,16 @@ export function parseCim(output: string): ProcessInfo[] {
   return rows.flatMap((row) => {
     const pid = Number(row.ProcessId)
     if (!Number.isFinite(pid)) return []
+    const privateBytes = Number(row.PrivatePageCount)
     return [
       {
         pid,
         ppid: Number(row.ParentProcessId) || 0,
         rssKb: Math.round((Number(row.WorkingSetSize) || 0) / 1024),
+        // `PrivatePageCount` is in bytes, despite its name.
+        ...(row.PrivatePageCount != null && Number.isFinite(privateBytes) ?
+          { privateKb: Math.round(privateBytes / 1024) }
+        : {}),
         command: typeof row.CommandLine === 'string' ? row.CommandLine : '',
       },
     ]
@@ -54,7 +61,7 @@ export async function listProcesses(): Promise<readonly ProcessInfo[]> {
       [
         '-NoProfile',
         '-Command',
-        'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,WorkingSetSize,CommandLine | ConvertTo-Json -Compress',
+        'Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,WorkingSetSize,PrivatePageCount,CommandLine | ConvertTo-Json -Compress',
       ],
       { maxBuffer: 64 * 1024 * 1024 },
     )

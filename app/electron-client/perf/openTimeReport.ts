@@ -111,8 +111,64 @@ export interface SpareRun {
   readonly cpuMs: readonly number[]
   /** The engine processes' memory (KiB) once the first spare was ready, before the first open. */
   readonly idleEngineKb?: number
+  /** Their private bytes then (KiB; read on Windows only). */
+  readonly idlePrivateKb?: number
+  /** The same ~15 s after a spare was ready, sampled after the opens (`spareIdle+15s`). */
+  readonly idleLaterEngineKb?: number
+  readonly idleLaterPrivateKb?: number
   /** The opens that used a spare. */
   readonly used: readonly OpenTag[]
+  /** The opens that took a spare still warming up, before its `STANDBY READY`. */
+  readonly warming: readonly OpenTag[]
+}
+
+/**
+ * Where the latest spare engine stands in the main process's output from line `from` on: `none`
+ * started, the latest `started` with no `ready after` line after it, or `ready`. The shim's ready
+ * line names no pid, but it follows its own spare's start: at most one spare runs at a time.
+ */
+export function spareState(lines: readonly string[], from: number): 'none' | 'started' | 'ready' {
+  for (let i = lines.length - 1; i >= Math.max(0, from); i--) {
+    if (!lines[i]!.includes('Spare engine: start')) continue
+    return lines.slice(i + 1).some((line) => line.includes('Spare engine: ready after')) ?
+        'ready'
+      : 'started'
+  }
+  return 'none'
+}
+
+const USED_LINE = /Spare engine: used \((?:pid \d+, )?(still warming up|ready after (\d+) ms)\)/
+
+/**
+ * The shim's `Spare engine: used (…)` line from line `from` on: whether the spare it took was
+ * ready, and since when (ms from the shim's start of it); `undefined` when no spare was used.
+ */
+export function spareUse(
+  lines: readonly string[],
+  from: number,
+): { readonly ready: boolean; readonly readyAfterMs?: number } | undefined {
+  for (const line of lines.slice(from)) {
+    const match = USED_LINE.exec(line)
+    if (match == null) continue
+    return match[2] == null ? { ready: false } : { ready: true, readyAfterMs: Number(match[2]) }
+  }
+  return undefined
+}
+
+/**
+ * A spare launch's open times without those of an open that used no spare (its `<open>:spareUsed`
+ * mark says `used: false`): they are an ordinary JVM open's, and must not reach the medians.
+ */
+export function withoutUnsparedOpens(
+  times: { readonly first: OpenTimes; readonly second: OpenTimes | null },
+  marks: readonly Mark[],
+): { readonly first: OpenTimes; readonly second: OpenTimes | null } {
+  const unspared = (tag: OpenTag) =>
+    marks.some((m) => m.k === `${tag}:spareUsed` && m.used === false)
+  return {
+    first: unspared('first') ? {} : times.first,
+    second: unspared('second') ? null : times.second,
+  }
 }
 
 const READY_LINE = /STANDBY READY (-?\d+)/g
@@ -130,16 +186,29 @@ export function parseSpareOutput(stdout: string): Pick<SpareRun, 'readyMs' | 'wa
 
 /** A spare launch's `SpareRun`: its output, its `spareIdle` RSS and its `<open>:spareUsed` marks. */
 export function spareRun(stdout: string, marks: readonly Mark[]): SpareRun {
-  const idle = marks.find((m) => m.k === 'rss' && m.phase === 'spareIdle')
-  const idleKb =
-    typeof idle?.engineKb === 'number' && idle.engineKb >= 0 ? idle.engineKb : undefined
-  const used = (['first', 'second'] as const).filter((tag) =>
-    marks.some((m) => m.k === `${tag}:spareUsed` && m.used === true),
-  )
+  const sample = (phase: string, field: 'engineKb' | 'enginePrivateKb') => {
+    const value = marks.find((m) => m.k === 'rss' && m.phase === phase)?.[field]
+    return typeof value === 'number' && value >= 0 ? value : undefined
+  }
+  const optional = (key: keyof SpareRun, value: number | undefined) =>
+    value == null ? {} : { [key]: value }
+  const opens = (ready: boolean | undefined) =>
+    (['first', 'second'] as const).filter((tag) =>
+      marks.some(
+        (m) =>
+          m.k === `${tag}:spareUsed` &&
+          m.used === true &&
+          (ready === undefined || m.ready === ready),
+      ),
+    )
   return {
     ...parseSpareOutput(stdout),
-    ...(idleKb != null ? { idleEngineKb: idleKb } : {}),
-    used,
+    ...optional('idleEngineKb', sample('spareIdle', 'engineKb')),
+    ...optional('idlePrivateKb', sample('spareIdle', 'enginePrivateKb')),
+    ...optional('idleLaterEngineKb', sample('spareIdle+15s', 'engineKb')),
+    ...optional('idleLaterPrivateKb', sample('spareIdle+15s', 'enginePrivateKb')),
+    used: opens(undefined),
+    warming: opens(false),
   }
 }
 
@@ -455,16 +524,20 @@ export function spareTable(report: OpenTimeReport): string {
     const runs = report.runs.filter((r) => r.engine === engine && r.spare != null)
     const spares = runs.map((r) => r.spare!)
     const med = (values: number[]) => cell(median(values))
-    const idle = median(spares.flatMap((s) => (s.idleEngineKb == null ? [] : [s.idleEngineKb])))
+    const mib = (pick: (s: SpareRun) => number | undefined) => {
+      const value = median(spares.flatMap((s) => pick(s) ?? []))
+      return value == null ? '–' : String(Math.round(value / 1024))
+    }
     const opens = runs.reduce((n, r) => n + (r.second != null ? 2 : 1), 0)
     const usedOpens = spares.reduce((n, s) => n + s.used.length, 0)
-    return `| ${engine} | ${runs.length} | ${med(spares.flatMap((s) => s.readyMs))} | ${med(spares.flatMap((s) => s.warmUpMs))} | ${med(spares.flatMap((s) => s.cpuMs))} | ${idle == null ? '–' : Math.round(idle / 1024)} | ${usedOpens}/${opens} |`
+    const warmingOpens = spares.reduce((n, s) => n + s.warming.length, 0)
+    return `| ${engine} | ${runs.length} | ${med(spares.flatMap((s) => s.readyMs))} | ${med(spares.flatMap((s) => s.warmUpMs))} | ${med(spares.flatMap((s) => s.cpuMs))} | ${mib((s) => s.idleEngineKb)} / ${mib((s) => s.idlePrivateKb)} | ${mib((s) => s.idleLaterEngineKb)} / ${mib((s) => s.idleLaterPrivateKb)} | ${usedOpens}/${opens} | ${warmingOpens}/${usedOpens} |`
   })
   return [
-    'Spare engines (medians over the launches; ready is from the spare’s own start; idle memory is the engine processes’ before the first open, MiB).',
+    'Spare engines (medians over the launches; ready is from the spare’s own start; idle memory is the engine processes’ working set / private bytes in MiB, when the first spare was ready and ~15 s after a later one was; private bytes are read on Windows only).',
     '',
-    '| Engine | Launches | Ready (ms) | Warm-up (ms) | Process CPU at ready (ms) | Idle (MiB) | Opens that used a spare |',
-    '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+    '| Engine | Launches | Ready (ms) | Warm-up (ms) | Process CPU at ready (ms) | Idle (MiB) | Idle 15 s later (MiB) | Opens that used a spare | Of those, before it was ready |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...rows,
   ].join('\n')
 }

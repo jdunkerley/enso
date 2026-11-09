@@ -17,9 +17,12 @@ import {
   regressionWarnings,
   renderMarkdown,
   spareRun,
+  spareState,
   spareTable,
+  spareUse,
   summarise,
   usedAotCache,
+  withoutUnsparedOpens,
   type Engine,
   type Mark,
   type OpenTimeReport,
@@ -583,14 +586,78 @@ describe('spare engines', () => {
     expect(parseSpareOutput('STANDBY READY -1').readyMs).toEqual([-1])
   })
 
-  test('a launch records its idle memory and which opens used a spare', () => {
+  test('a launch records its idle memory and which opens used a spare, and which a warming one', () => {
     const run = spareRun(stderr, [
-      { k: 'rss', t: 1, phase: 'spareIdle', engineKb: 700_000, ydocKb: 90_000 },
-      { k: 'first:spareUsed', t: 2, used: true },
+      {
+        k: 'rss',
+        t: 1,
+        phase: 'spareIdle',
+        engineKb: 700_000,
+        ydocKb: 90_000,
+        enginePrivateKb: 500_000,
+      },
+      { k: 'first:spareUsed', t: 2, used: true, ready: false },
       { k: 'second:spareUsed', t: 3, used: false },
+      { k: 'rss', t: 4, phase: 'spareIdle+15s', engineKb: 650_000, ydocKb: -1 },
     ])
     expect(run.idleEngineKb).toBe(700_000)
+    expect(run.idlePrivateKb).toBe(500_000)
+    expect(run.idleLaterEngineKb).toBe(650_000)
+    expect(run.idleLaterPrivateKb).toBeUndefined()
     expect(run.used).toEqual(['first'])
+    expect(run.warming).toEqual(['first'])
+  })
+
+  test("an open's spare is the latest started after the given line, ready once it says so", () => {
+    const lines = [
+      'Spare engine: started (pid 1)',
+      'Spare engine: ready after 1800 ms (1900 ms from its own start)',
+      'Spare engine: used (pid 1, ready after 1800 ms)',
+    ]
+    expect(spareState(lines, 0)).toBe('ready')
+    // After the first close: the first spare's lines no longer count.
+    expect(spareState(lines, 3)).toBe('none')
+    expect(spareState([...lines, 'Spare engine: started (pid 2)'], 3)).toBe('started')
+    // A spare stopped and started again: only the latest one's ready line counts.
+    expect(
+      spareState(
+        [
+          'Spare engine: started (pid 1)',
+          'Spare engine: ready after 1800 ms (1900 ms from its own start)',
+          'Spare engine: stopped: the open needs other settings',
+          'Spare engine: starting',
+        ],
+        0,
+      ),
+    ).toBe('started')
+  })
+
+  test('the used line says whether the spare was ready', () => {
+    const lines = [
+      'Spare engine: used (pid 1, ready after 1800 ms)',
+      'Spare engine: used (pid 2, still warming up)',
+      'Spare engine: used (still warming up)',
+    ]
+    expect(spareUse(lines, 0)).toEqual({ ready: true, readyAfterMs: 1800 })
+    expect(spareUse(lines, 1)).toEqual({ ready: false })
+    expect(spareUse(lines, 2)).toEqual({ ready: false })
+    expect(spareUse(lines, 3)).toBeUndefined()
+  })
+
+  test('the times of an open that used no spare are dropped', () => {
+    const times = { first: { welcomeShown: 2000 }, second: { welcomeShown: 1900 } }
+    const used = (tag: string, value: boolean) => ({ k: `${tag}:spareUsed`, t: 1, used: value })
+    expect(withoutUnsparedOpens(times, [used('first', true), used('second', true)])).toEqual(times)
+    expect(withoutUnsparedOpens(times, [used('first', true), used('second', false)])).toEqual({
+      first: { welcomeShown: 2000 },
+      second: null,
+    })
+    expect(withoutUnsparedOpens(times, [used('first', false)])).toEqual({
+      first: {},
+      second: { welcomeShown: 1900 },
+    })
+    // Not a spare launch: no marks, nothing dropped.
+    expect(withoutUnsparedOpens(times, [])).toEqual(times)
   })
 
   test('the tables give medians, ratios over native and the CPUs', () => {
@@ -608,7 +675,9 @@ describe('spare engines', () => {
             warmUpMs: [6100],
             cpuMs: [21400],
             idleEngineKb: 700 * 1024,
+            idlePrivateKb: 500 * 1024,
             used: ['first', 'second'] as const,
+            warming: ['second'] as const,
           },
         }
       : {}),
@@ -621,7 +690,9 @@ describe('spare engines', () => {
       runs: [launch('native', 2650), launch('jvm-spare', 3450)],
     }
     expect(ratioTable(report)).toContain('| jvm-spare | 1.30 |')
-    expect(spareTable(report)).toContain('| jvm-spare | 1 | 7900 | 6100 | 21400 | 700 | 2/2 |')
+    expect(spareTable(report)).toContain(
+      '| jvm-spare | 1 | 7900 | 6100 | 21400 | 700 / 500 | – / – | 2/2 | 1/2 |',
+    )
     expect(cpusLine(report)).toBe('CPUs (the IDE’s affinity): 8.')
     expect(
       cpusLine({ ...report, runs: [launch('native', 1, 8), launch('jvm-spare', 1, 32)] }),

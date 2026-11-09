@@ -948,34 +948,43 @@ engines are:
   has sent the setting and while no AOT training runs, so the spare engines use
   the cache in `<out>/jvm-aot` as `jvm` does, and a preparation launch (with no
   spare) trains one first unless it is there; only `jvm`'s preparation goes in
-  `shimAot`, but a cache gone after a spare launch is warned about too. Before
-  each open the harness waits on the dashboard for that open's spare to be ready
-  (the shim's `Spare engine: ready after …` line in the main process's output;
-  the second open's spare starts after the first close), at most 15 s, which is
-  what a user spends there (spec, "Measurement"); a spare not ready by then is
-  warned about and the open takes it warming up. Once the first spare is ready
-  the engine processes are sampled (`rss-spareIdle.json`, an `rss` mark with
-  phase `spareIdle`): the spare's idle memory. The setting must be on in the
-  IDE's profile (it is by default): the harness launches with the user's
-  profile.
-- `jvm-spare-early`: the same, opening as soon as the shim logs
-  `Spare engine: start…`, so the open waits for the warm-up (the shim gives an
-  open of a spare still warming up 60 s more). `jvm-spare-abandon`: the same
-  with `ENSO_ENGINE_ARGS=--vm.D enso.standby.abandonWarmUp=true`, which cancels
-  the warm-up when the open's line arrives (the spec's open question). Were
-  abandoning made the engine's default, `jvm-spare-early` would measure that
-  default.
+  `shimAot`, but a cache gone after a spare launch is warned about too. An
+  open's spare is the latest one the shim logs `Spare engine: start…` for after
+  the previous open began to close (`spareState`). Before each open the harness
+  waits on the dashboard for that spare's `Spare engine: ready after …` line (in
+  the main process's output), at most 15 s, which is what a user spends there
+  (spec, "Measurement"); a spare not ready by then is warned about and the open
+  takes it warming up. Once the first spare is ready the engine processes are
+  sampled (`rss-spareIdle.json`, an `rss` mark with phase `spareIdle`): the
+  spare's idle memory. After the opens, the spare started after the last close
+  is sampled again 15 s after it was ready (`spareIdle+15s`), off the timed
+  path. On Windows both samples also sum the processes' private bytes
+  (`Win32_Process.PrivatePageCount`, the committed memory, `enginePrivateKb`),
+  beside the working set. The setting must be on in the IDE's profile (it is by
+  default): the harness launches with the user's profile.
+- `jvm-spare-early`: the same, opening as soon as its spare has started, so the
+  open waits for the warm-up (the shim gives an open of a spare still warming up
+  60 s more). `jvm-spare-abandon`: the same with
+  `ENSO_ENGINE_ARGS=--vm.D enso.standby.abandonWarmUp=true` (not given to the
+  preparation launch), which cancels the warm-up when the open's line arrives
+  (the spec's open question). Were abandoning made the engine's default,
+  `jvm-spare-early` would measure that default.
 
-Every spare launch records `<open>:spareUsed` marks (`used`: whether the shim
-logged `Spare engine: used …` during that open); an open that used no spare (the
-engine log says `Engine: no pre-started spare (…)`) fails the launch, since its
-numbers would be an ordinary JVM open's. Its `RunResult.spare` (`spareRun`) has
-each spare's ready time and warm-up time and CPU (the echoed `STANDBY READY` and
-`standby: warm-up done` lines), the idle memory and the opens that used one.
-`open-time.md` adds, after the medians, the headline over native's per engine
-(`ratioTable`), the spare engines' table (`spareTable`) and the CPUs the IDE was
-pinned to (`cpusLine`; `RunResult.cpus`, read once per launch after its opens).
-With a spare alive, quitting the IDE takes up to ~5 s longer (`spareQuit.ts`).
+Every spare launch records `<open>:spareUsed` marks: `used`, whether the shim
+logged `Spare engine: used (…)` during that open, and from that line `ready`
+(false for `still warming up`) and `readyAfterMs` (`spareUse`). An open that
+used no spare (the engine log says `Engine: no pre-started spare (…)`) fails the
+launch, and its times are dropped (`withoutUnsparedOpens`: `first` becomes `{}`,
+`second` `null`), since they are an ordinary JVM open's and must not reach the
+medians. Its `RunResult.spare` (`spareRun`) has each spare's ready time and
+warm-up time and CPU (the echoed `STANDBY READY` and `standby: warm-up done`
+lines), the idle memory (working set and private bytes, at `spareIdle` and
+`spareIdle+15s`), the opens that used one and those that took one still warming
+up (`warming`; the table's last column). `open-time.md` adds, after the medians,
+the headline over native's per engine (`ratioTable`), the spare engines' table
+(`spareTable`) and the CPUs the IDE was pinned to (`cpusLine`; `RunResult.cpus`,
+read once per launch after its opens). With a spare alive, quitting the IDE
+takes up to ~5 s longer (`spareQuit.ts`).
 
 `jvm-nocache` is gone (`parseEngines` says so, naming `jvm-first`), and with it
 the harness's own recorded-and-created cache (`perf/jvmAotCache.ts`): the
