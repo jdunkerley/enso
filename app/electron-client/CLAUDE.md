@@ -834,6 +834,13 @@ because the inputs aren't checked in and the agent budget is real.
 
 ## Open-time harness
 
+Pinned runs: `perf/cpuAffinity.ts` reads how many CPUs a process may run on
+(`taskset -p` on Linux, `ProcessorAffinity` through PowerShell on Windows).
+`perf/poolReports.ts` pools the `open-time.json` of several rounds into one
+report (launches numbered `<round>0<n>`) and `perf/poolReportsCli.ts` prints its
+tables:
+`corepack pnpm --filter enso exec vite-node perf/poolReportsCli.ts -- <round dir>...`.
+
 `perf/openTime.ts` measures how long opening a project takes in the packaged IDE
 (spec `docs/superpowers/specs/2026-11-01-project-open-performance-design.md`,
 section 2). It is not a Playwright Test run: it drives Electron through
