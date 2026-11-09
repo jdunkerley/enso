@@ -22,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -166,6 +167,51 @@ public class StandbyTest {
   public void stdinClosedFirstGivesNoRequest() throws Exception {
     var standby = new Standby(Standby.NO_WARM_UP, abandoned -> "x", err, false);
     assertNull(standby.awaitRequest(in("")));
+  }
+
+  @Test
+  public void anythingButFalseAbandonsTheWarmUp() {
+    assertTrue(Standby.abandonOnLine(null));
+    assertFalse(Standby.abandonOnLine("false"));
+    assertFalse(Standby.abandonOnLine("FALSE"));
+    assertTrue(Standby.abandonOnLine("yes"));
+    assertTrue(Standby.abandonOnLine("true"));
+  }
+
+  @Test(timeout = 30_000)
+  public void anAbandonedWarmUpThatIgnoresItsCancelIsCancelledOnce() throws Exception {
+    var release = new CountDownLatch(1);
+    var cancels = new AtomicInteger();
+    Standby.WarmUp deaf =
+        new Standby.WarmUp() {
+          @Override
+          public void run() throws Exception {
+            release.await();
+          }
+
+          @Override
+          public void cancel() {
+            cancels.incrementAndGet();
+          }
+        };
+    var standby = new Standby(deaf, abandoned -> "x", err, true, Duration.ofMillis(200));
+    var executor = Executors.newSingleThreadExecutor();
+    try {
+      var result = executor.submit(() -> standby.awaitRequest(in(LINE)));
+      while (!err().contains("did not stop within")) {
+        assertFalse(err(), result.isDone());
+        Thread.onSpinWait();
+      }
+      release.countDown();
+      assertNotNull(result.get(10, TimeUnit.SECONDS));
+      assertEquals(1, cancels.get());
+      assertTrue(
+          err(),
+          err().contains("standby: warning: the abandoned warm-up did not stop within 200 ms"));
+      assertFalse(err(), err().contains("warm-up abandoned after"));
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @Test(timeout = 30_000)

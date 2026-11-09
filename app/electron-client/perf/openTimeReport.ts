@@ -44,7 +44,7 @@ export type OpenTimes = Partial<Record<Phase | Extra, number>>
  * a user's very first launch: the same, with the cache deleted before each launch.
  */
 export type Engine =
-  'native' | 'jvm' | 'jvm-first' | 'jvm-spare' | 'jvm-spare-early' | 'jvm-spare-abandon'
+  'native' | 'jvm' | 'jvm-first' | 'jvm-spare' | 'jvm-spare-early' | 'jvm-spare-wait'
 
 const ENGINES: readonly Engine[] = [
   'native',
@@ -52,13 +52,15 @@ const ENGINES: readonly Engine[] = [
   'jvm-first',
   'jvm-spare',
   'jvm-spare-early',
-  'jvm-spare-abandon',
+  'jvm-spare-wait',
 ]
 
 /**
  * The JVM with its spare engine (`project-manager-shim/CLAUDE.md`, "Spare engine"): `jvm-spare`
  * opens once the spare is ready (at most 15 s on the dashboard); `jvm-spare-early` opens at once,
- * while it warms up; `jvm-spare-abandon` opens at once with the warm-up abandoned on the line.
+ * while it warms up, which the engine abandons when the open's line arrives (its default);
+ * `jvm-spare-wait` opens at once too, with `enso.standby.abandonWarmUp=false`, so the open waits
+ * for the warm-up to finish.
  */
 export function isSpareEngine(engine: Engine): boolean {
   return engine.startsWith('jvm-spare')
@@ -116,6 +118,11 @@ export interface SpareRun {
   /** The same ~15 s after a spare was ready, sampled after the opens (`spareIdle+15s`). */
   readonly idleLaterEngineKb?: number
   readonly idleLaterPrivateKb?: number
+  /**
+   * The opens that have a `<open>:spareUsed` mark, used or not: an open that never ran (its launch
+   * failed first) has none. A report without the field counts `used` instead.
+   */
+  readonly marked?: readonly OpenTag[]
   /** The opens that used a spare. */
   readonly used: readonly OpenTag[]
   /** The opens that took a spare still warming up, before its `STANDBY READY`. */
@@ -207,6 +214,9 @@ export function spareRun(stdout: string, marks: readonly Mark[]): SpareRun {
     ...optional('idlePrivateKb', sample('spareIdle', 'enginePrivateKb')),
     ...optional('idleLaterEngineKb', sample('spareIdle+15s', 'engineKb')),
     ...optional('idleLaterPrivateKb', sample('spareIdle+15s', 'enginePrivateKb')),
+    marked: (['first', 'second'] as const).filter((tag) =>
+      marks.some((m) => m.k === `${tag}:spareUsed`),
+    ),
     used: opens(undefined),
     warming: opens(false),
   }
@@ -528,13 +538,13 @@ export function spareTable(report: OpenTimeReport): string {
       const value = median(spares.flatMap((s) => pick(s) ?? []))
       return value == null ? '–' : String(Math.round(value / 1024))
     }
-    const opens = runs.reduce((n, r) => n + (r.second != null ? 2 : 1), 0)
+    const opens = spares.reduce((n, s) => n + (s.marked ?? s.used).length, 0)
     const usedOpens = spares.reduce((n, s) => n + s.used.length, 0)
     const warmingOpens = spares.reduce((n, s) => n + s.warming.length, 0)
     return `| ${engine} | ${runs.length} | ${med(spares.flatMap((s) => s.readyMs))} | ${med(spares.flatMap((s) => s.warmUpMs))} | ${med(spares.flatMap((s) => s.cpuMs))} | ${mib((s) => s.idleEngineKb)} / ${mib((s) => s.idlePrivateKb)} | ${mib((s) => s.idleLaterEngineKb)} / ${mib((s) => s.idleLaterPrivateKb)} | ${usedOpens}/${opens} | ${warmingOpens}/${usedOpens} |`
   })
   return [
-    'Spare engines (medians over the launches; ready is from the spare’s own start; idle memory is the engine processes’ working set / private bytes in MiB, when the first spare was ready and ~15 s after a later one was; private bytes are read on Windows only).',
+    'Spare engines (medians over the launches; ready is from the spare’s own start; idle memory is the engine processes’ working set / private bytes in MiB, when the first spare was ready and ~15 s after a later one was; private bytes are read on Windows only. The warm-up and the CPU at ready include warm-ups an open abandoned, which end early, beside finished ones).',
     '',
     '| Engine | Launches | Ready (ms) | Warm-up (ms) | Process CPU at ready (ms) | Idle (MiB) | Idle 15 s later (MiB) | Opens that used a spare | Of those, before it was ready |',
     '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',

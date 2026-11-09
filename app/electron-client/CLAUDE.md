@@ -848,7 +848,7 @@ section 2). It is not a Playwright Test run: it drives Electron through
 `playwright`'s `_electron` and is started with
 
 ```
-corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm,jvm-first,jvm-spare,jvm-spare-early,jvm-spare-abandon] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics] [--jvm-options <opts>] [--template welcome|image]
+corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm,jvm-first,jvm-spare,jvm-spare-early,jvm-spare-wait] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics] [--jvm-options <opts>] [--template welcome|image]
 ```
 
 It needs a built `dist/ide/` (or `--exe`), and under Linux a display
@@ -857,10 +857,15 @@ once ("Target page, context or browser has been closed") while another IDE of
 the same name runs; close it first, or point `--exe` at a copy whose `app.asar`
 `package.json` `name` has been changed (same length), which has a profile of its
 own. Each launch creates two new projects with the bundled launcher
-(`enso --new`), starts the IDE, opens the first from the dashboard (the cold
-open), waits for the welcome table, opens the component browser and the `format`
-dropdown, closes the project, and does the same with the second. Times are
-milliseconds from the click on the project's row:
+(`enso --new`) in a new temporary directory, outside any git working tree and
+deleted after the launch (Note [Harness Projects Are Outside Any Repository]:
+under `--out` the IDE asked on close whether to use the enclosing repository,
+and the prompt blocked the close; with git installed the first close still asks
+whether to create one, which is answered "Not now", with a warning and an
+`<open>:repositoryPrompt` mark), starts the IDE, opens the first from the
+dashboard (the cold open), waits for the welcome table, opens the component
+browser and the `format` dropdown, closes the project, and does the same with
+the second. Times are milliseconds from the click on the project's row:
 
 | Phase            | Ends at                                                                      |
 | ---------------- | ---------------------------------------------------------------------------- |
@@ -962,15 +967,14 @@ engines are:
   (`Win32_Process.PrivatePageCount`, the committed memory, `enginePrivateKb`),
   beside the working set. The setting must be on in the IDE's profile (it is by
   default): the harness launches with the user's profile.
-- `jvm-spare-early`: the same, opening as soon as its spare has started, so the
-  open waits for the warm-up (the shim gives an open of a spare still warming up
-  60 s more). `jvm-spare-abandon`: the same with
-  `ENSO_ENGINE_ARGS=--vm.D enso.standby.abandonWarmUp=true` (not given to the
-  preparation launch), which cancels the warm-up when the open's line arrives
-  (the spec's open question). Since #659 abandoning is the engine's default, so
-  `jvm-spare-early` measures that default too and the two engines run the same
-  policy; an open that waits for the warm-up takes
-  `--vm.D enso.standby.abandonWarmUp=false`.
+- `jvm-spare-early`: the same, opening as soon as its spare has started, during
+  the warm-up, which the engine abandons when the open's line arrives (its
+  default since #659). `jvm-spare-wait`: the same with
+  `ENSO_ENGINE_ARGS=--vm.D enso.standby.abandonWarmUp=false` (not given to the
+  preparation launch), so the open waits for the warm-up to finish (the shim
+  gives an open of a spare still warming up 60 s more): the other answer to the
+  spec's open question, kept measurable. At 8 CPUs waiting lost to a cold start
+  (#659).
 
 Every spare launch records `<open>:spareUsed` marks: `used`, whether the shim
 logged `Spare engine: used (…)` during that open, and from that line `ready`

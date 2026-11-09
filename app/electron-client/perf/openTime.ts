@@ -292,11 +292,10 @@ const RSS_LATER_MS = 30_000
  * `spareIdle`, with private bytes on Windows): the spare's idle cost. After the opens, the spare
  * started after the last close is sampled again `SPARE_IDLE_LATER_MS` after it was ready
  * (`spareIdle+15s`), when a JVM has settled, off the timed path. `jvm-spare-early` opens as soon as
- * its spare has started, so the open waits for the warm-up (the shim gives such an open 60 s more
- * to start); `jvm-spare-abandon` does the same with `enso.standby.abandonWarmUp=true`, which
- * cancels the warm-up when the line arrives (the spec's open question). Should abandoning become
- * the engine's default, `jvm-spare-early` measures an open before `STANDBY READY` under that
- * default.
+ * its spare has started, during the warm-up, which the engine abandons when the open's line
+ * arrives (its default, `Standby.java`). `jvm-spare-wait` does the same with
+ * `enso.standby.abandonWarmUp=false`, so the open waits for the warm-up to finish (the shim gives
+ * such an open 60 s more to start): the other answer to the spec's open question, kept measurable.
  *
  * After each open, `<open>:spareUsed` says whether the shim logged `Spare engine: used (…)`
  * (`used`) and whether that spare was ready (`ready`, with `readyAfterMs`; `spareUse`), so the
@@ -441,19 +440,51 @@ async function ensureWindowSize(app: ElectronApplication, page: Page, marks: Mar
   marks.add('window', await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight })))
 }
 
-async function closeProject(page: Page, name: string) {
+/**
+ * Closes the project's tab. The IDE may first ask whether to keep versions with git (the
+ * repository prompt; `answerRepositoryPrompt` in `tests/electronTest.ts`): it appears up to a
+ * second or so after the click, and the `project/close` request is sent only once it is answered,
+ * so the prompt is raced against that request, not against a fixed wait. It is answered "Not now"
+ * (never "Use" or "Don't ask again", which the user's profile would keep), with a warning and a
+ * `<open>:repositoryPrompt` mark. The projects live outside any git working tree (Note [Harness
+ * Projects Are Outside Any Repository]), so with git installed the first close of a launch is asked
+ * whether to create one, never whether to use an enclosing one.
+ */
+async function closeProject(page: Page, name: string, tag: OpenTag, label: string, marks: Marks) {
+  const prompt = page.getByTestId('repository-prompt')
+  const closeRequest = page.waitForRequest(
+    (request) => request.url().endsWith('/api/project-service/project/close'),
+    { timeout: 60_000 },
+  )
+  // If the click throws, nothing awaits the request, so it must not leave an unhandled rejection.
+  closeRequest.catch(() => {})
   // The close button is a sibling of the `role="tab"` button, inside the same `.SelectableTab`.
   await page
     .locator('.SelectableTab', { has: page.getByRole('tab', { name }) })
     .locator('.CloseButton')
     .click()
-  // "Keep versions of your projects with git?" may ask first (see `answerRepositoryPrompt`).
-  const prompt = page.getByTestId('repository-prompt')
-  await prompt
-    .waitFor({ state: 'visible', timeout: 3000 })
-    .then(() => prompt.getByTestId('alert-dialog-cancel').click())
-    .catch(() => {})
+  await Promise.race([
+    prompt.waitFor({ state: 'visible', timeout: 60_000 }).catch(() => {}),
+    closeRequest.catch(() => {}),
+  ])
+  if (await prompt.isVisible()) {
+    marks.add(`${tag}:repositoryPrompt`)
+    console.warn(
+      `Open time: ${label} ${tag}: the repository prompt asked on close; answered Not now.`,
+    )
+    await prompt.getByTestId('alert-dialog-cancel').click()
+  }
+  await closeRequest
 }
+
+/* Note [Harness Projects Are Outside Any Repository]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A launch's projects go in a new temporary directory (`os.tmpdir()`), deleted after the launch,
+ * and `--out` holds only the reports. Under `--out` they were inside whatever repository `--out`
+ * is in (a checkout's scratch folder), and the IDE asked on close whether to keep their versions in
+ * that repository: an answer the harness did not wait for blocked the close, and the launch lost its
+ * second open. A "Use" or "Don't ask again" would also have stayed in the user's profile.
+ */
 
 /** Every Language Server log the launch wrote, each as its records, earliest first. */
 function readLsLogs(logDir: string): LsLogLine[][] {
@@ -494,7 +525,8 @@ async function measureLaunch(
   fs.rmSync(dir, { recursive: true, force: true })
   // A launch with no opens (the AOT preparation) creates no project, so nothing else makes it.
   fs.mkdirSync(dir, { recursive: true })
-  const projectsDir = path.join(dir, 'projects')
+  // Note [Harness Projects Are Outside Any Repository].
+  const projectsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'enso-open-time-'))
   const logDir = path.join(dir, 'logs')
   const launcher = findEngineLauncher(options.exe)
   if (!launcher) throw new Error(`No engine launcher next to ${options.exe}`)
@@ -659,7 +691,7 @@ async function measureLaunch(
         }
       }
       spareFrom = stdoutLines.length
-      await closeProject(page, names[tag])
+      await closeProject(page, names[tag], tag, label, marks)
       // The deliberate dwell on the dashboard between opens, as a user returns to it.
       await page.waitForTimeout(2000)
     }
@@ -703,6 +735,14 @@ async function measureLaunch(
         recursive: true,
         force: true,
       })
+    }
+    // On Windows an engine that is still exiting can hold a project file for a moment.
+    try {
+      fs.rmSync(projectsDir, { recursive: true, force: true, maxRetries: 8, retryDelay: 500 })
+    } catch (e) {
+      console.warn(
+        `Open time: ${label}: the projects in ${projectsDir} were not deleted: ${String(e)}`,
+      )
     }
   }
   const logs = readLsLogs(logDir)
@@ -843,11 +883,11 @@ function engineEnv(engine: Engine, options: Options): Record<string, string> {
   // The measured opens of `jvm` and `jvm-first` start an engine of their own: a spare would take
   // them over (Note [Spare Engines In The Harness]).
   if (!isSpareEngine(engine)) return { ...jvm, ENSO_SPARE_ENGINE: '0' }
-  return engine === 'jvm-spare-abandon' ?
+  return engine === 'jvm-spare-wait' ?
       {
         ...jvm,
         ENSO_SPARE_ENGINE: '1',
-        ENSO_ENGINE_ARGS: '--vm.D enso.standby.abandonWarmUp=true',
+        ENSO_ENGINE_ARGS: '--vm.D enso.standby.abandonWarmUp=false',
       }
     : { ...jvm, ENSO_SPARE_ENGINE: '1' }
 }
@@ -910,7 +950,7 @@ async function main() {
       engine === 'jvm' ||
       (isSpareEngine(engine) && findShimCache(shimAotDirectory(options)) == null)
     if (needsCache) {
-      // Nor the engine arguments of `jvm-spare-abandon`: the preparation only trains the cache.
+      // Nor the engine arguments of `jvm-spare-wait`: the preparation only trains the cache.
       const { ENSO_ENGINE_ARGS: _engineArgs, ...prepareEnv } = extraEnv
       try {
         prepared = await prepareShimAot(options, { ...prepareEnv, ENSO_SPARE_ENGINE: '0' })

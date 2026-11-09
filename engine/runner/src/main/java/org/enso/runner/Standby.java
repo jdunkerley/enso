@@ -151,7 +151,15 @@ final class Standby {
         warmUp,
         preloadFor(component, System.getenv(JvmOptions.ENVIRONMENT_VARIABLE), System.err),
         System.err,
-        Boolean.parseBoolean(System.getProperty(ABANDON_PROPERTY, "true")));
+        abandonOnLine(System.getProperty(ABANDON_PROPERTY)));
+  }
+
+  /**
+   * Whether the value of {@code enso.standby.abandonWarmUp} abandons the warm-up when the line
+   * arrives: anything but {@code false} (any case) does, so a typo keeps the default.
+   */
+  static boolean abandonOnLine(String value) {
+    return !"false".equalsIgnoreCase(value);
   }
 
   /**
@@ -247,10 +255,17 @@ final class Standby {
     if (abandonOnLine) {
       abandon();
     }
-    // A warm-up that hangs must not hold the open for good.
+    // A warm-up the open waits for must not hold it for good: it is cancelled after the wait. One
+    // already cancelled is not cancelled again; that it ignores the cancel is said, then waited
+    // out.
     if (!finished.await(lineWait.toMillis(), TimeUnit.MILLISECONDS)) {
-      err.println("standby: warm-up abandoned after " + describe(lineWait));
-      abandon();
+      if (abandonOnLine) {
+        err.println(
+            "standby: warning: the abandoned warm-up did not stop within " + describe(lineWait));
+      } else {
+        err.println("standby: warm-up abandoned after " + describe(lineWait));
+        abandon();
+      }
       finished.await();
     }
     return request;

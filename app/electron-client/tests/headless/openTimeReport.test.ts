@@ -565,10 +565,10 @@ describe('spare engines', () => {
   ].join('\n')
 
   test('parseEngines takes them and isSpareEngine knows them', () => {
-    expect(parseEngines('jvm-spare,jvm-spare-early,jvm-spare-abandon')).toEqual([
+    expect(parseEngines('jvm-spare,jvm-spare-early,jvm-spare-wait')).toEqual([
       'jvm-spare',
       'jvm-spare-early',
-      'jvm-spare-abandon',
+      'jvm-spare-wait',
     ])
     expect(isSpareEngine('jvm-spare-early')).toBe(true)
     expect(isSpareEngine('jvm')).toBe(false)
@@ -604,8 +604,36 @@ describe('spare engines', () => {
     expect(run.idlePrivateKb).toBe(500_000)
     expect(run.idleLaterEngineKb).toBe(650_000)
     expect(run.idleLaterPrivateKb).toBeUndefined()
+    expect(run.marked).toEqual(['first', 'second'])
     expect(run.used).toEqual(['first'])
     expect(run.warming).toEqual(['first'])
+    // A second open that never ran has no mark at all.
+    expect(
+      spareRun(stderr, [{ k: 'first:spareUsed', t: 2, used: true, ready: true }]).marked,
+    ).toEqual(['first'])
+  })
+
+  test('the spare table counts only the opens that have a spareUsed mark', () => {
+    const run = (
+      marked: readonly ('first' | 'second')[],
+      used: readonly ('first' | 'second')[],
+    ) => ({
+      engine: 'jvm-spare-early' as const,
+      run: 1,
+      first: { welcomeShown: 4000 },
+      // A launch that failed after its first open still has a (partial) second.
+      second: {},
+      notMeasured: [],
+      spare: { readyMs: [], warmUpMs: [], cpuMs: [], marked, used, warming: used },
+    })
+    const report = {
+      version: 1 as const,
+      platform: 'win32',
+      commit: null,
+      template: 'core' as const,
+      runs: [run(['first'], ['first']), run(['first', 'second'], ['first'])],
+    }
+    expect(spareTable(report)).toContain('| 2/3 | 2/2 |')
   })
 
   test("an open's spare is the latest started after the given line, ready once it says so", () => {

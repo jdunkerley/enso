@@ -120,7 +120,8 @@ Rejected:
 6. If stdin closes before a line arrives, it exits with status 0.
 
 Steps 2 and 3 run on a background thread; the line in step 5 is read as soon as
-it arrives, and step 5 waits for the warm-up to finish (see "Open questions").
+it arrives, and step 5 abandons a warm-up still running (settled in #659; see
+"Open questions").
 
 **Working directory.** `EnsoContext.checkWorkingDirectory` asserts that the
 process's working directory is the project root's parent, and is fatal under
@@ -195,15 +196,15 @@ A new `projectService/spareEngine.ts`, used by `EnsoRunner`:
 
 ## Error handling summary
 
-| Situation                             | Behaviour                                                                           |
-| ------------------------------------- | ----------------------------------------------------------------------------------- |
-| Spare fails to spawn or dies          | Logged, dropped; next open spawns as today; no retry until idle.                    |
-| Warm-up throws                        | Logged; the spare still reaches standby.                                            |
-| Open while warming up                 | Spare taken; the open waits for the warm-up's end (never longer than a cold start). |
-| Spawn key differs                     | Spare stopped; the open spawns as today.                                            |
-| Engine dies after the line is written | Today's crash path: watchdog, ordinary respawn.                                     |
-| Setting off, or `ENSO_SPARE_ENGINE=0` | No spare; any running spare stopped.                                                |
-| IDE quits                             | Spare killed; it also exits when its stdin closes.                                  |
+| Situation                             | Behaviour                                                                                 |
+| ------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Spare fails to spawn or dies          | Logged, dropped; next open spawns as today; no retry until idle.                          |
+| Warm-up throws                        | Logged; the spare still reaches standby.                                                  |
+| Open while warming up                 | Spare taken; the warm-up is abandoned on the line (#659), never longer than a cold start. |
+| Spawn key differs                     | Spare stopped; the open spawns as today.                                                  |
+| Engine dies after the line is written | Today's crash path: watchdog, ordinary respawn.                                           |
+| Setting off, or `ENSO_SPARE_ENGINE=0` | No spare; any running spare stopped.                                                      |
+| IDE quits                             | Spare killed; it also exits when its stdin closes.                                        |
 
 ## Testing
 
@@ -267,9 +268,12 @@ of the JVM-by-default spec).
 
 ## Open questions
 
-- **Open during the warm-up:** finish the warm-up before starting the Language
-  Server (as designed), or abandon it the moment the line arrives. Settled by
-  measuring both in PR 3; the faster one stays.
+- **Open during the warm-up:** settled by #659: abandon it the moment the line
+  arrives. At 8 CPUs the first open's welcome table came after 4145 ms when it
+  abandoned the warm-up, 4628 ms on a cold start and 5889 ms when it waited for
+  the warm-up (pooled medians of three rounds; abandoning was faster than both
+  in every round), so waiting broke the promise of never being longer than a
+  cold start. `enso.standby.abandonWarmUp=false` still waits.
 - **The class list for preloading** (step 3): generated from a training run (the
   classes a Language Server boot loads) or hand-kept. PR 1 decides, by what the
   AOT cache already holds: classes it archives need no preloading.
