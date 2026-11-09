@@ -52,6 +52,20 @@ build supplies none and nothing fetches one. The value lives in
 it (trimmed, blank clears). It is sent nowhere except Mapbox. Test:
 `__tests__/localTab.test.ts`.
 
+## Engine
+
+The Local tab's Engine section (`EngineSettingsSection.vue`) has one switch,
+"Pre-start the engine" (on by default), kept in `spareEngineSettingsStore`
+(`$/providers/spareEngineSettings`, `localStorage` key
+`enso-spare-engine-settings`). `useSpareEngineSync` (wired in `App.vue`) sends
+it to the project service (`engine/setSpare`) on load and on every change. The
+section is `visible` only while `engineRunsOnJvm` is true: the service's answer
+says which engine runs, and a native engine or a failed request hides the
+section, since only a JVM engine has a spare. Tests:
+`__tests__/localTab.test.ts` and
+`integration-test/dashboard/spareEngineSettings.spec.ts` (the mock answers
+`native` unless a spec sets `api.spareEngine.engineMode` in `setupApi.local`).
+
 ## Engine logs
 
 The Local tab's Engine logs section (`EngineLogsSettingsSection.vue`) holds two
@@ -79,5 +93,6 @@ scopes) and names it; a conflict a reset brings back is shown in red.
 `__tests__/`: the shell (`SettingsPage.test.ts`), the Local tab
 (`localTab.test.ts`) and the Keyboard shortcuts tab with its capture modal. The
 Playwright specs are `integration-test/dashboard/` `localModeSettings.spec.ts`,
-`localDirectories.spec.ts` and `localVersioningSettings.spec.ts`, and the
-settings check of `accessibility.spec.ts`.
+`localDirectories.spec.ts`, `localVersioningSettings.spec.ts` and
+`spareEngineSettings.spec.ts`, and the settings check of
+`accessibility.spec.ts`.
