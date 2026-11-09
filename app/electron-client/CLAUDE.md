@@ -797,6 +797,16 @@ rule in `playwright.config.ts`:
   `corepack pnpm -r --filter enso ide-integration-test [path.spec.ts]`. Runs are
   long (minutes), so avoid them in inner dev loops.
 
+Every spec runs with `ENSO_SPARE_ENGINE=0` (the fixture's `spareEngine` option,
+default `false`), so a spare engine never changes its timing.
+`tests/spareEngine.spec.ts` sets it: the app runs `ENSO_ENGINE_MODE=jvm` with a
+fresh `ENSO_JVM_AOT_DIR` of the test's own (deleted afterwards), waits for the
+AOT cache's training to end (`JDK AOT cache: trained in …`, minutes), then for
+`Spare engine: ready …` on the main process's output, opens a new project and
+checks `Spare engine: used …` and the engine log's
+`Engine: pre-started spare used` notice in the Logs tab (a stderr line, so shown
+with the Engine source ticked).
+
 When adding a Playwright test that needs an external dependency the CI doesn't
 have yet (e.g. `aiNode.spec.ts` needs the local `claude` CLI), gate the whole
 describe block on an env flag (`process.env.ENSO_TEST_AI === '1'`) and note the
@@ -880,7 +890,9 @@ before a manual run.
 
 Every launch sets the engine mode as a user would: `ENSO_ENGINE_MODE=native` or
 `jvm` (`engineEnv` in `perf/openTime.ts`), so the shim decides whether to pass
-`--jvm`, and which timeouts apply. The engines are:
+`--jvm`, and which timeouts apply. The JVM engines also set
+`ENSO_SPARE_ENGINE=0`: a measured open starts its own engine, never a
+pre-started spare. The engines are:
 
 - `native`: the native image.
 - `jvm`: the JVM as a user has it after the first open. The shim's own AOT cache

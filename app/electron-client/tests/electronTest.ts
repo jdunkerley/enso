@@ -49,6 +49,13 @@ export const test = base.extend<{
    * checks the fresh-install landing overrides it with `test.use({ welcomeProject: true })`.
    */
   welcomeProject: boolean
+  /**
+   * Whether the app runs the JVM engine with its spare engine. Default `false`: every other spec
+   * runs with `ENSO_SPARE_ENGINE=0`, so a spare never changes its timing. With it, the JDK AOT
+   * cache is a fresh directory of the test's own (`ENSO_JVM_AOT_DIR`), never the user's, so it is
+   * always trained first, and deleted afterwards.
+   */
+  spareEngine: boolean
   app: ElectronApplication
   page: Page
 }>({
@@ -62,13 +69,15 @@ export const test = base.extend<{
   },
   aiEnabled: [false, { option: true }],
   welcomeProject: [false, { option: true }],
+  spareEngine: [false, { option: true }],
 
   /** Setup for all tests: Create an electron-based app instance. */
-  app: async function ({ projectsDir, testRunId, aiEnabled, welcomeProject }, use) {
+  app: async function ({ projectsDir, testRunId, aiEnabled, welcomeProject, spareEngine }, use) {
     const args = [
       ...(process.env.ENSO_TEST_APP_ARGS?.split(',') ?? []),
       ...(welcomeProject ? [] : ['--no-welcome-project']),
     ]
+    const jvmAotDir = path.join(os.tmpdir(), 'enso-test-jvm-aot', testRunId)
     const app = await _electron.launch({
       executablePath: electronExecutablePath,
       args,
@@ -77,12 +86,16 @@ export const test = base.extend<{
         ENSO_TEST: 'true',
         ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
         ...(aiEnabled ? {} : { ENSO_AI_DISABLED: '1' }),
+        ...(spareEngine ?
+          { ENSO_ENGINE_MODE: 'jvm', ENSO_JVM_AOT_DIR: jvmAotDir }
+        : { ENSO_SPARE_ENGINE: '0' }),
       },
     })
     await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true })
     await use(app)
     await app.context().tracing.stop({ path: `test-traces/${testRunId}.zip` })
     await app.close()
+    if (spareEngine) await fs.rm(jvmAotDir, { recursive: true, force: true })
   },
   page: async function ({ app, viewport }, use) {
     const innerPage = await app.firstWindow()
