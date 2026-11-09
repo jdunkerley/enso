@@ -78,24 +78,28 @@ export const test = base.extend<{
       ...(welcomeProject ? [] : ['--no-welcome-project']),
     ]
     const jvmAotDir = path.join(os.tmpdir(), 'enso-test-jvm-aot', testRunId)
-    const app = await _electron.launch({
-      executablePath: electronExecutablePath,
-      args,
-      env: {
-        ...process.env,
-        ENSO_TEST: 'true',
-        ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
-        ...(aiEnabled ? {} : { ENSO_AI_DISABLED: '1' }),
-        ...(spareEngine ?
-          { ENSO_ENGINE_MODE: 'jvm', ENSO_JVM_AOT_DIR: jvmAotDir }
-        : { ENSO_SPARE_ENGINE: '0' }),
-      },
-    })
-    await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true })
-    await use(app)
-    await app.context().tracing.stop({ path: `test-traces/${testRunId}.zip` })
-    await app.close()
-    if (spareEngine) await fs.rm(jvmAotDir, { recursive: true, force: true })
+    const env = {
+      ...process.env,
+      ENSO_TEST: 'true',
+      ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
+      ...(aiEnabled ? {} : { ENSO_AI_DISABLED: '1' }),
+      // Either way the engine mode is set, whatever the shell says; the other specs get the default.
+      ...(spareEngine ?
+        { ENSO_ENGINE_MODE: 'jvm', ENSO_SPARE_ENGINE: '1', ENSO_JVM_AOT_DIR: jvmAotDir }
+      : { ENSO_ENGINE_MODE: 'native', ENSO_SPARE_ENGINE: '0' }),
+    }
+    const app = await _electron.launch({ executablePath: electronExecutablePath, args, env })
+    try {
+      await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true })
+      await use(app)
+      await app.context().tracing.stop({ path: `test-traces/${testRunId}.zip` })
+      await app.close()
+    } finally {
+      // On Windows a JVM that is still exiting can hold the cache's files for a moment.
+      if (spareEngine) {
+        await fs.rm(jvmAotDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+      }
+    }
   },
   page: async function ({ app, viewport }, use) {
     const innerPage = await app.firstWindow()
