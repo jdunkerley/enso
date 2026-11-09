@@ -310,3 +310,42 @@ describe('useComponentBrowserInput mode selection', () => {
     expect(input.interpretation.appliedSuggestion).toBeUndefined()
   })
 })
+
+describe('carrying the input over a session replacement (#604)', () => {
+  test('a captured input comes back after a reset', () => {
+    const db = mockGraphDb()
+    const before = useComponentBrowserInput(() => false, db, new SuggestionDb(), ref())
+    const sourcePort = db.getNodeFirstOutputPort(db.getIdentDefiningNode('operator1'))
+    assert(sourcePort != null)
+    before.reset({ type: 'newNode', sourcePort })
+    before.setSelectedMode('codeEditing')
+    before.content = { text: 'read "file"', selection: Range.emptyAt(4) }
+    const saved = before.capture()
+
+    const lastPicked = ref<ComponentBrowserMode>()
+    const after = useComponentBrowserInput(() => false, db, new SuggestionDb(), lastPicked)
+    after.reset({ type: 'newNode' })
+    after.restore(saved)
+
+    expect(after.text).toBe('read "file"')
+    expect(after.code).toBe('operator1.read "file"')
+    expect(after.selection).toEqual(Range.emptyAt(4))
+    expect(after.selectedMode).toBe('codeEditing')
+    // Put back, not picked: later browsers do not open in it.
+    expect(lastPicked.value).toBeUndefined()
+  })
+
+  test('an AI prompt comes back in component browsing while the agent is unavailable', () => {
+    const input = useComponentBrowserInput(() => false, mockGraphDb(), new SuggestionDb(), ref())
+    input.reset({ type: 'newNode' })
+    input.restore({
+      text: 'sum the column',
+      selection: { from: 99, to: 120 },
+      mode: 'aiPrompt',
+      selfArgument: undefined,
+    })
+    expect(input.selectedMode).toBe('componentBrowsing')
+    expect(input.text).toBe('sum the column')
+    expect(input.selection.to).toBeLessThanOrEqual('sum the column'.length)
+  })
+})

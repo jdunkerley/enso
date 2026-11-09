@@ -235,3 +235,11 @@ description and ticks it off. The flake baseline it compares against is
   client retries with backoff. A spec adds events with `addEngineLogEvent` /
   `addEngineLogLine` in `setupApi.local`; a fulfilled route closes the stream,
   so events added later arrive as the client reconnects (about every 0.5 s).
+- The mock ydoc server marks every index doc it serves with one session id (Note
+  [A New Server Session] in `ydoc-shared/yjsModel.ts`), the same for every
+  connection, so a socket that only reconnects is not a new session.
+  `localApi.replaceServerSession()` starts a new one, as a restarted ydoc host
+  would: the GUI makes its project stores again, and its new module docs load
+  the mocked sources afresh, without the edits the old ones received (edits that
+  never reached the file). `setMockMainFile` before it changes the file "on
+  disk" (`project-view/sessionReplacement.spec.ts`, #604).

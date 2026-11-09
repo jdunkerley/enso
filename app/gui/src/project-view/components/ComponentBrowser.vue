@@ -16,6 +16,7 @@ import ComponentList from '@/components/ComponentBrowser/ComponentList.vue'
 import { returnTypeInfo } from '@/components/ComponentBrowser/returnTypeInfo'
 import { useComponentBrowserInput, type Usage } from '@/components/ComponentBrowser/input'
 import GraphVisualization from '@/components/GraphEditor/GraphVisualization.vue'
+import type { CarriedComponentBrowserInput } from '@/components/GraphEditor/viewCarryOver'
 import { useResizeObserver } from '@/composables/events'
 import type { useNavigator } from '@/composables/navigator'
 import { groupColorStyle } from '@/composables/nodeColors'
@@ -65,6 +66,8 @@ const props = defineProps<{
   navigator: ReturnType<typeof useNavigator>
   usage: Usage
   graphEditorRoot: Opt<HTMLElement>
+  /** An input carried over a session replacement, put in place of the usage's own on mount. */
+  restoredInput?: CarriedComponentBrowserInput | undefined
 }>()
 
 /** Payload emitted when the user accepts an AI prompt. */
@@ -153,6 +156,7 @@ function panIntoView() {
 onMounted(() => {
   interaction.setCurrent(cbOpen)
   input.reset(props.usage)
+  if (props.restoredInput != null) input.restore(props.restoredInput)
   // Focus synchronously, so that no key typed right after the browser opens reaches the graph (#139).
   inputElement.value?.focus()
   panIntoView()
@@ -412,6 +416,11 @@ const handler = componentBrowserBindings.handler(
 const listsHandler = listBindings.handler({
   'list.moveUp': actions['list.moveUp'].action,
   'list.moveDown': actions['list.moveDown'].action,
+})
+
+defineExpose({
+  /** The input, for a session replacement to carry over (`viewCarryOver.ts`). */
+  captureInput: () => input.capture(),
 })
 </script>
 

@@ -13,7 +13,7 @@ vi.mock('../openedProjects/projectStates', () => ({
   useProjectStates: () => mocks,
 }))
 vi.mock('../localVersioning', () => ({ useLocalVersioning: () => ({}) }))
-vi.mock('../toasts', () => ({ useToasts: () => ({ show: () => {} }) }))
+vi.mock('../toasts', () => ({ useToasts: () => ({ show: () => {}, dismiss: () => {} }) }))
 vi.mock('../text', () => ({
   useText: () => ({ getText: (key: string, ...args: unknown[]) => [key, ...args].join(' ') }),
 }))
