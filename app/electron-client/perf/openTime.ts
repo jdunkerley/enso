@@ -877,6 +877,8 @@ function engineEnv(engine: Engine, options: Options): Record<string, string> {
   if (engine === 'native') return { ENSO_ENGINE_MODE: 'native' }
   const jvm = {
     ENSO_ENGINE_MODE: 'jvm',
+    // The measured opens start an engine of their own: a spare would take them over.
+    ENSO_SPARE_ENGINE: '0',
     ENSO_JVM_AOT_DIR: shimAotDirectory(options),
     ...jvmOptions,
   }
