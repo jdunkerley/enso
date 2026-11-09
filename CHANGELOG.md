@@ -2,10 +2,13 @@
 
 #### Enso IDE
 
+- [With the JVM engine, a notice says when the IDE is preparing the engine for
+  faster project opens, a one-time task of a few minutes on the first launch,
+  and when the engine is ready.][662]
 - [With the JVM engine, the IDE starts and warms up an engine in the background
   while you are on the dashboard, so the next project opens faster. Turn it off
-  with Pre-start the engine in Settings → Local → Engine; it uses about 0.5–0.8
-  GB of memory while no project is open.][658]
+  with Pre-start the engine in Settings → Local → Engine; it uses about 0.8 GB
+  of memory while no project is open.][658]
 - [When the connection to a project restarts, edits that had not been saved yet
   are put back, along with the selection, the open code panel and an open
   component browser. If the file changed in the meantime, it is kept and you are
@@ -468,6 +471,7 @@
 [626]: https://github.com/jdunkerley/enso/pull/626
 [642]: https://github.com/jdunkerley/enso/pull/642
 [658]: https://github.com/jdunkerley/enso/pull/658
+[662]: https://github.com/jdunkerley/enso/pull/662
 [629]: https://github.com/jdunkerley/enso/pull/629
 [622]: https://github.com/jdunkerley/enso/pull/622
 [573]: https://github.com/jdunkerley/enso/pull/573
