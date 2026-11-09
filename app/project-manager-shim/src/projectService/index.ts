@@ -198,6 +198,12 @@ export class ProjectService {
   private spareStopped = false
   /** Spare decisions, one at a time. */
   private spareQueue: Promise<void> = Promise.resolve()
+  /** A close has happened since a spare was last started: one whose start failed may be tried again. */
+  private spareRetryAllowed = false
+  /** Opens from `openProject`'s first line to its answer (a failure too). */
+  private opensInFlight = 0
+  /** Opens ever started: a spare decision that sees it change has met an open. */
+  private opensStarted = 0
 
   /**
    * `engine/setSpare`: the GUI's setting. Until the first call no spare is started. The answer says
@@ -226,13 +232,37 @@ export class ProjectService {
   private async refreshSpareNow(): Promise<void> {
     const runner = this.runner
     if (runner.startSpare == null || runner.stopSpare == null) return
-    const reason = await this.spareUnwantedReason()
+    const opensBefore = this.opensStarted
+    const reason = this.spareSettingsReason()
     if (reason != null) {
       await runner.stopSpare(reason)
       return
     }
     const launch = await this.engineLaunch(resolveDefaultEngineMode(this.engineModeSettings()))
     const key = this.spareKeyFor(launch)
+    const inUse =
+      runner.hasProjectsInUse != null ?
+        await runner.hasProjectsInUse()
+      : await runner.hasRunningProjects()
+    // Decided after the last await, with nothing awaited before `startSpare`: an open that started
+    // at any point of this decision (it is counted from its first line) means no spare, and so
+    // does a quit.
+    const lateReason =
+      this.spareStopped ? 'quitting'
+      : this.opensInFlight > 0 || this.opensStarted !== opensBefore ? 'a project is opening'
+      : inUse ? 'a project is open'
+      : undefined
+    if (lateReason != null) {
+      // A failed spare is tried again only once nothing is in use; the next close allows it again.
+      if (lateReason !== 'quitting') this.spareRetryAllowed = false
+      // An opening project takes a running spare or stops it itself (`EnsoRunner.openProject`).
+      if (lateReason !== 'a project is opening') await runner.stopSpare(lateReason)
+      return
+    }
+    if (this.spareRetryAllowed) {
+      this.spareRetryAllowed = false
+      runner.spareAvailableAgain?.()
+    }
     runner.startSpare({
       key,
       extraArgs: this.extraArgs,
@@ -241,8 +271,8 @@ export class ProjectService {
     })
   }
 
-  /** Why no spare is wanted now; `undefined` when one is. */
-  private async spareUnwantedReason(): Promise<string | undefined> {
+  /** Why the settings want no spare; `undefined` when they want one. */
+  private spareSettingsReason(): string | undefined {
     if (this.spareStopped) return 'quitting'
     if (this.spareSetting !== true) {
       return this.spareSetting === false ? 'the setting is off' : 'the GUI has not sent the setting'
@@ -257,11 +287,7 @@ export class ProjectService {
     if (this.engine?.jvmAot?.isTraining() === true) return 'the AOT cache is training'
     // `--profiling-path` takes a relative path, and a standby engine refuses relative paths.
     if (this.extraArgs.includes('--profiling-path')) return 'profiling is on'
-    const inUse =
-      this.runner.hasProjectsInUse != null ?
-        await this.runner.hasProjectsInUse()
-      : await this.runner.hasRunningProjects()
-    return inUse ? 'a project is open' : undefined
+    return undefined
   }
 
   /**
@@ -288,10 +314,12 @@ export class ProjectService {
       closing.catch(() => undefined),
       new Promise<void>((resolve) => {
         timer = setTimeout(resolve, this.engine?.spareAfterCloseMs ?? SPARE_AFTER_CLOSE_MS)
+        // A pending gate never keeps the process alive.
+        timer.unref()
       }),
     ])
     clearTimeout(timer)
-    this.runner.spareAvailableAgain?.()
+    this.spareRetryAllowed = true
     await this.refreshSpare()
   }
 
@@ -446,7 +474,28 @@ export class ProjectService {
     engineLogging?: EngineLoggingOptions,
   ): Promise<OpenProject> {
     this.logger.debug('Opening project', projectId)
+    // Counted before the first await, so a spare decision that runs meanwhile sees it.
+    this.opensInFlight += 1
+    this.opensStarted += 1
+    let opened = false
+    try {
+      const result = await this.openProjectCounted(projectId, projectsDirectory, engineLogging)
+      opened = true
+      return result
+    } finally {
+      this.opensInFlight -= 1
+      // A failed open leaves no project of its own open: a spare may be wanted again. Only now,
+      // when it no longer counts as opening.
+      if (!opened) void this.refreshSpare()
+    }
+  }
 
+  /** The rest of {@link openProject}, counted as an open in flight. */
+  private async openProjectCounted(
+    projectId: UUID,
+    projectsDirectory: Path,
+    engineLogging: EngineLoggingOptions | undefined,
+  ): Promise<OpenProject> {
     const project = await this.getProject(projectId, projectsDirectory, true)
     const openingKey = comparableProjectPath(project.path)
     this.openingProjects.set(openingKey, (this.openingProjects.get(openingKey) ?? 0) + 1)
@@ -510,8 +559,6 @@ export class ProjectService {
       )
     } catch (error) {
       await engineLog.close()
-      // The open failed and no project of it is open: a spare may be wanted again.
-      void this.refreshSpare()
       throw error
     } finally {
       jvmAot?.openAnswered()

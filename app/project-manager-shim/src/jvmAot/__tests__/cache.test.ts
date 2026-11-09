@@ -315,3 +315,54 @@ test('dispose stops a running training at once, before it awaits anything', asyn
   await disposed
   expect(await exists(path.join(root, 'train.lock'))).toBe(false)
 })
+
+test('isTraining: from the launch check, through an open and the wait to restart, until a cache is made', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  const trainer = new FakeTrainer()
+  const created = cache(trainer)
+  expect(created.isTraining()).toBe(false)
+  const starting = created.start()
+  // Looking for the cache, before anything is known.
+  expect(created.isTraining()).toBe(true)
+  await starting
+  expect(created.isTraining()).toBe(true)
+  created.openStarted()
+  created.openAnswered()
+  // Killed by the open, waiting to restart: still to come.
+  await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
+  expect(created.isTraining()).toBe(true)
+  await vi.advanceTimersByTimeAsync(61_000)
+  await vi.waitFor(() => expect(trainer.runs).toHaveLength(2))
+  expect(created.isTraining()).toBe(true)
+  await trainer.runs[1]!.finish()
+  await vi.waitFor(() => expect(created.isTraining()).toBe(false))
+})
+
+test('isTraining is false with a cache, the native default, after a failed training, and after a quit', async () => {
+  const first = new FakeTrainer()
+  const withCache = cache(first)
+  await trained(first, withCache)
+  expect(withCache.isTraining()).toBe(false)
+  const again = cache(new FakeTrainer())
+  await again.start()
+  expect(again.isTraining()).toBe(false)
+
+  const native = cache(new FakeTrainer(), { isJvmDefault: () => false })
+  await native.start()
+  expect(native.isTraining()).toBe(false)
+
+  await fs.rm(path.join(root), { recursive: true, force: true })
+  const failing = new FakeTrainer()
+  const failed = cache(failing)
+  await failed.start()
+  failing.runs[0]!.fail()
+  await vi.waitFor(() => expect(failed.isTraining()).toBe(false))
+
+  const quitting = new FakeTrainer()
+  const quit = cache(quitting)
+  await fs.rm(path.join(root), { recursive: true, force: true })
+  await quit.start()
+  expect(quit.isTraining()).toBe(true)
+  await quit.dispose()
+  expect(quit.isTraining()).toBe(false)
+})

@@ -396,15 +396,24 @@ a time on a queue). None until the GUI's first `setSpareEngine` (the setting,
 `engine/setSpare`); then a spare is wanted unless, in this order: quitting
 (`stopSpareEngine`, for good), the setting is off, `ENSO_SPARE_ENGINE=0`, the
 default engine (`resolveDefaultEngineMode`) is native, `ENSO_YDOC_HOST=engine`,
-the AOT cache is training (`JvmAotCache.isTraining`; Electron refreshes when it
-ends), `--profiling-path` is among the extra arguments (a relative path, which
-standby refuses), or a project is in use. An unwanted spare is stopped with that
-reason. The refresh runs on `setSpareEngine`, after a failed open, and after a
-close, once the closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2 s,
-`EngineSettings.spareAfterCloseMs`) has passed, whichever is first (that also
-lets a spare whose start failed be tried again, `spareAvailableAgain`). A native
-open stops the spare.
+the AOT cache is training (`JvmAotCache.isTraining`: from its launch check until
+a cache is made, a killed training waiting to restart included; Electron
+refreshes when it ends), `--profiling-path` is among the extra arguments (a
+relative path, which standby refuses), a project is opening, or a project is in
+use. An unwanted spare is stopped with that reason, except for an opening
+project, which takes the spare or stops it itself. The refresh runs on
+`setSpareEngine`, after a failed open (once it no longer counts as opening), and
+after a close, once the closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2
+s, `EngineSettings.spareAfterCloseMs`, an `unref`'d timer) has passed, whichever
+is first. A native open stops the spare.
 
+- **No spare beside an open.** `openProject` counts itself (`opensInFlight`,
+  `opensStarted`) from its first line, before any await. The decision to start
+  is made after the refresh's last await (the AOT options, then the runner's
+  `hasProjectsInUse`), with nothing awaited before `startSpare`: a quit, an open
+  in flight, or any open started since the refresh began means no spare. A spare
+  whose start failed is tried again (`spareAvailableAgain`) only by the refresh
+  after a close, and only when that refresh starts one.
 - **The key** (`spareKeyFor`): mode, the service's extra arguments, the AOT
   options, the extra environment (the secrets key) and `ENSO_JVM_OPTIONS`. A JVM
   open computes it from the same inputs, so with the same settings it takes the

@@ -18,6 +18,10 @@ let inUse: boolean
 let availableAgain: number
 let closing: ReturnType<typeof createDeferred<void>>
 let secretsKey: string
+let openFails: boolean
+/** When set, `hasProjectsInUse` answers what it saw when asked, once this resolves. */
+let inUseAnswer: Promise<void> | undefined
+let inUseAsked: ReturnType<typeof createDeferred<void>>
 
 function fakeRunner(): Runner {
   return {
@@ -25,6 +29,7 @@ function fakeRunner(): Runner {
     createProject: async () => {},
     openProject: async (_path, _id, _args, _env, _sink, launch) => {
       opens.push(launch)
+      if (openFails) throw new Error('the engine did not start')
       inUse = true
       return {
         jsonSocket: { host: '127.0.0.1', port: 1 },
@@ -37,7 +42,12 @@ function fakeRunner(): Runner {
     },
     isProjectRunning: async () => false,
     hasRunningProjects: async () => inUse,
-    hasProjectsInUse: async () => inUse,
+    hasProjectsInUse: async () => {
+      const seen = inUse
+      inUseAsked.resolve()
+      await inUseAnswer
+      return seen
+    },
     renameProject: async () => {},
     registerShutdownHook: async () => {},
     version: async () => '0.0.0',
@@ -62,6 +72,31 @@ function service(engine: EngineSettings = { option: 'jvm' }, extraArgs: string[]
   )
 }
 
+/** The parts of `JvmAotCache` the service uses: no options and no training, unless overridden. */
+function fakeAot(
+  overrides: Partial<Pick<JvmAotCache, 'isTraining' | 'jvmOptions' | 'openStarted'>>,
+) {
+  return {
+    isTraining: () => false,
+    jvmOptions: async () => [],
+    openStarted: () => {},
+    openAnswered: () => {},
+    checkUseLog: async () => {},
+    ...overrides,
+  } as JvmAotCache
+}
+
+/** AOT options that wait for `release`; `reached` resolves at the first call. */
+function heldOptions() {
+  const release = createDeferred<readonly string[]>()
+  const reached = createDeferred<void>()
+  const jvmOptions = () => {
+    reached.resolve()
+    return release.promise
+  }
+  return { release, reached, jvmOptions }
+}
+
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'spare-service-'))
   vi.stubEnv('ENSO_LOG_DIRECTORY', path.join(root, 'logs'))
@@ -75,6 +110,9 @@ beforeEach(async () => {
   availableAgain = 0
   closing = createDeferred<void>()
   secretsKey = 'key-a'
+  openFails = false
+  inUseAnswer = undefined
+  inUseAsked = createDeferred<void>()
   await createProject(path.join(root, 'P'), 'id-1')
 })
 
@@ -192,20 +230,113 @@ test('quitting stops the spare and starts no other', async () => {
 
 test('no spare while the AOT cache trains; the refresh after it starts one', async () => {
   let training = true
-  // The parts of `JvmAotCache` the service uses, for a first launch whose cache is training.
-  const jvmAot = {
-    isTraining: () => training,
-    jvmOptions: async () => [] as readonly string[],
-    openStarted: () => {},
-    openAnswered: () => {},
-    checkUseLog: async () => {},
-  } as JvmAotCache
+  // A first launch whose cache is training.
+  const jvmAot = fakeAot({ isTraining: () => training })
   const s = service({ option: 'jvm', jvmAot })
   await s.setSpareEngine(true)
   expect(starts).toEqual([])
   expect(stops).toEqual(['the AOT cache is training'])
   training = false
   // What Electron's `onTrainingEnded` does.
+  await s.refreshSpare()
+  expect(starts).toHaveLength(1)
+})
+
+test('a refresh that runs while an open has not reached the runner starts no spare', async () => {
+  let duringOpen: Promise<void> | undefined
+  const s = service({
+    option: 'jvm',
+    jvmAot: fakeAot({ openStarted: () => (duringOpen = s.refreshSpare()) }),
+  })
+  await s.setSpareEngine(true)
+  await s.openProject(UUID('id-1'), Path(root))
+  await duringOpen
+  // Only the spare before the open: the refresh met the open and left the spare to it.
+  expect(starts).toHaveLength(1)
+  expect(stops).toEqual([])
+})
+
+test('an open that starts during a refresh, after its checks, still means no spare', async () => {
+  const options = heldOptions()
+  const s = service({ option: 'jvm', jvmAot: fakeAot({ jvmOptions: options.jvmOptions }) })
+  const refresh = s.setSpareEngine(true)
+  // The refresh is past its settings checks, waiting for the AOT options.
+  await options.reached.promise
+  // The open waits for them too, before it reaches the runner.
+  const open = s.openProject(UUID('id-1'), Path(root))
+  options.release.resolve([])
+  await refresh
+  await open
+  expect(starts).toEqual([])
+  expect(opens).toHaveLength(1)
+})
+
+test('an open that starts and finishes while a refresh asks what is in use means no spare', async () => {
+  const answer = createDeferred<void>()
+  inUseAnswer = answer.promise
+  const s = service()
+  const refresh = s.setSpareEngine(true)
+  // The runner has seen nothing in use; its answer is still on the way.
+  await inUseAsked.promise
+  inUseAnswer = undefined
+  await s.openProject(UUID('id-1'), Path(root))
+  answer.resolve()
+  await refresh
+  expect(starts).toEqual([])
+})
+
+test('a failed open is followed by a spare', async () => {
+  const s = service()
+  openFails = true
+  await expect(s.openProject(UUID('id-1'), Path(root))).rejects.toThrow('the engine did not start')
+  // The setting arrives after the failure: the failure's own refresh found no setting.
+  expect(starts).toEqual([])
+  await s.setSpareEngine(true)
+  starts.length = 0
+  await expect(s.openProject(UUID('id-1'), Path(root))).rejects.toThrow('the engine did not start')
+  await vi.waitFor(() => expect(starts).toHaveLength(1))
+})
+
+test('a project reopened during the gate after a close: no spare, and a failed spare is not retried', async () => {
+  const s = service({ option: 'jvm', spareAfterCloseMs: 50 })
+  await s.setSpareEngine(true)
+  await s.openProject(UUID('id-1'), Path(root))
+  // The old engine keeps stopping (`closing` unresolved), so the gate ends with the delay.
+  const close = s.closeProject(UUID('id-1'), Path(root))
+  await s.openProject(UUID('id-1'), Path(root))
+  await vi.waitFor(() => expect(stops).toEqual(['a project is open']))
+  expect(starts).toHaveLength(1)
+  expect(availableAgain).toBe(0)
+  closing.resolve()
+  await close
+})
+
+test('a quit while a refresh is in flight or queued starts nothing', async () => {
+  const options = heldOptions()
+  const s = service({ option: 'jvm', jvmAot: fakeAot({ jvmOptions: options.jvmOptions }) })
+  const inFlight = s.setSpareEngine(true)
+  // In flight: past its settings checks, waiting for the AOT options.
+  await options.reached.promise
+  const queued = s.refreshSpare()
+  const quit = s.stopSpareEngine()
+  options.release.resolve([])
+  await Promise.all([inFlight, queued, quit])
+  expect(starts).toEqual([])
+  expect(stops).toEqual(['quitting', 'quitting', 'quitting'])
+})
+
+test('a close while the AOT cache is still wanted starts no spare; the refresh after training does', async () => {
+  let training = true
+  const s = service({ option: 'jvm', jvmAot: fakeAot({ isTraining: () => training }) })
+  await s.setSpareEngine(true)
+  await s.openProject(UUID('id-1'), Path(root))
+  closing.resolve()
+  await s.closeProject(UUID('id-1'), Path(root))
+  await vi.waitFor(() =>
+    expect(stops).toEqual(['the AOT cache is training', 'the AOT cache is training']),
+  )
+  expect(starts).toEqual([])
+  training = false
   await s.refreshSpare()
   expect(starts).toHaveLength(1)
 })

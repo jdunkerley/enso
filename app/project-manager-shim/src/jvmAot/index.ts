@@ -97,6 +97,8 @@ export class JvmAotCache {
   private opensInFlight = 0
   private retrainTimer: ReturnType<typeof setTimeout> | undefined
   private disposed = false
+  /** `start()` is looking for the cache: a training may follow. */
+  private checkingAtLaunch = false
 
   /** The trainer defaults to an {@link EngineTrainer} with its scratch project in `<root>/enso-aot-training`. */
   constructor(
@@ -141,12 +143,17 @@ export class JvmAotCache {
   /** At app launch: train when JVM is the default, there is no cache for the key, and no other window trains. */
   async start(): Promise<void> {
     if (this.disposed || !this.settings.isJvmDefault()) return
-    const cache = await this.cacheFile()
-    if (cache == null) return
-    // A training interrupted by a quit can leave its files (the next training deletes them too).
-    await this.deleteLeftovers(cache)
-    if (await exists(cache)) return
-    this.wanted = true
+    this.checkingAtLaunch = true
+    try {
+      const cache = await this.cacheFile()
+      if (cache == null) return
+      // A training interrupted by a quit can leave its files (the next training deletes them too).
+      await this.deleteLeftovers(cache)
+      if (await exists(cache)) return
+      this.wanted = true
+    } finally {
+      this.checkingAtLaunch = false
+    }
     await this.beginTraining()
   }
 
@@ -266,9 +273,13 @@ export class JvmAotCache {
     }, this.settings.retrainDelayMs ?? 60_000)
   }
 
-  /** Whether a training is starting or running (a launch without a cache): no spare meanwhile. */
+  /**
+   * Whether a training is still to come or running: from `start()` looking for the cache until a
+   * training has made one or failed, an aborted one waiting to restart included. No spare meanwhile.
+   */
   isTraining(): boolean {
-    return this.training != null || this.starting != null
+    if (this.disposed) return false
+    return this.checkingAtLaunch || this.wanted || this.training != null || this.starting != null
   }
 
   /**
