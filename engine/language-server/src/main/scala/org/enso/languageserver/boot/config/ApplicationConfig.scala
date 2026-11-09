@@ -1,5 +1,6 @@
 package org.enso.languageserver.boot.config
 
+import com.typesafe.config.ConfigFactory
 import pureconfig.ConfigSource
 import pureconfig.generic.auto._
 
@@ -27,9 +28,12 @@ object ApplicationConfig {
     val contextClassLoader = Thread.currentThread().getContextClassLoader
     try {
       Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
+      // A fresh `systemProperties()`, not pureconfig's `ConfigSource.systemProperties` (a snapshot
+      // taken when `ConfigSource` is first used): a standby engine sets the ydoc port and the
+      // channel token as properties after it started (engine/runner `StandbyRequest`).
       ConfigSource
         .resources(ConfigFilename)
-        .withFallback(ConfigSource.systemProperties)
+        .withFallback(ConfigSource.fromConfig(ConfigFactory.systemProperties()))
         .at(ConfigNamespace)
         .loadOrThrow[ApplicationConfig]
     } finally Thread.currentThread().setContextClassLoader(contextClassLoader)

@@ -14,6 +14,7 @@ import java.lang.System.Logger;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import org.apache.commons.lang3.SystemUtils;
+import org.enso.common.ContextFactory;
 import org.enso.interpreter.dsl.Builtin;
 import org.enso.interpreter.node.expression.builtin.text.util.ExpectStringNode;
 import org.enso.interpreter.runtime.EnsoContext;
@@ -57,6 +58,23 @@ public final class System {
     return java.lang.System.nanoTime();
   }
 
+  @Builtin.Method(
+      description =
+          "The context's working directory when a standby engine set it, else Nothing: relative"
+              + " local paths then resolve against it.")
+  @Builtin.Specialize
+  @SuppressWarnings("generic-enso-builtin-type")
+  @CompilerDirectives.TruffleBoundary
+  public static Object workingDirectoryOverride(EnsoContext ctx) {
+    // Whether a standby engine set it (Note [Standby Mode] in engine/runner `Standby`), not a
+    // comparison of paths: symlinks, 8.3 names or letter case could make a normal engine's
+    // context and process directories compare unequal.
+    if (java.lang.System.getProperty(ContextFactory.WORKING_DIRECTORY_PROPERTY) == null) {
+      return ctx.getNothing();
+    }
+    return Text.create(ctx.getCurrentWorkingDirectory().getAbsoluteFile().normalize().getPath());
+  }
+
   @Builtin.Specialize
   @Builtin.Method(description = "Exits the process, returning the provided code.")
   @CompilerDirectives.TruffleBoundary
@@ -97,6 +115,12 @@ public final class System {
         var path = expectStringNode.execute(cwdOrNothing);
         var tPath = ctx.getPublicTruffleFile(path);
         pb.directory(tPath);
+      } else {
+        // Always the context's working directory, deliberately, unlike `get_file`, which looks
+        // at the override only when it is set: in a normal engine the context's directory is the
+        // process's, so this changes nothing there, and a standby engine's process runs elsewhere
+        // (Note [Standby Mode] in engine/runner `Standby`).
+        pb.directory(ctx.getCurrentWorkingDirectory());
       }
 
       if (envOrNothing instanceof EnsoHashMap env) {

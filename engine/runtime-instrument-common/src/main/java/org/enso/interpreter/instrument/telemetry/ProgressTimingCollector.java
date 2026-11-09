@@ -8,6 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import org.enso.common.ProcessEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -147,9 +148,9 @@ public final class ProgressTimingCollector {
 
   private String resolveProjectId() {
     if (cachedProjectId == null) {
-      var id = System.getenv("ENSO_CLOUD_PROJECT_ID");
+      var id = ProcessEnvironment.get("ENSO_CLOUD_PROJECT_ID");
       if (id == null) {
-        id = System.getenv("ENSO_LOCAL_PROJECT_ID");
+        id = ProcessEnvironment.get("ENSO_LOCAL_PROJECT_ID");
       }
       cachedProjectId = id != null ? id : "unknown";
     }
@@ -158,9 +159,9 @@ public final class ProgressTimingCollector {
 
   private String resolveSessionId() {
     if (cachedSessionId == null) {
-      var id = System.getenv("ENSO_CLOUD_PROJECT_SESSION_ID");
+      var id = ProcessEnvironment.get("ENSO_CLOUD_PROJECT_SESSION_ID");
       if (id == null) {
-        id = System.getenv("ENSO_LOCAL_PROJECT_SESSION_ID");
+        id = ProcessEnvironment.get("ENSO_LOCAL_PROJECT_SESSION_ID");
       }
       cachedSessionId = id != null ? id : UUID.randomUUID().toString();
     }

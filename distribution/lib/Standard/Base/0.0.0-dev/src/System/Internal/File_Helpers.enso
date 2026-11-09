@@ -4,6 +4,7 @@ import project.Data.Boolean.Boolean
 import project.Data.Text.Text
 import project.Data.Time.Date_Time.Date_Time
 import project.Data.Time.Time_Zone
+import project.Internal.Runtime_Helpers
 import project.System.File.File
 import project.System.File_Format.Bytes
 import project.System.File_Format.File_Format_SPI
@@ -18,9 +19,18 @@ polyglot java import java.nio.file.Path as Java_Path
 polyglot java import java.time.ZonedDateTime as Java_ZonedDateTime
 polyglot java import java.time.ZoneOffset as Java_ZoneOffset
 
-## The builtin that returns a File instance for a given path.
+## The builtin that returns a File instance for a given path. A relative path
+   resolves against the context's working directory when a standby engine set
+   the context's working directory (the `enso.context.workingDirectory`
+   property; its process runs elsewhere); it is then made absolute. Otherwise
+   the path is kept as given.
 get_file path:Text =
-    File.Value (Java_Path.of path)
+    java_path = Java_Path.of path
+    resolved = case Runtime_Helpers.working_directory_override of
+        dir : Text -> if java_path.isAbsolute then java_path else
+            Java_Path.of dir . resolve java_path
+        _ -> java_path
+    File.Value resolved
 
 is_dir file:(File|Java_Path) -> Boolean =
     path = case file of

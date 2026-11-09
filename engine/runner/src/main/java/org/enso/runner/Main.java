@@ -33,6 +33,7 @@ import org.enso.common.ContextFactory;
 import org.enso.common.DebugServerInfo;
 import org.enso.common.HostEnsoUtils;
 import org.enso.common.LanguageInfo;
+import org.enso.common.ProcessEnvironment;
 import org.enso.common.PythonHomeFinder;
 import org.enso.distribution.DistributionManager;
 import org.enso.distribution.Environment;
@@ -109,6 +110,7 @@ public class Main {
   private static final String EXECUTION_ENVIRONMENT_OPTION = "execution-environment";
   private static final String WARNINGS_LIMIT = "warnings-limit";
   private static final String SYSTEM_PROPERTY = "vm.D";
+  private static final String STANDBY_OPTION = "standby";
 
   private static final String DEFAULT_MAIN_METHOD_NAME = "main";
 
@@ -493,6 +495,15 @@ public class Main {
             .numberOfArgs(1)
             .build();
 
+    var standbyOption =
+        cliOptionBuilder()
+            .longOpt(STANDBY_OPTION)
+            .desc(
+                "Starts the engine, warms it up, and waits for one line of JSON on stdin: the"
+                    + " arguments to run with. Used by the IDE's spare engine; runs only on the JVM"
+                    + " (--jvm with the native launcher).")
+            .build();
+
     var options = new Options();
     options
         .addOption(help)
@@ -509,6 +520,7 @@ public class Main {
         .addOption(newProjectAuthorNameOpt)
         .addOption(newProjectAuthorEmailOpt)
         .addOption(lsOption)
+        .addOption(standbyOption)
         .addOption(lsNativeOption)
         .addOption(lsProfilingPathOption)
         .addOption(lsProfilingTimeOption)
@@ -604,12 +616,6 @@ public class Main {
             ? nil()
             : join(new Contact(authorName, authorEmail), nil());
 
-    var edition = DefaultEdition.getDefaultEdition();
-    if (LOGGER.isTraceEnabled()) {
-      var baseEdition = edition.parent().getOrElse(() -> "<no-base>");
-      LOGGER.trace("Creating a new project " + name + " based on edition [" + baseEdition + "].");
-    }
-
     var template =
         templateOption.map(
             (n) ->
@@ -619,15 +625,44 @@ public class Main {
                           throw exitFail("Unknown project template name: '" + n + "'.");
                         }));
 
+    createProject(
+        root,
+        name,
+        normalizedNameOption,
+        template.getOrElse(() -> Template.Default$.MODULE$),
+        authors);
+    throw exitSuccess();
+  }
+
+  /**
+   * Creates a project from a template, with the default edition (`--new`, and the standby warm-up).
+   *
+   * @param root root path of the new project
+   * @param name the project name
+   * @param normalizedName the normalized name, if not derived from the name
+   * @param template the template to copy
+   * @param authors the authors and maintainers
+   */
+  static void createProject(
+      File root,
+      String name,
+      scala.Option<String> normalizedName,
+      Template template,
+      scala.collection.immutable.List<Contact> authors) {
+    var edition = DefaultEdition.getDefaultEdition();
+    if (LOGGER.isTraceEnabled()) {
+      var baseEdition = edition.parent().getOrElse(() -> "<no-base>");
+      LOGGER.trace("Creating a new project " + name + " based on edition [" + baseEdition + "].");
+    }
     PackageManager$.MODULE$
         .Default()
         .create(
             root,
             name,
             "local",
-            normalizedNameOption,
+            normalizedName,
             "0.0.1",
-            template.getOrElse(() -> Template.Default$.MODULE$),
+            template,
             scala.Option.apply(edition),
             authors,
             nil(),
@@ -637,7 +672,11 @@ public class Main {
             Option$.MODULE$.empty(),
             false,
             false);
-    throw exitSuccess();
+  }
+
+  /** A project with no authors, whose normalized name is derived from the name. */
+  static void createProject(File root, String name, Template template) {
+    createProject(root, name, Option$.MODULE$.empty(), template, nil());
   }
 
   /**
@@ -1590,7 +1629,9 @@ public class Main {
             .getOrElse(() -> defaultLogLevel);
     var hasJVMOption = line.hasOption(JVM_OPTION);
     setupLoggingContext(line);
-    if (line.hasOption(LANGUAGE_SERVER_OPTION)) {
+    // A standby engine becomes a Language Server: it sets up no logging of its own either (Note
+    // [Standby Mode] in `Standby`).
+    if (line.hasOption(LANGUAGE_SERVER_OPTION) || line.hasOption(STANDBY_OPTION)) {
       // Setup application-ls.conf as the default config file
       // https://github.com/lightbend/config?tab=readme-ov-file#standard-behavior
       // Language Server will also set up logging on its own.
@@ -1647,7 +1688,85 @@ public class Main {
         }
       }
     }
+    if (line.hasOption(STANDBY_OPTION)) {
+      runStandby(component);
+      return;
+    }
     handleLaunch(originalCwdOrNull, line, logLevel, logMasking[0]);
+  }
+
+  /**
+   * `--standby` (Note [Standby Mode] in {@link Standby}): warm up, read the argument line, and
+   * launch with it as if it had been the command line.
+   */
+  private void runStandby(File component)
+      throws IOException, InterruptedException, URISyntaxException {
+    if (HostEnsoUtils.isAot()) {
+      throw exitFail("--" + STANDBY_OPTION + " runs only on the JVM: add --" + JVM_OPTION + ".");
+    }
+    var restoreLogging = Standby.quietLogging(System.err);
+    StandbyRequest request;
+    try {
+      // `System.in` itself, not a reader over it or a new stream on the descriptor: the line is
+      // read a byte at a time, and the Language Server reads its shutdown line from `System.in`
+      // later.
+      request = Standby.create(component).awaitRequest(System.in);
+    } catch (IllegalArgumentException e) {
+      throw exitFail("standby: " + e.getMessage());
+    }
+    if (request == null) {
+      throw exitSuccess();
+    }
+    var args = request.args().toArray(new String[0]);
+    var line = preprocessArguments(args);
+    // The line is a Language Server's, as `project/open` passes it: a line that would run
+    // something else, or start another standby or JVM, is refused.
+    if (!line.hasOption(LANGUAGE_SERVER_OPTION)
+        || Stream.of(STANDBY_OPTION, JVM_OPTION, IN_PROJECT_OPTION, RUN_OPTION)
+            .anyMatch(line::hasOption)) {
+      throw exitFail(
+          "standby: the argument line must start a Language Server (--"
+              + LANGUAGE_SERVER_OPTION
+              + "), without --"
+              + STANDBY_OPTION
+              + ", --"
+              + JVM_OPTION
+              + ", --"
+              + IN_PROJECT_OPTION
+              + " or --"
+              + RUN_OPTION
+              + ".");
+    }
+    var projectPath = line.getOptionValue(LanguageServerApi.ROOT_PATH_OPTION);
+    Path path;
+    try {
+      path = projectPath == null ? null : Path.of(projectPath);
+    } catch (InvalidPathException e) {
+      throw exitFail("standby: the argument line's --path is not a valid path.");
+    }
+    if (path == null || !path.isAbsolute()) {
+      throw exitFail("standby: the argument line needs an absolute --path.");
+    }
+    var parent = path.normalize().getParent();
+    if (parent == null) {
+      throw exitFail("standby: --path cannot be a filesystem root.");
+    }
+    // The configuration (`application-ls.conf`, `${?NAME}`) prefers the environment to the
+    // property the line's value is set as: an inherited variable would win silently.
+    for (var name : request.env().keySet()) {
+      if (StandbyRequest.CONFIG_PROPERTIES.containsKey(name) && System.getenv(name) != null) {
+        throw exitFail(
+            "standby: "
+                + name
+                + " is set in the standby engine's environment and would override the line's"
+                + " value; start the standby engine without it.");
+      }
+    }
+    request.applyEnvironment();
+    System.setProperty(ContextFactory.WORKING_DIRECTORY_PROPERTY, parent.toString());
+    // The Language Server sets up its own logging from here.
+    restoreLogging.run();
+    launch(args);
   }
 
   final CommandLine preprocessArguments(String... args) {
@@ -1668,16 +1787,21 @@ public class Main {
   private void setupLoggingContext(CommandLine line) {
     if (line.hasOption(LanguageServerApi.CLOUD_PROJECT_ID_OPTION)) {
       MDC.put("projectId", line.getOptionValue(LanguageServerApi.CLOUD_PROJECT_ID_OPTION));
-    } else if (System.getenv(LanguageServerApi.ENSO_CLOUD_PROJECT_ID_ENV_NAME) != null) {
-      MDC.put("projectId", System.getenv(LanguageServerApi.ENSO_CLOUD_PROJECT_ID_ENV_NAME));
+    } else if (ProcessEnvironment.get(LanguageServerApi.ENSO_CLOUD_PROJECT_ID_ENV_NAME) != null) {
+      MDC.put(
+          "projectId", ProcessEnvironment.get(LanguageServerApi.ENSO_CLOUD_PROJECT_ID_ENV_NAME));
     }
-    if (System.getenv(LanguageServerApi.ENSO_CLOUD_PROJECT_ID_ENV_NAME) != null) {
+    if (ProcessEnvironment.get(LanguageServerApi.ENSO_CLOUD_PROJECT_ID_ENV_NAME) != null) {
       // In hybrid projects, the cloud project ID has precedence over the local project ID
       // because Cloud does not store the local project ID, and it is generated every time the
       // project is started.
-      MDC.put("projectLocalId", System.getenv(LanguageServerApi.ENSO_CLOUD_PROJECT_ID_ENV_NAME));
-    } else if (System.getenv(LanguageServerApi.ENSO_LOCAL_PROJECT_ID_ENV_NAME) != null) {
-      MDC.put("projectLocalId", System.getenv(LanguageServerApi.ENSO_LOCAL_PROJECT_ID_ENV_NAME));
+      MDC.put(
+          "projectLocalId",
+          ProcessEnvironment.get(LanguageServerApi.ENSO_CLOUD_PROJECT_ID_ENV_NAME));
+    } else if (ProcessEnvironment.get(LanguageServerApi.ENSO_LOCAL_PROJECT_ID_ENV_NAME) != null) {
+      MDC.put(
+          "projectLocalId",
+          ProcessEnvironment.get(LanguageServerApi.ENSO_LOCAL_PROJECT_ID_ENV_NAME));
     } else if (line.getOptionValue(LanguageServerApi.PROJECT_ID_OPTION) != null) {
       MDC.put("projectLocalId", line.getOptionValue(LanguageServerApi.PROJECT_ID_OPTION));
     }
@@ -1685,14 +1809,16 @@ public class Main {
       MDC.put(
           "projectSessionId",
           line.getOptionValue(LanguageServerApi.CLOUD_PROJECT_SESSION_ID_OPTION));
-    } else if (System.getenv(LanguageServerApi.ENSO_CLOUD_PROJECT_SESSION_ID_ENV_NAME) != null) {
+    } else if (ProcessEnvironment.get(LanguageServerApi.ENSO_CLOUD_PROJECT_SESSION_ID_ENV_NAME)
+        != null) {
       MDC.put(
           "projectSessionId",
-          System.getenv(LanguageServerApi.ENSO_CLOUD_PROJECT_SESSION_ID_ENV_NAME));
-    } else if (System.getenv(LanguageServerApi.ENSO_LOCAL_PROJECT_SESSION_ID_ENV_NAME) != null) {
+          ProcessEnvironment.get(LanguageServerApi.ENSO_CLOUD_PROJECT_SESSION_ID_ENV_NAME));
+    } else if (ProcessEnvironment.get(LanguageServerApi.ENSO_LOCAL_PROJECT_SESSION_ID_ENV_NAME)
+        != null) {
       MDC.put(
           "projectSessionId",
-          System.getenv(LanguageServerApi.ENSO_LOCAL_PROJECT_SESSION_ID_ENV_NAME));
+          ProcessEnvironment.get(LanguageServerApi.ENSO_LOCAL_PROJECT_SESSION_ID_ENV_NAME));
     }
   }
 

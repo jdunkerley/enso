@@ -14,6 +14,7 @@ Utility binaries and scripts that aid engine/GUI development. **Not** a catch-al
 - `pre-commit/` — `format-staged.mjs`, the Rust/Java/Scala half of the pre-commit hook (`lint-staged.config.mjs` at the root calls it). Must skip with a notice, never fail, when a tool is missing; see "Formatting hook" in `docs/CONTRIBUTING.md`.
 - `legal-review/`, `legal-review-helper/` — Third-party dependency license-review inputs and helpers.
 - `simple-library-server/` — Minimal HTTP library-server stub for testing the library download flow without touching the real library repository.
+- `standby-preload/` — `generate.mjs`, which turns a `-Xlog:class+load` log of a Language Server boot into the standby engine's preload list (`engine/runner`, "Standby mode").
 
 ## Conventions
 

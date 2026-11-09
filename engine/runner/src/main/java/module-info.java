@@ -24,6 +24,8 @@ module org.enso.runner {
   requires org.jline.reader;
   requires scala.library;
   requires org.slf4j;
+  // ConfigFactory.invalidateCaches: a standby engine sets configuration properties late.
+  requires typesafe.config;
 
   // required by Snowflake
   requires java.rmi;

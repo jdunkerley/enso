@@ -82,3 +82,98 @@ involved: they read `jvm.options` on their own (`enso` with the same rules;
 leading and trailing spaces and quotes each line, so `^ % ! & | < >` and spaces
 survive literally; it does not support a byte order mark, a double quote or a
 single quote in an option). They do not read `ENSO_JVM_OPTIONS`.
+
+## Standby mode (`--standby`)
+
+`enso --jvm --standby` is the IDE's spare engine (spec
+`docs/superpowers/specs/2026-11-08-jvm-warm-engine-design.md`; Note [Standby
+Mode] in `Standby.java`). It starts the JVM as `--jvm` does, then on a
+background thread runs `StandbyWarmUp` (a throwaway context on a temporary copy
+of the default template whose `Main` imports Base, Table, Database, Examples and
+Visualization, builds, filters, aggregates and sorts a table and prepares its
+visualization) and `StandbyPreloader`. It prints the markers
+`standby: warm-up running`, `standby: warm-up finished` (or
+`standby: warm-up abandoned`),
+`standby: warm-up done in N ms, <preloading>, process CPU C ms` and
+`STANDBY READY <ms since process start>` on stderr.
+
+It then reads one line from stdin (`Standby.awaitRequest(System.in)`, the same
+stream object the Language Server later reads its shutdown line from: never a
+reader or a fresh stream over the descriptor): `{"args":[...],"env":{...}}`
+(`StandbyRequest`), the arguments `project/open` would have passed. The line is
+refused unless it is a `--server` line without `--standby`, `--jvm`,
+`--in-project` or `--run`, and its `--path` must be absolute and not a
+filesystem root. `env` accepts only `LANGUAGE_SERVER_YDOC_PORT` and
+`LANGUAGE_SERVER_CHANNEL_TOKEN` (set as the `language-server.*` configuration
+properties) and `ENSO_LOCAL_PROJECT_ID` and `ENSO_LOCAL_PROJECT_SESSION_ID` (set
+as `enso.env.<NAME>`, read through `org.enso.common.ProcessEnvironment`). Any
+code that reads one of those four from the environment must read it the same
+way. The spare's spawn environment must not carry
+`LANGUAGE_SERVER_CHANNEL_TOKEN` or `LANGUAGE_SERVER_YDOC_PORT` (the
+configuration prefers the environment, so the engine refuses a line that sets
+one of them while it is inherited); only the four names go in the line, and
+everything else (the secrets key, other variables) goes in the spawn
+environment. It then sets the context's working directory
+(`enso.context.workingDirectory`, applied by `ContextFactory`) to the parent of
+`--path` and calls `launch` with the arguments. A closed stdin before the line
+exits with 0.
+
+- Until the line the root logger is at WARN (`Standby.quietLogging`; no appender
+  is installed), because the Language Server sets up logging itself. Messages
+  before it are stderr lines (`standby: warning: warm-up failed: …`).
+- The warm-up's project is `local.Enso_Standby_Warm_Up`, a reserved name; the IR
+  cache the compiler writes for it under `<data>/cache/ir/local/` is deleted
+  with its folder after the warm-up.
+- `--vm.D enso.standby.warmUp=false` skips the warm-up (tests);
+  `--vm.D enso.standby.abandonWarmUp=true` cancels a running warm-up when the
+  line arrives instead of waiting for it.
+- The preload list (`src/main/resources/org/enso/runner/standby-preload.txt`) is
+  generated: run a Language Server boot without an AOT cache with
+  `JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=<log>` (the shell launcher of
+  `built-distribution/` does not read `ENSO_JVM_OPTIONS`), then
+  `node tools/standby-preload/generate.mjs <log> <the list>`. Classes that have
+  gone are skipped at run time; regenerate it when a release's count drops
+  noticeably (the standby line says `preloaded N of M classes`). It is skipped
+  when the JVM runs with an AOT cache, which already holds those classes. The
+  cache is seen only in `jvm.options` and `ENSO_JVM_OPTIONS` (`JvmOptions.all`);
+  one given through `JAVA_TOOL_OPTIONS` is not seen and only causes a needless
+  preload. A `jvm.options` that cannot be read only turns preloading off
+  (`Standby.preloadFor` logs a warning).
+- **The process's working directory is the temporary directory**, and the JVM's
+  cannot be changed once it runs. Enso therefore resolves against the context's
+  working directory (the project's parent), not the process's, wherever it can:
+  `File_Helpers.get_file` (every relative local `File`, made absolute in a
+  standby engine), `File.current_directory`, and `Process.run` without a
+  directory (`System.create_process`). The builtin
+  `System.working_directory_override` answers the context's directory only when
+  the `enso.context.workingDirectory` property is set, never by comparing paths.
+  Known differences from a normal engine: a relative `File` shows its absolute
+  path; Java code handed a raw relative string (user code through
+  `polyglot java import`) resolves it against the temporary directory; and
+  `File.resolve_local_file` sees a relative path as absolute, so it skips the
+  cloud-project branch (never reached in the local-only IDE). Any new engine or
+  std-bits code that resolves a path against the process (`user.dir`, `Path.of`
+  of a relative string, a `ProcessBuilder` without a directory) must go through
+  the context's working directory instead.
+- A warm-up still running 60 s after the line is cancelled
+  (`standby: warm-up abandoned after 60 s`), and a bad line cancels a running
+  warm-up and waits for it before the process exits, so its folder is deleted.
+  The warm-up's folder and cache are deleted file by file: what cannot be (a
+  file still open on Windows) is left, with one warning line.
+- Tests:
+  - `StandbyRequestTest` (`StandbyRequest`, `StandbyJson`): the grammar; errors
+    never echo a value (a sentinel in each malformed form).
+  - `StandbyTest`: the wait (the line before and after the warm-up, abandon, the
+    60 s limit, a bad line stopping a running warm-up, stdin closed first,
+    `readLine` leaving the rest of stdin), and an unreadable `jvm.options`.
+  - `StandbyPreloaderTest`: the list and the AOT-cache skip.
+  - `StandbyWarmUpTest`: a cancel before the run, and deletion that goes on past
+    an undeletable file.
+  - `ContextWorkingDirectoryTest` (runtime-integration-tests): the context's
+    working directory.
+  - `StandbyProcessTest` runs the real `built-distribution/` (CI's JVM tests
+    build one with `buildEngineDistributionNoIndex`; skipped without one): no
+    warm-up, a full warm-up (only library caches written, no log lines on
+    stdout), a warm-up abandoned mid-run, stdin closed first, and the refused
+    lines (relative path, filesystem root, not a `--server` line, an inherited
+    channel token).
