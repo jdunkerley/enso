@@ -1056,6 +1056,15 @@ template's headline is both marks at once, and a report records it as
 `welcomeShown`, so `libraryShown` falls back to it, for a report of the `image`
 project only.
 
+**At 4 or 8 CPUs** (the re-gate is the first open at 8 CPUs, at most 1.5): pin
+the whole run, which the IDE inherits. On Windows, from PowerShell,
+`cmd /c "start "" /affinity FF /wait /b corepack pnpm --filter enso run perf:open …"`
+(`F` for 4); on Linux
+`taskset -c 0-7 corepack pnpm --filter enso run perf:open …`. Each report's last
+line says the CPUs it ran on. Interleave the engines by running rounds
+(`--runs 2`, three rounds, each its own `--out`), and pool them with
+`corepack pnpm --filter enso exec vite-node perf/poolReportsCli.ts -- <round dir>...`.
+
 CI uploads `electron-out.log` and `hsperf/` too; by hand, `ide-packaging.yml`
 takes `open_perf_engines`, `open_perf_runs`, `open_perf_budget`,
 `open_perf_diagnostics` and `open_perf_jvm_options`.
