@@ -1909,9 +1909,7 @@ lazy val `ydoc-server` = project
   .settings(
     Compile / run / fork := true,
     Compile / run / connectInput := true,
-    Compile / run / javaOptions := Seq(
-      "-ea"
-    ),
+    Compile / run / javaOptions := testAssertions,
     // We need to assembly the cmd line options here manually, because we need
     // to add path to this module, and adding that directly to the `modulePath` setting
     // would result in an sbt caught in an infinite recursion.
@@ -2122,9 +2120,28 @@ val truffleRunOpts = Seq(
   "-Dpolyglot.compiler.BackgroundCompilation=false"
 )
 
+/* Note [HostExecuteNode Assertions Are Off Under Test]
+ * ====================================================
+ * Every place that runs Enso with assertions on also turns them off for this one
+ * Truffle class. Since GraalVM 25.0.2 HostExecuteNode.createPrimitiveTargetCheck
+ * builds the type check for argument i from overloads already inapplicable at
+ * another argument, and with -ea fillArgTypesArray asserts that the cached types
+ * still validate and fails (https://github.com/jdunkerley/enso/issues/36, upstream
+ * https://github.com/oracle/graal/issues/14943). Without -ea the cached guard
+ * fails, the call falls back to the uncached path and picks the right overload;
+ * the only cost is lost overload caching. Java applies a class's assertion
+ * status to its nested classes, and a class-specific setting wins over -ea in
+ * either order. Drop the flag once a GraalVM release fixes it.
+ *
+ * Other sites: tools/build-scripts/src/stdlib-test/invocation.ts,
+ * Main.launchJvm, project/DistributionPackage.scala (appendJvmOpts), the root
+ * CLAUDE.md, and the notes in project/Dependencies.scala.
+ */
+val testAssertions = Seq("-ea", "-da:com.oracle.truffle.host.HostExecuteNode")
+
 val truffleRunOptionsSettings = Seq(
   fork := true,
-  javaOptions ++= "-ea" +: benchOnlyOptions
+  javaOptions ++= testAssertions ++ benchOnlyOptions
 )
 
 /** Explicitly provide `application-test.conf` as the resource that should be used for
@@ -5356,9 +5373,7 @@ lazy val `std-tests` = project
     frgaalJavaCompilerSetting,
     commands += WithDebugCommand.withDebug,
     Test / fork := true,
-    Test / javaOptions ++= Seq(
-      "-ea"
-    ),
+    Test / javaOptions ++= testAssertions,
     autoScalaLibrary := false,
     Compile / compile / compileInputs := (Compile / compile / compileInputs)
       .dependsOn(SPIHelpers.ensureSPIConsistency)
@@ -6645,7 +6660,7 @@ ThisBuild / NativeImage.additionalOpts := {
       opts = opts ++ Seq("-H:GenerateDebugInfo=1")
     }
     if (GraalVM.EnsoLauncher.test) {
-      opts = opts ++ Seq("-ea")
+      opts = opts ++ testAssertions
     }
     opts
   }

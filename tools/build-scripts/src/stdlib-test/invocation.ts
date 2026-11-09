@@ -9,6 +9,13 @@ import type { Suite } from './suites.ts'
 /** The heap-dump flag: in `JAVA_TOOL_OPTIONS` always, and a launcher argument except on Windows. */
 export const HEAP_DUMP = '-XX:+HeapDumpOnOutOfMemoryError'
 
+/**
+ * Assertions on, except for Truffle's HostExecuteNode, whose assertion fails on valid overloads since
+ * GraalVM 25.0.2 (#36, upstream oracle/graal#14943). Note [HostExecuteNode Assertions Are Off Under
+ * Test] in `build.sbt`.
+ */
+export const ASSERTIONS = '-enableassertions -da:com.oracle.truffle.host.HostExecuteNode'
+
 /** The launcher arguments before `--no-ir-caches --run` (`extra_engine_runner_args`). */
 export function runnerArguments(
   suite: Suite,
@@ -77,7 +84,7 @@ export function testEnvironment(inputs: TestEnvironmentInputs): Record<string, s
       : 'enso.bat'
     : 'enso'
   Object.assign(env, {
-    JAVA_TOOL_OPTIONS: `-enableassertions ${HEAP_DUMP}`,
+    JAVA_TOOL_OPTIONS: `${ASSERTIONS} ${HEAP_DUMP}`,
     ENSO_META_TEST_COMMAND: path.join(inputs.enginePackage, 'bin', launcher),
     ENSO_META_TEST_ARGS: ['--no-ir-caches', ...inputs.runnerArgs, '--run'].join(' '),
     ENSO_ENABLE_ASSERTIONS: 'true',

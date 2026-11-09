@@ -1538,6 +1538,9 @@ public class Main {
     assert assertsOn = true;
     if (assertsOn) {
       commandAndArgs.add("-ea");
+      // Note [HostExecuteNode Assertions Are Off Under Test] in build.sbt (#36,
+      // oracle/graal#14943).
+      commandAndArgs.add("-da:com.oracle.truffle.host.HostExecuteNode");
     }
     if (props != null) {
       for (var e : props.entrySet()) {

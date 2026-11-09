@@ -81,6 +81,9 @@ object Dependencies {
    * Without assertions the same defect silently selects a possibly-wrong
    * overload, so this is not a test-only concern.
    *
+   * Tests turn the assertion off for HostExecuteNode alone: Note
+   * [HostExecuteNode Assertions Are Off Under Test] in build.sbt.
+   *
    * See https://github.com/jdunkerley/enso/issues/36 before bumping this.
    */
 

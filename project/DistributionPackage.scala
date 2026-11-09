@@ -525,6 +525,8 @@ object DistributionPackage {
     }
   }
 
+  // Note [HostExecuteNode Assertions Are Off Under Test] in build.sbt (#36,
+  // oracle/graal#14943): the default `-da` below.
   /** Helper method to execute project manager and enso using similar technique.
     */
   private def adjustArgsAndStart(
@@ -532,7 +534,7 @@ object DistributionPackage {
     args: java.util.List[String],
     jvmOptName: String,
     pb: java.lang.ProcessBuilder,
-    appendJvmOpts: String     = "-ea",
+    appendJvmOpts: String     = "-ea -da:com.oracle.truffle.host.HostExecuteNode",
     cwd: Option[java.io.File] = None,
     env: Map[String, String]  = Map.empty
   ): java.lang.Process = {
