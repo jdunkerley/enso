@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [With the JVM engine, the IDE starts and warms up an engine in the background
+  while you are on the dashboard, so the next project opens faster. Turn it off
+  with Pre-start the engine in Settings → Local → Engine; it uses about 0.5–0.8
+  GB of memory while no project is open.][658]
 - [A project whose libraries cannot be loaded now says which ones, in a message
   of its own. If the edition installed with the IDE has them, the message offers
   to switch the project to it: Switch and reopen saves a version of the project
@@ -458,6 +462,7 @@
 [655]: https://github.com/jdunkerley/enso/pull/655
 [626]: https://github.com/jdunkerley/enso/pull/626
 [642]: https://github.com/jdunkerley/enso/pull/642
+[658]: https://github.com/jdunkerley/enso/pull/658
 [629]: https://github.com/jdunkerley/enso/pull/629
 [622]: https://github.com/jdunkerley/enso/pull/622
 [573]: https://github.com/jdunkerley/enso/pull/573
