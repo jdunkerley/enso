@@ -55,12 +55,15 @@ import {
   handleProjectProtocol,
   prepareAppImageEngine,
   setupProjectService,
+  spareEngineAlive,
   startAppImageEngineCopy,
   startJvmAotCache,
+  stopSpareEngine,
   version,
 } from './projectService.js'
 import { enableAll } from './security.js'
 import { Config, Server } from './server.js'
+import { holdQuitForSpareEngine } from './spareQuit.js'
 
 type Electron = typeof import('electron')
 
@@ -218,6 +221,13 @@ class App {
 
       this.electron.app.on('before-quit', () => {
         void disposeJvmAotCache()
+        // No spare starts from now on, even when none is running.
+        void stopSpareEngine()
+      })
+      // A spare still alive holds the quit until it has exited or been killed.
+      holdQuitForSpareEngine(this.electron.app, {
+        alive: spareEngineAlive,
+        stop: stopSpareEngine,
       })
 
       this.electron.app.on('will-quit', () => {

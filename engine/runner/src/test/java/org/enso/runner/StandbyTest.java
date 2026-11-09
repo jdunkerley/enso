@@ -188,6 +188,45 @@ public class StandbyTest {
     assertTrue(err(), err().contains(Standby.READY));
   }
 
+  @Test(timeout = 30_000)
+  public void stdinClosedFirstStopsTheRunningWarmUpBeforeNoRequest() throws Exception {
+    var gate = new Gate();
+    var standby = new Standby(gate, abandoned -> "x", err, false);
+    assertNull(standby.awaitRequest(in("")));
+    assertTrue("cancelled", gate.cancelled.get());
+    // The warm-up's thread had ended: it prints this line last.
+    assertTrue(err(), err().contains(Standby.READY));
+    assertTrue(err(), err().contains("standby: warm-up abandoned"));
+  }
+
+  @Test(timeout = 30_000)
+  public void stdinClosedFirstGivesUpOnAWarmUpThatIgnoresTheCancel() throws Exception {
+    var never = new CountDownLatch(1);
+    Standby.WarmUp stubborn =
+        new Standby.WarmUp() {
+          @Override
+          public void run() throws Exception {
+            never.await();
+          }
+
+          @Override
+          public void cancel() {}
+        };
+    var standby =
+        new Standby(stubborn, abandoned -> "x", err, false, Duration.ofSeconds(60), Duration.ZERO);
+    try {
+      assertNull(standby.awaitRequest(in("")));
+      assertTrue(
+          err(),
+          err()
+              .contains(
+                  "standby: warning: the cancelled warm-up did not stop within 0 s; exiting"
+                      + " without it"));
+    } finally {
+      never.countDown();
+    }
+  }
+
   @Test
   public void aBadLineIsRefused() {
     var standby = new Standby(Standby.NO_WARM_UP, abandoned -> "x", err, false);

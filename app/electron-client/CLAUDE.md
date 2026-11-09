@@ -139,8 +139,10 @@ desktop binary (AppImage/DMG/exe + installer).
   rotation a crash interrupted (Note [Crash-Safe Key Rotation] in
   `secretsKey.ts`). Rotate and reset both refuse while any engine runs
   (`ProjectService.hasRunningProjects`), since each engine holds the key it was
-  started with, and run one at a time. Status comes from the shim's
-  `secrets/status` route, not IPC. Use
+  started with, and run one at a time. The spare engine (which they do not
+  count) holds the old key too, so each refreshes it afterwards
+  (`afterKeyChange`, in a `finally`; not when refused). Status comes from the
+  shim's `secrets/status` route, not IPC. Use
   `new Entry('Enso', account, { linux: { store: 'secret-service' } })`, never
   `Entry.withTarget` (in 2.1.2 constructing one wipes an existing Windows
   credential), and without the pinned Linux store the default falls back to the
@@ -219,12 +221,23 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
 - `ENSO_JVM_AOT_DIR` — where the per-user JDK AOT cache lives instead of
   `<userData>/jvm-aot` (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
   cache trains in the background, once the window is up, only when the JVM is
-  the default engine; `before-quit` stops a running training. The open-time
-  harness points it at a directory of its run (`<out>/jvm-aot` for the JVM
-  engines, `<out>/shim-jvm-aot` for native, which never trains) and measures
+  the default engine; `before-quit` stops a running training (and the spare
+  engine, `stopSpareEngine`: while a spare is alive, `holdQuitForSpareEngine` in
+  `src/spareQuit.ts` cancels the quit, waits up to 5 s for the spare to exit,
+  kills its process tree if it has not, and quits again, once; tested in
+  `tests/headless/spareQuit.test.ts`). An update waits the same way: an update
+  installed on quit starts on the app's `quit` event, after that stop, and
+  `Updater.quitAndInstall` awaits `stopSpareEngine` (`beforeInstall`) before it
+  starts the installer, which on Windows runs before the app has quit. The
+  open-time harness points it at a directory of its run (`<out>/jvm-aot` for the
+  JVM engines, `<out>/shim-jvm-aot` for native, which never trains) and measures
   that cache (see "Open-time harness"), so its launches never pick up the
   user's. An empty value counts as unset. The root and the gate are in
   `src/jvmAotSettings.ts` (tested in `tests/headless/jvmAotSettings.test.ts`).
+- `ENSO_SPARE_ENGINE=0` — no spare engine whatever Settings → Local → Engine
+  says (`project-manager-shim/CLAUDE.md`, "Spare engine"). The Playwright
+  fixture sets it for every spec but `spareEngine.spec.ts`; the open-time
+  harness sets it for `jvm` and `jvm-first`.
 - `APPIMAGE` (set by the AppImage runtime) — with the JVM as the default engine
   (`--engine-mode`, `ENSO_ENGINE_MODE`, then the built-in default; nothing
   happens while it is native), a Linux AppImage runs its engine from a copy at
@@ -794,6 +807,18 @@ rule in `playwright.config.ts`:
   `corepack pnpm -r --filter enso ide-integration-test [path.spec.ts]`. Runs are
   long (minutes), so avoid them in inner dev loops.
 
+Every spec runs with `ENSO_ENGINE_MODE=native` and `ENSO_SPARE_ENGINE=0`,
+whatever the shell says (the fixture's `spareEngine` option, default `false`),
+so a spare engine never changes its timing. `tests/spareEngine.spec.ts` sets it:
+the app runs `ENSO_ENGINE_MODE=jvm` and `ENSO_SPARE_ENGINE=1` with a fresh
+`ENSO_JVM_AOT_DIR` of the test's own (deleted afterwards), waits for the AOT
+cache's training to end (`JDK AOT cache: trained in …`, ~45 s on a desktop),
+then for `Spare engine: ready …` in the main process's stdout and stderr, opens
+a new project and checks `Spare engine: used …` and the engine log's
+`Engine: pre-started spare used` notice in the Logs tab (a stderr line, so shown
+with the Engine source ticked). It has no retries (a retry repeats the training)
+and a 400 s budget.
+
 When adding a Playwright test that needs an external dependency the CI doesn't
 have yet (e.g. `aiNode.spec.ts` needs the local `claude` CLI), gate the whole
 describe block on an env flag (`process.env.ENSO_TEST_AI === '1'`) and note the
@@ -877,7 +902,9 @@ before a manual run.
 
 Every launch sets the engine mode as a user would: `ENSO_ENGINE_MODE=native` or
 `jvm` (`engineEnv` in `perf/openTime.ts`), so the shim decides whether to pass
-`--jvm`, and which timeouts apply. The engines are:
+`--jvm`, and which timeouts apply. The JVM engines also set
+`ENSO_SPARE_ENGINE=0`: a measured open starts its own engine, never a
+pre-started spare. The engines are:
 
 - `native`: the native image.
 - `jvm`: the JVM as a user has it after the first open. The shim's own AOT cache

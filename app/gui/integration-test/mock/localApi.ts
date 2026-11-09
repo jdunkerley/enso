@@ -160,6 +160,13 @@ export async function mockLocalApi(page: Page) {
     events: [] as { seq: number; event: string; data: Record<string, unknown> }[],
   }
 
+  /** The mocked spare engine: change `engineMode` in `setupApi.local`, before the page loads. */
+  const spareEngine = {
+    engineMode: 'native' as 'native' | 'jvm',
+    /** Each `engine/setSpare` the GUI sent, oldest first. */
+    requests: [] as boolean[],
+  }
+
   const callsObjects = new Set<typeof INITIAL_CALLS_OBJECT>()
 
   function trackCalls() {
@@ -614,6 +621,10 @@ export async function mockLocalApi(page: Page) {
       removeEntry(project.entry.path)
       recentPathDeleted(project.entry.path)
       return toJSONRPCResult(null)
+    })
+    await projectServiceRoute('engine/setSpare', (params) => {
+      spareEngine.requests.push(params.enabled === true)
+      return toJSONRPCResult({ engineMode: spareEngine.engineMode })
     })
     // Like the shim's `renameProject`: the name must not be empty or taken; the project's directory
     // is renamed after it, unless the project is running (the shim defers that until it stops, and
@@ -1251,6 +1262,7 @@ data: ${JSON.stringify(data)}
     versioning,
     /** The mocked bundled samples: change them in `setupApi.local`, before the page loads. */
     samples,
+    spareEngine,
     /** The paths in the Recent list, newest first, whether or not a project is still there. */
     recentProjectPaths: () => recentProjects.map((entry) => entry.path),
   } as const

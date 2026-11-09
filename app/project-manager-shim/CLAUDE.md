@@ -246,7 +246,8 @@ Test files that start (fake) engines pass `firstPort` from
 own band (parallel workers), and each run starts at a random port inside it
 (another checkout's run at the same time). A new such file needs a band of its
 own there. The bands are 2,000 ports wide and ten of them end at 29,000; an
-eleventh needs the first band's start lowered.
+eleventh, `spareOpen.test.ts`'s, is 7,000 to 8,000 (clear of 5173 and 8080).
+Another needs the first band's start lowered, or a gap found the same way.
 
 ## Ports and the engine's health check
 
@@ -355,6 +356,104 @@ limits apply, and a project's `jvm: false` still wins. Headless
 `--startup.project` runs take `--engine-mode` too (`runLocalProjectByPath`'s
 `engine`). Re-opening an open project writes no second mode line.
 
+## Spare engine (`projectService/spareEngine.ts`)
+
+A JVM engine started with `--standby` while no project is open (spec
+`docs/superpowers/specs/2026-11-08-jvm-warm-engine-design.md`; engine side in
+engine/runner CLAUDE.md, "Standby mode"). `EnsoRunner` owns one `SpareEngine`
+(`startSpare`, `stopSpare`, `spareAvailableAgain`, `spareAlive`, `spareState`,
+`sparePid`).
+
+- **The take.** An open whose `EngineLaunch` has a `spareKey` takes a spare
+  started with the same key, on its first attempt only; a spare with another key
+  is stopped, and the open spawns as before. The open's log gets one
+  `Engine: pre-started spare used (…)` or `Engine: no pre-started spare (…)`
+  line (`EngineLogSink.notice`); an open without a key leaves the spare alone
+  and says nothing. When no spare was running, the line gives the service's
+  reason (`EngineLaunch.spareIdleReason`, the last decision's), and there is no
+  line at all when spares are off (the setting, `ENSO_SPARE_ENGINE=0`). Under an
+  engine-hosted ydoc server with allowed origins there is no spare (the line
+  cannot carry them).
+- **The line.** The spare gets `{"args":[...],"env":{...}}` on stdin: the open's
+  arguments from `--server` on (never `--jvm`, which the engine refuses there),
+  and in `env` only the four `LINE_VARIABLES` (channel token, ydoc port under an
+  engine-hosted ydoc server, project id and session id). Everything else, the
+  secrets key included, is in the spare's spawn environment, which never carries
+  a line variable or `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS` (`spareSpawnEnv`;
+  the engine exits 1 on an inherited one). The line holds the token: it is never
+  logged.
+- **Stderr.** `take()` stops reading the spare's stderr; `OpenedProject`
+  attaches its reader in microtasks of the same turn (its spawner hands the
+  spare over), so nothing may be awaited between the take and
+  `OpenedProject.create`.
+- **Timeouts.** A spare taken while still warming up gets
+  `SPARE_WARM_UP_LIMIT_MS` (60 s, when the engine abandons a warm-up) on top of
+  the startup limit, for that engine only.
+- **Failure.** A taken spare that exits or times out before its health check
+  makes the open try again with an ordinary engine (and a second notice line);
+  that try does not use up one of the `PORT_ATTEMPTS`. A respawn after the open
+  is always an ordinary spawn. The worst case is a spare still warming up that
+  never starts: ~300 s (the JVM's 120 s startup limit plus the 60 s warm-up
+  limit, then up to 120 s for an ordinary engine) before the open is answered.
+- **Kills.** An engine that misses its startup limit, and one that does not stop
+  in time on close, is killed with its process tree (`killTree`): under a `.bat`
+  launcher killing `cmd.exe` alone would leave the engine running beside the one
+  that replaces it.
+- **Stop.** `stop` closes the spare's stdin, on which it exits by itself; one
+  still running after `SPARE_STOP_GRACE_MS` (10 s, an `unref`'d timer) is killed
+  with its tree. A quit cannot rely on that timer, since the process exits
+  first: `stopSpare(reason, { waitMs })` (`ProjectService.stopSpareEngine`)
+  waits up to `waitMs` for the spare, and any stopped one still exiting, kills
+  the trees of those left and waits up to 1 s more. Electron uses it with 5 s on
+  every quit and before an update installs (electron-client CLAUDE.md).
+- `hasProjectsInUse` (loading or running, not counting a project whose close has
+  begun) is what the service asks before starting the next spare.
+
+**When the service wants one** (`ProjectService.refreshSpare`, decisions one at
+a time on a queue). None until the GUI's first `setSpareEngine` (the setting;
+POST `/api/project-service/engine/setSpare` `{ enabled: boolean }` answers
+`{ engineMode }`, a non-boolean `enabled` is an error; clients:
+`ProjectManager.setSpareEngine`, `LocalBackend.setSpareEngine`); then a spare is
+wanted unless, in this order: quitting (`stopSpareEngine`, for good), the
+setting is off, `ENSO_SPARE_ENGINE=0`, the default engine
+(`resolveDefaultEngineMode`) is native, `ENSO_YDOC_HOST=engine`, the AOT cache
+is training (`JvmAotCache.isTraining`: from its launch check until a cache is
+made, a killed training waiting to restart included; Electron refreshes after
+`start()` and when `onTrainingEnded` says a training finished or failed, not
+when an open stopped it), `--profiling-path` is among the extra arguments (a
+relative path, which standby refuses), a project is opening, or a project is in
+use. An unwanted spare is stopped with that reason, except for an opening
+project, which takes the spare or stops it itself. The refresh runs on
+`setSpareEngine`, after a failed open (once it no longer counts as opening), and
+after a close, once the closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2
+s, `EngineSettings.spareAfterCloseMs`, an `unref`'d timer) has passed, whichever
+is first. A native open stops the spare. When a close's engine takes longer than
+2 s to exit, a spare starts 2 s into the close (the gate's delay), beside the
+closing engine; reopening the project then takes it if its key matches. A quit
+that is cancelled after the spare was stopped (`stopSpareEngine` is for good)
+leaves no spare for the rest of the session.
+
+- **No spare beside an open.** `openProject` counts itself (`opensInFlight`,
+  `opensStarted`) from its first line, before any await. The decision to start
+  is made after the refresh's last await (the AOT options, then the runner's
+  `hasProjectsInUse`), with nothing awaited before `startSpare`: a quit, an open
+  in flight, any open started since the refresh began, or an AOT training that
+  began meanwhile means no spare. A spare whose start failed is tried again
+  (`spareAvailableAgain`) only by the refresh after a close, and only when that
+  refresh starts one.
+- **The key** (`spareKeyFor`): mode, the service's extra arguments, the AOT
+  options, the extra environment (the secrets key) and `ENSO_JVM_OPTIONS`. A JVM
+  open computes it from the same inputs, so with the same settings it takes the
+  spare; its own engine logging (`--vm.D`) and the line variables travel in the
+  line and are not part of it. Engine mode, log level and `ENSO_ENGINE_ARGS`
+  change only at launch, so a changed input (a rotated secrets key, a new AOT
+  cache) is caught by the key at the take, which stops the stale spare.
+
+Tests: `__tests__/spareEngine.test.ts`, `__tests__/spareOpen.test.ts` (with the
+service, `through the service`) and `__tests__/spareService.test.ts` (the
+decisions, with a recording runner), with the fake engine
+`__tests__/fakeSpareEngine.ts`.
+
 ## JDK AOT cache (`src/jvmAot/`)
 
 A JVM engine starts faster with a JDK AOT cache (JEP 483/514). A cache records
@@ -409,11 +508,17 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   other's cache at every launch) and deletes older ones; it only ever deletes
   directories named like a key (16 hex digits), since `ENSO_JVM_AOT_DIR` may
   name a directory holding other things. A failed training (not an abort) leaves
-  no `enso.aot` and is not retried until the next launch. `dispose()`
-  (Electron's `before-quit`) aborts a running training before it awaits
-  anything, which kills its engine or `java` at once; the `.tmp` and `.aotconf`
-  such a quit can leave are deleted by the next `start()`. Three things measured
-  on the Windows bundle shaped this (Notes in `driver.ts` and `trainer.ts`):
+  no `enso.aot` and is not retried until the next launch. While another process
+  holds the lock, the cache tries again every `retrainDelayMs` (60 s) and stays
+  `isTraining` until that process's cache appears (or it gets the lock and
+  trains itself); a lock that cannot be taken at all (an error) counts as a
+  failed training. A finished or failed training, and a cache found made by
+  another process, call `onTrainingEnded` (Electron refreshes the spare engine).
+  `dispose()` (Electron's `before-quit`) aborts a running training before it
+  awaits anything, which kills its engine or `java` at once; the `.tmp` and
+  `.aotconf` such a quit can leave are deleted by the next `start()`. Three
+  things measured on the Windows bundle shaped this (Notes in `driver.ts` and
+  `trainer.ts`):
   - `/_health` passes while the Language Server is still initialising, and a
     channel socket opened then is dropped (`1006`): the driver reconnects once a
     second until the session is initialised (a `403` fails at once).
@@ -507,6 +612,13 @@ Always attach an `'error'` listener to a child's stdin (`EnsoRunner` does at
 spawn): a write to an exited child fails asynchronously with `EPIPE`, and with
 no listener that is an unhandled error that fails vitest runs and can crash the
 Electron main process (#401).
+
+To kill a child together with what it started, use `killTree`
+(`src/childProcess/killTree.ts`): on Windows a `.bat` launcher runs under
+`cmd.exe`, and killing `cmd.exe` alone orphans the engine (`taskkill /T /F`
+there, `SIGKILL` elsewhere). The AOT trainer and the spare engine
+(`projectService/spareEngine.ts`, which first closes the spare's stdin and kills
+only after `SPARE_STOP_GRACE_MS`, 10 s) use it.
 
 ## A second project's engine start on Windows (measured, no fix)
 

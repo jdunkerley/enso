@@ -17,8 +17,8 @@ const BAND_SIZE = 2_000
 /** Room left at the top of a band for the search to step past ports already in use. */
 const BAND_HEADROOM = 100
 /**
- * Low enough that ten bands end at 29,000, below the default and the ephemeral ranges. An eleventh
- * band needs this lowered again (or the bands narrowed).
+ * Low enough that ten bands end at 29,000, below the default and the ephemeral ranges. Another band
+ * needs this lowered again (or the bands narrowed), staying clear of `SPARE_OPEN_PORT`'s range.
  */
 const FIRST_BAND_START = 9_000
 
@@ -48,3 +48,8 @@ export const ENGINE_MODE_PORT = randomPortInBand(7)
 export const JVM_AOT_TRAINER_PORT = randomPortInBand(8)
 /** `ydocHost.test.ts`. */
 export const YDOC_HOST_PORT = randomPortInBand(9)
+/**
+ * `spareOpen.test.ts`: below the first band, half a band wide (7,000 to 8,000), clear of Vite's
+ * 5173 and of 8080.
+ */
+export const SPARE_OPEN_PORT = 7_000 + crypto.randomInt(1_000 - BAND_HEADROOM)

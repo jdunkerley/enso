@@ -1189,6 +1189,11 @@ export class LocalBackend extends backend.Backend {
     return this.projectManager.secretsStatus()
   }
 
+  /** Whether the project service keeps a pre-started engine; it answers which engine runs. */
+  setSpareEngine(enabled: boolean) {
+    return this.projectManager.setSpareEngine(enabled)
+  }
+
   /** The bundled samples' states in `<projects>/Samples`. */
   samplesStatus() {
     return this.projectManager.samplesStatus()

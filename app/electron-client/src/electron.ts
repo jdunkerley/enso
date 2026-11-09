@@ -2,7 +2,13 @@ import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
 import { resolveLogFileToReveal } from '@/logFileReveal'
 import * as paths from '@/paths'
-import { getLocalSecrets, getSecretsKeySource, hasRunningProjects } from '@/projectService'
+import {
+  getLocalSecrets,
+  getSecretsKeySource,
+  hasRunningProjects,
+  refreshSpareEngine,
+  stopSpareEngine,
+} from '@/projectService'
 import { resetSecrets, rotateSecretsKey } from '@/secretsKey'
 import { initUpdaterIpc } from '@/updaterIpc'
 import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from 'electron'
@@ -69,7 +75,8 @@ export function initIpc(
   electron: Electron | undefined,
   electronIsDev: boolean,
 ) {
-  initUpdaterIpc(BUILD_INFO.updates, electronUpdater.autoUpdater)
+  // The installer must not meet a spare engine still holding the engine's files.
+  initUpdaterIpc(BUILD_INFO.updates, electronUpdater.autoUpdater, stopSpareEngine)
   // The key is written to the clipboard here, in main: it never crosses into the renderer.
   ipcMain.handle(Channel.secretsCopyKey, () => {
     const key = getSecretsKeySource().exportKey()
@@ -83,6 +90,7 @@ export function initIpc(
       keySource: getSecretsKeySource(),
       store: getLocalSecrets(),
       hasRunningProjects,
+      afterKeyChange: refreshSpareEngine,
     }),
   )
   ipcMain.handle(Channel.secretsRotate, () =>
@@ -90,6 +98,7 @@ export function initIpc(
       keySource: getSecretsKeySource(),
       store: getLocalSecrets(),
       hasRunningProjects,
+      afterKeyChange: refreshSpareEngine,
     }),
   )
   ipcMain.on(Channel.error, (_event, data) => {

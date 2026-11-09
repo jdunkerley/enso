@@ -15,21 +15,33 @@ function broadcast(status: UpdateStatus) {
   }
 }
 
-/** Creates the updater and registers its IPC handlers. `autoUpdater` is a parameter for tests. */
-export function initUpdaterIpc(buildMode: UpdateMode, autoUpdater: AutoUpdaterLike) {
+/**
+ * Creates the updater and registers its IPC handlers. `autoUpdater` is a parameter for tests;
+ * `beforeInstall` is `UpdaterDeps.beforeInstall`.
+ */
+export function initUpdaterIpc(
+  buildMode: UpdateMode,
+  autoUpdater: AutoUpdaterLike,
+  beforeInstall?: () => Promise<void>,
+) {
   const mode = resolveUpdateMode(buildMode, {
     isPackaged: app.isPackaged,
     platform: process.platform,
     appImage: process.env.APPIMAGE,
   })
   console.info(`[Updater] Mode: ${mode}.`)
-  const updater = new Updater({ autoUpdater, mode, onStatus: broadcast })
+  const updater = new Updater({
+    autoUpdater,
+    mode,
+    onStatus: broadcast,
+    ...(beforeInstall != null ? { beforeInstall } : {}),
+  })
   ipcMain.handle(Channel.updaterMode, () => updater.mode)
   ipcMain.handle(Channel.updaterCheck, (_event, allowPrerelease: boolean) =>
     updater.check(allowPrerelease === true),
   )
   ipcMain.handle(Channel.updaterDownload, () => updater.download())
-  ipcMain.handle(Channel.updaterQuitAndInstall, () => {
-    updater.quitAndInstall()
+  ipcMain.handle(Channel.updaterQuitAndInstall, async () => {
+    await updater.quitAndInstall()
   })
 }

@@ -139,9 +139,14 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => {
+afterEach(async () => {
+  vi.unstubAllGlobals()
   Reflect.deleteProperty(window, 'api')
   openFileBrowser.mockReset()
+  // The spare-engine settings are module state, shared by every test.
+  const { engineRunsOnJvm, setPreStartEngine } = await import('$/providers/spareEngineSettings')
+  setPreStartEngine(true)
+  engineRunsOnJvm.value = false
 })
 
 describe('the Local settings tab', () => {
@@ -169,7 +174,6 @@ describe('the Local settings tab', () => {
     await openLocalTab()
     await vi.waitFor(() => expect(document.body.textContent).toContain(getText('secretsNone')))
     expect(document.body.textContent).toContain(getText('secretsSettingsSection'))
-    vi.unstubAllGlobals()
   })
 
   test('the Updates section is left out without the desktop updater', async () => {
@@ -198,7 +202,6 @@ describe('the Local settings tab', () => {
     await flushPromises()
     expect(useIncludePrereleases().value).toBe(true)
     setIncludePrereleases(false)
-    vi.unstubAllGlobals()
   })
 
   test('the Engine logs section has both logging switches, off by default', async () => {
@@ -222,6 +225,36 @@ describe('the Local settings tab', () => {
     await flushPromises()
     expect(engineLoggingOptions()).toEqual({ sqlQueries: true, performanceTimings: true })
     setEngineLogSettings({ sqlQueries: false, performanceTimings: false })
+  })
+
+  test('the Engine section is hidden unless projects get the JVM engine', async () => {
+    const { engineRunsOnJvm } = await import('$/providers/spareEngineSettings')
+    engineRunsOnJvm.value = false
+    await openLocalTab()
+    expect(document.body.textContent).toContain(getText('mapsSettingsSection'))
+    expect(document.body.textContent).not.toContain(getText('preStartEngineSetting'))
+  })
+
+  test('the Engine section has the pre-start switch, on by default, and keeps a change', async () => {
+    const { engineRunsOnJvm, spareEngineSettingsStore } =
+      await import('$/providers/spareEngineSettings')
+    engineRunsOnJvm.value = true
+    await openLocalTab()
+    expect(document.body.textContent).toContain(getText('engineSettingsSection'))
+    expect(document.body.textContent).toContain(getText('preStartEngineSettingDescription'))
+    expect(spareEngineSettingsStore.state.value.preStart).toBe(true)
+    const user = userEvent.setup()
+    await user.click(
+      required(
+        [...document.querySelectorAll<HTMLElement>('[role="switch"], input[type="checkbox"]')].find(
+          (element) =>
+            element.closest('label')?.textContent.includes(getText('preStartEngineSetting')),
+        ),
+      ),
+    )
+    await flushPromises()
+    expect(spareEngineSettingsStore.state.value.preStart).toBe(false)
+    expect(localStorage.getItem('enso-spare-engine-settings')).toContain('"preStart":false')
   })
 
   test('a typed directory, once saved, reaches the local paths', async () => {

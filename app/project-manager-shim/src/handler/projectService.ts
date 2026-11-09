@@ -499,6 +499,29 @@ export async function handleProjectServiceRequest(
         })
       break
     }
+    case 'POST /api/project-service/engine/setSpare': {
+      interface Body {
+        readonly enabled?: unknown
+      }
+      bodyJson<Body>(request)
+        .then(async (body) => {
+          if (typeof body.enabled !== 'boolean') {
+            throw new Error('engine/setSpare needs a boolean `enabled`')
+          }
+          const projectService = await getProjectService()
+          return projectService.setSpareEngine(body.enabled)
+        })
+        .then((result) => {
+          response.writeHead(HTTP_STATUS_OK, headers).end(toJSONRPCResult(result))
+        })
+        .catch((err) => {
+          console.error(err)
+          response
+            .writeHead(HTTP_STATUS_OK, headers)
+            .end(toJSONRPCError('engine/setSpare failed', err))
+        })
+      break
+    }
     default: {
       const message = `Unknown project service request ${requestPath}`
       console.error(message)

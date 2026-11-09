@@ -19,9 +19,11 @@ import { samplesSettled } from '../samples/index.js'
 import {
   describeEngineMode,
   liftJvmFlag,
+  resolveDefaultEngineMode,
   resolveEngineMode,
   type EngineMode,
   type EngineModeSettings,
+  type ResolvedEngineMode,
 } from './engineMode.js'
 import {
   comparableProjectPath,
@@ -40,9 +42,10 @@ import {
   type ProjectMetadata,
   type ProjectRepository,
 } from './projectRepository.js'
+import { spawnKey } from './spareEngine.js'
 import { engineTimeouts } from './timeouts.js'
 import { Path, UUID } from './types.js'
-import type { YdocHost } from './ydocHost.js'
+import { ydocHostKind, type YdocHost } from './ydocHost.js'
 
 export {
   loopbackOrigins,
@@ -81,6 +84,8 @@ export interface EngineSettings {
   readonly ensoExecutable?: string | undefined
   /** Told when each open starts and is answered (a failure too), like `jvmAot`. */
   readonly openObserver?: OpenObserver | undefined
+  /** How long after a close the next spare engine waits for the closing engine to exit (2 s). */
+  readonly spareAfterCloseMs?: number | undefined
 }
 
 /** Hears opens: Electron holds a Linux AppImage's engine copy back until the first is answered. */
@@ -88,6 +93,12 @@ export interface OpenObserver {
   openStarted(): void
   openAnswered(): void
 }
+
+/**
+ * After a close, the next spare engine starts once the closing engine has exited or this long has
+ * passed, whichever is first, so the two do not compete for CPU (spec, "After a close").
+ */
+export const SPARE_AFTER_CLOSE_MS = 2000
 
 /** Parameters for the "create project" endpoint. */
 export interface CreateProjectParams {
@@ -155,6 +166,11 @@ export class ProjectService {
     }
   }
 
+  /** How an engine in `mode` is launched: that mode's timeouts and, for the JVM, the AOT options. */
+  private async engineLaunch(mode: ResolvedEngineMode): Promise<EngineLaunch> {
+    return { mode, timeouts: engineTimeouts(mode.mode), ...(await this.aotOptions(mode.mode)) }
+  }
+
   /** The AOT cache's options for a JVM engine (`jvmOptions` of its launch), when there is a cache. */
   private async aotOptions(mode: EngineMode): Promise<Pick<EngineLaunch, 'jvmOptions'>> {
     const jvmAot = this.engine?.jvmAot
@@ -175,6 +191,161 @@ export class ProjectService {
 
   /** The engine logs of the open projects, served by `GET /api/engine-logs/stream`. */
   readonly engineLogs = new EngineLogHub()
+
+  /** Settings → Local → Engine's "Pre-start the engine"; `undefined` until the GUI sends it. */
+  private spareSetting: boolean | undefined
+  /** Set on quit: no spare is started again. */
+  private spareStopped = false
+  /** Why the last spare decision started none, for an open's log; `undefined` once one started. */
+  private spareIdleReason: string | undefined
+  /** Spare decisions, one at a time. */
+  private spareQueue: Promise<void> = Promise.resolve()
+  /** A close has happened since a spare was last started: one whose start failed may be tried again. */
+  private spareRetryAllowed = false
+  /** Opens from `openProject`'s first line to its answer (a failure too). */
+  private opensInFlight = 0
+  /** Opens ever started: a spare decision that sees it change has met an open. */
+  private opensStarted = 0
+
+  /**
+   * `engine/setSpare`: the GUI's setting. Until the first call no spare is started. The answer says
+   * which engine projects get by default, so the GUI shows the setting only for the JVM.
+   */
+  async setSpareEngine(enabled: boolean): Promise<{ readonly engineMode: EngineMode }> {
+    this.spareSetting = enabled
+    await this.refreshSpare()
+    return { engineMode: resolveDefaultEngineMode(this.engineModeSettings()).mode }
+  }
+
+  /** Start the spare engine if one is wanted (`spareEngine.ts`), stop it otherwise. */
+  refreshSpare(): Promise<void> {
+    this.spareQueue = this.spareQueue
+      .then(() => this.refreshSpareNow())
+      .catch((error: unknown) => this.logger.error('Failed to update the spare engine:', error))
+    return this.spareQueue
+  }
+
+  /**
+   * Quit: stop the spare engine for good. With `waitMs`, wait for it (and any stopped one still
+   * exiting) to exit, killing its tree after `waitMs` (`EnsoRunner.stopSpare`).
+   */
+  async stopSpareEngine(options: { readonly waitMs?: number } = {}): Promise<void> {
+    this.spareStopped = true
+    await this.refreshSpare()
+    if (options.waitMs != null) await this.runner.stopSpare?.('quitting', options)
+  }
+
+  /** Whether a spare engine runs, or a stopped one has not exited yet. */
+  spareEngineAlive(): boolean {
+    return this.runner.spareAlive?.() ?? false
+  }
+
+  private async refreshSpareNow(): Promise<void> {
+    const runner = this.runner
+    if (runner.startSpare == null || runner.stopSpare == null) return
+    const opensBefore = this.opensStarted
+    const reason = this.spareSettingsReason()
+    if (reason != null) {
+      this.spareIdleReason = reason
+      await runner.stopSpare(reason)
+      return
+    }
+    const launch = await this.engineLaunch(resolveDefaultEngineMode(this.engineModeSettings()))
+    const key = this.spareKeyFor(launch)
+    const inUse =
+      runner.hasProjectsInUse != null ?
+        await runner.hasProjectsInUse()
+      : await runner.hasRunningProjects()
+    // Decided after the last await, with nothing awaited before `startSpare`: an open that started
+    // at any point of this decision (it is counted from its first line) means no spare, and so
+    // does a quit, and so does an AOT training that `JvmAotCache.start()` began meanwhile (its end
+    // refreshes the spare).
+    const lateReason =
+      this.spareStopped ? 'quitting'
+      : this.opensInFlight > 0 || this.opensStarted !== opensBefore ? 'a project is opening'
+      : inUse ? 'a project is open'
+      : this.engine?.jvmAot?.isTraining() === true ? 'the AOT cache is training'
+      : undefined
+    if (lateReason != null) {
+      // A failed spare is tried again only once nothing is in use; the next close allows it again.
+      if (lateReason === 'a project is opening' || lateReason === 'a project is open') {
+        this.spareRetryAllowed = false
+      }
+      // The open that this decision met reports the reason it had no spare before it.
+      if (lateReason !== 'a project is opening') this.spareIdleReason = lateReason
+      // An opening project takes a running spare or stops it itself (`EnsoRunner.openProject`).
+      if (lateReason !== 'a project is opening') await runner.stopSpare(lateReason)
+      return
+    }
+    if (this.spareRetryAllowed) {
+      this.spareRetryAllowed = false
+      runner.spareAvailableAgain?.()
+    }
+    this.spareIdleReason = undefined
+    runner.startSpare({
+      key,
+      extraArgs: this.extraArgs,
+      extraEnv: this.extraEnvironment?.() ?? [],
+      launch: { ...launch, spareKey: key },
+    })
+  }
+
+  /** Whether spares are off: the setting, or `ENSO_SPARE_ENGINE=0`. An open then logs nothing. */
+  private spareDisabled(): boolean {
+    return this.spareSetting !== true || process.env.ENSO_SPARE_ENGINE === '0'
+  }
+
+  /** Why the settings want no spare; `undefined` when they want one. */
+  private spareSettingsReason(): string | undefined {
+    if (this.spareStopped) return 'quitting'
+    if (this.spareSetting !== true) {
+      return this.spareSetting === false ? 'the setting is off' : 'the GUI has not sent the setting'
+    }
+    if (process.env.ENSO_SPARE_ENGINE === '0') return 'ENSO_SPARE_ENGINE=0'
+    if (resolveDefaultEngineMode(this.engineModeSettings()).mode !== 'jvm') {
+      return 'the engine is native'
+    }
+    if (ydocHostKind() !== 'node') return 'ENSO_YDOC_HOST=engine'
+    // A first launch trains the AOT cache in the background: a spare would compete with it, and
+    // be discarded at the next open for the new cache. `onTrainingEnded` refreshes it.
+    if (this.engine?.jvmAot?.isTraining() === true) return 'the AOT cache is training'
+    // `--profiling-path` takes a relative path, and a standby engine refuses relative paths.
+    if (this.extraArgs.includes('--profiling-path')) return 'profiling is on'
+    return undefined
+  }
+
+  /**
+   * The spawn key of a JVM engine started now (decision 8 of the plan; `spawnKey`): a spare and an
+   * open with the same settings get the same one. An open's own arguments (its engine logging) and
+   * its line variables travel in the spare's line, so they are not part of it.
+   */
+  private spareKeyFor(launch: Pick<EngineLaunch, 'mode' | 'jvmOptions'>): string {
+    return spawnKey({
+      mode: launch.mode.mode,
+      args: this.extraArgs,
+      jvmOptions: launch.jvmOptions ?? [],
+      env: {
+        ...Object.fromEntries(this.extraEnvironment?.() ?? []),
+        ENSO_JVM_OPTIONS: process.env.ENSO_JVM_OPTIONS ?? '',
+      },
+    })
+  }
+
+  /** After a close: the next spare, once the closing engine has exited or the delay has passed. */
+  private async spareAfterClose(closing: Promise<void>): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([
+      closing.catch(() => undefined),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, this.engine?.spareAfterCloseMs ?? SPARE_AFTER_CLOSE_MS)
+        // A pending gate never keeps the process alive.
+        timer.unref()
+      }),
+    ])
+    clearTimeout(timer)
+    this.spareRetryAllowed = true
+    await this.refreshSpare()
+  }
 
   /** Creates a default ProjectService using the Enso executable found in the environment. */
   static default(
@@ -306,11 +477,7 @@ export class ProjectService {
     const project = await this.getProject(projectId, projectsDirectory, true)
     this.logger.debug(`Running project '${project.path}'`)
     const mode = await resolveEngineMode(project.path, this.engineModeSettings())
-    const launch: EngineLaunch = {
-      mode,
-      timeouts: engineTimeouts(mode.mode),
-      ...(await this.aotOptions(mode.mode)),
-    }
+    const launch = await this.engineLaunch(mode)
     const exitCode = await this.runner.runProject(
       project.path,
       this.projectEnvVars(await makeProjectTelemetryKey(projectsDirectory, projectId)),
@@ -331,7 +498,28 @@ export class ProjectService {
     engineLogging?: EngineLoggingOptions,
   ): Promise<OpenProject> {
     this.logger.debug('Opening project', projectId)
+    // Counted before the first await, so a spare decision that runs meanwhile sees it.
+    this.opensInFlight += 1
+    this.opensStarted += 1
+    let opened = false
+    try {
+      const result = await this.openProjectCounted(projectId, projectsDirectory, engineLogging)
+      opened = true
+      return result
+    } finally {
+      this.opensInFlight -= 1
+      // A failed open leaves no project of its own open: a spare may be wanted again. Only now,
+      // when it no longer counts as opening.
+      if (!opened) void this.refreshSpare()
+    }
+  }
 
+  /** The rest of {@link openProject}, counted as an open in flight. */
+  private async openProjectCounted(
+    projectId: UUID,
+    projectsDirectory: Path,
+    engineLogging: EngineLoggingOptions | undefined,
+  ): Promise<OpenProject> {
     const project = await this.getProject(projectId, projectsDirectory, true)
     const openingKey = comparableProjectPath(project.path)
     this.openingProjects.set(openingKey, (this.openingProjects.get(openingKey) ?? 0) + 1)
@@ -379,7 +567,16 @@ export class ProjectService {
     try {
       const mode = await resolveEngineMode(project.path, this.engineModeSettings())
       if (!alreadyLogging) engineLog.notice(describeEngineMode(mode))
-      launch = { mode, timeouts: engineTimeouts(mode.mode), ...(await this.aotOptions(mode.mode)) }
+      launch = await this.engineLaunch(mode)
+      if (mode.mode === 'jvm') {
+        launch = {
+          ...launch,
+          spareKey: this.spareKeyFor(launch),
+          spareIdleReason: this.spareDisabled() ? null : this.spareIdleReason,
+        }
+      } else {
+        await this.runner.stopSpare?.('a project with the native engine is opening')
+      }
       sockets = await this.runner.openProject(
         project.path,
         projectId,
@@ -443,8 +640,10 @@ export class ProjectService {
     }
     this.logger.debug('Closing project', projectId, projectsDirectory)
     this.versioningWarnings.delete(project.path)
+    const closing = this.runner.closeProject(project.path)
+    void this.spareAfterClose(closing)
     try {
-      await this.runner.closeProject(project.path)
+      await closing
     } finally {
       // The runner closes it too when the engine stops (`projectClosed`); this covers runners that
       // do not, and a close that threw.

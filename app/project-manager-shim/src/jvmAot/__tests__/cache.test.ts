@@ -315,3 +315,125 @@ test('dispose stops a running training at once, before it awaits anything', asyn
   await disposed
   expect(await exists(path.join(root, 'train.lock'))).toBe(false)
 })
+
+test('isTraining: from the launch check, through an open and the wait to restart, until a cache is made', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  const trainer = new FakeTrainer()
+  const created = cache(trainer)
+  expect(created.isTraining()).toBe(false)
+  const starting = created.start()
+  // Looking for the cache, before anything is known.
+  expect(created.isTraining()).toBe(true)
+  await starting
+  expect(created.isTraining()).toBe(true)
+  created.openStarted()
+  created.openAnswered()
+  // Killed by the open, waiting to restart: still to come.
+  await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
+  expect(created.isTraining()).toBe(true)
+  await vi.advanceTimersByTimeAsync(61_000)
+  await vi.waitFor(() => expect(trainer.runs).toHaveLength(2))
+  expect(created.isTraining()).toBe(true)
+  await trainer.runs[1]!.finish()
+  await vi.waitFor(() => expect(created.isTraining()).toBe(false))
+})
+
+test('isTraining is false with a cache, the native default, after a failed training, and after a quit', async () => {
+  const first = new FakeTrainer()
+  const withCache = cache(first)
+  await trained(first, withCache)
+  expect(withCache.isTraining()).toBe(false)
+  const again = cache(new FakeTrainer())
+  await again.start()
+  expect(again.isTraining()).toBe(false)
+
+  const native = cache(new FakeTrainer(), { isJvmDefault: () => false })
+  await native.start()
+  expect(native.isTraining()).toBe(false)
+
+  await fs.rm(path.join(root), { recursive: true, force: true })
+  const failing = new FakeTrainer()
+  const failed = cache(failing)
+  await failed.start()
+  failing.runs[0]!.fail()
+  await vi.waitFor(() => expect(failed.isTraining()).toBe(false))
+
+  const quitting = new FakeTrainer()
+  const quit = cache(quitting)
+  await fs.rm(path.join(root), { recursive: true, force: true })
+  await quit.start()
+  expect(quit.isTraining()).toBe(true)
+  await quit.dispose()
+  expect(quit.isTraining()).toBe(false)
+})
+
+test('a training is reported while it runs, and its end is announced', async () => {
+  const trainer = new FakeTrainer()
+  const onTrainingEnded = vi.fn()
+  const created = cache(trainer, { onTrainingEnded })
+  expect(created.isTraining()).toBe(false)
+  await created.start()
+  expect(created.isTraining()).toBe(true)
+  await trainer.runs[0]!.finish()
+  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledOnce())
+  await vi.waitFor(() => expect(created.isTraining()).toBe(false))
+})
+
+test('a failed training is announced too; one an open stopped is not', async () => {
+  const failing = new FakeTrainer()
+  const failed = vi.fn()
+  const first = cache(failing, { onTrainingEnded: failed })
+  await first.start()
+  failing.runs[0]!.fail()
+  await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce())
+
+  const stopped = new FakeTrainer()
+  const aborted = vi.fn()
+  const second = cache(stopped, { onTrainingEnded: aborted })
+  await second.start()
+  second.openStarted()
+  // The stopped training is over once its lock is released; it is still to come (`isTraining`).
+  await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
+  expect(second.isTraining()).toBe(true)
+  expect(aborted).not.toHaveBeenCalled()
+})
+
+test('while another process trains, the lock is checked again; its cache ends the wait', async () => {
+  await fs.mkdir(root, { recursive: true })
+  // This test's own pid is alive.
+  await fs.writeFile(path.join(root, 'train.lock'), String(process.pid))
+  const trainer = new FakeTrainer()
+  const onTrainingEnded = vi.fn()
+  const created = cache(trainer, { onTrainingEnded, retrainDelayMs: 20 })
+  await created.start()
+  expect(created.isTraining()).toBe(true)
+  // The other process finishes.
+  const directory = (await created.keyDirectory())!
+  await fs.mkdir(directory, { recursive: true })
+  await fs.writeFile(path.join(directory, 'enso.aot'), 'cache')
+  await fs.rm(path.join(root, 'train.lock'))
+  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledOnce())
+  expect(created.isTraining()).toBe(false)
+  expect(trainer.runs).toHaveLength(0)
+})
+
+test('a training lock that cannot be taken ends the training state, announced', async () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  // The root's parent is a file, so the lock's directory cannot be made.
+  await fs.writeFile(path.join(path.dirname(root), 'a-file'), '')
+  const trainer = new FakeTrainer()
+  const onTrainingEnded = vi.fn()
+  const created = cache(trainer, {
+    rootDirectory: path.join(path.dirname(root), 'a-file', 'jvm-aot'),
+    onTrainingEnded,
+  })
+  await created.start()
+  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledOnce())
+  expect(created.isTraining()).toBe(false)
+  expect(trainer.runs).toHaveLength(0)
+  expect(error).toHaveBeenCalledWith(
+    expect.stringContaining('could not take the training lock'),
+    expect.anything(),
+  )
+  error.mockRestore()
+})
