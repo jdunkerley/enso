@@ -32,6 +32,7 @@ import {
   type SamplesStatus,
   type SamplesUpdateResult,
   type SetProjectLabelsParams,
+  type SpareEngineStatus,
   type UUID,
   type VersionEntry,
   type VersioningStatus,
@@ -512,6 +513,14 @@ export class ProjectManager {
   /** Whether local secrets exist and can be unlocked, and where the key comes from. */
   async secretsStatus(): Promise<LocalSecretsStatus> {
     return this.runProjectServiceCommand('secrets/status', {})
+  }
+
+  /**
+   * Tell the project service whether to keep a pre-started engine (Settings → Local → Engine). It
+   * answers which engine projects get, so the setting shows only for the JVM.
+   */
+  async setSpareEngine(enabled: boolean): Promise<SpareEngineStatus> {
+    return this.runProjectServiceCommand('engine/setSpare', { enabled })
   }
 
   /** The bundled samples' states. */

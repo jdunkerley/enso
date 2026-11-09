@@ -392,20 +392,23 @@ engine/runner CLAUDE.md, "Standby mode"). `EnsoRunner` owns one `SpareEngine`
   begun) is what the service asks before starting the next spare.
 
 **When the service wants one** (`ProjectService.refreshSpare`, decisions one at
-a time on a queue). None until the GUI's first `setSpareEngine` (the setting,
-`engine/setSpare`); then a spare is wanted unless, in this order: quitting
-(`stopSpareEngine`, for good), the setting is off, `ENSO_SPARE_ENGINE=0`, the
-default engine (`resolveDefaultEngineMode`) is native, `ENSO_YDOC_HOST=engine`,
-the AOT cache is training (`JvmAotCache.isTraining`: from its launch check until
-a cache is made, a killed training waiting to restart included; Electron
-refreshes when it ends), `--profiling-path` is among the extra arguments (a
-relative path, which standby refuses), a project is opening, or a project is in
-use. An unwanted spare is stopped with that reason, except for an opening
-project, which takes the spare or stops it itself. The refresh runs on
-`setSpareEngine`, after a failed open (once it no longer counts as opening), and
-after a close, once the closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2
-s, `EngineSettings.spareAfterCloseMs`, an `unref`'d timer) has passed, whichever
-is first. A native open stops the spare.
+a time on a queue). None until the GUI's first `setSpareEngine` (the setting;
+POST `/api/project-service/engine/setSpare` `{ enabled: boolean }` answers
+`{ engineMode }`, a non-boolean `enabled` is an error; clients:
+`ProjectManager.setSpareEngine`, `LocalBackend.setSpareEngine`); then a spare is
+wanted unless, in this order: quitting (`stopSpareEngine`, for good), the
+setting is off, `ENSO_SPARE_ENGINE=0`, the default engine
+(`resolveDefaultEngineMode`) is native, `ENSO_YDOC_HOST=engine`, the AOT cache
+is training (`JvmAotCache.isTraining`: from its launch check until a cache is
+made, a killed training waiting to restart included; Electron refreshes when it
+ends), `--profiling-path` is among the extra arguments (a relative path, which
+standby refuses), a project is opening, or a project is in use. An unwanted
+spare is stopped with that reason, except for an opening project, which takes
+the spare or stops it itself. The refresh runs on `setSpareEngine`, after a
+failed open (once it no longer counts as opening), and after a close, once the
+closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2 s,
+`EngineSettings.spareAfterCloseMs`, an `unref`'d timer) has passed, whichever is
+first. A native open stops the spare.
 
 - **No spare beside an open.** `openProject` counts itself (`opensInFlight`,
   `opensStarted`) from its first line, before any await. The decision to start
