@@ -11,18 +11,24 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { _electron, type ElectronApplication, type Page } from 'playwright'
 import { electronExecutablePath, findEngineLauncher } from '../tests/packagedIde'
+import { cpuAffinity } from './cpuAffinity'
 import { hsperfDirectory, parseHsperfData, summariseJvmCounters } from './jvmCounters'
 import {
   classifyTemplate,
+  cpusLine,
   credentialFreeEnv,
   developMedians,
+  isSpareEngine,
   joinJvmOptions,
   notMeasured,
   openTimes,
   parseEngines,
   parseLsLogLine,
+  ratioTable,
   regressionWarnings,
   renderMarkdown,
+  spareRun,
+  spareTable,
   usedAotCache,
   type Engine,
   type LsLogLine,
@@ -264,8 +270,37 @@ async function openProject(
  * extras read ~0.5 s slow there; the sampling time is in the `rss` mark (`ms`). The extras are not
  * gated and the headline is taken before the sample.
  */
-type RssPhase = 'welcomeShown' | 'welcomeShown+30s'
+type RssPhase = 'welcomeShown' | 'welcomeShown+30s' | 'spareIdle'
 const RSS_LATER_MS = 30_000
+
+/* Note [Spare Engines In The Harness]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The `jvm-spare` engines are the JVM with the spare engine on (`project-manager-shim/CLAUDE.md`,
+ * "Spare engine"; `ENSO_SPARE_ENGINE=1`, set here, as `credentialFreeEnv` drops every `ENSO_*`).
+ * The shim starts a spare only once the GUI has sent the setting and no AOT training runs, so these
+ * engines use a trained cache as `jvm` does: one is prepared first unless it is there.
+ *
+ * `jvm-spare` waits on the dashboard before each open until the shim logs `Spare engine: ready
+ * after …` for that open's spare (the first, then the one started after the first close), at most
+ * `SPARE_WAIT_MS`, which is what a user spends on the dashboard (spec, "Measurement"); a spare not
+ * ready by then is warned about, and the open takes it still warming up. Once the first spare is
+ * ready the engine processes' memory is sampled (`rss` mark, phase `spareIdle`): the spare's idle
+ * cost. `jvm-spare-early` opens as soon as the shim logs `Spare engine: start…`, so the open waits
+ * for the warm-up (the shim gives such an open 60 s more to start); `jvm-spare-abandon` does the
+ * same with `enso.standby.abandonWarmUp=true`, which cancels the warm-up when the line arrives
+ * (the spec's open question). Should abandoning become the engine's default, `jvm-spare-early`
+ * measures an open before `STANDBY READY` under that default.
+ *
+ * After each open, `<open>:spareUsed` (`used`) says whether the shim logged `Spare engine: used`.
+ * An open that used none (the engine log then says `Engine: no pre-started spare (…)`) fails the
+ * launch: its numbers would be an ordinary JVM open's. `jvm` and `jvm-first` run with
+ * `ENSO_SPARE_ENGINE=0`, so their numbers are what they were. With a spare alive, quitting the IDE
+ * takes up to ~5 s longer (`src/spareQuit.ts`).
+ */
+const SPARE_WAIT_MS = 15_000
+
+const countLines = (lines: readonly string[], text: string) =>
+  lines.filter((line) => line.includes(text)).length
 
 /* Note [JVM Counters At Each Phase]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -489,6 +524,7 @@ async function measureLaunch(
   let app: ElectronApplication | undefined
   let page: Page | undefined
   let error: string | undefined
+  let cpus: number | undefined
   const sampleRss = async (phase: RssPhase) => {
     try {
       const electronPid = app?.process().pid
@@ -568,6 +604,28 @@ async function measureLaunch(
     await page.getByTestId('drive-view').waitFor({ state: 'visible', timeout: 120_000 })
     await ensureWindowSize(app, page, marks)
     for (const tag of opens) {
+      // Note [Spare Engines In The Harness]: this open's spare is the launch's first or second.
+      const expected = tag === 'first' ? 1 : 2
+      if (engine === 'jvm-spare') {
+        const ready = await poll(
+          async () => countLines(stdoutLines, 'Spare engine: ready after') >= expected,
+          SPARE_WAIT_MS,
+        )
+        if (!ready) {
+          console.warn(
+            `Open time: ${label} ${tag}: the spare was not ready within ${SPARE_WAIT_MS / 1000} s; the open takes it warming up.`,
+          )
+        } else if (tag === 'first') {
+          await sampleRss('spareIdle')
+        }
+      } else if (isSpareEngine(engine)) {
+        const started = await poll(
+          async () => countLines(stdoutLines, 'Spare engine: start') >= expected,
+          SPARE_WAIT_MS,
+        )
+        if (!started) throw new Error(`${tag}: no spare engine started within ${SPARE_WAIT_MS} ms`)
+      }
+      const usedBefore = countLines(stdoutLines, 'Spare engine: used')
       await openProject(
         page,
         names[tag],
@@ -580,9 +638,17 @@ async function measureLaunch(
         project,
         sampleRss,
       )
+      if (isSpareEngine(engine)) {
+        const used = countLines(stdoutLines, 'Spare engine: used') > usedBefore
+        marks.add(`${tag}:spareUsed`, { used })
+        if (!used) throw new Error(`${tag}: no pre-started spare was used (see electron-out.log)`)
+      }
       await closeProject(page, names[tag])
+      // The deliberate dwell on the dashboard between opens, as a user returns to it.
       await page.waitForTimeout(2000)
     }
+    // Once per launch, after the opens: on Windows the query is a PowerShell process.
+    cpus = await cpuAffinity(app.process().pid ?? -1)
     await beforeClose()
   } catch (e) {
     error = String(e).slice(0, 2000)
@@ -622,12 +688,15 @@ async function measureLaunch(
     : null
   const rss = runRss(marks.list)
   const cacheUsed = usedAotCache(marks.list)
+  const spare = isSpareEngine(engine) ? spareRun(stdoutLines.join('\n'), marks.list) : undefined
   return {
     engine,
     run,
     first,
     second,
     ...(rss ? { rss } : {}),
+    ...(spare ? { spare } : {}),
+    ...(cpus != null ? { cpus } : {}),
     // Recorded, never silent: the report warns about every phase or extra a launch missed.
     notMeasured: [...new Set([...notMeasured(first), ...(second ? notMeasured(second) : [])])],
     ...(error ? { error } : {}),
@@ -735,13 +804,21 @@ function engineEnv(engine: Engine, options: Options): Record<string, string> {
   const jvmOptions =
     options.jvmOptions.trim() === '' ? {} : { ENSO_JVM_OPTIONS: options.jvmOptions }
   if (engine === 'native') return { ENSO_ENGINE_MODE: 'native' }
-  return {
+  const jvm = {
     ENSO_ENGINE_MODE: 'jvm',
-    // The measured opens start an engine of their own: a spare would take them over.
-    ENSO_SPARE_ENGINE: '0',
     ENSO_JVM_AOT_DIR: shimAotDirectory(options),
     ...jvmOptions,
   }
+  // The measured opens of `jvm` and `jvm-first` start an engine of their own: a spare would take
+  // them over (Note [Spare Engines In The Harness]).
+  if (!isSpareEngine(engine)) return { ...jvm, ENSO_SPARE_ENGINE: '0' }
+  return engine === 'jvm-spare-abandon' ?
+      {
+        ...jvm,
+        ENSO_SPARE_ENGINE: '1',
+        ENSO_ENGINE_ARGS: '--vm.D enso.standby.abandonWarmUp=true',
+      }
+    : { ...jvm, ENSO_SPARE_ENGINE: '1' }
 }
 
 /** `<root>/<key>/enso.aot`, the shim's cache (`aotKey` names a 16-digit hexadecimal directory). */
@@ -796,11 +873,18 @@ async function main() {
     const deadline = Date.now() + options.budgetMinutes * 60_000
     const extraEnv = engineEnv(engine, options)
     let prepared: { trainingMs: number; cacheBytes: number } | undefined
-    if (engine === 'jvm') {
+    // `jvm` always trains afresh; a spare engine needs a cache too, and reuses one that is there
+    // (Note [Spare Engines In The Harness]). The preparation launch never has a spare.
+    const needsCache =
+      engine === 'jvm' ||
+      (isSpareEngine(engine) && findShimCache(shimAotDirectory(options)) == null)
+    if (needsCache) {
       try {
-        prepared = await prepareShimAot(options, extraEnv)
+        prepared = await prepareShimAot(options, { ...extraEnv, ENSO_SPARE_ENGINE: '0' })
       } catch (e) {
-        console.warn(`Open time: no jvm runs, the shim's AOT cache was not made: ${String(e)}`)
+        console.warn(
+          `Open time: no ${engine} runs, the shim's AOT cache was not made: ${String(e)}`,
+        )
         runs.push({
           engine,
           run: 0,
@@ -861,9 +945,12 @@ async function main() {
       runs.push(result)
       // The shim deletes a cache the JVM rejected: a missing one is a warning (Note [The Shim's
       // AOT Cache Is Prepared Before The Launches]).
-      if (prepared != null && findShimCache(shimAotDirectory(options)) == null) {
+      if (
+        (engine === 'jvm' || isSpareEngine(engine)) &&
+        findShimCache(shimAotDirectory(options)) == null
+      ) {
         rejectedIn.push(run)
-        console.warn(`Open time: the shim's AOT cache is gone after jvm launch ${run}.`)
+        console.warn(`Open time: the shim's AOT cache is gone after ${engine} launch ${run}.`)
       }
       // Evidence from the JVM itself: a cache that was skipped without a warning shows as almost
       // no shared classes (`usedAotCache`).
@@ -879,7 +966,9 @@ async function main() {
         )
       }
     }
-    if (prepared != null) shimAot = { ...prepared, rejectedIn, uncachedIn, uncheckedIn }
+    if (prepared != null && engine === 'jvm') {
+      shimAot = { ...prepared, rejectedIn, uncachedIn, uncheckedIn }
+    }
     if (options.jvmDiagnostics && engine !== 'native') {
       const {
         stdout,
@@ -913,7 +1002,14 @@ async function main() {
   // First: whatever the baseline holds, the measurement is kept (and becomes the next baseline).
   fs.writeFileSync(path.join(options.out, 'open-time.json'), JSON.stringify(report, null, 1))
   const baseline = readReports(options.baseline)
-  const markdown = renderMarkdown(report, baseline)
+  const markdown = [
+    renderMarkdown(report, baseline),
+    ratioTable(report),
+    spareTable(report),
+    cpusLine(report),
+  ]
+    .filter((part) => part !== '')
+    .join('\n\n')
   const warnings = regressionWarnings(report, baseline)
   fs.writeFileSync(path.join(options.out, 'open-time.md'), markdown)
   console.log(markdown)

@@ -237,7 +237,8 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
 - `ENSO_SPARE_ENGINE=0` — no spare engine whatever Settings → Local → Engine
   says (`project-manager-shim/CLAUDE.md`, "Spare engine"). The Playwright
   fixture sets it for every spec but `spareEngine.spec.ts`; the open-time
-  harness sets it for `jvm` and `jvm-first`.
+  harness sets it for `jvm` and `jvm-first`, and `ENSO_SPARE_ENGINE=1` for the
+  `jvm-spare` engines.
 - `APPIMAGE` (set by the AppImage runtime) — with the JVM as the default engine
   (`--engine-mode`, `ENSO_ENGINE_MODE`, then the built-in default; nothing
   happens while it is native), a Linux AppImage runs its engine from a copy at
@@ -847,7 +848,7 @@ section 2). It is not a Playwright Test run: it drives Electron through
 `playwright`'s `_electron` and is started with
 
 ```
-corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm,jvm-first] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics] [--jvm-options <opts>] [--template welcome|image]
+corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm,jvm-first,jvm-spare,jvm-spare-early,jvm-spare-abandon] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics] [--jvm-options <opts>] [--template welcome|image]
 ```
 
 It needs a built `dist/ide/` (or `--exe`), and under Linux a display
@@ -909,9 +910,10 @@ before a manual run.
 
 Every launch sets the engine mode as a user would: `ENSO_ENGINE_MODE=native` or
 `jvm` (`engineEnv` in `perf/openTime.ts`), so the shim decides whether to pass
-`--jvm`, and which timeouts apply. The JVM engines also set
+`--jvm`, and which timeouts apply. `jvm` and `jvm-first` also set
 `ENSO_SPARE_ENGINE=0`: a measured open starts its own engine, never a
-pre-started spare. The engines are:
+pre-started spare; the `jvm-spare` engines set `ENSO_SPARE_ENGINE=1`. The
+engines are:
 
 - `native`: the native image.
 - `jvm`: the JVM as a user has it after the first open. The shim's own AOT cache
@@ -940,6 +942,40 @@ pre-started spare. The engines are:
   open was answered (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). A
   delete that fails (a JVM of the last launch still holding `enso.aot` on
   Windows) is retried, then the launch is recorded as failed.
+- `jvm-spare`: the JVM with the spare engine on
+  (`project-manager-shim/CLAUDE.md`, "Spare engine"; Note [Spare Engines In The
+  Harness] in `perf/openTime.ts`). The shim starts a spare only after the GUI
+  has sent the setting and while no AOT training runs, so the spare engines use
+  the cache in `<out>/jvm-aot` as `jvm` does, and a preparation launch (with no
+  spare) trains one first unless it is there; only `jvm`'s preparation goes in
+  `shimAot`, but a cache gone after a spare launch is warned about too. Before
+  each open the harness waits on the dashboard for that open's spare to be ready
+  (the shim's `Spare engine: ready after …` line in the main process's output;
+  the second open's spare starts after the first close), at most 15 s, which is
+  what a user spends there (spec, "Measurement"); a spare not ready by then is
+  warned about and the open takes it warming up. Once the first spare is ready
+  the engine processes are sampled (`rss-spareIdle.json`, an `rss` mark with
+  phase `spareIdle`): the spare's idle memory. The setting must be on in the
+  IDE's profile (it is by default): the harness launches with the user's
+  profile.
+- `jvm-spare-early`: the same, opening as soon as the shim logs
+  `Spare engine: start…`, so the open waits for the warm-up (the shim gives an
+  open of a spare still warming up 60 s more). `jvm-spare-abandon`: the same
+  with `ENSO_ENGINE_ARGS=--vm.D enso.standby.abandonWarmUp=true`, which cancels
+  the warm-up when the open's line arrives (the spec's open question). Were
+  abandoning made the engine's default, `jvm-spare-early` would measure that
+  default.
+
+Every spare launch records `<open>:spareUsed` marks (`used`: whether the shim
+logged `Spare engine: used …` during that open); an open that used no spare (the
+engine log says `Engine: no pre-started spare (…)`) fails the launch, since its
+numbers would be an ordinary JVM open's. Its `RunResult.spare` (`spareRun`) has
+each spare's ready time and warm-up time and CPU (the echoed `STANDBY READY` and
+`standby: warm-up done` lines), the idle memory and the opens that used one.
+`open-time.md` adds, after the medians, the headline over native's per engine
+(`ratioTable`), the spare engines' table (`spareTable`) and the CPUs the IDE was
+pinned to (`cpusLine`; `RunResult.cpus`, read once per launch after its opens).
+With a spare alive, quitting the IDE takes up to ~5 s longer (`spareQuit.ts`).
 
 `jvm-nocache` is gone (`parseEngines` says so, naming `jvm-first`), and with it
 the harness's own recorded-and-created cache (`perf/jvmAotCache.ts`): the
