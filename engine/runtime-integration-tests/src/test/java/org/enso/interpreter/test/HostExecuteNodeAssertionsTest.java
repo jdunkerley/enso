@@ -18,7 +18,8 @@ public class HostExecuteNodeAssertionsTest {
   @Test
   public void assertionsAreOnExceptForHostExecuteNode() throws ClassNotFoundException {
     assertTrue(
-        "assertions are expected on in tests", HostExecuteNodeAssertionsTest.class.desiredAssertionStatus());
+        "assertions are expected on in tests",
+        HostExecuteNodeAssertionsTest.class.desiredAssertionStatus());
     assertFalse(
         "-da:com.oracle.truffle.host.HostExecuteNode is missing",
         Class.forName("com.oracle.truffle.host.HostExecuteNode").desiredAssertionStatus());
