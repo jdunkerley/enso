@@ -13,12 +13,14 @@ import {
   waitForDashboard,
 } from './electronTest'
 
+// At file level, so that the skip comes before the fixture launches an app: a launch that the test
+// body then skips still costs the Windows CI runner a start (and once failed loading the window).
+test.skip(SKIP_ON_WINDOWS_CI, SKIP_ON_WINDOWS_CI_REASON)
 test.use({ spareEngine: true })
 // A retry would repeat the whole training: on CI, three tries could outlast the packaging job.
 test.describe.configure({ retries: 0 })
 
 test('an open uses the spare engine', async ({ app, page }) => {
-  test.skip(SKIP_ON_WINDOWS_CI, SKIP_ON_WINDOWS_CI_REASON)
   // The fixture's AOT cache directory is empty: the JVM default trains one first (~45 s on a
   // desktop), and no spare starts until that training has ended (`isTraining`, `onTrainingEnded`).
   test.setTimeout(400_000)
