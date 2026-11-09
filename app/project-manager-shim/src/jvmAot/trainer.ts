@@ -10,6 +10,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import * as portfinder from 'portfinder'
+import { killTree } from '../childProcess/killTree.js'
 import { renameWithRetry } from '../localMetadata/jsonFile.js'
 import { aotCreateArguments, jvmOptionsValue } from '../projectService/jvmOptions.js'
 import { newChannelToken } from '../projectService/ydocHost.js'
@@ -69,22 +70,6 @@ interface Engine {
   readonly child: childProcess.ChildProcess
   readonly exited: Promise<number | null>
   readonly output: () => string
-}
-
-/** Kill `child` and everything it started (on Windows a `.bat` launcher's `cmd.exe` has a child). */
-function killTree(child: childProcess.ChildProcess): void {
-  if (child.pid == null || child.exitCode != null || child.signalCode != null) return
-  if (process.platform === 'win32') {
-    childProcess
-      .spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
-        stdio: 'ignore',
-        windowsHide: true,
-      })
-      // A failed spawn must not be an unhandled error in Electron's main process (#401).
-      .on('error', (error) => console.warn('JDK AOT cache: taskkill failed:', error))
-  } else {
-    child.kill('SIGKILL')
-  }
 }
 
 /** Implementation of {@link Trainer} with the bundled engine. */
@@ -190,7 +175,7 @@ export class EngineTrainer implements Trainer {
     const ensoExecutable = this.options.ensoExecutable
     let engine: Engine | undefined
     const onAbort = () => {
-      if (engine) killTree(engine.child)
+      if (engine) killTree(engine.child, 'JDK AOT cache')
     }
     signal.addEventListener('abort', onAbort)
     try {
@@ -313,7 +298,7 @@ export class EngineTrainer implements Trainer {
       await renameWithRetry(temporary, output)
     } catch (error) {
       if (engine) {
-        killTree(engine.child)
+        killTree(engine.child, 'JDK AOT cache')
         await this.waitForExit(engine, 10_000)
       }
       await fs

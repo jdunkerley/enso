@@ -26,13 +26,14 @@ import org.slf4j.LoggerFactory;
  * stdin: `{"args":[...],"env":{...}}` (`StandbyRequest`), the arguments `project/open` would have
  * passed and the open's own variables. It waits for the warm-up to end (unless
  * `enso.standby.abandonWarmUp` is true, which cancels it; a warm-up still running 60 s after the
- * line is cancelled too, and a bad line cancels it before the process exits), then hands the line to `Main`, which
- * applies the variables, sets the context's working directory to the parent of `--path`
- * (`ContextFactory.WORKING_DIRECTORY_PROPERTY`; relative paths and a filesystem root are refused,
- * and so is a line that does not start a Language Server or carries `--standby`, `--jvm`,
- * `--in-project` or `--run`), and calls `Main.launch`
- * with the arguments: from then on the process is an ordinary Language Server, which shuts down on
- * the next stdin line as always. If stdin closes before a line arrives, the process exits with 0.
+ * line is cancelled too, and a bad line or stdin closing first cancels it before the process
+ * exits), then hands the line to `Main`, which applies the variables, sets the context's working
+ * directory to the parent of `--path` (`ContextFactory.WORKING_DIRECTORY_PROPERTY`; relative paths
+ * and a filesystem root are refused, and so is a line that does not start a Language Server or
+ * carries `--standby`, `--jvm`, `--in-project` or `--run`), and calls `Main.launch` with the
+ * arguments: from then on the process is an ordinary Language Server, which shuts down on the next
+ * stdin line as always. If stdin closes before a line arrives, the process exits with 0 once the
+ * warm-up has stopped and deleted its files.
  *
  * Two things a normal engine gets from its spawn arrive late here, and both are handed over without
  * changing the Language Server's boot:
@@ -182,7 +183,8 @@ final class Standby {
   /**
    * Start the warm-up, and read the argument line.
    *
-   * @return the request, once the warm-up is over; {@code null} when stdin closed first
+   * @return the request, once the warm-up is over; {@code null} when stdin closed first (the
+   *     warm-up is then cancelled, and over)
    * @throws IllegalArgumentException when the line is not a valid request
    */
   StandbyRequest awaitRequest(InputStream in) throws IOException, InterruptedException {
@@ -201,6 +203,10 @@ final class Standby {
     thread.start();
     var line = readLine(in);
     if (line == null) {
+      // The process exits with 0 next: stop the warm-up first, so that its folder and IR cache are
+      // deleted.
+      abandon();
+      finished.await();
       return null;
     }
     StandbyRequest request;

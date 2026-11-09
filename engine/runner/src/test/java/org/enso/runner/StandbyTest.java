@@ -188,6 +188,17 @@ public class StandbyTest {
     assertTrue(err(), err().contains(Standby.READY));
   }
 
+  @Test(timeout = 30_000)
+  public void stdinClosedFirstStopsTheRunningWarmUpBeforeNoRequest() throws Exception {
+    var gate = new Gate();
+    var standby = new Standby(gate, abandoned -> "x", err, false);
+    assertNull(standby.awaitRequest(in("")));
+    assertTrue("cancelled", gate.cancelled.get());
+    // The warm-up's thread had ended: it prints this line last.
+    assertTrue(err(), err().contains(Standby.READY));
+    assertTrue(err(), err().contains("standby: warm-up abandoned"));
+  }
+
   @Test
   public void aBadLineIsRefused() {
     var standby = new Standby(Standby.NO_WARM_UP, abandoned -> "x", err, false);

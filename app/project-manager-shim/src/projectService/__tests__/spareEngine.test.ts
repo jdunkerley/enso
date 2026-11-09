@@ -3,7 +3,14 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { SpareEngine, spareNotice, spawnKey, standbyLine, type SpareSpawn } from '../spareEngine.js'
+import {
+  SpareEngine,
+  spareNotice,
+  spawnKey,
+  standbyLine,
+  type SpareEngineOptions,
+  type SpareSpawn,
+} from '../spareEngine.js'
 import { fakeSpareEnso, isAlive, spareEvents } from './fakeSpareEngine.js'
 
 let root: string
@@ -18,10 +25,37 @@ async function spawnOf(key: string, env: Record<string, string> = {}): Promise<S
   return { key, command, args: commandArgs, env: { ...process.env, SPARE_LOG: log, ...env } }
 }
 
-function spare(): SpareEngine {
-  const created = new SpareEngine({ log: () => {} })
+function spare(options: SpareEngineOptions = {}): SpareEngine {
+  const created = new SpareEngine({ log: () => {}, ...options })
   engines.push(created)
   return created
+}
+
+/**
+ * The pid of the fake engine that logged the `count`th `start`: the engine itself, which on Windows
+ * is a child of the `cmd.exe` whose pid `SpareEngine.pid` reports.
+ */
+async function fakePid(count: number): Promise<number> {
+  return vi.waitFor(
+    async () => {
+      const starts = (await spareEvents(log)).filter((e) => e.event === 'start')
+      expect(starts).toHaveLength(count)
+      return starts[count - 1]!.pid
+    },
+    { timeout: 10_000 },
+  )
+}
+
+/** Wait until the fake engine `pid` has logged `stdin-closed` and is gone. */
+async function closedByStdin(pid: number): Promise<void> {
+  await vi.waitFor(
+    async () => {
+      const events = await spareEvents(log)
+      expect(events.some((e) => e.event === 'stdin-closed' && e.pid === pid)).toBe(true)
+      expect(isAlive(pid)).toBe(false)
+    },
+    { timeout: 10_000 },
+  )
 }
 
 beforeEach(async () => {
@@ -76,24 +110,45 @@ test('a spare starts in the temporary directory, warms up, and is taken by its k
   }
 }, 30_000)
 
+test('a spare still warming up is taken as it is', async () => {
+  const engine = spare()
+  engine.start(await spawnOf('k1', { READY_DELAY_MS: '60000' }))
+  const pid = await fakePid(1)
+  const result = engine.take('k1')
+  expect(result.kind).toBe('taken')
+  if (result.kind === 'taken') {
+    expect(result.spare.readyAfterMs).toBeUndefined()
+    expect(spareNotice(result, result.spare.startedAt + 1500)).toBe(
+      'Engine: pre-started spare used (started 1.5 s before the open, still warming up)',
+    )
+    result.spare.child.stderr?.resume()
+    result.spare.child.stdin?.end()
+  }
+  await closedByStdin(pid)
+}, 30_000)
+
+test('the ready line is found when it arrives in two chunks, and only once complete', async () => {
+  const lines: string[] = []
+  const engine = spare({ log: (line) => lines.push(line) })
+  engine.start(await spawnOf('k1', { READY_SPLIT: '1' }))
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  const ready = lines.filter((line) => line.startsWith('ready after '))
+  expect(ready).toHaveLength(1)
+  expect(ready[0]).toMatch(/\(42 ms from its own start\)$/)
+}, 30_000)
+
 test('a spare with another key is stopped, not taken', async () => {
   const engine = spare()
   engine.start(await spawnOf('k1'))
   await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
-  const pid = engine.pid!
+  const pid = await fakePid(1)
   const result = engine.take('k2')
   expect(result).toEqual({ kind: 'none', reason: 'the spare was started with other settings' })
   expect(spareNotice(result, Date.now())).toBe(
     'Engine: no pre-started spare (the spare was started with other settings)',
   )
-  await vi.waitFor(
-    async () => {
-      const closed = (await spareEvents(log)).some((e) => e.event === 'stdin-closed')
-      expect(closed || !isAlive(pid)).toBe(true)
-    },
-    { timeout: 10_000 },
-  )
   expect(engine.state).toBe('none')
+  await closedByStdin(pid)
 }, 30_000)
 
 test('starting again with the same key keeps the running spare; a new key replaces it', async () => {
@@ -102,17 +157,16 @@ test('starting again with the same key keeps the running spare; a new key replac
   const first = engine.pid!
   engine.start(await spawnOf('k1'))
   expect(engine.pid).toBe(first)
-  const starts = async () => (await spareEvents(log)).filter((e) => e.event === 'start')
   // Replaced before its process ran, the first spare would log no start at all.
-  await vi.waitFor(async () => expect(await starts()).toHaveLength(1), { timeout: 10_000 })
+  const firstFake = await fakePid(1)
   engine.start(await spawnOf('k2'))
   expect(engine.pid).not.toBe(first)
   expect(engine.state).toBe('warming')
-  await vi.waitFor(async () => expect(await starts()).toHaveLength(2), { timeout: 10_000 })
-  await vi.waitFor(() => expect(isAlive(first)).toBe(false), { timeout: 10_000 })
+  await fakePid(2)
+  await closedByStdin(firstFake)
 }, 30_000)
 
-test('a spare that dies is dropped and not started again until the failure is cleared', async () => {
+test('a spare that dies is dropped, and its key is not started again until the failure is cleared', async () => {
   const engine = spare()
   engine.start(await spawnOf('k1', { SPARE_DIES: '1' }))
   await vi.waitFor(() => expect(engine.state).toBe('none'), { timeout: 10_000 })
@@ -120,17 +174,59 @@ test('a spare that dies is dropped and not started again until the failure is cl
   engine.start(await spawnOf('k1', { SPARE_DIES: '1' }))
   expect(engine.state).toBe('none')
   expect((await spareEvents(log)).filter((e) => e.event === 'start')).toHaveLength(1)
+  // Another key starts, and does not clear the first one's failure.
+  engine.start(await spawnOf('k2'))
+  expect(engine.state).toBe('warming')
+  expect(engine.take('k1').kind).toBe('none')
+  engine.start(await spawnOf('k1'))
+  expect(engine.state).toBe('none')
   engine.clearFailure()
   engine.start(await spawnOf('k1'))
   expect(engine.state).toBe('warming')
+}, 30_000)
+
+test('a spare that has exited is not taken', async () => {
+  const engine = spare()
+  engine.start(await spawnOf('k1'))
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  process.kill(await fakePid(1))
+  await vi.waitFor(() => expect(engine.state).toBe('none'), { timeout: 10_000 })
+  expect(engine.take('k1')).toEqual({ kind: 'none', reason: 'the last spare failed' })
+}, 30_000)
+
+test('an executable that cannot be started is a failure, reported after spawn returns', async () => {
+  const engine = spare()
+  const missing = { ...(await spawnOf('k1')), command: path.join(root, 'no-such-enso'), args: [] }
+  engine.start(missing)
+  await vi.waitFor(() => expect(engine.state).toBe('none'), { timeout: 10_000 })
+  expect(engine.take('k1')).toEqual({ kind: 'none', reason: 'the last spare failed' })
+  engine.start(missing)
+  expect(engine.state).toBe('none')
 }, 30_000)
 
 test('stop closes the spare', async () => {
   const engine = spare()
   engine.start(await spawnOf('k1'))
   await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
-  const pid = engine.pid!
+  const pid = await fakePid(1)
   engine.stop('quitting')
   expect(engine.state).toBe('none')
-  await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: 10_000 })
+  await closedByStdin(pid)
+}, 30_000)
+
+test('a stopped spare that does not exit is killed after the grace period, with its children', async () => {
+  const engine = spare({ stopGraceMs: 300 })
+  engine.start(await spawnOf('k1', { SPARE_IGNORES_STDIN: '1' }))
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  const launcher = engine.pid!
+  const pid = await fakePid(1)
+  engine.stop('quitting')
+  await vi.waitFor(
+    () => {
+      expect(isAlive(pid)).toBe(false)
+      expect(isAlive(launcher)).toBe(false)
+    },
+    { timeout: 10_000 },
+  )
+  expect((await spareEvents(log)).some((e) => e.event === 'stdin-closed')).toBe(false)
 }, 30_000)

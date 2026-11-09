@@ -4,7 +4,8 @@
  * `--rpc-port` and exits on a stdin line. With `--standby` it appends `start` to `SPARE_LOG`
  * (exiting with 3 at once when `SPARE_DIES=1`), prints `STANDBY READY 42` after `READY_DELAY_MS`,
  * reads one line, records it in `<project>.line.json` and becomes such an engine; stdin closing
- * first appends `stdin-closed` and exits with 0, as the real one does.
+ * first appends `stdin-closed` and exits with 0, as the real one does. `SPARE_IGNORES_STDIN=1` makes
+ * it ignore stdin closing (only a kill ends it), `READY_SPLIT=1` write the ready line in two chunks.
  */
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -28,9 +29,18 @@ if (!spawnArgs.includes('--standby')) {
 } else {
   event({ event: 'start', args: spawnArgs, cwd: process.cwd(), jvmOptions: process.env.ENSO_JVM_OPTIONS ?? null })
   if (process.env.SPARE_DIES === '1') process.exit(3)
-  setTimeout(() => process.stderr.write('STANDBY READY 42\\n'), Number(process.env.READY_DELAY_MS ?? '0'))
+  const ready = () => {
+    if (process.env.READY_SPLIT !== '1') return process.stderr.write('STANDBY READY 42\\n')
+    // Alone, the first chunk would read as "STANDBY READY 4".
+    process.stderr.write('STANDBY READY 4')
+    setTimeout(() => process.stderr.write('2\\n'), 200)
+  }
+  setTimeout(ready, Number(process.env.READY_DELAY_MS ?? '0'))
+  const ignoresStdin = process.env.SPARE_IGNORES_STDIN === '1'
+  if (ignoresStdin) setInterval(() => {}, 60_000)
   let buffered = ''
   const onEnd = () => {
+    if (ignoresStdin) return
     event({ event: 'stdin-closed' })
     process.exit(0)
   }

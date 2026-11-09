@@ -509,6 +509,13 @@ spawn): a write to an exited child fails asynchronously with `EPIPE`, and with
 no listener that is an unhandled error that fails vitest runs and can crash the
 Electron main process (#401).
 
+To kill a child together with what it started, use `killTree`
+(`src/childProcess/killTree.ts`): on Windows a `.bat` launcher runs under
+`cmd.exe`, and killing `cmd.exe` alone orphans the engine (`taskkill /T /F`
+there, `SIGKILL` elsewhere). The AOT trainer and the spare engine
+(`projectService/spareEngine.ts`, which first closes the spare's stdin and kills
+only after `SPARE_STOP_GRACE_MS`, 10 s) use it.
+
 ## A second project's engine start on Windows (measured, no fix)
 
 The project-open performance spec expected a Windows engine start of ~780 ms for

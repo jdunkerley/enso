@@ -6,6 +6,7 @@ import type { ChildProcess } from 'node:child_process'
 import * as childProcess from 'node:child_process'
 import * as crypto from 'node:crypto'
 import * as os from 'node:os'
+import { killTree } from '../childProcess/killTree.js'
 import type { EngineMode } from './engineMode.js'
 
 /**
@@ -20,7 +21,7 @@ export const LINE_VARIABLES: ReadonlySet<string> = new Set([
 ])
 
 /** The engine's `STANDBY READY <ms from its process start>` line. */
-const STANDBY_READY = /STANDBY READY (-?\d+)/
+const STANDBY_READY = /STANDBY READY (-?\d+)\r?\n/
 /** How much of a spare's stderr is kept to find the ready line in. */
 const STDERR_TAIL_LENGTH = 4096
 
@@ -89,12 +90,17 @@ export function spareNotice(result: TakeResult, now: number): string {
   return `Engine: pre-started spare used (started ${age} s before the open, ${ready})`
 }
 
+/** How long a stopped spare may take to exit by itself before its process tree is killed. */
+export const SPARE_STOP_GRACE_MS = 10_000
+
 export interface SpareEngineOptions {
   /** Where a spare's stderr goes besides the ready check: the runner's echo to its own stderr. */
   readonly echo?: (chunk: Buffer) => void
   /** `Spare engine: …` lines; `console.info` by default. */
   readonly log?: (message: string) => void
   readonly now?: () => number
+  /** {@link SPARE_STOP_GRACE_MS} by default. */
+  readonly stopGraceMs?: number
 }
 
 interface Running {
@@ -106,6 +112,11 @@ interface Running {
   readonly onExit: () => void
 }
 
+/** `pid N, ` for a log line, or nothing when the process has no pid (it never started). */
+function pidPhrase(child: ChildProcess): string {
+  return child.pid == null ? '' : `pid ${child.pid}, `
+}
+
 /**
  * At most one spare engine. A spare warms up, prints `STANDBY READY <ms>` on stderr, and waits for
  * one line on stdin, the arguments `project/open` would have passed it (engine/runner CLAUDE.md,
@@ -114,17 +125,19 @@ interface Running {
  */
 export class SpareEngine {
   private running: Running | undefined
-  /** The key of the last spare that failed: not started again until {@link clearFailure}. */
-  private failedKey: string | undefined
+  /** Keys whose last spare failed: not started again until {@link clearFailure}. */
+  private readonly failedKeys = new Set<string>()
   private readonly echo: (chunk: Buffer) => void
   private readonly log: (message: string) => void
   private readonly now: () => number
+  private readonly stopGraceMs: number
 
-  /** Manage spares with the given log, stderr echo and clock. */
+  /** Manage spares with the given log, stderr echo, clock and grace period. */
   constructor(options: SpareEngineOptions = {}) {
     this.echo = options.echo ?? (() => {})
     this.log = options.log ?? ((message) => console.info(`Spare engine: ${message}`))
     this.now = options.now ?? Date.now
+    this.stopGraceMs = options.stopGraceMs ?? SPARE_STOP_GRACE_MS
   }
 
   /** Whether a spare runs, and whether it has printed its ready line. */
@@ -147,11 +160,10 @@ export class SpareEngine {
     const current = this.running
     if (current?.key === spawn.key) return
     if (current != null) this.stop('its settings changed')
-    if (this.failedKey === spawn.key) {
+    if (this.failedKeys.has(spawn.key)) {
       this.log('not started: the last one with these settings failed; the next close tries again')
       return
     }
-    this.failedKey = undefined
     let child: ChildProcess
     try {
       child = childProcess.spawn(spawn.command, [...spawn.args], {
@@ -161,7 +173,7 @@ export class SpareEngine {
         windowsHide: true,
       })
     } catch (error) {
-      this.failedKey = spawn.key
+      this.failedKeys.add(spawn.key)
       this.log(`could not be started: ${String(error)}`)
       return
     }
@@ -187,15 +199,20 @@ export class SpareEngine {
       onExit: () => {
         if (this.running !== running) return
         this.running = undefined
-        this.failedKey = spawn.key
-        this.log('exited before it was used; dropped until the next close')
+        this.failedKeys.add(spawn.key)
+        this.detach(running)
+        // An 'error' after 'exit' (or the reverse) must not be unhandled.
+        running.child.on('error', () => {})
+        running.child.stderr?.resume()
+        this.log('exited or could not be started before it was used; dropped until the next close')
       },
     }
     child.stderr?.on('data', running.onStderr)
-    child.once('exit', running.onExit)
-    child.once('error', running.onExit)
+    child.on('exit', running.onExit)
+    // An executable that cannot be started is reported here, after `spawn` has returned.
+    child.on('error', running.onExit)
     this.running = running
-    this.log(`started (pid ${child.pid})`)
+    this.log(child.pid == null ? 'starting' : `started (pid ${child.pid})`)
   }
 
   /**
@@ -208,14 +225,12 @@ export class SpareEngine {
     if (running == null) {
       return {
         kind: 'none',
-        reason: this.failedKey != null ? 'the last spare failed' : 'no spare was running',
+        reason: this.failedKeys.has(key) ? 'the last spare failed' : 'no spare was running',
       }
     }
     if (running.child.exitCode != null || running.child.signalCode != null) {
-      // Its 'exit' event has not run yet: drop it as that would have.
-      this.running = undefined
-      this.failedKey = running.key
-      this.detach(running)
+      // Its 'exit' event has not been handled yet: drop it as that handler would.
+      running.onExit()
       return { kind: 'none', reason: 'the spare had exited' }
     }
     if (running.key !== key) {
@@ -226,7 +241,7 @@ export class SpareEngine {
     this.detach(running)
     const readiness =
       running.readyAfterMs == null ? 'still warming up' : `ready after ${running.readyAfterMs} ms`
-    this.log(`used (pid ${running.child.pid}, ${readiness})`)
+    this.log(`used (${pidPhrase(running.child)}${readiness})`)
     return {
       kind: 'taken',
       spare: {
@@ -237,22 +252,36 @@ export class SpareEngine {
     }
   }
 
-  /** Stop the spare, if any: its stdin closes (it exits by itself) and it is killed. */
+  /**
+   * Stop the spare, if any. Its stdin closes, on which it cancels its warm-up, deletes the
+   * warm-up's files and exits by itself; one still running after the grace period is killed with
+   * everything it started.
+   */
   stop(reason: string): void {
     const running = this.running
     if (running == null) return
     this.running = undefined
     this.detach(running)
+    const child = running.child
+    // Nothing else listens any more: a late spawn failure must not be an unhandled error.
+    child.on('error', () => {})
     // Read to the end, so a full pipe never holds up its exit.
-    running.child.stderr?.resume()
+    child.stderr?.resume()
     this.log(`stopped: ${reason}`)
-    running.child.stdin?.end()
-    running.child.kill()
+    child.stdin?.end()
+    if (child.exitCode != null || child.signalCode != null) return
+    const timer = setTimeout(() => {
+      this.log(`${pidPhrase(child)}still running ${this.stopGraceMs} ms after its stop: killed`)
+      killTree(child, 'Spare engine')
+    }, this.stopGraceMs)
+    // The grace period must not hold this process (the IDE quitting) open.
+    timer.unref()
+    child.once('exit', () => clearTimeout(timer))
   }
 
-  /** No project is open again: a key whose spare failed may be tried once more. */
+  /** No project is open again: the keys whose spares failed may be tried once more. */
   clearFailure(): void {
-    this.failedKey = undefined
+    this.failedKeys.clear()
   }
 
   private detach(running: Running): void {
