@@ -73,15 +73,31 @@ export interface TakenSpare {
   readonly readyAfterMs: number | undefined
 }
 
+/**
+ * What a take found. `idle` means no spare was running, for no reason this class knows: the service
+ * did not start one (`EngineLaunch.spareIdleReason` says why).
+ */
 export type TakeResult =
   | { readonly kind: 'taken'; readonly spare: TakenSpare }
-  | { readonly kind: 'none'; readonly reason: string }
+  | { readonly kind: 'none'; readonly reason: string; readonly idle?: boolean }
 
 export type SpareState = 'none' | 'warming' | 'ready'
 
-/** The engine log's line about an open's spare, so a slow open can be traced to it. */
-export function spareNotice(result: TakeResult, now: number): string {
-  if (result.kind === 'none') return `Engine: no pre-started spare (${result.reason})`
+/**
+ * The engine log's line about an open's spare, so a slow open can be traced to it. When no spare was
+ * running, `idleReason` is why the service started none: `null` (spares are off) means no line.
+ */
+export function spareNotice(
+  result: TakeResult,
+  now: number,
+  idleReason?: string | null,
+): string | undefined {
+  if (result.kind === 'none') {
+    if (result.idle !== true || idleReason === undefined) {
+      return `Engine: no pre-started spare (${result.reason})`
+    }
+    return idleReason == null ? undefined : `Engine: no pre-started spare (${idleReason})`
+  }
   const age = ((now - result.spare.startedAt) / 1000).toFixed(1)
   const ready =
     result.spare.readyAfterMs == null ?
@@ -99,6 +115,14 @@ export const SPARE_WARM_UP_LIMIT_MS = 60_000
 
 /** How long a stopped spare may take to exit by itself before its process tree is killed. */
 export const SPARE_STOP_GRACE_MS = 10_000
+
+/** How long a bounded stop waits for a killed spare's exit after its tree was killed. */
+export const SPARE_KILL_WAIT_MS = 1000
+
+/** A bounded stop: wait this long for the spare to exit, then kill its tree (quit, update). */
+export interface SpareStopOptions {
+  readonly waitMs?: number
+}
 
 export interface SpareEngineOptions {
   /** Where a spare's stderr goes besides the ready check: the runner's echo to its own stderr. */
@@ -132,6 +156,8 @@ function pidPhrase(child: ChildProcess): string {
  */
 export class SpareEngine {
   private running: Running | undefined
+  /** Stopped spares that have not exited yet, with what settles on their exit. */
+  private readonly stopping = new Map<ChildProcess, Promise<void>>()
   /** Keys whose last spare failed: not started again until {@link clearFailure}. */
   private readonly failedKeys = new Set<string>()
   private readonly echo: (chunk: Buffer) => void
@@ -154,6 +180,11 @@ export class SpareEngine {
     return running.readyAfterMs == null ? 'warming' : 'ready'
   }
 
+  /** Whether a spare runs, or a stopped one has not exited yet. */
+  get alive(): boolean {
+    return this.running != null || this.stopping.size > 0
+  }
+
   /** The running spare's process id (that of `cmd.exe` when a `.bat` runs through it). */
   get pid(): number | undefined {
     return this.running?.child.pid
@@ -166,7 +197,7 @@ export class SpareEngine {
   start(spawn: SpareSpawn): void {
     const current = this.running
     if (current?.key === spawn.key) return
-    if (current != null) this.stop('its settings changed')
+    if (current != null) void this.stop('its settings changed')
     if (this.failedKeys.has(spawn.key)) {
       this.log('not started: the last one with these settings failed; the next close tries again')
       return
@@ -230,10 +261,9 @@ export class SpareEngine {
   take(key: string): TakeResult {
     const running = this.running
     if (running == null) {
-      return {
-        kind: 'none',
-        reason: this.failedKeys.has(key) ? 'the last spare failed' : 'no spare was running',
-      }
+      return this.failedKeys.has(key) ?
+          { kind: 'none', reason: 'the last spare failed' }
+        : { kind: 'none', reason: 'no spare was running', idle: true }
     }
     if (running.child.exitCode != null || running.child.signalCode != null) {
       // Its 'exit' event has not been handled yet: drop it as that handler would.
@@ -241,7 +271,7 @@ export class SpareEngine {
       return { kind: 'none', reason: 'the spare had exited' }
     }
     if (running.key !== key) {
-      this.stop('the open needs other settings')
+      void this.stop('the open needs other settings')
       return { kind: 'none', reason: 'the spare was started with other settings' }
     }
     this.running = undefined
@@ -262,28 +292,57 @@ export class SpareEngine {
   /**
    * Stop the spare, if any. Its stdin closes, on which it cancels its warm-up, deletes the
    * warm-up's files and exits by itself; one still running after the grace period is killed with
-   * everything it started.
+   * everything it started. The promise settles on its exit.
+   *
+   * With `waitMs` (a quit, or an update about to install), the promise settles within about
+   * `waitMs` + {@link SPARE_KILL_WAIT_MS}: the spare, and every stopped one that has not exited yet,
+   * is given `waitMs` to exit, then its tree is killed and its exit waited for a little longer.
    */
-  stop(reason: string): void {
+  stop(reason: string, options: SpareStopOptions = {}): Promise<void> {
     const running = this.running
-    if (running == null) return
-    this.running = undefined
-    this.detach(running)
-    const child = running.child
+    if (running != null) {
+      this.running = undefined
+      this.detach(running)
+      this.log(`stopped: ${reason}`)
+      this.stopChild(running.child)
+    }
+    const waitMs = options.waitMs
+    const exits = [...this.stopping]
+    if (waitMs == null) return Promise.all(exits.map(([, exited]) => exited)).then(() => {})
+    return Promise.all(
+      exits.map(async ([child, exited]) => {
+        if (await settlesWithin(exited, waitMs)) return
+        this.log(`${pidPhrase(child)}still running ${waitMs} ms after its stop: killed`)
+        killTree(child, 'Spare engine')
+        await settlesWithin(exited, SPARE_KILL_WAIT_MS)
+      }),
+    ).then(() => {})
+  }
+
+  private stopChild(child: ChildProcess): void {
     // Nothing else listens any more: a late spawn failure must not be an unhandled error.
     child.on('error', () => {})
     // Read to the end, so a full pipe never holds up its exit.
     child.stderr?.resume()
-    this.log(`stopped: ${reason}`)
     child.stdin?.end()
     if (child.exitCode != null || child.signalCode != null) return
     const timer = setTimeout(() => {
       this.log(`${pidPhrase(child)}still running ${this.stopGraceMs} ms after its stop: killed`)
       killTree(child, 'Spare engine')
     }, this.stopGraceMs)
-    // The grace period must not hold this process (the IDE quitting) open.
+    // The grace period must not hold this process open; a quit uses a bounded stop instead.
     timer.unref()
-    child.once('exit', () => clearTimeout(timer))
+    const exited = new Promise<void>((resolve) => {
+      // A child that never started reports 'error' and no 'exit'.
+      const done = () => {
+        clearTimeout(timer)
+        this.stopping.delete(child)
+        resolve()
+      }
+      child.once('exit', done)
+      child.once('error', done)
+    })
+    this.stopping.set(child, exited)
   }
 
   /** No project is open again: the keys whose spares failed may be tried once more. */
@@ -296,4 +355,15 @@ export class SpareEngine {
     running.child.off('exit', running.onExit)
     running.child.off('error', running.onExit)
   }
+}
+
+/** Whether `promise` settles within `ms`. */
+async function settlesWithin(promise: Promise<void>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const settled = await Promise.race([
+    promise.then(() => true),
+    new Promise<false>((resolve) => (timer = setTimeout(() => resolve(false), ms))),
+  ])
+  clearTimeout(timer)
+  return settled
 }

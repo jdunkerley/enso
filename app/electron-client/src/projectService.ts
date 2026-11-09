@@ -283,9 +283,20 @@ export async function disposeJvmAotCache(): Promise<void> {
   await jvmAotCache?.dispose()
 }
 
-/** Stop the spare engine (quit). It also exits by itself when its stdin closes. */
+/** How long a quit, or an update's install, waits for the spare engine to exit before killing it. */
+export const SPARE_QUIT_WAIT_MS = 5000
+
+/**
+ * Stop the spare engine for good (quit), and wait for it to exit: it exits by itself once its stdin
+ * closes, or is killed with its children after {@link SPARE_QUIT_WAIT_MS}.
+ */
 export async function stopSpareEngine(): Promise<void> {
-  await projectService?.stopSpareEngine()
+  await projectService?.stopSpareEngine({ waitMs: SPARE_QUIT_WAIT_MS })
+}
+
+/** Whether a spare engine runs, or a stopped one has not exited yet. */
+export function spareEngineAlive(): boolean {
+  return projectService?.spareEngineAlive() ?? false
 }
 
 /** Start or replace the spare engine for the current settings (a new secrets key). */

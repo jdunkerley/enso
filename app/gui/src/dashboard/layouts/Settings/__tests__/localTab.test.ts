@@ -139,9 +139,14 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => {
+afterEach(async () => {
+  vi.unstubAllGlobals()
   Reflect.deleteProperty(window, 'api')
   openFileBrowser.mockReset()
+  // The spare-engine settings are module state, shared by every test.
+  const { engineRunsOnJvm, setPreStartEngine } = await import('$/providers/spareEngineSettings')
+  setPreStartEngine(true)
+  engineRunsOnJvm.value = false
 })
 
 describe('the Local settings tab', () => {
@@ -169,7 +174,6 @@ describe('the Local settings tab', () => {
     await openLocalTab()
     await vi.waitFor(() => expect(document.body.textContent).toContain(getText('secretsNone')))
     expect(document.body.textContent).toContain(getText('secretsSettingsSection'))
-    vi.unstubAllGlobals()
   })
 
   test('the Updates section is left out without the desktop updater', async () => {
@@ -198,7 +202,6 @@ describe('the Local settings tab', () => {
     await flushPromises()
     expect(useIncludePrereleases().value).toBe(true)
     setIncludePrereleases(false)
-    vi.unstubAllGlobals()
   })
 
   test('the Engine logs section has both logging switches, off by default', async () => {
@@ -233,7 +236,7 @@ describe('the Local settings tab', () => {
   })
 
   test('the Engine section has the pre-start switch, on by default, and keeps a change', async () => {
-    const { engineRunsOnJvm, setPreStartEngine, spareEngineSettingsStore } =
+    const { engineRunsOnJvm, spareEngineSettingsStore } =
       await import('$/providers/spareEngineSettings')
     engineRunsOnJvm.value = true
     await openLocalTab()
@@ -252,8 +255,6 @@ describe('the Local settings tab', () => {
     await flushPromises()
     expect(spareEngineSettingsStore.state.value.preStart).toBe(false)
     expect(localStorage.getItem('enso-spare-engine-settings')).toContain('"preStart":false')
-    setPreStartEngine(true)
-    engineRunsOnJvm.value = false
   })
 
   test('a typed directory, once saved, reaches the local paths', async () => {

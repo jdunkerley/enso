@@ -28,6 +28,12 @@ export interface UpdaterDeps {
    * could mean so ({@link mayMeanNoStableRelease}); see {@link confirmNoStableRelease}, the default.
    */
   readonly confirmNoStableRelease?: (allowCached: boolean) => Promise<boolean>
+  /**
+   * Awaited before the installer starts: on Windows it starts before the app quits, and must not
+   * meet a spare engine that still holds the engine's files (`stopSpareEngine`). Its failure does
+   * not stop the install.
+   */
+  readonly beforeInstall?: () => Promise<void>
 }
 
 /** Whether this run can update itself; see {@link UpdateMode}. */
@@ -214,10 +220,18 @@ export class Updater {
     }
   }
 
-  /** Quits through the normal quit path, installs silently, then relaunches. */
-  quitAndInstall(): void {
+  /**
+   * Quits through the normal quit path, installs silently, then relaunches; once
+   * {@link UpdaterDeps.beforeInstall} has settled.
+   */
+  async quitAndInstall(): Promise<void> {
     if (this.mode === 'manual') return
     console.info('[Updater] Restarting to install the update.')
+    try {
+      await this.deps.beforeInstall?.()
+    } catch (error) {
+      console.warn('[Updater] Preparing the install failed; installing anyway:', error)
+    }
     this.deps.autoUpdater.quitAndInstall(true, true)
   }
 

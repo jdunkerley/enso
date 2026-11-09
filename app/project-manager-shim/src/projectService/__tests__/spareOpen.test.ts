@@ -249,6 +249,27 @@ test('a spare that fails after the take gives way to an ordinary engine', async 
   await runner.closeProject(Path(project))
 })
 
+test('a spare that misses its startup limit is killed with its tree, and an ordinary engine serves the open', async () => {
+  vi.stubEnv('SPARE_NEVER_HEALTHY', '1')
+  await readySpare('k1')
+  const project = path.join(root, 'H')
+  const logSink = sink()
+  const launch: EngineLaunch = {
+    ...jvm('k1'),
+    timeouts: { ...ENGINE_TIMEOUTS.jvm, ydocWaitMs: 0, startupMs: 3000 },
+  }
+  await runner.openProject(Path(project), 'id-h', undefined, undefined, logSink, launch)
+  const { pid } = JSON.parse(await fs.readFile(`${project}.line.json`, 'utf8'))
+  // The engine itself, which on Windows is the child of the `cmd.exe` the runner started.
+  await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: 10_000 })
+  expect(await exists(`${project}.spawned.json`)).toBe(true)
+  expect(logSink.notices).toEqual([
+    expect.stringMatching(/^Engine: pre-started spare used/),
+    'Engine: the pre-started spare failed to start; starting a new one',
+  ])
+  await runner.closeProject(Path(project))
+}, 30_000)
+
 test('a closing project is no longer in use', async () => {
   const project = path.join(root, 'C')
   const release = path.join(root, 'release-exit')

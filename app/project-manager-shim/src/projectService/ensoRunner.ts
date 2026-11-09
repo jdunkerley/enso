@@ -10,6 +10,7 @@ import * as net from 'node:net'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import * as portfinder from 'portfinder'
+import { killTree } from '../childProcess/killTree.js'
 import { CommandError, runCommand as runChildCommand } from '../childProcess/runCommand.js'
 import type { ResolvedEngineMode } from './engineMode.js'
 import { jvmOptionsValue } from './jvmOptions.js'
@@ -20,6 +21,7 @@ import {
   spareNotice,
   standbyLine,
   type SpareState,
+  type SpareStopOptions,
   type TakeResult,
 } from './spareEngine.js'
 import { ENGINE_TIMEOUTS, engineTimeouts, type EngineTimeouts } from './timeouts.js'
@@ -147,8 +149,14 @@ export interface Runner {
   hasRunningProjects(): Promise<boolean>
   /** Start a spare engine for `request`, unless one with its key runs (`spareEngine.ts`). */
   startSpare?(request: SpareRequest): void
-  /** Stop the spare engine, if any. */
-  stopSpare?(reason: string): Promise<void>
+  /**
+   * Stop the spare engine, if any. Without `waitMs` it settles at once (the spare exits by itself,
+   * or is killed after a grace period); with it, once the spare and any stopped one still exiting
+   * have exited, or within about `waitMs` + 1 s, their trees killed (quit).
+   */
+  stopSpare?(reason: string, options?: SpareStopOptions): Promise<void>
+  /** Whether a spare engine runs, or a stopped one has not exited yet. */
+  spareAlive?(): boolean
   /** No project is open again: a spare whose start failed may be tried once more. */
   spareAvailableAgain?(): void
   /** Whether a project is open or opening, not counting one whose close has begun. */
@@ -257,6 +265,11 @@ export interface EngineLaunch {
    * with the same key. Without one no spare is taken.
    */
   readonly spareKey?: string
+  /**
+   * Why the service has no spare running for this open, for the engine log: `null` when spares are
+   * off (nothing is logged); `undefined` when it does not know.
+   */
+  readonly spareIdleReason?: string | null | undefined
 }
 
 /** What a spare is started with: the launch an open would have, without the open's own parts. */
@@ -523,9 +536,10 @@ class OpenedProject {
         () => {
           if (resolved || passedHealth || this.closed) return
           resolved = true
-          // SIGKILL the *specific* child this routine was waiting on. `onUnexpectedExit` decides
-          // whether to respawn: not while the project is still opening, by default after.
-          handle?.child.kill('SIGKILL')
+          // Kill the *specific* child this routine was waiting on, with what it started (the engine
+          // under a `.bat` launcher's `cmd.exe`). `onUnexpectedExit` decides whether to respawn:
+          // not while the project is still opening, by default after.
+          if (handle != null) killTree(handle.child, 'Language Server')
           deferred.reject(new Error('Language server startup timeout'))
         },
         startupTimeoutMs,
@@ -587,7 +601,7 @@ class OpenedProject {
 
   /**
    * Trigger the language server's graceful shutdown protocol (a single newline written to
-   * stdin) and wait for the child to exit. SIGKILL after a timeout if it doesn't.
+   * stdin) and wait for the child to exit. Its process tree is killed after a timeout if it doesn't.
    */
   private async gracefulShutdown(): Promise<void> {
     const handle = this.watcher.current
@@ -598,7 +612,7 @@ class OpenedProject {
       const killTimeout = setTimeout(() => {
         if (handle.alive) {
           console.error('Language Server process of', this.path, "didn't finish in time. Killing.")
-          handle.child.kill('SIGKILL')
+          killTree(handle.child, 'Language Server')
         }
       }, this.terminateMs)
       try {
@@ -648,7 +662,8 @@ export class EnsoRunner implements Runner {
   /** Paths whose close has begun: no longer in use, though their engine may still be stopping. */
   private readonly closingProjects = new Set<Path>()
   /** The spare engine (`spareEngine.ts`); its stderr is echoed like an engine's. */
-  private readonly spare = new SpareEngine({ echo: echoToStderr })
+  private readonly spare: SpareEngine
+  private readonly clock: StartupClock
 
   /** The spare engine's state, for tests and the service's decisions. */
   get spareState(): SpareState {
@@ -679,7 +694,11 @@ export class EnsoRunner implements Runner {
       readonly ydocHost?: YdocHost | undefined
       readonly startupClock?: StartupClock
     } = {},
-  ) {}
+  ) {
+    const clock = options.startupClock ?? REAL_STARTUP_CLOCK
+    this.clock = clock
+    this.spare = new SpareEngine({ echo: echoToStderr, now: () => clock.now() })
+  }
 
   private resolveCommandAndArgs(args: readonly string[]): [string, readonly string[]] {
     const [cmd, cmdArgs] =
@@ -745,9 +764,15 @@ export class EnsoRunner implements Runner {
     this.spare.start({ key: request.key, command, args: commandArgs, env })
   }
 
-  /** Stop the spare engine, if any. */
-  async stopSpare(reason: string): Promise<void> {
-    this.spare.stop(reason)
+  /** Stop the spare engine, if any; see {@link Runner.stopSpare}. */
+  async stopSpare(reason: string, options: SpareStopOptions = {}): Promise<void> {
+    const stopped = this.spare.stop(reason, options)
+    if (options.waitMs != null) await stopped
+  }
+
+  /** Whether a spare engine runs, or a stopped one has not exited yet. */
+  spareAlive(): boolean {
+    return this.spare.alive
   }
 
   /** No project is open again: a spare whose start failed may be tried once more. */
@@ -836,7 +861,9 @@ export class EnsoRunner implements Runner {
       // The ports are found free, but another program can take one before the engine binds it:
       // such an engine exits with a bind failure, and the open looks for new ports and tries again.
       let spareAsked = false
-      for (let attempt = 1; ; attempt++) {
+      // Counts the engines that failed to bind their ports; a failed spare is not one of them.
+      let attempt = 1
+      for (;;) {
         const [jsonPort, ydocPort] = await this.findServerPorts(
           this.options.firstPort ?? DEFAULT_JSONRPC_PORT,
         )
@@ -868,6 +895,7 @@ export class EnsoRunner implements Runner {
             console.warn(
               `The ydoc listener for project ${projectPath} could not bind its port; looking for new ports.`,
             )
+            attempt++
             continue
           }
         }
@@ -914,10 +942,11 @@ export class EnsoRunner implements Runner {
           if (spareAllowed) {
             spareResult = this.spare.take(launch.spareKey)
           } else {
-            this.spare.stop('the ydoc server of this open runs in the engine')
+            void this.spare.stop('the ydoc server of this open runs in the engine')
             spareResult = { kind: 'none', reason: 'the ydoc server runs in the engine' }
           }
-          logSink?.notice?.(spareNotice(spareResult, Date.now()))
+          const notice = spareNotice(spareResult, this.clock.now(), launch.spareIdleReason)
+          if (notice != null) logSink?.notice?.(notice)
         }
         // The taken spare's stderr has no reader until `OpenedProject` attaches one when its
         // spawner (below) hands the spare over: nothing may be awaited between the take and that.
@@ -999,6 +1028,7 @@ export class EnsoRunner implements Runner {
           console.warn(
             `Language Server for project ${projectPath} could not bind its port; looking for new ports.`,
           )
+          attempt++
         }
       }
     })()

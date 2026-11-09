@@ -13,6 +13,8 @@ import { Path, UUID } from '../types.js'
 let root: string
 let starts: SpareRequest[]
 let stops: string[]
+/** The `waitMs` of every bounded stop. */
+let waits: number[]
 let opens: (EngineLaunch | undefined)[]
 let inUse: boolean
 let availableAgain: number
@@ -52,7 +54,10 @@ function fakeRunner(): Runner {
     registerShutdownHook: async () => {},
     version: async () => '0.0.0',
     startSpare: (request) => void starts.push(request),
-    stopSpare: async (reason) => void stops.push(reason),
+    stopSpare: async (reason, options) => {
+      stops.push(reason)
+      if (options?.waitMs != null) waits.push(options.waitMs)
+    },
     spareAvailableAgain: () => void (availableAgain += 1),
   }
 }
@@ -105,6 +110,7 @@ beforeEach(async () => {
   vi.stubEnv('ENSO_ENGINE_MODE', '')
   starts = []
   stops = []
+  waits = []
   opens = []
   inUse = false
   availableAgain = 0
@@ -298,17 +304,17 @@ test('a failed open is followed by a spare', async () => {
 })
 
 test('a project reopened during the gate after a close: no spare, and a failed spare is not retried', async () => {
-  const s = service({ option: 'jvm', spareAfterCloseMs: 50 })
+  // The gate's delay is longer than the test: it ends when the old engine has stopped.
+  const s = service({ option: 'jvm', spareAfterCloseMs: 60_000 })
   await s.setSpareEngine(true)
   await s.openProject(UUID('id-1'), Path(root))
-  // The old engine keeps stopping (`closing` unresolved), so the gate ends with the delay.
   const close = s.closeProject(UUID('id-1'), Path(root))
   await s.openProject(UUID('id-1'), Path(root))
+  closing.resolve()
+  await close
   await vi.waitFor(() => expect(stops).toEqual(['a project is open']))
   expect(starts).toHaveLength(1)
   expect(availableAgain).toBe(0)
-  closing.resolve()
-  await close
 })
 
 test('a quit while a refresh is in flight or queued starts nothing', async () => {
@@ -356,4 +362,33 @@ test('a training that begins while a refresh waits for the AOT options means no 
   await refresh
   expect(starts).toEqual([])
   expect(stops).toEqual(['the AOT cache is training'])
+})
+
+test('a quit with a wait stops the spare, then waits for it with that bound', async () => {
+  const s = service()
+  await s.setSpareEngine(true)
+  await s.stopSpareEngine({ waitMs: 5000 })
+  expect(stops).toEqual(['quitting', 'quitting'])
+  expect(waits).toEqual([5000])
+  await s.refreshSpare()
+  expect(starts).toHaveLength(1)
+})
+
+test('an open tells the runner why no spare runs, and nothing when spares are off', async () => {
+  let training = true
+  const s = service({ option: 'jvm', jvmAot: fakeAot({ isTraining: () => training }) })
+  await s.setSpareEngine(false)
+  await s.openProject(UUID('id-1'), Path(root))
+  expect(opens[0]?.spareIdleReason).toBeNull()
+  closing.resolve()
+  await s.closeProject(UUID('id-1'), Path(root))
+  await s.setSpareEngine(true)
+  await s.openProject(UUID('id-1'), Path(root))
+  expect(opens[1]?.spareIdleReason).toBe('the AOT cache is training')
+  await s.closeProject(UUID('id-1'), Path(root))
+  training = false
+  await s.refreshSpare()
+  expect(starts).toHaveLength(1)
+  await s.openProject(UUID('id-1'), Path(root))
+  expect(opens[2]?.spareIdleReason).toBeUndefined()
 })

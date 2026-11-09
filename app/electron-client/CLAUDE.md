@@ -222,12 +222,18 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   `<userData>/jvm-aot` (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
   cache trains in the background, once the window is up, only when the JVM is
   the default engine; `before-quit` stops a running training (and the spare
-  engine, `stopSpareEngine`). The open-time harness points it at a directory of
-  its run (`<out>/jvm-aot` for the JVM engines, `<out>/shim-jvm-aot` for native,
-  which never trains) and measures that cache (see "Open-time harness"), so its
-  launches never pick up the user's. An empty value counts as unset. The root
-  and the gate are in `src/jvmAotSettings.ts` (tested in
-  `tests/headless/jvmAotSettings.test.ts`).
+  engine, `stopSpareEngine`: while a spare is alive, `holdQuitForSpareEngine` in
+  `src/spareQuit.ts` cancels the quit, waits up to 5 s for the spare to exit,
+  kills its process tree if it has not, and quits again, once; tested in
+  `tests/headless/spareQuit.test.ts`). An update waits the same way: an update
+  installed on quit starts on the app's `quit` event, after that stop, and
+  `Updater.quitAndInstall` awaits `stopSpareEngine` (`beforeInstall`) before it
+  starts the installer, which on Windows runs before the app has quit. The
+  open-time harness points it at a directory of its run (`<out>/jvm-aot` for the
+  JVM engines, `<out>/shim-jvm-aot` for native, which never trains) and measures
+  that cache (see "Open-time harness"), so its launches never pick up the
+  user's. An empty value counts as unset. The root and the gate are in
+  `src/jvmAotSettings.ts` (tested in `tests/headless/jvmAotSettings.test.ts`).
 - `ENSO_SPARE_ENGINE=0` — no spare engine whatever Settings → Local → Engine
   says (`project-manager-shim/CLAUDE.md`, "Spare engine"). The Playwright
   fixture sets it for every spec but `spareEngine.spec.ts`; the open-time

@@ -8,7 +8,8 @@
  * an engine; stdin closing
  * first appends `stdin-closed` and exits with 0, as the real one does. `SPARE_IGNORES_STDIN=1` makes
  * it ignore stdin closing (only a kill ends it), `READY_SPLIT=1` write the ready line in two chunks,
- * `SPARE_REFUSES_LINE=1` exit with 1 on its line, as the real one does on a line it refuses.
+ * `SPARE_REFUSES_LINE=1` exit with 1 on its line, as the real one does on a line it refuses, and
+ * `SPARE_NEVER_HEALTHY=1` take its line and then never answer the health check (only a kill ends it).
  */
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -68,7 +69,8 @@ if (!spawnArgs.includes('--standby')) {
     fs.writeFileSync(value('--path') + '.line.json', JSON.stringify({ ...line, pid: process.pid, spawnArgs }))
     event({ event: 'taken' })
     process.stderr.write('fake engine: line taken\\n')
-    serve(line.args)
+    if (process.env.SPARE_NEVER_HEALTHY === '1') setInterval(() => {}, 60_000)
+    else serve(line.args)
   }
   process.stdin.on('data', onData)
   process.stdin.on('end', onEnd)

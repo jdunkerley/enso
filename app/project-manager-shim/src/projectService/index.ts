@@ -196,6 +196,8 @@ export class ProjectService {
   private spareSetting: boolean | undefined
   /** Set on quit: no spare is started again. */
   private spareStopped = false
+  /** Why the last spare decision started none, for an open's log; `undefined` once one started. */
+  private spareIdleReason: string | undefined
   /** Spare decisions, one at a time. */
   private spareQueue: Promise<void> = Promise.resolve()
   /** A close has happened since a spare was last started: one whose start failed may be tried again. */
@@ -223,10 +225,19 @@ export class ProjectService {
     return this.spareQueue
   }
 
-  /** Quit: stop the spare engine for good. */
-  async stopSpareEngine(): Promise<void> {
+  /**
+   * Quit: stop the spare engine for good. With `waitMs`, wait for it (and any stopped one still
+   * exiting) to exit, killing its tree after `waitMs` (`EnsoRunner.stopSpare`).
+   */
+  async stopSpareEngine(options: { readonly waitMs?: number } = {}): Promise<void> {
     this.spareStopped = true
     await this.refreshSpare()
+    if (options.waitMs != null) await this.runner.stopSpare?.('quitting', options)
+  }
+
+  /** Whether a spare engine runs, or a stopped one has not exited yet. */
+  spareEngineAlive(): boolean {
+    return this.runner.spareAlive?.() ?? false
   }
 
   private async refreshSpareNow(): Promise<void> {
@@ -235,6 +246,7 @@ export class ProjectService {
     const opensBefore = this.opensStarted
     const reason = this.spareSettingsReason()
     if (reason != null) {
+      this.spareIdleReason = reason
       await runner.stopSpare(reason)
       return
     }
@@ -259,6 +271,8 @@ export class ProjectService {
       if (lateReason === 'a project is opening' || lateReason === 'a project is open') {
         this.spareRetryAllowed = false
       }
+      // The open that this decision met reports the reason it had no spare before it.
+      if (lateReason !== 'a project is opening') this.spareIdleReason = lateReason
       // An opening project takes a running spare or stops it itself (`EnsoRunner.openProject`).
       if (lateReason !== 'a project is opening') await runner.stopSpare(lateReason)
       return
@@ -267,12 +281,18 @@ export class ProjectService {
       this.spareRetryAllowed = false
       runner.spareAvailableAgain?.()
     }
+    this.spareIdleReason = undefined
     runner.startSpare({
       key,
       extraArgs: this.extraArgs,
       extraEnv: this.extraEnvironment?.() ?? [],
       launch: { ...launch, spareKey: key },
     })
+  }
+
+  /** Whether spares are off: the setting, or `ENSO_SPARE_ENGINE=0`. An open then logs nothing. */
+  private spareDisabled(): boolean {
+    return this.spareSetting !== true || process.env.ENSO_SPARE_ENGINE === '0'
   }
 
   /** Why the settings want no spare; `undefined` when they want one. */
@@ -549,7 +569,11 @@ export class ProjectService {
       if (!alreadyLogging) engineLog.notice(describeEngineMode(mode))
       launch = await this.engineLaunch(mode)
       if (mode.mode === 'jvm') {
-        launch = { ...launch, spareKey: this.spareKeyFor(launch) }
+        launch = {
+          ...launch,
+          spareKey: this.spareKeyFor(launch),
+          spareIdleReason: this.spareDisabled() ? null : this.spareIdleReason,
+        }
       } else {
         await this.runner.stopSpare?.('a project with the native engine is opening')
       }

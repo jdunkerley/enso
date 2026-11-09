@@ -361,15 +361,19 @@ limits apply, and a project's `jvm: false` still wins. Headless
 A JVM engine started with `--standby` while no project is open (spec
 `docs/superpowers/specs/2026-11-08-jvm-warm-engine-design.md`; engine side in
 engine/runner CLAUDE.md, "Standby mode"). `EnsoRunner` owns one `SpareEngine`
-(`startSpare`, `stopSpare`, `spareAvailableAgain`, `spareState`, `sparePid`).
+(`startSpare`, `stopSpare`, `spareAvailableAgain`, `spareAlive`, `spareState`,
+`sparePid`).
 
 - **The take.** An open whose `EngineLaunch` has a `spareKey` takes a spare
   started with the same key, on its first attempt only; a spare with another key
   is stopped, and the open spawns as before. The open's log gets one
   `Engine: pre-started spare used (…)` or `Engine: no pre-started spare (…)`
   line (`EngineLogSink.notice`); an open without a key leaves the spare alone
-  and says nothing. Under an engine-hosted ydoc server with allowed origins
-  there is no spare (the line cannot carry them).
+  and says nothing. When no spare was running, the line gives the service's
+  reason (`EngineLaunch.spareIdleReason`, the last decision's), and there is no
+  line at all when spares are off (the setting, `ENSO_SPARE_ENGINE=0`). Under an
+  engine-hosted ydoc server with allowed origins there is no spare (the line
+  cannot carry them).
 - **The line.** The spare gets `{"args":[...],"env":{...}}` on stdin: the open's
   arguments from `--server` on (never `--jvm`, which the engine refuses there),
   and in `env` only the four `LINE_VARIABLES` (channel token, ydoc port under an
@@ -386,8 +390,22 @@ engine/runner CLAUDE.md, "Standby mode"). `EnsoRunner` owns one `SpareEngine`
   `SPARE_WARM_UP_LIMIT_MS` (60 s, when the engine abandons a warm-up) on top of
   the startup limit, for that engine only.
 - **Failure.** A taken spare that exits or times out before its health check
-  makes the open try again with an ordinary engine (and a second notice line). A
-  respawn after the open is always an ordinary spawn.
+  makes the open try again with an ordinary engine (and a second notice line);
+  that try does not use up one of the `PORT_ATTEMPTS`. A respawn after the open
+  is always an ordinary spawn. The worst case is a spare still warming up that
+  never starts: ~300 s (the JVM's 120 s startup limit plus the 60 s warm-up
+  limit, then up to 120 s for an ordinary engine) before the open is answered.
+- **Kills.** An engine that misses its startup limit, and one that does not stop
+  in time on close, is killed with its process tree (`killTree`): under a `.bat`
+  launcher killing `cmd.exe` alone would leave the engine running beside the one
+  that replaces it.
+- **Stop.** `stop` closes the spare's stdin, on which it exits by itself; one
+  still running after `SPARE_STOP_GRACE_MS` (10 s, an `unref`'d timer) is killed
+  with its tree. A quit cannot rely on that timer, since the process exits
+  first: `stopSpare(reason, { waitMs })` (`ProjectService.stopSpareEngine`)
+  waits up to `waitMs` for the spare, and any stopped one still exiting, kills
+  the trees of those left and waits up to 1 s more. Electron uses it with 5 s on
+  every quit and before an update installs (electron-client CLAUDE.md).
 - `hasProjectsInUse` (loading or running, not counting a project whose close has
   begun) is what the service asks before starting the next spare.
 
@@ -409,7 +427,11 @@ project, which takes the spare or stops it itself. The refresh runs on
 `setSpareEngine`, after a failed open (once it no longer counts as opening), and
 after a close, once the closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2
 s, `EngineSettings.spareAfterCloseMs`, an `unref`'d timer) has passed, whichever
-is first. A native open stops the spare.
+is first. A native open stops the spare. When a close's engine takes longer than
+2 s to exit, a spare starts 2 s into the close (the gate's delay), beside the
+closing engine; reopening the project then takes it if its key matches. A quit
+that is cancelled after the spare was stopped (`stopSpareEngine` is for good)
+leaves no spare for the rest of the session.
 
 - **No spare beside an open.** `openProject` counts itself (`opensInFlight`,
   `opensStarted`) from its first line, before any await. The decision to start

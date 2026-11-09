@@ -18,6 +18,7 @@ class FakeAutoUpdater extends EventEmitter {
 function setup(
   mode: 'auto' | 'manual' = 'auto',
   confirmNoStableRelease: (allowCached: boolean) => Promise<boolean> = async () => false,
+  beforeInstall?: () => Promise<void>,
 ) {
   const autoUpdater = new FakeAutoUpdater()
   const statuses: UpdateStatus[] = []
@@ -26,6 +27,7 @@ function setup(
     mode,
     onStatus: (status) => statuses.push(status),
     confirmNoStableRelease,
+    ...(beforeInstall != null ? { beforeInstall } : {}),
   }
   return { autoUpdater, statuses, updater: new Updater(deps) }
 }
@@ -125,17 +127,40 @@ describe('Updater', () => {
     expect(autoUpdater.checkForUpdates).not.toHaveBeenCalled()
   })
 
-  test('installs silently and relaunches', () => {
+  test('installs silently and relaunches', async () => {
     const { autoUpdater, updater } = setup()
-    updater.quitAndInstall()
+    await updater.quitAndInstall()
     expect(autoUpdater.quitAndInstall).toHaveBeenCalledWith(true, true)
+  })
+
+  test('the install waits for beforeInstall (the spare engine stopping)', async () => {
+    let release!: () => void
+    const beforeInstall = vi.fn(() => new Promise<void>((resolve) => (release = resolve)))
+    const { autoUpdater, updater } = setup('auto', undefined, beforeInstall)
+    const installing = updater.quitAndInstall()
+    await vi.waitFor(() => expect(beforeInstall).toHaveBeenCalledOnce())
+    expect(autoUpdater.quitAndInstall).not.toHaveBeenCalled()
+    release()
+    await installing
+    expect(autoUpdater.quitAndInstall).toHaveBeenCalledWith(true, true)
+  })
+
+  test('a failing beforeInstall does not stop the install', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { autoUpdater, updater } = setup('auto', undefined, async () => {
+      throw new Error('no spare')
+    })
+    await updater.quitAndInstall()
+    expect(autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   test('manual mode never touches electron-updater', async () => {
     const { autoUpdater, updater } = setup('manual')
     expect(await updater.check(true)).toEqual({ state: 'idle' })
     await updater.download()
-    updater.quitAndInstall()
+    await updater.quitAndInstall()
     expect(autoUpdater.checkForUpdates).not.toHaveBeenCalled()
     expect(autoUpdater.downloadUpdate).not.toHaveBeenCalled()
     expect(autoUpdater.quitAndInstall).not.toHaveBeenCalled()
@@ -667,7 +692,7 @@ describe('initUpdaterIpc', () => {
 
   test('download and quit-and-install reach the updater; quit-and-install replies nothing', async () => {
     const { autoUpdater, download, quitAndInstall } = await handlers()
-    expect(quitAndInstall()).toBeUndefined()
+    expect(await quitAndInstall()).toBeUndefined()
     expect(autoUpdater.quitAndInstall).toHaveBeenCalledOnce()
     await download()
   })

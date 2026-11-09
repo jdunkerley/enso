@@ -7,6 +7,7 @@ import {
   getSecretsKeySource,
   hasRunningProjects,
   refreshSpareEngine,
+  stopSpareEngine,
 } from '@/projectService'
 import { resetSecrets, rotateSecretsKey } from '@/secretsKey'
 import { initUpdaterIpc } from '@/updaterIpc'
@@ -74,7 +75,8 @@ export function initIpc(
   electron: Electron | undefined,
   electronIsDev: boolean,
 ) {
-  initUpdaterIpc(BUILD_INFO.updates, electronUpdater.autoUpdater)
+  // The installer must not meet a spare engine still holding the engine's files.
+  initUpdaterIpc(BUILD_INFO.updates, electronUpdater.autoUpdater, stopSpareEngine)
   // The key is written to the clipboard here, in main: it never crosses into the renderer.
   ipcMain.handle(Channel.secretsCopyKey, () => {
     const key = getSecretsKeySource().exportKey()
