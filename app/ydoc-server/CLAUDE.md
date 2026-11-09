@@ -174,12 +174,17 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   `serverSessions` (Note [A New Server Session] in `ydoc-shared/yjsModel.ts`). A
   GUI that sees a second id calls `reconnectProject`, which rebuilds the
   project's stores with a new `ls=` name (deferred to the end of an opening
-  under way) and shows a toast: edits that had not reached a live session, and
-  the project view's own state, are lost. An engine restart should take the same
-  path in both host modes (the Node host's sockets are dropped with the engine,
-  and under `ENSO_YDOC_HOST=engine` the server dies with it), but that is #602
-  and unverified; under the engine host a restart on new ports leaves the GUI
-  retrying the old `ydocUrl`, which this does not cover.
+  under way) and shows a toast. Edits that had not reached the file are carried
+  over (#604, `gui/src/providers/openedProjects/module/carryOver.ts`): once the
+  new session has loaded the module, the GUI puts its own text back if the file
+  is one it had itself since the last update from this server, and otherwise
+  keeps the file and offers its version in a toast; node metadata, the
+  selection, the open dock and an open component browser come back too. Undo
+  history does not (it refers to the old docs). An engine restart should take
+  the same path in both host modes (the Node host's sockets are dropped with the
+  engine, and under `ENSO_YDOC_HOST=engine` the server dies with it), but that
+  is #602 and unverified; under the engine host a restart on new ports leaves
+  the GUI retrying the old `ydocUrl`, which this does not cover.
 - **Every session reference is released.** The process outlives its engines, so
   a session that is never released lives on with its Language Server client: a
   connection refused because its doc is unknown (a GUI reconnecting with the

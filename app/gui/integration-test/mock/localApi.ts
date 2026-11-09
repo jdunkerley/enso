@@ -44,6 +44,8 @@ import {
   mockDataHandler,
   mockLSHandler,
   mockYdocProvider,
+  replaceMockServerSession,
+  resetMockYdocServer,
   updateVisualizationData,
 } from './lsHandler'
 import { HISTORY_ROUTES } from './versioning/historyRoutes'
@@ -133,6 +135,7 @@ export async function mockLocalApi(page: Page) {
   // `clearMockWidgetConfigurations()` before the fixture runs; resetting to
   // the initial set here would undo that.
   clearPreprocessorOverrides()
+  resetMockYdocServer()
 
   const fileSystem = new Map<string, FileSystemEntryWithData>()
   const openProjects = new Map<UUID, ProjectState>()
@@ -1237,6 +1240,11 @@ data: ${JSON.stringify(data)}
     addEngineLogEvent,
     addEngineLogLine,
     updateVisualization,
+    /**
+     * Start a new ydoc server session: the GUI makes its project stores again, and its module docs
+     * come back from the mocked sources, without the edits the old session received.
+     */
+    replaceServerSession: replaceMockServerSession,
     addLabel,
     addRecentProject,
     /** The mocked git versioning: change it in `setupApi.local`, before the page loads. */

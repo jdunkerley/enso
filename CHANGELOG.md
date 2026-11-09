@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [When the connection to a project restarts, edits that had not been saved yet
+  are put back, along with the selection, the open code panel and an open
+  component browser. If the file changed in the meantime, it is kept and you are
+  offered your version instead.][654]
 - [A project whose libraries cannot be loaded now says which ones, in a message
   of its own. If the edition installed with the IDE has them, the message offers
   to switch the project to it: Switch and reopen saves a version of the project
@@ -455,6 +459,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[654]: https://github.com/jdunkerley/enso/pull/654
 [655]: https://github.com/jdunkerley/enso/pull/655
 [626]: https://github.com/jdunkerley/enso/pull/626
 [642]: https://github.com/jdunkerley/enso/pull/642

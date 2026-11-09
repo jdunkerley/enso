@@ -8,6 +8,7 @@ import {
   useWidgetRegistry,
 } from '$/components/WithCurrentProject.vue'
 import { panelEquals, useContainerData } from '$/providers/container'
+import { useOpenedProjects } from '$/providers/openedProjects'
 import type { Node, NodeId } from '$/providers/openedProjects/graph'
 import { isInputNode, nodeId } from '$/providers/openedProjects/graph/graphDatabase'
 import {
@@ -37,6 +38,10 @@ import { performCollapse, prepareCollapsedInfo } from '@/components/GraphEditor/
 import { helpActionHandlers } from '@/components/GraphEditor/helpActions'
 import { useGraphEditorClipboard } from '@/components/GraphEditor/graphClipboard'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
+import type {
+  CarriedComponentBrowserInput,
+  ViewCarryOver,
+} from '@/components/GraphEditor/viewCarryOver'
 import { selectionActionHandlers } from '@/components/GraphEditor/selectionActions'
 import { createSelectionAlignmentHandlers } from '@/components/GraphEditor/selectionAlignment'
 import { useGraphTidy } from '@/components/GraphEditor/tidy/useGraphTidy'
@@ -88,6 +93,7 @@ import {
   onActivated,
   onDeactivated,
   onMounted,
+  onScopeDispose,
   ref,
   toRaw,
   toRef,
@@ -543,6 +549,7 @@ function openComponentBrowser(usage: Usage, position: Vec2) {
 function hideComponentBrowser() {
   graphStore.editedNodeInfo = undefined
   componentBrowserOpened.value = false
+  restoredComponentBrowserInput.value = undefined
   overrideDisplayedDocs.value = undefined
   aiMode.value = false
 }
@@ -634,6 +641,59 @@ watch(
 )
 
 const root = useTemplateRef<HTMLElement>('root')
+
+// === Session replacement ===
+
+// When the project's ydoc server session is replaced, its stores are made again and this view with
+// them (`reconnectProject` in `$/providers/openedProjects`). The view's own state is captured as
+// the old stores go, and put back when the new view mounts (`viewCarryOver.ts`).
+
+const openedProjects = useOpenedProjects()
+const componentBrowser = useTemplateRef('componentBrowser')
+const restoredComponentBrowserInput = ref<CarriedComponentBrowserInput>()
+
+function captureView(): ViewCarryOver {
+  const usage = componentBrowserUsage.value
+  const input = componentBrowserOpened.value ? componentBrowser.value?.captureInput() : undefined
+  const position = componentBrowserNodePosition.value
+  return {
+    selection: [...nodeSelection.selected],
+    dockOpen: showCodeEditor.value,
+    componentBrowser:
+      input != null ?
+        {
+          usage:
+            usage.type === 'editNode' ?
+              { type: 'editNode', node: usage.node }
+            : { type: 'newNode' },
+          position: { x: position.x, y: position.y },
+          input,
+        }
+      : undefined,
+  }
+}
+
+function restoreView(carried: ViewCarryOver) {
+  showCodeEditor.value = carried.dockOpen
+  nodeSelection.setSelection(new Set(carried.selection))
+  const browser = carried.componentBrowser
+  if (browser == null) return
+  if (browser.usage.type === 'editNode') {
+    // A node that is gone with the session's changes has nothing to edit.
+    if (!graphStore.db.nodeIdToNode.has(browser.usage.node)) return
+    restoredComponentBrowserInput.value = browser.input
+    graphStore.editedNodeInfo = { id: browser.usage.node, initialCursorPos: 0 }
+  } else {
+    restoredComponentBrowserInput.value = browser.input
+    openComponentBrowser({ type: 'newNode' }, new Vec2(browser.position.x, browser.position.y))
+  }
+}
+
+onScopeDispose(openedProjects.registerViewCarryOver(assetId.value, captureView))
+onMounted(() => {
+  const carried = openedProjects.takeViewCarryOver(assetId.value)
+  if (carried != null) restoreView(carried)
+})
 
 // === Node Creation ===
 
@@ -901,6 +961,7 @@ const contextMenuActions: DisplayableActionName[] = [
             :nodePosition="componentBrowserNodePosition"
             :usage="componentBrowserUsage"
             :graphEditorRoot="root"
+            :restoredInput="restoredComponentBrowserInput"
             @accepted="commitComponentBrowser"
             @acceptedAi="handleAiAccepted"
             @canceled="hideComponentBrowser"

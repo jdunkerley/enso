@@ -27,7 +27,7 @@ import {
   encodeControlMessage,
   parseControlMessage,
 } from 'ydoc-shared/ydocControl'
-import { VISUALIZATIONS_SUBDOC_KEY } from 'ydoc-shared/yjsModel'
+import { DistributedProject, VISUALIZATIONS_SUBDOC_KEY } from 'ydoc-shared/yjsModel'
 import { Doc, Map as YMap } from 'yjs'
 import mockDb from './data/mockSuggestions.json' with { type: 'json' }
 import { mockDataWSHandler } from './dataServer'
@@ -737,9 +737,38 @@ export const mockDataHandler = mockDataWSHandler(async (segments) => {
   return await file?.arrayBuffer()
 })
 
+/**
+ * The mock ydoc server's session (Note [A New Server Session] in `ydoc-shared`'s `yjsModel.ts`):
+ * every index doc it serves is marked with it, the same one for each connection, so that a socket
+ * that merely reconnects is not taken for a new session.
+ */
+let mockServerSession = 'mock-server-session-0'
+/** The index docs of the mock ydoc server's open connections, for {@link replaceMockServerSession}. */
+const mockIndexDocs = new Set<Doc>()
+
+/**
+ * Start a new mock ydoc server session, as a restarted ydoc host would: the open index docs get
+ * the new session's id, and the GUI makes its project stores again. The new connections' module
+ * docs are loaded afresh from the mocked sources ({@link setMockMainFile} changes them "on disk"),
+ * so edits the old ones received are not in them, as edits that never reached the file.
+ */
+export function replaceMockServerSession() {
+  mockServerSession = `mock-server-session-${crypto.randomUUID()}`
+  for (const doc of mockIndexDocs) new DistributedProject(doc).markServerSession(mockServerSession)
+}
+
+/** Forget the session replacements of an earlier test. */
+export function resetMockYdocServer() {
+  mockServerSession = 'mock-server-session-0'
+  mockIndexDocs.clear()
+}
+
 export const mockYdocProvider = (room: string, doc: Doc) => {
   const srcFiles: Record<string, string> = fileTree.src
   if (room === 'index') {
+    mockIndexDocs.add(doc)
+    doc.on('destroy', () => mockIndexDocs.delete(doc))
+    new DistributedProject(doc).markServerSession(mockServerSession)
     const modules = doc.getMap('modules')
     for (const file in srcFiles) modules.set(file, new Doc({ guid: `mock-${file}` }))
     // Install a vis subdoc placeholder so the client resolves the

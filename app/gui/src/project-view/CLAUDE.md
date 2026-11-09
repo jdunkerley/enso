@@ -60,6 +60,16 @@ collaborative edits, and uses `y-protocols` for awareness (cursors, selections).
 New interactions typically become composables in `components/GraphEditor/` or
 `composables/`.
 
+When the project's ydoc session is replaced, the view is unmounted with the old
+stores and mounted again with new ones (`reconnectProject`). `GraphEditor.vue`
+registers a capture of its own state with `registerViewCarryOver` and takes it
+back on mount (`takeViewCarryOver`): the selection (external ids), whether the
+bottom dock is open, and an open component browser with its input
+(`components/GraphEditor/viewCarryOver.ts`; the browser's `restoredInput` prop,
+`input.capture`/`restore`). The right panel, the dock's tab and the viewport
+outlive the view already. State added to the view that a user would miss after a
+reconnect belongs there too (#604).
+
 ## Visualizations
 
 Each visualization in `components/visualizations/` is compiled as a **custom
