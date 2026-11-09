@@ -246,7 +246,8 @@ Test files that start (fake) engines pass `firstPort` from
 own band (parallel workers), and each run starts at a random port inside it
 (another checkout's run at the same time). A new such file needs a band of its
 own there. The bands are 2,000 ports wide and ten of them end at 29,000; an
-eleventh needs the first band's start lowered.
+eleventh, `spareOpen.test.ts`'s, is 7,000 to 8,000 (clear of 5173 and 8080).
+Another needs the first band's start lowered, or a gap found the same way.
 
 ## Ports and the engine's health check
 
