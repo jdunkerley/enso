@@ -228,6 +228,10 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   launches never pick up the user's. An empty value counts as unset. The root
   and the gate are in `src/jvmAotSettings.ts` (tested in
   `tests/headless/jvmAotSettings.test.ts`).
+- `ENSO_SPARE_ENGINE=0` — no spare engine whatever Settings → Local → Engine
+  says (`project-manager-shim/CLAUDE.md`, "Spare engine"). The Playwright
+  fixture sets it for every spec but `spareEngine.spec.ts`; the open-time
+  harness sets it for `jvm` and `jvm-first`.
 - `APPIMAGE` (set by the AppImage runtime) — with the JVM as the default engine
   (`--engine-mode`, `ENSO_ENGINE_MODE`, then the built-in default; nothing
   happens while it is native), a Linux AppImage runs its engine from a copy at
