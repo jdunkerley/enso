@@ -2,16 +2,22 @@
 import { describe, expect, test } from 'vitest'
 import {
   classifyTemplate,
+  cpusLine,
   credentialFreeEnv,
   developMedians,
+  isSpareEngine,
   joinJvmOptions,
   median,
   notMeasured,
   openTimes,
   parseEngines,
   parseLsLogLine,
+  parseSpareOutput,
+  ratioTable,
   regressionWarnings,
   renderMarkdown,
+  spareRun,
+  spareTable,
   summarise,
   usedAotCache,
   type Engine,
@@ -542,5 +548,83 @@ describe('usedAotCache', () => {
     expect(regressionWarnings(base, undefined)).toEqual([
       expect.stringContaining('loaded almost no classes'),
     ])
+  })
+})
+
+describe('spare engines', () => {
+  const stderr = [
+    'Spare engine: started (pid 1)',
+    'standby: warm-up done in 6100 ms, preloading skipped: the AOT cache holds the classes, process CPU 21400 ms',
+    'STANDBY READY 7900',
+    'Spare engine: used (pid 1, ready after 8000 ms)',
+    'standby: warm-up done in 5900 ms, preloaded 7000 of 7100 classes, process CPU 20100 ms',
+    'STANDBY READY 7600',
+  ].join('\n')
+
+  test('parseEngines takes them and isSpareEngine knows them', () => {
+    expect(parseEngines('jvm-spare,jvm-spare-early,jvm-spare-abandon')).toEqual([
+      'jvm-spare',
+      'jvm-spare-early',
+      'jvm-spare-abandon',
+    ])
+    expect(isSpareEngine('jvm-spare-early')).toBe(true)
+    expect(isSpareEngine('jvm')).toBe(false)
+  })
+
+  test("reads each spare's ready time, warm-up and CPU", () => {
+    expect(parseSpareOutput(stderr)).toEqual({
+      readyMs: [7900, 7600],
+      warmUpMs: [6100, 5900],
+      cpuMs: [21400, 20100],
+    })
+  })
+
+  test('a ready time of -1 is read as is', () => {
+    expect(parseSpareOutput('STANDBY READY -1').readyMs).toEqual([-1])
+  })
+
+  test('a launch records its idle memory and which opens used a spare', () => {
+    const run = spareRun(stderr, [
+      { k: 'rss', t: 1, phase: 'spareIdle', engineKb: 700_000, ydocKb: 90_000 },
+      { k: 'first:spareUsed', t: 2, used: true },
+      { k: 'second:spareUsed', t: 3, used: false },
+    ])
+    expect(run.idleEngineKb).toBe(700_000)
+    expect(run.used).toEqual(['first'])
+  })
+
+  test('the tables give medians, ratios over native and the CPUs', () => {
+    const launch = (engine: 'native' | 'jvm-spare', headline: number, cpus = 8) => ({
+      engine,
+      run: 1,
+      first: { welcomeShown: headline },
+      second: { welcomeShown: headline - 500 },
+      notMeasured: [],
+      cpus,
+      ...(engine === 'jvm-spare' ?
+        {
+          spare: {
+            readyMs: [7900],
+            warmUpMs: [6100],
+            cpuMs: [21400],
+            idleEngineKb: 700 * 1024,
+            used: ['first', 'second'] as const,
+          },
+        }
+      : {}),
+    })
+    const report = {
+      version: 1 as const,
+      platform: 'win32',
+      commit: null,
+      template: 'core' as const,
+      runs: [launch('native', 2650), launch('jvm-spare', 3450)],
+    }
+    expect(ratioTable(report)).toContain('| jvm-spare | 1.30 |')
+    expect(spareTable(report)).toContain('| jvm-spare | 1 | 7900 | 6100 | 21400 | 700 | 2/2 |')
+    expect(cpusLine(report)).toBe('CPUs (the IDE’s affinity): 8.')
+    expect(
+      cpusLine({ ...report, runs: [launch('native', 1, 8), launch('jvm-spare', 1, 32)] }),
+    ).toBe('CPUs (the IDE’s affinity) differ between launches: 8, 32.')
   })
 })
