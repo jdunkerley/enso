@@ -55,7 +55,9 @@ it (trimmed, blank clears). It is sent nowhere except Mapbox. Test:
 ## Engine
 
 The Local tab's Engine section (`EngineSettingsSection.vue`) has one switch,
-"Pre-start the engine" (on by default), kept in `spareEngineSettingsStore`
+"Pre-start the engine" (on by default; its description gives the spare's cost as
+about 0.8 GB of memory while no project is open, the settled working set
+measured in #659), kept in `spareEngineSettingsStore`
 (`$/providers/spareEngineSettings`, `localStorage` key
 `enso-spare-engine-settings`). `useSpareEngineSync` (wired in `App.vue`) sends
 it to the project service (`engine/setSpare`) on load and on every change. The

@@ -7,6 +7,7 @@ import * as readline from 'node:readline'
 import * as url from 'node:url'
 
 import type { Electron } from '@/electron'
+import { setJvmAotTrainingStatus } from '@/jvmAotIpc'
 import {
   AfterFirstOpen,
   appImageEngine,
@@ -189,8 +190,13 @@ function createJvmAotCache(
     appVersion: app.getVersion(),
     ensoExecutable,
     isJvmDefault: () => isJvmDefaultEngine(engine, process.env),
-    // No spare engine starts while the cache trains (`isTraining`); once it has, one is wanted.
-    onTrainingEnded: () => void projectService?.refreshSpare(),
+    // The GUI shows a toast from a training's start until it ends.
+    onTrainingStarted: () => setJvmAotTrainingStatus('training'),
+    onTrainingEnded: (outcome) => {
+      setJvmAotTrainingStatus(outcome)
+      // No spare engine starts while the cache trains (`isTraining`); once it has, one is wanted.
+      void projectService?.refreshSpare()
+    },
   })
 }
 

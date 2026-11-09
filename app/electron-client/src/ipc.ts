@@ -70,6 +70,13 @@ export enum Channel {
   /** Main → renderer: broadcast whenever the `UpdateStatus` changes. */
   updaterStatus = 'updater-status',
   /**
+   * Renderer → main: query this launch's JDK AOT cache training (`JvmAotTrainingStatus` from
+   * `enso-common/src/jvmAot`), so that a window loaded mid-training learns of it.
+   */
+  jvmAotTrainingStatus = 'jvm-aot-training-status',
+  /** Main → renderer: broadcast whenever the JDK AOT cache training's status changes. */
+  jvmAotTrainingStatusChanged = 'jvm-aot-training-status-changed',
+  /**
    * Renderer → main: copy the local secrets key to the clipboard. Main writes the clipboard itself,
    * so the key never reaches the renderer; resolves `false` when there is no key.
    */

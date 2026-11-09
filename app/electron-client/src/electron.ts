@@ -1,5 +1,6 @@
 import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
+import { initJvmAotIpc } from '@/jvmAotIpc'
 import { resolveLogFileToReveal } from '@/logFileReveal'
 import * as paths from '@/paths'
 import {
@@ -77,6 +78,7 @@ export function initIpc(
 ) {
   // The installer must not meet a spare engine still holding the engine's files.
   initUpdaterIpc(BUILD_INFO.updates, electronUpdater.autoUpdater, stopSpareEngine)
+  initJvmAotIpc()
   // The key is written to the clipboard here, in main: it never crosses into the renderer.
   ipcMain.handle(Channel.secretsCopyKey, () => {
     const key = getSecretsKeySource().exportKey()
