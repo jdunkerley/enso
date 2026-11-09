@@ -158,16 +158,19 @@ exits with 0.
 - A warm-up still running 60 s after the line is cancelled
   (`standby: warm-up abandoned after 60 s`), and a bad line, or stdin closing
   before the line, cancels a running warm-up and waits for it before the process
-  exits, so its folder is deleted. The warm-up's folder and cache are deleted
-  file by file: what cannot be (a file still open on Windows) is left, with one
-  warning line.
+  exits, so its folder is deleted. After stdin closes that wait is at most 10 s
+  (`Standby.CLOSE_WAIT`; the IDE may be quitting): a warm-up still running then
+  is left to the exit, with a
+  `standby: warning: the cancelled warm-up did not stop within 10 s` line. The
+  warm-up's folder and cache are deleted file by file: what cannot be (a file
+  still open on Windows) is left, with one warning line.
 - Tests:
   - `StandbyRequestTest` (`StandbyRequest`, `StandbyJson`): the grammar; errors
     never echo a value (a sentinel in each malformed form).
   - `StandbyTest`: the wait (the line before and after the warm-up, abandon, the
     60 s limit, a bad line or a closed stdin stopping a running warm-up, stdin
-    closed first, `readLine` leaving the rest of stdin), and an unreadable
-    `jvm.options`.
+    closed first, the bounded wait for a warm-up that ignores its cancel,
+    `readLine` leaving the rest of stdin), and an unreadable `jvm.options`.
   - `StandbyPreloaderTest`: the list and the AOT-cache skip.
   - `StandbyWarmUpTest`: a cancel before the run, and deletion that goes on past
     an undeletable file.

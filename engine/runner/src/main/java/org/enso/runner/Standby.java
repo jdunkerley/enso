@@ -99,10 +99,18 @@ final class Standby {
   private final PrintStream err;
   private final boolean abandonOnLine;
   private final Duration lineWait;
+  private final Duration closeWait;
   private volatile boolean abandoned;
 
   /** How long a warm-up may still run once the line has arrived, before it is abandoned. */
   static final Duration LINE_WAIT = Duration.ofSeconds(60);
+
+  /**
+   * How long a warm-up cancelled because stdin closed before the line may take to stop, before the
+   * process exits regardless: the IDE that closed it may be quitting, and must not leave a JVM
+   * behind.
+   */
+  static final Duration CLOSE_WAIT = Duration.ofSeconds(10);
 
   Standby(WarmUp warmUp, Preload preload, PrintStream err, boolean abandonOnLine) {
     this(warmUp, preload, err, abandonOnLine, LINE_WAIT);
@@ -110,11 +118,22 @@ final class Standby {
 
   Standby(
       WarmUp warmUp, Preload preload, PrintStream err, boolean abandonOnLine, Duration lineWait) {
+    this(warmUp, preload, err, abandonOnLine, lineWait, CLOSE_WAIT);
+  }
+
+  Standby(
+      WarmUp warmUp,
+      Preload preload,
+      PrintStream err,
+      boolean abandonOnLine,
+      Duration lineWait,
+      Duration closeWait) {
     this.warmUp = warmUp;
     this.preload = preload;
     this.err = err;
     this.abandonOnLine = abandonOnLine;
     this.lineWait = lineWait;
+    this.closeWait = closeWait;
   }
 
   /** The standby of `enso --standby`: the real warm-up and preloader, and the two properties. */
@@ -184,7 +203,7 @@ final class Standby {
    * Start the warm-up, and read the argument line.
    *
    * @return the request, once the warm-up is over; {@code null} when stdin closed first (the
-   *     warm-up is then cancelled, and over)
+   *     warm-up is then cancelled, and over, or still stopping after {@link #CLOSE_WAIT})
    * @throws IllegalArgumentException when the line is not a valid request
    */
   StandbyRequest awaitRequest(InputStream in) throws IOException, InterruptedException {
@@ -204,9 +223,15 @@ final class Standby {
     var line = readLine(in);
     if (line == null) {
       // The process exits with 0 next: stop the warm-up first, so that its folder and IR cache are
-      // deleted.
+      // deleted. A warm-up that does not stop in time is left to the exit, which loses its cleanup:
+      // the IDE closes stdin when it quits, and a JVM must not outlive it.
       abandon();
-      finished.await();
+      if (!finished.await(closeWait.toMillis(), TimeUnit.MILLISECONDS)) {
+        err.println(
+            "standby: warning: the cancelled warm-up did not stop within "
+                + describe(closeWait)
+                + "; exiting without it");
+      }
       return null;
     }
     StandbyRequest request;
@@ -223,13 +248,17 @@ final class Standby {
     }
     // A warm-up that hangs must not hold the open for good.
     if (!finished.await(lineWait.toMillis(), TimeUnit.MILLISECONDS)) {
-      var ms = lineWait.toMillis();
-      err.println(
-          "standby: warm-up abandoned after " + (ms % 1000 == 0 ? ms / 1000 + " s" : ms + " ms"));
+      err.println("standby: warm-up abandoned after " + describe(lineWait));
       abandon();
       finished.await();
     }
     return request;
+  }
+
+  /** {@code 60 s}, or {@code 200 ms} when not whole seconds. */
+  private static String describe(Duration duration) {
+    var ms = duration.toMillis();
+    return ms % 1000 == 0 ? ms / 1000 + " s" : ms + " ms";
   }
 
   private void abandon() {
