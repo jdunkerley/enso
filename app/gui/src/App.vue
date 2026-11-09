@@ -22,6 +22,7 @@ import {
 } from '$/composables/appShellEffects'
 import { useOfflineNotification } from '$/composables/offlineNotification'
 import { useSecretsKeyReminder } from '$/composables/secretsKeyReminder'
+import { useSpareEngineSync } from '$/composables/spareEngineSync'
 import { useCodeFontRootClasses } from '$/providers/codeFont'
 import { appOpenCloseCallback } from '$/utils/analytics'
 import '@/assets/base.css'
@@ -88,6 +89,7 @@ useClearSelectionOnClick()
 useDevNavigate()
 useOfflineNotification()
 useSecretsKeyReminder()
+useSpareEngineSync()
 
 // The "About Enso" dialog, opened by the app menu here, and by the user and info menus. Loaded on
 // first use, so that it keeps the dialog (and Reka) out of the initial chunk, and kept mounted
