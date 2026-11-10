@@ -8,7 +8,10 @@ import { readToolchainPins } from '../../../ci/toolchain-pins.mjs'
 
 /** The pinned versions `toolchain-check` compares against. */
 export interface Pins {
+  /** The GraalVM release (`toolchain.graalvm`): the Maven packages and the download tag. */
   readonly graalvm: string
+  /** The GraalVM JDK's own version (`toolchain.graalvm-jdk`); on 25.0.x the release's. */
+  readonly graalvmJdk: string
   readonly sbt: string
   readonly flatc: string
   readonly graalpy: string
@@ -35,6 +38,7 @@ export function readPins(files: PinFiles): Pins {
   const manifest = JSON.parse(files.packageJson) as { packageManager?: string }
   return {
     graalvm: required(toolchain.graalvm, 'build-config.yaml (`toolchain.graalvm`)'),
+    graalvmJdk: required(toolchain['graalvm-jdk'], 'build-config.yaml (`toolchain.graalvm-jdk`)'),
     sbt: required(toolchain.sbt, 'build-config.yaml (`toolchain.sbt`)'),
     flatc: required(toolchain.flatc, 'build-config.yaml (`toolchain.flatc`)'),
     graalpy: required(toolchain.graalpy, 'build-config.yaml (`toolchain.graalpy`)'),
@@ -62,21 +66,52 @@ export interface Tool {
   readonly required: boolean
   /** A different version fails the check; otherwise it is a warning. */
   readonly strict: boolean
+  /** Whether `found` is the expected version; plain equality when absent. */
+  readonly accepts?: (found: string) => boolean
   readonly hint: string
+}
+
+/**
+ * GraalVM's release and JDK versions in `java -version`'s output, as `<release> (JDK <jdk>)`, or
+ * `null`. The vendor line names the release and its build the JDK: `GraalVM CE 25.0.1+8.1 (build
+ * 25.0.1+8-jvmci-b01)` on 25.0.x, `GraalVM CE 25.5.5.0.3+1.1 (build 25.0.5.0.3+1-jvmci-25.5-b26)`
+ * on the innovation line (Note [GraalVM Follows The Innovation Line] in
+ * `project/Dependencies.scala`).
+ */
+export function parseGraalVM(output: string): string | null {
+  const match = output.match(/GraalVM CE (\d+(?:\.\d+)*)\S* \(build (\d+(?:\.\d+)*)\+/)
+  return match == null ? null : graalVMVersions(match[1]!, match[2]!)
+}
+
+function graalVMVersions(release: string, jdk: string): string {
+  return `${release} (JDK ${jdk})`
+}
+
+/**
+ * Where the GraalVM CE JDK for these pins is downloaded: the innovation line's `graal-<release>`
+ * tag, or `jdk-<version>` on 25.0.x, where the JDK and the release share a version.
+ */
+export function graalVMDownload(pins: Pick<Pins, 'graalvm' | 'graalvmJdk'>): string {
+  const tag = pins.graalvm === pins.graalvmJdk ? `jdk-${pins.graalvm}` : `graal-${pins.graalvm}`
+  return `https://github.com/graalvm/graalvm-ce-builds/releases/tag/${tag}`
 }
 
 /** The tools to check, in the order they are reported. */
 export function toolsToCheck(pins: Pins): Tool[] {
+  const sdkman =
+    pins.graalvm === pins.graalvmJdk ?
+      ` (SDKMAN: \`sdk install java ${pins.graalvm}-graalce\`)`
+    : ''
   return [
     {
       name: 'GraalVM',
       program: 'java',
       args: ['-version'],
-      expected: pins.graalvm,
-      parse: (output) => output.match(/GraalVM CE (\d+(?:\.\d+)*)/)?.[1] ?? null,
+      expected: graalVMVersions(pins.graalvm, pins.graalvmJdk),
+      parse: parseGraalVM,
       required: true,
       strict: true,
-      hint: `Install GraalVM Community ${pins.graalvm}, first on the PATH, with JAVA_HOME pointing at it (SDKMAN: \`sdk install java ${pins.graalvm}-graalce\`). sbt refuses any other JDK.`,
+      hint: `Install GraalVM Community ${pins.graalvm} (JDK ${pins.graalvmJdk}) from ${graalVMDownload(pins)}${sdkman}, first on the PATH, with JAVA_HOME pointing at it. sbt refuses any other JDK.`,
     },
     {
       name: 'sbt launcher',
@@ -134,9 +169,11 @@ export function toolsToCheck(pins: Pins): Tool[] {
       args: ['--version'],
       expected: pins.graalpy,
       parse: (output) => output.match(/GraalVM CE Native (\d+(?:\.\d+)*)/)?.[1] ?? null,
+      // GraalPy 25.5.5 reports the GraalVM release it was built from, 25.5.5.0.3.
+      accepts: (found) => found === pins.graalpy || found.startsWith(`${pins.graalpy}.`),
       required: false,
       strict: false,
-      hint: `Optional: only test/Examples_Tests' Python spec runs it, and is skipped without it. Download graalpy-community-${pins.graalpy} from https://github.com/oracle/graalpython/releases/tag/graal-${pins.graalpy} and put its bin on the PATH.`,
+      hint: `Optional: only test/Examples_Tests' Python spec runs it, and is skipped without it. Download the community standalone (\`graalpy3.<n>-community-${pins.graalpy}-…\`, or \`graalpy-community-${pins.graalpy}-…\` before 25.5) from https://github.com/oracle/graalpython/releases/tag/graal-${pins.graalpy} and put its bin on the PATH.`,
     },
   ]
 }
@@ -161,7 +198,8 @@ export function evaluate(tool: Tool, exitStatus: number, output: string): Result
       fails: tool.required,
     }
   }
-  if (found === tool.expected) return { tool, found, status: 'ok', fails: false }
+  const accepted = tool.accepts?.(found) ?? found === tool.expected
+  if (accepted) return { tool, found, status: 'ok', fails: false }
   return { tool, found, status: 'mismatch', fails: tool.strict }
 }
 

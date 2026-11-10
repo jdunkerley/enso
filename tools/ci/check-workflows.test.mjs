@@ -572,52 +572,92 @@ ${conditions.map((c, i) => `  job${i}:\n    if: "\${{ ${c} }}"\n`).join('')}`
 })
 
 describe('checkToolchainPins', () => {
+  /** A `Dependencies.scala` with the JDK, the release and GraalPy at the given versions. */
+  const scalaWith = (jdk, release, graalpy) =>
+    `object Dependencies {\n  val graalVersion = "${jdk}"\n  val graalMavenPackagesVersion = "${release}"\n  val graalPyVersion = "${graalpy}"\n  val flatbuffersVersion      = "24.3.25"\n}\n`
   const build = {
-    'project/Dependencies.scala':
-      'object Dependencies {\n  val graalVersion = "25.0.1"\n  val graalMavenPackagesVersion = "25.0.1"\n  val flatbuffersVersion      = "24.3.25"\n}\n',
+    'project/Dependencies.scala': scalaWith('25.0.1', '25.0.1', '25.0.1'),
     'project/build.properties': '# HELD at 1.10.6.\r\nsbt.version=1.10.6\r\n',
   }
   const config = (pins) => `latest-release: 2025.3.4\ntoolchain:\n${pins}`
-  const allPins =
-    '  graalvm: 25.0.1\n  sbt: 1.10.6 # held\n  flatc: 24.3.25\n  graalpy: 25.0.1\n'
+  /** The `toolchain:` block with the JDK, the release and GraalPy at the given versions. */
+  const pinsWith = (jdk, release, graalpy) =>
+    `  graalvm: ${release}\n  graalvm-jdk: ${jdk}\n  sbt: 1.10.6 # held\n  flatc: 24.3.25\n  graalpy: ${graalpy}\n`
+  const allPins = pinsWith('25.0.1', '25.0.1', '25.0.1')
   test("accepts pins equal to the build's own copies", () => {
     const repo = fixture({}, { 'build-config.yaml': config(allPins), ...build })
     assert.deepEqual(checkToolchainPins(repo), [])
+  })
+  test('accepts an innovation release: five-part versions, the JDK not the release', () => {
+    const repo = fixture(
+      {},
+      {
+        ...build,
+        'build-config.yaml': config(pinsWith('25.0.5.0.3', '25.5.5.0.3', '25.5.5')),
+        'project/Dependencies.scala': scalaWith('25.0.5.0.3', '25.5.5.0.3', '25.5.5'),
+      },
+    )
+    assert.deepEqual(checkToolchainPins(repo), [])
+  })
+  test('pairs each GraalVM pin with its own copy, not with the other two', () => {
+    // The JDK and the release swapped, and GraalPy given the release's version.
+    const repo = fixture(
+      {},
+      {
+        ...build,
+        'build-config.yaml': config(pinsWith('25.5.5.0.3', '25.0.5.0.3', '25.5.5.0.3')),
+        'project/Dependencies.scala': scalaWith('25.0.5.0.3', '25.5.5.0.3', '25.5.5'),
+      },
+    )
+    assert.deepEqual(checkToolchainPins(repo), [
+      'build-config.yaml: `toolchain.graalvm` is 25.0.5.0.3, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.5.5.0.3',
+      'build-config.yaml: `toolchain.graalvm-jdk` is 25.5.5.0.3, but `graalVersion` in project/Dependencies.scala is 25.0.5.0.3',
+      'build-config.yaml: `toolchain.graalpy` is 25.5.5.0.3, but `graalPyVersion` in project/Dependencies.scala is 25.5.5',
+    ])
   })
   test('rejects a pin that drifted, and a missing pin', () => {
     const pins = '  graalvm: 25.0.2\n  sbt: 1.10.6\n  graalpy: 25.0.1\n'
     const problems = checkToolchainPins(fixture({}, { 'build-config.yaml': config(pins), ...build }))
     assert.deepEqual(problems.sort(), [
       'build-config.yaml: `toolchain.graalvm` is 25.0.2, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.1',
-      'build-config.yaml: `toolchain.graalvm` is 25.0.2, but `graalVersion` in project/Dependencies.scala is 25.0.1',
       'build-config.yaml: no `toolchain.flatc` pin',
+      'build-config.yaml: no `toolchain.graalvm-jdk` pin',
     ])
   })
   test('rejects a half-bumped GraalVM: the Maven packages behind the JDK', () => {
-    const scala = build['project/Dependencies.scala'].replace(
-      'graalMavenPackagesVersion = "25.0.1"',
-      'graalMavenPackagesVersion = "25.0.0"',
-    )
-    const repo = fixture(
-      {},
-      { ...build, 'build-config.yaml': config(allPins), 'project/Dependencies.scala': scala },
-    )
-    assert.deepEqual(checkToolchainPins(repo), [
-      'build-config.yaml: `toolchain.graalvm` is 25.0.1, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.0',
-      'build-config.yaml: `toolchain.graalpy` is 25.0.1, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.0',
-    ])
-  })
-  test('compares versions as text, as the awk reader does', () => {
-    const scala = build['project/Dependencies.scala'].replaceAll('"25.0.1"', '"25.0"')
     const repo = fixture(
       {},
       {
         ...build,
-        'build-config.yaml': config(allPins.replaceAll('25.0.1', '25.0')),
-        'project/Dependencies.scala': scala,
+        'build-config.yaml': config(pinsWith('25.0.5.0.3', '25.5.5.0.3', '25.5.5')),
+        'project/Dependencies.scala': scalaWith('25.0.5.0.3', '25.0.1', '25.5.5'),
+      },
+    )
+    assert.deepEqual(checkToolchainPins(repo), [
+      'build-config.yaml: `toolchain.graalvm` is 25.5.5.0.3, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.1',
+    ])
+  })
+  test('compares versions as text, as the awk reader does', () => {
+    const repo = fixture(
+      {},
+      {
+        ...build,
+        'build-config.yaml': config(pinsWith('25.0', '25.0', '25.0')),
+        'project/Dependencies.scala': scalaWith('25.0', '25.0', '25.0'),
       },
     )
     assert.deepEqual(checkToolchainPins(repo), [])
+    const padded = fixture(
+      {},
+      {
+        ...build,
+        'build-config.yaml': config(pinsWith('25.0.1', '25.0.1.0', '25.0.1')),
+        'project/Dependencies.scala': scalaWith('25.0.1', '25.0.1', '25.0.1'),
+      },
+    )
+    assert.deepEqual(checkToolchainPins(padded), [
+      'build-config.yaml: `toolchain.graalvm` is 25.0.1.0, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.1',
+    ])
   })
   test('rejects a quoted pin, which the awk reader would pass on with its quotes', () => {
     const pins = allPins.replace('25.0.1', '"25.0.1"')
@@ -631,46 +671,69 @@ describe('checkToolchainPins', () => {
       {},
       {
         'build-config.yaml': config(allPins),
-        'project/Dependencies.scala': build['project/Dependencies.scala'],
+        'project/Dependencies.scala': build['project/Dependencies.scala'].replace(
+          /\n {2}val graalPyVersion.*/,
+          '',
+        ),
       },
     )
-    assert.deepEqual(checkToolchainPins(repo), ['project/build.properties: no `sbt.version` found'])
+    assert.deepEqual(checkToolchainPins(repo), [
+      'project/Dependencies.scala: no `graalPyVersion` found',
+      'project/build.properties: no `sbt.version` found',
+    ])
     assert.deepEqual(checkToolchainPins(fixture({})), ['build-config.yaml: missing'])
   })
 })
 
 describe('checkNativeLibsFixtures', () => {
-  const scala = 'object Dependencies {\n  val graalVersion = "25.0.1"\n}\n'
+  const scala =
+    'object Dependencies {\n  val graalVersion = "25.0.1"\n  val graalMavenPackagesVersion = "25.0.1"\n}\n'
   const libs = (version) =>
     JSON.stringify({
       [`component/truffle-api-${version}.jar`]: ['a.so'],
       [`component/truffle-nfi-libffi-${version}.jar`]: ['b.so'],
     })
-  const repoWith = (base, cloud) =>
+  const repoWith = (base, cloud, dependencies = scala) =>
     fixture(
       {},
       {
-        'project/Dependencies.scala': scala,
+        'project/Dependencies.scala': dependencies,
         'test/Base_Tests/data/native_libs.json': base,
         'test/Cloud_Tests/data/native_libs.json': cloud,
       },
     )
-  test('accepts fixtures keyed by the graalVersion', () => {
+  test('accepts fixtures keyed by the graalMavenPackagesVersion', () => {
     assert.deepEqual(checkNativeLibsFixtures(repoWith(libs('25.0.1'), libs('25.0.1'))), [])
+  })
+  test('keys on the release, not the JDK, on the innovation line', () => {
+    const innovation = scala
+      .replace('graalVersion = "25.0.1"', 'graalVersion = "25.0.5.0.3"')
+      .replace('graalMavenPackagesVersion = "25.0.1"', 'graalMavenPackagesVersion = "25.5.5.0.3"')
+    assert.deepEqual(
+      checkNativeLibsFixtures(repoWith(libs('25.5.5.0.3'), libs('25.5.5.0.3'), innovation)),
+      [],
+    )
+    assert.deepEqual(
+      checkNativeLibsFixtures(repoWith(libs('25.5.5.0.3'), libs('25.0.5.0.3'), innovation)),
+      [
+        'test/Cloud_Tests/data/native_libs.json: `component/truffle-api-25.0.5.0.3.jar` is not for `graalMavenPackagesVersion` 25.5.5.0.3 in project/Dependencies.scala',
+        'test/Cloud_Tests/data/native_libs.json: `component/truffle-nfi-libffi-25.0.5.0.3.jar` is not for `graalMavenPackagesVersion` 25.5.5.0.3 in project/Dependencies.scala',
+      ],
+    )
   })
   test('rejects a fixture left behind by a GraalVM bump', () => {
     const problems = checkNativeLibsFixtures(repoWith(libs('25.0.1'), libs('25.0.0')))
     assert.deepEqual(problems, [
-      'test/Cloud_Tests/data/native_libs.json: `component/truffle-api-25.0.0.jar` is not for `graalVersion` 25.0.1 in project/Dependencies.scala',
-      'test/Cloud_Tests/data/native_libs.json: `component/truffle-nfi-libffi-25.0.0.jar` is not for `graalVersion` 25.0.1 in project/Dependencies.scala',
+      'test/Cloud_Tests/data/native_libs.json: `component/truffle-api-25.0.0.jar` is not for `graalMavenPackagesVersion` 25.0.1 in project/Dependencies.scala',
+      'test/Cloud_Tests/data/native_libs.json: `component/truffle-nfi-libffi-25.0.0.jar` is not for `graalMavenPackagesVersion` 25.0.1 in project/Dependencies.scala',
     ])
   })
-  test('rejects a missing or malformed fixture, and a build without graalVersion', () => {
+  test('rejects a missing or malformed fixture, and a build without the release', () => {
     const problems = checkNativeLibsFixtures(repoWith(libs('25.0.1'), 'not json'))
     assert.deepEqual(problems, ['test/Cloud_Tests/data/native_libs.json: missing or not a JSON object'])
     const none = fixture({}, { 'project/Dependencies.scala': 'object Dependencies {}\n' })
     assert.deepEqual(checkNativeLibsFixtures(none), [
-      'project/Dependencies.scala: no `graalVersion` found',
+      'project/Dependencies.scala: no `graalMavenPackagesVersion` found',
     ])
   })
 })

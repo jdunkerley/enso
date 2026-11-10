@@ -12,12 +12,20 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
-import { readToolchainPins, TOOLCHAIN_PIN_FILES, TOOLCHAIN_PINS } from './toolchain-pins.mjs'
+import {
+  GRAALVM_RELEASE_PIN,
+  readToolchainPins,
+  TOOLCHAIN_PIN_FILES,
+  TOOLCHAIN_PINS,
+} from './toolchain-pins.mjs'
 
 /** Specs and plans: a pull request that changes only these starts no workflow. */
 export const SPEC_PATHS = 'docs/superpowers/**'
 
-/** Test fixtures keyed by `component/truffle-*-<graalVersion>.jar`; see `checkNativeLibsFixtures`. */
+/**
+ * Test fixtures keyed by `component/truffle-*-<graalMavenPackagesVersion>.jar`; see
+ * `checkNativeLibsFixtures`.
+ */
 export const NATIVE_LIBS_FILES = [
   'test/Base_Tests/data/native_libs.json',
   'test/Cloud_Tests/data/native_libs.json',
@@ -697,8 +705,11 @@ export function checkWindowsInstallerSmokeTest({ workflows }) {
  * `.github/actions/setup-jvm` installs the versions pinned under `toolchain:` in
  * `build-config.yaml`, read by `readToolchainPins` (`toolchain-pins.mjs`) exactly as its awk does.
  * sbt enforces its own copies (`Running on GraalVM version X. Expected GraalVM version Y.`, the
- * `flatc` version check, `sbt.version`), so each pin must equal the build's. A pin is a bare
- * version: `setup-jvm` reads it with awk, which does not unquote.
+ * `flatc` version check, `sbt.version`), so each pin must equal the build's: `graalvm` the
+ * release (`graalMavenPackagesVersion`), `graalvm-jdk` the JDK (`graalVersion`), `graalpy`
+ * `graalPyVersion`. They are compared as text, so a five-part innovation version
+ * (`25.5.5.0.3`) needs nothing special. A pin is a bare version: `setup-jvm` reads it with awk,
+ * which does not unquote.
  */
 export function checkToolchainPins({ files }) {
   const config = files?.['build-config.yaml']
@@ -734,13 +745,16 @@ export function checkToolchainPins({ files }) {
 
 /**
  * The `native_libs.json` test fixtures list the native libraries inside GraalVM's Truffle jars and
- * are keyed by jar name (`component/truffle-api-<graalVersion>.jar`). A GraalVM bump that leaves
- * them behind fails only in the Standard Library test jobs, ~20 minutes in. So every key must name
- * the `graalVersion` in `project/Dependencies.scala`, and there must be a `truffle-api` key.
+ * are keyed by jar name (`component/truffle-api-<version>.jar`). Jars carry the GraalVM release's
+ * Maven version, which on the innovation line is not the JDK's. A GraalVM bump that leaves them
+ * behind fails only in the Standard Library test jobs, ~20 minutes in. So every key must name the
+ * `graalMavenPackagesVersion` in `project/Dependencies.scala`, and there must be a `truffle-api`
+ * key.
  */
 export function checkNativeLibsFixtures({ files }) {
-  const graalVersion = files?.['project/Dependencies.scala']?.match(TOOLCHAIN_PINS[0].pattern)?.[1]
-  if (graalVersion == null) return ['project/Dependencies.scala: no `graalVersion` found']
+  const { name, pattern } = GRAALVM_RELEASE_PIN
+  const release = files?.['project/Dependencies.scala']?.match(pattern)?.[1]
+  if (release == null) return [`project/Dependencies.scala: no \`${name}\` found`]
   const problems = []
   for (const file of NATIVE_LIBS_FILES) {
     let keys
@@ -752,14 +766,14 @@ export function checkNativeLibsFixtures({ files }) {
     }
     for (const key of keys) {
       const version = key.match(/-(\d[^/]*)\.jar$/)?.[1]
-      if (version !== graalVersion) {
+      if (version !== release) {
         problems.push(
-          `${file}: \`${key}\` is not for \`graalVersion\` ${graalVersion} in project/Dependencies.scala`,
+          `${file}: \`${key}\` is not for \`${name}\` ${release} in project/Dependencies.scala`,
         )
       }
     }
     if (!keys.some((key) => key.includes('/truffle-api-'))) {
-      problems.push(`${file}: no \`component/truffle-api-${graalVersion}.jar\` key`)
+      problems.push(`${file}: no \`component/truffle-api-${release}.jar\` key`)
     }
   }
   return problems

@@ -5,11 +5,15 @@ import org.enso.semver.SemVer
 /** Version information identifying the runtime that can be used with an engine
   * release.
   *
-  * @param graalVersion version of the GraalVM. Can be specified as a semantic
-  *                     version.
-  * @param javaVersion Java version of the GraalVM flavour that should be used.
-  *                    Can be specified either as a single integer or as a
-  *                    semantic version
+  * @param graalVersion version of the GraalVM release (an engine manifest's
+  *                     `graal-vm-version`). Can be specified as a semantic
+  *                     version, or as up to five dot-separated numbers (an
+  *                     innovation release, e.g. `25.5.5.0.3`).
+  * @param javaVersion Java version of the GraalVM flavour that should be used
+  *                    (`graal-java-version`). Can be specified as a single
+  *                    integer, a semantic version or up to five dot-separated
+  *                    numbers (`25.0.5.0.3`). On GraalVM's innovation line it
+  *                    differs from the release's version.
   */
 case class GraalVMVersion(graalVersion: String, javaVersion: String)
     extends Comparable[GraalVMVersion] {
@@ -39,6 +43,11 @@ case class GraalVMVersion(graalVersion: String, javaVersion: String)
         return comp
       }
     }
+    val javaNumericComp =
+      GraalVMVersion.compareNumeric(javaVersion, other.javaVersion)
+    if (javaNumericComp.exists(_ != 0)) {
+      return javaNumericComp.get
+    }
 
     val graalSemVer      = SemVer.parse(graalVersion)
     val otherGraalSemVer = SemVer.parse(other.graalVersion)
@@ -47,6 +56,11 @@ case class GraalVMVersion(graalVersion: String, javaVersion: String)
       if (comp != 0) {
         return comp
       }
+    }
+    val graalNumericComp =
+      GraalVMVersion.compareNumeric(graalVersion, other.graalVersion)
+    if (graalNumericComp.exists(_ != 0)) {
+      return graalNumericComp.get
     }
 
     val javaMajorComp = javaMajorVersion.compareTo(other.javaMajorVersion)
@@ -63,13 +77,32 @@ case class GraalVMVersion(graalVersion: String, javaVersion: String)
 }
 
 object GraalVMVersion {
-  def isCorrectVersionFormat(version: String): Boolean = {
-    version.toIntOption match {
-      case Some(_) => true
-      case None =>
-        SemVer
-          .parse(version)
-          .fold(_ => version.matches("^(\\d+\\.){3}\\d+$"), _ => true)
+
+  /** One to five dot-separated numbers. GraalVM's innovation releases have
+    * five: release `25.5.5.0.3` ships JDK `25.0.5.0.3`.
+    */
+  private val numericVersion = "^\\d+(\\.\\d+){0,4}$"
+
+  def isCorrectVersionFormat(version: String): Boolean =
+    version.matches(numericVersion) || SemVer.parse(version).isSuccess
+
+  /** Compares two versions made of dot-separated numbers component by
+    * component, a missing component counting as zero; `None` unless both are
+    * of that form.
+    */
+  private[components] def compareNumeric(a: String, b: String): Option[Int] =
+    if (a.matches(numericVersion) && b.matches(numericVersion)) {
+      val as = a.split('.').map(_.toLong)
+      val bs = b.split('.').map(_.toLong)
+      val n  = math.max(as.length, bs.length)
+      Some(
+        as.padTo(n, 0L)
+          .zip(bs.padTo(n, 0L))
+          .map { case (x, y) => java.lang.Long.compare(x, y) }
+          .find(_ != 0)
+          .getOrElse(0)
+      )
+    } else {
+      None
     }
-  }
 }

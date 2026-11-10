@@ -193,15 +193,19 @@ settings. Every workflow is hand-written YAML (build simplification;
   `rust: "true"`. Quote `-D` arguments (`sbt "-Dsbt.server.autostart=false" …`):
   on Windows, PowerShell splits an unquoted one at its first dot.
   `tools/ci/check-workflows.mjs` fails a job that runs `sbt` before `setup-jvm`,
-  and fails `build-config.yaml`'s pins if they drift from `graalVersion`,
-  `graalMavenPackagesVersion`, `flatbuffersVersion`
-  (`project/Dependencies.scala`) or `sbt.version` (`project/build.properties`).
-  It counts `sbt` (and `sbt.bat`) as a command after inline `VAR=value`
-  assignments and wrappers (`timeout`, `time`, `env`, `nice`, `xvfb-run`,
-  `cmd /c`), inside `bash -c` and `pwsh -Command` scripts and local composite
-  actions, and behind any `tools/build-scripts` command that starts sbt (one
-  whose entry point imports `src/lib/sbt.ts`), run as a package script or with
-  plain node.
+  and fails `build-config.yaml`'s pins if they drift from `graalVersion`
+  (`graalvm-jdk`), `graalMavenPackagesVersion` (`graalvm`), `graalPyVersion`
+  (`graalpy`), `flatbuffersVersion` (`project/Dependencies.scala`) or
+  `sbt.version` (`project/build.properties`). `setup-jvm` installs GraalVM CE
+  with `graalvm/setup-graalvm` when the release and the JDK share a version
+  (25.0.x), and otherwise downloads the innovation release's archive itself and
+  checks its `.sha256` (Note [GraalVM Innovation Releases] in its `action.yml`);
+  GraalPy's asset name is read from its release. It counts `sbt` (and `sbt.bat`)
+  as a command after inline `VAR=value` assignments and wrappers (`timeout`,
+  `time`, `env`, `nice`, `xvfb-run`, `cmd /c`), inside `bash -c` and
+  `pwsh -Command` scripts and local composite actions, and behind any
+  `tools/build-scripts` command that starts sbt (one whose entry point imports
+  `src/lib/sbt.ts`), run as a package script or with plain node.
 
 ## Where the build logic lives
 
