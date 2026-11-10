@@ -167,8 +167,12 @@ final class PyForeignNode extends GenericForeignNode {
                     def dst(self, dt):
                       return self._rules.dst(dt);
 
-                  def conv(rules):
-                      return EnsoTzInfo(rules)
+                  def conv(rules, fixed_offset):
+                      if fixed_offset == -2147483648:
+                        return EnsoTzInfo(rules)
+                      if fixed_offset == 0:
+                        return timezone.utc
+                      return timezone(timedelta(seconds=fixed_offset))
 
                   conv
                   """,
@@ -178,7 +182,22 @@ final class PyForeignNode extends GenericForeignNode {
       fnPythonZone = ctx.getEnv().parsePublic(src).call();
       nodePythonZone = insert(InteropLibrary.getFactory().create(fnPythonZone));
     }
-    return nodePythonZone.execute(fnPythonZone, new ZoneWrapper(zone));
+    // Note [Fixed Offsets Become Python Timezones]
+    // GraalPy 25.5 turns a Python datetime into a Java time zone (interop asTimeZone) by calling
+    // tzinfo.utcoffset(None), and runs that Python code without holding its GIL, which its own
+    // assertions reject. A fixed-offset zone is therefore passed as Python's built-in
+    // datetime.timezone, which runs no Python code there; only region zones keep EnsoTzInfo,
+    // and those still fail on GraalPy 25.5.
+    return nodePythonZone.execute(fnPythonZone, new ZoneWrapper(zone), fixedOffsetSeconds(zone));
+  }
+
+  /** The zone's offset in seconds if it is fixed, else {@link Integer#MIN_VALUE}. */
+  @CompilerDirectives.TruffleBoundary
+  private static int fixedOffsetSeconds(ZoneId zone) {
+    var rules = zone.getRules();
+    return rules.isFixedOffset()
+        ? rules.getOffset(java.time.Instant.EPOCH).getTotalSeconds()
+        : Integer.MIN_VALUE;
   }
 
   private Object combinePythonDateTimeZone(Object date, Object time, Object zone)
