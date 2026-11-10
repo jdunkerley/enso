@@ -319,8 +319,18 @@ object GraalVM {
     * optimising runtime runs only on a GraalVM JDK of the same feature release.
     * A JDK on the innovation line names it (`jvmci-25.5-b26`: the release's
     * first two components); a 25.0.x JDK does not (`jvmci-b01`), and then the
-    * major versions must agree.
+    * release must have the JDK's version.
     * See Note [GraalVM Follows The Innovation Line] in `Dependencies.scala`.
+    *
+    * The meta-build has no test harness (`project/CLAUDE.md`), so this was
+    * checked with `sbt eval GraalVM.jvmVersionProblem(...)` on six cases
+    * (`java.vm.version`, graalVersion, graalMavenPackagesVersion):
+    *  - `25.0.5.0.3+1-jvmci-25.5-b26`, 25.0.5.0.3, 25.5.5.0.3: None;
+    *  - `25.0.1+8-jvmci-b01`, 25.0.1, 25.0.1: None;
+    *  - `25.0.5.0.3+1-jvmci-25.5-b26`, 25.0.5.0.3, 25.4.4.1.1: wrong release;
+    *  - `25.0.1+8-jvmci-b01`, 25.0.5.0.3, 25.5.5.0.3: wrong JDK;
+    *  - `25.0.1+8-jvmci-b01`, 25.0.1, 25.0.5: a 25.0.x JDK, another release;
+    *  - `25.0.1` (no `+`), 25.0.1, 25.0.1: unparsable.
     */
   def jvmVersionProblem(
     vmVersion: String,
@@ -352,14 +362,16 @@ object GraalVM {
           s"which needs a JDK for release $releaseFeature."
         )
       case Some(_) => None
-      case None =>
-        val jdkMajor     = graalVersion.takeWhile(_ != '.')
-        val releaseMajor = graalPackagesVersion.takeWhile(_ != '.')
-        if (jdkMajor != releaseMajor) {
+      case None    =>
+        // A 25.0.x JDK: its release has the JDK's own version.
+        if (graalVersion != graalPackagesVersion) {
           Some(
-            s"Running on GraalVM JDK $graalVersion ($vmVersion), which " +
-            s"names no JVMCI release. Its major version does not match the " +
-            s"GraalVM packages' release $graalPackagesVersion."
+            s"Running on GraalVM JDK $graalVersion ($vmVersion), a 25.0.x " +
+            s"JDK (its JVMCI version names no release), whose GraalVM " +
+            s"packages are $graalVersion too. The build asks for release " +
+            s"$graalPackagesVersion: set graalVersion and " +
+            s"graalMavenPackagesVersion to the same 25.0.x version, or use " +
+            s"the JDK of release $graalPackagesVersion."
           )
         } else {
           None

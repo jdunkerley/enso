@@ -59,12 +59,18 @@ object GraalCEReleaseProvider {
     */
   val default = new GraalCEReleaseProvider(githubRepository)
 
-  /** Whether `version` is a GraalVM 25+ innovation release (25.1, 25.2, ...),
-    * whose JDK has a version of its own: release `25.5.5.0.3` ships JDK
-    * `25.0.5.0.3`. On 25.0.x the two are equal.
+  /** Whether `version` is a GraalVM 25+ innovation release (25.1, 25.2, ...):
+    * its feature release is not 0, and its JDK has the release's version with
+    * the feature release replaced by 0 (release `25.5.5.0.3` ships JDK
+    * `25.0.5.0.3`). On 25.0.x the two versions are equal.
     */
-  def isInnovationRelease(version: GraalVMVersion): Boolean =
-    version.graalMajorVersion >= 25 && version.graalVersion != version.javaVersion
+  def isInnovationRelease(version: GraalVMVersion): Boolean = {
+    val parts = version.graalVersion.split('.')
+    version.graalMajorVersion >= 25 &&
+    parts.length >= 3 &&
+    parts(1) != "0" &&
+    version.javaVersion == parts.updated(1, "0").mkString(".")
+  }
 
   /** The tag of the `graalvm-ce-builds` release that holds `version`. */
   def tagName(version: GraalVMVersion): String =

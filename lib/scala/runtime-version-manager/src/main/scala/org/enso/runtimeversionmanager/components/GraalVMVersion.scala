@@ -72,7 +72,13 @@ case class GraalVMVersion(graalVersion: String, javaVersion: String)
       return graalMajorComp
     }
 
-    0
+    // Consistent with equals: versions that compare equal above but are
+    // spelled differently (`25.0.1` and `25.0.1.0`) are ordered by their text.
+    val graalTextComp = graalVersion.compareTo(other.graalVersion)
+    if (graalTextComp != 0) {
+      return graalTextComp
+    }
+    javaVersion.compareTo(other.javaVersion)
   }
 }
 

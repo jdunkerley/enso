@@ -66,6 +66,14 @@ class GraalVMVersionSpec extends AnyWordSpec with Matchers {
       i5.compareTo(GraalVMVersion("25.5.5.0.3", "25.0.5.0.3")) shouldEqual 0
     }
 
+    "compare equal only when equal" in {
+      val padded = GraalVMVersion("25.0.1.0", "25.0.1")
+      val plain  = GraalVMVersion("25.0.1", "25.0.1")
+      padded.compareTo(plain) should not equal 0
+      padded.compareTo(plain).sign shouldEqual -plain.compareTo(padded).sign
+      plain.compareTo(GraalVMVersion("25.0.1", "25.0.1")) shouldEqual 0
+    }
+
     "order releases of the same JDK by the release" in {
       val jdk = "25.0.5.0.3"
       (GraalVMVersion("25.5.5.0.3", jdk)

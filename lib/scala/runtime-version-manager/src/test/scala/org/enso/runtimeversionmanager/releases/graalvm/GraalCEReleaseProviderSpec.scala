@@ -23,6 +23,17 @@ class GraalCEReleaseProviderSpec extends AnyWordSpec with Matchers {
     "find an innovation release under its release's tag" in {
       GraalCEReleaseProvider.isInnovationRelease(innovation) shouldBe true
       GraalCEReleaseProvider.isInnovationRelease(lts) shouldBe false
+      // The release/JDK shape: a JDK of another release, or a feature release
+      // 0 with a different JDK, is not an innovation release.
+      GraalCEReleaseProvider.isInnovationRelease(
+        GraalVMVersion("25.5.5.0.3", "25.0.4.1.1")
+      ) shouldBe false
+      GraalCEReleaseProvider.isInnovationRelease(
+        GraalVMVersion("25.0.2", "25.0.1")
+      ) shouldBe false
+      GraalCEReleaseProvider.isInnovationRelease(
+        GraalVMVersion("25.1.3", "25.0.3")
+      ) shouldBe true
       GraalCEReleaseProvider.tagName(innovation) shouldEqual "graal-25.5.5.0.3"
     }
 

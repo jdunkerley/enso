@@ -83,14 +83,17 @@ runs:
         pin sbt
         pin flatc
         pin graalpy
-        # See Note [GraalVM Innovation Releases]. `setup-graalvm` installs 25.0.x by its JDK version,
-        # and Oracle GraalVM's innovation releases by feature release (`25.5`).
+        # See Note [GraalVM Innovation Releases]. `setup-graalvm` installs 25.0.x by its JDK version.
         if [ "$graalvm" = "$jdk" ]; then
           echo "graalvm-from=action" >> "$GITHUB_OUTPUT"
           echo "graalvm-java-version=$jdk" >> "$GITHUB_OUTPUT"
         elif [ "$EDITION" = "oracle" ]; then
-          echo "graalvm-from=action" >> "$GITHUB_OUTPUT"
-          echo "graalvm-release=$(cut -d. -f1-2 <<< "$graalvm")" >> "$GITHUB_OUTPUT"
+          # Not supported yet: `setup-graalvm` takes Oracle GraalVM's innovation releases only by
+          # feature release (`version: 25.5`), which installs the newest 25.5.x rather than the
+          # pinned one. Enable once the GraalVM bump (PR 3 of the 25.5 upgrade spec) verifies a
+          # route on a throwaway branch.
+          echo "::error file=build-config.yaml::setup-jvm: Oracle GraalVM cannot be installed for an innovation release yet (graalvm $graalvm, graalvm-jdk $jdk); see Note [GraalVM Innovation Releases]."
+          exit 1
         else
           echo "graalvm-from=archive" >> "$GITHUB_OUTPUT"
         fi
@@ -100,16 +103,16 @@ runs:
     # are equal) and `setup-graalvm` installs it by that version from the `jdk-<version>` tag. On
     # the innovation line they differ (release 25.5.5.0.3 ships JDK 25.0.5.0.3), the tag is
     # `graal-<release>` and the asset `graalvm-community-jdk-<major>i<minor>-<jdk>_<os>-<arch>_bin`;
-    # `setup-graalvm` documents innovation releases only for Oracle GraalVM. So for CE this
-    # action downloads that archive itself, as it does flatc and GraalPy, checks it against the
-    # release's `.sha256`, and sets `JAVA_HOME`, `GRAALVM_HOME` and `PATH` as `setup-graalvm`
-    # would. See Note [GraalVM Follows The Innovation Line] in `project/Dependencies.scala`.
+    # `setup-graalvm` documents innovation releases only for Oracle GraalVM, and checks no
+    # checksum. So for CE this action downloads that archive itself, as it does flatc and GraalPy,
+    # checks it against the release's `.sha256`, and sets `JAVA_HOME`, `GRAALVM_HOME` and `PATH`
+    # as `setup-graalvm` would. Oracle GraalVM on an innovation release fails the pins step until
+    # a route is verified. See Note [GraalVM Follows The Innovation Line] in `project/Dependencies.scala`.
     - if: steps.pins.outputs.graalvm-from == 'action'
       name: Set up GraalVM
       uses: graalvm/setup-graalvm@v1
       with:
         java-version: ${{ steps.pins.outputs.graalvm-java-version }}
-        version: ${{ steps.pins.outputs.graalvm-release }}
         distribution: ${{ inputs.edition == 'oracle' && 'graalvm' || 'graalvm-community' }}
         github-token: ${{ github.token }}
     - if: steps.pins.outputs.graalvm-from == 'archive'
