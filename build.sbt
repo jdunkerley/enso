@@ -2133,11 +2133,23 @@ val truffleRunOpts = Seq(
  * status to its nested classes, and a class-specific setting wins over -ea in
  * either order. Drop the flag once a GraalVM release fixes it.
  *
+ * GraalPy 25.5 adds a second one, -da:com.oracle.graal.python.runtime.ExecutionContext
+ * (its nested CallContext included): a function that EPB parses with argument
+ * names (Env.parsePublic(source, argNames), every `foreign python` method) runs
+ * in a frame without GraalPy's frame reference, and once its call site is
+ * specialized CallContext.prepareCall asserts PArguments.assertIsPythonFrame
+ * ("calling from non-Python or non-top-level frame"). Without -ea the call
+ * works (PR #666).
+ *
  * Other sites: tools/build-scripts/src/stdlib-test/invocation.ts,
  * Main.launchJvm, project/DistributionPackage.scala (appendJvmOpts), the root
  * CLAUDE.md, and the notes in project/Dependencies.scala.
  */
-val testAssertions = Seq("-ea", "-da:com.oracle.truffle.host.HostExecuteNode")
+val testAssertions = Seq(
+  "-ea",
+  "-da:com.oracle.truffle.host.HostExecuteNode",
+  "-da:com.oracle.graal.python.runtime.ExecutionContext"
+)
 
 val truffleRunOptionsSettings = Seq(
   fork := true,

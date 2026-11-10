@@ -534,7 +534,8 @@ object DistributionPackage {
     pb: java.lang.ProcessBuilder,
     // Note [HostExecuteNode Assertions Are Off Under Test] in build.sbt (#36,
     // oracle/graal#14943).
-    appendJvmOpts: String     = "-ea -da:com.oracle.truffle.host.HostExecuteNode",
+    appendJvmOpts: String =
+      "-ea -da:com.oracle.truffle.host.HostExecuteNode -da:com.oracle.graal.python.runtime.ExecutionContext",
     cwd: Option[java.io.File] = None,
     env: Map[String, String]  = Map.empty
   ): java.lang.Process = {

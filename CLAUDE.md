@@ -319,7 +319,8 @@ has silently produced a wrong result here:
      against an unfiltered run — before reading that as a pass.
 
   ```bash
-  cd test && JAVA_TOOL_OPTIONS="-enableassertions -da:com.oracle.truffle.host.HostExecuteNode" \
+  cd test && JAVA_TOOL_OPTIONS="-enableassertions -da:com.oracle.truffle.host.HostExecuteNode \
+    -da:com.oracle.graal.python.runtime.ExecutionContext" \
     ../built-distribution/enso-engine-*/enso-*/bin/enso \
     --no-ir-caches --run "$PWD/DuckDB_Tests"
   ```

@@ -1544,6 +1544,7 @@ public class Main {
       // Note [HostExecuteNode Assertions Are Off Under Test] in build.sbt (#36,
       // oracle/graal#14943).
       commandAndArgs.add("-da:com.oracle.truffle.host.HostExecuteNode");
+      commandAndArgs.add("-da:com.oracle.graal.python.runtime.ExecutionContext");
     }
     if (props != null) {
       for (var e : props.entrySet()) {
