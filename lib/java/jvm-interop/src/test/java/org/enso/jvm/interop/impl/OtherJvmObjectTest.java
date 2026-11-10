@@ -162,7 +162,12 @@ public class OtherJvmObjectTest {
       var stack = e.getGuestObject().invokeMember("getStackTrace");
       for (var i = 0; i < 5; i++) {
         var elem = stack.getArrayElement(i);
-        assertEquals(singleStack.get(i).toString(), elem.toString());
+        var expected = singleStack.get(i);
+        // Compared without the module: since GraalVM 25.1 a PolyglotException's host frames
+        // print without it (`java.lang.…`), while the other JVM's frames keep it (`java.base/…`).
+        assertEquals(expected.getClassName(), elem.invokeMember("getClassName").asString());
+        assertEquals(expected.getMethodName(), elem.invokeMember("getMethodName").asString());
+        assertEquals(expected.getLineNumber(), elem.invokeMember("getLineNumber").asInt());
       }
     }
   }

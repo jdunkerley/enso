@@ -47,6 +47,12 @@ final class OtherJvmObject implements TruffleObject {
   private static final Message GET_META_QUALIFIED_NAME =
       Message.resolve(InteropLibrary.class, "getMetaQualifiedName");
   private static final Message IS_NULL = Message.resolve(InteropLibrary.class, "isNull");
+  // Truffle 25.1 added host-object interop messages. An object of the other JVM is not a host
+  // object here, and forwarding `asHostObject` would try to send a raw Java object back.
+  private static final Message IS_HOST_OBJECT =
+      Message.resolve(InteropLibrary.class, "isHostObject");
+  private static final Message AS_HOST_OBJECT =
+      Message.resolve(InteropLibrary.class, "asHostObject");
   private static final Message HAS_ARRAY_ELEMENTS =
       Message.resolve(InteropLibrary.class, "hasArrayElements");
   private static final Message HAS_HASH_ENTRIES =
@@ -147,6 +153,12 @@ final class OtherJvmObject implements TruffleObject {
       }
       if (message == GET_META_QUALIFIED_NAME && metaQualifiedName != null) {
         return metaQualifiedName;
+      }
+      if (message == IS_HOST_OBJECT) {
+        return false;
+      }
+      if (message == AS_HOST_OBJECT) {
+        throw UnsupportedMessageException.create();
       }
       if (message == IS_NULL) {
         return OtherInteropType.isNull(mask);

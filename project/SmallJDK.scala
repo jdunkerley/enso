@@ -31,7 +31,11 @@ object SmallJDK {
     "jdk.charsets",
     "jdk.crypto.ec",
     "jdk.httpserver",
-    "jdk.localedata"
+    "jdk.localedata",
+    // jlink on GraalVM 25.0.1 pulled these three in transitively; 25.5 does not.
+    "java.sql",
+    "java.transaction.xa",
+    "java.xml"
   )
 
   private val ADDITIONAL_NI_BUILD_MODS = Seq(

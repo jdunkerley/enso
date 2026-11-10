@@ -24,6 +24,10 @@ import org.enso.interpreter.runtime.EnsoContext;
     description = "Returns the current value of monadic state.")
 @ReportPolymorphism
 @GenerateUncached
+// DynamicObjectLibrary is deprecated since Truffle 25.1 (GR-36894); moving to the DynamicObject
+// nodes is a follow-up of the GraalVM 25.5 upgrade. Truffle DSL's multi-line warning about it
+// crashes sbt's build-server reporter (it reads a message line as a file path).
+@SuppressWarnings("deprecation")
 public abstract class GetStateNode extends Node {
   static GetStateNode build() {
     return create();
