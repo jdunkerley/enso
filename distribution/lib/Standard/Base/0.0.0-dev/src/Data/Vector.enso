@@ -1649,7 +1649,7 @@ type Builder
         subrange = if self.propagate_warnings then slice else
             Warning.remove_warnings slice
 
-        first_dataflow_error = subrange.find (x-> x.is_error) if_missing=Nothing
+        first_dataflow_error = Array_Like_Helpers.first_dataflow_error subrange
         Panic.rethrow_wrapped_if_error <|
             first_dataflow_error.if_not_error <|
                 append_result = self.elements_java_builder.appendTo subrange
