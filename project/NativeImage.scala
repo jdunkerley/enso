@@ -200,9 +200,10 @@ object NativeImage {
       // classes, which GraalVM 25.5's builder refuses on the class path.
       def isFrgaal(path: String) =
         path.replace(File.separatorChar, '/').contains("/org/frgaal/")
-      val ourCp  = (Runtime / fullClasspath).value
-      val auxCp  = additionalCp.value
-      val fullCp = (ourCp.map(_.data.getAbsolutePath) ++ auxCp).filterNot(isFrgaal)
+      val ourCp = (Runtime / fullClasspath).value
+      val auxCp = additionalCp.value
+      val fullCp =
+        (ourCp.map(_.data.getAbsolutePath) ++ auxCp).filterNot(isFrgaal)
 
       val mp = if (modulePath.nonEmpty) {
         val mpStr = modulePath.mkString(File.pathSeparator)
