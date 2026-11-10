@@ -24,9 +24,10 @@ import org.slf4j.LoggerFactory;
  * and preloads classes (`StandbyPreloader`), then prints `standby: warm-up done in N ms, …` and
  * `STANDBY READY <ms from process start>` on stderr. Meanwhile the main thread reads one line from
  * stdin: `{"args":[...],"env":{...}}` (`StandbyRequest`), the arguments `project/open` would have
- * passed and the open's own variables. It waits for the warm-up to end (unless
- * `enso.standby.abandonWarmUp` is true, which cancels it; a warm-up still running 60 s after the
- * line is cancelled too, and a bad line or stdin closing first cancels it before the process
+ * passed and the open's own variables. It cancels a warm-up still running (unless
+ * `enso.standby.abandonWarmUp` is false, which waits for it: abandoning is the default since
+ * #659, as waiting made an open slower than a cold start; a warm-up still running 60 s after the
+ * line is cancelled even then, and a bad line or stdin closing first cancels it before the process
  * exits), then hands the line to `Main`, which applies the variables, sets the context's working
  * directory to the parent of `--path` (`ContextFactory.WORKING_DIRECTORY_PROPERTY`; relative paths
  * and a filesystem root are refused, and so is a line that does not start a Language Server or
@@ -150,7 +151,15 @@ final class Standby {
         warmUp,
         preloadFor(component, System.getenv(JvmOptions.ENVIRONMENT_VARIABLE), System.err),
         System.err,
-        Boolean.parseBoolean(System.getProperty(ABANDON_PROPERTY, "false")));
+        abandonOnLine(System.getProperty(ABANDON_PROPERTY)));
+  }
+
+  /**
+   * Whether the value of {@code enso.standby.abandonWarmUp} abandons the warm-up when the line
+   * arrives: anything but {@code false} (any case) does, so a typo keeps the default.
+   */
+  static boolean abandonOnLine(String value) {
+    return !"false".equalsIgnoreCase(value);
   }
 
   /**
@@ -246,10 +255,17 @@ final class Standby {
     if (abandonOnLine) {
       abandon();
     }
-    // A warm-up that hangs must not hold the open for good.
+    // A warm-up the open waits for must not hold it for good: it is cancelled after the wait. One
+    // already cancelled is not cancelled again; that it ignores the cancel is said, then waited
+    // out.
     if (!finished.await(lineWait.toMillis(), TimeUnit.MILLISECONDS)) {
-      err.println("standby: warm-up abandoned after " + describe(lineWait));
-      abandon();
+      if (abandonOnLine) {
+        err.println(
+            "standby: warning: the abandoned warm-up did not stop within " + describe(lineWait));
+      } else {
+        err.println("standby: warm-up abandoned after " + describe(lineWait));
+        abandon();
+      }
       finished.await();
     }
     return request;

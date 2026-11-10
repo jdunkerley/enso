@@ -237,7 +237,8 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
 - `ENSO_SPARE_ENGINE=0` — no spare engine whatever Settings → Local → Engine
   says (`project-manager-shim/CLAUDE.md`, "Spare engine"). The Playwright
   fixture sets it for every spec but `spareEngine.spec.ts`; the open-time
-  harness sets it for `jvm` and `jvm-first`.
+  harness sets it for `jvm` and `jvm-first`, and `ENSO_SPARE_ENGINE=1` for the
+  `jvm-spare` engines.
 - `APPIMAGE` (set by the AppImage runtime) — with the JVM as the default engine
   (`--engine-mode`, `ENSO_ENGINE_MODE`, then the built-in default; nothing
   happens while it is native), a Linux AppImage runs its engine from a copy at
@@ -834,13 +835,20 @@ because the inputs aren't checked in and the agent budget is real.
 
 ## Open-time harness
 
+Pinned runs: `perf/cpuAffinity.ts` reads how many CPUs a process may run on
+(`taskset -p` on Linux, `ProcessorAffinity` through PowerShell on Windows).
+`perf/poolReports.ts` pools the `open-time.json` of several rounds into one
+report (launches numbered `<round>0<n>`) and `perf/poolReportsCli.ts` prints its
+tables:
+`corepack pnpm --filter enso exec vite-node perf/poolReportsCli.ts -- <round dir>...`.
+
 `perf/openTime.ts` measures how long opening a project takes in the packaged IDE
 (spec `docs/superpowers/specs/2026-11-01-project-open-performance-design.md`,
 section 2). It is not a Playwright Test run: it drives Electron through
 `playwright`'s `_electron` and is started with
 
 ```
-corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm,jvm-first] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics] [--jvm-options <opts>] [--template welcome|image]
+corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm,jvm-first,jvm-spare,jvm-spare-early,jvm-spare-wait] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics] [--jvm-options <opts>] [--template welcome|image]
 ```
 
 It needs a built `dist/ide/` (or `--exe`), and under Linux a display
@@ -849,10 +857,15 @@ once ("Target page, context or browser has been closed") while another IDE of
 the same name runs; close it first, or point `--exe` at a copy whose `app.asar`
 `package.json` `name` has been changed (same length), which has a profile of its
 own. Each launch creates two new projects with the bundled launcher
-(`enso --new`), starts the IDE, opens the first from the dashboard (the cold
-open), waits for the welcome table, opens the component browser and the `format`
-dropdown, closes the project, and does the same with the second. Times are
-milliseconds from the click on the project's row:
+(`enso --new`) in a new temporary directory, outside any git working tree and
+deleted after the launch (Note [Harness Projects Are Outside Any Repository]:
+under `--out` the IDE asked on close whether to use the enclosing repository,
+and the prompt blocked the close; with git installed the first close still asks
+whether to create one, which is answered "Not now", with a warning and an
+`<open>:repositoryPrompt` mark), starts the IDE, opens the first from the
+dashboard (the cold open), waits for the welcome table, opens the component
+browser and the `format` dropdown, closes the project, and does the same with
+the second. Times are milliseconds from the click on the project's row:
 
 | Phase            | Ends at                                                                      |
 | ---------------- | ---------------------------------------------------------------------------- |
@@ -902,9 +915,10 @@ before a manual run.
 
 Every launch sets the engine mode as a user would: `ENSO_ENGINE_MODE=native` or
 `jvm` (`engineEnv` in `perf/openTime.ts`), so the shim decides whether to pass
-`--jvm`, and which timeouts apply. The JVM engines also set
+`--jvm`, and which timeouts apply. `jvm` and `jvm-first` also set
 `ENSO_SPARE_ENGINE=0`: a measured open starts its own engine, never a
-pre-started spare. The engines are:
+pre-started spare; the `jvm-spare` engines set `ENSO_SPARE_ENGINE=1`. The
+engines are:
 
 - `native`: the native image.
 - `jvm`: the JVM as a user has it after the first open. The shim's own AOT cache
@@ -933,6 +947,50 @@ pre-started spare. The engines are:
   open was answered (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). A
   delete that fails (a JVM of the last launch still holding `enso.aot` on
   Windows) is retried, then the launch is recorded as failed.
+- `jvm-spare`: the JVM with the spare engine on
+  (`project-manager-shim/CLAUDE.md`, "Spare engine"; Note [Spare Engines In The
+  Harness] in `perf/openTime.ts`). The shim starts a spare only after the GUI
+  has sent the setting and while no AOT training runs, so the spare engines use
+  the cache in `<out>/jvm-aot` as `jvm` does, and a preparation launch (with no
+  spare) trains one first unless it is there; only `jvm`'s preparation goes in
+  `shimAot`, but a cache gone after a spare launch is warned about too. An
+  open's spare is the latest one the shim logs `Spare engine: start…` for after
+  the previous open began to close (`spareState`). Before each open the harness
+  waits on the dashboard for that spare's `Spare engine: ready after …` line (in
+  the main process's output), at most 15 s, which is what a user spends there
+  (spec, "Measurement"); a spare not ready by then is warned about and the open
+  takes it warming up. Once the first spare is ready the engine processes are
+  sampled (`rss-spareIdle.json`, an `rss` mark with phase `spareIdle`): the
+  spare's idle memory. After the opens, the spare started after the last close
+  is sampled again 15 s after it was ready (`spareIdle+15s`), off the timed
+  path. On Windows both samples also sum the processes' private bytes
+  (`Win32_Process.PrivatePageCount`, the committed memory, `enginePrivateKb`),
+  beside the working set. The setting must be on in the IDE's profile (it is by
+  default): the harness launches with the user's profile.
+- `jvm-spare-early`: the same, opening as soon as its spare has started, during
+  the warm-up, which the engine abandons when the open's line arrives (its
+  default since #659). `jvm-spare-wait`: the same with
+  `ENSO_ENGINE_ARGS=--vm.D enso.standby.abandonWarmUp=false` (not given to the
+  preparation launch), so the open waits for the warm-up to finish (the shim
+  gives an open of a spare still warming up 60 s more): the other answer to the
+  spec's open question, kept measurable. At 8 CPUs waiting lost to a cold start
+  (#659).
+
+Every spare launch records `<open>:spareUsed` marks: `used`, whether the shim
+logged `Spare engine: used (…)` during that open, and from that line `ready`
+(false for `still warming up`) and `readyAfterMs` (`spareUse`). An open that
+used no spare (the engine log says `Engine: no pre-started spare (…)`) fails the
+launch, and its times are dropped (`withoutUnsparedOpens`: `first` becomes `{}`,
+`second` `null`), since they are an ordinary JVM open's and must not reach the
+medians. Its `RunResult.spare` (`spareRun`) has each spare's ready time and
+warm-up time and CPU (the echoed `STANDBY READY` and `standby: warm-up done`
+lines), the idle memory (working set and private bytes, at `spareIdle` and
+`spareIdle+15s`), the opens that used one and those that took one still warming
+up (`warming`; the table's last column). `open-time.md` adds, after the medians,
+the headline over native's per engine (`ratioTable`), the spare engines' table
+(`spareTable`) and the CPUs the IDE was pinned to (`cpusLine`; `RunResult.cpus`,
+read once per launch after its opens). With a spare alive, quitting the IDE
+takes up to ~5 s longer (`spareQuit.ts`).
 
 `jvm-nocache` is gone (`parseEngines` says so, naming `jvm-first`), and with it
 the harness's own recorded-and-created cache (`perf/jvmAotCache.ts`): the
@@ -1003,6 +1061,15 @@ and macOS are informational. It refuses a dispatch whose `jvm` launches have no
 template's headline is both marks at once, and a report records it as
 `welcomeShown`, so `libraryShown` falls back to it, for a report of the `image`
 project only.
+
+**At 4 or 8 CPUs** (the re-gate is the first open at 8 CPUs, at most 1.5): pin
+the whole run, which the IDE inherits. On Windows, from PowerShell,
+`cmd /c "start "" /affinity FF /wait /b corepack pnpm --filter enso run perf:open …"`
+(`F` for 4); on Linux
+`taskset -c 0-7 corepack pnpm --filter enso run perf:open …`. Each report's last
+line says the CPUs it ran on. Interleave the engines by running rounds
+(`--runs 2`, three rounds, each its own `--out`), and pool them with
+`corepack pnpm --filter enso exec vite-node perf/poolReportsCli.ts -- <round dir>...`.
 
 CI uploads `electron-out.log` and `hsperf/` too; by hand, `ide-packaging.yml`
 takes `open_perf_engines`, `open_perf_runs`, `open_perf_budget`,

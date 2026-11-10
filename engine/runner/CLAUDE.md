@@ -125,8 +125,10 @@ exits with 0.
   cache the compiler writes for it under `<data>/cache/ir/local/` is deleted
   with its folder after the warm-up.
 - `--vm.D enso.standby.warmUp=false` skips the warm-up (tests);
-  `--vm.D enso.standby.abandonWarmUp=true` cancels a running warm-up when the
-  line arrives instead of waiting for it.
+  `--vm.D enso.standby.abandonWarmUp=false` waits for a running warm-up when the
+  line arrives instead of cancelling it, which is the default since #659
+  (measured at 8 CPUs, an open that waited for the warm-up was slower than a
+  cold start; one that cancelled it was faster).
 - The preload list (`src/main/resources/org/enso/runner/standby-preload.txt`) is
   generated: run a Language Server boot without an AOT cache with
   `JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=<log>` (the shell launcher of
@@ -155,8 +157,12 @@ exits with 0.
   std-bits code that resolves a path against the process (`user.dir`, `Path.of`
   of a relative string, a `ProcessBuilder` without a directory) must go through
   the context's working directory instead.
-- A warm-up still running 60 s after the line is cancelled
-  (`standby: warm-up abandoned after 60 s`), and a bad line, or stdin closing
+- With `abandonWarmUp=false`, a warm-up still running 60 s after the line is
+  cancelled (`standby: warm-up abandoned after 60 s`); an abandoned warm-up that
+  ignores its cancel for 60 s is waited for, with
+  `standby: warning: the abandoned warm-up did not stop within 60 s`, and is not
+  cancelled again. A value other than `false` (any case) abandons, so a typo
+  keeps the default (`Standby.abandonOnLine`). A bad line, or stdin closing
   before the line, cancels a running warm-up and waits for it before the process
   exits, so its folder is deleted. After stdin closes that wait is at most 10 s
   (`Standby.CLOSE_WAIT`; the IDE may be quitting): a warm-up still running then
@@ -169,8 +175,9 @@ exits with 0.
     never echo a value (a sentinel in each malformed form).
   - `StandbyTest`: the wait (the line before and after the warm-up, abandon, the
     60 s limit, a bad line or a closed stdin stopping a running warm-up, stdin
-    closed first, the bounded wait for a warm-up that ignores its cancel,
-    `readLine` leaving the rest of stdin), and an unreadable `jvm.options`.
+    closed first, the bounded wait for a warm-up that ignores its cancel, an
+    abandoned warm-up cancelled only once, `abandonOnLine`, `readLine` leaving
+    the rest of stdin), and an unreadable `jvm.options`.
   - `StandbyPreloaderTest`: the list and the AOT-cache skip.
   - `StandbyWarmUpTest`: a cancel before the run, and deletion that goes on past
     an undeletable file.

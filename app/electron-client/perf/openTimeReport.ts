@@ -43,7 +43,28 @@ export type OpenTimes = Partial<Record<Phase | Extra, number>>
  * bundled JDK with the shim's own AOT cache, trained before the measured launches. `jvm-first` is
  * a user's very first launch: the same, with the cache deleted before each launch.
  */
-export type Engine = 'native' | 'jvm' | 'jvm-first'
+export type Engine =
+  'native' | 'jvm' | 'jvm-first' | 'jvm-spare' | 'jvm-spare-early' | 'jvm-spare-wait'
+
+const ENGINES: readonly Engine[] = [
+  'native',
+  'jvm',
+  'jvm-first',
+  'jvm-spare',
+  'jvm-spare-early',
+  'jvm-spare-wait',
+]
+
+/**
+ * The JVM with its spare engine (`project-manager-shim/CLAUDE.md`, "Spare engine"): `jvm-spare`
+ * opens once the spare is ready (at most 15 s on the dashboard); `jvm-spare-early` opens at once,
+ * while it warms up, which the engine abandons when the open's line arrives (its default);
+ * `jvm-spare-wait` opens at once too, with `enso.standby.abandonWarmUp=false`, so the open waits
+ * for the warm-up to finish.
+ */
+export function isSpareEngine(engine: Engine): boolean {
+  return engine.startsWith('jvm-spare')
+}
 /** The first open of a launch is cold; the second opens another project in the same session. */
 export type OpenTag = 'first' | 'second'
 
@@ -77,6 +98,128 @@ export interface RunResult {
   readonly error?: string
   /** Sampled on the first open of the launch; absent when a sample failed. */
   readonly rss?: RunRss
+  /** A spare engine launch's numbers (`spareRun`). */
+  readonly spare?: SpareRun
+  /** How many CPUs the IDE was pinned to (`cpuAffinity`), when it could be read. */
+  readonly cpus?: number
+}
+
+/** What a launch's spare engines reported (their stderr, echoed by the shim). */
+export interface SpareRun {
+  /** Per spare, in start order: ms from its process start to `STANDBY READY`. */
+  readonly readyMs: readonly number[]
+  /** Per spare: the warm-up's own duration, and the process's CPU time at its end. */
+  readonly warmUpMs: readonly number[]
+  readonly cpuMs: readonly number[]
+  /** The engine processes' memory (KiB) once the first spare was ready, before the first open. */
+  readonly idleEngineKb?: number
+  /** Their private bytes then (KiB; read on Windows only). */
+  readonly idlePrivateKb?: number
+  /** The same ~15 s after a spare was ready, sampled after the opens (`spareIdle+15s`). */
+  readonly idleLaterEngineKb?: number
+  readonly idleLaterPrivateKb?: number
+  /**
+   * The opens that have a `<open>:spareUsed` mark, used or not: an open that never ran (its launch
+   * failed first) has none. A report without the field counts `used` instead.
+   */
+  readonly marked?: readonly OpenTag[]
+  /** The opens that used a spare. */
+  readonly used: readonly OpenTag[]
+  /** The opens that took a spare still warming up, before its `STANDBY READY`. */
+  readonly warming: readonly OpenTag[]
+}
+
+/**
+ * Where the latest spare engine stands in the main process's output from line `from` on: `none`
+ * started, the latest `started` with no `ready after` line after it, or `ready`. The shim's ready
+ * line names no pid, but it follows its own spare's start: at most one spare runs at a time.
+ */
+export function spareState(lines: readonly string[], from: number): 'none' | 'started' | 'ready' {
+  for (let i = lines.length - 1; i >= Math.max(0, from); i--) {
+    if (!lines[i]!.includes('Spare engine: start')) continue
+    return lines.slice(i + 1).some((line) => line.includes('Spare engine: ready after')) ?
+        'ready'
+      : 'started'
+  }
+  return 'none'
+}
+
+const USED_LINE = /Spare engine: used \((?:pid \d+, )?(still warming up|ready after (\d+) ms)\)/
+
+/**
+ * The shim's `Spare engine: used (…)` line from line `from` on: whether the spare it took was
+ * ready, and since when (ms from the shim's start of it); `undefined` when no spare was used.
+ */
+export function spareUse(
+  lines: readonly string[],
+  from: number,
+): { readonly ready: boolean; readonly readyAfterMs?: number } | undefined {
+  for (const line of lines.slice(from)) {
+    const match = USED_LINE.exec(line)
+    if (match == null) continue
+    return match[2] == null ? { ready: false } : { ready: true, readyAfterMs: Number(match[2]) }
+  }
+  return undefined
+}
+
+/**
+ * A spare launch's open times without those of an open that used no spare (its `<open>:spareUsed`
+ * mark says `used: false`): they are an ordinary JVM open's, and must not reach the medians.
+ */
+export function withoutUnsparedOpens(
+  times: { readonly first: OpenTimes; readonly second: OpenTimes | null },
+  marks: readonly Mark[],
+): { readonly first: OpenTimes; readonly second: OpenTimes | null } {
+  const unspared = (tag: OpenTag) =>
+    marks.some((m) => m.k === `${tag}:spareUsed` && m.used === false)
+  return {
+    first: unspared('first') ? {} : times.first,
+    second: unspared('second') ? null : times.second,
+  }
+}
+
+const READY_LINE = /STANDBY READY (-?\d+)/g
+const WARM_UP_LINE = /standby: warm-up done in (\d+) ms, .*?, process CPU (-?\d+) ms/g
+
+/** Each spare's `STANDBY READY` and warm-up line, in order. */
+export function parseSpareOutput(stdout: string): Pick<SpareRun, 'readyMs' | 'warmUpMs' | 'cpuMs'> {
+  const warmUps = [...stdout.matchAll(WARM_UP_LINE)]
+  return {
+    readyMs: [...stdout.matchAll(READY_LINE)].map((m) => Number(m[1])),
+    warmUpMs: warmUps.map((m) => Number(m[1])),
+    cpuMs: warmUps.map((m) => Number(m[2])),
+  }
+}
+
+/** A spare launch's `SpareRun`: its output, its `spareIdle` RSS and its `<open>:spareUsed` marks. */
+export function spareRun(stdout: string, marks: readonly Mark[]): SpareRun {
+  const sample = (phase: string, field: 'engineKb' | 'enginePrivateKb') => {
+    const value = marks.find((m) => m.k === 'rss' && m.phase === phase)?.[field]
+    return typeof value === 'number' && value >= 0 ? value : undefined
+  }
+  const optional = (key: keyof SpareRun, value: number | undefined) =>
+    value == null ? {} : { [key]: value }
+  const opens = (ready: boolean | undefined) =>
+    (['first', 'second'] as const).filter((tag) =>
+      marks.some(
+        (m) =>
+          m.k === `${tag}:spareUsed` &&
+          m.used === true &&
+          (ready === undefined || m.ready === ready),
+      ),
+    )
+  return {
+    ...parseSpareOutput(stdout),
+    ...optional('idleEngineKb', sample('spareIdle', 'engineKb')),
+    ...optional('idlePrivateKb', sample('spareIdle', 'enginePrivateKb')),
+    ...optional('idleLaterEngineKb', sample('spareIdle+15s', 'engineKb')),
+    ...optional('idleLaterPrivateKb', sample('spareIdle+15s', 'enginePrivateKb')),
+    marked: (['first', 'second'] as const).filter((tag) =>
+      marks.some((m) => m.k === `${tag}:spareUsed`),
+    ),
+    used: opens(undefined),
+    warming: opens(false),
+  }
 }
 
 /**
@@ -383,6 +526,64 @@ export function describeShimAot(aot: ShimAot): string {
 
 const cell = (value: number | undefined) => (value == null ? '–' : String(Math.round(value)))
 
+/** The spare engines' medians: ready, warm-up, CPU at ready, idle memory, and opens that used one. */
+export function spareTable(report: OpenTimeReport): string {
+  const engines = [...new Set(report.runs.map((r) => r.engine))].filter(isSpareEngine)
+  if (engines.length === 0) return ''
+  const rows = engines.map((engine) => {
+    const runs = report.runs.filter((r) => r.engine === engine && r.spare != null)
+    const spares = runs.map((r) => r.spare!)
+    const med = (values: number[]) => cell(median(values))
+    const mib = (pick: (s: SpareRun) => number | undefined) => {
+      const value = median(spares.flatMap((s) => pick(s) ?? []))
+      return value == null ? '–' : String(Math.round(value / 1024))
+    }
+    const opens = spares.reduce((n, s) => n + (s.marked ?? s.used).length, 0)
+    const usedOpens = spares.reduce((n, s) => n + s.used.length, 0)
+    const warmingOpens = spares.reduce((n, s) => n + s.warming.length, 0)
+    return `| ${engine} | ${runs.length} | ${med(spares.flatMap((s) => s.readyMs))} | ${med(spares.flatMap((s) => s.warmUpMs))} | ${med(spares.flatMap((s) => s.cpuMs))} | ${mib((s) => s.idleEngineKb)} / ${mib((s) => s.idlePrivateKb)} | ${mib((s) => s.idleLaterEngineKb)} / ${mib((s) => s.idleLaterPrivateKb)} | ${usedOpens}/${opens} | ${warmingOpens}/${usedOpens} |`
+  })
+  return [
+    'Spare engines (medians over the launches; ready is from the spare’s own start; idle memory is the engine processes’ working set / private bytes in MiB, when the first spare was ready and ~15 s after a later one was; private bytes are read on Windows only. The warm-up and the CPU at ready include warm-ups an open abandoned, which end early, beside finished ones).',
+    '',
+    '| Engine | Launches | Ready (ms) | Warm-up (ms) | Process CPU at ready (ms) | Idle (MiB) | Idle 15 s later (MiB) | Opens that used a spare | Of those, before it was ready |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+    ...rows,
+  ].join('\n')
+}
+
+/** Each engine's headline over native's, first and second open; empty without native launches. */
+export function ratioTable(report: OpenTimeReport): string {
+  const summaries = summarise(report)
+  const native = summaries.find((s) => s.engine === 'native')
+  if (native == null) return ''
+  const ratio = (s: EngineSummary, open: 'first' | 'second') => {
+    const engine = s[open][HEADLINE]
+    const base = native[open][HEADLINE]
+    return engine == null || base == null ? '–' : (engine / base).toFixed(2)
+  }
+  return [
+    'Headline over native (medians). The re-gate: the first open, at 8 CPUs, at most 1.5.',
+    '',
+    '| Engine | First open | Second open |',
+    '| --- | ---: | ---: |',
+    ...summaries
+      .filter((s) => s.engine !== 'native')
+      .map((s) => `| ${s.engine} | ${ratio(s, 'first')} | ${ratio(s, 'second')} |`),
+  ].join('\n')
+}
+
+/** The CPUs the IDE was pinned to, or that the launches differ; empty when none was read. */
+export function cpusLine(report: OpenTimeReport): string {
+  const counts = [...new Set(report.runs.flatMap((r) => (r.cpus == null ? [] : [r.cpus])))].sort(
+    (a, b) => a - b,
+  )
+  if (counts.length === 0) return ''
+  return counts.length === 1 ?
+      `CPUs (the IDE’s affinity): ${counts[0]}.`
+    : `CPUs (the IDE’s affinity) differ between launches: ${counts.join(', ')}.`
+}
+
 /** The RSS medians, in MiB: one row per engine that has samples; empty when none has. */
 function rssTable(summaries: readonly EngineSummary[], platform: string): string[] {
   const rows = summaries.flatMap((s) => {
@@ -559,10 +760,10 @@ export function parseEngines(value: string): Engine[] {
         "The engine jvm-nocache is gone: `jvm` is now the shim's own AOT cache, and `jvm-first` is a user's first launch, with no cache yet",
       )
     }
-    if (engine !== 'native' && engine !== 'jvm' && engine !== 'jvm-first') {
+    if (!(ENGINES as readonly string[]).includes(engine)) {
       throw new Error(`Unknown engine: ${engine}`)
     }
-    return engine
+    return engine as Engine
   })
 }
 

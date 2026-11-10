@@ -128,4 +128,14 @@ describe('the parsers', () => {
     expect(parseCim(JSON.stringify(row))).toEqual([p(5, 1, 2048, '')])
     expect(parseCim('')).toEqual([])
   })
+  test('parseCim reads private bytes as KiB when the row has them', () => {
+    const row = {
+      ProcessId: 5,
+      ParentProcessId: 1,
+      WorkingSetSize: 2_097_152,
+      PrivatePageCount: 1_048_576,
+      CommandLine: 'java',
+    }
+    expect(parseCim(JSON.stringify(row))).toEqual([{ ...p(5, 1, 2048, 'java'), privateKb: 1024 }])
+  })
 })
