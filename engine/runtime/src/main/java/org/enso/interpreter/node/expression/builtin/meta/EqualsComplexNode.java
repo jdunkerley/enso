@@ -318,8 +318,7 @@ abstract class EqualsComplexNode extends Node {
       try {
         for (; i < selfSize; i++) {
           Object selfElem = valueToEnsoNode.execute(selfInterop.readArrayElement(selfArray, i));
-          Object otherElem =
-              valueToEnsoNode.execute(otherInterop.readArrayElement(otherArray, i));
+          Object otherElem = valueToEnsoNode.execute(otherInterop.readArrayElement(otherArray, i));
           var elemsAreEqual = equalsNode.execute(frame, selfElem, otherElem);
           if (!elemsAreEqual.isTrue()) {
             return elemsAreEqual;
@@ -370,8 +369,7 @@ abstract class EqualsComplexNode extends Node {
           entriesCompared++;
           if (otherInterop.isHashEntryExisting(otherHashMap, key)
               && otherInterop.isHashEntryReadable(otherHashMap, key)) {
-            var otherValue =
-                valueToEnsoNode.execute(otherInterop.readHashValue(otherHashMap, key));
+            var otherValue = valueToEnsoNode.execute(otherInterop.readHashValue(otherHashMap, key));
             var res = equalsNode.execute(frame, selfValue, otherValue);
             if (!res.isTrue()) {
               return res;
