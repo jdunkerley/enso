@@ -4050,7 +4050,10 @@ lazy val `engine-runner` = project
             targetDir                 = engineDistributionRoot.value / "bin",
             staticOnLinux             = false,
             excludeConfigs = Seq(
-              ".*gax-grpc-.*\\.jar,META-INF/native-image/com.google.api/gax-grpc/native-image.properties"
+              ".*gax-grpc-.*\\.jar,META-INF/native-image/com.google.api/gax-grpc/native-image.properties",
+              // GraalVM 25.5's own library support enables a Groovy feature that its builder
+              // then cannot load when it runs from the small JDK. Enso has no Groovy.
+              ".*library-support\\.jar,META-INF/native-image/com.oracle.svm/polyglot/native-image.properties"
             ),
             modulePath = mp,
             additionalOptions = Seq(
