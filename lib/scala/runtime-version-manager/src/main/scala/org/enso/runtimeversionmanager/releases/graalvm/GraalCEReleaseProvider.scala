@@ -30,12 +30,8 @@ class GraalCEReleaseProvider(releaseProvider: SimpleReleaseProvider)
     destination: Path
   ): TaskProgress[Unit] = {
     val packageName = packageFileName(version)
-    val tagName = if (version.graalMajorVersion < 23) {
-      s"vm-${version.graalVersion}"
-    } else {
-      s"jdk-${version.javaVersion}"
-    }
-    val release = releaseProvider.releaseForTag(tagName)
+    val release =
+      releaseProvider.releaseForTag(GraalCEReleaseProvider.tagName(version))
     release match {
       case Failure(exception) =>
         TaskProgress.immediateFailure(exception)
@@ -63,31 +59,72 @@ object GraalCEReleaseProvider {
     */
   val default = new GraalCEReleaseProvider(githubRepository)
 
+  /** Whether `version` is a GraalVM 25+ innovation release (25.1, 25.2, ...):
+    * its feature release is not 0, and its JDK has the release's version with
+    * the feature release replaced by 0 (release `25.5.5.0.3` ships JDK
+    * `25.0.5.0.3`). On 25.0.x the two versions are equal.
+    */
+  def isInnovationRelease(version: GraalVMVersion): Boolean = {
+    val parts = version.graalVersion.split('.')
+    version.graalMajorVersion >= 25 &&
+    parts.length >= 3 &&
+    parts(1) != "0" &&
+    version.javaVersion == parts.updated(1, "0").mkString(".")
+  }
+
+  /** The tag of the `graalvm-ce-builds` release that holds `version`. */
+  def tagName(version: GraalVMVersion): String =
+    if (version.graalMajorVersion < 23) {
+      s"vm-${version.graalVersion}"
+    } else if (isInnovationRelease(version)) {
+      s"graal-${version.graalVersion}"
+    } else {
+      s"jdk-${version.javaVersion}"
+    }
+
   /** Generates the name of the package for the currently running OS and a
     * specified release version.
     */
-  def packageFileNameForCurrentOS(version: GraalVMVersion): String = {
-    val os = OS.operatingSystem match {
+  def packageFileNameForCurrentOS(version: GraalVMVersion): String =
+    packageFileName(version, OS.operatingSystem, OS.architecture)
+
+  /** The name of the package of `version` for the given OS and architecture
+    * (as [[OS.architecture]] names it).
+    */
+  def packageFileName(
+    version: GraalVMVersion,
+    operatingSystem: OS,
+    architecture: String
+  ): String = {
+    val os = operatingSystem match {
       case OS.Linux   => "linux"
       case OS.MacOS   => if (version.graalMajorVersion < 23) "darwin" else "macos"
       case OS.Windows => "windows"
     }
-    val extension = OS.operatingSystem match {
+    val extension = operatingSystem match {
       case OS.Linux   => ".tar.gz"
       case OS.MacOS   => ".tar.gz"
       case OS.Windows => ".zip"
     }
     if (version.graalMajorVersion < 23) {
-      val arch = OS.architecture
+      val arch = architecture
       "graalvm-ce-" +
       s"java${version.javaVersion}-$os-$arch-${version.graalVersion}$extension"
     } else {
-      val arch = OS.architecture match {
+      val arch = architecture match {
         case "amd64" => "x64"
         case arch    => arch
       }
+      // `graalvm-community-jdk-25i5-25.0.5.0.3_…` on the innovation line.
+      val release =
+        if (isInnovationRelease(version)) {
+          val minor = version.graalVersion.split('.')(1)
+          s"${version.graalMajorVersion}i$minor-"
+        } else {
+          ""
+        }
       "graalvm-community-jdk-" +
-      s"${version.javaVersion}_${os}-${arch}_bin$extension"
+      s"$release${version.javaVersion}_${os}-${arch}_bin$extension"
     }
   }
 }

@@ -54,20 +54,44 @@ object Dependencies {
   val scalacVersion = "2.13.17"
   // source version of the Java language
   val javaVersion = "25"
-  // version of the GraalVM JDK
-  // See Note [GraalVM Is Held At 25.0.1]
+  // Version of the GraalVM JDK, as `java.vm.version` prints it before the `+`.
+  // `toolchain.graalvm-jdk` in `build-config.yaml` pins it too.
+  // Do not change the name of this variable, `tools/ci/toolchain-pins.mjs` reads it by regex.
+  // See Note [GraalVM Follows The Innovation Line]
   val graalVersion = "25.0.1"
-  // Version used for the Graal/Truffle related Maven packages
-  // Must equal graalVersion: GraalVM.versionCheck fails the build otherwise.
+  // The GraalVM release: the version of the Graal/Truffle related Maven packages, and the
+  // `graal-<version>` tag the JDK is downloaded from. `toolchain.graalvm` pins it too.
   // Do not change the name of this variable,
   // it is read by `tools/ci/toolchain-pins.mjs` (the workflow policy's pin check) and by
   // developers' WSL toolchain scripts, by regex matching.
-  // See Note [GraalVM Is Held At 25.0.1]
+  // See Note [GraalVM Follows The Innovation Line]
   val graalMavenPackagesVersion = "25.0.1"
+  // The standalone GraalPy release that `test/Examples_Tests` runs (`toolchain.graalpy`).
+  // Only `tools/ci/toolchain-pins.mjs` reads it, by regex; the build does not use it.
+  val graalPyVersion = "25.0.1"
 
-  /* Note [GraalVM Is Held At 25.0.1]
-   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   * 25.0.2 breaks host-interop overload resolution. Its only Truffle change is
+  /* Note [GraalVM Follows The Innovation Line]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Only the GraalVM CE innovation line (25.1, 25.2, ...) gets security fixes in
+   * Community; 25.0.2 was the last 25.0 LTS build. On that line the three
+   * versions above differ, e.g. for release 25.5.5.0.3:
+   *
+   * - graalVersion is the JDK's own version, 25.0.5.0.3 (`java.vm.version` is
+   *   `25.0.5.0.3+1-jvmci-25.5-b26`);
+   * - graalMavenPackagesVersion is the release, 25.5.5.0.3: every
+   *   `org.graalvm.*` jar, and the download tag `graal-25.5.5.0.3`;
+   * - graalPyVersion is the standalone GraalPy's, 25.5.5.
+   *
+   * Versions have up to five components. Since 25.1 Truffle's optimising
+   * runtime runs only on a GraalVM JDK of the same feature release, so
+   * GraalVM.versionCheck requires the JDK's `jvmci-<major>.<minor>` to equal the
+   * release's first two components. On 25.0.x all three versions are equal and
+   * the JDK prints `jvmci-b01`; then only the major versions are compared.
+   *
+   * The build is still on 25.0.1, held there by #36 (below) until the move to
+   * 25.5 (docs/superpowers/specs/2026-11-09-graalvm-25.5-upgrade-design.md).
+   *
+   * #36: 25.0.2 breaks host-interop overload resolution. Its only Truffle change is
    * "Fixed overloaded method caching regression in HostExecuteNode", and that is
    * exactly what fails: HostExecuteNode.fillArgTypesArray asserts that its cached
    * argument types still validate against the overload it selected, and they do

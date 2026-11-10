@@ -10,19 +10,23 @@
 latest-release: 2025.3.4
 
 # The JVM toolchain that CI's `.github/actions/setup-jvm` installs. The build keeps its own copies,
-# and `tools/ci/check-workflows.mjs` fails if these drift from them:
-# - graalvm: `graalVersion` in `project/Dependencies.scala` (sbt refuses any other JDK), and
-#   `graalMavenPackagesVersion` there (the GraalVM / Truffle Maven packages);
+# and `tools/ci/check-workflows.mjs` fails if these drift from them (`project/Dependencies.scala`
+# unless named):
+# - graalvm: the GraalVM release, `graalMavenPackagesVersion` (the GraalVM / Truffle Maven packages,
+#   and the `graal-<release>` tag CI downloads the JDK from);
+# - graalvm-jdk: the GraalVM JDK, `graalVersion` (what `java -version` prints; sbt refuses any other
+#   JDK). On 25.0.x it equals `graalvm`; on the innovation line it does not (25.5.5.0.3 ships JDK
+#   25.0.5.0.3), see Note [GraalVM Follows The Innovation Line] there;
 # - sbt: `sbt.version` in `project/build.properties` (HELD there, see its note);
-# - flatc: `flatbuffersVersion` in `project/Dependencies.scala` (checked when the language server
-#   compiles);
-# - graalpy: `graalMavenPackagesVersion` in `project/Dependencies.scala` (the standalone GraalPy
-#   that `test/Examples_Tests` runs; `setup-jvm` installs it when asked).
+# - flatc: `flatbuffersVersion` (checked when the language server compiles);
+# - graalpy: `graalPyVersion` (the standalone GraalPy that `test/Examples_Tests` runs; `setup-jvm`
+#   installs it when asked).
 # `tools/build-scripts`' `toolchain-check` compares an installed toolchain against them.
 # One flat `key: value` per line, the value a bare (unquoted) version: `setup-jvm` reads them
 # with awk, and `tools/ci/toolchain-pins.mjs` reads them the same way.
 toolchain:
   graalvm: 25.0.1
+  graalvm-jdk: 25.0.1
   sbt: 1.10.6
   flatc: 24.3.25
   graalpy: 25.0.1

@@ -248,15 +248,27 @@ object GraalVM {
     "Oracle Corporation"
   )
 
-  private val downloadLink =
-    s"https://github.com/graalvm/graalvm-ce-builds/releases/tag/jdk-${Dependencies.graalVersion}"
+  /** The GitHub release that holds the GraalVM CE JDK for these versions: the
+    * innovation line's `graal-<release>` tag, or `jdk-<version>` on 25.0.x,
+    * where the JDK and the release share a version.
+    * See Note [GraalVM Follows The Innovation Line] in `Dependencies.scala`.
+    */
+  def downloadLink(
+    graalVersion: String,
+    graalPackagesVersion: String
+  ): String = {
+    val tag =
+      if (graalVersion == graalPackagesVersion) s"jdk-$graalVersion"
+      else s"graal-$graalPackagesVersion"
+    s"https://github.com/graalvm/graalvm-ce-builds/releases/tag/$tag"
+  }
 
   /** Augments a state transition to do GraalVM version check.
     *
-    * @param graalVersion  the GraalVM version that should be used for
+    * @param graalVersion  the GraalVM JDK version that should be used for
     *                      building this project
-    * @param graalPackagesVersion Version of Truffle and GraalVM packages that
-    *                             will be downloaded from Maven
+    * @param graalPackagesVersion the GraalVM release: the version of Truffle and
+    *                             the GraalVM packages downloaded from Maven
     * @param javaVersion Version of the Java source code
     * @return an augmented state transition that does all the state changes of
     *         oldTransition but also runs the version checks
@@ -267,24 +279,14 @@ object GraalVM {
     javaVersion: String,
     oldState: State
   ): State = {
-    val log = oldState.log
-    // The Truffle runtime in the GraalVM / Truffle Maven packages must match the
-    // Graal compiler of the JDK it runs on, and since GraalVM 25 both carry the
-    // same version. `build-config.yaml` pins them as one `graalvm` value too.
-    if (!isSameVersion(graalPackagesVersion, graalVersion)) {
-      log.error(
-        s"GraalVM packages version $graalPackagesVersion does not match " +
-        s"GraalVM version $graalVersion. Bump graalMavenPackagesVersion and " +
-        s"graalVersion in project/Dependencies.scala together."
-      )
-      return oldState.fail
-    }
+    val log        = oldState.log
+    val link       = downloadLink(graalVersion, graalPackagesVersion)
     val javaVendor = System.getProperty("java.vendor")
     if (!allowedJavaVendors.contains(javaVendor)) {
       log.warn(
         s"Running on non-GraalVM JVM (The actual java.vendor is $javaVendor). " +
         s"Expected Java vendors: ${allowedJavaVendors.mkString(", ")}. " +
-        s"Download link: $downloadLink"
+        s"Download link: $link"
       )
     }
 
@@ -293,75 +295,87 @@ object GraalVM {
       log.error(
         s"Running on Java version $javaSpecVersion. " +
         s"Expected Java version $javaVersion. " +
-        s"Download link: $downloadLink"
+        s"Download link: $link"
       )
       return oldState.fail
     }
 
     val vmVersion = System.getProperty("java.vm.version")
-    tryParseJavaVMVersion(vmVersion) match {
-      case Some(version) =>
-        if (!isSameVersion(version, graalVersion)) {
-          log.error(
-            s"Running on GraalVM version $version. " +
-            s"Expected GraalVM version $graalVersion. " +
-            s"Download link: $downloadLink"
-          )
-          oldState.fail
-        } else {
-          oldState
-        }
-      case None =>
-        log.error(
-          s"Could not parse GraalVM version from java.vm.version: $vmVersion."
-        )
+    jvmVersionProblem(vmVersion, graalVersion, graalPackagesVersion) match {
+      case Some(problem) =>
+        log.error(s"$problem Download link: $link")
         oldState.fail
+      case None =>
+        oldState
     }
   }
 
-  private def tryParseJavaVMVersion(
-    version: String
+  /** Why a JVM whose `java.vm.version` is `vmVersion` cannot build with the
+    * GraalVM JDK `graalVersion` and the GraalVM release `graalPackagesVersion`,
+    * or `None` when it can.
+    *
+    * The JDK's version (`vmVersion` before the `+`) must be `graalVersion`
+    * exactly. Its JVMCI version must belong to the release: since 25.1 Truffle's
+    * optimising runtime runs only on a GraalVM JDK of the same feature release.
+    * A JDK on the innovation line names it (`jvmci-25.5-b26`: the release's
+    * first two components); a 25.0.x JDK does not (`jvmci-b01`), and then the
+    * release must have the JDK's version.
+    * See Note [GraalVM Follows The Innovation Line] in `Dependencies.scala`.
+    *
+    * The meta-build has no test harness (`project/CLAUDE.md`), so this was
+    * checked with `sbt eval GraalVM.jvmVersionProblem(...)` on six cases
+    * (`java.vm.version`, graalVersion, graalMavenPackagesVersion):
+    *  - `25.0.5.0.3+1-jvmci-25.5-b26`, 25.0.5.0.3, 25.5.5.0.3: None;
+    *  - `25.0.1+8-jvmci-b01`, 25.0.1, 25.0.1: None;
+    *  - `25.0.5.0.3+1-jvmci-25.5-b26`, 25.0.5.0.3, 25.4.4.1.1: wrong release;
+    *  - `25.0.1+8-jvmci-b01`, 25.0.5.0.3, 25.5.5.0.3: wrong JDK;
+    *  - `25.0.1+8-jvmci-b01`, 25.0.1, 25.0.5: a 25.0.x JDK, another release;
+    *  - `25.0.1` (no `+`), 25.0.1, 25.0.1: unparsable.
+    */
+  def jvmVersionProblem(
+    vmVersion: String,
+    graalVersion: String,
+    graalPackagesVersion: String
   ): Option[String] = {
-    if (version.contains('+')) {
-      Some(version.split('+')(0))
-    } else {
-      None
+    val plus = Option(vmVersion).map(_.indexOf('+')).getOrElse(-1)
+    if (plus < 0) {
+      return Some(
+        s"Could not parse GraalVM version from java.vm.version: $vmVersion."
+      )
     }
-  }
-
-  private def isSameVersion(s1: String, s2: String): Boolean = {
-    if (s1 == s2) {
-      true
-    } else {
-      val semVer1 = toSemVer(s1)
-      val semVer2 = toSemVer(s2)
-      semVer1 == semVer2
+    val jdkVersion = vmVersion.substring(0, plus)
+    if (jdkVersion != graalVersion) {
+      return Some(
+        s"Running on GraalVM version $jdkVersion. " +
+        s"Expected GraalVM version $graalVersion."
+      )
     }
-  }
-
-  private def toSemVer(ver: String): SemVer = {
-    try {
-      if (ver.contains(".")) {
-        val items = ver.split('.')
-        if (items.length == 2) {
-          SemVer(Integer.parseInt(items(0)), Integer.parseInt(items(1)), 0)
-        } else if (items.length == 3) {
-          SemVer(
-            Integer.parseInt(items(0)),
-            Integer.parseInt(items(1)),
-            Integer.parseInt(items(2))
+    val releaseFeature =
+      graalPackagesVersion.split('.').take(2).mkString(".")
+    val jvmciFeature =
+      """jvmci-(\d+\.\d+)""".r.findFirstMatchIn(vmVersion).map(_.group(1))
+    jvmciFeature match {
+      case Some(feature) if feature != releaseFeature =>
+        Some(
+          s"Running on a GraalVM JDK for release $feature ($vmVersion). " +
+          s"The GraalVM packages are release $graalPackagesVersion, " +
+          s"which needs a JDK for release $releaseFeature."
+        )
+      case Some(_) => None
+      case None    =>
+        // A 25.0.x JDK: its release has the JDK's own version.
+        if (graalVersion != graalPackagesVersion) {
+          Some(
+            s"Running on GraalVM JDK $graalVersion ($vmVersion), a 25.0.x " +
+            s"JDK (its JVMCI version names no release), whose GraalVM " +
+            s"packages are $graalVersion too. The build asks for release " +
+            s"$graalPackagesVersion: set graalVersion and " +
+            s"graalMavenPackagesVersion to the same 25.0.x version, or use " +
+            s"the JDK of release $graalPackagesVersion."
           )
         } else {
-          throw new IllegalArgumentException(s"Cannot parse version: $ver")
+          None
         }
-      } else {
-        SemVer(Integer.parseInt(ver), 0, 0)
-      }
-    } catch {
-      case e: NumberFormatException =>
-        throw new IllegalArgumentException(s"Cannot parse version: $ver", e)
     }
   }
-
-  private case class SemVer(major: Int, minor: Int, patch: Int)
 }

@@ -17,7 +17,11 @@ after(() => rmSync(scratch, { recursive: true, force: true }))
 const FIXTURES = {
   'the real file': {
     text: readFileSync(path.join(repoRoot, 'build-config.yaml'), 'utf8'),
-    keys: ['graalvm', 'graalpy', 'sbt', 'flatc', 'missing'],
+    keys: ['graalvm', 'graalvm-jdk', 'graalpy', 'sbt', 'flatc', 'missing'],
+  },
+  'a key is matched whole, not by prefix': {
+    text: 'toolchain:\n  graalvm-jdk: 25.0.5.0.3\n  graalvm: 25.5.5.0.3\n',
+    keys: ['graalvm', 'graalvm-jdk'],
   },
   'a value glued to its key is no pin': {
     text: 'toolchain:\n  graalvm:25.0.1\n',
@@ -83,7 +87,8 @@ describe('readToolchainPins agrees with the awk reader in setup-jvm', () => {
 
 test('readToolchainPins reads the real pins', () => {
   const pins = readToolchainPins(readFileSync(path.join(repoRoot, 'build-config.yaml'), 'utf8'))
-  for (const key of ['graalvm', 'graalpy', 'sbt', 'flatc']) {
-    assert.match(pins[key] ?? '', /^\d+\.\d+\.\d+$/, key)
+  for (const key of ['graalvm', 'graalvm-jdk', 'graalpy', 'sbt', 'flatc']) {
+    // Three to five components: GraalVM's innovation releases have five (25.5.5.0.3).
+    assert.match(pins[key] ?? '', /^\d+(\.\d+){2,4}$/, key)
   }
 })

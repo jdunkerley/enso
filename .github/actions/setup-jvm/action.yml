@@ -74,17 +74,106 @@ runs:
             exit 1
           fi
           echo "$1=$value" >> "$GITHUB_OUTPUT"
+          pinned=$value
         }
         pin graalvm
+        graalvm=$pinned
+        pin graalvm-jdk
+        jdk=$pinned
         pin sbt
         pin flatc
         pin graalpy
-    - name: Set up GraalVM
+        # See Note [GraalVM Innovation Releases]. `setup-graalvm` installs 25.0.x by its JDK version.
+        if [ "$graalvm" = "$jdk" ]; then
+          echo "graalvm-from=action" >> "$GITHUB_OUTPUT"
+          echo "graalvm-java-version=$jdk" >> "$GITHUB_OUTPUT"
+        elif [ "$EDITION" = "oracle" ]; then
+          # Not supported yet: `setup-graalvm` takes Oracle GraalVM's innovation releases only by
+          # feature release (`version: 25.5`), which installs the newest 25.5.x rather than the
+          # pinned one. Enable once the GraalVM bump (PR 3 of the 25.5 upgrade spec) verifies a
+          # route on a throwaway branch.
+          echo "::error file=build-config.yaml::setup-jvm: Oracle GraalVM cannot be installed for an innovation release yet (graalvm $graalvm, graalvm-jdk $jdk); see Note [GraalVM Innovation Releases]."
+          exit 1
+        else
+          echo "graalvm-from=archive" >> "$GITHUB_OUTPUT"
+        fi
+    # Note [GraalVM Innovation Releases]
+    # ===================================
+    # On 25.0.x the GraalVM CE JDK and its release share a version (`graalvm` and `graalvm-jdk`
+    # are equal) and `setup-graalvm` installs it by that version from the `jdk-<version>` tag. On
+    # the innovation line they differ (release 25.5.5.0.3 ships JDK 25.0.5.0.3), the tag is
+    # `graal-<release>` and the asset `graalvm-community-jdk-<major>i<minor>-<jdk>_<os>-<arch>_bin`;
+    # `setup-graalvm` documents innovation releases only for Oracle GraalVM, and checks no
+    # checksum. So for CE this action downloads that archive itself, as it does flatc and GraalPy,
+    # checks it against the release's `.sha256`, and sets `JAVA_HOME`, `GRAALVM_HOME` and `PATH`
+    # as `setup-graalvm` would. Oracle GraalVM on an innovation release fails the pins step until
+    # a route is verified. See Note [GraalVM Follows The Innovation Line] in `project/Dependencies.scala`.
+    - if: steps.pins.outputs.graalvm-from == 'action'
+      name: Set up GraalVM
       uses: graalvm/setup-graalvm@v1
       with:
-        java-version: ${{ steps.pins.outputs.graalvm }}
+        java-version: ${{ steps.pins.outputs.graalvm-java-version }}
         distribution: ${{ inputs.edition == 'oracle' && 'graalvm' || 'graalvm-community' }}
         github-token: ${{ github.token }}
+    - if: steps.pins.outputs.graalvm-from == 'archive'
+      name: Set up GraalVM (innovation release)
+      shell: bash
+      env:
+        GRAALVM_VERSION: ${{ steps.pins.outputs.graalvm }}
+        GRAALVM_JDK: ${{ steps.pins.outputs.graalvm-jdk }}
+      run: |-
+        case "$RUNNER_OS" in
+          Linux) os=linux; ext=tar.gz ;;
+          Windows) os=windows; ext=zip ;;
+          macOS) os=macos; ext=tar.gz ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=x64 ;;
+          ARM64) arch=aarch64 ;;
+        esac
+        major=${GRAALVM_VERSION%%.*}
+        minor=$(cut -d. -f2 <<< "$GRAALVM_VERSION")
+        name="graalvm-community-jdk-${major}i${minor}-${GRAALVM_JDK}_${os}-${arch}_bin.$ext"
+        url="https://github.com/graalvm/graalvm-ce-builds/releases/download/graal-$GRAALVM_VERSION/$name"
+        dir=$RUNNER_TEMP
+        if [ "$RUNNER_OS" = "Windows" ]; then dir=$(cygpath -u "$RUNNER_TEMP"); fi
+        curl --retry 4 --retry-connrefused -fsSL -o "$dir/$name" "$url"
+        curl --retry 4 --retry-connrefused -fsSL -o "$dir/$name.sha256" "$url.sha256"
+        expected=$(awk '{ print $1; exit }' "$dir/$name.sha256")
+        if command -v sha256sum > /dev/null; then
+          actual=$(sha256sum "$dir/$name" | awk '{ print $1 }')
+        else
+          actual=$(shasum -a 256 "$dir/$name" | awk '{ print $1 }')
+        fi
+        if [ -z "$expected" ] || [ "$actual" != "$expected" ]; then
+          echo "::error::setup-jvm: $name has SHA-256 $actual; its release says ${expected:-nothing}."
+          exit 1
+        fi
+        rm -rf "$dir/graalvm"
+        mkdir "$dir/graalvm"
+        if [ "$ext" = "tar.gz" ]; then
+          tar -xzf "$dir/$name" -C "$dir/graalvm"
+        elif command -v unzip > /dev/null; then
+          unzip -o -q "$dir/$name" -d "$dir/graalvm"
+        else
+          # A native program: it takes the Windows path.
+          7z x -y -o"$RUNNER_TEMP/graalvm" "$RUNNER_TEMP/$name" > /dev/null
+        fi
+        rm "$dir/$name" "$dir/$name.sha256"
+        # The archive holds one directory (`graalvm-community-<release>+<build>`).
+        top=$(find "$dir/graalvm" -mindepth 1 -maxdepth 1 -type d)
+        if [ "$(wc -l <<< "$top")" != 1 ] || [ -z "$top" ]; then
+          echo "::error::setup-jvm: expected one directory in $name, found: ${top:-none}"
+          exit 1
+        fi
+        home=$top
+        if [ "$RUNNER_OS" = "macOS" ]; then home=$top/Contents/Home; fi
+        if [ "$RUNNER_OS" = "Windows" ]; then home=$(cygpath -w "$home"); fi
+        {
+          echo "JAVA_HOME=$home"
+          echo "GRAALVM_HOME=$home"
+        } >> "$GITHUB_ENV"
+        echo "$home/bin" >> "$GITHUB_PATH"
     # The launcher from the release tarball, as `formatting.yml` always used, unpacked outside the
     # working tree. Git Bash's `tar` reads `D:\...` as a remote host, hence the POSIX path.
     - name: Set up sbt
@@ -127,12 +216,15 @@ runs:
         chmod +x "$dir/flatc/flatc" 2>/dev/null || true
         echo "$RUNNER_TEMP/flatc" >> "$GITHUB_PATH"
     # The release asset the retired build CLI's `graalpy` goodie downloaded; it unpacks to one
-    # directory of the same name.
+    # directory. Its name is read from the release: GraalPy 25.5 renamed it from
+    # `graalpy-community-<v>` to `graalpy3.13-community-<v>` (the Python version), so a
+    # `graalpy3.*` asset is taken first. It is checked against the release's `.sha256`.
     - if: inputs.graalpy == 'true'
       name: Set up GraalPy
       shell: bash
       env:
         GRAALPY_VERSION: ${{ steps.pins.outputs.graalpy }}
+        GH_TOKEN: ${{ github.token }}
       run: |-
         case "$RUNNER_OS" in
           Linux) os=linux; ext=tar.gz ;;
@@ -143,21 +235,56 @@ runs:
           X64) arch=amd64 ;;
           ARM64) arch=aarch64 ;;
         esac
-        name="graalpy-community-$GRAALPY_VERSION-$os-$arch"
+        release="https://github.com/oracle/graalpython/releases/download/graal-$GRAALPY_VERSION"
+        # The asset names, without `gh` or `jq` (the self-hosted Mac may have neither).
+        auth=()
+        if [ -n "${GH_TOKEN:-}" ]; then auth=(-H "Authorization: Bearer $GH_TOKEN"); fi
+        assets=$(curl --retry 4 --retry-connrefused -fsSL "${auth[@]}" \
+          "https://api.github.com/repos/oracle/graalpython/releases/tags/graal-$GRAALPY_VERSION" |
+          sed -n 's/^ *"name": *"\(graalpy[^"]*\)",*$/\1/p')
+        suffix="-community-$GRAALPY_VERSION-$os-$arch.$ext"
+        asset=
+        while IFS= read -r candidate; do
+          case "$candidate" in
+            graalpy3.*"$suffix") asset=$candidate; break ;;
+          esac
+        done <<< "$assets"
+        if [ -z "$asset" ] && grep -qxF "graalpy$suffix" <<< "$assets"; then asset="graalpy$suffix"; fi
+        if [ -z "$asset" ]; then
+          echo "::error::setup-jvm: no GraalPy asset ending \`$suffix\` in the graal-$GRAALPY_VERSION release."
+          exit 1
+        fi
         dir=$RUNNER_TEMP
         if [ "$RUNNER_OS" = "Windows" ]; then dir=$(cygpath -u "$RUNNER_TEMP"); fi
-        curl --retry 4 --retry-connrefused -fsSL -o "$dir/graalpy.$ext" \
-          "https://github.com/oracle/graalpython/releases/download/graal-$GRAALPY_VERSION/$name.$ext"
+        curl --retry 4 --retry-connrefused -fsSL -o "$dir/$asset" "$release/$asset"
+        curl --retry 4 --retry-connrefused -fsSL -o "$dir/$asset.sha256" "$release/$asset.sha256"
+        expected=$(awk '{ print $1; exit }' "$dir/$asset.sha256")
+        if command -v sha256sum > /dev/null; then
+          actual=$(sha256sum "$dir/$asset" | awk '{ print $1 }')
+        else
+          actual=$(shasum -a 256 "$dir/$asset" | awk '{ print $1 }')
+        fi
+        if [ -z "$expected" ] || [ "$actual" != "$expected" ]; then
+          echo "::error::setup-jvm: $asset has SHA-256 $actual; its release says ${expected:-nothing}."
+          exit 1
+        fi
+        rm -rf "$dir/graalpy"
+        mkdir "$dir/graalpy"
         if [ "$ext" = "tar.gz" ]; then
-          tar -xzf "$dir/graalpy.$ext" -C "$dir"
+          tar -xzf "$dir/$asset" -C "$dir/graalpy"
         elif command -v unzip > /dev/null; then
-          unzip -o -q "$dir/graalpy.zip" -d "$dir"
+          unzip -o -q "$dir/$asset" -d "$dir/graalpy"
         else
           # A native program: it takes the Windows path.
-          7z x -y -o"$RUNNER_TEMP" "$RUNNER_TEMP/graalpy.zip" > /dev/null
+          7z x -y -o"$RUNNER_TEMP/graalpy" "$RUNNER_TEMP/$asset" > /dev/null
         fi
-        rm "$dir/graalpy.$ext"
-        echo "$RUNNER_TEMP/$name/bin" >> "$GITHUB_PATH"
+        rm "$dir/$asset" "$dir/$asset.sha256"
+        top=$(find "$dir/graalpy" -mindepth 1 -maxdepth 1 -type d)
+        if [ -z "$top" ] || [ "$(wc -l <<< "$top")" != 1 ]; then
+          echo "::error::setup-jvm: expected one directory in $asset, found: ${top:-none}"
+          exit 1
+        fi
+        echo "$RUNNER_TEMP/graalpy/$(basename "$top")/bin" >> "$GITHUB_PATH"
     # Note [Install The Rust Toolchain Before sbt]
     # =============================================
     # sbt compiles the Rust parser (and `checkEnsoSyntax` runs it) with `cargo`, and under `all`
@@ -175,6 +302,7 @@ runs:
       shell: bash
       env:
         GRAALVM_VERSION: ${{ steps.pins.outputs.graalvm }}
+        GRAALVM_JDK: ${{ steps.pins.outputs.graalvm-jdk }}
         GRAALVM_VENDOR: ${{ steps.pins.outputs.vendor }}
         FLATC_VERSION: ${{ steps.pins.outputs.flatc }}
         GRAALPY_VERSION: ${{ steps.pins.outputs.graalpy }}
@@ -184,7 +312,10 @@ runs:
         # Captured first: `grep -q` stops reading early, which `pipefail` would report.
         java=$(java -version 2>&1)
         echo "$java"
-        grep -qF "$GRAALVM_VENDOR $GRAALVM_VERSION" <<< "$java"
+        # The vendor names the release and the build the JDK: `GraalVM CE 25.0.1+8.1 (build
+        # 25.0.1+8-jvmci-b01)`, `GraalVM CE 25.5.5.0.3+1.1 (build 25.0.5.0.3+1-jvmci-25.5-b26)`.
+        grep -qF "$GRAALVM_VENDOR $GRAALVM_VERSION+" <<< "$java"
+        grep -qF "(build $GRAALVM_JDK+" <<< "$java"
         command -v sbt
         if [ "$WITH_FLATC" = "true" ]; then
           flatc=$(flatc --version)
