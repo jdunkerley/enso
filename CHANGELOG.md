@@ -398,6 +398,8 @@
   bundled standard libraries (including `Standard.Image`) resolve as before. To
   download editions, list an edition provider under `edition-providers` in
   `global-config.yaml`.
+- [Update to GraalVM 25.5][666]: polyglot Python is now Python 3.13, with
+  GraalPy and GraalJS 25.5.
 
 #### Enso Standard Library
 
@@ -464,6 +466,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [654]: https://github.com/jdunkerley/enso/pull/654
+[666]: https://github.com/jdunkerley/enso/pull/666
 [655]: https://github.com/jdunkerley/enso/pull/655
 [626]: https://github.com/jdunkerley/enso/pull/626
 [642]: https://github.com/jdunkerley/enso/pull/642
