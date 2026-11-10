@@ -16,6 +16,7 @@ import com.oracle.truffle.api.interop.UnknownKeyException;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.library.CachedLibrary;
+import com.oracle.truffle.api.nodes.LoopNode;
 import com.oracle.truffle.api.nodes.Node;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -312,13 +313,20 @@ abstract class EqualsComplexNode extends Node {
       if (selfSize != otherInterop.getArraySize(otherArray)) {
         return EqualsAndInfo.FALSE;
       }
-      for (long i = 0; i < selfSize; i++) {
-        Object selfElem = valueToEnsoNode.execute(selfInterop.readArrayElement(selfArray, i));
-        Object otherElem = valueToEnsoNode.execute(otherInterop.readArrayElement(otherArray, i));
-        var elemsAreEqual = equalsNode.execute(frame, selfElem, otherElem);
-        if (!elemsAreEqual.isTrue()) {
-          return elemsAreEqual;
+      // See Note [Reporting Builtin Loop Counts] in VectorFromFunctionNode.
+      long i = 0;
+      try {
+        for (; i < selfSize; i++) {
+          Object selfElem = valueToEnsoNode.execute(selfInterop.readArrayElement(selfArray, i));
+          Object otherElem =
+              valueToEnsoNode.execute(otherInterop.readArrayElement(otherArray, i));
+          var elemsAreEqual = equalsNode.execute(frame, selfElem, otherElem);
+          if (!elemsAreEqual.isTrue()) {
+            return elemsAreEqual;
+          }
         }
+      } finally {
+        LoopNode.reportLoopCount(this, (int) Math.min(i, Integer.MAX_VALUE));
       }
       return EqualsAndInfo.TRUE;
     } catch (UnsupportedMessageException | InvalidArrayIndexException e) {
@@ -351,21 +359,29 @@ abstract class EqualsComplexNode extends Node {
         return EqualsAndInfo.FALSE;
       }
       Object selfEntriesIter = selfInterop.getHashEntriesIterator(selfHashMap);
-      while (entriesInterop.hasIteratorNextElement(selfEntriesIter)) {
-        Object selfKeyValue = entriesInterop.getIteratorNextElement(selfEntriesIter);
-        Object key = keyToEnsoNode.execute(entriesInterop.readArrayElement(selfKeyValue, 0));
-        Object selfValue =
-            valueToEnsoNode.execute(entriesInterop.readArrayElement(selfKeyValue, 1));
-        if (otherInterop.isHashEntryExisting(otherHashMap, key)
-            && otherInterop.isHashEntryReadable(otherHashMap, key)) {
-          var otherValue = valueToEnsoNode.execute(otherInterop.readHashValue(otherHashMap, key));
-          var res = equalsNode.execute(frame, selfValue, otherValue);
-          if (!res.isTrue()) {
-            return res;
+      // See Note [Reporting Builtin Loop Counts] in VectorFromFunctionNode.
+      int entriesCompared = 0;
+      try {
+        while (entriesInterop.hasIteratorNextElement(selfEntriesIter)) {
+          Object selfKeyValue = entriesInterop.getIteratorNextElement(selfEntriesIter);
+          Object key = keyToEnsoNode.execute(entriesInterop.readArrayElement(selfKeyValue, 0));
+          Object selfValue =
+              valueToEnsoNode.execute(entriesInterop.readArrayElement(selfKeyValue, 1));
+          entriesCompared++;
+          if (otherInterop.isHashEntryExisting(otherHashMap, key)
+              && otherInterop.isHashEntryReadable(otherHashMap, key)) {
+            var otherValue =
+                valueToEnsoNode.execute(otherInterop.readHashValue(otherHashMap, key));
+            var res = equalsNode.execute(frame, selfValue, otherValue);
+            if (!res.isTrue()) {
+              return res;
+            }
+          } else {
+            return EqualsAndInfo.FALSE;
           }
-        } else {
-          return EqualsAndInfo.FALSE;
         }
+      } finally {
+        LoopNode.reportLoopCount(this, entriesCompared);
       }
       return EqualsAndInfo.TRUE;
     } catch (UnsupportedMessageException

@@ -5,6 +5,7 @@ import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.library.CachedLibrary;
+import com.oracle.truffle.api.nodes.LoopNode;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.profiles.BranchProfile;
 import com.oracle.truffle.api.profiles.LoopConditionProfile;
@@ -32,6 +33,19 @@ public abstract class VectorFromFunctionNode extends Node {
   }
 
   private static final int MAX_MAP_WARNINGS = 10;
+
+  /* Note [Reporting Builtin Loop Counts]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * A builtin that loops over user-sized data in plain Java is invisible to Truffle's compilation
+   * heuristics: a `for` loop is not a `LoopNode`, so its root only accumulates one count per call.
+   * One `Vector.new 1000000` call then looks exactly as cold as `Vector.new 1`, and the builtin's
+   * root is compiled only after the call threshold (400 calls on Truffle 25.1+, where an idle
+   * compile queue no longer lowers it), running each element's iteration in the interpreter until
+   * then. `LoopNode.reportLoopCount` feeds the iterations actually done into the enclosing root's
+   * call-and-loop count (and any enclosing OSR loop), as a `LoopNode` would. It is reported in a
+   * `finally` so that early returns and panics still count the work done. `reportLoopCount`
+   * itself handles the last tier and non-constant sources, so callers need no guard.
+   */
 
   /**
    * @param length Length of the vector to create.
@@ -66,34 +80,40 @@ public abstract class VectorFromFunctionNode extends Node {
     var target = ArrayBuilder.newBuilder(len);
     var errorsEncountered = 0;
     loopConditionProfile.profileCounted(len);
-    for (int i = 0; loopConditionProfile.inject(i < len); i++) {
-      var value = invokeFunctionNode.execute(func, frame, state, new Long[] {(long) i});
-      Object valueToAdd = value;
-      if (value instanceof DataflowError err) {
-        errorEncounteredProfile.enter();
-        switch (onProblems) {
-          case IGNORE -> valueToAdd = nothing;
-          case REPORT_ERROR -> {
-            var mapErr = ctx.getBuiltins().error().makeMapError(i, err.getPayload());
-            return DataflowError.withDefaultTrace(mapErr, this, stateNode, hasContextEnabledNode);
-          }
-          case REPORT_WARNING -> {
-            errorsEncountered++;
-            if (errorsEncountered > MAX_MAP_WARNINGS) {
-              valueToAdd = nothing;
-            } else {
-              var wrappedInWarn =
-                  Warning.attach(
-                      ctx, frame, nothing, err.getPayload(), null, warnsLib, appendWarningNode);
-              valueToAdd = wrappedInWarn;
+    // See Note [Reporting Builtin Loop Counts].
+    int i = 0;
+    try {
+      for (; loopConditionProfile.inject(i < len); i++) {
+        var value = invokeFunctionNode.execute(func, frame, state, new Long[] {(long) i});
+        Object valueToAdd = value;
+        if (value instanceof DataflowError err) {
+          errorEncounteredProfile.enter();
+          switch (onProblems) {
+            case IGNORE -> valueToAdd = nothing;
+            case REPORT_ERROR -> {
+              var mapErr = ctx.getBuiltins().error().makeMapError(i, err.getPayload());
+              return DataflowError.withDefaultTrace(mapErr, this, stateNode, hasContextEnabledNode);
+            }
+            case REPORT_WARNING -> {
+              errorsEncountered++;
+              if (errorsEncountered > MAX_MAP_WARNINGS) {
+                valueToAdd = nothing;
+              } else {
+                var wrappedInWarn =
+                    Warning.attach(
+                        ctx, frame, nothing, err.getPayload(), null, warnsLib, appendWarningNode);
+                valueToAdd = wrappedInWarn;
+              }
+            }
+            case NO_WRAP -> {
+              return err;
             }
           }
-          case NO_WRAP -> {
-            return err;
-          }
         }
+        target.add(valueToAdd, warnsLib);
       }
-      target.add(valueToAdd, warnsLib);
+    } finally {
+      LoopNode.reportLoopCount(this, i);
     }
     var vector = target.asVector(true);
     if (errorsEncountered >= MAX_MAP_WARNINGS) {

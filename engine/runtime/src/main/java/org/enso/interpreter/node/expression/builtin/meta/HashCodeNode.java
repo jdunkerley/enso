@@ -18,6 +18,7 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
+import com.oracle.truffle.api.nodes.LoopNode;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.profiles.ConditionProfile;
 import com.oracle.truffle.api.profiles.LoopConditionProfile;
@@ -497,15 +498,21 @@ public abstract class HashCodeNode extends Node {
       long arraySize = interop.getArraySize(selfArray);
       loopProfile.profileCounted(arraySize);
       int[] elemHashCodes = new int[(int) arraySize];
-      for (int i = 0; loopProfile.inject(i < arraySize); i++) {
-        if (interop.isArrayElementReadable(selfArray, i)) {
-          Object elem = interop.readArrayElement(selfArray, i);
-          if (elem instanceof Atom atomElem && customComparatorNode.execute(atomElem) != null) {
-            elemHashCodes[i] = (int) hashCallbackNode.execute(atomElem);
-          } else {
-            elemHashCodes[i] = (int) hashCodeNode.execute(elem);
+      // See Note [Reporting Builtin Loop Counts] in VectorFromFunctionNode.
+      int i = 0;
+      try {
+        for (; loopProfile.inject(i < arraySize); i++) {
+          if (interop.isArrayElementReadable(selfArray, i)) {
+            Object elem = interop.readArrayElement(selfArray, i);
+            if (elem instanceof Atom atomElem && customComparatorNode.execute(atomElem) != null) {
+              elemHashCodes[i] = (int) hashCallbackNode.execute(atomElem);
+            } else {
+              elemHashCodes[i] = (int) hashCodeNode.execute(elem);
+            }
           }
         }
+      } finally {
+        LoopNode.reportLoopCount(this, i);
       }
       return Arrays.hashCode(elemHashCodes);
     } catch (UnsupportedMessageException | InvalidArrayIndexException e) {
@@ -532,13 +539,20 @@ public abstract class HashCodeNode extends Node {
     try {
       mapSize = (int) interop.getHashSize(selfMap);
       Object entriesIterator = interop.getHashEntriesIterator(selfMap);
-      while (interop.hasIteratorNextElement(entriesIterator)) {
-        Object entry = interop.getIteratorNextElement(entriesIterator);
-        Object key = interop.readArrayElement(entry, 0);
-        Object value = interop.readArrayElement(entry, 1);
-        // We don't care about the order of keys and values, so we just sum all their hash codes.
-        keysHashCode += hashCodeNode.execute(key);
-        valuesHashCode += hashCodeNode.execute(value);
+      // See Note [Reporting Builtin Loop Counts] in VectorFromFunctionNode.
+      int entriesHashed = 0;
+      try {
+        while (interop.hasIteratorNextElement(entriesIterator)) {
+          Object entry = interop.getIteratorNextElement(entriesIterator);
+          Object key = interop.readArrayElement(entry, 0);
+          Object value = interop.readArrayElement(entry, 1);
+          // We don't care about the order of keys and values, so we just sum all their hash codes.
+          keysHashCode += hashCodeNode.execute(key);
+          valuesHashCode += hashCodeNode.execute(value);
+          entriesHashed++;
+        }
+      } finally {
+        LoopNode.reportLoopCount(this, entriesHashed);
       }
     } catch (UnsupportedMessageException | StopIterationException | InvalidArrayIndexException e) {
       throw EnsoContext.get(this).raiseAssertionPanic(this, null, e);
