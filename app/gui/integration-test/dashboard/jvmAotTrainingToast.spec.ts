@@ -12,9 +12,19 @@ const toast = (page: Page) => page.getByTestId('toast')
 async function screenshot(page: Page, name: string) {
   const dir = process.env.PR_SCREENSHOT_DIR
   if (!dir) return
-  // The toast's own slide-in, not its timer bar's animation, which runs until it closes.
+  // The slide-in and the icon's zoom-in (0.3 s); not the timer bar, which runs until the toast
+  // closes, or the spinner. Scoped styles suffix the keyframes' names (`toast-zoom-in-<hash>`).
   await toast(page).evaluate((element) =>
-    Promise.all(element.getAnimations().map((animation) => animation.finished)),
+    Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        .filter(
+          (animation) =>
+            animation instanceof CSSAnimation &&
+            /^toast-(zoom-in|slide-in)/.test(animation.animationName),
+        )
+        .map((animation) => animation.finished),
+    ),
   )
   const box = await toast(page).boundingBox()
   if (box == null) return

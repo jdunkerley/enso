@@ -175,8 +175,25 @@ export class JvmAotCache {
 
   /** Start a training, unless one runs, an open is in flight, or another process holds the lock. */
   private beginTraining(): Promise<void> {
-    this.starting ??= this.tryBeginTraining().finally(() => (this.starting = undefined))
+    this.starting ??= this.tryBeginTraining()
+      .catch((error: unknown) => this.startFailed(error))
+      .finally(() => (this.starting = undefined))
     return this.starting
+  }
+
+  /**
+   * A training that could not start (a lock release or a file check threw) ends like a failed one,
+   * so that `onTrainingEnded` still comes after `onTrainingStarted`. Nothing to do when a training
+   * runs (its own end is announced) or the end was already announced.
+   */
+  private startFailed(error: unknown): void {
+    if (this.training != null || !this.wanted) return
+    this.wanted = false
+    console.error(
+      'JDK AOT cache: training could not start; trying again at the next launch:',
+      error,
+    )
+    if (!this.disposed) this.announceEnded('failed')
   }
 
   private async tryBeginTraining(): Promise<void> {
