@@ -191,6 +191,11 @@ object SmallJDK {
       "lib/svm/bin/../builder/svm-configure.jar",
       "lib/svm/bin/../builder/svm-capnproto-runtime.jar",
       "lib/svm/bin/../builder/svm-foreign.jar",
+      // New in GraalVM 25.5: org.graalvm.nativeimage.base requires these.
+      "lib/svm/bin/../builder/svm-shared.jar",
+      "lib/svm/bin/../builder/vmaccess.jar",
+      "lib/svm/bin/../builder/vmaccess-guest.jar",
+      "lib/svm/bin/../builder/hostvmaccess.jar",
       "lib/svm/bin/../library-support.jar"
     )
     moduleJars.map { jar =>

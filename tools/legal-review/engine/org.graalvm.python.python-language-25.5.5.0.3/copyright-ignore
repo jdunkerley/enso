@@ -67,4 +67,6 @@ Copyright (c) 2024, Oracle and/or its affiliates.
 Copyright (c) 2024, Oracle and/or its affiliates. All rights reserved.
 Copyright (c) 2025, Oracle and/or its affiliates. All rights reserved.
 hasMember = reallyHasMember(capiLibrary, "Py_GetCopyright");
-if (!hasMember) messages.add("missing implementation: Py_GetCopyright");
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+The above copyright notice and this permission notice shall be
+if (!hasMember && !isExcludedOnCurrentPlatform("Py_GetCopyright")) messages.add("missing implementation: Py_GetCopyright");
