@@ -1531,11 +1531,11 @@ public class Main {
      * ("UnsatisfiedLinkError: 'int sun.nio.fs.UnixNativeDispatcher.init()'"). */
     var useJNI = ImageInfo.inImageCode() && !System.getProperty("os.name", "").startsWith("Linux");
     var commandAndArgs = new ArrayList<String>();
-    if (originalCwdOrNull != null) {
-      commandAndArgs.add("-Denso.user.dir=" + originalCwdOrNull);
-    }
     if (!useJNI) {
       commandAndArgs.add(javaExecutable.getPath());
+    }
+    if (originalCwdOrNull != null) {
+      commandAndArgs.add("-Denso.user.dir=" + originalCwdOrNull);
     }
     var assertsOn = false;
     assert assertsOn = true;
