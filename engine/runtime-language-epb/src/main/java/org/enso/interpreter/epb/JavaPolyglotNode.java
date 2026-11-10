@@ -28,6 +28,7 @@ final class JavaPolyglotNode {
               "org.graalvm.jniutils", // required by org.graalvm.truffle since GraalVM 25.5
               "org.enso.engine.common",
               "java.net.http", // needed by Audit_Logs
+              "java.sql", // org.graalvm.truffle requires it only statically since GraalVM 25.5
               "java.rmi", // needed by Snowflake
               "org.slf4j",
               "org.enso.logging.utils",

@@ -42,7 +42,10 @@ AOT-ready; any other library loads its Java in the guest JVM. See Note
 
 ## JVM mode (`--jvm`)
 
-`Main.launchJvm` starts the JVM with a fixed option list, then appends
+The `enso` native image creates the JVM in its own process through JNI, except
+on Linux, where since GraalVM 25.5 it starts `java` as a process (the image
+exports `JVM_IsStaticallyLinked`, and an in-process JVM then never loads
+libnio). `Main.launchJvm` starts the JVM with a fixed option list, then appends
 `JvmOptions.all(component, System.getenv("ENSO_JVM_OPTIONS"))`, in this order:
 
 1. `jvm.options` in the engine package root, beside `component/` (source

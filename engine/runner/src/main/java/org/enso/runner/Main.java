@@ -1525,8 +1525,11 @@ public class Main {
       File component,
       File javaExecutable)
       throws IOException, InterruptedException {
-    /* Cannot use JNI when not in Native Image code. Fallback to launching a process. */
-    var useJNI = ImageInfo.inImageCode();
+    /* Cannot use JNI when not in Native Image code. Fallback to launching a process.
+     * On Linux a GraalVM 25.5 image exports JVM_IsStaticallyLinked, which the JVM's libjava then
+     * binds to, so the JVM created in-process never loads libnio and fails to boot
+     * ("UnsatisfiedLinkError: 'int sun.nio.fs.UnixNativeDispatcher.init()'"). */
+    var useJNI = ImageInfo.inImageCode() && !System.getProperty("os.name", "").startsWith("Linux");
     var commandAndArgs = new ArrayList<String>();
     if (originalCwdOrNull != null) {
       commandAndArgs.add("-Denso.user.dir=" + originalCwdOrNull);

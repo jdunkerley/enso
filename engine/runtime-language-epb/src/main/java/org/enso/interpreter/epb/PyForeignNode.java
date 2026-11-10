@@ -157,6 +157,9 @@ final class PyForeignNode extends GenericForeignNode {
                       self._rules = rules
 
                     def utcoffset(self, when):
+                      # Python 3.13 also asks with no datetime; the offset depends on one
+                      if when is None:
+                        return None
                       when = when.replace(tzinfo=None)
                       d = timedelta(seconds=self._rules.offset(when))
                       return d

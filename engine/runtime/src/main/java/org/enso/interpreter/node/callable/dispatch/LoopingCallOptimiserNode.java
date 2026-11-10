@@ -172,10 +172,11 @@ public abstract class LoopingCallOptimiserNode extends CallOptimiserNode {
     private final int stateSlotIdx;
     private final int callerInfoSlotIdx;
     private final FrameDescriptor descriptor;
+    private final boolean uncached;
     @Child private ExecuteCallNode dispatchNode;
 
     /** Creates a new node used for repeating a call. */
-    private RepeatedCallNode(ExecuteCallNode dispatchNode) {
+    private RepeatedCallNode(ExecuteCallNode dispatchNode, boolean uncached) {
       var descrBuilder = FrameDescriptor.newBuilder();
       functionSlotIdx = descrBuilder.addSlot(FrameSlotKind.Object, "<TCO Function>", null);
       resultSlotIdx = descrBuilder.addSlot(FrameSlotKind.Object, "<TCO Result>", null);
@@ -183,15 +184,16 @@ public abstract class LoopingCallOptimiserNode extends CallOptimiserNode {
       stateSlotIdx = descrBuilder.addSlot(FrameSlotKind.Object, "<TCO State>", null);
       callerInfoSlotIdx = descrBuilder.addSlot(FrameSlotKind.Object, "<TCO Caller Info>", null);
       descriptor = descrBuilder.build();
+      this.uncached = uncached;
       this.dispatchNode = dispatchNode;
     }
 
     static RepeatedCallNode getUncached() {
-      return new RepeatedCallNode(ExecuteCallNodeGen.getUncached());
+      return new RepeatedCallNode(ExecuteCallNodeGen.getUncached(), true);
     }
 
     static RepeatedCallNode create() {
-      return new RepeatedCallNode(ExecuteCallNodeGen.create());
+      return new RepeatedCallNode(ExecuteCallNodeGen.create(), false);
     }
 
     private VirtualFrame createFrame() {
@@ -275,7 +277,10 @@ public abstract class LoopingCallOptimiserNode extends CallOptimiserNode {
      */
     @Override
     public boolean executeRepeating(VirtualFrame frame) {
-      com.oracle.truffle.api.TruffleSafepoint.poll(this);
+      // The uncached loop node is adopted by no RootNode, so it is no safepoint location: Truffle
+      // asserts that one is when an action pushes it as the encapsulating node (GraalPy 25.5's
+      // AsyncHandler does).
+      com.oracle.truffle.api.TruffleSafepoint.poll(uncached ? null : this);
       try {
         Function function = getNextFunction(frame);
         Object state = getNextState(frame);
