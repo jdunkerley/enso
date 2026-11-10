@@ -3874,7 +3874,11 @@ lazy val `engine-runner` = project
     }
   )
   .settings(
-    NativeImage.smallJdk := Some(buildSmallJdk.value),
+    // The launcher's image is built by the GraalVM JDK's own `native-image`, as on Windows
+    // (whose jlinked JDK has no `lib/svm/bin/native-image`). On GraalVM 25.5 the builder no
+    // longer runs from a jlinked JDK: features in jlinked modules are not found and
+    // configuration in `jrt:` resources is refused.
+    NativeImage.smallJdk := None,
     NativeImage.additionalCp := {
       val runnerDeps =
         (Compile / fullClasspath).value.map(_.data.getAbsolutePath)
@@ -4050,10 +4054,7 @@ lazy val `engine-runner` = project
             targetDir                 = engineDistributionRoot.value / "bin",
             staticOnLinux             = false,
             excludeConfigs = Seq(
-              ".*gax-grpc-.*\\.jar,META-INF/native-image/com.google.api/gax-grpc/native-image.properties",
-              // GraalVM 25.5's own library support enables a Groovy feature that its builder
-              // then cannot load when it runs from the small JDK. Enso has no Groovy.
-              ".*library-support\\.jar,META-INF/native-image/com.oracle.svm/polyglot/native-image.properties"
+              ".*gax-grpc-.*\\.jar,META-INF/native-image/com.google.api/gax-grpc/native-image.properties"
             ),
             modulePath = mp,
             additionalOptions = Seq(
