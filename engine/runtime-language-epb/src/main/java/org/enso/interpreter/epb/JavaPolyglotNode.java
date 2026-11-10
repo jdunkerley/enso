@@ -25,6 +25,7 @@ final class JavaPolyglotNode {
               "org.enso.persistance",
               "org.graalvm.polyglot",
               "org.graalvm.truffle",
+              "org.graalvm.jniutils", // required by org.graalvm.truffle since GraalVM 25.5
               "org.enso.engine.common",
               "java.net.http", // needed by Audit_Logs
               "java.rmi", // needed by Snowflake
