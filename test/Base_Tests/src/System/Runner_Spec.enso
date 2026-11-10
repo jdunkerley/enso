@@ -177,7 +177,7 @@ add_specs suite_builder = suite_builder.group "Engine runner" group_builder->
 
             proc_bldr = Process.new_builder "enso"
                 . set_arguments enso_args
-                . set_env "JAVA_TOOL_OPTIONS" "-ea"
+                . set_env "JAVA_TOOL_OPTIONS" "-ea -da:com.oracle.truffle.host.HostExecuteNode"
                 . set_env "YDOC_SERVER_JS" js_file.to_text
                 . set_env "LANGUAGE_SERVER_YDOC_PORT" ydoc_port.to_text
                 . set_directory proj_dir.parent

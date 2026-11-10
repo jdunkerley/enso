@@ -84,7 +84,8 @@ describe('the environment', () => {
     expect(env).toEqual({
       PATH: '/bin',
       ENSO_POSTGRES_HOST: 'localhost:5432',
-      JAVA_TOOL_OPTIONS: '-enableassertions -XX:+HeapDumpOnOutOfMemoryError',
+      JAVA_TOOL_OPTIONS:
+        '-enableassertions -da:com.oracle.truffle.host.HostExecuteNode -XX:+HeapDumpOnOutOfMemoryError',
       ENSO_META_TEST_COMMAND: path.join('/e', 'bin', 'enso'),
       ENSO_META_TEST_ARGS: `--no-ir-caches -XX:+HeapDumpOnOutOfMemoryError --jvm ${jdk} --run`,
       ENSO_ENABLE_ASSERTIONS: 'true',

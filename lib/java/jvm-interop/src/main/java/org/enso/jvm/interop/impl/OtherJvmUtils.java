@@ -39,6 +39,8 @@ public final class OtherJvmUtils {
     assert assertsOn = true;
     if (assertsOn) {
       commandAndArgs.add("-ea");
+      // Note [HostExecuteNode Assertions Are Off Under Test] in build.sbt (#36).
+      commandAndArgs.add("-da:com.oracle.truffle.host.HostExecuteNode");
     }
     commandAndArgs.add("--sun-misc-unsafe-memory-access=allow");
     commandAndArgs.add("-Dpolyglot.engine.WarnInterpreterOnly=false");

@@ -78,8 +78,12 @@ object Dependencies {
    * Verified one variable at a time, same commit, only this version changed:
    * 25.0.2 crashes DuckDB_Tests, 25.0.1 passes it.
    *
-   * Without assertions the same defect silently selects a possibly-wrong
-   * overload, so this is not a test-only concern.
+   * Without assertions the cached guard fails, the call falls back to the
+   * uncached path and that selects the right overload (verified on Windows and
+   * Linux); the only cost is lost overload caching at those call sites.
+   *
+   * Tests turn the assertion off for HostExecuteNode alone: Note
+   * [HostExecuteNode Assertions Are Off Under Test] in build.sbt.
    *
    * See https://github.com/jdunkerley/enso/issues/36 before bumping this.
    */

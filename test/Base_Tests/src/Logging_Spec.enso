@@ -159,7 +159,7 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
             . set_arguments jvm_args+["--run", prj_dir.to_text]+args
             . set_directory prj_dir.parent
             . set_env "ENSO_LOG_DIRECTORY" logs_dir.to_text
-            . set_env "JAVA_TOOL_OPTIONS" "-ea"
+            . set_env "JAVA_TOOL_OPTIONS" "-ea -da:com.oracle.truffle.host.HostExecuteNode"
             . create
 
         if proc.exit_code != Exit_Code.Success then

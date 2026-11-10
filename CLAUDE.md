@@ -312,10 +312,15 @@ has silently produced a wrong result here:
      against an unfiltered run — before reading that as a pass.
 
   ```bash
-  cd test && JAVA_TOOL_OPTIONS="-enableassertions" \
+  cd test && JAVA_TOOL_OPTIONS="-enableassertions -da:com.oracle.truffle.host.HostExecuteNode" \
     ../built-distribution/enso-engine-*/enso-*/bin/enso \
     --no-ir-caches --run "$PWD/DuckDB_Tests"
   ```
+
+  The `-da` switches off the assertion in Truffle's `HostExecuteNode` alone: it
+  fails on valid overloads since GraalVM 25.0.2 (#36, upstream
+  oracle/graal#14943). Note [HostExecuteNode Assertions Are Off Under Test] in
+  `build.sbt`.
 
 - **The library-repository tests (`LibraryUploadTest`, `LibraryDownloadTest`,
   `LibrariesTest`, `UpdatingEditionProviderTest`, `EditionManagerTest`) no

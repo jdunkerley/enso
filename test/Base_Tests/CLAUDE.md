@@ -17,7 +17,7 @@ a filter matched against group and spec names; a filter that matches nothing
 still exits 0, so check the number of tests reported.
 
 ```bash
-cd test && JAVA_TOOL_OPTIONS="-enableassertions" \
+cd test && JAVA_TOOL_OPTIONS="-enableassertions -da:com.oracle.truffle.host.HostExecuteNode" \
   ../built-distribution/enso-engine-*/enso-*/bin/enso \
   --no-ir-caches --run "$PWD/Base_Tests" "pow"
 ```
