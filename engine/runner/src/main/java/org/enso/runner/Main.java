@@ -1528,7 +1528,8 @@ public class Main {
     /* Cannot use JNI when not in Native Image code. Fallback to launching a process.
      * On Linux a GraalVM 25.5 image exports JVM_IsStaticallyLinked, which the JVM's libjava then
      * binds to, so the JVM created in-process never loads libnio and fails to boot
-     * ("UnsatisfiedLinkError: 'int sun.nio.fs.UnixNativeDispatcher.init()'"). */
+     * ("UnsatisfiedLinkError: 'int sun.nio.fs.UnixNativeDispatcher.init()'"). There the image
+     * replaces itself with `java` (Note [The Launcher Becomes The JVM On Linux] in `PosixExec`). */
     var useJNI = ImageInfo.inImageCode() && !System.getProperty("os.name", "").startsWith("Linux");
     var commandAndArgs = new ArrayList<String>();
     if (!useJNI) {
@@ -1599,6 +1600,14 @@ public class Main {
       jvm.executeMain("org/enso/runner/Main", commandAndArgs.toArray(new String[0]));
       // the above call should never return
       exitCode = 1;
+    } else if (ImageInfo.inImageCode()) {
+      // Linux: see Note [The Launcher Becomes The JVM On Linux] in `PosixExec`. Nothing runs after
+      // a successful execv, so this finishes what doExit would.
+      RunnerLogging.tearDown();
+      System.out.flush();
+      System.err.flush();
+      var res = PosixExec.exec(javaExecutable.getAbsolutePath(), commandAndArgs);
+      throw new IOException("Cannot execute " + javaExecutable + " (execv returned " + res + ")");
     } else {
       var pb = new ProcessBuilder();
       pb.inheritIO();
