@@ -808,14 +808,20 @@ rule in `playwright.config.ts`:
   `corepack pnpm -r --filter enso ide-integration-test [path.spec.ts]`. Runs are
   long (minutes), so avoid them in inner dev loops.
 
-Every spec runs with `ENSO_ENGINE_MODE=native` and `ENSO_SPARE_ENGINE=0`,
-whatever the shell says (the fixture's `spareEngine` option, default `false`),
-so a spare engine never changes its timing. `tests/spareEngine.spec.ts` sets it:
-the app runs `ENSO_ENGINE_MODE=jvm` and `ENSO_SPARE_ENGINE=1` with a fresh
-`ENSO_JVM_AOT_DIR` of the test's own (deleted afterwards), waits for the AOT
-cache's training to end (`JDK AOT cache: trained in …`, ~45 s on a desktop),
-then for `Spare engine: ready …` in the main process's stdout and stderr, opens
-a new project and checks `Spare engine: used …` and the engine log's
+Every spec runs with `ENSO_SPARE_ENGINE=0` (the fixture's `spareEngine` option,
+default `false`), so a spare engine never changes its timing, and with the
+shell's `ENSO_ENGINE_MODE`: unset, that is the app's default, the JVM. Its JDK
+AOT cache is `<tmp>/enso-test-jvm-aot/shared`, shared by the run's specs, never
+the user's (a training keeps only the two newest keys, so it could delete an
+installed IDE's cache). CI runs `tests/localWorkflow.spec.ts` again with
+`ENSO_ENGINE_MODE=native`, non-blocking while the native image is broken on
+GraalVM 25.5 (Note [The Package Tests Run Both Engines] in `ide-packaging.yml`).
+`tests/spareEngine.spec.ts` sets it: the app runs `ENSO_ENGINE_MODE=jvm` and
+`ENSO_SPARE_ENGINE=1` with a fresh `ENSO_JVM_AOT_DIR` of the test's own (deleted
+afterwards), waits for the AOT cache's training to end
+(`JDK AOT cache: trained in …`, ~45 s on a desktop), then for
+`Spare engine: ready …` in the main process's stdout and stderr, opens a new
+project and checks `Spare engine: used …` and the engine log's
 `Engine: pre-started spare used` notice in the Logs tab (a stderr line, so shown
 with the Engine source ticked). It has no retries (a retry repeats the training)
 and a 400 s budget.

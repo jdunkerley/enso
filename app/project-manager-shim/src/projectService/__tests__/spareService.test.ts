@@ -138,7 +138,7 @@ test('no spare until the GUI reports the setting; then one, and the answer names
 })
 
 test('no spare with the native engine, the setting off, ENSO_SPARE_ENGINE=0, the engine ydoc host, or profiling', async () => {
-  expect(await service({}).setSpareEngine(true)).toEqual({ engineMode: 'native' })
+  expect(await service({ option: 'native' }).setSpareEngine(true)).toEqual({ engineMode: 'native' })
   await service().setSpareEngine(false)
   vi.stubEnv('ENSO_SPARE_ENGINE', '0')
   await service().setSpareEngine(true)

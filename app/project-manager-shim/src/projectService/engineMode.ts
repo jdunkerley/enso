@@ -18,8 +18,8 @@ export interface EngineModeSettings {
   readonly defaultMode?: EngineMode
 }
 
-/** The built-in default. It becomes `jvm` in the switch (stage 3). */
-export const DEFAULT_ENGINE_MODE: EngineMode = 'native'
+/** The built-in default, `jvm` since the switch (stage 3). */
+export const DEFAULT_ENGINE_MODE: EngineMode = 'jvm'
 
 /** `native` or `jvm`, case and surrounding space ignored; anything else is `undefined`. */
 export function parseEngineMode(raw: string | undefined): EngineMode | undefined {

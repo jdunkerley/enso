@@ -25,8 +25,8 @@ on:
         default: false
       open_perf_jvm:
         description: >-
-          Measure the open time on the JVM too (with an AOT cache), after native, on the same
-          build.
+          Measure the open time on the native image too, before the JVM (the default engine, with
+          an AOT cache), on the same build.
         required: false
         type: boolean
         default: false
@@ -330,12 +330,13 @@ jobs:
     # when the backend is built; when it ran and failed, there is no backend to package.
     if: ${{ !cancelled() && needs.gui-build.result == 'success' && needs.find-backend.result != 'failure' }}
     runs-on: ${{ matrix.runner }}
-    # 30 as before; only a run that measures gets more (the measuring steps have timeouts of their
-    # own, which `continue-on-error` absorbs, so a runaway never reaches this one).
-    timeout-minutes: ${{ (inputs.open_perf == true || inputs.open_perf == 'true') && (inputs.open_perf_engines && 240 || inputs.open_perf_jvm && 120 || 75) || 30 }}
+    # 45 for the package tests on both engines (Note [The Package Tests Run Both Engines]); only a
+    # run that measures gets more, the JVM's (the measuring steps have timeouts of their own, which
+    # `continue-on-error` absorbs, so a runaway never reaches this one).
+    timeout-minutes: ${{ (inputs.open_perf == true || inputs.open_perf == 'true') && (inputs.open_perf_engines && 240 || 120) || 45 }}
     env:
       OPEN_PERF: ${{ inputs.open_perf == true || inputs.open_perf == 'true' }}
-      OPEN_PERF_ENGINES: ${{ inputs.open_perf_engines || (inputs.open_perf_jvm && 'native,jvm' || 'native') }}
+      OPEN_PERF_ENGINES: ${{ inputs.open_perf_engines || (inputs.open_perf_jvm && 'native,jvm' || 'jvm') }}
       OPEN_PERF_RUNS: ${{ inputs.open_perf_runs || '5' }}
       OPEN_PERF_BUDGET: ${{ inputs.open_perf_budget || '12' }}
       OPEN_PERF_DIAGNOSTICS: ${{ inputs.open_perf_diagnostics == true }}
@@ -425,13 +426,40 @@ jobs:
         env:
           DEBUG: "pw:browser log:"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Note [The Package Tests Run Both Engines]
+      # =========================================
+      # The specs above run the app's default engine, the JVM (the fixture keeps the shell's
+      # `ENSO_ENGINE_MODE`; `app/electron-client/tests/electronTest.ts`), and the spare engine spec
+      # runs the JVM anyway. The native engine stays a user's choice (`ENSO_ENGINE_MODE=native`,
+      # `jvm: false`), so one spec runs again on it. On GraalVM 25.5 the native image's host interop
+      # is broken (#666), so until the native image is removed (#664) this run does not block, as
+      # Note [Native Standard Library Tests Do Not Block] in `engine-checks-platform.yml`.
+      - if: matrix.os == 'linux'
+        name: Run Package Tests (native engine)
+        continue-on-error: true
+        timeout-minutes: 15
+        run: xvfb-run corepack pnpm -r --filter enso ide-integration-test tests/localWorkflow.spec.ts
+        env:
+          ENSO_ENGINE_MODE: native
+          DEBUG: "pw:browser log:"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: matrix.os == 'windows'
+        name: Run Package Tests (native engine)
+        continue-on-error: true
+        timeout-minutes: 15
+        run: corepack pnpm -r --filter enso ide-integration-test tests/localWorkflow.spec.ts
+        env:
+          ENSO_ENGINE_MODE: native
+          DEBUG: "pw:browser log:"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Note [Open Time In CI]
       # ======================
       # `app/electron-client/perf/openTime.ts` opens two new projects per launch, five launches,
       # and records when each phase of an open ends (spec
       # docs/superpowers/specs/2026-11-01-project-open-performance-design.md, section 2). It runs on
       # develop pushes, on pull requests with the `CI: Open perf` label and when started by hand
-      # (`open_perf`, and `open_perf_jvm` for the JVM beside native). It compares with the median
+      # (`open_perf`). It measures the default engine, the JVM (`jvm`, with the shim's AOT cache;
+      # `open_perf_jvm` adds native beside it), with the JVM's step timeout. It compares with the median
       # of the last five develop runs' `open-perf-<os>` artifacts (Note [Noisy Medians] in
       # openTimeReport.ts) and warns, never fails: shared runners are noisy, so these steps
       # continue on error (`checkOpenPerf` in tools/ci/check-workflows.mjs). The extras
@@ -464,7 +492,7 @@ jobs:
       - if: env.OPEN_PERF == 'true' && matrix.os == 'linux'
         name: Measure the open time
         continue-on-error: true
-        timeout-minutes: ${{ inputs.open_perf_engines && 180 || inputs.open_perf_jvm && 60 || 25 }}
+        timeout-minutes: ${{ inputs.open_perf_engines && 180 || 60 }}
         run: |
           extra=()
           if [ "$OPEN_PERF_DIAGNOSTICS" = true ]; then extra+=(--jvm-diagnostics); fi
@@ -486,7 +514,7 @@ jobs:
       - if: env.OPEN_PERF == 'true' && matrix.os == 'windows'
         name: Measure the open time
         continue-on-error: true
-        timeout-minutes: ${{ inputs.open_perf_engines && 180 || inputs.open_perf_jvm && 60 || 25 }}
+        timeout-minutes: ${{ inputs.open_perf_engines && 180 || 60 }}
         shell: pwsh
         run: |
           $extra = @()

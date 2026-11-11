@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [Projects now run on the JVM engine by default, which starts library code such
+  as Image, Postgres and AWS faster. To go back to the native engine, set
+  `ENSO_ENGINE_MODE=native`, or `jvm: false` in a project's
+  `package.yaml`.][666]
 - [With the JVM engine, the IDE starts and warms up an engine in the background
   while you are on the dashboard, so the next project opens faster. Turn it off
   with Pre-start the engine in Settings → Local → Engine; it uses about 0.5–0.8

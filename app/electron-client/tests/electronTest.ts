@@ -13,6 +13,8 @@ import {
 import { electronExecutablePath } from './packagedIde'
 
 const LOADING_TIMEOUT = 10000
+/** The JDK AOT cache of every spec but the spare engine's (see `spareEngine`). */
+const SHARED_JVM_AOT_DIR = path.join(os.tmpdir(), 'enso-test-jvm-aot', 'shared')
 
 /**
  * The packaged engine is markedly slower on the Windows CI runner — real-time antivirus scanning
@@ -51,9 +53,12 @@ export const test = base.extend<{
   welcomeProject: boolean
   /**
    * Whether the app runs the JVM engine with its spare engine. Default `false`: every other spec
-   * runs with `ENSO_SPARE_ENGINE=0`, so a spare never changes its timing. With it, the JDK AOT
-   * cache is a fresh directory of the test's own (`ENSO_JVM_AOT_DIR`), never the user's, so it is
-   * always trained first, and deleted afterwards.
+   * runs with `ENSO_SPARE_ENGINE=0`, so a spare never changes its timing, and with the engine mode
+   * the shell gives (`ENSO_ENGINE_MODE`; unset is the app's default, the JVM). With it, the JDK AOT
+   * cache is a fresh directory of the test's own (`ENSO_JVM_AOT_DIR`), so it is always trained
+   * first, and deleted afterwards. Without it, the cache is one directory shared by every test of
+   * the run (trained once, kept). Either way it is never the user's: a training keeps only the
+   * two newest keys, so it could delete an installed IDE's cache.
    */
   spareEngine: boolean
   app: ElectronApplication
@@ -83,10 +88,11 @@ export const test = base.extend<{
       ENSO_TEST: 'true',
       ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
       ...(aiEnabled ? {} : { ENSO_AI_DISABLED: '1' }),
-      // Either way the engine mode is set, whatever the shell says; the other specs get the default.
+      // The spare spec is always the JVM; the others keep the shell's mode (CI runs one spec again
+      // with `ENSO_ENGINE_MODE=native`).
       ...(spareEngine ?
         { ENSO_ENGINE_MODE: 'jvm', ENSO_SPARE_ENGINE: '1', ENSO_JVM_AOT_DIR: jvmAotDir }
-      : { ENSO_ENGINE_MODE: 'native', ENSO_SPARE_ENGINE: '0' }),
+      : { ENSO_SPARE_ENGINE: '0', ENSO_JVM_AOT_DIR: SHARED_JVM_AOT_DIR }),
     }
     const app = await _electron.launch({ executablePath: electronExecutablePath, args, env })
     try {

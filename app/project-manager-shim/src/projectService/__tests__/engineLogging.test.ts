@@ -107,11 +107,11 @@ test('the open takes the option when package.yaml says nothing', async () => {
   expect(launches.at(-1)?.mode).toEqual({ mode: 'jvm', source: 'option' })
 })
 
-test('with no settings the open is native, from the default', async () => {
+test('with no settings the open is the JVM, from the default', async () => {
   vi.stubEnv('ENSO_ENGINE_MODE', '')
   const service = new ProjectService(fakeRunner(), [])
   await service.openProject(UUID('id-1'), Path(root))
-  expect(launches.at(-1)?.mode).toEqual({ mode: 'native', source: 'default' })
+  expect(launches.at(-1)?.mode).toEqual({ mode: 'jvm', source: 'default' })
 })
 
 test('ENSO_ENGINE_MODE is the environment source', async () => {
