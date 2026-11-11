@@ -47,6 +47,10 @@ test('Project Duplicate', async ({ page }) => {
   // centre of the window, right over the tab's close button. On the Windows CI runner it can still
   // be there when the graph appears, and then the click times out (#212).
   const driveView = page.getByTestId('drive-view')
+  // Wait for the first execution to end ("Initializing the project…" goes away). The graph appears
+  // before it, and on the Windows CI runner's JVM engine the drive's stop button was still in its
+  // opening state then, and the click never landed.
+  await expect(page.getByText('Initializing the project.')).toHaveCount(0, { timeout: 120_000 })
   // The first close in the projects folder offers to keep versions with git; answer "Not now".
   await answerRepositoryPrompt(
     page,

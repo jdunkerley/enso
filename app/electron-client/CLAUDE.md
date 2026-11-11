@@ -240,6 +240,9 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   `Channel.jvmAotTrainingStatus` and broadcasts
   `Channel.jvmAotTrainingStatusChanged` (tested in
   `tests/headless/jvmAotIpc.test.ts`).
+- `ENSO_JVM_AOT=0` — no JDK AOT cache at all: nothing trains, and no open uses
+  one (`isJvmAotEnabled`; `createJvmAotCache` returns `null`). The Playwright
+  fixture sets it for every spec but `spareEngine.spec.ts`.
 - `ENSO_SPARE_ENGINE=0` — no spare engine whatever Settings → Local → Engine
   says (`project-manager-shim/CLAUDE.md`, "Spare engine"). The Playwright
   fixture sets it for every spec but `spareEngine.spec.ts`; the open-time
@@ -816,10 +819,10 @@ rule in `playwright.config.ts`:
 
 Every spec runs with `ENSO_SPARE_ENGINE=0` (the fixture's `spareEngine` option,
 default `false`), so a spare engine never changes its timing, and with the
-shell's `ENSO_ENGINE_MODE`: unset, that is the app's default, the JVM. Its JDK
-AOT cache is `<tmp>/enso-test-jvm-aot/shared`, shared by the run's specs, never
-the user's (a training keeps only the two newest keys, so it could delete an
-installed IDE's cache). CI runs `tests/localWorkflow.spec.ts` again with
+shell's `ENSO_ENGINE_MODE`: unset, that is the app's default, the JVM. It has no
+JDK AOT cache (`ENSO_JVM_AOT=0`): on CI's two CPUs a training slowed every open,
+each open killed it so it never finished, and its toast covered the controls the
+specs click. CI runs `tests/localWorkflow.spec.ts` again with
 `ENSO_ENGINE_MODE=native`, non-blocking while the native image is broken on
 GraalVM 25.5 (Note [The Package Tests Run Both Engines] in `ide-packaging.yml`).
 `tests/spareEngine.spec.ts` sets it: the app runs `ENSO_ENGINE_MODE=jvm` and

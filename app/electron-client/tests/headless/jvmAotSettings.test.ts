@@ -10,9 +10,19 @@ import {
   AfterFirstOpen,
   appImageEngine,
   isEngineCopyPath,
+  isJvmAotEnabled,
   isJvmDefaultEngine,
   jvmAotRootDirectory,
 } from '../../src/jvmAotSettings'
+
+describe('isJvmAotEnabled', () => {
+  test('on unless ENSO_JVM_AOT is 0', () => {
+    expect(isJvmAotEnabled({})).toBe(true)
+    expect(isJvmAotEnabled({ ENSO_JVM_AOT: '1' })).toBe(true)
+    expect(isJvmAotEnabled({ ENSO_JVM_AOT: '' })).toBe(true)
+    expect(isJvmAotEnabled({ ENSO_JVM_AOT: '0' })).toBe(false)
+  })
+})
 
 describe('isJvmDefaultEngine', () => {
   test('the JVM by default (since the switch): the cache trains with no settings', () => {

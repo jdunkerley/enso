@@ -15,6 +15,15 @@ export function jvmAotRootDirectory(
 }
 
 /**
+ * Whether the IDE keeps a JDK AOT cache at all: `ENSO_JVM_AOT=0` turns it off (no training, no
+ * cache used), as `ENSO_SPARE_ENGINE=0` does the spare engine. The package tests set it: a training
+ * on CI's two CPUs slows every open, and each open kills it, so it would never finish anyway.
+ */
+export function isJvmAotEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
+  return env.ENSO_JVM_AOT !== '0'
+}
+
+/**
  * Whether the JVM is the resolved default engine (`--engine-mode`, `ENSO_ENGINE_MODE`, then the
  * built-in default): the AOT cache trains only then. A project's own `jvm:` key does not count.
  */
