@@ -490,12 +490,25 @@ shell launchers today `enso --run <project>` from elsewhere only warns (and
 fails under `-ea`, the root `CLAUDE.md`'s first trap). The IDE is unaffected:
 the shim already starts every engine in the project's parent.
 
-For the CLI, C2's launchers take over what the image did: for `--run` and
-`--in-project` they find the project root (the nearest ancestor with
-`package.yaml`), `cd` to its parent, and pass the original directory as
-`-Denso.user.dir`. That is a few lines in `sh`, more in `cmd`. If `enso.bat`
-cannot do it reliably, the alternative is a launcher-side `java` helper class
-run before the engine, which costs a second JVM start (open question 3).
+**The rule (owner, 2026-11-11): the CLI follows the IDE's.** A project run from
+the command line gets the working directory the IDE gives it, the project root's
+parent, from wherever `enso` was started, so relative paths (`File.new`,
+`Data.read "data/…"`) resolve to the same files in both. This is required, not
+best effort: no warning-only path remains.
+
+C2's launchers take over what the image did: for `--run` and `--in-project` they
+find the project root (the nearest ancestor with `package.yaml`), `cd` to its
+parent, and pass the original directory as `-Denso.user.dir`. That is a few
+lines in `sh`, more in `cmd`. If `enso.bat` cannot do it reliably, a
+launcher-side `java` helper class run before the engine does it instead, at the
+cost of a second JVM start: correctness wins over that start-up.
+
+C2's tests check the rule directly: one project whose `main` reads a file by a
+relative path and prints `File.current_directory`, run under `-ea` from the
+project's parent, from inside the project, from a subfolder of it and from an
+unrelated folder, on Linux and Windows (a path with a space too). Each run
+prints the same directory as an IDE open of that project (the shim's `cwd`) and
+reads the same file, and none trips `checkWorkingDirectory`.
 
 ## Testing per phase
 
@@ -520,11 +533,12 @@ run before the engine, which costs a second JVM start (open question 3).
   and that the stdin newline reaches it. The Playwright suite and the
   packaged-IDE tests on Linux (AppImage) and Windows; the AppImage check above.
 - **C2.** A shell distribution on Linux, Windows and macOS: `--version`,
-  `--new`, `--run` from the project's parent and from elsewhere, an option with
-  spaces in `ENSO_JVM_OPTIONS`, a `jvm.options` with a BOM; the root
-  `CLAUDE.md`'s by-hand recipe; the formatting job; `gatherLicenses`,
-  `bloopInstall` and the manifest round-trip (root `CLAUDE.md`: a clean
-  `sbt compile` proves none of them). The MSVC and JDK-module checks above.
+  `--new`, the working-directory runs ("The working directory": parent, inside,
+  a subfolder, elsewhere, under `-ea`, matching the IDE), an option with spaces
+  in `ENSO_JVM_OPTIONS`, a `jvm.options` with a BOM; the root `CLAUDE.md`'s
+  by-hand recipe; the formatting job; `gatherLicenses`, `bloopInstall` and the
+  manifest round-trip (root `CLAUDE.md`: a clean `sbt compile` proves none of
+  them). The MSVC and JDK-module checks above.
 - **C3.** Every JVM suite: `sbt test`, the standard-library suites on Linux,
   Windows and macOS, the packaged-IDE tests.
 - **Throughout:** the root `CLAUDE.md`'s Linux rule. Paths, processes and
@@ -600,14 +614,14 @@ P PR1 ─ P PR2 ─ P PR3 (25.5) + B (switch), #666 ─ C1 ─ C2 ─ C3 ─ C4
   launchers and the shim's direct `java` cover the IDE and the CLI (decision 1).
 - Heap sizing; the JVM-by-default spec's RSS reporting stays as it is.
 
-## Open questions for the owner
+## The owner's decisions (all questions answered)
 
 1. **PR M now?** _Decided (owner, 2026-11-11):_ yes. With no release waits, PR M
    folds into A2, and A1 follows it.
 2. **Releases between A1 and B.** _Decided (owner, 2026-11-11):_ moot. There are
    no users to cut a release for, and B rides in #666.
-3. **The CLI's working directory.** On the JVM, `enso --run <project>` from
-   another directory no longer changes to the project's parent.
-   _Recommendation:_ the shell launchers find the project root and `cd`, passing
-   `-Denso.user.dir`, as the native image did; a second JVM start only if
-   `enso.bat` cannot do it reliably.
+3. **The CLI's working directory.** _Decided (owner, 2026-11-11):_ the CLI
+   follows the IDE's rule and opens in the right place, the project root's
+   parent, wherever it was started ("The working directory"). The shell
+   launchers `cd` there, passing `-Denso.user.dir`; a `java` helper with a
+   second JVM start if `enso.bat` cannot.
