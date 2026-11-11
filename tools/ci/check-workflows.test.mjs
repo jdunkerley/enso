@@ -390,14 +390,13 @@ jobs:
       runner: '["self-hosted", "macOS"]'
       jvm-tests: \${{ inputs.engine }}
       stdlib-suites: >-
-        \${{ inputs.libraries && '[{"suite": "standard-library-in-native"},
-        {"suite": "standard-library"}, {"suite": "std-aws"}]' || '[]' }}
+        \${{ inputs.libraries && '[{"suite": "standard-library"}, {"suite": "std-aws"}]' || '[]' }}
 `
 
 describe('checkMacosChecksRunWhatIsRequested', () => {
   const problems = (text) =>
     checkMacosChecksRunWhatIsRequested(fixture({ 'workflows/macos-checks.yml': text }))
-  test('accepts one call that runs the JVM tests on engine and three suites on libraries', () => {
+  test('accepts one call that runs the JVM tests on engine and two suites on libraries', () => {
     assert.deepEqual(problems(MACOS_CHECKS_OK), [])
   })
   test('applies only once macos-checks.yml exists', () => {

@@ -432,8 +432,7 @@ jobs:
       # `ENSO_ENGINE_MODE`; `app/electron-client/tests/electronTest.ts`), and the spare engine spec
       # runs the JVM anyway. The native engine stays a user's choice (`ENSO_ENGINE_MODE=native`,
       # `jvm: false`), so one spec runs again on it. On GraalVM 25.5 the native image's host interop
-      # is broken (#666), so until the native image is removed (#664) this run does not block, as
-      # Note [Native Standard Library Tests Do Not Block] in `engine-checks-platform.yml`.
+      # is broken (#666), so until the native image is removed (#664) this run does not block.
       - if: matrix.os == 'linux'
         name: Run Package Tests (native engine)
         continue-on-error: true

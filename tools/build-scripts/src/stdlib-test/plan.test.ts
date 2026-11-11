@@ -165,23 +165,23 @@ const SPLIT_SHARDS: StdlibTestMap['shards'] = [
   },
   { name: 'Others', projects: '*' },
 ]
-const NATIVE_WITH_POSTGRES: SuiteEntry = {
-  suite: 'standard-library-in-native',
-  title: 'Native',
-  'small-jdk': false,
+const JVM_WITH_POSTGRES: SuiteEntry = {
+  suite: 'standard-library',
+  title: 'JVM',
+  'small-jdk': true,
   postgres: true,
 }
-const NATIVE_WITHOUT_POSTGRES: SuiteEntry = {
-  suite: 'standard-library-in-native',
-  title: 'Native',
-  'small-jdk': false,
+const JVM_WITHOUT_POSTGRES: SuiteEntry = {
+  suite: 'standard-library',
+  title: 'JVM',
+  'small-jdk': true,
 }
 const ALL = { projects: null, reasons: [] }
 
 describe('planMatrix with a split shard', () => {
   test('a split shard is one job per part, with a group filter', () => {
     const matrix = planMatrix(
-      [NATIVE_WITH_POSTGRES],
+      [JVM_WITH_POSTGRES],
       { ...MAP, shards: SPLIT_SHARDS },
       PROJECTS,
       ALL,
@@ -189,20 +189,20 @@ describe('planMatrix with a split shard', () => {
     )
     expect(matrix.filter((m) => m.only === 'Table_Tests')).toEqual([
       {
-        ...NATIVE_WITH_POSTGRES,
-        title: 'Native (Table PostgreSQL)',
+        ...JVM_WITH_POSTGRES,
+        title: 'JVM (Table PostgreSQL)',
         only: 'Table_Tests',
         'group-filter': '^(?:\\[PostgreSQL\\])',
       },
       {
-        ...NATIVE_WITH_POSTGRES,
-        title: 'Native (Table SQLite File)',
+        ...JVM_WITH_POSTGRES,
+        title: 'JVM (Table SQLite File)',
         only: 'Table_Tests',
         'group-filter': '^(?:\\[SQLite File\\])',
       },
       {
-        ...NATIVE_WITH_POSTGRES,
-        title: 'Native (Table Rest)',
+        ...JVM_WITH_POSTGRES,
+        title: 'JVM (Table Rest)',
         only: 'Table_Tests',
         'group-filter': '^(?!(?:\\[PostgreSQL\\]|\\[SQLite File\\]))',
       },
@@ -210,7 +210,7 @@ describe('planMatrix with a split shard', () => {
   })
   test('a part that needs postgres is dropped without it, and the rest covers its groups', () => {
     const matrix = planMatrix(
-      [NATIVE_WITHOUT_POSTGRES],
+      [JVM_WITHOUT_POSTGRES],
       { ...MAP, shards: SPLIT_SHARDS },
       PROJECTS,
       ALL,
@@ -219,13 +219,13 @@ describe('planMatrix with a split shard', () => {
     expect(
       matrix.filter((m) => m.only === 'Table_Tests').map((m) => [m.title, m['group-filter']]),
     ).toEqual([
-      ['Native (Table SQLite File)', '^(?:\\[SQLite File\\])'],
-      ['Native (Table Rest)', '^(?!(?:\\[SQLite File\\]))'],
+      ['JVM (Table SQLite File)', '^(?:\\[SQLite File\\])'],
+      ['JVM (Table Rest)', '^(?!(?:\\[SQLite File\\]))'],
     ])
   })
   test('without sharding a split shard is not split', () => {
     const matrix = planMatrix(
-      [NATIVE_WITH_POSTGRES],
+      [JVM_WITH_POSTGRES],
       { ...MAP, shards: SPLIT_SHARDS },
       PROJECTS,
       ALL,
@@ -239,14 +239,14 @@ describe('planMatrix with a split shard', () => {
       { name: 'O', projects: '*' as const },
     ]
     expect(() =>
-      planMatrix([NATIVE_WITH_POSTGRES], { ...MAP, shards: bad }, PROJECTS, ALL, true),
+      planMatrix([JVM_WITH_POSTGRES], { ...MAP, shards: bad }, PROJECTS, ALL, true),
     ).toThrow(/one project/)
     const noRest = [
       { name: 'T', projects: ['Table_Tests'], split: [{ name: 'A', groups: 'x' }] },
       { name: 'O', projects: '*' as const },
     ]
     expect(() =>
-      planMatrix([NATIVE_WITH_POSTGRES], { ...MAP, shards: noRest }, PROJECTS, ALL, true),
+      planMatrix([JVM_WITH_POSTGRES], { ...MAP, shards: noRest }, PROJECTS, ALL, true),
     ).toThrow(/without `groups`/)
   })
 })
@@ -258,31 +258,31 @@ const PROJECT_SHARDS: StdlibTestMap['shards'] = [
 ]
 
 describe('planMatrix with a shard that needs a database', () => {
-  // standard-library-in-native denies AWS_Tests and Microsoft_Tests (suites.ts NOT_SEPARATE).
+  // standard-library denies AWS_Tests and Microsoft_Tests (suites.ts NOT_SEPARATE).
   const projects = [...PROJECTS, 'Postgres_Tests'].sort()
   test('runs the shard where the suite has the database', () => {
     const matrix = planMatrix(
-      [NATIVE_WITH_POSTGRES],
+      [JVM_WITH_POSTGRES],
       { ...MAP, shards: PROJECT_SHARDS },
       projects,
       ALL,
       true,
     )
     expect(matrix.map((m) => [m.title, m.only])).toEqual([
-      ['Native (Table)', 'Table_Tests'],
-      ['Native (Postgres)', 'Postgres_Tests'],
-      ['Native (Others)', 'Base_Tests,DuckDB_Tests,Geo_Tests,Tableau_Tests,Visualization_Tests'],
+      ['JVM (Table)', 'Table_Tests'],
+      ['JVM (Postgres)', 'Postgres_Tests'],
+      ['JVM (Others)', 'Base_Tests,DuckDB_Tests,Geo_Tests,Tableau_Tests,Visualization_Tests'],
     ])
   })
   test('without the database its projects run in the "*" shard', () => {
     const matrix = planMatrix(
-      [NATIVE_WITHOUT_POSTGRES],
+      [JVM_WITHOUT_POSTGRES],
       { ...MAP, shards: PROJECT_SHARDS },
       projects,
       ALL,
       true,
     )
-    expect(matrix.map((m) => m.title)).toEqual(['Native (Table)', 'Native (Others)'])
+    expect(matrix.map((m) => m.title)).toEqual(['JVM (Table)', 'JVM (Others)'])
     expect(matrix[1]?.only.split(',')).toContain('Postgres_Tests')
   })
 })
