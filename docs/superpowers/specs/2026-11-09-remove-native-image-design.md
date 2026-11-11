@@ -16,7 +16,15 @@ switch. Stage 3 of that spec (the switch to `jvm` by default, with its gate) is
 unchanged and is Phase B here. The GraalVM 25.5 upgrade
 (`2026-11-09-graalvm-25.5-upgrade-design.md`, PR #661, "P") comes first: it
 keeps native green only until this removal, and its re-gate decides when Phase B
-may ship.
+may ship. The re-gate passed on 2026-11-11 (8 CPUs: welcome 1.32, `image` 1.15),
+and Phase B rides in P's PR 3 (#666).
+
+**No release waits (owner, 2026-11-11).** This is a personal fork with no real
+users, so nothing waits for a release to ship first: Phase C follows Phase B as
+soon as it is ready, and PR M (the engine-hosted ydoc server's deletion) does
+not wait for a release with the Node host. Where this spec gave a wait a reason
+("so a user who needed native has had a release to say so"), that reason does
+not apply here.
 
 The footprint below was surveyed on `origin/develop` (f755c7f54a) on 2026-11-09.
 Paths are checked against it; line numbers drift and are given only where they
@@ -63,13 +71,13 @@ help find a place.
      The native engine build job stays: the escape hatch needs it.
 
    - **Phase B: the switch** to `jvm` by default (stage 3 of the JVM-by-default
-     spec), after P and its re-gate on the upgraded build.
-     `ENSO_ENGINE_MODE=native` and `package.yaml` `jvm: false` remain for one
-     release.
-   - **Phase C, one release after the switch:** native goes. The shim spawns
-     `java` directly, the engine-mode machinery goes, `bin/enso(.bat)` are the
-     only launchers, and every native-only file, dependency, job and document is
-     deleted.
+     spec), after P and its re-gate on the upgraded build (in #666).
+     `ENSO_ENGINE_MODE=native` and `package.yaml` `jvm: false` remain until
+     Phase C.
+   - **Phase C, right after the switch** (no release wait, above): native goes.
+     The shim spawns `java` directly, the engine-mode machinery goes,
+     `bin/enso(.bat)` are the only launchers, and every native-only file,
+     dependency, job and document is deleted.
 
 3. **CLI start-up on the JVM is accepted.** It is measured and reported
    (`--version`, `--new`, `--run`), not gated. The CLI uses the bundled JDK's
@@ -136,9 +144,9 @@ the native engine goes in Phase C.
   through `OtherJvmClassLoader` in both modes: under the JVM it is "single JVM
   mock mode", with `ydoc-server.jar` added to the loader. Deleting jvm-interop
   therefore breaks the `ENSO_YDOC_HOST=engine` rollback in every mode. PR M of
-  the JVM-by-default plan deletes the engine-hosted server, but only after a
-  release has shipped with the Node host. **A1 lands after PR M** (open question
-  1).
+  the JVM-by-default plan deletes the engine-hosted server; it planned to wait
+  for a release with the Node host, which no longer applies. **A1 lands after PR
+  M**, and PR M folds into A2 (open question 1, decided).
 - **The re-gate needs a native `image` baseline.** P's re-gate compares
   `jvm-spare` with native on the welcome **and** `image` templates, and the
   `image` template calls Standard.Image, which runs in the guest under native.
@@ -153,8 +161,9 @@ the native engine goes in Phase C.
   suite already runs `--jvm` on the small JDK.
 - **The IDE's default is still native between A1 and B.** A project that uses a
   guest library fails to open on a native engine with the message above until
-  the user sets `jvm: true` or `ENSO_ENGINE_MODE=jvm`. That is acceptable on
-  nightlies, not in a release (open question 2).
+  the user sets `jvm: true` or `ENSO_ENGINE_MODE=jvm`. With no users that is
+  acceptable, and the window is short, since B rides in #666 (open question 2,
+  decided).
 
 **Enso-side crossing rules.** `Enso_Secret`'s class-name exception match, the
 `In_Memory_*` foreign-table conversions and the `JDBCDriverTypes`
@@ -227,13 +236,14 @@ Stage 3 of the JVM-by-default spec, unchanged:
 - the owner's installer test before the merge (merge gate for features).
 
 `ENSO_ENGINE_MODE=native`, `--engine-mode=native` and `package.yaml`
-`jvm: false` stay for one release as the rollback. The native engine is still
-built and bundled, so they work.
+`jvm: false` stay until Phase C as the rollback. The native engine is still
+built and bundled, so they work (on GraalVM 25.5 only partly: its host interop
+is broken, #666).
 
 The packaged-IDE tests open a project in the default (JVM) mode and once with
-`ENSO_ENGINE_MODE=native`, so the escape hatch stays tested for its release.
-After A1, the native open uses the welcome template, which needs no guest
-library.
+`ENSO_ENGINE_MODE=native`, so the escape hatch stays tested until Phase C (in
+#666 the native run does not block, as native is broken on 25.5). After A1, the
+native open uses the welcome template, which needs no guest library.
 
 **CLI measurement.** Phase B also measures the CLI on the JVM, since its numbers
 are what Phase C's users get. On the owner's machine and in WSL, a release
@@ -244,9 +254,9 @@ gate (decision 3).
 
 ## Phase C: native goes
 
-One release after Phase B shipped without being flipped back. Several PRs,
-ordered so that each leaves a working build: the IDE's launch first, then the
-build, then the code, then the documents.
+Right after Phase B (no release wait). Several PRs, ordered so that each leaves
+a working build: the IDE's launch first, then the build, then the code, then the
+documents.
 
 ### C1. The IDE starts `java` itself
 
@@ -337,9 +347,8 @@ engine the shim starts:
   JDK's `NI_BASE_MODULES` and the copied `lib/svm` and `lib/static` go if the
   check below passes.
 - `GraalVM.EnsoLauncher` and `ENSO_LAUNCHER`. Its only remaining value would be
-  `shell`, so it is removed rather than kept as a one-value switch. A set
-  `ENSO_LAUNCHER` logs a warning for one release. `tools/build-scripts`'
-  `ide-local` stops setting it.
+  `shell`, so it is removed rather than kept as a one-value switch.
+  `tools/build-scripts`' `ide-local` stops setting it.
 - `build.sbt`: the engine-runner image task (`NativeLibraryFeature`,
   `EnsoLibraryFeature`, the gax-grpc features, build-time initialisation, the
   `enso.exp` linker option), `stdLibsJars`, `extraNITestLibs`, the
@@ -528,12 +537,11 @@ run before the engine, which costs a second JVM start (open question 3).
 - **B:** as stage 3: `ENSO_ENGINE_MODE=native`, `--engine-mode=native` or
   `jvm: false` per user or project, without a release; the default flips back in
   one line with one.
-- **C:** one release after B, so a user who needed native has had a release to
-  say so. C1 is revertible on its own (the shim goes back to `bin/enso`). C2/C3
-  delete the build of native; undoing them means reverting the PRs and
-  rebuilding, so they go only after C1 has been on nightlies without an issue.
-  If a JVM-only defect appears after a release, it is fixed forward; there is no
-  native to fall back to, which is the point of the one-release wait.
+- **C:** right after B, with no release wait (no users to hear from). C1 is
+  revertible on its own (the shim goes back to `bin/enso`). C2/C3 delete the
+  build of native; undoing them means reverting the PRs and rebuilding, so they
+  go after C1 has been in the owner's use without an issue. A JVM-only defect is
+  fixed forward; there is no native to fall back to.
 
 ## Risks
 
@@ -570,8 +578,8 @@ run before the engine, which costs a second JVM start (open question 3).
 ## Order with the GraalVM upgrade (P, #661)
 
 ```
-P PR1 ─ P PR2 ─ P PR3 (25.5) ─ re-gate ─ B (switch) ── one release ── C1 ─ C2 ─ C3 ─ C4
-      A2, A3 (now, in any order)        └─ A1 (after PR M and the re-gate's native baseline)
+P PR1 ─ P PR2 ─ P PR3 (25.5) + B (switch), #666 ─ C1 ─ C2 ─ C3 ─ C4
+      A2 (+ PR M), A3 (now, in any order)  └─ A1 (after PR M; the re-gate's native baseline is taken)
 ```
 
 - A2 and A3 can land now, before or between P's PRs. Each removes work P's PR 3
@@ -579,8 +587,9 @@ P PR1 ─ P PR2 ─ P PR3 (25.5) ─ re-gate ─ B (switch) ── one release �
 - A1 after PR M and after the re-gate's native `image` measurement (or with the
   pre-A1 baseline). If it lands before P's PR 3, PR 3 no longer needs
   `jvm-interop`'s `Message.resolve` fix (P's API table).
-- B after P's PR 3 and the re-gate, as P fixes.
-- C one release after B.
+- B after P's PR 3 and the re-gate, as P fixes; in the event, B rides in PR 3
+  (#666), after the re-gate passed.
+- C right after B (no release wait).
 
 ## Out of scope
 
@@ -593,15 +602,10 @@ P PR1 ─ P PR2 ─ P PR3 (25.5) ─ re-gate ─ B (switch) ── one release �
 
 ## Open questions for the owner
 
-1. **PR M now?** A1 cannot delete jvm-interop while `YdocServerImpl` uses it,
-   and PR M (deleting the engine-hosted ydoc server) waits for a release with
-   the Node host. _Recommendation:_ if no one has needed
-   `ENSO_YDOC_HOST=engine`, fold PR M into A2 now. Otherwise A2 removes only the
-   image, and A1 waits for PR M.
-2. **Releases between A1 and B.** The IDE's default is still native then, so a
-   project using a guest library fails to open until the user sets `jvm: true`
-   or `ENSO_ENGINE_MODE=jvm`. _Recommendation:_ cut no release between A1 and B.
-   If one is needed, revert A1 on the release branch only.
+1. **PR M now?** _Decided (owner, 2026-11-11):_ yes. With no release waits, PR M
+   folds into A2, and A1 follows it.
+2. **Releases between A1 and B.** _Decided (owner, 2026-11-11):_ moot. There are
+   no users to cut a release for, and B rides in #666.
 3. **The CLI's working directory.** On the JVM, `enso --run <project>` from
    another directory no longer changes to the project's parent.
    _Recommendation:_ the shell launchers find the project root and `cd`, passing
