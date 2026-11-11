@@ -1,4 +1,5 @@
 import type { FeatureFlags } from '$/providers/featureFlags'
+import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
 import { test } from 'integration-test/base'
 import type { Page, Route } from 'playwright'
 import LATEST_GITHUB_RELEASES from './data/latestGithubReleases.json' with { type: 'json' }
@@ -19,6 +20,20 @@ export async function recordCloudRequests(page: Page): Promise<string[]> {
 
 export interface RegisterMocksOptions {
   readonly aiAvailable?: boolean
+  /**
+   * The JDK AOT cache training's status that the mocked Electron API answers when the page asks on
+   * load; `idle` (nothing trains) by default. A spec changes it with {@link setJvmAotTrainingStatus}.
+   */
+  readonly jvmAotTrainingStatus?: JvmAotTrainingStatus
+}
+
+/** Broadcast a new training status from the mocked Electron API, as Electron main does. */
+export async function setJvmAotTrainingStatus(page: Page, status: JvmAotTrainingStatus) {
+  await page.evaluate((status) => {
+    const mock = (window as unknown as { __jvmAotMock: { emit: (status: string) => void } })
+      .__jvmAotMock
+    mock.emit(status)
+  }, status)
 }
 
 /** Execute registration hooks for all playwright mocks that are shared across all tests. */
@@ -31,7 +46,7 @@ export async function registerMocks(
     mockDate(page),
     mockUnneededUrls(page),
     mockFeatureFlags(page, featureFlags),
-    mockElectronApi(page, options.aiAvailable ?? false),
+    mockElectronApi(page, options.aiAvailable ?? false, options.jvmAotTrainingStatus ?? 'idle'),
     addMockClipboardInitScript(page),
   ])
 }
@@ -64,135 +79,161 @@ async function mockFeatureFlags(page: Page, featureFlags: Partial<FeatureFlags>)
 }
 
 // Mock FileBrowserApi that is usually provided by Electron.
-async function mockElectronApi(page: Page, aiAvailable: boolean) {
+async function mockElectronApi(
+  page: Page,
+  aiAvailable: boolean,
+  jvmAotTrainingStatus: JvmAotTrainingStatus,
+) {
   await test.step('Mock electron API', () => {
-    return page.addInitScript((aiAvailable) => {
-      Object.defineProperty(window, 'api', {
-        value: {
-          navigation: {
-            goBack: () => {},
-            goForward: () => {},
-          },
-          menu: { setMenuItemHandler: () => {} },
-          fileBrowser: { openFileBrowser: async () => ['/path/to/some/mock/file'] },
-          log: {
-            log: () => {},
-            info: () => {},
-            warn: () => {},
-            error: () => {},
-          },
-          projectManagement: {
-            setOpenProjectHandler: () => {},
-          },
-          versionInfo: {
-            version: 'MOCK-version',
-            build: 'MOCK-build',
-            electron: 'MOCK-electron-version',
-            chrome: 'MOCK-chrome-version',
-          },
-          // The AI mock works in two modes. By default, `generateComponent` resolves immediately
-          // with a hardcoded body — that's what `aiNodes.spec.ts` exercises. Tests can flip
-          // `window.__aiMockController.deferred = true` to switch to driver mode, where each
-          // request waits in `pending` until the test resolves it; this is what
-          // `aiPlaceholder.spec.ts` uses to observe the placeholder lifecycle. The controller
-          // additionally records the most recent request payload so edit-flow tests can assert
-          // on the `editContext` field sent to the agent.
-          ai: ((): unknown => {
-            interface AiRequest {
-              requestId: string
-              prompt: string
-              context: {
-                sourceIdentifier?: string
-                editContext?: { previousPrompt: string; previousDefinition?: string }
+    return page.addInitScript(
+      ({ aiAvailable, jvmAotTrainingStatus }) => {
+        Object.defineProperty(window, 'api', {
+          value: {
+            navigation: {
+              goBack: () => {},
+              goForward: () => {},
+            },
+            menu: { setMenuItemHandler: () => {} },
+            fileBrowser: { openFileBrowser: async () => ['/path/to/some/mock/file'] },
+            log: {
+              log: () => {},
+              info: () => {},
+              warn: () => {},
+              error: () => {},
+            },
+            projectManagement: {
+              setOpenProjectHandler: () => {},
+            },
+            versionInfo: {
+              version: 'MOCK-version',
+              build: 'MOCK-build',
+              electron: 'MOCK-electron-version',
+              chrome: 'MOCK-chrome-version',
+            },
+            // The AI mock works in two modes. By default, `generateComponent` resolves immediately
+            // with a hardcoded body — that's what `aiNodes.spec.ts` exercises. Tests can flip
+            // `window.__aiMockController.deferred = true` to switch to driver mode, where each
+            // request waits in `pending` until the test resolves it; this is what
+            // `aiPlaceholder.spec.ts` uses to observe the placeholder lifecycle. The controller
+            // additionally records the most recent request payload so edit-flow tests can assert
+            // on the `editContext` field sent to the agent.
+            ai: ((): unknown => {
+              interface AiRequest {
+                requestId: string
+                prompt: string
+                context: {
+                  sourceIdentifier?: string
+                  editContext?: { previousPrompt: string; previousDefinition?: string }
+                }
               }
-            }
-            interface AiReply {
-              result:
-                | { ok: true; value: unknown }
-                | { ok: false; error: { payload: string; context: never[] } }
-              usage: null
-            }
-            interface Controller {
-              aiAvailable: boolean
-              deferred: boolean
-              pending: Map<string, (reply: AiReply) => void>
-              progressHandlers: Array<(event: unknown) => void>
-              cancels: string[]
-              lastRequest: AiRequest | null
-              requests: AiRequest[]
-            }
-            const w = window as unknown as { __aiMockController: Controller }
-            w.__aiMockController = {
-              aiAvailable,
-              deferred: false,
-              pending: new Map(),
-              progressHandlers: [],
-              cancels: [],
-              lastRequest: null,
-              requests: [],
-            }
-            const immediateReply = (request: AiRequest): AiReply => {
-              const src = request.context.sourceIdentifier
-              const value =
-                src != null ?
-                  {
-                    functionName: 'ai_helper',
-                    argumentNames: ['input'],
-                    body: `result = input\nresult`,
-                    callArguments: [src],
+              interface AiReply {
+                result:
+                  | { ok: true; value: unknown }
+                  | { ok: false; error: { payload: string; context: never[] } }
+                usage: null
+              }
+              interface Controller {
+                aiAvailable: boolean
+                deferred: boolean
+                pending: Map<string, (reply: AiReply) => void>
+                progressHandlers: Array<(event: unknown) => void>
+                cancels: string[]
+                lastRequest: AiRequest | null
+                requests: AiRequest[]
+              }
+              const w = window as unknown as { __aiMockController: Controller }
+              w.__aiMockController = {
+                aiAvailable,
+                deferred: false,
+                pending: new Map(),
+                progressHandlers: [],
+                cancels: [],
+                lastRequest: null,
+                requests: [],
+              }
+              const immediateReply = (request: AiRequest): AiReply => {
+                const src = request.context.sourceIdentifier
+                const value =
+                  src != null ?
+                    {
+                      functionName: 'ai_helper',
+                      argumentNames: ['input'],
+                      body: `result = input\nresult`,
+                      callArguments: [src],
+                    }
+                  : {
+                      functionName: 'ai_helper',
+                      argumentNames: [],
+                      body: `result = 42\nresult`,
+                      callArguments: [],
+                    }
+                return { result: { ok: true, value }, usage: null }
+              }
+              return {
+                availability: (): Promise<{ status: string; reason?: string }> =>
+                  Promise.resolve(
+                    w.__aiMockController.aiAvailable ?
+                      { status: 'ready' }
+                    : { status: 'unavailable', reason: 'Claude Code is not installed.' },
+                  ),
+                onAvailabilityChanged: (): (() => void) => () => {},
+                generateComponent: (request: AiRequest): Promise<AiReply> => {
+                  w.__aiMockController.lastRequest = request
+                  w.__aiMockController.requests.push(request)
+                  if (!w.__aiMockController.deferred) {
+                    return Promise.resolve(immediateReply(request))
                   }
-                : {
-                    functionName: 'ai_helper',
-                    argumentNames: [],
-                    body: `result = 42\nresult`,
-                    callArguments: [],
-                  }
-              return { result: { ok: true, value }, usage: null }
-            }
-            return {
-              availability: (): Promise<{ status: string; reason?: string }> =>
-                Promise.resolve(
-                  w.__aiMockController.aiAvailable ?
-                    { status: 'ready' }
-                  : { status: 'unavailable', reason: 'Claude Code is not installed.' },
-                ),
-              onAvailabilityChanged: (): (() => void) => () => {},
-              generateComponent: (request: AiRequest): Promise<AiReply> => {
-                w.__aiMockController.lastRequest = request
-                w.__aiMockController.requests.push(request)
-                if (!w.__aiMockController.deferred) {
-                  return Promise.resolve(immediateReply(request))
-                }
-                return new Promise((resolve) => {
-                  w.__aiMockController.pending.set(request.requestId, resolve)
-                })
-              },
-              onProgress: (handler: (event: unknown) => void): (() => void) => {
-                w.__aiMockController.progressHandlers.push(handler)
-                return () => {
-                  const list = w.__aiMockController.progressHandlers
-                  const idx = list.indexOf(handler)
-                  if (idx !== -1) list.splice(idx, 1)
-                }
-              },
-              cancel: (requestId: string): void => {
-                w.__aiMockController.cancels.push(requestId)
-                const resolve = w.__aiMockController.pending.get(requestId)
-                if (resolve != null) {
-                  w.__aiMockController.pending.delete(requestId)
-                  resolve({
-                    result: { ok: false, error: { payload: 'Cancelled by user', context: [] } },
-                    usage: null,
+                  return new Promise((resolve) => {
+                    w.__aiMockController.pending.set(request.requestId, resolve)
                   })
-                }
-              },
-              onToolCall: () => () => {},
-              replyToolCall: () => {},
-            }
-          })(),
-        }, // satisfies import('$/electronApi').ElectronApi,
-      })
-    }, aiAvailable)
+                },
+                onProgress: (handler: (event: unknown) => void): (() => void) => {
+                  w.__aiMockController.progressHandlers.push(handler)
+                  return () => {
+                    const list = w.__aiMockController.progressHandlers
+                    const idx = list.indexOf(handler)
+                    if (idx !== -1) list.splice(idx, 1)
+                  }
+                },
+                cancel: (requestId: string): void => {
+                  w.__aiMockController.cancels.push(requestId)
+                  const resolve = w.__aiMockController.pending.get(requestId)
+                  if (resolve != null) {
+                    w.__aiMockController.pending.delete(requestId)
+                    resolve({
+                      result: { ok: false, error: { payload: 'Cancelled by user', context: [] } },
+                      usage: null,
+                    })
+                  }
+                },
+                onToolCall: () => () => {},
+                replyToolCall: () => {},
+              }
+            })(),
+            // The JDK AOT cache training: `trainingStatus` answers the status given to
+            // `registerMocks`; `setJvmAotTrainingStatus` broadcasts a new one through `__jvmAotMock`.
+            jvmAot: ((): unknown => {
+              const handlers = new Set<(status: string) => void>()
+              let status: string = jvmAotTrainingStatus
+              ;(window as unknown as { __jvmAotMock: unknown }).__jvmAotMock = {
+                emit: (next: string) => {
+                  status = next
+                  for (const handler of handlers) handler(next)
+                },
+              }
+              return {
+                trainingStatus: () => Promise.resolve(status),
+                onTrainingStatus: (handler: (status: string) => void) => {
+                  handlers.add(handler)
+                  return () => handlers.delete(handler)
+                },
+              }
+            })(),
+          }, // satisfies import('$/electronApi').ElectronApi,
+        })
+      },
+      { aiAvailable, jvmAotTrainingStatus },
+    )
   })
 }
 

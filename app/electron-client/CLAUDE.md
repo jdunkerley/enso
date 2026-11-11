@@ -234,6 +234,12 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   that cache (see "Open-time harness"), so its launches never pick up the
   user's. An empty value counts as unset. The root and the gate are in
   `src/jvmAotSettings.ts` (tested in `tests/headless/jvmAotSettings.test.ts`).
+  The GUI shows a toast while a training is due and how it ended:
+  `src/jvmAotIpc.ts` keeps the status (`idle`, `training`, `trained`, `failed`,
+  set from the cache's `onTrainingStarted` and `onTrainingEnded`), answers
+  `Channel.jvmAotTrainingStatus` and broadcasts
+  `Channel.jvmAotTrainingStatusChanged` (tested in
+  `tests/headless/jvmAotIpc.test.ts`).
 - `ENSO_SPARE_ENGINE=0` — no spare engine whatever Settings → Local → Engine
   says (`project-manager-shim/CLAUDE.md`, "Spare engine"). The Playwright
   fixture sets it for every spec but `spareEngine.spec.ts`; the open-time

@@ -514,8 +514,15 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   holds the lock, the cache tries again every `retrainDelayMs` (60 s) and stays
   `isTraining` until that process's cache appears (or it gets the lock and
   trains itself); a lock that cannot be taken at all (an error) counts as a
-  failed training. A finished or failed training, and a cache found made by
-  another process, call `onTrainingEnded` (Electron refreshes the spare engine).
+  failed training. `start()` calls `onTrainingStarted` once it has found that a
+  training is due (never when the cache is there); a finished or failed
+  training, and a cache found made by another process, call `onTrainingEnded`
+  with `trained` or `failed` (Electron refreshes the spare engine and tells the
+  GUI, which shows a toast meanwhile). A training an open stops is neither: it
+  is still due. A training that throws while it starts (a lock release that
+  fails) ends as `failed` too (`startFailed`). While another process holds
+  `train.lock`, this window shows the training toast as well, and reports
+  `trained` up to 60 s (`retrainDelayMs`) after the other process finishes.
   `dispose()` (Electron's `before-quit`) aborts a running training before it
   awaits anything, which kills its engine or `java` at once; the `.tmp` and
   `.aotconf` such a quit can leave are deleted by the next `start()`. Three

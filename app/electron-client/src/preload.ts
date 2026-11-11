@@ -14,6 +14,7 @@ import type {
   AiToolCallReply,
   AiToolCallRequest,
 } from 'enso-common/src/ai'
+import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
 import type { UpdateStatus } from 'enso-common/src/updater'
 import type { $Config } from 'enso-gui/src/config'
 import type { ElectronApi } from 'enso-gui/src/electronApi'
@@ -199,6 +200,18 @@ const secrets: ElectronApi['secrets'] = {
   rotate: () => electron.ipcRenderer.invoke(ipc.Channel.secretsRotate),
 }
 
+const jvmAot: ElectronApi['jvmAot'] = {
+  trainingStatus: () => electron.ipcRenderer.invoke(ipc.Channel.jvmAotTrainingStatus),
+  onTrainingStatus: (handler) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: JvmAotTrainingStatus) =>
+      handler(status)
+    electron.ipcRenderer.on(ipc.Channel.jvmAotTrainingStatusChanged, listener)
+    return () => {
+      electron.ipcRenderer.removeListener(ipc.Channel.jvmAotTrainingStatusChanged, listener)
+    }
+  },
+}
+
 const api: ElectronApi = {
   navigation,
   menu,
@@ -223,6 +236,7 @@ const api: ElectronApi = {
   ai,
   updater,
   secrets,
+  jvmAot,
 }
 
 exposeInMainWorld(API_KEY, api)
