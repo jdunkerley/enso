@@ -59,6 +59,7 @@ import {
   startAppImageEngineCopy,
   startJvmAotCache,
   stopSpareEngine,
+  trainJvmAotNow,
   version,
 } from './projectService.js'
 import { enableAll } from './security.js'
@@ -635,6 +636,16 @@ class App {
       await this.electron?.app.whenReady()
       await printInfo()
       return this.quit()
+    } else if (args.trainJvmAot && this.electron) {
+      // Before `runElectronApp`: no single-instance lock (an IDE the update relaunches must start
+      // beside it), and no window.
+      const exitCode = await trainJvmAotNow(this.electron, this.electronIsDev, {
+        option: engineModeOption(args),
+      }).catch((error: unknown) => {
+        console.error('JDK AOT cache: the training failed:', error)
+        return 1
+      })
+      return this.exit(exitCode)
     } else if (this.electron) {
       this.runElectronApp(args, fileToOpen)
     } else if (args.headless) {

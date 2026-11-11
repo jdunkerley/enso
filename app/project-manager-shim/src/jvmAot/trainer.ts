@@ -29,6 +29,9 @@ import { enginePaths, readJvmOptionsText } from './key.js'
  * the open-time harness did when it made its own caches (it now measures this one instead).
  */
 
+/** The training's processes' priority (`JvmAotCacheSettings.trainingPriority`). */
+export type TrainingPriority = 'belowNormal' | 'normal'
+
 /** Trains a cache into `output`; rejects (with an `AbortError` on `signal`) and leaves no file on failure. */
 export interface Trainer {
   train(output: string, signal: AbortSignal): Promise<void>
@@ -51,6 +54,8 @@ export interface EngineTrainerOptions {
   readonly exitTimeoutMs?: number
   /** The `java` that creates the cache; the bundled runtime's when omitted (tests replace it). */
   readonly javaExecutable?: string
+  /** `belowNormal` (the default) lowers the engine's and `java`'s priority; `normal` leaves it. */
+  readonly priority?: TrainingPriority
 }
 
 const DEFAULT_FIRST_PORT = 30616
@@ -158,8 +163,8 @@ export class EngineTrainer implements Trainer {
   }
 
   /** Lower a child's priority; best effort: a training at normal priority is still a training. */
-  private static lowerPriority(engine: Engine): void {
-    if (engine.child.pid == null) return
+  private lowerPriority(engine: Engine): void {
+    if (this.options.priority === 'normal' || engine.child.pid == null) return
     try {
       os.setPriority(engine.child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL)
     } catch {
@@ -240,7 +245,7 @@ export class EngineTrainer implements Trainer {
         env,
         scratchRoot,
       )
-      EngineTrainer.lowerPriority(engine)
+      this.lowerPriority(engine)
       await this.waitForHealth(port, engine, signal)
       const driving = engine
       await driveOpen({
@@ -287,7 +292,7 @@ export class EngineTrainer implements Trainer {
         scratchRoot,
       )
       engine.child.stdin?.end()
-      EngineTrainer.lowerPriority(engine)
+      this.lowerPriority(engine)
       const createCode = await this.waitForExit(engine, exitTimeoutMs)
       if (signal.aborted) throw abortError()
       if (createCode !== 0 || !(await exists(temporary))) {

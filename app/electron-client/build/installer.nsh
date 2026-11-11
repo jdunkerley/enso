@@ -39,3 +39,18 @@
     DeleteRegKey HKCU "Software\Classes\Enso.ProjectBundle"
   ${EndIf}
 !macroend
+
+; #668: train the JDK AOT cache once the files are in place, so that the first launch already
+; has it (otherwise the IDE trains it in the background, and the first opens run without it).
+; `--train-jvm-aot` takes ~45 s on a desktop and exits 0 or 1; a failure only means the IDE trains
+; at launch, so the exit code is not checked. An in-app update (`--updated`) does not wait: the
+; relaunched IDE would be held for the whole training. It finds the training's lock held and
+; waits for that cache instead.
+!macro customInstall
+  ${If} ${isUpdated}
+    Exec '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --train-jvm-aot'
+  ${Else}
+    DetailPrint "Preparing the engine for fast project opens (about a minute)..."
+    ExecWait '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" --train-jvm-aot'
+  ${EndIf}
+!macroend
