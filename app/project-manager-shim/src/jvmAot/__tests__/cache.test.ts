@@ -367,16 +367,48 @@ test('isTraining is false with a cache, the native default, after a failed train
   expect(quit.isTraining()).toBe(false)
 })
 
-test('a training is reported while it runs, and its end is announced', async () => {
+test('a training is reported while it runs, and its start and end are announced', async () => {
   const trainer = new FakeTrainer()
+  const onTrainingStarted = vi.fn()
   const onTrainingEnded = vi.fn()
-  const created = cache(trainer, { onTrainingEnded })
+  const created = cache(trainer, { onTrainingStarted, onTrainingEnded })
   expect(created.isTraining()).toBe(false)
   await created.start()
+  expect(onTrainingStarted).toHaveBeenCalledOnce()
   expect(created.isTraining()).toBe(true)
   await trainer.runs[0]!.finish()
-  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledOnce())
+  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledExactlyOnceWith('trained'))
   await vi.waitFor(() => expect(created.isTraining()).toBe(false))
+  expect(onTrainingStarted).toHaveBeenCalledOnce()
+})
+
+test('no start is announced with a cache, or with the native default', async () => {
+  const first = new FakeTrainer()
+  await trained(first, cache(first))
+  const onTrainingStarted = vi.fn()
+  const onTrainingEnded = vi.fn()
+  await cache(new FakeTrainer(), { onTrainingStarted, onTrainingEnded }).start()
+  await cache(new FakeTrainer(), {
+    isJvmDefault: () => false,
+    onTrainingStarted,
+    onTrainingEnded,
+  }).start()
+  expect(onTrainingStarted).not.toHaveBeenCalled()
+  expect(onTrainingEnded).not.toHaveBeenCalled()
+})
+
+test('a training an open stopped stays started, and is announced once when it ends', async () => {
+  const trainer = new FakeTrainer()
+  const onTrainingStarted = vi.fn()
+  const onTrainingEnded = vi.fn()
+  const created = cache(trainer, { onTrainingStarted, onTrainingEnded, retrainDelayMs: 20 })
+  await created.start()
+  created.openStarted()
+  created.openAnswered()
+  await vi.waitFor(() => expect(trainer.runs).toHaveLength(2))
+  await trainer.runs[1]!.finish()
+  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledExactlyOnceWith('trained'))
+  expect(onTrainingStarted).toHaveBeenCalledOnce()
 })
 
 test('a failed training is announced too; one an open stopped is not', async () => {
@@ -385,7 +417,7 @@ test('a failed training is announced too; one an open stopped is not', async () 
   const first = cache(failing, { onTrainingEnded: failed })
   await first.start()
   failing.runs[0]!.fail()
-  await vi.waitFor(() => expect(failed).toHaveBeenCalledOnce())
+  await vi.waitFor(() => expect(failed).toHaveBeenCalledExactlyOnceWith('failed'))
 
   const stopped = new FakeTrainer()
   const aborted = vi.fn()
@@ -412,7 +444,7 @@ test('while another process trains, the lock is checked again; its cache ends th
   await fs.mkdir(directory, { recursive: true })
   await fs.writeFile(path.join(directory, 'enso.aot'), 'cache')
   await fs.rm(path.join(root, 'train.lock'))
-  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledOnce())
+  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledExactlyOnceWith('trained'))
   expect(created.isTraining()).toBe(false)
   expect(trainer.runs).toHaveLength(0)
 })
@@ -428,7 +460,7 @@ test('a training lock that cannot be taken ends the training state, announced', 
     onTrainingEnded,
   })
   await created.start()
-  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledOnce())
+  await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledExactlyOnceWith('failed'))
   expect(created.isTraining()).toBe(false)
   expect(trainer.runs).toHaveLength(0)
   expect(error).toHaveBeenCalledWith(

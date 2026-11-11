@@ -42,11 +42,21 @@ export interface JvmAotCacheSettings {
   /** How long after the last open was answered a killed training restarts: 60 s. */
   readonly retrainDelayMs?: number
   /**
-   * Told when a training has ended, with the cache written or failed, but not when an open stopped
-   * it: no spare engine starts while one runs (`isTraining`), so it is refreshed then.
+   * Told once `start()` has found that a training is needed (no cache for the key): from then on
+   * the cache is being prepared, through any open that stops the training, until
+   * `onTrainingEnded`. Not told when the cache is already there.
    */
-  readonly onTrainingEnded?: () => void
+  readonly onTrainingStarted?: () => void
+  /**
+   * Told when a training has ended, with the cache written (`trained`, also when another process
+   * made it) or failed, but not when an open stopped it: no spare engine starts while one runs
+   * (`isTraining`), so it is refreshed then.
+   */
+  readonly onTrainingEnded?: (outcome: JvmAotTrainingOutcome) => void
 }
+
+/** How a training ended: a cache was made (here or by another process), or none will be this launch. */
+export type JvmAotTrainingOutcome = 'trained' | 'failed'
 
 const CACHE_FILE = 'enso.aot'
 const USE_LOG_FILE = 'use.log'
@@ -159,13 +169,31 @@ export class JvmAotCache {
     } finally {
       this.checkingAtLaunch = false
     }
+    this.settings.onTrainingStarted?.()
     await this.beginTraining()
   }
 
   /** Start a training, unless one runs, an open is in flight, or another process holds the lock. */
   private beginTraining(): Promise<void> {
-    this.starting ??= this.tryBeginTraining().finally(() => (this.starting = undefined))
+    this.starting ??= this.tryBeginTraining()
+      .catch((error: unknown) => this.startFailed(error))
+      .finally(() => (this.starting = undefined))
     return this.starting
+  }
+
+  /**
+   * A training that could not start (a lock release or a file check threw) ends like a failed one,
+   * so that `onTrainingEnded` still comes after `onTrainingStarted`. Nothing to do when a training
+   * runs (its own end is announced) or the end was already announced.
+   */
+  private startFailed(error: unknown): void {
+    if (this.training != null || !this.wanted) return
+    this.wanted = false
+    console.error(
+      'JDK AOT cache: training could not start; trying again at the next launch:',
+      error,
+    )
+    if (!this.disposed) this.announceEnded('failed')
   }
 
   private async tryBeginTraining(): Promise<void> {
@@ -183,7 +211,7 @@ export class JvmAotCache {
         'JDK AOT cache: could not take the training lock; trying again at the next launch:',
         error,
       )
-      this.announceEnded()
+      this.announceEnded('failed')
       return
     }
     if (release == null) {
@@ -196,7 +224,7 @@ export class JvmAotCache {
       await release()
       if (await exists(cache)) {
         this.wanted = false
-        if (!this.disposed) this.announceEnded()
+        if (!this.disposed) this.announceEnded('trained')
       }
       return
     }
@@ -210,7 +238,7 @@ export class JvmAotCache {
           this.wanted = false
           console.info(`JDK AOT cache: trained in ${Date.now() - started} ms.`)
           this.training = undefined
-          this.announceEnded()
+          this.announceEnded('trained')
           await this.deleteOtherKeys(directory)
         },
         (error: unknown) => {
@@ -223,7 +251,7 @@ export class JvmAotCache {
             this.wanted = false
             console.error('JDK AOT cache: training failed; trying again at the next launch:', error)
             this.training = undefined
-            this.announceEnded()
+            this.announceEnded('failed')
           }
         },
       )
@@ -237,8 +265,8 @@ export class JvmAotCache {
    * Tell `onTrainingEnded`, once `isTraining` says so: a training being started counts as one, so
    * from within it the call waits for that to settle.
    */
-  private announceEnded(): void {
-    const announce = () => this.settings.onTrainingEnded?.()
+  private announceEnded(outcome: JvmAotTrainingOutcome): void {
+    const announce = () => this.settings.onTrainingEnded?.(outcome)
     const starting = this.starting
     if (starting != null) void starting.then(announce, announce)
     else announce()

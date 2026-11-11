@@ -20,6 +20,7 @@ import {
   useDevNavigate,
   useThemeClass,
 } from '$/composables/appShellEffects'
+import { useJvmAotTrainingToast } from '$/composables/jvmAotTrainingToast'
 import { useOfflineNotification } from '$/composables/offlineNotification'
 import { useSecretsKeyReminder } from '$/composables/secretsKeyReminder'
 import { useSpareEngineSync } from '$/composables/spareEngineSync'
@@ -90,6 +91,7 @@ useDevNavigate()
 useOfflineNotification()
 useSecretsKeyReminder()
 useSpareEngineSync()
+useJvmAotTrainingToast()
 
 // The "About Enso" dialog, opened by the app menu here, and by the user and info menus. Loaded on
 // first use, so that it keeps the dialog (and Reka) out of the initial chunk, and kept mounted

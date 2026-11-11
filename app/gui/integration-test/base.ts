@@ -1,4 +1,5 @@
 import type { FeatureFlags } from '$/providers/featureFlags'
+import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
 import { UUID } from 'enso-common/src/services/Backend'
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import { test as base, expect as baseExpect, type Locator, type Page } from 'playwright/test'
@@ -25,6 +26,8 @@ export const test = base.extend<{
    * specs assume `false`. AI specs opt in with `test.use({ aiAvailable: true })`.
    */
   aiAvailable: boolean
+  /** The JDK AOT cache training's status when the page loads (`registerMocks`); `idle` by default. */
+  jvmAotTrainingStatus: JvmAotTrainingStatus
   setupApi: {
     local?: (api: MockLocalApi) => void
     addDefaultProject?: boolean
@@ -40,6 +43,7 @@ export const test = base.extend<{
 }>({
   featureFlags: [{}, { option: true }],
   aiAvailable: [false, { option: true }],
+  jvmAotTrainingStatus: ['idle', { option: true }],
   setupApi: [{}, { option: true }],
   cloudRequests: [
     async ({ page }, use) => {
@@ -65,10 +69,10 @@ export const test = base.extend<{
     setupApi.local?.(api)
     return use(api)
   },
-  drivePage: async ({ page, localApi, featureFlags, aiAvailable }, use) => {
+  drivePage: async ({ page, localApi, featureFlags, aiAvailable, jvmAotTrainingStatus }, use) => {
     // Only make sure that the local API mock is registered; the spec uses it through `localApi`.
     const _ = { localApi }
-    await registerMocks(page, featureFlags, { aiAvailable })
+    await registerMocks(page, featureFlags, { aiAvailable, jvmAotTrainingStatus })
     await page.goto('/')
     await waitForAppLoaded(page)
     await use(new DrivePageActions(page, {}))

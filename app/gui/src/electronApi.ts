@@ -8,6 +8,7 @@ import type {
   AiToolCallRequest,
 } from 'enso-common/src/ai'
 import type { DownloadUrlOptions } from 'enso-common/src/download'
+import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
 import type { Path } from 'enso-common/src/services/Backend'
 import type { UpdateMode, UpdateStatus } from 'enso-common/src/updater'
 import type { FileFilter } from './project-view/util/fileFilter'
@@ -126,6 +127,14 @@ export interface SecretsApi {
   readonly rotate: () => Promise<void>
 }
 
+/** The JDK AOT cache's training at this launch; see `app/electron-client/src/jvmAotIpc.ts`. */
+export interface JvmAotApi {
+  /** The current status, for a window that loads while a training runs. */
+  readonly trainingStatus: () => Promise<JvmAotTrainingStatus>
+  /** Subscribe to status changes. Returns a disposer. */
+  readonly onTrainingStatus: (handler: (status: JvmAotTrainingStatus) => void) => () => void
+}
+
 /**
  * The messages Electron main rejects `secrets.rotate` and `secrets.reset` with while a project is
  * running; they mirror `ROTATE_BLOCKED_BY_PROJECTS` and `RESET_BLOCKED_BY_PROJECTS` in
@@ -156,5 +165,7 @@ export interface ElectronApi {
   readonly ai: AiApi
   readonly updater: UpdaterApi
   readonly secrets: SecretsApi
+  /** Absent outside Electron: in the browser build, nothing trains. */
+  readonly jvmAot?: JvmAotApi
 }
 export type { FileFilter, MenuItem, MenuItemHandler }

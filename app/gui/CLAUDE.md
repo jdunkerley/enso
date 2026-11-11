@@ -302,6 +302,20 @@ project itself (the edition switch of #600, `versioning/commit-if-enabled`):
 nothing when the project's versions are not kept, and a rejection, which stops
 the change, when the version cannot be saved.
 
+## JDK AOT cache training toast
+
+While Electron trains the JDK AOT cache (JVM engine only: the first launch, and
+after a `jvm.options` change), `useJvmAotTrainingToast`
+(`$/composables/jvmAotTrainingToast`, wired in `App.vue`) shows a lasting toast
+with a spinner; "Engine ready" replaces it when the training succeeds (closing
+by itself) and a warning when it fails (until closed). The status comes from
+`window.api.jvmAot` (`app/electron-client/src/jvmAotIpc.ts`): a query on load,
+so a window loaded mid-training shows the toast, and a broadcast on each change.
+A window that loads after the end shows nothing. The Playwright mock answers
+`idle` unless a spec sets `jvmAotTrainingStatus` (`test.use`), and
+`setJvmAotTrainingStatus` (`mock/registerMocks.ts`) broadcasts a change
+(`dashboard/jvmAotTrainingToast.spec.ts`).
+
 ## Unresolved libraries and the edition switch
 
 A project's libraries that the engine could not load (`library/loadFailed`,
