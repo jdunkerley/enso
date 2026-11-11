@@ -3,10 +3,10 @@
 The Enso Language Server (LS). Embedder-side service that owns a GraalVM
 polyglot `Context` running the Enso runtime and exposes its capabilities over
 **JSON-RPC (text protocol)** and a **binary protocol** for data links. The GUI
-reaches the server only through the ydoc server. The ydoc server runs in Node
-and connects to the channel sockets below, or runs inside this process when
-`LANGUAGE_SERVER_YDOC_PORT` is set (it has no default); the `--rpc-port`
-JSON-RPC listener (default 8080) is still bound directly.
+reaches the server only through the ydoc server, which runs in Node (hosted by
+the IDE) and connects to the channel sockets below; the `--rpc-port` JSON-RPC
+listener (default 8080) is still bound directly. The engine-hosted ydoc server
+(`LANGUAGE_SERVER_YDOC_PORT`) is gone.
 
 Read `README.md` here and
 [Language-Server](https://github.com/jdunkerley/enso/wiki/Language-Server) for
@@ -14,8 +14,8 @@ the full protocol and design notes.
 
 ## Responsibilities
 
-- Manage project state, open files, and Yjs-backed text sessions (via
-  `ydoc-server-polyglot`).
+- Manage project state, open files, and Yjs-backed text sessions (through the
+  Node ydoc server's channels).
 - Expose code execution, node management, introspection, completion and
   renaming. There is no find-usages, jump-to-definition or type-interaction
   endpoint.

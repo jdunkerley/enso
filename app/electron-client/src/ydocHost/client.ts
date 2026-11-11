@@ -102,11 +102,6 @@ export class UtilityProcessYdocHost implements YdocHost {
     this.origins = [...origins]
   }
 
-  /** The origins set by {@link allowOrigins}; also the engine-hosted listener's (`ENSO_YDOC_HOST=engine`). */
-  allowedOrigins(): readonly string[] {
-    return this.origins
-  }
-
   /** Stop the listener on `port` in the utility process. */
   async close(port: number): Promise<void> {
     this.open.delete(port)

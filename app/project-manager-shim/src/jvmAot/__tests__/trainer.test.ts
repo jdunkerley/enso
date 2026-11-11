@@ -37,7 +37,6 @@ fs.writeFileSync(record, JSON.stringify({
   pid: process.pid,
   jvmOptions: process.env.ENSO_JVM_OPTIONS ?? null,
   token: process.env.LANGUAGE_SERVER_CHANNEL_TOKEN ?? null,
-  ydocPort: process.env.LANGUAGE_SERVER_YDOC_PORT ?? null,
 }))
 const { startFakeLanguageServer } = await import(${JSON.stringify(FAKE_LS)})
 const never = process.env.FAKE_NEVER_COMPLETE === '1'
@@ -88,7 +87,6 @@ interface Recorded {
   pid: number
   jvmOptions: string | null
   token: string | null
-  ydocPort: string | null
 }
 
 const recordFile = () => path.join(root, 'record.json')
@@ -134,7 +132,6 @@ beforeEach(async () => {
   bundle = path.join(root, 'bundle')
   vi.stubEnv('FAKE_RECORD', recordFile())
   vi.stubEnv('FAKE_JAVA_RECORD', javaRecordFile())
-  vi.stubEnv('LANGUAGE_SERVER_YDOC_PORT', '1234')
   vi.stubEnv('ENSO_JVM_OPTIONS', '')
 })
 
@@ -170,7 +167,6 @@ test(
       `-Dinherited=1\n-XX:AOTMode=record\n-XX:AOTConfiguration=${output}.aotconf`,
     )
     expect(engine.token).toMatch(/^[0-9a-f]{64}$/)
-    expect(engine.ydocPort).toBeNull()
     const java = JSON.parse(await fs.readFile(javaRecordFile(), 'utf8')) as { args: string[] }
     expect(java.args).toEqual([
       '-XX:AOTMode=create',

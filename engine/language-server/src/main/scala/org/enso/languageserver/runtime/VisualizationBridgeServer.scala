@@ -714,7 +714,7 @@ object VisualizationBridgeActor {
 
   /** Factory for building the bridge actor and its two callback classes as a
     * bundle, given an actor system + runtime + event stream. The caller is
-    * responsible for passing the callbacks to `YdocServerApi.launchYdocServer`
+    * responsible for passing the callbacks to the channel endpoint
     * and for managing the returned `ActorRef`'s lifecycle.
     */
   def apply(

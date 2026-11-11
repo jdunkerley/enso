@@ -31,12 +31,10 @@ describe('engineTimeouts', () => {
     expect(engineTimeouts('native', {})).toEqual({
       startupMs: 30_000,
       terminateMs: 10_000,
-      ydocWaitMs: 5_000,
     })
     expect(engineTimeouts('jvm', {})).toEqual({
       startupMs: 120_000,
       terminateMs: 30_000,
-      ydocWaitMs: 30_000,
     })
     expect(ENGINE_TIMEOUTS.jvm.startupMs).toBe(120_000)
   })

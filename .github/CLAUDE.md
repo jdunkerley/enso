@@ -114,18 +114,15 @@ settings. Every workflow is hand-written YAML (build simplification;
 - **App-only PRs package with develop's backend.** A PR to `develop` that
   changes no engine file (`engine-changed-files.yml`) and none of the files the
   backend build reads outside the engine paths (`backend_changed` in
-  `ide-changed-files.yml`: `app/ydoc-server-polyglot`, `app/ydoc-server`,
-  `app/ydoc-shared`, `app/ydoc-channel`, `app/common`, `app/lezer-markdown`, the
-  root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, and
-  `ide-packaging.yml`; the engine bundle embeds the ydoc server) gets
-  `build_backend: false`, and `ide-packaging.yml` downloads the `backend-<os>`
-  artifacts of the newest develop run of `ide-pull-request.yml` whose commit is
-  an ancestor of the commit being packaged, the PR's merge commit
-  (`find-backend`). Any of those changes, a PR to another base branch (stacked),
-  or the `CI: Build IDE` label builds the backend instead; develop and releases
-  always do. The ydoc list is the `workspace:` closure of
-  `ydoc-server-polyglot`; keep it in step with those `package.json` files (Note
-  [The Backend Reads The ydoc Server]).
+  `ide-changed-files.yml`: the root `package.json`, `pnpm-lock.yaml`,
+  `pnpm-workspace.yaml`, and `ide-packaging.yml`) gets `build_backend: false`,
+  and `ide-packaging.yml` downloads the `backend-<os>` artifacts of the newest
+  develop run of `ide-pull-request.yml` whose commit is an ancestor of the
+  commit being packaged, the PR's merge commit (`find-backend`). Any of those
+  changes, a PR to another base branch (stacked), or the `CI: Build IDE` label
+  builds the backend instead; develop and releases always do. The engine bundle
+  holds no app code since the engine-hosted ydoc server went, so the ydoc
+  packages are not on the list.
 - **The `CI: Open perf` label measures the open time.** On a pull request to
   `ide-pull-request.yml` it makes the packaging run (as `CI: Build IDE` does)
   and passes `open_perf: true`; develop pushes measure it too, and a

@@ -219,8 +219,6 @@ export class EngineTrainer implements Trainer {
         ]),
         LANGUAGE_SERVER_CHANNEL_TOKEN: token,
       }
-      // The channel socket replaces the embedded ydoc server, which the training does not need.
-      delete env.LANGUAGE_SERVER_YDOC_PORT
       engine = this.spawn(
         ensoExecutable,
         [

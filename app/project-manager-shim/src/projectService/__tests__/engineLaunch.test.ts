@@ -52,7 +52,7 @@ const recorded = async (project: string) =>
 
 const jvm = (timeouts: Partial<EngineTimeouts> = {}): EngineLaunch => ({
   mode: { mode: 'jvm', source: 'environment' },
-  timeouts: { ...ENGINE_TIMEOUTS.jvm, ydocWaitMs: 0, ...timeouts },
+  timeouts: { ...ENGINE_TIMEOUTS.jvm, ...timeouts },
 })
 
 beforeEach(async () => {
@@ -73,7 +73,7 @@ test('a JVM launch passes --jvm first, and native passes nothing', async () => {
   const b = path.join(root, 'B')
   await runner.openProject(Path(b), 'id-b', undefined, undefined, undefined, {
     mode: { mode: 'native', source: 'default' },
-    timeouts: { ...ENGINE_TIMEOUTS.native, ydocWaitMs: 0 },
+    timeouts: ENGINE_TIMEOUTS.native,
   })
   expect((await recorded(b)).args).not.toContain('--jvm')
   await runner.closeProject(Path(b))
