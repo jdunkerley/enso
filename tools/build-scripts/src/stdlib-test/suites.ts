@@ -26,8 +26,13 @@ const NOT_SEPARATE = ['Microsoft_Tests', 'AWS_Tests']
 export const SUITES: Readonly<Record<string, Suite>> = {
   'standard-library': { deny: NOT_SEPARATE, smallJdk: true, nativeRunner: true },
   'standard-library-in-native': { deny: NOT_SEPARATE, smallJdk: false, nativeRunner: true },
-  'std-aws': { allow: ['AWS_Tests'], smallJdk: false, nativeRunner: true },
-  'std-microsoft': { allow: ['Microsoft_Tests'], smallJdk: false, nativeRunner: true },
+  'std-aws': { allow: ['AWS_Tests'], smallJdk: false, runnerArgs: ['--jvm'], nativeRunner: true },
+  'std-microsoft': {
+    allow: ['Microsoft_Tests'],
+    smallJdk: false,
+    runnerArgs: ['--jvm'],
+    nativeRunner: true,
+  },
   'std-snowflake': { allow: ['Snowflake_Tests'], smallJdk: false, nativeRunner: false },
   'std-snowflake-jvm': {
     allow: ['Snowflake_Tests'],
@@ -47,13 +52,8 @@ export const SUITES: Readonly<Record<string, Suite>> = {
       'Microsoft_Tests',
     ],
     smallJdk: false,
+    runnerArgs: ['--jvm'],
     nativeRunner: true,
-  },
-  'std-mock-dual-microsoft': {
-    allow: ['Microsoft_Tests'],
-    smallJdk: false,
-    runnerArgs: ['--jvm', '--vm.D=polyglot.enso.classLoading=Standard.Microsoft:guest,hosted'],
-    nativeRunner: false,
   },
 }
 

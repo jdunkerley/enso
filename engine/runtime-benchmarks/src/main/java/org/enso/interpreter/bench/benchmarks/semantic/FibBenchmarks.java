@@ -12,9 +12,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.infra.BenchmarkParams;
 
-/**
- * Base class for {@link FibHostJavaPolyglotBenchmarks} and {@link FibGuestJavaPolyglotBenchmarks}.
- */
+/** Base class for {@link FibHostJavaPolyglotBenchmarks}. */
 public abstract class FibBenchmarks {
 
   private ContextUtils ctx;

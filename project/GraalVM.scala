@@ -128,10 +128,6 @@ object GraalVM {
     private val testNISize        = NativeImageSize(100, 350)
   }
 
-  /** Has the user requested to use Espresso for Java interop? */
-  private def isEspressoMode(): Boolean =
-    "espresso".equals(System.getenv("ENSO_JAVA"))
-
   private val version: String = Dependencies.graalMavenPackagesVersion
 
   final def mavenPackagesVersion: String = version
@@ -216,23 +212,9 @@ object GraalVM {
     "org.graalvm.tools" % "insight-heap-tool" % version
   )
 
-  private val espressoPkgs =
-    Seq(
-      "org.graalvm.truffle"  % "truffle-nfi"                      % version,
-      "org.graalvm.truffle"  % "truffle-nfi-libffi"               % version,
-      "org.graalvm.espresso" % "espresso-language"                % version,
-      "org.graalvm.espresso" % "espresso-libs-resources"          % version,
-      "org.graalvm.espresso" % "espresso-runtime-resources-jdk21" % version
-    )
-
   val toolsPkgs = chromeInspectorPkgs ++ debugAdapterProtocolPkgs ++ insightPkgs
 
-  val langsPkgs =
-    if (isEspressoMode()) {
-      espressoPkgs
-    } else {
-      jsPkgs ++ pythonPkgs
-    }
+  val langsPkgs = jsPkgs ++ pythonPkgs
 
   private val allowedJavaVendors = Seq(
     "GraalVM Community",

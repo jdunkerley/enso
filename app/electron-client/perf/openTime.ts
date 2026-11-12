@@ -603,13 +603,10 @@ async function measureLaunch(
       console.warn(`Open time: no RSS sample at ${phase}: ${String(e)}`)
     }
   }
-  // A native engine has a JVM only for a library's Java (a guest JVM, Note [A Project That Uses A
-  // Library With Java Code] in `projectTemplates.ts`), so the welcome template's native launches
-  // have no counters to copy.
+  // A native engine has no JVM, so its launches have no counters to copy (Note [A Project That
+  // Uses A Library With Java Code] in `projectTemplates.ts`).
   const snapshot =
-    engine === 'native' && project == null ?
-      () => {}
-    : (phase: string) => snapshotJvmCounters(dir, phase, marks)
+    engine === 'native' ? () => {} : (phase: string) => snapshotJvmCounters(dir, phase, marks)
   try {
     marks.add('launch')
     app = await _electron.launch({

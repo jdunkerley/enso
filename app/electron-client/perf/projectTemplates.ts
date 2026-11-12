@@ -8,15 +8,14 @@ import zlib from 'node:zlib'
 
 /* Note [A Project That Uses A Library With Java Code]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * The native image has the Java of `Standard.Base`, `Table`, `Database`, `SQLite` and `DuckDB`
- * compiled in (`EnsoLibraryFeature` marks them AOT-ready); any other library's Java runs in a guest
- * HotSpot JVM that the native engine creates in its own process on first use
- * (`EnsoPolyglotJava.initOtherJvm`, `OtherJvmClassLoader`). On the JVM every library's Java is
- * hosted. So the new-project template measures only the native image's best case. The `image`
- * template opens a project whose first node calls `Standard.Image` (OpenCV through Java, a guest
- * JVM under native) on a PNG in the project's `data/`, and whose second node shows the result in a
- * table, the analogue of the welcome table; it needs no credentials and no service. The headline
- * is that table showing `headline`.
+ * The native image has the Java of `Standard.Base`, `Table`, `Database` and `DuckDB` compiled in
+ * (`EnsoLibraryFeature` marks them AOT-ready); any other library's Java is not available under
+ * native, and using it is an error that says to run on the JVM (Note [A Library's Java Must Be In
+ * The Native Image] in `EnsoPolyglotJava`). On the JVM every library's Java is hosted. The `image`
+ * template opens a project whose first node calls `Standard.Image` (OpenCV through Java, so the
+ * JVM only) on a PNG in the project's `data/`, and whose second node shows the result in a table,
+ * the analogue of the welcome table; it needs no credentials and no service. The headline is that
+ * table showing `headline`.
  */
 
 /** A project the harness writes over a new one. */

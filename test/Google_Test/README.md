@@ -23,9 +23,3 @@ the tests:
 enso$ sbt
 sbt:enso> runEngineDistribution --run test/Google_Test
 ```
-
-To execute the same tests in _dual JVM mode_ one can alter the last line to:
-
-```
-sbt:enso> runEngineDistribution --run test/Google_Test --vm.D=polyglot.enso.classLoading=Standard.Google:guest,enso_dev.Google_Test:guest,hosted
-```

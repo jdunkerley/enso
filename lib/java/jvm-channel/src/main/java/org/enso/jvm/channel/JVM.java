@@ -28,8 +28,7 @@ public final class JVM {
 
   /**
    * Create new JVM. Either HotSpot JVM or natively compiled JVM. Use {@link #executeMain} to launch
-   * a main method inside of the JVM. Use {@link Channel#create} to establish a channel to send more
-   * intricate messages to the JVM.
+   * a main method inside of the JVM.
    *
    * @param path path where the JDK is installed - either path to the HotSpot JVM directory or
    *     direct path to the dynamic library that contains the {@code JNI_CreateJavaVM} entry point
@@ -101,7 +100,7 @@ public final class JVM {
    *
    * @return JNI environment to make calls into the JVM
    */
-  final JNI.JNIEnv env() {
+  private JNI.JNIEnv env() {
     if (javaVM.isNull()) {
       var env = initializeEnv();
       if (env.isNonNull()) {

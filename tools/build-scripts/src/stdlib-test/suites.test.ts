@@ -86,7 +86,7 @@ describe('selection', () => {
   test('aliases, and an unknown suite', () => {
     expect(suiteNamed('stdlib-native').name).toBe('standard-library-in-native')
     expect(() => suiteNamed('std-everything')).toThrow('Unknown suite std-everything')
-    expect(Object.keys(SUITES)).toHaveLength(8)
+    expect(Object.keys(SUITES)).toHaveLength(7)
   })
 })
 

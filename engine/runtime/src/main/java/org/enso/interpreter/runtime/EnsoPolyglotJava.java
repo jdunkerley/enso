@@ -5,19 +5,15 @@ import com.oracle.truffle.api.interop.ArityException;
 import com.oracle.truffle.api.interop.InteropException;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
-import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.source.Source;
 import java.io.File;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.enso.common.HostEnsoUtils;
-import org.enso.common.RuntimeOptions;
 import org.enso.interpreter.runtime.util.TruffleFileSystem;
 import org.enso.pkg.NativeLibraryFinder;
 import org.enso.pkg.Package;
@@ -34,7 +30,6 @@ final class EnsoPolyglotJava {
       new EnsoContext.Extra<>(CtxData.class, CtxData::new);
 
   private final EnsoContext ctx;
-  private final boolean isHostClassLoading;
 
   /**
    * Current classpath. This list can grow over time, but already added entries to the list shall
@@ -67,13 +62,11 @@ final class EnsoPolyglotJava {
 
   /**
    * @param ctx associated conext
-   * @param isHostClassLoading do host classloading
    * @param growingPath classpath that may receive new entries incrementally - just make sure the
    *     list is ready for multi threaded read access
    */
-  private EnsoPolyglotJava(EnsoContext ctx, boolean isHostClassLoading, List<File> growingPath) {
+  private EnsoPolyglotJava(EnsoContext ctx, List<File> growingPath) {
     this.ctx = ctx;
-    this.isHostClassLoading = isHostClassLoading;
     this.classPath = growingPath;
   }
 
@@ -108,81 +101,48 @@ final class EnsoPolyglotJava {
     return null;
   }
 
-  @CompilerDirectives.TruffleBoundary
-  boolean isOtherObject(Object obj) {
-    try {
-      var iop = InteropLibrary.getUncached();
-      return obj != null
-          && iop.hasLanguage(obj)
-          && iop.getLanguage(obj).getSimpleName().equals("EpbLanguage");
-    } catch (UnsupportedMessageException ex) {
-      return false;
-    }
-  }
-
-  @CompilerDirectives.TruffleBoundary
-  boolean isOtherFunction(Object obj) {
-    return isOtherObject(obj) && InteropLibrary.getUncached().isExecutable(obj);
-  }
-
   /**
-   * Finds proper "polyglot Java" for given package - e.g. Enso library/project.
+   * Finds the "polyglot Java" for the given context. Every library loads its Java through the host
+   * class loader: on the JVM any library can, and in the native image only the libraries whose Java
+   * is compiled into the image (see {@link #javaNotInImage}).
    *
    * @param ctx the context to query for
-   * @param pkgOrNull the library or {@code null} for code outside of any library
    * @return instance of "polyglot Java" for further queries
    */
-  static EnsoPolyglotJava find(EnsoContext ctx, org.enso.pkg.Package<?> pkgOrNull) {
-    var useGuest = true;
-    var data = KEY.get(ctx);
-    if (data.isHostClassLoading(pkgOrNull)) {
-      if (isHostClassLoadingFor(pkgOrNull)) {
-        useGuest = false;
-      } else {
-        if (pkgOrNull != null) {
-          pkgOrNull.checkAotReady(
-              () -> {
-                logger.info(
-                    "Package {} forced to guest classloading. Use --jvm when encountering"
-                        + " problems.",
-                    logNameForPkg(pkgOrNull));
-              });
-        }
-      }
-    }
-    return find(ctx, useGuest);
+  static EnsoPolyglotJava find(EnsoContext ctx) {
+    return KEY.get(ctx).hosted;
   }
 
-  static EnsoPolyglotJava find(EnsoContext ctx, boolean guestJava) {
-    var data = KEY.get(ctx);
-    if (guestJava) {
-      return data.guest;
-    } else {
-      return data.hosted;
-    }
-  }
+  /* Note [A Library's Java Must Be In The Native Image]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * The native engine can load only the Java compiled into its image: the libraries marked AOT
+   * ready by `EnsoLibraryFeature`, and the JDK classes the image registers. Other libraries
+   * used to run their Java in a guest JVM started inside the process (`jvm-interop`); that is gone
+   * (docs/superpowers/specs/2026-11-09-remove-native-image-design.md, A1). A class such a library
+   * asks for, and the image does not have, is an error naming the library and the way to run it
+   * on the JVM instead. On the JVM every library's Java loads, so this never applies there.
+   */
 
-  private static String logNameForPkg(Package<?> pkgOrNull) {
-    return pkgOrNull == null ? "<none>" : pkgOrNull.libraryName().qualifiedName();
-  }
-
-  private static boolean isHostClassLoadingFor(Package<?> pkgOrNull) {
-    if (HostEnsoUtils.isAot()) {
-      if (pkgOrNull != null && pkgOrNull.isAotReady()) {
-        // if the package has been "compiled into" AOT binary
-        return true;
-      }
-    } else {
-      // any package can be loaded via host interop in non-AOT mode
-      return true;
+  /**
+   * The error to report when a class {@code pkgOrNull} asked for could not be loaded, because the
+   * library's Java is not part of the native image (Note [A Library's Java Must Be In The Native
+   * Image]).
+   *
+   * @param aot whether this is the native image ({@link HostEnsoUtils#isAot()})
+   * @param pkgOrNull the library that asked for the class, or {@code null} for code outside of any
+   * @return the message, or {@code null} when the library's Java is available
+   */
+  static String javaNotInImage(boolean aot, Package<?> pkgOrNull) {
+    if (!aot || pkgOrNull == null || pkgOrNull.isAotReady()) {
+      return null;
     }
-    return false;
+    return pkgOrNull.libraryName().qualifiedName()
+        + "'s Java is not part of the native engine. Run on the JVM: `enso --jvm`, `jvm: true` in"
+        + " package.yaml, or `ENSO_ENGINE_MODE=jvm` in the IDE.";
   }
 
   static void close(EnsoContext ctx) {
-    var data = KEY.get(ctx);
-    data.hosted.close();
-    data.guest.close();
+    KEY.get(ctx).hosted.close();
   }
 
   @CompilerDirectives.TruffleBoundary
@@ -248,10 +208,7 @@ final class EnsoPolyglotJava {
     }
   }
 
-  /**
-   * This method ensure that hosted as well as guest classpath is the same. This is necessary until
-   * real isolation between libraries is implemented.
-   */
+  /** Adds {@code path} to the classpath every library loads its Java from. */
   static void addToClassPath(EnsoContext ctx, Object whoIsIgnored, File path)
       throws InteropException {
     var data = KEY.get(ctx);
@@ -281,46 +238,8 @@ final class EnsoPolyglotJava {
   }
 
   private Object createPolyglotJava(EnsoContext ctx) throws IllegalStateException {
-    if (isHostClassLoading) {
-      var src = Source.newBuilder("epb", "java:0#hosted", "<Bindings>").build();
-      var target = ctx.parseInternal(src);
-      return target.call();
-    } else {
-      var envJava = System.getenv("ENSO_JAVA");
-      if (envJava == null) {
-        return initOtherJvm(ctx);
-      }
-      if ("espresso".equals(envJava)) {
-        var src = Source.newBuilder("java", "<Bindings>", "getbindings.java").build();
-        try {
-          var java = ctx.parseInternal(src).call();
-          logger.error("Using experimental Espresso support!");
-          return java;
-        } catch (Exception ex) {
-          if (ex.getMessage().contains("No language for id java found.")) {
-            logger.error(
-                "Environment variable ENSO_JAVA={}, but {}",
-                new Object[] {envJava, ex.getMessage()});
-            logger.error("Copy missing libraries to components directory");
-            logger.error("Continuing in regular Java mode");
-            return initOtherJvm(ctx);
-          } else {
-            var ise = new IllegalStateException(ex.getMessage());
-            ise.setStackTrace(ex.getStackTrace());
-            throw ise;
-          }
-        }
-      } else {
-        throw new IllegalStateException(
-            "Specify ENSO_JAVA=espresso to use Espresso. Was: " + envJava);
-      }
-    }
-  }
-
-  private Object initOtherJvm(EnsoContext ctx1) {
-    logger.info("Initializing OtherJvm support!");
-    var src = Source.newBuilder("epb", "java:0#guest", "<Bindings>").build();
-    com.oracle.truffle.api.CallTarget target = ctx1.parseInternal(src);
+    var src = Source.newBuilder("epb", "java:0#hosted", "<Bindings>").build();
+    var target = ctx.parseInternal(src);
     return target.call();
   }
 
@@ -366,44 +285,10 @@ final class EnsoPolyglotJava {
   private static final class CtxData {
     private final List<File> classPath;
     private final EnsoPolyglotJava hosted;
-    private final EnsoPolyglotJava guest;
-    private final Map<String, String> hostClassLoading;
 
     CtxData(EnsoContext ctx) {
       this.classPath = new CopyOnWriteArrayList<>();
-      this.hosted = new EnsoPolyglotJava(ctx, true, classPath);
-      this.guest = new EnsoPolyglotJava(ctx, false, classPath);
-      this.hostClassLoading = new LinkedHashMap<>();
-      for (var entry : ctx.getHostClassLoading().split(",")) {
-        var libState = entry.split(":");
-        switch (libState.length) {
-          case 2 -> {
-            assert RuntimeOptions.HOST_CLASS_LOADING_HOSTED.equals(libState[1])
-                || RuntimeOptions.HOST_CLASS_LOADING_GUEST.equals(libState[1]);
-            hostClassLoading.putIfAbsent(libState[0], libState[1]);
-          }
-          case 1 -> hostClassLoading.putIfAbsent("", libState[0]);
-          default ->
-              throw new IllegalStateException(
-                  "Expecting [<namespace.name>]:hosted|guest, but was: " + entry);
-        }
-      }
-      assert hostClassLoading.containsKey("");
-    }
-
-    private boolean isHostClassLoading(Package<?> pkgOrNull) {
-      return RuntimeOptions.HOST_CLASS_LOADING_HOSTED.equals(find(pkgOrNull));
-    }
-
-    private String find(Package<?> pkgOrNull) {
-      if (pkgOrNull != null) {
-        var fqn = pkgOrNull.libraryName().toString();
-        var set = hostClassLoading.get(fqn);
-        if (set != null) {
-          return set;
-        }
-      }
-      return hostClassLoading.get("");
+      this.hosted = new EnsoPolyglotJava(ctx, classPath);
     }
   }
 }

@@ -1,8 +1,6 @@
 {
   "resources":{
   "includes":[{
-    "pattern":"\\QMETA-INF/native-image/com.oracle.truffle.espresso/native-image.properties\\E"
-  }, {
     "pattern":"\\QMETA-INF/org/enso/interpreter/node/expression/builtin/BuiltinMethods.metadata\\E"
   }, {
     "pattern":"\\QMETA-INF/org/enso/interpreter/node/expression/builtin/BuiltinTypes.metadata\\E"
