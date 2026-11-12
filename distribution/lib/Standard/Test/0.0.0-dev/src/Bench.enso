@@ -32,16 +32,13 @@ type Bench_Options
     ## ---
        private: true
        ---
-    private Impl (warmup:Phase_Conf) (measure:Phase_Conf) (jvm_args : Text | Nothing = Nothing)
+    private Impl (warmup:Phase_Conf) (measure:Phase_Conf)
 
     ## Sets the warmup phase.
-    set_warmup self (warm:Phase_Conf) -> Bench_Options = Bench_Options.Impl warm self.measure self.jvm_args
+    set_warmup self (warm:Phase_Conf) -> Bench_Options = Bench_Options.Impl warm self.measure
 
     ## Sets the measurement phase.
-    set_measure self (meas:Phase_Conf) -> Bench_Options = Bench_Options.Impl self.warmup meas self.jvm_args
-
-    ## Sets additional JVM args
-    set_jvm_args self args:Text -> Bench_Options = Bench_Options.Impl self.warmup self.measure args
+    set_measure self (meas:Phase_Conf) -> Bench_Options = Bench_Options.Impl self.warmup meas
 
     ## ---
        private: true
@@ -199,8 +196,6 @@ type Bench
             case should_skip bench_name of
                 False ->
                     IO.println <| "Benchmarking '" + bench_name + "' with configuration: " + c.to_text
-                    if c.jvm_args != Nothing then
-                        IO.println <| "Ignoring JVM arguments "+c.jvm_args
                     Bench.measure bench_name c.warmup c.measure (s.code 0)
                 True ->
                     IO.println <| "Skipping '" + bench_name + "' benchmark"

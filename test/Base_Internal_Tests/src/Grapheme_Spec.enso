@@ -1,8 +1,8 @@
 from Standard.Base import all
 
-import Standard.Base.Internal.Extra_Imports.Text_Utils
-import Standard.Base.Internal.Extra_Imports.CaseFoldedString
-import Standard.Base.Internal.Extra_Imports.Exception as JException
+polyglot java import java.lang.Exception as JException
+polyglot java import org.enso.base.Text_Utils
+polyglot java import org.enso.base.text.CaseFoldedString
 
 from Standard.Test import all
 

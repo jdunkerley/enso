@@ -37,7 +37,7 @@ from Standard.Test import all
 generate_code nesting_level:Integer -> Text =
     bldr = Vector_Builder.new
     bldr.append "from Standard.Base import all"
-    bldr.append "import Standard.Base.Internal.Extra_Imports.RuntimeException"
+    bldr.append "polyglot java import java.lang.RuntimeException"
     bldr.append '\n'
     bldr.append <| "main = "
     bldr.append <|

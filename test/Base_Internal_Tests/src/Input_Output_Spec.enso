@@ -4,8 +4,8 @@ from Standard.Test import all
 import Standard.Test.Test_Environment
 
 polyglot java import org.enso.base_test_helpers.RangeStream
-import Standard.Base.Internal.Extra_Imports.Stream_Utils
-import Standard.Base.Internal.Extra_Imports.File_Utils
+polyglot java import org.enso.base.Stream_Utils
+polyglot java import org.enso.base.file_system.File_Utils
 
 
 add_specs suite_builder =

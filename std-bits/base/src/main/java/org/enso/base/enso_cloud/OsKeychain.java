@@ -9,7 +9,7 @@ import java.lang.ref.Reference;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Locale;
-import org.graalvm.polyglot.Context;
+import org.enso.base.polyglot.EnsoMeta;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,15 +30,11 @@ final class OsKeychain implements KeychainReader {
    * `service|account` (the app writes `account.service`), and on Linux it matches the attribute
    * `account` (the app writes `username`). So this class calls the OS directly.
    *
-   * It was written to work in the engine's native-image launcher (removed in #664), where JNA's reflective parts failed:
-   * `Library` interfaces are dynamic proxies, `Structure`s are read reflectively, and
-   * `PointerByReference` is instantiated reflectively ("requires a public no-arg constructor").
-   * So it uses only `NativeLibrary.getFunction(..).invoke*`, out-parameters in a `Memory`, and
-   * structs read at fixed 64-bit offsets. On Linux it uses the non-variadic libsecret entry point.
-   *
-   * The calls must come from Standard.Base code (here: the secrets-key lookup behind
-   * `Enso_Secret`). A user script's own `polyglot java import` of an engine class was served by a
-   * separate HotSpot JVM under the native launcher (gone), so it did not exercise this code.
+   * It uses only `NativeLibrary.getFunction(..).invoke*`, out-parameters in a `Memory`, and structs
+   * read at fixed 64-bit offsets, avoiding JNA's reflective parts (`Library` interfaces are dynamic
+   * proxies, `Structure`s are read reflectively, and `PointerByReference` is instantiated
+   * reflectively). These were needed to work in the engine's native-image launcher, which is gone
+   * (#664); the plain calls stay. On Linux it uses the non-variadic libsecret entry point.
    *
    * The identity, per OS:
    * - Windows: a generic credential with target `<account>.<service>`; the blob is UTF-16LE.
@@ -97,10 +93,7 @@ final class OsKeychain implements KeychainReader {
       }
       if (System.getProperty("jna.boot.library.path") == null) {
         try {
-          var ctx = Context.getCurrent();
-          var ensoBindings = ctx.getPolyglotBindings().getMember("ensoBindings");
-          var enso = ensoBindings != null ? ensoBindings.execute("enso") : ctx.getBindings("enso");
-          var found = enso.invokeMember("find_native_library", "jnidispatch");
+          var found = EnsoMeta.getBindings().invokeMember("find_native_library", "jnidispatch");
           if (found != null && found.isString()) {
             var dir = Path.of(found.asString()).getParent();
             if (dir != null) {
