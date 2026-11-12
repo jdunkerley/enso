@@ -7,8 +7,8 @@ and the supporting packages. It is a pnpm monorepo.
 - `electron-client/`: the Electron main process.
 - `project-manager-shim/`: the project manager, replacing the Scala one.
 - `common/`: TypeScript utilities shared by the GUI and the Electron client.
-- `ydoc-server/`, `ydoc-server-polyglot/`, `ydoc-shared/`, `ydoc-channel/`,
-  `ydoc-inspect/`: the ydoc (collaborative editing) stack.
+- `ydoc-server/`, `ydoc-shared/`, `ydoc-channel/`, `ydoc-inspect/`: the ydoc
+  (collaborative editing) stack.
 - `rust-ffi/`: the Rust parser compiled to WASM.
 - `lezer-markdown/`, `lang-markdown/`, `table-expression/`: editor grammars.
 - `licenses/`: license data.

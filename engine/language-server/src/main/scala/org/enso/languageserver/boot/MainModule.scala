@@ -77,7 +77,6 @@ import java.lang.management.ManagementFactory
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.time.Clock
-import java.util.concurrent.Executors
 
 import scala.concurrent.duration.DurationInt
 
@@ -462,17 +461,13 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
 
   private val jsonRpcProtocolFactory = new JsonRpcProtocolFactory
 
-  private val truffleContext = {
-    val contextInitialization =
-      new TruffleContextInitialization(
-        system.dispatcher,
-        builder,
-        contextSupervisor,
-        system.eventStream
-      )
-    contextInitialization.initComponent()
-    contextInitialization.getContext
-  }
+  // The supervisor keeps the context it registers.
+  new TruffleContextInitialization(
+    system.dispatcher,
+    builder,
+    contextSupervisor,
+    system.eventStream
+  ).initComponent()
   private val initializationComponent =
     ResourcesInitialization(
       system.eventStream,
@@ -556,7 +551,6 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
       BinaryEncoder.empty,
       new BinaryConnectionControllerFactory(fileManager)(system),
       messagesCallback,
-      truffleContext,
       system
     )
   log.trace("Created Binary Channel Callbacks [{}]", binaryChannelCallbacks)
@@ -571,29 +565,6 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
     visualizationBridge.actor
   )
 
-  private val ydoc: Option[java.util.concurrent.ExecutorService] =
-    applicationConfig.ydoc.port.map { port =>
-      val ydocExecutor = Executors.newSingleThreadExecutor(r => {
-        val thread = new Thread(r)
-        thread.setName("Ydoc main thread")
-        // Ydoc should not prevent JVM from exiting
-        thread.setDaemon(true)
-        thread
-      })
-      ydocExecutor.execute(() =>
-        org.enso.ydoc.api.YdocServerApi
-          .launchYdocServer(
-            applicationConfig.ydoc.hostname,
-            port,
-            jsonRpcServer.yjsChannelCallbacks,
-            binaryChannelCallbacks,
-            visualizationBridge.controlCallbacks,
-            visualizationBridge.dataCallbacks
-          )
-      )
-      ydocExecutor
-    }
-
   log.debug(
     "Main module of the Language Server initialized with config [{}]",
     languageServerConfig
@@ -603,7 +574,6 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
   def close(): Unit = {
     suggestionsRepo.close()
     contextSupervisor.close()
-    ydoc.foreach(_.shutdownNow())
     runtimeEventsMonitor.close()
     log.info("Stopped Language Server")
     MDC.remove("projectLocalId")

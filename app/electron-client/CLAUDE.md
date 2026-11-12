@@ -64,9 +64,9 @@ desktop binary (AppImage/DMG/exe + installer).
   (`index.ts`), with or without a window. Keep that call wherever the port is
   decided, or every page is refused. It prints `ydoc host pid=<pid>` at start;
   its stdout and stderr go through the main process's console, so they reach the
-  IDE log. `ENSO_YDOC_HOST=engine` puts the server back in the engine for one
-  release (see `project-manager-shim/CLAUDE.md`, "ydoc host"). Tests:
-  `tests/headless/ydocHostClient.test.ts` (against a fake child),
+  IDE log. There is no other host: the engine-hosted ydoc server
+  (`ENSO_YDOC_HOST=engine`) is gone (see `project-manager-shim/CLAUDE.md`, "ydoc
+  host"). Tests: `tests/headless/ydocHostClient.test.ts` (against a fake child),
   `tests/headless/ydocHostServe.test.ts`.
 - Installs the bundled sample projects at start-up and keeps them up to date
   (`LocalSamples.sync` in `project-manager-shim`, called from `onStart`; the
@@ -210,10 +210,6 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
 - `ENSO_BUILD_IDE_BUNDLED_ENGINE_VERSION` — nothing reads it: the `watch:*`
   scripts still set it, but the bundled engine is whatever is in
   `ENSO_BUILD_BACKEND`.
-- `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
-- `ENSO_YDOC_HOST` (`node` | `engine`, default `node`) — where opened projects'
-  ydoc servers run: the utility process above, or (the one-release rollback)
-  inside the engine.
 - `ENSO_ENGINE_MODE` (`native` | `jvm`) — which engine projects get, below
   `--engine-mode` and a project's `package.yaml` `jvm:` key (see
   `project-manager-shim/CLAUDE.md`, "Engine mode"). `--engine-mode <mode>` is
@@ -1129,13 +1125,12 @@ refused when `project/open` was answered and accepted ~300 ms later. The
 engine's ydoc server (GraalJS) listens after the Language Server passes
 `/_health`, which is when the shim answered; that is consistent with Windows
 retrying a refused loopback connect after ~500 ms (inferred from the constant
-510 to 525 ms gap, not observed; Linux fails at once). The fix is in the shim,
-which now also waits for the ydoc port to accept before answering (Note [Open
-Waits For The Ydoc Port] in
-`project-manager-shim/src/projectService/ensoRunner.ts`): the gap is ~27 ms on
-Windows, `guiConnected` 769 to 588 ms. `openAnswered` moves later by the wait,
-so read `guiConnected`, not the gap, to judge the open. To trace a gap like this
-again: hook `WebSocket`, `fetch` and `setTimeout` in the page with
+510 to 525 ms gap, not observed; Linux fails at once). The fix was in the shim,
+which then waited for the ydoc port to accept before answering (the gap fell to
+~27 ms on Windows, `guiConnected` 769 to 588 ms). The ydoc server now runs in
+Node and listens before the engine is spawned, so there is no such wait any
+more. Read `guiConnected`, not the gap, to judge the open. To trace a gap like
+this again: hook `WebSocket`, `fetch` and `setTimeout` in the page with
 `page.evaluate`, and log every `response` (the harness records only the project
 service's).
 

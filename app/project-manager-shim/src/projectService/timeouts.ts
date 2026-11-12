@@ -16,21 +16,19 @@ export function timeoutFromEnv(raw: string | undefined, fallback: number): numbe
   return Math.min(value, MAX_TIMEOUT_MS)
 }
 
-/** How long an engine has to start, to exit when asked, and for its ydoc port to accept. */
+/** How long an engine has to start, and to exit when asked. */
 export interface EngineTimeouts {
   readonly startupMs: number
   readonly terminateMs: number
-  readonly ydocWaitMs: number
 }
 
 /**
  * The spec's stage 1e table. A JVM engine passes `/_health` at ~10 s uncached on the CI Windows
- * runner (a slow laptop is 3x that), its shutdown runs Akka's and the JIT's teardown, and until the
- * ydoc server leaves the engine its ydoc port came 5.3 s after `lsReady` on Windows.
+ * runner (a slow laptop is 3x that), and its shutdown runs Akka's and the JIT's teardown.
  */
 export const ENGINE_TIMEOUTS: Readonly<Record<EngineMode, EngineTimeouts>> = {
-  native: { startupMs: 30_000, terminateMs: 10_000, ydocWaitMs: 5_000 },
-  jvm: { startupMs: 120_000, terminateMs: 30_000, ydocWaitMs: 30_000 },
+  native: { startupMs: 30_000, terminateMs: 10_000 },
+  jvm: { startupMs: 120_000, terminateMs: 30_000 },
 }
 
 /** The column for `mode`; the two environment variables override both columns. */
@@ -42,6 +40,5 @@ export function engineTimeouts(
   return {
     startupMs: timeoutFromEnv(env.ENSO_ENGINE_STARTUP_TIMEOUT_MS, column.startupMs),
     terminateMs: timeoutFromEnv(env.ENSO_ENGINE_TERMINATE_TIMEOUT_MS, column.terminateMs),
-    ydocWaitMs: column.ydocWaitMs,
   }
 }

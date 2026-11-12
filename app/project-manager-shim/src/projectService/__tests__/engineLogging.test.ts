@@ -95,7 +95,7 @@ test('the open resolves the mode: package.yaml first', async () => {
   await service.openProject(UUID('id-1'), Path(root))
   expect(launches.at(-1)).toMatchObject({
     mode: { mode: 'jvm', source: 'package.yaml' },
-    timeouts: { startupMs: 120_000, terminateMs: 30_000, ydocWaitMs: 30_000 },
+    timeouts: { startupMs: 120_000, terminateMs: 30_000 },
   })
 })
 

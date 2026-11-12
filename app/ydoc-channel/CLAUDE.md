@@ -7,8 +7,7 @@ Small Yjs-based **bidirectional message channel** library shared by
 Not a reimplementation of `y-protocols` — it sits alongside it for control-plane
 messages that shouldn't live inside the synced `Y.Doc`'s root types.
 
-Kept framework-free and dependency-light on purpose (`lib0` + `yjs` only) so
-both Node and GraalJS bundles can consume it.
+Kept framework-free and dependency-light on purpose (`lib0` + `yjs` only).
 
 ## Closing
 
@@ -18,5 +17,4 @@ Java side — the Language Server registers a no-argument callback through
 `org.enso.ydoc.api.YjsChannel.onClose` on each channel it is handed in
 `onConnect`, and `YdocJsonRpcServer` ends that JSON-RPC session (sends
 `MessageHandler.Disconnected`) when it runs (#369). A handler registered after
-the close runs at once. Renaming or changing its arity breaks the JVM side
-silently, since GraalJS maps the Java interface onto this class by member name.
+the close runs at once.

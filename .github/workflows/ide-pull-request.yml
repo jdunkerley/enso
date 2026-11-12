@@ -67,7 +67,7 @@ jobs:
     needs: [gui-changed-files, ide-changed-files, engine-changed-files]
     with:
       # A pull request to develop that changes no engine file and nothing else the backend build reads
-      # (the ydoc server) packages with develop's backend (Note [Reusing Develop's Backend] in
+      # (the manifests, `ide-packaging.yml`) packages with develop's backend (Note [Reusing Develop's Backend] in
       # `ide-packaging.yml`).
       build_backend: >-
         ${{ github.event_name != 'pull_request'

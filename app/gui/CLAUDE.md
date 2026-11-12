@@ -176,12 +176,13 @@ is hidden.
 ## ProjectView ↔ backend
 
 The ProjectView subtree never connects to the Enso Language Server directly. It
-opens WebSockets only to the ydoc server (which runs inside the engine), and the
-JSON-RPC and binary protocols travel as `YjsChannel`s on the index doc
-(`createRpcTransport` and `createDataSocket` in `src/project-view/util/net.ts`,
-used by `src/providers/openedProjects/project/project.ts`). The Yjs client lives
-in `ydoc-shared`; the sockets use `y-websocket` / `modern-isomorphic-ws`.
-Parsing of Enso source on the client side uses the Rust parser compiled to WASM
+opens WebSockets only to the ydoc server (Node, hosted by the IDE;
+`app/ydoc-server`), and the JSON-RPC and binary protocols travel as
+`YjsChannel`s on the index doc (`createRpcTransport` and `createDataSocket` in
+`src/project-view/util/net.ts`, used by
+`src/providers/openedProjects/project/project.ts`). The Yjs client lives in
+`ydoc-shared`; the sockets use `y-websocket` / `modern-isomorphic-ws`. Parsing
+of Enso source on the client side uses the Rust parser compiled to WASM
 (`rust-ffi` package → `ydoc-shared/src/ast/`).
 
 ## Dashboard ↔ backend
