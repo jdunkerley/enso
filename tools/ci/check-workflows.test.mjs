@@ -576,12 +576,12 @@ describe('checkToolchainPins', () => {
     `object Dependencies {\n  val graalVersion = "${jdk}"\n  val graalMavenPackagesVersion = "${release}"\n  val graalPyVersion = "${graalpy}"\n  val flatbuffersVersion      = "24.3.25"\n}\n`
   const build = {
     'project/Dependencies.scala': scalaWith('25.0.1', '25.0.1', '25.0.1'),
-    'project/build.properties': '# HELD at 1.10.6.\r\nsbt.version=1.10.6\r\n',
+    'project/build.properties': 'sbt.version=1.13.1\r\n',
   }
   const config = (pins) => `latest-release: 2025.3.4\ntoolchain:\n${pins}`
   /** The `toolchain:` block with the JDK, the release and GraalPy at the given versions. */
   const pinsWith = (jdk, release, graalpy) =>
-    `  graalvm: ${release}\n  graalvm-jdk: ${jdk}\n  sbt: 1.10.6 # held\n  flatc: 24.3.25\n  graalpy: ${graalpy}\n`
+    `  graalvm: ${release}\n  graalvm-jdk: ${jdk}\n  sbt: 1.13.1\n  flatc: 24.3.25\n  graalpy: ${graalpy}\n`
   const allPins = pinsWith('25.0.1', '25.0.1', '25.0.1')
   test("accepts pins equal to the build's own copies", () => {
     const repo = fixture({}, { 'build-config.yaml': config(allPins), ...build })
@@ -615,7 +615,7 @@ describe('checkToolchainPins', () => {
     ])
   })
   test('rejects a pin that drifted, and a missing pin', () => {
-    const pins = '  graalvm: 25.0.2\n  sbt: 1.10.6\n  graalpy: 25.0.1\n'
+    const pins = '  graalvm: 25.0.2\n  sbt: 1.13.1\n  graalpy: 25.0.1\n'
     const problems = checkToolchainPins(fixture({}, { 'build-config.yaml': config(pins), ...build }))
     assert.deepEqual(problems.sort(), [
       'build-config.yaml: `toolchain.graalvm` is 25.0.2, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.1',
