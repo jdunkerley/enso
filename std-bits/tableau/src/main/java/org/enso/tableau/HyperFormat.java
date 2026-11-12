@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.stream.IntStream;
 import org.enso.base.polyglot.EnsoExceptionWrapper;
 import org.enso.base.polyglot.EnsoMeta;
-import org.enso.table.data.column.builder.Builder;
 import org.enso.table.data.column.storage.ColumnStorage;
 import org.enso.table.data.column.storage.type.BigDecimalType;
 import org.enso.table.data.column.storage.type.BigIntegerType;
@@ -315,9 +314,7 @@ public class HyperFormat {
       boolean throwDontWarn) {
     assert names.length == storages.length;
 
-    // Localize storages to avoid issues with foreign memory access.
-    var localisedStorages =
-        Arrays.stream(storages).map(Builder::makeLocal).toArray(ColumnStorage<?>[]::new);
+    var localisedStorages = storages;
 
     try {
       List<String> warningUnmatchedColumns = new ArrayList<>();

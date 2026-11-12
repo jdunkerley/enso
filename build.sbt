@@ -4706,7 +4706,6 @@ lazy val `std-tests` = project
   .dependsOn(`std-table`)
   .dependsOn(`std-database`)
   .dependsOn(`std-sqlite`)
-  .dependsOn(`runtime-language-arrow`)
   .dependsOn(`test-utils`)
 
 lazy val `opencv-wrapper` = project

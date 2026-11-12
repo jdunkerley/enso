@@ -1,6 +1,5 @@
 package org.enso.table.data.column.builder;
 
-import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.LongBuffer;
@@ -27,24 +26,9 @@ final class LongBuilder extends ValidityBuilder implements BuilderForLong, Build
 
   private LongBuilder(
       int initialSize, ProblemAggregator problemAggregator, IntegerType storageType) {
-    this(
-        allocBuffer(initialSize, 0),
-        initialSize,
-        0,
-        new CastProblemAggregator(problemAggregator, null, storageType),
-        storageType);
-  }
-
-  private LongBuilder(
-      LongBuffer data,
-      int initialSize,
-      long validity,
-      CastProblemAggregator problemAggregator,
-      IntegerType storageType) {
-    super(initialSize, validity);
-    this.data = data;
+    this.data = allocBuffer(initialSize);
     this.storageType = storageType;
-    this.problemAggregator = problemAggregator;
+    this.problemAggregator = new CastProblemAggregator(problemAggregator, null, storageType);
   }
 
   static LongBuilder make(int initialSize, IntegerType type, ProblemAggregator problemAggregator) {
@@ -52,32 +36,17 @@ final class LongBuilder extends ValidityBuilder implements BuilderForLong, Build
     return new LongBuilder(initialSize, problemAggregator, integerType);
   }
 
-  static LongBuilder fromAddress(int size, long address, long validity, IntegerType type) {
-    assert address != 0;
-    var buf = allocBuffer(size, address);
-    return new LongBuilder(buf, size, validity, null, type);
-  }
-
   /**
    * Allocates continuous direct memory buffer.
    *
    * @param size the size of buffer to allocate
-   * @param data address of data to read or {@code 0} to allocate new data
    * @return long buffer representing data
    */
-  private static LongBuffer allocBuffer(int size, long data) {
+  private static LongBuffer allocBuffer(int size) {
     var wholeDataSize = Long.BYTES * size;
-    ByteBuffer buf;
-    if (data == 0L) {
-      buf = ByteBuffer.allocateDirect(wholeDataSize).order(ByteOrder.LITTLE_ENDIAN);
-    } else {
-      var seg = MemorySegment.ofAddress(data).reinterpret(wholeDataSize);
-      buf = seg.asByteBuffer().order(ByteOrder.LITTLE_ENDIAN);
-    }
-    assert buf.capacity() == wholeDataSize;
-    var lb = buf.order(ByteOrder.LITTLE_ENDIAN).asLongBuffer();
+    var buf = ByteBuffer.allocateDirect(wholeDataSize).order(ByteOrder.LITTLE_ENDIAN);
+    var lb = buf.asLongBuffer();
     assert lb.capacity() == size;
-    assert lb.order() == ByteOrder.LITTLE_ENDIAN;
     return lb;
   }
 
@@ -88,7 +57,7 @@ final class LongBuilder extends ValidityBuilder implements BuilderForLong, Build
 
   @Override
   protected void resize(int desiredCapacity) {
-    var newData = allocBuffer(desiredCapacity, 0);
+    var newData = allocBuffer(desiredCapacity);
     int toCopy = Math.min(currentSize, data.capacity());
     newData.put(0, data, 0, toCopy);
     data = newData;
@@ -238,19 +207,9 @@ final class LongBuilder extends ValidityBuilder implements BuilderForLong, Build
 
   @Override
   public ColumnStorage<Long> seal() {
-    return seal(null);
-  }
-
-  /**
-   * Seals this buffer as copy of provided storage.
-   *
-   * @param otherStorage storage to copy size from if non-{@code null}
-   * @return locally copied storage
-   */
-  final LongStorage seal(ColumnStorage<?> otherStorage) {
     ensureFreeSpaceFor(0);
     var buf = data.asReadOnlyBuffer().position(0).limit(currentSize);
     var validity = this.validityMap();
-    return new LongStorage(buf, validity, storageType, otherStorage);
+    return new LongStorage(buf, validity, storageType);
   }
 }

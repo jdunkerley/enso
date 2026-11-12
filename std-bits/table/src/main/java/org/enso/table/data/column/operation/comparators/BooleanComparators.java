@@ -67,8 +67,7 @@ final class BooleanComparators {
                   ImmutableBitSet.allFalse(size),
                   left.getValidityMap(),
                   Builder.checkSize(size),
-                  false,
-                  null);
+                  false);
         }
       };
 
@@ -92,8 +91,7 @@ final class BooleanComparators {
                   ImmutableBitSet.allFalse(size),
                   left.getValidityMap(),
                   Builder.checkSize(size),
-                  true,
-                  null)
+                  true)
               : NotOperation.applySpecializedBoolStorage(left);
         }
       };
@@ -114,8 +112,7 @@ final class BooleanComparators {
             MapOperationProblemAggregator problemAggregator) {
           var size = Builder.checkSize(left.getSize());
           return rightBoolean
-              ? new BoolStorage(
-                  ImmutableBitSet.allFalse(size), left.getValidityMap(), size, false, null)
+              ? new BoolStorage(ImmutableBitSet.allFalse(size), left.getValidityMap(), size, false)
               : left;
         }
       };
@@ -141,8 +138,7 @@ final class BooleanComparators {
                   ImmutableBitSet.allFalse(size),
                   left.getValidityMap(),
                   Builder.checkSize(left.getSize()),
-                  true,
-                  null);
+                  true);
         }
       };
 }

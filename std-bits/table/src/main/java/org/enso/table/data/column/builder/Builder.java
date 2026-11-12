@@ -1,6 +1,5 @@
 package org.enso.table.data.column.builder;
 
-import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.LocalDate;
@@ -87,91 +86,6 @@ public interface Builder {
             ? builder.seal()
             : MaskOperation.getSlicedStorage(builder.seal(), new IndexMapper.Constant(size));
     return storageType.asTypedStorage(unTyped);
-  }
-
-  /**
-   * Converts a proxy storage to local storage.
-   *
-   * @param <T> type of storage
-   * @param storage the storage instance, possibly a {@link Proxy#isProxyClass proxy}
-   * @return either {@code storage} itself, or optimized storage of the same {@link
-   *     ColumnStorage#typeChar()} and {@link ColumnStorage#typeSize()} over the same {@link
-   *     ColumnStorage#addressOfData() data}
-   */
-  static <T> ColumnStorage<T> makeLocal(ColumnStorage<T> storage) {
-    if (!Proxy.isProxyClass(storage.getClass())) {
-      return storage;
-    }
-
-    var storageType = StorageType.ofStorage(storage);
-    var size = Math.toIntExact(storage.getSize());
-
-    if (size == 0) {
-      return Builder.makeEmpty(storageType, 0);
-    }
-
-    if (storageType instanceof NullType) {
-      var b = new NullBuilder();
-      b.appendNulls(size);
-      return storageType.asTypedStorage(b.seal());
-    }
-
-    var data = storage.addressOfData();
-    if (data != 0) {
-      var validity = storage.addressOfValidity();
-
-      var localStorage =
-          switch (storageType) {
-            case BooleanType _ -> BoolBuilder.fromAddress(size, data, validity).seal(storage);
-            case IntegerType type ->
-                LongBuilder.fromAddress(size, data, validity, type).seal(storage);
-            case FloatType _ -> DoubleBuilder.fromAddress(size, data, validity).seal(storage);
-            case TextType type ->
-                StringBuilder.fromAddress(size, data, validity, type).seal(storage);
-            case DateType _ -> DateBuilder.fromAddress(size, data, validity).seal(storage);
-            case DateTimeType _ -> DateTimeBuilder.fromAddress(size, data, validity).seal(storage);
-            case TimeOfDayType _ ->
-                TimeOfDayBuilder.fromAddress(size, data, validity).seal(storage);
-            default -> {
-              // Currently: BigInteger, BigDecimal, AnyObject
-              BuilderUtil.LOGGER.warn(
-                  "Unable to make local buffer based storage for {} size {}", storageType, size);
-              yield null;
-            }
-          };
-
-      if (localStorage != null) {
-        assert assertSameStorages(storage, localStorage);
-        return storageType.asTypedStorage(localStorage);
-      }
-    }
-
-    // Handle BigInteger specially
-    if (storageType instanceof BigIntegerType) {
-      var b = Builder.getForBigInteger(size, null);
-      b.appendBulkStorage(storage);
-      var localStorage = b.seal();
-      return storageType.asTypedStorage(localStorage);
-    }
-
-    // No off-heap data to copy: the proxy is itself a working ColumnStorage, so keep it. (Such
-    // proxies mostly came from the guest JVM, which is gone; it needed a ColumnStorageProxy here.)
-    return storage;
-  }
-
-  private static boolean assertSameStorages(ColumnStorage<?> s1, ColumnStorage<?> s2) {
-    var sb = new java.lang.StringBuilder();
-    if (s1.getSize() != s2.getSize()) {
-      sb.append("Unexpected size %d != %d\n".formatted(s1.getSize(), s2.getSize()));
-    }
-    if (s1.typeChar() != s2.typeChar()) {
-      sb.append("Unexpected type %s != %s\n".formatted(s1.typeChar(), s2.typeChar()));
-    }
-    if (s1.typeSize() != s2.typeSize()) {
-      sb.append("Unexpected type %d != %d\n".formatted(s1.typeSize(), s2.typeSize()));
-    }
-    assert sb.isEmpty() : sb;
-    return sb.isEmpty();
   }
 
   /**

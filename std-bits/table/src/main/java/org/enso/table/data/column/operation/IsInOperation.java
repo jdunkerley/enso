@@ -268,8 +268,7 @@ public final class IsInOperation {
     // If had both true and false, then return all true when not nothing
     if (flags.hadTrue && flags.hadFalse) {
       var validityMap = makeValidityMap(boolStorage, checkedSize);
-      return new BoolStorage(
-          ImmutableBitSet.allFalse(checkedSize), validityMap, checkedSize, true, null);
+      return new BoolStorage(ImmutableBitSet.allFalse(checkedSize), validityMap, checkedSize, true);
     }
 
     // Only have one of true or false

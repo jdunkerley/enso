@@ -64,11 +64,7 @@ public class DoubleIsOperation implements UnaryOperation {
       if (storage instanceof ColumnStorageWithValidityMap withNothingMap) {
         var size = (int) storage.getSize();
         return new BoolStorage(
-            ImmutableBitSet.allFalse(size),
-            withNothingMap.getValidityMap(),
-            size,
-            finiteValue,
-            null);
+            ImmutableBitSet.allFalse(size), withNothingMap.getValidityMap(), size, finiteValue);
       }
 
       return StorageIterators.mapOverStorage(

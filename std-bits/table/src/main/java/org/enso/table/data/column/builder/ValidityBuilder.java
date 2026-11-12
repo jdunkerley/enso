@@ -1,6 +1,5 @@
 package org.enso.table.data.column.builder;
 
-import java.lang.foreign.MemorySegment;
 import java.util.BitSet;
 import org.enso.table.util.ImmutableBitSet;
 
@@ -9,21 +8,6 @@ abstract sealed class ValidityBuilder implements Builder
     permits DoubleBuilder, LongBuilder, DateBuilder {
   private BitSet validityMap;
   int currentSize;
-
-  /**
-   * Initializes a validityMap builder.
-   *
-   * @param size the size of buffer to allocate
-   * @param validity address of validity bitmap to read or {@code 0} to assume all data are valid
-   */
-  protected ValidityBuilder(int size, long validity) {
-    if (validity != 0L) {
-      var seg = MemorySegment.ofAddress(validity).reinterpret((size + 7) / 8);
-      var valid = seg.asByteBuffer();
-      validityMap = BitSet.valueOf(valid);
-      currentSize = size;
-    }
-  }
 
   /**
    * Lazily initialized getter for the {@link #validityMap} field. Allocates new bitset if none has

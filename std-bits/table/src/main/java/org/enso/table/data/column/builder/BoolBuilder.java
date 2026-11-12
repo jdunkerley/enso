@@ -1,6 +1,5 @@
 package org.enso.table.data.column.builder;
 
-import java.lang.foreign.MemorySegment;
 import java.util.BitSet;
 import org.enso.table.data.column.storage.BoolStorage;
 import org.enso.table.data.column.storage.ColumnStorage;
@@ -25,14 +24,6 @@ final class BoolBuilder implements BuilderForBoolean, BuilderWithRetyping {
     this.vals = vals;
     this.validityMap = validityMap;
     this.size = size;
-  }
-
-  static BoolBuilder fromAddress(int sizeInBits, long data, long validity) {
-    var bytesSize = (sizeInBits + 7) / 8;
-    var vals = BitSet.valueOf(MemorySegment.ofAddress(data).reinterpret(bytesSize).asByteBuffer());
-    var validityMap =
-        BitSet.valueOf(MemorySegment.ofAddress(validity).reinterpret(bytesSize).asByteBuffer());
-    return new BoolBuilder(vals, validityMap, sizeInBits);
   }
 
   @Override
@@ -107,13 +98,9 @@ final class BoolBuilder implements BuilderForBoolean, BuilderWithRetyping {
 
   @Override
   public ColumnStorage<Boolean> seal() {
-    return seal(null);
-  }
-
-  ColumnStorage<Boolean> seal(ColumnStorage<?> other) {
     var vals = new ImmutableBitSet(this.vals, size);
     var validityMap = new ImmutableBitSet(this.validityMap, size);
-    return new BoolStorage(vals, validityMap, size, false, other);
+    return new BoolStorage(vals, validityMap, size, false);
   }
 
   @Override

@@ -36,8 +36,7 @@ public class IsNothingOperationTest {
     var storage = Builder.getForBoolean(3).append(true).append(false).appendNulls(1).seal();
     if (negate) {
       if (storage instanceof BoolStorage bs) {
-        storage =
-            new BoolStorage(bs.getValues(), bs.getValidityMap(), (int) bs.getSize(), true, null);
+        storage = new BoolStorage(bs.getValues(), bs.getValidityMap(), (int) bs.getSize(), true);
       } else {
         fail("Expecting bool storage: " + storage);
       }

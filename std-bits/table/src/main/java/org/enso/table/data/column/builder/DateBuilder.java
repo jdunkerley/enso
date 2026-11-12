@@ -1,6 +1,5 @@
 package org.enso.table.data.column.builder;
 
-import java.lang.foreign.MemorySegment;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
@@ -20,31 +19,15 @@ final class DateBuilder extends ValidityBuilder
   private IntBuffer data;
 
   DateBuilder(int size, boolean allowDateToDateTimeConversion) {
-    this(size, 0, 0, allowDateToDateTimeConversion);
-  }
-
-  private DateBuilder(int size, long data, long validity, boolean allowDateToDateTimeConversion) {
-    super(size, validity);
-    this.data = allocBuffer(size, data);
+    this.data = allocBuffer(size);
     this.allowDateToDateTimeConversion = allowDateToDateTimeConversion;
   }
 
-  private static IntBuffer allocBuffer(int initialSize, long data) {
+  private static IntBuffer allocBuffer(int initialSize) {
     var wholeDataSize = Long.BYTES * initialSize;
-    ByteBuffer buf;
-    if (data == 0L) {
-      buf = ByteBuffer.allocateDirect(wholeDataSize).order(ByteOrder.LITTLE_ENDIAN);
-    } else {
-      var seg = MemorySegment.ofAddress(data).reinterpret(wholeDataSize);
-      buf = seg.asByteBuffer().order(ByteOrder.LITTLE_ENDIAN);
-    }
+    var buf = ByteBuffer.allocateDirect(wholeDataSize).order(ByteOrder.LITTLE_ENDIAN);
     assert buf.capacity() == wholeDataSize;
-    assert buf.order() == ByteOrder.LITTLE_ENDIAN;
     return buf.asIntBuffer();
-  }
-
-  static DateBuilder fromAddress(int size, long data, long validity) {
-    return new DateBuilder(size, data, validity, false);
   }
 
   @Override
@@ -109,7 +92,7 @@ final class DateBuilder extends ValidityBuilder
 
   @Override
   protected void resize(int desiredCapacity) {
-    var newData = allocBuffer(desiredCapacity, 0);
+    var newData = allocBuffer(desiredCapacity);
     int toCopy = Math.min(currentSize, data.capacity());
     newData.put(0, this.data, 0, toCopy);
     this.data = newData;
@@ -117,15 +100,11 @@ final class DateBuilder extends ValidityBuilder
 
   @Override
   public ColumnStorage<LocalDate> seal() {
-    return seal(null);
-  }
-
-  final ColumnStorage<LocalDate> seal(ColumnStorage<?> otherStorage) {
     ensureFreeSpaceFor(0);
     var buf = data.asReadOnlyBuffer().position(0).limit(currentSize);
     var validity = this.validityMap();
 
-    return new DateStorage(buf, validity, otherStorage);
+    return new DateStorage(buf, validity);
   }
 
   @Override
