@@ -9,4 +9,4 @@
     - with_connection self action:Standard.Base.Any.Any related_query:(Standard.Base.Nothing.Nothing|Standard.Base.Data.Text.Text)= -> Standard.Base.Any.Any
     - with_metadata self ~action:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - with_prepared_statement self query:(Standard.Base.Data.Text.Text|Standard.Database.SQL.SQL_Statement) statement_setter:Standard.Base.Any.Any action:Standard.Base.Any.Any skip_log:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-- create types_record:Standard.Base.Any.Any url:Standard.Base.Data.Text.Text properties:Standard.Base.Data.Vector.Vector catalog:Standard.Base.Data.Text.Text= schema:Standard.Base.Data.Text.Text= -> Standard.Base.Any.Any
+- create url:Standard.Base.Data.Text.Text properties:Standard.Base.Data.Vector.Vector catalog:Standard.Base.Data.Text.Text= schema:Standard.Base.Data.Text.Text= init_script:Standard.Base.Data.Text.Text= -> Standard.Base.Any.Any

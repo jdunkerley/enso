@@ -7,8 +7,7 @@ from Standard.Table import Table, Value_Type
 import project.SQL.SQL_Type
 
 polyglot java import java.sql.ResultSet
-polyglot java import org.enso.database.fetchers.ColumnFetcher # necessary for reflection metadata
-polyglot java import org.enso.database.fetchers.ColumnFetcherFactory
+polyglot java import org.enso.database.fetchers.ColumnFetcher
 polyglot java import org.enso.table.data.column.storage.type.AnyObjectType
 polyglot java import org.enso.table.data.column.storage.type.DateTimeType
 
@@ -31,7 +30,6 @@ result_set_to_table result_set column_fetcher_factory sql_type_to_value_type=(_-
             _       -> Storage.closest_storage_type value_type
         storage_type.typeString
 
-    column_fetcher = column_fetcher_factory.getColumnFetcherClass . static
-    java_columns = if last_row_only then column_fetcher.readLastRow result_set storageTypeMapper column_fetcher_factory else
-        column_fetcher.readResultSet result_set row_limit storageTypeMapper column_fetcher_factory
+    java_columns = if last_row_only then ColumnFetcher.readLastRow result_set storageTypeMapper column_fetcher_factory else
+        ColumnFetcher.readResultSet result_set row_limit storageTypeMapper column_fetcher_factory
     Java_Exports.make_table_from_java_columns java_columns

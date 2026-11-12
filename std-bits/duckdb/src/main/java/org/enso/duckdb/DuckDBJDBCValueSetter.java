@@ -7,10 +7,6 @@ import java.time.LocalTime;
 import org.enso.database.JDBCValueSetter;
 
 public class DuckDBJDBCValueSetter extends JDBCValueSetter {
-  public DuckDBJDBCValueSetter() {
-    super("DuckDB");
-  }
-
   @Override
   public void setLocalTime(PreparedStatement stmt, int columnIndex, LocalTime localTime)
       throws SQLException {

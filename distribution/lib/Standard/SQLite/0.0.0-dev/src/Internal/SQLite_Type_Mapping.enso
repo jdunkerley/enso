@@ -16,8 +16,6 @@ import Standard.Database.SQL.SQL_Type
 from Standard.Database.Errors import Unsupported_Database_Type
 
 polyglot java import java.sql.Types
-polyglot java import org.enso.database.fetchers.ColumnFetcherFactory
-polyglot java import org.enso.database.JDBCValueSetter
 ## ---
    private: true
    ---
@@ -95,7 +93,7 @@ type SQLite_Type_Mapping
        Gets the ColumnFetcherFactory to be used for SQLite.
     column_fetcher_factory : Any
     column_fetcher_factory =
-        ColumnFetcherFactory.DEFAULT
+        SQL_Type_Mapping.default_column_fetcher_factory
 
     ## ---
        private: true
@@ -165,7 +163,7 @@ type SQLite_Type_Mapping
        private: true
        ---
     value_setter =
-        JDBCValueSetter.create "SQLite"
+        SQL_Type_Mapping.default_value_setter
 
     ## ---
        private: true
