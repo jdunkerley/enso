@@ -48,10 +48,25 @@ object HTTPDownload {
    * covers only the wait for the response headers, so a large download whose
    * body takes longer is not cut short. A POST (a library upload) has none,
    * since its answer comes only after the whole body is sent.
+   *
+   * The JDK's request timeout does not cover the body either, so a server that
+   * sends the headers and then goes quiet would still hang the download for
+   * good (#637). So the body has an idle timeout, [[BodyIdleTimeout]]: no
+   * bytes for that long and the download is aborted, the connection closed.
+   * It is idle, not total, so a slow but steady download is never cut short.
+   * It does not make the host "unresponsive" (Note [An Unresponsive Server Is
+   * Not Asked Again At Once]): the server did answer, and a stalled transfer
+   * says little about the next request.
    */
 
   /** How long a request waits for the connection to the server. */
   val ConnectTimeout: Duration = Duration.ofSeconds(30)
+
+  /** How long the body of a response may go without a single byte. */
+  val BodyIdleTimeout: Duration = Duration.ofSeconds(30)
+
+  /** [[BodyIdleTimeout]], unless a test shortens it. */
+  @volatile private[http] var bodyIdleTimeout: Duration = BodyIdleTimeout
 
   /* Note [An Unresponsive Server Is Not Asked Again At Once]
    * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -185,8 +200,14 @@ object HTTPDownload {
           .connectTimeout(ConnectTimeout)
           .executor(vThreadExecutor)
           .build()
+        val idleHandler = IdleTimeoutBodyHandler.of(
+          bodyHandler,
+          bodyIdleTimeout,
+          s"The download from [${request.uri}] stalled: no data arrived " +
+          s"for ${describeDuration(bodyIdleTimeout)}."
+        )
         httpClient
-          .sendAsync(request.requestImpl, bodyHandler)
+          .sendAsync(request.requestImpl, idleHandler)
           .whenComplete { (_, failure) =>
             if (failure == null) unresponsiveServers.remove(server)
             else
@@ -196,6 +217,14 @@ object HTTPDownload {
                   Unresponsive(System.nanoTime(), waited)
                 )
               }
+          }
+          .handle[HttpResponse[T]] { (response, failure) =>
+            // Closing a stalled connection makes the client fail with an
+            // error of its own; the stall is the cause worth reporting.
+            val stalled = idleHandler.stalled()
+            if (stalled != null) throw stalled
+            else if (failure != null) throw failure
+            else response
           }
     }
   }

@@ -26,7 +26,9 @@ case class HTTPRequestBuilder private (
     * Download Waits For An Answer Only So Long] in [[HTTPDownload]]).
     */
   def GET: HTTPRequest = {
-    HTTPRequest(internalBuilder.GET().timeout(responseTimeout).build())
+    HTTPRequest(
+      withHeaders().GET().timeout(responseTimeout).build()
+    )
   }
 
   /** Sets how long a GET request waits for the response to start; the default
@@ -60,11 +62,18 @@ case class HTTPRequestBuilder private (
     )
   }
 
-  def build(): HTTPRequest = {
+  def build(): HTTPRequest =
+    HTTPRequest(withHeaders().build())
+
+  /** A copy of the underlying builder with the added headers, so building does
+    * not change this builder (and building twice does not repeat the headers).
+    */
+  private def withHeaders(): HttpRequest.Builder = {
+    val builder = internalBuilder.copy()
     headers.foreach { case (name, value) =>
-      internalBuilder.header(name, value)
+      builder.header(name, value)
     }
-    HTTPRequest(internalBuilder.build())
+    builder
   }
 }
 
