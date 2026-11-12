@@ -443,7 +443,6 @@ lazy val enso = (project in file("."))
     `jna-wrapper-extracted`,
     `json-rpc-server`,
     `jvm-channel`,
-    `jvm-interop`,
     `language-server`,
     `language-server-deps-wrapper`,
     `library-manager`,
@@ -527,8 +526,6 @@ lazy val enso = (project in file("."))
     `version-output`,
     `ydoc-api`,
     `ydoc-polyfill`,
-    `ydoc-server`,
-    `ydoc-server-registration`,
     `zio-wrapper`
   )
   .settings(Global / concurrentRestrictions += Tags.exclusive(Exclusive))
@@ -621,7 +618,6 @@ lazy val componentModulesPaths =
     (`filewatcher` / Compile / exportedModuleBin).value,
     (`json-rpc-server` / Compile / exportedModuleBin).value,
     (`jvm-channel` / Compile / exportedModuleBin).value,
-    (`jvm-interop` / Compile / exportedModuleBin).value,
     (`language-server` / Compile / exportedModuleBin).value,
     (`language-server-deps-wrapper` / Compile / exportedModuleBin).value,
     (`library-manager` / Compile / exportedModuleBin).value,
@@ -667,8 +663,6 @@ lazy val componentModulesPaths =
     (`version-output` / Compile / exportedModuleBin).value,
     (`ydoc-api` / Compile / exportedModuleBin).value,
     (`ydoc-polyfill` / Compile / exportedModuleBin).value,
-    (`ydoc-server` / Compile / exportedModuleBin).value,
-    (`ydoc-server-registration` / Compile / exportedModuleBin).value,
     (`zio-wrapper` / Compile / exportedModuleBin).value
   )
   ourMods ++ thirdPartyModFiles
@@ -1865,151 +1859,6 @@ lazy val `ydoc-polyfill` = project
   .dependsOn(`ydoc-api`)
   .dependsOn(`syntax-rust-definition`)
 
-lazy val `ydoc-server` = project
-  .in(file("lib/java/ydoc-server"))
-  .enablePlugins(JPMSPlugin)
-  .configs(Test)
-  .settings(
-    customFrgaalJavaCompilerSettings("25"),
-    javaModuleName := "org.enso.ydoc.server",
-    Compile / exportJars := true,
-    crossPaths := false,
-    autoScalaLibrary := false,
-    Test / fork := true,
-    commands += WithDebugCommand.withDebug,
-    Compile / moduleDependencies ++=
-      GraalVM.modules ++ GraalVM.jsPkgs ++ GraalVM.chromeInspectorPkgs ++ helidon ++ slf4jApi,
-    Compile / internalModuleDependencies := Seq(
-      (`syntax-rust-definition` / Compile / exportedModule).value,
-      (`ydoc-api` / Compile / exportedModule).value,
-      (`ydoc-polyfill` / Compile / exportedModule).value,
-      (`engine-common` / Compile / exportedModule).value,
-      (`persistance` / Compile / exportedModule).value,
-      (`jvm-channel` / Compile / exportedModule).value,
-      (`jvm-interop` / Compile / exportedModule).value
-    ),
-    libraryDependencies ++= slf4jApi ++ Seq(
-      "org.graalvm.truffle"        % "truffle-api"                 % graalMavenPackagesVersion % "provided",
-      "org.graalvm.sdk"            % "nativeimage"                 % graalMavenPackagesVersion % "provided",
-      "org.graalvm.polyglot"       % "inspect-community"           % graalMavenPackagesVersion % "runtime",
-      "org.graalvm.polyglot"       % "js-community"                % graalMavenPackagesVersion % "runtime",
-      "io.helidon.webclient"       % "helidon-webclient-websocket" % helidonVersion            % Test,
-      "io.helidon.webserver"       % "helidon-webserver-websocket" % helidonVersion            % Test,
-      "junit"                      % "junit"                       % junitVersion              % Test,
-      "com.github.sbt"             % "junit-interface"             % junitIfVersion            % Test,
-      "com.fasterxml.jackson.core" % "jackson-databind"            % jacksonVersion            % Test
-    ),
-    libraryDependencies ++= {
-      GraalVM.modules ++ GraalVM.jsPkgs ++ GraalVM.chromeInspectorPkgs ++ helidon
-    }
-  )
-  // `Compile/run` settings are necessary for the `run` task to work.
-  // We add it here for convenience so that one can start ydoc-server directly
-  // with `ydoc-server/run` task.
-  .settings(
-    Compile / run / fork := true,
-    Compile / run / connectInput := true,
-    Compile / run / javaOptions := testAssertions,
-    // We need to assembly the cmd line options here manually, because we need
-    // to add path to this module, and adding that directly to the `modulePath` setting
-    // would result in an sbt caught in an infinite recursion.
-    //
-    Compile / run / javaOptions ++= {
-      val mp        = (Compile / modulePath).value
-      val jar       = (Compile / exportedProductJars).value.head
-      val modName   = javaModuleName.value
-      val allMp     = mp ++ Seq(jar.data.absolutePath)
-      val mainKlazz = (Compile / mainClass).value.get
-      val args = Seq(
-        "--module-path",
-        allMp.mkString(File.pathSeparator),
-        "--module",
-        modName + "/" + mainKlazz
-      )
-      args
-    },
-    Compile / resourceGenerators += Def.task {
-      Ydoc.generateJsBundle(
-        (ThisBuild / baseDirectory).value,
-        baseDirectory.value,
-        (Compile / resourceManaged).value,
-        streams.value
-      )
-    }
-  )
-  .settings(
-    NativeImage.smallJdk := None,
-    NativeImage.additionalCp := Seq.empty,
-    rebuildNativeImage := Def.taskDyn {
-      val mpp =
-        (Compile / modulePath).value ++ Seq((Compile / packageBin).value)
-      val mp = mpp.map(_.getAbsolutePath)
-      NativeImage
-        .buildNativeImage(
-          "org.enso.ydoc.server",
-          staticOnLinux       = false,
-          additionalOptions   = Seq.empty,
-          targetDir           = engineDistributionRoot.value / "component",
-          modulePath          = mp,
-          mainModule          = Some("org.enso.ydoc.server"),
-          mainClass           = Some("org.enso.ydoc.server.Main"),
-          initializeAtRuntime = Seq("io.helidon.webclient.api.LoomClient"),
-          symlink             = false,
-          shared              = true,
-          useCp               = false
-        )
-    }.value,
-    buildNativeImage := Def.taskDyn {
-      NativeImage
-        .incrementalNativeImageBuild(
-          rebuildNativeImage,
-          "org.enso.ydoc.server",
-          targetDir = engineDistributionRoot.value / "component",
-          shared    = true,
-          extraInputs = Def.task(
-            (Compile / modulePath).value ++ Seq((Compile / packageBin).value)
-          )
-        )
-    }.value
-  )
-  .dependsOn(`jvm-interop`)
-  .dependsOn(`ydoc-api`)
-  .dependsOn(`ydoc-polyfill`)
-
-lazy val `ydoc-server-registration` = project
-  .in(file("lib/java/ydoc-server-registration"))
-  .enablePlugins(JPMSPlugin)
-  .configs(Test)
-  .settings(
-    customFrgaalJavaCompilerSettings("21"),
-    Compile / exportJars := true,
-    crossPaths := false,
-    autoScalaLibrary := false,
-    Test / fork := true,
-    commands += WithDebugCommand.withDebug,
-    Compile / moduleDependencies ++=
-      GraalVM.modules,
-    Compile / internalModuleDependencies := Seq(
-      (`engine-runner-common` / Compile / exportedModule).value,
-      (`ydoc-api` / Compile / exportedModule).value,
-      (`jvm-channel` / Compile / exportedModule).value,
-      (`jvm-interop` / Compile / exportedModule).value
-    ),
-    libraryDependencies ++= Seq(
-      "org.graalvm.sdk"      % "nativeimage"       % graalMavenPackagesVersion % "provided",
-      "org.graalvm.polyglot" % "inspect-community" % graalMavenPackagesVersion % "runtime",
-      "junit"                % "junit"             % junitVersion              % Test,
-      "com.github.sbt"       % "junit-interface"   % junitIfVersion            % Test
-    ),
-    libraryDependencies ++= {
-      GraalVM.modules
-    }
-  )
-  .dependsOn(`engine-runner-common`)
-  .dependsOn(`ydoc-api`)
-  .dependsOn(`jvm-channel`)
-  .dependsOn(`jvm-interop`)
-
 lazy val `persistance` = (project in file("lib/java/persistance"))
   .enablePlugins(JPMSPlugin)
   .settings(
@@ -2416,8 +2265,6 @@ lazy val `language-server` = (project in file("engine/language-server"))
       (`engine-common` / Compile / exportedModule).value,
       (`fansi-wrapper` / Compile / exportedModule).value,
       (`interpreter-dsl` / Compile / exportedModule).value,
-      (`jvm-channel` / Compile / exportedModule).value,
-      (`jvm-interop` / Compile / exportedModule).value,
       (`language-server-deps-wrapper` / Compile / exportedModule).value,
       (`library-manager` / Compile / exportedModule).value,
       (`logging-config` / Compile / exportedModule).value,
@@ -2701,13 +2548,10 @@ lazy val `runtime-language-epb` =
         "org.graalvm.sdk"      % "nativeimage" % graalMavenPackagesVersion
       ),
       Compile / internalModuleDependencies := Seq(
-        (`jvm-channel` / Compile / exportedModule).value,
-        (`jvm-interop` / Compile / exportedModule).value,
         (`runtime-utils` / Compile / exportedModule).value,
         (`ydoc-polyfill` / Compile / exportedModule).value
       )
     )
-    .dependsOn(`jvm-interop` % Test)
 
 lazy val `runtime-language-arrow` =
   (project in file("engine/runtime-language-arrow"))
@@ -2981,8 +2825,6 @@ lazy val `runtime-integration-tests` =
         (`engine-common` / Compile / exportedModule).value,
         (`fansi-wrapper` / Compile / exportedModule).value,
         (`interpreter-dsl` / Compile / exportedModule).value,
-        (`jvm-channel` / Compile / exportedModule).value,
-        (`jvm-interop` / Compile / exportedModule).value,
         (`library-manager` / Compile / exportedModule).value,
         (`logging-config` / Compile / exportedModule).value,
         (`logging-service` / Compile / exportedModule).value,
@@ -3169,8 +3011,6 @@ lazy val `runtime-benchmarks` =
         (`engine-common` / Compile / exportedModule).value,
         (`fansi-wrapper` / Compile / exportedModule).value,
         (`interpreter-dsl` / Compile / exportedModule).value,
-        (`jvm-channel` / Compile / exportedModule).value,
-        (`jvm-interop` / Compile / exportedModule).value,
         (`library-manager` / Compile / exportedModule).value,
         (`logging-config` / Compile / exportedModule).value,
         (`logging-service` / Compile / exportedModule).value,
@@ -3754,14 +3594,12 @@ lazy val `engine-runner-common` = project
       (`library-manager` / Compile / exportedModule).value,
       (`logging-utils` / Compile / exportedModule).value,
       (`pkg` / Compile / exportedModule).value,
-      (`ydoc-api` / Compile / exportedModule).value,
       (`polyglot-api` / Compile / exportedModule).value
     )
   )
   .dependsOn(`edition-updater`)
   .dependsOn(`library-manager`)
   .dependsOn(`polyglot-api`)
-  .dependsOn(`ydoc-api`)
   .dependsOn(testkit % Test)
 
 lazy val `engine-runner` = project
@@ -3808,7 +3646,6 @@ lazy val `engine-runner` = project
       (`engine-common` / Compile / exportedModule).value,
       (`engine-runner-common` / Compile / exportedModule).value,
       (`jvm-channel` / Compile / exportedModule).value,
-      (`jvm-interop` / Compile / exportedModule).value,
       (`library-manager` / Compile / exportedModule).value,
       (`logging-config` / Compile / exportedModule).value,
       (`logging-utils` / Compile / exportedModule).value,
@@ -3820,9 +3657,7 @@ lazy val `engine-runner` = project
       (`runtime-parser` / Compile / exportedModule).value,
       (`runtime-version-manager` / Compile / exportedModule).value,
       (`semver` / Compile / exportedModule).value,
-      (`version-output` / Compile / exportedModule).value,
-      (`ydoc-api` / Compile / exportedModule).value,
-      (`ydoc-server-registration` / Compile / exportedModule).value
+      (`version-output` / Compile / exportedModule).value
     ),
     // Runtime / modulePath is used as module-path for the native image build.
     Runtime / moduleDependencies :=
@@ -3894,10 +3729,6 @@ lazy val `engine-runner` = project
     NativeImage.additionalCp := {
       val runnerDeps =
         (Compile / fullClasspath).value.map(_.data.getAbsolutePath)
-      val jvmInteropDeps =
-        (`jvm-interop` / Compile / fullClasspath).value.map(
-          _.data.getAbsolutePath
-        )
       val runtimeDeps =
         (`runtime` / Compile / fullClasspath).value.map(_.data.getAbsolutePath)
       val loggingDeps =
@@ -3920,21 +3751,17 @@ lazy val `engine-runner` = project
         val log = streams.value.log
         val langServer = (`language-server` / Compile / fullClasspath).value
           .map(_.data.getAbsolutePath)
-        val ydocServerRegistration =
-          (`ydoc-server-registration` / Compile / fullClasspath).value
-            .map(_.data.getAbsolutePath)
         if (GraalVM.EnsoLauncher.disableLanguageServer) {
           log.info(
             s"Skipping language server in native image build as ${GraalVM.EnsoLauncher.VAR_NAME} env variable is ${GraalVM.EnsoLauncher.toString}"
           )
           Seq()
         } else {
-          langServer ++ ydocServerRegistration
+          langServer
         }
       }
       val core = (
         runnerDeps ++
-          jvmInteropDeps ++
           runtimeDeps ++
           loggingDeps ++
           replDebugInstr ++
@@ -4024,9 +3851,10 @@ lazy val `engine-runner` = project
         // Note [Java-Free Libraries In The Image]
         // A library with no Java of its own whose `polyglot java import`s are all
         // JDK classes (Standard.XML) is hosted in the image: `EnsoLibraryFeature`
-        // registers those JDK classes and marks it AOT-ready, so its calls do not
-        // cross to the guest JVM. Such a library must ship no jar, or its Java
-        // would end up in the image.
+        // registers those JDK classes and marks it AOT-ready, so the native
+        // engine can run it (any other library's Java is not in the image; Note
+        // [A Library's Java Must Be In The Native Image] in `EnsoPolyglotJava`).
+        // Such a library must ship no jar, or its Java would end up in the image.
         //
         // The cost is a hand-kept list. Host interop reaches the JDK's own
         // implementation classes through the public interfaces they implement,
@@ -4174,7 +4002,6 @@ lazy val `engine-runner` = project
   .dependsOn(`runtime-parser`)
   .dependsOn(`runtime-version-manager`)
   .dependsOn(`version-output`)
-  .dependsOn(`ydoc-server-registration`)
 
 lazy val buildSmallJdk =
   taskKey[File]("Build a minimal JDK used for native image generation")
@@ -4292,59 +4119,8 @@ lazy val `jvm-channel` =
         "org.graalvm.sdk"      % "nativeimage" % graalMavenPackagesVersion,
         "org.graalvm.polyglot" % "polyglot"    % graalMavenPackagesVersion,
         "org.graalvm.sdk"      % "word"        % graalMavenPackagesVersion
-      ),
-      Compile / internalModuleDependencies ++= Seq(
-        (`engine-common` / Compile / exportedModule).value,
-        (`persistance` / Compile / exportedModule).value
       )
     )
-    .dependsOn(`persistance`)
-    .dependsOn(`persistance-dsl` % "provided")
-
-lazy val `jvm-interop` =
-  project
-    .in(file("lib/java/jvm-interop"))
-    .enablePlugins(JPMSPlugin)
-    .settings(
-      annotationProcSetting,
-      customFrgaalJavaCompilerSettings("24"),
-      // jvm-interop/test has to run with -ea disabled form Truffle.
-      // Otherwise Truffle library performs a lot of additional
-      // checks and they skew the message counts. Thus enabling -ea
-      // only for Enso packages
-      inConfig(Compile)(
-        Seq(fork := true, javaOptions ++= Seq("-ea:org.enso.jvm..."))
-      ),
-      publishLocalSetting,
-      autoScalaLibrary := false,
-      crossPaths := false,
-      (Test / fork) := true,
-      commands += WithDebugCommand.withDebug,
-      libraryDependencies ++= Seq(
-        "org.graalvm.truffle"  % "truffle-api"           % graalMavenPackagesVersion % "provided",
-        "org.graalvm.truffle"  % "truffle-dsl-processor" % graalMavenPackagesVersion % "provided",
-        "org.graalvm.sdk"      % "graal-sdk"             % graalMavenPackagesVersion % Test,
-        "junit"                % "junit"                 % junitVersion              % Test,
-        "com.github.sbt"       % "junit-interface"       % junitIfVersion            % Test,
-        "org.graalvm.polyglot" % "js-community"          % graalMavenPackagesVersion % Test
-      ),
-      Compile / moduleDependencies ++= Seq(
-        "org.graalvm.truffle"  % "truffle-api" % graalMavenPackagesVersion,
-        "org.graalvm.sdk"      % "nativeimage" % graalMavenPackagesVersion,
-        "org.graalvm.polyglot" % "polyglot"    % graalMavenPackagesVersion,
-        "org.graalvm.sdk"      % "word"        % graalMavenPackagesVersion
-      ),
-      Compile / internalModuleDependencies ++= Seq(
-        (`jvm-channel` / Compile / exportedModule).value,
-        (`engine-common` / Compile / exportedModule).value,
-        (`persistance` / Compile / exportedModule).value
-      ),
-      Test / libraryDependencies ++= GraalVM.jsPkgs
-    )
-    .dependsOn(`engine-common`)
-    .dependsOn(`jvm-channel`)
-    .dependsOn(`persistance-dsl` % "provided")
-    .dependsOn(`test-utils` % Test)
 
 lazy val `os-environment-lib` =
   project
@@ -6627,20 +6403,13 @@ lazy val buildEngineDistributionNoIndex =
   taskKey[Unit](
     "Builds the engine distribution without generating indexes and optionally generating native image"
   )
-// `Def.taskDyn`, not `Def.taskIf`: an `if` inside a `taskIf` branch does not stop
-// `.value` from scheduling the ydoc image, so `ENSO_LAUNCHER=...,-ydoc` picks
-// the task to run.
+// `Def.taskDyn`, not `Def.taskIf`, so the native image is only scheduled when
+// `shouldBuildNativeImage` asks for it.
 buildEngineDistributionNoIndex := Def.taskDyn {
   createEnginePackageNoIndex.value
   if (!shouldBuildNativeImage.value) Def.task(())
-  else if (GraalVM.EnsoLauncher.disableYdoc)
-    Def.task {
-      (`engine-runner` / buildNativeImage).value
-      (`engine-runner` / checkNativeImageSize).value
-    }
   else
     Def.task {
-      (`ydoc-server` / buildNativeImage).value
       (`engine-runner` / buildNativeImage).value
       (`engine-runner` / checkNativeImageSize).value
     }

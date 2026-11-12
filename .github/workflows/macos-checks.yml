@@ -41,8 +41,7 @@ jobs:
       jvm-tests-split: false
       jvm-tests: ${{ inputs.engine }}
       stdlib-suites: >-
-        ${{ inputs.libraries && '[{"suite": "standard-library-in-native", "title": "Native", "small-jdk": false},
-        {"suite": "standard-library", "title": "JVM", "small-jdk": true},
+        ${{ inputs.libraries && '[{"suite": "standard-library", "title": "JVM", "small-jdk": true},
         {"suite": "std-aws", "title": "AWS", "small-jdk": false}]' || '[]' }}
       clean_build_required: ${{ inputs.clean_build_required }}
     secrets: inherit

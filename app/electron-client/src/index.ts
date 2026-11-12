@@ -24,12 +24,7 @@ import process from 'node:process'
 import { LocalSamples, runLocalProjectByPath } from 'project-manager-shim'
 import type { ProjectService } from 'project-manager-shim/projectService'
 import { shutdownClaudeAgent } from './ai/claudeAgent.js'
-import {
-  engineModeOption,
-  parseArgs,
-  withoutDeepLink,
-  withoutInstallerFlags,
-} from './configParser.js'
+import { parseArgs, withoutDeepLink, withoutInstallerFlags } from './configParser.js'
 import { VERSION } from './contentConfig.js'
 import { printInfo, VERSION_INFO } from './debug.js'
 import { initIpc, registerShortcuts, setChromeOptions } from './electron.js'
@@ -370,9 +365,7 @@ class App {
         // Before the server and any engine start, so both see the key.
         await this.initialiseSecretsKey()
         // Before the project service and the JDK AOT cache find the engine.
-        await prepareAppImageEngine(this.electron, this.electronIsDev, {
-          option: engineModeOption(args),
-        })
+        await prepareAppImageEngine(this.electron, this.electronIsDev)
         // Note that we want to do all the actions synchronously, so when the window
         // appears, it serves the website immediately.
         await this.startContentServerIfEnabled(args)
@@ -422,9 +415,7 @@ class App {
     const backendProfileOpts =
       args.debug.profile ? ['--profiling-path', 'profiling.npss', ...backendProfileTime] : []
     const backendOpts = [...backendVerboseOpts, ...backendProfileOpts]
-    return setupProjectService(backendOpts, this.electron, this.electronIsDev, {
-      option: engineModeOption(args),
-    })
+    return setupProjectService(backendOpts, this.electron, this.electronIsDev)
   }
 
   /** Start the content server, which will serve the application content (HTML) to the window. */
@@ -639,12 +630,12 @@ class App {
     } else if (args.trainJvmAot && this.electron) {
       // Before `runElectronApp`: no single-instance lock (an IDE the update relaunches must start
       // beside it), and no window.
-      const exitCode = await trainJvmAotNow(this.electron, this.electronIsDev, {
-        option: engineModeOption(args),
-      }).catch((error: unknown) => {
-        console.error('JDK AOT cache: the training failed:', error)
-        return 1
-      })
+      const exitCode = await trainJvmAotNow(this.electron, this.electronIsDev).catch(
+        (error: unknown) => {
+          console.error('JDK AOT cache: the training failed:', error)
+          return 1
+        },
+      )
       return this.exit(exitCode)
     } else if (this.electron) {
       this.runElectronApp(args, fileToOpen)
@@ -655,9 +646,7 @@ class App {
         return this.exit(1)
       } else if (projectToOpen) {
         try {
-          const exitCode = await runLocalProjectByPath(Path(projectToOpen), {
-            option: engineModeOption(args),
-          })
+          const exitCode = await runLocalProjectByPath(Path(projectToOpen))
           // Forward exact failure exit code if available (or 0 if no error).
           this.exit(exitCode)
         } catch (error) {

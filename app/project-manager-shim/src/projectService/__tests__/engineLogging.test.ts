@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createProject } from '../../localMetadata/__tests__/testUtils.js'
 import type { EngineLaunch, Runner } from '../ensoRunner.js'
 import { ProjectService } from '../index.js'
+import { NATIVE_REMOVED_NOTICE } from '../nativeRequest.js'
 import { Path, UUID } from '../types.js'
 
 let root: string
@@ -87,79 +88,46 @@ test("the service's own engine arguments come first", async () => {
   expect(await openWith(['--log-level', 'info'])).toEqual(['--log-level', 'info'])
 })
 
-test('the open resolves the mode: package.yaml first', async () => {
-  await fs.writeFile(path.join(root, 'P', 'package.yaml'), 'name: P\njvm: true\n')
-  const service = new ProjectService(fakeRunner(), [], console, undefined, undefined, undefined, {
-    option: 'native',
-  })
+const logLines = (service: ProjectService): string[] => {
+  const channel = service.engineLogs.get(path.join(root, 'P'))
+  return (channel?.subscribe({ event: () => {}, end: () => {} }).replay ?? []).flatMap((event) =>
+    event.type === 'line' ? [event.text] : [],
+  )
+}
+
+test('an open gets the JVM timeouts', async () => {
+  const service = new ProjectService(fakeRunner(), [])
   await service.openProject(UUID('id-1'), Path(root))
   expect(launches.at(-1)).toMatchObject({
-    mode: { mode: 'jvm', source: 'package.yaml' },
-    timeouts: { startupMs: 120_000, terminateMs: 30_000, ydocWaitMs: 30_000 },
+    timeouts: { startupMs: 120_000, terminateMs: 30_000 },
   })
 })
 
-test('the open takes the option when package.yaml says nothing', async () => {
-  const service = new ProjectService(fakeRunner(), [], console, undefined, undefined, undefined, {
-    option: 'jvm',
-  })
-  await service.openProject(UUID('id-1'), Path(root))
-  expect(launches.at(-1)?.mode).toEqual({ mode: 'jvm', source: 'option' })
-})
-
-test('with no settings the open is the JVM, from the default', async () => {
+test('the engine log no longer starts with a mode line', async () => {
   vi.stubEnv('ENSO_ENGINE_MODE', '')
   const service = new ProjectService(fakeRunner(), [])
   await service.openProject(UUID('id-1'), Path(root))
-  expect(launches.at(-1)?.mode).toEqual({ mode: 'jvm', source: 'default' })
+  expect(logLines(service).filter((text) => text.startsWith('Engine mode:'))).toEqual([])
 })
 
-test('ENSO_ENGINE_MODE is the environment source', async () => {
-  vi.stubEnv('ENSO_ENGINE_MODE', 'jvm')
+test.each([
+  ['ENSO_ENGINE_MODE=native', undefined, 'native'],
+  ['package.yaml jvm: false', 'name: P\njvm: false\n', ''],
+])('%s logs that the native engine was removed, once', async (_name, yaml, environment) => {
+  vi.stubEnv('ENSO_ENGINE_MODE', environment)
+  if (yaml != null) await fs.writeFile(path.join(root, 'P', 'package.yaml'), yaml)
   const service = new ProjectService(fakeRunner(), [])
   await service.openProject(UUID('id-1'), Path(root))
-  expect(launches.at(-1)?.mode).toEqual({ mode: 'jvm', source: 'environment' })
+  await service.openProject(UUID('id-1'), Path(root))
+  expect(logLines(service).filter((text) => text.includes('native engine was removed'))).toEqual([
+    NATIVE_REMOVED_NOTICE,
+  ])
 })
 
-test('the run resolves the mode too', async () => {
-  const seen: (EngineLaunch | undefined)[] = []
-  const runner: Runner = {
-    ...fakeRunner(),
-    runProject: async (_path, _env, launch) => {
-      seen.push(launch)
-      return 0
-    },
-  }
-  const service = new ProjectService(runner, [], console, undefined, undefined, undefined, {
-    option: 'jvm',
-  })
-  await service.runProject(UUID('id-1'), Path(root))
-  expect(seen.at(-1)?.mode).toEqual({ mode: 'jvm', source: 'option' })
-})
-
-test('the engine log starts with the mode', async () => {
-  const service = new ProjectService(fakeRunner(), [], console, undefined, undefined, undefined, {
-    environment: 'jvm',
-  })
+test('jvm: true in package.yaml wins over ENSO_ENGINE_MODE=native, and logs nothing', async () => {
+  vi.stubEnv('ENSO_ENGINE_MODE', 'native')
+  await fs.writeFile(path.join(root, 'P', 'package.yaml'), 'name: P\njvm: true\n')
+  const service = new ProjectService(fakeRunner(), [])
   await service.openProject(UUID('id-1'), Path(root))
-  const channel = service.engineLogs.get(path.join(root, 'P'))
-  const lines = (channel?.subscribe({ event: () => {}, end: () => {} }).replay ?? []).flatMap(
-    (event) => (event.type === 'line' ? [event.text] : []),
-  )
-  expect(lines[0]).toBe('Engine mode: jvm (ENSO_ENGINE_MODE)')
-})
-
-test('re-opening an open project writes no second mode line', async () => {
-  const service = new ProjectService(fakeRunner(), [], console, undefined, undefined, undefined, {
-    environment: 'jvm',
-  })
-  await service.openProject(UUID('id-1'), Path(root))
-  await service.openProject(UUID('id-1'), Path(root))
-  const replay = service.engineLogs
-    .get(path.join(root, 'P'))
-    ?.subscribe({ event: () => {}, end: () => {} }).replay
-  const modeLines = (replay ?? []).filter(
-    (event) => event.type === 'line' && event.text.startsWith('Engine mode:'),
-  )
-  expect(modeLines).toHaveLength(1)
+  expect(logLines(service)).not.toContain(NATIVE_REMOVED_NOTICE)
 })

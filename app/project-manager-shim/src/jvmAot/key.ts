@@ -4,7 +4,7 @@
  * with the app version and with the engine's `jvm.options`.
  */
 import * as crypto from 'node:crypto'
-import * as fs from 'node:fs/promises'
+import * as fsSync from 'node:fs'
 import * as path from 'node:path'
 
 /** What the key is computed from. */
@@ -39,16 +39,21 @@ export interface EnginePaths {
  * finds, so it gets no cache).
  */
 export async function enginePaths(ensoExecutable: string): Promise<EnginePaths | undefined> {
+  return enginePathsSync(ensoExecutable)
+}
+
+/** {@link enginePaths}, for a caller that cannot wait (the runner spawns synchronously). */
+export function enginePathsSync(ensoExecutable: string): EnginePaths | undefined {
   let engineRoot: string
   try {
-    engineRoot = await fs.realpath(path.dirname(path.dirname(ensoExecutable)))
+    engineRoot = fsSync.realpathSync(path.dirname(path.dirname(ensoExecutable)))
   } catch {
     return undefined
   }
   const runtimes = path.join(engineRoot, '..', '..', 'runtime')
-  let entries: import('node:fs').Dirent[]
+  let entries: fsSync.Dirent[]
   try {
-    entries = await fs.readdir(runtimes, { withFileTypes: true })
+    entries = fsSync.readdirSync(runtimes, { withFileTypes: true })
   } catch {
     return undefined
   }
@@ -59,8 +64,13 @@ export async function enginePaths(ensoExecutable: string): Promise<EnginePaths |
 
 /** The text of the engine's `jvm.options` (`<engineRoot>/jvm.options`), `''` when it has none. */
 export async function readJvmOptionsText(engineRoot: string): Promise<string> {
+  return readJvmOptionsTextSync(engineRoot)
+}
+
+/** {@link readJvmOptionsText}, for a caller that cannot wait. */
+export function readJvmOptionsTextSync(engineRoot: string): string {
   try {
-    return await fs.readFile(path.join(engineRoot, 'jvm.options'), 'utf8')
+    return fsSync.readFileSync(path.join(engineRoot, 'jvm.options'), 'utf8')
   } catch {
     return ''
   }

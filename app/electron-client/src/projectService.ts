@@ -13,7 +13,6 @@ import {
   appImageEngine,
   isEngineCopyPath,
   isJvmAotEnabled,
-  isJvmDefaultEngine,
   jvmAotRootDirectory,
 } from '@/jvmAotSettings'
 import * as paths from '@/paths'
@@ -27,12 +26,11 @@ import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVe
 import {
   loopbackOrigins,
   ProjectService,
-  ydocHostKind,
   type EngineSettings,
 } from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
-/** Where the engine mode may come from besides a project's `package.yaml`. */
+/** What the host gives the project service: the AOT cache, the AppImage engine, the ydoc host. */
 let engineSettings: EngineSettings | undefined
 let localMetadata: LocalMetadata | null = null
 let localVersioning: LocalVersioning | null = null
@@ -67,8 +65,8 @@ function forkYdocHost(): YdocHostChild {
 }
 
 /**
- * Where opened projects' ydoc servers run under `ENSO_YDOC_HOST=node` (the default): a utility
- * process, forked at start-up by `setupProjectService` (`start()`).
+ * Where opened projects' ydoc servers run: a utility process, forked at start-up by
+ * `setupProjectService` (`start()`).
  */
 function getYdocHost(): UtilityProcessYdocHost {
   ydocHost ??= new UtilityProcessYdocHost(forkYdocHost)
@@ -180,7 +178,6 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
 function createJvmAotCache(
   electron: Electron,
   electronIsDev: boolean,
-  engine: EngineSettings | undefined,
   overrides: Partial<JvmAotCacheSettings> = {},
 ): JvmAotCache | null {
   if (!isJvmAotEnabled(process.env)) return null
@@ -193,7 +190,6 @@ function createJvmAotCache(
     rootDirectory: jvmAotRootDirectory(process.env, app.getPath('userData')),
     appVersion: app.getVersion(),
     ensoExecutable,
-    isJvmDefault: () => isJvmDefaultEngine(engine, process.env),
     // The GUI shows a toast from a training's start until it ends.
     onTrainingStarted: () => setJvmAotTrainingStatus('training'),
     onTrainingEnded: (outcome) => {
@@ -208,15 +204,11 @@ function createJvmAotCache(
 /**
  * `--train-jvm-aot`, which the Windows installer runs once the files are in place (#668): train the
  * cache now, at normal priority, so that the first launch already has it. Answers the exit code: 0
- * when there is a cache or nothing to train (the native default, another process training it), 1
+ * when there is a cache or nothing to train (no cache for this install, another process training it), 1
  * when the training failed, after which the IDE trains at launch as before.
  */
-export async function trainJvmAotNow(
-  electron: Electron,
-  electronIsDev: boolean,
-  engine: EngineSettings | undefined,
-): Promise<number> {
-  const cache = createJvmAotCache(electron, electronIsDev, engine, {
+export async function trainJvmAotNow(electron: Electron, electronIsDev: boolean): Promise<number> {
+  const cache = createJvmAotCache(electron, electronIsDev, {
     trainingPriority: 'normal',
     // No window, and no project service, to tell.
     onTrainingStarted: () => {},
@@ -237,7 +229,7 @@ export async function trainJvmAotNow(
 }
 
 /**
- * Under a Linux AppImage with the JVM as the default engine, the engine is run from its copy at
+ * Under a Linux AppImage, the engine is run from its copy at
  * `<userData>/engine/<version>/` (`appImageEngine`): its launcher when the copy is complete, given
  * to the project service and the AOT cache explicitly, never through the environment.
  */
@@ -254,7 +246,6 @@ const appImageCopyGate = new AfterFirstOpen(60_000)
 export async function prepareAppImageEngine(
   electron: Electron,
   electronIsDev: boolean,
-  engine: EngineSettings | undefined,
 ): Promise<void> {
   const userData = app.getPath('userData')
   const inherited = process.env.ENSO_ENGINE_PATH
@@ -265,15 +256,11 @@ export async function prepareAppImageEngine(
     Reflect.deleteProperty(process.env, 'ENSO_ENGINE_PATH')
   }
   try {
-    const { enginePath, startCopy } = await appImageEngine(
-      process.env,
-      {
-        resourcesPath: paths.resourcesPath(electron, electronIsDev),
-        userData,
-        version: app.getVersion(),
-      },
-      engine,
-    )
+    const { enginePath, startCopy } = await appImageEngine(process.env, {
+      resourcesPath: paths.resourcesPath(electron, electronIsDev),
+      userData,
+      version: app.getVersion(),
+    })
     if (enginePath != null)
       console.info(`Running the AppImage's engine from its copy at ${enginePath}.`)
     appImageEnginePath = enginePath
@@ -302,7 +289,7 @@ export function startAppImageEngineCopy(): void {
 }
 
 /**
- * Train the JDK AOT cache in the background if it is needed (the JVM is the default engine).
+ * Train the JDK AOT cache in the background if it is needed.
  *
  * The GUI may have asked for a spare engine before this runs. `start()` counts as training from its
  * first line (`isTraining`), so the refresh right after it stops a spare started meanwhile, and the
@@ -351,12 +338,10 @@ export function setupProjectService(
   args: readonly string[],
   electron: Electron,
   electronIsDev: boolean,
-  engine?: EngineSettings,
 ): ProjectService {
   extraArgs = args
-  jvmAotCache ??= createJvmAotCache(electron, electronIsDev, engine)
+  jvmAotCache ??= createJvmAotCache(electron, electronIsDev)
   engineSettings = {
-    ...engine,
     jvmAot: jvmAotCache ?? undefined,
     ensoExecutable: appImageEnginePath,
     openObserver: appImageCopyGate,
@@ -372,7 +357,7 @@ export function setupProjectService(
     )
   }
   // The ydoc host's start is not left to the first open, whose engine would wait for it.
-  if (ydocHostKind() === 'node') getYdocHost().start()
+  getYdocHost().start()
   return projectService
 }
 

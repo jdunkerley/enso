@@ -595,10 +595,9 @@ describe('samples routes', () => {
 describe('engine/setSpare', () => {
   afterEach(() => vi.unstubAllEnvs())
 
-  test('answers which engine projects get', async () => {
-    vi.stubEnv('ENSO_ENGINE_MODE', '')
+  test('answers with nothing', async () => {
     expect(await call('engine/setSpare', { enabled: true })).toEqual(
-      expect.objectContaining({ result: { engineMode: 'jvm' } }),
+      expect.objectContaining({ result: null }),
     )
   })
 

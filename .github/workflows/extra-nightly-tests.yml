@@ -67,12 +67,6 @@ jobs:
             postgres: false
             mssql: false
             heap-dumps: false
-          - name: Snowflake Tests (Native) (LinuxLatest)
-            suite: std-snowflake
-            report: Extra Library Tests Report
-            postgres: false
-            mssql: false
-            heap-dumps: false
           - name: Standard Library Cloud Tests (GraalVM CE) (LinuxLatest)
             suite: std-cloud-related
             report: Standard Library Tests Report

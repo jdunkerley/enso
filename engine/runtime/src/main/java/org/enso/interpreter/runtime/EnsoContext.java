@@ -35,6 +35,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
+import org.enso.common.HostEnsoUtils;
 import org.enso.common.LanguageInfo;
 import org.enso.common.RuntimeOptions;
 import org.enso.compiler.Compiler;
@@ -592,7 +593,7 @@ public final class EnsoContext {
    * @return {@code true} or {@code false}
    */
   public boolean isJavaPolyglotObject(Object obj) {
-    return isHostObject(obj) || EnsoPolyglotJava.find(this, true).isOtherObject(obj);
+    return isHostObject(obj);
   }
 
   /**
@@ -602,7 +603,7 @@ public final class EnsoContext {
    * @return {@code true} or {@code false}
    */
   public boolean isJavaPolyglotFunction(Object obj) {
-    return environment.isHostFunction(obj) || EnsoPolyglotJava.find(this, true).isOtherObject(obj);
+    return environment.isHostFunction(obj);
   }
 
   /**
@@ -649,10 +650,17 @@ public final class EnsoContext {
   @TruffleBoundary
   public TruffleObject lookupJavaClass(Package<?> who, String className) {
     var collectedExceptions = new ArrayList<Exception>();
-    var polyglotJava = EnsoPolyglotJava.find(this, who);
+    var polyglotJava = EnsoPolyglotJava.find(this);
     var hostSymbol = polyglotJava.lookupJavaClass(who, className, collectedExceptions);
     if (hostSymbol instanceof TruffleObject obj) {
       return obj;
+    }
+    // Note [A Library's Java Must Be In The Native Image]
+    var notInImage = EnsoPolyglotJava.javaNotInImage(HostEnsoUtils.isAot(), who);
+    if (notInImage != null) {
+      logger.log(Level.WARNING, notInImage);
+      var err = getBuiltins().error().makeCompileError(notInImage + " (" + className + ")");
+      return DataflowError.withDefaultTrace(err, null);
     }
     var level = Level.WARNING;
     for (var ex : collectedExceptions) {
@@ -753,10 +761,6 @@ public final class EnsoContext {
    */
   public boolean isInteractiveMode() {
     return getOption(RuntimeOptions.INTERACTIVE_MODE_KEY);
-  }
-
-  final String getHostClassLoading() {
-    return getOption(RuntimeOptions.HOST_CLASS_LOADING_KEY);
   }
 
   /**

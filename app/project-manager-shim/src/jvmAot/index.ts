@@ -1,8 +1,8 @@
 /**
  * @file The per-user JDK AOT cache (spec, stage 1d "The AOT cache lifecycle"): trained in the
- * background a little after app launch when the JVM is the default engine (or by the Windows
- * installer, `trainNow`), never started while an open is in flight but not stopped by one either,
- * used by every JVM engine once it exists, and deleted when a JVM says it does not match.
+ * background a little after app launch (or by the Windows installer, `trainNow`), never started
+ * while an open is in flight but not stopped by one either, used by every engine once it exists,
+ * and deleted when a JVM says it does not match.
  */
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -11,13 +11,8 @@ import { acquireTrainingLock } from './lock.js'
 import { EngineTrainer, type Trainer, type TrainingPriority } from './trainer.js'
 import { aotRejection } from './useLog.js'
 
-export {
-  aotCreateArguments,
-  jvmOptionsValue,
-  LAUNCHER_JVM_OPTIONS,
-  parseJvmOptionsFile,
-  splitJvmOptions,
-} from '../projectService/jvmOptions.js'
+export { aotCreateArguments } from '../projectService/javaLaunch.js'
+export { parseJvmOptionsFile, splitJvmOptions } from '../projectService/jvmOptions.js'
 export { driveOpen, welcomeNodeId } from './driver.js'
 export { aotKey, enginePaths, isAppImageMount, isTranslocated, readJvmOptionsText } from './key.js'
 export { acquireTrainingLock } from './lock.js'
@@ -37,8 +32,6 @@ export interface JvmAotCacheSettings {
   readonly appVersion: string
   /** The bundled engine's launcher (`<resources>/enso/dist/<version>/bin/enso`). */
   readonly ensoExecutable: string
-  /** Whether the JVM is the resolved default engine (`resolveDefaultEngineMode`). */
-  readonly isJvmDefault: () => boolean
   /**
    * How long after the last open was answered a training held back by it starts, and how often a
    * training waiting for another process's lock looks again: 60 s.
@@ -73,7 +66,7 @@ export type JvmAotTrainingOutcome = 'trained' | 'failed'
 
 /**
  * What `trainNow` did: made the cache, failed, or had nothing to do (a cache already there, the
- * native default, no cache for this engine, or another process training it).
+ * no cache for this engine, or another process training it).
  */
 export type JvmAotTrainNowOutcome = JvmAotTrainingOutcome | 'skipped'
 
@@ -176,8 +169,7 @@ export class JvmAotCache {
   }
 
   /**
-   * At app launch: train when JVM is the default, there is no cache for the key, and no other
-   * window trains. The check is made at once (so that `isTraining` holds back the spare engine and
+   * At app launch: train when there is no cache for the key, and no other window trains. The check is made at once (so that `isTraining` holds back the spare engine and
    * the GUI shows the toast); the training begins `startDelayMs` later.
    */
   async start(): Promise<void> {
@@ -202,9 +194,9 @@ export class JvmAotCache {
     return this.wanted ? 'skipped' : 'failed'
   }
 
-  /** Whether a training is due: the JVM is the default and this engine's cache is missing. */
+  /** Whether a training is due: this engine's cache is missing. */
   private async checkAtLaunch(): Promise<boolean> {
-    if (this.disposed || !this.settings.isJvmDefault()) return false
+    if (this.disposed) return false
     this.checkingAtLaunch = true
     try {
       const cache = await this.cacheFile()

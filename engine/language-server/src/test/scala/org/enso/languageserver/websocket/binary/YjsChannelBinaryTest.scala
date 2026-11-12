@@ -26,8 +26,7 @@ import scala.concurrent.duration._
 
 /** The real binary-protocol handlers behind the Language Server's channel
   * socket, as the Node ydoc host reaches them: a binary frame must decode and
-  * be answered (the in-process ydoc server hands the handlers JavaScript
-  * buffers, the socket Java ones).
+  * be answered.
   */
 class YjsChannelBinaryTest extends BaseBinaryServerTest {
 
@@ -40,7 +39,6 @@ class YjsChannelBinaryTest extends BaseBinaryServerTest {
       BinaryEncoder.empty,
       connectionControllerFactory,
       Nil,
-      null,
       system
     )
     val endpoint = new YjsChannelEndpoint(

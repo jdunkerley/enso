@@ -29,4 +29,4 @@ sbt "json-rpc-server/testOnly org.enso.jsonrpc.YdocJsonRpcServerSpec"
 ```
 
 `YdocJsonRpcServerSpec` drives `ServerCallbacks` with a fake `YjsChannel`, so it
-needs neither GraalJS nor the ydoc server.
+needs no ydoc server.

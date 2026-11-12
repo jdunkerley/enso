@@ -50,7 +50,6 @@ function cache(trainer: FakeTrainer, settings: Partial<JvmAotCacheSettings> = {}
       rootDirectory: root,
       appVersion: '1',
       ensoExecutable: bundle,
-      isJvmDefault: () => true,
       // At once, unless a test is about the delay.
       startDelayMs: 0,
       ...settings,
@@ -88,7 +87,7 @@ afterEach(async () => {
   await fs.rm(path.dirname(root), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
-test('trains at launch when the JVM is the default, and uses the cache after', async () => {
+test('trains at launch, and uses the cache after', async () => {
   const trainer = new FakeTrainer()
   const created = cache(trainer)
   await created.start()
@@ -104,12 +103,6 @@ test('trains at launch when the JVM is the default, and uses the cache after', a
   )
   // The lock is released once the training is over.
   await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
-})
-
-test('no training when the default is native', async () => {
-  const trainer = new FakeTrainer()
-  await cache(trainer, { isJvmDefault: () => false }).start()
-  expect(trainer.runs).toHaveLength(0)
 })
 
 test('no training when the cache exists', async () => {
@@ -173,7 +166,7 @@ test('the training begins 10 s after the launch, not with it (#670)', async () =
   const trainer = new FakeTrainer()
   // The default delay, not the helper's.
   const created = new JvmAotCache(
-    { rootDirectory: root, appVersion: '1', ensoExecutable: bundle, isJvmDefault: () => true },
+    { rootDirectory: root, appVersion: '1', ensoExecutable: bundle },
     trainer,
   )
   caches.push(created)
@@ -243,7 +236,7 @@ test('trainNow trains at once and says how it ended', async () => {
   expect(await cache(new FakeTrainer()).trainNow()).toBe('skipped')
 })
 
-test('trainNow: failed, skipped for the native default, and skipped while another process trains', async () => {
+test('trainNow: failed, and skipped while another process trains', async () => {
   const error = vi.spyOn(console, 'error').mockImplementation(() => {})
   const failing = new FakeTrainer()
   const failed = cache(failing).trainNow()
@@ -251,8 +244,6 @@ test('trainNow: failed, skipped for the native default, and skipped while anothe
   failing.runs[0]!.fail()
   expect(await failed).toBe('failed')
   error.mockRestore()
-
-  expect(await cache(new FakeTrainer(), { isJvmDefault: () => false }).trainNow()).toBe('skipped')
 
   await fs.mkdir(root, { recursive: true })
   // This test's own pid is alive.
@@ -408,7 +399,7 @@ test('isTraining: from the launch check, through an open, until a cache is made'
   await vi.waitFor(() => expect(created.isTraining()).toBe(false))
 })
 
-test('isTraining is false with a cache, the native default, after a failed training, and after a quit', async () => {
+test('isTraining is false with a cache, after a failed training, and after a quit', async () => {
   const first = new FakeTrainer()
   const withCache = cache(first)
   await trained(first, withCache)
@@ -416,10 +407,6 @@ test('isTraining is false with a cache, the native default, after a failed train
   const again = cache(new FakeTrainer())
   await again.start()
   expect(again.isTraining()).toBe(false)
-
-  const native = cache(new FakeTrainer(), { isJvmDefault: () => false })
-  await native.start()
-  expect(native.isTraining()).toBe(false)
 
   await fs.rm(path.join(root), { recursive: true, force: true })
   const failing = new FakeTrainer()
@@ -452,17 +439,12 @@ test('a training is reported while it runs, and its start and end are announced'
   expect(onTrainingStarted).toHaveBeenCalledOnce()
 })
 
-test('no start is announced with a cache, or with the native default', async () => {
+test('no start is announced with a cache', async () => {
   const first = new FakeTrainer()
   await trained(first, cache(first))
   const onTrainingStarted = vi.fn()
   const onTrainingEnded = vi.fn()
   await cache(new FakeTrainer(), { onTrainingStarted, onTrainingEnded }).start()
-  await cache(new FakeTrainer(), {
-    isJvmDefault: () => false,
-    onTrainingStarted,
-    onTrainingEnded,
-  }).start()
   expect(onTrainingStarted).not.toHaveBeenCalled()
   expect(onTrainingEnded).not.toHaveBeenCalled()
 })

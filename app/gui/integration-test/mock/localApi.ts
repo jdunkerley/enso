@@ -160,9 +160,8 @@ export async function mockLocalApi(page: Page) {
     events: [] as { seq: number; event: string; data: Record<string, unknown> }[],
   }
 
-  /** The mocked spare engine: change `engineMode` in `setupApi.local`, before the page loads. */
+  /** The mocked spare engine. */
   const spareEngine = {
-    engineMode: 'native' as 'native' | 'jvm',
     /** Each `engine/setSpare` the GUI sent, oldest first. */
     requests: [] as boolean[],
   }
@@ -624,7 +623,7 @@ export async function mockLocalApi(page: Page) {
     })
     await projectServiceRoute('engine/setSpare', (params) => {
       spareEngine.requests.push(params.enabled === true)
-      return toJSONRPCResult({ engineMode: spareEngine.engineMode })
+      return toJSONRPCResult(null)
     })
     // Like the shim's `renameProject`: the name must not be empty or taken; the project's directory
     // is renamed after it, unless the project is running (the shim defers that until it stops, and

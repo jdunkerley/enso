@@ -23,18 +23,11 @@ on:
         required: false
         type: boolean
         default: false
-      open_perf_jvm:
-        description: >-
-          Measure the open time on the native image too, before the JVM (the default engine, with
-          an AOT cache), on the same build.
-        required: false
-        type: boolean
-        default: false
       open_perf_engines:
         description: >-
-          The engines to measure, overriding open_perf_jvm: `native`; `jvm` (the JVM as a user has
-          it after the first open: the shim's AOT cache, trained before the launches); `jvm-first`
-          (a user's very first launch: no cache yet), comma-separated.
+          The engines to measure (default `jvm`): `jvm` (the JVM as a user has it after the first
+          open: the shim's AOT cache, trained before the launches); `jvm-first` (a user's very
+          first launch: no cache yet); the `jvm-spare` variants, comma-separated.
         required: false
         type: string
         default: ""
@@ -58,7 +51,8 @@ on:
       open_perf_template:
         description: >-
           The project to open: `welcome` (the new-project template) or `image` (a project that
-          calls Standard.Image, whose Java runs in a guest JVM under native; projectTemplates.ts).
+          calls Standard.Image, whose Java is not in the native image, so it opens on the JVM only;
+          projectTemplates.ts).
           Several, comma-separated, are measured in turn on the same runner, in open-perf/<name>.
         required: false
         type: string
@@ -115,9 +109,9 @@ env:
 # A pull request to develop packages the IDE with the backend that develop already built, instead of
 # rebuilding it (`build_backend` is false; `ide-pull-request.yml` decides), unless it changes an
 # engine file (`engine-changed-files.yml`), a file the backend build reads outside the engine paths
-# (`backend_changed` in `ide-changed-files.yml`: the ydoc server and its workspace dependencies, the
-# manifests, and this file), or carries the `CI: Build IDE` label. A pull request to any other base
-# (stacked on another branch) always builds it, as develop's backend may lack the base's changes.
+# (`backend_changed` in `ide-changed-files.yml`: the manifests and this file), or carries the `CI:
+# Build IDE` label. A pull request to any other base (stacked on another branch) always builds it,
+# as develop's backend may lack the base's changes.
 # `find-backend` picks the newest develop run whose `backend-linux` artifact is unexpired, whose
 # commit is an ancestor of the commit being packaged (`github.sha`: on a pull request its merge
 # commit, which `package-ide` checks out, so the backend is never newer than the GUI), which is a run
@@ -166,13 +160,6 @@ jobs:
         with:
           clean: false
       - uses: ./.github/actions/setup-node
-      # The prebuilt CLI: otherwise the ydoc bundle's `postinstall` (`app/rust-ffi/build-wasm.mjs`)
-      # runs `cargo install wasm-bindgen-cli`, 1.2 min on Linux and 3 on Windows. The version must be
-      # `WASM_BINDGEN_VERSION` in `build-wasm.mjs` (`check-workflows.mjs` checks it).
-      - name: Install wasm-bindgen-cli
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-bindgen-cli@0.2.128
       - name: Clean before
         uses: ./.github/actions/git-clean
       - name: Set up the build scripts
@@ -253,7 +240,7 @@ jobs:
               --jq '[.artifacts[] | select(.name == "backend-windows" and (.expired | not))] | length') || continue
             [ "$windows" -ge 1 ] || continue
             echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
-            echo "Backend not built: no engine or ydoc server files changed. Using develop run [$run_id](https://github.com/$REPO/actions/runs/$run_id) at \`$sha\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "Backend not built: no engine or backend build files changed. Using develop run [$run_id](https://github.com/$REPO/actions/runs/$run_id) at \`$sha\`." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           done <<< "$candidates"
           echo "::error::No develop backend whose commit is an ancestor of $HEAD_SHA (the commit being packaged). Merge develop into the branch, or add the 'CI: Build IDE' label to build one."
@@ -330,13 +317,12 @@ jobs:
     # when the backend is built; when it ran and failed, there is no backend to package.
     if: ${{ !cancelled() && needs.gui-build.result == 'success' && needs.find-backend.result != 'failure' }}
     runs-on: ${{ matrix.runner }}
-    # 45 for the package tests on both engines (Note [The Package Tests Run Both Engines]); only a
-    # run that measures gets more, the JVM's (the measuring steps have timeouts of their own, which
-    # `continue-on-error` absorbs, so a runaway never reaches this one).
+    # 45 for the package tests; only a run that measures gets more (the measuring steps have
+    # timeouts of their own, which `continue-on-error` absorbs, so a runaway never reaches this one).
     timeout-minutes: ${{ (inputs.open_perf == true || inputs.open_perf == 'true') && (inputs.open_perf_engines && 240 || 120) || 45 }}
     env:
       OPEN_PERF: ${{ inputs.open_perf == true || inputs.open_perf == 'true' }}
-      OPEN_PERF_ENGINES: ${{ inputs.open_perf_engines || (inputs.open_perf_jvm && 'native,jvm' || 'jvm') }}
+      OPEN_PERF_ENGINES: ${{ inputs.open_perf_engines || 'jvm' }}
       OPEN_PERF_RUNS: ${{ inputs.open_perf_runs || '5' }}
       OPEN_PERF_BUDGET: ${{ inputs.open_perf_budget || '12' }}
       OPEN_PERF_DIAGNOSTICS: ${{ inputs.open_perf_diagnostics == true }}
@@ -426,40 +412,13 @@ jobs:
         env:
           DEBUG: "pw:browser log:"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # Note [The Package Tests Run Both Engines]
-      # =========================================
-      # The specs above run the app's default engine, the JVM (the fixture keeps the shell's
-      # `ENSO_ENGINE_MODE`; `app/electron-client/tests/electronTest.ts`), and the spare engine spec
-      # runs the JVM anyway. The native engine stays a user's choice (`ENSO_ENGINE_MODE=native`,
-      # `jvm: false`), so one spec runs again on it. On GraalVM 25.5 the native image's host interop
-      # is broken (#666), so until the native image is removed (#664) this run does not block, as
-      # Note [Native Standard Library Tests Do Not Block] in `engine-checks-platform.yml`.
-      - if: matrix.os == 'linux'
-        name: Run Package Tests (native engine)
-        continue-on-error: true
-        timeout-minutes: 15
-        run: xvfb-run corepack pnpm -r --filter enso ide-integration-test tests/localWorkflow.spec.ts
-        env:
-          ENSO_ENGINE_MODE: native
-          DEBUG: "pw:browser log:"
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: matrix.os == 'windows'
-        name: Run Package Tests (native engine)
-        continue-on-error: true
-        timeout-minutes: 15
-        run: corepack pnpm -r --filter enso ide-integration-test tests/localWorkflow.spec.ts
-        env:
-          ENSO_ENGINE_MODE: native
-          DEBUG: "pw:browser log:"
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Note [Open Time In CI]
       # ======================
       # `app/electron-client/perf/openTime.ts` opens two new projects per launch, five launches,
       # and records when each phase of an open ends (spec
       # docs/superpowers/specs/2026-11-01-project-open-performance-design.md, section 2). It runs on
       # develop pushes, on pull requests with the `CI: Open perf` label and when started by hand
-      # (`open_perf`). It measures the default engine, the JVM (`jvm`, with the shim's AOT cache;
-      # `open_perf_jvm` adds native beside it), with the JVM's step timeout. It compares with the median
+      # (`open_perf`). It measures the JVM (`jvm`, with the shim's AOT cache), the only engine. It compares with the median
       # of the last five develop runs' `open-perf-<os>` artifacts (Note [Noisy Medians] in
       # openTimeReport.ts) and warns, never fails: shared runners are noisy, so these steps
       # continue on error (`checkOpenPerf` in tools/ci/check-workflows.mjs). The extras
@@ -563,19 +522,6 @@ jobs:
           compression-level: 0
           name: test-traces-${{ matrix.os }}-amd64
           path: app/electron-client/test-traces
-      # The traces hold what the window showed, not what the engine did: on a failure the IDE's own
-      # log and the engines' logs (the shim's `getEngineLogDirectory`) go up too.
-      - if: failure()
-        name: Upload IDE And Engine Logs
-        uses: actions/upload-artifact@v5
-        with:
-          name: ide-logs-${{ matrix.os }}-amd64
-          path: |
-            ~/AppData/Local/enso/log
-            ~/AppData/Roaming/enso/logs
-            ~/.local/share/enso/log
-            ~/.config/enso/logs
-          if-no-files-found: warn
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean

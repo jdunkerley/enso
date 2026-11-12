@@ -18,6 +18,7 @@ import { ProjectService } from '../index.js'
 import { SPARE_WARM_UP_LIMIT_MS } from '../spareEngine.js'
 import { ENGINE_TIMEOUTS } from '../timeouts.js'
 import { Path, UUID } from '../types.js'
+import { fakeLauncherCommand } from './fakeLauncher.js'
 import { fakeSpareEnso, isAlive, spareEvents } from './fakeSpareEngine.js'
 import { SPARE_OPEN_PORT } from './testPorts.js'
 
@@ -32,8 +33,7 @@ const exists = (file: string) =>
   )
 
 const jvm = (spareKey?: string): EngineLaunch => ({
-  mode: { mode: 'jvm', source: 'option' },
-  timeouts: { ...ENGINE_TIMEOUTS.jvm, ydocWaitMs: 0 },
+  timeouts: ENGINE_TIMEOUTS,
   ...(spareKey != null ? { spareKey } : {}),
 })
 
@@ -84,6 +84,7 @@ beforeEach(async () => {
   log = path.join(root, 'spare.log')
   vi.stubEnv('SPARE_LOG', log)
   runner = new EnsoRunner(await fakeSpareEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: SPARE_OPEN_PORT,
   })
 })
@@ -117,8 +118,8 @@ test('an open takes a matching spare and writes it the line', async () => {
   )
   expect(await exists(`${project}.spawned.json`)).toBe(false)
   const line = JSON.parse(await fs.readFile(`${project}.line.json`, 'utf8'))
-  expect(line.spawnArgs).toEqual(['--jvm', '--standby', '--log-level', 'info'])
-  // The engine refuses a line with `--jvm` (`StandbyRequest`): the spare already runs on the JVM.
+  expect(line.spawnArgs).toEqual(['--standby', '--log-level', 'info'])
+  // The engine refuses a line with `--jvm` (`StandbyRequest`).
   expect(line.args[0]).toBe('--server')
   expect(line.args).not.toContain('--jvm')
   expect(line.args).toContain('--vm.D')
@@ -127,12 +128,10 @@ test('an open takes a matching spare and writes it the line', async () => {
     'ENSO_LOCAL_PROJECT_ID',
     'ENSO_LOCAL_PROJECT_SESSION_ID',
     'LANGUAGE_SERVER_CHANNEL_TOKEN',
-    'LANGUAGE_SERVER_YDOC_PORT',
   ])
   expect(line.env.LANGUAGE_SERVER_CHANNEL_TOKEN).toMatch(/^[0-9a-f]{64}$/)
   expect(line.env.ENSO_LOCAL_PROJECT_ID).toBe('key-1')
   expect(line.env.ENSO_LOCAL_PROJECT_SESSION_ID).toBe('session-1')
-  expect(line.env.LANGUAGE_SERVER_YDOC_PORT).toBe(String(sockets.ydocSocket.port))
   expect(logSink.notices).toEqual([expect.stringMatching(/^Engine: pre-started spare used/)])
   expect(runner.spareState).toBe('none')
   await runner.closeProject(Path(project))
@@ -140,13 +139,11 @@ test('an open takes a matching spare and writes it the line', async () => {
 
 test("the spare's spawn environment never carries the line's variables", async () => {
   vi.stubEnv('LANGUAGE_SERVER_CHANNEL_TOKEN', 'inherited')
-  vi.stubEnv('LANGUAGE_SERVER_YDOC_PORT', '1')
   vi.stubEnv('ENSO_LOCAL_PROJECT_ID', 'inherited')
   await readySpare('k1')
   const [start] = await spareEvents(log)
   expect(start?.env).toEqual({
     LANGUAGE_SERVER_CHANNEL_TOKEN: null,
-    LANGUAGE_SERVER_YDOC_PORT: null,
     ENSO_LOCAL_PROJECT_ID: null,
     ENSO_SECRETS_KEY: 'secret',
   })
@@ -165,6 +162,7 @@ test('a spare taken while warming up gives its open the warm-up limit on top of 
   vi.stubEnv('READY_DELAY_MS', '60000')
   const clock = recordingClock()
   runner = new EnsoRunner(await fakeSpareEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: SPARE_OPEN_PORT,
     startupClock: clock,
   })
@@ -174,13 +172,14 @@ test('a spare taken while warming up gives its open the warm-up limit on top of 
   const logSink = sink()
   await runner.openProject(Path(project), 'id-w', undefined, undefined, logSink, jvm('k1'))
   expect(logSink.notices).toEqual([expect.stringMatching(/still warming up\)$/)])
-  expect(clock.startupTimeouts).toEqual([ENGINE_TIMEOUTS.jvm.startupMs + SPARE_WARM_UP_LIMIT_MS])
+  expect(clock.startupTimeouts).toEqual([ENGINE_TIMEOUTS.startupMs + SPARE_WARM_UP_LIMIT_MS])
   await runner.closeProject(Path(project))
 })
 
 test('a ready spare and its respawn get the plain startup limit', async () => {
   const clock = recordingClock()
   runner = new EnsoRunner(await fakeSpareEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: SPARE_OPEN_PORT,
     startupClock: clock,
   })
@@ -190,10 +189,7 @@ test('a ready spare and its respawn get the plain startup limit', async () => {
   const { pid } = JSON.parse(await fs.readFile(`${project}.line.json`, 'utf8'))
   process.kill(pid, 'SIGKILL')
   await vi.waitFor(() => expect(clock.startupTimeouts).toHaveLength(2), { timeout: 20_000 })
-  expect(clock.startupTimeouts).toEqual([
-    ENGINE_TIMEOUTS.jvm.startupMs,
-    ENGINE_TIMEOUTS.jvm.startupMs,
-  ])
+  expect(clock.startupTimeouts).toEqual([ENGINE_TIMEOUTS.startupMs, ENGINE_TIMEOUTS.startupMs])
   await runner.closeProject(Path(project))
 }, 30_000)
 
@@ -256,7 +252,7 @@ test('a spare that misses its startup limit is killed with its tree, and an ordi
   const logSink = sink()
   const launch: EngineLaunch = {
     ...jvm('k1'),
-    timeouts: { ...ENGINE_TIMEOUTS.jvm, ydocWaitMs: 0, startupMs: 3000 },
+    timeouts: { ...ENGINE_TIMEOUTS, startupMs: 3000 },
   }
   await runner.openProject(Path(project), 'id-h', undefined, undefined, logSink, launch)
   const { pid } = JSON.parse(await fs.readFile(`${project}.line.json`, 'utf8'))
@@ -293,11 +289,10 @@ describe('through the service', () => {
   beforeEach(async () => {
     vi.stubEnv('ENSO_LOG_DIRECTORY', path.join(root, 'logs'))
     vi.stubEnv('ENSO_SPARE_ENGINE', '')
-    vi.stubEnv('ENSO_YDOC_HOST', '')
-    vi.stubEnv('ENSO_ENGINE_MODE', '')
     secretsKey = 'key-a'
-    // A ydoc host that only says yes: the open then waits for no ydoc port the fake lacks.
+    // A ydoc host that only says yes, as Electron's would.
     hosted = new EnsoRunner(await fakeSpareEnso(root), {
+      engineCommand: fakeLauncherCommand,
       firstPort: SPARE_OPEN_PORT,
       ydocHost: { listen: async () => {}, close: async () => {} },
     })
@@ -309,7 +304,7 @@ describe('through the service', () => {
       undefined,
       undefined,
       () => [['ENSO_SECRETS_KEY', secretsKey]],
-      { option: 'jvm' },
+      {},
     )
     await createProject(path.join(root, 'S'), 'id-s')
   })

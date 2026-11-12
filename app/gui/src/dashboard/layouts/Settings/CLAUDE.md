@@ -61,12 +61,9 @@ measured in #659), kept in `spareEngineSettingsStore`
 (`$/providers/spareEngineSettings`, `localStorage` key
 `enso-spare-engine-settings`). `useSpareEngineSync` (wired in `App.vue`) sends
 it to the project service (`engine/setSpare`) on load and on every change. The
-section is `visible` only while `engineRunsOnJvm` is true: the service's answer
-says which engine runs, and a native engine or a failed request hides the
-section, since only a JVM engine has a spare. Tests:
-`__tests__/localTab.test.ts` and
-`integration-test/dashboard/spareEngineSettings.spec.ts` (the mock answers
-`native` unless a spec sets `api.spareEngine.engineMode` in `setupApi.local`).
+section is always shown (it was hidden under the native engine, which has no
+spare, until that engine was removed). Tests: `__tests__/localTab.test.ts` and
+`integration-test/dashboard/spareEngineSettings.spec.ts`.
 
 ## Engine logs
 

@@ -114,28 +114,24 @@ settings. Every workflow is hand-written YAML (build simplification;
 - **App-only PRs package with develop's backend.** A PR to `develop` that
   changes no engine file (`engine-changed-files.yml`) and none of the files the
   backend build reads outside the engine paths (`backend_changed` in
-  `ide-changed-files.yml`: `app/ydoc-server-polyglot`, `app/ydoc-server`,
-  `app/ydoc-shared`, `app/ydoc-channel`, `app/common`, `app/lezer-markdown`, the
-  root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, and
-  `ide-packaging.yml`; the engine bundle embeds the ydoc server) gets
-  `build_backend: false`, and `ide-packaging.yml` downloads the `backend-<os>`
-  artifacts of the newest develop run of `ide-pull-request.yml` whose commit is
-  an ancestor of the commit being packaged, the PR's merge commit
-  (`find-backend`). Any of those changes, a PR to another base branch (stacked),
-  or the `CI: Build IDE` label builds the backend instead; develop and releases
-  always do. The ydoc list is the `workspace:` closure of
-  `ydoc-server-polyglot`; keep it in step with those `package.json` files (Note
-  [The Backend Reads The ydoc Server]).
+  `ide-changed-files.yml`: the root `package.json`, `pnpm-lock.yaml`,
+  `pnpm-workspace.yaml`, and `ide-packaging.yml`) gets `build_backend: false`,
+  and `ide-packaging.yml` downloads the `backend-<os>` artifacts of the newest
+  develop run of `ide-pull-request.yml` whose commit is an ancestor of the
+  commit being packaged, the PR's merge commit (`find-backend`). Any of those
+  changes, a PR to another base branch (stacked), or the `CI: Build IDE` label
+  builds the backend instead; develop and releases always do. The engine bundle
+  holds no app code since the engine-hosted ydoc server went, so the ydoc
+  packages are not on the list.
 - **The `CI: Open perf` label measures the open time.** On a pull request to
   `ide-pull-request.yml` it makes the packaging run (as `CI: Build IDE` does)
   and passes `open_perf: true`; develop pushes measure it too, and a
   hand-started `ide-packaging.yml` with `open_perf`. It measures the default
-  engine, the JVM (`open_perf_jvm` adds native beside it). Adding or removing
-  the label starts a run, and removing it cancels a packaging run in progress,
-  so every unrelated-label test in `ide-pull-request.yml` names both labels
-  (`checkOpenPerf` in `tools/ci/check-workflows.mjs` fails one that does not).
-  The measuring steps continue on error: they warn and never fail, as shared
-  runners are noisy.
+  engine, the JVM. Adding or removing the label starts a run, and removing it
+  cancels a packaging run in progress, so every unrelated-label test in
+  `ide-pull-request.yml` names both labels (`checkOpenPerf` in
+  `tools/ci/check-workflows.mjs` fails one that does not). The measuring steps
+  continue on error: they warn and never fail, as shared runners are noisy.
 - **One OS/arch set is one `strategy.matrix`**, with `fail-fast: false`. Where a
   platform's failure must not skip or delay the other platform's jobs, the
   platform is a reusable workflow called with a matrix (`engine-checks.yml`);
@@ -183,8 +179,8 @@ settings. Every workflow is hand-written YAML (build simplification;
   `project/build.properties` (Note [The sbt Dependency Cache Key]). The Linux
   stdlib tests also cache GraalPy's pip wheels, `~/.cache/pip-graalpy`
   (`graalpy-pip-Linux-<GraalPy version>`, saved on `develop` by the jobs that
-  run `Examples_Tests` (on Linux, the JVM and Native "Others" shards; a job that
-  does not run it never saves); Note [GraalPy Wheel Cache] in
+  run `Examples_Tests` (on Linux, the JVM "Others" shard; a job that does not
+  run it never saves); Note [GraalPy Wheel Cache] in
   `engine-checks-platform.yml`), so `Examples_Tests` stops compiling numpy for
   GraalPy (12-13 min); `setup-jvm` exposes the pinned version as its
   `graalpy-version` output. The engine jobs that compile Rust share a Rust cache

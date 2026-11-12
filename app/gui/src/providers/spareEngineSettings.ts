@@ -6,7 +6,7 @@
  * shows only when projects get the JVM engine.
  */
 import { createPersistedStore } from '$/utils/persistedStore'
-import { computed, ref, type ComputedRef } from 'vue'
+import { computed, type ComputedRef } from 'vue'
 import { z } from 'zod'
 
 /** The setting, as stored. */
@@ -41,6 +41,3 @@ export function usePreStartEngine(): ComputedRef<boolean> {
 export function setPreStartEngine(preStart: boolean) {
   spareEngineSettingsStore.setState({ preStart })
 }
-
-/** Whether projects get the JVM engine: the project service's answer to `engine/setSpare`. */
-export const engineRunsOnJvm = ref(false)

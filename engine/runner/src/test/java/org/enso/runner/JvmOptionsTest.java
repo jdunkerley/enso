@@ -1,9 +1,14 @@
 package org.enso.runner;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.Rule;
 import org.junit.Test;
@@ -62,6 +67,89 @@ public class JvmOptionsTest {
         new File(component.getParentFile(), "jvm.options").toPath(), bom + "# comment\n-Da=1\n");
     assertEquals(List.of("-Da=1"), JvmOptions.fromFile(component));
     assertEquals(List.of("-Db=2"), JvmOptions.fromEnvironment(bom + "-Db=2\n"));
+  }
+
+  /**
+   * The cases of {@code jvm-options-cases.txt}, which the shim's TypeScript parser (app/
+   * project-manager-shim, {@code jvmOptions.test.ts}) is tested against too.
+   */
+  @Test
+  public void sharedCases() throws Exception {
+    var cases = SharedCase.read();
+    assertTrue("the fixture has cases", cases.size() >= 8);
+    var component = component();
+    for (var c : cases) {
+      if (c.file != null) {
+        Files.writeString(new File(component.getParentFile(), "jvm.options").toPath(), c.file);
+        assertEquals(c.name + " (file)", c.fileExpect, JvmOptions.fromFile(component));
+      }
+      if (c.env != null) {
+        assertEquals(c.name + " (env)", c.envExpect, JvmOptions.fromEnvironment(c.env));
+      }
+    }
+  }
+
+  private static final class SharedCase {
+    final String name;
+    String file;
+    String env;
+    final List<String> fileExpect = new ArrayList<>();
+    final List<String> envExpect = new ArrayList<>();
+
+    SharedCase(String name) {
+      this.name = name;
+    }
+
+    static List<SharedCase> read() throws IOException {
+      var result = new ArrayList<SharedCase>();
+      try (var in = JvmOptionsTest.class.getResourceAsStream("jvm-options-cases.txt")) {
+        assertNotNull("jvm-options-cases.txt", in);
+        for (var line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\r?\n")) {
+          if (line.startsWith("== ")) {
+            result.add(new SharedCase(line.substring(3)));
+          } else if (line.isEmpty() || line.startsWith("#")) {
+            continue;
+          } else {
+            var current = result.get(result.size() - 1);
+            var colon = line.indexOf(": ");
+            var key = line.substring(0, colon);
+            var value = unescape(line.substring(colon + 2));
+            switch (key) {
+              case "file" -> current.file = value;
+              case "env" -> current.env = value;
+              case "file-expect" -> current.fileExpect.add(value);
+              case "env-expect" -> current.envExpect.add(value);
+              default -> throw new IllegalStateException("unknown key " + key);
+            }
+          }
+        }
+      }
+      return result;
+    }
+
+    private static String unescape(String s) {
+      var out = new StringBuilder();
+      for (var i = 0; i < s.length(); i++) {
+        var ch = s.charAt(i);
+        if (ch != '\\') {
+          out.append(ch);
+          continue;
+        }
+        var next = s.charAt(++i);
+        switch (next) {
+          case 'n' -> out.append('\n');
+          case 'r' -> out.append('\r');
+          case 't' -> out.append('\t');
+          case '\\' -> out.append('\\');
+          case 'u' -> {
+            out.append((char) Integer.parseInt(s.substring(i + 1, i + 5), 16));
+            i += 4;
+          }
+          default -> throw new IllegalStateException("unknown escape \\" + next);
+        }
+      }
+      return out.toString();
+    }
   }
 
   @Test

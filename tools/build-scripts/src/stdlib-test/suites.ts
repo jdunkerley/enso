@@ -25,10 +25,13 @@ const NOT_SEPARATE = ['Microsoft_Tests', 'AWS_Tests']
 /** The suites the retired build CLI's `backend test` knew. */
 export const SUITES: Readonly<Record<string, Suite>> = {
   'standard-library': { deny: NOT_SEPARATE, smallJdk: true, nativeRunner: true },
-  'standard-library-in-native': { deny: NOT_SEPARATE, smallJdk: false, nativeRunner: true },
-  'std-aws': { allow: ['AWS_Tests'], smallJdk: false, nativeRunner: true },
-  'std-microsoft': { allow: ['Microsoft_Tests'], smallJdk: false, nativeRunner: true },
-  'std-snowflake': { allow: ['Snowflake_Tests'], smallJdk: false, nativeRunner: false },
+  'std-aws': { allow: ['AWS_Tests'], smallJdk: false, runnerArgs: ['--jvm'], nativeRunner: true },
+  'std-microsoft': {
+    allow: ['Microsoft_Tests'],
+    smallJdk: false,
+    runnerArgs: ['--jvm'],
+    nativeRunner: true,
+  },
   'std-snowflake-jvm': {
     allow: ['Snowflake_Tests'],
     smallJdk: false,
@@ -47,20 +50,14 @@ export const SUITES: Readonly<Record<string, Suite>> = {
       'Microsoft_Tests',
     ],
     smallJdk: false,
+    runnerArgs: ['--jvm'],
     nativeRunner: true,
-  },
-  'std-mock-dual-microsoft': {
-    allow: ['Microsoft_Tests'],
-    smallJdk: false,
-    runnerArgs: ['--jvm', '--vm.D=polyglot.enso.classLoading=Standard.Microsoft:guest,hosted'],
-    nativeRunner: false,
   },
 }
 
 /** The retired build CLI's aliases. */
 const ALIASES: Readonly<Record<string, string>> = {
   stdlib: 'standard-library',
-  'stdlib-native': 'standard-library-in-native',
 }
 
 /** The suite called `name` (or an alias of it), with its canonical name. */

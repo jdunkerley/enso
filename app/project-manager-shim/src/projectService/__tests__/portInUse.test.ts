@@ -13,6 +13,7 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { EnsoRunner } from '../ensoRunner.js'
 import { Path } from '../types.js'
+import { fakeLauncherCommand } from './fakeLauncher.js'
 import { PORT_IN_USE_PORT } from './testPorts.js'
 
 /** Far beyond the time a loaded machine needs to start a Node process. */
@@ -67,6 +68,7 @@ const starts = async (project: Path) => Number(await fs.readFile(`${project}.sta
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'port-in-use-'))
   runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: PORT_IN_USE_PORT,
     startupTimeoutMs: STARTUP_TIMEOUT_MS,
   })

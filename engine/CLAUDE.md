@@ -101,6 +101,7 @@ the long version, and
   [Runtime-Roadmap](https://github.com/jdunkerley/enso/wiki/Runtime-Roadmap)).
   New code should lean Java-first unless it benefits from Scala's type system;
   mixing is fine but inheritance across languages needs care.
-- `language-server` and `runtime` talk via binary Ydoc frames (via the polyglot
-  `ydoc-server-polyglot`) when ydoc is enabled. The polyglot variant runs
-  _inside_ the engine's GraalJS — not in Node.
+- The ydoc server runs in Node (`app/ydoc-server`, hosted by the IDE) and
+  reaches the `language-server` over its channel sockets
+  (`/channel/{json,binary,vis-control,vis-data}` on the RPC port; see
+  `engine/language-server/CLAUDE.md`). The engine no longer hosts it.

@@ -42,13 +42,11 @@ test('discovery finds every *_Tests project with a package.yaml', () => {
 })
 
 describe('selection', () => {
-  test('both standard-library suites run 15 projects: all but Microsoft and AWS', () => {
-    for (const name of ['standard-library', 'standard-library-in-native']) {
-      const selected = selectProjects(PROJECTS, suiteNamed(name).suite)
-      expect(selected).toHaveLength(15)
-      expect(selected).not.toContain('Microsoft_Tests')
-      expect(selected).not.toContain('AWS_Tests')
-    }
+  test('the standard-library suite runs 15 projects: all but Microsoft and AWS', () => {
+    const selected = selectProjects(PROJECTS, suiteNamed('standard-library').suite)
+    expect(selected).toHaveLength(15)
+    expect(selected).not.toContain('Microsoft_Tests')
+    expect(selected).not.toContain('AWS_Tests')
   })
   test('the dedicated suites run one project each', () => {
     expect(selectProjects(PROJECTS, suiteNamed('std-aws').suite)).toEqual(['AWS_Tests'])
@@ -84,9 +82,9 @@ describe('selection', () => {
     ).toEqual(['Base_Test', 'AWS_Tests', '', 'Nope'])
   })
   test('aliases, and an unknown suite', () => {
-    expect(suiteNamed('stdlib-native').name).toBe('standard-library-in-native')
+    expect(suiteNamed('stdlib').name).toBe('standard-library')
     expect(() => suiteNamed('std-everything')).toThrow('Unknown suite std-everything')
-    expect(Object.keys(SUITES)).toHaveLength(8)
+    expect(Object.keys(SUITES)).toHaveLength(5)
   })
 })
 

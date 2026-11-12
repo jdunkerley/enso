@@ -77,7 +77,7 @@ function parseOptions(argv: readonly string[]): Options {
     options: {
       out: { type: 'string' },
       runs: { type: 'string', default: '5' },
-      engines: { type: 'string', default: 'native' },
+      engines: { type: 'string', default: 'jvm' },
       baseline: { type: 'string', multiple: true },
       summary: { type: 'string' },
       exe: { type: 'string' },
@@ -92,7 +92,13 @@ function parseOptions(argv: readonly string[]): Options {
   })
   // `parseArgs` types an option with a default as possibly undefined: apply the defaults here.
   if (!values.out) throw new Error('--out <dir> is required')
-  const engines = parseEngines(values.engines ?? 'native')
+  const engines = parseEngines(values.engines ?? 'jvm')
+  if (engines.includes('native')) {
+    // The report still reads `native` runs of earlier dispatches, but none can be made any more.
+    throw new Error(
+      'The native engine was removed: measure jvm, jvm-first or the jvm-spare engines.',
+    )
+  }
   return {
     out: path.resolve(values.out),
     runs: Number(values.runs ?? '5'),
@@ -551,7 +557,7 @@ async function measureLaunch(
     ENSO_LOG_DIRECTORY: logDir,
     // The shim's own JDK AOT cache (`project-manager-shim/jvmAot`) is a directory of the run's,
     // never the user's `<userData>/jvm-aot`. A `jvm` engine points it at `<out>/jvm-aot`
-    // (`engineEnv`), which the preparation launch fills; native never trains, so it keeps this.
+    // (`engineEnv`), which the preparation launch fills.
     ENSO_JVM_AOT_DIR: path.join(options.out, 'shim-jvm-aot'),
     // `--engine-log-level debug`: the engine's own log at that level, to split an open (e.g.
     // `AttachVisualizationCmd`, `Starting ExecuteJob`, module loading); slower, so not for medians.
@@ -603,13 +609,7 @@ async function measureLaunch(
       console.warn(`Open time: no RSS sample at ${phase}: ${String(e)}`)
     }
   }
-  // A native engine has a JVM only for a library's Java (a guest JVM, Note [A Project That Uses A
-  // Library With Java Code] in `projectTemplates.ts`), so the welcome template's native launches
-  // have no counters to copy.
-  const snapshot =
-    engine === 'native' && project == null ?
-      () => {}
-    : (phase: string) => snapshotJvmCounters(dir, phase, marks)
+  const snapshot = (phase: string) => snapshotJvmCounters(dir, phase, marks)
   try {
     marks.add('launch')
     app = await _electron.launch({
@@ -852,8 +852,7 @@ function readReports(targets: readonly string[]): OpenTimeReport[] {
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * The harness no longer makes a JDK AOT cache of its own (it used to record, create and check one
  * by hand, which no user ever had). A `jvm` engine launches the IDE as a user does: the engine
- * mode is `ENSO_ENGINE_MODE=jvm`, so the shim passes `--jvm`, trains its per-user cache in the
- * background (`project-manager-shim/jvmAot`) and starts every engine with it. The cache lives in
+ * shim trains its per-user cache in the background (`project-manager-shim/jvmAot`) and starts every engine with it. The cache lives in
  * `ENSO_JVM_AOT_DIR=<out>/jvm-aot`, never the user's. A preparation launch idles on the dashboard
  * until `<out>/jvm-aot/<key>/enso.aot` exists, which the trainer renames into place when it is
  * complete, and records how long that took (`trainingMs`) and how big it is. The measured launches
@@ -874,9 +873,7 @@ function shimAotDirectory(options: Options): string {
 function engineEnv(engine: Engine, options: Options): Record<string, string> {
   const jvmOptions =
     options.jvmOptions.trim() === '' ? {} : { ENSO_JVM_OPTIONS: options.jvmOptions }
-  if (engine === 'native') return { ENSO_ENGINE_MODE: 'native' }
   const jvm = {
-    ENSO_ENGINE_MODE: 'jvm',
     // The measured opens start an engine of their own: a spare would take them over.
     ENSO_SPARE_ENGINE: '0',
     ENSO_JVM_AOT_DIR: shimAotDirectory(options),
@@ -971,7 +968,7 @@ async function main() {
         continue
       }
     }
-    if (engine !== 'native' && options.jvmOptions.trim() !== '') {
+    if (options.jvmOptions.trim() !== '') {
       // An experiment (`--jvm-options`, e.g. `-XX:TieredStopAtLevel=1`): engine options, so they
       // go in `ENSO_JVM_OPTIONS`, which the launcher adds to the JVM it starts. The shim's training
       // got them too, through the inherited environment. Said in the log, as the report does not
@@ -1044,7 +1041,7 @@ async function main() {
     if (prepared != null && engine === 'jvm') {
       shimAot = { ...prepared, rejectedIn, uncachedIn, uncheckedIn }
     }
-    if (options.jvmDiagnostics && engine !== 'native') {
+    if (options.jvmDiagnostics) {
       const {
         stdout,
         cacheUsed: _cacheUsed,

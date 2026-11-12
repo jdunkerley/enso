@@ -40,8 +40,15 @@ vi.mock('project-manager-shim/localVersioning', () => ({
 }))
 vi.mock('project-manager-shim/projectService', () => ({
   loopbackOrigins: () => [],
-  ydocHostKind: () => 'engine',
   ProjectService: { default: () => ({ refreshSpare }) },
+}))
+// `setupProjectService` starts the ydoc host's utility process: nothing to fork here.
+vi.mock('@/ydocHost/client', () => ({
+  UtilityProcessYdocHost: class {
+    start() {}
+    allowOrigins() {}
+    dispose() {}
+  },
 }))
 
 const { Channel } = await import('@/ipc')

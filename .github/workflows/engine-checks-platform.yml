@@ -104,10 +104,9 @@ jobs:
   # (`all` because a hosted runner has more memory than the retired build CLI's single-batch
   # threshold). The version comes from `tools/build-scripts` (`version`); its step keeps `id:
   # build`, so the job's outputs are what they were, and it exports the version to the later steps,
-  # which is how sbt names the package. `ENSO_LAUNCHER` is `native,test` plus `-ydoc` (see the
-  # job's `env`); `native,test` was the value the retired build CLI forced. `setup-msvc` replaces
-  # the retired build CLI's MSVC environment on Windows: the native images link with it, and the
-  # runtime DLL copy reads `VCToolsRedistDir`. The build
+  # which is how sbt names the package. `ENSO_LAUNCHER` is `native,test`, the value the retired
+  # build CLI forced. `setup-msvc` replaces the retired build CLI's MSVC environment on Windows: the
+  # native images link with it, and the runtime DLL copy reads `VCToolsRedistDir`. The build
   # compiles the Rust parser with several `cargo` calls at once, so `setup-jvm` installs the Rust
   # toolchain first (`rust`; Note [Install The Rust Toolchain Before sbt] in
   # `.github/actions/setup-jvm`). Gone from this job, because only the retired build CLI read them
@@ -116,10 +115,11 @@ jobs:
   #
   # Note [The Engine's Cargo Target Directory]
   # ==========================================
-  # The jobs that compile Rust (the parser's WASM build and AST generator in the ydoc bundle, the
-  # Java generator, the syntax check) build into `../cargo-target`, next to the checkout, not into
-  # `.cargo/config.toml`'s `target/rust`: the build job starts with `sbt clean`, and on develop
-  # `git-clean` runs before the Rust cache's post-job save, and both delete `target/`. They share
+  # The jobs that compile Rust (the parser's Java generator, the syntax check, and the WASM build of
+  # the workspace's `postinstall` in the JVM tests) build into `../cargo-target`, next to the
+  # checkout, not into `.cargo/config.toml`'s `target/rust`: the build job starts with `sbt clean`,
+  # and on develop `git-clean` runs before the Rust cache's post-job save, and both delete
+  # `target/`. They share
   # one cache entry per OS (`setup-rust`, key `engine`), which only the build job saves, on develop.
   # The parser's JNI library is built by sbt into `lib/rust/parser/target` with its own
   # `--target-dir` and is not cached (`sbt clean` deletes it).
@@ -128,14 +128,8 @@ jobs:
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     timeout-minutes: 60
     env:
-      # `-ydoc` leaves the ydoc server's native image out: no engine check starts the ydoc server
-      # (the consumers of this job's artifact are lint, benchmarks, the API check, the standard
-      # library tests and `gui-checks.yml`'s ProjectService tests, none of which does: those run
-      # ydoc in-process, through the language server, and need no native image; `sbt test` builds
-      # the server's JavaScript bundle itself),
-      # and IDE packaging builds its own backend, ydoc image included (`buildEngineBundle`). The
-      # job name and artifact name keep `(native,test)`: they are labels, not the value.
-      ENSO_LAUNCHER: native,test,-ydoc
+      # The job name and artifact name say `(native,test)` too.
+      ENSO_LAUNCHER: native,test
       CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     # The distribution's version, for the jobs that use it. See Note [Lint Reads The Distribution's
     # Version].
@@ -149,13 +143,6 @@ jobs:
         with:
           clean: false
       - uses: ./.github/actions/setup-node
-      # The prebuilt CLI: otherwise the ydoc bundle's `postinstall` (`app/rust-ffi/build-wasm.mjs`)
-      # runs `cargo install wasm-bindgen-cli`, 1.2 min on Linux and 3 on Windows. The version must be
-      # `WASM_BINDGEN_VERSION` in `build-wasm.mjs` (`check-workflows.mjs` checks it).
-      - name: Install wasm-bindgen-cli
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-bindgen-cli@0.2.128
       - name: Clean before
         uses: ./.github/actions/git-clean
       - name: Set up the build scripts
@@ -299,10 +286,7 @@ jobs:
   #   against, as a local `sbt test` would; `ENSO_LAUNCHER: shell` keeps the native launcher out of it, whatever the
   #   environment says about release mode. The job starts with the run instead of after the build,
   #   which takes Windows JVM Tests from ~78 to ~51 min after the start (the 2c finding,
-  #   `docs/superpowers/specs/2026-10-30-ci-speed-2c-finding.md`). The ydoc native image is not
-  #   rebuilt (the retired build CLI did, 4-7 min on Linux): no test loads it. The ydoc server's
-  #   JavaScript bundle, which the tests do use, is built by `sbt test` (`ydoc-server`'s resource
-  #   generator).
+  #   `docs/superpowers/specs/2026-10-30-ci-speed-2c-finding.md`).
   #
   # Note [The JVM Tests Are Split In Two] (#433)
   # ============================================
@@ -311,7 +295,7 @@ jobs:
   #
   # `runtime-integration-tests` (the interpreter's JUnit tests and the runtime's instrument specs)
   # is most of `sbt test`: in the runs of #450 and #451 it ran ~25 of Windows' 36 minutes of tests
-  # and ~17 of Linux's 26, and the rest (every other project, language server and ydoc included)
+  # and ~17 of Linux's 26, and the rest (every other project, language server included)
   # ~10 and ~9. So the job is a matrix of two parts, each of which builds the engine package in its
   # own sbt session (both need it: `runtime-integration-tests` reads `component/` and `lib/`, the
   # `std-benchmarks` compile in `rest` reads `bin*`) and runs one `sbt` call:
@@ -354,8 +338,9 @@ jobs:
         with:
           clean: false
       - uses: ./.github/actions/setup-node
-      # The prebuilt CLI: otherwise the ydoc bundle's `postinstall` (`app/rust-ffi/build-wasm.mjs`)
-      # runs `cargo install wasm-bindgen-cli`, 1.2 min on Linux and 3 on Windows. The version must be
+      # The prebuilt CLI: otherwise the workspace's `postinstall` (`app/rust-ffi/build-wasm.mjs`),
+      # which the library server's `pnpm install` runs (here and in `DummyRepository`), runs `cargo
+      # install wasm-bindgen-cli`, 1.2 min on Linux and 3 on Windows. The version must be
       # `WASM_BINDGEN_VERSION` in `build-wasm.mjs` (`check-workflows.mjs` checks it).
       - name: Install wasm-bindgen-cli
         uses: taiki-e/install-action@v2
@@ -496,13 +481,6 @@ jobs:
         with:
           clean: false
       - uses: ./.github/actions/setup-node
-      # The prebuilt CLI: otherwise the ydoc bundle's `postinstall` (`app/rust-ffi/build-wasm.mjs`)
-      # runs `cargo install wasm-bindgen-cli`, 1.2 min on Linux and 3 on Windows. The version must be
-      # `WASM_BINDGEN_VERSION` in `build-wasm.mjs` (`check-workflows.mjs` checks it).
-      - name: Install wasm-bindgen-cli
-        uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-bindgen-cli@0.2.128
       - name: Clean before
         uses: ./.github/actions/git-clean
       - name: Download the engine distribution
@@ -644,14 +622,6 @@ jobs:
     if: inputs.os == 'linux' && needs.stdlib-plan.result == 'success' && needs.stdlib-plan.outputs.matrix != '[]'
     needs: [build-engine-distribution, stdlib-plan]
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
-    # Note [Native Standard Library Tests Do Not Block]
-    # On GraalVM 25.5 the native runner's Standard Library suites fail (host interop in the image,
-    # the guest JVM on Linux), and native image is being removed
-    # (docs/superpowers/specs/2026-11-09-remove-native-image-design.md). Per the GraalVM 25.5
-    # upgrade spec (owner's answer 3) the Native suites report but do not fail the checks until
-    # that removal lands. So does the Microsoft suite (`std-microsoft`), which runs the native
-    # runner too (owner, 2026-11-11).
-    continue-on-error: ${{ startsWith(matrix.title, 'Native') || matrix.suite == 'std-microsoft' }}
     timeout-minutes: 90
     permissions:
       checks: write
@@ -747,15 +717,6 @@ jobs:
           exit 1
         env:
           ID: ${{ job.services.sqlserver.id }}
-      # Note [Memory Map Limit For Guest Libraries]
-      # The native launcher runs a library kept out of the image (Standard.Microsoft,
-      # Standard.SQLite) in the guest JVM, which maps far more memory than the image does. A long
-      # run, the Table SQLite groups, died with "Failed to modify protection of code memory ...
-      # vm.max_map_count" (exit code 99) at the default limit of 65530. The Linux runners are
-      # ours to configure, so raise the limit. Linux only: this job runs on Linux only (the
-      # other platforms' job below has no such limit to raise).
-      - name: Raise the memory map limit
-        run: sudo sysctl -w vm.max_map_count=262144
       - name: Run the Standard Library tests
         run: corepack pnpm --filter build-scripts run stdlib-test ${{ matrix.suite }} --only "${{ matrix.only }}"
         env:
@@ -826,8 +787,6 @@ jobs:
     if: inputs.os != 'linux' && needs.stdlib-plan.result == 'success' && needs.stdlib-plan.outputs.matrix != '[]'
     needs: [build-engine-distribution, stdlib-plan]
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
-    # Note [Native Standard Library Tests Do Not Block]
-    continue-on-error: ${{ startsWith(matrix.title, 'Native') || matrix.suite == 'std-microsoft' }}
     timeout-minutes: 90
     permissions:
       checks: write

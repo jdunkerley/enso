@@ -51,18 +51,6 @@ public final class RuntimeOptions {
           .category(OptionCategory.INTERNAL)
           .build();
 
-  public static final String HOST_CLASS_LOADING = optionName("classLoading");
-  public static final String HOST_CLASS_LOADING_HOSTED = "hosted";
-  public static final String HOST_CLASS_LOADING_GUEST = "guest";
-  public static final OptionKey<String> HOST_CLASS_LOADING_KEY =
-      new OptionKey<>(HOST_CLASS_LOADING_HOSTED);
-  private static final OptionDescriptor HOST_CLASS_LOADING_DESCRIPTOR =
-      OptionDescriptor.newBuilder(HOST_CLASS_LOADING_KEY, HOST_CLASS_LOADING)
-          .help("Controls the way Enso runtime resolves polyglot java import statements")
-          .usageSyntax("Expecting comma separated list of `[<namespace>.<name>:]?hosted|guest`")
-          .category(OptionCategory.INTERNAL)
-          .build();
-
   public static final String TREAT_WARNINGS_AS_ERRORS = optionName("treatWarningsAsErrors");
   public static final OptionKey<Boolean> TREAT_WARNINGS_AS_ERRORS_KEY = new OptionKey<>(false);
   private static final OptionDescriptor TREAT_WARNINGS_AS_ERRORS_DESCRIPTOR =
@@ -195,7 +183,6 @@ public final class RuntimeOptions {
               DISABLE_INLINE_CACHES_DESCRIPTOR,
               DISABLE_PRIVATE_CHECK_DESCRIPTOR,
               ENABLE_STATIC_ANALYSIS_DESCRIPTOR,
-              HOST_CLASS_LOADING_DESCRIPTOR,
               CHECK_CWD_DESCRIPTOR,
               EDITIONS_DIRECTORY_DESCRIPTOR,
               TREAT_WARNINGS_AS_ERRORS_DESCRIPTOR,
