@@ -1,5 +1,5 @@
 /** @file Commonly used functions for electron tests */
-import { execFile } from 'node:child_process'
+import { execFile, type ExecFileException } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
@@ -130,13 +130,19 @@ export const test = base.extend<{
  * 10 s apart (busy or waiting?), and the threads of every JVM. The bundled runtime has no `jcmd`, so
  * it uses the runner's own JDK (`JAVA_HOME_25_X64`, else `JAVA_HOME_21_X64`, else `JAVA_HOME`).
  * A missing tool is noted in the file, never fatal.
+ *
+ * The first dumps (#674) showed no deadlock: in each try one of the IDE's own Electron processes had
+ * used 1,300 to 1,600 s of CPU while the engine's JVM had used ~50 s, and a `git status` of the
+ * project timed out too. So the file also lists the command line of each `enso`/`java` process,
+ * whose `--type=` names the Electron helper, and says when a command was killed by its timeout
+ * (the first process list and `jcmd -l` failed with no other output then).
  */
 async function dumpEngineState(testRunId: string, testInfo: TestInfo): Promise<void> {
   if (process.env.CI == null) return
   const run = (file: string, args: string[]) =>
     new Promise<string>((resolve) =>
-      execFile(file, args, { timeout: 60_000, maxBuffer: 64 * 1024 * 1024 }, (error, out, err) =>
-        resolve(`${out}${err}${error != null ? `\n(${error.message})` : ''}`),
+      execFile(file, args, { timeout: 120_000, maxBuffer: 64 * 1024 * 1024 }, (error, out, err) =>
+        resolve(`${out}${err}${error != null ? `\n(${describeFailure(error)})` : ''}`),
       ),
     )
   const processes = () =>
@@ -147,10 +153,21 @@ async function dumpEngineState(testRunId: string, testInfo: TestInfo): Promise<v
         'Get-Process | Sort-Object CPU -Descending | Select-Object -First 25 Id,ProcessName,CPU,WorkingSet64 | Format-Table -AutoSize | Out-String -Width 200',
       ])
     : run('ps', ['-eo', 'pid,ppid,pcpu,cputime,rss,comm', '--sort=-pcpu'])
+  // Which of the IDE's processes is which: Electron's helpers say `--type=gpu-process`,
+  // `--type=renderer` or `--type=utility` (the ydoc host); the main process says none.
+  const commandLines = () =>
+    process.platform === 'win32' ?
+      run('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Get-CimInstance Win32_Process -Filter "Name=\'enso.exe\' or Name=\'java.exe\'" | ForEach-Object { \'{0} (parent {1}): {2}\' -f $_.ProcessId, $_.ParentProcessId, "$($_.CommandLine)".Substring(0, [Math]::Min(400, "$($_.CommandLine)".Length)) }',
+      ])
+    : run('ps', ['-eo', 'pid,ppid,args', '--sort=-pcpu'])
   const sections = [`Test: ${testInfo.titlePath.join(' > ')} (${testInfo.status})`]
   sections.push(`Processes at ${new Date().toISOString()}:\n${await processes()}`)
   await new Promise((resolve) => setTimeout(resolve, 10_000))
   sections.push(`Processes at ${new Date().toISOString()}:\n${await processes()}`)
+  sections.push(`Command lines at ${new Date().toISOString()}:\n${await commandLines()}`)
   const javaHome = [
     process.env.JAVA_HOME_25_X64,
     process.env.JAVA_HOME_21_X64,
@@ -173,6 +190,12 @@ async function dumpEngineState(testRunId: string, testInfo: TestInfo): Promise<v
   }
   await fs.mkdir('test-traces', { recursive: true })
   await fs.writeFile(`test-traces/${testRunId}-engine.txt`, sections.join('\n\n'))
+}
+
+/** Why a command of the dump failed: Node's message alone was only "Command failed: <command>". */
+function describeFailure(error: ExecFileException): string {
+  if (error.killed) return `killed after 120 s: ${error.cmd ?? ''}`
+  return `${error.message.trim()} (exit code ${error.code ?? '?'}, signal ${error.signal ?? 'none'})`
 }
 
 /**
