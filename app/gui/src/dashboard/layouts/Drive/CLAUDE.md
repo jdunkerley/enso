@@ -50,6 +50,21 @@ as no samples. The Playwright mock is `integration-test/mock/localSamples.ts`
 (no samples unless a spec adds them; `route: 'version'` makes one versioned);
 the spec is `dashboard/localSamples.spec.ts`.
 
+## Dropping a folder into itself (#644)
+
+A folder cannot be dropped into itself or into a folder inside it. Holding a
+drag over a folder opens it, so the drag can end up inside the folder it
+carries; every drop target then refuses it: the rows and the `..` entry do not
+accept the drag (no highlight), and `dropInto`, `doPaste` and `useMoveAssets` do
+nothing with it (the table says "Cancelled moving …"). The check is
+`canDropAssetsInto` in `$/utils/dropTarget`, which reads the nesting from the
+local directory ids (they carry the path); `canDropRowsInto` in `drag.ts`
+applies it to a drag payload. A multiple selection is refused as a whole when
+any of its folders contains the target. The shim's `filesystem-move` refuses
+such a move too (`isInsidePath`), though the file system itself would reject it
+(`EINVAL` on Linux and macOS, `EPERM` on Windows), leaving the tree untouched.
+The spec is `dashboard/dropIntoSelf.spec.ts`.
+
 ## The parent-folder entry (#640)
 
 Inside a folder below its category's root, the table's first body row is a `..`

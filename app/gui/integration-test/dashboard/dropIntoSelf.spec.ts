@@ -20,6 +20,9 @@ test.use({
   },
 })
 
+// Holding a drag over a folder takes two seconds to open it, twice over.
+test.setTimeout(60_000)
+
 /** Longer than the two seconds a drag is held over a folder to open it. */
 const OPEN_TIMEOUT_MS = 6_000
 

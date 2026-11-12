@@ -24,13 +24,13 @@ import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
 import { twMerge } from '$/utils/style/tailwindMerge'
 import { useEventListener } from '@vueuse/core'
-import { DirectoryId } from 'enso-common/src/services/Backend'
+import type { DirectoryId } from 'enso-common/src/services/Backend'
 import { onMounted, onUpdated, ref, watch } from 'vue'
 
 const props = defineProps<{
   columns: readonly Column[]
   /** The folder the entry opens; it changes when the drive moves to another folder. */
-  targetId: string
+  targetId: DirectoryId
   /** Whether the arrow keys moved to the entry, so that it takes the focus. */
   isKeyboardSelected: boolean
   /** Whether the entry is the grid's one tab stop. */
@@ -103,7 +103,7 @@ useEventListener(document, 'drop', endDrag, { capture: true })
 function acceptDrag(event: DragEvent) {
   const payload = ASSET_ROWS.lookup(event)
   if (
-    (payload != null && canDropRowsInto(payload, DirectoryId(props.targetId))) ||
+    (payload != null && canDropRowsInto(payload, props.targetId)) ||
     event.dataTransfer?.types.includes('Files') === true
   ) {
     event.preventDefault()
