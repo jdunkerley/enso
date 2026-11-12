@@ -1,5 +1,9 @@
-import { describe, expect, test } from 'vitest'
-import { cellCoordFromEvent, useCommunityCellRange } from '../communityCellRange'
+import { describe, expect, test, vi } from 'vitest'
+import {
+  cellCoordFromEvent,
+  displayedColumnIds,
+  useCommunityCellRange,
+} from '../communityCellRange'
 
 const columnIds = () => ['a', 'b', 'c', 'd']
 
@@ -110,5 +114,28 @@ describe('cellCoordFromEvent', () => {
   test('ignores pinned rows, whose row-index is not a body row index', () => {
     const html = '<div class="ag-row" row-index="t-0"><div class="ag-cell" col-id="a"></div></div>'
     expect(cellCoordFromEvent(eventOn(html, '.ag-cell'))).toBeUndefined()
+  })
+})
+
+describe('displayedColumnIds', () => {
+  const column = (id: string) => ({ getColId: () => id })
+
+  test('lists the displayed columns in order', () => {
+    const api = {
+      isDestroyed: () => false,
+      getAllDisplayedColumns: () => [column('a'), column('b')],
+    }
+    expect(displayedColumnIds(api)).toEqual(['a', 'b'])
+  })
+
+  test('is empty before the grid exists', () => {
+    expect(displayedColumnIds(undefined)).toEqual([])
+  })
+
+  test('is empty, without touching the API, once the grid is destroyed', () => {
+    // A destroyed API returns `undefined` from `getAllDisplayedColumns` (AG Grid warning #26).
+    const getAllDisplayedColumns = vi.fn(() => undefined as never)
+    expect(displayedColumnIds({ isDestroyed: () => true, getAllDisplayedColumns })).toEqual([])
+    expect(getAllDisplayedColumns).not.toHaveBeenCalled()
   })
 })
