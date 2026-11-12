@@ -50,7 +50,7 @@ jobs:
           cache-key: benchmark-standard-libraries
           flatc: "true"
       # `std-benchmarks/bench` builds the engine distribution first (its annotation processor
-      # needs one), with the native runner that `ENSO_LAUNCHER` asks for.
+      # needs one), with the default launcher (`shell`): JMH runs in the sbt JVM, so no native runner.
       - name: Run the benchmarks
         # A hung benchmark otherwise holds the runner for the job's whole 4 hours (5 with two arms).
         timeout-minutes: ${{ inputs.jvm-options != '' && 280 || 150 }}
@@ -79,7 +79,6 @@ jobs:
           BENCH_NAME: ${{ inputs.bench-name }}
           JUST_CHECK: ${{ inputs.just-check }}
           JVM_OPTIONS: ${{ inputs.jvm-options }}
-          ENSO_LAUNCHER: native,-ls
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
       # Check mode (`just-check`) writes no report on purpose: it runs every benchmark once, in

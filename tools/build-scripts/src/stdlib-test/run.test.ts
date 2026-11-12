@@ -47,9 +47,9 @@ describe('runStdlibTests', () => {
     const root = repository(['Base_Tests', 'AWS_Tests', 'Examples_Tests'])
     const { calls, context: c } = context(root)
     const junit = path.join(root, 'target', 'test-results')
-    expect(
-      await runStdlibTests({ suite: 'standard-library-in-native', clean: true, dryRun: false }, c),
-    ).toBe(0)
+    expect(await runStdlibTests({ suite: 'standard-library', clean: true, dryRun: false }, c)).toBe(
+      0,
+    )
     expect(calls).toEqual([
       `remove ${path.join('/home/u', '.local', 'share', 'enso', 'cache')}`,
       'remove /r/bench-report.xml',
@@ -108,7 +108,7 @@ describe('runStdlibTests', () => {
   })
   test('a dry run lists the commands and runs nothing', async () => {
     const { calls, logged, context: c } = context(repository(['Base_Tests']))
-    expect(await runStdlibTests({ suite: 'stdlib-native', clean: true, dryRun: true }, c)).toBe(0)
+    expect(await runStdlibTests({ suite: 'stdlib', clean: true, dryRun: true }, c)).toBe(0)
     expect(calls).toEqual([])
     expect(logged.at(-1)).toContain('--no-ir-caches --run')
   })
