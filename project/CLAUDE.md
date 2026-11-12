@@ -55,6 +55,11 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   the PATH, else the newest `Windows Kits\10\bin\<version>\x64`; the build fails
   when there is none, the merge loses an element, or the result does not run
   with `sun.jnu.encoding = UTF-8`. It drops the launchers' Oracle signature.
+- `AntlrSources.scala` — Strips the absolute grammar path from the header
+  comment of the Java that sbt-antlr4 generates for `std-table` (Note [ANTLR
+  Output Has No Absolute Paths], #696): javac reads a backslash followed by `u`
+  in that path as a unicode escape, comments included, so a checkout under such
+  a directory failed to compile.
 - `Dependencies.scala` — Central dependency version catalog.
 - `plugins.sbt` — SBT plugin versions. Pinned to known-good combinations; don't
   bump casually.
