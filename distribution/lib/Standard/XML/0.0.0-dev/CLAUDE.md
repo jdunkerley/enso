@@ -46,21 +46,13 @@ xml = table.to_xml ["Year"] ["Author"] "Title" "Books" "Book"
 
 The library has no `std-bits` project and ships no jar: `src/Internal/Dom.enso`
 calls the JDK's XML APIs (`javax.xml`, `org.w3c.dom`) directly, and
-`Table.to_xml` builds its document in Enso. `build.sbt` lists it as a Java-free
-library (Note [Java-Free Libraries In The Image]), so `EnsoLibraryFeature`
-registers only those JDK classes and marks it AOT-ready: under the native
-launcher it is hosted, and walking the DOM costs no cross-JVM round trips. (As a
-guest library with a helper jar, every DOM call was a round trip: 81 s for
-`to_xml` of 100k×5 cells.)
+`Table.to_xml` builds its document in Enso. That made it a Java-free library
+the native image could host; the native image is gone (#664), and on the JVM a
+helper jar would cost nothing extra, but none is needed.
 
-- Import only JDK classes here. A jar in `polyglot/java`, or a
-  `polyglot java import` of a class the image does not have, fails the native
-  image build.
-- Calling a method on an object the JDK hands back (a DOM node, the document
-  builder) needs its public interface imported in `Internal/Dom.enso`, even if
-  the code never names it: that import is what registers the interface's methods
-  in the image (Note [Interfaces Imported For The Image]). Missing one works on
-  the JVM and fails only under the native launcher.
+- The interface imports in `Internal/Dom.enso` that the code never names (Note
+  [Interfaces Imported For The Image]) were for the native image only; they are
+  harmless on the JVM.
 - Java exceptions are caught by class (`SAXParseException`, `IOException`,
   `java.lang.Exception`) and turned into `XML_Error`s by `_xml_errors`; that
   works because the classes are the host's.
