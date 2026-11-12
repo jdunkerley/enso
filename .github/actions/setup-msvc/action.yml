@@ -1,7 +1,7 @@
 name: Set up MSVC
 description: >-
   The MSVC developer environment (`vcvarsall.bat x64`) for the rest of the job, on Windows; a no-op
-  elsewhere. Native images on Windows link with MSVC, and the engine package gets the MSVC runtime
+  elsewhere. The engine package gets the MSVC runtime
   DLLs from `VCToolsRedistDir` (`project/MsvcRuntime.scala`, which also needs `dumpbin`). What
   the retired build CLI applied when `cl` was not on the PATH (its `vs.rs`).
 runs:

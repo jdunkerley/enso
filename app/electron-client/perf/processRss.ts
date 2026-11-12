@@ -1,6 +1,6 @@
 /**
  * @file Resident memory of the processes an open-time launch starts: the engine's (the launcher and
- * the JVM or native image under it) and the ydoc host's. See `perf/openTime.ts`, which samples at
+ * the JVM under it) and the ydoc host's. See `perf/openTime.ts`, which samples at
  * `welcomeShown` and 30 s later (ruling 14 of the JVM-by-default plan).
  */
 import { execFile } from 'node:child_process'
@@ -100,7 +100,7 @@ export function executablePath(command: string): string {
   return normalisePath(exe ? exe[1]! : (trimmed.split(/\s/)[0] ?? ''))
 }
 
-/** Names of the engine's own processes: the launcher, the native image and the JVM it starts. */
+/** Names of the engine's own processes: the launcher and the JVM it starts. */
 const ENGINE_EXECUTABLES = new Set(['enso', 'enso.exe', 'java', 'java.exe'])
 
 /**
@@ -133,7 +133,7 @@ function descendants(processes: readonly ProcessInfo[], root: number): Set<numbe
 }
 
 /**
- * The engine's processes: every descendant of `electronPid` that is the launcher, the native image
+ * The engine's processes: every descendant of `electronPid` that is the launcher
  * or `java`, and all their descendants, each once. `ideExecutable` is the IDE's own binary: a
  * process running it is never the engine, whatever its arguments. On Windows Playwright's
  * `electronApplication.process()` is a launcher, and the real main process (`Enso.exe --inspect=0

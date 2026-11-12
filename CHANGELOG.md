@@ -3,9 +3,8 @@
 #### Enso IDE
 
 - [Projects now run on the JVM engine by default, which starts library code such
-  as Image, Postgres and AWS faster. To go back to the native engine, set
-  `ENSO_ENGINE_MODE=native`, or `jvm: false` in a project's
-  `package.yaml`.][666]
+  as Image, Postgres and AWS faster. (The native engine this replaced has since
+  been removed.)][666]
 - [On Windows the installer prepares the engine for faster project opens, so the
   first projects open quickly from the first launch; installing takes about a
   minute longer. Opening a project no longer interrupts that preparation where
@@ -311,6 +310,10 @@
 
 #### Enso Language & Runtime
 
+- [The native engine is gone][694]. The IDE and the `enso` command run on the
+  bundled JVM, so libraries with Java code of their own work everywhere.
+  `ENSO_ENGINE_MODE=native` and `jvm: false` in a project's `package.yaml` are
+  still accepted but no longer do anything.
 - [Removed the unused `T in Context` type-signature syntax][384]. Writing `in`
   in a type, as in `foo : Integer -> Integer in Input`, is now a compile error;
   the context part was never checked. Execution contexts are unaffected: they
@@ -478,6 +481,7 @@
 
 [654]: https://github.com/jdunkerley/enso/pull/654
 [666]: https://github.com/jdunkerley/enso/pull/666
+[694]: https://github.com/jdunkerley/enso/pull/694
 [671]: https://github.com/jdunkerley/enso/pull/671
 [655]: https://github.com/jdunkerley/enso/pull/655
 [626]: https://github.com/jdunkerley/enso/pull/626

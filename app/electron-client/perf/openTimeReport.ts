@@ -39,7 +39,7 @@ export const HEADLINE: Phase = 'welcomeShown'
 /** Milliseconds from the click on the project's row. */
 export type OpenTimes = Partial<Record<Phase | Extra, number>>
 /**
- * `native` is the native image. `jvm` is the engine as a user has it after the first open: the
+ * `native` is the removed native image (only earlier reports have it). `jvm` is the engine as a user has it after the first open: the
  * bundled JDK with the shim's own AOT cache, trained before the measured launches. `jvm-first` is
  * a user's very first launch: the same, with the cache deleted before each launch.
  */
@@ -595,7 +595,7 @@ function rssTable(summaries: readonly EngineSummary[], platform: string): string
   })
   if (rows.length === 0) return []
   return [
-    `${platform === 'win32' ? 'Working set' : 'Resident memory'}, MiB, medians of the first open (engine: the launcher and the JVM or native image under it; ydoc: the utility process).`,
+    `${platform === 'win32' ? 'Working set' : 'Resident memory'}, MiB, medians of the first open (engine: the launcher and the JVM under it; ydoc: the utility process).`,
     '',
     '| Engine | Engine at welcome table | Engine 30 s later | Ydoc host at welcome table | Ydoc host 30 s later |',
     '| --- | ---: | ---: | ---: | ---: |',

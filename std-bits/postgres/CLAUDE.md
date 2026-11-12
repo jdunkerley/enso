@@ -5,5 +5,4 @@ Ships the `postgresql` JDBC driver (and its `checker-qual`) for
 code is Enso, in `distribution/lib/Standard/Postgres/`; the shared dialect is
 `Standard.Database.Postgres_Family`.
 
-These jars are not on the native image class path (`stdLibsJars` in
-`build.sbt`): like `std-microsoft`, the library runs on the JVM only.
+The jars are loaded from the library's `polyglot/java` like any other driver.

@@ -92,7 +92,7 @@ describes each of those commands.
   something CI will catch for you.
 - Scala/Java: GraalVM-based. See
   [Infrastructure](https://github.com/jdunkerley/enso/wiki/Infrastructure) for
-  `sbt`, native-image and GraalVM upgrade guides.
+  `sbt` and the GraalVM upgrade guide.
 - TypeScript: TS `catalog:` version in `pnpm-workspace.yaml`. Use
   `corepack pnpm` (not bare `pnpm`/`npm`).
 
@@ -198,13 +198,16 @@ has silently produced a wrong result here:
   shells, so a bare `wsl -e bash -lc` has no GraalVM, sbt or Node and quietly
   picks up the Windows binaries through `/mnt/c`. The script reads the GraalVM
   and Node versions from the checkout (`graalMavenPackagesVersion`,
-  `.node-version`), so a version bump needs no edit; but it must find GraalVM
-  CE's innovation-line archive, which unpacks to `graalvm-community-<release>+*`
-  (no `openjdk-`) and downloads from the `graal-<release>` tag (#665 has the
-  diff). Maven, which only `tools/enso4igv` uses, is not part of it. WSL reaches
-  the repo at `/mnt/c/...`, so **give cargo its own target directory** — sharing
-  `target/` with the Windows build means every switch re-links the whole
-  workspace, and the two hosts evict each other's artifacts:
+  `.node-version`), so a version bump needs no edit. It finds both archive
+  names: `graalvm-community-openjdk-<release>+*` (25.0.x) and the innovation
+  line's `graalvm-community-<release>+*` (no `openjdk-`, downloaded from the
+  `graal-<release>` tag; #665 has the diff). Git cannot see a Windows worktree
+  from WSL, so the script falls back to the main checkout's versions: set
+  `ENSO_REPO=/mnt/c/.../<worktree>` to read a worktree's. Maven, which only
+  `tools/enso4igv` uses, is not part of it. WSL reaches the repo at
+  `/mnt/c/...`, so **give cargo its own target directory** — sharing `target/`
+  with the Windows build means every switch re-links the whole workspace, and
+  the two hosts evict each other's artifacts:
 
   ```bash
   wsl -e bash -lc '. ~/.enso-toolchain.sh && cd /mnt/c/Repos/Enso/ide && export CARGO_TARGET_DIR=$HOME/enso-target && cargo test --workspace'
@@ -212,7 +215,7 @@ has silently produced a wrong result here:
 
   `rust-toolchain.toml` is honoured there, so the pinned version installs on
   first use. Worth doing for anything that touches platform surface: paths,
-  processes, native images and file permissions behave differently on the two
+  processes, native libraries and file permissions behave differently on the two
   hosts.
 
 - **An incremental typecheck is not a verification after a dependency change.**
@@ -292,8 +295,8 @@ has silently produced a wrong result here:
   the outdated assumption and stayed green.
 - **Run the formatting job's own command after touching `project/plugins.sbt` or
   `project/build.properties`.** Neither `compile` nor `buildEngineDistribution`
-  invokes `scalafmtCheck`, so a green native-image build is silent about an
-  sbt/plugin version mismatch (sbt-scalafmt 2.6.x refuses to start below sbt
+  invokes `scalafmtCheck`, so a green engine-distribution build is silent about
+  an sbt/plugin version mismatch (sbt-scalafmt 2.6.x refuses to start below sbt
   1.12.9). The check is cheap:
 
   ```bash

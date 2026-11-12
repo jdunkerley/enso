@@ -12,8 +12,8 @@ import Standard.Database.Postgres_Family.Postgres_Type_Mapping.Postgres_Type_Map
 import Standard.Database.SQL.SQL_Type
 
 # The Java helpers are imported here, not taken from `Standard.Database`: this
-# library runs on the guest JVM, and a helper created by Database's hosted
-# classes would not be usable with its driver. Everything else is the shared
+# library ships its own driver, and a helper created by Database's classes
+# is not meant to be used with it. Everything else is the shared
 # Postgres-family mapping.
 polyglot java import org.enso.database.fetchers.ColumnFetcherFactory
 polyglot java import org.enso.database.JDBCValueSetter

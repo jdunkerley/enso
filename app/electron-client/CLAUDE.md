@@ -257,10 +257,10 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   after that stop, and `Updater.quitAndInstall` awaits `stopSpareEngine`
   (`beforeInstall`) before it starts the installer, which on Windows runs before
   the app has quit. The open-time harness points it at a directory of its run
-  (`<out>/jvm-aot` for the JVM engines, `<out>/shim-jvm-aot` for native, which
-  never trains) and measures that cache (see "Open-time harness"), so its
-  launches never pick up the user's. An empty value counts as unset. The root
-  and the gate are in `src/jvmAotSettings.ts` (tested in
+  (`<out>/jvm-aot` for the JVM engines, `<out>/shim-jvm-aot` for the removed
+  native engine, which never trained) and measures that cache (see "Open-time
+  harness"), so its launches never pick up the user's. An empty value counts as
+  unset. The root and the gate are in `src/jvmAotSettings.ts` (tested in
   `tests/headless/jvmAotSettings.test.ts`). The GUI shows a toast while a
   training is due and how it ended: `src/jvmAotIpc.ts` keeps the status (`idle`,
   `training`, `trained`, `failed`, set from the cache's `onTrainingStarted` and
@@ -963,7 +963,7 @@ of earlier dispatches). `jvm` and `jvm-first` also set `ENSO_SPARE_ENGINE=0`: a
 measured open starts its own engine, never a pre-started spare; the `jvm-spare`
 engines set `ENSO_SPARE_ENGINE=1`. The engines are:
 
-- `native`: the native image.
+- `native`: the removed native image (refused; only earlier reports have it).
 - `jvm`: the JVM as a user has it after the first open. The shim's own AOT cache
   (`project-manager-shim/CLAUDE.md`, "JDK AOT cache") lives in
   `ENSO_JVM_AOT_DIR=<out>/jvm-aot`, never the user's. Before the measured
@@ -1054,13 +1054,13 @@ trained with the options it is used with. Truffle diagnostics stay in
 `JAVA_TOOL_OPTIONS`.
 
 **RSS** is reported, not gated. On the first open of every launch the harness
-sums the memory of the engine's processes (the launcher, the native image or
-`java` under it, and their children: descendants of the Electron process named
-`enso`, `enso.exe`, `java` or `java.exe`, never Electron's own `--type=` helpers
-and any process running the IDE's own binary, which on Windows includes the real
-main process under Playwright's launcher) and of the ydoc host's utility process
-(its pid is the last `ydoc host pid=` line of the output), at `welcomeShown` and
-30 s later (`perf/processRss.ts`: `ps -axo` on Linux and macOS,
+sums the memory of the engine's processes (the launcher, the `java` under it,
+and their children: descendants of the Electron process named `enso`,
+`enso.exe`, `java` or `java.exe`, never Electron's own `--type=` helpers and any
+process running the IDE's own binary, which on Windows includes the real main
+process under Playwright's launcher) and of the ydoc host's utility process (its
+pid is the last `ydoc host pid=` line of the output), at `welcomeShown` and 30 s
+later (`perf/processRss.ts`: `ps -axo` on Linux and macOS,
 `Get-CimInstance Win32_Process` on Windows, whose working set is the figure).
 `open-time.md` prints the medians in MiB, a row per engine (`rss` in
 `open-time.json`; "Working set" on Windows, which is not Linux's resident set,
@@ -1123,10 +1123,10 @@ takes `open_perf_engines`, `open_perf_runs`, `open_perf_budget`,
 `--template image` opens, instead of the new-project template, a project whose
 first node calls `Standard.Image` on a PNG in its `data/` and whose second shows
 the result in a table; the headline (`welcomeShown`, and `libraryShown`) is that
-table showing `Image 16x16`, and there are no extras. That library's Java is not
-in the native image, so the template opens on the JVM only (Note [A Project That
-Uses A Library With Java Code] in `perf/projectTemplates.ts`).
-`ide-packaging.yml` takes it as `open_perf_template`.
+table showing `Image 16x16`, and there are no extras. That library calls OpenCV
+through Java (Note [A Project That Uses A Library With Java Code] in
+`perf/projectTemplates.ts`). `ide-packaging.yml` takes it as
+`open_perf_template`.
 
 `tests/packagedIde.ts` holds where the packaged app, its engine launcher, its
 `java` and its engine component are; the Playwright specs, `globalSetup.ts` and

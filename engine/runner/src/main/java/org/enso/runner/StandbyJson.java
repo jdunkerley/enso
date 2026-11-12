@@ -8,7 +8,7 @@ import java.util.Map;
 /**
  * A strict reader for the standby argument line: JSON objects, arrays and strings only, which is
  * all the line holds (Note [Standby Mode] in {@code Standby}). Anything else is an {@link
- * IllegalArgumentException}. The runner has no JSON library, and must stay Native-Image friendly.
+ * IllegalArgumentException}. The runner has no JSON library, and so reads the line by hand.
  *
  * <p>Errors name positions and keys only, never values: the line carries the channel token.
  */

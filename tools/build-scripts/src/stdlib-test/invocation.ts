@@ -8,7 +8,7 @@ import type { Suite } from './suites.ts'
 
 /**
  * The heap-dump flag, in `JAVA_TOOL_OPTIONS`. It used to be a launcher argument too, which only the
- * native launcher understood: the shell launchers hand every argument to the runner.
+ * removed native launcher understood.
  */
 export const HEAP_DUMP = '-XX:+HeapDumpOnOutOfMemoryError'
 

@@ -12,9 +12,9 @@ type Data
     Value ~enso_bin:File ~std_base:File
 
     bench_compile_base self extra_params=[] =
-        # `--vm.D`, not `-D`: the engine sets it as a system property under any launcher. The
-        # native launcher took a bare `-D`, but `bin/enso` passes it to the engine as an argument,
-        # which read it as a project path.
+        # `--vm.D`, not `-D`: the engine sets it as a system property. A bare `-D` (the removed
+        # native launcher took it) would reach the engine as an argument, which read it as a project
+        # path.
         no_src_archive_opt = ["--vm.D", "org.enso.compiler.noSourceArchives=" + self.std_base.to_text]
         self.startup (["--no-compile-dependencies", "--log-level", "debug", "--compile", self.std_base.to_text] + no_src_archive_opt + extra_params)
 

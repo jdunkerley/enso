@@ -1,7 +1,7 @@
 private
 
-## This file contains additional imports necessary for building native image
-   version of Enso with Standard libraries included in
+## This file contains additional imports kept from the native image build (removed in #664), which
+   needed every Java class the library uses imported explicitly. Harmless on the JVM.
 
 polyglot java import org.enso.table.aggregations.Aggregator
 polyglot java import org.enso.table.aggregations.Concatenate
