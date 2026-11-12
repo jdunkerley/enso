@@ -174,16 +174,14 @@ jobs:
 
       # The shim's `ProjectService` tests start a real engine. They get develop's latest engine
       # distribution: the newest unexpired artifact of `engine-pull-request.yml` on develop (kept 90
-      # days). Only Linux has one here; elsewhere those tests skip (#359). The artifact lost its
-      # `(native,test)` when the native build went (#683); until develop has built the new name,
-      # the old one is taken (the shim runs `java` itself, so either distribution serves).
+      # days). Only Linux has one here; elsewhere those tests skip (#359).
       - name: 🔎 Find develop's engine distribution
         id: engine
         if: runner.os == 'Linux'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for artifact in "Engine Distribution (GraalVM CE) (linux, amd64)" "Engine Distribution (GraalVM CE) (native,test) (linux, amd64)"; do
+          for artifact in "Engine Distribution (GraalVM CE) (linux, amd64)"; do
             run_id=$(gh api -X GET "repos/${{ github.repository }}/actions/artifacts" \
               -f name="$artifact" -f per_page=100 \
               --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_branch == "develop")][0].workflow_run.id // empty')
