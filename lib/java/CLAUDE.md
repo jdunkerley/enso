@@ -17,8 +17,8 @@ Java support libraries for the engine. Two shapes live together here:
      (`Directories`) and, on Windows, `main`'s arguments recovered from the wide
      command line (`Arguments`, `WindowsArguments`; Note [Arguments Outside The
      ANSI Code Page]). Its `@CFunction` code (working directory, trash bin) and
-     `jvm-channel/` and `os-environment-lib/` went with the native image
-     (#664, C3).
+     `jvm-channel/` and `os-environment-lib/` went with the native image (#664,
+     C3).
    - `ydoc-api/` — `YjsChannel`, the channel between the Language Server and the
      (Node) ydoc server, served over the channel sockets.
    - `ydoc-polyfill/` — Web/Node API polyfills and the parser functions for

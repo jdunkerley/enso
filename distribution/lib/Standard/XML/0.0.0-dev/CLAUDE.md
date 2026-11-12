@@ -46,8 +46,8 @@ xml = table.to_xml ["Year"] ["Author"] "Title" "Books" "Book"
 
 The library has no `std-bits` project and ships no jar: `src/Internal/Dom.enso`
 calls the JDK's XML APIs (`javax.xml`, `org.w3c.dom`) directly, and
-`Table.to_xml` builds its document in Enso. That made it a Java-free library
-the native image could host; the native image is gone (#664), and on the JVM a
+`Table.to_xml` builds its document in Enso. That made it a Java-free library the
+native image could host; the native image is gone (#664), and on the JVM a
 helper jar would cost nothing extra, but none is needed.
 
 - The interface imports in `Internal/Dom.enso` that the code never names (Note

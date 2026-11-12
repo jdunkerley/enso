@@ -79,9 +79,10 @@ Rules for an option line (in the file or in `ENSO_JVM_OPTIONS`):
   `--add-opens java.base/java.nio=…`, and no `@argfile`, `-jar` or `-cp`.
 - The quoted form `-Xlog:…:file="C:\Users\John Smith\use.log"` works where the
   option reaches `java` as one argument: from the IDE (Windows keeps it intact)
-  and from `enso.bat` (which escapes the quotes). Where a JVM runs the runner and
-  relaunches through `ProcessBuilder` (`--jvm <other JDK>`), Windows' argument
-  quoting splits such an argument at its space; write the path unquoted there.
+  and from `enso.bat` (which escapes the quotes). Where a JVM runs the runner
+  and relaunches through `ProcessBuilder` (`--jvm <other JDK>`), Windows'
+  argument quoting splits such an argument at its space; write the path unquoted
+  there.
 - A leading UTF-8 byte order mark is ignored.
 
 ## Launchers
