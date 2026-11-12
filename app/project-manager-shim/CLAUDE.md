@@ -269,70 +269,44 @@ the native engine):
 | --------------------------------------- | -----: |
 | Start-up: `/_health` passed             |  120 s |
 | Terminate: exit after the stdin newline |   30 s |
-| ydoc port wait                          |   30 s |
 
 An engine that has not passed `/_health` within the start-up limit is killed.
 `ENSO_ENGINE_STARTUP_TIMEOUT_MS` and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS` override
 them (the shim's own AOT training launch gets longer limits of its own). A
 runner called without a launch (tests) keeps the same values.
 
-`project/open` is also answered only once the engine's ydoc port accepts a
-connection (`EnsoRunner`'s `ydocWaitMs`, per launch, `DEFAULT_YDOC_WAIT_MS` only
-for a launch without timeouts; Note [Open Waits For The Ydoc Port]). The ydoc
-server listens ~300 ms after `/_health` passes, and a GUI that connected earlier
-was refused (measured). That is consistent with Windows retrying a refused
-loopback connect after ~500 ms (inferred from the constant 510 to 525 ms gap).
-On Linux the GUI was refused too and connected only on y-websocket's third
-retry, ~1.4 s after the answer, so the wait helps there as well; the open-time
-harness hid it until `guiConnected` was changed to mean the socket is open (Note
-[The GUI Is Connected When Its Socket Is Open] in
-`app/electron-client/perf/openTimeReport.ts`). The ydoc server binds
-`localhost`, which the JVM resolves to `127.0.0.1` (an IPv4-mapped address on
-Linux), the address the probe and the GUI use. The wait is bounded, the startup
-timeout stops applying once `/_health` has passed, and `EnsoRunner` defaults to
-none, because the fake engines of the tests have no ydoc server
-(`healthPolling.test.ts` has the one that does). Under the Node ydoc host (next
-section) there is no wait: the listener is up before the engine is spawned.
-
-The health checks, the ydoc polls and the startup timeout read the time and
-schedule through a `StartupClock` (`EnsoRunner`'s `startupClock` option, the
-real clock by default). Tests of that schedule replace it and assert the delays
-the runner asks for, never real elapsed time: a fake engine is a separate Node
-process whose start-up a loaded CI runner stretches unpredictably (Note
-[Start-Up Tests Read The Schedule] in `healthPolling.test.ts`).
+The health checks and the startup timeout read the time and schedule through a
+`StartupClock` (`EnsoRunner`'s `startupClock` option, the real clock by
+default). Tests of that schedule replace it and assert the delays the runner
+asks for, never real elapsed time: a fake engine is a separate Node process
+whose start-up a loaded CI runner stretches unpredictably (Note [Start-Up Tests
+Read The Schedule] in `healthPolling.test.ts`).
 
 ## ydoc host (`projectService/ydocHost.ts`)
 
-An opened project's ydoc server runs in one of two places, chosen per open by
-`ENSO_YDOC_HOST` (`ydocHostKind`; any case, an unknown value warns and means
-`node`):
+An opened project's ydoc server runs in Node: the runner's `YdocHost`
+(`EnsoRunner`'s `ydocHost` option, passed in as `EngineSettings.ydocHost`)
+`listen`s on the ydoc port **before** the engine is spawned, connected to the
+engine's Language Server channel sockets
+(`ws://127.0.0.1:<rpc port>/channel/<kind>?token=…`), so the GUI never meets a
+refused ydoc port and the open does not wait for one. The listener is closed by
+the `close-ydoc-listener` shutdown hook (after the engine has exited) and when
+an attempt fails. A listener whose port was taken after the search
+(`EADDRINUSE`) makes the open search again, like an engine's bind failure.
+Electron's host is a utility process (`app/electron-client/src/ydocHost/`),
+`dev:vite`'s is `NodeYdocHost` itself. A runner without a host (the tests'
+fakes, the Vite preview server) starts no ydoc server at all. The engine-hosted
+ydoc server (`ENSO_YDOC_HOST=engine`, `LANGUAGE_SERVER_YDOC_PORT`,
+`LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS`) is gone, and with it the wait for the
+engine's ydoc port.
 
-- `node` (default) — the runner's `YdocHost` (`EnsoRunner`'s `ydocHost` option,
-  passed in as `EngineSettings.ydocHost`) `listen`s on the ydoc port **before**
-  the engine is spawned, connected to the engine's Language Server channel
-  sockets (`ws://127.0.0.1:<rpc port>/channel/<kind>?token=…`). The engine gets
-  no `LANGUAGE_SERVER_YDOC_PORT`, so it starts no embedded server. The listener
-  is closed by the `close-ydoc-listener` shutdown hook (after the engine has
-  exited) and when an attempt fails. A listener whose port was taken after the
-  search (`EADDRINUSE`) makes the open search again, like an engine's bind
-  failure. Electron's host is a utility process
-  (`app/electron-client/src/ydocHost/`), `dev:vite`'s is `NodeYdocHost` itself.
-- `engine` — the one-release rollback (removed with the engine-hosted server, PR
-  M of the JVM-by-default plan): the engine gets `LANGUAGE_SERVER_YDOC_PORT` and
-  serves ydoc in GraalJS, as before. It also gets
-  `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS`, the host's `allowedOrigins()`
-  comma-separated (empty without a host, so every browser page is refused;
-  #614). A runner without a host (the tests' fakes, headless runs) behaves the
-  same way.
-
-Either way every engine start gets `LANGUAGE_SERVER_CHANNEL_TOKEN`
-(`newChannelToken`, 32 random bytes as hex, fresh per open; a respawn keeps its
-open's token). The Language Server refuses channel sockets without it, from a
-non-loopback peer, or with an `Origin` header. Sessions in one host are keyed by
-the GUI's `ls=` name, which is `gui-rpc-<random uuid>` per opened project in the
-GUI, so two listeners in one process never share one
-(`app/ydoc-server/CLAUDE.md`, "Sessions are process-global"). Tests:
-`__tests__/ydocHost.test.ts`.
+Every engine start gets `LANGUAGE_SERVER_CHANNEL_TOKEN` (`newChannelToken`, 32
+random bytes as hex, fresh per open; a respawn keeps its open's token). The
+Language Server refuses channel sockets without it, from a non-loopback peer, or
+with an `Origin` header. Sessions in one host are keyed by the GUI's `ls=` name,
+which is `gui-rpc-<random uuid>` per opened project in the GUI, so two listeners
+in one process never share one (`app/ydoc-server/CLAUDE.md`, "Sessions are
+process-global"). Tests: `__tests__/ydocHost.test.ts`.
 
 ## Starting an engine (`projectService/javaLaunch.ts`)
 
@@ -400,17 +374,14 @@ engine/runner CLAUDE.md, "Standby mode"). `EnsoRunner` owns one `SpareEngine`
   line (`EngineLogSink.notice`); an open without a key leaves the spare alone
   and says nothing. When no spare was running, the line gives the service's
   reason (`EngineLaunch.spareIdleReason`, the last decision's), and there is no
-  line at all when spares are off (the setting, `ENSO_SPARE_ENGINE=0`). Under an
-  engine-hosted ydoc server with allowed origins there is no spare (the line
-  cannot carry them).
+  line at all when spares are off (the setting, `ENSO_SPARE_ENGINE=0`).
 - **The line.** The spare gets `{"args":[...],"env":{...}}` on stdin: the open's
   arguments from `--server` on (never `--jvm`, which the engine refuses there,
-  and the shim no longer passes it), and in `env` only the four `LINE_VARIABLES`
-  (channel token, ydoc port under an engine-hosted ydoc server, project id and
-  session id). Everything else, the secrets key included, is in the spare's
-  spawn environment, which never carries a line variable or
-  `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS` (`spareSpawnEnv`; the engine exits 1 on
-  an inherited one). The line holds the token: it is never logged.
+  and the shim no longer passes it), and in `env` only the three
+  `LINE_VARIABLES` (channel token, project id and session id). Everything else,
+  the secrets key included, is in the spare's spawn environment, which never
+  carries a line variable (`spareSpawnEnv`; the engine exits 1 on an inherited
+  one). The line holds the token: it is never logged.
 - **Stderr.** `take()` stops reading the spare's stderr; `OpenedProject`
   attaches its reader in microtasks of the same turn (its spawner hands the
   spare over), so nothing may be awaited between the take and
@@ -443,19 +414,19 @@ POST `/api/project-service/engine/setSpare` `{ enabled: boolean }` answers
 `null`, a non-boolean `enabled` is an error; clients:
 `ProjectManager.setSpareEngine`, `LocalBackend.setSpareEngine`); then a spare is
 wanted unless, in this order: quitting (`stopSpareEngine`, for good), the
-setting is off, `ENSO_SPARE_ENGINE=0`, `ENSO_YDOC_HOST=engine`, the AOT cache is
-training (`JvmAotCache.isTraining`: from its launch check until a cache is made,
-a killed training waiting to restart included; Electron refreshes after
-`start()` and when `onTrainingEnded` says a training finished or failed, not
-when an open stopped it), `--profiling-path` is among the extra arguments (a
-relative path, which standby refuses), a project is opening, or a project is in
-use. An unwanted spare is stopped with that reason, except for an opening
-project, which takes the spare or stops it itself. The refresh runs on
-`setSpareEngine`, after a failed open (once it no longer counts as opening), and
-after a close, once the closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2
-s, `EngineSettings.spareAfterCloseMs`, an `unref`'d timer) has passed, whichever
-is first. When a close's engine takes longer than 2 s to exit, a spare starts 2
-s into the close (the gate's delay), beside the closing engine; reopening the
+setting is off, `ENSO_SPARE_ENGINE=0`, the AOT cache is training
+(`JvmAotCache.isTraining`: from its launch check until a cache is made, a killed
+training waiting to restart included; Electron refreshes after `start()` and
+when `onTrainingEnded` says a training finished or failed, not when an open
+stopped it), `--profiling-path` is among the extra arguments (a relative path,
+which standby refuses), a project is opening, or a project is in use. An
+unwanted spare is stopped with that reason, except for an opening project, which
+takes the spare or stops it itself. The refresh runs on `setSpareEngine`, after
+a failed open (once it no longer counts as opening), and after a close, once the
+closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2 s,
+`EngineSettings.spareAfterCloseMs`, an `unref`'d timer) has passed, whichever is
+first. When a close's engine takes longer than 2 s to exit, a spare starts 2 s
+into the close (the gate's delay), beside the closing engine; reopening the
 project then takes it if its key matches. A quit that is cancelled after the
 spare was stopped (`stopSpareEngine` is for good) leaves no spare for the rest
 of the session.
@@ -518,9 +489,9 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   `<root>/enso-aot-training/`, starts the `--server` engine on it at
   below-normal priority (`os.setPriority`) with the launch options
   `-XX:AOTMode=record` and `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a
-  fresh `LANGUAGE_SERVER_CHANNEL_TOKEN` and no `LANGUAGE_SERVER_YDOC_PORT`,
-  waits for `/_health` (180 s), and `driveOpen` plays an open over the Language
-  Server's channel sockets (`/channel/{json,vis-control,vis-data}?token=`):
+  fresh `LANGUAGE_SERVER_CHANNEL_TOKEN`, waits for `/_health` (180 s), and
+  `driveOpen` plays an open over the Language Server's channel sockets
+  (`/channel/{json,vis-control,vis-data}?token=`):
   `session/initProtocolConnection`, `executionContext/create` and `push` of
   `main`, an `attach` of the table visualisation to the node the template's
   metadata shows one for (`welcomeNodeId`), then waits for `executionComplete`

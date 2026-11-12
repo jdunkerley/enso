@@ -3,12 +3,14 @@
 Yjs server that bridges the Enso Language Server and GUI clients (Yjs/CRDT over
 WebSocket). It runs in Node beside the engine (`NodeYdocHost`, "Node host"
 below): in the IDE in an Electron utility process, under `dev:vite` in the dev
-server itself, reaching the Language Server over its channel sockets. Under
-`ENSO_YDOC_HOST=engine` (the one-release rollback) it still runs inside the
-engine's JVM via `ydoc-server-polyglot` (GraalJS), through in-process channel
-callbacks. The Playwright mocks (`gui/integration-test/mock/localApi.ts`) use
-its `WSSharedDoc`/`YjsConnection` directly. It holds a Yjs document per opened
-Enso module and reconciles local edits with LS file state.
+server itself, reaching the Language Server over its channel sockets. It used to
+run inside the engine's JVM too (`ydoc-server-polyglot` on GraalJS, the
+`ENSO_YDOC_HOST=engine` rollback); that host is gone, so this server runs only
+in Node now. Some code still carries GraalJS fallbacks (`YjsBinaryChannel`'s
+default view, `origin.ts`'s `parseOrigin`): they are dead in Node and can go.
+The Playwright mocks (`gui/integration-test/mock/localApi.ts`) use its
+`WSSharedDoc`/`YjsConnection` directly. It holds a Yjs document per opened Enso
+module and reconciles local edits with LS file state.
 
 ## Role in the architecture
 
@@ -30,9 +32,6 @@ This server:
 
 - `ydoc-shared/` — types and the AST module shared with clients.
 - `ydoc-channel/` — thin Yjs transport wrapper used by both sides.
-- `ydoc-server-polyglot/` — this very server, but re-bundled for GraalJS so it
-  can run _inside_ the engine's JVM process. If you change server behavior,
-  build/test both variants.
 - `ydoc-inspect/` — dev proxy that dumps all traffic; use it when debugging sync
   bugs.
 
@@ -65,11 +64,9 @@ This server:
   `NodeYdocHost`. The GUI takes each project's ydoc address from `project/open`.
   A change here reaches the next opened project after a dev server restart (the
   host is created once).
-- `ENSO_YDOC_HOST=engine` (rollback, one release): the engine serves ydoc on the
-  port the shim passes as `LANGUAGE_SERVER_YDOC_PORT`; a hand-started
-  `enso --server` serves none unless that variable is set.
+- A hand-started `enso --server` serves no ydoc: start a `NodeYdocHost` beside
+  it.
 - Standalone: `pnpm run dev:inspect` runs the server through `ydoc-inspect`.
-- Polyglot (inside engine): see `ydoc-server-polyglot/`.
 
 ## Gotchas
 
@@ -97,28 +94,23 @@ This server:
   map so a new project gets none: regenerate it with
   `UPDATE_TEMPLATE_ID_MAP=1 corepack pnpm --filter ydoc-server exec vitest run src/__tests__/languageServerSession.test.ts -t "full id map"`
   after changing the template's code.
-- The Polyglot variant runs on GraalJS — only a subset of Node APIs is
-  available. Check that any new dep works in both `node` and `graaljs` before
-  importing.
-- **Under `ENSO_YDOC_HOST=engine` this code runs in the engine's JVM**
-  (`ydoc-server-polyglot`, packed into the engine's `ydoc-server` jar), so a
-  change reaches that path only through a rebuilt engine. The default Node host
-  is bundled into the Electron client (`ydocHost.mjs`) instead.
+- The server is bundled into the Electron client (`ydocHost.mjs`), so a change
+  ships with the IDE, not the engine.
 
 ## Node host
 
-`NodeYdocHost` (`src/nodeHost.ts`) runs this server in a plain Node process
-instead of the engine's GraalJS: `listen({ host, port, languageServer })` starts
-one WebSocket listener per opened project (resolving once the port accepts; a
-second `listen` on a port replaces the first), `close(port)` and `closeAll()`
-stop them. It reaches the Language Server through `remoteChannelServer`
-(`src/remoteChannelServer.ts`), a `YjsChannelServer` whose every channel is one
-WebSocket to `ws://<host>:<port>/channel/<kind>?token=<token>`, kind being
-`json`, `binary`, `vis-control` or `vis-data`. Messages sent before the socket
-opens are buffered; text frames are strings, binary frames `Uint8Array`s. The
-token is the engine's `LANGUAGE_SERVER_CHANNEL_TOKEN`; the Language Server
-refuses a socket without it. Bytes are `Uint8Array`s (`nodeByteBufferClass`,
-whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
+`NodeYdocHost` (`src/nodeHost.ts`) runs this server in a plain Node process:
+`listen({ host, port, languageServer })` starts one WebSocket listener per
+opened project (resolving once the port accepts; a second `listen` on a port
+replaces the first), `close(port)` and `closeAll()` stop them. It reaches the
+Language Server through `remoteChannelServer` (`src/remoteChannelServer.ts`), a
+`YjsChannelServer` whose every channel is one WebSocket to
+`ws://<host>:<port>/channel/<kind>?token=<token>`, kind being `json`, `binary`,
+`vis-control` or `vis-data`. Messages sent before the socket opens are buffered;
+text frames are strings, binary frames `Uint8Array`s. The token is the engine's
+`LANGUAGE_SERVER_CHANNEL_TOKEN`; the Language Server refuses a socket without
+it. Bytes are `Uint8Array`s (`nodeByteBufferClass`, whose `view` replaces
+GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
 
 - **A GUI socket's `Origin` is checked before the upgrade** (#596, Note [The
   ydoc Listener Checks Origin] in `src/origin.ts`). A handshake whose `Origin`
@@ -131,23 +123,20 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   addresses (its port under each loopback name, and Vite's `resolvedUrls`). A
   dev server opened by the machine's host name, through `server.origin` or a
   reverse proxy is refused: add the origin to `devServerOrigins` in
-  `gui/vite.config.ts`. No list refuses every browser page. The engine-hosted
-  server (`ENSO_YDOC_HOST=engine`) makes the same check since #614, with the
-  host's `allowedOrigins()` passed in `LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS`.
-  GraalJS has no `URL`, so `originOf` falls back to `parseOrigin` there: `http`
-  and `https` only, canonical hosts only (dotted-quad IPv4, `[::1]`, no `xn--`),
-  and anything it does not recognise is refused. `origin.test.ts` holds it to
-  `URL`'s answers over the #628 review's adversarial cases. Not covered: other
-  local processes, which can omit `Origin` (#615).
+  `gui/vite.config.ts`. No list refuses every browser page. `originOf` falls
+  back to `parseOrigin` where there is no `URL` (GraalJS, for the engine-hosted
+  server of #614, now gone): `http` and `https` only, canonical hosts only
+  (dotted-quad IPv4, `[::1]`, no `xn--`), and anything it does not recognise is
+  refused. `origin.test.ts` holds it to `URL`'s answers over the #628 review's
+  adversarial cases. Not covered: other local processes, which can omit `Origin`
+  (#615).
 - **A socket for a document its session does not hold is refused before the
   upgrade** (#601, Note [An Unknown Document Is Refused Before The Upgrade] in
   `src/handshake.ts`): `404` for a module doc the `ls=` session does not hold
   (or a session that does not exist yet), `400` with no doc or no `ls=`.
   `y-websocket` resets its backoff when a socket opens, so upgrading and then
   closing made a stale client retry every ~100 ms (91 attempts in 10 s,
-  measured); refused before the upgrade it backs off (7 in 10 s). The
-  engine-hosted server refuses the same way since #614 (`documentRefusal`,
-  through the polyfill's `verifyClient`).
+  measured); refused before the upgrade it backs off (7 in 10 s).
 - **One session opens two `json` sockets**, not one: `YjsServerTransport` hands
   the Language Server a proxy channel (for the GUI) and a backend channel (the
   ydoc server's own). The Language Server must accept both.
@@ -181,10 +170,8 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   keeps the file and offers its version in a toast; node metadata, the
   selection, the open dock and an open component browser come back too. Undo
   history does not (it refers to the old docs). An engine restart should take
-  the same path in both host modes (the Node host's sockets are dropped with the
-  engine, and under `ENSO_YDOC_HOST=engine` the server dies with it), but that
-  is #602 and unverified; under the engine host a restart on new ports leaves
-  the GUI retrying the old `ydocUrl`, which this does not cover.
+  the same path (the Node host's sockets are dropped with the engine), but that
+  is #602 and unverified.
 - **Every session reference is released.** The process outlives its engines, so
   a session that is never released lives on with its Language Server client: a
   connection refused because its doc is unknown (a GUI reconnecting with the
@@ -205,10 +192,10 @@ whose `view` replaces GraalJS's `new Uint8Array(new ArrayBuffer(byteBuffer))`).
   `electron-client/src/ydocHost/serve.ts`.)
 - A listener's server error after it started is logged, not thrown: one process
   hosts every project's listener.
-- **Channel sockets have no `maxPayload`** (`0`), like the in-process channels
-  they replace; `ws`'s 100 MiB default would close a channel on a large
-  visualization frame. The token is only sent to loopback hosts (`channelUrl`
-  throws otherwise).
+- **Channel sockets have no `maxPayload`** (`0`), like the engine-hosted
+  server's in-process channels before them; `ws`'s 100 MiB default would close a
+  channel on a large visualization frame. The token is only sent to loopback
+  hosts (`channelUrl` throws otherwise).
 - A socket that fails to connect (the Language Server gone, or a 403 for a wrong
   token, logged as a misconfiguration) is reported after a doubling delay (250
   ms to 5 s) so the GUI's reconnecting is not a hot loop. A GUI socket error
@@ -230,7 +217,8 @@ for each module doc the GUI loaded, its guid, state vector (`[clientId, clock]`
 pairs) and delete set (`{ clientId: [[clock, length]] }`). The delete set is
 needed because a deletion advances no clock: a last edit that only deletes is
 invisible in a state vector. Both travel as JSON, not base64: `lib0`'s base64 is
-Node- or browser-specific, and GraalJS is neither.
+Node- or browser-specific, and GraalJS (the engine-hosted server's runtime, now
+gone) was neither.
 
 The **whole** state vector and delete set of each module doc are sent, not only
 the GUI's "own" edits. Filtering them is wrong: a graph edit is made in a fresh

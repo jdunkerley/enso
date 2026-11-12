@@ -52,7 +52,7 @@ const recorded = async (project: string) =>
   }
 
 const jvm = (timeouts: Partial<EngineTimeouts> = {}): EngineLaunch => ({
-  timeouts: { ...ENGINE_TIMEOUTS, ydocWaitMs: 0, ...timeouts },
+  timeouts: { ...ENGINE_TIMEOUTS, ...timeouts },
 })
 
 beforeEach(async () => {

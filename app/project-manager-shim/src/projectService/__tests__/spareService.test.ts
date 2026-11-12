@@ -106,7 +106,6 @@ beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'spare-service-'))
   vi.stubEnv('ENSO_LOG_DIRECTORY', path.join(root, 'logs'))
   vi.stubEnv('ENSO_SPARE_ENGINE', '')
-  vi.stubEnv('ENSO_YDOC_HOST', '')
   starts = []
   stops = []
   waits = []
@@ -135,22 +134,14 @@ test('no spare until the GUI reports the setting; then one', async () => {
   expect(starts[0]!.extraEnv).toEqual([['ENSO_SECRETS_KEY', 'key-a']])
 })
 
-test('no spare with the setting off, ENSO_SPARE_ENGINE=0, the engine ydoc host, or profiling', async () => {
+test('no spare with the setting off, ENSO_SPARE_ENGINE=0, or profiling', async () => {
   await service().setSpareEngine(false)
   vi.stubEnv('ENSO_SPARE_ENGINE', '0')
   await service().setSpareEngine(true)
   vi.stubEnv('ENSO_SPARE_ENGINE', '')
-  vi.stubEnv('ENSO_YDOC_HOST', 'engine')
-  await service().setSpareEngine(true)
-  vi.stubEnv('ENSO_YDOC_HOST', '')
   await service({}, ['--profiling-path', 'profiling.npss']).setSpareEngine(true)
   expect(starts).toEqual([])
-  expect(stops).toEqual([
-    'the setting is off',
-    'ENSO_SPARE_ENGINE=0',
-    'ENSO_YDOC_HOST=engine',
-    'profiling is on',
-  ])
+  expect(stops).toEqual(['the setting is off', 'ENSO_SPARE_ENGINE=0', 'profiling is on'])
 })
 
 test('turning the setting off stops the spare, and on starts one again', async () => {

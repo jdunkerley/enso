@@ -23,8 +23,8 @@ import scala.util.control.NonFatal
 
 /** The Language Server's end of the ydoc server's four channels, as WebSockets
   * on the RPC port: `/channel/{json,binary,vis-control,vis-data}?token=<t>`.
-  * Each connection becomes one [[YjsChannel]] handed to the same
-  * `Server.onConnect` callbacks the engine-hosted ydoc server calls in-process.
+  * Each connection becomes one [[YjsChannel]] handed to the channel kind's
+  * `Server.onConnect` callbacks.
   * See Note [The Channel Socket] below.
   *
   * @param token the token a client must present, if the engine has one

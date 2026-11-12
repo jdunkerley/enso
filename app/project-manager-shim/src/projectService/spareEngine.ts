@@ -14,7 +14,6 @@ import { killTree } from '../childProcess/killTree.js'
  */
 export const LINE_VARIABLES: ReadonlySet<string> = new Set([
   'LANGUAGE_SERVER_CHANNEL_TOKEN',
-  'LANGUAGE_SERVER_YDOC_PORT',
   'ENSO_LOCAL_PROJECT_ID',
   'ENSO_LOCAL_PROJECT_SESSION_ID',
 ])

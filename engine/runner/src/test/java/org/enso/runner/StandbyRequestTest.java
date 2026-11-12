@@ -14,7 +14,6 @@ import org.junit.Test;
 public class StandbyRequestTest {
   @After
   public void clear() {
-    System.clearProperty("language-server.ydoc.port");
     System.clearProperty("language-server.channel-token");
     System.clearProperty(ProcessEnvironment.PROPERTY_PREFIX + "ENSO_LOCAL_PROJECT_ID");
   }
@@ -100,10 +99,9 @@ public class StandbyRequestTest {
   @Test
   public void appliesTheEnvironmentAsProperties() {
     StandbyRequest.parse(
-            "{\"args\":[],\"env\":{\"LANGUAGE_SERVER_YDOC_PORT\":\"1234\","
-                + "\"LANGUAGE_SERVER_CHANNEL_TOKEN\":\"tok\",\"ENSO_LOCAL_PROJECT_ID\":\"key-1\"}}")
+            "{\"args\":[],\"env\":{\"LANGUAGE_SERVER_CHANNEL_TOKEN\":\"tok\","
+                + "\"ENSO_LOCAL_PROJECT_ID\":\"key-1\"}}")
         .applyEnvironment();
-    assertEquals("1234", System.getProperty("language-server.ydoc.port"));
     assertEquals("tok", System.getProperty("language-server.channel-token"));
     assertEquals("key-1", ProcessEnvironment.get("ENSO_LOCAL_PROJECT_ID"));
   }

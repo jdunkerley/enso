@@ -373,9 +373,10 @@ has silently produced a wrong result here:
 
 - "Polyglot" has multiple meanings here: (1) GraalVM polyglot — Enso calling
   JS/Python/Java at runtime; (2) Enso Polyglot Bridge (EPB) — an internal
-  sub-language for single-threaded language contexts; (3) `ydoc-server-polyglot`
-  — the ydoc server bundled to run inside the GraalVM/JVM process. Don't
-  conflate them.
+  sub-language for single-threaded language contexts; (3) historically,
+  `ydoc-server-polyglot` — the ydoc server bundled to run inside the engine,
+  deleted with the engine-hosted ydoc server (the ydoc server runs only in Node
+  now). Don't conflate them.
 - The "standard library" has two halves: pure Enso sources in
   `distribution/lib/Standard/` and Java helpers in `std-bits/`. Adding a new
   stdlib primitive usually touches both.

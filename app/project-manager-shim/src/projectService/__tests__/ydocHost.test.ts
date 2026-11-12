@@ -1,9 +1,8 @@
 /**
- * @file The ydoc host an open uses: under `node` (the default) the shim's host listens on the ydoc
- * port before the engine starts and the engine gets no `LANGUAGE_SERVER_YDOC_PORT`; under `engine`
- * the engine serves it, as before. Either way the engine gets a channel token. The engine is a fake
- * `enso`, a Node script that records its environment, answers the health check, and exits on a
- * stdin newline (or at once with `FAKE_ENSO_FAIL=1`).
+ * @file The ydoc host an open uses: the shim's host listens on the ydoc port before the engine
+ * starts, and the engine gets a channel token. The engine is a fake `enso`, a Node script that
+ * records its environment, answers the health check, and exits on a stdin newline (or at once with
+ * `FAKE_ENSO_FAIL=1`).
  */
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
@@ -11,7 +10,7 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { EnsoRunner } from '../ensoRunner.js'
 import { Path } from '../types.js'
-import { newChannelToken, ydocHostKind, type YdocHost } from '../ydocHost.js'
+import { newChannelToken, type YdocHost } from '../ydocHost.js'
 import { fakeLauncherCommand } from './fakeLauncher.js'
 import { YDOC_HOST_PORT } from './testPorts.js'
 
@@ -21,9 +20,7 @@ import * as http from 'node:http'
 const args = process.argv.slice(2)
 const value = (flag) => args[args.indexOf(flag) + 1]
 fs.writeFileSync(value('--path') + '.env.json', JSON.stringify({
-  LANGUAGE_SERVER_YDOC_PORT: process.env.LANGUAGE_SERVER_YDOC_PORT,
   LANGUAGE_SERVER_CHANNEL_TOKEN: process.env.LANGUAGE_SERVER_CHANNEL_TOKEN,
-  LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS: process.env.LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS,
 }))
 if (process.env.FAKE_ENSO_FAIL === '1') process.exit(1)
 http.createServer((_q, r) => r.end('OK')).listen(Number(value('--rpc-port')), '127.0.0.1')
@@ -49,9 +46,7 @@ async function fakeEnso(directory: string): Promise<Path> {
 
 const seenEnv = async (project: string) =>
   JSON.parse(await fs.readFile(`${project}.env.json`, 'utf8')) as {
-    LANGUAGE_SERVER_YDOC_PORT?: string
     LANGUAGE_SERVER_CHANNEL_TOKEN?: string
-    LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS?: string
   }
 
 /** Whether any engine has started in the test's root (each fake writes `<project>.env.json`). */
@@ -81,10 +76,9 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
-test('node: the host listens on the ydoc port before the engine starts, with the engine token', async () => {
+test('the host listens on the ydoc port before the engine starts, with the engine token', async () => {
   const calls: string[] = []
   const engineStartedAtListen: boolean[] = []
-  vi.stubEnv('ENSO_YDOC_HOST', 'node')
   const runner = new EnsoRunner(await fakeEnso(root), {
     engineCommand: fakeLauncherCommand,
     firstPort: YDOC_HOST_PORT,
@@ -93,8 +87,6 @@ test('node: the host listens on the ydoc port before the engine starts, with the
   const p = path.join(root, 'N')
   const sockets = await runner.openProject(Path(p), 'id-n')
   const seen = await seenEnv(p)
-  expect(seen.LANGUAGE_SERVER_YDOC_PORT).toBeUndefined()
-  expect(seen.LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS).toBeUndefined()
   expect(seen.LANGUAGE_SERVER_CHANNEL_TOKEN).toMatch(/^[0-9a-f]{64}$/)
   expect(calls).toEqual([
     `listen 127.0.0.1:${sockets.ydocSocket.port} ls=127.0.0.1:${sockets.jsonSocket.port} token=${seen.LANGUAGE_SERVER_CHANNEL_TOKEN}`,
@@ -104,92 +96,14 @@ test('node: the host listens on the ydoc port before the engine starts, with the
   expect(calls.at(-1)).toBe(`close ${sockets.ydocSocket.port}`)
 })
 
-test('node: the open does not wait for a ydoc port, which the engine does not serve', async () => {
-  // The fake engine never listens on the ydoc port: under `engine` the open would wait the whole
-  // `ydocWaitMs`; under `node` the host has the port already, so there is no wait at all.
-  vi.stubEnv('ENSO_YDOC_HOST', 'node')
-  const ydocWaitMs = 10_000
-  const runner = new EnsoRunner(await fakeEnso(root), {
-    engineCommand: fakeLauncherCommand,
-    firstPort: YDOC_HOST_PORT,
-    ydocWaitMs,
-    ydocHost: recordingHost([]),
-  })
-  const p = path.join(root, 'Q')
-  const started = Date.now()
-  await runner.openProject(Path(p), 'id-q')
-  expect(Date.now() - started).toBeLessThan(ydocWaitMs / 2)
-  await runner.closeProject(Path(p))
-}, 30_000)
-
-test('node is the default: no ENSO_YDOC_HOST uses the host', async () => {
-  const calls: string[] = []
-  vi.stubEnv('ENSO_YDOC_HOST', undefined)
-  const runner = new EnsoRunner(await fakeEnso(root), {
-    engineCommand: fakeLauncherCommand,
-    firstPort: YDOC_HOST_PORT,
-    ydocHost: recordingHost(calls),
-  })
-  const p = path.join(root, 'D')
-  await runner.openProject(Path(p), 'id-d')
-  expect(calls).toHaveLength(1)
-  expect((await seenEnv(p)).LANGUAGE_SERVER_YDOC_PORT).toBeUndefined()
-  await runner.closeProject(Path(p))
-})
-
-test('engine: the engine gets the ydoc port and a token, and the host is not used', async () => {
-  vi.stubEnv('ENSO_YDOC_HOST', 'engine')
-  const host = { listen: vi.fn(), close: vi.fn() }
-  const runner = new EnsoRunner(await fakeEnso(root), {
-    engineCommand: fakeLauncherCommand,
-    firstPort: YDOC_HOST_PORT,
-    ydocHost: host,
-  })
-  const p = path.join(root, 'E')
-  const sockets = await runner.openProject(Path(p), 'id-e')
-  const seen = await seenEnv(p)
-  expect(seen.LANGUAGE_SERVER_YDOC_PORT).toBe(String(sockets.ydocSocket.port))
-  expect(seen.LANGUAGE_SERVER_CHANNEL_TOKEN).toMatch(/^[0-9a-f]{64}$/)
-  await runner.closeProject(Path(p))
-  expect(host.listen).not.toHaveBeenCalled()
-  expect(host.close).not.toHaveBeenCalled()
-})
-
-test("engine: the engine's listener gets the host's origins (#614)", async () => {
-  vi.stubEnv('ENSO_YDOC_HOST', 'engine')
-  const origins = ['https://localhost:5000', 'https://127.0.0.1:5000']
-  const runner = new EnsoRunner(await fakeEnso(root), {
-    engineCommand: fakeLauncherCommand,
-    firstPort: YDOC_HOST_PORT,
-    ydocHost: { listen: vi.fn(), close: vi.fn(), allowedOrigins: () => origins },
-  })
-  const p = path.join(root, 'O')
-  await runner.openProject(Path(p), 'id-o')
-  expect((await seenEnv(p)).LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS).toBe(origins.join(','))
-  await runner.closeProject(Path(p))
-})
-
-test('engine: a host without origins gives the listener none, so it refuses every page', async () => {
-  vi.stubEnv('ENSO_YDOC_HOST', 'engine')
-  const runner = new EnsoRunner(await fakeEnso(root), {
-    engineCommand: fakeLauncherCommand,
-    firstPort: YDOC_HOST_PORT,
-  })
-  const p = path.join(root, 'P')
-  await runner.openProject(Path(p), 'id-p')
-  expect((await seenEnv(p)).LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS).toBe('')
-  await runner.closeProject(Path(p))
-})
-
-test('without a host (node or not) the engine serves ydoc, as before', async () => {
-  vi.stubEnv('ENSO_YDOC_HOST', 'node')
+test('without a host the engine still starts, with a token', async () => {
   const runner = new EnsoRunner(await fakeEnso(root), {
     engineCommand: fakeLauncherCommand,
     firstPort: YDOC_HOST_PORT,
   })
   const p = path.join(root, 'W')
-  const sockets = await runner.openProject(Path(p), 'id-w')
-  expect((await seenEnv(p)).LANGUAGE_SERVER_YDOC_PORT).toBe(String(sockets.ydocSocket.port))
+  await runner.openProject(Path(p), 'id-w')
+  expect((await seenEnv(p)).LANGUAGE_SERVER_CHANNEL_TOKEN).toMatch(/^[0-9a-f]{64}$/)
   await runner.closeProject(Path(p))
 })
 
@@ -269,17 +183,6 @@ test('a ydoc port taken before the listener binds it makes the open search again
   expect(calls).toHaveLength(1)
   expect(calls[0]).toMatch(new RegExp(`^listen 127\\.0\\.0\\.1:${sockets.ydocSocket.port} `))
   await runner.closeProject(Path(p))
-})
-
-test('ydocHostKind', () => {
-  expect(ydocHostKind({})).toBe('node')
-  expect(ydocHostKind({ ENSO_YDOC_HOST: '' })).toBe('node')
-  expect(ydocHostKind({ ENSO_YDOC_HOST: 'Engine' })).toBe('engine')
-  expect(ydocHostKind({ ENSO_YDOC_HOST: ' node ' })).toBe('node')
-  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-  expect(ydocHostKind({ ENSO_YDOC_HOST: 'graal' })).toBe('node')
-  expect(warn).toHaveBeenCalledOnce()
-  warn.mockRestore()
 })
 
 test('newChannelToken: 32 random bytes as hex', () => {

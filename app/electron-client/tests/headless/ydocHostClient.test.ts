@@ -97,15 +97,6 @@ test('listens carry the allowed origins, also when restored after an exit (#596)
   ])
 })
 
-test('tells the allowed origins, for the engine-hosted listener (#614)', () => {
-  const { host, spawn } = setup()
-  expect(host.allowedOrigins()).toEqual([])
-  host.allowOrigins(['https://localhost:8080'])
-  expect(host.allowedOrigins()).toEqual(['https://localhost:8080'])
-  // Under `ENSO_YDOC_HOST=engine` nothing listens here: asking forks nothing.
-  expect(spawn).not.toHaveBeenCalled()
-})
-
 test('failed rejects with the message', async () => {
   const { host } = setup((r) => ({ type: 'failed', id: r.id, message: 'listen EADDRINUSE' }))
   await expect(host.listen(request(4000))).rejects.toThrow('listen EADDRINUSE')

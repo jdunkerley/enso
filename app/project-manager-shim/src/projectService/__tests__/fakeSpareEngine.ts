@@ -38,7 +38,7 @@ if (!spawnArgs.includes('--standby')) {
 } else {
   const envOf = (name) => process.env[name] ?? null
   const env = Object.fromEntries(
-    ['LANGUAGE_SERVER_CHANNEL_TOKEN', 'LANGUAGE_SERVER_YDOC_PORT', 'ENSO_LOCAL_PROJECT_ID', 'ENSO_SECRETS_KEY'].map((name) => [name, envOf(name)]),
+    ['LANGUAGE_SERVER_CHANNEL_TOKEN', 'ENSO_LOCAL_PROJECT_ID', 'ENSO_SECRETS_KEY'].map((name) => [name, envOf(name)]),
   )
   event({ event: 'start', args: spawnArgs, cwd: process.cwd(), jvmOptions: process.env.ENSO_JVM_OPTIONS ?? null, env })
   if (process.env.SPARE_DIES === '1') process.exit(3)

@@ -31,7 +31,6 @@ describe('engineTimeouts', () => {
     expect(engineTimeouts({})).toEqual({
       startupMs: 120_000,
       terminateMs: 30_000,
-      ydocWaitMs: 30_000,
     })
     expect(ENGINE_TIMEOUTS.startupMs).toBe(120_000)
   })

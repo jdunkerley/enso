@@ -124,15 +124,14 @@ reader or a fresh stream over the descriptor): `{"args":[...],"env":{...}}`
 (`StandbyRequest`), the arguments `project/open` would have passed. The line is
 refused unless it is a `--server` line without `--standby`, `--jvm`,
 `--in-project` or `--run`, and its `--path` must be absolute and not a
-filesystem root. `env` accepts only `LANGUAGE_SERVER_YDOC_PORT` and
-`LANGUAGE_SERVER_CHANNEL_TOKEN` (set as the `language-server.*` configuration
-properties) and `ENSO_LOCAL_PROJECT_ID` and `ENSO_LOCAL_PROJECT_SESSION_ID` (set
-as `enso.env.<NAME>`, read through `org.enso.common.ProcessEnvironment`). Any
-code that reads one of those four from the environment must read it the same
-way. The spare's spawn environment must not carry
-`LANGUAGE_SERVER_CHANNEL_TOKEN` or `LANGUAGE_SERVER_YDOC_PORT` (the
-configuration prefers the environment, so the engine refuses a line that sets
-one of them while it is inherited); only the four names go in the line, and
+filesystem root. `env` accepts only `LANGUAGE_SERVER_CHANNEL_TOKEN` (set as the
+`language-server.channel-token` configuration property) and
+`ENSO_LOCAL_PROJECT_ID` and `ENSO_LOCAL_PROJECT_SESSION_ID` (set as
+`enso.env.<NAME>`, read through `org.enso.common.ProcessEnvironment`). Any code
+that reads one of those three from the environment must read it the same way.
+The spare's spawn environment must not carry `LANGUAGE_SERVER_CHANNEL_TOKEN`
+(the configuration prefers the environment, so the engine refuses a line that
+sets it while it is inherited); only the three names go in the line, and
 everything else (the secrets key, other variables) goes in the spawn
 environment. It then sets the context's working directory
 (`enso.context.workingDirectory`, applied by `ContextFactory`) to the parent of

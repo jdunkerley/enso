@@ -59,14 +59,12 @@ class BinaryYdocServerSpec
         bytes: ByteBuffer
       ): Either[DecodingFailure, ByteBuffer] = Right(bytes)
     }
-    // The polyglot context is only used to convert inbound messages.
     val callbacks =
       new BinaryYdocServer.BinaryServerCallbacks[ByteBuffer, ByteBuffer](
         decoder,
         BinaryEncoder.empty,
         new ProbeControllerFactory(controller),
         List.empty,
-        null,
         system
       )
     val channel = new FakeChannel

@@ -5,8 +5,8 @@ import java.util.function.Consumer;
 /**
  * A bidirectional communication channel between the Language Server and the Ydoc server.
  *
- * <p>Register <em>JSON</em> and/or <em>binary</em> implementations of {@link Server} when
- * initializing the Ydoc subsystem - e.g. when calling {@link YdocServerApi#launchYdocServer}
+ * <p>The Language Server registers <em>JSON</em> and <em>binary</em> implementations of {@link
+ * Server} with its channel socket endpoint, one per channel kind.
  *
  * <p>Whenever new connection arrives, a call to {@link
  * Server#onConnect(org.enso.ydoc.api.YjsChannel)} method is made with a provided instance of the

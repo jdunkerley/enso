@@ -6,7 +6,6 @@ import {
 } from 'enso-common/src/utilities/childProcess'
 import * as childProcess from 'node:child_process'
 import * as fs from 'node:fs'
-import * as net from 'node:net'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import * as portfinder from 'portfinder'
@@ -25,16 +24,16 @@ import {
 } from './spareEngine.js'
 import { ENGINE_TIMEOUTS, engineTimeouts, type EngineTimeouts } from './timeouts.js'
 import { Path } from './types.js'
-import { newChannelToken, ydocHostKind, type YdocHost } from './ydocHost.js'
+import { newChannelToken, type YdocHost } from './ydocHost.js'
 
 const HEALTHCHECK_FAILURES_TO_RESTART = 3
 const LOAD_HEALTHCHECK_INTERVAL = 250
 /* Note [Start-up Health Polling]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * A native engine (measured before it was removed) answered `/_health` some 200 ms after it was spawned, and the open waits for that
- * answer. Polling every 250 ms (the first check 250 ms after the spawn) added up to 250 ms to every
- * open, so the first second polls every 25 ms; a slow start (the JVM, a cold machine) then falls
- * back to 250 ms, so the checks never pile up.
+ * A native engine (measured before it was removed) answered `/_health` some 200 ms after it was
+ * spawned, and the open waits for that answer. Polling every 250 ms (the first check 250 ms after
+ * the spawn) added up to 250 ms to every open, so the first second polls every 25 ms; a slow start
+ * (the JVM, a cold machine) then falls back to 250 ms, so the checks never pile up.
  */
 const LOAD_HEALTHCHECK_FAST_INTERVAL = 25
 const LOAD_HEALTHCHECK_FAST_PERIOD_MS = 1000
@@ -56,12 +55,12 @@ export function loadHealthcheckDelay(elapsedMs: number): number {
 }
 
 /** What a timer of an engine's start-up is for. */
-export type StartupTimer = 'healthCheck' | 'ydocPoll' | 'startupTimeout'
+export type StartupTimer = 'healthCheck' | 'startupTimeout'
 
 /**
- * The clock of an engine's start-up: its health checks, the wait for its ydoc port and its startup
- * timeout all read the time and schedule through it. Tests replace it to observe the schedule the
- * runner asks for, which a loaded machine cannot distort the way it stretches real time.
+ * The clock of an engine's start-up: its health checks and its startup timeout read the time and
+ * schedule through it. Tests replace it to observe the schedule the runner asks for, which a loaded
+ * machine cannot distort the way it stretches real time.
  */
 export interface StartupClock {
   now(): number
@@ -71,49 +70,6 @@ export interface StartupClock {
 const REAL_STARTUP_CLOCK: StartupClock = {
   now: () => Date.now(),
   schedule: (_timer, callback, delayMs) => void setTimeout(callback, delayMs),
-}
-/* Note [Open Waits For The Ydoc Port]
- * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * The ydoc server runs inside the engine and starts listening some 300 ms after the Language
- * Server passes its health check, which is when `project/open` used to be answered. The GUI
- * connects to the ydoc port as soon as it has the answer. Measured: the port was refused at the
- * answer and accepted about 300 ms later, the ydoc socket opened ~525 ms after the answer on
- * Windows, and the renderer sat idle all that time (a profile shows ~80% `(idle)` and nothing
- * waiting in the GUI's code). That is consistent with Windows retrying a refused loopback connect
- * after ~500 ms (inferred from the constant 510-525 ms gap, not observed). On Linux the refusal is
- * immediate and y-websocket retries after 200, 400 and 800 ms: before this wait the GUI's fourth
- * socket was the first to open, ~1.4 s after the answer (PR #504's CI run). So the open also waits
- * until the ydoc port accepts a connection, polling it as the health check is. On Linux the probe
- * succeeds within a poll of the port appearing in the kernel's listen table (measured in WSL with
- * a native engine: 300 to 450 ms after `/_health`, the same with or without probing). It
- * is bounded by `ydocWaitMs` (an engine without a ydoc server, such as a fake one in a test, only
- * delays the answer by that), and the startup timeout does not apply once the health check has
- * passed, so the wait can never get a healthy engine killed. Under the Node ydoc host (the default,
- * `ydocHost.ts`) the shim's listener is up before the engine is even spawned, so there is nothing to
- * wait for and the wait is skipped.
- */
-const YDOC_POLL_INTERVAL = 10
-/** How long one connection attempt to the ydoc port may take. */
-const YDOC_CONNECT_TIMEOUT_MS = 250
-
-/** The default for how long an open waits for the engine's ydoc port to accept connections. */
-export const DEFAULT_YDOC_WAIT_MS = ENGINE_TIMEOUTS.ydocWaitMs
-
-/** Whether a TCP connection to `socket` is accepted right now. */
-function acceptsConnections(socket: Socket): Promise<boolean> {
-  return new Promise((resolve) => {
-    const connection = net.connect(socket.port, socket.host)
-    connection.setTimeout(YDOC_CONNECT_TIMEOUT_MS)
-    connection.once('connect', () => {
-      connection.destroy()
-      resolve(true)
-    })
-    connection.once('timeout', () => {
-      connection.destroy()
-      resolve(false)
-    })
-    connection.once('error', () => resolve(false))
-  })
 }
 const WATCHDOG_HEALTHCHECK_INTERVAL = 3000
 const LANGUAGE_SERVER_CRASH_LOOP_MAX = 5
@@ -280,15 +236,10 @@ export interface SpareRequest {
 
 /**
  * The environment a spare is spawned with: without the variables its line carries, which the
- * engine refuses to find inherited (engine/runner CLAUDE.md, "Standby mode"), and without allowed
- * origins for an engine-hosted ydoc server, which an open that takes a spare has none of.
+ * engine refuses to find inherited (engine/runner CLAUDE.md, "Standby mode").
  */
 function spareSpawnEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return Object.fromEntries(
-    Object.entries(env).filter(
-      ([name]) => !LINE_VARIABLES.has(name) && name !== 'LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS',
-    ),
-  )
+  return Object.fromEntries(Object.entries(env).filter(([name]) => !LINE_VARIABLES.has(name)))
 }
 
 const DEFAULT_JSONRPC_PORT = 30616
@@ -339,7 +290,6 @@ class OpenedProject {
     private readonly startupTimeoutMs: number,
     /** Added to the startup limit of the first engine only (a spare still warming up). */
     private firstEngineExtraStartupMs: number,
-    private readonly ydocWaitMs: number,
     private readonly terminateMs: number,
     private readonly clock: StartupClock,
   ) {
@@ -367,7 +317,6 @@ class OpenedProject {
     logSink: EngineLogSink | undefined,
     startupTimeoutMs: number,
     firstEngineExtraStartupMs: number,
-    ydocWaitMs: number,
     terminateMs: number,
     clock: StartupClock = REAL_STARTUP_CLOCK,
   ) {
@@ -382,7 +331,6 @@ class OpenedProject {
       logSink,
       startupTimeoutMs,
       firstEngineExtraStartupMs,
-      ydocWaitMs,
       terminateMs,
       clock,
     )
@@ -492,11 +440,8 @@ class OpenedProject {
       const healthy = await this.checkServerHealth()
       if (over()) return
       if (healthy) {
-        // The engine has started: the startup timeout below no longer applies, and must not kill
-        // it while the (bounded) wait for its ydoc port runs.
+        // The engine has started: the startup timeout below no longer applies.
         passedHealth = true
-        await this.waitForYdocPort(over)
-        if (over()) return
         resolved = true
         this.started = true
         this.startWatchdog()
@@ -610,17 +555,6 @@ class OpenedProject {
     await handle.waitForDrain()
   }
 
-  /** Wait, for at most `ydocWaitMs`, until the ydoc port accepts a connection (Note [Open Waits For The Ydoc Port]). */
-  private async waitForYdocPort(over: () => boolean): Promise<void> {
-    const deadline = this.clock.now() + this.ydocWaitMs
-    while (!over() && this.clock.now() < deadline) {
-      if (await acceptsConnections(this.sockets.ydocSocket)) return
-      await new Promise<void>((resolve) =>
-        this.clock.schedule('ydocPoll', resolve, YDOC_POLL_INTERVAL),
-      )
-    }
-  }
-
   // Health check function
   async checkServerHealth(): Promise<boolean> {
     try {
@@ -659,20 +593,17 @@ export class EnsoRunner implements Runner {
   /**
    * Creates a new EnsoRunner with the path to the Enso executable. `firstPort` is where the search
    * for an engine's free ports starts; `startupTimeoutMs` is how long an engine has to pass its
-   * first health check before it is killed. `ydocWaitMs` is how long an open then waits for the
-   * engine's ydoc port to accept connections (0, the default, does not wait: an engine that has no
-   * ydoc server, as the fakes of the tests, would only delay its open). `ydocHost` serves the ydoc
-   * server outside the engine when `ENSO_YDOC_HOST` is `node` (the default); without one, the engine
-   * serves it, as under `ENSO_YDOC_HOST=engine`. `startupClock` replaces the real clock of every
-   * engine's start-up, and `engineCommand` the command of every engine (given `ensoPath`), for
-   * tests; by default an engine is the bundled `java` (`javaLaunch.ts`).
+   * first health check before it is killed. `ydocHost` serves each opened project's ydoc server
+   * (Electron's utility process, or `NodeYdocHost` in the Vite dev server); without one (the tests'
+   * fake engines, headless runs) no ydoc server is started. `startupClock` replaces the real clock
+   * of every engine's start-up, and `engineCommand` the command of every engine (given `ensoPath`),
+   * for tests; by default an engine is the bundled `java` (`javaLaunch.ts`).
    */
   constructor(
     ensoPath: Path,
     private readonly options: {
       readonly firstPort?: number
       readonly startupTimeoutMs?: number
-      readonly ydocWaitMs?: number
       readonly ydocHost?: YdocHost | undefined
       readonly startupClock?: StartupClock
       readonly engineCommand?: (ensoPath: Path) => EngineCommand
@@ -859,18 +790,8 @@ export class EnsoRunner implements Runner {
         const rootId = crypto.randomUUID()
         // Each engine gets its own token, which the Language Server requires of a channel socket.
         const token = newChannelToken()
-        const nodeHost = ydocHostKind() === 'node' ? this.options.ydocHost : undefined
-        // Under `engine`, the engine's listener checks `Origin` against the app's origins, which
-        // the host knows (Note [The Engine-Hosted Listener Checks Origin] in `Ydoc.java`).
-        const engineYdocEnv: Record<string, string> =
-          nodeHost ?
-            {}
-          : {
-              LANGUAGE_SERVER_YDOC_PORT: ydocPort.toString(),
-              LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS: (
-                this.options.ydocHost?.allowedOrigins?.() ?? []
-              ).join(','),
-            }
+        // The ydoc listener is up before the engine is spawned, so the GUI never meets a refused port.
+        const nodeHost = this.options.ydocHost
         if (nodeHost) {
           try {
             await nodeHost.listen({
@@ -913,25 +834,17 @@ export class EnsoRunner implements Runner {
 
         const env = {
           ...process.env,
-          ...engineYdocEnv,
           LANGUAGE_SERVER_CHANNEL_TOKEN: token,
           ...(extraEnv ? Object.fromEntries(extraEnv) : {}),
         }
 
         const cwd = path.dirname(projectPath)
         // A spare engine (`spareEngine.ts`) is taken by the first engine of an open whose launch
-        // has its key. The engine cannot take allowed origins on its line (`StandbyRequest` in
-        // engine/runner), so an engine-hosted ydoc server for a browser page means no spare.
-        const spareAllowed = (engineYdocEnv.LANGUAGE_SERVER_YDOC_ALLOWED_ORIGINS ?? '') === ''
+        // has its key.
         let spareResult: TakeResult | undefined
         if (!spareAsked && launch?.spareKey != null) {
           spareAsked = true
-          if (spareAllowed) {
-            spareResult = this.spare.take(launch.spareKey)
-          } else {
-            void this.spare.stop('the ydoc server of this open runs in the engine')
-            spareResult = { kind: 'none', reason: 'the ydoc server runs in the engine' }
-          }
+          spareResult = this.spare.take(launch.spareKey)
           const notice = spareNotice(spareResult, this.clock.now(), launch.spareIdleReason)
           if (notice != null) logSink?.notice?.(notice)
         }
@@ -947,9 +860,6 @@ export class EnsoRunner implements Runner {
         // The line carries only the open's own variables; never log it (it holds the token).
         const lineEnv: Record<string, string> = {
           LANGUAGE_SERVER_CHANNEL_TOKEN: token,
-          ...(engineYdocEnv.LANGUAGE_SERVER_YDOC_PORT != null ?
-            { LANGUAGE_SERVER_YDOC_PORT: engineYdocEnv.LANGUAGE_SERVER_YDOC_PORT }
-          : {}),
           ...Object.fromEntries((extraEnv ?? []).filter(([name]) => LINE_VARIABLES.has(name))),
         }
         let project: OpenedProject
@@ -985,9 +895,6 @@ export class EnsoRunner implements Runner {
               this.options.startupTimeoutMs ??
               LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
             spareWarmingUpMs,
-            // Nothing to wait for when the shim's listener serves the port (Note [Open Waits For
-            // The Ydoc Port]).
-            nodeHost ? 0 : (launch?.timeouts.ydocWaitMs ?? this.options.ydocWaitMs ?? 0),
             launch?.timeouts.terminateMs ?? terminateTimeoutMs(),
             this.options.startupClock,
           )

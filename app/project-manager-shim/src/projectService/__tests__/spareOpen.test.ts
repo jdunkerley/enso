@@ -33,7 +33,7 @@ const exists = (file: string) =>
   )
 
 const jvm = (spareKey?: string): EngineLaunch => ({
-  timeouts: { ...ENGINE_TIMEOUTS, ydocWaitMs: 0 },
+  timeouts: ENGINE_TIMEOUTS,
   ...(spareKey != null ? { spareKey } : {}),
 })
 
@@ -128,12 +128,10 @@ test('an open takes a matching spare and writes it the line', async () => {
     'ENSO_LOCAL_PROJECT_ID',
     'ENSO_LOCAL_PROJECT_SESSION_ID',
     'LANGUAGE_SERVER_CHANNEL_TOKEN',
-    'LANGUAGE_SERVER_YDOC_PORT',
   ])
   expect(line.env.LANGUAGE_SERVER_CHANNEL_TOKEN).toMatch(/^[0-9a-f]{64}$/)
   expect(line.env.ENSO_LOCAL_PROJECT_ID).toBe('key-1')
   expect(line.env.ENSO_LOCAL_PROJECT_SESSION_ID).toBe('session-1')
-  expect(line.env.LANGUAGE_SERVER_YDOC_PORT).toBe(String(sockets.ydocSocket.port))
   expect(logSink.notices).toEqual([expect.stringMatching(/^Engine: pre-started spare used/)])
   expect(runner.spareState).toBe('none')
   await runner.closeProject(Path(project))
@@ -141,13 +139,11 @@ test('an open takes a matching spare and writes it the line', async () => {
 
 test("the spare's spawn environment never carries the line's variables", async () => {
   vi.stubEnv('LANGUAGE_SERVER_CHANNEL_TOKEN', 'inherited')
-  vi.stubEnv('LANGUAGE_SERVER_YDOC_PORT', '1')
   vi.stubEnv('ENSO_LOCAL_PROJECT_ID', 'inherited')
   await readySpare('k1')
   const [start] = await spareEvents(log)
   expect(start?.env).toEqual({
     LANGUAGE_SERVER_CHANNEL_TOKEN: null,
-    LANGUAGE_SERVER_YDOC_PORT: null,
     ENSO_LOCAL_PROJECT_ID: null,
     ENSO_SECRETS_KEY: 'secret',
   })
@@ -256,7 +252,7 @@ test('a spare that misses its startup limit is killed with its tree, and an ordi
   const logSink = sink()
   const launch: EngineLaunch = {
     ...jvm('k1'),
-    timeouts: { ...ENGINE_TIMEOUTS, ydocWaitMs: 0, startupMs: 3000 },
+    timeouts: { ...ENGINE_TIMEOUTS, startupMs: 3000 },
   }
   await runner.openProject(Path(project), 'id-h', undefined, undefined, logSink, launch)
   const { pid } = JSON.parse(await fs.readFile(`${project}.line.json`, 'utf8'))
@@ -293,9 +289,8 @@ describe('through the service', () => {
   beforeEach(async () => {
     vi.stubEnv('ENSO_LOG_DIRECTORY', path.join(root, 'logs'))
     vi.stubEnv('ENSO_SPARE_ENGINE', '')
-    vi.stubEnv('ENSO_YDOC_HOST', '')
     secretsKey = 'key-a'
-    // A ydoc host that only says yes: the open then waits for no ydoc port the fake lacks.
+    // A ydoc host that only says yes, as Electron's would.
     hosted = new EnsoRunner(await fakeSpareEnso(root), {
       engineCommand: fakeLauncherCommand,
       firstPort: SPARE_OPEN_PORT,

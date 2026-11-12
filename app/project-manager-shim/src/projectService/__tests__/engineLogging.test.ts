@@ -99,7 +99,7 @@ test('an open gets the JVM timeouts', async () => {
   const service = new ProjectService(fakeRunner(), [])
   await service.openProject(UUID('id-1'), Path(root))
   expect(launches.at(-1)).toMatchObject({
-    timeouts: { startupMs: 120_000, terminateMs: 30_000, ydocWaitMs: 30_000 },
+    timeouts: { startupMs: 120_000, terminateMs: 30_000 },
   })
 })
 

@@ -18,7 +18,6 @@ import { withinVersioningTimeout, type LocalVersioning } from '../localVersionin
 import { samplesSettled } from '../samples/index.js'
 import {
   comparableProjectPath,
-  DEFAULT_YDOC_WAIT_MS,
   EnsoRunner,
   findEnsoExecutable,
   type EngineLaunch,
@@ -37,15 +36,9 @@ import {
 import { spawnKey } from './spareEngine.js'
 import { engineTimeouts } from './timeouts.js'
 import { Path, UUID } from './types.js'
-import { ydocHostKind, type YdocHost } from './ydocHost.js'
+import type { YdocHost } from './ydocHost.js'
 
-export {
-  loopbackOrigins,
-  ydocHostKind,
-  type YdocHost,
-  type YdocHostKind,
-  type YdocListenRequest,
-} from './ydocHost.js'
+export { loopbackOrigins, type YdocHost, type YdocListenRequest } from './ydocHost.js'
 
 export interface RunningLanguageServerInfo {
   readonly sockets: LanguageServerSockets
@@ -59,8 +52,8 @@ export interface EngineSettings {
   /** The per-user JDK AOT cache: its options go to every engine, and opens stop its training. */
   readonly jvmAot?: JvmAotCache | undefined
   /**
-   * Where opened projects' ydoc servers run when `ENSO_YDOC_HOST` is `node` (the default): Electron's
-   * utility process, or `NodeYdocHost` in the Vite dev server. Without one the engine serves it.
+   * Where opened projects' ydoc servers run: Electron's utility process, or `NodeYdocHost` in the
+   * Vite dev server. Without one no ydoc server is started.
    */
   readonly ydocHost?: YdocHost | undefined
   /**
@@ -279,7 +272,6 @@ export class ProjectService {
       return this.spareSetting === false ? 'the setting is off' : 'the GUI has not sent the setting'
     }
     if (process.env.ENSO_SPARE_ENGINE === '0') return 'ENSO_SPARE_ENGINE=0'
-    if (ydocHostKind() !== 'node') return 'ENSO_YDOC_HOST=engine'
     // A first launch trains the AOT cache in the background: a spare would compete with it, and
     // be discarded at the next open for the new cache. `onTrainingEnded` refreshes it.
     if (this.engine?.jvmAot?.isTraining() === true) return 'the AOT cache is training'
@@ -335,11 +327,7 @@ export class ProjectService {
     }
     // The start-up and terminate timeouts come per launch (`engineTimeouts`;
     // `ENSO_ENGINE_STARTUP_TIMEOUT_MS` and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS` override them).
-    // `ydocWaitMs` is the fallback for a launch without them.
-    const runner = new EnsoRunner(ensoPath, {
-      ydocWaitMs: DEFAULT_YDOC_WAIT_MS,
-      ydocHost: engine?.ydocHost,
-    })
+    const runner = new EnsoRunner(ensoPath, { ydocHost: engine?.ydocHost })
 
     // Read extra arguments from environment variable
     const envArgs = process.env.ENSO_ENGINE_ARGS

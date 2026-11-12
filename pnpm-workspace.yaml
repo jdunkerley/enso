@@ -10,7 +10,6 @@ packages:
   - app/ydoc-channel
   - app/ydoc-inspect
   - app/ydoc-server
-  - app/ydoc-server-polyglot
   - app/ydoc-shared
   - docs-site
   - lib/js/runner

@@ -26,7 +26,6 @@ import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVe
 import {
   loopbackOrigins,
   ProjectService,
-  ydocHostKind,
   type EngineSettings,
 } from 'project-manager-shim/projectService'
 
@@ -66,8 +65,8 @@ function forkYdocHost(): YdocHostChild {
 }
 
 /**
- * Where opened projects' ydoc servers run under `ENSO_YDOC_HOST=node` (the default): a utility
- * process, forked at start-up by `setupProjectService` (`start()`).
+ * Where opened projects' ydoc servers run: a utility process, forked at start-up by
+ * `setupProjectService` (`start()`).
  */
 function getYdocHost(): UtilityProcessYdocHost {
   ydocHost ??= new UtilityProcessYdocHost(forkYdocHost)
@@ -325,7 +324,7 @@ export function setupProjectService(
     )
   }
   // The ydoc host's start is not left to the first open, whose engine would wait for it.
-  if (ydocHostKind() === 'node') getYdocHost().start()
+  getYdocHost().start()
   return projectService
 }
 
