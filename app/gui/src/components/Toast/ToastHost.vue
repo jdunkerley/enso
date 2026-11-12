@@ -3,10 +3,11 @@
  * @file Renders the app's toasts (`$/providers/toasts`): one container per screen position, each
  * listing its toasts oldest first. Mounted once, in `App.vue`.
  *
- * Toasts are 320px wide, top centre by default, sliding in and out, at most three at once, with a
- * close button, a progress bar that pauses on hover and while the window is unfocused, and
- * `role="alert"` on the message of an error or a warning, `role="status"` on the others. A click in
- * a container never dismisses a dialog (`data-ignore-click-outside`).
+ * Toasts are 320px wide, top centre by default (below the top bar, so as not to cover the project
+ * tabs), sliding in and out, at most three at once, with a close button, a progress bar that pauses
+ * on hover and while the window is unfocused, and `role="alert"` on the message of an error or a
+ * warning, `role="status"` on the others. A click in a container never dismisses a dialog
+ * (`data-ignore-click-outside`).
  */
 import { useToasts, type ToastPosition, type ToastsStore } from '$/providers/toasts'
 import { computed } from 'vue'
@@ -57,8 +58,9 @@ const containers = computed(() =>
   box-sizing: border-box;
   color: #fff;
 
+  /* Below the top bar (the project tabs), so that a lasting toast does not cover a tab. */
   &.top-center {
-    top: 1em;
+    top: var(--top-bar-height, 3rem);
     left: 50%;
     transform: translateX(-50%);
   }
@@ -77,7 +79,7 @@ const containers = computed(() =>
     margin: 0;
 
     &.top-center {
-      top: 0;
+      top: var(--top-bar-height, 3rem);
       left: 0;
       transform: translateX(0);
     }
