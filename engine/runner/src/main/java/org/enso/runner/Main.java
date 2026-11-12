@@ -236,7 +236,7 @@ public class Main {
     var lsNativeOption =
         cliOptionBuilder()
             .longOpt(LANGUAGE_SERVER_NATIVE_OPTION)
-            .desc("Runs Language Server in native-image mode")
+            .desc("Has no effect: the native image it selected is gone.")
             .build();
     var lsProfilingPathOption =
         cliOptionBuilder()
@@ -498,8 +498,8 @@ public class Main {
             .longOpt(STANDBY_OPTION)
             .desc(
                 "Starts the engine, warms it up, and waits for one line of JSON on stdin: the"
-                    + " arguments to run with. Used by the IDE's spare engine; runs only on the JVM"
-                    + " (--jvm with the native launcher).")
+                    + " arguments to run with. Used by the IDE's spare engine; runs only on the"
+                    + " JVM.")
             .build();
 
     var options = new Options();

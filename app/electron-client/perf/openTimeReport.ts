@@ -595,7 +595,7 @@ function rssTable(summaries: readonly EngineSummary[], platform: string): string
   })
   if (rows.length === 0) return []
   return [
-    `${platform === 'win32' ? 'Working set' : 'Resident memory'}, MiB, medians of the first open (engine: the launcher and the JVM or native image under it; ydoc: the utility process).`,
+    `${platform === 'win32' ? 'Working set' : 'Resident memory'}, MiB, medians of the first open (engine: the launcher and the JVM under it; ydoc: the utility process).`,
     '',
     '| Engine | Engine at welcome table | Engine 30 s later | Ydoc host at welcome table | Ydoc host 30 s later |',
     '| --- | ---: | ---: | ---: | ---: |',
