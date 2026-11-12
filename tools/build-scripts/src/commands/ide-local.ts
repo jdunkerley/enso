@@ -1,10 +1,11 @@
 /**
  * @file `ide-local`: builds the IDE installer from this checkout, start to finish. It builds the
- * engine bundle with sbt (`buildEngineBundle`, `ENSO_LAUNCHER=native` unless set), copies it to
+ * engine bundle with sbt (`buildEngineBundle`), copies it to
  * `dist/backend`, installs the workspace, builds the GUI into `dist/gui`, and packages both into
  * `dist/ide`, as `ide-build` does in CI. It deletes `dist/backend`, `dist/gui` and `dist/ide` as it
  * starts, so a failed run never leaves a previous build's engine, GUI or installer there. On
- * Windows, run it from a Visual Studio developer prompt (the native images need MSVC). Never run in
+ * Windows, run it from a Visual Studio developer prompt (`MsvcRuntime` copies the MSVC runtime DLLs
+ * from it). Never run in
  * CI: it starts sbt, so the workflow policy would require `setup-jvm` first.
  *
  *     corepack pnpm --filter build-scripts run ide-local [--mode <vite mode>]

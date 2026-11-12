@@ -26,31 +26,29 @@ export function engineBundleDir(
 }
 
 /**
- * sbt's environment for the bundle: the version triple, as the `version` command publishes it, and
- * `ENSO_LAUNCHER=native` (what the IDE ships, and CI's packaging passes) unless the caller set one.
+ * sbt's environment for the bundle: the version triple, as the `version` command publishes it. (The
+ * engine's launchers are always the shell scripts: `ENSO_LAUNCHER` went with the native build.)
  */
 export function engineBuildEnv(env: NodeJS.ProcessEnv, versions: Versions): NodeJS.ProcessEnv {
-  const launcher = env.ENSO_LAUNCHER ?? ''
   return {
     ...env,
     ENSO_VERSION: versions.version.text,
     ENSO_EDITION: versions.version.text,
     ENSO_RELEASE_MODE: String(versions.releaseMode),
-    ENSO_LAUNCHER: launcher !== '' ? launcher : 'native',
   }
 }
 
 /**
- * Why the engine bundle cannot be built in this environment, or `null`. On Windows the native
- * images link with MSVC, and `MsvcRuntime` copies the runtime DLLs from `VCToolsRedistDir`, which
- * only a Visual Studio developer environment sets.
+ * Why the engine bundle cannot be built in this environment, or `null`. On Windows `MsvcRuntime`
+ * copies the MSVC runtime DLLs into the engine package from `VCToolsRedistDir`, which only a Visual
+ * Studio developer environment sets.
  */
 export function msvcProblem(platform: NodeJS.Platform, env: NodeJS.ProcessEnv): string | null {
   if (platform !== 'win32' || (env.VCToolsRedistDir ?? '') !== '') return null
   return (
     'VCToolsRedistDir is not set. Run this from a Visual Studio "Developer PowerShell" or ' +
-    '"x64 Native Tools Command Prompt" (or after vcvars64.bat): the engine bundle\'s native images ' +
-    'need the MSVC environment.'
+    '"x64 Native Tools Command Prompt" (or after vcvars64.bat): the engine bundle\'s MSVC runtime ' +
+    'DLL copy needs the MSVC environment.'
   )
 }
 

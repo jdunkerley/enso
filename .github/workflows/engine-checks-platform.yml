@@ -104,9 +104,11 @@ jobs:
   # (`all` because a hosted runner has more memory than the retired build CLI's single-batch
   # threshold). The version comes from `tools/build-scripts` (`version`); its step keeps `id:
   # build`, so the job's outputs are what they were, and it exports the version to the later steps,
-  # which is how sbt names the package. `ENSO_LAUNCHER` is `native,test`, the value the retired
-  # build CLI forced. `setup-msvc` replaces the retired build CLI's MSVC environment on Windows: the
-  # native images link with it, and the runtime DLL copy reads `VCToolsRedistDir`. The build
+  # which is how sbt names the package. The distribution's launchers are the shell scripts
+  # `bin/enso` and `bin/enso.bat`: the native image is no longer built (native-image removal C2,
+  # #683), and with it went `ENSO_LAUNCHER` and the `(native,test)` in the job's and the artifact's
+  # names. `setup-msvc` replaces the retired build CLI's MSVC environment on Windows: the runtime
+  # DLL copy (`MsvcRuntime`) reads `VCToolsRedistDir`. The build
   # compiles the Rust parser with several `cargo` calls at once, so `setup-jvm` installs the Rust
   # toolchain first (`rust`; Note [Install The Rust Toolchain Before sbt] in
   # `.github/actions/setup-jvm`). Gone from this job, because only the retired build CLI read them
@@ -124,12 +126,10 @@ jobs:
   # The parser's JNI library is built by sbt into `lib/rust/parser/target` with its own
   # `--target-dir` and is not cached (`sbt clean` deletes it).
   build-engine-distribution:
-    name: Build Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+    name: Build Engine Distribution (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     timeout-minutes: 60
     env:
-      # The job name and artifact name say `(native,test)` too.
-      ENSO_LAUNCHER: native,test
       CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     # The distribution's version, for the jobs that use it. See Note [Lint Reads The Distribution's
     # Version].
@@ -175,7 +175,7 @@ jobs:
       - name: Upload Engine Distribution
         uses: actions/upload-artifact@v5
         with:
-          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+          name: Engine Distribution (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
           path: built-distribution.tar
       - name: Cleanup Archive
         run: rm built-distribution.tar
@@ -239,7 +239,7 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+          name: Engine Distribution (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Check the distribution's version
         run: |-
           if [ -z "$ENSO_VERSION" ]; then
@@ -283,8 +283,7 @@ jobs:
   #   `.github/actions/setup-jvm`).
   # - The job does not wait for the build job (#442). `buildEngineDistributionNoIndex` runs first in
   #   the same sbt session as the part's test command and builds the engine package the tests run
-  #   against, as a local `sbt test` would; `ENSO_LAUNCHER: shell` keeps the native launcher out of it, whatever the
-  #   environment says about release mode. The job starts with the run instead of after the build,
+  #   against, as a local `sbt test` would. The job starts with the run instead of after the build,
   #   which takes Windows JVM Tests from ~78 to ~51 min after the start (the 2c finding,
   #   `docs/superpowers/specs/2026-10-30-ci-speed-2c-finding.md`).
   #
@@ -363,7 +362,8 @@ jobs:
           shared-key: engine
           save: "false"
           workspaces: ". -> ../cargo-target"
-      # `sbt test` builds native images on Windows too (os-environment's tests).
+      # `sbt test` built native images on Windows (os-environment's tests) until the native build went
+      # (#683); whether this job still needs MSVC is settled with `setup-msvc`'s follow-up.
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
       - if: runner.os == 'Windows'
@@ -416,7 +416,6 @@ jobs:
         env:
           SBT_TASKS: ${{ matrix.tasks }}
           EXPECTED_SUCCESSES: ${{ matrix.successes }}
-          ENSO_LAUNCHER: shell
           ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
@@ -486,7 +485,7 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+          name: Engine Distribution (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
@@ -533,7 +532,7 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+          name: Engine Distribution (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Check the Standard Library API
         run: corepack pnpm --filter build-scripts run stdlib-api-check
         env:
@@ -554,7 +553,7 @@ jobs:
     uses: ./.github/workflows/docs-site-build.yml
     with:
       source: distribution
-      distribution-artifact: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+      distribution-artifact: Engine Distribution (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
 
   # Note [Standard Library Test Selection]
   # ======================================
@@ -668,7 +667,7 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+          name: Engine Distribution (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Set up the JVM toolchain
         id: jvm
         uses: ./.github/actions/setup-jvm
@@ -812,7 +811,7 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+          name: Engine Distribution (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:

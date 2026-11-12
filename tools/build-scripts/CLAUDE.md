@@ -40,7 +40,7 @@ prints one.
   drops files from an image that is too small without failing
   (`src/ide-build/verifyDmg.ts`). Locally, use `ide-local`.
 - `ide-local [--mode <vite mode>]` — the whole IDE from this checkout: sbt
-  `buildEngineBundle` (`ENSO_LAUNCHER=native` unless set; on Windows, from a
+  `buildEngineBundle` (on Windows, from a
   Visual Studio developer prompt, which it checks), the bundle copied to
   `dist/backend`, `pnpm install`, `build:gui` into `dist/gui`, then
   `ide-build`'s packaging into `dist/ide`. It deletes `dist/backend`, `dist/gui`

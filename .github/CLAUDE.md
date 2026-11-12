@@ -65,8 +65,8 @@ settings. Every workflow is hand-written YAML (build simplification;
   (GraalVM CE, or Oracle GraalVM with `edition: oracle`, sbt, optionally `flatc`
   and GraalPy at the `toolchain:` pins in `build-config.yaml` and the
   `rust-toolchain.toml` Rust toolchain, plus the sbt dependency cache),
-  `setup-msvc` (the MSVC developer environment on Windows, for native images and
-  the runtime DLL copy), `git-clean`, `setup-build-scripts` (install
+  `setup-msvc` (the MSVC developer environment on Windows, for the runtime DLL
+  copy, `MsvcRuntime`; its own removal is a follow-up of #683), `git-clean`, `setup-build-scripts` (install
   `tools/build-scripts`' dependencies only), `download-engine-distribution`.
 - `actionlint.yaml` — actionlint's configuration; each ignore says why it stays.
 - `settings.yml`, `mergify.yml` — inherited from upstream. Neither is live on

@@ -1,5 +1,5 @@
-# Hand-written. The Standard Library suites that need outside services: Snowflake (on the JVM and
-# native) and the cloud-related projects. The Linux engine distribution comes from
+# Hand-written. The Standard Library suites that need outside services: Snowflake (on the JVM)
+# and the cloud-related projects. The Linux engine distribution comes from
 # `engine-checks-platform.yml`, called with no checks of its own; the suites are this file's job.
 # Started by hand.
 #
@@ -107,7 +107,7 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
+          name: Engine Distribution (GraalVM CE) (linux, amd64)
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
