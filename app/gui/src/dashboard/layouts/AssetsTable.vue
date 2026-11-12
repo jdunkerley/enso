@@ -53,7 +53,12 @@ import AssetsTableCombinedContextMenu from '#/layouts/AssetsTableCombinedContext
 import { useAssetItems } from '#/layouts/Drive/assetItems'
 import { useAutoScroll } from '#/layouts/Drive/autoScroll'
 import { useDragAnnouncements } from '#/layouts/Drive/dragAnnouncements'
-import { ASSET_ROWS, setDragImageToBlank, type AssetRowsDragPayload } from '#/layouts/Drive/drag'
+import {
+  ASSET_ROWS,
+  canDropRowsInto,
+  setDragImageToBlank,
+  type AssetRowsDragPayload,
+} from '#/layouts/Drive/drag'
 import {
   useListDirectoryRefetchInterval,
   usePaste,
@@ -107,6 +112,7 @@ import AssetQuery from '$/utils/AssetQuery'
 import type { AssetsDataTransferPayload } from '$/utils/assetsDataTransfer'
 import { backendMutationOptions, backendQueryOptions } from '$/utils/backendQuery'
 import { withPresence } from '$/utils/data/set'
+import { canDropAssetsInto } from '$/utils/dropTarget'
 import {
   deleteAssetsMutationKey,
   moveAssetsMutationKey,
@@ -586,14 +592,14 @@ function doPaste(newParentIdRaw: DirectoryId) {
   let newParentId = newParentIdRaw
   const { pasteData } = driveStore.state
   if (pasteData == null) return
-  if (pasteData.data.assets.some((asset) => asset.id === newParentId)) {
-    if (pasteData.data.assets[0] && pasteData.data.assets.length === 1) {
-      // The folder is the only thing selected: paste into its parent, not into itself.
-      newParentId = pasteData.data.assets[0].parentId
-    } else {
-      toasts.show('Cannot paste a folder into itself.', { type: 'error' })
-      return
-    }
+  const [onlyAsset, ...otherAssets] = pasteData.data.assets
+  if (onlyAsset?.id === newParentId && otherAssets.length === 0) {
+    // The folder is the only thing selected: paste into its parent, not into itself.
+    newParentId = onlyAsset.parentId
+  }
+  if (!canDropAssetsInto(pasteData.data.assets, newParentId)) {
+    toasts.show('Cannot paste a folder into itself.', { type: 'error' })
+    return
   }
   void paste({
     fromCategory: pasteData.data.category,
@@ -1127,7 +1133,7 @@ function dropInto(event: DragEvent, directoryId: DirectoryId, destination: Table
   const payload = ASSET_ROWS.lookup(event)
   const items = payload?.items ?? []
 
-  if (payload != null && items.every((innerItem) => innerItem.key !== directoryId)) {
+  if (payload != null && canDropRowsInto(payload, directoryId)) {
     event.preventDefault()
     event.stopPropagation()
     modals.closeAll()
@@ -1154,7 +1160,8 @@ function dropInto(event: DragEvent, directoryId: DirectoryId, destination: Table
     void uploadFiles(Array.from(event.dataTransfer.files), directoryId)
     return
   }
-  // Rows dropped where they cannot go (a directory onto itself) stay where they were.
+  // Rows dropped where they cannot go (a directory onto itself or into one inside it) stay where
+  // they were.
   dragAnnouncements.rejected()
 }
 

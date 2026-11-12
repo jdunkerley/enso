@@ -14,7 +14,7 @@
  * elsewhere, leaving the window). Like a row, it is reached with the arrow keys and can be the
  * grid's tab stop.
  */
-import { ASSET_ROWS } from '#/layouts/Drive/drag'
+import { ASSET_ROWS, canDropRowsInto } from '#/layouts/Drive/drag'
 import { useTabStopContents } from '#/layouts/Drive/rovingTabStop'
 import { Column, COLUMN_CSS_CLASS } from '#/pages/dashboard/components/column/columnUtils'
 import Icon from '$/components/Icon/Icon.vue'
@@ -24,6 +24,7 @@ import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
 import { twMerge } from '$/utils/style/tailwindMerge'
 import { useEventListener } from '@vueuse/core'
+import { DirectoryId } from 'enso-common/src/services/Backend'
 import { onMounted, onUpdated, ref, watch } from 'vue'
 
 const props = defineProps<{
@@ -95,9 +96,16 @@ watch(
 useEventListener(document, 'dragend', endDrag, { capture: true })
 useEventListener(document, 'drop', endDrag, { capture: true })
 
-/** Accept dragged rows (none of them can be the parent folder) and files. */
+/**
+ * Accept dragged rows and files. Rows are refused when the folder above is one of them or inside
+ * one (the drag may have opened the dragged folder and gone on into it).
+ */
 function acceptDrag(event: DragEvent) {
-  if (ASSET_ROWS.lookup(event) != null || event.dataTransfer?.types.includes('Files') === true) {
+  const payload = ASSET_ROWS.lookup(event)
+  if (
+    (payload != null && canDropRowsInto(payload, DirectoryId(props.targetId))) ||
+    event.dataTransfer?.types.includes('Files') === true
+  ) {
     event.preventDefault()
     isDraggedOver.value = true
   }

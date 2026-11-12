@@ -5,13 +5,14 @@ import { dropOperationBetweenCategories, useCategories, type Category } from '$/
 import type { TransferrableAsset } from '$/utils/assetsDataTransfer'
 import { executeMutation } from '$/utils/backendQuery'
 import { copyAssetsMutationOptions, moveAssetsMutationOptions } from '$/utils/driveMutations'
+import { canDropAssetsInto } from '$/utils/dropTarget'
 import { useQueryClient } from '@tanstack/vue-query'
 import type { DirectoryId } from 'enso-common/src/services/Backend'
 
 /**
  * Return a function that moves or copies assets from one category to another, into `newParentId`
  * or else the target category's root. Dropping into the same folder, or from or into Recent, does
- * nothing. Call it in a component's `setup`; the function it returns may be called at any time.
+ * nothing, and so does dropping a folder into itself or into a folder inside it. Call it in a component's `setup`; the function it returns may be called at any time.
  */
 export function useMoveAssets() {
   const queryClient = useQueryClient()
@@ -28,7 +29,9 @@ export function useMoveAssets() {
     const target = newParentId ?? categories.categoryDirectoryId(to)
     const { localBackend } = backends
     if (target == null || localBackend == null) return
-    const ids = Array.from(assets, (asset) => asset.id)
+    const list = Array.from(assets)
+    if (!canDropAssetsInto(list, target)) return
+    const ids = list.map((asset) => asset.id)
     return method === 'copy' ?
         executeMutation(queryClient, copyAssetsMutationOptions(localBackend), [ids, target])
       : executeMutation(queryClient, moveAssetsMutationOptions(localBackend, resolveDuplications), [

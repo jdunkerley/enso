@@ -171,6 +171,21 @@ function isFileHidden(filePath: string): boolean {
   return dotfile.test(filePath)
 }
 
+/**
+ * Whether `inner` is a path strictly below `outer`. A directory moved there would end up inside
+ * itself: the file system refuses it (`EINVAL` or `EPERM`, by platform), and no metadata should
+ * follow a move that cannot happen.
+ */
+export function isInsidePath(outer: string, inner: string): boolean {
+  const relative = path.relative(path.resolve(outer), path.resolve(inner))
+  return (
+    relative !== '' &&
+    relative !== '..' &&
+    !relative.startsWith('..' + path.sep) &&
+    !path.isAbsolute(relative)
+  )
+}
+
 /** Return whether a file exists. */
 async function fileExists(path: string): Promise<boolean> {
   try {
@@ -335,6 +350,8 @@ export async function handleFilesystemCommand(
           destinationPath == null
         )
           break
+        // A directory cannot go into itself or below itself: the error, not `fs.rename`'s.
+        if (isInsidePath(sourcePath, destinationPath)) break
         const isProject = await isProjectDirectory(sourcePath)
         await fs.rename(sourcePath, destinationPath)
         if (isProject && localVersioning != null) {
