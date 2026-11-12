@@ -34,29 +34,21 @@ export type Electron = typeof import('electron')
  * Chrome options refer to: https://peter.sh/experiments/chromium-command-line-switches.
  */
 export function setChromeOptions(electron: Electron) {
-  // Needed to accept localhost self-signed cert
-  electron.app.commandLine.appendSwitch('ignore-certificate-errors')
-  // Enable native CPU-mappable GPU memory buffer support on Linux.
-  electron.app.commandLine.appendSwitch('enable-native-gpu-memory-buffers')
-  // Override the list of blocked GPU hardware, allowing for GPU acceleration on system configurations
-  // that do not inherently support it. It should be noted that some hardware configurations may have
-  // driver issues that could result in rendering discrepancies. Despite this, the utilization of GPU
-  // acceleration has the potential to significantly enhance the performance of the application in our
-  // specific use cases. This behavior can be observed in the following example:
-  // https://groups.google.com/a/chromium.org/g/chromium-dev/c/09NnO6jYT6o.
-  electron.app.commandLine.appendSwitch('ignore-gpu-blocklist')
   // Note [The Packaged-IDE Tests Run Without GPU Acceleration].
   if (process.env.ENSO_TEST_DISABLE_GPU === '1') electron.app.disableHardwareAcceleration()
 }
 
 /* Note [The Packaged-IDE Tests Run Without GPU Acceleration]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * The Windows CI runner has no GPU. With `ignore-gpu-blocklist` the GPU process still accelerates,
- * in software, and while the project view's spinners turned it used 1,300 to 2,200 s of CPU in a
- * ~12-minute try, against ~50 s for the engine's JVM, which then never finished its first execution
- * (#674: `Project Duplicate` hung in most runs, and the job hit its time limit). With
- * `disableHardwareAcceleration()` the same suite passed in 29 s. The Playwright fixture
- * (`tests/electronTest.ts`) sets `ENSO_TEST_DISABLE_GPU=1` for every spec; nothing else does.
+ * The Windows CI runner has no GPU. The app then passed `ignore-gpu-blocklist`, so the GPU process
+ * still accelerated, in software, and while the project view's spinners turned it used 1,300 to
+ * 2,200 s of CPU in a ~12-minute try, against ~50 s for the engine's JVM, which then never finished
+ * its first execution (#674: `Project Duplicate` hung in most runs, and the job hit its time limit).
+ * With `disableHardwareAcceleration()` the same suite passed in 29 s. That switch is gone (#688):
+ * Chromium's blocklist now decides, as in any browser, so a machine without a usable GPU (a VM, an
+ * RDP session) should fall back to its cheaper software path by itself. The Playwright fixture
+ * (`tests/electronTest.ts`) still sets `ENSO_TEST_DISABLE_GPU=1` for every spec, so the tests do
+ * not depend on that; nothing else sets it.
  */
 
 /** Register keyboard shortcuts that should be handled by Electron. */

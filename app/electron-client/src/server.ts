@@ -213,6 +213,12 @@ export class Server {
   private localSecrets: LocalSecrets | undefined
   private keyFromEnvironment: boolean
   private localSamples: LocalSamples | undefined
+  /**
+   * The PEM certificate this launch generated, once {@link run} has started listening. The window
+   * trusts exactly this one (Note [Only The Content Server's Certificate Is Trusted] in
+   * `localCertificate.ts`).
+   */
+  certificate: string | undefined
 
   /**
    * Create a simple HTTP server.
@@ -281,6 +287,7 @@ export class Server {
       validity: defaultValidity,
     })
 
+    this.certificate = cert.cert
     const ipv4Server = await this.listen(cert, IPV4_LOOPBACK)
     let ipv6Server: https.Server | undefined
     try {
