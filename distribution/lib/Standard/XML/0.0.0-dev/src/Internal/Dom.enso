@@ -2,16 +2,6 @@ private
 
 from Standard.Base import all
 
-## Note [XML Uses Only The JDK]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   `Standard.XML` has no Java of its own: everything here is a call into the
-   JDK's XML APIs (`javax.xml`, `org.w3c.dom`). It was written so the native
-   image could host it (the image and the guest JVM it needed for other
-   libraries are gone, #664): a helper jar would have put the library in the
-   guest JVM, where every DOM call was a round trip (#521's review measured 160
-   µs per call). On the JVM a jar would cost nothing, but none is needed;
-   import only JDK classes unless that changes.
-
 polyglot java import java.io.ByteArrayOutputStream
 polyglot java import java.io.StringReader
 polyglot java import java.lang.StringBuilder
@@ -24,33 +14,6 @@ polyglot java import javax.xml.xpath.XPathFactory
 polyglot java import org.w3c.dom.bootstrap.DOMImplementationRegistry
 polyglot java import org.xml.sax.helpers.DefaultHandler
 polyglot java import org.xml.sax.InputSource
-
-## Note [Interfaces Imported For The Image]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   The JDK hands back its own implementation classes (`DocumentBuilderImpl`,
-   `ElementImpl`, ...), in packages `java.xml` does not export. Host interop
-   calls their methods through the public types they implement, and in the
-   native image it could only see those types' methods if they were registered
-   for reflection, so these were imported for that alone: every public type
-   whose methods this library calls on an object it did not construct.
-
-   The native image is gone (#664) and the JVM needs none of them; the list
-   stays until someone prunes it. No other library is to copy the pattern.
-polyglot java import java.util.regex.Matcher
-polyglot java import javax.xml.parsers.DocumentBuilder
-polyglot java import javax.xml.xpath.XPath
-polyglot java import org.w3c.dom.Attr
-polyglot java import org.w3c.dom.Document
-polyglot java import org.w3c.dom.DOMConfiguration
-polyglot java import org.w3c.dom.DOMImplementation
-polyglot java import org.w3c.dom.Element
-polyglot java import org.w3c.dom.NamedNodeMap
-polyglot java import org.w3c.dom.Node
-polyglot java import org.w3c.dom.NodeList
-polyglot java import org.w3c.dom.Text as Dom_Text
-polyglot java import org.w3c.dom.ls.DOMImplementationLS
-polyglot java import org.w3c.dom.ls.LSOutput
-polyglot java import org.w3c.dom.ls.LSSerializer
 
 ## Node types of `org.w3c.dom.Node`.
 private _ELEMENT_NODE = 1

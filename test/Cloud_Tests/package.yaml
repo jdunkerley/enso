@@ -7,5 +7,3 @@ author: jdunkerley
 maintainer: jdunkerley
 # Cloud_Tests import stuff from Base_Tests sibling project. So we need this property here.
 prefer-local-libraries: true
-# Run in JVM mode due to hacky access to Standard.Base Java classes
-jvm: true

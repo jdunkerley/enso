@@ -4,8 +4,8 @@ import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 
 from Standard.Test import all
 
-import Standard.Base.Internal.Extra_Imports.ObjectComparator
-import Standard.Base.Internal.Extra_Imports.CompareException
+polyglot java import org.enso.base.ObjectComparator
+polyglot java import org.enso.base.CompareException
 
 # === Test Resources ===
 
