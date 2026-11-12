@@ -155,6 +155,7 @@ import type {
   GetContextMenuItemsParams,
   GetRowIdFunc,
   GridApi,
+  GridPreDestroyedEvent,
   GridReadyEvent,
   ICellEditorComp,
   IDatasource,
@@ -173,6 +174,7 @@ import * as objects from 'enso-common/src/utilities/data/object'
 import {
   computed,
   h,
+  onBeforeUnmount,
   onMounted,
   onUnmounted,
   reactive,
@@ -184,7 +186,11 @@ import {
 } from 'vue'
 import { AG_GRID_LOCALE_EN } from '@ag-grid-community/locale'
 
-import { cellCoordFromEvent, useCommunityCellRange } from './AgGridTableView/communityCellRange'
+import {
+  cellCoordFromEvent,
+  displayedColumnIds,
+  useCommunityCellRange,
+} from './AgGridTableView/communityCellRange'
 import {
   installCommunityClipboardPatch,
   type ClipboardDeps,
@@ -232,9 +238,7 @@ const {
   clear,
   isInRange,
   rectangle,
-} = useCommunityCellRange(
-  () => gridApi.value?.getAllDisplayedColumns().map((c) => c.getColId()) ?? [],
-)
+} = useCommunityCellRange(() => displayedColumnIds(gridApi.value))
 
 const effectiveDefaultColDef = computed(() => buildDefaultColDef(props.defaultColDef, isInRange))
 
@@ -247,6 +251,21 @@ function onGridReady(event: GridReadyEvent<TData>) {
   clear()
   installCommunityClipboardPatch(event.api, clipboardDeps, pasteClipboardDeps)
 }
+
+/**
+ * Forget the API as soon as its grid starts to be destroyed. The cell class rule behind the range
+ * highlight and the deferred repaint both go through `gridApi`, and AG Grid keeps evaluating cell
+ * rules while it removes the rows; a destroyed API answers `undefined` to calls that are typed to
+ * return values (warning #26 and then `TypeError`s). Comparing the API keeps a late event of an old
+ * grid from dropping the API of the grid that replaced it (`gridKey` changed).
+ */
+function onGridPreDestroyed(event: GridPreDestroyedEvent<TData>) {
+  if (gridApi.value === event.api) gridApi.value = undefined
+}
+
+onBeforeUnmount(() => {
+  gridApi.value = undefined
+})
 
 function clipboardDeps(): ClipboardDeps {
   return {
@@ -746,6 +765,7 @@ const customLocale = {
       :suppressFieldDotNotation="true"
       :popupParent="popupParent"
       @gridReady="onGridReady"
+      @gridPreDestroyed="onGridPreDestroyed"
       @firstDataRendered="updateColumnWidths"
       @rowDataUpdated="(updateColumnWidths($event), emit('rowDataUpdated', $event))"
       @columnResized="lockColumnSize"
