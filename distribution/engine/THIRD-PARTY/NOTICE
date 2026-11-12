@@ -3,12 +3,12 @@ Copyright 2020 - 2026 New Byte Order sp. z o. o.
 
 'logback-classic', licensed under the LGPL-2.1-only, is distributed with the engine.
 The license file can be found at `licenses/GNU_Lesser_General_Public_License`.
-Copyright notices related to this dependency can be found in the directory `ch.qos.logback.logback-classic-1.6.4`.
+Copyright notices related to this dependency can be found in the directory `ch.qos.logback.logback-classic-1.6.6`.
 
 
 'logback-core', licensed under the LGPL-2.1-only, is distributed with the engine.
 The license file can be found at `licenses/GNU_Lesser_General_Public_License`.
-Copyright notices related to this dependency can be found in the directory `ch.qos.logback.logback-core-1.6.4`.
+Copyright notices related to this dependency can be found in the directory `ch.qos.logback.logback-core-1.6.6`.
 
 
 'shapeless_2.13', licensed under the Apache 2, is distributed with the engine.
@@ -398,17 +398,17 @@ Copyright notices related to this dependency can be found in the directory `org.
 
 'bcpkix-jdk18on', licensed under the Bouncy Castle Licence, is distributed with the engine.
 The license file can be found at `licenses/Bouncy_Castle_Licence.txt`.
-Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcpkix-jdk18on-1.86`.
+Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcpkix-jdk18on-1.87`.
 
 
 'bcprov-jdk18on', licensed under the Bouncy Castle Licence, is distributed with the engine.
 The license file can be found at `licenses/Bouncy_Castle_Licence.txt`.
-Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcprov-jdk18on-1.86`.
+Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcprov-jdk18on-1.87`.
 
 
 'bcutil-jdk18on', licensed under the Bouncy Castle Licence, is distributed with the engine.
 The license file can be found at `licenses/Bouncy_Castle_Licence.txt`.
-Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcutil-jdk18on-1.86`.
+Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcutil-jdk18on-1.87`.
 
 
 'js-language', licensed under the MIT License, is distributed with the engine.
