@@ -83,7 +83,7 @@ export function findEnginePackage(
   return found[0] as EnginePackage
 }
 
-/** The `enso` launcher of an engine package. */
+/** The `enso` launcher of an engine package: the shell script `bin/enso`, or `bin/enso.bat`. */
 export function ensoBinary(packageDir: string, platform: NodeJS.Platform): string {
-  return path.join(packageDir, 'bin', platform === 'win32' ? 'enso.exe' : 'enso')
+  return path.join(packageDir, 'bin', platform === 'win32' ? 'enso.bat' : 'enso')
 }

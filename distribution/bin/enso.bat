@@ -6,8 +6,10 @@ for %%r in ("%~dp0..") do set "engine-root=%%~fr"
 set "comp-dir=%engine-root%\component"
 rem A bundle (e.g. the IDE's) places the engine at <root>\dist\<version> and its
 rem JDK at <root>\runtime\graalvm-*. Prefer that JDK, so the engine still starts
-rem when java is not on PATH.
+rem when java is not on PATH. Without one, JAVA_HOME's, then the PATH's. It must be
+rem a GraalVM JDK: jvm.options has options other JDKs refuse (-XX:-UseJVMCICompiler).
 set "java-exe=java"
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "java-exe=%JAVA_HOME%\bin\java.exe"
 for /d %%d in ("%engine-root%\..\..\runtime\graalvm-*") do if exist "%%d\bin\java.exe" set "java-exe=%%d\bin\java.exe"
 
 rem Note [The Launcher Starts In The Project's Parent] in bin/enso: for --run and

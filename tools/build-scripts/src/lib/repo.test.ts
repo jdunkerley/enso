@@ -20,6 +20,15 @@ test('Windows shims go through the shell, as one command line', () => {
   )
 })
 
+test('a batch file named by path goes through the shell on Windows', () => {
+  expect(invocation('D:/e p/bin/enso.bat', ['--run', 'a b'], 'win32')).toEqual({
+    file: '"D:/e p/bin/enso.bat" --run "a b"',
+    args: [],
+    shell: true,
+  })
+  expect(invocation('/e/bin/enso', ['--run'], 'linux').shell).toBe(false)
+})
+
 test('everything else starts directly', () => {
   expect(invocation('git', ['diff'], 'win32')).toEqual({
     file: 'git',

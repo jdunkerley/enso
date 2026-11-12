@@ -108,7 +108,7 @@ export async function runStdlibTests(
     )
   if (groupFilter !== '') context.log(`Test groups: ${groupFilter}`)
   const smallJdk = path.join(context.repoRoot, 'target', 'small-jdk')
-  const runnerArgs = runnerArguments(suite, context.platform, smallJdk, env.GRAAL_EDITION)
+  const runnerArgs = runnerArguments(suite, smallJdk, env.GRAAL_EDITION)
   if (runnerArgs.includes(smallJdk) && !context.exists(smallJdk)) {
     throw new Error(
       `Suite ${name} runs on the small JDK, and ${smallJdk} does not exist. Build it with ` +
@@ -145,7 +145,6 @@ export async function runStdlibTests(
       base: env,
       platform: context.platform,
       enginePackage: context.enginePackage.dir,
-      nativeRunner: suite.nativeRunner,
       runnerArgs,
       junitDir,
       httpbinUrl: httpbin.url,

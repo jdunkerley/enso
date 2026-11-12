@@ -109,6 +109,12 @@ Since C2 of the native-image removal (#683) the shell launchers
 shim starts `java` itself). They start the JVM themselves and `--jvm` does not
 relaunch from them, so `Main.launchJvm` is not involved:
 
+- **Which `java`.** The bundle's `runtime/graalvm-*` (the IDE's layout), else
+  `$JAVA_HOME/bin/java`, else the PATH's. It must be GraalVM: `jvm.options` has
+  `-XX:-UseJVMCICompiler`, which another JDK refuses ("VM option
+  'UseJVMCICompiler' is experimental …"). A CI job that runs a built
+  distribution's `bin/enso` therefore uses `setup-jvm` first.
+
 - They read `jvm.options`, fixed options included, then `ENSO_JVM_OPTIONS`, with
   `JvmOptions`' rules (trim, byte order mark, `#` comments in the file only, the
   newline rule for the variable). `enso.bat` quotes each option, so spaces and
@@ -178,9 +184,9 @@ exits with 0.
   cold start; one that cancelled it was faster).
 - The preload list (`src/main/resources/org/enso/runner/standby-preload.txt`) is
   generated: run a Language Server boot without an AOT cache with
-  `JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=<log>` (or `ENSO_JVM_OPTIONS`), then
-  `node tools/standby-preload/generate.mjs <log> <the list>`. Classes that have
-  gone are skipped at run time; regenerate it when a release's count drops
+  `JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=<log>` (or `ENSO_JVM_OPTIONS`),
+  then `node tools/standby-preload/generate.mjs <log> <the list>`. Classes that
+  have gone are skipped at run time; regenerate it when a release's count drops
   noticeably (the standby line says `preloaded N of M classes`). It is skipped
   when the JVM runs with an AOT cache, which already holds those classes. The
   cache is seen only in `jvm.options` and `ENSO_JVM_OPTIONS` (`JvmOptions.all`);

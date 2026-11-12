@@ -512,7 +512,9 @@ jobs:
         uses: ./.github/actions/git-clean
 
   # `tools/build-scripts`' `stdlib-api-check` runs what the retired build CLI's `backend
-  # stdlib-api-check` ran, against the downloaded distribution at the build job's version.
+  # stdlib-api-check` ran, against the downloaded distribution at the build job's version. Its
+  # `bin/enso` runs on the `java` of `JAVA_HOME` (or the PATH): the distribution has no bundled
+  # runtime, and `jvm.options` needs GraalVM, so `setup-jvm` provides the pinned one (#683).
   standard-library-api-check:
     name: Standard Library API check (linux, amd64)
     if: inputs.os == 'linux' && inputs.linux-checks
@@ -533,6 +535,12 @@ jobs:
         uses: ./.github/actions/download-engine-distribution
         with:
           name: Engine Distribution (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: engine
+          cache-save: "false"
+          edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
       - name: Check the Standard Library API
         run: corepack pnpm --filter build-scripts run stdlib-api-check
         env:

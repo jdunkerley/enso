@@ -5,8 +5,13 @@ ENGINE_ROOT=$(dirname "$(dirname "$(realpath "$0")")")
 COMP_PATH=$ENGINE_ROOT/component
 # A bundle (e.g. the IDE's) places the engine at <root>/dist/<version> and its
 # JDK at <root>/runtime/graalvm-*. Prefer that JDK, so the engine still starts
-# when `java` is not on PATH (the IDE launched from Finder or the Dock).
+# when `java` is not on PATH (the IDE launched from Finder or the Dock). Without
+# one, JAVA_HOME's, then the PATH's. It must be a GraalVM JDK: jvm.options has
+# options other JDKs refuse (-XX:-UseJVMCICompiler).
 JAVA=java
+if [ -n "${JAVA_HOME-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+  JAVA=$JAVA_HOME/bin/java
+fi
 for candidate in "$ENGINE_ROOT"/../../runtime/graalvm-*/bin/java; do
   if [ -x "$candidate" ]; then
     JAVA=$candidate

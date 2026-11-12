@@ -22,8 +22,9 @@ export interface RunOptions {
 }
 
 /**
- * Programs that are `.cmd`/`.bat` shims on Windows. Only the shell resolves those; Node finds a
- * `.exe` (`java`, `git`, `enso.exe`) by itself.
+ * Programs that are `.cmd`/`.bat` shims on Windows. Only the shell resolves those, and only the
+ * shell runs a `.bat`/`.cmd` named by path (`bin/enso.bat`); Node finds a `.exe` (`java`, `git`)
+ * by itself.
  */
 const WINDOWS_SHIMS = new Set(['corepack', 'npm', 'npx', 'pnpm', 'sbt'])
 
@@ -46,7 +47,7 @@ export function invocation(
   args: readonly string[],
   platform: NodeJS.Platform = process.platform,
 ): { readonly file: string; readonly args: string[]; readonly shell: boolean } {
-  if (platform === 'win32' && WINDOWS_SHIMS.has(program)) {
+  if (platform === 'win32' && (WINDOWS_SHIMS.has(program) || /\.(bat|cmd)$/i.test(program))) {
     return { file: windowsCommandLine(program, args), args: [], shell: true }
   }
   return { file: program, args: [...args], shell: false }

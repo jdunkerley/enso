@@ -66,5 +66,5 @@ describe('findEnginePackage', () => {
 
 test('the launcher name', () => {
   expect(ensoBinary('/p', 'linux')).toBe(path.join('/p', 'bin', 'enso'))
-  expect(ensoBinary('/p', 'win32')).toBe(path.join('/p', 'bin', 'enso.exe'))
+  expect(ensoBinary('/p', 'win32')).toBe(path.join('/p', 'bin', 'enso.bat'))
 })
