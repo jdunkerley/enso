@@ -15,6 +15,9 @@ const Path = newtypeConstructor<Path>()
 
 // Test timeout for operations involving language server startup
 const LANGUAGE_SERVER_TEST_TIMEOUT = 35000
+// Test timeout for the rest, which start the engine for a moment (`--new`): a JVM takes longer
+// than vitest's default 5 s to start on a CI runner.
+const ENGINE_TEST_TIMEOUT = 30000
 
 // These tests run a real engine: the checkout's `built-distribution/` (`sbt buildEngineDistribution`)
 // or `ENSO_ENGINE_PATH`. CI on Linux provides develop's; without one they skip (#359).
@@ -27,7 +30,7 @@ if (ensoPath == null) {
   )
 }
 
-describe.skipIf(ensoPath == null)('ProjectService', () => {
+describe.skipIf(ensoPath == null)('ProjectService', { timeout: ENGINE_TEST_TIMEOUT }, () => {
   let projectService: ProjectService
   let tempDir: string
   let projectsDirectory: Path

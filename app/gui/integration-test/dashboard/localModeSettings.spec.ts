@@ -31,6 +31,7 @@ test('settings open on the Local tab', async ({ drivePage, page }) => {
   await expect(sectionHeadings(page)).toHaveText([
     TEXT.localSettingsSection,
     TEXT.localVersionsSettingsSection,
+    TEXT.engineSettingsSection,
     TEXT.engineLogsSettingsSection,
     TEXT.mapsSettingsSection,
   ])
