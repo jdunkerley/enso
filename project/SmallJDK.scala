@@ -8,14 +8,6 @@ import scala.collection.immutable.Seq
   */
 object SmallJDK {
 
-  private val NI_BUILDER_MODULES = Seq(
-    "org.graalvm.nativeimage.builder",
-    "org.graalvm.nativeimage.driver",
-    "org.graalvm.nativeimage.librarysupport",
-    "org.graalvm.nativeimage.objectfile",
-    "org.graalvm.nativeimage.pointsto"
-  )
-
   private val NI_BASE_MODULES = Seq(
     "org.graalvm.nativeimage",
     "org.graalvm.nativeimage.base",
@@ -38,10 +30,6 @@ object SmallJDK {
     "java.xml"
   )
 
-  private val ADDITIONAL_NI_BUILD_MODS = Seq(
-    "java.prefs"
-  )
-
   private val DEBUG_MODULES = Seq(
     "jdk.jdwp.agent"
   )
@@ -50,40 +38,6 @@ object SmallJDK {
     "java.naming",
     "jdk.security.auth"
   )
-
-  /** Builds a small JDK appropriate for building native image.
-    * @param targetJdkDirectory Target directory. If non empty, will be deleted.
-    */
-  def buildSmallJDKForNativeImage(
-    targetJdkDirectory: File
-  ): Unit = {
-    if (targetJdkDirectory.exists()) {
-      IO.delete(targetJdkDirectory)
-    }
-    val niModules     = (NI_BASE_MODULES ++ NI_BUILDER_MODULES).mkString(",")
-    val jdkModules    = (JDK_MODULES ++ ADDITIONAL_NI_BUILD_MODS).mkString(",")
-    val debugModules  = DEBUG_MODULES.mkString(",")
-    val pythonModules = PYTHON_MODULES.mkString(",")
-
-    val mp = modulePath()
-      .map(_.toAbsolutePath.toString)
-      .mkString(File.pathSeparator)
-
-    val jlinkArgs = Seq(
-      "--module-path",
-      mp,
-      "--output",
-      targetJdkDirectory.toString,
-      "--add-modules",
-      s"$niModules,$jdkModules,$debugModules,$pythonModules"
-    )
-    runJlink(jlinkArgs)
-    copyLibDirs(targetJdkDirectory)
-    assert(
-      targetJdkDirectory.exists(),
-      "Directory of small JDK " + targetJdkDirectory + " is not present"
-    )
-  }
 
   /** Builds a small JDK with `jlink` appropriate for running
     * Enso in `--jvm` mode.
@@ -196,7 +150,8 @@ object SmallJDK {
       "lib/svm/bin/../builder/vmaccess.jar",
       "lib/svm/bin/../builder/vmaccess-guest.jar",
       "lib/svm/bin/../builder/hostvmaccess.jar",
-      // ...and org.graalvm.nativeimage.driver these, for the native-image JDK.
+      // ...and these, which org.graalvm.nativeimage.driver (the native-image builder's JDK) needed.
+      // They go with the release JDK's native-image modules (a follow-up of #683).
       "lib/svm/bin/../builder/svm-guest-staging.jar",
       "lib/svm/bin/../builder/svm-jvmci-guest-staging.jar",
       "lib/svm/bin/../builder/svm-jvmci-shared.jar",

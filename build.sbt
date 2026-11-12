@@ -60,11 +60,6 @@ ThisBuild / assembly / logLevel := Level.Warn
 val simpleLibraryServerTag = Tags.Tag("simple-library-server")
 Global / concurrentRestrictions += Tags.limit(simpleLibraryServerTag, 1)
 
-/** Tag limiting the concurrent spawning of `native-image` subprocess.
-  */
-val nativeImageBuildTag = NativeImage.nativeImageBuildTag
-Global / concurrentRestrictions += Tags.limit(nativeImageBuildTag, 1)
-
 lazy val gatherLicenses =
   taskKey[Unit](
     "Gathers licensing information for relevant dependencies of all distributions"
@@ -292,7 +287,7 @@ ciBuildEngineDistribution := Def
 lazy val buildEngineBundle = taskKey[File](
   "Builds the engine bundle the IDE ships (the engine package, a small JDK and `.enso.bundle`) " +
   "in built-distribution/engine-bundle-<version>-<os>-<arch>/enso. " +
-  "ENSO_LAUNCHER is the caller's: the IDE's CI passes `native`. See project/EngineBundle.scala."
+  "See project/EngineBundle.scala."
 )
 buildEngineBundle := Def
   .sequential(
@@ -400,13 +395,6 @@ lazy val frgaalShouldNotLimitModules = Def.settingKey[Boolean](
   "Whether --limit-modules cmd line option should be passed to the java process that runs " +
   "the frgaal compiler"
 )
-
-// Native Image Generation
-lazy val rebuildNativeImage = taskKey[Unit]("Force to rebuild native image")
-lazy val buildNativeImage =
-  taskKey[Unit]("Ensure that the Native Image is built.")
-lazy val checkNativeImageSize =
-  taskKey[Unit]("Ensures the generated Native Image has reasonable size")
 
 // ============================================================================
 // === Global Project =========================================================
@@ -3659,7 +3647,7 @@ lazy val `engine-runner` = project
       (`semver` / Compile / exportedModule).value,
       (`version-output` / Compile / exportedModule).value
     ),
-    // Runtime / modulePath is used as module-path for the native image build.
+    // Runtime / modulePath is the module path of `engine-runner/run` (`Runtime / javaOptions`).
     Runtime / moduleDependencies :=
       (Compile / moduleDependencies).value ++
       scalaReflect ++
@@ -3720,272 +3708,6 @@ lazy val `engine-runner` = project
       oldVal.take(idx) ++ oldVal.drop(idx + 2)
     }
   )
-  .settings(
-    // The launcher's image is built by the GraalVM JDK's own `native-image`, as on Windows
-    // (whose jlinked JDK has no `lib/svm/bin/native-image`). On GraalVM 25.5 the builder no
-    // longer runs from a jlinked JDK: features in jlinked modules are not found and
-    // configuration in `jrt:` resources is refused.
-    NativeImage.smallJdk := None,
-    NativeImage.additionalCp := {
-      val runnerDeps =
-        (Compile / fullClasspath).value.map(_.data.getAbsolutePath)
-      val runtimeDeps =
-        (`runtime` / Compile / fullClasspath).value.map(_.data.getAbsolutePath)
-      val loggingDeps =
-        (`logging-service-logback` / Compile / fullClasspath).value.map(
-          _.data.getAbsolutePath
-        )
-      val replDebugInstr =
-        (`runtime-instrument-repl-debugger` / Compile / fullClasspath).value
-          .map(_.data.getAbsolutePath)
-      val runtimeServerInstr =
-        (`runtime-instrument-runtime-server` / Compile / fullClasspath).value
-          .map(_.data.getAbsolutePath)
-      val idExecInstr =
-        (`runtime-instrument-id-execution` / Compile / fullClasspath).value
-          .map(_.data.getAbsolutePath)
-      val epbLang =
-        (`runtime-language-epb` / Compile / fullClasspath).value
-          .map(_.data.getAbsolutePath)
-      def langServer = {
-        val log = streams.value.log
-        val langServer = (`language-server` / Compile / fullClasspath).value
-          .map(_.data.getAbsolutePath)
-        if (GraalVM.EnsoLauncher.disableLanguageServer) {
-          log.info(
-            s"Skipping language server in native image build as ${GraalVM.EnsoLauncher.VAR_NAME} env variable is ${GraalVM.EnsoLauncher.toString}"
-          )
-          Seq()
-        } else {
-          langServer
-        }
-      }
-      val core = (
-        runnerDeps ++
-          runtimeDeps ++
-          loggingDeps ++
-          replDebugInstr ++
-          runtimeServerInstr ++
-          idExecInstr ++
-          langServer ++
-          epbLang
-      ).distinct
-      def stdLibsJars = {
-        val log = streams.value.log
-        val base =
-          `base-polyglot-root`.listFiles("*.jar").map(_.getAbsolutePath())
-        if (GraalVM.EnsoLauncher.fast) {
-          log.info(
-            s"Skipping support for non-Standard.Base libraries in the image build as ${GraalVM.EnsoLauncher.VAR_NAME} env variable is ${GraalVM.EnsoLauncher.toString}"
-          )
-          base
-        } else {
-          base ++
-          `table-polyglot-root`.listFiles("*.jar").map(_.getAbsolutePath()) ++
-          `database-polyglot-root`
-            .listFiles("*.jar")
-            .map(_.getAbsolutePath()) ++
-          `std-duckdb-polyglot-root`
-            .listFiles("*.jar")
-            .map(_.getAbsolutePath())
-        }
-      }
-      core ++ stdLibsJars ++ extraNITestLibs.value
-    },
-    extraNITestLibs := Def.taskDyn {
-      Def.task {
-        Seq[String]()
-      }
-    }.value,
-    buildSmallJdk := {
-      val smallJdkDirectory = (target.value / "jdk").getAbsoluteFile()
-      SmallJDK.buildSmallJDKForNativeImage(smallJdkDirectory)
-      smallJdkDirectory
-    },
-    rebuildNativeImage := Def
-      .taskDyn {
-        // Limit max memory limit
-        val macArmOnCI =
-          sys.env.get("CI").isDefined && Platform.isMacOS && Platform.isArm64
-        val maxLimit = if (macArmOnCI) Some(14336) else Some(15608)
-        // Features from gax-grpc-2.31.0
-        val grpcFeatures =
-          "com.google.api.gax.grpc.nativeimage.ProtobufMessageFeature," +
-          "com.google.api.gax.grpc.nativeimage.GrpcNettyFeature"
-        val features = Seq(
-          "org.enso.interpreter.runtime.nativeimage.NativeLibraryFeature"
-        )
-        // heapdump monitoring is not supported on Windows
-        val enableHeapDumpOpts =
-          if (!GraalVM.EnsoLauncher.release && !Platform.isWindows)
-            Seq(
-              "--enable-monitoring=heapdump"
-            )
-          else Seq()
-        val linkOpts = if (Platform.isWindows) {
-          val ensoTarget = file("target")
-          val ensoExp    = file("distribution/bin/enso.exp")
-          Seq(
-            "-H:NativeLinkerOption=" + ensoExp.getAbsolutePath,
-            "-H:TempDirectory=" + ensoTarget.getAbsolutePath,
-            "-H:+TraceNativeToolUsage"
-          )
-        } else {
-          Seq()
-        }
-
-        val debugOpts =
-          if (GraalVM.EnsoLauncher.debug)
-            Seq(
-              "-g",
-              "-O0",
-              "-H:+SourceLevelDebug",
-              "-H:-DeleteLocalSymbols",
-              // you may need to set smallJdk := None to use following flags:
-              // "--trace-class-initialization=org.enso.syntax2.Parser",
-              // "--diagnostics-mode",
-              // "--verbose",
-              "-Dnic=nic"
-            )
-          else Seq()
-        // Note [Java-Free Libraries In The Image]
-        // A library with no Java of its own whose `polyglot java import`s are all
-        // JDK classes (Standard.XML) is hosted in the image: `EnsoLibraryFeature`
-        // registers those JDK classes and marks it AOT-ready, so the native
-        // engine can run it (any other library's Java is not in the image; Note
-        // [A Library's Java Must Be In The Native Image] in `EnsoPolyglotJava`).
-        // Such a library must ship no jar, or its Java would end up in the image.
-        //
-        // The cost is a hand-kept list. Host interop reaches the JDK's own
-        // implementation classes through the public interfaces they implement,
-        // and in the image it sees only those registered, so the library has to
-        // import every such interface it calls through (Note [Interfaces
-        // Imported For The Image] in Standard.XML's `Internal/Dom.enso`). The
-        // build checks only that it imports JDK classes (`EnsoLibraryFeature`);
-        // a missing interface fails at run time, under the native launcher only
-        // ("Method `x` of type ...Impl could not be found"), so run the
-        // library's tests natively (CI's native standard library suite does).
-        // This exists for Standard.XML alone: do not list another library here
-        // without the owner's agreement.
-        val javaFreeLibraries = javaFreeLibraryRoots
-        for (lib <- javaFreeLibraries) {
-          val jars = Option((lib / "polyglot" / "java").listFiles())
-            .getOrElse(Array[File]())
-            .filter(_.getName.endsWith(".jar"))
-          if (jars.nonEmpty) {
-            throw new IllegalStateException(
-              s"$lib is listed as a Java-free library but ships ${jars.mkString(", ")}"
-            )
-          }
-        }
-        val javaFreeLibrariesOpts =
-          if (javaFreeLibraries.isEmpty) Seq()
-          else
-            Seq(
-              "-Denso.nativeImage.javaFreeLibraries=" + javaFreeLibraries
-                .map(_.getAbsolutePath)
-                .mkString(java.io.File.pathSeparator)
-            )
-        val mp = (Runtime / modulePath).value.map(_.getAbsolutePath)
-        NativeImage
-          .buildNativeImage(
-            "enso",
-            buildMemoryLimitMegabytes = maxLimit,
-            targetDir                 = engineDistributionRoot.value / "bin",
-            staticOnLinux             = false,
-            excludeConfigs = Seq(
-              ".*gax-grpc-.*\\.jar,META-INF/native-image/com.google.api/gax-grpc/native-image.properties"
-            ),
-            modulePath = mp,
-            additionalOptions = Seq(
-              "-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.NoOpLog",
-              "-H:+AddAllCharsets",
-              "-H:+IncludeAllLocales",
-              "-R:-InstallSegfaultHandler",
-              "--features=" + features.mkString(","),
-              // Needed for the NativeLibraryFeature
-              "--add-opens=org.graalvm.nativeimage.builder/com.oracle.svm.core.jdk=ALL-UNNAMED",
-              // Snowflake uses Apache Arrow (equivalent of #9664 in native-image setup)
-              "--add-opens=java.base/java.nio=ALL-UNNAMED",
-              // Needed for grpc-gax
-              "--add-opens=java.base/java.time=ALL-UNNAMED",
-              "--enable-url-protocols=jar,https"
-            ) ++ enableHeapDumpOpts ++ debugOpts ++ linkOpts ++ javaFreeLibrariesOpts,
-            mainModule = Some("org.enso.runner"),
-            mainClass  = Some("org.enso.runner.Main"),
-            initializeAtRuntime = Seq(
-              "org.apache",
-              "org.openxmlformats",
-              "org.jline",
-              "zio.internal",
-              "zio",
-              "org.enso.runner",
-              "sun.awt",
-              "sun.java2d",
-              "sun.font",
-              "java.awt",
-              "com.sun.imageio",
-              "com.sun.jna",
-              "com.microsoft",
-              "com.azure",
-              "akka.http",
-              "org.enso.base",
-              "org.enso.logging",
-              "org.enso.common.ContextLoggingConfigurator",
-              "org.enso.table",
-              "org.enso.database",
-              "org.enso.tableau",
-              "com.google",
-              "io.grpc",
-              "io.netty.util.concurrent.AbstractScheduledEventExecutor",
-              "io.netty.resolver.dns",
-              "io.opencensus",
-              "com.sun.jna",
-              "com.tableau.hyperapi",
-              "com.typesafe.config.impl.ConfigImpl$EnvVariablesHolder",
-              "com.typesafe.config.impl.ConfigImpl$SystemPropertiesHolder",
-              // See https://github.com/HarrDevY/native-register-bouncy-castle
-              "org.bouncycastle.jcajce.provider.drbg.DRBG$Default",
-              "org.bouncycastle.jcajce.provider.drbg.DRBG$NonceAndIV",
-              "org.duckdb"
-            ),
-            initializeAtBuildtime = NativeImage.defaultBuildTimeInitClasses ++
-              Seq(
-                "org.bouncycastle",
-                "org.enso.snowflake.BouncyCastleInitializer",
-                "org.enso.interpreter.runtime.nativeimage"
-              )
-          )
-      }
-      .dependsOn(NativeImage.additionalCp)
-      .dependsOn(NativeImage.smallJdk)
-      .dependsOn(
-        createEnginePackageNoIndex
-      )
-      .value,
-    buildNativeImage := Def.taskDyn {
-      NativeImage
-        .incrementalNativeImageBuild(
-          rebuildNativeImage,
-          "enso",
-          targetDir = engineDistributionRoot.value / "bin",
-          // The Java-free libraries' sources too: `EnsoLibraryFeature` reads their
-          // `polyglot java import`s (Note [Java-Free Libraries In The Image]).
-          extraInputs = Def.task(
-            (Runtime / modulePath).value ++ javaFreeLibraryRoots.map(_ / "src")
-          )
-        )
-    }.value,
-    checkNativeImageSize := Def
-      .taskDyn {
-        NativeImage.checkNativeImageSize(
-          name      = "enso",
-          targetDir = engineDistributionRoot.value / "bin"
-        )
-      }
-      .dependsOn(buildNativeImage)
-      .value
-  )
   .dependsOn(cli)
   .dependsOn(`distribution-manager`)
   .dependsOn(`edition-updater`)
@@ -4003,9 +3725,6 @@ lazy val `engine-runner` = project
   .dependsOn(`runtime-version-manager`)
   .dependsOn(`version-output`)
 
-lazy val buildSmallJdk =
-  taskKey[File]("Build a minimal JDK used for native image generation")
-
 /** Command for building small JDK for the release.
   * Use as `buildSmallJdkForRelease <targetDir>`.
   */
@@ -4015,11 +3734,6 @@ ThisBuild / commands += Command.single("buildSmallJdkForRelease") {
     state.log.info(s"Small JDK built in: $targetDir")
     state
 }
-
-lazy val extraNITestLibs =
-  taskKey[Seq[String]](
-    "List of extra test libraries to be included in Native Image"
-  )
 
 lazy val `distribution-manager` = project
   .in(file("lib/scala/distribution-manager"))
@@ -4145,47 +3859,7 @@ lazy val `os-environment-lib` =
         (`jvm-channel` / Compile / exportedModule).value,
         (`logging-utils` / Compile / exportedModule).value,
         (`logging-config` / Compile / exportedModule).value
-      ),
-      NativeImage.smallJdk := None,
-      NativeImage.additionalCp := {
-        val ourDeps = (Test / fullClasspath).value.map(_.data.getAbsolutePath)
-        ourDeps
-      },
-      rebuildNativeImage := Def.taskDyn {
-        val targetDir = (Test / target).value
-        NativeImage.buildNativeImage(
-          "os-environment-lib",
-          staticOnLinux = false,
-          targetDir     = targetDir,
-          symlink       = false,
-          mainClass     = Some("org.enso.os.environment.lib.HelloTitle"),
-          shared        = true,
-          additionalOptions = Seq(
-            "-ea",
-            "-R:-InstallSegfaultHandler"
-          ) ++ (if (GraalVM.EnsoLauncher.debug) {
-                  // useful perf & debug switches:
-                  Seq(
-                    "-g",
-                    "-O0",
-                    "-H:+SourceLevelDebug",
-                    "-H:-DeleteLocalSymbols",
-                    "-Dnic=nic"
-                  )
-                } else {
-                  Seq()
-                })
-        )
-      }.value,
-      Test / buildNativeImage := Def.taskDyn {
-        val targetDir = (Test / target).value
-        NativeImage.incrementalNativeImageBuild(
-          rebuildNativeImage,
-          "os-environment-lib",
-          targetDir = targetDir,
-          shared    = true
-        )
-      }.value
+      )
     )
     .dependsOn(`engine-common`)
     .dependsOn(`jvm-channel`)
@@ -4203,6 +3877,7 @@ lazy val `os-environment` =
         "org.graalvm.sdk" % "nativeimage"     % graalMavenPackagesVersion % "provided",
         "org.graalvm.sdk" % "graal-sdk"       % graalMavenPackagesVersion % "provided",
         "commons-io"      % "commons-io"      % commonsIoVersion,
+        "com.typesafe"    % "config"          % typesafeConfigVersion     % Test,
         "junit"           % "junit"           % junitVersion              % Test,
         "com.github.sbt"  % "junit-interface" % junitIfVersion            % Test
       ),
@@ -4219,77 +3894,21 @@ lazy val `os-environment` =
         (`logging-utils` / Compile / exportedModule).value,
         (`logging-config` / Compile / exportedModule).value
       ),
-      NativeImage.smallJdk := None,
-      NativeImage.additionalCp := {
-        val ourDeps = (Test / fullClasspath).value.map(_.data.getAbsolutePath)
-        ourDeps
-      },
-      rebuildNativeImage := Def.taskDyn {
-        val ignore    = (Test / fullClasspath).value
-        val targetDir = (Test / target).value
-        NativeImage.buildNativeImage(
-          "test-os-env",
-          staticOnLinux = false,
-          targetDir     = targetDir,
-          symlink       = false,
-          mainClass     = Some("org.enso.os.environment.TestRunner"),
-          additionalOptions = Seq(
-            "-ea",
-            "--features=org.enso.os.environment.TestCollectorFeature",
-            "-R:-InstallSegfaultHandler"
-          ) ++ (if (GraalVM.EnsoLauncher.debug) {
-                  // useful perf & debug switches:
-                  Seq(
-                    "-g",
-                    "-O0",
-                    "-H:+SourceLevelDebug",
-                    "-H:-DeleteLocalSymbols",
-                    // you may need to set smallJdk := None to use following flags:
-                    // "--trace-class-initialization=org.enso.syntax2.Parser",
-                    // "--diagnostics-mode",
-                    // "--verbose",
-                    "-Dnic=nic"
-                  )
-                } else {
-                  Seq()
-                })
-        )
-      }.value,
-      Test / buildNativeImage := Def.taskDyn {
-        val targetDir = (Test / target).value
-        NativeImage.incrementalNativeImageBuild(
-          rebuildNativeImage,
-          "test-os-env",
-          targetDir        = targetDir,
-          useTestClassPath = true
-        )
-      }.value,
-      Test / test := Def
-        .task {
-          val logger    = streams.value.log
-          val exeSuffix = if (Platform.isWindows) ".exe" else ""
-          val libSuffix =
-            if (Platform.isWindows) ".dll"
-            else if (Platform.isLinux) ".so"
-            else ".dylib"
-          val exeFile =
-            (Test / target).value / ("test-os-env" + exeSuffix)
-          val binPath = exeFile.getAbsolutePath
-          val res =
-            Process(
-              Seq(binPath),
-              None,
-              "JAVA_TOOL_OPTIONS"  -> "--enable-native-access=org.enso.jvm.channel",
-              "OS_ENVIRONMENT_LIB" -> ((`os-environment-lib` / Test / target).value / ("os-environment-lib" + libSuffix)).toString
-            ) ! logger
-          if (res != 0) {
-            logger.error("Some test in os-environment failed")
-            throw new TestsFailedException()
-          }
-        }
-        .dependsOn(`os-environment-lib` / Test / buildNativeImage)
-        .dependsOn(Test / buildNativeImage)
-        .value,
+      // Note [os-environment's Native-Only Tests]
+      // The trash bin and the JNI invocation of a JVM work only in a native image, and their
+      // tests ran in one (`test-os-env`, with `os-environment-lib` as a shared library) until the
+      // native build went (native-image removal C2, #683). Their code and tests go in C3; until then
+      // they are left out of the JVM run. `TestChangeDirectory` skips itself outside an image.
+      Test / testOptions += Tests.Filter(name =>
+        !Set(
+          "org.enso.os.environment.jni.LoadClassTest",
+          "org.enso.os.environment.trash.TrashBinTest"
+        ).contains(name)
+      ),
+      // The logging modules need these on the test module path.
+      Test / moduleDependencies ++= scalaLibrary ++ Seq(
+        "com.typesafe" % "config" % typesafeConfigVersion
+      ),
       Test / fork := true
     )
     .dependsOn(`engine-common`)
@@ -4484,8 +4103,7 @@ lazy val `std-benchmarks` = (project in file("std-bits/benchmarks"))
     // Note [Standard Library Benchmarks Exit On OOM]
     // An OutOfMemoryError in a JMH worker thread does not stop the run: the uncaught-exception
     // handler runs out of memory too, and the JVM then hangs until the job is cancelled (3 hours
-    // in #302). The `-XX:+ExitOnOutOfMemoryError` in the native image's build arguments is not
-    // this JVM's.
+    // in #302).
     javaOptions += "-XX:+ExitOnOutOfMemoryError"
   )
   .settings(
@@ -4857,17 +4475,6 @@ lazy val `locking-test-helper` = project
   )
 
 val `std-lib-root` = file("distribution/lib/Standard/")
-
-/** The Java-free libraries hosted in the native image (Note [Java-Free Libraries
-  * In The Image] in `engine-runner`'s `rebuildNativeImage`). None when the image
-  * leaves out every library but Base (`ENSO_LAUNCHER=fast`).
-  *
-  * Standard.XML only. Its hand-kept interface imports fail only at run time and
-  * only under the native launcher when one is missing (see the Note), so do
-  * not add a library here without the owner's agreement.
-  */
-def javaFreeLibraryRoots: Seq[File] =
-  if (GraalVM.EnsoLauncher.fast) Seq() else Seq(stdLibComponentRoot("XML"))
 
 def stdLibComponentRoot(name: String): File =
   `std-lib-root` / name / stdLibVersion
@@ -6401,54 +6008,16 @@ ThisBuild / createEnginePackageNoIndex := {
 
 lazy val buildEngineDistributionNoIndex =
   taskKey[Unit](
-    "Builds the engine distribution without generating indexes and optionally generating native image"
+    "Builds the engine distribution without generating indexes"
   )
-// `Def.taskDyn`, not `Def.taskIf`, so the native image is only scheduled when
-// `shouldBuildNativeImage` asks for it.
-buildEngineDistributionNoIndex := Def.taskDyn {
+buildEngineDistributionNoIndex := {
   createEnginePackageNoIndex.value
-  if (!shouldBuildNativeImage.value) Def.task(())
-  else
-    Def.task {
-      (`engine-runner` / buildNativeImage).value
-      (`engine-runner` / checkNativeImageSize).value
-    }
-}.value
+}
 
 // This makes the buildEngineDistribution task usable as a dependency
 // of other tasks.
 ThisBuild / buildEngineDistributionNoIndex := {
   createEnginePackageNoIndex.value
-}
-
-lazy val shouldBuildNativeImage = taskKey[Boolean](
-  "Whether native image should be build within buildEngineDistribution task"
-)
-
-ThisBuild / shouldBuildNativeImage := {
-  GraalVM.EnsoLauncher.native
-}
-
-ThisBuild / NativeImage.additionalOpts := {
-  if (!GraalVM.EnsoLauncher.native) {
-    Seq()
-  } else {
-    var opts = if (GraalVM.EnsoLauncher.release) {
-      // Picking `-Os` option instead of `-O3` in production on purpose.
-      // See https://github.com/enso-org/enso/pull/12855#issuecomment-2812552448
-      Seq("-Os")
-    } else {
-      Seq("-Ob")
-    }
-
-    if (GraalVM.EnsoLauncher.debug) {
-      opts = opts ++ Seq("-H:GenerateDebugInfo=1")
-    }
-    if (GraalVM.EnsoLauncher.test) {
-      opts = opts ++ testAssertions
-    }
-    opts
-  }
 }
 
 ThisBuild / engineDistributionRoot := {

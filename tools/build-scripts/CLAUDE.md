@@ -40,14 +40,13 @@ prints one.
   drops files from an image that is too small without failing
   (`src/ide-build/verifyDmg.ts`). Locally, use `ide-local`.
 - `ide-local [--mode <vite mode>]` — the whole IDE from this checkout: sbt
-  `buildEngineBundle` (`ENSO_LAUNCHER=native` unless set; on Windows, from a
-  Visual Studio developer prompt, which it checks), the bundle copied to
-  `dist/backend`, `pnpm install`, `build:gui` into `dist/gui`, then
-  `ide-build`'s packaging into `dist/ide`. It deletes `dist/backend`, `dist/gui`
-  and `dist/ide` when it starts, so it never reuses an old engine bundle and a
-  failed run leaves no earlier installer behind; the engine itself builds
-  incrementally (`sbt clean` first for a clean one). It starts sbt, so it never
-  runs in CI.
+  `buildEngineBundle` (on Windows, from a Visual Studio developer prompt, which
+  it checks), the bundle copied to `dist/backend`, `pnpm install`, `build:gui`
+  into `dist/gui`, then `ide-build`'s packaging into `dist/ide`. It deletes
+  `dist/backend`, `dist/gui` and `dist/ide` when it starts, so it never reuses
+  an old engine bundle and a failed run leaves no earlier installer behind; the
+  engine itself builds incrementally (`sbt clean` first for a clean one). It
+  starts sbt, so it never runs in CI.
 - `stdlib-test <suite>` — what the retired build CLI's `backend test <suite>`
   did: each selected `test/*_Tests` project in turn,
   `enso --no-ir-caches --run`, with the retired build CLI's arguments and

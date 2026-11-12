@@ -27,17 +27,14 @@ test('sbt builds the bundle incrementally', () => {
   expect(ENGINE_BUNDLE_COMMAND).toBe('buildEngineBundle')
 })
 
-test('sbt gets the version triple and a native launcher, unless the caller chose one', () => {
+test('sbt gets the version triple', () => {
   const versions = { version: version('2026.1.1-dev'), releaseMode: false }
   expect(engineBuildEnv({ PATH: '/bin' }, versions)).toEqual({
     PATH: '/bin',
     ENSO_VERSION: '2026.1.1-dev',
     ENSO_EDITION: '2026.1.1-dev',
     ENSO_RELEASE_MODE: 'false',
-    ENSO_LAUNCHER: 'native',
   })
-  expect(engineBuildEnv({ ENSO_LAUNCHER: '' }, versions).ENSO_LAUNCHER).toBe('native')
-  expect(engineBuildEnv({ ENSO_LAUNCHER: 'shell' }, versions).ENSO_LAUNCHER).toBe('shell')
   expect(engineBuildEnv({ ENSO_VERSION: 'stale' }, versions).ENSO_VERSION).toBe('2026.1.1-dev')
 })
 

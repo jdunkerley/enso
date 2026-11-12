@@ -4,7 +4,7 @@ description: >-
   distribution job, from its artifact.
 inputs:
   name:
-    description: The artifact's name, e.g. `Engine Distribution (GraalVM CE) (native,test) (linux, amd64)`.
+    description: The artifact's name, e.g. `Engine Distribution (GraalVM CE) (linux, amd64)`.
     required: true
 runs:
   using: composite

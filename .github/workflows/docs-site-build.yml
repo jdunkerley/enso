@@ -24,7 +24,7 @@ on:
         description: "The engine distribution artifact, for `source: distribution`."
         required: false
         type: string
-        default: Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
+        default: Engine Distribution (GraalVM CE) (linux, amd64)
       static-checks:
         description: >-
           Also typecheck, lint and unit-test `docs-site/` (`docs-site.yml`, for pull requests that

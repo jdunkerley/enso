@@ -242,8 +242,6 @@ jobs:
             runner: ubuntu-latest
           - os: windows
             runner: windows-latest
-    env:
-      ENSO_LAUNCHER: native
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -301,8 +299,6 @@ jobs:
     if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on: [self-hosted, macOS]
     timeout-minutes: 45
-    env:
-      ENSO_LAUNCHER: native
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5

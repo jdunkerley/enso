@@ -65,9 +65,10 @@ settings. Every workflow is hand-written YAML (build simplification;
   (GraalVM CE, or Oracle GraalVM with `edition: oracle`, sbt, optionally `flatc`
   and GraalPy at the `toolchain:` pins in `build-config.yaml` and the
   `rust-toolchain.toml` Rust toolchain, plus the sbt dependency cache),
-  `setup-msvc` (the MSVC developer environment on Windows, for native images and
-  the runtime DLL copy), `git-clean`, `setup-build-scripts` (install
-  `tools/build-scripts`' dependencies only), `download-engine-distribution`.
+  `setup-msvc` (the MSVC developer environment on Windows, for the runtime DLL
+  copy, `MsvcRuntime`; its own removal is a follow-up of #683), `git-clean`,
+  `setup-build-scripts` (install `tools/build-scripts`' dependencies only),
+  `download-engine-distribution`.
 - `actionlint.yaml` — actionlint's configuration; each ignore says why it stays.
 - `settings.yml`, `mergify.yml` — inherited from upstream. Neither is live on
   this fork: the branch rules are a repository ruleset, which requires no status
@@ -221,7 +222,7 @@ needs more than one tool. A job that runs a distribution built by another job
 | `engine-checks-platform.yml` › Build Engine Distribution  | `version`, then `sbt "clean; all ciBuildEngineDistribution"`                                                   | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
 | `engine-checks-platform.yml` › JVM Tests                  | `sbt …` steps (`buildEngineDistributionNoIndex; …`, two parts, #433)                                           | `setup-jvm`, `setup-msvc`                        |
 | `engine-checks-platform.yml` › Benchmarks                 | `sbt … runtime-benchmarks/bench` (version from the build job)                                                  | `setup-jvm`                                      |
-| `engine-checks-platform.yml` › API check                  | `corepack pnpm --filter build-scripts run stdlib-api-check`                                                    | `setup-build-scripts`                            |
+| `engine-checks-platform.yml` › API check                  | `corepack pnpm --filter build-scripts run stdlib-api-check`                                                    | `setup-jvm`, `setup-build-scripts`               |
 | `engine-checks-platform.yml` › Standard Library test plan | `corepack pnpm --filter build-scripts run stdlib-test-plan`                                                    | `setup-build-scripts`                            |
 | `engine-checks-platform.yml` › stdlib tests               | `corepack pnpm --filter build-scripts run stdlib-test <suite> --only <projects>`                               | `setup-jvm` (GraalPy), `setup-build-scripts`     |
 | `engine-checks-platform.yml` › Docs site                  | `docs-site-build.yml`: `generate`, `build`, `test:e2e` (`typecheck`, `lint`, `test:unit` from `docs-site.yml`) | `setup-node`                                     |

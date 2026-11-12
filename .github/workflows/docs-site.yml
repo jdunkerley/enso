@@ -72,7 +72,9 @@ jobs:
           REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.sha }}
         run: |
-          for artifact in docs-site-catalogues "Engine Distribution (GraalVM CE) (native,test) (linux, amd64)"; do
+          # The last name is the distribution's before the native build went (#683), for develop runs
+          # from before then.
+          for artifact in docs-site-catalogues "Engine Distribution (GraalVM CE) (linux, amd64)" "Engine Distribution (GraalVM CE) (native,test) (linux, amd64)"; do
             candidates=$(gh api -X GET "repos/$REPO/actions/artifacts" -f name="$artifact" -f per_page=100 \
               --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_branch == "develop" and .workflow_run.head_repository_id == .workflow_run.repository_id)
                      | "\(.workflow_run.id) \(.workflow_run.head_sha)"] | .[:30] | .[]')

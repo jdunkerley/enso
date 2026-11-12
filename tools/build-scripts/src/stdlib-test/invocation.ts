@@ -6,7 +6,10 @@
 import path from 'node:path'
 import type { Suite } from './suites.ts'
 
-/** The heap-dump flag: in `JAVA_TOOL_OPTIONS` always, and a launcher argument except on Windows. */
+/**
+ * The heap-dump flag, in `JAVA_TOOL_OPTIONS`. It used to be a launcher argument too, which only the
+ * native launcher understood: the shell launchers hand every argument to the runner.
+ */
 export const HEAP_DUMP = '-XX:+HeapDumpOnOutOfMemoryError'
 
 /**
@@ -21,14 +24,10 @@ export const ASSERTIONS =
 /** The launcher arguments before `--no-ir-caches --run` (`extra_engine_runner_args`). */
 export function runnerArguments(
   suite: Suite,
-  platform: NodeJS.Platform,
   smallJdk: string,
   graalEdition: string | undefined,
 ): string[] {
-  const args =
-    suite.runnerArgs != null ? [...suite.runnerArgs]
-    : platform === 'win32' ? []
-    : [HEAP_DUMP]
+  const args = suite.runnerArgs != null ? [...suite.runnerArgs] : []
   if (suite.smallJdk && graalEdition !== 'Oracle GraalVM') args.push('--jvm', smallJdk)
   return args
 }
@@ -45,7 +44,6 @@ export interface TestEnvironmentInputs {
   readonly base: Readonly<Record<string, string | undefined>>
   readonly platform: NodeJS.Platform
   readonly enginePackage: string
-  readonly nativeRunner: boolean
   readonly runnerArgs: readonly string[]
   readonly junitDir: string
   readonly httpbinUrl: string | null
@@ -79,12 +77,7 @@ export function testEnvironment(inputs: TestEnvironmentInputs): Record<string, s
     if (env[name] === '') delete env[name]
   }
   if (env.ENSO_TEST_GROUP_FILTER === '') delete env.ENSO_TEST_GROUP_FILTER
-  const launcher =
-    inputs.platform === 'win32' ?
-      inputs.nativeRunner ?
-        'enso.exe'
-      : 'enso.bat'
-    : 'enso'
+  const launcher = inputs.platform === 'win32' ? 'enso.bat' : 'enso'
   Object.assign(env, {
     JAVA_TOOL_OPTIONS: `${ASSERTIONS} ${HEAP_DUMP}`,
     ENSO_META_TEST_COMMAND: path.join(inputs.enginePackage, 'bin', launcher),

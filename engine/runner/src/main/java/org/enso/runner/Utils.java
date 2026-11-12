@@ -192,6 +192,42 @@ final class Utils {
   }
 
   /**
+   * Makes a relative {@code --in-project} value absolute against {@code userDir}, the directory the
+   * user started {@code enso} in. The launcher starts the process in the project's parent (Note
+   * [The Launcher Starts In The Project's Parent] in {@code distribution/bin/enso}), and the runner
+   * reads the value as it is, against the process's directory; {@code --run}'s path is resolved
+   * against {@code userDir} by {@link #findFileAndProject} instead.
+   *
+   * @param args the command line
+   * @param userDir the directory {@code enso} was started in
+   * @return {@code args} itself when there is nothing to change, otherwise a changed copy
+   */
+  static String[] absoluteInProject(String[] args, String userDir) {
+    for (var i = 0; i < args.length; i++) {
+      String value;
+      String prefix;
+      var at = i;
+      if (args[i].equals("--in-project") && i + 1 < args.length) {
+        at = i + 1;
+        prefix = "";
+        value = args[at];
+      } else if (args[i].startsWith("--in-project=")) {
+        prefix = "--in-project=";
+        value = args[i].substring(prefix.length());
+      } else {
+        continue;
+      }
+      if (value.isEmpty() || new File(value).isAbsolute()) {
+        return args;
+      }
+      var result = args.clone();
+      result[at] = prefix + new File(userDir, value).getPath();
+      return result;
+    }
+    return args;
+  }
+
+  /**
    * This method has to be called as early as possible. It attempts to find the project root
    * directory of the given file, and if the project root is found, it uses native code to change
    * the working directory to the project root. In order for the JVM's {@code java.io} to reflect

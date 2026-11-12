@@ -115,16 +115,8 @@ object DistributionPackage {
     }
   }
 
-  private def batOrExeName(baseName: String): String =
-    if (Platform.isWindows) {
-      if (GraalVM.EnsoLauncher.native) {
-        baseName + ".exe"
-      } else {
-        baseName + ".bat"
-      }
-    } else {
-      baseName
-    }
+  private def launcherName(baseName: String): String =
+    if (Platform.isWindows) baseName + ".bat" else baseName
 
   /** @param distributionRoot Root directory for the engine build distribution. Will be populated.
     * @param jarModulesToCopy Modular Jar archives that will be copied into the `component` directory.
@@ -205,20 +197,11 @@ object DistributionPackage {
       log             = log
     )
 
-    if (GraalVM.EnsoLauncher.native) {
-      log.info(
-        s"Using native launchers as ${GraalVM.EnsoLauncher.VAR_NAME} env variable is ${GraalVM.EnsoLauncher.toString}"
-      )
-    } else {
-      log.info(
-        s"Using shell launchers as ${GraalVM.EnsoLauncher.VAR_NAME} env variable is ${GraalVM.EnsoLauncher.toString}"
-      )
-      copyDirectoryIncremental(
-        file("distribution/bin"),
-        distributionRoot / "bin",
-        cacheFactory.make("engine-bin")
-      )
-    }
+    copyDirectoryIncremental(
+      file("distribution/bin"),
+      distributionRoot / "bin",
+      cacheFactory.make("engine-bin")
+    )
 
     buildEngineManifest(
       template     = file("distribution/manifest.template.yaml"),
@@ -615,7 +598,7 @@ object DistributionPackage {
   ): Boolean = {
     import scala.collection.JavaConverters._
 
-    val enso = distributionRoot / "bin" / batOrExeName("enso")
+    val enso = distributionRoot / "bin" / launcherName("enso")
     val pb   = new java.lang.ProcessBuilder()
     val all  = new java.util.ArrayList[String]()
     val (atIndex, fileToRun, projectPath) =

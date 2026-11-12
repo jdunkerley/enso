@@ -32,10 +32,8 @@ env:
 # does not record the version.
 #
 # The retired build CLI's `backend benchmark enso-jmh` (`std-libs-benchmark.yml`) did the same with
-# `std-benchmarks/bench`, and also set `ENSO_LAUNCHER=native,-ls`: running the JMH benchmarks turns
-# on the native runner (`BuildConfigurationResolved::new` in the retired build CLI's `engine.rs`),
-# so the distribution they run is built with a native-image runner without the language server. The
-# runtime benchmarks leave `ENSO_LAUNCHER` unset (the build's default, `shell`).
+# `std-benchmarks/bench`. (It also set `ENSO_LAUNCHER=native,-ls`, which built a native runner
+# nothing used; the native build and `ENSO_LAUNCHER` are gone since #683.)
 
 permissions:
   contents: read

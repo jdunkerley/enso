@@ -14,29 +14,25 @@ export interface Suite {
   readonly deny?: readonly string[]
   /** Run on the small JDK (`--jvm <repo>/target/small-jdk`), unless the edition is Oracle GraalVM. */
   readonly smallJdk: boolean
-  /** Runner arguments that replace the heap-dump flag (`extra_engine_runner_args`). */
+  /** Runner arguments (`extra_engine_runner_args`). */
   readonly runnerArgs?: readonly string[]
-  /** Whether `ENSO_META_TEST_COMMAND` names the native launcher (`enso.exe`, not `enso.bat`). */
-  readonly nativeRunner: boolean
 }
 
 const NOT_SEPARATE = ['Microsoft_Tests', 'AWS_Tests']
 
 /** The suites the retired build CLI's `backend test` knew. */
 export const SUITES: Readonly<Record<string, Suite>> = {
-  'standard-library': { deny: NOT_SEPARATE, smallJdk: true, nativeRunner: true },
-  'std-aws': { allow: ['AWS_Tests'], smallJdk: false, runnerArgs: ['--jvm'], nativeRunner: true },
+  'standard-library': { deny: NOT_SEPARATE, smallJdk: true },
+  'std-aws': { allow: ['AWS_Tests'], smallJdk: false, runnerArgs: ['--jvm'] },
   'std-microsoft': {
     allow: ['Microsoft_Tests'],
     smallJdk: false,
     runnerArgs: ['--jvm'],
-    nativeRunner: true,
   },
   'std-snowflake-jvm': {
     allow: ['Snowflake_Tests'],
     smallJdk: false,
     runnerArgs: ['--jvm'],
-    nativeRunner: false,
   },
   'std-cloud-related': {
     allow: [
@@ -51,7 +47,6 @@ export const SUITES: Readonly<Record<string, Suite>> = {
     ],
     smallJdk: false,
     runnerArgs: ['--jvm'],
-    nativeRunner: true,
   },
 }
 

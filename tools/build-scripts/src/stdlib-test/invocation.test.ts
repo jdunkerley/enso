@@ -17,10 +17,9 @@ const jdk = '/home/runner/work/enso/enso/target/small-jdk'
 const project = (name: string) => `/home/runner/work/enso/enso/test/${name}`
 
 describe('the command line', () => {
-  test('Linux JVM, as logged', () => {
-    const runner = runnerArguments(suiteNamed('standard-library').suite, 'linux', jdk, 'GraalVM CE')
+  test('Linux JVM: no heap-dump argument, which the shell launcher would pass to the runner', () => {
+    const runner = runnerArguments(suiteNamed('standard-library').suite, jdk, 'GraalVM CE')
     expect(projectArguments(runner, project('Base_Internal_Tests'))).toEqual([
-      '-XX:+HeapDumpOnOutOfMemoryError',
       '--jvm',
       jdk,
       '--no-ir-caches',
@@ -29,44 +28,25 @@ describe('the command line', () => {
       '--disable-private-check',
     ])
   })
-  test('Windows JVM: no heap-dump argument', () => {
-    const windowsJdk = 'D:\\a\\enso\\enso\\target\\small-jdk'
-    const runner = runnerArguments(
-      suiteNamed('standard-library').suite,
-      'win32',
-      windowsJdk,
-      'GraalVM CE',
-    )
-    expect(runner).toEqual(['--jvm', windowsJdk])
-  })
-  test('Oracle GraalVM: the heap-dump argument on Linux, nothing on Windows', () => {
+  test('Oracle GraalVM: nothing before the project', () => {
     const suite = suiteNamed('standard-library').suite
     expect(
-      projectArguments(
-        runnerArguments(suite, 'linux', jdk, 'Oracle GraalVM'),
-        project('Base_Tests'),
-      ),
-    ).toEqual(['-XX:+HeapDumpOnOutOfMemoryError', '--no-ir-caches', '--run', project('Base_Tests')])
-    expect(runnerArguments(suite, 'win32', jdk, 'Oracle GraalVM')).toEqual([])
+      projectArguments(runnerArguments(suite, jdk, 'Oracle GraalVM'), project('Base_Tests')),
+    ).toEqual(['--no-ir-caches', '--run', project('Base_Tests')])
   })
   test('the dedicated cloud suites run on the JVM', () => {
     for (const name of ['std-aws', 'std-microsoft', 'std-cloud-related']) {
-      expect(runnerArguments(suiteNamed(name).suite, 'linux', jdk, 'GraalVM CE')).toEqual(['--jvm'])
+      expect(runnerArguments(suiteNamed(name).suite, jdk, 'GraalVM CE')).toEqual(['--jvm'])
     }
   })
   test('Oracle GraalVM runs the JVM suite without the small JDK', () => {
-    const runner = runnerArguments(
-      suiteNamed('standard-library').suite,
-      'linux',
-      jdk,
-      'Oracle GraalVM',
-    )
-    expect(runner).toEqual(['-XX:+HeapDumpOnOutOfMemoryError'])
+    const runner = runnerArguments(suiteNamed('standard-library').suite, jdk, 'Oracle GraalVM')
+    expect(runner).toEqual([])
   })
-  test('suites with their own runner arguments replace the heap-dump argument', () => {
-    expect(runnerArguments(suiteNamed('std-snowflake-jvm').suite, 'linux', jdk, undefined)).toEqual(
-      ['--jvm'],
-    )
+  test('suites with their own runner arguments', () => {
+    expect(runnerArguments(suiteNamed('std-snowflake-jvm').suite, jdk, undefined)).toEqual([
+      '--jvm',
+    ])
   })
 })
 
@@ -79,12 +59,11 @@ describe('the environment', () => {
     ENSO_SQLSERVER_DATABASE: '',
   }
   test('Linux JVM', () => {
-    const runner = runnerArguments(suiteNamed('standard-library').suite, 'linux', jdk, undefined)
+    const runner = runnerArguments(suiteNamed('standard-library').suite, jdk, undefined)
     const env = testEnvironment({
       base,
       platform: 'linux',
       enginePackage: '/e',
-      nativeRunner: true,
       runnerArgs: runner,
       junitDir: '/r/target/test-results',
       httpbinUrl: 'http://localhost:19649/',
@@ -95,25 +74,24 @@ describe('the environment', () => {
       JAVA_TOOL_OPTIONS:
         '-enableassertions -da:com.oracle.truffle.host.HostExecuteNode -da:com.oracle.graal.python.runtime.ExecutionContext -XX:+HeapDumpOnOutOfMemoryError',
       ENSO_META_TEST_COMMAND: path.join('/e', 'bin', 'enso'),
-      ENSO_META_TEST_ARGS: `--no-ir-caches -XX:+HeapDumpOnOutOfMemoryError --jvm ${jdk} --run`,
+      ENSO_META_TEST_ARGS: `--no-ir-caches --jvm ${jdk} --run`,
       ENSO_ENABLE_ASSERTIONS: 'true',
       ENSO_TEST_ANSI_COLORS: 'true',
       ENSO_TEST_JUNIT_DIR: '/r/target/test-results',
       ENSO_HTTP_TEST_HTTPBIN_URL: 'http://localhost:19649/',
     })
   })
-  test('Windows native: the time factors, and the native launcher', () => {
+  test('Windows: the time factors, and the batch launcher', () => {
     const env = testEnvironment({
       base: {},
       platform: 'win32',
       enginePackage: 'D:\\e',
-      nativeRunner: true,
       runnerArgs: [],
       junitDir: 'D:\\r',
       httpbinUrl: null,
     })
     expect(env.ENSO_META_TEST_ARGS).toBe('--no-ir-caches --run')
-    expect(env.ENSO_META_TEST_COMMAND).toBe(path.join('D:\\e', 'bin', 'enso.exe'))
+    expect(env.ENSO_META_TEST_COMMAND).toBe(path.join('D:\\e', 'bin', 'enso.bat'))
     expect(env.CI_TEST_TIMEFACTOR).toBe('2')
     expect(env.CI_TEST_FLAKY_ENABLE).toBe('true')
     expect(env.ENSO_HTTP_TEST_HTTPBIN_URL).toBeUndefined()
@@ -124,7 +102,6 @@ describe('the environment', () => {
         base: { ENSO_TEST_GROUP_FILTER: filter },
         platform: 'linux',
         enginePackage: '/e',
-        nativeRunner: true,
         runnerArgs: [],
         junitDir: '/j',
         httpbinUrl: null,
@@ -137,7 +114,6 @@ describe('the environment', () => {
       base: {},
       platform: 'linux',
       enginePackage: '/e',
-      nativeRunner: true,
       runnerArgs: [],
       junitDir: '/j',
       httpbinUrl: null,
