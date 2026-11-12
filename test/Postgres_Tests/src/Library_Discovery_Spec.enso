@@ -14,7 +14,7 @@ private run_project main_src:Text -> Text =
     parent = Enso_Bin_Utils.create_tmp_dir
     Panic.with_finalizer (parent.delete recursive=True) <|
         project = Enso_Bin_Utils.create_new_project parent "discovery_check" main_src
-        jvm_args = if Enso_Bin_Utils.runs_in_aot then [] else ["--jvm"]
+        jvm_args = if Enso_Bin_Utils.runs_in_native_image then [] else ["--jvm"]
         Enso_Bin_Utils.enso_run jvm_args+["--run", project.path] parent.path
 
 ## The project runs under `enso --jvm`, which on Windows still meets the

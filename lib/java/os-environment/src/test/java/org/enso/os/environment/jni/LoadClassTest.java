@@ -1,6 +1,7 @@
 package org.enso.os.environment.jni;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -33,8 +34,31 @@ public class LoadClassTest {
     return impl;
   }
 
+  /*
+   * Note [A HotSpot JVM Breaks The Test Image On Windows]
+   * ====================================================
+   * After a HotSpot JVM has run in this test image's process on Windows, the image's own file I/O
+   * fails ("The handle is invalid", "Invalid access to memory location", or a crash), so every
+   * later test in the run fails. A likely cause: the image exports the JDK libraries it links
+   * statically (`JNI_OnLoad_java`, `JNI_OnLoad_nio` and their `Java_*` functions), and HotSpot
+   * takes them for its own built-in libraries. Until A1 (#675) a channel test (`Channel.create`)
+   * started the JVM first, which hid the problem. So `executeMainClass` runs in a test image of its
+   * own. The native launcher does not meet it: once it starts the JVM, no image code runs again.
+   */
+  private static final String IN_CHILD = "ENSO_LOAD_CLASS_TEST_CHILD";
+
   @Test
   public void executeMainClass() throws Exception {
+    if (System.getenv(IN_CHILD) == null) {
+      var self = ProcessHandle.current().info().command().orElseThrow();
+      var pb = new ProcessBuilder(self, "executeMainClass").redirectErrorStream(true);
+      pb.environment().put(IN_CHILD, "true");
+      var p = pb.start();
+      var output = new String(p.getInputStream().readAllBytes());
+      assertEquals("executeMainClass in " + self + " succeeds:\n" + output, 0, p.waitFor());
+      assertTrue(output, output.contains("Number of tests: 1"));
+      return;
+    }
     var out = File.createTempFile("check-main", ".log");
     var gen = new Random();
     for (var i = 0; i < 5; i++) {
