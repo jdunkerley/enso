@@ -45,6 +45,8 @@ export function setChromeOptions(electron: Electron) {
   // specific use cases. This behavior can be observed in the following example:
   // https://groups.google.com/a/chromium.org/g/chromium-dev/c/09NnO6jYT6o.
   electron.app.commandLine.appendSwitch('ignore-gpu-blocklist')
+  // EXPERIMENT (#674): the packaged-IDE tests on the GPU-less Windows runner.
+  if (process.env.ENSO_TEST_DISABLE_GPU === '1') electron.app.disableHardwareAcceleration()
 }
 
 /** Register keyboard shortcuts that should be handled by Electron. */
