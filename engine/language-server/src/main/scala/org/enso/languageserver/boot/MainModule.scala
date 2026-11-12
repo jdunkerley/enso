@@ -55,12 +55,7 @@ import org.enso.librarymanager.local.DefaultLocalLibraryProvider
 import org.enso.librarymanager.published.PublishedLibraryCache
 import org.enso.lockmanager.server.LockManagerService
 import org.enso.logger.masking.Masking
-import org.enso.common.{
-  ContextFactory,
-  HostEnsoUtils,
-  PythonHomeFinder,
-  RuntimeOptions
-}
+import org.enso.common.{ContextFactory, PythonHomeFinder, RuntimeOptions}
 import org.enso.filewatcher.WatcherFactory
 import org.enso.languageserver.boot.resource.TruffleContextInitialization
 import org.enso.logging.utils.akka.AkkaConverter
@@ -326,12 +321,6 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
     Runtime.getRuntime.availableProcessors().toString
   )
 
-  if (HostEnsoUtils.isAot()) {
-    log.info("Running Language Server in AOT mode")
-  } else {
-    log.info("Running Language Server in JVM mode")
-  }
-
   private val pythonHome = PythonHomeFinder.findPythonHome() match {
     case path if path != null =>
       path.getParent.toFile.getCanonicalPath
@@ -419,8 +408,7 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
     localLibraryManager      = localLibraryManager,
     editionReferenceResolver = editionReferenceResolver,
     editionManager           = editionManager,
-    localLibraryProvider =
-      DefaultLocalLibraryProvider.make(libraryLocations, HostEnsoUtils.isAot()),
+    localLibraryProvider     = DefaultLocalLibraryProvider.make(libraryLocations),
     publishedLibraryCache =
       PublishedLibraryCache.makeReadOnlyCache(libraryLocations),
     installerConfig = LibraryInstallerConfig(
@@ -604,13 +592,12 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
       .asInstanceOf[Long]
     val totalMemMB = totalMem / 1024 / 1024
     telemetryLog.trace(
-      "Initializing main module of the Language Server: project_id={}, edition={}, graal_version={}, enso_version={}, is_release={}, AOT={}, os_name={}, os_arch={}, os_version={}, available_cpus={}, total_memory_MB={}, available_memory_MB={}",
+      "Initializing main module of the Language Server: project_id={}, edition={}, graal_version={}, enso_version={}, is_release={}, os_name={}, os_arch={}, os_version={}, available_cpus={}, total_memory_MB={}, available_memory_MB={}",
       serverConfig.projectId,
       BuildVersion.currentEdition(),
       BuildVersion.graalVersion(),
       BuildVersion.ensoVersion(),
       BuildVersion.isRelease,
-      HostEnsoUtils.isAot,
       osBean.getName,
       osBean.getArch,
       osBean.getVersion,

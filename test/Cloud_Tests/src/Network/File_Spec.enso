@@ -8,7 +8,6 @@ from Standard.Test import all
 import Standard.Test.Test_Environment
 
 import enso_dev.Base_Tests.Data.Data_Spec
-from enso_dev.Base_Tests.Enso_Bin_Utils import runs_in_aot
 import project.Network.Enso_Cloud.Cloud_Tests_Setup.Cloud_Tests_Setup
 
 ## We rely on a less strict equality for `File` as it is fine if a relative file gets resolved to absolute.
@@ -30,8 +29,7 @@ add_specs suite_builder =
     suite_builder.group "Path Operations" group_builder->
         current_project_root = enso_project.root
         base_directory = current_project_root.parent
-        pending_on_jvm = if runs_in_aot.not then "This test only works in AOT mode" else Nothing
-        group_builder.specify "will resolve relative paths relative to the currently running project" pending=pending_on_jvm <|
+        group_builder.specify "will resolve relative paths relative to the currently running project" <|
             dot = File.new "."
             dot.should_be_a File
             # The `.` path should resolve to the base path

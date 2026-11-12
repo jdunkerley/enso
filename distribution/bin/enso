@@ -28,7 +28,7 @@ done
 # nearest directory at or above the given path that holds `package.yaml`, and
 # starts the JVM in its parent, passing the directory it was started in as
 # `-Denso.user.dir`. The runner resolves the relative paths of the command line
-# against that (`Utils.adjustCwdToProject`, `Main.launch`). A path that does
+# against that (`Utils.originalUserDir`, `Main.launch`). A path that does
 # not exist, or lies in no project, leaves the directory as it is. `enso.bat`
 # does the same.
 project_arg=

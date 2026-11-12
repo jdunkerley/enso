@@ -58,31 +58,6 @@ final class Package[F](
 
   def getConfig(): Config = config
 
-  /** Flag libraries that are ahead-of-time compilation ready.
-    * Libraries that contain polyglot JAR files need special treatment. For example
-    * one provided by `EnsoLibraryFeature`. Otherwise they return `false`
-    * from this method.
-    */
-  final def isAotReady(): Boolean = {
-    PackageUtils.isAotReady(getConfig())
-  }
-
-  /** Marks library as AOT ready. Can only be called during image build time.
-    * Otherwise it throws `IllegalStateException`
-    */
-  final def markAotReady() = {
-    PackageUtils.markAotReady(getConfig())
-  }
-
-  /** Returns true, if one should print a warning about the library not being
-    * AOT ready.
-    */
-  final def checkAotReady(warn: Runnable): Unit = {
-    if (!PackageUtils.checkAotReady(getConfig(), true)) {
-      warn.run()
-    }
-  }
-
   /** Reloads the config from file system */
   def reloadConfig(): Try[Config] = {
     val configFile = root.getChild(Package.configFileName)

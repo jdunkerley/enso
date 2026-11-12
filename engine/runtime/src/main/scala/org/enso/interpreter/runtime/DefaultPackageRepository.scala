@@ -1,7 +1,6 @@
 package org.enso.interpreter.runtime
 
 import scala.jdk.OptionConverters.RichOption
-import org.enso.common.HostEnsoUtils
 import org.enso.compiler.PackageRepository
 import org.enso.compiler.context.CompilerContext
 import org.enso.compiler.core.ir.{Module => IRModule}
@@ -21,7 +20,6 @@ import org.enso.pkg.{
   ComponentGroup,
   ComponentGroups,
   ExtendedComponentGroup,
-  NativeLibraryFinder,
   Package,
   PackageManager,
   QualifiedName,
@@ -32,11 +30,7 @@ import org.enso.common.CompilationStage
 
 import java.nio.file.Path
 import scala.collection.immutable.ListSet
-import scala.jdk.CollectionConverters.{
-  CollectionHasAsScala,
-  IterableHasAsJava,
-  SeqHasAsJava
-}
+import scala.jdk.CollectionConverters.{IterableHasAsJava, SeqHasAsJava}
 import scala.util.{Failure, Success, Try, Using}
 import scala.util.control.NonFatal
 import org.enso.distribution.locking.ResourceManager
@@ -45,9 +39,7 @@ import org.enso.editions.updater.EditionManager
 import org.enso.editions.{DefaultEdition, Editions, LibraryName}
 import org.enso.interpreter.runtime.builtin.Builtins
 import org.enso.interpreter.runtime.instrument.NotificationHandler
-import org.enso.interpreter.runtime.nativeimage.NativeLibrarySearchPath
 import org.enso.librarymanager.DefaultLibraryProvider
-import org.graalvm.nativeimage.ImageInfo
 import org.slf4j.LoggerFactory
 
 /** The default [[PackageRepository]] implementation.
@@ -266,39 +258,12 @@ private class DefaultPackageRepository(
     // `getPackageForLibrary`. When background jobs are already running it can
     // run before this method returns; with the old order it found no package,
     // loaded no suggestions, and a library loaded mid-session never reached the
-    // GUI. The native library path is set first, as it must precede anything
-    // that could load native code.
-    if (isLibrary) {
-      addNativeLibPath(pkg)
-    }
-
+    // GUI.
     loadedPackages.put(libraryName, Some(pkg))
 
     if (isLibrary) {
       val root = Path.of(pkg.root.toString)
       notificationHandler.addedLibrary(libraryName, libraryVersion, root)
-    }
-  }
-
-  /** If the package contains any native libraries, their parent directories are added to the
-    * native library search path. This only works in native image.
-    * @param pkg the package to check for native libraries
-    */
-  private def addNativeLibPath(
-    pkg: Package[TruffleFile]
-  ): Unit = {
-    if (ImageInfo.inImageRuntimeCode()) {
-      val nativeLibs = NativeLibraryFinder.listAllNativeLibraries(
-        pkg,
-        TruffleFileSystem.INSTANCE
-      )
-      val distinctParentDirs = nativeLibs.asScala
-        .map(_.getParent)
-        .toSet
-      distinctParentDirs.foreach { dir =>
-        logger.debug("Adding '{}' to native lib search path", dir.getPath)
-        NativeLibrarySearchPath.addToSearchPath(dir.getPath)
-      }
     }
   }
 
@@ -530,7 +495,7 @@ private class DefaultPackageRepository(
         logger.warn(s"Resolution failed with [${failed.error}].")
       case Right(resolved) =>
         logger.debug(
-          s"Found library ${resolved.toString(HostEnsoUtils.isAot())} " +
+          s"Found library ${resolved} " +
           s"at [${MaskedPath(resolved.root.location).applyMasking()}]."
         )
     }
@@ -944,8 +909,7 @@ private object DefaultPackageRepository {
         edition             = edition.get,
         preferLocalLibraries =
           projectPackage.exists(_.getConfig().preferLocalLibraries),
-        projectRoot = projectRoot,
-        checkAot    = HostEnsoUtils.isAot()
+        projectRoot = projectRoot
       )
     new DefaultPackageRepository(
       resolvingLibraryProvider,

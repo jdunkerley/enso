@@ -5,7 +5,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.module.ModuleFinder;
 import java.lang.module.ModuleReference;
-import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -15,7 +14,6 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import org.graalvm.nativeimage.ImageInfo;
 
 public final class File_Utils {
   private File_Utils() {}
@@ -69,26 +67,12 @@ public final class File_Utils {
    * @return the path - never {@code null}
    * @throws IOException when the path cannot be found
    */
-  public static String getExecutableLocation() throws IOException, URISyntaxException {
-    File exec;
-    if (ImageInfo.inImageRuntimeCode()) {
-      exec = getExecutableLocationInNI();
-    } else {
-      var runnerMod = findRunnerModule();
-      if (runnerMod.isPresent()) {
-        exec = getExecutableLocationFromModule(runnerMod.get());
-      } else {
-        throw new FileNotFoundException();
-      }
+  public static String getExecutableLocation() throws IOException {
+    var runnerMod = findRunnerModule();
+    if (runnerMod.isEmpty()) {
+      throw new FileNotFoundException();
     }
-    return exec.getCanonicalPath();
-  }
-
-  private static File getExecutableLocationInNI() throws URISyntaxException {
-    var codeSource = File_Utils.class.getProtectionDomain().getCodeSource();
-    assert codeSource != null;
-    var loc = codeSource.getLocation();
-    return new File(loc.toURI());
+    return getExecutableLocationFromModule(runnerMod.get()).getCanonicalPath();
   }
 
   private static Optional<ModuleReference> findRunnerModule() {
@@ -114,12 +98,7 @@ public final class File_Utils {
   private static File resolveFromBinDir(Path binDir) throws FileNotFoundException {
     File exec;
     if (File.separatorChar == '\\') {
-      var exe = binDir.resolve("enso.exe").toFile();
-      if (exe.canExecute()) {
-        exec = exe;
-      } else {
-        exec = binDir.resolve("enso.bat").toFile();
-      }
+      exec = binDir.resolve("enso.bat").toFile();
     } else {
       exec = binDir.resolve("enso").toFile();
     }

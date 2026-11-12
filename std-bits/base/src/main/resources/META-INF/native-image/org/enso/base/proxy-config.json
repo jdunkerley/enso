@@ -1,7 +1,0 @@
-[
-    {
-        "interfaces": [
-            "org.enso.base.enso_cloud.AuthenticationProvider$AuthenticationService"
-        ]
-    }
-]

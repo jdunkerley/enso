@@ -13,13 +13,12 @@ Java support libraries for the engine. Two shapes live together here:
      boilerplate (`@BuiltinMethod`, `@Specialization`, etc.).
    - `persistance/` + `persistance-dsl/` — custom serialization framework used
      by `engine/polyglot-api/` and IR caches. Annotation-driven.
-   - `jvm-channel/` — the JNI invocation API the native launcher uses to start
-     HotSpot in its own process for `--jvm` (`JVM`, `PosixJVM`, `WindowsJVM`,
-     `JNI`, `JNIBoot`). The channel between the native image and a guest JVM,
-     and `jvm-interop` over it, are gone (native-image removal, A1); the rest
-     goes with the native launcher.
-   - `os-environment/` + `os-environment-lib/` — OS-specific process/env
-     helpers.
+   - `os-environment/` — OS-specific helpers: the user's directories
+     (`Directories`) and, on Windows, `main`'s arguments recovered from the wide
+     command line (`Arguments`, `WindowsArguments`; Note [Arguments Outside The
+     ANSI Code Page]). Its `@CFunction` code (working directory, trash bin) and
+     `jvm-channel/` and `os-environment-lib/` went with the native image (#664,
+     C3).
    - `ydoc-api/` — `YjsChannel`, the channel between the Language Server and the
      (Node) ydoc server, served over the channel sockets.
    - `ydoc-polyfill/` — Web/Node API polyfills and the parser functions for

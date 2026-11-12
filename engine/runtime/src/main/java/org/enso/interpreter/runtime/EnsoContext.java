@@ -35,7 +35,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
-import org.enso.common.HostEnsoUtils;
 import org.enso.common.LanguageInfo;
 import org.enso.common.RuntimeOptions;
 import org.enso.compiler.Compiler;
@@ -654,13 +653,6 @@ public final class EnsoContext {
     var hostSymbol = polyglotJava.lookupJavaClass(who, className, collectedExceptions);
     if (hostSymbol instanceof TruffleObject obj) {
       return obj;
-    }
-    // Note [A Library's Java Must Be In The Native Image]
-    var notInImage = EnsoPolyglotJava.javaNotInImage(HostEnsoUtils.isAot(), who);
-    if (notInImage != null) {
-      logger.log(Level.WARNING, notInImage);
-      var err = getBuiltins().error().makeCompileError(notInImage + " (" + className + ")");
-      return DataflowError.withDefaultTrace(err, null);
     }
     var level = Level.WARNING;
     for (var ex : collectedExceptions) {

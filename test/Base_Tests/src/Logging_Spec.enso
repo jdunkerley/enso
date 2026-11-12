@@ -17,8 +17,6 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
 
     tmp_root = Enso_Bin_Utils.create_tmp_dir
 
-    jvm_args = if Enso_Bin_Utils.runs_in_native_image then [] else [ "--jvm" ]
-
     group_builder.teardown <|
         tmp_root.delete recursive=True
 
@@ -156,7 +154,7 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
         logs_dir.create_directory
 
         proc = Process.new_builder "enso"
-            . set_arguments jvm_args+["--run", prj_dir.to_text]+args
+            . set_arguments ["--run", prj_dir.to_text]+args
             . set_directory prj_dir.parent
             . set_env "ENSO_LOG_DIRECTORY" logs_dir.to_text
             . set_env "JAVA_TOOL_OPTIONS" "-ea -da:com.oracle.truffle.host.HostExecuteNode"

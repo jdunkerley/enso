@@ -430,7 +430,6 @@ lazy val enso = (project in file("."))
     `jna-wrapper`,
     `jna-wrapper-extracted`,
     `json-rpc-server`,
-    `jvm-channel`,
     `language-server`,
     `language-server-deps-wrapper`,
     `library-manager`,
@@ -449,7 +448,6 @@ lazy val enso = (project in file("."))
     `netty-resolver-dns-native-macos-wrapper`,
     `opencv-wrapper`,
     `os-environment`,
-    `os-environment-lib`,
     `persistance`,
     `persistance-dsl`,
     pkg,
@@ -605,7 +603,6 @@ lazy val componentModulesPaths =
     (`fansi-wrapper` / Compile / exportedModuleBin).value,
     (`filewatcher` / Compile / exportedModuleBin).value,
     (`json-rpc-server` / Compile / exportedModuleBin).value,
-    (`jvm-channel` / Compile / exportedModuleBin).value,
     (`language-server` / Compile / exportedModuleBin).value,
     (`language-server-deps-wrapper` / Compile / exportedModuleBin).value,
     (`library-manager` / Compile / exportedModuleBin).value,
@@ -936,15 +933,12 @@ lazy val pkg = (project in file("lib/scala/pkg"))
     version := "0.1",
     Compile / run / mainClass := Some("org.enso.pkg.Main"),
     libraryDependencies ++= Seq(
-      "org.graalvm.sdk"    % "nativeimage"      % graalMavenPackagesVersion % "provided",
-      "io.circe"          %% "circe-core"       % circeVersion              % "provided",
-      "org.yaml"           % "snakeyaml"        % snakeyamlVersion          % "provided",
-      "org.scalatest"     %% "scalatest"        % scalatestVersion          % Test,
+      "io.circe"          %% "circe-core"       % circeVersion     % "provided",
+      "org.yaml"           % "snakeyaml"        % snakeyamlVersion % "provided",
+      "org.scalatest"     %% "scalatest"        % scalatestVersion % Test,
       "org.apache.commons" % "commons-compress" % commonsCompressVersion
     ),
     Compile / moduleDependencies ++= Seq(
-      "org.graalvm.sdk"    % "word"             % graalMavenPackagesVersion,
-      "org.graalvm.sdk"    % "nativeimage"      % graalMavenPackagesVersion,
       "org.apache.commons" % "commons-compress" % commonsCompressVersion,
       "org.yaml"           % "snakeyaml"        % snakeyamlVersion
     ),
@@ -2021,7 +2015,6 @@ lazy val `engine-common` = project
     commands += WithDebugCommand.withDebug,
     Test / envVars ++= distributionEnvironmentOverrides,
     libraryDependencies ++= Seq(
-      "org.graalvm.sdk"      % "nativeimage"     % graalMavenPackagesVersion % "provided",
       "org.graalvm.polyglot" % "polyglot"        % graalMavenPackagesVersion % "provided",
       "junit"                % "junit"           % junitVersion              % Test,
       "com.github.sbt"       % "junit-interface" % junitIfVersion            % Test
@@ -3633,7 +3626,6 @@ lazy val `engine-runner` = project
       (`editions` / Compile / exportedModule).value,
       (`engine-common` / Compile / exportedModule).value,
       (`engine-runner-common` / Compile / exportedModule).value,
-      (`jvm-channel` / Compile / exportedModule).value,
       (`library-manager` / Compile / exportedModule).value,
       (`logging-config` / Compile / exportedModule).value,
       (`logging-utils` / Compile / exportedModule).value,
@@ -3812,110 +3804,30 @@ lazy val `benchmarks-common` =
     )
     .dependsOn(`polyglot-api`)
 
-lazy val `jvm-channel` =
-  project
-    .in(file("lib/java/jvm-channel"))
-    .enablePlugins(JPMSPlugin)
-    .settings(
-      customFrgaalJavaCompilerSettings(targetJdk = "24"),
-      publishLocalSetting,
-      autoScalaLibrary := false,
-      crossPaths := false,
-      (Test / fork) := true,
-      commands += WithDebugCommand.withDebug,
-      libraryDependencies ++= Seq(
-        "org.graalvm.sdk" % "nativeimage"     % graalMavenPackagesVersion % "provided",
-        "org.graalvm.sdk" % "graal-sdk"       % graalMavenPackagesVersion % "provided",
-        "junit"           % "junit"           % junitVersion              % Test,
-        "com.github.sbt"  % "junit-interface" % junitIfVersion            % Test
-      ),
-      Compile / moduleDependencies ++= Seq(
-        "org.graalvm.sdk"      % "nativeimage" % graalMavenPackagesVersion,
-        "org.graalvm.polyglot" % "polyglot"    % graalMavenPackagesVersion,
-        "org.graalvm.sdk"      % "word"        % graalMavenPackagesVersion
-      )
-    )
-
-lazy val `os-environment-lib` =
-  project
-    .in(file("lib/java/os-environment-lib"))
-    .enablePlugins(JPMSPlugin)
-    .settings(
-      frgaalJavaCompilerSetting,
-      libraryDependencies ++= slf4jApi ++ Seq(
-        "org.graalvm.sdk" % "nativeimage"     % graalMavenPackagesVersion % "provided",
-        "org.graalvm.sdk" % "graal-sdk"       % graalMavenPackagesVersion % "provided",
-        "junit"           % "junit"           % junitVersion              % Test,
-        "com.github.sbt"  % "junit-interface" % junitIfVersion            % Test
-      ),
-      Compile / moduleDependencies ++= slf4jApi ++ Seq(
-        "org.graalvm.sdk"      % "nativeimage" % graalMavenPackagesVersion,
-        "org.graalvm.polyglot" % "polyglot"    % graalMavenPackagesVersion,
-        "org.graalvm.sdk"      % "word"        % graalMavenPackagesVersion
-      ),
-      Compile / internalModuleDependencies ++= Seq(
-        (`engine-common` / Compile / exportedModule).value,
-        (`persistance` / Compile / exportedModule).value,
-        (`jvm-channel` / Compile / exportedModule).value,
-        (`logging-utils` / Compile / exportedModule).value,
-        (`logging-config` / Compile / exportedModule).value
-      )
-    )
-    .dependsOn(`engine-common`)
-    .dependsOn(`jvm-channel`)
-    .dependsOn(`persistance`)
-    .dependsOn(`persistance-dsl` % "provided")
-
 lazy val `os-environment` =
   project
     .in(file("lib/java/os-environment"))
     .enablePlugins(JPMSPlugin)
     .settings(
-      frgaalJavaCompilerSetting,
-      annotationProcSetting,
-      libraryDependencies ++= slf4jApi ++ Seq(
-        "org.graalvm.sdk" % "nativeimage"     % graalMavenPackagesVersion % "provided",
+      // The Foreign Function API (WindowsArguments) is final since JDK 22.
+      customFrgaalJavaCompilerSettings(targetJdk = "24"),
+      libraryDependencies ++= Seq(
         "org.graalvm.sdk" % "graal-sdk"       % graalMavenPackagesVersion % "provided",
-        "commons-io"      % "commons-io"      % commonsIoVersion,
-        "com.typesafe"    % "config"          % typesafeConfigVersion     % Test,
         "junit"           % "junit"           % junitVersion              % Test,
         "com.github.sbt"  % "junit-interface" % junitIfVersion            % Test
       ),
-      Compile / moduleDependencies ++= slf4jApi ++ Seq(
-        "commons-io"           % "commons-io"  % commonsIoVersion,
+      // engine-common requires org.graalvm.polyglot, which requires these.
+      Compile / moduleDependencies ++= Seq(
         "org.graalvm.sdk"      % "nativeimage" % graalMavenPackagesVersion,
         "org.graalvm.polyglot" % "polyglot"    % graalMavenPackagesVersion,
         "org.graalvm.sdk"      % "word"        % graalMavenPackagesVersion
       ),
       Compile / internalModuleDependencies ++= Seq(
-        (`engine-common` / Compile / exportedModule).value,
-        (`persistance` / Compile / exportedModule).value,
-        (`jvm-channel` / Compile / exportedModule).value,
-        (`logging-utils` / Compile / exportedModule).value,
-        (`logging-config` / Compile / exportedModule).value
-      ),
-      // Note [os-environment's Native-Only Tests]
-      // The trash bin and the JNI invocation of a JVM work only in a native image, and their
-      // tests ran in one (`test-os-env`, with `os-environment-lib` as a shared library) until the
-      // native build went (native-image removal C2, #683). Their code and tests go in C3; until then
-      // they are left out of the JVM run. `TestChangeDirectory` skips itself outside an image.
-      Test / testOptions += Tests.Filter(name =>
-        !Set(
-          "org.enso.os.environment.jni.LoadClassTest",
-          "org.enso.os.environment.trash.TrashBinTest"
-        ).contains(name)
-      ),
-      // The logging modules need these on the test module path.
-      Test / moduleDependencies ++= scalaLibrary ++ Seq(
-        "com.typesafe" % "config" % typesafeConfigVersion
+        (`engine-common` / Compile / exportedModule).value
       ),
       Test / fork := true
     )
     .dependsOn(`engine-common`)
-    .dependsOn(`jvm-channel`)
-    .dependsOn(`os-environment-lib` % "test->test")
-    .dependsOn(`persistance`)
-    .dependsOn(`persistance-dsl` % "provided")
 
 lazy val `bench-processor` = (project in file("lib/scala/bench-processor"))
   .enablePlugins(JPMSPlugin)

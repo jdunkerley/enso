@@ -13,7 +13,6 @@ import java.io.File;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import org.enso.common.HostEnsoUtils;
 import org.enso.interpreter.runtime.util.TruffleFileSystem;
 import org.enso.pkg.NativeLibraryFinder;
 import org.enso.pkg.Package;
@@ -103,42 +102,13 @@ final class EnsoPolyglotJava {
 
   /**
    * Finds the "polyglot Java" for the given context. Every library loads its Java through the host
-   * class loader: on the JVM any library can, and in the native image only the libraries whose Java
-   * is compiled into the image (see {@link #javaNotInImage}).
+   * class loader.
    *
    * @param ctx the context to query for
    * @return instance of "polyglot Java" for further queries
    */
   static EnsoPolyglotJava find(EnsoContext ctx) {
     return KEY.get(ctx).hosted;
-  }
-
-  /* Note [A Library's Java Must Be In The Native Image]
-   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   * The native engine can load only the Java compiled into its image: the libraries marked AOT
-   * ready by `EnsoLibraryFeature`, and the JDK classes the image registers. Other libraries
-   * used to run their Java in a guest JVM started inside the process (`jvm-interop`); that is gone
-   * (docs/superpowers/specs/2026-11-09-remove-native-image-design.md, A1). A class such a library
-   * asks for, and the image does not have, is an error naming the library and the way to run it
-   * on the JVM instead. On the JVM every library's Java loads, so this never applies there.
-   */
-
-  /**
-   * The error to report when a class {@code pkgOrNull} asked for could not be loaded, because the
-   * library's Java is not part of the native image (Note [A Library's Java Must Be In The Native
-   * Image]).
-   *
-   * @param aot whether this is the native image ({@link HostEnsoUtils#isAot()})
-   * @param pkgOrNull the library that asked for the class, or {@code null} for code outside of any
-   * @return the message, or {@code null} when the library's Java is available
-   */
-  static String javaNotInImage(boolean aot, Package<?> pkgOrNull) {
-    if (!aot || pkgOrNull == null || pkgOrNull.isAotReady()) {
-      return null;
-    }
-    return pkgOrNull.libraryName().qualifiedName()
-        + "'s Java is not part of the native engine. Run on the JVM: `enso --jvm`, `jvm: true` in"
-        + " package.yaml, or `ENSO_ENGINE_MODE=jvm` in the IDE.";
   }
 
   static void close(EnsoContext ctx) {

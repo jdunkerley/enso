@@ -1,7 +1,6 @@
 package org.enso.interpreter.epb;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
-import com.oracle.truffle.api.TruffleOptions;
 import com.oracle.truffle.api.exception.AbstractTruffleException;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.ExportLibrary;
@@ -40,12 +39,8 @@ class ForeignParsingException extends AbstractTruffleException {
   @TruffleBoundary
   private static String createMessage(String truffleLangId, Iterable<String> installedLangs) {
     var allLangs = String.join(", ", installedLangs);
-    var format = "Cannot parse `foreign %s` method. Only available languages are %s. %s";
-    var extraInfo = "";
-    if (TruffleOptions.AOT) {
-      extraInfo = "\nMore languages may be available in JVM mode. Try running with --jvm option.";
-    }
-    return String.format(format, truffleLangId, allLangs, extraInfo);
+    var format = "Cannot parse `foreign %s` method. Only available languages are %s.";
+    return String.format(format, truffleLangId, allLangs);
   }
 
   @Override

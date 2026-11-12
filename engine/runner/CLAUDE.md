@@ -24,49 +24,35 @@ needs from the language comes back through `Value`.
   method names that match language-side registrations (chase constants across
   the boundary when debugging).
 
-## Native Image
+## JVM only
 
-The runner is compiled to a native binary via Native Image for the `enso`
-command (see
-[Infrastructure-Native-Image](https://github.com/jdunkerley/enso/wiki/Infrastructure-Native-Image)).
-Avoid anything that's not Native-Image-friendly (e.g. dynamic class loading,
-reflection without config).
-
-`EnsoLibraryFeature` decides which standard libraries are hosted in the image:
-those whose `polyglot/java` jars are on the image class path, plus the Java-free
-libraries `build.sbt` names in `enso.nativeImage.javaFreeLibraries`
-(`Standard.XML`, whose imports are all JDK classes). It registers every
-`polyglot java import` of those libraries for reflection and marks them
-AOT-ready. Any other library's Java is not available under native: a class it
-asks for that the image lacks is an error naming the library and the way to run
-on the JVM (Note [A Library's Java Must Be In The Native Image] in
-`EnsoPolyglotJava`; the in-process guest JVM that used to run it is gone). See
-Note [Java-Free Libraries In The Image] in `build.sbt`.
-
-`--jvm` starts HotSpot through `JVM` in `lib/java/jvm-channel`, which since the
-guest JVM went holds only that JNI-invocation subset (`JVM`, `PosixJVM`,
-`WindowsJVM`, `JNI`, `JNIBoot`). It goes with the native launcher.
-
-## JVM mode (`--jvm`)
-
-**C1 of the native-image removal (the IDE side).** The IDE's shim no longer runs
-`enso` and no longer passes `--jvm`: it starts `<runtime>/bin/java` itself with
-the options below and `-m org.enso.runner/org.enso.runner.Main`
-(`app/project-manager-shim/src/projectService/javaLaunch.ts`). The fixed options
-(`--sun-misc-unsafe-memory-access=allow`,
+Since the native-image removal (#664; C3 deleted the native-only code) the
+runner runs only on the JVM. The IDE's shim starts `<runtime>/bin/java` itself
+with the options below and `-m org.enso.runner/org.enso.runner.Main`
+(`app/project-manager-shim/src/projectService/javaLaunch.ts`); the CLI's
+launchers `bin/enso` and `bin/enso.bat` do the same (see Launchers). The fixed
+options (`--sun-misc-unsafe-memory-access=allow`,
 `--enable-native-access=org.graalvm.truffle`,
-`--add-opens=java.base/java.nio=ALL-UNNAMED`) are now the first lines of
+`--add-opens=java.base/java.nio=ALL-UNNAMED`) are the first lines of
 `jvm.options`, so the shim, `bin/enso`, `bin/enso.bat` and `Main.launchJvm` read
-one list; `Main.launchJvm` adds none of its own. The native launcher still
-exists until C2/C3, which delete it.
+one list; `Main.launchJvm` adds none of its own.
 
-The `enso` native image creates the JVM in its own process through JNI, except
-on Linux, where since GraalVM 25.5 it replaces itself with `java` through
-`execv` (the image exports `JVM_IsStaticallyLinked`, and an in-process JVM then
-never loads libnio). The PID stays the same, so the IDE's `SIGKILL` and any
-other signal reach the JVM (Note [The Launcher Becomes The JVM On Linux] in
-`PosixExec`). A JVM running the runner (`--jvm <other JDK>`) still starts `java`
-as a child process. `Main.launchJvm` starts the JVM with
+**Arguments outside the ANSI code page (Windows).** `java.exe` builds `main`'s
+arguments from the ANSI command line, so a character the system code page lacks
+arrives as `?`. `Main.main` recovers the real arguments from the wide command
+line (`Arguments.getCurrent().alterArgs`, `WindowsArguments` in
+`lib/java/os-environment`, through the Foreign Function API, which is why
+`jvm.options` enables native access for `org.enso.os.environment`). Only the
+arguments after the main class can be recovered: a JVM option (`--module-path`,
+`-D…`, `-XX:AOTCache=…`) with such a character is already mangled when the JVM
+starts (Note [Arguments Outside The ANSI Code Page] in `WindowsArguments`).
+
+## `--jvm`
+
+`--jvm` stays accepted. On the JVM it does nothing unless it names a different
+JDK (`--jvm <java home>`), which relaunches the runner as a child process
+through `ProcessBuilder` (`Main.launchJvm`); `jvm: true` in `package.yaml` is
+the same no-op. `Main.launchJvm` starts that JVM with
 `JvmOptions.all(component, System.getenv("ENSO_JVM_OPTIONS"))`, in this order:
 
 1. `jvm.options` in the engine package root, beside `component/` (source
@@ -83,23 +69,20 @@ as a child process. `Main.launchJvm` starts the JVM with
    way. A value without a newline is split on whitespace, which is what a person
    types.
 
-Both come before `--module-path`/`-m`. Keep `JvmOptions` Native-Image friendly
-(plain `java.io`/`java.nio` only): it runs in the `enso` native image. The shim
-reads the same file for every engine it starts (`projectService/javaLaunch.ts`;
-the AOT trainer included).
+Both come before `--module-path`/`-m`. The shim reads the same file for every
+engine it starts (`projectService/javaLaunch.ts`; the AOT trainer included).
 
 Rules for an option line (in the file or in `ENSO_JVM_OPTIONS`):
 
 - It must be a JVM option, not a `java`-launcher one, in single-token form with
   `=`: `--add-opens=java.base/java.nio=ALL-UNNAMED`, never
-  `--add-opens java.base/java.nio=…`, and no `@argfile`, `-jar` or `-cp`. On the
-  native `enso` (the JNI path) each line becomes one `JavaVMOption`, which the
-  launcher's own argument parsing never sees.
-- The quoted form `-Xlog:…:file="C:\Users\John Smith\use.log"` is for the JNI
-  path only (the `enso` native image; the IDE passes it to `java` as one
-  argument, which Windows keeps intact). Where a JVM runs the runner and
-  relaunches through `ProcessBuilder` (`--jvm <other JDK>`), Windows' argument
-  quoting splits such an argument at its space; write the path unquoted there.
+  `--add-opens java.base/java.nio=…`, and no `@argfile`, `-jar` or `-cp`.
+- The quoted form `-Xlog:…:file="C:\Users\John Smith\use.log"` works where the
+  option reaches `java` as one argument: from the IDE (Windows keeps it intact)
+  and from `enso.bat` (which escapes the quotes). Where a JVM runs the runner
+  and relaunches through `ProcessBuilder` (`--jvm <other JDK>`), Windows'
+  argument quoting splits such an argument at its space; write the path unquoted
+  there.
 - A leading UTF-8 byte order mark is ignored.
 
 ## Launchers
@@ -129,7 +112,7 @@ relaunch from them, so `Main.launchJvm` is not involved:
   started in as `-Denso.user.dir` (Note [The Launcher Starts In The Project's
   Parent] in `bin/enso`): the IDE's rule, so `EnsoContext.checkWorkingDirectory`
   holds under `-ea` wherever `enso` is started, and relative paths in the
-  program resolve as in the IDE. On the JVM, `Utils.adjustCwdToProject` returns
+  program resolve as in the IDE. On the JVM, `Utils.originalUserDir` returns
   `enso.user.dir`; `--run`'s path is resolved against it
   (`Utils.findFileAndProject`), and a relative `--in-project` is made absolute
   against it (`Utils.absoluteInProject`, `Main.launch`). A path that does not
