@@ -240,6 +240,9 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   `Channel.jvmAotTrainingStatus` and broadcasts
   `Channel.jvmAotTrainingStatusChanged` (tested in
   `tests/headless/jvmAotIpc.test.ts`).
+- `ENSO_JVM_AOT=0` — no JDK AOT cache at all: nothing trains, and no open uses
+  one (`isJvmAotEnabled`; `createJvmAotCache` returns `null`). The Playwright
+  fixture sets it for every spec but `spareEngine.spec.ts`.
 - `ENSO_SPARE_ENGINE=0` — no spare engine whatever Settings → Local → Engine
   says (`project-manager-shim/CLAUDE.md`, "Spare engine"). The Playwright
   fixture sets it for every spec but `spareEngine.spec.ts`; the open-time
@@ -814,14 +817,20 @@ rule in `playwright.config.ts`:
   `corepack pnpm -r --filter enso ide-integration-test [path.spec.ts]`. Runs are
   long (minutes), so avoid them in inner dev loops.
 
-Every spec runs with `ENSO_ENGINE_MODE=native` and `ENSO_SPARE_ENGINE=0`,
-whatever the shell says (the fixture's `spareEngine` option, default `false`),
-so a spare engine never changes its timing. `tests/spareEngine.spec.ts` sets it:
-the app runs `ENSO_ENGINE_MODE=jvm` and `ENSO_SPARE_ENGINE=1` with a fresh
-`ENSO_JVM_AOT_DIR` of the test's own (deleted afterwards), waits for the AOT
-cache's training to end (`JDK AOT cache: trained in …`, ~45 s on a desktop),
-then for `Spare engine: ready …` in the main process's stdout and stderr, opens
-a new project and checks `Spare engine: used …` and the engine log's
+Every spec runs with `ENSO_SPARE_ENGINE=0` (the fixture's `spareEngine` option,
+default `false`), so a spare engine never changes its timing, and with the
+shell's `ENSO_ENGINE_MODE`: unset, that is the app's default, the JVM. It has no
+JDK AOT cache (`ENSO_JVM_AOT=0`): on CI's two CPUs a training slowed every open,
+each open killed it so it never finished, and its toast covered the controls the
+specs click. CI runs `tests/localWorkflow.spec.ts` again with
+`ENSO_ENGINE_MODE=native`, non-blocking while the native image is broken on
+GraalVM 25.5 (Note [The Package Tests Run Both Engines] in `ide-packaging.yml`).
+`tests/spareEngine.spec.ts` sets it: the app runs `ENSO_ENGINE_MODE=jvm` and
+`ENSO_SPARE_ENGINE=1` with a fresh `ENSO_JVM_AOT_DIR` of the test's own (deleted
+afterwards), waits for the AOT cache's training to end
+(`JDK AOT cache: trained in …`, ~45 s on a desktop), then for
+`Spare engine: ready …` in the main process's stdout and stderr, opens a new
+project and checks `Spare engine: used …` and the engine log's
 `Engine: pre-started spare used` notice in the Logs tab (a stderr line, so shown
 with the Engine source ticked). It has no retries (a retry repeats the training)
 and a 400 s budget.

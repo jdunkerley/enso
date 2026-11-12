@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [Projects now run on the JVM engine by default, which starts library code such
+  as Image, Postgres and AWS faster. To go back to the native engine, set
+  `ENSO_ENGINE_MODE=native`, or `jvm: false` in a project's
+  `package.yaml`.][666]
 - [With the JVM engine, a notice says when the IDE is preparing the engine for
   faster project opens, a one-time task of a few minutes on the first launch,
   and when the engine is ready.][662]
@@ -401,6 +405,8 @@
   bundled standard libraries (including `Standard.Image`) resolve as before. To
   download editions, list an edition provider under `edition-providers` in
   `global-config.yaml`.
+- [Update to GraalVM 25.5][666]: polyglot Python is now Python 3.13, with
+  GraalPy and GraalJS 25.5.
 
 #### Enso Standard Library
 
@@ -467,6 +473,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [654]: https://github.com/jdunkerley/enso/pull/654
+[666]: https://github.com/jdunkerley/enso/pull/666
 [655]: https://github.com/jdunkerley/enso/pull/655
 [626]: https://github.com/jdunkerley/enso/pull/626
 [642]: https://github.com/jdunkerley/enso/pull/642

@@ -49,9 +49,9 @@ test('the run takes --engine-mode', async () => {
   expect(launches.at(-1)?.mode).toEqual({ mode: 'jvm', source: 'option' })
 })
 
-test('without the option the run is native, from the default', async () => {
+test('without the option the run is the JVM, from the default', async () => {
   await runLocalProjectByUuid(UUID('id-1'), Path(root), undefined, fakeRunner())
-  expect(launches.at(-1)?.mode).toEqual({ mode: 'native', source: 'default' })
+  expect(launches.at(-1)?.mode).toEqual({ mode: 'jvm', source: 'default' })
 })
 
 test('a run by path marks the project as running while it runs', async () => {

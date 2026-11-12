@@ -129,12 +129,13 @@ settings. Every workflow is hand-written YAML (build simplification;
 - **The `CI: Open perf` label measures the open time.** On a pull request to
   `ide-pull-request.yml` it makes the packaging run (as `CI: Build IDE` does)
   and passes `open_perf: true`; develop pushes measure it too, and a
-  hand-started `ide-packaging.yml` with `open_perf` (and `open_perf_jvm` for the
-  JVM beside native). Adding or removing the label starts a run, and removing it
-  cancels a packaging run in progress, so every unrelated-label test in
-  `ide-pull-request.yml` names both labels (`checkOpenPerf` in
-  `tools/ci/check-workflows.mjs` fails one that does not). The measuring steps
-  continue on error: they warn and never fail, as shared runners are noisy.
+  hand-started `ide-packaging.yml` with `open_perf`. It measures the default
+  engine, the JVM (`open_perf_jvm` adds native beside it). Adding or removing
+  the label starts a run, and removing it cancels a packaging run in progress,
+  so every unrelated-label test in `ide-pull-request.yml` names both labels
+  (`checkOpenPerf` in `tools/ci/check-workflows.mjs` fails one that does not).
+  The measuring steps continue on error: they warn and never fail, as shared
+  runners are noisy.
 - **One OS/arch set is one `strategy.matrix`**, with `fail-fast: false`. Where a
   platform's failure must not skip or delay the other platform's jobs, the
   platform is a reusable workflow called with a matrix (`engine-checks.yml`);

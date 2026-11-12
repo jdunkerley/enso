@@ -199,6 +199,25 @@ public final class ContextFactory {
     return this;
   }
 
+  /*
+   * Note [Low Compilation Load Lowers The Thresholds]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Truffle scales its first-tier compilation threshold (400 calls or loop iterations) by the
+   * load of the compile queue. Up to GraalVM 25.0 an idle queue (load below 10) lowered it to
+   * about 25; Truffle 25.1 (GR-76434) changed engine.DynamicCompilationThresholdsMinNormalLoad
+   * from 10 to 0, so the threshold stays 400. Roots that loop in plain Java without reporting
+   * their loop counts (VectorFromFunctionNode: Vector.new, fill, map) then compile far later, and
+   * Vector benchmarks ran up to 9x slower on 25.5 (PR #666; the investigation is
+   * scratchpad/wave1/jvm/P3inv/report.md, not checked in). The 25.0 value is restored here, for
+   * every context the engine builds. It is an internal (experimental) option: the builder allows
+   * experimental options. Drop it once the loops report their counts and the guard passes without
+   * it.
+   */
+  private static final String MIN_NORMAL_LOAD_OPTION =
+      "engine.DynamicCompilationThresholdsMinNormalLoad";
+
+  private static final String MIN_NORMAL_LOAD = "10";
+
   public Context build() {
     if (executionEnvironment != null) {
       options.put("enso.ExecutionEnvironment", executionEnvironment);
@@ -215,6 +234,12 @@ public final class ContextFactory {
     }
     if (pythonResourceDir != null) {
       System.setProperty("polyglot.engine.resourcePath.python", pythonResourceDir);
+    }
+    if (engineOptions == null) {
+      options = new HashMap<>(options);
+      options.putIfAbsent(MIN_NORMAL_LOAD_OPTION, MIN_NORMAL_LOAD);
+    } else {
+      engineOptions.put(MIN_NORMAL_LOAD_OPTION, MIN_NORMAL_LOAD);
     }
     var builder =
         Context.newBuilder()

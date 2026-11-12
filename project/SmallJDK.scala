@@ -31,7 +31,11 @@ object SmallJDK {
     "jdk.charsets",
     "jdk.crypto.ec",
     "jdk.httpserver",
-    "jdk.localedata"
+    "jdk.localedata",
+    // jlink on GraalVM 25.0.1 pulled these three in transitively; 25.5 does not.
+    "java.sql",
+    "java.transaction.xa",
+    "java.xml"
   )
 
   private val ADDITIONAL_NI_BUILD_MODS = Seq(
@@ -187,6 +191,15 @@ object SmallJDK {
       "lib/svm/bin/../builder/svm-configure.jar",
       "lib/svm/bin/../builder/svm-capnproto-runtime.jar",
       "lib/svm/bin/../builder/svm-foreign.jar",
+      // New in GraalVM 25.5: org.graalvm.nativeimage.base requires these.
+      "lib/svm/bin/../builder/svm-shared.jar",
+      "lib/svm/bin/../builder/vmaccess.jar",
+      "lib/svm/bin/../builder/vmaccess-guest.jar",
+      "lib/svm/bin/../builder/hostvmaccess.jar",
+      // ...and org.graalvm.nativeimage.driver these, for the native-image JDK.
+      "lib/svm/bin/../builder/svm-guest-staging.jar",
+      "lib/svm/bin/../builder/svm-jvmci-guest-staging.jar",
+      "lib/svm/bin/../builder/svm-jvmci-shared.jar",
       "lib/svm/bin/../library-support.jar"
     )
     moduleJars.map { jar =>

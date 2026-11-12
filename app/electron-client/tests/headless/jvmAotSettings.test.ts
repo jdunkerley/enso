@@ -10,19 +10,29 @@ import {
   AfterFirstOpen,
   appImageEngine,
   isEngineCopyPath,
+  isJvmAotEnabled,
   isJvmDefaultEngine,
   jvmAotRootDirectory,
 } from '../../src/jvmAotSettings'
 
-describe('isJvmDefaultEngine', () => {
-  test('native by default: nothing is trained before the switch', () => {
-    expect(isJvmDefaultEngine(undefined, {})).toBe(false)
-    expect(isJvmDefaultEngine({}, { ENSO_ENGINE_MODE: 'bogus' })).toBe(false)
+describe('isJvmAotEnabled', () => {
+  test('on unless ENSO_JVM_AOT is 0', () => {
+    expect(isJvmAotEnabled({})).toBe(true)
+    expect(isJvmAotEnabled({ ENSO_JVM_AOT: '1' })).toBe(true)
+    expect(isJvmAotEnabled({ ENSO_JVM_AOT: '' })).toBe(true)
+    expect(isJvmAotEnabled({ ENSO_JVM_AOT: '0' })).toBe(false)
   })
-  test('ENSO_ENGINE_MODE and --engine-mode turn it on; the option wins', () => {
-    expect(isJvmDefaultEngine(undefined, { ENSO_ENGINE_MODE: 'jvm' })).toBe(true)
-    expect(isJvmDefaultEngine({ option: 'jvm' }, {})).toBe(true)
-    expect(isJvmDefaultEngine({ option: 'native' }, { ENSO_ENGINE_MODE: 'jvm' })).toBe(false)
+})
+
+describe('isJvmDefaultEngine', () => {
+  test('the JVM by default (since the switch): the cache trains with no settings', () => {
+    expect(isJvmDefaultEngine(undefined, {})).toBe(true)
+    expect(isJvmDefaultEngine({}, { ENSO_ENGINE_MODE: 'bogus' })).toBe(true)
+  })
+  test('ENSO_ENGINE_MODE and --engine-mode turn it off; the option wins', () => {
+    expect(isJvmDefaultEngine(undefined, { ENSO_ENGINE_MODE: 'native' })).toBe(false)
+    expect(isJvmDefaultEngine({ option: 'native' }, {})).toBe(false)
+    expect(isJvmDefaultEngine({ option: 'jvm' }, { ENSO_ENGINE_MODE: 'native' })).toBe(true)
   })
 })
 
@@ -92,7 +102,9 @@ describe('appImageEngine', () => {
   test('while the default engine is native, nothing is copied (no disk used)', () =>
     withApp(async (base, app) => {
       const env = { APPIMAGE: '/a/Enso.AppImage' }
-      expect(await appImageEngine(env, app, undefined)).toEqual({})
+      expect(await appImageEngine({ ...env, ENSO_ENGINE_MODE: 'native' }, app, undefined)).toEqual(
+        {},
+      )
       expect(
         await appImageEngine({ ...env, ENSO_ENGINE_MODE: 'jvm' }, app, { option: 'native' }),
       ).toEqual({})

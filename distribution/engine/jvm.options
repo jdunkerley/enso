@@ -9,3 +9,7 @@
 # C2 compiles the engine's own Java, not Graal-as-JIT (JVMCI), which opens a project faster.
 # Truffle guest code still compiles through libgraal. See #518.
 -XX:-UseJVMCICompiler
+
+# Graal's pre-25.3 inliner: 25.3+ priority inlining doubled JIT CPU while a project
+# opens (#518, P). Applies to Truffle's compilations through libgraal.
+-Djdk.graal.UsePriorityInlining=false

@@ -190,7 +190,8 @@ add_specs suite_builder = suite_builder.group "Engine runner" group_builder->
 
             proc.stdout . should_contain "Custom JavaScript is running"
             proc.stdout . should_contain "Preventing the startup by throwing an exception"
-            proc.stderr . should_contain "Debugger listening on ws://127.0.0.1:9229/enso_ydoc"
+            # The Chrome inspector prints this on stdout since GraalVM 25.5 (on stderr before).
+            (proc.stdout + proc.stderr) . should_contain "Debugger listening on ws://127.0.0.1:9229/enso_ydoc"
 
 ## PRIVATE
    A port that was free a moment ago.

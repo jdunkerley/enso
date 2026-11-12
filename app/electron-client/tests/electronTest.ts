@@ -1,4 +1,6 @@
 /** @file Commonly used functions for electron tests */
+import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -9,6 +11,7 @@ import {
   type ElectronApplication,
   type Locator,
   type Page,
+  type TestInfo,
 } from 'playwright/test'
 import { electronExecutablePath } from './packagedIde'
 
@@ -51,9 +54,13 @@ export const test = base.extend<{
   welcomeProject: boolean
   /**
    * Whether the app runs the JVM engine with its spare engine. Default `false`: every other spec
-   * runs with `ENSO_SPARE_ENGINE=0`, so a spare never changes its timing. With it, the JDK AOT
-   * cache is a fresh directory of the test's own (`ENSO_JVM_AOT_DIR`), never the user's, so it is
-   * always trained first, and deleted afterwards.
+   * runs with `ENSO_SPARE_ENGINE=0`, so a spare never changes its timing, and with the engine mode
+   * the shell gives (`ENSO_ENGINE_MODE`; unset is the app's default, the JVM). With it, the JDK AOT
+   * cache is a fresh directory of the test's own (`ENSO_JVM_AOT_DIR`), so it is always trained
+   * first, and deleted afterwards: never the user's, since a training keeps only the two newest
+   * keys and could delete an installed IDE's cache. Without it, there is no cache
+   * (`ENSO_JVM_AOT=0`): on CI's two CPUs a training slowed every open, each open killed it so it
+   * never finished, and its toast covered the controls the specs click.
    */
   spareEngine: boolean
   app: ElectronApplication
@@ -72,7 +79,11 @@ export const test = base.extend<{
   spareEngine: [false, { option: true }],
 
   /** Setup for all tests: Create an electron-based app instance. */
-  app: async function ({ projectsDir, testRunId, aiEnabled, welcomeProject, spareEngine }, use) {
+  app: async function (
+    { projectsDir, testRunId, aiEnabled, welcomeProject, spareEngine },
+    use,
+    testInfo,
+  ) {
     const args = [
       ...(process.env.ENSO_TEST_APP_ARGS?.split(',') ?? []),
       ...(welcomeProject ? [] : ['--no-welcome-project']),
@@ -83,15 +94,18 @@ export const test = base.extend<{
       ENSO_TEST: 'true',
       ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
       ...(aiEnabled ? {} : { ENSO_AI_DISABLED: '1' }),
-      // Either way the engine mode is set, whatever the shell says; the other specs get the default.
+      // The spare spec is always the JVM; the others keep the shell's mode (CI runs one spec again
+      // with `ENSO_ENGINE_MODE=native`).
       ...(spareEngine ?
         { ENSO_ENGINE_MODE: 'jvm', ENSO_SPARE_ENGINE: '1', ENSO_JVM_AOT_DIR: jvmAotDir }
-      : { ENSO_ENGINE_MODE: 'native', ENSO_SPARE_ENGINE: '0' }),
+      : { ENSO_SPARE_ENGINE: '0', ENSO_JVM_AOT: '0' }),
     }
     const app = await _electron.launch({ executablePath: electronExecutablePath, args, env })
     try {
       await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true })
       await use(app)
+      // Note [A Failed Test Dumps The Engine's Threads].
+      if (testInfo.status !== testInfo.expectedStatus) await dumpEngineState(testRunId, testInfo)
       await app.context().tracing.stop({ path: `test-traces/${testRunId}.zip` })
       await app.close()
     } finally {
@@ -107,6 +121,59 @@ export const test = base.extend<{
     await use(innerPage)
   },
 })
+
+/* Note [A Failed Test Dumps The Engine's Threads]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * On the Windows CI runner the JVM engine's first execution of a new project did not finish in
+ * 300 s (#666), and its INFO log did not say why. When a test fails under CI, before the app
+ * closes, this writes `test-traces/<run>-engine.txt`: the CPU time of the busiest processes, twice
+ * 10 s apart (busy or waiting?), and the threads of every JVM. The bundled runtime has no `jcmd`, so
+ * it uses the runner's own JDK (`JAVA_HOME_25_X64`, else `JAVA_HOME_21_X64`, else `JAVA_HOME`).
+ * A missing tool is noted in the file, never fatal.
+ */
+async function dumpEngineState(testRunId: string, testInfo: TestInfo): Promise<void> {
+  if (process.env.CI == null) return
+  const run = (file: string, args: string[]) =>
+    new Promise<string>((resolve) =>
+      execFile(file, args, { timeout: 60_000, maxBuffer: 64 * 1024 * 1024 }, (error, out, err) =>
+        resolve(`${out}${err}${error != null ? `\n(${error.message})` : ''}`),
+      ),
+    )
+  const processes = () =>
+    process.platform === 'win32' ?
+      run('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Get-Process | Sort-Object CPU -Descending | Select-Object -First 25 Id,ProcessName,CPU,WorkingSet64 | Format-Table -AutoSize | Out-String -Width 200',
+      ])
+    : run('ps', ['-eo', 'pid,ppid,pcpu,cputime,rss,comm', '--sort=-pcpu'])
+  const sections = [`Test: ${testInfo.titlePath.join(' > ')} (${testInfo.status})`]
+  sections.push(`Processes at ${new Date().toISOString()}:\n${await processes()}`)
+  await new Promise((resolve) => setTimeout(resolve, 10_000))
+  sections.push(`Processes at ${new Date().toISOString()}:\n${await processes()}`)
+  const javaHome = [
+    process.env.JAVA_HOME_25_X64,
+    process.env.JAVA_HOME_21_X64,
+    process.env.JAVA_HOME,
+  ].find((home) => home != null && home !== '')
+  const jcmd =
+    javaHome && path.join(javaHome, 'bin', process.platform === 'win32' ? 'jcmd.exe' : 'jcmd')
+  if (!jcmd || !existsSync(jcmd)) {
+    sections.push('No jcmd: no JAVA_HOME_25_X64, JAVA_HOME_21_X64 or JAVA_HOME with one.')
+  } else {
+    const list = await run(jcmd, ['-l'])
+    sections.push(`${jcmd} -l:\n${list}`)
+    for (const line of list.split(/\r?\n/)) {
+      const [pid, ...main] = line.trim().split(' ')
+      if (pid == null || !/^\d+$/.test(pid) || main.join(' ').includes('JCmd')) continue
+      sections.push(
+        `Threads of ${pid} (${main.join(' ')}):\n${await run(jcmd, [pid, 'Thread.print'])}`,
+      )
+    }
+  }
+  await fs.mkdir('test-traces', { recursive: true })
+  await fs.writeFile(`test-traces/${testRunId}-engine.txt`, sections.join('\n\n'))
+}
 
 /**
  * The tab of the project a fresh install opens: the bundled `Getting_Started` sample

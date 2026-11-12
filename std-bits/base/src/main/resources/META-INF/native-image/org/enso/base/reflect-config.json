@@ -423,6 +423,7 @@
     },
     {
         "name": "org.slf4j.spi.LoggingEventBuilder",
+        "allPublicMethods": true,
         "methods": [
             {
                 "name": "setMessage",

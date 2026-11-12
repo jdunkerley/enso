@@ -12,6 +12,7 @@ import {
   AfterFirstOpen,
   appImageEngine,
   isEngineCopyPath,
+  isJvmAotEnabled,
   isJvmDefaultEngine,
   jvmAotRootDirectory,
 } from '@/jvmAotSettings'
@@ -173,13 +174,14 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
 /**
  * The per-user JDK AOT cache (`project-manager-shim/jvmAot`), under `<userData>/jvm-aot`, or
  * `ENSO_JVM_AOT_DIR` (the open-time harness points it at its own directory). `null` when the
- * engine cannot be found.
+ * engine cannot be found, and with `ENSO_JVM_AOT=0`.
  */
 function createJvmAotCache(
   electron: Electron,
   electronIsDev: boolean,
   engine: EngineSettings | undefined,
 ): JvmAotCache | null {
+  if (!isJvmAotEnabled(process.env)) return null
   const ensoExecutable = findEnsoExecutable(
     paths.resourcesPath(electron, electronIsDev),
     appImageEnginePath,

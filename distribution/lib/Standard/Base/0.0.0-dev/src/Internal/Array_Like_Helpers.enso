@@ -48,6 +48,11 @@ vector_to_array array_like = @Builtin_Method "Array_Like_Helpers.vector_to_array
 flatten : (Vector | Array) -> Vector
 flatten array_like = @Builtin_Method "Array_Like_Helpers.flatten"
 
+# The first element of `array_like` that is a dataflow error, or `Nothing`.
+# See Note [Scanning A Vector For Dataflow Errors] in `FirstDataflowErrorNode`.
+first_dataflow_error : (Vector | Array) -> Any
+first_dataflow_error array_like = @Builtin_Method "Array_Like_Helpers.first_dataflow_error"
+
 insert_builtin : (Vector | Array) -> Integer -> (Vector | Array) -> Vector
 insert_builtin vector at items = @Builtin_Method "Array_Like_Helpers.insert_builtin"
 

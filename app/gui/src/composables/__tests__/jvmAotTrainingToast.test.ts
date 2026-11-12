@@ -50,7 +50,7 @@ function run(api: JvmAotApi) {
 }
 
 describe('useJvmAotTrainingToast', () => {
-  test('a training shows a lasting toast with a spinner and a close button', async () => {
+  test('a training shows a lasting toast with a spinner and a close button, bottom-right', async () => {
     const { api, emit } = fakeApi()
     const scope = run(api)
     await settle()
@@ -63,6 +63,7 @@ describe('useJvmAotTrainingToast', () => {
         isLoading: true,
         autoClose: false,
         closeButton: true,
+        position: 'bottom-right',
       }),
     ])
     scope.stop()
@@ -77,6 +78,7 @@ describe('useJvmAotTrainingToast', () => {
     expect(shown()).toEqual([
       expect.objectContaining({
         content: getText('jvmAotTrainedToast'),
+        position: 'bottom-right',
         type: 'success',
         isLoading: false,
         autoClose: DEFAULT_AUTO_CLOSE_MS,

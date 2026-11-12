@@ -3,6 +3,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import {
+  DEFAULT_ENGINE_MODE,
   describeEngineMode,
   liftJvmFlag,
   parseEngineMode,
@@ -61,6 +62,11 @@ describe('resolveEngineMode', () => {
     })
     expect((await resolveEngineMode(project, {})).source).toBe('default')
   })
+})
+
+test('the built-in default is the JVM', () => {
+  expect(DEFAULT_ENGINE_MODE).toBe('jvm')
+  expect(resolveDefaultEngineMode({})).toEqual({ mode: 'jvm', source: 'default' })
 })
 
 test('resolveDefaultEngineMode ignores the project', () => {

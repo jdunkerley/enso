@@ -1,23 +1,24 @@
 package org.enso.interpreter.runtime.data;
 
-import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
-import org.enso.interpreter.EnsoLanguage;
+import org.enso.common.LanguageInfo;
 
 /** All non-primitive Enso types extends from {@code EnsoObject}. */
 @ExportLibrary(InteropLibrary.class)
 public abstract class EnsoObject implements TruffleObject {
+  // Truffle 25.1 replaced `hasLanguage`/`getLanguage` (a language class) with these two (its id).
+  // The deprecated pair still works for callers: InteropLibrary derives it from these.
   @ExportMessage
-  public boolean hasLanguage() {
+  public boolean hasLanguageId() {
     return true;
   }
 
   @ExportMessage
-  public Class<? extends TruffleLanguage<?>> getLanguage() {
-    return EnsoLanguage.class;
+  public String getLanguageId() {
+    return LanguageInfo.ID;
   }
 
   /**

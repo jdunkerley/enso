@@ -9,6 +9,11 @@ import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
 import { onScopeDispose } from 'vue'
 
 const TOAST_ID: ToastId = 'jvm-aot-training'
+/**
+ * Bottom-right, not the default top centre: the training toast stays for minutes, and at the top
+ * centre it covers the graph editor's toolbar (Add Component) for all that time.
+ */
+const POSITION = 'bottom-right'
 
 /**
  * Follow the training: while it runs, a toast with a spinner that stays until it ends (or the user
@@ -35,7 +40,7 @@ export function useJvmAotTrainingToast(api: JvmAotApi | undefined = window.api?.
     if (toasts.isActive(TOAST_ID) || toasts.isQueued(TOAST_ID)) {
       toasts.update(TOAST_ID, { ...outcome, render: text })
     } else {
-      toasts.show(text, { ...outcome, toastId: TOAST_ID })
+      toasts.show(text, { ...outcome, toastId: TOAST_ID, position: POSITION })
     }
   }
 
@@ -45,6 +50,7 @@ export function useJvmAotTrainingToast(api: JvmAotApi | undefined = window.api?.
         sawTraining = true
         toasts.show(getText('jvmAotTrainingToast'), {
           toastId: TOAST_ID,
+          position: POSITION,
           type: 'info',
           isLoading: true,
           autoClose: false,

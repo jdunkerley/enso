@@ -11,10 +11,12 @@ export const HEAP_DUMP = '-XX:+HeapDumpOnOutOfMemoryError'
 
 /**
  * Assertions on, except for Truffle's HostExecuteNode, whose assertion fails on valid overloads since
- * GraalVM 25.0.2 (#36, upstream oracle/graal#14943). Note [HostExecuteNode Assertions Are Off Under
- * Test] in `build.sbt`.
+ * GraalVM 25.0.2 (#36, upstream oracle/graal#14943), and for GraalPy's ExecutionContext, whose
+ * frame assertion fails on `foreign python` calls since 25.5. Note [HostExecuteNode Assertions Are
+ * Off Under Test] in `build.sbt`.
  */
-export const ASSERTIONS = '-enableassertions -da:com.oracle.truffle.host.HostExecuteNode'
+export const ASSERTIONS =
+  '-enableassertions -da:com.oracle.truffle.host.HostExecuteNode -da:com.oracle.graal.python.runtime.ExecutionContext'
 
 /** The launcher arguments before `--no-ir-caches --run` (`extra_engine_runner_args`). */
 export function runnerArguments(

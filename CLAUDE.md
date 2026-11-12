@@ -198,11 +198,13 @@ has silently produced a wrong result here:
   shells, so a bare `wsl -e bash -lc` has no GraalVM, sbt or Node and quietly
   picks up the Windows binaries through `/mnt/c`. The script reads the GraalVM
   and Node versions from the checkout (`graalMavenPackagesVersion`,
-  `.node-version`), so it needs no edit when the repo bumps them; Maven, which
-  only `tools/enso4igv` uses, is not part of it. WSL reaches the repo at
-  `/mnt/c/...`, so **give cargo its own target directory** — sharing `target/`
-  with the Windows build means every switch re-links the whole workspace, and
-  the two hosts evict each other's artifacts:
+  `.node-version`), so a version bump needs no edit; but it must find GraalVM
+  CE's innovation-line archive, which unpacks to `graalvm-community-<release>+*`
+  (no `openjdk-`) and downloads from the `graal-<release>` tag (#665 has the
+  diff). Maven, which only `tools/enso4igv` uses, is not part of it. WSL reaches
+  the repo at `/mnt/c/...`, so **give cargo its own target directory** — sharing
+  `target/` with the Windows build means every switch re-links the whole
+  workspace, and the two hosts evict each other's artifacts:
 
   ```bash
   wsl -e bash -lc '. ~/.enso-toolchain.sh && cd /mnt/c/Repos/Enso/ide && export CARGO_TARGET_DIR=$HOME/enso-target && cargo test --workspace'
@@ -317,7 +319,8 @@ has silently produced a wrong result here:
      against an unfiltered run — before reading that as a pass.
 
   ```bash
-  cd test && JAVA_TOOL_OPTIONS="-enableassertions -da:com.oracle.truffle.host.HostExecuteNode" \
+  cd test && JAVA_TOOL_OPTIONS="-enableassertions -da:com.oracle.truffle.host.HostExecuteNode \
+    -da:com.oracle.graal.python.runtime.ExecutionContext" \
     ../built-distribution/enso-engine-*/enso-*/bin/enso \
     --no-ir-caches --run "$PWD/DuckDB_Tests"
   ```

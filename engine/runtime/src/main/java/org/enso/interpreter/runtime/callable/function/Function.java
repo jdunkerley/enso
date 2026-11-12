@@ -166,7 +166,7 @@ public final class Function extends EnsoObject {
    * the build with "Blocklisted methods are reachable for runtime compilation".
    *
    * <p>Whether the analysis reaches this depends on how much lands on the classpath Native Image
-   * sees, so it can stay latent for a long time: removing the boundary reports 20 violations on
+   * sees, so it can stay latent for a long time: removing the boundary reported 20 violations on
    * GraalVM 25.0.1 and 40 on 25.0.2, every one of them routed through this method. The boundary
    * costs nothing measurable — the generated binary is the same size either way.
    */

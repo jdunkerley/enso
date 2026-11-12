@@ -644,6 +644,14 @@ jobs:
     if: inputs.os == 'linux' && needs.stdlib-plan.result == 'success' && needs.stdlib-plan.outputs.matrix != '[]'
     needs: [build-engine-distribution, stdlib-plan]
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
+    # Note [Native Standard Library Tests Do Not Block]
+    # On GraalVM 25.5 the native runner's Standard Library suites fail (host interop in the image,
+    # the guest JVM on Linux), and native image is being removed
+    # (docs/superpowers/specs/2026-11-09-remove-native-image-design.md). Per the GraalVM 25.5
+    # upgrade spec (owner's answer 3) the Native suites report but do not fail the checks until
+    # that removal lands. So does the Microsoft suite (`std-microsoft`), which runs the native
+    # runner too (owner, 2026-11-11).
+    continue-on-error: ${{ startsWith(matrix.title, 'Native') || matrix.suite == 'std-microsoft' }}
     timeout-minutes: 90
     permissions:
       checks: write
@@ -818,6 +826,8 @@ jobs:
     if: inputs.os != 'linux' && needs.stdlib-plan.result == 'success' && needs.stdlib-plan.outputs.matrix != '[]'
     needs: [build-engine-distribution, stdlib-plan]
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
+    # Note [Native Standard Library Tests Do Not Block]
+    continue-on-error: ${{ startsWith(matrix.title, 'Native') || matrix.suite == 'std-microsoft' }}
     timeout-minutes: 90
     permissions:
       checks: write

@@ -341,13 +341,15 @@ gets, the first match winning: the project's `package.yaml` `jvm: true|false`
 `jvm: false` now means native even when the default is JVM); Electron's
 `--engine-mode=native|jvm` (`--jvm` is an alias; passed in as
 `EngineSettings.option`); `ENSO_ENGINE_MODE=native|jvm` (an unknown value is
-ignored); then `DEFAULT_ENGINE_MODE`, `native` for now. The result
-(`ResolvedEngineMode`: mode and source) decides whether the runner puts `--jvm`
-first in the engine's arguments and which timeout column applies; both travel in
-the `EngineLaunch` that `Runner.openProject`/`runProject` take. `--new`,
-`--version` and the filesystem commands do not take a launch and stay native.
-The engine log panel's first line is `Engine mode: <mode> (<source>)`
-(`EngineLogChannel.notice`, a `stderr` line before any session).
+ignored); then `DEFAULT_ENGINE_MODE`, `jvm` since the switch (stage 3 of the
+JVM-by-default plan, in #666; `ENSO_ENGINE_MODE=native` or `jvm: false` goes
+back). The result (`ResolvedEngineMode`: mode and source) decides whether the
+runner puts `--jvm` first in the engine's arguments and which timeout column
+applies; both travel in the `EngineLaunch` that
+`Runner.openProject`/`runProject` take. `--new`, `--version` and the filesystem
+commands do not take a launch and stay native. The engine log panel's first line
+is `Engine mode: <mode> (<source>)` (`EngineLogChannel.notice`, a `stderr` line
+before any session).
 
 A `--jvm` in `ENSO_ENGINE_ARGS` (a developer back door; the open-time harness
 sets `ENSO_ENGINE_MODE` instead) is lifted into the `jvm` option by

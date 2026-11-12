@@ -598,7 +598,7 @@ describe('engine/setSpare', () => {
   test('answers which engine projects get', async () => {
     vi.stubEnv('ENSO_ENGINE_MODE', '')
     expect(await call('engine/setSpare', { enabled: true })).toEqual(
-      expect.objectContaining({ result: { engineMode: 'native' } }),
+      expect.objectContaining({ result: { engineMode: 'jvm' } }),
     )
   })
 
