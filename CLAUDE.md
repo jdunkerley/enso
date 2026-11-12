@@ -312,7 +312,11 @@ has silently produced a wrong result here:
      AssertionError: Initializing with unexpected working directory (…/enso)
      ```
 
-     So `cd test` first, then pass the project path.
+     `bin/enso` and `enso.bat` take care of it for `--run` and `--in-project`
+     (since #683): they start the JVM in the project's parent, from wherever
+     they are called (Note [The Launcher Starts In The Project's Parent] in
+     `distribution/bin/enso`). Anything that starts `java` itself must do the
+     same; `cd test` first stays harmless.
 
   2. **A filter argument that matches nothing still exits 0** and prints
      `0 tests failed.` Check that tests actually ran — compare the log length

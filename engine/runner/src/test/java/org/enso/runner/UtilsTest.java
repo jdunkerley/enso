@@ -21,6 +21,27 @@ public class UtilsTest {
   public UtilsTest() {}
 
   @Test
+  public void relativeInProjectIsResolvedAgainstTheUserDirectory() throws Exception {
+    var userDir = folder.getRoot().getAbsolutePath();
+    var expected = new File(userDir, "proj").getPath();
+    var args = new String[] {"--in-project", "proj", "--run", "x.enso"};
+    var result = Utils.absoluteInProject(args, userDir);
+    assertEquals(List.of("--in-project", expected, "--run", "x.enso"), List.of(result));
+    assertEquals("proj", args[1]);
+    var eq = Utils.absoluteInProject(new String[] {"--in-project=proj"}, userDir);
+    assertEquals(List.of("--in-project=" + expected), List.of(eq));
+  }
+
+  @Test
+  public void absoluteOrMissingInProjectIsLeftAlone() {
+    var userDir = folder.getRoot().getAbsolutePath();
+    var absolute = new String[] {"--in-project", userDir, "--run", "x.enso"};
+    assertTrue(absolute == Utils.absoluteInProject(absolute, userDir));
+    var none = new String[] {"--run", "x.enso"};
+    assertTrue(none == Utils.absoluteInProject(none, userDir));
+  }
+
+  @Test
   public void printStackTrace1() throws Exception {
     var f = folder.newFile("p.enso");
     var code =

@@ -102,14 +102,34 @@ Rules for an option line (in the file or in `ENSO_JVM_OPTIONS`):
   quoting splits such an argument at its space; write the path unquoted there.
 - A leading UTF-8 byte order mark is ignored.
 
-The shell launchers `distribution/bin/enso` and `enso.bat` start the JVM
-themselves and `--jvm` does not relaunch from them, so `Main.launchJvm` is not
-involved: they read `jvm.options` on their own, fixed options included (`enso`
-with the same rules; `enso.bat` skips blank, whitespace-only and `#` lines, also
-indented ones, trims leading and trailing spaces and quotes each line, so
-`^ % ! & | < >` and spaces survive literally; it does not support a byte order
-mark, a double quote or a single quote in an option). They do not read
-`ENSO_JVM_OPTIONS`.
+## Launchers
+
+Since C2 of the native-image removal (#683) the shell launchers
+`distribution/bin/enso` and `enso.bat` are the CLI's only launchers (the IDE's
+shim starts `java` itself). They start the JVM themselves and `--jvm` does not
+relaunch from them, so `Main.launchJvm` is not involved:
+
+- They read `jvm.options`, fixed options included, then `ENSO_JVM_OPTIONS`, with
+  `JvmOptions`' rules (trim, byte order mark, `#` comments in the file only, the
+  newline rule for the variable). `enso.bat` quotes each option, so spaces and
+  `^ % ! & | < >` survive literally; a double quote inside an option (the quoted
+  `-Xlog` file form) is escaped for `java.exe`, but between such quotes
+  `& | < > ^` are not supported. It decodes the file in the console's code page
+  and recognises the byte order mark by the same decoding (`bom` in the script).
+  A line starting with `;` is dropped by `enso.bat`.
+- **The working directory.** For `--run` and `--in-project` (the latter wins)
+  they find the project root, the nearest directory at or above the path with a
+  `package.yaml`, start the JVM in its parent, and pass the directory they were
+  started in as `-Denso.user.dir` (Note [The Launcher Starts In The Project's
+  Parent] in `bin/enso`): the IDE's rule, so `EnsoContext.checkWorkingDirectory`
+  holds under `-ea` wherever `enso` is started, and relative paths in the
+  program resolve as in the IDE. On the JVM, `Utils.adjustCwdToProject` returns
+  `enso.user.dir`; `--run`'s path is resolved against it
+  (`Utils.findFileAndProject`), and a relative `--in-project` is made absolute
+  against it (`Utils.absoluteInProject`, `Main.launch`). A path that does not
+  exist or is in no project leaves the directory alone. `enso.bat` reads the
+  arguments as cmd splits them, at `, ; =` as well as spaces, so such a path
+  must be quoted.
 
 ## Standby mode (`--standby`)
 
@@ -158,8 +178,7 @@ exits with 0.
   cold start; one that cancelled it was faster).
 - The preload list (`src/main/resources/org/enso/runner/standby-preload.txt`) is
   generated: run a Language Server boot without an AOT cache with
-  `JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=<log>` (the shell launcher of
-  `built-distribution/` does not read `ENSO_JVM_OPTIONS`), then
+  `JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=<log>` (or `ENSO_JVM_OPTIONS`), then
   `node tools/standby-preload/generate.mjs <log> <the list>`. Classes that have
   gone are skipped at run time; regenerate it when a release's count drops
   noticeably (the standby line says `preloaded N of M classes`). It is skipped

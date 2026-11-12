@@ -1631,6 +1631,13 @@ public class Main {
     } else if (line.hasOption(RUN_OPTION)) {
       originalCwdOrNull = Utils.adjustCwdToProject(line.getOptionValue(RUN_OPTION));
     }
+    if (originalCwdOrNull != null) {
+      // The process runs in the project's parent, not where the user started `enso`.
+      var absolute = Utils.absoluteInProject(args, originalCwdOrNull);
+      if (absolute != args) {
+        line = preprocessArguments(absolute);
+      }
+    }
 
     var logMasking = new boolean[1];
     var props = parseSystemProperties(line);

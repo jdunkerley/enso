@@ -1,4 +1,6 @@
 #!/usr/bin/env sh
+# The engine's launcher: runs the runner on a JVM (engine/runner CLAUDE.md, "Launchers").
+unset CDPATH
 ENGINE_ROOT=$(dirname "$(dirname "$(realpath "$0")")")
 COMP_PATH=$ENGINE_ROOT/component
 # A bundle (e.g. the IDE's) places the engine at <root>/dist/<version> and its
@@ -11,23 +13,118 @@ for candidate in "$ENGINE_ROOT"/../../runtime/graalvm-*/bin/java; do
     break
   fi
 done
-# The package's jvm.options (engine/runner JvmOptions.java): one JVM option per
-# line, blank lines and # comments skipped. It starts with the fixed options. The options go before `-m`, the
-# user's arguments after it, so they are put in "$@" in that order.
+
+# Note [The Launcher Starts In The Project's Parent]
+# ==================================================
+# The engine expects to run in the project root's parent, as the IDE starts it
+# (`EnsoContext.checkWorkingDirectory`, which asserts under `-ea`), and a JVM
+# cannot change its own directory. So for `--run` and `--in-project` (the
+# latter wins, as in `Main.launch`) the launcher finds the project root, the
+# nearest directory at or above the given path that holds `package.yaml`, and
+# starts the JVM in its parent, passing the directory it was started in as
+# `-Denso.user.dir`. The runner resolves the relative paths of the command line
+# against that (`Utils.adjustCwdToProject`, `Main.launch`). A path that does
+# not exist, or lies in no project, leaves the directory as it is. `enso.bat`
+# does the same.
+project_arg=
+run_arg=
+in_project_arg=
+prev=
+for arg in "$@"; do
+  case $prev in
+    --run) [ -n "$run_arg" ] || run_arg=$arg; prev=; continue ;;
+    --in-project) [ -n "$in_project_arg" ] || in_project_arg=$arg; prev=; continue ;;
+  esac
+  case $arg in
+    --run=*) [ -n "$run_arg" ] || run_arg=${arg#--run=} ;;
+    --in-project=*) [ -n "$in_project_arg" ] || in_project_arg=${arg#--in-project=} ;;
+  esac
+  prev=$arg
+done
+if [ -n "$in_project_arg" ]; then
+  project_arg=$in_project_arg
+else
+  project_arg=$run_arg
+fi
+
+# Prints the parent of the project root at or above $1; fails when there is none.
+project_parent() {
+  if [ -d "$1" ]; then
+    dir=$(cd -P -- "$1" 2>/dev/null && pwd -P) || return 1
+  elif [ -e "$1" ]; then
+    dir=$(cd -P -- "$(dirname -- "$1")" 2>/dev/null && pwd -P) || return 1
+  else
+    return 1
+  fi
+  while :; do
+    if [ -e "$dir/package.yaml" ]; then
+      dirname -- "$dir"
+      return 0
+    fi
+    [ "$dir" = / ] && return 1
+    dir=$(dirname -- "$dir")
+  done
+}
+
+# The JVM options go before `-m`, the user's arguments after it, so they are
+# put in "$@" after the user's and rotated behind them at the end.
 USER_ARGS=$#
+if [ -n "$project_arg" ] && target=$(project_parent "$project_arg"); then
+  user_dir=$(pwd -P)
+  cd -P -- "$target" || exit 1
+  set -- "$@" "-Denso.user.dir=$user_dir"
+fi
+
+# Trims $line and drops a leading UTF-8 byte order mark, as JvmOptions.clean does.
 BOM=$(printf '\357\273\277')
+clean_line() {
+  line=${line#"${line%%[![:space:]]*}"}
+  line=${line%"${line##*[![:space:]]}"}
+  case $line in
+    "$BOM"*)
+      line=${line#"$BOM"}
+      line=${line#"${line%%[![:space:]]*}"}
+      ;;
+  esac
+}
+
+# The package's jvm.options (engine/runner JvmOptions.java): one JVM option per
+# line, blank lines and # comments skipped. It starts with the fixed options.
 if [ -f "$ENGINE_ROOT/jvm.options" ]; then
   while IFS= read -r line || [ -n "$line" ]; do
-    line=${line%"$(printf '\r')"}
-    line=${line#"$BOM"}
-    line=${line#"${line%%[![:space:]]*}"}
-    line=${line%"${line##*[![:space:]]}"}
+    clean_line
     case $line in
       "" | "#"*) ;;
       *) set -- "$@" "$line" ;;
     esac
   done < "$ENGINE_ROOT/jvm.options"
 fi
+
+# ENSO_JVM_OPTIONS, after jvm.options (Note [JVM Options Of The Engine] in
+# JvmOptions.java): a value with a newline is one option per line, so that an
+# option may contain spaces; any other value is split on whitespace.
+NL='
+'
+case ${ENSO_JVM_OPTIONS-} in
+  "") ;;
+  *"$NL"*)
+    while IFS= read -r line || [ -n "$line" ]; do
+      clean_line
+      [ -z "$line" ] || set -- "$@" "$line"
+    done <<EOF
+$ENSO_JVM_OPTIONS
+EOF
+    ;;
+  *)
+    set -f
+    for line in $ENSO_JVM_OPTIONS; do
+      clean_line
+      [ -z "$line" ] || set -- "$@" "$line"
+    done
+    set +f
+    ;;
+esac
+
 set -- "$@" -m org.enso.runner/org.enso.runner.Main
 # Rotate the user's arguments, which came first, behind the options.
 while [ "$USER_ARGS" -gt 0 ]; do
@@ -37,4 +134,3 @@ while [ "$USER_ARGS" -gt 0 ]; do
   USER_ARGS=$((USER_ARGS - 1))
 done
 exec "$JAVA" --module-path "$COMP_PATH" "$@"
-exit
