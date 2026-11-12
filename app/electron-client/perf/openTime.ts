@@ -556,7 +556,7 @@ async function measureLaunch(
     ENSO_AI_DISABLED: '1',
     ENSO_LOG_DIRECTORY: logDir,
     // The shim's own JDK AOT cache (`project-manager-shim/jvmAot`) is a directory of the run's,
-    // never the user's `<userData>/jvm-aot`. A `jvm` engine points it at `<out>/jvm-aot`
+    // never the user's own cache. A `jvm` engine points it at `<out>/jvm-aot`
     // (`engineEnv`), which the preparation launch fills.
     ENSO_JVM_AOT_DIR: path.join(options.out, 'shim-jvm-aot'),
     // `--engine-log-level debug`: the engine's own log at that level, to split an open (e.g.

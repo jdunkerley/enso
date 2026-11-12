@@ -27,7 +27,7 @@ export { EngineTrainer, type Trainer, type TrainingPriority } from './trainer.js
 export { aotRejection } from './useLog.js'
 
 export interface JvmAotCacheSettings {
-  /** `<userData>/jvm-aot`, or `ENSO_JVM_AOT_DIR`. */
+  /** `jvm-aot` in the local cache directory, or `ENSO_JVM_AOT_DIR`. */
   readonly rootDirectory: string
   readonly appVersion: string
   /** The bundled engine's launcher (`<resources>/enso/dist/<version>/bin/enso`). */

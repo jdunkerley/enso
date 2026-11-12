@@ -11,6 +11,7 @@ import {
   isEngineCopyPath,
   isJvmAotEnabled,
   jvmAotRootDirectory,
+  removeLeftoverJvmAotCache,
 } from '../../src/jvmAotSettings'
 
 describe('isJvmAotEnabled', () => {
@@ -23,10 +24,83 @@ describe('isJvmAotEnabled', () => {
 })
 
 describe('jvmAotRootDirectory', () => {
-  test('<userData>/jvm-aot, unless ENSO_JVM_AOT_DIR is set and not empty', () => {
-    expect(jvmAotRootDirectory({}, 'U')).toBe(path.join('U', 'jvm-aot'))
-    expect(jvmAotRootDirectory({ ENSO_JVM_AOT_DIR: '' }, 'U')).toBe(path.join('U', 'jvm-aot'))
-    expect(jvmAotRootDirectory({ ENSO_JVM_AOT_DIR: 'D' }, 'U')).toBe('D')
+  test('Windows: %LOCALAPPDATA%/Enso/jvm-aot, else under the home directory', () => {
+    expect(jvmAotRootDirectory({ LOCALAPPDATA: 'C:\\L' }, 'win32', 'C:\\Users\\u')).toBe(
+      'C:\\L\\Enso\\jvm-aot',
+    )
+    expect(jvmAotRootDirectory({}, 'win32', 'C:\\Users\\u')).toBe(
+      'C:\\Users\\u\\AppData\\Local\\Enso\\jvm-aot',
+    )
+  })
+
+  test('macOS: ~/Library/Caches/Enso/jvm-aot', () => {
+    expect(jvmAotRootDirectory({}, 'darwin', '/Users/u')).toBe(
+      '/Users/u/Library/Caches/Enso/jvm-aot',
+    )
+  })
+
+  test('Linux: $XDG_CACHE_HOME/enso/jvm-aot, falling back to ~/.cache/enso/jvm-aot', () => {
+    expect(jvmAotRootDirectory({ XDG_CACHE_HOME: '/x' }, 'linux', '/home/u')).toBe(
+      '/x/enso/jvm-aot',
+    )
+    expect(jvmAotRootDirectory({ XDG_CACHE_HOME: '' }, 'linux', '/home/u')).toBe(
+      '/home/u/.cache/enso/jvm-aot',
+    )
+    expect(jvmAotRootDirectory({}, 'linux', '/home/u')).toBe('/home/u/.cache/enso/jvm-aot')
+  })
+
+  test('ENSO_JVM_AOT_DIR wins on every platform, unless it is empty', () => {
+    for (const platform of ['win32', 'darwin', 'linux'] as const) {
+      expect(jvmAotRootDirectory({ ENSO_JVM_AOT_DIR: 'D' }, platform, '/h')).toBe('D')
+      expect(jvmAotRootDirectory({ ENSO_JVM_AOT_DIR: '' }, platform, '/h')).not.toBe('')
+    }
+  })
+})
+
+describe('removeLeftoverJvmAotCache', () => {
+  async function withUserData(run: (userData: string) => Promise<void>) {
+    const base = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'aot-leftover-')))
+    try {
+      const userData = path.join(base, 'userData')
+      await fs.mkdir(path.join(userData, 'jvm-aot', 'key'), { recursive: true })
+      await fs.writeFile(path.join(userData, 'jvm-aot', 'key', 'enso.aot'), 'x')
+      await fs.writeFile(path.join(userData, 'keep.txt'), 'x')
+      await run(userData)
+    } finally {
+      await fs.rm(base, { recursive: true, force: true })
+    }
+  }
+  const exists = (p: string) =>
+    fs.access(p).then(
+      () => true,
+      () => false,
+    )
+
+  test('removes <userData>/jvm-aot, and nothing else of userData', () =>
+    withUserData(async (userData) => {
+      expect(await removeLeftoverJvmAotCache({}, userData, 'linux', '/home/u')).toBe(true)
+      expect(await exists(path.join(userData, 'jvm-aot'))).toBe(false)
+      expect(await exists(path.join(userData, 'keep.txt'))).toBe(true)
+      // Nothing left: nothing to do, no failure.
+      expect(await removeLeftoverJvmAotCache({}, userData, 'linux', '/home/u')).toBe(false)
+    }))
+
+  test('keeps it when ENSO_JVM_AOT_DIR points at it', () =>
+    withUserData(async (userData) => {
+      const env = { ENSO_JVM_AOT_DIR: path.join(userData, 'jvm-aot') }
+      expect(await removeLeftoverJvmAotCache(env, userData, 'linux', '/home/u')).toBe(false)
+      expect(await exists(path.join(userData, 'jvm-aot', 'key', 'enso.aot'))).toBe(true)
+    }))
+
+  test('removes it when ENSO_JVM_AOT_DIR points elsewhere', () =>
+    withUserData(async (userData) => {
+      const env = { ENSO_JVM_AOT_DIR: path.join(userData, 'elsewhere') }
+      expect(await removeLeftoverJvmAotCache(env, userData, 'linux', '/home/u')).toBe(true)
+      expect(await exists(path.join(userData, 'jvm-aot'))).toBe(false)
+    }))
+
+  test('never throws', async () => {
+    expect(await removeLeftoverJvmAotCache({}, '\0bad', 'linux', '/home/u')).toBe(false)
   })
 })
 
