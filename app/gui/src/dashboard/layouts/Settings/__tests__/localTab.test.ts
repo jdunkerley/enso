@@ -144,9 +144,8 @@ afterEach(async () => {
   Reflect.deleteProperty(window, 'api')
   openFileBrowser.mockReset()
   // The spare-engine settings are module state, shared by every test.
-  const { engineRunsOnJvm, setPreStartEngine } = await import('$/providers/spareEngineSettings')
+  const { setPreStartEngine } = await import('$/providers/spareEngineSettings')
   setPreStartEngine(true)
-  engineRunsOnJvm.value = false
 })
 
 describe('the Local settings tab', () => {
@@ -227,18 +226,8 @@ describe('the Local settings tab', () => {
     setEngineLogSettings({ sqlQueries: false, performanceTimings: false })
   })
 
-  test('the Engine section is hidden unless projects get the JVM engine', async () => {
-    const { engineRunsOnJvm } = await import('$/providers/spareEngineSettings')
-    engineRunsOnJvm.value = false
-    await openLocalTab()
-    expect(document.body.textContent).toContain(getText('mapsSettingsSection'))
-    expect(document.body.textContent).not.toContain(getText('preStartEngineSetting'))
-  })
-
   test('the Engine section has the pre-start switch, on by default, and keeps a change', async () => {
-    const { engineRunsOnJvm, spareEngineSettingsStore } =
-      await import('$/providers/spareEngineSettings')
-    engineRunsOnJvm.value = true
+    const { spareEngineSettingsStore } = await import('$/providers/spareEngineSettings')
     await openLocalTab()
     expect(document.body.textContent).toContain(getText('engineSettingsSection'))
     expect(document.body.textContent).toContain(getText('preStartEngineSettingDescription'))

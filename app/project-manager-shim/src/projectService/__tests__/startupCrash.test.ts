@@ -13,6 +13,7 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { EnsoRunner } from '../ensoRunner.js'
 import { Path } from '../types.js'
+import { fakeLauncherCommand } from './fakeLauncher.js'
 import { STARTUP_CRASH_PORT } from './testPorts.js'
 
 /**
@@ -103,6 +104,7 @@ async function requestsToPortAfterwards(project: Path): Promise<number> {
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'startup-crash-'))
   runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: STARTUP_CRASH_PORT,
     startupTimeoutMs: STARTUP_TIMEOUT_MS,
   })
@@ -127,6 +129,7 @@ test('an engine that exits while loading fails the open and leaves nothing behin
 test('an engine that does not start in time fails the open and leaves nothing behind', async () => {
   const project = Path(path.join(root, 'Hang'))
   runner = new EnsoRunner(Path(path.join(root, launcherName())), {
+    engineCommand: fakeLauncherCommand,
     firstPort: STARTUP_CRASH_PORT,
     startupTimeoutMs: HANG_STARTUP_TIMEOUT_MS,
   })

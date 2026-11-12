@@ -12,7 +12,13 @@ import * as path from 'node:path'
 import * as portfinder from 'portfinder'
 import { killTree } from '../childProcess/killTree.js'
 import { renameWithRetry } from '../localMetadata/jsonFile.js'
-import { aotCreateArguments, jvmOptionsValue } from '../projectService/jvmOptions.js'
+import {
+  aotCreateArguments,
+  javaCommand,
+  type EngineCommand,
+  type JavaEngine,
+  type SpawnCommand,
+} from '../projectService/javaLaunch.js'
 import { newChannelToken } from '../projectService/ydocHost.js'
 import { driveOpen } from './driver.js'
 import { enginePaths, readJvmOptionsText } from './key.js'
@@ -20,13 +26,15 @@ import { enginePaths, readJvmOptionsText } from './key.js'
 /* Note [The Cache Is Created In Two Steps]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * JEP 514's one step (`-XX:AOTCacheOutput=`) creates the cache in a child JVM that the training
- * JVM forks as it exits, with what it can reconstruct of its own command line. The launcher starts
- * its JVM through JNI, and that child does not get the same modules: on the Windows bundle it
- * failed with `Mismatched values for property jdk.module.addmods: jdk.internal.vm.ci` and
+ * JVM forks as it exits, with what it can reconstruct of its own command line. When the native
+ * launcher started the JVM through JNI, that child did not get the same modules: on the Windows
+ * bundle it failed with `Mismatched values for property jdk.module.addmods: jdk.internal.vm.ci` and
  * `NoClassDefFoundError: jdk/vm/ci/services/Services`, leaving only the `.config` (2026-11-05). So
  * the training engine records (`-XX:AOTMode=record -XX:AOTConfiguration=`), and the bundled `java`
- * then creates the cache with the options the launcher gives its JVM (`aotCreateArguments`), as
- * the open-time harness did when it made its own caches (it now measures this one instead).
+ * then creates the cache with the options an engine is started with (`aotCreateArguments`), as
+ * the open-time harness did when it made its own caches (it now measures this one instead). The
+ * two steps stayed when the shim began to start `java` itself: they are not known to be
+ * unnecessary, and the second is cheap.
  */
 
 /** Trains a cache into `output`; rejects (with an `AbortError` on `signal`) and leaves no file on failure. */
@@ -49,8 +57,14 @@ export interface EngineTrainerOptions {
    * `java` to create the cache: 5 minutes each.
    */
   readonly exitTimeoutMs?: number
-  /** The `java` that creates the cache; the bundled runtime's when omitted (tests replace it). */
-  readonly javaExecutable?: string
+  /** For tests: the processes to spawn in place of the bundled `java`. */
+  readonly commands?: TrainerCommands
+}
+
+/** The processes the trainer spawns: the engine (`--new`, `--server`) and the cache's creation. */
+export interface TrainerCommands {
+  readonly engine: EngineCommand
+  readonly create: (args: readonly string[]) => SpawnCommand
 }
 
 const DEFAULT_FIRST_PORT = 30616
@@ -77,17 +91,8 @@ export class EngineTrainer implements Trainer {
   /** A trainer for the engine whose launcher is `options.ensoExecutable`. */
   constructor(private readonly options: EngineTrainerOptions) {}
 
-  private spawn(
-    executable: string,
-    args: readonly string[],
-    env: NodeJS.ProcessEnv,
-    cwd: string,
-  ): Engine {
-    const [command, commandArgs] =
-      executable.endsWith('.bat') ?
-        ['cmd.exe', ['/c', executable, ...args]]
-      : [executable, [...args]]
-    const child = childProcess.spawn(command, commandArgs, {
+  private spawn([command, commandArgs]: SpawnCommand, env: NodeJS.ProcessEnv, cwd: string): Engine {
+    const child = childProcess.spawn(command, [...commandArgs], {
       env,
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -182,9 +187,18 @@ export class EngineTrainer implements Trainer {
       if (signal.aborted) throw abortError()
       const paths = await enginePaths(ensoExecutable)
       if (paths == null) throw new Error(`No bundled runtime beside ${ensoExecutable}`)
-      const java =
-        this.options.javaExecutable ??
-        path.join(paths.runtimeRoot, 'bin', process.platform === 'win32' ? 'java.exe' : 'java')
+      const java: JavaEngine = {
+        javaExecutable: path.join(
+          paths.runtimeRoot,
+          'bin',
+          process.platform === 'win32' ? 'java.exe' : 'java',
+        ),
+        engineRoot: paths.engineRoot,
+      }
+      const commands: TrainerCommands = this.options.commands ?? {
+        engine: (args, jvmOptions) => javaCommand(java, args, { extraJvmOptions: jvmOptions }),
+        create: (args) => [java.javaExecutable, args],
+      }
       await fs.rm(scratchRoot, { recursive: true, force: true })
       await fs.mkdir(scratchRoot, { recursive: true })
       await fs.mkdir(path.dirname(output), { recursive: true })
@@ -192,10 +206,9 @@ export class EngineTrainer implements Trainer {
       await fs.rm(config, { force: true })
       const projectRoot = path.join(scratchRoot, TRAINING_PROJECT)
 
-      // The scratch project: `enso --new`, native, from the bundled (welcome) template.
+      // The scratch project: `enso --new`, from the bundled (welcome) template.
       engine = this.spawn(
-        ensoExecutable,
-        ['--new', projectRoot, '--new-project-name', TRAINING_PROJECT],
+        commands.engine(['--new', projectRoot, '--new-project-name', TRAINING_PROJECT]),
         process.env,
         scratchRoot,
       )
@@ -213,30 +226,27 @@ export class EngineTrainer implements Trainer {
       const token = newChannelToken()
       const env: NodeJS.ProcessEnv = {
         ...process.env,
-        ENSO_JVM_OPTIONS: jvmOptionsValue(process.env.ENSO_JVM_OPTIONS, [
-          '-XX:AOTMode=record',
-          `-XX:AOTConfiguration=${config}`,
-        ]),
         LANGUAGE_SERVER_CHANNEL_TOKEN: token,
       }
       // The channel socket replaces the embedded ydoc server, which the training does not need.
       delete env.LANGUAGE_SERVER_YDOC_PORT
       engine = this.spawn(
-        ensoExecutable,
-        [
-          '--jvm',
-          '--server',
-          '--root-id',
-          crypto.randomUUID(),
-          '--project-id',
-          crypto.randomUUID(),
-          '--path',
-          projectRoot,
-          '--interface',
-          '127.0.0.1',
-          '--rpc-port',
-          String(port),
-        ],
+        commands.engine(
+          [
+            '--server',
+            '--root-id',
+            crypto.randomUUID(),
+            '--project-id',
+            crypto.randomUUID(),
+            '--path',
+            projectRoot,
+            '--interface',
+            '127.0.0.1',
+            '--rpc-port',
+            String(port),
+          ],
+          ['-XX:AOTMode=record', `-XX:AOTConfiguration=${config}`],
+        ),
         env,
         scratchRoot,
       )
@@ -275,14 +285,13 @@ export class EngineTrainer implements Trainer {
 
       // Note [The Cache Is Created In Two Steps]
       engine = this.spawn(
-        java,
-        aotCreateArguments({
-          config,
-          cache: temporary,
-          component: path.join(paths.engineRoot, 'component'),
-          optionsFile: await readJvmOptionsText(paths.engineRoot),
-          jvmOptions: process.env.ENSO_JVM_OPTIONS ?? '',
-        }),
+        commands.create(
+          aotCreateArguments(java, {
+            config,
+            cache: temporary,
+            jvmOptionsText: await readJvmOptionsText(paths.engineRoot),
+          }),
+        ),
         process.env,
         scratchRoot,
       )

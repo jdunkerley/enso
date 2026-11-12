@@ -1552,9 +1552,9 @@ public class Main {
         commandAndArgs.add("-D" + e.getKey() + "=" + e.getValue());
       }
     }
-    commandAndArgs.add("--sun-misc-unsafe-memory-access=allow");
-    commandAndArgs.add("--enable-native-access=org.graalvm.truffle");
-    commandAndArgs.add("--add-opens=java.base/java.nio=ALL-UNNAMED");
+    // The fixed options (--sun-misc-unsafe-memory-access, --enable-native-access, --add-opens) are
+    // the first lines of the engine's jvm.options: the IDE's shim, bin/enso and this method read
+    // the one list (Note [JVM Options Of The Engine]).
     commandAndArgs.addAll(
         JvmOptions.all(component, System.getenv(JvmOptions.ENVIRONMENT_VARIABLE)));
     if (!component.isDirectory()) {

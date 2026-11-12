@@ -17,15 +17,6 @@ import type { ProjectLifecycleListener } from '../localMetadata/index.js'
 import { withinVersioningTimeout, type LocalVersioning } from '../localVersioning/index.js'
 import { samplesSettled } from '../samples/index.js'
 import {
-  describeEngineMode,
-  liftJvmFlag,
-  resolveDefaultEngineMode,
-  resolveEngineMode,
-  type EngineMode,
-  type EngineModeSettings,
-  type ResolvedEngineMode,
-} from './engineMode.js'
-import {
   comparableProjectPath,
   DEFAULT_YDOC_WAIT_MS,
   EnsoRunner,
@@ -36,6 +27,7 @@ import {
   type Socket,
 } from './ensoRunner.js'
 import * as nameValidation from './nameValidation.js'
+import { NATIVE_REMOVED_NOTICE, nativeRequested } from './nativeRequest.js'
 import {
   ProjectFileRepository,
   type Project,
@@ -55,8 +47,6 @@ export {
   type YdocListenRequest,
 } from './ydocHost.js'
 
-export { resolveDefaultEngineMode } from './engineMode.js'
-
 export interface RunningLanguageServerInfo {
   readonly sockets: LanguageServerSockets
   readonly projectName: string
@@ -64,13 +54,9 @@ export interface RunningLanguageServerInfo {
   readonly projectNamespace: string
 }
 
-/** Where the engine mode may come from besides a project's `package.yaml` (`engineMode.ts`). */
+/** What the host gives the project service besides its arguments. */
 export interface EngineSettings {
-  /** Electron's `--engine-mode` (or its alias `--jvm`). */
-  readonly option?: EngineMode | undefined
-  /** The raw `ENSO_ENGINE_MODE`; the process environment's when omitted. */
-  readonly environment?: string | undefined
-  /** The per-user JDK AOT cache: its options go to every JVM engine, and opens stop its training. */
+  /** The per-user JDK AOT cache: its options go to every engine, and opens stop its training. */
   readonly jvmAot?: JvmAotCache | undefined
   /**
    * Where opened projects' ydoc servers run when `ENSO_YDOC_HOST` is `node` (the default): Electron's
@@ -159,22 +145,15 @@ export class ProjectService {
     private readonly engine?: EngineSettings,
   ) {}
 
-  private engineModeSettings(): EngineModeSettings {
-    return {
-      option: this.engine?.option,
-      environment: this.engine?.environment ?? process.env.ENSO_ENGINE_MODE,
-    }
+  /** How an engine is launched: the timeouts and the AOT cache's options. */
+  private async engineLaunch(): Promise<EngineLaunch> {
+    return { timeouts: engineTimeouts(), ...(await this.aotOptions()) }
   }
 
-  /** How an engine in `mode` is launched: that mode's timeouts and, for the JVM, the AOT options. */
-  private async engineLaunch(mode: ResolvedEngineMode): Promise<EngineLaunch> {
-    return { mode, timeouts: engineTimeouts(mode.mode), ...(await this.aotOptions(mode.mode)) }
-  }
-
-  /** The AOT cache's options for a JVM engine (`jvmOptions` of its launch), when there is a cache. */
-  private async aotOptions(mode: EngineMode): Promise<Pick<EngineLaunch, 'jvmOptions'>> {
+  /** The AOT cache's options for an engine (`jvmOptions` of its launch), when there is a cache. */
+  private async aotOptions(): Promise<Pick<EngineLaunch, 'jvmOptions'>> {
     const jvmAot = this.engine?.jvmAot
-    if (mode !== 'jvm' || jvmAot == null) return {}
+    if (jvmAot == null) return {}
     try {
       const jvmOptions = await jvmAot.jvmOptions()
       return jvmOptions.length > 0 ? { jvmOptions } : {}
@@ -208,13 +187,11 @@ export class ProjectService {
   private opensStarted = 0
 
   /**
-   * `engine/setSpare`: the GUI's setting. Until the first call no spare is started. The answer says
-   * which engine projects get by default, so the GUI shows the setting only for the JVM.
+   * `engine/setSpare`: the GUI's setting. Until the first call no spare is started.
    */
-  async setSpareEngine(enabled: boolean): Promise<{ readonly engineMode: EngineMode }> {
+  async setSpareEngine(enabled: boolean): Promise<void> {
     this.spareSetting = enabled
     await this.refreshSpare()
-    return { engineMode: resolveDefaultEngineMode(this.engineModeSettings()).mode }
   }
 
   /** Start the spare engine if one is wanted (`spareEngine.ts`), stop it otherwise. */
@@ -250,7 +227,7 @@ export class ProjectService {
       await runner.stopSpare(reason)
       return
     }
-    const launch = await this.engineLaunch(resolveDefaultEngineMode(this.engineModeSettings()))
+    const launch = await this.engineLaunch()
     const key = this.spareKeyFor(launch)
     const inUse =
       runner.hasProjectsInUse != null ?
@@ -302,9 +279,6 @@ export class ProjectService {
       return this.spareSetting === false ? 'the setting is off' : 'the GUI has not sent the setting'
     }
     if (process.env.ENSO_SPARE_ENGINE === '0') return 'ENSO_SPARE_ENGINE=0'
-    if (resolveDefaultEngineMode(this.engineModeSettings()).mode !== 'jvm') {
-      return 'the engine is native'
-    }
     if (ydocHostKind() !== 'node') return 'ENSO_YDOC_HOST=engine'
     // A first launch trains the AOT cache in the background: a spare would compete with it, and
     // be discarded at the next open for the new cache. `onTrainingEnded` refreshes it.
@@ -315,13 +289,12 @@ export class ProjectService {
   }
 
   /**
-   * The spawn key of a JVM engine started now (decision 8 of the plan; `spawnKey`): a spare and an
+   * The spawn key of an engine started now (decision 8 of the plan; `spawnKey`): a spare and an
    * open with the same settings get the same one. An open's own arguments (its engine logging) and
    * its line variables travel in the spare's line, so they are not part of it.
    */
-  private spareKeyFor(launch: Pick<EngineLaunch, 'mode' | 'jvmOptions'>): string {
+  private spareKeyFor(launch: Pick<EngineLaunch, 'jvmOptions'>): string {
     return spawnKey({
-      mode: launch.mode.mode,
       args: this.extraArgs,
       jvmOptions: launch.jvmOptions ?? [],
       env: {
@@ -360,9 +333,9 @@ export class ProjectService {
     if (!ensoPath) {
       throw new Error(`${PRODUCT_NAME} executable not found`)
     }
-    // The start-up and terminate timeouts come per launch, from the engine mode's column
-    // (`engineTimeouts`; `ENSO_ENGINE_STARTUP_TIMEOUT_MS` and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS`
-    // override both). `ydocWaitMs` is the fallback for a launch without a mode.
+    // The start-up and terminate timeouts come per launch (`engineTimeouts`;
+    // `ENSO_ENGINE_STARTUP_TIMEOUT_MS` and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS` override them).
+    // `ydocWaitMs` is the fallback for a launch without them.
     const runner = new EnsoRunner(ensoPath, {
       ydocWaitMs: DEFAULT_YDOC_WAIT_MS,
       ydocHost: engine?.ydocHost,
@@ -371,17 +344,15 @@ export class ProjectService {
     // Read extra arguments from environment variable
     const envArgs = process.env.ENSO_ENGINE_ARGS
     const envArgsArray = envArgs ? envArgs.split(/\s+/).filter((arg) => arg.length > 0) : []
-    const lifted = liftJvmFlag([...envArgsArray, ...extraArgs], engine?.option)
-    const allExtraArgs = lifted.args
 
     return new ProjectService(
       runner,
-      allExtraArgs,
+      [...envArgsArray, ...extraArgs],
       console,
       lifecycle,
       versioning,
       extraEnvironment,
-      { ...engine, option: lifted.option },
+      engine,
     )
   }
 
@@ -476,8 +447,8 @@ export class ProjectService {
   async runProject(projectId: UUID, projectsDirectory: Path): Promise<number> {
     const project = await this.getProject(projectId, projectsDirectory, true)
     this.logger.debug(`Running project '${project.path}'`)
-    const mode = await resolveEngineMode(project.path, this.engineModeSettings())
-    const launch = await this.engineLaunch(mode)
+    if (await nativeRequested(project.path)) this.logger.warn(NATIVE_REMOVED_NOTICE)
+    const launch = await this.engineLaunch()
     const exitCode = await this.runner.runProject(
       project.path,
       this.projectEnvVars(await makeProjectTelemetryKey(projectsDirectory, projectId)),
@@ -548,7 +519,7 @@ export class ProjectService {
 
     // The log channel opens before the engine starts, so that its start-up is in the replay buffer.
     const localProjectKey = await makeProjectTelemetryKey(projectsDirectory, projectId)
-    // An open project keeps the engine it has: no second mode line in the middle of its log.
+    // An open project keeps the engine it has: no second notice in the middle of its log.
     const alreadyLogging = this.engineLogs.get(project.path)?.isOpen === true
     const engineLog = this.engineLogs.open({
       projectPath: project.path,
@@ -565,17 +536,14 @@ export class ProjectService {
     jvmAot?.openStarted()
     this.engine?.openObserver?.openStarted()
     try {
-      const mode = await resolveEngineMode(project.path, this.engineModeSettings())
-      if (!alreadyLogging) engineLog.notice(describeEngineMode(mode))
-      launch = await this.engineLaunch(mode)
-      if (mode.mode === 'jvm') {
-        launch = {
-          ...launch,
-          spareKey: this.spareKeyFor(launch),
-          spareIdleReason: this.spareDisabled() ? null : this.spareIdleReason,
-        }
-      } else {
-        await this.runner.stopSpare?.('a project with the native engine is opening')
+      if (!alreadyLogging && (await nativeRequested(project.path))) {
+        engineLog.notice(NATIVE_REMOVED_NOTICE)
+      }
+      launch = await this.engineLaunch()
+      launch = {
+        ...launch,
+        spareKey: this.spareKeyFor(launch),
+        spareIdleReason: this.spareDisabled() ? null : this.spareIdleReason,
       }
       sockets = await this.runner.openProject(
         project.path,

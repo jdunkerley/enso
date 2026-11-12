@@ -53,13 +53,13 @@ async function writeLog(baseName: string, content: string) {
 describe('EngineLogChannel', () => {
   test('notice emits one stderr line before any session', () => {
     const log = collect()
-    channel.notice('Engine mode: native (default)')
+    channel.notice('A line of the shim')
     expect(log.events).toContainEqual(
       expect.objectContaining({
         type: 'line',
         source: 'stderr',
         sessionId: null,
-        text: 'Engine mode: native (default)',
+        text: 'A line of the shim',
       }),
     )
   })

@@ -53,9 +53,8 @@ export const test = base.extend<{
    */
   welcomeProject: boolean
   /**
-   * Whether the app runs the JVM engine with its spare engine. Default `false`: every other spec
-   * runs with `ENSO_SPARE_ENGINE=0`, so a spare never changes its timing, and with the engine mode
-   * the shell gives (`ENSO_ENGINE_MODE`; unset is the app's default, the JVM). With it, the JDK AOT
+   * Whether the app runs with its spare engine. Default `false`: every other spec
+   * runs with `ENSO_SPARE_ENGINE=0`, so a spare never changes its timing. With it, the JDK AOT
    * cache is a fresh directory of the test's own (`ENSO_JVM_AOT_DIR`), so it is always trained
    * first, and deleted afterwards: never the user's, since a training keeps only the two newest
    * keys and could delete an installed IDE's cache. Without it, there is no cache
@@ -94,10 +93,8 @@ export const test = base.extend<{
       ENSO_TEST: 'true',
       ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
       ...(aiEnabled ? {} : { ENSO_AI_DISABLED: '1' }),
-      // The spare spec is always the JVM; the others keep the shell's mode (CI runs one spec again
-      // with `ENSO_ENGINE_MODE=native`).
       ...(spareEngine ?
-        { ENSO_ENGINE_MODE: 'jvm', ENSO_SPARE_ENGINE: '1', ENSO_JVM_AOT_DIR: jvmAotDir }
+        { ENSO_SPARE_ENGINE: '1', ENSO_JVM_AOT_DIR: jvmAotDir }
       : { ENSO_SPARE_ENGINE: '0', ENSO_JVM_AOT: '0' }),
     }
     const app = await _electron.launch({ executablePath: electronExecutablePath, args, env })

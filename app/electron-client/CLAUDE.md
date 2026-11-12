@@ -214,30 +214,29 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
 - `ENSO_YDOC_HOST` (`node` | `engine`, default `node`) — where opened projects'
   ydoc servers run: the utility process above, or (the one-release rollback)
   inside the engine.
-- `ENSO_ENGINE_MODE` (`native` | `jvm`) — which engine projects get, below
-  `--engine-mode` and a project's `package.yaml` `jvm:` key (see
-  `project-manager-shim/CLAUDE.md`, "Engine mode"). `--engine-mode <mode>` is
-  the command-line form; `--jvm` is its alias.
+- `ENSO_ENGINE_MODE` — parsed and ignored: the native engine is gone, every
+  engine is the JVM. A value of `native` (or a project's `jvm: false`) only logs
+  a line in the engine log (`project-manager-shim/CLAUDE.md`, "The removed
+  native engine"). The `--engine-mode` and `--jvm` flags were removed.
 - `ENSO_JVM_AOT_DIR` — where the per-user JDK AOT cache lives instead of
   `<userData>/jvm-aot` (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
-  cache trains in the background, once the window is up, only when the JVM is
-  the default engine; `before-quit` stops a running training (and the spare
-  engine, `stopSpareEngine`: while a spare is alive, `holdQuitForSpareEngine` in
-  `src/spareQuit.ts` cancels the quit, waits up to 5 s for the spare to exit,
-  kills its process tree if it has not, and quits again, once; tested in
-  `tests/headless/spareQuit.test.ts`). An update waits the same way: an update
-  installed on quit starts on the app's `quit` event, after that stop, and
-  `Updater.quitAndInstall` awaits `stopSpareEngine` (`beforeInstall`) before it
-  starts the installer, which on Windows runs before the app has quit. The
-  open-time harness points it at a directory of its run (`<out>/jvm-aot` for the
-  JVM engines, `<out>/shim-jvm-aot` for native, which never trains) and measures
-  that cache (see "Open-time harness"), so its launches never pick up the
-  user's. An empty value counts as unset. The root and the gate are in
-  `src/jvmAotSettings.ts` (tested in `tests/headless/jvmAotSettings.test.ts`).
-  The GUI shows a toast while a training is due and how it ended:
-  `src/jvmAotIpc.ts` keeps the status (`idle`, `training`, `trained`, `failed`,
-  set from the cache's `onTrainingStarted` and `onTrainingEnded`), answers
-  `Channel.jvmAotTrainingStatus` and broadcasts
+  cache trains in the background, once the window is up; `before-quit` stops a
+  running training (and the spare engine, `stopSpareEngine`: while a spare is
+  alive, `holdQuitForSpareEngine` in `src/spareQuit.ts` cancels the quit, waits
+  up to 5 s for the spare to exit, kills its process tree if it has not, and
+  quits again, once; tested in `tests/headless/spareQuit.test.ts`). An update
+  waits the same way: an update installed on quit starts on the app's `quit`
+  event, after that stop, and `Updater.quitAndInstall` awaits `stopSpareEngine`
+  (`beforeInstall`) before it starts the installer, which on Windows runs before
+  the app has quit. The open-time harness points it at a directory of its run
+  (`<out>/jvm-aot` for the JVM engines, `<out>/shim-jvm-aot` for native, which
+  never trains) and measures that cache (see "Open-time harness"), so its
+  launches never pick up the user's. An empty value counts as unset. The root
+  and the gate are in `src/jvmAotSettings.ts` (tested in
+  `tests/headless/jvmAotSettings.test.ts`). The GUI shows a toast while a
+  training is due and how it ended: `src/jvmAotIpc.ts` keeps the status (`idle`,
+  `training`, `trained`, `failed`, set from the cache's `onTrainingStarted` and
+  `onTrainingEnded`), answers `Channel.jvmAotTrainingStatus` and broadcasts
   `Channel.jvmAotTrainingStatusChanged` (tested in
   `tests/headless/jvmAotIpc.test.ts`).
 - `ENSO_JVM_AOT=0` — no JDK AOT cache at all: nothing trains, and no open uses
@@ -248,24 +247,23 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   fixture sets it for every spec but `spareEngine.spec.ts`; the open-time
   harness sets it for `jvm` and `jvm-first`, and `ENSO_SPARE_ENGINE=1` for the
   `jvm-spare` engines.
-- `APPIMAGE` (set by the AppImage runtime) — with the JVM as the default engine
-  (`--engine-mode`, `ENSO_ENGINE_MODE`, then the built-in default; nothing
-  happens while it is native), a Linux AppImage runs its engine from a copy at
-  `<userData>/engine/<version>/`, because its mount moves at every launch and
-  the AOT cache would never match (`project-manager-shim/CLAUDE.md`, "JDK AOT
-  cache"). `prepareAppImageEngine` (`projectService.ts`, called in `main()`
-  before the project service is set up) keeps a complete copy's launcher in a
-  module variable and passes it to the project service and the cache; it is
-  never written to `process.env`, which an in-app update's relaunch inherits.
-  Without a complete copy, `startAppImageEngineCopy` (called once the window has
-  loaded) makes one for the next launch, held back by `AfterFirstOpen` until the
-  first open has been answered (or a minute without an open), so that it does
-  not compete with that open for the AppImage's mount; a copy that fails or
-  finds no room is not tried again for that build for a day. A user's own
-  `ENSO_ENGINE_PATH` wins and turns all this off (`appImageEngine` in
-  `src/jvmAotSettings.ts`); one inside `<userData>/engine/` is an earlier IDE's
-  copy inherited through an update's relaunch, and `prepareAppImageEngine`
-  removes it from the environment (`isEngineCopyPath`).
+- `APPIMAGE` (set by the AppImage runtime) — a Linux AppImage runs its engine
+  from a copy at `<userData>/engine/<version>/`, because its mount moves at
+  every launch and the AOT cache would never match
+  (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). `prepareAppImageEngine`
+  (`projectService.ts`, called in `main()` before the project service is set up)
+  keeps a complete copy's launcher in a module variable and passes it to the
+  project service and the cache; it is never written to `process.env`, which an
+  in-app update's relaunch inherits. Without a complete copy,
+  `startAppImageEngineCopy` (called once the window has loaded) makes one for
+  the next launch, held back by `AfterFirstOpen` until the first open has been
+  answered (or a minute without an open), so that it does not compete with that
+  open for the AppImage's mount; a copy that fails or finds no room is not tried
+  again for that build for a day. A user's own `ENSO_ENGINE_PATH` wins and turns
+  all this off (`appImageEngine` in `src/jvmAotSettings.ts`); one inside
+  `<userData>/engine/` is an earlier IDE's copy inherited through an update's
+  relaunch, and `prepareAppImageEngine` removes it from the environment
+  (`isEngineCopyPath`).
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.
@@ -818,14 +816,11 @@ rule in `playwright.config.ts`:
   long (minutes), so avoid them in inner dev loops.
 
 Every spec runs with `ENSO_SPARE_ENGINE=0` (the fixture's `spareEngine` option,
-default `false`), so a spare engine never changes its timing, and with the
-shell's `ENSO_ENGINE_MODE`: unset, that is the app's default, the JVM. It has no
-JDK AOT cache (`ENSO_JVM_AOT=0`): on CI's two CPUs a training slowed every open,
-each open killed it so it never finished, and its toast covered the controls the
-specs click. CI runs `tests/localWorkflow.spec.ts` again with
-`ENSO_ENGINE_MODE=native`, non-blocking while the native image is broken on
-GraalVM 25.5 (Note [The Package Tests Run Both Engines] in `ide-packaging.yml`).
-`tests/spareEngine.spec.ts` sets it: the app runs `ENSO_ENGINE_MODE=jvm` and
+default `false`), so a spare engine never changes its timing. It has no JDK AOT
+cache (`ENSO_JVM_AOT=0`): on CI's two CPUs a training slowed every open, each
+open killed it so it never finished, and its toast covered the controls the
+specs click. (CI no longer runs `tests/localWorkflow.spec.ts` a second time on
+the native engine.) `tests/spareEngine.spec.ts` sets it: the app runs with
 `ENSO_SPARE_ENGINE=1` with a fresh `ENSO_JVM_AOT_DIR` of the test's own (deleted
 afterwards), waits for the AOT cache's training to end
 (`JDK AOT cache: trained in …`, ~45 s on a desktop), then for
@@ -928,12 +923,11 @@ any variable named `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_KEY` or
 measurement is not changed by them. Still unset the credentials in the shell
 before a manual run.
 
-Every launch sets the engine mode as a user would: `ENSO_ENGINE_MODE=native` or
-`jvm` (`engineEnv` in `perf/openTime.ts`), so the shim decides whether to pass
-`--jvm`, and which timeouts apply. `jvm` and `jvm-first` also set
-`ENSO_SPARE_ENGINE=0`: a measured open starts its own engine, never a
-pre-started spare; the `jvm-spare` engines set `ENSO_SPARE_ENGINE=1`. The
-engines are:
+Every launch is the JVM, as a user has it (`engineEnv` in `perf/openTime.ts`;
+`--engines native` is refused, though the report still reads the `native` runs
+of earlier dispatches). `jvm` and `jvm-first` also set `ENSO_SPARE_ENGINE=0`: a
+measured open starts its own engine, never a pre-started spare; the `jvm-spare`
+engines set `ENSO_SPARE_ENGINE=1`. The engines are:
 
 - `native`: the native image.
 - `jvm`: the JVM as a user has it after the first open. The shim's own AOT cache
@@ -1047,11 +1041,11 @@ Note [RSS Is Sampled On The First Open].
 three dispatches of the ratio JVM/native, within each dispatch, for
 `welcomeShown` (welcome template) and `libraryShown` (`image` template), both at
 most 1.5 passing and either over 1.6 failing (between: the owner decides), on
-the values as printed. Run a dispatch with
-`open_perf_engines=native,jvm,jvm-first` and `open_perf_template=welcome,image`
-with `open_perf_runs=5` (the default; keep it: with 3 launches per cell, a
-single hang leaves a cell under the 3 successes it needs and the result is
-"insufficient data"), download both platforms
+the values as printed. Run a dispatch with `open_perf_engines=jvm,jvm-first`
+(the gate's `native` baseline can no longer be measured) and
+`open_perf_template=welcome,image` with `open_perf_runs=5` (the default; keep
+it: with 3 launches per cell, a single hang leaves a cell under the 3 successes
+it needs and the result is "insufficient data"), download both platforms
 (`gh run download <id> --name open-perf-windows --dir <dir>/<id>/windows`, and
 `open-perf-linux`), and
 

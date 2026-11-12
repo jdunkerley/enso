@@ -1,8 +1,11 @@
 /**
- * @file The trainer with a fake bundle: a fake `enso` (a Node script) that makes the scratch
+ * @file The trainer with a fake bundle: a fake engine (a Node script) that makes the scratch
  * project for `--new`, and for `--server` serves the fake Language Server and, on the stdin
  * newline, writes the file named by `-XX:AOTConfiguration=` and exits; and a fake `java` that
- * writes the cache named by `-XX:AOTCache=` from that configuration.
+ * writes the cache named by `-XX:AOTCache=` from that configuration. The trainer's commands are
+ * replaced (`EngineTrainerOptions.commands`): the fake engine gets the JVM options of its launch
+ * as a leading `--fake-jvm-options <base64 JSON>`. The command lines of the real `java` are
+ * tested in `javaLaunch.test.ts`.
  */
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
@@ -10,7 +13,6 @@ import * as path from 'node:path'
 import * as url from 'node:url'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { JVM_AOT_TRAINER_PORT } from '../../projectService/__tests__/testPorts.js'
-import { LAUNCHER_JVM_OPTIONS } from '../../projectService/jvmOptions.js'
 import { EngineTrainer } from '../trainer.js'
 
 const FAKE_LS = url.pathToFileURL(path.join(import.meta.dirname, 'fakeLanguageServer.ts')).href
@@ -22,7 +24,12 @@ const TEMPLATE_MAIN = path.resolve(
 const FAKE_ENSO = `
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-const args = process.argv.slice(2)
+let args = process.argv.slice(2)
+let jvmOptions = []
+if (args[0] === '--fake-jvm-options') {
+  jvmOptions = JSON.parse(Buffer.from(args[1], 'base64').toString())
+  args = args.slice(2)
+}
 const value = (flag) => args[args.indexOf(flag) + 1]
 const record = process.env.FAKE_RECORD
 if (args.includes('--new')) {
@@ -35,7 +42,7 @@ if (args.includes('--new')) {
 fs.writeFileSync(record, JSON.stringify({
   args,
   pid: process.pid,
-  jvmOptions: process.env.ENSO_JVM_OPTIONS ?? null,
+  jvmOptions,
   token: process.env.LANGUAGE_SERVER_CHANNEL_TOKEN ?? null,
   ydocPort: process.env.LANGUAGE_SERVER_YDOC_PORT ?? null,
 }))
@@ -47,7 +54,7 @@ await startFakeLanguageServer({
   completeAfterMs: never ? null : 100,
 })
 process.stdin.on('data', () => {
-  const config = process.env.ENSO_JVM_OPTIONS.split(/\\r?\\n/)
+  const config = jvmOptions
     .find((o) => o.startsWith('-XX:AOTConfiguration='))
     .slice('-XX:AOTConfiguration='.length)
   const code = Number(process.env.FAKE_EXIT_CODE ?? '0')
@@ -83,10 +90,15 @@ async function launcher(directory: string, name: string, script: string): Promis
   return file
 }
 
+/** The process of a fake launcher: a `.bat` goes through `cmd.exe`. */
+function run(file: string, args: readonly string[]): [string, readonly string[]] {
+  return file.endsWith('.bat') ? ['cmd.exe', ['/c', file, ...args]] : [file, args]
+}
+
 interface Recorded {
   args: string[]
   pid: number
-  jvmOptions: string | null
+  jvmOptions: string[]
   token: string | null
   ydocPort: string | null
 }
@@ -118,9 +130,19 @@ async function trainer(): Promise<EngineTrainer> {
   await fs.mkdir(bin, { recursive: true })
   await fs.mkdir(runtimeBin, { recursive: true })
   await fs.writeFile(path.join(engineRoot, 'jvm.options'), '# c\n-Dfrom.file=1\n')
+  const fakeEnso = await launcher(bin, 'enso', FAKE_ENSO)
+  const fakeJava = await launcher(runtimeBin, 'java', FAKE_JAVA)
   return new EngineTrainer({
-    ensoExecutable: await launcher(bin, 'enso', FAKE_ENSO),
-    javaExecutable: await launcher(runtimeBin, 'java', FAKE_JAVA),
+    ensoExecutable: fakeEnso,
+    commands: {
+      engine: (args, jvmOptions) =>
+        run(fakeEnso, [
+          '--fake-jvm-options',
+          Buffer.from(JSON.stringify(jvmOptions ?? [])).toString('base64'),
+          ...args,
+        ]),
+      create: (args) => run(fakeJava, args),
+    },
     scratchRoot: path.join(root, 'scratch'),
     firstPort: JVM_AOT_TRAINER_PORT,
     startupTimeoutMs: 20_000,
@@ -157,29 +179,31 @@ test(
 )
 
 test(
-  'the engine records with --jvm, a token and no ydoc port; java creates as the launcher would',
+  'the engine records, with a token and no ydoc port; java creates with the options of an engine',
   { timeout: 30_000 },
   async () => {
     vi.stubEnv('ENSO_JVM_OPTIONS', '-Dinherited=1')
     const output = path.join(root, 'key dir', 'enso.aot')
     await (await trainer()).train(output, new AbortController().signal)
     const engine = await recorded()
-    expect(engine.args.slice(0, 2)).toEqual(['--jvm', '--server'])
+    expect(engine.args.slice(0, 2)).toEqual(['--server', '--root-id'])
+    expect(engine.args).not.toContain('--jvm')
     expect(engine.args[engine.args.indexOf('--path') + 1]).toBe(path.join(root, 'scratch', 'Train'))
-    expect(engine.jvmOptions).toBe(
-      `-Dinherited=1\n-XX:AOTMode=record\n-XX:AOTConfiguration=${output}.aotconf`,
-    )
+    expect(engine.jvmOptions).toEqual([
+      '-XX:AOTMode=record',
+      `-XX:AOTConfiguration=${output}.aotconf`,
+    ])
     expect(engine.token).toMatch(/^[0-9a-f]{64}$/)
     expect(engine.ydocPort).toBeNull()
     const java = JSON.parse(await fs.readFile(javaRecordFile(), 'utf8')) as { args: string[] }
     expect(java.args).toEqual([
+      '-Dfrom.file=1',
+      '-Dinherited=1',
       '-XX:AOTMode=create',
       `-XX:AOTConfiguration=${output}.aotconf`,
       `-XX:AOTCache=${output}.tmp`,
-      ...LAUNCHER_JVM_OPTIONS,
-      '-Dfrom.file=1',
-      '-Dinherited=1',
-      `--module-path=${path.join(bundle, 'enso', 'dist', '1.0', 'component')}`,
+      '--module-path',
+      path.join(bundle, 'enso', 'dist', '1.0', 'component'),
       '-m',
       'org.enso.runner/org.enso.runner.Main',
     ])

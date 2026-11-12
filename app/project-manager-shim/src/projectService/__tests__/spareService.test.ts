@@ -65,7 +65,7 @@ function fakeRunner(): Runner {
 /** The service's own logging, without the debug lines of every open and close. */
 const quiet: Console = { ...console, debug: () => {} }
 
-function service(engine: EngineSettings = { option: 'jvm' }, extraArgs: string[] = []) {
+function service(engine: EngineSettings = {}, extraArgs: string[] = []) {
   return new ProjectService(
     fakeRunner(),
     extraArgs,
@@ -107,7 +107,6 @@ beforeEach(async () => {
   vi.stubEnv('ENSO_LOG_DIRECTORY', path.join(root, 'logs'))
   vi.stubEnv('ENSO_SPARE_ENGINE', '')
   vi.stubEnv('ENSO_YDOC_HOST', '')
-  vi.stubEnv('ENSO_ENGINE_MODE', '')
   starts = []
   stops = []
   waits = []
@@ -128,17 +127,15 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
-test('no spare until the GUI reports the setting; then one, and the answer names the engine', async () => {
+test('no spare until the GUI reports the setting; then one', async () => {
   const s = service()
   expect(starts).toEqual([])
-  expect(await s.setSpareEngine(true)).toEqual({ engineMode: 'jvm' })
+  await s.setSpareEngine(true)
   expect(starts).toHaveLength(1)
-  expect(starts[0]!.launch.mode.mode).toBe('jvm')
   expect(starts[0]!.extraEnv).toEqual([['ENSO_SECRETS_KEY', 'key-a']])
 })
 
-test('no spare with the native engine, the setting off, ENSO_SPARE_ENGINE=0, the engine ydoc host, or profiling', async () => {
-  expect(await service({ option: 'native' }).setSpareEngine(true)).toEqual({ engineMode: 'native' })
+test('no spare with the setting off, ENSO_SPARE_ENGINE=0, the engine ydoc host, or profiling', async () => {
   await service().setSpareEngine(false)
   vi.stubEnv('ENSO_SPARE_ENGINE', '0')
   await service().setSpareEngine(true)
@@ -146,10 +143,9 @@ test('no spare with the native engine, the setting off, ENSO_SPARE_ENGINE=0, the
   vi.stubEnv('ENSO_YDOC_HOST', 'engine')
   await service().setSpareEngine(true)
   vi.stubEnv('ENSO_YDOC_HOST', '')
-  await service({ option: 'jvm' }, ['--profiling-path', 'profiling.npss']).setSpareEngine(true)
+  await service({}, ['--profiling-path', 'profiling.npss']).setSpareEngine(true)
   expect(starts).toEqual([])
   expect(stops).toEqual([
-    'the engine is native',
     'the setting is off',
     'ENSO_SPARE_ENGINE=0',
     'ENSO_YDOC_HOST=engine',
@@ -175,17 +171,13 @@ test('a changed input gives a new key, so the spare is replaced', async () => {
   expect(starts[1]!.key).not.toBe(starts[0]!.key)
 })
 
-test("a JVM open carries the spare's key; a native one stops the spare", async () => {
+test("an open carries the spare's key", async () => {
   const s = service()
   await s.setSpareEngine(true)
   await s.openProject(UUID('id-1'), Path(root))
   expect(opens[0]!.spareKey).toBe(starts[0]!.key)
   closing.resolve()
   await s.closeProject(UUID('id-1'), Path(root))
-  const native = service({ option: 'native' })
-  await native.openProject(UUID('id-1'), Path(root))
-  expect(opens[1]!.spareKey).toBeUndefined()
-  expect(stops).toContain('a project with the native engine is opening')
 })
 
 test("an open's own engine logging leaves its key alone; a setting changed since the spare does not", async () => {
@@ -204,7 +196,7 @@ test("an open's own engine logging leaves its key alone; a setting changed since
 })
 
 test('after a close the next spare waits for the old engine or the delay, whichever is first', async () => {
-  const s = service({ option: 'jvm', spareAfterCloseMs: 100 })
+  const s = service({ spareAfterCloseMs: 100 })
   await s.setSpareEngine(true)
   await s.openProject(UUID('id-1'), Path(root))
   const close = s.closeProject(UUID('id-1'), Path(root))
@@ -214,7 +206,7 @@ test('after a close the next spare waits for the old engine or the delay, whiche
   closing.resolve()
   await close
 
-  const slow = service({ option: 'jvm', spareAfterCloseMs: 60_000 })
+  const slow = service({ spareAfterCloseMs: 60_000 })
   closing = createDeferred<void>()
   await slow.setSpareEngine(true)
   await slow.openProject(UUID('id-1'), Path(root))
@@ -238,7 +230,7 @@ test('no spare while the AOT cache trains; the refresh after it starts one', asy
   let training = true
   // A first launch whose cache is training.
   const jvmAot = fakeAot({ isTraining: () => training })
-  const s = service({ option: 'jvm', jvmAot })
+  const s = service({ jvmAot })
   await s.setSpareEngine(true)
   expect(starts).toEqual([])
   expect(stops).toEqual(['the AOT cache is training'])
@@ -251,7 +243,6 @@ test('no spare while the AOT cache trains; the refresh after it starts one', asy
 test('a refresh that runs while an open has not reached the runner starts no spare', async () => {
   let duringOpen: Promise<void> | undefined
   const s = service({
-    option: 'jvm',
     jvmAot: fakeAot({ openStarted: () => (duringOpen = s.refreshSpare()) }),
   })
   await s.setSpareEngine(true)
@@ -264,7 +255,7 @@ test('a refresh that runs while an open has not reached the runner starts no spa
 
 test('an open that starts during a refresh, after its checks, still means no spare', async () => {
   const options = heldOptions()
-  const s = service({ option: 'jvm', jvmAot: fakeAot({ jvmOptions: options.jvmOptions }) })
+  const s = service({ jvmAot: fakeAot({ jvmOptions: options.jvmOptions }) })
   const refresh = s.setSpareEngine(true)
   // The refresh is past its settings checks, waiting for the AOT options.
   await options.reached.promise
@@ -305,7 +296,7 @@ test('a failed open is followed by a spare', async () => {
 
 test('a project reopened during the gate after a close: no spare, and a failed spare is not retried', async () => {
   // The gate's delay is longer than the test: it ends when the old engine has stopped.
-  const s = service({ option: 'jvm', spareAfterCloseMs: 60_000 })
+  const s = service({ spareAfterCloseMs: 60_000 })
   await s.setSpareEngine(true)
   await s.openProject(UUID('id-1'), Path(root))
   const close = s.closeProject(UUID('id-1'), Path(root))
@@ -319,7 +310,7 @@ test('a project reopened during the gate after a close: no spare, and a failed s
 
 test('a quit while a refresh is in flight or queued starts nothing', async () => {
   const options = heldOptions()
-  const s = service({ option: 'jvm', jvmAot: fakeAot({ jvmOptions: options.jvmOptions }) })
+  const s = service({ jvmAot: fakeAot({ jvmOptions: options.jvmOptions }) })
   const inFlight = s.setSpareEngine(true)
   // In flight: past its settings checks, waiting for the AOT options.
   await options.reached.promise
@@ -333,7 +324,7 @@ test('a quit while a refresh is in flight or queued starts nothing', async () =>
 
 test('a close while the AOT cache is still wanted starts no spare; the refresh after training does', async () => {
   let training = true
-  const s = service({ option: 'jvm', jvmAot: fakeAot({ isTraining: () => training }) })
+  const s = service({ jvmAot: fakeAot({ isTraining: () => training }) })
   await s.setSpareEngine(true)
   await s.openProject(UUID('id-1'), Path(root))
   closing.resolve()
@@ -351,7 +342,6 @@ test('a training that begins while a refresh waits for the AOT options means no 
   const options = heldOptions()
   let training = false
   const s = service({
-    option: 'jvm',
     jvmAot: fakeAot({ isTraining: () => training, jvmOptions: options.jvmOptions }),
   })
   const refresh = s.setSpareEngine(true)
@@ -376,7 +366,7 @@ test('a quit with a wait stops the spare, then waits for it with that bound', as
 
 test('an open tells the runner why no spare runs, and nothing when spares are off', async () => {
   let training = true
-  const s = service({ option: 'jvm', jvmAot: fakeAot({ isTraining: () => training }) })
+  const s = service({ jvmAot: fakeAot({ isTraining: () => training }) })
   await s.setSpareEngine(false)
   await s.openProject(UUID('id-1'), Path(root))
   expect(opens[0]?.spareIdleReason).toBeNull()

@@ -509,10 +509,10 @@ export async function handleProjectServiceRequest(
             throw new Error('engine/setSpare needs a boolean `enabled`')
           }
           const projectService = await getProjectService()
-          return projectService.setSpareEngine(body.enabled)
+          await projectService.setSpareEngine(body.enabled)
         })
-        .then((result) => {
-          response.writeHead(HTTP_STATUS_OK, headers).end(toJSONRPCResult(result))
+        .then(() => {
+          response.writeHead(HTTP_STATUS_OK, headers).end(toJSONRPCResult(null))
         })
         .catch((err) => {
           console.error(err)

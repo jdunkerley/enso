@@ -206,6 +206,16 @@ jobs:
           rm built-distribution.tar
           find built-distribution -path '*/bin/enso' -print -quit | grep .
 
+      # The shim starts every engine as `<runtime>/bin/java` (C1 of the native-image removal), and
+      # the distribution above has no bundled runtime, so the `java` on the PATH runs it: it must
+      # be the pinned GraalVM (`jvm.options` needs JVMCI), not the runner's own JDK.
+      - name: ☕ Set up GraalVM for the engine
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: engine
+          cache-save: "false"
+
       - name: 🧪 Unit Tests
         id: unit-tests
         continue-on-error: true

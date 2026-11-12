@@ -12,8 +12,7 @@ import * as path from 'node:path'
 import * as portfinder from 'portfinder'
 import { killTree } from '../childProcess/killTree.js'
 import { CommandError, runCommand as runChildCommand } from '../childProcess/runCommand.js'
-import type { ResolvedEngineMode } from './engineMode.js'
-import { jvmOptionsValue } from './jvmOptions.js'
+import { javaEngineCommand, type EngineCommand } from './javaLaunch.js'
 import {
   LINE_VARIABLES,
   SPARE_WARM_UP_LIMIT_MS,
@@ -32,7 +31,7 @@ const HEALTHCHECK_FAILURES_TO_RESTART = 3
 const LOAD_HEALTHCHECK_INTERVAL = 250
 /* Note [Start-up Health Polling]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * A native engine answers `/_health` some 200 ms after it is spawned, and the open waits for that
+ * A native engine (measured before it was removed) answered `/_health` some 200 ms after it was spawned, and the open waits for that
  * answer. Polling every 250 ms (the first check 250 ms after the spawn) added up to 250 ms to every
  * open, so the first second polls every 25 ms; a slow start (the JVM, a cold machine) then falls
  * back to 250 ms, so the checks never pile up.
@@ -98,7 +97,7 @@ const YDOC_POLL_INTERVAL = 10
 const YDOC_CONNECT_TIMEOUT_MS = 250
 
 /** The default for how long an open waits for the engine's ydoc port to accept connections. */
-export const DEFAULT_YDOC_WAIT_MS = ENGINE_TIMEOUTS.native.ydocWaitMs
+export const DEFAULT_YDOC_WAIT_MS = ENGINE_TIMEOUTS.ydocWaitMs
 
 /** Whether a TCP connection to `socket` is accepted right now. */
 function acceptsConnections(socket: Socket): Promise<boolean> {
@@ -252,12 +251,11 @@ export interface ShutdownHookRegistry {
 export type ShutdownHookType = keyof ShutdownHookRegistry
 
 /**
- * How one engine is launched: its resolved mode (`--jvm` for a JVM engine), the timeouts of that
- * mode's column, and extra JVM options (`ENSO_JVM_OPTIONS`, one per line). Without it a launch is
- * what it was before engine modes: no `--jvm`, the runner's own timeouts.
+ * How one engine is launched: its timeouts and extra JVM options (the AOT cache's, which go to the
+ * command line after `ENSO_JVM_OPTIONS`; `javaLaunch.ts`). Without it a launch gets the runner's
+ * own timeouts.
  */
 export interface EngineLaunch {
-  readonly mode: ResolvedEngineMode
   readonly timeouts: EngineTimeouts
   readonly jvmOptions?: readonly string[]
   /**
@@ -293,30 +291,13 @@ function spareSpawnEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   )
 }
 
-/** `--jvm` for a JVM launch, nothing otherwise. */
-function modeArgs(launch: EngineLaunch | undefined): readonly string[] {
-  return launch?.mode.mode === 'jvm' ? ['--jvm'] : []
-}
-
-/** `ENSO_JVM_OPTIONS` with `launch`'s options appended one per line (ruling 2 of the plan). */
-function jvmOptionsEnv(launch: EngineLaunch | undefined): Record<string, string> {
-  const options = launch?.jvmOptions ?? []
-  if (options.length === 0) return {}
-  return { ENSO_JVM_OPTIONS: jvmOptionsValue(process.env.ENSO_JVM_OPTIONS, options) }
-}
-
 const DEFAULT_JSONRPC_PORT = 30616
 /** How long an engine has to pass its first health check before it is killed. */
-export const LANGUAGE_SERVER_STARTUP_TIMEOUT_MS = ENGINE_TIMEOUTS.native.startupMs
+export const LANGUAGE_SERVER_STARTUP_TIMEOUT_MS = ENGINE_TIMEOUTS.startupMs
 
-/**
- * How long a native engine has to exit after it was asked to, before it is killed: 10 s, or
- * `ENSO_ENGINE_TERMINATE_TIMEOUT_MS`. The open-time harness's JDK AOT training launch needs longer:
- * the recording JVM writes its training data as it exits, which took more than 10 s on the
- * Windows runner.
- */
+/** How long an engine has to exit after it was asked to, before it is killed (`timeouts.ts`). */
 function terminateTimeoutMs(): number {
-  return engineTimeouts('native').terminateMs
+  return engineTimeouts().terminateMs
 }
 
 /**
@@ -536,8 +517,8 @@ class OpenedProject {
         () => {
           if (resolved || passedHealth || this.closed) return
           resolved = true
-          // Kill the *specific* child this routine was waiting on, with what it started (the engine
-          // under a `.bat` launcher's `cmd.exe`). `onUnexpectedExit` decides whether to respawn:
+          // Kill the *specific* child this routine was waiting on, with what it started.
+          // `onUnexpectedExit` decides whether to respawn:
           // not while the project is still opening, by default after.
           if (handle != null) killTree(handle.child, 'Language Server')
           deferred.reject(new Error('Language server startup timeout'))
@@ -683,28 +664,34 @@ export class EnsoRunner implements Runner {
    * ydoc server, as the fakes of the tests, would only delay its open). `ydocHost` serves the ydoc
    * server outside the engine when `ENSO_YDOC_HOST` is `node` (the default); without one, the engine
    * serves it, as under `ENSO_YDOC_HOST=engine`. `startupClock` replaces the real clock of every
-   * engine's start-up, for tests.
+   * engine's start-up, and `engineCommand` the command of every engine (given `ensoPath`), for
+   * tests; by default an engine is the bundled `java` (`javaLaunch.ts`).
    */
   constructor(
-    private ensoPath: Path,
+    ensoPath: Path,
     private readonly options: {
       readonly firstPort?: number
       readonly startupTimeoutMs?: number
       readonly ydocWaitMs?: number
       readonly ydocHost?: YdocHost | undefined
       readonly startupClock?: StartupClock
+      readonly engineCommand?: (ensoPath: Path) => EngineCommand
     } = {},
   ) {
     const clock = options.startupClock ?? REAL_STARTUP_CLOCK
     this.clock = clock
+    this.command = (options.engineCommand ?? javaEngineCommand)(ensoPath)
     this.spare = new SpareEngine({ echo: echoToStderr, now: () => clock.now() })
   }
 
-  private resolveCommandAndArgs(args: readonly string[]): [string, readonly string[]] {
-    const [cmd, cmdArgs] =
-      this.ensoPath.endsWith('.bat') ?
-        ['cmd.exe', ['/c', this.ensoPath, ...args]]
-      : [this.ensoPath, args]
+  /** The command of an engine with some arguments, and a launch's JVM options. */
+  private readonly command: EngineCommand
+
+  private resolveCommandAndArgs(
+    args: readonly string[],
+    launch?: EngineLaunch,
+  ): [string, readonly string[]] {
+    const [cmd, cmdArgs] = this.command(args, launch?.jvmOptions)
     const isDevMode = process.env.NODE_ENV === 'development'
     if (isDevMode) {
       console.log('runProcess', cmd, cmdArgs.join(' '))
@@ -715,8 +702,9 @@ export class EnsoRunner implements Runner {
   private async runProcess<T extends childProcess.ChildProcess>(
     args: readonly string[],
     spawnCallback: (cmd: string, cmdArgs: readonly string[]) => T,
+    launch?: EngineLaunch,
   ) {
-    const [cmd, cmdArgs] = this.resolveCommandAndArgs(args)
+    const [cmd, cmdArgs] = this.resolveCommandAndArgs(args, launch)
     return spawnCallback(cmd, cmdArgs)
   }
 
@@ -754,13 +742,12 @@ export class EnsoRunner implements Runner {
    * the launch's environment except the variables of an open's line (`spareSpawnEnv`).
    */
   startSpare(request: SpareRequest): void {
-    const args = [...modeArgs(request.launch), '--standby', ...request.extraArgs]
+    const args = ['--standby', ...request.extraArgs]
     const env = spareSpawnEnv({
       ...process.env,
-      ...jvmOptionsEnv(request.launch),
       ...Object.fromEntries(request.extraEnv),
     })
-    const [command, commandArgs] = this.resolveCommandAndArgs(args)
+    const [command, commandArgs] = this.resolveCommandAndArgs(args, request.launch)
     this.spare.start({ key: request.key, command, args: commandArgs, env })
   }
 
@@ -792,15 +779,17 @@ export class EnsoRunner implements Runner {
     extraEnv?: readonly (readonly [string, string])[],
     launch?: EngineLaunch,
   ): Promise<number> {
-    const args = [...modeArgs(launch), '--run', projectPath]
+    const args = ['--run', projectPath]
     const env = {
       ...process.env,
-      ...jvmOptionsEnv(launch),
       ...(extraEnv ? Object.fromEntries(extraEnv) : {}),
     }
     const cwd = path.dirname(projectPath)
-    const spawnedProcess = await this.runProcess(args, (cmd, cmdArgs) =>
-      childProcess.spawn(cmd, cmdArgs, { env, cwd, stdio: ['inherit', 'inherit', 'inherit'] }),
+    const spawnedProcess = await this.runProcess(
+      args,
+      (cmd, cmdArgs) =>
+        childProcess.spawn(cmd, cmdArgs, { env, cwd, stdio: ['inherit', 'inherit', 'inherit'] }),
+      launch,
     )
     this.activeRuns += 1
     let counted = true
@@ -906,7 +895,6 @@ export class EnsoRunner implements Runner {
             console.error(`Failed to close the ydoc listener of project ${projectPath}:`, error)
           }
         }
-        // A spare already runs in the launch's mode, and refuses a line that names it.
         const serverArgs: readonly string[] = [
           '--server',
           '--root-id',
@@ -921,13 +909,12 @@ export class EnsoRunner implements Runner {
           jsonPort.toString(),
           ...(extraArgs ?? []),
         ]
-        const args: readonly string[] = [...modeArgs(launch), ...serverArgs]
+        const args: readonly string[] = serverArgs
 
         const env = {
           ...process.env,
           ...engineYdocEnv,
           LANGUAGE_SERVER_CHANNEL_TOKEN: token,
-          ...jvmOptionsEnv(launch),
           ...(extraEnv ? Object.fromEntries(extraEnv) : {}),
         }
 
@@ -980,14 +967,17 @@ export class EnsoRunner implements Runner {
                 child.stdin?.write(standbyLine(serverArgs, lineEnv))
                 return Promise.resolve(child)
               }
-              return this.runProcess(args, (cmd, cmdArgs) =>
-                childProcess.spawn(cmd, cmdArgs, {
-                  env,
-                  detached: false,
-                  cwd,
-                  stdio: ['pipe', 'inherit', 'pipe'],
-                  windowsHide: true,
-                }),
+              return this.runProcess(
+                args,
+                (cmd, cmdArgs) =>
+                  childProcess.spawn(cmd, cmdArgs, {
+                    env,
+                    detached: false,
+                    cwd,
+                    stdio: ['pipe', 'inherit', 'pipe'],
+                    windowsHide: true,
+                  }),
+                launch,
               )
             },
             logSink,
@@ -1162,9 +1152,7 @@ export class EnsoRunner implements Runner {
   /** Gets the version of the Enso executable. */
   async version(): Promise<string> {
     return new Promise((resolve, reject) => {
-      const args = ['--version']
-      const cmd = this.ensoPath.endsWith('.bat') ? 'cmd.exe' : this.ensoPath
-      const cmdArgs = this.ensoPath.endsWith('.bat') ? ['/c', this.ensoPath, ...args] : args
+      const [cmd, cmdArgs] = this.resolveCommandAndArgs(['--version'])
       const process = childProcess.spawn(cmd, cmdArgs)
 
       let stdout = ''

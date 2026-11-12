@@ -12,6 +12,7 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { EnsoRunner } from '../ensoRunner.js'
 import { Path } from '../types.js'
+import { fakeLauncherCommand } from './fakeLauncher.js'
 import { STDIN_CLOSED_PORT } from './testPorts.js'
 
 const FAKE_ENSO = `
@@ -67,7 +68,10 @@ afterEach(async () => {
 })
 
 test('closing a project whose engine no longer reads stdin completes without an unhandled error', async () => {
-  const runner = new EnsoRunner(await fakeEnso(root), { firstPort: STDIN_CLOSED_PORT })
+  const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
+    firstPort: STDIN_CLOSED_PORT,
+  })
   const project = Path(path.join(root, 'Project'))
   await runner.openProject(project, 'id')
   await expect.poll(() => exists(`${project}.stdin-closed`), { timeout: 15_000 }).toBe(true)

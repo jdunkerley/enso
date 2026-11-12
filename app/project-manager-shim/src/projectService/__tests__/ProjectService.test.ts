@@ -41,10 +41,6 @@ describe.skipIf(ensoPath == null)('ProjectService', () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'project-service-test-'))
     projectsDirectory = Path(tempDir)
     vi.stubEnv('ENSO_LOG_DIRECTORY', path.join(tempDir, 'log'))
-    // The project lifecycle, not the engine mode, is under test. CI's engine has no bundled runtime,
-    // and the JDK the JVM mode then finds may refuse `jvm.options` (`-XX:-UseJVMCICompiler` needs
-    // GraalVM), so these run the native engine whatever the default.
-    vi.stubEnv('ENSO_ENGINE_MODE', 'native')
   })
 
   afterEach(async () => {

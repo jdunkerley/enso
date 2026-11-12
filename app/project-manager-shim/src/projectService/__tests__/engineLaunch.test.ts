@@ -1,6 +1,6 @@
 /**
- * @file An open and a run take their engine launch: `--jvm` for a JVM engine, `ENSO_JVM_OPTIONS`
- * for extra options, and the launch's timeouts in place of the runner's. The engine is a fake
+ * @file An open and a run take their engine launch: its JVM options reach the command (and
+ * `--jvm` is never passed), and its timeouts replace the runner's. The engine is a fake
  * `enso`, a Node script that records its arguments, answers the health check after `DELAY_MS` and
  * exits on a stdin newline after `EXIT_DELAY_MS`.
  */
@@ -11,6 +11,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { EnsoRunner, type EngineLaunch } from '../ensoRunner.js'
 import { ENGINE_TIMEOUTS, type EngineTimeouts } from '../timeouts.js'
 import { Path } from '../types.js'
+import { fakeLauncherCommand } from './fakeLauncher.js'
 import { ENGINE_MODE_PORT } from './testPorts.js'
 
 const FAKE_ENSO = `
@@ -51,8 +52,7 @@ const recorded = async (project: string) =>
   }
 
 const jvm = (timeouts: Partial<EngineTimeouts> = {}): EngineLaunch => ({
-  mode: { mode: 'jvm', source: 'environment' },
-  timeouts: { ...ENGINE_TIMEOUTS.jvm, ydocWaitMs: 0, ...timeouts },
+  timeouts: { ...ENGINE_TIMEOUTS, ydocWaitMs: 0, ...timeouts },
 })
 
 beforeEach(async () => {
@@ -64,46 +64,49 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
-test('a JVM launch passes --jvm first, and native passes nothing', async () => {
-  const runner = new EnsoRunner(await fakeEnso(root), { firstPort: ENGINE_MODE_PORT })
+test('an open and a run pass the engine arguments only, never --jvm', async () => {
+  const runner = new EnsoRunner(await fakeEnso(root), {
+    firstPort: ENGINE_MODE_PORT,
+    engineCommand: fakeLauncherCommand,
+  })
   const a = path.join(root, 'A')
   await runner.openProject(Path(a), 'id-a', ['--log-level', 'info'], undefined, undefined, jvm())
-  expect((await recorded(a)).args.slice(0, 2)).toEqual(['--jvm', '--server'])
+  expect((await recorded(a)).args.slice(0, 2)).toEqual(['--server', '--root-id'])
+  expect((await recorded(a)).args).not.toContain('--jvm')
   await runner.closeProject(Path(a))
-  const b = path.join(root, 'B')
-  await runner.openProject(Path(b), 'id-b', undefined, undefined, undefined, {
-    mode: { mode: 'native', source: 'default' },
-    timeouts: { ...ENGINE_TIMEOUTS.native, ydocWaitMs: 0 },
-  })
-  expect((await recorded(b)).args).not.toContain('--jvm')
-  await runner.closeProject(Path(b))
-})
-
-test('--run takes the mode too', async () => {
-  const runner = new EnsoRunner(await fakeEnso(root), { firstPort: ENGINE_MODE_PORT })
   const p = path.join(root, 'R')
   expect(await runner.runProject(Path(p), undefined, jvm())).toBe(0)
-  expect((await recorded(p)).args.slice(0, 2)).toEqual(['--jvm', '--run'])
+  expect((await recorded(p)).args.slice(0, 2)).toEqual(['--run', p])
 })
 
-test('the JVM options reach ENSO_JVM_OPTIONS one per line, after an inherited value', async () => {
-  vi.stubEnv('ENSO_JVM_OPTIONS', '-Dinherited=1')
-  const runner = new EnsoRunner(await fakeEnso(root), { firstPort: ENGINE_MODE_PORT })
+test("the launch's JVM options reach the command of an open, a run and a spare", async () => {
+  const seen: (readonly string[] | undefined)[] = []
+  const runner = new EnsoRunner(await fakeEnso(root), {
+    firstPort: ENGINE_MODE_PORT,
+    engineCommand: (ensoPath) => {
+      const command = fakeLauncherCommand(ensoPath)
+      return (args, jvmOptions) => {
+        seen.push(jvmOptions)
+        return command(args, jvmOptions)
+      }
+    },
+  })
+  const options = ['-XX:AOTCache=C:\\Users\\John Smith\\enso.aot', '-Dx=y']
   const p = path.join(root, 'O')
   await runner.openProject(Path(p), 'id-o', undefined, undefined, undefined, {
     ...jvm(),
-    jvmOptions: ['-XX:AOTCache=C:\\Users\\John Smith\\enso.aot', '-Dx=y'],
+    jvmOptions: options,
   })
-  expect((await recorded(p)).jvmOptions).toBe(
-    '-Dinherited=1\n-XX:AOTCache=C:\\Users\\John Smith\\enso.aot\n-Dx=y',
-  )
   await runner.closeProject(Path(p))
+  await runner.runProject(Path(path.join(root, 'R')), undefined, { ...jvm(), jvmOptions: options })
+  expect(seen).toEqual([options, options])
 })
 
 test("a launch's startup timeout replaces the runner's", async () => {
   // The runner's own 1 s would kill an engine that passes its health check after 2 s.
   vi.stubEnv('DELAY_MS', '2000')
   const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: ENGINE_MODE_PORT,
     startupTimeoutMs: 1000,
   })
@@ -121,9 +124,12 @@ test("a launch's startup timeout replaces the runner's", async () => {
   await runner.closeProject(Path(p))
 })
 
-test("a launch's terminate timeout replaces the native default", async () => {
+test("a launch's terminate timeout replaces the default", async () => {
   vi.stubEnv('EXIT_DELAY_MS', '6000')
-  const runner = new EnsoRunner(await fakeEnso(root), { firstPort: ENGINE_MODE_PORT })
+  const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
+    firstPort: ENGINE_MODE_PORT,
+  })
   const p = path.join(root, 'T')
   await runner.openProject(
     Path(p),
