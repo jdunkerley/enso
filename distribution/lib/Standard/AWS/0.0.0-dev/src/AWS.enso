@@ -14,7 +14,6 @@ import project.AWS_Region.AWS_Region
 import project.Errors.Invalid_AWS_URI
 
 polyglot java import org.enso.aws.ClientBuilder
-polyglot java import org.enso.base.enso_cloud.EnsoSecretHelper
 polyglot java import java.net.http.HttpClient
 
 ## Methods for interacting with AWS services.
@@ -50,7 +49,7 @@ type AWS
     signed_fetch (uri:URI=(Missing_Argument.throw "uri")) (method:HTTP_Method=..Get) (headers:(Vector (Header | Pair Text Text))=[]) (format = Auto_Detect) credentials:AWS_Credential=..Default (region_service:AWS_Region_Service=(AWS.resolve_region_and_service uri)) =
         if is_fetch_method method . not then Error.throw (Illegal_Argument.Error ("Unsupported method " + method.to_display_text))
         request = Request.new method uri (Header.unify_vector headers) Request_Body.Empty
-        http = with_hash_and_client HTTP.new hash_method=ClientBuilder.getSHA256Function make_client=(_make_client credentials region_service) enso_secret_helper=EnsoSecretHelper
+        http = with_hash_and_client HTTP.new hash_method=ClientBuilder.getSHA256Function make_client=(_make_client credentials region_service)
         raw_response = http.request request write_operation=False
         raw_response.decode format=format if_unsupported=raw_response.with_materialized_body
 
@@ -121,7 +120,7 @@ type AWS
     signed_post (uri:URI=(Missing_Argument.throw "uri")) (body:Request_Body=..Empty) (method:HTTP_Method=..Post) (headers:(Vector (Header | Pair Text Text))=[]) (response_format = Auto_Detect) credentials:AWS_Credential=..Default (region_service:AWS_Region_Service=(AWS.resolve_region_and_service uri)) (write_operation:Boolean=True) =
         if is_post_method method . not then Error.throw (Illegal_Argument.Error ("Unsupported method " + method.to_display_text))
         request = Request.new method uri (Header.unify_vector headers) body
-        http = with_hash_and_client HTTP.new hash_method=ClientBuilder.getSHA256Function make_client=(_make_client credentials region_service) enso_secret_helper=EnsoSecretHelper
+        http = with_hash_and_client HTTP.new hash_method=ClientBuilder.getSHA256Function make_client=(_make_client credentials region_service)
         raw_response = http.request request write_operation=write_operation
         raw_response.decode format=response_format if_unsupported=raw_response.with_materialized_body
 

@@ -36,7 +36,7 @@
     - Not_Found resolved_path:Standard.Base.Any.Any
     - Wrong_Key
     - to_display_text self -> Standard.Base.Any.Any
-- as_credential_reference secret:Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret credential_reference:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- as_credential_reference secret:Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret -> Standard.Base.Any.Any
 - handle_local_secret_panics ~action:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - local_secret_error e:Standard.Base.Any.Any name:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)= -> Standard.Base.Any.Any
 - secret_asset_uri secret:Standard.Base.Any.Any -> Standard.Base.Any.Any

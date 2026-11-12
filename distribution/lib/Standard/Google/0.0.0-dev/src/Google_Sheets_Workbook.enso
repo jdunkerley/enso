@@ -18,7 +18,6 @@ from Standard.Table.Internal.Table_Helpers import duplicate_rows
 
 import Standard.Base.Internal.Telemetry
 
-polyglot java import org.enso.base.enso_cloud.ExternalLibraryCredentialHelper.CredentialReference
 polyglot java import org.enso.google.GoogleSheetsForEnso
 polyglot java import org.enso.google.GoogleSheetsHeaders.HeaderBehavior
 polyglot java import org.enso.google.WrappedGoogleCredentials
@@ -243,7 +242,7 @@ type Google_API_Error
 private _wrap_credentials credential:(File|Enso_Secret|Nothing)=Nothing =
     case credential of
         secret : Enso_Secret ->
-            WrappedGoogleCredentials.fromCredentialReference (as_credential_reference secret CredentialReference)
+            WrappedGoogleCredentials.fromCredentialReference (as_credential_reference secret)
         secret_file : File ->
             WrappedGoogleCredentials.fromFile secret_file.path
         _ -> Nothing
