@@ -66,7 +66,9 @@ let engine: JavaEngine
 test.beforeAll(() => {
   const bundle = engineBundleRoot()
   if (bundle == null) throw new Error('The packaged IDE has no engine bundle.')
-  scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'enso-non-ansi-'))
+  // The long form: the runner's `TEMP` is an 8.3 short path (`RUNNER~1`), and the engine reports
+  // the long one.
+  scratch = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'enso-non-ansi-')))
   root = path.join(scratch, NON_ANSI)
   fs.mkdirSync(root)
   const link = path.join(root, 'enso')
