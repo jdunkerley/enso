@@ -40,12 +40,17 @@ object SmallJDK {
   )
 
   /** Builds a small JDK with `jlink` appropriate for running
-    * Enso in `--jvm` mode.
+    * Enso in `--jvm` mode. On Windows its `java.exe` and `javaw.exe` get the
+    * UTF-8 code page manifest (Note [The Bundled java.exe Uses UTF-8] in
+    * `JavaUtf8Manifest`), so every Windows build of the engine bundle has it.
     * @param targetJdkDirectory Target directory. If not empty,
     *                          will be deleted.
+    * @param buildRoot the build's root directory (the manifest is under `project/`)
     */
   def buildSmallJDKForRelease(
-    targetJdkDirectory: File
+    targetJdkDirectory: File,
+    buildRoot: File,
+    log: sbt.Logger
   ): Unit = {
     if (targetJdkDirectory.exists()) {
       IO.delete(targetJdkDirectory)
@@ -73,6 +78,14 @@ object SmallJDK {
       "Directory of small JDK " + targetJdkDirectory +
       " was not created."
     )
+    if (Platform.isWindows) {
+      JavaUtf8Manifest.embed(
+        targetJdkDirectory,
+        JavaUtf8Manifest.manifest(buildRoot),
+        log
+      )
+      JavaUtf8Manifest.checkActive(targetJdkDirectory, log)
+    }
   }
 
   /** Fails the build when `jdkDirectory`'s `java` cannot map its CDS archive

@@ -405,11 +405,30 @@ jobs:
         env:
           DEBUG: "pw:browser log:"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Note [The Package Tests Run From A Path Outside The ANSI Code Page]
+      # ===================================================================
+      # On Windows the unpacked IDE is moved under `$RUNNER_TEMP\Łukasz 漢` and reached through a
+      # junction at its old place, so every package test opens its projects with an engine whose
+      # real path (the shim resolves it, `enginePathsSync`) is outside the runner's ANSI code page,
+      # as for a user with such a name (#693). The runner's user name is ASCII. `nonAnsiPath.spec.ts`
+      # checks the move took (`ENSO_TEST_NON_ANSI_INSTALL`) and runs the engine through a junction
+      # of that name too. The name is built from code points so the script's encoding cannot matter.
+      - if: matrix.os == 'windows'
+        name: Move the unpacked IDE under a path outside the ANSI code page
+        shell: pwsh
+        run: |
+          $parent = Join-Path $env:RUNNER_TEMP ("$([char]0x141)ukasz $([char]0x6F22)")
+          New-Item -ItemType Directory -Force $parent | Out-Null
+          $target = Join-Path $parent 'win-unpacked'
+          Move-Item dist/ide/win-unpacked $target
+          New-Item -ItemType Junction -Path dist/ide/win-unpacked -Target $target | Out-Null
+          Write-Host "The unpacked IDE is in $target."
       - if: matrix.os == 'windows'
         name: Run Package Tests
         run: corepack pnpm -r --filter enso ide-integration-test
         env:
           DEBUG: "pw:browser log:"
+          ENSO_TEST_NON_ANSI_INSTALL: "1"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Note [Open Time In CI]
       # ======================

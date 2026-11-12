@@ -45,7 +45,14 @@ line (`Arguments.getCurrent().alterArgs`, `WindowsArguments` in
 `jvm.options` enables native access for `org.enso.os.environment`). Only the
 arguments after the main class can be recovered: a JVM option (`--module-path`,
 `-D…`, `-XX:AOTCache=…`) with such a character is already mangled when the JVM
-starts (Note [Arguments Outside The ANSI Code Page] in `WindowsArguments`).
+starts (Note [Arguments Outside The ANSI Code Page] in `WindowsArguments`). The
+IDE's bundled runtime fixes that: its `java.exe` and `javaw.exe` carry a
+manifest that makes UTF-8 their ANSI code page (Windows 10 1903+; embedded at
+build time, Note [The Bundled java.exe Uses UTF-8] in
+`project/JavaUtf8Manifest.scala`, #693), so the shim and `enso.bat` (which
+prefers the bundle's runtime) pass every option intact, `sun.jnu.encoding` and
+`native.encoding` are `UTF-8`, and output to a pipe is UTF-8. A JDK from
+`JAVA_HOME` or the PATH has no such manifest and keeps the limit.
 
 ## `--jvm`
 

@@ -47,7 +47,14 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   run passes `--generate-cds-archive`, so the image carries
   `lib/server/classes*.jsa` (`bin/server` on Windows; class-data sharing for the
   jlinked modules); `checkSharing` runs `java -Xshare:on -version` on it and
-  fails `buildEngineBundle` when the archive does not map.
+  fails `buildEngineBundle` when the archive does not map. On Windows it embeds
+  `java-utf8.manifest` in the image's `java.exe` and `javaw.exe` first
+  (`JavaUtf8Manifest.scala`, Note [The Bundled java.exe Uses UTF-8], #693): a
+  UTF-8 `activeCodePage`, merged into their own manifest with `mt.exe`, so the
+  JVM's options keep characters outside the ANSI code page. The build fails when
+  `mt.exe` is not on the PATH (a Developer Prompt; CI's `setup-msvc`), the merge
+  loses an element, or the result does not run with `sun.jnu.encoding = UTF-8`.
+  It drops the launchers' Oracle signature.
 - `Dependencies.scala` — Central dependency version catalog.
 - `plugins.sbt` — SBT plugin versions. Pinned to known-good combinations; don't
   bump casually.

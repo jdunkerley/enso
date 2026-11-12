@@ -297,7 +297,11 @@ buildEngineBundle := Def
       val root = engineDistributionRoot.value
       EngineDistributionChecks.afterBuild(root, ensoVersion, log)
       val smallJdk = baseDirectory.value / "target" / "small-jdk"
-      SmallJDK.buildSmallJDKForRelease(smallJdk)
+      SmallJDK.buildSmallJDKForRelease(
+        smallJdk,
+        (ThisBuild / baseDirectory).value,
+        log
+      )
       SmallJDK.checkSharing(smallJdk, log)
       val (os, arch) = packageBuilder.value.localPlatform
       EngineBundle.create(
@@ -3722,7 +3726,11 @@ lazy val `engine-runner` = project
   */
 ThisBuild / commands += Command.single("buildSmallJdkForRelease") {
   (state, targetDir) =>
-    SmallJDK.buildSmallJDKForRelease(new File(targetDir))
+    SmallJDK.buildSmallJDKForRelease(
+      new File(targetDir),
+      state.baseDir,
+      state.log
+    )
     state.log.info(s"Small JDK built in: $targetDir")
     state
 }
