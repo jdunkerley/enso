@@ -23,7 +23,7 @@ test('one holder at a time; a dead holder is taken over', async () => {
     )
     await takenOver!()
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -35,7 +35,7 @@ test('an unreadable lock is taken over', async () => {
     expect(release).toBeDefined()
     await release!()
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -52,7 +52,7 @@ test('a lock not touched for ten minutes is stale, even when its pid is alive (p
     expect(release).toBeDefined()
     await release!()
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -65,7 +65,7 @@ test('two takers of a dead lock: exactly one gets it', async () => {
     expect(results.filter((r) => r != null)).toHaveLength(1)
     for (const release of results) await release?.()
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -101,7 +101,7 @@ test('a taker that finds a takeover under way gives up, and the lock is never mi
     await first!()
     expect(await fs.readdir(root)).toEqual([])
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -115,7 +115,7 @@ test('a takeover file left by a dead taker does not block takeovers (#603)', asy
     expect((await fs.readdir(root)).sort()).toEqual(['train.lock'])
     await release!()
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -130,7 +130,7 @@ test('a live takeover file, recently touched, makes a taker give up (#603)', asy
     expect(await fs.readFile(path.join(root, 'train.lock'), 'utf8')).toBe('999999 dead-token')
     expect(await fs.readFile(takeover, 'utf8')).toBe(`${process.pid} another-taker`)
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -157,7 +157,7 @@ test("a release while its stale lock is being taken over leaves the taker's lock
     await second!()
     expect(await fs.readdir(root)).toEqual([])
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -178,7 +178,7 @@ test("a holder whose lock was taken over does not release the new holder's lock"
     await second!()
     expect(await fs.readdir(root)).toEqual([])
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -197,7 +197,7 @@ test('a takeover deletes locks moved aside long ago, and keeps recent ones', asy
     expect((await fs.readdir(root)).sort()).toEqual(['train.lock', 'train.lock.stale-2-2'])
     await release!()
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -211,7 +211,7 @@ test('a takeover file still being written is held, not stale (review of #603, M1
     expect(await acquireTrainingLock(root)).toBeUndefined()
     expect(await fs.readFile(takeover, 'utf8')).toBe('')
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -234,7 +234,7 @@ test('a file is linked into place complete, and created anyway where links are r
     expect(await fs.readdir(root)).toEqual(['train.lock'])
     await fallback!()
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -255,7 +255,7 @@ test('a takeover file older than 30 s is stale even when its pid is alive (revie
     expect(await fs.readdir(root)).toEqual(['train.lock'])
     await release!()
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -271,7 +271,7 @@ test('a release that cannot get the takeover file gives up and leaves its lock (
     // Not deleted without the takeover file: that would be the check-then-act of #603.
     expect(await fs.readFile(file, 'utf8')).toBe(ours)
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -293,7 +293,7 @@ test('a heartbeat skips while the takeover file is held, and touches the lock af
     )
     await release!()
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -317,7 +317,7 @@ test("no takeover lands between a release's token check and its delete (#603 ite
     expect(taker).toBeUndefined()
     expect(await fs.readdir(root)).toEqual([])
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -343,7 +343,7 @@ test('a lock and a takeover file are linked into place, never created in place',
     expect(linked.map((entry) => entry.target)).toEqual(['train.lock', 'train.lock.takeover'])
     expect(linked.every((entry) => entry.whole && entry.absent)).toBe(true)
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -370,7 +370,7 @@ test('where links are refused, an empty takeover file replaced while it was judg
     expect(result).toBeUndefined()
     expect(await fs.readFile(takeover, 'utf8')).toBe('')
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })
 
@@ -390,6 +390,6 @@ test("a takeover deletes only the lock's own old files, not other files with .ne
     expect((await fs.readdir(root)).sort()).toEqual(['cache.new-1-x', 'train.lock'])
     await release!()
   } finally {
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   }
 })

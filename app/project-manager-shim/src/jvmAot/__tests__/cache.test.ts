@@ -408,7 +408,7 @@ test('isTraining is false with a cache, after a failed training, and after a qui
   await again.start()
   expect(again.isTraining()).toBe(false)
 
-  await fs.rm(path.join(root), { recursive: true, force: true })
+  await fs.rm(path.join(root), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   const failing = new FakeTrainer()
   const failed = cache(failing)
   await failed.start()
@@ -417,7 +417,7 @@ test('isTraining is false with a cache, after a failed training, and after a qui
 
   const quitting = new FakeTrainer()
   const quit = cache(quitting)
-  await fs.rm(path.join(root), { recursive: true, force: true })
+  await fs.rm(path.join(root), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   await quit.start()
   expect(quit.isTraining()).toBe(true)
   await quit.dispose()
@@ -476,7 +476,7 @@ test('a failed training is announced too; one an open holds back is not', async 
   failing.runs[0]!.fail()
   await vi.waitFor(() => expect(failed).toHaveBeenCalledExactlyOnceWith('failed'))
 
-  await fs.rm(root, { recursive: true, force: true })
+  await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   const held = new FakeTrainer()
   const ended = vi.fn()
   const second = cache(held, { onTrainingEnded: ended, startDelayMs: 20 })
