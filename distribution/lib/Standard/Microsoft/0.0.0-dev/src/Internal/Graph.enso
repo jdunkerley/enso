@@ -4,7 +4,6 @@ from Standard.Base import all
 import Standard.Base.Network.HTTP.Request_Body.Request_Body
 
 polyglot java import org.enso.base.enso_cloud.ExternalLibraryCredentialHelper.AccessToken
-polyglot java import org.enso.base.enso_cloud.ExternalLibraryCredentialHelper.CredentialReference
 polyglot java import org.enso.microsoft.ms365.MS365Service
 
 type Graph

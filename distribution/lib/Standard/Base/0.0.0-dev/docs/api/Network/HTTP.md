@@ -19,4 +19,4 @@
 - _resolve_headers req:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - is_fetch_method method:Standard.Base.Network.HTTP.HTTP_Method.HTTP_Method -> Standard.Base.Data.Boolean.Boolean
 - is_post_method method:Standard.Base.Network.HTTP.HTTP_Method.HTTP_Method -> Standard.Base.Data.Boolean.Boolean
-- with_hash_and_client http:Standard.Base.Any.Any hash_method:Standard.Base.Any.Any make_client:Standard.Base.Any.Any enso_secret_helper:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+- with_hash_and_client http:Standard.Base.Any.Any hash_method:Standard.Base.Any.Any make_client:Standard.Base.Any.Any -> Standard.Base.Any.Any
