@@ -23,7 +23,6 @@ class RecordingCache extends JvmAotCache {
       rootDirectory: root,
       appVersion: '1',
       ensoExecutable: 'enso',
-      isJvmDefault: () => true,
     })
   }
   override openStarted(): void {
@@ -65,9 +64,8 @@ function fakeRunner(): Runner {
   }
 }
 
-function service(environment: string): ProjectService {
+function service(): ProjectService {
   return new ProjectService(fakeRunner(), [], console, undefined, undefined, undefined, {
-    environment,
     jvmAot: new RecordingCache(),
   })
 }
@@ -86,39 +84,30 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
-test('a JVM open stops the training, gets the cache options, then checks the use log', async () => {
-  await service('jvm').openProject(UUID('id-1'), Path(root))
+test('an open stops the training, gets the cache options, then checks the use log', async () => {
+  await service().openProject(UUID('id-1'), Path(root))
   expect(launches[0]?.jvmOptions).toEqual(OPTIONS)
   await vi.waitFor(() =>
     expect(events).toEqual(['openStarted', 'engine', 'openAnswered', 'checkUseLog']),
   )
-})
-
-test('a native open stops the training too, but takes no options and checks no log', async () => {
-  await service('native').openProject(UUID('id-1'), Path(root))
-  expect(launches[0]?.jvmOptions).toBeUndefined()
-  expect(events).toEqual(['openStarted', 'engine', 'openAnswered'])
 })
 
 test('a failed open is answered too', async () => {
   failOpen = true
-  await expect(service('jvm').openProject(UUID('id-1'), Path(root))).rejects.toThrow('no engine')
+  await expect(service().openProject(UUID('id-1'), Path(root))).rejects.toThrow('no engine')
   await vi.waitFor(() =>
     expect(events).toEqual(['openStarted', 'engine', 'openAnswered', 'checkUseLog']),
   )
 })
 
-test('a JVM run gets the cache options', async () => {
-  await service('jvm').runProject(UUID('id-1'), Path(root))
+test('a run gets the cache options', async () => {
+  await service().runProject(UUID('id-1'), Path(root))
   expect(launches[0]?.jvmOptions).toEqual(OPTIONS)
-  await service('native').runProject(UUID('id-1'), Path(root))
-  expect(launches[1]?.jvmOptions).toBeUndefined()
 })
 
 test('an open observer (the AppImage engine copy waits for one) hears every open, a failed one too', async () => {
   const heard: string[] = []
   const observed = new ProjectService(fakeRunner(), [], console, undefined, undefined, undefined, {
-    environment: 'native',
     openObserver: {
       openStarted: () => heard.push('started'),
       openAnswered: () => heard.push('answered'),

@@ -13,13 +13,19 @@ Java support libraries for the engine. Two shapes live together here:
      boilerplate (`@BuiltinMethod`, `@Specialization`, etc.).
    - `persistance/` + `persistance-dsl/` — custom serialization framework used
      by `engine/polyglot-api/` and IR caches. Annotation-driven.
-   - `jvm-channel/` — typed bidirectional channel between embedded processes.
-   - `jvm-interop/` — helpers for Enso ↔ Java interop.
+   - `jvm-channel/` — the JNI invocation API the native launcher uses to start
+     HotSpot in its own process for `--jvm` (`JVM`, `PosixJVM`, `WindowsJVM`,
+     `JNI`, `JNIBoot`). The channel between the native image and a guest JVM,
+     and `jvm-interop` over it, are gone (native-image removal, A1); the rest
+     goes with the native launcher.
    - `os-environment/` + `os-environment-lib/` — OS-specific process/env
      helpers.
-   - `ydoc-api/`, `ydoc-server/`, `ydoc-polyfill/`, `ydoc-server-registration/`
-     — Java side of the ydoc story. Lets the engine host `ydoc-server-polyglot`
-     and register itself as a ydoc backend.
+   - `ydoc-api/` — `YjsChannel`, the channel between the Language Server and the
+     (Node) ydoc server, served over the channel sockets.
+   - `ydoc-polyfill/` — Web/Node API polyfills and the parser functions for
+     GraalJS, which EPB (`runtime-language-epb`) installs in its JavaScript
+     context. The engine-hosted ydoc server (`ydoc-server`,
+     `ydoc-server-registration`) that they were written for is gone.
    - `logging-service-common/`, `logging-service-opensearch/`,
      `logging-service-telemetry/` — pluggable logging sinks.
    - `python-extract/`, `benchmarks-common/`, `runtime-utils/`, `test-utils/` —

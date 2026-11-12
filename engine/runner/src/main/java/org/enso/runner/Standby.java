@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  *   resolves relative file paths and starts processes against the context's working directory, not
  *   the process's (`System.java` and `File_Helpers.enso` in the standard library). In a normal
  *   engine the two are the same.
- * - The per-open variables (the channel token, the ydoc port, the project and session ids). A JVM
+ * - The per-open variables (the channel token, the project and session ids). A JVM
  *   cannot change its own environment, so `StandbyRequest.applyEnvironment` sets each as the system
  *   property it is also read through: the configuration's own property for the Language Server's
  *   settings, `enso.env.<NAME>` for those read through `ProcessEnvironment`.

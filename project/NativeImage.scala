@@ -145,13 +145,6 @@ object NativeImage {
           "because native-image binary was not found."
         )
       }
-      if (additionalOptions.contains("--language:java")) {
-        log.warn(
-          s"Building ${targetLoc} image with experimental Espresso support!"
-        )
-
-      }
-
       val (staticParameters, pathExts) =
         if (staticOnLinux && Platform.isLinux) {
           // Note [Static Build On Linux]

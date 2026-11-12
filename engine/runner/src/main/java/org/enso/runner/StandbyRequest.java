@@ -19,9 +19,7 @@ import org.enso.common.ProcessEnvironment;
 record StandbyRequest(List<String> args, Map<String, String> env) {
   /** The variables the Language Server reads through its configuration, and their properties. */
   static final Map<String, String> CONFIG_PROPERTIES =
-      Map.of(
-          "LANGUAGE_SERVER_YDOC_PORT", "language-server.ydoc.port",
-          "LANGUAGE_SERVER_CHANNEL_TOKEN", "language-server.channel-token");
+      Map.of("LANGUAGE_SERVER_CHANNEL_TOKEN", "language-server.channel-token");
 
   /** The variables read through {@link ProcessEnvironment}. */
   static final Set<String> PROCESS_VARIABLES =

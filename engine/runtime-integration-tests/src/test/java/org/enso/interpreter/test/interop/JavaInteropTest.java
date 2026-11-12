@@ -22,18 +22,9 @@ import org.junit.Test;
  * problem then having whole integration tests and moreover this suite executes the same test in
  * various configurations automatically.
  *
- * <p>The test itself is abstract class and just defines the test cases. Then there are various
- * implementations:
- *
- * <ul>
- *   <li>{@link HostJavaInteropTest} - regular GraalVM <em>host interop</em> with JVM classes
- *   <li>{@link GuestJavaInteropTest} - dual JVM mode used when running Enso in <em>native
- *       image</em> mode and loading classes in separate <b>HotSpot</b> JVM
- * </ul>
- *
- * Those implementations setup the {@link #ctx()} and execute the test in that setup. This way we
- * can guarantee consistency between various implementations of the {@code polyglot java import}
- * statements.
+ * <p>The test itself is abstract class and just defines the test cases. {@link HostJavaInteropTest}
+ * implements it with regular GraalVM <em>host interop</em> with JVM classes: it sets up the {@link
+ * #ctx()} and executes the test in that setup.
  *
  * <p>Execute all these tests as:
  *

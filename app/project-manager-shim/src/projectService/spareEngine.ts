@@ -7,7 +7,6 @@ import * as childProcess from 'node:child_process'
 import * as crypto from 'node:crypto'
 import * as os from 'node:os'
 import { killTree } from '../childProcess/killTree.js'
-import type { EngineMode } from './engineMode.js'
 
 /**
  * The variables of one open: written on the spare's line, never part of its spawn key. The engine
@@ -15,7 +14,6 @@ import type { EngineMode } from './engineMode.js'
  */
 export const LINE_VARIABLES: ReadonlySet<string> = new Set([
   'LANGUAGE_SERVER_CHANNEL_TOKEN',
-  'LANGUAGE_SERVER_YDOC_PORT',
   'ENSO_LOCAL_PROJECT_ID',
   'ENSO_LOCAL_PROJECT_SESSION_ID',
 ])
@@ -27,7 +25,6 @@ const STDERR_TAIL_LENGTH = 4096
 
 /** What a spare is started with, beyond the executable: an open must start with the same. */
 export interface SpawnKeyInputs {
-  readonly mode: EngineMode
   readonly args: readonly string[]
   readonly jvmOptions: readonly string[]
   readonly env: Readonly<Record<string, string>>
@@ -45,7 +42,7 @@ export function spawnKey(inputs: SpawnKeyInputs): string {
   )
   return crypto
     .createHash('sha256')
-    .update(JSON.stringify([inputs.mode, inputs.args, inputs.jvmOptions, env]))
+    .update(JSON.stringify([inputs.args, inputs.jvmOptions, env]))
     .digest('hex')
 }
 

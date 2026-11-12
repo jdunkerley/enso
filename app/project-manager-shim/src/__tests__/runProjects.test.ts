@@ -1,4 +1,4 @@
-/** @file A headless `--run` takes the command line's engine mode. */
+/** @file A headless `--run` takes the JVM launch (the native engine is gone). */
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -34,7 +34,6 @@ function fakeRunner(): Runner {
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'run-projects-'))
-  vi.stubEnv('ENSO_ENGINE_MODE', '')
   launches = []
   await createProject(path.join(root, 'P'), 'id-1')
 })
@@ -44,14 +43,9 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
-test('the run takes --engine-mode', async () => {
-  await runLocalProjectByUuid(UUID('id-1'), Path(root), { option: 'jvm' }, fakeRunner())
-  expect(launches.at(-1)?.mode).toEqual({ mode: 'jvm', source: 'option' })
-})
-
-test('without the option the run is the JVM, from the default', async () => {
+test('a run takes a launch with the JVM timeouts', async () => {
   await runLocalProjectByUuid(UUID('id-1'), Path(root), undefined, fakeRunner())
-  expect(launches.at(-1)?.mode).toEqual({ mode: 'jvm', source: 'default' })
+  expect(launches.at(-1)?.timeouts.startupMs).toBe(120_000)
 })
 
 test('a run by path marks the project as running while it runs', async () => {

@@ -23,7 +23,6 @@ describe('logOrigin', () => {
     'org.enso.compiler.Compiler',
     'org.enso.languageserver.boot.LanguageServerComponent',
     'org.enso.runner.Main',
-    'org.enso.jvm.interop',
     'org.enso',
     'enso',
     'enso.org.enso.interpreter.runtime.EnsoContext',

@@ -16,7 +16,6 @@ import {
 import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
 import { setDownloadDirectory, setLocalRootDirectory } from '$/providers/localDirectories'
 import { mapboxSettingsStore, setMapboxToken } from '$/providers/mapboxToken'
-import { engineRunsOnJvm } from '$/providers/spareEngineSettings'
 import { Path } from 'enso-common/src/services/Backend'
 import { z } from 'zod'
 import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection.vue'
@@ -94,8 +93,6 @@ const LOCAL_TAB: SettingsTabData = {
     },
     {
       nameId: 'engineSettingsSection',
-      // Only a JVM engine has a spare to pre-start; the project service says which engine runs.
-      visible: () => engineRunsOnJvm.value,
       entries: [
         {
           type: 'custom',

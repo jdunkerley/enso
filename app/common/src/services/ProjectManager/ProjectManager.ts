@@ -32,7 +32,6 @@ import {
   type SamplesStatus,
   type SamplesUpdateResult,
   type SetProjectLabelsParams,
-  type SpareEngineStatus,
   type UUID,
   type VersionEntry,
   type VersioningStatus,
@@ -515,12 +514,9 @@ export class ProjectManager {
     return this.runProjectServiceCommand('secrets/status', {})
   }
 
-  /**
-   * Tell the project service whether to keep a pre-started engine (Settings → Local → Engine). It
-   * answers which engine projects get, so the setting shows only for the JVM.
-   */
-  async setSpareEngine(enabled: boolean): Promise<SpareEngineStatus> {
-    return this.runProjectServiceCommand('engine/setSpare', { enabled })
+  /** Tell the project service whether to keep a pre-started engine (Settings → Local → Engine). */
+  async setSpareEngine(enabled: boolean): Promise<void> {
+    await this.runProjectServiceCommand('engine/setSpare', { enabled })
   }
 
   /** The bundled samples' states. */

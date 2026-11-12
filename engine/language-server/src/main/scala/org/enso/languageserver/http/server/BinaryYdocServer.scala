@@ -8,9 +8,7 @@ import org.enso.languageserver.http.server.BinaryWebSocketControlProtocol.{
 }
 import org.enso.languageserver.util.binary.{BinaryDecoder, BinaryEncoder}
 import org.enso.ydoc.api.YjsChannel
-import org.graalvm.polyglot.Context
 
-import java.lang.foreign.MemorySegment
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -27,13 +25,12 @@ object BinaryYdocServer {
     * - Creates [[OutgoingMessageHandler]] actor for encoding and sending responses
     * - Registers [[OnCloseHandler]] to end the session when the channel closes
     *
-    * Binary messages use direct ByteBuffer for efficient cross-runtime data transfer.
+    * Binary messages arrive as Java `ByteBuffer`s from the channel socket.
     *
     * @param decoder decodes inbound binary packets to typed messages
     * @param encoder encodes outbound typed messages to binary packets
     * @param factory creates connection controllers for each client session
     * @param messageCallbacks hooks invoked for each message (used for profiling)
-    * @param context GraalVM polyglot context for converting JavaScript values
     * @param system the Akka actor system
     * @tparam A type of decoded inbound messages
     * @tparam B type of outbound messages to encode
@@ -43,7 +40,6 @@ object BinaryYdocServer {
     encoder: BinaryEncoder[B],
     factory: ConnectionControllerFactory,
     messageCallbacks: List[ByteBuffer => Unit],
-    context: Context,
     system: ActorSystem
   ) extends YjsChannel.Server
       with LazyLogging {
@@ -77,19 +73,8 @@ object BinaryYdocServer {
     ): Unit = {
       logger.trace(s"Received binary message ${message.getClass}")
       try {
-        val buffer = message match {
-          // The WebSocket channel of the Language Server (a Node ydoc host)
-          // hands over a Java buffer; only the in-process ydoc server's
-          // JavaScript buffers need the polyglot native pointer.
-          case b: ByteBuffer => b
-          case _ =>
-            val value   = context.asValue(message)
-            val address = value.asNativePointer()
-            MemorySegment
-              .ofAddress(address)
-              .reinterpret(value.getBufferSize())
-              .asByteBuffer()
-        }
+        // The channel socket (`YjsChannelEndpoint`) hands over Java buffers.
+        val buffer  = message.asInstanceOf[ByteBuffer]
         val decoded = decoder.decode(buffer)
         incomingMessageHandler ! decoded
         messageCallbacks.foreach(cb => cb(buffer))

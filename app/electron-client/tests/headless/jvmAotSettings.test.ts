@@ -1,6 +1,5 @@
 /**
- * @file The AOT cache's root and its gate (it trains only when the JVM is the default engine), and
- * the AppImage's stable engine copy.
+ * @file The AOT cache's root and its gate, and the AppImage's stable engine copy.
  */
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
@@ -11,7 +10,6 @@ import {
   appImageEngine,
   isEngineCopyPath,
   isJvmAotEnabled,
-  isJvmDefaultEngine,
   jvmAotRootDirectory,
 } from '../../src/jvmAotSettings'
 
@@ -21,18 +19,6 @@ describe('isJvmAotEnabled', () => {
     expect(isJvmAotEnabled({ ENSO_JVM_AOT: '1' })).toBe(true)
     expect(isJvmAotEnabled({ ENSO_JVM_AOT: '' })).toBe(true)
     expect(isJvmAotEnabled({ ENSO_JVM_AOT: '0' })).toBe(false)
-  })
-})
-
-describe('isJvmDefaultEngine', () => {
-  test('the JVM by default (since the switch): the cache trains with no settings', () => {
-    expect(isJvmDefaultEngine(undefined, {})).toBe(true)
-    expect(isJvmDefaultEngine({}, { ENSO_ENGINE_MODE: 'bogus' })).toBe(true)
-  })
-  test('ENSO_ENGINE_MODE and --engine-mode turn it off; the option wins', () => {
-    expect(isJvmDefaultEngine(undefined, { ENSO_ENGINE_MODE: 'native' })).toBe(false)
-    expect(isJvmDefaultEngine({ option: 'native' }, {})).toBe(false)
-    expect(isJvmDefaultEngine({ option: 'jvm' }, { ENSO_ENGINE_MODE: 'native' })).toBe(true)
   })
 })
 
@@ -67,17 +53,11 @@ describe('appImageEngine', () => {
     }
   }
 
-  const jvm = { option: 'jvm' as const }
-
   test('outside an AppImage, or with ENSO_ENGINE_PATH set, nothing changes', () =>
     withApp(async (base, app) => {
-      expect(await appImageEngine({}, app, jvm)).toEqual({})
+      expect(await appImageEngine({}, app)).toEqual({})
       expect(
-        await appImageEngine(
-          { APPIMAGE: '/a/Enso.AppImage', ENSO_ENGINE_PATH: '/e/enso' },
-          app,
-          jvm,
-        ),
+        await appImageEngine({ APPIMAGE: '/a/Enso.AppImage', ENSO_ENGINE_PATH: '/e/enso' }, app),
       ).toEqual({})
       expect(await fs.readdir(base)).not.toContain('userData')
     }))
@@ -92,40 +72,23 @@ describe('appImageEngine', () => {
       expect(isEngineCopyPath(path.join(app.userData, 'engines', 'enso'), app.userData)).toBe(false)
       expect(isEngineCopyPath('/opt/enso/bin/enso', app.userData)).toBe(false)
       const env = { APPIMAGE: '/a/Enso.AppImage', ENSO_ENGINE_PATH: old }
-      const first = await appImageEngine(env, app, jvm)
+      const first = await appImageEngine(env, app)
       expect(first.enginePath).toBeUndefined()
       const copied = path.join(app.userData, 'engine', '2026.2.0', 'dist', '1.0', 'bin', 'enso')
       expect(await first.startCopy?.()).toBe(copied)
-      expect(await appImageEngine(env, app, jvm)).toEqual({ enginePath: copied })
+      expect(await appImageEngine(env, app)).toEqual({ enginePath: copied })
     }))
 
-  test('while the default engine is native, nothing is copied (no disk used)', () =>
-    withApp(async (base, app) => {
-      const env = { APPIMAGE: '/a/Enso.AppImage' }
-      expect(await appImageEngine({ ...env, ENSO_ENGINE_MODE: 'native' }, app, undefined)).toEqual(
-        {},
-      )
-      expect(
-        await appImageEngine({ ...env, ENSO_ENGINE_MODE: 'jvm' }, app, { option: 'native' }),
-      ).toEqual({})
-      expect(await fs.readdir(base)).not.toContain('userData')
-    }))
-
-  test('JVM by --engine-mode or ENSO_ENGINE_MODE: the copy starts when asked, and the next launch uses it', () =>
+  test('the copy starts when asked, and the next launch uses it', () =>
     withApp(async (_base, app) => {
-      for (const [env, engine] of [
-        [{ APPIMAGE: '/a/Enso.AppImage' }, jvm],
-        [{ APPIMAGE: '/a/Enso.AppImage', ENSO_ENGINE_MODE: 'jvm' }, undefined],
-      ] as const) {
-        await fs.rm(app.userData, { recursive: true, force: true })
-        const first = await appImageEngine(env, app, engine)
-        expect(first.enginePath).toBeUndefined()
-        // Nothing is copied before the window is up and `startCopy` is called.
-        await expect(fs.access(app.userData)).rejects.toThrow()
-        const copied = path.join(app.userData, 'engine', '2026.2.0', 'dist', '1.0', 'bin', 'enso')
-        expect(await first.startCopy?.()).toBe(copied)
-        expect(await appImageEngine(env, app, engine)).toEqual({ enginePath: copied })
-      }
+      const env = { APPIMAGE: '/a/Enso.AppImage' }
+      const first = await appImageEngine(env, app)
+      expect(first.enginePath).toBeUndefined()
+      // Nothing is copied before the window is up and `startCopy` is called.
+      await expect(fs.access(app.userData)).rejects.toThrow()
+      const copied = path.join(app.userData, 'engine', '2026.2.0', 'dist', '1.0', 'bin', 'enso')
+      expect(await first.startCopy?.()).toBe(copied)
+      expect(await appImageEngine(env, app)).toEqual({ enginePath: copied })
     }))
 
   test('the environment is never written: the copy cannot leak into a relaunch', () =>
@@ -133,8 +96,8 @@ describe('appImageEngine', () => {
       // An in-app update relaunches the new AppImage with this process's environment, so a copy's
       // path there would make the new version run the old version's engine.
       const env = Object.freeze({ APPIMAGE: '/a/Enso.AppImage' })
-      await (await appImageEngine(env, app, jvm)).startCopy?.()
-      expect((await appImageEngine(env, app, jvm)).enginePath).toBeDefined()
+      await (await appImageEngine(env, app)).startCopy?.()
+      expect((await appImageEngine(env, app)).enginePath).toBeDefined()
       expect(env).toEqual({ APPIMAGE: '/a/Enso.AppImage' })
     }))
 })

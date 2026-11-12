@@ -1,14 +1,9 @@
 from Standard.Base import all
 from Standard.Test import all
 
-from project.Enso_Bin_Utils import create_tmp_dir, enso_run, create_new_project, runs_in_aot
+from project.Enso_Bin_Utils import create_tmp_dir, enso_run, create_new_project
 
-polyglot java import java.lang.ProcessHandle as J_ProcessHandle
 polyglot java import java.lang.System as J_System
-polyglot java import java.lang.Thread as J_Thread
-polyglot java import java.net.ServerSocket
-polyglot java import java.util.concurrent.CompletableFuture
-polyglot java import java.util.concurrent.atomic.AtomicBoolean
 
 
 add_specs suite_builder = suite_builder.group "Engine runner" group_builder->
@@ -145,78 +140,6 @@ add_specs suite_builder = suite_builder.group "Engine runner" group_builder->
             Test.with_clue ("No .tgz files in " + file_names.to_text) <|
                 file_names.filter (_.ends_with "tgz") . is_empty . should_be_true
 
-    group_builder.specify "Executing language server with YDOC_SERVER_JS" <|
-        tmp_dir = create_tmp_dir
-
-        cleanup =
-            tmp_dir.delete recursive=True
-
-        Panic.with_finalizer cleanup <|
-            proj_dir = create_new_project tmp_dir "Proj" "main = 42"
-
-            # The engine-hosted ydoc server starts only when it is given a port
-            # (`LANGUAGE_SERVER_YDOC_PORT`; there is no default any more).
-            ydoc_port = find_free_port
-            rpc_port = find_free_port
-
-            enso_args = [ "--server", "--daemon" ]
-                + [ "--root-id", "fbfd4950-2324-4108-99b7-019a614f94ab"]
-                + [ "--project-id", "2b27d943-7c6b-4481-8e69-67d0c57a02ed" ]
-                + [ "--path",  proj_dir.path, "--interface", "127.0.0.1", "--rpc-port", rpc_port.to_text ]
-                + if runs_in_aot then [] else [ "--jvm" ]
-
-            js_file = File.create_temporary_file "custom_ydoc" ".js"
-            js_code = """
-                console.log("Custom JavaScript is running");
-                let msg = "Preventing the startup by throwing an exception";
-                console.log(msg)
-                throw msg;
-
-
-            js_code.write js_file
-
-            proc_bldr = Process.new_builder "enso"
-                . set_arguments enso_args
-                . set_env "JAVA_TOOL_OPTIONS" "-ea -da:com.oracle.truffle.host.HostExecuteNode"
-                . set_env "YDOC_SERVER_JS" js_file.to_text
-                . set_env "LANGUAGE_SERVER_YDOC_PORT" ydoc_port.to_text
-                . set_directory proj_dir.parent
-
-            # The server must exit by itself (code 7); if it does not, kill it
-            # so that the failure is a failed test, not a hung job.
-            proc = with_kill_after 120 proc_bldr.create
-            if proc.exit_code != Exit_Code.Failure 7 then
-                Test.fail "Unexpected exit code: "+proc.exit_code.to_text+'\n'+proc.stdout+proc.stderr
-
-            proc.stdout . should_contain "Custom JavaScript is running"
-            proc.stdout . should_contain "Preventing the startup by throwing an exception"
-            # The Chrome inspector prints this on stdout since GraalVM 25.5 (on stderr before).
-            (proc.stdout + proc.stderr) . should_contain "Debugger listening on ws://127.0.0.1:9229/enso_ydoc"
-
-## PRIVATE
-   A port that was free a moment ago.
-find_free_port -> Integer =
-    socket = ServerSocket.new 0
-    port = socket.getLocalPort
-    socket.close
-    port
-
-## PRIVATE
-   Runs `action`; if it is still running after `seconds`, kills the child
-   processes of this one (which unblocks `action` when it waits for one). The
-   suite runs its specs one at a time, so the only child is the one under test.
-with_kill_after seconds:Integer ~action =
-    done = AtomicBoolean.new False
-    kill_leftovers =
-        J_ProcessHandle.current.descendants.forEach h->
-            h.destroyForcibly
-    wait_then_kill _ =
-        0.up_to (seconds * 4) . each _->
-            if done.get.not then J_Thread.sleep 250
-        if done.get.not then kill_leftovers
-    # A one-argument callback: the closest thing to a `Runnable` Enso can pass.
-    CompletableFuture.completedFuture 0 . thenAcceptAsync wait_then_kill
-    Panic.with_finalizer (done.set True) action
 
 main filter=Nothing =
     suite = Test.build suite_builder->

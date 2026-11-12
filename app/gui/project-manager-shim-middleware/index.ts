@@ -96,9 +96,9 @@ export class ProjectManagerShimMiddleware {
   })
 
   /**
-   * Where opened projects' ydoc servers run under `ENSO_YDOC_HOST=node` (the default): the dev
-   * server's own `NodeYdocHost`, set by `vite.config.ts` once the server exists. Without one (the
-   * preview server) the engine serves ydoc, as under `ENSO_YDOC_HOST=engine`.
+   * Where opened projects' ydoc servers run: the dev server's own `NodeYdocHost`, set by
+   * `vite.config.ts` once the server exists. The preview server has none, so an opened project
+   * there has no ydoc server.
    */
   ydocHost: YdocHost | undefined
 

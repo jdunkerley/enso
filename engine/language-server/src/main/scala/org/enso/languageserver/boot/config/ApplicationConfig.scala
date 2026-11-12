@@ -6,16 +6,15 @@ import pureconfig.generic.auto._
 
 /** An `application.conf` configuration.
   *
-  * @param ydoc the embedded ydoc server
   * @param channelToken the token a ydoc host must present on the channel
   *                     sockets (`LANGUAGE_SERVER_CHANNEL_TOKEN`); without one
   *                     every channel socket is refused
   */
-case class ApplicationConfig(ydoc: YdocConfig, channelToken: Option[String]) {
+case class ApplicationConfig(channelToken: Option[String]) {
 
   /** The token is a secret: a logged config must not leak it. */
   override def toString: String =
-    s"ApplicationConfig(ydoc=$ydoc,channelToken=${channelToken.map(_ => "<redacted>")})"
+    s"ApplicationConfig(channelToken=${channelToken.map(_ => "<redacted>")})"
 }
 
 object ApplicationConfig {
@@ -29,8 +28,8 @@ object ApplicationConfig {
     try {
       Thread.currentThread().setContextClassLoader(getClass.getClassLoader)
       // A fresh `systemProperties()`, not pureconfig's `ConfigSource.systemProperties` (a snapshot
-      // taken when `ConfigSource` is first used): a standby engine sets the ydoc port and the
-      // channel token as properties after it started (engine/runner `StandbyRequest`).
+      // taken when `ConfigSource` is first used): a standby engine sets the channel token as a
+      // property after it started (engine/runner `StandbyRequest`).
       ConfigSource
         .resources(ConfigFilename)
         .withFallback(ConfigSource.fromConfig(ConfigFactory.systemProperties()))

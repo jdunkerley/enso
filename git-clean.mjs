@@ -83,7 +83,6 @@ async function cleanJunctions() {
     'app/table-expression/node_modules',
     'app/ydoc-server/node_modules',
     'app/ydoc-server-nodejs/node_modules',
-    'app/ydoc-server-polyglot/node_modules',
     'app/ydoc-shared/node_modules',
     'lib/js/runner/node_modules',
     'tools/simple-library-server/node_modules',

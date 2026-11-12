@@ -53,12 +53,6 @@ export const SUITES: Readonly<Record<string, Suite>> = {
     runnerArgs: ['--jvm'],
     nativeRunner: true,
   },
-  'std-mock-dual-microsoft': {
-    allow: ['Microsoft_Tests'],
-    smallJdk: false,
-    runnerArgs: ['--jvm', '--vm.D=polyglot.enso.classLoading=Standard.Microsoft:guest,hosted'],
-    nativeRunner: false,
-  },
 }
 
 /** The retired build CLI's aliases. */

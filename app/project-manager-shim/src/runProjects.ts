@@ -34,7 +34,7 @@ function createProjectService(engine?: EngineSettings, runner?: Runner): Project
 }
 
 /**
- * Run a local project by UUID. `engine` carries the command line's `--engine-mode`; `runner` is for
+ * Run a local project by UUID. `engine` carries the host's engine settings; `runner` is for
  * tests (the Enso executable's runner otherwise).
  */
 export async function runLocalProjectByUuid(

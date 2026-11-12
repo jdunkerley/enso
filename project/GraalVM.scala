@@ -22,8 +22,6 @@ object GraalVM {
     *  - `fast`: `native`, unoptimised, with only `Standard.Base`'s polyglot
     *    support in the image.
     *  - `-ls`: `native`, unoptimised, without the language server.
-    *  - `-ydoc`: `native`, unoptimised, without the ydoc server's native image
-    *    (`buildEngineDistributionNoIndex` leaves it out).
     *
     * Any other value fails the build.
     */
@@ -45,14 +43,13 @@ object GraalVM {
     }
 
     private lazy val parsed
-      : (Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) = {
+      : (Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) = {
       var shell                 = false
       var native                = false
       var test                  = false
       var debug                 = false
       var fast                  = false
       var disableLanguageServer = false
-      var disableYdoc           = false
       toString().split(",").foreach {
         case "shell"  => shell  = true
         case "native" => native = true
@@ -72,10 +69,6 @@ object GraalVM {
           native                = true
           disableLanguageServer = true
         }
-        case "-ydoc" => {
-          native      = true
-          disableYdoc = true
-        }
         case v =>
           throw new IllegalStateException(s"Unexpected value of $VAR_NAME: $v")
       }
@@ -90,8 +83,7 @@ object GraalVM {
         test,
         debug,
         fast,
-        disableLanguageServer,
-        disableYdoc
+        disableLanguageServer
       )
     }
     def native                = parsed._2
@@ -99,9 +91,8 @@ object GraalVM {
     def debug                 = parsed._4
     def fast                  = parsed._5
     def disableLanguageServer = parsed._6
-    def disableYdoc           = parsed._7
     def release =
-      native && !test && !debug && !fast && !disableLanguageServer && !disableYdoc
+      native && !test && !debug && !fast && !disableLanguageServer
   }
 
   case class NativeImageSize(
@@ -136,10 +127,6 @@ object GraalVM {
     private val macARM64Release   = NativeImageSize(100, 273)
     private val testNISize        = NativeImageSize(100, 350)
   }
-
-  /** Has the user requested to use Espresso for Java interop? */
-  private def isEspressoMode(): Boolean =
-    "espresso".equals(System.getenv("ENSO_JAVA"))
 
   private val version: String = Dependencies.graalMavenPackagesVersion
 
@@ -225,23 +212,9 @@ object GraalVM {
     "org.graalvm.tools" % "insight-heap-tool" % version
   )
 
-  private val espressoPkgs =
-    Seq(
-      "org.graalvm.truffle"  % "truffle-nfi"                      % version,
-      "org.graalvm.truffle"  % "truffle-nfi-libffi"               % version,
-      "org.graalvm.espresso" % "espresso-language"                % version,
-      "org.graalvm.espresso" % "espresso-libs-resources"          % version,
-      "org.graalvm.espresso" % "espresso-runtime-resources-jdk21" % version
-    )
-
   val toolsPkgs = chromeInspectorPkgs ++ debugAdapterProtocolPkgs ++ insightPkgs
 
-  val langsPkgs =
-    if (isEspressoMode()) {
-      espressoPkgs
-    } else {
-      jsPkgs ++ pythonPkgs
-    }
+  val langsPkgs = jsPkgs ++ pythonPkgs
 
   private val allowedJavaVendors = Seq(
     "GraalVM Community",

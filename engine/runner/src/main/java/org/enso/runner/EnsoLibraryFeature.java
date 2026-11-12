@@ -120,8 +120,8 @@ public final class EnsoLibraryFeature implements Feature {
    * The libraries named by {@code enso.nativeImage.javaFreeLibraries} (separated by {@link
    * File#pathSeparator}): libraries with no Java of their own, whose {@code polyglot java import}s
    * are all classes already in the image (JDK ones). They are processed like the libraries found on
-   * the class path, so they are hosted rather than loaded in the guest JVM. See Note [Java-Free
-   * Libraries In The Image] in {@code build.sbt}.
+   * the class path, so the native engine can run them. See Note [Java-Free Libraries In The Image]
+   * in {@code build.sbt}.
    *
    * @return the libraries' root directories
    * @throws IllegalStateException if one of them ships a jar, which would put its Java in the image

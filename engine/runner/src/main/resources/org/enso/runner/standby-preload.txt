@@ -8311,7 +8311,6 @@ pureconfig.CapitalizedWordsNamingConvention$
 java.util.regex.Pattern$Behind
 java.util.regex.Pattern$Pos
 pureconfig.generic.ProductHint$UseOrDefault
-org.enso.languageserver.boot.config.YdocConfig
 pureconfig.ReadsMissingKeys
 pureconfig.CollectionReaders$$anon$1
 pureconfig.generic.MapShapedReader$$anon$1

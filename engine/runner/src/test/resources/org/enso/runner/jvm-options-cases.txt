@@ -1,0 +1,74 @@
+# Tricky `jvm.options` and `ENSO_JVM_OPTIONS` values, read by both parsers: `JvmOptionsTest` (Java,
+# engine/runner) and `jvmOptions.test.ts` (TypeScript, app/project-manager-shim). A change to one
+# parser's rules is a change here, so the other fails until it follows (Note [JVM Options Of The
+# Engine]).
+#
+# A case starts with `== <name>`. Its lines are `key: value`, the value with the escapes `\n`, `\r`,
+# `\t`, `\` and `\uXXXX`:
+#   file:        the text of a jvm.options
+#   file-expect: one option the file gives, in order (any number)
+#   env:         the value of ENSO_JVM_OPTIONS
+#   env-expect:  one option the value gives, in order (any number)
+# A key that is absent leaves that half out of the case. Characters that Java's `trim` and
+# JavaScript's differ on (U+00A0 and other non-ASCII spaces) are left out of the cases.
+
+== plain: comments, blank lines, indentation
+file: # tuned for the open\n-Dpolyglot.engine.Mode=latency\n\n  -XX:CICompilerCount=2  \n\t--add-opens=java.base/java.nio=ALL-UNNAMED\t\n
+file-expect: -Dpolyglot.engine.Mode=latency
+file-expect: -XX:CICompilerCount=2
+file-expect: --add-opens=java.base/java.nio=ALL-UNNAMED
+
+== a hash that is not at the start of the line stays
+file: -Da=1 # not a comment\n   # indented comment\n
+file-expect: -Da=1 # not a comment
+
+== whitespace-only lines and no final newline
+file: \n   \n\t\n-Da=1
+file-expect: -Da=1
+
+== CRLF line endings
+file: -Da=1\r\n\r\n  # c\r\n-Db=2\r\n
+file-expect: -Da=1
+file-expect: -Db=2
+env: -Dc=3\r\n-Dd=4\r\n
+env-expect: -Dc=3
+env-expect: -Dd=4
+
+== a byte order mark before a comment, and before an option
+file: \uFEFF# comment\n-Da=1\n
+file-expect: -Da=1
+
+== a byte order mark before the first option
+file: \uFEFF-Da=1\n-Db=2\n
+file-expect: -Da=1
+file-expect: -Db=2
+env: \uFEFF-Dc=3\n
+env-expect: -Dc=3
+
+== spaces inside an option
+file: -XX:AOTCache=C:\\Users\\John Smith\\enso.aot\n
+file-expect: -XX:AOTCache=C:\\Users\\John Smith\\enso.aot
+env: -XX:AOTCache=C:\\Users\\John Smith\\enso.aot\r\n-Dx=a b\n\n
+env-expect: -XX:AOTCache=C:\\Users\\John Smith\\enso.aot
+env-expect: -Dx=a b
+
+== quotes are kept
+file: -Xlog:aot=warning,cds=warning:file="C:\\Users\\John Smith\\use.log"::filecount=0\n
+file-expect: -Xlog:aot=warning,cds=warning:file="C:\\Users\\John Smith\\use.log"::filecount=0
+env: -Xlog:aot=warning:file="C:\\Users\\John Smith\\use.log"\n-Da='b c'\n
+env-expect: -Xlog:aot=warning:file="C:\\Users\\John Smith\\use.log"
+env-expect: -Da='b c'
+
+== an environment value without a newline splits on whitespace
+env: \u0020\u0020-Da=1   -Db=2\t-Dc=3\u0020
+env-expect: -Da=1
+env-expect: -Db=2
+env-expect: -Dc=3
+
+== a single option with a trailing newline keeps its spaces
+env: -XX:AOTCacheOutput=C:\\Users\\John Smith\\enso.aot.tmp\n
+env-expect: -XX:AOTCacheOutput=C:\\Users\\John Smith\\enso.aot.tmp
+
+== an empty or blank value gives nothing
+env: \u0020\u0020
+file: \n

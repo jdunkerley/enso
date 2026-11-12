@@ -27,31 +27,21 @@ describe('timeoutFromEnv', () => {
 })
 
 describe('engineTimeouts', () => {
-  test('native and JVM columns', () => {
-    expect(engineTimeouts('native', {})).toEqual({
-      startupMs: 30_000,
-      terminateMs: 10_000,
-      ydocWaitMs: 5_000,
-    })
-    expect(engineTimeouts('jvm', {})).toEqual({
+  test('the JVM timeouts are the only ones', () => {
+    expect(engineTimeouts({})).toEqual({
       startupMs: 120_000,
       terminateMs: 30_000,
-      ydocWaitMs: 30_000,
     })
-    expect(ENGINE_TIMEOUTS.jvm.startupMs).toBe(120_000)
+    expect(ENGINE_TIMEOUTS.startupMs).toBe(120_000)
   })
-  test('the environment overrides both columns', () => {
+  test('the environment overrides them', () => {
     const env = {
       ENSO_ENGINE_STARTUP_TIMEOUT_MS: '180000',
       ENSO_ENGINE_TERMINATE_TIMEOUT_MS: '60000',
     }
-    for (const mode of ['native', 'jvm'] as const) {
-      expect(engineTimeouts(mode, env)).toMatchObject({ startupMs: 180_000, terminateMs: 60_000 })
-    }
+    expect(engineTimeouts(env)).toMatchObject({ startupMs: 180_000, terminateMs: 60_000 })
   })
-  test('a bad override falls back to the column', () => {
-    expect(engineTimeouts('jvm', { ENSO_ENGINE_STARTUP_TIMEOUT_MS: 'soon' }).startupMs).toBe(
-      120_000,
-    )
+  test('a bad override falls back to the default', () => {
+    expect(engineTimeouts({ ENSO_ENGINE_STARTUP_TIMEOUT_MS: 'soon' }).startupMs).toBe(120_000)
   })
 })

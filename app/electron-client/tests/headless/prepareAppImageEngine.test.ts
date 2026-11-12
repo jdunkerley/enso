@@ -36,13 +36,13 @@ test("an ENSO_ENGINE_PATH inside the IDE's engine copies is dropped (review of #
     'ENSO_ENGINE_PATH',
     path.join(userData, 'engine', '2025.9.0', 'dist', 'bin', 'enso'),
   )
-  await prepareAppImageEngine(electron, false, undefined)
+  await prepareAppImageEngine(electron, false)
   expect(process.env.ENSO_ENGINE_PATH).toBeUndefined()
 })
 
 test("a user's ENSO_ENGINE_PATH is kept", async () => {
   const users = path.join(path.sep, 'opt', 'enso', 'bin', 'enso')
   Reflect.set(process.env, 'ENSO_ENGINE_PATH', users)
-  await prepareAppImageEngine(electron, false, undefined)
+  await prepareAppImageEngine(electron, false)
   expect(process.env.ENSO_ENGINE_PATH).toBe(users)
 })

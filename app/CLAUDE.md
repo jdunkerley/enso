@@ -32,11 +32,6 @@ Electron shell — plus a few grammars and shims.
   (`electron-client/src/ydocHost/`), under `dev:vite` in the dev server, both
   reaching the Language Server over its channel sockets. The Playwright mocks
   (`gui/integration-test/mock/localApi.ts`) use its pieces directly.
-- `ydoc-server-polyglot/` — The server bundled (esbuild, CommonJS) to run
-  **inside** the GraalVM JVM engine process via GraalJS, through in-process
-  channel callbacks. Since stage 1a of the JVM-by-default plan this is only the
-  rollback host (`ENSO_YDOC_HOST=engine`), until it is deleted one release later
-  (PR M).
 - `ydoc-channel/` — Small Yjs-based bidirectional message channel library, used
   by both client and server.
 - `ydoc-inspect/` — Dev-only proxy that logs Ydoc/LS traffic for debugging
