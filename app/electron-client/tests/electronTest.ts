@@ -1,4 +1,6 @@
 /** @file Commonly used functions for electron tests */
+import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -9,6 +11,7 @@ import {
   type ElectronApplication,
   type Locator,
   type Page,
+  type TestInfo,
 } from 'playwright/test'
 import { electronExecutablePath } from './packagedIde'
 
@@ -76,7 +79,11 @@ export const test = base.extend<{
   spareEngine: [false, { option: true }],
 
   /** Setup for all tests: Create an electron-based app instance. */
-  app: async function ({ projectsDir, testRunId, aiEnabled, welcomeProject, spareEngine }, use) {
+  app: async function (
+    { projectsDir, testRunId, aiEnabled, welcomeProject, spareEngine },
+    use,
+    testInfo,
+  ) {
     const args = [
       ...(process.env.ENSO_TEST_APP_ARGS?.split(',') ?? []),
       ...(welcomeProject ? [] : ['--no-welcome-project']),
@@ -97,6 +104,8 @@ export const test = base.extend<{
     try {
       await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true })
       await use(app)
+      // Note [A Failed Test Dumps The Engine's Threads].
+      if (testInfo.status !== testInfo.expectedStatus) await dumpEngineState(testRunId, testInfo)
       await app.context().tracing.stop({ path: `test-traces/${testRunId}.zip` })
       await app.close()
     } finally {
@@ -112,6 +121,59 @@ export const test = base.extend<{
     await use(innerPage)
   },
 })
+
+/* Note [A Failed Test Dumps The Engine's Threads]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * On the Windows CI runner the JVM engine's first execution of a new project did not finish in
+ * 300 s (#666), and its INFO log did not say why. When a test fails under CI, before the app
+ * closes, this writes `test-traces/<run>-engine.txt`: the CPU time of the busiest processes, twice
+ * 10 s apart (busy or waiting?), and the threads of every JVM. The bundled runtime has no `jcmd`, so
+ * it uses the runner's own JDK (`JAVA_HOME_25_X64`, else `JAVA_HOME_21_X64`, else `JAVA_HOME`).
+ * A missing tool is noted in the file, never fatal.
+ */
+async function dumpEngineState(testRunId: string, testInfo: TestInfo): Promise<void> {
+  if (process.env.CI == null) return
+  const run = (file: string, args: string[]) =>
+    new Promise<string>((resolve) =>
+      execFile(file, args, { timeout: 60_000, maxBuffer: 64 * 1024 * 1024 }, (error, out, err) =>
+        resolve(`${out}${err}${error != null ? `\n(${error.message})` : ''}`),
+      ),
+    )
+  const processes = () =>
+    process.platform === 'win32' ?
+      run('powershell', [
+        '-NoProfile',
+        '-Command',
+        'Get-Process | Sort-Object CPU -Descending | Select-Object -First 25 Id,ProcessName,CPU,WorkingSet64 | Format-Table -AutoSize | Out-String -Width 200',
+      ])
+    : run('ps', ['-eo', 'pid,ppid,pcpu,cputime,rss,comm', '--sort=-pcpu'])
+  const sections = [`Test: ${testInfo.titlePath.join(' > ')} (${testInfo.status})`]
+  sections.push(`Processes at ${new Date().toISOString()}:\n${await processes()}`)
+  await new Promise((resolve) => setTimeout(resolve, 10_000))
+  sections.push(`Processes at ${new Date().toISOString()}:\n${await processes()}`)
+  const javaHome = [
+    process.env.JAVA_HOME_25_X64,
+    process.env.JAVA_HOME_21_X64,
+    process.env.JAVA_HOME,
+  ].find((home) => home != null && home !== '')
+  const jcmd =
+    javaHome && path.join(javaHome, 'bin', process.platform === 'win32' ? 'jcmd.exe' : 'jcmd')
+  if (!jcmd || !existsSync(jcmd)) {
+    sections.push('No jcmd: no JAVA_HOME_25_X64, JAVA_HOME_21_X64 or JAVA_HOME with one.')
+  } else {
+    const list = await run(jcmd, ['-l'])
+    sections.push(`${jcmd} -l:\n${list}`)
+    for (const line of list.split(/\r?\n/)) {
+      const [pid, ...main] = line.trim().split(' ')
+      if (pid == null || !/^\d+$/.test(pid) || main.join(' ').includes('JCmd')) continue
+      sections.push(
+        `Threads of ${pid} (${main.join(' ')}):\n${await run(jcmd, [pid, 'Thread.print'])}`,
+      )
+    }
+  }
+  await fs.mkdir('test-traces', { recursive: true })
+  await fs.writeFile(`test-traces/${testRunId}-engine.txt`, sections.join('\n\n'))
+}
 
 /**
  * The tab of the project a fresh install opens: the bundled `Getting_Started` sample
