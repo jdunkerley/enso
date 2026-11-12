@@ -178,8 +178,17 @@ installer (the old Rust installer was removed).
 - `build/installer.nsh` migrates an existing install made by the old Rust
   installer: it removes that installer's uninstall key, `App Paths` entry and
   ProgIDs, and keeps `.enso` file association working.
+- `build/installer.nsh`'s `customInstall` trains the JDK AOT cache (#668) by
+  running the installed app with `--train-jvm-aot` (`trainJvmAotNow` in
+  `src/projectService.ts`: no window, no single-instance lock, normal priority,
+  exit 0 with a cache or nothing to do, 1 on failure, which the installer
+  ignores: the IDE then trains at launch). An install the user runs waits for it
+  (`ExecWait`, ~45 s on a desktop); an in-app update (`${isUpdated}`) does not,
+  and the relaunched IDE finds `train.lock` held and waits for that cache.
 - `tools/ci/windows-installer-smoke.ps1` runs in CI on every packaging run: it
-  installs silently, starts the app, and uninstalls.
+  installs silently, checks that the install trained one AOT cache under
+  `%APPDATA%\Enso\jvm-aot` (printing the newest IDE log if not), starts the app,
+  and uninstalls (removing that cache).
 - Builds are unsigned for now.
 
 **Build the engine locally — don't bundle a released one.** `ide-local` always
@@ -216,13 +225,14 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   native engine"). The `--engine-mode` and `--jvm` flags were removed.
 - `ENSO_JVM_AOT_DIR` — where the per-user JDK AOT cache lives instead of
   `<userData>/jvm-aot` (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
-  cache trains in the background, once the window is up; `before-quit` stops a
-  running training (and the spare engine, `stopSpareEngine`: while a spare is
-  alive, `holdQuitForSpareEngine` in `src/spareQuit.ts` cancels the quit, waits
-  up to 5 s for the spare to exit, kills its process tree if it has not, and
-  quits again, once; tested in `tests/headless/spareQuit.test.ts`). An update
-  waits the same way: an update installed on quit starts on the app's `quit`
-  event, after that stop, and `Updater.quitAndInstall` awaits `stopSpareEngine`
+  cache trains in the background, 10 s after the window is up, unless the
+  Windows installer has trained it already; `before-quit` stops a running
+  training (and the spare engine, `stopSpareEngine`: while a spare is alive,
+  `holdQuitForSpareEngine` in `src/spareQuit.ts` cancels the quit, waits up to 5
+  s for the spare to exit, kills its process tree if it has not, and quits
+  again, once; tested in `tests/headless/spareQuit.test.ts`). An update waits
+  the same way: an update installed on quit starts on the app's `quit` event,
+  after that stop, and `Updater.quitAndInstall` awaits `stopSpareEngine`
   (`beforeInstall`) before it starts the installer, which on Windows runs before
   the app has quit. The open-time harness points it at a directory of its run
   (`<out>/jvm-aot` for the JVM engines, `<out>/shim-jvm-aot` for native, which
@@ -947,11 +957,13 @@ engines set `ENSO_SPARE_ENGINE=1`. The engines are:
   for `jvm` only when it has `shimAot`: older `jvm` runs had the harness's own
   cache. `open-time.md` prints it under the caption.
 - `jvm-first`: the same variables, with `<out>/jvm-aot` deleted before every
-  launch: a user's very first launch. Nothing trains during its open: the shim
-  stops a running training when an open starts and restarts it 60 s after the
-  open was answered (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). A
-  delete that fails (a JVM of the last launch still holding `enso.aot` on
-  Windows) is retried, then the launch is recorded as failed.
+  launch: a user's very first launch. Nothing trains during its first open: the
+  shim begins a training 10 s after launch, and an open in flight before then
+  holds it back until 60 s after the open was answered
+  (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"); one that has begun is no
+  longer stopped by an open. A delete that fails (a JVM of the last launch still
+  holding `enso.aot` on Windows) is retried, then the launch is recorded as
+  failed.
 - `jvm-spare`: the JVM with the spare engine on
   (`project-manager-shim/CLAUDE.md`, "Spare engine"; Note [Spare Engines In The
   Harness] in `perf/openTime.ts`). The shim starts a spare only after the GUI

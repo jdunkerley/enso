@@ -50,6 +50,8 @@ function cache(trainer: FakeTrainer, settings: Partial<JvmAotCacheSettings> = {}
       rootDirectory: root,
       appVersion: '1',
       ensoExecutable: bundle,
+      // At once, unless a test is about the delay.
+      startDelayMs: 0,
       ...settings,
     },
     trainer,
@@ -85,7 +87,7 @@ afterEach(async () => {
   await fs.rm(path.dirname(root), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
-test('trains at launch when the JVM is the default, and uses the cache after', async () => {
+test('trains at launch, and uses the cache after', async () => {
   const trainer = new FakeTrainer()
   const created = cache(trainer)
   await created.start()
@@ -147,40 +149,108 @@ test('no training while another live process holds the lock', async () => {
   expect(trainer.runs).toHaveLength(0)
 })
 
-test('an open kills the training; it restarts 60 s after the last answer', async () => {
-  vi.useFakeTimers({ shouldAdvanceTime: true })
+test('an open does not stop a running training (#669)', async () => {
   const trainer = new FakeTrainer()
   const created = cache(trainer)
   await created.start()
   created.openStarted()
-  expect(trainer.runs[0]!.signal.aborted).toBe(true)
-  // The killed training's lock is released (real file I/O, outside the fake clock).
-  await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
+  created.openAnswered()
+  expect(trainer.runs[0]!.signal.aborted).toBe(false)
+  await trainer.runs[0]!.finish()
+  await vi.waitFor(async () => expect(await created.jvmOptions()).toHaveLength(2))
+  expect(trainer.runs).toHaveLength(1)
+})
+
+test('the training begins 10 s after the launch, not with it (#670)', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  const trainer = new FakeTrainer()
+  // The default delay, not the helper's.
+  const created = new JvmAotCache(
+    { rootDirectory: root, appVersion: '1', ensoExecutable: bundle },
+    trainer,
+  )
+  caches.push(created)
+  await created.start()
+  // Due at once, so no spare starts and the toast shows; begun only after the delay.
+  expect(created.isTraining()).toBe(true)
+  await vi.advanceTimersByTimeAsync(9_000)
+  expect(trainer.runs).toHaveLength(0)
+  await vi.advanceTimersByTimeAsync(2_000)
+  await vi.waitFor(() => expect(trainer.runs).toHaveLength(1))
+})
+
+test('an open during the start delay holds the training back until 60 s after the last answer', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  const trainer = new FakeTrainer()
+  const created = cache(trainer, { startDelayMs: 10_000 })
+  await created.start()
+  created.openStarted()
+  await vi.advanceTimersByTimeAsync(5_000)
   created.openAnswered()
   await vi.advanceTimersByTimeAsync(30_000)
   created.openStarted()
   created.openAnswered()
   await vi.advanceTimersByTimeAsync(59_000)
-  expect(trainer.runs).toHaveLength(1)
+  expect(trainer.runs).toHaveLength(0)
   await vi.advanceTimersByTimeAsync(2_000)
-  await vi.waitFor(() => expect(trainer.runs).toHaveLength(2))
+  await vi.waitFor(() => expect(trainer.runs).toHaveLength(1))
 })
 
-test('no restart while an open is still in flight', async () => {
+test('no start while an open is still in flight', async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   const trainer = new FakeTrainer()
-  const created = cache(trainer)
+  const created = cache(trainer, { startDelayMs: 10_000 })
   await created.start()
   created.openStarted()
   created.openStarted()
   created.openAnswered()
-  // The killed training's lock is released (real file I/O, outside the fake clock).
-  await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
   await vi.advanceTimersByTimeAsync(120_000)
-  expect(trainer.runs).toHaveLength(1)
+  expect(trainer.runs).toHaveLength(0)
   created.openAnswered()
   await vi.advanceTimersByTimeAsync(61_000)
-  await vi.waitFor(() => expect(trainer.runs).toHaveLength(2))
+  await vi.waitFor(() => expect(trainer.runs).toHaveLength(1))
+})
+
+test('a quit during the start delay starts nothing', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  const trainer = new FakeTrainer()
+  const created = cache(trainer, { startDelayMs: 10_000 })
+  await created.start()
+  await created.dispose()
+  await vi.advanceTimersByTimeAsync(20_000)
+  expect(trainer.runs).toHaveLength(0)
+})
+
+test('trainNow trains at once and says how it ended', async () => {
+  const trainer = new FakeTrainer()
+  const onTrainingStarted = vi.fn()
+  // The delay is the IDE's; the installer's training does not wait for it.
+  const created = cache(trainer, { startDelayMs: 60_000, onTrainingStarted })
+  const outcome = created.trainNow()
+  await vi.waitFor(() => expect(trainer.runs).toHaveLength(1))
+  await trainer.runs[0]!.finish()
+  expect(await outcome).toBe('trained')
+  expect(await created.jvmOptions()).toHaveLength(2)
+  expect(onTrainingStarted).not.toHaveBeenCalled()
+  // Nothing to do the second time.
+  expect(await cache(new FakeTrainer()).trainNow()).toBe('skipped')
+})
+
+test('trainNow: failed, and skipped while another process trains', async () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const failing = new FakeTrainer()
+  const failed = cache(failing).trainNow()
+  await vi.waitFor(() => expect(failing.runs).toHaveLength(1))
+  failing.runs[0]!.fail()
+  expect(await failed).toBe('failed')
+  error.mockRestore()
+
+  await fs.mkdir(root, { recursive: true })
+  // This test's own pid is alive.
+  await fs.writeFile(path.join(root, 'train.lock'), String(process.pid))
+  const waiting = new FakeTrainer()
+  expect(await cache(waiting).trainNow()).toBe('skipped')
+  expect(waiting.runs).toHaveLength(0)
 })
 
 test('a finished training is not restarted by an open', async () => {
@@ -309,7 +379,7 @@ test('dispose stops a running training at once, before it awaits anything', asyn
   expect(await exists(path.join(root, 'train.lock'))).toBe(false)
 })
 
-test('isTraining: from the launch check, through an open and the wait to restart, until a cache is made', async () => {
+test('isTraining: from the launch check, through an open, until a cache is made', async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   const trainer = new FakeTrainer()
   const created = cache(trainer)
@@ -321,13 +391,11 @@ test('isTraining: from the launch check, through an open and the wait to restart
   expect(created.isTraining()).toBe(true)
   created.openStarted()
   created.openAnswered()
-  // Killed by the open, waiting to restart: still to come.
-  await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
-  expect(created.isTraining()).toBe(true)
+  // Running through the open.
   await vi.advanceTimersByTimeAsync(61_000)
-  await vi.waitFor(() => expect(trainer.runs).toHaveLength(2))
   expect(created.isTraining()).toBe(true)
-  await trainer.runs[1]!.finish()
+  expect(trainer.runs).toHaveLength(1)
+  await trainer.runs[0]!.finish()
   await vi.waitFor(() => expect(created.isTraining()).toBe(false))
 })
 
@@ -340,7 +408,7 @@ test('isTraining is false with a cache, after a failed training, and after a qui
   await again.start()
   expect(again.isTraining()).toBe(false)
 
-  await fs.rm(path.join(root), { recursive: true, force: true })
+  await fs.rm(path.join(root), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   const failing = new FakeTrainer()
   const failed = cache(failing)
   await failed.start()
@@ -349,7 +417,7 @@ test('isTraining is false with a cache, after a failed training, and after a qui
 
   const quitting = new FakeTrainer()
   const quit = cache(quitting)
-  await fs.rm(path.join(root), { recursive: true, force: true })
+  await fs.rm(path.join(root), { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
   await quit.start()
   expect(quit.isTraining()).toBe(true)
   await quit.dispose()
@@ -381,21 +449,26 @@ test('no start is announced with a cache', async () => {
   expect(onTrainingEnded).not.toHaveBeenCalled()
 })
 
-test('a training an open stopped stays started, and is announced once when it ends', async () => {
+test('a training an open held back stays started, and is announced once when it ends', async () => {
   const trainer = new FakeTrainer()
   const onTrainingStarted = vi.fn()
   const onTrainingEnded = vi.fn()
-  const created = cache(trainer, { onTrainingStarted, onTrainingEnded, retrainDelayMs: 20 })
+  const created = cache(trainer, {
+    onTrainingStarted,
+    onTrainingEnded,
+    startDelayMs: 20,
+    retrainDelayMs: 20,
+  })
   await created.start()
   created.openStarted()
   created.openAnswered()
-  await vi.waitFor(() => expect(trainer.runs).toHaveLength(2))
-  await trainer.runs[1]!.finish()
+  await vi.waitFor(() => expect(trainer.runs).toHaveLength(1))
+  await trainer.runs[0]!.finish()
   await vi.waitFor(() => expect(onTrainingEnded).toHaveBeenCalledExactlyOnceWith('trained'))
   expect(onTrainingStarted).toHaveBeenCalledOnce()
 })
 
-test('a failed training is announced too; one an open stopped is not', async () => {
+test('a failed training is announced too; one an open holds back is not', async () => {
   const failing = new FakeTrainer()
   const failed = vi.fn()
   const first = cache(failing, { onTrainingEnded: failed })
@@ -403,15 +476,16 @@ test('a failed training is announced too; one an open stopped is not', async () 
   failing.runs[0]!.fail()
   await vi.waitFor(() => expect(failed).toHaveBeenCalledExactlyOnceWith('failed'))
 
-  const stopped = new FakeTrainer()
-  const aborted = vi.fn()
-  const second = cache(stopped, { onTrainingEnded: aborted })
+  await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  const held = new FakeTrainer()
+  const ended = vi.fn()
+  const second = cache(held, { onTrainingEnded: ended, startDelayMs: 20 })
   await second.start()
   second.openStarted()
-  // The stopped training is over once its lock is released; it is still to come (`isTraining`).
-  await vi.waitFor(async () => expect(await exists(path.join(root, 'train.lock'))).toBe(false))
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  expect(held.runs).toHaveLength(0)
   expect(second.isTraining()).toBe(true)
-  expect(aborted).not.toHaveBeenCalled()
+  expect(ended).not.toHaveBeenCalled()
 })
 
 test('while another process trains, the lock is checked again; its cache ends the wait', async () => {

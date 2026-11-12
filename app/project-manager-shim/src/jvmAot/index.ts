@@ -1,13 +1,14 @@
 /**
  * @file The per-user JDK AOT cache (spec, stage 1d "The AOT cache lifecycle"): trained in the
- * background at app launch, killed by any open and restarted 60 s after the last one was answered,
- * used by every engine once it exists, and deleted when a JVM says it does not match.
+ * background a little after app launch (or by the Windows installer, `trainNow`), never started
+ * while an open is in flight but not stopped by one either, used by every engine once it exists,
+ * and deleted when a JVM says it does not match.
  */
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { aotKey, enginePaths, isAppImageMount, isTranslocated, readJvmOptionsText } from './key.js'
 import { acquireTrainingLock } from './lock.js'
-import { EngineTrainer, type Trainer } from './trainer.js'
+import { EngineTrainer, type Trainer, type TrainingPriority } from './trainer.js'
 import { aotRejection } from './useLog.js'
 
 export { aotCreateArguments } from '../projectService/javaLaunch.js'
@@ -22,7 +23,7 @@ export {
   type StableEngineHooks,
   type StableEngineOptions,
 } from './stableEngine.js'
-export { EngineTrainer, type Trainer } from './trainer.js'
+export { EngineTrainer, type Trainer, type TrainingPriority } from './trainer.js'
 export { aotRejection } from './useLog.js'
 
 export interface JvmAotCacheSettings {
@@ -31,8 +32,21 @@ export interface JvmAotCacheSettings {
   readonly appVersion: string
   /** The bundled engine's launcher (`<resources>/enso/dist/<version>/bin/enso`). */
   readonly ensoExecutable: string
-  /** How long after the last open was answered a killed training restarts: 60 s. */
+  /**
+   * How long after the last open was answered a training held back by it starts, and how often a
+   * training waiting for another process's lock looks again: 60 s.
+   */
   readonly retrainDelayMs?: number
+  /**
+   * How long after `start()` the training begins: 10 s, so that it does not compete with the IDE's
+   * own start-up (#670). An open in that time holds it back until `retrainDelayMs` after its answer.
+   */
+  readonly startDelayMs?: number
+  /**
+   * The training engine's and `java`'s priority: `belowNormal` in the IDE, where it runs beside
+   * the user's work, `normal` in the installer (`trainNow`), where nothing else waits.
+   */
+  readonly trainingPriority?: TrainingPriority
   /**
    * Told once `start()` has found that a training is needed (no cache for the key): from then on
    * the cache is being prepared, through any open that stops the training, until
@@ -49,6 +63,12 @@ export interface JvmAotCacheSettings {
 
 /** How a training ended: a cache was made (here or by another process), or none will be this launch. */
 export type JvmAotTrainingOutcome = 'trained' | 'failed'
+
+/**
+ * What `trainNow` did: made the cache, failed, or had nothing to do (a cache already there, the
+ * no cache for this engine, or another process training it).
+ */
+export type JvmAotTrainNowOutcome = JvmAotTrainingOutcome | 'skipped'
 
 const CACHE_FILE = 'enso.aot'
 const USE_LOG_FILE = 'use.log'
@@ -117,6 +137,7 @@ export class JvmAotCache {
       new EngineTrainer({
         ensoExecutable: settings.ensoExecutable,
         scratchRoot: path.join(settings.rootDirectory, SCRATCH_DIRECTORY),
+        priority: settings.trainingPriority ?? 'belowNormal',
       })
   }
 
@@ -147,22 +168,47 @@ export class JvmAotCache {
     return directory != null ? path.join(directory, CACHE_FILE) : undefined
   }
 
-  /** At app launch: train when there is no cache for the key, and no other window trains. */
+  /**
+   * At app launch: train when there is no cache for the key, and no other window trains. The check is made at once (so that `isTraining` holds back the spare engine and
+   * the GUI shows the toast); the training begins `startDelayMs` later.
+   */
   async start(): Promise<void> {
-    if (this.disposed) return
+    if (!(await this.checkAtLaunch())) return
+    this.settings.onTrainingStarted?.()
+    const delayMs = this.settings.startDelayMs ?? 10_000
+    if (delayMs <= 0) await this.beginTraining()
+    else this.scheduleTraining(delayMs)
+  }
+
+  /**
+   * Train now and wait for the end (the Windows installer's `--train-jvm-aot`, #668). Nothing is
+   * announced; the caller disposes the cache afterwards.
+   */
+  async trainNow(): Promise<JvmAotTrainNowOutcome> {
+    if (!(await this.checkAtLaunch())) return 'skipped'
+    await this.beginTraining()
+    await this.training?.done
+    const cache = await this.cacheFile()
+    if (cache != null && (await exists(cache))) return 'trained'
+    // Still due: another process holds the lock and trains it.
+    return this.wanted ? 'skipped' : 'failed'
+  }
+
+  /** Whether a training is due: this engine's cache is missing. */
+  private async checkAtLaunch(): Promise<boolean> {
+    if (this.disposed) return false
     this.checkingAtLaunch = true
     try {
       const cache = await this.cacheFile()
-      if (cache == null) return
+      if (cache == null) return false
       // A training interrupted by a quit can leave its files (the next training deletes them too).
       await this.deleteLeftovers(cache)
-      if (await exists(cache)) return
+      if (await exists(cache)) return false
       this.wanted = true
+      return true
     } finally {
       this.checkingAtLaunch = false
     }
-    this.settings.onTrainingStarted?.()
-    await this.beginTraining()
   }
 
   /** Start a training, unless one runs, an open is in flight, or another process holds the lock. */
@@ -308,15 +354,18 @@ export class JvmAotCache {
     }
   }
 
-  /** An open started: kill a running training (its files are deleted). */
+  /**
+   * An open started: a training still due is held back until it has been answered. A running one
+   * goes on, at below-normal priority, so the open has the CPU first: killing it, as this once did,
+   * meant that a user who opened projects every minute or two never got a cache (#669).
+   */
   openStarted(): void {
     this.opensInFlight += 1
     clearTimeout(this.retrainTimer)
     this.retrainTimer = undefined
-    this.training?.controller.abort()
   }
 
-  /** An open was answered: restart training `retrainDelayMs` after the last one, if still needed. */
+  /** An open was answered: start a training still due `retrainDelayMs` after the last one. */
   openAnswered(): void {
     this.opensInFlight = Math.max(0, this.opensInFlight - 1)
     this.scheduleRetrain()
@@ -327,19 +376,25 @@ export class JvmAotCache {
    * (the last open's answer schedules it then).
    */
   private scheduleRetrain(): void {
-    if (this.opensInFlight > 0 || !this.wanted || this.disposed) return
+    this.scheduleTraining(this.settings.retrainDelayMs ?? 60_000)
+  }
+
+  /** Try training `delayMs` from now, if it is still due, none runs and no open is in flight. */
+  private scheduleTraining(delayMs: number): void {
+    if (this.opensInFlight > 0 || !this.wanted || this.disposed || this.training != null) return
     clearTimeout(this.retrainTimer)
     this.retrainTimer = setTimeout(() => {
       this.retrainTimer = undefined
       this.beginTraining().catch((error: unknown) =>
         console.error('JDK AOT cache: training could not start:', error),
       )
-    }, this.settings.retrainDelayMs ?? 60_000)
+    }, delayMs)
   }
 
   /**
    * Whether a training is still to come or running: from `start()` looking for the cache until a
-   * training has made one or failed, an aborted one waiting to restart included. No spare meanwhile.
+   * training has made one or failed, one waiting to begin (the start delay, an open in flight,
+   * another process's lock) included. No spare meanwhile.
    */
   isTraining(): boolean {
     if (this.disposed) return false

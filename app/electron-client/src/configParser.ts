@@ -17,6 +17,11 @@ const OPTIONS_META: Readonly<Record<string, { flag: string; description: string 
     description:
       'Run in headless mode (single execution). Requires `--startup.project <project path>`.',
   },
+  trainJvmAot: {
+    flag: '--train-jvm-aot',
+    description:
+      'Train the JDK AOT cache for this install and exit (the Windows installer runs it): exit code 0 when there is a cache or nothing to train, 1 when the training failed',
+  },
   displayWindow: {
     flag: '--no-window',
     description: 'Run server only, no GUI',

@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-  Installs the IDE silently, checks it is registered and starts, then uninstalls it.
+  Installs the IDE silently, checks it is registered, trained the JDK AOT cache (#668) and starts,
+  then uninstalls it.
   This is the check that would have caught the installer that exited on launch (#251).
   It refuses to run where an Enso is already installed, so it is safe on a developer machine.
 #>
@@ -39,10 +40,28 @@ if ((Get-EnsoUninstallEntries).Count -gt 0 -or @(Get-MachineEnsoEntries).Count -
   throw 'Refusing to run: an Enso install is already present.'
 }
 
+# The installer trains the JDK AOT cache (#668) under the IDE's userData. Only the key directories
+# this install makes are checked and removed: a developer machine may have its own.
+$aotRoot = Join-Path $env:APPDATA 'Enso\jvm-aot'
+function Get-AotKeys { if (Test-Path $aotRoot) { @(Get-ChildItem $aotRoot -Directory | ForEach-Object Name) } else { @() } }
+$aotKeysBefore = Get-AotKeys
+
 $installer = (Resolve-Path $Installer).Path
 Write-Host "Installing $installer"
+$installStarted = Get-Date
 $process = Start-Process $installer -ArgumentList '/S' -PassThru -Wait
 if ($process.ExitCode -ne 0) { throw "The installer exited with $($process.ExitCode)." }
+Write-Host "Installed in $([int]((Get-Date) - $installStarted).TotalSeconds) s."
+
+$newAotKeys = @(Get-AotKeys | Where-Object { $aotKeysBefore -notcontains $_ })
+$trained = @($newAotKeys | Where-Object { Test-Path (Join-Path $aotRoot "$_\enso.aot") })
+if ($trained.Count -ne 1) {
+  $log = Get-ChildItem (Join-Path $env:APPDATA 'Enso\logs') -File -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime | Select-Object -Last 1
+  if ($log) { Write-Host "The newest IDE log, $($log.FullName):"; Get-Content $log.FullName -Tail 60 }
+  throw "Expected the installer to train one JDK AOT cache, found $($trained.Count) (new key directories: $($newAotKeys -join ', '))."
+}
+Write-Host "The installer trained the JDK AOT cache $(Join-Path $aotRoot $trained[0])."
 
 Assert-NoMachineInstall
 # HKCU is where a per-user install registers: exactly one entry must be there.
@@ -82,4 +101,5 @@ if ((Get-EnsoUninstallEntries).Count -gt 0) { throw 'The uninstaller left its un
 Assert-NoMachineInstall
 Remove-Item $uninstaller -Force -ErrorAction SilentlyContinue
 Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+foreach ($key in $newAotKeys) { Remove-Item (Join-Path $aotRoot $key) -Recurse -Force -ErrorAction SilentlyContinue }
 Write-Host 'Installer smoke test passed.'

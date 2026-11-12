@@ -415,21 +415,20 @@ POST `/api/project-service/engine/setSpare` `{ enabled: boolean }` answers
 `ProjectManager.setSpareEngine`, `LocalBackend.setSpareEngine`); then a spare is
 wanted unless, in this order: quitting (`stopSpareEngine`, for good), the
 setting is off, `ENSO_SPARE_ENGINE=0`, the AOT cache is training
-(`JvmAotCache.isTraining`: from its launch check until a cache is made, a killed
-training waiting to restart included; Electron refreshes after `start()` and
-when `onTrainingEnded` says a training finished or failed, not when an open
-stopped it), `--profiling-path` is among the extra arguments (a relative path,
-which standby refuses), a project is opening, or a project is in use. An
-unwanted spare is stopped with that reason, except for an opening project, which
-takes the spare or stops it itself. The refresh runs on `setSpareEngine`, after
-a failed open (once it no longer counts as opening), and after a close, once the
-closing engine has exited or `SPARE_AFTER_CLOSE_MS` (2 s,
-`EngineSettings.spareAfterCloseMs`, an `unref`'d timer) has passed, whichever is
-first. When a close's engine takes longer than 2 s to exit, a spare starts 2 s
-into the close (the gate's delay), beside the closing engine; reopening the
-project then takes it if its key matches. A quit that is cancelled after the
-spare was stopped (`stopSpareEngine` is for good) leaves no spare for the rest
-of the session.
+(`JvmAotCache.isTraining`: from its launch check until a cache is made, one
+waiting to begin included; Electron refreshes after `start()` and when
+`onTrainingEnded` says a training finished or failed), `--profiling-path` is
+among the extra arguments (a relative path, which standby refuses), a project is
+opening, or a project is in use. An unwanted spare is stopped with that reason,
+except for an opening project, which takes the spare or stops it itself. The
+refresh runs on `setSpareEngine`, after a failed open (once it no longer counts
+as opening), and after a close, once the closing engine has exited or
+`SPARE_AFTER_CLOSE_MS` (2 s, `EngineSettings.spareAfterCloseMs`, an `unref`'d
+timer) has passed, whichever is first. When a close's engine takes longer than 2
+s to exit, a spare starts 2 s into the close (the gate's delay), beside the
+closing engine; reopening the project then takes it if its key matches. A quit
+that is cancelled after the spare was stopped (`stopSpareEngine` is for good)
+leaves no spare for the rest of the session.
 
 - **No spare beside an open.** `openProject` counts itself (`opensInFlight`,
   `opensStarted`) from its first line, before any await. The decision to start
@@ -458,9 +457,13 @@ A JVM engine starts faster with a JDK AOT cache (JEP 483/514). A cache records
 the module path and the runtime it was trained with, and no platform installs
 the IDE at a fixed path, so it cannot ship in the installer: each user trains
 their own (spec `docs/superpowers/specs/2026-11-03-jvm-by-default-design.md`,
-stage 1d). `JvmAotCache` (`index.ts`) owns its lifecycle; Electron creates one
-in `app/electron-client/src/projectService.ts` and passes it to the
-`ProjectService` as `EngineSettings.jvmAot`. The Vite dev server has none.
+stage 1d). A cache built elsewhere and copied in is refused even behind a
+directory junction at a fixed path, since the JVM resolves the real path
+(measured 2026-11-11, #668). On Windows the installer trains it (`trainNow`,
+below); elsewhere the IDE does, at launch. `JvmAotCache` (`index.ts`) owns its
+lifecycle; Electron creates one in `app/electron-client/src/projectService.ts`
+and passes it to the `ProjectService` as `EngineSettings.jvmAot`. The Vite dev
+server has none.
 
 - **Key** (`key.ts`): the first 16 hex digits of SHA-256 over the app version,
   the real path of the engine distribution (`dist/<version>`), the bundled
@@ -471,26 +474,32 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   (`/.mount_<random>/`, `isAppImageMount`): no key, so nothing is trained or
   used.
 - **Training** (`trainer.ts`, `driver.ts`): `start()`, called once the window is
-  up, trains when there is no cache for the key and no other process holds
-  `<root>/train.lock` (`lock.ts`: created exclusively with the pid and a random
-  token, and touched every minute; a lock whose pid is dead, or that has not
-  been touched for 10 minutes, since pids are reused, is taken over. A takeover,
-  a heartbeat and a release run only while holding `train.lock.takeover`,
-  created exclusively, so a stale lock is removed in place, never moved aside
-  and put back, and no takeover can land between a holder's token check and its
-  touch or delete (Note [Takeovers Are Serialised], #603). A taker that finds
-  the takeover file held gives up; a release retries for 2 s and then leaves its
-  lock. A takeover file is stale when its pid is dead or after 30 s, since it is
-  held for milliseconds. Both files are written under a unique name and
-  hard-linked into place, so neither is ever seen empty (Note [A Lock File
-  Appears Complete]). `.stale-` asides left by earlier versions, and `.new-`
-  files a crash left, are deleted once older than 10 minutes). `EngineTrainer`
-  makes a scratch project with `--new` (the welcome template) in
-  `<root>/enso-aot-training/`, starts the `--server` engine on it at
-  below-normal priority (`os.setPriority`) with the launch options
-  `-XX:AOTMode=record` and `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a
-  fresh `LANGUAGE_SERVER_CHANNEL_TOKEN`, waits for `/_health` (180 s), and
-  `driveOpen` plays an open over the Language Server's channel sockets
+  up, decides at once (so the spare engine is held back and the toast shows) and
+  begins the training `startDelayMs` (10 s) later, so it does not compete with
+  the IDE's own start-up (#670). `trainNow()` trains at once and resolves with
+  `trained`, `failed` or `skipped` (nothing to do, or another process holds the
+  lock); Electron's `--train-jvm-aot` uses it, at `trainingPriority: 'normal'`.
+  A training runs only when there is no cache for the key and no other process
+  holds `<root>/train.lock` (`lock.ts`: created exclusively with the pid and a
+  random token, and touched every minute; a lock whose pid is dead, or that has
+  not been touched for 10 minutes, since pids are reused, is taken over. A
+  takeover, a heartbeat and a release run only while holding
+  `train.lock.takeover`, created exclusively, so a stale lock is removed in
+  place, never moved aside and put back, and no takeover can land between a
+  holder's token check and its touch or delete (Note [Takeovers Are Serialised],
+  #603). A taker that finds the takeover file held gives up; a release retries
+  for 2 s and then leaves its lock. A takeover file is stale when its pid is
+  dead or after 30 s, since it is held for milliseconds. Both files are written
+  under a unique name and hard-linked into place, so neither is ever seen empty
+  (Note [A Lock File Appears Complete]). `.stale-` asides left by earlier
+  versions, and `.new-` files a crash left, are deleted once older than 10
+  minutes). `EngineTrainer` makes a scratch project with `--new` (the welcome
+  template) in `<root>/enso-aot-training/`, starts the `--server` engine on it
+  at below-normal priority (`os.setPriority`; `normal` for the installer) with
+  the launch options `-XX:AOTMode=record` and
+  `-XX:AOTConfiguration=<key>/enso.aot.aotconf`, a fresh
+  `LANGUAGE_SERVER_CHANNEL_TOKEN`, waits for `/_health` (180 s), and `driveOpen`
+  plays an open over the Language Server's channel sockets
   (`/channel/{json,vis-control,vis-data}?token=`):
   `session/initProtocolConnection`, `executionContext/create` and `push` of
   `main`, an `attach` of the table visualisation to the node the template's
@@ -513,10 +522,9 @@ in `app/electron-client/src/projectService.ts` and passes it to the
   cache is there); a finished or failed training, and a cache found made by
   another process, call `onTrainingEnded` with `trained` or `failed` (Electron
   refreshes the spare engine and tells the GUI, which shows a toast meanwhile).
-  A training an open stops is neither: it is still due. A training that throws
-  while it starts (a lock release that fails) ends as `failed` too
-  (`startFailed`). While another process holds `train.lock`, this window shows
-  the training toast as well, and reports `trained` up to 60 s
+  A training that throws while it starts (a lock release that fails) ends as
+  `failed` too (`startFailed`). While another process holds `train.lock`, this
+  window shows the training toast as well, and reports `trained` up to 60 s
   (`retrainDelayMs`) after the other process finishes. `dispose()` (Electron's
   `before-quit`) aborts a running training before it awaits anything, which
   kills its engine or `java` at once; the `.tmp` and `.aotconf` such a quit can
@@ -533,10 +541,15 @@ in `app/electron-client/src/projectService.ts` and passes it to the
     stayed when the shim began to start `java` itself: the one-step form was not
     re-measured.
 - **Yielding**: `ProjectService.openProject` calls `openStarted()` before the
-  engine starts (any mode) and `openAnswered()` after the answer, a failure
-  included. An open kills a running training (on Windows with `taskkill /T`, so
-  the engine's children go too) and deletes its `.tmp`; the training restarts 60
-  s after the last open in flight was answered.
+  engine starts and `openAnswered()` after the answer, a failure included. A
+  training not yet begun waits until 60 s after the last open in flight was
+  answered; a running one goes on through opens, at below-normal priority (#669:
+  an open used to kill it, so a user who opened projects every minute or two
+  never got a cache). Measured on the Windows bundle (2026-11-11), a training
+  takes 42 to 47 s at normal priority at 2, 4, 8 or 32 CPUs: the JVM's start in
+  record mode (~15 s) and the driven open (~16 to 19 s) dominate, so the ~110 s
+  seen in the IDE was the low priority competing with its start-up, not the CPU
+  count.
 - **Use**: an open or run gets `jvmOptions()` in its launch, two options,
   `-XX:AOTCache=<key>/enso.aot` and
   `-Xlog:aot=warning,cds=warning:file="<key>/use.log"::filecount=0` (the path

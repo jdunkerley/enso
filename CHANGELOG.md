@@ -6,6 +6,10 @@
   as Image, Postgres and AWS faster. To go back to the native engine, set
   `ENSO_ENGINE_MODE=native`, or `jvm: false` in a project's
   `package.yaml`.][666]
+- [On Windows the installer prepares the engine for faster project opens, so the
+  first projects open quickly from the first launch; installing takes about a
+  minute longer. Opening a project no longer interrupts that preparation where
+  the IDE does it itself.][671]
 - [With the JVM engine, a notice says when the IDE is preparing the engine for
   faster project opens, a one-time task of a few minutes on the first launch,
   and when the engine is ready.][662]
@@ -474,6 +478,7 @@
 
 [654]: https://github.com/jdunkerley/enso/pull/654
 [666]: https://github.com/jdunkerley/enso/pull/666
+[671]: https://github.com/jdunkerley/enso/pull/671
 [655]: https://github.com/jdunkerley/enso/pull/655
 [626]: https://github.com/jdunkerley/enso/pull/626
 [642]: https://github.com/jdunkerley/enso/pull/642

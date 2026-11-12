@@ -55,3 +55,8 @@ test('--no-welcome-project reaches the web app, and the default opens the welcom
     false,
   )
 })
+
+test('--train-jvm-aot, which the Windows installer runs (#668)', () => {
+  expect(parseArgs(['--train-jvm-aot']).trainJvmAot).toBe(true)
+  expect(parseArgs([]).trainJvmAot).toBe(false)
+})

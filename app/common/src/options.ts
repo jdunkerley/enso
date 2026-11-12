@@ -8,6 +8,8 @@ const DEFAULT_PORT = 8080
 export const OptionsSchema = z.object({
   version: z.boolean().default(false),
   headless: z.boolean().default(false),
+  /** Train the JDK AOT cache and exit (the Windows installer runs this, #668). */
+  trainJvmAot: z.boolean().default(false),
   displayWindow: z.boolean().default(true),
   useServer: z.boolean().default(true),
   engineEnabled: z.boolean().default(true),

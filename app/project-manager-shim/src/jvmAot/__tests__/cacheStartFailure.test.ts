@@ -44,6 +44,7 @@ test('a lock release that throws before the training runs ends it as failed', as
       rootDirectory: path.join(base, 'jvm-aot'),
       appVersion: '1',
       ensoExecutable: path.join(base, 'enso', 'dist', '1.0', 'bin', 'enso'),
+      startDelayMs: 0,
       onTrainingStarted,
       onTrainingEnded,
     },

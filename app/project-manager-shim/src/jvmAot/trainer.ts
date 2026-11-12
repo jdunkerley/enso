@@ -37,6 +37,9 @@ import { enginePaths, readJvmOptionsText } from './key.js'
  * unnecessary, and the second is cheap.
  */
 
+/** The training's processes' priority (`JvmAotCacheSettings.trainingPriority`). */
+export type TrainingPriority = 'belowNormal' | 'normal'
+
 /** Trains a cache into `output`; rejects (with an `AbortError` on `signal`) and leaves no file on failure. */
 export interface Trainer {
   train(output: string, signal: AbortSignal): Promise<void>
@@ -57,6 +60,8 @@ export interface EngineTrainerOptions {
    * `java` to create the cache: 5 minutes each.
    */
   readonly exitTimeoutMs?: number
+  /** `belowNormal` (the default) lowers the engine's and `java`'s priority; `normal` leaves it. */
+  readonly priority?: TrainingPriority
   /** For tests: the processes to spawn in place of the bundled `java`. */
   readonly commands?: TrainerCommands
 }
@@ -163,8 +168,8 @@ export class EngineTrainer implements Trainer {
   }
 
   /** Lower a child's priority; best effort: a training at normal priority is still a training. */
-  private static lowerPriority(engine: Engine): void {
-    if (engine.child.pid == null) return
+  private lowerPriority(engine: Engine): void {
+    if (this.options.priority === 'normal' || engine.child.pid == null) return
     try {
       os.setPriority(engine.child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL)
     } catch {
@@ -248,7 +253,7 @@ export class EngineTrainer implements Trainer {
         env,
         scratchRoot,
       )
-      EngineTrainer.lowerPriority(engine)
+      this.lowerPriority(engine)
       await this.waitForHealth(port, engine, signal)
       const driving = engine
       await driveOpen({
@@ -294,7 +299,7 @@ export class EngineTrainer implements Trainer {
         scratchRoot,
       )
       engine.child.stdin?.end()
-      EngineTrainer.lowerPriority(engine)
+      this.lowerPriority(engine)
       const createCode = await this.waitForExit(engine, exitTimeoutMs)
       if (signal.aborted) throw abortError()
       if (createCode !== 0 || !(await exists(temporary))) {

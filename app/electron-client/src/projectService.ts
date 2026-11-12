@@ -19,7 +19,7 @@ import * as paths from '@/paths'
 import { lazyKeyringEntries, SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
 import { UtilityProcessYdocHost, type YdocHostChild } from '@/ydocHost/client'
 import { findEnsoExecutable, getProjectRoot } from 'project-manager-shim'
-import { JvmAotCache } from 'project-manager-shim/jvmAot'
+import { JvmAotCache, type JvmAotCacheSettings } from 'project-manager-shim/jvmAot'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { defaultSecretsFilePath, encodeKey, LocalSecrets } from 'project-manager-shim/localSecrets'
 import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
@@ -172,9 +172,14 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
 /**
  * The per-user JDK AOT cache (`project-manager-shim/jvmAot`), under `<userData>/jvm-aot`, or
  * `ENSO_JVM_AOT_DIR` (the open-time harness points it at its own directory). `null` when the
- * engine cannot be found, and with `ENSO_JVM_AOT=0`.
+ * engine cannot be found, and with `ENSO_JVM_AOT=0`. `overrides` replace the IDE's settings (the
+ * installer's training, `trainJvmAotNow`).
  */
-function createJvmAotCache(electron: Electron, electronIsDev: boolean): JvmAotCache | null {
+function createJvmAotCache(
+  electron: Electron,
+  electronIsDev: boolean,
+  overrides: Partial<JvmAotCacheSettings> = {},
+): JvmAotCache | null {
   if (!isJvmAotEnabled(process.env)) return null
   const ensoExecutable = findEnsoExecutable(
     paths.resourcesPath(electron, electronIsDev),
@@ -192,7 +197,35 @@ function createJvmAotCache(electron: Electron, electronIsDev: boolean): JvmAotCa
       // No spare engine starts while the cache trains (`isTraining`); once it has, one is wanted.
       void projectService?.refreshSpare()
     },
+    ...overrides,
   })
+}
+
+/**
+ * `--train-jvm-aot`, which the Windows installer runs once the files are in place (#668): train the
+ * cache now, at normal priority, so that the first launch already has it. Answers the exit code: 0
+ * when there is a cache or nothing to train (no cache for this install, another process training it), 1
+ * when the training failed, after which the IDE trains at launch as before.
+ */
+export async function trainJvmAotNow(electron: Electron, electronIsDev: boolean): Promise<number> {
+  const cache = createJvmAotCache(electron, electronIsDev, {
+    trainingPriority: 'normal',
+    // No window, and no project service, to tell.
+    onTrainingStarted: () => {},
+    onTrainingEnded: () => {},
+  })
+  if (cache == null) {
+    console.info('JDK AOT cache: none for this install; nothing to train.')
+    return 0
+  }
+  try {
+    const started = Date.now()
+    const outcome = await cache.trainNow()
+    console.info(`JDK AOT cache: the installer's training ${outcome} (${Date.now() - started} ms).`)
+    return outcome === 'failed' ? 1 : 0
+  } finally {
+    await cache.dispose()
+  }
 }
 
 /**
