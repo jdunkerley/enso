@@ -28,6 +28,24 @@ desktop binary (AppImage/DMG/exe + installer).
   request from another site (`Sec-Fetch-Site`, `Origin`). The API can change
   secrets and run commands, so do not add a route that bypasses the check or
   bind any other address. Tests: `tests/headless/server.test.ts`.
+- Trusts that server's certificate, and no other. `server.ts` makes a fresh
+  `mkcert` CA and certificate at every launch (`Server.certificate`), and
+  `src/localCertificate.ts` installs a `setCertificateVerifyProc` on the default
+  session and on every session created later (`session-created`; the Playwright
+  window uses the `test` partition) before any exists. It accepts a connection
+  only to `localhost`, `127.0.0.1` or `::1` presenting the certificate with this
+  launch's SHA-256 fingerprint; everything else keeps Chromium's verdict (`-3`).
+  Do not bring back `ignore-certificate-errors`: it turned TLS verification off
+  for every request on Chromium's network stack, the updater and `electron-dl`
+  downloads included (#688; Note [Only The Content Server's Certificate Is
+  Trusted]). The ydoc listeners are plain `ws://`, so they need nothing;
+  `--no-window` serves the pages to the user's own browser, which shows its
+  usual warning; `--no-server` (a window on another instance's server) now fails
+  that server's certificate. Tests: `tests/headless/localCertificate.test.ts`.
+- Sets no Chromium switches of its own: Chromium's GPU blocklist and memory
+  buffer defaults apply (`ignore-gpu-blocklist` and
+  `enable-native-gpu-memory-buffers` were removed in #688; the first made a
+  GPU-less machine accelerate in software at great CPU cost, #674).
 - Runs the Project Manager in-process via the TS `project-manager-shim` (the
   Scala Project Manager is no longer used, not even in the packaged Electron
   build).
@@ -251,9 +269,10 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   `tests/headless/jvmAotIpc.test.ts`).
 - `ENSO_TEST_DISABLE_GPU=1` — `app.disableHardwareAcceleration()`. The
   Playwright fixture sets it for every spec: on the GPU-less Windows runner the
-  GPU process, accelerating in software because of `ignore-gpu-blocklist`,
-  starved the engine until `Project Duplicate` timed out (#674; Note [The
-  Packaged-IDE Tests Run Without GPU Acceleration] in `src/electron.ts`).
+  GPU process, then accelerating in software because of the since-removed
+  `ignore-gpu-blocklist` switch, starved the engine until `Project Duplicate`
+  timed out (#674; Note [The Packaged-IDE Tests Run Without GPU Acceleration] in
+  `src/electron.ts`).
 - `ENSO_JVM_AOT=0` — no JDK AOT cache at all: nothing trains, and no open uses
   one (`isJvmAotEnabled`; `createJvmAotCache` returns `null`). The Playwright
   fixture sets it for every spec but `spareEngine.spec.ts`.

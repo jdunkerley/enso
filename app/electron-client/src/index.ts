@@ -36,6 +36,7 @@ import {
 } from './fileAssociations.js'
 import { loadGuiConfig } from './guiConfig.js'
 import { Channel } from './ipc.js'
+import { installLocalCertificateTrust, trustLocalServerCertificate } from './localCertificate.js'
 import { setupLogger } from './log.js'
 import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from './menuItems.js'
 import { capitalizeFirstLetter } from './naming.js'
@@ -201,6 +202,8 @@ class App {
     if (isOriginalInstance) {
       this.handleItemOpening(fileToOpen)
       setChromeOptions(electron)
+      // Before any session exists: Note [Only The Content Server's Certificate Is Trusted].
+      installLocalCertificateTrust(electron)
       enableAll()
 
       this.onStart(this.electron, this.electronIsDev).catch((err) => {
@@ -440,6 +443,7 @@ class App {
       getSecretsKeySource().fromEnvironment,
       this.localSamples,
     )
+    if (this.server.certificate != null) trustLocalServerCertificate(this.server.certificate)
     console.log('Content server started.')
   }
 
