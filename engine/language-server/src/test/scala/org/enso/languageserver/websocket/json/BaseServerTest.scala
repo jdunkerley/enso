@@ -382,8 +382,7 @@ abstract class BaseServerTest
       localLibraryManager      = localLibraryManager,
       editionReferenceResolver = editionReferenceResolver,
       editionManager           = editionManager,
-      localLibraryProvider =
-        DefaultLocalLibraryProvider.make(libraryLocations, false),
+      localLibraryProvider     = DefaultLocalLibraryProvider.make(libraryLocations),
       publishedLibraryCache =
         PublishedLibraryCache.makeReadOnlyCache(libraryLocations),
       installerConfig = LibraryInstallerConfig(

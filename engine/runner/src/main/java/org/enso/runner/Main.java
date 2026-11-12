@@ -38,7 +38,6 @@ import org.enso.common.PythonHomeFinder;
 import org.enso.distribution.DistributionManager;
 import org.enso.distribution.Environment;
 import org.enso.editions.DefaultEdition;
-import org.enso.jvm.channel.JVM;
 import org.enso.libraryupload.LibraryUploader.UploadFailedError;
 import org.enso.logger.Converter;
 import org.enso.logger.ObservedMessage;
@@ -56,7 +55,6 @@ import org.enso.runner.common.ProfilingConfig;
 import org.enso.runner.common.WrongOption;
 import org.enso.version.BuildVersion;
 import org.enso.version.VersionDescription;
-import org.graalvm.nativeimage.ImageInfo;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.PolyglotException.StackFrame;
 import org.graalvm.polyglot.SourceSection;
@@ -1525,16 +1523,8 @@ public class Main {
       File component,
       File javaExecutable)
       throws IOException, InterruptedException {
-    /* Cannot use JNI when not in Native Image code. Fallback to launching a process.
-     * On Linux a GraalVM 25.5 image exports JVM_IsStaticallyLinked, which the JVM's libjava then
-     * binds to, so the JVM created in-process never loads libnio and fails to boot
-     * ("UnsatisfiedLinkError: 'int sun.nio.fs.UnixNativeDispatcher.init()'"). There the image
-     * replaces itself with `java` (Note [The Launcher Becomes The JVM On Linux] in `PosixExec`). */
-    var useJNI = ImageInfo.inImageCode() && !System.getProperty("os.name", "").startsWith("Linux");
     var commandAndArgs = new ArrayList<String>();
-    if (!useJNI) {
-      commandAndArgs.add(javaExecutable.getPath());
-    }
+    commandAndArgs.add(javaExecutable.getPath());
     if (originalCwdOrNull != null) {
       commandAndArgs.add("-Denso.user.dir=" + originalCwdOrNull);
     }
@@ -1560,20 +1550,10 @@ public class Main {
     if (!component.isDirectory()) {
       throw new IOException("Cannot find " + component + " directory");
     }
-    JVM jvm;
-    if (useJNI) {
-      commandAndArgs.add("--module-path=" + component.getPath());
-      commandAndArgs.add("-Djdk.module.main=org.enso.runner");
-      var javaHome = javaExecutable.getParentFile().getParentFile();
-      jvm = JVM.create(javaHome, commandAndArgs.toArray(new String[0]));
-      commandAndArgs.clear();
-    } else {
-      commandAndArgs.add("--module-path");
-      commandAndArgs.add(component.getPath());
-      commandAndArgs.add("-m");
-      commandAndArgs.add("org.enso.runner/org.enso.runner.Main");
-      jvm = null;
-    }
+    commandAndArgs.add("--module-path");
+    commandAndArgs.add(component.getPath());
+    commandAndArgs.add("-m");
+    commandAndArgs.add("org.enso.runner/org.enso.runner.Main");
     var it = line.iterator();
     while (it.hasNext()) {
       var op = it.next();
@@ -1595,26 +1575,11 @@ public class Main {
       }
     }
     commandAndArgs.addAll(line.getArgList());
-    int exitCode;
-    if (jvm != null) {
-      jvm.executeMain("org/enso/runner/Main", commandAndArgs.toArray(new String[0]));
-      // the above call should never return
-      exitCode = 1;
-    } else if (ImageInfo.inImageCode()) {
-      // Linux: see Note [The Launcher Becomes The JVM On Linux] in `PosixExec`. Nothing runs after
-      // a successful execv, so this finishes what doExit would.
-      RunnerLogging.tearDown();
-      System.out.flush();
-      System.err.flush();
-      var res = PosixExec.exec(javaExecutable.getAbsolutePath(), commandAndArgs);
-      throw new IOException("Cannot execute " + javaExecutable + " (execv returned " + res + ")");
-    } else {
-      var pb = new ProcessBuilder();
-      pb.inheritIO();
-      pb.command(commandAndArgs);
-      var p = pb.start();
-      exitCode = p.waitFor();
-    }
+    var pb = new ProcessBuilder();
+    pb.inheritIO();
+    pb.command(commandAndArgs);
+    var p = pb.start();
+    var exitCode = p.waitFor();
     if (exitCode == 0) {
       throw exitSuccess();
     } else {
@@ -1626,10 +1591,8 @@ public class Main {
     var line = preprocessArguments(args);
 
     String originalCwdOrNull = null;
-    if (line.hasOption(IN_PROJECT_OPTION)) {
-      originalCwdOrNull = Utils.adjustCwdToProject(line.getOptionValue(IN_PROJECT_OPTION));
-    } else if (line.hasOption(RUN_OPTION)) {
-      originalCwdOrNull = Utils.adjustCwdToProject(line.getOptionValue(RUN_OPTION));
+    if (line.hasOption(IN_PROJECT_OPTION) || line.hasOption(RUN_OPTION)) {
+      originalCwdOrNull = Utils.originalUserDir();
     }
     if (originalCwdOrNull != null) {
       // The process runs in the project's parent, not where the user started `enso`.
@@ -1660,12 +1623,7 @@ public class Main {
       // Language Server will also set up logging on its own.
       System.setProperty("config.resource", "application-ls.conf");
     } else {
-      if (hasJVMOption && HostEnsoUtils.isAot()) {
-        // avoid setting up logger in SVM
-        // as we are about to fully run in HotSpot
-      } else {
-        setupLogging(line, logLevel, logMasking);
-      }
+      setupLogging(line, logLevel, logMasking);
     }
 
     var loc = Main.class.getProtectionDomain().getCodeSource().getLocation();
@@ -1673,7 +1631,6 @@ public class Main {
     if (!component.getName().equals("component")) {
       component = new File(component, "component");
     }
-    assert checkOutdatedLauncher(new File(loc.toURI()), component) || true;
     var jvmInProjectEnforced = isJvmModeEnabled(originalCwdOrNull, line);
     if (hasJVMOption || jvmInProjectEnforced) {
       var jvm = line.getOptionValue(JVM_OPTION);
@@ -1697,20 +1654,6 @@ public class Main {
         }
       }
     }
-    if (HostEnsoUtils.isAot()) {
-      if (jvmInProjectEnforced) {
-        throw exitFail("Cannot find java executable to run in JVM mode");
-      } else {
-        if (System.getProperty("java.home") == null) {
-          var exe = JavaFinder.findJavaExecutable();
-          if (exe != null) {
-            var path = exe.getParentFile().getParentFile().getAbsolutePath();
-            System.setProperty("java.home", path);
-            LOGGER.debug("Setting java.home property for AOT mode to {}", path);
-          }
-        }
-      }
-    }
     if (line.hasOption(STANDBY_OPTION)) {
       runStandby(component);
       return;
@@ -1724,9 +1667,6 @@ public class Main {
    */
   private void runStandby(File component)
       throws IOException, InterruptedException, URISyntaxException {
-    if (HostEnsoUtils.isAot()) {
-      throw exitFail("--" + STANDBY_OPTION + " runs only on the JVM: add --" + JVM_OPTION + ".");
-    }
     var restoreLogging = Standby.quietLogging(System.err);
     StandbyRequest request;
     try {
@@ -1898,29 +1838,5 @@ public class Main {
         throw exitFail(e.getMessage());
       }
     }
-  }
-
-  /**
-   * Check if native image based launcher is up-to-date. Prints a warning when it is outdated.
-   *
-   * @param base the base file to check
-   * @param dir directory with other files that should be older than base
-   * @return
-   */
-  private boolean checkOutdatedLauncher(File base, File dir) {
-    var needsCheck = base.canExecute();
-    if (needsCheck) {
-      var files = dir.listFiles();
-      if (files != null) {
-        var baseTime = base.lastModified();
-        for (var f : files) {
-          if (baseTime < f.lastModified()) {
-            stderr("File " + base + " is older than " + f + " consider running in --jvm mode");
-            return false;
-          }
-        }
-      }
-    }
-    return true;
   }
 }

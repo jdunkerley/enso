@@ -17,9 +17,6 @@ public final class PythonHomeFinder {
    * @return Path to existing directory with GraalPy resources or null if it cannot be found.
    */
   public static Path findPythonHome() {
-    if (HostEnsoUtils.isAot()) {
-      return null;
-    }
     var modPath = getEnsoRuntimeModulePath();
     if (modPath == null) {
       return null;

@@ -222,25 +222,14 @@ public final class ContextFactory {
     if (executionEnvironment != null) {
       options.put("enso.ExecutionEnvironment", executionEnvironment);
     }
-    var inAOTMode = HostEnsoUtils.isAot();
-    java.util.Map<String, String> engineOptions = null;
+    options = new HashMap<>(options);
     if (runtimerServerKey != null) {
-      if (!inAOTMode) {
-        options.put(runtimerServerKey, "true");
-      } else {
-        engineOptions = new java.util.HashMap<>();
-        engineOptions.put(runtimerServerKey, "true");
-      }
+      options.put(runtimerServerKey, "true");
     }
     if (pythonResourceDir != null) {
       System.setProperty("polyglot.engine.resourcePath.python", pythonResourceDir);
     }
-    if (engineOptions == null) {
-      options = new HashMap<>(options);
-      options.putIfAbsent(MIN_NORMAL_LOAD_OPTION, MIN_NORMAL_LOAD);
-    } else {
-      engineOptions.put(MIN_NORMAL_LOAD_OPTION, MIN_NORMAL_LOAD);
-    }
+    options.putIfAbsent(MIN_NORMAL_LOAD_OPTION, MIN_NORMAL_LOAD);
     var builder =
         Context.newBuilder()
             .allowExperimentalOptions(true)
@@ -286,22 +275,11 @@ public final class ContextFactory {
               new File(new File(new File(new File(projectRoot), "polyglot"), "python"), "bin"),
               "graalpy");
       if (graalpy.exists()) {
-        if (inAOTMode) {
-          throw new IllegalStateException("Cannot use Python in AOT mode. Run with --jvm");
-        }
         builder.option("python.Executable", graalpy.getAbsolutePath());
       }
     }
 
-    if (engineOptions != null) {
-      // In AOT mode one must not use a shared engine; the latter causes issues when initializing
-      // message transport - it is set to `null`.
-      var eng = Engine.newBuilder().allowExperimentalOptions(true).options(engineOptions);
-      if (messageTransport != null) {
-        eng.serverTransport(messageTransport);
-      }
-      builder.engine(eng.build());
-    } else if (messageTransport != null) {
+    if (messageTransport != null) {
       builder.serverTransport(messageTransport);
     }
 

@@ -1,6 +1,5 @@
 package org.enso.common;
 
-import org.graalvm.nativeimage.ImageInfo;
 import org.graalvm.polyglot.PolyglotException;
 
 public final class HostEnsoUtils {
@@ -20,14 +19,5 @@ public final class HostEnsoUtils {
               exception.asHostException().getClass().getName();
           default -> ex.getClass().getName();
         };
-  }
-
-  /**
-   * Checks state of the AOT mode. Delegates to {@link ImageInfo#inImageRuntimeCode}.
-   *
-   * @return {@code true} if running inside of native executable, {@code false} otherwise
-   */
-  public static boolean isAot() {
-    return ImageInfo.inImageRuntimeCode();
   }
 }

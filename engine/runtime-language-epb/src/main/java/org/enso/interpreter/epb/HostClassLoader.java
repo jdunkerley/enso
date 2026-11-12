@@ -1,7 +1,6 @@
 package org.enso.interpreter.epb;
 
 import com.oracle.truffle.api.CompilerDirectives;
-import com.oracle.truffle.api.TruffleOptions;
 import com.oracle.truffle.api.interop.ArityException;
 import com.oracle.truffle.api.interop.InteropException;
 import com.oracle.truffle.api.interop.InteropLibrary;
@@ -118,36 +117,8 @@ final class HostClassLoader extends URLClassLoader implements AutoCloseable, Tru
       logger.log(Logger.Level.TRACE, "Class {0} not found, delegating to super", name);
       return super.loadClass(name, resolve);
     } catch (Throwable e) {
-      if (isAttemptToLoadBytecodeInNI(e)) {
-        logger.log(
-            Logger.Level.TRACE,
-            "Attempt to load bytecode for class {0}, delegating to super" + name);
-        return super.loadClass(name, resolve);
-      } else {
-        logger.log(Logger.Level.TRACE, "Failure while loading a class: " + e.getMessage(), e);
-        throw e;
-      }
-    }
-  }
-
-  /**
-   * Returns true if the given exception represents {@code
-   * com.oracle.svm.core.jdk.UnsupportedFeatureError} thrown when an attempt to load a class via
-   * bytecode is made. It is known that {@link #findClass(String)} throws this Error if {@code jar}
-   * URL protocol is enabled (via {@code --enable-protocols=jar} option) during native image build,
-   * because it tries to define the class.
-   *
-   * <p>This exception is more or less an equivalent of {@link ClassNotFoundException} so we treat
-   * it that way.
-   */
-  private static boolean isAttemptToLoadBytecodeInNI(Throwable t) {
-    var isAot = TruffleOptions.AOT;
-    if (isAot) {
-      return t instanceof Error err
-          && err.getMessage() != null
-          && err.getMessage().contains("Classes cannot be defined at runtime");
-    } else {
-      return false;
+      logger.log(Logger.Level.TRACE, "Failure while loading a class: " + e.getMessage(), e);
+      throw e;
     }
   }
 

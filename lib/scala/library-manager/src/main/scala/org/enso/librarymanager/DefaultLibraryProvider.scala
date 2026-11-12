@@ -120,8 +120,7 @@ object DefaultLibraryProvider {
     languageHome: Option[LanguageHome],
     projectRoot: Option[Path],
     edition: Editions.ResolvedEdition,
-    preferLocalLibraries: Boolean,
-    checkAot: Boolean
+    preferLocalLibraries: Boolean
   ): ResolvingLibraryProvider = {
     val (localLibraryProvider, publishedLibraryProvider) = makeProviders(
       distributionManager,
@@ -129,8 +128,7 @@ object DefaultLibraryProvider {
       lockUserInterface,
       progressReporter,
       languageHome,
-      projectRoot,
-      checkAot
+      projectRoot
     )
 
     new DefaultLibraryProvider(
@@ -148,8 +146,7 @@ object DefaultLibraryProvider {
     lockUserInterface: LockUserInterface,
     progressReporter: ProgressReporter,
     languageHome: Option[LanguageHome],
-    projectRoot: Option[Path],
-    checkAot: Boolean
+    projectRoot: Option[Path]
   ): (
     LocalLibraryProvider,
     PublishedLibraryProvider with PublishedLibraryCache
@@ -168,8 +165,7 @@ object DefaultLibraryProvider {
 
     val localLibraryProvider =
       new DefaultLocalLibraryProvider(
-        locations.localLibrarySearchPaths,
-        checkAot
+        locations.localLibrarySearchPaths
       )
     val publishedLibraryProvider =
       new DefaultPublishedLibraryProvider(primaryCache, additionalCaches)
