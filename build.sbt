@@ -4632,6 +4632,8 @@ lazy val `std-table` = project
     Antlr4 / antlr4Version := antlrVersion,
     Antlr4 / antlr4GenVisitor := true,
     Antlr4 / antlr4TreatWarningsAsErrors := true,
+    // Note [ANTLR Output Has No Absolute Paths] (project/AntlrSources.scala)
+    Antlr4 / antlr4Generate ~= AntlrSources.stripGrammarPaths,
     Compile / managedSourceDirectories += {
       (Antlr4 / sourceManaged).value / "main" / "antlr4"
     },
