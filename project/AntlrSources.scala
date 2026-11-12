@@ -23,7 +23,8 @@ import sbt._
  */
 object AntlrSources {
 
-  private val Header = """(?m)\A// Generated from .*[/\\]([^/\\\r\n]+\.g4) by ANTLR""".r
+  private val Header =
+    """(?m)\A// Generated from .*[/\\]([^/\\\r\n]+\.g4) by ANTLR""".r
 
   /** Rewrites the `// Generated from <path> by ANTLR` header of `file` so that
     * it keeps only the grammar's file name. Files without that header are left
