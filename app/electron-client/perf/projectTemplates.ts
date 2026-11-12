@@ -8,12 +8,8 @@ import zlib from 'node:zlib'
 
 /* Note [A Project That Uses A Library With Java Code]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * The native image has the Java of `Standard.Base`, `Table`, `Database` and `DuckDB` compiled in
- * (`EnsoLibraryFeature` marks them AOT-ready); any other library's Java is not available under
- * native, and using it is an error that says to run on the JVM (Note [A Library's Java Must Be In
- * The Native Image] in `EnsoPolyglotJava`). On the JVM every library's Java is hosted. The `image`
- * template opens a project whose first node calls `Standard.Image` (OpenCV through Java, so the
- * JVM only) on a PNG in the project's `data/`, and whose second node shows the result in a table,
+ * The `image` template opens a project whose first node calls `Standard.Image` (OpenCV through
+ * Java, a library with Java code of its own, which the old native image could not host) on a PNG in the project's `data/`, and whose second node shows the result in a table,
  * the analogue of the welcome table; it needs no credentials and no service. The headline is that
  * table showing `headline`.
  */

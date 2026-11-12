@@ -30,7 +30,7 @@ const HEALTHCHECK_FAILURES_TO_RESTART = 3
 const LOAD_HEALTHCHECK_INTERVAL = 250
 /* Note [Start-up Health Polling]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * A native engine (measured before it was removed) answered `/_health` some 200 ms after it was
+ * The removed native engine answered `/_health` some 200 ms after it was
  * spawned, and the open waits for that answer. Polling every 250 ms (the first check 250 ms after
  * the spawn) added up to 250 ms to every open, so the first second polls every 25 ms; a slow start
  * (the JVM, a cold machine) then falls back to 250 ms, so the checks never pile up.

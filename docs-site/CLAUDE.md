@@ -57,7 +57,7 @@ A real distribution without building one: the catalogues of the newest green
 ```bash
 run=$(gh run list -R jdunkerley/enso -w engine-pull-request.yml -b develop -s success -L 1 --json databaseId --jq '.[0].databaseId')
 mkdir -p "$SCRATCH/dist" && cd "$SCRATCH/dist"
-gh run download "$run" -R jdunkerley/enso -n "Engine Distribution (GraalVM CE) (native,test) (linux, amd64)"
+gh run download "$run" -R jdunkerley/enso -n "Engine Distribution (GraalVM CE) (linux, amd64)"
 tar -xf built-distribution.tar --wildcards 'built-distribution/*/lib/*/*/*/catalogue.json' 'built-distribution/*/lib/*/*/*/package.yaml'
 rm built-distribution.tar
 # then: generate -- --lib "$(ls -d "$SCRATCH"/dist/built-distribution/*/*/lib)"

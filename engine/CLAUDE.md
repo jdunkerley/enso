@@ -27,8 +27,8 @@ the **Truffle** framework.
   `runtime-parser-processor-tests/` — Java bindings to the Rust parser and
   annotation-processor pipeline that builds them.
 - `runtime-compiler/`, `runtime-compiler-dump/`, `runtime-compiler-dump-igv/` —
-  Compiler (IR + passes) extracted as its own module for native-image
-  friendliness. IGV support = integration with the Graal visualizer (see
+  Compiler (IR + passes) extracted as its own module (a leftover of the
+  native-image days). IGV support = integration with the Graal visualizer (see
   `tools/enso4igv/`).
 - `runtime-instrument-*` — Truffle instruments. `common` is shared
   infrastructure; the others are the REPL debugger, IDE runtime-server, and
@@ -93,9 +93,9 @@ the long version, and
 
 ## Gotchas
 
-- Building the runtime is slow (native-image stages + annotation processing).
-  The first full build can take 10+ minutes. Incremental SBT builds are much
-  faster.
+- Building the runtime is slow (annotation processing, the Rust parser and the
+  standard library indexing). The first full build can take 10+ minutes.
+  Incremental SBT builds are much faster.
 - The Scala/Java source split is the result of an **ongoing** migration from
   Scala to Java (see
   [Runtime-Roadmap](https://github.com/jdunkerley/enso/wiki/Runtime-Roadmap)).

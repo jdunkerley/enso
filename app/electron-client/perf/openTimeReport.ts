@@ -39,7 +39,7 @@ export const HEADLINE: Phase = 'welcomeShown'
 /** Milliseconds from the click on the project's row. */
 export type OpenTimes = Partial<Record<Phase | Extra, number>>
 /**
- * `native` is the native image. `jvm` is the engine as a user has it after the first open: the
+ * `native` is the removed native image (only earlier reports have it). `jvm` is the engine as a user has it after the first open: the
  * bundled JDK with the shim's own AOT cache, trained before the measured launches. `jvm-first` is
  * a user's very first launch: the same, with the cache deleted before each launch.
  */

@@ -14,7 +14,7 @@ public final class RandomUtils {
 
   private RandomUtils() {}
 
-  /** Delay the {@link Random} instance initialization when building the native image. */
+  /** Delay the {@link Random} instance initialization (a leftover of the native image build). */
   private static final class LazyRandom {
 
     private static Random instance = null;

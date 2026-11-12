@@ -20,7 +20,7 @@ import java.util.Properties;
 /**
  * A copy of org.duckdb.DuckDBNative from duckdb_jdbc 1.5.5.1 (`Dependencies.duckdbVersion`) whose
  * static initializer first tries to load the shared library by name, so that the library Enso
- * extracts into `polyglot/lib` is found through the class loader (and in Native Image). Only if
+ * extracts into `polyglot/lib` is found through the class loader. Only if
  * that fails does it fall back to upstream's own loading (a library bundled in the jar, then one
  * next to the jar).
  *

@@ -536,8 +536,8 @@ server has none.
     second until the session is initialised (a `403` fails at once).
   - With no visualisation attached, `executionComplete` never came; the GUI
     attaches as it connects, and so does the driver.
-  - JEP 514's one-step `-XX:AOTCacheOutput=` failed under the native launcher:
-    its forked child JVM lacked the JNI-started JVM's modules
+  - JEP 514's one-step `-XX:AOTCacheOutput=` failed under the (since removed)
+    native launcher: its forked child JVM lacked the JNI-started JVM's modules
     (`jdk.internal.vm.ci`), hence record, then create with `java`. The two steps
     stayed when the shim began to start `java` itself: the one-step form was not
     re-measured.
@@ -578,19 +578,19 @@ server has none.
   `--appimage-extract-and-run` extracts to a `/tmp/appimage_extracted_<hash>/`
   that it deletes; `isAppImageMount` covers both), and the JVM refuses a cache
   whose module path moved (`shared class paths mismatch`). A symlink at a fixed
-  path did not help the native launcher, which resolved its own executable, so
-  the JVM still saw the mount's paths (experiment X1 of the plan, measured on
-  WSLg; discussion #518). C1 left the copy in place: whether a symlink works now
-  that the shim names every path needs a real AppImage (the spec's "Check before
-  deleting"; the `java` launcher may resolve its own home through the real
-  path). So the IDE runs a copy of the bundle: `stableEnginePath` copies
-  `resources/enso` (`.enso.bundle`, without which the launcher does not find the
-  bundled runtime, `dist/`, `runtime/`: ~1.8 GB, ~15 s with `fs.cp` on an NVMe
-  disk under WSL) to `<userData>/engine/<version>/`, times kept, through a
-  temporary directory renamed into place with a `.complete` file written last
-  that holds a fingerprint of the bundle (the launcher's and `runtime.jar`'s
-  size and mtime, the runtime's name; a dev build keeps its version, so the
-  fingerprint decides).
+  path did not help the (since removed) native launcher, which resolved its own
+  executable, so the JVM still saw the mount's paths (experiment X1 of the plan,
+  measured on WSLg; discussion #518). C1 left the copy in place: whether a
+  symlink works now that the shim names every path needs a real AppImage (the
+  spec's "Check before deleting"; the `java` launcher may resolve its own home
+  through the real path). So the IDE runs a copy of the bundle:
+  `stableEnginePath` copies `resources/enso` (`.enso.bundle`, without which the
+  launcher does not find the bundled runtime, `dist/`, `runtime/`: ~1.8 GB, ~15
+  s with `fs.cp` on an NVMe disk under WSL) to `<userData>/engine/<version>/`,
+  times kept, through a temporary directory renamed into place with a
+  `.complete` file written last that holds a fingerprint of the bundle (the
+  launcher's and `runtime.jar`'s size and mtime, the runtime's name; a dev build
+  keeps its version, so the fingerprint decides).
   - **Room first**: the copy needs the bundle's size plus 1 GiB or 20%,
     whichever is more (`fs.statfs`); short of that it deletes the other copies
     and looks again, then gives up. A failed copy is deleted at once (a

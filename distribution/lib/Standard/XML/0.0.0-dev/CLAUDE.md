@@ -52,7 +52,7 @@ helper jar would cost nothing extra, but none is needed.
 
 - The interface imports in `Internal/Dom.enso` that the code never names (Note
   [Interfaces Imported For The Image]) were for the native image only; they are
-  harmless on the JVM.
+  harmless on the JVM, and can be deleted.
 - Java exceptions are caught by class (`SAXParseException`, `IOException`,
   `java.lang.Exception`) and turned into `XML_Error`s by `_xml_errors`; that
   works because the classes are the host's.

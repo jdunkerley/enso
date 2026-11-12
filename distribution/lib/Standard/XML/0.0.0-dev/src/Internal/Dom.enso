@@ -5,14 +5,12 @@ from Standard.Base import all
 ## Note [XML Uses Only The JDK]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    `Standard.XML` has no Java of its own: everything here is a call into the
-   JDK's XML APIs (`javax.xml`, `org.w3c.dom`). Under the native launcher the
-   library is hosted in the image (`EnsoLibraryFeature` marks it AOT-ready from
-   `enso.nativeImage.javaFreeLibraries`, registering only these JDK classes),
-   so the DOM lives on the host and walking it costs no cross-JVM round trips.
-   A helper jar would put the library in the guest JVM, where every DOM call is
-   a round trip (#521's review measured 160 µs per call). Keep it that way:
-   import only JDK classes, and `build.sbt` and `EnsoLibraryFeature` refuse a
-   library on that list that ships a jar.
+   JDK's XML APIs (`javax.xml`, `org.w3c.dom`). It was written so the native
+   image could host it (the image and the guest JVM it needed for other
+   libraries are gone, #664): a helper jar would have put the library in the
+   guest JVM, where every DOM call was a round trip (#521's review measured 160
+   µs per call). On the JVM a jar would cost nothing, but none is needed;
+   import only JDK classes unless that changes.
 
 polyglot java import java.io.ByteArrayOutputStream
 polyglot java import java.io.StringReader
@@ -32,20 +30,12 @@ polyglot java import org.xml.sax.InputSource
    The JDK hands back its own implementation classes (`DocumentBuilderImpl`,
    `ElementImpl`, ...), in packages `java.xml` does not export. Host interop
    calls their methods through the public types they implement, and in the
-   native image it can only see those types' methods if they were registered
-   for reflection. `EnsoLibraryFeature` registers what a library imports, so
-   these are imported for that alone: every public type whose methods this
-   library calls on an object it did not construct. Without one, the native
-   launcher fails with "Method `x` of type ...Impl could not be found", while
-   the JVM works.
+   native image it could only see those types' methods if they were registered
+   for reflection, so these were imported for that alone: every public type
+   whose methods this library calls on an object it did not construct.
 
-   Nothing at build time catches a missing one: `EnsoLibraryFeature` checks
-   only that the imports are JDK classes. It fails at run time, under the
-   native launcher only, so a change here needs `XML_Tests` run natively (CI's
-   native standard library suite runs it). This list, and being a Java-free
-   library at all (Note [Java-Free Libraries In The Image] in `build.sbt`),
-   is for Standard.XML only: no other library is to copy the pattern without
-   the owner's agreement.
+   The native image is gone (#664) and the JVM needs none of them; the list
+   stays until someone prunes it. No other library is to copy the pattern.
 polyglot java import java.util.regex.Matcher
 polyglot java import javax.xml.parsers.DocumentBuilder
 polyglot java import javax.xml.xpath.XPath

@@ -261,7 +261,7 @@ async function openProject(
 /* Note [RSS Is Sampled On The First Open]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * RSS is reported, not gated (the plan's owner answer 3), for native against the JVM: the engine's
- * processes (the launcher, the native image or `java` under it, and their children; `processRss.ts`)
+ * processes (the launcher, `java` under it, and their children; `processRss.ts`)
  * and the ydoc host's utility process (its pid is in the `ydoc host pid=` line of the output), at
  * the headline and 30 s later. Only the first open, and the 30 s are waited out before the project
  * closes, so the second open of such a launch starts later than the others': its numbers are not

@@ -10,7 +10,7 @@ import org.enso.interpreter.runtime.data.hash.EnsoHashMap;
  * object only. It used to consult a global {@code Assumption} as well ("no equality has produced
  * warnings yet"): while that held, {@code isTrue()} was {@code this == TRUE}, and creating a
  * warnings-carrying instance invalidated it. That is only sound if every compiled body that folded
- * the assumption is invalidated along with it. In the native image (where this class is initialised
+ * the assumption is invalidated along with it. In the native image (since removed; this class was initialised
  * at image build time) it was not: code compiled at run time kept treating the assumption as valid
  * after it had been invalidated - no dependent code was invalidated with it - so a
  * warnings-carrying {@code True} reaching such code read as {@code False}. That is how {@code 12.1

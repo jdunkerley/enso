@@ -12,7 +12,7 @@ import { renameWithRetry } from '../localMetadata/jsonFile.js'
  * An AppImage mounts itself at a new `/tmp/.mount_<random>` at every launch. A JDK AOT cache
  * records the module path and the runtime it was trained with, and the JVM refuses it when they
  * moved (`shared class paths mismatch`), so a cache trained from the mount is useless at the next
- * launch. A symlink at a fixed path does not help: the native launcher finds itself through its
+ * launch. A symlink at a fixed path did not help the (since removed) native launcher, which found itself through its
  * resolved executable, so the JVM's paths are the mount's whichever path started it (experiment X1
  * of the JVM-by-default plan, discussion #518). So the bundle (`resources/enso`: `.enso.bundle`,
  * `dist/`, `runtime/`, about 1.8 GB) is copied once per build to `<userData>/engine/<version>/`,

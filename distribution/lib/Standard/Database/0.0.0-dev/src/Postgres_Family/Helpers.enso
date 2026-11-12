@@ -12,7 +12,7 @@ from project.Internal.Result_Set import result_set_to_table
    private: true
    ---
    The `column_fetcher_factory` is the connection's own (its type mapping's), so
-   that a library running on the guest JVM does not use Database's hosted one.
+   that a library with its own driver does not use Database's helper classes.
 get_encoding_name jdbc_connection:JDBC_Connection column_fetcher_factory -> Text =
     server_encoding = _get_pragma_value jdbc_connection column_fetcher_factory "SHOW server_encoding" . catch SQL_Error _-> "SQL_ASCII"
     if server_encoding != "SQL_ASCII" then server_encoding else

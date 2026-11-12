@@ -18,9 +18,9 @@ its `MessageHandlerSupervisor`.
   and when it reconnects to the language server.
 
 Classes called from JS (the channel's message and close handlers,
-`ServerCallbacks`) are listed in
-`src/main/resources/META-INF/native-image/.../reflect-config.json`; add any new
-one there.
+`ServerCallbacks`) are also listed in
+`src/main/resources/META-INF/native-image/.../reflect-config.json`, a leftover
+of the native image that nothing reads now; a new one needs no entry.
 
 ## Testing
 
