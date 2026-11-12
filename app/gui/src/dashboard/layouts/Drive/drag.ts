@@ -5,7 +5,8 @@
  * (`$/utils/assetsDataTransfer`), which the category buttons read.
  */
 import type { Category } from '$/providers/category'
-import type { AnyAsset, AssetId } from 'enso-common/src/services/Backend'
+import { canDropAssetsInto } from '$/utils/dropTarget'
+import type { AnyAsset, AssetId, DirectoryId } from 'enso-common/src/services/Backend'
 import { uniqueString } from 'enso-common/src/utilities/uniqueString'
 
 /** A transparent one-pixel GIF. */
@@ -71,3 +72,14 @@ export interface AssetRowsDragPayload {
 export const ASSET_ROWS = new DragPayloadManager<AssetRowsDragPayload>(
   'application/x-enso-asset-list',
 )
+
+/**
+ * Whether the dragged rows may be dropped into the directory: none of them is a directory that is
+ * the target or contains it.
+ */
+export function canDropRowsInto(payload: AssetRowsDragPayload, targetId: DirectoryId) {
+  return canDropAssetsInto(
+    payload.items.map(({ asset }) => asset),
+    targetId,
+  )
+}

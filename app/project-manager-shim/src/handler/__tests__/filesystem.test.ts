@@ -9,6 +9,7 @@ import {
   encodeSessionId,
   getProjectSessionLogs,
   handleFilesystemCommand,
+  isInsidePath,
   listProjectSessionPages,
   listProjectSessions,
 } from '../filesystem'
@@ -523,5 +524,42 @@ describe('datalink entries', () => {
         path: path.join(tmpDir, 'Broken.datalink'),
       }),
     ])
+  })
+})
+
+describe('filesystem move of a directory into itself', () => {
+  let tmpDir: string
+
+  beforeEach(async () => {
+    tmpDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'filesystem-move-test-'))
+  })
+
+  afterEach(async () => {
+    await fsPromises.rm(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 1000 })
+  })
+
+  test('is an error that leaves the tree as it was', async () => {
+    const outer = path.join(tmpDir, 'Outer')
+    await fsPromises.mkdir(path.join(outer, 'Inner'), { recursive: true })
+    for (const destination of [path.join(outer, 'Inner', 'Outer'), path.join(outer, 'Outer')]) {
+      const response = await handleFilesystemCommand(
+        ['--filesystem-move-from', outer, '--filesystem-move-to', destination],
+        {} as any,
+      )
+      expect(JSON.parse(response as string)).toHaveProperty('error')
+    }
+    expect(fs.readdirSync(tmpDir)).toEqual(['Outer'])
+    expect(fs.readdirSync(outer)).toEqual(['Inner'])
+  })
+})
+
+describe('isInsidePath', () => {
+  test('is true only for a path strictly below', () => {
+    const outer = path.join(os.tmpdir(), 'a')
+    expect(isInsidePath(outer, path.join(outer, 'b', 'c'))).toBe(true)
+    expect(isInsidePath(outer, outer)).toBe(false)
+    expect(isInsidePath(outer, path.join(os.tmpdir(), 'ab'))).toBe(false)
+    expect(isInsidePath(outer, os.tmpdir())).toBe(false)
+    expect(isInsidePath(outer, path.join(outer, '..foo'))).toBe(true)
   })
 })
