@@ -258,8 +258,6 @@ jobs:
           cache-key: engine
           flatc: "true"
           rust: "true"
-      - name: Set up MSVC
-        uses: ./.github/actions/setup-msvc
       - id: version
         name: Compute the version
         run: corepack pnpm --filter build-scripts run version

@@ -1,4 +1,4 @@
-/** @file `ide-local`'s inputs: the bundle path, sbt's and the GUI's environments, the MSVC check. */
+/** @file `ide-local`'s inputs: the bundle path, sbt's and the GUI's environments. */
 import path from 'node:path'
 import { expect, test } from 'vitest'
 import { version } from '../version/version.ts'
@@ -8,7 +8,6 @@ import {
   engineBundleDir,
   guiBuildArgs,
   guiBuildEnv,
-  msvcProblem,
 } from './ideLocal.ts'
 
 test('the bundle is where EngineBundle.root puts it', () => {
@@ -36,14 +35,6 @@ test('sbt gets the version triple', () => {
     ENSO_RELEASE_MODE: 'false',
   })
   expect(engineBuildEnv({ ENSO_VERSION: 'stale' }, versions).ENSO_VERSION).toBe('2026.1.1-dev')
-})
-
-test('only Windows needs the MSVC developer environment', () => {
-  expect(msvcProblem('linux', {})).toBeNull()
-  expect(msvcProblem('darwin', {})).toBeNull()
-  expect(msvcProblem('win32', { VCToolsRedistDir: 'C:\\VS\\Redist\\MSVC\\14.44\\' })).toBeNull()
-  expect(msvcProblem('win32', {})).toContain('VCToolsRedistDir is not set')
-  expect(msvcProblem('win32', { VCToolsRedistDir: '' })).toContain('vcvars64.bat')
 })
 
 test('the GUI is built in the requested mode, with the version and commit', () => {

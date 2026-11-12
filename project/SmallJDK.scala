@@ -1,19 +1,12 @@
 import sbt.io.IO
 
 import java.io.File
-import java.nio.file.{Path, Paths}
+import java.nio.file.Path
 import scala.collection.immutable.Seq
 
 /** Building small JDK distributions with `jlink` command
   */
 object SmallJDK {
-
-  private val NI_BASE_MODULES = Seq(
-    "org.graalvm.nativeimage",
-    "org.graalvm.nativeimage.base",
-    "com.oracle.graal.graal_enterprise",
-    "com.oracle.svm.svm_enterprise"
-  )
 
   private val JDK_MODULES = Seq(
     "java.naming",
@@ -28,6 +21,36 @@ object SmallJDK {
     "java.sql",
     "java.transaction.xa",
     "java.xml"
+  )
+
+  /* Note [The Release JDK's Truffle Modules]
+   * ========================================
+   * Until the native-image modules went (#701, a follow-up of #683), the image also took
+   * `org.graalvm.nativeimage`, `org.graalvm.nativeimage.base`, `graal_enterprise` and
+   * `svm_enterprise`, with the native-image builder's jars from `lib/svm` on the module path, and
+   * those pulled the modules below in transitively. They are named here instead:
+   * - `java.management`, `jdk.management` and `jdk.unsupported`: Truffle's optimizing runtime (the
+   *   `truffle-runtime` and `truffle-compiler` jars in `component/`) requires them, and without
+   *   them the boot layer does not resolve;
+   * - `jdk.graal.compiler`: the Graal compiler as a Java module ("jargraal"), with
+   *   `jdk.internal.vm.ci` and the `org.graalvm.truffle.compiler`, `org.graalvm.word` and
+   *   `org.graalvm.collections` modules it requires. Truffle compiles through libgraal
+   *   (`jvmcicompiler.dll`/`libjvmcicompiler.so`, which belongs to `java.base`), so this is only
+   *   the fallback when libgraal cannot be used; it stays so that the runtime is the one the
+   *   engine has always had. Without it the image is ~31 MB smaller and still compiles (checked
+   *   on 25.5.5 in #701).
+   * The image then differs from the old one by exactly the native-image modules
+   * (`org.graalvm.nativeimage*`, `*_enterprise`, `jdk.graal.compiler.*vmaccess*`), and nothing is
+   * copied from the build JDK's `lib/`: `lib/svm`, `lib/static`, `lib/graalvm` and
+   * `lib/truffle` held only the native-image builder, its static JDK libraries, its agents,
+   * `truffle-runtime-svm.jar` and a `truffle-compiler.jar` that no launcher puts on a path (the
+   * engine's is in `component/`).
+   */
+  private val TRUFFLE_MODULES = Seq(
+    "java.management",
+    "jdk.management",
+    "jdk.unsupported",
+    "jdk.graal.compiler"
   )
 
   private val DEBUG_MODULES = Seq(
@@ -55,24 +78,18 @@ object SmallJDK {
     if (targetJdkDirectory.exists()) {
       IO.delete(targetJdkDirectory)
     }
-    val mp = modulePath()
-      .map(_.toAbsolutePath.toString)
-      .mkString(File.pathSeparator)
     val modules =
-      JDK_MODULES ++ NI_BASE_MODULES ++ DEBUG_MODULES ++ PYTHON_MODULES
+      (JDK_MODULES ++ TRUFFLE_MODULES ++ DEBUG_MODULES ++ PYTHON_MODULES).distinct
     val jlinkArgs = Seq(
       "--no-header-files",
       "--no-man-pages",
       "--generate-cds-archive",
-      "--module-path",
-      mp,
       "--output",
       targetJdkDirectory.toString,
       "--add-modules",
       modules.mkString(",")
     )
     runJlink(jlinkArgs)
-    copyLibDirs(targetJdkDirectory)
     assert(
       targetJdkDirectory.exists(),
       "Directory of small JDK " + targetJdkDirectory +
@@ -120,18 +137,6 @@ object SmallJDK {
     }
   }
 
-  private def copyLibDirs(smallJdkDirectory: File): Unit = {
-    libDirs().foreach(libDir =>
-      IO.copyDirectory(
-        libDir.toFile,
-        smallJdkDirectory.toPath
-          .resolve("lib")
-          .resolve(libDir.toFile.getName)
-          .toFile
-      )
-    )
-  }
-
   private def javaHome(): Path = {
     val prop = System.getProperty("java.home")
     if (prop == null) {
@@ -143,47 +148,5 @@ object SmallJDK {
 
   private def jlink(): Path = {
     javaHome().resolve("bin").resolve("jlink")
-  }
-
-  private def modulePath(): List[Path] = {
-    val moduleJars = List(
-      "lib/svm/bin/../../graalvm/svm-driver.jar",
-      "lib/svm/bin/../builder/native-image-base.jar",
-      "lib/svm/bin/../builder/espresso-svm.jar",
-      "lib/svm/bin/../builder/objectfile.jar",
-      "lib/svm/bin/../builder/pointsto.jar",
-      "lib/svm/bin/../builder/reporter.jar",
-      "lib/svm/bin/../builder/svm-enterprise.jar",
-      "lib/svm/bin/../builder/svm.jar",
-      "lib/svm/bin/../builder/svm-configure.jar",
-      "lib/svm/bin/../builder/svm-capnproto-runtime.jar",
-      "lib/svm/bin/../builder/svm-foreign.jar",
-      // New in GraalVM 25.5: org.graalvm.nativeimage.base requires these.
-      "lib/svm/bin/../builder/svm-shared.jar",
-      "lib/svm/bin/../builder/vmaccess.jar",
-      "lib/svm/bin/../builder/vmaccess-guest.jar",
-      "lib/svm/bin/../builder/hostvmaccess.jar",
-      // ...and these, which org.graalvm.nativeimage.driver (the native-image builder's JDK) needed.
-      // They go with the release JDK's native-image modules (a follow-up of #683).
-      "lib/svm/bin/../builder/svm-guest-staging.jar",
-      "lib/svm/bin/../builder/svm-jvmci-guest-staging.jar",
-      "lib/svm/bin/../builder/svm-jvmci-shared.jar",
-      "lib/svm/bin/../library-support.jar"
-    )
-    moduleJars.map { jar =>
-      javaHome().resolve(jar)
-    }
-  }
-
-  private def libDirs(): List[Path] = {
-    val targetLibDirs = List(
-      "graalvm",
-      "svm",
-      "static",
-      "truffle"
-    )
-    targetLibDirs.map { d =>
-      javaHome().resolve("lib").resolve(d)
-    }
   }
 }

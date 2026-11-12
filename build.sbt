@@ -228,20 +228,20 @@ checkIRCacheSizes := Def
 /* Note [CI Engine Distribution Build]
  * ===================================
  * What the retired build CLI's `backend ci-build-engine-distribution` ran after `clean`, in one sbt
- * session: `buildEngineDistribution`; then `checkIRCacheSizes`; then, on Windows, the MSVC runtime
- * DLL copy into the engine package (`MsvcRuntime`, which needs `setup-msvc` or a Developer Prompt);
- * then, not on Windows, `verifyGeneratedPackage` for the engine and for Base, Table, Image and
- * Database at the package's versioned paths (the retired build CLI skipped it on Windows: "FIXME
- * ... CRLF issues?"). Before those, on every platform, `ShippedCataloguesSpec` checks the standard
- * libraries' `catalogue.json` files with the language server's own rule, so a catalogue the
- * language server would skip fails the build instead of turning the feature off silently.
+ * session: `buildEngineDistribution`; then `checkIRCacheSizes`; then, not on Windows,
+ * `verifyGeneratedPackage` for the engine and for Base, Table, Image and Database at the package's
+ * versioned paths (the retired build CLI skipped it on Windows: "FIXME ... CRLF issues?"). On
+ * Windows it also copied the MSVC runtime DLLs into the package until #701. Before those, on every
+ * platform, `ShippedCataloguesSpec` checks the standard libraries' `catalogue.json` files with the
+ * language server's own rule, so a catalogue the language server would skip fails the build
+ * instead of turning the feature off silently.
  * CI calls `sbt "clean; all ciBuildEngineDistribution"`. It is a task of its
  * own, not a CI flag on `buildEngineDistribution`: `checkIRCacheSizes` depends on that task, and
  * `CI` is set in every job that reaches it (lint, benchmarks, JVM tests, the IDE bundle).
  */
 lazy val ciBuildEngineDistribution = taskKey[Unit](
-  "CI's engine distribution build: buildEngineDistribution, checkIRCacheSizes, the MSVC runtime " +
-  "DLL copy (Windows) and verifyGeneratedPackage (not Windows). See Note [CI Engine Distribution Build]."
+  "CI's engine distribution build: buildEngineDistribution, checkIRCacheSizes and " +
+  "verifyGeneratedPackage (not Windows). See Note [CI Engine Distribution Build]."
 )
 ciBuildEngineDistribution := Def
   .sequential(
