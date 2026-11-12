@@ -187,8 +187,8 @@ installer (the old Rust installer was removed).
   and the relaunched IDE finds `train.lock` held and waits for that cache.
 - `tools/ci/windows-installer-smoke.ps1` runs in CI on every packaging run: it
   installs silently, checks that the install trained one AOT cache under
-  `%APPDATA%\Enso\jvm-aot` (printing the newest IDE log if not), starts the app,
-  and uninstalls (removing that cache).
+  `%LOCALAPPDATA%\Enso\jvm-aot` (printing the newest IDE log if not), starts the
+  app, and uninstalls (removing that cache).
 - Builds are unsigned for now.
 
 **Build the engine locally — don't bundle a released one.** `ide-local` always
@@ -223,8 +223,12 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   engine is the JVM. A value of `native` (or a project's `jvm: false`) only logs
   a line in the engine log (`project-manager-shim/CLAUDE.md`, "The removed
   native engine"). The `--engine-mode` and `--jvm` flags were removed.
-- `ENSO_JVM_AOT_DIR` — where the per-user JDK AOT cache lives instead of
-  `<userData>/jvm-aot` (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
+- `ENSO_JVM_AOT_DIR` — where the per-user JDK AOT cache lives instead of the
+  platform's local cache directory (`jvmAotRootDirectory`: Windows
+  `%LOCALAPPDATA%\Enso\jvm-aot`, macOS `~/Library/Caches/Enso/jvm-aot`, Linux
+  `$XDG_CACHE_HOME/enso/jvm-aot` or `~/.cache/enso/jvm-aot`; not `userData`,
+  which is roaming on Windows, #682; a leftover `<userData>/jvm-aot` is deleted
+  once per launch) (`project-manager-shim/CLAUDE.md`, "JDK AOT cache"). The
   cache trains in the background, 10 s after the window is up, unless the
   Windows installer has trained it already; `before-quit` stops a running
   training (and the spare engine, `stopSpareEngine`: while a spare is alive,

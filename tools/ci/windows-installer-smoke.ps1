@@ -40,9 +40,9 @@ if ((Get-EnsoUninstallEntries).Count -gt 0 -or @(Get-MachineEnsoEntries).Count -
   throw 'Refusing to run: an Enso install is already present.'
 }
 
-# The installer trains the JDK AOT cache (#668) under the IDE's userData. Only the key directories
-# this install makes are checked and removed: a developer machine may have its own.
-$aotRoot = Join-Path $env:APPDATA 'Enso\jvm-aot'
+# The installer trains the JDK AOT cache (#668) in the local cache directory (#682), not the roaming
+# userData. Only the key directories this install makes are checked and removed: a developer machine may have its own.
+$aotRoot = Join-Path $env:LOCALAPPDATA 'Enso\jvm-aot'
 function Get-AotKeys { if (Test-Path $aotRoot) { @(Get-ChildItem $aotRoot -Directory | ForEach-Object Name) } else { @() } }
 $aotKeysBefore = Get-AotKeys
 

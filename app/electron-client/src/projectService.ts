@@ -14,6 +14,7 @@ import {
   isEngineCopyPath,
   isJvmAotEnabled,
   jvmAotRootDirectory,
+  removeLeftoverJvmAotCache,
 } from '@/jvmAotSettings'
 import * as paths from '@/paths'
 import { lazyKeyringEntries, SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
@@ -170,7 +171,7 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
 }
 
 /**
- * The per-user JDK AOT cache (`project-manager-shim/jvmAot`), under `<userData>/jvm-aot`, or
+ * The per-user JDK AOT cache (`project-manager-shim/jvmAot`), in the platform's local cache directory (`jvmAotRootDirectory`), or
  * `ENSO_JVM_AOT_DIR` (the open-time harness points it at its own directory). `null` when the
  * engine cannot be found, and with `ENSO_JVM_AOT=0`. `overrides` replace the IDE's settings (the
  * installer's training, `trainJvmAotNow`).
@@ -181,13 +182,15 @@ function createJvmAotCache(
   overrides: Partial<JvmAotCacheSettings> = {},
 ): JvmAotCache | null {
   if (!isJvmAotEnabled(process.env)) return null
+  // Once per launch: this runs at startup and for `--train-jvm-aot`, each once.
+  void removeLeftoverJvmAotCache(process.env, app.getPath('userData'))
   const ensoExecutable = findEnsoExecutable(
     paths.resourcesPath(electron, electronIsDev),
     appImageEnginePath,
   )
   if (ensoExecutable == null) return null
   return new JvmAotCache({
-    rootDirectory: jvmAotRootDirectory(process.env, app.getPath('userData')),
+    rootDirectory: jvmAotRootDirectory(process.env),
     appVersion: app.getVersion(),
     ensoExecutable,
     // The GUI shows a toast from a training's start until it ends.

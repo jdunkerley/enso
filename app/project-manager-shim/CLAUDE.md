@@ -468,11 +468,12 @@ server has none.
 - **Key** (`key.ts`): the first 16 hex digits of SHA-256 over the app version,
   the real path of the engine distribution (`dist/<version>`), the bundled
   runtime (the one directory under `<root>/runtime/`) and the text of the
-  engine's `jvm.options`. The cache is `<userData>/jvm-aot/<key>/enso.aot`
-  (`ENSO_JVM_AOT_DIR` replaces `<userData>/jvm-aot`). No runtime (a development
-  build), a macOS `AppTranslocation/` path or a Linux AppImage mount
-  (`/.mount_<random>/`, `isAppImageMount`): no key, so nothing is trained or
-  used.
+  engine's `jvm.options`. The cache is `<root>/<key>/enso.aot`, where the root
+  is `jvm-aot` in the platform's local cache directory (Electron's
+  `jvmAotRootDirectory`; was `<userData>/jvm-aot` before #682), or
+  `ENSO_JVM_AOT_DIR`. No runtime (a development build), a macOS
+  `AppTranslocation/` path or a Linux AppImage mount (`/.mount_<random>/`,
+  `isAppImageMount`): no key, so nothing is trained or used.
 - **Training** (`trainer.ts`, `driver.ts`): `start()`, called once the window is
   up, decides at once (so the spare engine is held back and the toast shows) and
   begins the training `startDelayMs` (10 s) later, so it does not compete with
