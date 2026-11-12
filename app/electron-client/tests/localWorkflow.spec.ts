@@ -32,6 +32,7 @@ async function writeToFocusedComponentBrowser(page: Page, content: string): Prom
 // first read of the project fail and restart its Language Server client, and until #143 that
 // restart left the IDE's proxy channel closed, so the IDE's requests were never delivered.
 test('Project Duplicate', async ({ page }) => {
+  test.setTimeout(420_000)
   await waitForDashboard(page)
   await closeWelcome(page)
   // The graph appearing shows that the project opened and its Language Server connection works.
@@ -49,8 +50,10 @@ test('Project Duplicate', async ({ page }) => {
   const driveView = page.getByTestId('drive-view')
   // Wait for the first execution to end ("Initializing the project…" goes away). The graph appears
   // before it, and on the Windows CI runner's JVM engine the drive's stop button was still in its
-  // opening state then, and the click never landed.
-  await expect(page.getByText('Initializing the project.')).toHaveCount(0, { timeout: 120_000 })
+  // opening state then, and the click never landed. That first execution is slow there: still
+  // running 170 s after the open in all three tries of #666's run (26 s at 2 CPUs on a desktop),
+  // while its Language Server was otherwise answering, so it gets 300 s and the test 420 s.
+  await expect(page.getByText('Initializing the project.')).toHaveCount(0, { timeout: 300_000 })
   // The first close in the projects folder offers to keep versions with git; answer "Not now".
   await answerRepositoryPrompt(
     page,
