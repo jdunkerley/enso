@@ -48,16 +48,9 @@ import java.util.function.Consumer;
  * <h3><code>polyglot java</code> Support</h3>
  *
  * {@code EpbLanguage} is responsible for handling loading of Java classes via {@link
- * JavaPolyglotNode}. There are three modes to load classes:
- *
- * <ul>
- *   <li>{@code hosted} - regular GraalVM Java interop is used to load JVM classes
- *   <li>{@code guest} - support SubstrateVM/HotspotVM bridge via {@code JVM} and {@code Channel}
- *   <li>Espresso support - experimental controlled by {@code ENSO_JAVA} environment variable
- * </ul>
- *
- * Each of these mechanisms is supposed to create a {@link TruffleObject} representing the JVM class
- * that Enso can then operate with.
+ * JavaPolyglotNode}: the {@code java:0#hosted} source creates a {@link HostClassLoader}, and
+ * regular GraalVM Java interop loads the JVM classes through it. Each class it loads is a {@link
+ * TruffleObject} that Enso can then operate with.
  */
 @TruffleLanguage.Registration(
     id = EpbLanguage.ID,

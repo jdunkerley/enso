@@ -1083,12 +1083,10 @@ takes `open_perf_engines`, `open_perf_runs`, `open_perf_budget`,
 `--template image` opens, instead of the new-project template, a project whose
 first node calls `Standard.Image` on a PNG in its `data/` and whose second shows
 the result in a table; the headline (`welcomeShown`, and `libraryShown`) is that
-table showing `Image 16x16`, and there are no extras. Under native that
-library's Java runs in a guest JVM the engine starts on first use, so this is
-the fair comparison for projects that use library Java (Note [A Project That
-Uses A Library With Java Code] in `perf/projectTemplates.ts`). Its native
-launches copy the guest JVM's counters too. `ide-packaging.yml` takes it as
-`open_perf_template`.
+table showing `Image 16x16`, and there are no extras. That library's Java is not
+in the native image, so the template opens on the JVM only (Note [A Project That
+Uses A Library With Java Code] in `perf/projectTemplates.ts`).
+`ide-packaging.yml` takes it as `open_perf_template`.
 
 `tests/packagedIde.ts` holds where the packaged app, its engine launcher, its
 `java` and its engine component are; the Playwright specs, `globalSetup.ts` and

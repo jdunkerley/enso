@@ -17,7 +17,7 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
 
     tmp_root = Enso_Bin_Utils.create_tmp_dir
 
-    jvm_args = if Enso_Bin_Utils.runs_in_aot then [] else [ "--jvm" ]
+    jvm_args = if Enso_Bin_Utils.runs_in_native_image then [] else [ "--jvm" ]
 
     group_builder.teardown <|
         tmp_root.delete recursive=True

@@ -121,7 +121,7 @@ final class ForeignEvalNode extends RootNode {
     if ("hosted".equals(code)) {
       return JavaPolyglotNode.createHosted(context);
     } else {
-      return JavaPolyglotNode.create(context);
+      throw new ForeignParsingException("Unknown Java class loading: " + code, this);
     }
   }
 

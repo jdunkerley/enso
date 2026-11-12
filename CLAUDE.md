@@ -92,7 +92,7 @@ describes each of those commands.
   something CI will catch for you.
 - Scala/Java: GraalVM-based. See
   [Infrastructure](https://github.com/jdunkerley/enso/wiki/Infrastructure) for
-  `sbt`, native-image, dual-JVM, and GraalVM upgrade guides.
+  `sbt`, native-image and GraalVM upgrade guides.
 - TypeScript: TS `catalog:` version in `pnpm-workspace.yaml`. Use
   `corepack pnpm` (not bare `pnpm`/`npm`).
 
