@@ -177,8 +177,7 @@ public class HttpDownloadBodyTest {
 
   @Test(timeout = 30_000)
   public void aStalledBodyDoesNotShutTheServerOut() {
-    var first =
-        TaskProgress.waitForTask(HTTPDownload.fetchString(uri("/stalls")));
+    var first = TaskProgress.waitForTask(HTTPDownload.fetchString(uri("/stalls")));
     assertTrue("The stalled fetch fails", first.isFailure());
     // The server answered, so it is not "unresponsive": the next request is sent.
     var second = TaskProgress.waitForTask(HTTPDownload.fetchString(uri("/accept")));
