@@ -47,7 +47,7 @@ test('settings open on the Local tab', async ({ drivePage, page }) => {
   await sidebarTab(page, TEXT.keyboardShortcutsSettingsTab).click()
   await expect(sectionHeadings(page)).toHaveText([TEXT.keyboardShortcutsSettingsSection])
   await sidebarTab(page, TEXT.localSettingsTab).click()
-  await expect(sectionHeadings(page)).toHaveCount(4)
+  await expect(sectionHeadings(page)).toHaveCount(5)
 })
 
 test('the rail has Settings and About buttons, and Settings opens the Local tab', async ({
