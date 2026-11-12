@@ -6,7 +6,7 @@
  * `ENSO_TEST_GROUP_FILTER` (one project only) runs the test groups whose names match; a run in
  * which it ran no test fails.
  *
- *     corepack pnpm --filter build-scripts run stdlib-test -- standard-library-in-native
+ *     corepack pnpm --filter build-scripts run stdlib-test -- standard-library
  */
 import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
