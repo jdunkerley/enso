@@ -292,17 +292,6 @@ public final class ContextFactory {
         builder.option("python.Executable", graalpy.getAbsolutePath());
       }
     }
-    if (ENGINE_HAS_JAVA) {
-      var javaHome = System.getProperty("java.home");
-      if (javaHome != null) {
-        builder.option("java.JavaHome", javaHome);
-      }
-      builder
-          .option("java.ExposeNativeJavaVM", "true")
-          .option("java.Polyglot", "true")
-          .option("java.UseBindingsLoader", "true")
-          .allowCreateThread(true);
-    }
 
     if (engineOptions != null) {
       // In AOT mode one must not use a shared engine; the latter causes issues when initializing
@@ -319,24 +308,6 @@ public final class ContextFactory {
     var ctx = builder.build();
     ContextInsightSetup.configureContext(ctx);
     return ctx;
-  }
-
-  /**
-   * Checks whether the polyglot engine has Espresso. Recorded as static constant to be remembered
-   * in AOT mode.
-   */
-  private static final boolean ENGINE_HAS_JAVA;
-
-  static {
-    var modules = ModuleLayer.boot().modules().stream();
-    var found = modules.anyMatch(m -> "org.graalvm.espresso".equals(m.getName()));
-    if (!found) {
-      var url =
-          ContextFactory.class.getResource(
-              "/META-INF/native-image/com.oracle.truffle.espresso/native-image.properties");
-      found = url != null;
-    }
-    ENGINE_HAS_JAVA = found;
   }
 
   private static HostAccess allWithTypeMapping() {

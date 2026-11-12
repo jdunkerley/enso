@@ -58,7 +58,8 @@ on:
       open_perf_template:
         description: >-
           The project to open: `welcome` (the new-project template) or `image` (a project that
-          calls Standard.Image, whose Java runs in a guest JVM under native; projectTemplates.ts).
+          calls Standard.Image, whose Java is not in the native image, so it opens on the JVM only;
+          projectTemplates.ts).
           Several, comma-separated, are measured in turn on the same runner, in open-perf/<name>.
         required: false
         type: string

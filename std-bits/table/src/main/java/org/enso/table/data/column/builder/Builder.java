@@ -11,7 +11,6 @@ import org.enso.table.data.column.operation.masks.IndexMapper;
 import org.enso.table.data.column.operation.masks.MaskOperation;
 import org.enso.table.data.column.storage.BoolStorage;
 import org.enso.table.data.column.storage.ColumnStorage;
-import org.enso.table.data.column.storage.ColumnStorageProxy;
 import org.enso.table.data.column.storage.PreciseTypeOptions;
 import org.enso.table.data.column.storage.type.AnyObjectType;
 import org.enso.table.data.column.storage.type.BigDecimalType;
@@ -155,9 +154,9 @@ public interface Builder {
       return storageType.asTypedStorage(localStorage);
     }
 
-    // Fallback and use a ColumnStorageProxy
-    var proxiedStorage = ColumnStorageProxy.create(storageType, size, storage);
-    return storageType.asTypedStorage(proxiedStorage);
+    // No off-heap data to copy: the proxy is itself a working ColumnStorage, so keep it. (Such
+    // proxies mostly came from the guest JVM, which is gone; it needed a ColumnStorageProxy here.)
+    return storage;
   }
 
   private static boolean assertSameStorages(ColumnStorage<?> s1, ColumnStorage<?> s2) {

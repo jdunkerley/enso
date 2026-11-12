@@ -443,7 +443,6 @@ lazy val enso = (project in file("."))
     `jna-wrapper-extracted`,
     `json-rpc-server`,
     `jvm-channel`,
-    `jvm-interop`,
     `language-server`,
     `language-server-deps-wrapper`,
     `library-manager`,
@@ -619,7 +618,6 @@ lazy val componentModulesPaths =
     (`filewatcher` / Compile / exportedModuleBin).value,
     (`json-rpc-server` / Compile / exportedModuleBin).value,
     (`jvm-channel` / Compile / exportedModuleBin).value,
-    (`jvm-interop` / Compile / exportedModuleBin).value,
     (`language-server` / Compile / exportedModuleBin).value,
     (`language-server-deps-wrapper` / Compile / exportedModuleBin).value,
     (`library-manager` / Compile / exportedModuleBin).value,
@@ -2267,8 +2265,6 @@ lazy val `language-server` = (project in file("engine/language-server"))
       (`engine-common` / Compile / exportedModule).value,
       (`fansi-wrapper` / Compile / exportedModule).value,
       (`interpreter-dsl` / Compile / exportedModule).value,
-      (`jvm-channel` / Compile / exportedModule).value,
-      (`jvm-interop` / Compile / exportedModule).value,
       (`language-server-deps-wrapper` / Compile / exportedModule).value,
       (`library-manager` / Compile / exportedModule).value,
       (`logging-config` / Compile / exportedModule).value,
@@ -2552,13 +2548,10 @@ lazy val `runtime-language-epb` =
         "org.graalvm.sdk"      % "nativeimage" % graalMavenPackagesVersion
       ),
       Compile / internalModuleDependencies := Seq(
-        (`jvm-channel` / Compile / exportedModule).value,
-        (`jvm-interop` / Compile / exportedModule).value,
         (`runtime-utils` / Compile / exportedModule).value,
         (`ydoc-polyfill` / Compile / exportedModule).value
       )
     )
-    .dependsOn(`jvm-interop` % Test)
 
 lazy val `runtime-language-arrow` =
   (project in file("engine/runtime-language-arrow"))
@@ -2832,8 +2825,6 @@ lazy val `runtime-integration-tests` =
         (`engine-common` / Compile / exportedModule).value,
         (`fansi-wrapper` / Compile / exportedModule).value,
         (`interpreter-dsl` / Compile / exportedModule).value,
-        (`jvm-channel` / Compile / exportedModule).value,
-        (`jvm-interop` / Compile / exportedModule).value,
         (`library-manager` / Compile / exportedModule).value,
         (`logging-config` / Compile / exportedModule).value,
         (`logging-service` / Compile / exportedModule).value,
@@ -3020,8 +3011,6 @@ lazy val `runtime-benchmarks` =
         (`engine-common` / Compile / exportedModule).value,
         (`fansi-wrapper` / Compile / exportedModule).value,
         (`interpreter-dsl` / Compile / exportedModule).value,
-        (`jvm-channel` / Compile / exportedModule).value,
-        (`jvm-interop` / Compile / exportedModule).value,
         (`library-manager` / Compile / exportedModule).value,
         (`logging-config` / Compile / exportedModule).value,
         (`logging-service` / Compile / exportedModule).value,
@@ -3657,7 +3646,6 @@ lazy val `engine-runner` = project
       (`engine-common` / Compile / exportedModule).value,
       (`engine-runner-common` / Compile / exportedModule).value,
       (`jvm-channel` / Compile / exportedModule).value,
-      (`jvm-interop` / Compile / exportedModule).value,
       (`library-manager` / Compile / exportedModule).value,
       (`logging-config` / Compile / exportedModule).value,
       (`logging-utils` / Compile / exportedModule).value,
@@ -3741,10 +3729,6 @@ lazy val `engine-runner` = project
     NativeImage.additionalCp := {
       val runnerDeps =
         (Compile / fullClasspath).value.map(_.data.getAbsolutePath)
-      val jvmInteropDeps =
-        (`jvm-interop` / Compile / fullClasspath).value.map(
-          _.data.getAbsolutePath
-        )
       val runtimeDeps =
         (`runtime` / Compile / fullClasspath).value.map(_.data.getAbsolutePath)
       val loggingDeps =
@@ -3778,7 +3762,6 @@ lazy val `engine-runner` = project
       }
       val core = (
         runnerDeps ++
-          jvmInteropDeps ++
           runtimeDeps ++
           loggingDeps ++
           replDebugInstr ++
@@ -3868,9 +3851,10 @@ lazy val `engine-runner` = project
         // Note [Java-Free Libraries In The Image]
         // A library with no Java of its own whose `polyglot java import`s are all
         // JDK classes (Standard.XML) is hosted in the image: `EnsoLibraryFeature`
-        // registers those JDK classes and marks it AOT-ready, so its calls do not
-        // cross to the guest JVM. Such a library must ship no jar, or its Java
-        // would end up in the image.
+        // registers those JDK classes and marks it AOT-ready, so the native
+        // engine can run it (any other library's Java is not in the image; Note
+        // [A Library's Java Must Be In The Native Image] in `EnsoPolyglotJava`).
+        // Such a library must ship no jar, or its Java would end up in the image.
         //
         // The cost is a hand-kept list. Host interop reaches the JDK's own
         // implementation classes through the public interfaces they implement,
@@ -4135,59 +4119,8 @@ lazy val `jvm-channel` =
         "org.graalvm.sdk"      % "nativeimage" % graalMavenPackagesVersion,
         "org.graalvm.polyglot" % "polyglot"    % graalMavenPackagesVersion,
         "org.graalvm.sdk"      % "word"        % graalMavenPackagesVersion
-      ),
-      Compile / internalModuleDependencies ++= Seq(
-        (`engine-common` / Compile / exportedModule).value,
-        (`persistance` / Compile / exportedModule).value
       )
     )
-    .dependsOn(`persistance`)
-    .dependsOn(`persistance-dsl` % "provided")
-
-lazy val `jvm-interop` =
-  project
-    .in(file("lib/java/jvm-interop"))
-    .enablePlugins(JPMSPlugin)
-    .settings(
-      annotationProcSetting,
-      customFrgaalJavaCompilerSettings("24"),
-      // jvm-interop/test has to run with -ea disabled form Truffle.
-      // Otherwise Truffle library performs a lot of additional
-      // checks and they skew the message counts. Thus enabling -ea
-      // only for Enso packages
-      inConfig(Compile)(
-        Seq(fork := true, javaOptions ++= Seq("-ea:org.enso.jvm..."))
-      ),
-      publishLocalSetting,
-      autoScalaLibrary := false,
-      crossPaths := false,
-      (Test / fork) := true,
-      commands += WithDebugCommand.withDebug,
-      libraryDependencies ++= Seq(
-        "org.graalvm.truffle"  % "truffle-api"           % graalMavenPackagesVersion % "provided",
-        "org.graalvm.truffle"  % "truffle-dsl-processor" % graalMavenPackagesVersion % "provided",
-        "org.graalvm.sdk"      % "graal-sdk"             % graalMavenPackagesVersion % Test,
-        "junit"                % "junit"                 % junitVersion              % Test,
-        "com.github.sbt"       % "junit-interface"       % junitIfVersion            % Test,
-        "org.graalvm.polyglot" % "js-community"          % graalMavenPackagesVersion % Test
-      ),
-      Compile / moduleDependencies ++= Seq(
-        "org.graalvm.truffle"  % "truffle-api" % graalMavenPackagesVersion,
-        "org.graalvm.sdk"      % "nativeimage" % graalMavenPackagesVersion,
-        "org.graalvm.polyglot" % "polyglot"    % graalMavenPackagesVersion,
-        "org.graalvm.sdk"      % "word"        % graalMavenPackagesVersion
-      ),
-      Compile / internalModuleDependencies ++= Seq(
-        (`jvm-channel` / Compile / exportedModule).value,
-        (`engine-common` / Compile / exportedModule).value,
-        (`persistance` / Compile / exportedModule).value
-      ),
-      Test / libraryDependencies ++= GraalVM.jsPkgs
-    )
-    .dependsOn(`engine-common`)
-    .dependsOn(`jvm-channel`)
-    .dependsOn(`persistance-dsl` % "provided")
-    .dependsOn(`test-utils` % Test)
 
 lazy val `os-environment-lib` =
   project

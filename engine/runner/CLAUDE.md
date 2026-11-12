@@ -37,8 +37,15 @@ those whose `polyglot/java` jars are on the image class path, plus the Java-free
 libraries `build.sbt` names in `enso.nativeImage.javaFreeLibraries`
 (`Standard.XML`, whose imports are all JDK classes). It registers every
 `polyglot java import` of those libraries for reflection and marks them
-AOT-ready; any other library loads its Java in the guest JVM. See Note
-[Java-Free Libraries In The Image] in `build.sbt`.
+AOT-ready. Any other library's Java is not available under native: a class it
+asks for that the image lacks is an error naming the library and the way to run
+on the JVM (Note [A Library's Java Must Be In The Native Image] in
+`EnsoPolyglotJava`; the in-process guest JVM that used to run it is gone). See
+Note [Java-Free Libraries In The Image] in `build.sbt`.
+
+`--jvm` starts HotSpot through `JVM` in `lib/java/jvm-channel`, which since the
+guest JVM went holds only that JNI-invocation subset (`JVM`, `PosixJVM`,
+`WindowsJVM`, `JNI`, `JNIBoot`). It goes with the native launcher.
 
 ## JVM mode (`--jvm`)
 

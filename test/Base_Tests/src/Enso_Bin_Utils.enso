@@ -3,6 +3,7 @@ from Standard.Base import all
 from Standard.Test import all
 
 polyglot java import java.lang.ProcessHandle as J_ProcessHandle
+polyglot java import java.lang.System as J_System
 
 
 ## Returns True if current process runs in AOT mode (Native Image).
@@ -14,6 +15,16 @@ runs_in_aot =
         if args.isPresent && args.get.contains "--jvm" then False else
             # running in AOT mode
             True
+
+## Returns True if current process is a native image.
+
+   Unlike `runs_in_aot`, this is False for the JVM that the native launcher
+   (`enso.exe --jvm`) starts in its own process on Windows: there the command is
+   `enso.exe` and `ProcessHandle` reports no arguments, so `runs_in_aot` says
+   True. A child `enso` must get `--jvm` whenever this is False, as a native
+   engine runs only the Java compiled into its image.
+runs_in_native_image =
+    (J_System.getProperty "org.graalvm.nativeimage.imagecode") == "runtime"
 
 ## Create temporary directory
 create_tmp_dir -> File =
