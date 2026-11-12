@@ -132,6 +132,12 @@ export class VisualizationBridge {
    * the live set since the last scan, emit a `detach` iff we previously sent
    * an `attach` for it (`slotMeta` holds that record) and it is not a
    * one-shot `inFrame` request (those the runtime auto-detaches).
+   *
+   * A scan runs once per transaction, so a client that replaces a slot (same visualizationId,
+   * new rid) must do it in one transaction: then the new attach is sent before the old detach,
+   * and the Language Server's bridge does not forward that detach to the runtime. In two, the
+   * runtime gets a detach and an attach of one visualization, which race (Note [A Modify Is One
+   * Transaction] in the GUI's `executionContext.ts`, #634).
    */
   private scan(): void {
     const liveIds = new Set<string>()

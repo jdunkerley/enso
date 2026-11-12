@@ -451,45 +451,12 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
           return Ok()
         }
 
-        const attach = (visId: Uuid, config: NodeVisualizationConfiguration) => {
-          const spec: VisualizationSlotSpec = {
-            visualizationId: visId as VisualizationId,
-            contextId: this.id,
-            nodeExternalId: config.expressionId,
-            request: serializeRequest(config, this.projectNames),
-          }
-          const requestId = newVisRequestId()
-          vis.createSlot(spec, requestId)
-          state.visualizationSlotByVisId.set(visId, requestId)
-          state.visualizations.set(visId, config)
-        }
-
-        const detach = (visId: Uuid) => {
-          const requestId = state.visualizationSlotByVisId.get(visId)
-          if (requestId != null) vis.removeSlot(requestId)
-          state.visualizationSlotByVisId.delete(visId)
-          state.visualizations.delete(visId)
-        }
-
-        // Attach new and update existing visualizations. Modify is always a
-        // detach+attach: every change gets a new slot with a new request id so
-        // the response is unambiguously paired with its preprocessor.
-        for (const [id, config] of this.visualizationConfigs) {
-          const previousConfig = state.visualizations.get(id)
-          if (previousConfig == null) {
-            attach(id, config)
-          } else if (!visualizationConfigEqual(previousConfig, config)) {
-            detach(id)
-            attach(id, config)
-          }
-        }
-
-        // Detach removed visualizations.
-        for (const id of Array.from(state.visualizations.keys())) {
-          if (!this.visualizationConfigs.get(id)) {
-            detach(id)
-          }
-        }
+        reconcileVisualizationSlots(vis, state, this.visualizationConfigs, (visId, config) => ({
+          visualizationId: visId as VisualizationId,
+          contextId: this.id,
+          nodeExternalId: config.expressionId,
+          request: serializeRequest(config, this.projectNames),
+        }))
         return Ok()
       }
 
@@ -572,6 +539,75 @@ function serializeMethodPointer(
  * `VisRequestPreprocessor` in `ydoc-shared/visualizations.ts` and the
  * decoder in `VisualizationBridgeServer.scala`.
  */
+/**
+ * The visualization slots an execution context has written: for each visualization id, its
+ * current slot's request id and the configuration that slot asks for.
+ */
+export interface VisualizationSlotState {
+  visualizationSlotByVisId: Map<Uuid, VisRequestId>
+  visualizations: Map<Uuid, NodeVisualizationConfiguration>
+}
+
+/**
+ * Bring the slots in `vis` in line with `wanted`, the configuration each visualization should
+ * have: a new visualization gets a slot, a removed one loses its slot, and a changed one gets a
+ * new slot (new request id, same visualization id) in place of its old one, so that a response
+ * is unambiguously paired with its preprocessor. `state` records what was written.
+ *
+ * All the changes are one Yjs transaction (Note [A Modify Is One Transaction]).
+ */
+export function reconcileVisualizationSlots(
+  vis: Visualizations,
+  state: VisualizationSlotState,
+  wanted: ReadonlyMap<Uuid, NodeVisualizationConfiguration>,
+  slotSpec: (visId: Uuid, config: NodeVisualizationConfiguration) => VisualizationSlotSpec,
+): void {
+  const attach = (visId: Uuid, config: NodeVisualizationConfiguration) => {
+    const requestId = newVisRequestId()
+    vis.createSlot(slotSpec(visId, config), requestId)
+    state.visualizationSlotByVisId.set(visId, requestId)
+    state.visualizations.set(visId, config)
+  }
+
+  const detach = (visId: Uuid) => {
+    const requestId = state.visualizationSlotByVisId.get(visId)
+    if (requestId != null) vis.removeSlot(requestId)
+    state.visualizationSlotByVisId.delete(visId)
+    state.visualizations.delete(visId)
+  }
+
+  vis.doc.transact(() => {
+    for (const [id, config] of wanted) {
+      const previousConfig = state.visualizations.get(id)
+      if (previousConfig == null) {
+        attach(id, config)
+      } else if (!visualizationConfigEqual(previousConfig, config)) {
+        detach(id)
+        attach(id, config)
+      }
+    }
+    for (const id of Array.from(state.visualizations.keys())) {
+      if (!wanted.get(id)) detach(id)
+    }
+  })
+}
+
+/* Note [A Modify Is One Transaction]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A changed visualization keeps its id and gets a new slot: the old slot is removed and the new
+ * one created. The ydoc server's bridge (`VisualizationBridge.scan`) reconciles the slots once per
+ * transaction, sending the attaches of the new slots before the detaches of the removed ones; the
+ * Language Server's bridge (`VisualizationBridgeServer`) then sees a detach of a visualization
+ * that still has a newer attach and does not forward it, since the runtime's attach is an upsert.
+ *
+ * As two transactions, the removal reached the bridge first, so the runtime got a real
+ * `DetachVisualization` and an `AttachVisualization` of the same id. They run as concurrent jobs:
+ * the upsert at high priority, deferring itself while an execution holds the context lock, the
+ * detach after that execution, where it removed the visualization the upsert had just set. The
+ * node's widget configuration (`get_widget_json`, re-attached whenever an argument changes) then
+ * never came, and its dropdowns stayed missing or showed raw tags (#634).
+ */
+
 function serializeRequest(
   config: NodeVisualizationConfiguration,
   projectNames: ProjectNameStore,
