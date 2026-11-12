@@ -10,6 +10,7 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { EnsoRunner, type StartupClock } from '../ensoRunner.js'
 import { Path } from '../types.js'
+import { fakeLauncherCommand } from './fakeLauncher.js'
 import { HEALTH_POLLING_PORT } from './testPorts.js'
 
 /* Note [Start-Up Tests Read The Schedule]
@@ -106,6 +107,7 @@ test('polls a starting engine every 25 ms for its first second, then every 250 m
     if (delays.length === 43) fs.writeFileSync(`${project}.ready`, '')
   })
   const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: HEALTH_POLLING_PORT,
     startupClock: clock,
   })
@@ -137,6 +139,7 @@ test('the startup timeout does not kill an engine that is healthy', async () => 
     },
   }
   const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: HEALTH_POLLING_PORT,
     startupTimeoutMs: 30_000,
     startupClock: clock,

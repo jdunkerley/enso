@@ -49,31 +49,44 @@ guest JVM went holds only that JNI-invocation subset (`JVM`, `PosixJVM`,
 
 ## JVM mode (`--jvm`)
 
+**C1 of the native-image removal (the IDE side).** The IDE's shim no longer runs
+`enso` and no longer passes `--jvm`: it starts `<runtime>/bin/java` itself with
+the options below and `-m org.enso.runner/org.enso.runner.Main`
+(`app/project-manager-shim/src/projectService/javaLaunch.ts`). The fixed options
+(`--sun-misc-unsafe-memory-access=allow`,
+`--enable-native-access=org.graalvm.truffle`,
+`--add-opens=java.base/java.nio=ALL-UNNAMED`) are now the first lines of
+`jvm.options`, so the shim, `bin/enso`, `bin/enso.bat` and `Main.launchJvm` read
+one list; `Main.launchJvm` adds none of its own. The native launcher still
+exists until C2/C3, which delete it.
+
 The `enso` native image creates the JVM in its own process through JNI, except
 on Linux, where since GraalVM 25.5 it replaces itself with `java` through
 `execv` (the image exports `JVM_IsStaticallyLinked`, and an in-process JVM then
 never loads libnio). The PID stays the same, so the IDE's `SIGKILL` and any
 other signal reach the JVM (Note [The Launcher Becomes The JVM On Linux] in
 `PosixExec`). A JVM running the runner (`--jvm <other JDK>`) still starts `java`
-as a child process. `Main.launchJvm` starts the JVM with a fixed option list,
-then appends `JvmOptions.all(component, System.getenv("ENSO_JVM_OPTIONS"))`, in
-this order:
+as a child process. `Main.launchJvm` starts the JVM with
+`JvmOptions.all(component, System.getenv("ENSO_JVM_OPTIONS"))`, in this order:
 
 1. `jvm.options` in the engine package root, beside `component/` (source
    `distribution/engine/jvm.options`, copied by `DistributionPackage` and
    required by `EngineDistributionChecks`): one option per line, `#` comments
    and blank lines ignored. It is the engine's, so the IDE and the CLI both get
-   it.
+   it, and it begins with the fixed options. Its parsing is tested against the
+   shim's TypeScript parser with a shared fixture,
+   `src/test/resources/org/enso/runner/jvm-options-cases.txt` (`JvmOptionsTest`,
+   `jvmOptions.test.ts`): change a rule in both parsers and the fixture.
 2. `ENSO_JVM_OPTIONS`. A value containing a newline is split on newlines, so an
    option may contain spaces (a path under `C:\Users\John Smith\`, a quoted
    `-Xlog:…:file="…"`); the IDE's project-manager shim always writes it that
    way. A value without a newline is split on whitespace, which is what a person
    types.
 
-Both come after the fixed list and before `--module-path`/`-m`. Keep
-`JvmOptions` Native-Image friendly (plain `java.io`/`java.nio` only): it runs in
-the `enso` native image. The shim's AOT trainer reads the same file when it
-starts `java` itself (`app/project-manager-shim/src/jvmAot/trainer.ts`).
+Both come before `--module-path`/`-m`. Keep `JvmOptions` Native-Image friendly
+(plain `java.io`/`java.nio` only): it runs in the `enso` native image. The shim
+reads the same file for every engine it starts (`projectService/javaLaunch.ts`;
+the AOT trainer included).
 
 Rules for an option line (in the file or in `ENSO_JVM_OPTIONS`):
 
@@ -83,19 +96,20 @@ Rules for an option line (in the file or in `ENSO_JVM_OPTIONS`):
   native `enso` (the JNI path) each line becomes one `JavaVMOption`, which the
   launcher's own argument parsing never sees.
 - The quoted form `-Xlog:…:file="C:\Users\John Smith\use.log"` is for the JNI
-  path only (the `enso` native image, which is what the IDE runs). Where a JVM
-  runs the runner and relaunches through `ProcessBuilder` (`--jvm <other JDK>`),
-  Windows' argument quoting splits such an argument at its space; write the path
-  unquoted there.
+  path only (the `enso` native image; the IDE passes it to `java` as one
+  argument, which Windows keeps intact). Where a JVM runs the runner and
+  relaunches through `ProcessBuilder` (`--jvm <other JDK>`), Windows' argument
+  quoting splits such an argument at its space; write the path unquoted there.
 - A leading UTF-8 byte order mark is ignored.
 
 The shell launchers `distribution/bin/enso` and `enso.bat` start the JVM
 themselves and `--jvm` does not relaunch from them, so `Main.launchJvm` is not
-involved: they read `jvm.options` on their own (`enso` with the same rules;
-`enso.bat` skips blank, whitespace-only and `#` lines, also indented ones, trims
-leading and trailing spaces and quotes each line, so `^ % ! & | < >` and spaces
-survive literally; it does not support a byte order mark, a double quote or a
-single quote in an option). They do not read `ENSO_JVM_OPTIONS`.
+involved: they read `jvm.options` on their own, fixed options included (`enso`
+with the same rules; `enso.bat` skips blank, whitespace-only and `#` lines, also
+indented ones, trims leading and trailing spaces and quotes each line, so
+`^ % ! & | < >` and spaces survive literally; it does not support a byte order
+mark, a double quote or a single quote in an option). They do not read
+`ENSO_JVM_OPTIONS`.
 
 ## Standby mode (`--standby`)
 

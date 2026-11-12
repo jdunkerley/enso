@@ -11,6 +11,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { EnsoRunner } from '../ensoRunner.js'
 import { Path } from '../types.js'
 import { newChannelToken, type YdocHost } from '../ydocHost.js'
+import { fakeLauncherCommand } from './fakeLauncher.js'
 import { YDOC_HOST_PORT } from './testPorts.js'
 
 const FAKE_ENSO = `
@@ -79,6 +80,7 @@ test('the host listens on the ydoc port before the engine starts, with the engin
   const calls: string[] = []
   const engineStartedAtListen: boolean[] = []
   const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: YDOC_HOST_PORT,
     ydocHost: recordingHost(calls, engineStartedAtListen),
   })
@@ -95,7 +97,10 @@ test('the host listens on the ydoc port before the engine starts, with the engin
 })
 
 test('without a host the engine still starts, with a token', async () => {
-  const runner = new EnsoRunner(await fakeEnso(root), { firstPort: YDOC_HOST_PORT })
+  const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
+    firstPort: YDOC_HOST_PORT,
+  })
   const p = path.join(root, 'W')
   await runner.openProject(Path(p), 'id-w')
   expect((await seenEnv(p)).LANGUAGE_SERVER_CHANNEL_TOKEN).toMatch(/^[0-9a-f]{64}$/)
@@ -105,6 +110,7 @@ test('without a host the engine still starts, with a token', async () => {
 test('each engine gets its own token', async () => {
   const calls: string[] = []
   const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: YDOC_HOST_PORT,
     ydocHost: recordingHost(calls),
   })
@@ -123,6 +129,7 @@ test('a failed open closes the listener', async () => {
   const calls: string[] = []
   vi.stubEnv('FAKE_ENSO_FAIL', '1')
   const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: YDOC_HOST_PORT,
     ydocHost: recordingHost(calls),
   })
@@ -139,6 +146,7 @@ test('a listener that cannot start fails the open before an engine starts', asyn
     close: vi.fn(async () => {}),
   }
   const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
     firstPort: YDOC_HOST_PORT,
     ydocHost: host,
   })
@@ -163,7 +171,11 @@ test('a ydoc port taken before the listener binds it makes the open search again
     close: recording.close,
   }
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-  const runner = new EnsoRunner(await fakeEnso(root), { firstPort: YDOC_HOST_PORT, ydocHost: host })
+  const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
+    firstPort: YDOC_HOST_PORT,
+    ydocHost: host,
+  })
   const p = path.join(root, 'U')
   const sockets = await runner.openProject(Path(p), 'id-u')
   expect(warn).toHaveBeenCalledOnce()

@@ -123,7 +123,7 @@ export class EngineLogChannel {
   }
 
   /**
-   * A line of the shim's own for the log, such as the engine mode: one `stderr` line before any
+   * A line of the shim's own for the log, such as a removed engine's notice: one `stderr` line before any
    * session, emitted at once.
    */
   notice(text: string): void {

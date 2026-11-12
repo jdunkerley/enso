@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { EnsoRunner } from '../ensoRunner.js'
 import { ProjectService } from '../index.js'
 import { Path } from '../types.js'
+import { fakeLauncherCommand } from './fakeLauncher.js'
 import { RUNNING_PROJECTS_PORT } from './testPorts.js'
 
 const FAKE_ENSO = `
@@ -55,7 +56,10 @@ async function fakeEnso(directory: string): Promise<Path> {
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'running-projects-'))
-  runner = new EnsoRunner(await fakeEnso(root), { firstPort: RUNNING_PROJECTS_PORT })
+  runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
+    firstPort: RUNNING_PROJECTS_PORT,
+  })
 })
 
 afterEach(async () => {
@@ -90,7 +94,9 @@ describe('hasRunningProjects', () => {
   }, 30_000)
 
   test('a --run that fails to spawn does not stay counted', async () => {
-    const missing = new EnsoRunner(Path(path.join(root, 'no-such-enso')))
+    const missing = new EnsoRunner(Path(path.join(root, 'no-such-enso')), {
+      engineCommand: (ensoPath) => () => [ensoPath, []],
+    })
     await expect(missing.runProject(Path(path.join(root, 'P')))).rejects.toThrow()
     expect(await missing.hasRunningProjects()).toBe(false)
   })

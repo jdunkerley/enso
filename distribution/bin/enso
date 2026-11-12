@@ -1,7 +1,6 @@
 #!/usr/bin/env sh
 ENGINE_ROOT=$(dirname "$(dirname "$(realpath "$0")")")
 COMP_PATH=$ENGINE_ROOT/component
-JAVA_OPTS="--enable-native-access=org.graalvm.truffle --sun-misc-unsafe-memory-access=allow --add-opens=java.base/java.nio=ALL-UNNAMED"
 # A bundle (e.g. the IDE's) places the engine at <root>/dist/<version> and its
 # JDK at <root>/runtime/graalvm-*. Prefer that JDK, so the engine still starts
 # when `java` is not on PATH (the IDE launched from Finder or the Dock).
@@ -13,7 +12,7 @@ for candidate in "$ENGINE_ROOT"/../../runtime/graalvm-*/bin/java; do
   fi
 done
 # The package's jvm.options (engine/runner JvmOptions.java): one JVM option per
-# line, blank lines and # comments skipped. The options go before `-m`, the
+# line, blank lines and # comments skipped. It starts with the fixed options. The options go before `-m`, the
 # user's arguments after it, so they are put in "$@" in that order.
 USER_ARGS=$#
 BOM=$(printf '\357\273\277')
@@ -37,5 +36,5 @@ while [ "$USER_ARGS" -gt 0 ]; do
   set -- "$@" "$first"
   USER_ARGS=$((USER_ARGS - 1))
 done
-exec "$JAVA" --module-path "$COMP_PATH" $JAVA_OPTS "$@"
+exec "$JAVA" --module-path "$COMP_PATH" "$@"
 exit

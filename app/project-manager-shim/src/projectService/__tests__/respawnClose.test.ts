@@ -13,6 +13,7 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { EnsoRunner } from '../ensoRunner.js'
 import { Path } from '../types.js'
+import { fakeLauncherCommand } from './fakeLauncher.js'
 import { RESPAWN_CLOSE_PORT } from './testPorts.js'
 
 const FAKE_ENSO = `
@@ -63,7 +64,10 @@ afterEach(async () => {
 })
 
 test('a close that lands during the watchdog respawn starts no new engine', async () => {
-  const runner = new EnsoRunner(await fakeEnso(root), { firstPort: RESPAWN_CLOSE_PORT })
+  const runner = new EnsoRunner(await fakeEnso(root), {
+    engineCommand: fakeLauncherCommand,
+    firstPort: RESPAWN_CLOSE_PORT,
+  })
   const project = Path(path.join(root, 'Project'))
   let closing: Promise<void> | undefined
   // The watchdog logs, then calls `respawn()` (which starts stopping the old engine) in the same

@@ -293,11 +293,6 @@ export type LocalSecretsStatus = (
  */
 export type SampleState = 'current' | 'edited' | 'updateAvailable' | 'missing' | 'unreadable'
 
-/** The project service's answer to `engine/setSpare`: which engine projects get by default. */
-export interface SpareEngineStatus {
-  readonly engineMode: 'native' | 'jvm'
-}
-
 /** The bundled samples, and where they are installed. */
 export interface SamplesStatus {
   /** `<projects>/Samples`. */

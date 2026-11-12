@@ -1,4 +1,4 @@
-import { engineModeOption, parseArgs, withoutDeepLink, withoutInstallerFlags } from '@/configParser'
+import { parseArgs, withoutDeepLink, withoutInstallerFlags } from '@/configParser'
 import {
   buildWebAppURLSearchParamsFromArgs,
   defaultOptions,
@@ -39,13 +39,9 @@ test('the relaunch after an update starts the IDE with the default options', () 
   expect(withoutInstallerFlags(['--updated', '--no-engine'])).toEqual(['--no-engine'])
 })
 
-test('--engine-mode, and --jvm as its alias', () => {
-  expect(engineModeOption(parseArgs(['--engine-mode', 'jvm']))).toBe('jvm')
-  expect(engineModeOption(parseArgs(['--engine-mode=native']))).toBe('native')
-  expect(engineModeOption(parseArgs(['--jvm']))).toBe('jvm')
-  expect(engineModeOption(parseArgs(['--jvm', '--engine-mode', 'native']))).toBe('native')
-  expect(engineModeOption(parseArgs([]))).toBeUndefined()
-  expect(() => parseArgs(['--engine-mode', 'graal'])).toThrow()
+test('--engine-mode and --jvm are gone', () => {
+  expect(() => parseArgs(['--engine-mode', 'jvm'])).toThrow()
+  expect(() => parseArgs(['--jvm'])).toThrow()
 })
 
 test('--no-welcome-project reaches the web app, and the default opens the welcome project', () => {

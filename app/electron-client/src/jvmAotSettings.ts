@@ -4,7 +4,6 @@
  */
 import * as path from 'node:path'
 import { readyStableEngine, stableEnginePath } from 'project-manager-shim/jvmAot'
-import { resolveDefaultEngineMode, type EngineSettings } from 'project-manager-shim/projectService'
 
 /** `ENSO_JVM_AOT_DIR` when it is set and not empty, else `<userData>/jvm-aot`. */
 export function jvmAotRootDirectory(
@@ -21,20 +20,6 @@ export function jvmAotRootDirectory(
  */
 export function isJvmAotEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
   return env.ENSO_JVM_AOT !== '0'
-}
-
-/**
- * Whether the JVM is the resolved default engine (`--engine-mode`, `ENSO_ENGINE_MODE`, then the
- * built-in default): the AOT cache trains only then. A project's own `jvm:` key does not count.
- */
-export function isJvmDefaultEngine(
-  engine: EngineSettings | undefined,
-  env: Readonly<Record<string, string | undefined>>,
-): boolean {
-  return (
-    resolveDefaultEngineMode({ option: engine?.option, environment: env.ENSO_ENGINE_MODE }).mode ===
-    'jvm'
-  )
 }
 
 /** What a Linux AppImage does about its engine at launch ({@link appImageEngine}). */
@@ -56,8 +41,7 @@ export function isEngineCopyPath(enginePath: string, userData: string): boolean 
 }
 
 /**
- * Under a Linux AppImage (`APPIMAGE` set), with the JVM as the default engine (the AOT cache is
- * what the copy is for) and no `ENSO_ENGINE_PATH` of the user's, the engine to run is a copy of
+ * Under a Linux AppImage (`APPIMAGE` set), with no `ENSO_ENGINE_PATH` of the user's, the engine to run is a copy of
  * the bundled one at `<userData>/engine/<version>/` (an `ENSO_ENGINE_PATH` inside
  * `<userData>/engine/` is inherited, not the user's: {@link isEngineCopyPath}), whose path, unlike the AppImage's mount, is
  * the same at every launch (`project-manager-shim/jvmAot`, `stableEngine.ts`). When there is no
@@ -70,11 +54,10 @@ export function isEngineCopyPath(enginePath: string, userData: string): boolean 
 export async function appImageEngine(
   env: Readonly<Record<string, string | undefined>>,
   settings: { readonly resourcesPath: string; readonly userData: string; readonly version: string },
-  engine: EngineSettings | undefined,
 ): Promise<AppImageEngine> {
   const usersEngine =
     env.ENSO_ENGINE_PATH && !isEngineCopyPath(env.ENSO_ENGINE_PATH, settings.userData)
-  if (!env.APPIMAGE || usersEngine || !isJvmDefaultEngine(engine, env)) return {}
+  if (!env.APPIMAGE || usersEngine) return {}
   const options = {
     userData: settings.userData,
     version: settings.version,

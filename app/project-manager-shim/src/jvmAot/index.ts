@@ -1,8 +1,7 @@
 /**
  * @file The per-user JDK AOT cache (spec, stage 1d "The AOT cache lifecycle"): trained in the
- * background at app launch when the JVM is the default engine, killed by any open and restarted
- * 60 s after the last one was answered, used by every JVM engine once it exists, and deleted when a
- * JVM says it does not match.
+ * background at app launch, killed by any open and restarted 60 s after the last one was answered,
+ * used by every engine once it exists, and deleted when a JVM says it does not match.
  */
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -11,13 +10,8 @@ import { acquireTrainingLock } from './lock.js'
 import { EngineTrainer, type Trainer } from './trainer.js'
 import { aotRejection } from './useLog.js'
 
-export {
-  aotCreateArguments,
-  jvmOptionsValue,
-  LAUNCHER_JVM_OPTIONS,
-  parseJvmOptionsFile,
-  splitJvmOptions,
-} from '../projectService/jvmOptions.js'
+export { aotCreateArguments } from '../projectService/javaLaunch.js'
+export { parseJvmOptionsFile, splitJvmOptions } from '../projectService/jvmOptions.js'
 export { driveOpen, welcomeNodeId } from './driver.js'
 export { aotKey, enginePaths, isAppImageMount, isTranslocated, readJvmOptionsText } from './key.js'
 export { acquireTrainingLock } from './lock.js'
@@ -37,8 +31,6 @@ export interface JvmAotCacheSettings {
   readonly appVersion: string
   /** The bundled engine's launcher (`<resources>/enso/dist/<version>/bin/enso`). */
   readonly ensoExecutable: string
-  /** Whether the JVM is the resolved default engine (`resolveDefaultEngineMode`). */
-  readonly isJvmDefault: () => boolean
   /** How long after the last open was answered a killed training restarts: 60 s. */
   readonly retrainDelayMs?: number
   /**
@@ -155,9 +147,9 @@ export class JvmAotCache {
     return directory != null ? path.join(directory, CACHE_FILE) : undefined
   }
 
-  /** At app launch: train when JVM is the default, there is no cache for the key, and no other window trains. */
+  /** At app launch: train when there is no cache for the key, and no other window trains. */
   async start(): Promise<void> {
-    if (this.disposed || !this.settings.isJvmDefault()) return
+    if (this.disposed) return
     this.checkingAtLaunch = true
     try {
       const cache = await this.cacheFile()

@@ -13,7 +13,6 @@ import {
   appImageEngine,
   isEngineCopyPath,
   isJvmAotEnabled,
-  isJvmDefaultEngine,
   jvmAotRootDirectory,
 } from '@/jvmAotSettings'
 import * as paths from '@/paths'
@@ -31,7 +30,7 @@ import {
 } from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
-/** Where the engine mode may come from besides a project's `package.yaml`. */
+/** What the host gives the project service: the AOT cache, the AppImage engine, the ydoc host. */
 let engineSettings: EngineSettings | undefined
 let localMetadata: LocalMetadata | null = null
 let localVersioning: LocalVersioning | null = null
@@ -175,11 +174,7 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
  * `ENSO_JVM_AOT_DIR` (the open-time harness points it at its own directory). `null` when the
  * engine cannot be found, and with `ENSO_JVM_AOT=0`.
  */
-function createJvmAotCache(
-  electron: Electron,
-  electronIsDev: boolean,
-  engine: EngineSettings | undefined,
-): JvmAotCache | null {
+function createJvmAotCache(electron: Electron, electronIsDev: boolean): JvmAotCache | null {
   if (!isJvmAotEnabled(process.env)) return null
   const ensoExecutable = findEnsoExecutable(
     paths.resourcesPath(electron, electronIsDev),
@@ -190,7 +185,6 @@ function createJvmAotCache(
     rootDirectory: jvmAotRootDirectory(process.env, app.getPath('userData')),
     appVersion: app.getVersion(),
     ensoExecutable,
-    isJvmDefault: () => isJvmDefaultEngine(engine, process.env),
     // The GUI shows a toast from a training's start until it ends.
     onTrainingStarted: () => setJvmAotTrainingStatus('training'),
     onTrainingEnded: (outcome) => {
@@ -202,7 +196,7 @@ function createJvmAotCache(
 }
 
 /**
- * Under a Linux AppImage with the JVM as the default engine, the engine is run from its copy at
+ * Under a Linux AppImage, the engine is run from its copy at
  * `<userData>/engine/<version>/` (`appImageEngine`): its launcher when the copy is complete, given
  * to the project service and the AOT cache explicitly, never through the environment.
  */
@@ -219,7 +213,6 @@ const appImageCopyGate = new AfterFirstOpen(60_000)
 export async function prepareAppImageEngine(
   electron: Electron,
   electronIsDev: boolean,
-  engine: EngineSettings | undefined,
 ): Promise<void> {
   const userData = app.getPath('userData')
   const inherited = process.env.ENSO_ENGINE_PATH
@@ -230,15 +223,11 @@ export async function prepareAppImageEngine(
     Reflect.deleteProperty(process.env, 'ENSO_ENGINE_PATH')
   }
   try {
-    const { enginePath, startCopy } = await appImageEngine(
-      process.env,
-      {
-        resourcesPath: paths.resourcesPath(electron, electronIsDev),
-        userData,
-        version: app.getVersion(),
-      },
-      engine,
-    )
+    const { enginePath, startCopy } = await appImageEngine(process.env, {
+      resourcesPath: paths.resourcesPath(electron, electronIsDev),
+      userData,
+      version: app.getVersion(),
+    })
     if (enginePath != null)
       console.info(`Running the AppImage's engine from its copy at ${enginePath}.`)
     appImageEnginePath = enginePath
@@ -267,7 +256,7 @@ export function startAppImageEngineCopy(): void {
 }
 
 /**
- * Train the JDK AOT cache in the background if it is needed (the JVM is the default engine).
+ * Train the JDK AOT cache in the background if it is needed.
  *
  * The GUI may have asked for a spare engine before this runs. `start()` counts as training from its
  * first line (`isTraining`), so the refresh right after it stops a spare started meanwhile, and the
@@ -316,12 +305,10 @@ export function setupProjectService(
   args: readonly string[],
   electron: Electron,
   electronIsDev: boolean,
-  engine?: EngineSettings,
 ): ProjectService {
   extraArgs = args
-  jvmAotCache ??= createJvmAotCache(electron, electronIsDev, engine)
+  jvmAotCache ??= createJvmAotCache(electron, electronIsDev)
   engineSettings = {
-    ...engine,
     jvmAot: jvmAotCache ?? undefined,
     ensoExecutable: appImageEnginePath,
     openObserver: appImageCopyGate,

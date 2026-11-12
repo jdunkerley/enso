@@ -1,8 +1,15 @@
-# Options for the JVM that `enso --jvm` starts (engine/runner JvmOptions.java), one per line,
-# after the launcher's fixed list and before ENSO_JVM_OPTIONS. They are the engine's: the IDE
-# and the CLI both get them. The IDE's per-user AOT cache key includes this file's text, so a
-# change here retrains it (project-manager-shim jvmAot/key.ts).
+# The engine's JVM options (engine/runner JvmOptions.java), one per line, before
+# ENSO_JVM_OPTIONS. The IDE's shim, bin/enso and enso.bat, and the runner's own relaunch
+# (Main.launchJvm) all read this one list; the shim parses it as JvmOptions.java does. The
+# IDE's per-user AOT cache key includes this file's text, so a change here retrains it
+# (project-manager-shim jvmAot/key.ts).
 #
+# Fixed options. Note that a line is a JVM option in single-token form, not a `java` launcher one.
+# Unsafe memory access is used by Truffle and Arrow; JDK 25 warns about it.
+--sun-misc-unsafe-memory-access=allow
+--enable-native-access=org.graalvm.truffle
+--add-opens=java.base/java.nio=ALL-UNNAMED
+
 # JDK 25 warns about these modules' restricted method calls; a later JDK makes them errors.
 --enable-native-access=ALL-UNNAMED,org.enso.language.server
 

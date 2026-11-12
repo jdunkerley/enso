@@ -1,6 +1,5 @@
 @echo off
 set "comp-dir=%~dp0..\component"
-set java-opts=--enable-native-access=org.graalvm.truffle --sun-misc-unsafe-memory-access=allow --add-opens=java.base/java.nio=ALL-UNNAMED
 rem A bundle (e.g. the IDE's) places the engine at <root>\dist\<version> and its
 rem JDK at <root>\runtime\graalvm-*. Prefer that JDK, so the engine still starts
 rem when java is not on PATH.
@@ -18,7 +17,7 @@ if exist "%~dp0..\jvm.options" for /f "usebackq eol=# tokens=*" %%o in ("%~dp0..
   call :trim
   if defined opt call :append
 )
-"%java-exe%" --module-path "%comp-dir%" %java-opts% %jvm-file-opts% -m org.enso.runner/org.enso.runner.Main %*
+"%java-exe%" --module-path "%comp-dir%" %jvm-file-opts% -m org.enso.runner/org.enso.runner.Main %*
 exit /B %errorlevel%
 
 :trim
