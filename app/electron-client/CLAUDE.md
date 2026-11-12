@@ -249,6 +249,11 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   `onTrainingEnded`), answers `Channel.jvmAotTrainingStatus` and broadcasts
   `Channel.jvmAotTrainingStatusChanged` (tested in
   `tests/headless/jvmAotIpc.test.ts`).
+- `ENSO_TEST_DISABLE_GPU=1` — `app.disableHardwareAcceleration()`. The
+  Playwright fixture sets it for every spec: on the GPU-less Windows runner the
+  GPU process, accelerating in software because of `ignore-gpu-blocklist`,
+  starved the engine until `Project Duplicate` timed out (#674; Note [The
+  Packaged-IDE Tests Run Without GPU Acceleration] in `src/electron.ts`).
 - `ENSO_JVM_AOT=0` — no JDK AOT cache at all: nothing trains, and no open uses
   one (`isJvmAotEnabled`; `createJvmAotCache` returns `null`). The Playwright
   fixture sets it for every spec but `spareEngine.spec.ts`.

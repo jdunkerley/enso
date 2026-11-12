@@ -45,9 +45,19 @@ export function setChromeOptions(electron: Electron) {
   // specific use cases. This behavior can be observed in the following example:
   // https://groups.google.com/a/chromium.org/g/chromium-dev/c/09NnO6jYT6o.
   electron.app.commandLine.appendSwitch('ignore-gpu-blocklist')
-  // EXPERIMENT (#674): the packaged-IDE tests on the GPU-less Windows runner.
+  // Note [The Packaged-IDE Tests Run Without GPU Acceleration].
   if (process.env.ENSO_TEST_DISABLE_GPU === '1') electron.app.disableHardwareAcceleration()
 }
+
+/* Note [The Packaged-IDE Tests Run Without GPU Acceleration]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The Windows CI runner has no GPU. With `ignore-gpu-blocklist` the GPU process still accelerates,
+ * in software, and while the project view's spinners turned it used 1,300 to 2,200 s of CPU in a
+ * ~12-minute try, against ~50 s for the engine's JVM, which then never finished its first execution
+ * (#674: `Project Duplicate` hung in most runs, and the job hit its time limit). With
+ * `disableHardwareAcceleration()` the same suite passed in 29 s. The Playwright fixture
+ * (`tests/electronTest.ts`) sets `ENSO_TEST_DISABLE_GPU=1` for every spec; nothing else does.
+ */
 
 /** Register keyboard shortcuts that should be handled by Electron. */
 export function registerShortcuts(electron: Electron) {

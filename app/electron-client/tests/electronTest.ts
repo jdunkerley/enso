@@ -91,6 +91,7 @@ export const test = base.extend<{
     const env = {
       ...process.env,
       ENSO_TEST: 'true',
+      // Note [The Packaged-IDE Tests Run Without GPU Acceleration] in src/electron.ts.
       ENSO_TEST_DISABLE_GPU: '1',
       ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
       ...(aiEnabled ? {} : { ENSO_AI_DISABLED: '1' }),
