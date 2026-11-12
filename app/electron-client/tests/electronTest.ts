@@ -102,7 +102,9 @@ export const test = base.extend<{
       await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true })
       await use(app)
       // Note [A Failed Test Dumps The Engine's Threads].
-      if (testInfo.status !== testInfo.expectedStatus) await dumpEngineState(testRunId, testInfo)
+      if (testInfo.status !== testInfo.expectedStatus) {
+        await dumpEngineState(app, testRunId, testInfo)
+      }
       await app.context().tracing.stop({ path: `test-traces/${testRunId}.zip` })
       await app.close()
     } finally {
@@ -133,8 +135,18 @@ export const test = base.extend<{
  * project timed out too. So the file also lists the command line of each `enso`/`java` process,
  * whose `--type=` names the Electron helper, and says when a command was killed by its timeout
  * (the first process list and `jcmd -l` failed with no other output then).
+ *
+ * Those dumps never reached anyone: with the hang each try took ~12 minutes, the job's time limit
+ * cancelled the run in the third, and the traces are uploaded only on failure. So the dump is also
+ * printed (the `line` reporter shows a test's output as it comes; `dot` did not), and it starts
+ * with Electron's own `app.getAppMetrics()`: each of its processes' type and CPU time, asked of the
+ * main process with a time limit, since that process may be the starved one.
  */
-async function dumpEngineState(testRunId: string, testInfo: TestInfo): Promise<void> {
+async function dumpEngineState(
+  app: ElectronApplication,
+  testRunId: string,
+  testInfo: TestInfo,
+): Promise<void> {
   if (process.env.CI == null) return
   const run = (file: string, args: string[]) =>
     new Promise<string>((resolve) =>
@@ -157,10 +169,11 @@ async function dumpEngineState(testRunId: string, testInfo: TestInfo): Promise<v
       run('powershell', [
         '-NoProfile',
         '-Command',
-        'Get-CimInstance Win32_Process -Filter "Name=\'enso.exe\' or Name=\'java.exe\'" | ForEach-Object { \'{0} (parent {1}): {2}\' -f $_.ProcessId, $_.ParentProcessId, "$($_.CommandLine)".Substring(0, [Math]::Min(400, "$($_.CommandLine)".Length)) }',
+        'Get-CimInstance Win32_Process -Filter "Name=\'enso.exe\' or Name=\'java.exe\'" | ForEach-Object { \'{0} (parent {1}, {2:N0} s CPU): {3}\' -f $_.ProcessId, $_.ParentProcessId, (($_.KernelModeTime + $_.UserModeTime) / 1e7), "$($_.CommandLine)".Substring(0, [Math]::Min(400, "$($_.CommandLine)".Length)) }',
       ])
     : run('ps', ['-eo', 'pid,ppid,args', '--sort=-pcpu'])
   const sections = [`Test: ${testInfo.titlePath.join(' > ')} (${testInfo.status})`]
+  sections.push(`Electron app metrics at ${new Date().toISOString()}:\n${await appMetrics(app)}`)
   sections.push(`Processes at ${new Date().toISOString()}:\n${await processes()}`)
   await new Promise((resolve) => setTimeout(resolve, 10_000))
   sections.push(`Processes at ${new Date().toISOString()}:\n${await processes()}`)
@@ -185,8 +198,34 @@ async function dumpEngineState(testRunId: string, testInfo: TestInfo): Promise<v
       )
     }
   }
+  const dump = sections.join('\n\n')
   await fs.mkdir('test-traces', { recursive: true })
-  await fs.writeFile(`test-traces/${testRunId}-engine.txt`, sections.join('\n\n'))
+  await fs.writeFile(`test-traces/${testRunId}-engine.txt`, dump)
+  console.log(`==== Engine dump of ${testRunId} ====\n${dump}\n==== End of the engine dump ====`)
+}
+
+/**
+ * Electron's view of its processes: pid, type (`Browser` is the main process, then `GPU`, `Tab`,
+ * `Utility`), cumulative CPU seconds and the current CPU percentage. At most 30 s.
+ */
+async function appMetrics(app: ElectronApplication): Promise<string> {
+  const metrics = app
+    .evaluate(({ app }) =>
+      app
+        .getAppMetrics()
+        .map(
+          (m) =>
+            `${m.pid} ${m.type}${m.serviceName ? ` (${m.serviceName})` : ''}: ` +
+            `${(m.cpu.cumulativeCPUUsage ?? 0).toFixed(1)} s CPU, ` +
+            `${m.cpu.percentCPUUsage.toFixed(1)} % now`,
+        )
+        .join('\n'),
+    )
+    .catch((error: unknown) => `(failed: ${String(error)})`)
+  const timeout = new Promise<string>((resolve) =>
+    setTimeout(() => resolve('(no answer within 30 s)'), 30_000),
+  )
+  return Promise.race([metrics, timeout])
 }
 
 /** Why a command of the dump failed: Node's message alone was only "Command failed: <command>". */

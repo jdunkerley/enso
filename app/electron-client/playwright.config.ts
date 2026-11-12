@@ -8,6 +8,10 @@ export default defineConfig({
   // Warms the engine's IR cache once so specs don't each pay a cold standard-library compile.
   globalSetup: './globalSetup.ts',
   forbidOnly: !!process.env.CI,
+  // `line` on CI, not the default `dot`: it prints a failure, and a test's output (the engine dump,
+  // Note [A Failed Test Dumps The Engine's Threads] in tests/electronTest.ts), as they happen, so
+  // they reach the log even when the job's time limit cancels the run.
+  reporter: process.env.CI ? 'line' : 'list',
   // Each spec drives a freshly-launched packaged Electron app + engine + Language Server, so a
   // slow CI runner or the occasional localhost static-server startup race can fail a step that
   // is healthy on a second attempt. Retry on CI; keep local runs fail-fast.
