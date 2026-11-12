@@ -180,8 +180,8 @@ settings. Every workflow is hand-written YAML (build simplification;
   `project/build.properties` (Note [The sbt Dependency Cache Key]). The Linux
   stdlib tests also cache GraalPy's pip wheels, `~/.cache/pip-graalpy`
   (`graalpy-pip-Linux-<GraalPy version>`, saved on `develop` by the jobs that
-  run `Examples_Tests` (on Linux, the JVM and Native "Others" shards; a job that
-  does not run it never saves); Note [GraalPy Wheel Cache] in
+  run `Examples_Tests` (on Linux, the JVM "Others" shard; a job that does not
+  run it never saves); Note [GraalPy Wheel Cache] in
   `engine-checks-platform.yml`), so `Examples_Tests` stops compiling numpy for
   GraalPy (12-13 min); `setup-jvm` exposes the pinned version as its
   `graalpy-version` output. The engine jobs that compile Rust share a Rust cache

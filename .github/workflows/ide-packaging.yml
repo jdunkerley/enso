@@ -426,8 +426,7 @@ jobs:
       # `ENSO_ENGINE_MODE`; `app/electron-client/tests/electronTest.ts`), and the spare engine spec
       # runs the JVM anyway. The native engine stays a user's choice (`ENSO_ENGINE_MODE=native`,
       # `jvm: false`), so one spec runs again on it. On GraalVM 25.5 the native image's host interop
-      # is broken (#666), so until the native image is removed (#664) this run does not block, as
-      # Note [Native Standard Library Tests Do Not Block] in `engine-checks-platform.yml`.
+      # is broken (#666), so until the native image is removed (#664) this run does not block.
       - if: matrix.os == 'linux'
         name: Run Package Tests (native engine)
         continue-on-error: true
@@ -557,19 +556,6 @@ jobs:
           compression-level: 0
           name: test-traces-${{ matrix.os }}-amd64
           path: app/electron-client/test-traces
-      # The traces hold what the window showed, not what the engine did: on a failure the IDE's own
-      # log and the engines' logs (the shim's `getEngineLogDirectory`) go up too.
-      - if: failure()
-        name: Upload IDE And Engine Logs
-        uses: actions/upload-artifact@v5
-        with:
-          name: ide-logs-${{ matrix.os }}-amd64
-          path: |
-            ~/AppData/Local/enso/log
-            ~/AppData/Roaming/enso/logs
-            ~/.local/share/enso/log
-            ~/.config/enso/logs
-          if-no-files-found: warn
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean

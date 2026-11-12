@@ -39,12 +39,20 @@ describe('the command line', () => {
     )
     expect(runner).toEqual(['--jvm', windowsJdk])
   })
-  test('native: the heap-dump argument on Linux, nothing on Windows', () => {
-    const native = suiteNamed('standard-library-in-native').suite
+  test('Oracle GraalVM: the heap-dump argument on Linux, nothing on Windows', () => {
+    const suite = suiteNamed('standard-library').suite
     expect(
-      projectArguments(runnerArguments(native, 'linux', jdk, 'GraalVM CE'), project('Base_Tests')),
+      projectArguments(
+        runnerArguments(suite, 'linux', jdk, 'Oracle GraalVM'),
+        project('Base_Tests'),
+      ),
     ).toEqual(['-XX:+HeapDumpOnOutOfMemoryError', '--no-ir-caches', '--run', project('Base_Tests')])
-    expect(runnerArguments(native, 'win32', jdk, 'GraalVM CE')).toEqual([])
+    expect(runnerArguments(suite, 'win32', jdk, 'Oracle GraalVM')).toEqual([])
+  })
+  test('the dedicated cloud suites run on the JVM', () => {
+    for (const name of ['std-aws', 'std-microsoft', 'std-cloud-related']) {
+      expect(runnerArguments(suiteNamed(name).suite, 'linux', jdk, 'GraalVM CE')).toEqual(['--jvm'])
+    }
   })
   test('Oracle GraalVM runs the JVM suite without the small JDK', () => {
     const runner = runnerArguments(

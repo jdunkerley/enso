@@ -64,8 +64,7 @@ guest library with a helper jar, every DOM call was a round trip: 81 s for
 - Java exceptions are caught by class (`SAXParseException`, `IOException`,
   `java.lang.Exception`) and turned into `XML_Error`s by `_xml_errors`; that
   works because the classes are the host's.
-- Run `test/XML_Tests` with the native launcher after a change (the
-  `standard-library-in-native` suite).
+- Run `test/XML_Tests` after a change (the `standard-library` suite).
 
 ## Things to avoid in generated code
 

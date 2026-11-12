@@ -595,12 +595,12 @@ export function checkMacosJobsAreGated({ workflows }) {
  * The suites `macos-checks.yml` runs on `inputs.libraries`, as the retired build CLI did on the
  * Mac.
  */
-const MACOS_LIBRARY_SUITES = ['standard-library-in-native', 'standard-library', 'std-aws']
+const MACOS_LIBRARY_SUITES = ['standard-library', 'std-aws']
 
 /**
  * `macos-checks.yml` (#288) runs only what its inputs ask for (`macos_checks_run_only_...`): it is
  * one call of `engine-checks-platform.yml` on the self-hosted Mac, which always builds the engine
- * distribution, runs the JVM tests on `inputs.engine`, and the three library suites on
+ * distribution, runs the JVM tests on `inputs.engine`, and the two library suites on
  * `inputs.libraries` (else none, `[]`).
  */
 export function checkMacosChecksRunWhatIsRequested({ workflows }) {
