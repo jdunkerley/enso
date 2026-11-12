@@ -137,7 +137,7 @@ public final class JDBCBatchInsert {
       case Integer integerValue -> stmt.setLong(columnIndex, integerValue.longValue());
       case Long longValue -> stmt.setLong(columnIndex, longValue);
       case BigInteger bigIntegerValue ->
-          jdbcValueSetter.setBigDecimal(stmt, columnIndex, bigIntegerValue, 0);
+          jdbcValueSetter.setBigDecimal(stmt, columnIndex, new BigDecimal(bigIntegerValue));
       case Float floatValue ->
           setFloatingPointValue(
               stmt, columnIndex, floatValue, supportsSeparateNaN, supportsInfinity);

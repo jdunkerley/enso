@@ -19,10 +19,11 @@ from project.Errors import SQL_Error, SQL_Timeout
 polyglot java import java.sql.Connection
 polyglot java import java.sql.DatabaseMetaData
 polyglot java import java.sql.PreparedStatement
+polyglot java import java.sql.SQLException
+polyglot java import java.sql.SQLTimeoutException
 polyglot java import org.enso.database.JDBCBatchInsert
 polyglot java import org.enso.database.dryrun.OperationSynchronizer
-polyglot java import org.enso.database.JDBCDriverTypes
-polyglot java import org.enso.database.JDBCValueSetter
+polyglot java import org.enso.database.JDBCProxy
 
 type JDBC_Connection
     ## ---
@@ -173,25 +174,29 @@ type JDBC_Connection
    ---
    A special method used by dialects that construct a Java JDBC connection using
    some custom logic.
-create types_record url:Text properties:Vector catalog:Text="" schema:Text="" =
+
+   ## Arguments
+    - `url`: The JDBC URL to connect to.
+    - `properties`: The connection properties, as a vector of key-value pairs.
+    - `catalog`: The catalog to set on the connection; empty to leave it as is.
+    - `schema`: The schema to set on the connection; empty to leave it as is.
+    - `init_script`: A SQL script to run on the new connection; empty to run
+      none.
+create url:Text properties:Vector catalog:Text="" schema:Text="" init_script:Text="" =
     ## ---
        private: true
        ---
-       Creates a handler for SQL Errors.
-
-       ## Arguments
-       - `types_record`: The JDBC driver types record containing exception classes.
-
-       ## Returns
        A function which executes `action` and returns its result, catching any
        panics and if they are coming from JDBC, wraps them with our own error
        types and returns as regular data-flow errors.
-    create_sql_error_handler types_record =
-        handler ~action related_query=Nothing =
-            Panic.catch types_record.sqlExceptionClass action caught_panic->
-                if caught_panic.is_a types_record.sqlTimeoutExceptionClass then Error.throw (SQL_Timeout.Error caught_panic.payload related_query) else
-                    Error.throw (SQL_Error.Error caught_panic.payload related_query)
-        handler
+    sql_error_handler ~action related_query=Nothing =
+        Panic.catch SQLException action caught_panic->
+            ## This tests the `Caught_Panic`, not its payload, so it has never
+               matched and a timeout is reported as a plain `SQL_Error`. Testing
+               `caught_panic.payload` would start raising `SQL_Timeout`, which is
+               a change of behaviour, so it is left for a separate change.
+            if caught_panic.is_a SQLTimeoutException then Error.throw (SQL_Timeout.Error caught_panic.payload related_query) else
+                Error.throw (SQL_Error.Error caught_panic.payload related_query)
 
     ## ---
        private: true
@@ -201,14 +206,13 @@ create types_record url:Text properties:Vector catalog:Text="" schema:Text="" =
         pairs = properties.map pair-> [pair.first, Derived_Secret_Value.from pair.second]
         Dictionary.from_vector pairs
 
-    sql_error_handler = create_sql_error_handler types_record
     java_props = properties_dict properties
     ## Resolving a local secret among the properties can fail (a locked store,
        another key, a deleted secret): that is an `Enso_Secret_Error`.
     java_connection = handle_local_secret_panics <| sql_error_handler <|
-        types_record.getConnectionWithCatalogSchema url java_props catalog schema
+        JDBCProxy.getConnectionWithCatalogSchema url java_props catalog schema init_script
     resource = Managed_Resource.register java_connection close_connection
-    JDBC_Connection.Value resource types_record.newOperationSynchronizer sql_error_handler types_record.newBatchInsert
+    JDBC_Connection.Value resource OperationSynchronizer.new sql_error_handler JDBCBatchInsert.new
 
 ## ---
    private: true

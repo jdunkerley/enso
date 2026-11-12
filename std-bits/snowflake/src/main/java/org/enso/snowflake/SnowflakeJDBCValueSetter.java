@@ -13,10 +13,6 @@ public final class SnowflakeJDBCValueSetter extends JDBCValueSetter {
   private static final DateTimeFormatter dateTimeWithOffsetFormatter =
       DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS XXX");
 
-  public SnowflakeJDBCValueSetter() {
-    super("Snowflake");
-  }
-
   public void setZonedDateTime(PreparedStatement stmt, int columnIndex, ZonedDateTime dateTime)
       throws SQLException {
     String formatted = dateTime.format(dateTimeWithOffsetFormatter);

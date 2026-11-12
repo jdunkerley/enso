@@ -18,8 +18,6 @@ from Standard.Database.Errors import Unsupported_Database_Type
 import project.Database.Redshift.Internal.Redshift_Error_Mapper.Redshift_Error_Mapper
 
 polyglot java import java.sql.Types
-polyglot java import org.enso.database.fetchers.ColumnFetcherFactory
-polyglot java import org.enso.database.JDBCValueSetter
 
 ## ---
    private: true
@@ -109,7 +107,7 @@ type Redshift_Type_Mapping
        Gets the ColumnFetcherFactory to be used for Redshift.
     column_fetcher_factory : Any
     column_fetcher_factory =
-        ColumnFetcherFactory.DEFAULT
+        SQL_Type_Mapping.default_column_fetcher_factory
 
     ## ---
        private: true
@@ -173,7 +171,7 @@ type Redshift_Type_Mapping
         Statement_Setter.for_fill_hole fill_home
 
     value_setter =
-        JDBCValueSetter.create "Redshift"
+        SQL_Type_Mapping.default_value_setter
 
     ## ---
        private: true
