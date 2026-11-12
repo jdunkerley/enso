@@ -9,4 +9,9 @@ final class LinuxArguments implements Arguments {
   public String[] alterArgs(String[] originalArgs) {
     return originalArgs;
   }
+
+  @Override
+  public String systemProperty(String name) {
+    return System.getProperty(name);
+  }
 }

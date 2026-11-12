@@ -8,8 +8,7 @@ import java.util.LinkedList;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.enso.common.LanguageInfo;
-import org.enso.os.environment.chdir.WorkingDirectory;
-import org.graalvm.nativeimage.ImageInfo;
+import org.enso.os.environment.Arguments;
 import org.graalvm.polyglot.SourceSection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -228,44 +227,16 @@ final class Utils {
   }
 
   /**
-   * This method has to be called as early as possible. It attempts to find the project root
-   * directory of the given file, and if the project root is found, it uses native code to change
-   * the working directory to the project root. In order for the JVM's {@code java.io} to reflect
-   * the working directory change, this methods must be called before any class from {@code java.io}
-   * is accessed.
+   * The directory {@code enso} was started in, when it is not the process's working directory: the
+   * launchers start the JVM in the project's parent for {@code --run} and {@code --in-project} and
+   * pass the original directory as {@code -Denso.user.dir} (Note [The Launcher Starts In The
+   * Project's Parent] in {@code distribution/bin/enso}). On Windows it is read as given on the
+   * command line, outside the ANSI code page too (Note [Arguments Outside The ANSI Code Page] in
+   * {@code WindowsArguments}).
    *
-   * <p>Note that invoking native code is the only reliable way to change the working directory in
-   * the current process.
-   *
-   * <p>For detailed explanation see this <a
-   * href="https://github.com/enso-org/enso/pull/12618#issuecomment-2778451448">GH comment</a>.
-   *
-   * @param fileToRun the file to run, value of the {@code --run} option.
-   * @return cwd to use or {@code null} if no change to cwd was made
+   * @return the original directory, or {@code null} if the launcher did not change it
    */
-  static String adjustCwdToProject(String fileToRun) {
-    assert fileToRun != null;
-    if (!ImageInfo.inImageRuntimeCode()) {
-      return System.getProperty("enso.user.dir");
-    }
-
-    var nativeApi = WorkingDirectory.getInstance();
-    var projectRoot = nativeApi.findProjectRoot(fileToRun);
-    if (projectRoot != null) {
-      var parentDir = nativeApi.parentFile(projectRoot);
-      assert parentDir != null;
-      var curDir = nativeApi.currentWorkingDir();
-      if (!parentDir.equals(curDir)) {
-        var dirChanged = nativeApi.changeWorkingDir(parentDir);
-        if (!dirChanged) {
-          LOGGER.error("Cannot change working directory to {}", parentDir);
-        } else {
-          LOGGER.debug("Changed working directory to {}", parentDir);
-        }
-      }
-      return curDir;
-    } else {
-      return null;
-    }
+  static String originalUserDir() {
+    return Arguments.getCurrent().systemProperty("enso.user.dir");
   }
 }

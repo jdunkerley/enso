@@ -11,7 +11,9 @@
 --add-opens=java.base/java.nio=ALL-UNNAMED
 
 # JDK 25 warns about these modules' restricted method calls; a later JDK makes them errors.
---enable-native-access=ALL-UNNAMED,org.enso.language.server
+# org.enso.os.environment reads the wide command line on Windows (Note [Arguments Outside The
+# ANSI Code Page] in WindowsArguments).
+--enable-native-access=ALL-UNNAMED,org.enso.language.server,org.enso.os.environment
 
 # C2 compiles the engine's own Java, not Graal-as-JIT (JVMCI), which opens a project faster.
 # Truffle guest code still compiles through libgraal. See #518.
