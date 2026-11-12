@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Merged into the manifest of the bundled JDK's java.exe and javaw.exe on Windows, so that their
+  ANSI code page is UTF-8: see Note [The Bundled java.exe Uses UTF-8] in
+  project/JavaUtf8Manifest.scala (#693). Windows 10 1903 and later honour it; older Windows ignores
+  the element.
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

@@ -208,6 +208,15 @@ installer (the old Rust installer was removed).
   `%LOCALAPPDATA%\Enso\jvm-aot` (printing the newest IDE log if not), starts the
   app, and uninstalls (removing that cache).
 - Builds are unsigned for now.
+- The bundled runtime's `java.exe` has a UTF-8 `activeCodePage` manifest (#693;
+  `project/JavaUtf8Manifest.scala`), so the engine starts under a per-user
+  install path outside the ANSI code page (`C:\Users\Łukasz\…`). On CI the
+  Windows package tests run with the unpacked IDE moved under such a directory
+  (Note [The Package Tests Run From A Path Outside The ANSI Code Page] in
+  `ide-packaging.yml`), and `tests/nonAnsiPath.spec.ts` runs the engine with the
+  shim's command line (`javaCommand`, the AOT cache's `aotCreateArguments`)
+  through a junction named `Łukasz 漢`: `--version`, an AOT cache created and
+  used there, and `--new`/`--run` of a project there.
 
 **Build the engine locally — don't bundle a released one.** `ide-local` always
 compiles the engine from these sources. Packaging a released engine instead

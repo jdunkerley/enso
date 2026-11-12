@@ -34,8 +34,13 @@ import java.util.List;
  * wide command line (`systemProperty`).
  *
  * Every other option for the JVM itself (the module path, `-XX:AOTCache=…`) goes through the ANSI
- * conversion before any Java runs, so a JDK or an engine installed under such a path cannot start
- * through `java.exe` at all.
+ * conversion before any Java runs, which no Java code can repair. So the IDE's bundled runtime's
+ * `java.exe` carries a manifest that makes UTF-8 its ANSI code page (Windows 10 1903 and later;
+ * Note [The Bundled java.exe Uses UTF-8] in `project/JavaUtf8Manifest.scala`, #693): under it the
+ * whole command line arrives intact, and this class finds no `?` to repair. A JDK without the
+ * manifest (a user's own, from `JAVA_HOME` or the PATH) still cannot start an engine installed
+ * under such a path, nor take a module path or AOT cache there; this class still repairs `main`'s
+ * arguments for it.
  */
 
 /** Recovers {@code main}'s arguments from the wide command line on Windows. */

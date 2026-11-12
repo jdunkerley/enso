@@ -11,7 +11,7 @@ import { acquireTrainingLock } from './lock.js'
 import { EngineTrainer, type Trainer, type TrainingPriority } from './trainer.js'
 import { aotRejection } from './useLog.js'
 
-export { aotCreateArguments } from '../projectService/javaLaunch.js'
+export { aotCreateArguments, javaCommand, type JavaEngine } from '../projectService/javaLaunch.js'
 export { parseJvmOptionsFile, splitJvmOptions } from '../projectService/jvmOptions.js'
 export { driveOpen, welcomeNodeId } from './driver.js'
 export { aotKey, enginePaths, isAppImageMount, isTranslocated, readJvmOptionsText } from './key.js'
