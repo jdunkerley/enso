@@ -30,8 +30,11 @@ import scala.sys.process._
  * - Rewriting the resources drops the launchers' Authenticode signature (Oracle's). The fork
  *   ships unsigned; a signing step (electron-builder's) runs after this one, on the installer.
  *
- * `mt.exe` comes with the Windows SDK and is on the PATH in a Visual Studio Developer Prompt (CI:
- * `setup-msvc`), which the engine bundle needs for `MsvcRuntime` anyway; without it the build fails.
+ * `mt.exe` comes with the Windows SDK. It is taken from the PATH (a Visual Studio Developer Prompt;
+ * CI's `setup-msvc`), else from the newest `Windows Kits\10\bin\<version>\x64` under `Program Files
+ * (x86)`, where the runner images and a Visual Studio install put it: the standard library test
+ * jobs build their small JDK (`buildSmallJdkForRelease`) without the MSVC environment. Without it
+ * the build fails.
  */
 
 /** Embeds the UTF-8 code page manifest in a Windows JDK's launchers (see the Note above). */
@@ -158,7 +161,9 @@ object JavaUtf8Manifest {
       )
   }
 
-  /** `mt.exe` from the PATH, else from the Windows SDK of a Developer Prompt. */
+  /** `mt.exe` from the PATH, else from the Windows SDK of a Developer Prompt, else the newest
+    * installed Windows 10 SDK's.
+    */
   private def findMt(): File = {
     val onPath = sys.env
       .getOrElse("PATH", "")
@@ -170,12 +175,29 @@ object JavaUtf8Manifest {
       .get("WindowsSdkVerBinPath")
       .map(dir => file(dir) / "x64" / "mt.exe")
       .filter(_.isFile)
-    onPath.orElse(inSdk).getOrElse {
+    val programFiles = sys.env.get("ProgramFiles(x86)").map(file).toSeq
+    val inKits = programFiles
+      .flatMap(dir =>
+        Option((dir / "Windows Kits" / "10" / "bin").listFiles()).toSeq.flatten
+      )
+      .map(_ / "x64" / "mt.exe")
+      .filter(_.isFile)
+      .sortBy(mt => sdkVersion(mt.getParentFile.getParentFile.getName))
+      .lastOption
+    onPath.orElse(inSdk).orElse(inKits).getOrElse {
       throw new MessageOnlyException(
-        "mt.exe (Windows SDK) is not on the PATH: run this from a Visual Studio Developer Prompt " +
-        "(CI: the `setup-msvc` action), so that the bundled java.exe gets its UTF-8 code page " +
-        "manifest (Note [The Bundled java.exe Uses UTF-8] in project/JavaUtf8Manifest.scala)."
+        "mt.exe (Windows SDK) is neither on the PATH nor under Windows Kits\\10\\bin: install the " +
+        "Windows SDK or run this from a Visual Studio Developer Prompt, so that the bundled " +
+        "java.exe gets its UTF-8 code page manifest (Note [The Bundled java.exe Uses UTF-8] in " +
+        "project/JavaUtf8Manifest.scala)."
       )
     }
   }
+
+  /** `10.0.26100.0` as comparable numbers; a directory that is not a version sorts first. */
+  private def sdkVersion(name: String): (Int, Int, Int, Int) =
+    name.split('.').map(p => scala.util.Try(p.toInt).getOrElse(-1)) match {
+      case Array(a, b, c, d) => (a, b, c, d)
+      case _                 => (-1, -1, -1, -1)
+    }
 }

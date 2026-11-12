@@ -51,10 +51,10 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   `java-utf8.manifest` in the image's `java.exe` and `javaw.exe` first
   (`JavaUtf8Manifest.scala`, Note [The Bundled java.exe Uses UTF-8], #693): a
   UTF-8 `activeCodePage`, merged into their own manifest with `mt.exe`, so the
-  JVM's options keep characters outside the ANSI code page. The build fails when
-  `mt.exe` is not on the PATH (a Developer Prompt; CI's `setup-msvc`), the merge
-  loses an element, or the result does not run with `sun.jnu.encoding = UTF-8`.
-  It drops the launchers' Oracle signature.
+  JVM's options keep characters outside the ANSI code page. `mt.exe` comes from
+  the PATH, else the newest `Windows Kits\10\bin\<version>\x64`; the build fails
+  when there is none, the merge loses an element, or the result does not run
+  with `sun.jnu.encoding = UTF-8`. It drops the launchers' Oracle signature.
 - `Dependencies.scala` — Central dependency version catalog.
 - `plugins.sbt` — SBT plugin versions. Pinned to known-good combinations; don't
   bump casually.
