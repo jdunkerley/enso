@@ -24,11 +24,16 @@ public class JobsTest {
     var visualization2 = UUID.randomUUID();
     var visualization3 = UUID.randomUUID();
 
-    var upsert1 = new UpsertVisualizationJob(Option.empty(), visualization1, expression1, config, 0L);
-    var upsert2 = new UpsertVisualizationJob(Option.empty(), visualization2, expression1, config, 0L);
-    var upsert3 = new UpsertVisualizationJob(Option.empty(), visualization3, expression2, config, 0L);
-    var upsert4 = new UpsertVisualizationJob(Option.empty(), visualization1, expression1, config, 0L);
-    var upsert5 = new UpsertVisualizationJob(Option.empty(), visualization1, expression2, config, 0L);
+    var upsert1 =
+        new UpsertVisualizationJob(Option.empty(), visualization1, expression1, config, 0L);
+    var upsert2 =
+        new UpsertVisualizationJob(Option.empty(), visualization2, expression1, config, 0L);
+    var upsert3 =
+        new UpsertVisualizationJob(Option.empty(), visualization3, expression2, config, 0L);
+    var upsert4 =
+        new UpsertVisualizationJob(Option.empty(), visualization1, expression1, config, 0L);
+    var upsert5 =
+        new UpsertVisualizationJob(Option.empty(), visualization1, expression2, config, 0L);
 
     assertFalse(upsert1.equalsTo(upsert2));
     assertFalse(upsert2.equalsTo(upsert3));
