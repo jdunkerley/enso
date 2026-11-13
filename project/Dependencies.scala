@@ -366,7 +366,8 @@ object Dependencies {
   // Held on the 73.x line: ICU 74 relicensed icu4j from the ICU licence to
   // Unicode-3.0, so moving past it is a legal review, not a version bump.
   val icuVersion = "73.2"
-  // Held, together with `xmlbeansVersion`: `lib/java/poi-wrapper` shadows five
+  // Held, together with `xmlbeansVersion` (both used by `std-excel`):
+  // `lib/java/poi-wrapper` shadows five
   // POI classes with modified copies of their 5.2.3 sources (to avoid a
   // dependency on `java.desktop`). A newer POI needs those copies re-derived
   // from its own sources first, otherwise old code runs against new internals.

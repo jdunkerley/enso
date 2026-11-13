@@ -1,0 +1,30 @@
+from Standard.Base import all
+
+## Indicates that the target range contains existing data and the user did not
+   specify to overwrite.
+type Existing_Data
+    ## ---
+       private: true
+       ---
+    Error message
+
+    ## ---
+       private: true
+       ---
+       Create a human-readable version of the error.
+    to_display_text : Text
+    to_display_text self = "Existing data found: " + self.message
+
+## Indicates that the specified range is not large enough to fit the data.
+type Range_Exceeded
+    ## ---
+       private: true
+       ---
+    Error message
+
+    ## ---
+       private: true
+       ---
+       Create a human-readable version of the error.
+    to_display_text : Text
+    to_display_text self = "Range exceeded: " + self.message

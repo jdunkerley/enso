@@ -2,6 +2,7 @@ from Standard.Base import all
 
 
 from Standard.Table import all
+from Standard.Excel import all
 from Standard.Database import all
 from Standard.Image import all
 
@@ -24,7 +25,7 @@ add_specs suite_builder =
             result = Widgets.get_widget_json Data .read ["format"]
             result.should_contain '"label":"SQLite","value":"..SQLite","parameters":[],"icon":"","requires":"Standard.SQLite.SQLite_Format.SQLite_Format","patterns":["*.sqlite","*.db"]}'
             result.should_contain '"label":"Delimited","value":"..Delimited","parameters":[],"icon":"","requires":"Standard.Table.Delimited.Delimited_Format.Delimited_Format","patterns":["*.csv","*.tsv","*.tab"]}'
-            result.should_contain '"label":"Excel Sheet","value":"..Sheet","parameters":[],"icon":"","requires":"Standard.Table.Excel.Excel_Format.Excel_Format"'
+            result.should_contain '"label":"Excel Sheet","value":"..Sheet","parameters":[],"icon":"","requires":"Standard.Excel.Excel_Format.Excel_Format"'
 
         group_builder.specify "should give Auto Detect neither field" <|
             result = Widgets.get_widget_json Data .read ["format"]

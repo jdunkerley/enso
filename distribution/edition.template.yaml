@@ -86,6 +86,9 @@ libraries:
   - name: Standard.YXDB
     repository: release
     version: {{LIBS_VERSION}}
+  - name: Standard.Excel
+    repository: release
+    version: {{LIBS_VERSION}}
   - name: Standard.DuckDB
     repository: release
     version: {{LIBS_VERSION}}

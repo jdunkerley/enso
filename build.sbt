@@ -141,6 +141,7 @@ GatherLicenses.distributions := Seq(
     Distribution.sbtProjects(`std-fixed-width`)
   ),
   makeStdLibDistribution("YXDB", Distribution.sbtProjects(`std-yxdb`)),
+  makeStdLibDistribution("Excel", Distribution.sbtProjects(`std-excel`)),
   makeStdLibDistribution("Image", Distribution.sbtProjects(`std-image`)),
   makeStdLibDistribution("AWS", Distribution.sbtProjects(`std-aws`)),
   // A JAR wrapper whose output a library ships (`extraJars`,
@@ -294,7 +295,8 @@ ciBuildEngineDistribution := Def
             "Database",
             "SQLite",
             "Postgres",
-            "YXDB"
+            "YXDB",
+            "Excel"
           )
         ) {
           GatherLicenses.verifyPackageAt(
@@ -532,6 +534,7 @@ lazy val enso = (project in file("."))
     `std-edi`,
     `std-fixed-width`,
     `std-yxdb`,
+    `std-excel`,
     `std-duckdb`,
     `sqlite-wrapper`,
     `syntax-rust-definition`,
@@ -2730,6 +2733,7 @@ lazy val runtime = (project in file("engine/runtime"))
       .dependsOn(`std-edi` / Compile / packageBin)
       .dependsOn(`std-fixed-width` / Compile / packageBin)
       .dependsOn(`std-yxdb` / Compile / packageBin)
+      .dependsOn(`std-excel` / Compile / packageBin)
       .dependsOn(`std-snowflake` / Compile / packageBin)
       .dependsOn(`std-table` / Compile / packageBin)
       .dependsOn(`std-tableau` / Compile / packageBin)
@@ -3961,6 +3965,7 @@ lazy val `std-benchmarks` = (project in file("std-bits/benchmarks"))
         (`std-edi` / Compile / packageBin).value
         (`std-fixed-width` / Compile / packageBin).value
         (`std-yxdb` / Compile / packageBin).value
+        (`std-excel` / Compile / packageBin).value
         (`std-snowflake` / Compile / packageBin).value
         (`std-table` / Compile / packageBin).value
         (`std-tableau` / Compile / packageBin).value
@@ -4458,6 +4463,8 @@ val `fixed-width-polyglot-root` =
   stdLibComponentRoot("Fixed_Width") / "polyglot" / "java"
 val `yxdb-polyglot-root` =
   stdLibComponentRoot("YXDB") / "polyglot" / "java"
+val `excel-polyglot-root` =
+  stdLibComponentRoot("Excel") / "polyglot" / "java"
 val `database-test-suite-polyglot-root` =
   stdLibComponentRoot("Database_Test_Suite") / "polyglot" / "java"
 val `std-aws-polyglot-root` =
@@ -4564,6 +4571,7 @@ lazy val `enso-test-java-helpers` = project
       val primaryLocation = (Compile / packageBin / artifactPath).value
       val secondaryLocations = Seq(
         file("test/Table_Tests/polyglot/java/base-test-java-helpers.jar"),
+        file("test/Excel_Tests/polyglot/java/base-test-java-helpers.jar"),
         file("test/Image_Tests/polyglot/java/base-test-java-helpers.jar")
       )
       secondaryLocations.foreach { target =>
@@ -4677,24 +4685,15 @@ lazy val `std-table` = project
       (Antlr4 / sourceManaged).value / "main" / "antlr4"
     },
     libraryDependencies ++= Seq(
-      "org.graalvm.polyglot"     % "polyglot"              % graalMavenPackagesVersion % "provided" exclude ("org.graalvm.sdk", "collections"),
-      "com.univocity"            % "univocity-parsers"     % univocityParsersVersion,
-      "org.apache.poi"           % "poi-ooxml"             % poiOoxmlVersion,
-      "org.apache.xmlbeans"      % "xmlbeans"              % xmlbeansVersion,
-      "org.antlr"                % "antlr4-runtime"        % antlrVersion,
-      "org.apache.logging.log4j" % "log4j"                 % "2.24.3",
-      "org.apache.logging.log4j" % "log4j-to-slf4j"        % "2.24.3", // org.apache.poi uses log4j
-      "org.graalvm.truffle"      % "truffle-api"           % graalMavenPackagesVersion % Test,
-      "junit"                    % "junit"                 % junitVersion              % Test,
-      "com.github.sbt"           % "junit-interface"       % junitIfVersion            % Test,
-      "org.mockito"              % "mockito-core"          % mockitoJavaVersion        % Test,
-      "org.mockito"              % "mockito-junit-jupiter" % mockitoJavaVersion        % Test
+      "org.graalvm.polyglot" % "polyglot"              % graalMavenPackagesVersion % "provided" exclude ("org.graalvm.sdk", "collections"),
+      "com.univocity"        % "univocity-parsers"     % univocityParsersVersion,
+      "org.antlr"            % "antlr4-runtime"        % antlrVersion,
+      "org.graalvm.truffle"  % "truffle-api"           % graalMavenPackagesVersion % Test,
+      "junit"                % "junit"                 % junitVersion              % Test,
+      "com.github.sbt"       % "junit-interface"       % junitIfVersion            % Test,
+      "org.mockito"          % "mockito-core"          % mockitoJavaVersion        % Test,
+      "org.mockito"          % "mockito-junit-jupiter" % mockitoJavaVersion        % Test
     ),
-    Compile / unmanagedJars := {
-      Seq(
-        Attributed.blank((`poi-wrapper` / assembly).value)
-      )
-    },
     Compile / packageBin := {
       val result            = (Compile / packageBin).value
       val cacheStoreFactory = streams.value.cacheStoreFactory
@@ -4705,15 +4704,8 @@ lazy val `std-table` = project
           ignoreScalaLibrary = true,
           libraryUpdates     = (Compile / update).value,
           unmanagedClasspath = (Compile / unmanagedJars).value,
-          ignoreDependenciesByModuleID = Some(
-            Seq(
-              "org.apache.poi" % "poi"            % poiOoxmlVersion,
-              "org.apache.poi" % "poi-ooxml"      % poiOoxmlVersion,
-              "org.apache.poi" % "poi-ooxml-lite" % poiOoxmlVersion
-            )
-          ),
-          logger            = streams.value.log,
-          cacheStoreFactory = cacheStoreFactory
+          logger             = streams.value.log,
+          cacheStoreFactory  = cacheStoreFactory
         )
       result
     },
@@ -4722,7 +4714,6 @@ lazy val `std-table` = project
       IO.delete(`table-polyglot-root`)
     }.value
   )
-  .dependsOn(`poi-wrapper`)
   .dependsOn(`std-base` % "provided")
 
 lazy val `std-tests` = project
@@ -5505,6 +5496,59 @@ lazy val `std-yxdb` = project
       IO.delete(`yxdb-polyglot-root`)
     }.value
   )
+  .dependsOn(`std-base` % "provided")
+  .dependsOn(`std-table` % "provided")
+
+lazy val `std-excel` = project
+  .in(file("std-bits") / "excel")
+  .settings(
+    frgaalJavaCompilerSetting,
+    autoScalaLibrary := false,
+    Compile / compile / compileInputs := (Compile / compile / compileInputs)
+      .dependsOn(SPIHelpers.ensureSPIConsistency)
+      .value,
+    Compile / packageBin / artifactPath :=
+      `excel-polyglot-root` / "std-excel.jar",
+    libraryDependencies ++= Seq(
+      "org.graalvm.polyglot"     % "polyglot"        % graalMavenPackagesVersion % "provided",
+      "org.apache.poi"           % "poi-ooxml"       % poiOoxmlVersion,
+      "org.apache.xmlbeans"      % "xmlbeans"        % xmlbeansVersion,
+      "org.apache.logging.log4j" % "log4j"           % "2.24.3",
+      "org.apache.logging.log4j" % "log4j-to-slf4j"  % "2.24.3", // org.apache.poi uses log4j
+      "junit"                    % "junit"           % junitVersion              % Test,
+      "com.github.sbt"           % "junit-interface" % junitIfVersion            % Test
+    ),
+    Compile / unmanagedJars := Seq(
+      Attributed.blank((`poi-wrapper` / assembly).value)
+    ),
+    Compile / packageBin := {
+      val result            = (Compile / packageBin).value
+      val cacheStoreFactory = streams.value.cacheStoreFactory
+      StdBits
+        .copyDependencies(
+          `excel-polyglot-root`,
+          Seq("std-excel.jar"),
+          ignoreScalaLibrary = true,
+          libraryUpdates     = (Compile / update).value,
+          unmanagedClasspath = (Compile / unmanagedJars).value,
+          ignoreDependenciesByModuleID = Some(
+            Seq(
+              "org.apache.poi" % "poi"            % poiOoxmlVersion,
+              "org.apache.poi" % "poi-ooxml"      % poiOoxmlVersion,
+              "org.apache.poi" % "poi-ooxml-lite" % poiOoxmlVersion
+            )
+          ),
+          logger            = streams.value.log,
+          cacheStoreFactory = cacheStoreFactory
+        )
+      result
+    },
+    clean := Def.task {
+      val _ = clean.value
+      IO.delete(`excel-polyglot-root`)
+    }.value
+  )
+  .dependsOn(`poi-wrapper`)
   .dependsOn(`std-base` % "provided")
   .dependsOn(`std-table` % "provided")
 

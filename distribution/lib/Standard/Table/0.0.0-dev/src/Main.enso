@@ -17,21 +17,15 @@ export project.Data_Formatter.Data_Formatter
 export project.Delimited.Delimited_Format.Delimited_Format
 export project.Delimited.Quote_Style.Quote_Style
 
-export project.Excel.Excel_Format.Excel_Format
-export project.Excel.Excel_Range.Excel_Range
-export project.Excel.Excel_Workbook.Excel_Workbook
-
 export project.Expression.expr
 
 export project.Extensions.Column_Vector_Extensions.to_column
-export project.Extensions.Excel_Extensions.from_excel
 export project.Extensions.Table_Conversions.from_objects
 export project.Extensions.Table_Conversions.parse_to_table
 export project.Extensions.Table_Conversions.to_table
 export project.Extensions.Table_Conversions.write_table
 
 export project.Fill_With.Fill_With
-
 
 export project.Generate_Rows_Range.Generate_Rows_Range
 

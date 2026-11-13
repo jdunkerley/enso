@@ -73,7 +73,7 @@ describe('logOrigin', () => {
     'local.My_Project.Main.Report',
     // The std-bits helpers, under `org.enso` but the libraries'.
     'org.enso.table',
-    'org.enso.table.read.ExcelReader',
+    'org.enso.excel.ExcelReader',
     'org.enso.base.net.http.HttpClient',
     'org.enso.database.JDBCProxy',
     'org.enso.tableau.HyperReader',

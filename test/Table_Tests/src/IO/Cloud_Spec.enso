@@ -1,6 +1,7 @@
 from Standard.Base import all
 
 from Standard.Table import all
+from Standard.Excel import all
 
 from Standard.Test import all
 

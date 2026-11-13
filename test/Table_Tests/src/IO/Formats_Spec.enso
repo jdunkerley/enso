@@ -3,6 +3,7 @@ import Standard.Base.Errors.File_Error.File_Error
 import Standard.Base.Runtime.Context
 
 from Standard.Table import all
+from Standard.Excel import all
 import Standard.Table.Errors.Invalid_JSON_Format
 
 from Standard.Test import all

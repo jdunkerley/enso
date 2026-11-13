@@ -1,0 +1,514 @@
+from Standard.Base import all
+import Standard.Base.Data.Read.Return_As.Return_As as Return_As_Base
+import Standard.Base.Data.Vector.No_Wrap
+import Standard.Base.Errors.Common.Type_Error
+import Standard.Base.Errors.Deprecated.Deprecated
+import Standard.Base.Errors.File_Error.File_Error
+import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+import Standard.Base.Errors.Illegal_State.Illegal_State
+import Standard.Base.Metadata.Display
+import Standard.Base.Metadata.Widget
+import Standard.Base.System.File.Advanced.Temporary_File.Temporary_File
+import Standard.Base.System.Input_Stream.Input_Stream
+from Standard.Base.Data.Filter_Condition import sql_like_to_regex
+from Standard.Base.Metadata import make_single_choice
+from Standard.Base.Metadata.Choice import Option
+from Standard.Base.Metadata.Widget import Multiple_Choice, Single_Choice
+from Standard.Base.Visualization.Table_Viz_Data import Table_Viz_Data, Table_Viz_Header
+
+import Standard.Table.Column.Column
+import Standard.Table.Columns_To_Keep.Columns_To_Keep
+import project.Excel_File_Format.Excel_File_Format
+import project.Excel_Range.Excel_Range
+import Standard.Table.Headers.Headers
+import project.Internal.Excel_Reader
+import project.Internal.Excel_Section.Excel_Section
+import Standard.Table.Internal.Java_Problems
+import Standard.Table.Internal.Read_Many_As_Merged_Table_Strategy.Read_Many_As_Merged_Table_Strategy
+import Standard.Table.Internal.Read_Many_As_Merged_Table_Strategy.Read_Many_As_Table_Result
+import Standard.Base.Internal.Telemetry
+import Standard.Table.Match_Columns.Match_Columns
+import Standard.Table.Return_As_Table.Return_As_Table
+import Standard.Table.Rows_To_Read.Rows_To_Read
+import Standard.Table.Table.Table
+from Standard.Table.Errors import Empty_Sheet, No_Rows
+from Standard.Table.Internal.In_Memory_Helpers import from_java_table
+from project.Internal.Excel_Reader import handle_invalid_location
+from Standard.Table.Internal.Table_Helpers import duplicate_rows
+
+polyglot java import java.io.File as Java_File
+polyglot java import org.enso.excel.ExcelWorkbookReader
+polyglot java import org.enso.excel.ExcelReader
+
+type Excel_Workbook
+    ## ---
+       private: true
+       advanced: true
+       ---
+       Load a File as a connection to an Excel workbook.
+
+       ## Arguments
+        - `file`: The file to load.
+        - `xl_format`: Whether to use the old XLS format (default is XLSX).
+    new : File | Temporary_File -> Excel_File_Format -> Excel_Workbook
+    new file:(File | Temporary_File) xl_format:Excel_File_Format=Excel_File_Format.XLSX =
+        file_for_errors = if file.is_a Temporary_File then Nothing else file
+
+        continuation raw_file =
+            File_Error.handle_java_exceptions raw_file <| Excel_Reader.handle_bad_format file_for_errors <| Illegal_State.handle_java_exception <|
+                # The `java_file` depends on the liveness of the possible `Temporary_File` but that is ensured by storing the `file` in the resulting workbook instance.
+                java_file = Java_File.new raw_file.absolute.normalize.path
+                ExcelReader.openFile java_file xl_format.to_java
+                Excel_Workbook.Value java_file file xl_format
+        case file of
+            tmp : Temporary_File -> tmp.with_file continuation
+            f : File -> continuation f
+
+    ## ---
+       private: true
+       advanced: true
+       ---
+       Load an Input_Stream as a connection to an Excel workbook.
+
+       ## Arguments
+        - `stream`: The stream to load.
+        - `xls_format`: Whether to use the old XLS format (default is XLSX).
+        - `file`: Optional file reference.
+    from_stream : Input_Stream -> Excel_File_Format -> File | Nothing -> Excel_Workbook
+    from_stream stream xl_format:Excel_File_Format=Excel_File_Format.XLSX file=Nothing = Excel_Reader.handle_bad_format file <|
+        temp_file = Temporary_File.from_stream_light stream
+        Excel_Workbook.new temp_file xl_format
+
+    ## ---
+       private: true
+       ---
+       Creates an Excel_Workbook.
+    private Value java_file:Java_File file:(File|Temporary_File|Nothing) internal_xl_format:Excel_File_Format
+
+    ## ---
+       icon: metadata
+       ---
+       Is the Workbook in the old XLS format?
+    xls_format : Boolean
+    xls_format self = self.internal_xl_format == Excel_File_Format.XLS
+
+    ## ---
+       private: true
+       icon: metadata
+       ---
+       Returns the list of databases (or catalogs) for the connection.
+    databases : Vector (Text | Nothing)
+    databases self = [Nothing]
+
+    ## ---
+       private: true
+       icon: metadata
+       ---
+       Returns the name of the current file.
+    database : Text
+    database self = case self.file of
+        regular_file : File -> regular_file.path
+        ## A Temporary_File is still visualized as no path, because the fact that the workbook is stored as a file is
+           just an implementation detail - it is coming form a stream so there is no logical file it is associated with.
+        _ -> ""
+
+    ## ---
+       private: true
+       icon: data_input
+       ---
+       Returns a new Workbook with the specified file.
+
+       ## Arguments
+        - database: The target file to open as an Excel_Workbook.
+    set_database : Text | File -> Excel_Workbook ! Illegal_Argument
+    set_database self database:(Text | File) =
+        if database == self.database then self else
+            file = File.new database
+            if file.exists && file.is_directory.not then Excel_Workbook.new file self.internal_xl_format else
+                Error.throw (Illegal_Argument.Error "The specified file ('"+file.path+"') does not exist.")
+
+    ## ---
+       private: true
+       icon: metadata
+       ---
+       Returns the list of schemas for the connection within the current database
+       (or catalog).
+    schemas : Vector (Text | Nothing)
+    schemas self = [Nothing]
+
+    ## ---
+       private: true
+       icon: metadata
+       ---
+       Returns the name of the current schema.
+    schema : Text | Nothing
+    schema self = Nothing
+
+    ## ---
+       private: true
+       icon: data_input
+       ---
+       Returns a new Workbook with the specified schema set as default.
+
+       ## Arguments
+        - schema: The name of the schema to connect to.
+    @schema (Single_Choice display=Display.Always values=[Option 'Nothing'])
+    set_schema : Text | Nothing -> Excel_Workbook ! Illegal_Argument
+    set_schema self schema =
+        if schema == self.schema then self else
+            Error.throw (Illegal_Argument.Error "Changing schema is not supported.")
+
+    ## ---
+       group: Standard.Base.Metadata
+       icon: metadata
+       suggested: 5
+       ---
+       Gets the number of sheets.
+    sheet_count : Integer
+    sheet_count self = self.sheet_names.length
+
+    ## ---
+       group: Standard.Base.Metadata
+       icon: metadata
+       suggested: 3
+       ---
+       Gets the names of all the sheets.
+    sheet_names : Vector Text
+    sheet_names self = Excel_Reader.handle_bad_format self.file <| Illegal_State.handle_java_exception <|
+        Vector.from_polyglot_array (ExcelReader.readSheetNames self.java_file self.internal_xl_format.to_java)
+
+    ## ---
+       group: Standard.Base.Metadata
+       icon: metadata
+       suggested: 6
+       ---
+       Gets the number of named ranges.
+    named_ranges_count : Integer
+    named_ranges_count self = self.named_ranges.length
+
+    ## ---
+       group: Standard.Base.Metadata
+       icon: metadata
+       suggested: 4
+       ---
+       Gets the names of all the named ranges.
+    named_ranges : Vector Text
+    named_ranges self = Excel_Reader.handle_bad_format self.file <| Illegal_State.handle_java_exception <|
+        Vector.from_polyglot_array (ExcelReader.readRangeNames self.java_file self.internal_xl_format.to_java)
+
+    ## ---
+       private: true
+       icon: metadata
+       ---
+       Gets a list of the table types.
+    table_types : Vector Text
+    table_types self = ['Worksheet', 'Named Range']
+
+    ## ---
+       private: true
+       group: Standard.Base.Metadata
+       icon: metadata
+       ---
+       Returns a materialised Table of all the matching views and tables.
+
+       ## Arguments
+        - `name_like`: The table name pattern to search for. Support SQL
+          wildcards (`%`, `_`).
+        - `database`: The database name to search in (default is current
+          database).
+        - `schema`: The schema name to search in (defaults to current schema).
+        - `types`: The table types to search for. The list of values can be
+          obtained using the `table_types` method.
+        - `all_fields`: Return all the fields in the metadata table.
+    @types (self-> Single_Choice values=(self.table_types.map t-> Option t t.pretty))
+    tables : Text -> Text -> Text -> Vector -> Boolean -> Table
+    tables self name_like=Nothing database=self.database schema=self.schema types=Nothing all_fields=False =
+        types_vector = case types of
+            Nothing -> Nothing
+            _ : Vector -> types
+            _ -> [types]
+
+        _ = [all_fields]
+        rows = if schema != Nothing then [] else
+            sheets = if types_vector.is_nothing || types_vector.contains "Worksheet" then self.sheet_names.map s-> [s, 'Worksheet', database, Nothing] else []
+            ranges = if types_vector.is_nothing || types_vector.contains "Named Range" then self.named_ranges.map r-> [r, 'Named Range', database, Nothing] else []
+            sheets + ranges
+
+        filtered = if name_like == Nothing then rows else
+            regex = sql_like_to_regex name_like
+            rows.filter r-> regex.matches r.first
+
+        Table.from_rows ['Name', 'Type', 'Database', 'Schema'] filtered
+
+    ## ---
+       private: true
+       icon: data_input
+       ---
+       Read a range into a Table.
+
+       ## Arguments
+        - `query`: sheet name, range name or address to read from the workbook.
+        - `alias`: optionally specify a friendly alias for the query (unused).
+        - `headers`: whether to use the first row as headers (default is
+          `Detect_Headers`).
+    @query (self-> Single_Choice display=Display.Always values=(self.tables.at "Name" . to_vector . map t-> Option t t.pretty))
+    query : Text -> Text -> Headers -> Table
+    query self (query : Text) (alias : Text = "") (headers : Headers = Headers.Detect_Headers) =
+        _ = [alias]
+        self.read query headers=headers
+
+    ## ---
+       aliases: [get, import, load, open, range, sheet, worksheet]
+       group: Standard.Base.Input
+       icon: data_input
+       suggested: 1
+       ---
+       Read a range into a Table.
+
+       ## Arguments
+        - `query`: sheet name, range name or address to read from the workbook.
+        - `headers`: whether to use the first row as headers (default is
+          `Detect_Headers`).
+        - `limit`: the maximum number of rows to read. If set to `Nothing`, all
+          rows will be returned.
+    @query self-> _query_widget self
+    @limit Rows_To_Read.default_widget
+    read : Text | Excel_Range | Integer -> Headers -> Rows_To_Read -> Integer -> Problem_Behavior -> Table
+    read self (query : Text | Excel_Range | Integer) (headers : Headers = ..Detect_Headers) (limit : Rows_To_Read = ..All_Rows) (skip_rows:Integer=0) (on_problems:Problem_Behavior=..Report_Warning) = Excel_Reader.handle_bad_format self.file <| Illegal_State.handle_java_exception <| handle_invalid_location <| Empty_Sheet.handle_java_exception <|
+        java_headers = Excel_Reader.make_java_headers headers
+        java_limit = limit.rows_to_read
+        java_table = Java_Problems.with_problem_aggregator on_problems java_problem_aggregator->
+            case query of
+                _ : Excel_Range -> ExcelReader.readRange self.java_file query.java_range java_headers skip_rows java_limit self.internal_xl_format.to_java java_problem_aggregator
+                _ : Text -> ExcelReader.readRangeByName self.java_file query java_headers skip_rows java_limit self.internal_xl_format.to_java java_problem_aggregator
+                _ : Integer -> ExcelReader.readSheetByIndex self.java_file query java_headers skip_rows java_limit self.internal_xl_format.to_java java_problem_aggregator
+        result = limit.attach_warning (from_java_table java_table)
+        result.if_not_error <|
+            Telemetry.log "Excel_Workbook.read" "Read sheet: format={}, output={}, row_count={}, column_count={}, xls_format={}, file_format={}" ["Excel_Format", "Table", result.row_count, result.column_count, self.internal_xl_format==Excel_File_Format.XLS, self.internal_xl_format.to_text]
+            result
+
+    ## ---
+       private: true
+       group: Standard.Base.Input
+       icon: data_input
+       ---
+       Read an Excel_Section from the Workbook
+
+       ## Arguments
+        - `section`: the section to read.
+    read_section : Excel_Section -> (Excel_Workbook | Table | Vector)
+    read_section self section = Excel_Reader.handle_bad_format self.file <| Illegal_State.handle_java_exception <| handle_invalid_location <| Empty_Sheet.handle_java_exception <|
+        case section of
+            Excel_Section.Worksheet sheet headers skip_rows row_limit ->
+                java_headers = Excel_Reader.make_java_headers headers
+                java_limit = row_limit.rows_to_read
+                names = self.sheet_names
+                sheet_name = case sheet of
+                    _ : Text -> if names.contains sheet then sheet else Error.throw (Illegal_Argument.Error "Worksheet not found.")
+                    _ : Integer ->
+                        if (sheet < 1 || sheet >= names.length) then Error.throw (Illegal_Argument.Error "Worksheet index out of range.") else
+                            names.at (sheet - 1)
+                    _ -> Error.throw (Illegal_Argument.Error "Worksheet must be either Text or an Integer.")
+                java_table = Java_Problems.with_problem_aggregator Problem_Behavior.Report_Warning java_problem_aggregator->
+                    ExcelReader.readRangeByName self.java_file sheet_name java_headers skip_rows java_limit self.internal_xl_format.to_java java_problem_aggregator
+                row_limit.attach_warning (from_java_table java_table)
+            Excel_Section.Cell_Range address headers skip_rows row_limit ->
+                java_headers = Excel_Reader.make_java_headers headers
+                java_limit = row_limit.rows_to_read
+                java_table = Java_Problems.with_problem_aggregator Problem_Behavior.Report_Warning java_problem_aggregator->
+                    case address of
+                        _ : Excel_Range -> ExcelReader.readRange self.java_file address.java_range java_headers skip_rows java_limit self.internal_xl_format.to_java java_problem_aggregator
+                        _ : Text -> ExcelReader.readRangeByName self.java_file address java_headers skip_rows java_limit self.internal_xl_format.to_java java_problem_aggregator
+                row_limit.attach_warning (from_java_table java_table)
+
+    ## ---
+       private: true
+       group: Standard.Base.Input
+       icon: data_input
+       ---
+       Reads a worksheet from the workbook.
+
+       ## Arguments
+        - `name`: the name of the worksheet to read.
+        - `headers`: whether to use the first row as headers (default is
+          `Detect_Headers`).
+    @name (self-> Single_Choice display=Display.Always values=(self.sheet_names.map t-> Option t t.pretty))
+    sheet : Text | Integer -> Headers -> Table
+    sheet self name:(Text | Integer) headers:Headers=Headers.Detect_Headers =
+        Warning.attach (Deprecated.Warning "Standard.Excel.Excel_Workbook.Excel_Workbook" "sheet" "Deprecated: use `read` instead.") <|
+            self.read_section (Excel_Section.Worksheet name headers 0 Nothing)
+
+    ## ---
+       private: true
+       advanced: true
+       ---
+       Closes the workbook, releasing any resources it holds.
+       This method may be used to release the underlying workbook file, e.g. to
+       be able to delete it.
+    close : Nothing
+    close self =
+        ExcelReader.closeFile self.java_file self.internal_xl_format.to_java
+
+    ## ---
+       private: true
+       ---
+       Returns a simple text description of the workbook.
+    to_text : Text
+    to_text self =
+        associated_regular_file = case self.file of
+            regular_file : File -> " (" + regular_file.name + ")"
+            _ -> ""
+        "Excel_Workbook"+associated_regular_file
+
+    ## ---
+       private: true
+       ---
+       Returns a short human-readable text representation of the workbook.
+    to_display_text : Text
+    to_display_text self = self.to_text
+
+    ## ---
+       private: true
+       ---
+       Provides a JS object representation for use in visualizations.
+    to_js_object : JS_Object
+    to_js_object self =
+        additional_fields = case self.file of
+            regular_file : File -> [["file", regular_file.path], ["sheet_names", self.sheet_names]]
+            _ -> []
+        JS_Object.from_pairs <|
+            [["type", "Excel_Workbook"], ["xls_format", self.xls_format], ["child_label", "sheet"], ["visualization_header", "Table"]] + additional_fields
+
+    ## ---
+       group: Standard.Base.Input
+       icon: data_input
+       suggested: 2
+       ---
+       Reads one or more sheets into a Table.
+
+       ## Arguments
+        - `sheet_names`: the names of sheets, ranges or addresses to read.
+          Defaults to all sheets. An invalid `sheet_name` will be reported as a
+          problem.
+        - `headers`: whether to use the first row as headers (default is
+          `Detect_Headers`) for each sheet.
+        - `return`: how to return the tables. Defaults to `As_Merged_Table`
+          meaning the tables are merged into a single table.
+        - `on_problems`: how to handle problems during reading. Defaults to
+          `Report_Warning`.
+    @sheet_names build_sheet_selector
+    @return make_single_choice Return_As_Table.get_dropdown_options
+    read_many : Vector Text -> Headers -> Return_As_Base -> Problem_Behavior -> Table
+    read_many self sheet_names:Vector=self.sheet_names (headers:Headers=..Detect_Headers) (return=..As_Merged_Table) (on_problems:Problem_Behavior=..Report_Warning) =
+        resolved_return = _resolve_return_as_compatibility return
+        if sheet_names.is_empty then Error.throw (Illegal_Argument.Error "No sheets selected.") else
+            case resolved_return of
+                Return_As_Table.With_New_Column -> 
+                    tables_or_nothing = sheet_names.map on_problems=on_problems address->
+                        self.read address headers on_problems=on_problems
+                    Table.new [["Sheet Name", sheet_names], ["Table", tables_or_nothing]]
+                Return_As_Table.As_Merged_Table columns_to_keep match ->
+                    names_and_tables = _read_sheets self sheet_names headers on_problems
+                    only_valid = names_and_tables.filter p-> p.second.is_nothing.not
+                    no_valid_sheets = only_valid.is_empty
+                    if no_valid_sheets then Error.throw (Illegal_Argument.Error "No valid sheets found.") else
+                        valid_names = only_valid.map .first
+                        valid_tables = only_valid.map .second
+                        unified_tables = Table.from_union valid_tables columns_to_keep=columns_to_keep match_columns=match on_problems=on_problems
+                        (_sheet_names_table valid_names valid_tables).zip unified_tables right_prefix="" on_problems=on_problems
+
+## ---
+   private: true
+   ---
+build_sheet_selector workbook:Excel_Workbook display:Display=Display.Always -> Widget =
+    names = workbook.sheet_names.map n-> Option n n.pretty
+    Multiple_Choice display=display values=names
+
+## ---
+   private: true
+   deprecated: true
+   ---
+   How to merge sheets into a single table.
+   This type is deprecated and has been superseded by `Return_As_Table`.
+   It is kept only for compatibility reasons.
+type Return_As
+    ## ---
+       deprecated: true
+       ---
+       Each sheet is returned as a row.
+       This option is deprecated, because it has been renamed. Please use the
+       equivalent `With_New_Column` instead.
+    Table_Of_Tables
+
+    ## ---
+       deprecated: true
+       ---
+       All sheets are merged into a single table. A union operation is performed.
+       This option is deprecated, because it has been renamed. Please use the
+       equivalent `As_Merged_Table` instead.
+    Merged_Table (columns_to_keep : Columns_To_Keep = Columns_To_Keep.In_Any) (match : Match_Columns = Match_Columns.By_Name)
+
+## A helper method that ensures that we can take the new `Return_As_Table` type
+   as well as the deprecated `Return_As` type, together with autoscoping.
+   With autoscoping, the `As_Merged_Table` constructor is ambiguous, so plain
+   autoscoping would not work and we do some workarounds to make it work.
+   In case of the ambiguity, the new-style `Return_As_Table.As_Merged_Table`
+   variant is preferred.
+private _resolve_return_as_compatibility return =
+    Panic.catch Type_Error (return:Return_As_Table) (_->Nothing) . if_nothing <|
+        old_style = Panic.catch Type_Error (return:Return_As) (_->Nothing)
+        if old_style.is_nothing then Error.throw (Illegal_Argument.Error "Valid values for `return` are: `..With_New_Column` or `..As_Merged_Table`. Instead, got `"+return.to_display_text+"`.") else
+            case old_style of
+                Return_As.Table_Of_Tables ->
+                    Warning.attach (Deprecated.Warning "Standard.Excel.Excel_Workbook.Return_As" "Table_Of_Tables" "Deprecated: use `..With_New_Column` instead.") <|
+                        Return_As_Table.With_New_Column
+                Return_As.Merged_Table columns_to_keep match ->
+                    Warning.attach (Deprecated.Warning "Standard.Excel.Excel_Workbook.Return_As" "Merged_Table" "Deprecated: use `..As_Merged_Table` instead.") <|
+                        Return_As_Table.As_Merged_Table columns_to_keep match
+
+## Creates a query widget for the `read` method.
+private _query_widget wb:Excel_Workbook display:Display=..Always -> Widget =
+    default_address = "'" + wb.sheet_names.first.replace "'" "''" + "'!A1:E5"
+    options = [Option "<By Index>" "1", Option "<Range>" "Excel_Range.from_address "+default_address.pretty] + (wb.tables.at "Name" . to_vector . map t-> Option t t.pretty)
+    Single_Choice display=display values=options
+
+private _read_sheets workbook:Excel_Workbook (sheet_names : Vector Text) headers:Headers on_problems:Problem_Behavior -> Vector (Pair Text (Table | Nothing)) =
+    sheet_names.map on_problems=No_Wrap.Value address->
+        table = workbook.read address headers on_problems=on_problems
+        r = Pair.new address table
+        # If in Report_Error mode, we forward the original error without wrapping, otherwise we wrap any warnings.
+        if on_problems == Problem_Behavior.Report_Error then r else 
+            r.catch Any error->
+                on_problems.attach_problem_after (Pair.new address Nothing) <|
+                    (No_Rows.Warning "The sheet "+address.to_display_text+" failed to load, so it is not included in the `As_Merged_Table` result of `read_many`. The error was: "+error.to_display_text)
+
+private _sheet_names_table (sheet_names : Vector Text) (loaded_tables : Vector Table) -> Table =
+    table = Column.from_vector "Sheet Name" sheet_names . to_table
+    counts = loaded_tables.map t-> t.row_count
+    duplicate_rows table counts
+
+## ---
+   private: true
+   ---
+   Loads all sheets in the Excel workbook and merges them into a single table.
+Read_Many_As_Merged_Table_Strategy.from (that:Excel_Workbook) =
+    callback path columns_to_keep match_columns on_problems =
+        tables = _read_sheets that that.sheet_names ..Detect_Headers on_problems
+        only_valid = tables.filter p-> p.second.is_nothing.not
+        case only_valid.is_empty of
+            True ->
+                on_problems.attach_problem_after Read_Many_As_Table_Result.No_Data <|
+                    (No_Rows.Warning "The workbook "+path.to_display_text+" failed to load any sheets, so it is not included in the `As_Merged_Table` result of `read_many`.")
+            False ->
+                sheet_names = only_valid.map .first
+                valid_tables = only_valid.map .second
+                metadata = _sheet_names_table sheet_names valid_tables
+                data = Table.from_union valid_tables columns_to_keep match_columns on_problems
+                Read_Many_As_Table_Result.Table metadata=metadata data=data
+    Read_Many_As_Merged_Table_Strategy.Value callback
+
+## ---
+   private: true
+   ---
+Table_Viz_Data.from (that:Excel_Workbook) = 
+    Table_Viz_Data.GenericGrid [Table_Viz_Header.Link "worksheets" "worksheet" "read"] [that.sheet_names]
