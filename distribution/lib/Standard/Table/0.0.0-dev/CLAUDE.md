@@ -52,6 +52,9 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
 - Joins with mismatched key types silently produce mismatch markers — verify
   column types are compatible before joining.
 
+- EDI (ANSI X12) reading is not part of this library: it moved to `Standard.EDI`
+  (`from Standard.EDI import all`).
+
 ## Where to read more
 
 - `src/Table.enso` — type definition with method docs.

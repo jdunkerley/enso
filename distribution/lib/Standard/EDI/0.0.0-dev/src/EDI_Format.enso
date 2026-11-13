@@ -9,9 +9,11 @@ from Standard.Base.Logging import all
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Text_Input
 
-import project.Table.Table
+from Standard.Table import Table
 
-polyglot java import org.enso.table.read.EDIReader
+import project.Main
+
+polyglot java import org.enso.edi.EDIReader
 
 ## Read ANSI X12 Electronic Data Interchange (EDI) Format
 type EDI_Format
@@ -131,7 +133,7 @@ type EDI_Definition
     as_custom self = case self of
         EDI_Definition.Custom _ _ -> self
         EDI_Definition.EDI_822 ->
-            this_proj = Project_Description.new Standard.Table.Main
+            this_proj = Project_Description.new Standard.EDI.Main
             EDI_Definition.From_Json (this_proj.data / "EDI_822.json") . as_custom
         EDI_Definition.From_Json json ->
             parsed = Data.read json format=JSON_Format

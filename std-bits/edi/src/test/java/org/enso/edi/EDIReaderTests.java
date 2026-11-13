@@ -1,4 +1,4 @@
-package org.enso.table.read;
+package org.enso.edi;
 
 import static org.junit.Assert.*;
 

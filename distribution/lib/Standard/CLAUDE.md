@@ -31,6 +31,8 @@ there.
 - `Google_Api/` — **Deprecated** placeholder; use `Google` instead.
 - `Saas/` — Salesforce, Strava, SMTP email.
 - `Tableau/` — Tableau Hyper extract (`.hyper`) read/write.
+- `EDI/` — ANSI X12 EDI reading (`EDI_Format`, `EDI_Definition`), `.edi` and
+  `.822` files.
 - `XML/` — XML documents (`XML_Document`, `XML_Element`, XPath), the `.xml` file
   format, and `Table.to_xml`.
 - `Image/` — Image read/write and arithmetic via OpenCV.

@@ -21,6 +21,7 @@ libraries:
   Database: { stdBits: [database], dependsOn: [Base, Table] }
   Database_Test_Suite: { stdBits: [database-test-suite], dependsOn: [Base, Database, SQLite, Table, Test] }
   DuckDB: { stdBits: [duckdb], dependsOn: [Base, Database, Table] }
+  EDI: { stdBits: [edi], dependsOn: [Base, Table] }
   Examples: { stdBits: [], dependsOn: [Base, Table] }
   Generic_JDBC: { stdBits: [], dependsOn: [Base, Database, Table] }
   Geo: { stdBits: [], dependsOn: [Base, Table] }
@@ -49,6 +50,9 @@ testProjects:
     testImports: [Base_Tests]
   DuckDB_Tests:
     imports: [Base, Database, Database_Test_Suite, DuckDB, Table, Test]
+    testImports: []
+  EDI_Tests:
+    imports: [Base, EDI, Table, Test]
     testImports: []
   Examples_Tests: { imports: [Base, Examples, Test], testImports: [Base_Tests] }
   Generic_JDBC_Tests:

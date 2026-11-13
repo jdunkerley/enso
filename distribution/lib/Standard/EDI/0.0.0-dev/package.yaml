@@ -1,0 +1,9 @@
+name: EDI
+namespace: Standard
+version: 0.0.0-dev
+license: Apache-2.0
+public-types: [EDI_Format, EDI_Definition]
+
+services:
+  - provides: Standard.Base.System.File_Format.File_Format_SPI
+    with: Standard.EDI.Internal.Services.Impl

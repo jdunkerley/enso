@@ -77,6 +77,9 @@ libraries:
   - name: Standard.XML
     repository: release
     version: {{LIBS_VERSION}}
+  - name: Standard.EDI
+    repository: release
+    version: {{LIBS_VERSION}}
   - name: Standard.DuckDB
     repository: release
     version: {{LIBS_VERSION}}
