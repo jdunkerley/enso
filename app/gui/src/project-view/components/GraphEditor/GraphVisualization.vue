@@ -4,6 +4,7 @@ import { visualizationBindings } from '@/bindings'
 import type { RawDataSource } from '@/components/GraphEditor/GraphVisualization/visualizationData'
 import { useVisualizationData } from '@/components/GraphEditor/GraphVisualization/visualizationData'
 import {
+  handleResize,
   visualizationSize,
   type VisualizationResize,
 } from '@/components/GraphEditor/GraphVisualization/visualizationSize'
@@ -154,13 +155,8 @@ const resizeHandles = useResizeHandles({
   position: toRef(props, 'nodePosition'),
   scale: toRef(props, 'scale'),
 })
-// A side dragged onto the opposite one clamps the size to 0, which is not a size to save.
 resizeHandles.onBoundsChange((bounds, sides) =>
-  emit('resize', {
-    ...((sides.left || sides.right) && bounds.width > 0 ? { width: bounds.width } : {}),
-    ...((sides.top || sides.bottom) && bounds.height > 0 ? { height: bounds.height } : {}),
-    ...(sides.left || sides.top ? { position: bounds.pos } : {}),
-  }),
+  emit('resize', handleResize(bounds, sides, props.nodeSize.x)),
 )
 
 const handlesShown = computed(() => props.show && !props.isPreview && props.isResizable)

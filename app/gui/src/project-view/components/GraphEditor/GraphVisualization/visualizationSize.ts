@@ -1,5 +1,6 @@
 /** @file The size a node's visualization is drawn at. */
 import type { Opt } from '@/util/data/opt'
+import type { BoundsSet, Rect } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
 
 /**
@@ -32,4 +33,24 @@ export interface VisualizationResize {
   width?: number
   height?: number
   position?: Vec2
+}
+
+/**
+ * The change to save for a step of a handle drag that has reached `bounds`. The visualization has
+ * left, right and bottom handles. A left drag never moves the right edge: the width is floored as
+ * {@link visualizationSize} floors it, and the position is taken from the right edge, so a drag
+ * past the floor does not shift the visualization (and push its neighbours). A side dragged onto
+ * the opposite one clamps the size to 0, which is not a size to save.
+ */
+export function handleResize(
+  bounds: Rect,
+  sides: BoundsSet,
+  nodeWidth: number,
+): VisualizationResize {
+  const height = sides.bottom && bounds.height > 0 ? { height: bounds.height } : {}
+  if (sides.left) {
+    const width = Math.max(bounds.width, nodeWidth, MIN_WIDTH_PX)
+    return { width, ...height, position: new Vec2(bounds.right - width, bounds.top) }
+  }
+  return { ...(sides.right && bounds.width > 0 ? { width: bounds.width } : {}), ...height }
 }
