@@ -259,7 +259,7 @@ const { copyNodesToClipboard, createNodesFromClipboard } = useGraphEditorClipboa
 const showCodeEditor = ref(false)
 const dockTab = useDockTab()
 const codeTabFocus = provideCodeTabFocus()
-const graphTidy = useGraphTidy(graphStore, module)
+const graphTidy = useGraphTidy(graphStore)
 
 const localVersioning = useLocalVersioning()
 const { getText } = useText()
@@ -394,7 +394,7 @@ const actionHandlers = registerHandlers({
     {
       collapseNodes,
       copyNodesToClipboard,
-      ...createSelectionAlignmentHandlers(graphStore, module),
+      ...createSelectionAlignmentHandlers(graphStore),
       deleteNodes: (nodes) => graphStore.deleteNodes(nodes.map(nodeId)),
       deleteAndConnectAround: (nodes) => {
         return module.value.edit(async (edit) => {
@@ -417,13 +417,18 @@ const actionHandlers = registerHandlers({
               'Errors occurred while connecting around removed components.',
             )
           }
+          const deleted: NodeId[] = []
           for (const node of nodes) {
             // We cannot call graphStore.deleteNodes, because it bases on the graphDb
             // which is not updated with reconnections above.
             const outerAst = edit.getVersion(node.outerAst)
-            if (outerAst.isStatement()) Ast.deleteFromParentBlock(outerAst)
+            if (outerAst.isStatement()) {
+              Ast.deleteFromParentBlock(outerAst)
+              deleted.push(nodeId(node))
+            }
           }
-          graphStore.releasePushedBy(nodes.map(nodeId), edit)
+          // Only the deleted nodes leave: what they were pushing returns.
+          graphStore.releasePushedBy(deleted, edit)
           return Ok()
         })
       },

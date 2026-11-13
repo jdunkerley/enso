@@ -60,6 +60,28 @@ export function nodeBox(position: Vec2, bare: Vec2, vis: Opt<VisualizationMetada
   return boxAt(position, { x: Math.max(bare.x, viz.x), y: bare.y + viz.y })
 }
 
+/**
+ * `displaced` with every mention of `oldId` (in `by` and `under`) replaced by `newId`: the pusher
+ * is the same node under a new id. Returns `displaced` itself when it does not mention `oldId`.
+ */
+export function repointDisplaced(
+  displaced: DeepReadonly<NodeDisplacementMetadata> | undefined,
+  oldId: NodeId,
+  newId: NodeId,
+): DeepReadonly<NodeDisplacementMetadata> | undefined {
+  if (displaced == null) return displaced
+  const inBy = displaced.by.some((pusher) => pusher.id === oldId)
+  const inUnder = displaced.under?.includes(oldId) ?? false
+  if (!inBy && !inUnder) return displaced
+  return {
+    ...displaced,
+    ...(inBy && {
+      by: displaced.by.map((pusher) => (pusher.id === oldId ? { ...pusher, id: newId } : pusher)),
+    }),
+    ...(inUnder && { under: displaced.under?.map((id) => (id === oldId ? newId : id)) }),
+  }
+}
+
 const NO_BOX: Box = { left: 0, top: 0, right: 0, bottom: 0 }
 
 /** The layout of the graph around nodes that change. */

@@ -1,6 +1,7 @@
 import {
   createDisplacement,
   nodeBox,
+  repointDisplaced,
   type NodeChange,
 } from '$/providers/openedProjects/graph/displacement'
 import type { NodeId } from '$/providers/openedProjects/graph/graphDatabase'
@@ -172,4 +173,51 @@ test('a node with no measured size neither moves nor pushes', () => {
   ])
   g.change('A', { vis: SHOWN })
   expect(g.y('B')).toBe(52)
+})
+
+test('a pusher that changes its id is named by its new id, in `by` and in `under`', () => {
+  const old = 'old' as NodeId
+  const fresh = 'fresh' as NodeId
+  const displaced: NodeDisplacementMetadata = {
+    home: { x: 0, y: 0 },
+    at: { x: 0, y: 100 },
+    by: [
+      { id: old, gap: 16, dir: 'down' },
+      { id: 'other' as NodeId, gap: 8, dir: 'right' },
+    ],
+    under: ['other' as NodeId, old],
+  }
+  expect(repointDisplaced(displaced, old, fresh)).toEqual({
+    home: { x: 0, y: 0 },
+    at: { x: 0, y: 100 },
+    by: [
+      { id: fresh, gap: 16, dir: 'down' },
+      { id: 'other', gap: 8, dir: 'right' },
+    ],
+    under: ['other', fresh],
+  })
+  expect(displaced.by[0]!.id).toBe(old)
+  expect(displaced.under).toEqual(['other', old])
+})
+
+test('a displaced value that does not name the old id is returned as it is', () => {
+  const displaced: NodeDisplacementMetadata = {
+    home: { x: 0, y: 0 },
+    at: { x: 0, y: 100 },
+    by: [{ id: 'other' as NodeId, gap: 16, dir: 'down' }],
+  }
+  expect(repointDisplaced(displaced, 'old' as NodeId, 'fresh' as NodeId)).toBe(displaced)
+  expect(repointDisplaced(undefined, 'old' as NodeId, 'fresh' as NodeId)).toBeUndefined()
+})
+
+test('only `under` naming the old id is rewritten', () => {
+  const displaced: NodeDisplacementMetadata = {
+    home: { x: 0, y: 0 },
+    at: { x: 0, y: 100 },
+    by: [{ id: 'other' as NodeId, gap: 16, dir: 'down' }],
+    under: ['old' as NodeId],
+  }
+  const result = repointDisplaced(displaced, 'old' as NodeId, 'fresh' as NodeId)
+  expect(result).toEqual({ ...displaced, under: ['fresh'] })
+  expect(result?.by).toBe(displaced.by)
 })

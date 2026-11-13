@@ -1,4 +1,4 @@
-import { createDisplacement } from '$/providers/openedProjects/graph/displacement'
+import { createDisplacement, repointDisplaced } from '$/providers/openedProjects/graph/displacement'
 import {
   GraphDb,
   nodeIdFromOuterAst,
@@ -45,7 +45,11 @@ import {
   type ShallowReactive,
   type ShallowRef,
 } from 'vue'
-import { normalizePosition, type CachedAppearance } from 'ydoc-shared/ast'
+import {
+  normalizePosition,
+  type CachedAppearance,
+  type NodeDisplacementMetadata,
+} from 'ydoc-shared/ast'
 import type { ExpressionUpdate } from 'ydoc-shared/languageServerTypes'
 import { reachable } from 'ydoc-shared/util/data/graph'
 import type { ExternalId, VisualizationMetadata } from 'ydoc-shared/yjsModel'
@@ -507,6 +511,20 @@ export function createGraphStore(
     displacement.afterRemoval(ids, edit)
   }
 
+  /**
+   * The node `oldId` is now `newId` (its expression was replaced): the nodes it pushes name the new
+   * id, in `edit`, so they stay where they are.
+   */
+  function repointPushedBy(oldId: NodeId, newId: NodeId, edit: MutableModule) {
+    for (const id of db.nodeIdToNode.keys()) {
+      const metadata = module.mutableNodeMetadata(db.idFromExternal(id), edit)
+      const displaced = metadata?.get('displaced')
+      const repointed = repointDisplaced(displaced, oldId, newId)
+      // Built from plain copies of the read-only view: it can stand for the mutable type.
+      if (repointed !== displaced) metadata?.set('displaced', repointed as NodeDisplacementMetadata)
+    }
+  }
+
   function updateNodeRect(nodeId: NodeId, rect: Rect) {
     nodeRects.set(nodeId, rect)
     if (rect.pos.equals(Vec2.Infinity)) {
@@ -807,6 +825,7 @@ export function createGraphStore(
     setNodesVisualization,
     setNodePositions,
     releasePushedBy,
+    repointPushedBy,
     updateNodeRect,
     updateNodeOutputAnim,
     addPortInstance,

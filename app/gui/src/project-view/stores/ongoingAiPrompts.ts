@@ -7,6 +7,7 @@ import {
   useProjectNames,
 } from '$/components/WithCurrentProject.vue'
 import type { GraphStore, NodeId } from '$/providers/openedProjects/graph'
+import { nodeIdFromOuterAst } from '$/providers/openedProjects/graph/graphDatabase'
 import { proxyRefs } from '$/utils/reactivity'
 import { DEFAULT_NODE_SIZE } from '@/components/ComponentBrowser/placement'
 import {
@@ -104,7 +105,7 @@ export interface OngoingAiPromptsDeps {
     | 'currentMethod'
     | 'registerExtraOccupiedAreas'
     | 'generateLocallyUniqueIdent'
-    | 'releasePushedBy'
+    | 'repointPushedBy'
   >
   readonly module: CurrentProjectStore['module']
   readonly ai: Pick<ReturnType<typeof useAI>, 'dispatch'>
@@ -430,14 +431,12 @@ export function ongoingAiPromptsStoreFactory(deps: OngoingAiPromptsDeps) {
       const assignmentId = node.outerAst.id
       const editedNodeId = entry.editTarget.nodeId
       const editResult = module.value.edit((edit) => {
-        // The node is replaced by one with a new id: what the old one was pushing returns.
-        graphStore.releasePushedBy([editedNodeId], edit)
         const mutableTopLevel = edit.getVersion(topLevel)
         const mutableAssignment = edit.get(assignmentId)
         if (!(mutableAssignment instanceof Ast.MutableAssignment)) {
           return Err('Cannot resolve edited AI node in module edit.')
         }
-        return updateAiNode({
+        const updated = updateAiNode({
           edit,
           topLevel: mutableTopLevel,
           assignment: mutableAssignment,
@@ -445,6 +444,13 @@ export function ongoingAiPromptsStoreFactory(deps: OngoingAiPromptsDeps) {
           prompt: entry.prompt,
           response,
         })
+        if (!updated.ok) return updated
+        // The node stays, under a new id (its expression was replaced): the nodes it pushes follow
+        // the new id and stay where they are, below its visualization.
+        const newNodeId = nodeIdFromOuterAst(mutableAssignment)
+        if (newNodeId == null) return Err('Cannot resolve the updated AI node.')
+        graphStore.repointPushedBy(editedNodeId, newNodeId, edit)
+        return updated
       })
       if (!editResult.ok) {
         handleFailure(entry, editResult.error.message('Cannot update AI component'))

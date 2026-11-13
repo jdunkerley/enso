@@ -4,11 +4,9 @@
  */
 import type { GraphStore, NodeId } from '$/providers/openedProjects/graph'
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
-import type { ModuleStore } from '$/providers/openedProjects/module/module'
 import { Ast } from '@/util/ast'
 import { Vec2 } from '@/util/data/vec2'
 import theme from '@/util/theme'
-import type { Ref } from 'vue'
 import { streamLayout, type LayoutComponent } from './streamLayout'
 
 /**
@@ -87,7 +85,7 @@ export function buildTidyModel(
 }
 
 /** Tidy up: lay out the whole graph, or the given selection, and write positions as one undoable edit. */
-export function useGraphTidy(graphStore: GraphStore, _module: Ref<ModuleStore>) {
+export function useGraphTidy(graphStore: GraphStore) {
   const defaultSize = new Vec2(theme.node.height * 4, theme.node.height)
   function tidy(selection?: readonly NodeId[]) {
     const scope = selection != null && selection.length > 1 ? new Set(selection) : undefined
