@@ -5440,7 +5440,7 @@ lazy val `std-fixed-width` = project
     Compile / packageBin / artifactPath :=
       `fixed-width-polyglot-root` / "std-fixed-width.jar",
     libraryDependencies ++= Seq(
-      "org.graalvm.polyglot" % "polyglot"        % graalMavenPackagesVersion % "provided"
+      "org.graalvm.polyglot" % "polyglot" % graalMavenPackagesVersion % "provided"
     ),
     Compile / packageBin := {
       val result            = (Compile / packageBin).value
