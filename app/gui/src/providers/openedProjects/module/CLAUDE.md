@@ -28,6 +28,11 @@ import logic (`imports.ts`).
   `docs/superpowers/specs/2026-10-30-postgres-sqlite-libraries-design.md`
   (section 3 and its Amendments).
 
+`undoManager.holdStep()` (`undoHold.ts`) keeps every change until its returned
+function is called in one undo step, however long the pauses (a visualization
+resize drag, with the pushes it causes); call the function, or every later
+change joins the step.
+
 ## Carrying the module over a session replacement (#604)
 
 When the project's ydoc server session is replaced, `reconnectProject`
