@@ -191,11 +191,7 @@ create url:Text properties:Vector catalog:Text="" schema:Text="" init_script:Tex
        types and returns as regular data-flow errors.
     sql_error_handler ~action related_query=Nothing =
         Panic.catch SQLException action caught_panic->
-            ## This tests the `Caught_Panic`, not its payload, so it has never
-               matched and a timeout is reported as a plain `SQL_Error`. Testing
-               `caught_panic.payload` would start raising `SQL_Timeout`, which is
-               a change of behaviour, so it is left for a separate change.
-            if caught_panic.is_a SQLTimeoutException then Error.throw (SQL_Timeout.Error caught_panic.payload related_query) else
+            if caught_panic.payload.is_a SQLTimeoutException then Error.throw (SQL_Timeout.Error caught_panic.payload related_query) else
                 Error.throw (SQL_Error.Error caught_panic.payload related_query)
 
     ## ---

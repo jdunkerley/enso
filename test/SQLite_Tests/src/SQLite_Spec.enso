@@ -12,11 +12,15 @@ from Standard.Table.Errors import Invalid_Column_Names, Duplicate_Output_Column_
 
 from Standard.Database import all
 from Standard.SQLite import all
-from Standard.Database.Errors import SQL_Error, Unsupported_Database_Type
+from Standard.Database.Errors import SQL_Error, SQL_Timeout, Unsupported_Database_Type
+import Standard.Database.Internal.JDBC_Connection as JDBC_Module
 import Standard.Database.Internal.Data_Link_Setup.Data_Link_Setup
 from Standard.Database.Internal.Data_Link_Setup import with_data_link_extension
 
 from Standard.Test import all
+
+polyglot java import java.sql.SQLException
+polyglot java import java.sql.SQLTimeoutException
 
 import Standard.Database_Test_Suite
 from Standard.Database_Test_Suite import Backend
@@ -167,6 +171,22 @@ sqlite_specific_spec suite_builder prefix create_connection_func setup =
             action = data.connection.read (SQL_Query.Raw_SQL "SELECT A FROM undefined_table")
             action . should_fail_with SQL_Error
             action.catch.to_text . should_equal "There was an SQL error: [SQLITE_ERROR] SQL error or missing database (no such table: undefined_table). [Query was: SELECT A FROM undefined_table]"
+
+        group_builder.specify "should report a JDBC timeout as SQL_Timeout, and other JDBC errors as SQL_Error" <|
+            jdbc = JDBC_Module.create "jdbc:sqlite::memory:" []
+            Panic.rethrow jdbc
+
+            timeout = jdbc.with_connection related_query="SELECT 1" (_-> Panic.throw (SQLTimeoutException.new "query timed out"))
+            timeout . should_fail_with SQL_Timeout
+            timeout.catch.to_text . should_equal "The SQL connection timed out: query timed out. [Query was: SELECT 1]"
+
+            no_query = jdbc.with_connection (_-> Panic.throw (SQLTimeoutException.new "query timed out"))
+            no_query.catch.to_text . should_equal "The SQL connection timed out: query timed out."
+
+            other = jdbc.with_connection (_-> Panic.throw (SQLException.new "boom"))
+            other . should_fail_with SQL_Error
+            other.catch.is_a SQL_Timeout . should_be_false
+            jdbc.close
 
         group_builder.specify "is capable of handling weird tables" <|
             Problems.assume_no_problems <|
