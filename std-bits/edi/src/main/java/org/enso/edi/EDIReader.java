@@ -1,4 +1,4 @@
-package org.enso.table.read;
+package org.enso.edi;
 
 import java.util.ArrayList;
 import java.util.Arrays;

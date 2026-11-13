@@ -1,7 +1,7 @@
 from Standard.Base import all
 
-from Standard.Table import all
-from Standard.Table.IO.EDI_Format import EDI_Format
+from Standard.Table import Table
+from Standard.EDI import all
 
 from Standard.Test import all
 

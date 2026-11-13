@@ -135,6 +135,7 @@ GatherLicenses.distributions := Seq(
   makeStdLibDistribution("Database", Distribution.sbtProjects(`std-database`)),
   makeStdLibDistribution("SQLite", Distribution.sbtProjects(`std-sqlite`)),
   makeStdLibDistribution("Postgres", Distribution.sbtProjects(`std-postgres`)),
+  makeStdLibDistribution("EDI", Distribution.sbtProjects(`std-edi`)),
   makeStdLibDistribution("Image", Distribution.sbtProjects(`std-image`)),
   makeStdLibDistribution("AWS", Distribution.sbtProjects(`std-aws`)),
   // A JAR wrapper whose output a library ships (`extraJars`,
@@ -522,6 +523,7 @@ lazy val enso = (project in file("."))
     `std-saas`,
     `std-sqlite`,
     `std-postgres`,
+    `std-edi`,
     `std-duckdb`,
     `sqlite-wrapper`,
     `syntax-rust-definition`,
@@ -2717,6 +2719,7 @@ lazy val runtime = (project in file("engine/runtime"))
       .dependsOn(`std-saas` / Compile / packageBin)
       .dependsOn(`std-sqlite` / Compile / packageBin)
       .dependsOn(`std-postgres` / Compile / packageBin)
+      .dependsOn(`std-edi` / Compile / packageBin)
       .dependsOn(`std-snowflake` / Compile / packageBin)
       .dependsOn(`std-table` / Compile / packageBin)
       .dependsOn(`std-tableau` / Compile / packageBin)
@@ -3945,6 +3948,7 @@ lazy val `std-benchmarks` = (project in file("std-bits/benchmarks"))
         (`std-saas` / Compile / packageBin).value
         (`std-sqlite` / Compile / packageBin).value
         (`std-postgres` / Compile / packageBin).value
+        (`std-edi` / Compile / packageBin).value
         (`std-snowflake` / Compile / packageBin).value
         (`std-table` / Compile / packageBin).value
         (`std-tableau` / Compile / packageBin).value
@@ -4436,6 +4440,8 @@ val `sqlite-native-libs` =
   stdLibComponentRoot("SQLite") / "polyglot" / "lib"
 val `postgres-polyglot-root` =
   stdLibComponentRoot("Postgres") / "polyglot" / "java"
+val `edi-polyglot-root` =
+  stdLibComponentRoot("EDI") / "polyglot" / "java"
 val `database-test-suite-polyglot-root` =
   stdLibComponentRoot("Database_Test_Suite") / "polyglot" / "java"
 val `std-aws-polyglot-root` =
@@ -5375,6 +5381,44 @@ lazy val `std-postgres` = project
   .dependsOn(`std-base` % "provided")
   .dependsOn(`std-table` % "provided")
   .dependsOn(`std-database` % "provided")
+
+lazy val `std-edi` = project
+  .in(file("std-bits") / "edi")
+  .settings(
+    frgaalJavaCompilerSetting,
+    autoScalaLibrary := false,
+    Compile / compile / compileInputs := (Compile / compile / compileInputs)
+      .dependsOn(SPIHelpers.ensureSPIConsistency)
+      .value,
+    Compile / packageBin / artifactPath :=
+      `edi-polyglot-root` / "std-edi.jar",
+    libraryDependencies ++= Seq(
+      "org.graalvm.polyglot" % "polyglot"        % graalMavenPackagesVersion % "provided",
+      "junit"                % "junit"           % junitVersion              % Test,
+      "com.github.sbt"       % "junit-interface" % junitIfVersion            % Test
+    ),
+    Compile / packageBin := {
+      val result            = (Compile / packageBin).value
+      val cacheStoreFactory = streams.value.cacheStoreFactory
+      StdBits
+        .copyDependencies(
+          `edi-polyglot-root`,
+          Seq("std-edi.jar"),
+          ignoreScalaLibrary = true,
+          libraryUpdates     = (Compile / update).value,
+          unmanagedClasspath = (Compile / unmanagedClasspath).value,
+          logger             = streams.value.log,
+          cacheStoreFactory
+        )
+      result
+    },
+    clean := Def.task {
+      val _ = clean.value
+      IO.delete(`edi-polyglot-root`)
+    }.value
+  )
+  .dependsOn(`std-base` % "provided")
+  .dependsOn(`std-table` % "provided")
 
 lazy val `std-sqlite` = project
   .in(file("std-bits") / "sqlite")

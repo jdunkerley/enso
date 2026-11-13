@@ -15,6 +15,7 @@ Each subdir mirrors a standard-library module name.
   for its upload specs.
 - `postgres/` — `Standard.Postgres`. The `postgresql` JDBC driver; no Java of
   its own.
+- `edi/` — `Standard.EDI`. `EDIReader`, the ANSI X12 segment parser (JDK only).
 - `sqlite/` — `Standard.SQLite`. Packaging only: the `sqlite-jdbc` driver and
   its native library.
 - `aws/`, `google/`, `microsoft/`, `snowflake/`, `tableau/`, `duckdb/`, `saas/`
