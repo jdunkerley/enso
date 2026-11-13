@@ -1,7 +1,6 @@
 # Nodes make room: pushing neighbours when a node changes size
 
-Date: 2026-11-13. Status: design, revised after review, awaiting the owner's
-answers to the open questions at the end.
+Date: 2026-11-13. Status: design, revised after review.
 
 ## Summary
 
@@ -98,7 +97,10 @@ Each pushed node remembers its **home**: its position before the first push.
   than this feature (a drag, the arrow keys, Align, Spacing, Tidy up, the code
   editor, a version restore) forgets its home and stays where it was put.
 - **Home taken.** If a node that is not one of its pushers now covers the place
-  it would return to, see open question 1.
+  it would return to, it returns as far as it can without overlapping that node
+  (keeping the gap), then forgets its home. It does not stay where it was
+  pushed: with two visualizations side by side that could leave it hanging far
+  below both.
 - **Two pushers.** A node pushed by two nodes keeps its first home. When one of
   them stops pushing it, it returns as far as the other allows, and goes home
   when neither pushes it.
@@ -107,7 +109,9 @@ Each pushed node remembers its **home**: its position before the first push.
 - **Removing a pusher** (delete, delete and reconnect, collapse into a function,
   replacement by the AI node) counts as closing it: the nodes it pushed return
   in the same undo step.
-- **Moving a pusher** by hand: see open question 2.
+- **Moving a pusher** by hand (a drag, the arrow keys, Align, Spacing, Tidy up):
+  when the move is committed, the nodes it was pushing return home, in the
+  move's undo step. The moved node pushes nothing at its new place.
 - **Copy and paste** does not copy a home.
 
 The home is saved with the project, so closing a visualization that has been
@@ -182,7 +186,14 @@ to rectangle `new`, in one edit:
 3. **Write** each changed node's position and field (`at` set to the new
    position), or remove the field from a node that is home.
 
-A removed pusher is the same procedure with an empty `new`.
+A removed pusher is the same procedure with an empty `new`. A pusher moved by
+hand is the same procedure with adding switched off: step 2 recomputes the nodes
+that list it and adds no new entries, whichever way it moved.
+
+**Home taken** is applied as a node is recomputed. If the position its field
+gives overlaps a node that is not in its `by` and is not itself being moved in
+this pass, the node is placed clear of that node by the gap, in the direction of
+the push it is returning from, and its field is removed.
 
 Positions only ever increase from the homes, and a pushed node is always below
 or to the right of its pusher, so the list cannot cycle. The implementation
@@ -235,8 +246,12 @@ node's file metadata field by field:
   arrive in one call, so the store sees the right edge stay still and pushes
   nothing. The `graph.toggleVisualization` shortcut gets a batch entry point
   that sorts the selection top to bottom.
-- **The node's height handle:** `setNodeHeight`. Second pull request; see open
-  question 3.
+- **The node's height handle:** `setNodeHeight`. Second pull request, which also
+  saves the height (below).
+- **A pusher moved by hand:** the commit of a drag or arrow-key move, Align,
+  Spacing and Tidy up call `relayout` for each moved node that others list in
+  `by`, with its old and new rectangle. A move is not a growth, so step 2 adds
+  no new pushers; the nodes it was pushing recompute and return.
 - **The table-editor widget** (`ResizableWidget.vue`). It has a right handle
   only, and its size is in the widget's metadata. The node's widget size after
   the change is not known until render, so the new widget width is taken as the
@@ -281,6 +296,15 @@ dangling entries are dropped at the next write.
 - **Nodes at identical positions** (the Playwright mock project has some, with
   visualizations open). They overlap before any growth, so they are never pushed
   by each other.
+
+### Saving a node's height
+
+A node's height override (`position.h`) is not written to the project file
+today: `nodeMetadataToFile` writes only the position's `vector`, so a node
+resized by its height handle shrinks back on reload. With this feature its
+neighbours would stay pushed under a node that is no longer tall. The second
+pull request saves the height, as a new optional key written and read beside the
+position, absent when there is no override.
 
 ## Testing
 
@@ -336,21 +360,6 @@ Each is a feature: a `CHANGELOG.md` entry, and before and after screenshots.
 | Which size changes push       | Direct resizes and show or hide; never a side effect of editing      |
 | Undo                          | The moves are part of the causing action's undo step                 |
 | When the moves are computed   | At the action, in the same edit; not from a watcher on rendered size |
-
-## Open questions
-
-1. **Home taken.** The agreed rule was that the node stays where it is and
-   forgets its home. With two visualizations side by side, that can leave a node
-   hanging far below both: A pushes X, B opens over X's home without reaching X,
-   A closes, X stays at A's depth for good. Proposed instead: the node returns
-   as far as it can without overlapping what is in its way, then forgets its
-   home.
-2. **A pusher moved by hand.** Dragging away a node whose visualization is
-   pushing others. Proposed: at the drop, the nodes it was pushing return home,
-   in the drag's undo step, and the moved node pushes nothing at its new place.
-   The alternative is that they stay and forget their homes.
-3. **A node's height is not saved to the project file today** (the server writes
-   only the position's `vector`), so a node resized by its height handle shrinks
-   back on reload. With this feature its neighbours would stay pushed, with
-   homes, under a node that is no longer tall. Proposed: save the height, in the
-   second pull request.
+| Home taken                    | Return as far as possible without overlapping, then forget the home  |
+| A pusher moved by hand        | The nodes it pushed return home at the drop; it pushes nothing new   |
+| Node height                   | Saved to the project file, in the second pull request                |
