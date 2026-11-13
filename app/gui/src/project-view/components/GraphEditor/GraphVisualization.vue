@@ -3,6 +3,7 @@ import { proxyRefs } from '$/utils/reactivity'
 import { visualizationBindings } from '@/bindings'
 import type { RawDataSource } from '@/components/GraphEditor/GraphVisualization/visualizationData'
 import { useVisualizationData } from '@/components/GraphEditor/GraphVisualization/visualizationData'
+import { visualizationSize } from '@/components/GraphEditor/GraphVisualization/visualizationSize'
 import VisualizationToolbar from '@/components/GraphEditor/GraphVisualization/VisualizationToolbar.vue'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import { useResizeHandles } from '@/components/resizeHandles'
@@ -15,15 +16,6 @@ import type { Opt } from '@/util/data/opt'
 import { Vec2 } from '@/util/data/vec2'
 import { computed, nextTick, ref, toRef, watch, watchEffect } from 'vue'
 import { visIdentifierEquals, type VisualizationIdentifier } from 'ydoc-shared/yjsModel'
-
-/**
- * The minimum width must be at least the total width of:
- * - both of toolbars that are always visible (32px + 60px), and
- * - the 4px flex gap between the toolbars.
- */
-const MIN_WIDTH_PX = 200
-const MIN_CONTENT_HEIGHT_PX = 32
-const DEFAULT_CONTENT_HEIGHT_PX = 150
 
 const props = defineProps<{
   show: boolean
@@ -148,11 +140,9 @@ useEvent(globalEventRegistryPre, 'keydown', keydownHandler)
 // === Sizing and Fullscreen ===
 // =============================
 
-const vizWidth = computed<number>(() => Math.max(props.width ?? 0, props.nodeSize.x, MIN_WIDTH_PX))
-const vizHeight = computed<number>(() =>
-  Math.max(props.height ?? DEFAULT_CONTENT_HEIGHT_PX, MIN_CONTENT_HEIGHT_PX),
-)
-const vizSize = computed<Vec2>(() => new Vec2(vizWidth.value, vizHeight.value))
+const vizSize = computed<Vec2>(() => visualizationSize(props.width, props.height, props.nodeSize.x))
+const vizWidth = computed<number>(() => vizSize.value.x)
+const vizHeight = computed<number>(() => vizSize.value.y)
 
 watch(vizWidth, (width) => emit('update:effectiveWidth', width), { immediate: true })
 watch(vizHeight, (height) => emit('update:effectiveHeight', height), { immediate: true })
