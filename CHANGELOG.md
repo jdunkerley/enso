@@ -420,7 +420,7 @@
 - [EDI files are read by the new Standard.EDI library; add
   `from Standard.EDI import all` to use `EDI_Format` by name.][733]
 - [Fixed-width text files are read by the new Standard.Fixed_Width library; add
-  `from Standard.Fixed_Width import all` to use `Fixed_Width_Format`.][NNN]
+  `from Standard.Fixed_Width import all` to use `Fixed_Width_Format`.][734]
 - [Standard.Database_Test_Suite: a conformance suite for database backends. A
   backend describes itself in a few lines and runs the same table and database
   tests as the built-in ones. The suite is not in the IDE installer; for now it
@@ -484,7 +484,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [733]: https://github.com/jdunkerley/enso/pull/733
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[734]: https://github.com/jdunkerley/enso/pull/734
 [654]: https://github.com/jdunkerley/enso/pull/654
 [666]: https://github.com/jdunkerley/enso/pull/666
 [694]: https://github.com/jdunkerley/enso/pull/694
