@@ -146,11 +146,14 @@ export function relayout(
   /** Nodes that moved back towards home, with the direction to step aside in. */
   const returned = new Map<string, PushDirection>()
 
-  /** Set the node's position from its field. Returns whether it moved. */
+  /**
+   * Set the node's position from its field. Returns whether it moved. A pusher with no measured
+   * size is unknown, not absent: while any is, the node and its field stay as they are.
+   */
   function recompute(s: State): boolean {
     const d = s.displaced
     if (!d) return false
-    const dodge = d.by[0]?.dir ?? 'down'
+    if (d.by.some((e) => !box(e.id))) return false
     let dx = 0
     let dy = 0
     const kept: Pusher[] = []
@@ -160,8 +163,7 @@ export function relayout(
     const pusherAtHome = (id: string) => homeBox(state.get(id)!)
     for (const e of d.by) {
       if (e.dir !== 'right') continue
-      const pusher = box(e.id)
-      if (!pusher) continue
+      const pusher = box(e.id)!
       const need = pusher.right + e.gap - home.left
       if (need > EPS && overlapsY(pusherAtHome(e.id), home)) {
         dx = Math.max(dx, need)
@@ -170,8 +172,7 @@ export function relayout(
     }
     for (const e of d.by) {
       if (e.dir !== 'down') continue
-      const pusher = box(e.id)
-      if (!pusher) continue
+      const pusher = box(e.id)!
       const need = pusher.bottom + e.gap - home.top
       if (need > EPS && overlapsX(pusherAtHome(e.id), home)) {
         dy = Math.max(dy, need)
@@ -180,7 +181,10 @@ export function relayout(
     }
     const pos = { x: d.home.x + dx, y: d.home.y + dy }
     const moved = pos.x !== s.pos.x || pos.y !== s.pos.y
-    if (pos.x < s.pos.x - EPS || pos.y < s.pos.y - EPS) returned.set(s.id, dodge)
+    // The direction it steps aside in, if its home is taken, is that of the push it is returning
+    // from: the axis whose offset shrank (down when both did).
+    if (pos.y < s.pos.y - EPS) returned.set(s.id, 'down')
+    else if (pos.x < s.pos.x - EPS) returned.set(s.id, 'right')
     s.pos = pos
     s.displaced = kept.length > 0 ? { ...d, at: pos, by: kept } : undefined
     if (!s.displaced) homes.set(s.id, d)
@@ -191,15 +195,16 @@ export function relayout(
 
   const queue: Change[] = changes.filter((c) => state.has(c.id))
 
-  // Check the saved fields.
+  // Check the saved fields. All of them first: a recompute below reads other nodes' homes.
+  for (const s of state.values()) {
+    if (s.displaced && !near(s.displaced.at, s.pos)) {
+      // Moved by something else: it stays where it was put.
+      s.displaced = undefined
+    }
+  }
   for (const s of state.values()) {
     const d = s.displaced
     if (!d) continue
-    if (!near(d.at, s.pos)) {
-      // Moved by something else: it stays where it was put.
-      s.displaced = undefined
-      continue
-    }
     const live = d.by.filter((e) => state.has(e.id))
     if (live.length === d.by.length) continue
     const pusherRemoved = d.by.some((e) => removed.has(e.id))
@@ -245,10 +250,15 @@ export function relayout(
         const contact = firstContact(oldAtHome, now, homeBox(state.get(item.id)!), atHome)
         if (contact) {
           if (!s.displaced) {
+            // A node counts as under this one if it overlaps this one's home at its own home or
+            // where it is now (pushed onto it): either way it is no stranger when this one returns.
             const under = [...state.values()]
               .filter(
                 (o) =>
-                  o.id !== s.id && o.id !== item.id && o.placed && overlaps(homeBox(o), atHome),
+                  o.id !== s.id &&
+                  o.id !== item.id &&
+                  o.placed &&
+                  (overlaps(homeBox(o), atHome) || overlaps(boxAt(o.pos, o.size), atHome)),
               )
               .map((o) => o.id)
             s.displaced = {

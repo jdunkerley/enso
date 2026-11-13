@@ -218,6 +218,100 @@ test('several nodes changing at once are laid out in the order given', () => {
   expect(pos(after, 'C')).toEqual({ x: 0, y: 404 })
 })
 
+test('a node placed onto a pushed node returns onto it, not beside it', () => {
+  const opened = resize([node('G', 0, 0), node('X', 0, 52), node('A', 110, 150)], 'G', {
+    x: 100,
+    y: 182,
+  })
+  expect(pos(opened, 'X')).toEqual({ x: 0, y: 202 })
+  const withB = [...opened, node('B', 50, 210)]
+  const grown = resize(withB, 'A', { x: 100, y: 100 })
+  expect(pos(grown, 'B')).toEqual({ x: 50, y: 278 })
+  const shrunk = resize(grown, 'A', CLOSED)
+  expect(pos(shrunk, 'B')).toEqual({ x: 50, y: 210 })
+  expect(field(shrunk, 'B')).toBeUndefined()
+})
+
+test('a pusher with no measured size leaves the node and its field as they are', () => {
+  const start = [node('P1', 0, 0), node('P2', 110, 0), node('X', 50, 52, 110)]
+  const both = resize(resize(start, 'P1', { x: 100, y: 232 }), 'P2', { x: 100, y: 182 })
+  expect(pos(both, 'X')).toEqual({ x: 50, y: 252 })
+  const before = field(both, 'X')
+  expect(before?.by.map((e) => e.id)).toEqual(['P1', 'P2'])
+  const P2 = both.find((n) => n.id === 'P2')!
+  const next = both.map((n) =>
+    n.id === 'P1' ? { ...n, size: { x: 0, y: 0 } }
+    : n.id === 'P2' ? { ...n, size: CLOSED }
+    : n,
+  )
+  const placements = relayout(next, [{ id: 'P2', old: boxAt(P2.pos, P2.size), adds: true }])
+  expect(placements.has('X')).toBe(false)
+  const after = apply(next, placements)
+  expect(pos(after, 'X')).toEqual({ x: 50, y: 252 })
+  expect(field(after, 'X')).toEqual(before)
+})
+
+test('home taken after a push to the right: it steps aside to the right', () => {
+  const open = resize([node('A', 0, 0), node('D', 120, 0)], 'A', { x: 300, y: 32 })
+  expect(pos(open, 'D')).toEqual({ x: 320, y: 0 })
+  const closed = resize([...open, node('Z', 120, 0)], 'A', CLOSED)
+  expect(pos(closed, 'D')).toEqual({ x: 252, y: 0 })
+  expect(field(closed, 'D')).toBeUndefined()
+})
+
+/** P2 is left of X and pushes it right; P1 is above X and pushes it down. */
+function pushedRightThenDown() {
+  const start = [node('P1', 120, 0), node('P2', 0, 52), node('X', 120, 52)]
+  const right = resize(start, 'P2', { x: 120, y: 32 })
+  expect(pos(right, 'X')).toEqual({ x: 140, y: 52 })
+  const both = resize(right, 'P1', { x: 100, y: 182 })
+  return { start, both }
+}
+
+test('a node pushed right by one pusher and down by another returns home when both shrink', () => {
+  const { start, both } = pushedRightThenDown()
+  expect(pos(both, 'X')).toEqual({ x: 140, y: 202 })
+  expect(field(both, 'X')?.by).toEqual([
+    { id: 'P2', gap: 20, dir: 'right' },
+    { id: 'P1', gap: 20, dir: 'down' },
+  ])
+  const p1Closed = resize(both, 'P1', CLOSED)
+  expect(pos(p1Closed, 'X')).toEqual({ x: 140, y: 52 })
+  expect(resize(p1Closed, 'P2', CLOSED)).toEqual(start)
+})
+
+test('home taken steps aside in the direction of the push it is returning from', () => {
+  const { both } = pushedRightThenDown()
+  // X's first push was to the right, but closing P1 returns it upwards onto Z.
+  const closed = resize([...both, node('Z', 140, 52)], 'P1', CLOSED)
+  expect(pos(closed, 'X')).toEqual({ x: 140, y: 116 })
+  expect(field(closed, 'X')).toBeUndefined()
+})
+
+test('a pusher moved by hand counts as moved when a removal recomputes its nodes', () => {
+  // Q pushed N once, then was itself moved by hand away from N's column: its saved home is stale.
+  const N = node('N', 0, 250, 100, 32, {
+    displaced: {
+      home: { x: 0, y: 100 },
+      at: { x: 0, y: 250 },
+      by: [
+        { id: 'R', gap: 32, dir: 'down' },
+        { id: 'Q', gap: 32, dir: 'down' },
+      ],
+    },
+  })
+  const Q = node('Q', 500, 0, 100, 82, {
+    displaced: { home: { x: 0, y: 0 }, at: { x: 0, y: 0 }, by: [{ id: 'S', gap: 0, dir: 'down' }] },
+  })
+  const nodes = [N, Q]
+  const after = apply(
+    nodes,
+    relayout(nodes, [{ id: 'R', old: boxAt({ x: 0, y: 0 }, { x: 100, y: 218 }), adds: false }]),
+  )
+  expect(pos(after, 'N')).toEqual({ x: 0, y: 100 })
+  expect(field(after, 'N')).toBeUndefined()
+})
+
 /** A small seeded generator, so a failure can be reproduced. */
 function mulberry32(seed: number) {
   return () => {
