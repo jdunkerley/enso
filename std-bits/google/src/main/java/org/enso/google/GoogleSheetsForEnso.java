@@ -1,6 +1,6 @@
 package org.enso.google;
 
-import static org.enso.table.excel.ExcelUtils.fromExcelDateTime;
+import static org.enso.table.util.SerialDates.fromSerialDateTime;
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -212,19 +212,19 @@ public class GoogleSheetsForEnso {
         return effectiveValue.getNumberValue();
       }
       case "DATE" -> {
-        Temporal t = fromExcelDateTime(doubleValue);
+        Temporal t = fromSerialDateTime(doubleValue);
         return t instanceof java.time.LocalDateTime
             ? ((java.time.LocalDateTime) t).toLocalDate()
             : java.time.LocalDate.from(t);
       }
       case "TIME" -> {
-        Temporal t = fromExcelDateTime(doubleValue);
+        Temporal t = fromSerialDateTime(doubleValue);
         return t instanceof java.time.LocalDateTime
             ? ((java.time.LocalDateTime) t).toLocalTime()
             : java.time.LocalTime.from(t);
       }
       case "DATE_TIME" -> {
-        Temporal t = fromExcelDateTime(doubleValue);
+        Temporal t = fromSerialDateTime(doubleValue);
         return t instanceof java.time.ZonedDateTime
             ? t
             : java.time.ZonedDateTime.ofInstant(
