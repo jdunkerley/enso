@@ -1,4 +1,4 @@
-package org.enso.table.parsing.problems;
+package org.enso.fixed_width;
 
 import org.enso.base.polyglot.EnsoMeta;
 import org.enso.table.problems.Problem;
@@ -9,6 +9,6 @@ public record InconsistentFixedWidthLengths() implements Problem {
   @Override
   public Value asEnsoValue() {
     return EnsoMeta.makeInstance(
-        "Standard.Table.Errors", "Inconsistent_Fixed_Width_Lengths", "Error");
+        "Standard.Fixed_Width.Errors", "Inconsistent_Fixed_Width_Lengths", "Error");
   }
 }

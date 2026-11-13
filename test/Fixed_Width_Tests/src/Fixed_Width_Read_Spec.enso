@@ -5,12 +5,10 @@ import Standard.Base.System.Input_Stream.Input_Stream
 
 from Standard.Table import all
 import Standard.Table.Errors.Additional_Invalid_Rows
-import Standard.Table.Errors.Fixed_Width_Line_Too_Long
-import Standard.Table.Errors.Inconsistent_Fixed_Width_Lengths
-import Standard.Table.Errors.Invalid_Fixed_Width_Row
+from Standard.Fixed_Width import all
 import Standard.Table.Errors.No_Column_Names_Found
-import Standard.Table.Fixed_Width.Fixed_Width_Format.Fixed_Width_Layout_Entry
-import Standard.Table.Fixed_Width.Fixed_Width_Format.Infer_Layout
+import Standard.Fixed_Width.Fixed_Width_Format.Fixed_Width_Layout_Entry
+import Standard.Fixed_Width.Fixed_Width_Format.Infer_Layout
 
 from Standard.Test import all
 import Standard.Test.Test_Environment
@@ -18,7 +16,7 @@ import Standard.Test.Test_Environment
 import enso_dev.Base_Tests.Data.Text.Encoding_Spec
 
 
-polyglot java import org.enso.table.read.FixedWidthReader
+polyglot java import org.enso.fixed_width.FixedWidthReader
 
 add_direct_specs suite_builder =
     data_dir = enso_project.data / "fixed-width"

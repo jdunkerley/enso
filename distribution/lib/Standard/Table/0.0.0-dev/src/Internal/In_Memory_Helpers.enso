@@ -1,5 +1,6 @@
 import Standard.Base.Data.Vector.Vector
 
+import project.In_Memory_Table as In_Memory_Table_Module
 import project.In_Memory_Table.In_Memory_Table
 
 polyglot java import org.enso.table.data.column.storage.ColumnStorage as Java_ColumnStorage
@@ -11,3 +12,13 @@ polyglot java import org.enso.table.data.column.storage.ColumnStorage as Java_Co
 get_java_column_storages (table : In_Memory_Table) -> Vector Java_ColumnStorage =
     java_columns = table.java_table.getColumns
     java_columns.map c->c.getStorage
+
+## ---
+   private: true
+   ---
+   Makes a `Table` from a Java Table, triggering the data-quality metrics and
+   refining the result. A public entry point to the module-private
+   `In_Memory_Table.from_java_table`, for extension libraries (`Fixed_Width`,
+   later `YXDB` and `Excel`) that read into a Java table.
+from_java_table java_table =
+    In_Memory_Table_Module.from_java_table java_table

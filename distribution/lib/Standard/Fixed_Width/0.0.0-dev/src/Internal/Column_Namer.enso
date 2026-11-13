@@ -1,4 +1,4 @@
-import Standard.Base.Data.Text.Text
+from Standard.Base import all
 import Standard.Base.Runtime.Ref.Ref
 
 ## ---

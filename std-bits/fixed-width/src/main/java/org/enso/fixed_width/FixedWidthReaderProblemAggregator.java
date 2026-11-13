@@ -1,11 +1,9 @@
-package org.enso.table.read;
+package org.enso.fixed_width;
 
 import org.enso.table.parsing.problems.AdditionalInvalidRows;
-import org.enso.table.parsing.problems.InconsistentFixedWidthLengths;
-import org.enso.table.parsing.problems.InvalidFixedWidthRow;
 import org.enso.table.problems.Problem;
 import org.enso.table.problems.ProblemAggregator;
-import org.enso.table.read.FixedWidthReader.InvalidFixedWidthRowsBehavior;
+import org.enso.fixed_width.FixedWidthReader.InvalidFixedWidthRowsBehavior;
 
 public class FixedWidthReaderProblemAggregator extends ProblemAggregator {
 

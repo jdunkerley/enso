@@ -33,6 +33,7 @@ One directory per suite, typically:
 - `Geo_Tests/`, `Image_Tests/` — media suites.
 - `EDI_Tests/` — `Standard.EDI`: reading `.822`/`.edi` files with the default,
   raw and custom definitions.
+- `Fixed_Width_Tests/` — `Standard.Fixed_Width`: reading fixed-width text files.
 - `XML_Tests/` — `Standard.XML`: parsing, XPath, writing, `Table.to_xml`, the
   table conversions and the Table visualisation of XML values.
 - `Examples_Tests/` — runs the `Standard.Examples` workflows and asserts their
