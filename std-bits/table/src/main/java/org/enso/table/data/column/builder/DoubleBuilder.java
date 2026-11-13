@@ -1,6 +1,5 @@
 package org.enso.table.data.column.builder;
 
-import java.lang.foreign.MemorySegment;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -26,15 +25,7 @@ sealed class DoubleBuilder extends ValidityBuilder implements BuilderForDouble
   private DoubleBuffer data;
 
   DoubleBuilder(int initialSize, ProblemAggregator problemAggregator) {
-    this(allocBuffer(initialSize, 0L), initialSize, 0L, problemAggregator);
-  }
-
-  private DoubleBuilder(
-      DoubleBuffer buf, int initialSize, long validity, ProblemAggregator problemAggregator) {
-    super(initialSize, validity);
-
-    assert ByteOrder.LITTLE_ENDIAN == buf.order();
-    this.data = buf;
+    this.data = allocBuffer(initialSize);
     precisionLossAggregator =
         problemAggregator == null ? null : new PrecisionLossAggregator(problemAggregator);
   }
@@ -43,29 +34,14 @@ sealed class DoubleBuilder extends ValidityBuilder implements BuilderForDouble
    * Allocates continuous direct memory buffer.
    *
    * @param size the size of buffer to allocate
-   * @param data address of data to read or {@code 0} to allocate new data
    * @return buffer representing data
    */
-  private static DoubleBuffer allocBuffer(int size, long data) {
+  private static DoubleBuffer allocBuffer(int size) {
     var wholeDataSize = Double.BYTES * size;
-    ByteBuffer buf;
-    if (data == 0L) {
-      buf = ByteBuffer.allocateDirect(wholeDataSize).order(ByteOrder.LITTLE_ENDIAN);
-    } else {
-      var seg = MemorySegment.ofAddress(data).reinterpret(wholeDataSize);
-      buf = seg.asByteBuffer().order(ByteOrder.LITTLE_ENDIAN);
-    }
-    assert buf.capacity() == wholeDataSize;
-    var doubles = buf.order(ByteOrder.LITTLE_ENDIAN).asDoubleBuffer();
+    var buf = ByteBuffer.allocateDirect(wholeDataSize).order(ByteOrder.LITTLE_ENDIAN);
+    var doubles = buf.asDoubleBuffer();
     assert doubles.capacity() == size;
-    assert doubles.order() == ByteOrder.LITTLE_ENDIAN;
     return doubles;
-  }
-
-  static DoubleBuilder fromAddress(int size, long address, long validity) {
-    assert address != 0;
-    var buf = allocBuffer(size, address);
-    return new DoubleBuilder(buf, size, validity, null);
   }
 
   @Override
@@ -79,7 +55,7 @@ sealed class DoubleBuilder extends ValidityBuilder implements BuilderForDouble
 
   @Override
   protected void resize(int desiredCapacity) {
-    var newData = allocBuffer(desiredCapacity, 0);
+    var newData = allocBuffer(desiredCapacity);
     int toCopy = Math.min(currentSize, data.capacity());
     newData.put(0, data, 0, toCopy);
     data = newData;
@@ -227,20 +203,10 @@ sealed class DoubleBuilder extends ValidityBuilder implements BuilderForDouble
 
   @Override
   public ColumnStorage<Double> seal() {
-    return seal(null);
-  }
-
-  /**
-   * Seals this buffer as copy of provided storage.
-   *
-   * @param otherStorage storage to copy size from if non-{@code null}
-   * @return locally copied storage
-   */
-  final DoubleStorage seal(ColumnStorage<?> otherStorage) {
     ensureFreeSpaceFor(0);
     var buf = data.asReadOnlyBuffer().position(0).limit(currentSize);
     var validity = this.validityMap();
-    return new DoubleStorage(buf, validity, otherStorage);
+    return new DoubleStorage(buf, validity);
   }
 
   /**

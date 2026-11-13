@@ -17,14 +17,9 @@ public final class EnsoMeta {
     return nothingValueRef.get();
   }
 
-  private static Value getBindings() {
-    var ctx = Context.getCurrent();
-    var bindings = ctx.getPolyglotBindings().getMember("ensoBindings");
-    if (bindings != null) {
-      return bindings.execute("enso");
-    } else {
-      return ctx.getBindings("enso");
-    }
+  /** Returns the `enso` language bindings of the current context. */
+  public static Value getBindings() {
+    return Context.getCurrent().getBindings("enso");
   }
 
   /** Evaluates an Enso expression and returns the result. */

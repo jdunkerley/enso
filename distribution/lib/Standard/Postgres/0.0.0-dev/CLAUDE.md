@@ -34,17 +34,8 @@ result = t.read
 - `src/Internal/` — `Pgpass` (the `.pgpass` reader, Postgres only) and the SPI
   registrations (`Postgres_Services`).
 - The shared dialect, type mapping and error mapper are
-  `Standard.Database.Postgres_Family` (DuckDB and Redshift use them too).
-
-## The driver's own helpers
-
-The `postgresql` driver ships with this library, so it must create and use every
-JDBC object itself (it used to run on the guest JVM, which is gone):
-`Postgres_Connection` makes its own `JDBCDriverTypes`, and
-`Internal/Postgres_Type_Mapping` wraps the family mapping with this library's
-own `ColumnFetcherFactory` and `JDBCValueSetter` imports (the family's would be
-Database's classes). Keep new `polyglot java import`s of Database's Java helpers
-in this library's modules, not in `Standard.Database`.
+  `Standard.Database.Postgres_Family` (DuckDB and Redshift use them too);
+  `Postgres_Connection` uses the family type mapping directly.
 
 ## Things to avoid in generated code
 

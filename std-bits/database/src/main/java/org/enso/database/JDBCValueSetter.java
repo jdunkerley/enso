@@ -1,7 +1,6 @@
 package org.enso.database;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Types;
@@ -12,27 +11,12 @@ import java.time.ZonedDateTime;
 import org.enso.base.polyglot.NumericConverter;
 import org.graalvm.polyglot.Value;
 
+/**
+ * The default way of binding Enso values to the parameters of a {@link PreparedStatement}. A
+ * backend whose driver needs something different extends it and overrides the setters it must
+ * change.
+ */
 public class JDBCValueSetter {
-  private final String databaseName;
-
-  /**
-   * A helper method that creates a JDBCDriverTypes record.
-   *
-   * @param databaseName the name of the Database type for the record
-   * @return a new JDBCDriverTypes record
-   */
-  public static JDBCValueSetter create(String databaseName) {
-    return new JDBCValueSetter(databaseName);
-  }
-
-  protected JDBCValueSetter(String databaseName) {
-    this.databaseName = databaseName;
-  }
-
-  public String databaseName() {
-    return databaseName;
-  }
-
   /** Sets an Enso Integer in a PreparedStatement. */
   public void setInteger(PreparedStatement stmt, int columnIndex, Value value) throws SQLException {
     if (NumericConverter.isBigInteger(value)) {
@@ -68,10 +52,9 @@ public class JDBCValueSetter {
     stmt.setObject(columnIndex, localDate, Types.DATE);
   }
 
-  public void setBigDecimal(
-      PreparedStatement stmt, int columnIndex, BigInteger unscaledValue, int scale)
+  /** Sets a BigDecimal in a PreparedStatement. */
+  public void setBigDecimal(PreparedStatement stmt, int columnIndex, BigDecimal value)
       throws SQLException {
-    var big = new BigDecimal(unscaledValue, scale);
-    stmt.setBigDecimal(columnIndex, big);
+    stmt.setBigDecimal(columnIndex, value);
   }
 }

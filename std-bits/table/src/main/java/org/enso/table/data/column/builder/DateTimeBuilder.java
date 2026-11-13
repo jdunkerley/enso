@@ -1,19 +1,14 @@
 package org.enso.table.data.column.builder;
 
-import java.lang.foreign.MemorySegment;
-import java.nio.ByteOrder;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.BitSet;
 import org.enso.table.data.column.storage.ColumnStorage;
-import org.enso.table.data.column.storage.TypedStorage;
 import org.enso.table.data.column.storage.type.DateTimeType;
 import org.enso.table.data.column.storage.type.DateType;
 import org.enso.table.data.column.storage.type.StorageType;
-import org.enso.table.data.column.storage.type.TextType;
 import org.enso.table.error.ValueTypeMismatchException;
 
 /** A builder for ZonedDateTime columns. */
@@ -25,36 +20,6 @@ final class DateTimeBuilder extends TypedBuilder<ZonedDateTime> {
     super(DateTimeType.INSTANCE, new ZonedDateTime[size]);
     this.allowDateToDateTimeConversion = allowDateToDateTimeConversion;
     this.wasLocalDate = allowDateToDateTimeConversion ? new BitSet(size) : null;
-  }
-
-  static DateTimeBuilder fromAddress(int size, long data, long validity) {
-    var validityBuffer =
-        MemorySegment.ofAddress(validity).reinterpret((size + 7) / 8).asByteBuffer();
-    var bits = BitSet.valueOf(validityBuffer);
-    var buf =
-        MemorySegment.ofAddress(data)
-            .reinterpret(Long.BYTES * size)
-            .asByteBuffer()
-            .order(ByteOrder.LITTLE_ENDIAN);
-
-    var zonesBuf =
-        StringBuilder.fromAddress(size, data + buf.limit(), validity, TextType.VARIABLE_LENGTH);
-    var zonesStorage = zonesBuf.seal(null);
-
-    var b = new DateTimeBuilder(size, false);
-    for (var i = 0; i < size; i++) {
-      var stamp = buf.getLong();
-      if (bits.get(i)) {
-        var nanos = stamp % 1_000_000_000;
-        var epochSeconds = stamp / 1_000_000_000;
-        var instant = Instant.ofEpochSecond(epochSeconds, nanos);
-        var zone = ZoneId.of(zonesStorage.getItemBoxed(i));
-        b.append(ZonedDateTime.ofInstant(instant, zone));
-      } else {
-        b.appendNulls(1);
-      }
-    }
-    return b;
   }
 
   /**
@@ -104,15 +69,6 @@ final class DateTimeBuilder extends TypedBuilder<ZonedDateTime> {
   @Override
   public boolean accepts(Object o) {
     return o instanceof ZonedDateTime || (allowDateToDateTimeConversion && o instanceof LocalDate);
-  }
-
-  @Override
-  protected ColumnStorage<ZonedDateTime> doSeal() {
-    return seal(null);
-  }
-
-  final ColumnStorage<ZonedDateTime> seal(ColumnStorage<?> other) {
-    return new TypedStorage<>(getStorageType(), data, other);
   }
 
   @Override

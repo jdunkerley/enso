@@ -110,6 +110,24 @@ describe('useMoveAssets', () => {
     expect(local.copyAsset).toHaveBeenCalledWith('file-a', folder)
   })
 
+  test('a folder dropped into itself or a folder inside it does nothing', async () => {
+    const move = await setup()
+    const outer = newDirectoryId(Path('/a/Outer'))
+    const folder = { ...asset(outer), type: AssetType.directory }
+    for (const method of ['move', 'copy'] as const) {
+      await move({ type: 'local' }, { type: 'local' }, [folder], outer, method)
+      await move(
+        { type: 'local' },
+        { type: 'local' },
+        [folder],
+        newDirectoryId(Path('/a/Outer/Inner')),
+        method,
+      )
+    }
+    expect(local.updateAsset).not.toHaveBeenCalled()
+    expect(local.copyAsset).not.toHaveBeenCalled()
+  })
+
   test('a drop into Recent does nothing', async () => {
     const move = await setup()
     await move({ type: 'local' }, { type: 'localRecent' }, [asset('file-a')])

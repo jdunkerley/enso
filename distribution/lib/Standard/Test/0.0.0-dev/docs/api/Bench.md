@@ -11,7 +11,6 @@
 - type Bench_Builder
     - group self name:Standard.Base.Data.Text.Text configuration:Standard.Test.Bench.Bench_Options fn:(Standard.Test.Bench.Group_Builder -> Standard.Base.Any.Any) -> Standard.Base.Any.Any
 - type Bench_Options
-    - set_jvm_args self args:Standard.Base.Data.Text.Text -> Standard.Test.Bench.Bench_Options
     - set_measure self meas:Standard.Test.Bench.Phase_Conf -> Standard.Test.Bench.Bench_Options
     - set_warmup self warm:Standard.Test.Bench.Phase_Conf -> Standard.Test.Bench.Bench_Options
     - to_text self -> Standard.Base.Data.Text.Text

@@ -1493,10 +1493,8 @@ Float.from (that : Decimal) =
 ## ---
    private: true
    ---
-   Returns two numbers: the actual value and the scale associated to it
-
-value_with_scale (that : Decimal) -> Pair Integer Integer =
-    Pair.new that.big_decimal.unscaledValue that.big_decimal.scale
+   Returns the Java `BigDecimal` backing the `Decimal`.
+to_big_decimal (that : Decimal) -> BigDecimal = that.big_decimal
 
 ## ---
    private: true

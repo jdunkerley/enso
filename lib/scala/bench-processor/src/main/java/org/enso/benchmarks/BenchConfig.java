@@ -8,6 +8,4 @@ public interface BenchConfig {
   PhaseConfig warmup();
 
   PhaseConfig measure();
-
-  String jvm_args();
 }

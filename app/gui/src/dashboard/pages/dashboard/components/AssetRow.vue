@@ -12,7 +12,7 @@
  * focus and is scrolled into view. A row being deleted, restored, renamed or moved (or cut) is
  * faded.
  */
-import { ASSET_ROWS } from '#/layouts/Drive/drag'
+import { ASSET_ROWS, canDropRowsInto } from '#/layouts/Drive/drag'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useTabStopContents } from '#/layouts/Drive/rovingTabStop'
 import AssetColumnCell from '#/pages/dashboard/components/column/AssetColumnCell.vue'
@@ -156,8 +156,8 @@ function onDragOverRow(event: DragEvent) {
   const item = props.item
   const directoryId = item.type === AssetType.directory ? item.id : item.parentId
   const payload = ASSET_ROWS.lookup(event)
-  const isPayloadMatch =
-    payload != null && payload.items.every((innerItem) => innerItem.key !== directoryId)
+  // Not into a dragged folder, or into one inside it: no highlight, and no drop.
+  const isPayloadMatch = payload != null && canDropRowsInto(payload, directoryId)
   if (isPayloadMatch || event.dataTransfer?.types.includes('Files') === true) {
     event.preventDefault()
     if (item.type === AssetType.directory) {

@@ -32,7 +32,7 @@ public final class Column {
   public Column(String name, ColumnStorage<?> storage) {
     ensureNameIsValid(name);
     this.name = name;
-    this.storage = Builder.makeLocal(storage);
+    this.storage = storage;
     LOGGER.trace(
         "Column[{}] of {}:{} type with size: {}",
         name,

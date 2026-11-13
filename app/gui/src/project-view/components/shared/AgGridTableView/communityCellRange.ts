@@ -1,3 +1,4 @@
+import type { GridApi } from 'ag-grid-community'
 import { ref, type Ref } from 'vue'
 
 /** A single grid cell, identified the same way AG Grid identifies cells in its own events. */
@@ -28,6 +29,20 @@ export function cellCoordFromEvent(event: Event): CellCoord | undefined {
   const rowIndexAttr = cell?.closest('.ag-row[row-index]')?.getAttribute('row-index')
   if (colId == null || rowIndexAttr == null || !/^\d+$/.test(rowIndexAttr)) return undefined
   return { rowIndex: Number(rowIndexAttr), colId }
+}
+
+/**
+ * The ids of the grid's displayed columns, in order — empty before the grid exists and after it
+ * is destroyed. A destroyed `GridApi` logs AG Grid warning #26 and returns `undefined` from
+ * `getAllDisplayedColumns`, which is not what its type says; the cell class rule that reads the
+ * range runs while a grid is being torn down (cells are re-evaluated as rows are removed), so it
+ * must not trust a stale API.
+ */
+export function displayedColumnIds(
+  api: Pick<GridApi, 'isDestroyed' | 'getAllDisplayedColumns'> | undefined,
+): string[] {
+  if (api == null || api.isDestroyed()) return []
+  return api.getAllDisplayedColumns().map((c) => c.getColId())
 }
 
 /**

@@ -46,13 +46,10 @@ xml = table.to_xml ["Year"] ["Author"] "Title" "Books" "Book"
 
 The library has no `std-bits` project and ships no jar: `src/Internal/Dom.enso`
 calls the JDK's XML APIs (`javax.xml`, `org.w3c.dom`) directly, and
-`Table.to_xml` builds its document in Enso. That made it a Java-free library the
-native image could host; the native image is gone (#664), and on the JVM a
-helper jar would cost nothing extra, but none is needed.
+`Table.to_xml` builds its document in Enso. It could have a helper jar (all
+libraries share one JVM), but none is needed; import only JDK classes unless
+that changes.
 
-- The interface imports in `Internal/Dom.enso` that the code never names (Note
-  [Interfaces Imported For The Image]) were for the native image only; they are
-  harmless on the JVM, and can be deleted.
 - Java exceptions are caught by class (`SAXParseException`, `IOException`,
   `java.lang.Exception`) and turned into `XML_Error`s by `_xml_errors`; that
   works because the classes are the host's.

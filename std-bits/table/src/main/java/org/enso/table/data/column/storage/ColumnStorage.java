@@ -23,26 +23,6 @@ public interface ColumnStorage<T> extends Iterable<T> {
   long typeSize();
 
   /**
-   * Address of the off-heap storage of data.
-   *
-   * @return {@code 0} if there are no data to share, otherwise the address of the data in a format
-   *     appropriate for this storage {@link #typeChar()} and {@link #typeSize()}.
-   * @see #addressOfValidity
-   */
-  default long addressOfData() {
-    return 0;
-  }
-
-  /**
-   * Address of the off-heap storage of validity bitmap.
-   *
-   * @return {@code 0} if there are no bitmap information to share
-   */
-  default long addressOfValidity() {
-    return 0;
-  }
-
-  /**
    * Checks whether the value at idx is Nothing.
    *
    * @param index – the index to check.

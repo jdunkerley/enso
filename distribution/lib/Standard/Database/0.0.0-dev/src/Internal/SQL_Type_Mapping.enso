@@ -9,6 +9,7 @@ import project.Internal.IR.SQL_IR_Expression.SQL_IR_Expression
 import project.Internal.SQL_Type_Reference.SQL_Type_Reference
 import project.SQL.SQL_Type
 
+polyglot java import org.enso.database.fetchers.ColumnFetcherFactory
 polyglot java import org.enso.database.JDBCValueSetter
 
 ## ---
@@ -192,6 +193,22 @@ default_sql_type_to_text sql_type =
             if sql_type.scale.is_nothing then "(" + sql_type.precision.to_text + ")" else
                 "(" + sql_type.precision.to_text + "," + sql_type.scale.to_text + ")"
     sql_type.name.trim + suffix
+
+## ---
+   private: true
+   ---
+   The ColumnFetcherFactory for a backend whose driver returns the standard JDBC
+   types. Such a backend uses it as its `column_fetcher_factory`.
+default_column_fetcher_factory : Any
+default_column_fetcher_factory = ColumnFetcherFactory.DEFAULT
+
+## ---
+   private: true
+   ---
+   The JDBCValueSetter for a backend whose driver needs no special treatment
+   of the values it is given. Such a backend uses it as its `value_setter`.
+default_value_setter : JDBCValueSetter
+default_value_setter = JDBCValueSetter.new
 
 ## ---
    private: true

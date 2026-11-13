@@ -52,7 +52,7 @@
 - handle_number_format_exception ~action:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - handle_precision_loss original_value:Standard.Base.Any.Any conversion_result:Standard.Base.Data.Decimal.ConversionResult -> Standard.Base.Any.Any
 - handle_unsupported_argument_types ~action:Standard.Base.Any.Any -> Standard.Base.Any.Any
-- value_with_scale that:Standard.Base.Data.Decimal.Decimal -> (Standard.Base.Data.Pair.Pair Standard.Base.Data.Numbers.Integer Standard.Base.Data.Numbers.Integer)
+- to_big_decimal that:Standard.Base.Data.Decimal.Decimal -> Standard.Base.Data.Decimal.BigDecimal
 - Standard.Base.Data.Ordering.Comparable.from that:Standard.Base.Data.Decimal.Decimal -> Standard.Base.Data.Ordering.Comparable
 - Standard.Base.Data.Ordering.Comparable.from that:Standard.Base.Data.Numbers.Number -> Standard.Base.Data.Ordering.Comparable
 - Standard.Base.Data.Decimal.Decimal.from that:Standard.Base.Data.Text.Text -> Standard.Base.Data.Decimal.Decimal

@@ -38,10 +38,6 @@ public interface ColumnFetcherFactory {
     return results.toArray(new String[0]);
   }
 
-  default Class<? extends ColumnFetcher> getColumnFetcherClass() {
-    return ColumnFetcher.class;
-  }
-
   ColumnFetcher forStorageType(
       StorageType<?> storageType,
       int index,

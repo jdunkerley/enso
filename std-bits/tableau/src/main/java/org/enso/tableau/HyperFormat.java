@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.stream.IntStream;
 import org.enso.base.polyglot.EnsoExceptionWrapper;
 import org.enso.base.polyglot.EnsoMeta;
-import org.enso.table.data.column.builder.Builder;
 import org.enso.table.data.column.storage.ColumnStorage;
 import org.enso.table.data.column.storage.type.BigDecimalType;
 import org.enso.table.data.column.storage.type.BigIntegerType;
@@ -49,7 +48,6 @@ import org.enso.table.data.column.storage.type.TextType;
 import org.enso.table.data.column.storage.type.TimeOfDayType;
 import org.enso.table.data.table.Column;
 import org.enso.table.problems.ProblemAggregator;
-import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -165,7 +163,7 @@ public class HyperFormat {
             dotIdx == -1 ? name.substring(libIdx + 1) : name.substring(libIdx + 1, dotIdx);
         // Windows libs don't have `lib` prefix.
         var libName = osLibName.startsWith("lib") ? osLibName.substring(3) : osLibName;
-        var bindings = getBindings();
+        var bindings = EnsoMeta.getBindings();
         var found = bindings.invokeMember("find_native_library", libName);
         try {
           if (found == null || found.asString() == null) {
@@ -192,7 +190,7 @@ public class HyperFormat {
             dotIdx == -1 ? name.substring(libIdx + 1) : name.substring(libIdx + 1, dotIdx);
         // Windows libs don't have `lib` prefix.
         var libName = osLibName.startsWith("lib") ? osLibName.substring(3) : osLibName;
-        var bindings = getBindings();
+        var bindings = EnsoMeta.getBindings();
         var found = bindings.invokeMember("find_native_library", libName);
         try {
           if (found == null || found.asString() == null) {
@@ -315,9 +313,7 @@ public class HyperFormat {
       boolean throwDontWarn) {
     assert names.length == storages.length;
 
-    // Localize storages to avoid issues with foreign memory access.
-    var localisedStorages =
-        Arrays.stream(storages).map(Builder::makeLocal).toArray(ColumnStorage<?>[]::new);
+    var localisedStorages = storages;
 
     try {
       List<String> warningUnmatchedColumns = new ArrayList<>();
@@ -661,16 +657,6 @@ public class HyperFormat {
         throw new HyperTypeMismatch(
             columnName, expectedSqlType.toString(), actualSqlType.toString());
       }
-    }
-  }
-
-  private static Value getBindings() {
-    var ctx = Context.getCurrent();
-    var bindings = ctx.getPolyglotBindings().getMember("ensoBindings");
-    if (bindings != null) {
-      return bindings.execute("enso");
-    } else {
-      return ctx.getBindings("enso");
     }
   }
 

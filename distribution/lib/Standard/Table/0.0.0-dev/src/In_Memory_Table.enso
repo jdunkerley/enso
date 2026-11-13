@@ -3,7 +3,6 @@ import Standard.Base.Data.Vector.No_Wrap
 import Standard.Base.Errors.Deprecated.Deprecated
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Runtime.Context
-from Standard.Base.Logging import all
 from Standard.Base.Widget_Helpers import make_delimiter_selector
 
 import project.Column.Column
@@ -19,7 +18,6 @@ import project.Table.Table
 from project.Internal.Table_Type_Helpers import table_from_implementation
 
 polyglot java import org.enso.table.data.column.DataQualityMetrics
-polyglot java import org.enso.table.data.table.Column as Java_Column
 polyglot java import org.enso.table.data.table.Table as Java_Table
 
 ## A table whose data is stored in memory.
@@ -47,14 +45,9 @@ type In_Memory_Table
     ## ---
        private: true
        ---
-       A getter that allows one to specify the target Java type and handles
-       conversions when needed
-    private java_table self =
-        raw_table = self.internal_java_table
-        if raw_table.is_a Java_Table then raw_table else
-            # coming from the other JVM and deserves conversion
-            new_columns = raw_table.getColumns.map c-> Java_Column.new c.getName c.getStorage
-            Java_Table.new new_columns
+       A getter that is a workaround for bug
+       https://github.com/enso-org/enso/issues/12180
+    private java_table self = self.internal_java_table
 
     ## ---
        private: true
@@ -105,12 +98,7 @@ type In_Memory_Table
    Helper method for internal use to make a Table from a Java Table.
 private from_java_table java_table =
     ## Trigger data quality metrics computation (conditionally on Output context).
-    if Context.Output.is_enabled.not then
-        case java_table of
-            _:Java_Table ->
-                DataQualityMetrics.triggerTable java_table
-            _ ->
-                In_Memory_Table.log_internal "Cannot compute DataQualityMetrics for "+java_table.to_text
+    if Context.Output.is_enabled.not then DataQualityMetrics.triggerTable java_table
 
     Table_Refinements.refine_table <|
         In_Memory_Table.Value java_table

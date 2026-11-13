@@ -1,6 +1,5 @@
 package org.enso.table.data.column.storage;
 
-import java.lang.foreign.MemorySegment;
 import java.nio.LongBuffer;
 import java.util.NoSuchElementException;
 import org.enso.table.data.column.storage.iterators.ColumnLongStorageIterator;
@@ -15,36 +14,16 @@ public final class LongStorage extends AbstractLongStorage implements ColumnStor
   private final LongBuffer data;
   private final ImmutableBitSet validityMap;
 
-  /** original proxy storage to keep from being garbage collected */
-  private final ColumnStorage<?> proxy;
-
   /**
    * @param data the underlying data up to {@code data.limit()}
    * @param validityMap a bit set denoting at index {@code i} whether or not the real value is
    *     present.
    * @param type the type specifying the bit-width of integers that are allowed in this storage
-   * @param otherStorage reference to proxy storage to prevent it from being GCed while this storage
-   *     is used
    */
-  public LongStorage(
-      LongBuffer data,
-      ImmutableBitSet validityMap,
-      IntegerType type,
-      ColumnStorage<?> otherStorage) {
+  public LongStorage(LongBuffer data, ImmutableBitSet validityMap, IntegerType type) {
     super(data.limit(), type);
     this.data = data;
     this.validityMap = validityMap;
-    this.proxy = otherStorage;
-  }
-
-  @Override
-  public long addressOfData() {
-    return MemorySegment.ofBuffer(data).address();
-  }
-
-  @Override
-  public long addressOfValidity() {
-    return MemorySegment.ofBuffer(validityMap.rawData()).address();
   }
 
   @Override
@@ -67,7 +46,7 @@ public final class LongStorage extends AbstractLongStorage implements ColumnStor
   /** Widening to a bigger type can be done without copying the data. */
   @Override
   public LongStorage widen(IntegerType widerType) {
-    return new LongStorage(data, validityMap, widerType, proxy);
+    return new LongStorage(data, validityMap, widerType);
   }
 
   /**
