@@ -34,7 +34,11 @@ export interface DisplacementDeps {
   nodes(): Iterable<DisplacementNode>
   /** The node's measured size without its visualization. */
   bareSize(id: NodeId): Vec2 | undefined
-  readDisplaced(id: NodeId): DeepReadonly<NodeDisplacementMetadata> | undefined
+  /** The node's `displaced` metadata, read from `edit` when given. */
+  readDisplaced(
+    id: NodeId,
+    edit?: MutableModule,
+  ): DeepReadonly<NodeDisplacementMetadata> | undefined
   write(
     id: NodeId,
     placement: {
@@ -63,6 +67,7 @@ export function createDisplacement(deps: DisplacementDeps) {
   function layoutNodes(
     updates: ReadonlyMap<NodeId, NodeChange>,
     without: ReadonlySet<NodeId>,
+    edit?: MutableModule,
   ): { nodes: LayoutNode[]; oldBoxes: Map<NodeId, Box> } {
     const nodes: LayoutNode[] = []
     const oldBoxes = new Map<NodeId, Box>()
@@ -80,7 +85,7 @@ export function createDisplacement(deps: DisplacementDeps) {
         pos: { x: position.x, y: position.y },
         size: box ? { x: box.right - box.left, y: box.bottom - box.top } : { x: 0, y: 0 },
         // `relayout` copies what it changes and never mutates the field it is given.
-        displaced: deps.readDisplaced(node.id) as Displaced | undefined,
+        displaced: deps.readDisplaced(node.id, edit) as Displaced | undefined,
         fixed: node.fixed,
       })
     }
@@ -107,7 +112,7 @@ export function createDisplacement(deps: DisplacementDeps) {
      * pushed.
      */
     afterChange(updates: ReadonlyMap<NodeId, NodeChange>, adds: boolean, edit?: MutableModule) {
-      const { nodes, oldBoxes } = layoutNodes(updates, new Set())
+      const { nodes, oldBoxes } = layoutNodes(updates, new Set(), edit)
       const changes = [...updates.keys()]
         .flatMap((id): Change[] => {
           const old = oldBoxes.get(id)
@@ -120,7 +125,7 @@ export function createDisplacement(deps: DisplacementDeps) {
     /** Lay out after the user removed nodes: what they pushed returns. */
     afterRemoval(ids: Iterable<NodeId>, edit?: MutableModule) {
       const without = new Set(ids)
-      const { nodes, oldBoxes } = layoutNodes(new Map(), without)
+      const { nodes, oldBoxes } = layoutNodes(new Map(), without, edit)
       const changes = [...without].map((id): Change => ({
         id,
         old: oldBoxes.get(id) ?? NO_BOX,

@@ -366,11 +366,9 @@ const actionHandlers = registerHandlers({
         selected,
         (id) => graphStore.db.nodeIdToNode.get(id)?.vis?.visible === true,
       )
-      module.value.batchEdits(() => {
-        for (const nodeId of selected) {
-          graphStore.setNodeVisualization(nodeId, { visible: !allVisible })
-        }
-      })
+      graphStore.setNodesVisualization(
+        Array.from(selected, (id) => [id, { visible: !allVisible }] as const),
+      )
     },
   },
   'graph.pasteNode': { action: createNodesFromClipboard },

@@ -375,8 +375,8 @@ export function createGraphStore(
     })
   }
 
-  function setNodePosition(nodeId: NodeId, position: Vec2) {
-    const metadata = module.mutableNodeMetadata(db.idFromExternal(nodeId))
+  function setNodePosition(nodeId: NodeId, position: Vec2, edit?: MutableModule) {
+    const metadata = module.mutableNodeMetadata(db.idFromExternal(nodeId), edit)
     if (!metadata) return
     const oldPos = metadata.get('position')
     if (oldPos?.x !== position.x || oldPos?.y !== position.y)
@@ -394,14 +394,11 @@ export function createGraphStore(
         }
     },
     bareSize: (id) => nodeState.nodeBareSizes.get(id),
-    readDisplaced: (id) => module.mutableNodeMetadata(db.idFromExternal(id))?.get('displaced'),
+    readDisplaced: (id, edit) =>
+      module.mutableNodeMetadata(db.idFromExternal(id), edit)?.get('displaced'),
     write: (id, { position, displaced }, edit) => {
-      const metadata = module.mutableNodeMetadata(db.idFromExternal(id), edit)
-      if (!metadata) return
-      const oldPos = metadata.get('position')
-      if (oldPos?.x !== position.x || oldPos?.y !== position.y)
-        metadata.set('position', normalizePosition({ ...oldPos, ...position.xy() }))
-      metadata.set('displaced', displaced)
+      setNodePosition(id, position, edit)
+      module.mutableNodeMetadata(db.idFromExternal(id), edit)?.set('displaced', displaced)
     },
   })
 
@@ -445,6 +442,10 @@ export function createGraphStore(
    * Set nodes' visualization metadata, making room for a visualization that grows and letting the
    * neighbours back when it shrinks, in the same edit. `positions` moves nodes in that edit too:
    * the left resize handle changes a width and a position together.
+   *
+   * Call it at most once per outer transaction, passing every node in one call: do not call it, or
+   * `setNodeVisualization`, in a loop inside `batchEdits` or an edit, because the node database it
+   * lays out against is updated only when the transaction commits.
    */
   function setNodesVisualization(
     updates: Iterable<readonly [NodeId, Partial<VisualizationMetadata>]>,
@@ -484,6 +485,10 @@ export function createGraphStore(
   /**
    * Move nodes by hand (a finished drag, Align, Spacing, Tidy up). The nodes they were pushing
    * return, and a moved node forgets the place it was pushed from.
+   *
+   * Call it at most once per outer transaction, passing every node in one call: do not call it in a
+   * loop inside `batchEdits` or an edit, because the node database it lays out against is updated
+   * only when the transaction commits.
    */
   function setNodePositions(moves: Iterable<readonly [NodeId, Vec2]>) {
     const positions = new Map(moves)
