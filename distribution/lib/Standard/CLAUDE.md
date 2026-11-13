@@ -33,6 +33,7 @@ there.
 - `Tableau/` — Tableau Hyper extract (`.hyper`) read/write.
 - `EDI/` — ANSI X12 EDI reading (`EDI_Format`, `EDI_Definition`), `.edi` and
   `.822` files.
+- `Fixed_Width/` — fixed-width text reading (`Fixed_Width_Format`).
 - `XML/` — XML documents (`XML_Document`, `XML_Element`, XPath), the `.xml` file
   format, and `Table.to_xml`.
 - `Image/` — Image read/write and arithmetic via OpenCV.

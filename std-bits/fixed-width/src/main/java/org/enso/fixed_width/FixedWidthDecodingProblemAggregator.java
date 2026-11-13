@@ -1,4 +1,4 @@
-package org.enso.table.read;
+package org.enso.fixed_width;
 
 import org.enso.base.encoding.DecodingProblemAggregator;
 

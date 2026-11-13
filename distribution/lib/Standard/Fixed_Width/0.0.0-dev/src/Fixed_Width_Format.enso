@@ -11,17 +11,18 @@ from Standard.Base.Metadata import make_single_choice
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Numeric_Input, Vector_Editor
 
-import project.Column.Column
-import project.Data_Formatter.Data_Formatter
-import project.Fixed_Width.Internal.Column_Namer.Column_Namer
-import project.Fixed_Width.Invalid_Fixed_Width_Rows.Invalid_Fixed_Width_Rows
-import project.Fixed_Width.On_Empty_Field.On_Empty_Field
+import Standard.Table.Column.Column
+import Standard.Table.Data_Formatter.Data_Formatter
+import project.Internal.Column_Namer.Column_Namer
+import project.Invalid_Fixed_Width_Rows.Invalid_Fixed_Width_Rows
+import project.On_Empty_Field.On_Empty_Field
 import project.Internal.Fixed_Width_Reader
+import project.Main
 import Standard.Base.Internal.Telemetry
-import project.Rows_To_Read.Rows_To_Read
-import project.Table.Table
+import Standard.Table.Rows_To_Read.Rows_To_Read
+import Standard.Table.Table.Table
 
-polyglot java import org.enso.table.read.FixedWidthReader.Justification
+polyglot java import org.enso.fixed_width.FixedWidthReader.Justification
 
 ## Read fixed-width files into a Table.
    A fixed-width format defines its columns as fixed column offsets and widths.

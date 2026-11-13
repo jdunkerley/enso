@@ -1,4 +1,4 @@
-package org.enso.table.parsing.problems;
+package org.enso.fixed_width;
 
 import org.enso.base.polyglot.EnsoMeta;
 import org.enso.table.problems.Problem;
@@ -14,7 +14,7 @@ public record InvalidFixedWidthRow(
   @Override
   public Value asEnsoValue() {
     return EnsoMeta.makeInstance(
-        "Standard.Table.Errors",
+        "Standard.Fixed_Width.Errors",
         "Invalid_Fixed_Width_Row",
         "Error",
         sourceLineNumber(),

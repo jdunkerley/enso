@@ -1,4 +1,4 @@
-package org.enso.table.read;
+package org.enso.fixed_width;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -18,6 +18,7 @@ import org.enso.table.parsing.DatatypeParser;
 import org.enso.table.parsing.problems.CommonParseProblemAggregator;
 import org.enso.table.parsing.problems.ParseProblemAggregator;
 import org.enso.table.problems.ProblemAggregator;
+import org.enso.table.read.NoColumnNamesFoundException;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 

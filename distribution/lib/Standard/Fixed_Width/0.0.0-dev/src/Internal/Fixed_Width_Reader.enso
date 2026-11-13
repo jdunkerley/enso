@@ -4,25 +4,26 @@ import Standard.Base.Errors.File_Error.File_Error
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.System.Input_Stream.Input_Stream
 
-import project.Column.Column
-import project.Fixed_Width.Fixed_Width_Format.Fixed_Width_Format
-import project.Fixed_Width.Fixed_Width_Format.Fixed_Width_Layout
-import project.Fixed_Width.Fixed_Width_Format.Infer_Layout
-import project.Fixed_Width.Invalid_Fixed_Width_Rows.Invalid_Fixed_Width_Rows
-import project.Fixed_Width.On_Empty_Field.On_Empty_Field
-import project.Internal.Java_Problems
-import project.Table.Table
-from project.Errors import Empty_File_Error, Fixed_Width_Line_Too_Long, No_Column_Names_Found
-from project.In_Memory_Table import from_java_table
+import Standard.Table.Column.Column
+import project.Fixed_Width_Format.Fixed_Width_Format
+import project.Fixed_Width_Format.Fixed_Width_Layout
+import project.Fixed_Width_Format.Infer_Layout
+import project.Invalid_Fixed_Width_Rows.Invalid_Fixed_Width_Rows
+import project.On_Empty_Field.On_Empty_Field
+import Standard.Table.Internal.Java_Problems
+import Standard.Table.Table.Table
+from Standard.Table.Errors import Empty_File_Error, No_Column_Names_Found
+from project.Errors import Fixed_Width_Line_Too_Long
+from Standard.Table.Internal.In_Memory_Helpers import from_java_table
 
 polyglot java import java.io.IOException
 polyglot java import java.io.Reader
 polyglot java import org.enso.table.parsing.IdentityParser
 polyglot java import org.enso.table.parsing.TypeInferringParser
-polyglot java import org.enso.table.read.FixedWidthDecodingProblemAggregator
-polyglot java import org.enso.table.read.FixedWidthReader
-polyglot java import org.enso.table.read.FixedWidthReader.FixedWidthLayoutEntry
-polyglot java import org.enso.table.read.FixedWidthReader.InvalidFixedWidthRowsBehavior
+polyglot java import org.enso.fixed_width.FixedWidthDecodingProblemAggregator
+polyglot java import org.enso.fixed_width.FixedWidthReader
+polyglot java import org.enso.fixed_width.FixedWidthReader.FixedWidthLayoutEntry
+polyglot java import org.enso.fixed_width.FixedWidthReader.InvalidFixedWidthRowsBehavior
 
 ## ---
    private: true
