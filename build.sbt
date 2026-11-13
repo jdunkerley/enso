@@ -4685,14 +4685,14 @@ lazy val `std-table` = project
       (Antlr4 / sourceManaged).value / "main" / "antlr4"
     },
     libraryDependencies ++= Seq(
-      "org.graalvm.polyglot"     % "polyglot"              % graalMavenPackagesVersion % "provided" exclude ("org.graalvm.sdk", "collections"),
-      "com.univocity"            % "univocity-parsers"     % univocityParsersVersion,
-      "org.antlr"                % "antlr4-runtime"        % antlrVersion,
-      "org.graalvm.truffle"      % "truffle-api"           % graalMavenPackagesVersion % Test,
-      "junit"                    % "junit"                 % junitVersion              % Test,
-      "com.github.sbt"           % "junit-interface"       % junitIfVersion            % Test,
-      "org.mockito"              % "mockito-core"          % mockitoJavaVersion        % Test,
-      "org.mockito"              % "mockito-junit-jupiter" % mockitoJavaVersion        % Test
+      "org.graalvm.polyglot" % "polyglot"              % graalMavenPackagesVersion % "provided" exclude ("org.graalvm.sdk", "collections"),
+      "com.univocity"        % "univocity-parsers"     % univocityParsersVersion,
+      "org.antlr"            % "antlr4-runtime"        % antlrVersion,
+      "org.graalvm.truffle"  % "truffle-api"           % graalMavenPackagesVersion % Test,
+      "junit"                % "junit"                 % junitVersion              % Test,
+      "com.github.sbt"       % "junit-interface"       % junitIfVersion            % Test,
+      "org.mockito"          % "mockito-core"          % mockitoJavaVersion        % Test,
+      "org.mockito"          % "mockito-junit-jupiter" % mockitoJavaVersion        % Test
     ),
     Compile / packageBin := {
       val result            = (Compile / packageBin).value
@@ -5437,7 +5437,7 @@ lazy val `std-fixed-width` = project
     Compile / packageBin / artifactPath :=
       `fixed-width-polyglot-root` / "std-fixed-width.jar",
     libraryDependencies ++= Seq(
-      "org.graalvm.polyglot" % "polyglot"        % graalMavenPackagesVersion % "provided"
+      "org.graalvm.polyglot" % "polyglot" % graalMavenPackagesVersion % "provided"
     ),
     Compile / packageBin := {
       val result            = (Compile / packageBin).value
@@ -5473,7 +5473,7 @@ lazy val `std-yxdb` = project
     Compile / packageBin / artifactPath :=
       `yxdb-polyglot-root` / "std-yxdb.jar",
     libraryDependencies ++= Seq(
-      "org.graalvm.polyglot" % "polyglot" % graalMavenPackagesVersion % "provided",
+      "org.graalvm.polyglot" % "polyglot"  % graalMavenPackagesVersion % "provided",
       "uk.co.jdunkerley"     % "yxdb-java" % "0.1.4"
     ),
     Compile / packageBin := {
