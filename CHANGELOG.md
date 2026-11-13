@@ -4,7 +4,7 @@
 
 - [Showing or resizing a visualization moves the components in its way, and
   hiding it puts them back where they were. The moves are part of the same undo
-  step.][NNN]
+  step.][735]
 - [Projects now run on the JVM engine by default, which starts library code such
   as Image, Postgres and AWS faster. (The native engine this replaced has since
   been removed.)][666]
@@ -482,7 +482,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[735]: https://github.com/jdunkerley/enso/pull/735
 [654]: https://github.com/jdunkerley/enso/pull/654
 [666]: https://github.com/jdunkerley/enso/pull/666
 [694]: https://github.com/jdunkerley/enso/pull/694
