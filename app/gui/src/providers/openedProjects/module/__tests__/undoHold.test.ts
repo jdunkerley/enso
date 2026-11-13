@@ -27,6 +27,26 @@ test('changes made while a step is held undo together, and apart from their neig
   expect([...map.keys()]).toEqual([])
 })
 
+test('overlapping holds are one step, ending with the last release, in either order', () => {
+  for (const order of [
+    [0, 1],
+    [1, 0],
+  ]) {
+    const { map, manager } = setup()
+    const releases = [holdUndoStep(manager), holdUndoStep(manager)]
+    map.set('a', 1)
+    releases[order[0]!]!()
+    map.set('b', 1)
+    expect(manager.captureTimeout).toBe(Number.POSITIVE_INFINITY)
+    releases[order[1]!]!()
+    expect(manager.captureTimeout).toBe(0)
+    map.set('after', 1)
+    manager.undo()
+    manager.undo()
+    expect([...map.keys()]).toEqual([])
+  }
+})
+
 test('releasing restores the timeout, and a second release does nothing', () => {
   const { manager } = setup()
   const release = holdUndoStep(manager)

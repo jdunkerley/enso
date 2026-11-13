@@ -51,7 +51,7 @@ import type { Opt } from '@/util/data/opt'
 import { Rect } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
 import { Ok } from 'enso-common/src/utilities/data/result'
-import { computed, onUnmounted, ref, toRef, watch, watchEffect } from 'vue'
+import { computed, onBeforeUnmount, onUnmounted, ref, toRef, watch, watchEffect } from 'vue'
 import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
 
 const contentNodeStyle = {
@@ -251,7 +251,7 @@ const transform = computed(() => {
   return `translate(${x}px, ${y}px)`
 })
 
-const { isDragged, pointerEvents } = useClickableDraggable({
+const { isDragged, isPointerDown, pointerEvents } = useClickableDraggable({
   dragMove: (fullOffset) => emit('dragging', fullOffset),
   dragCommit: () => emit('draggingCommited'),
   dragCancel: () => emit('draggingCancelled'),
@@ -262,6 +262,11 @@ const { isDragged, pointerEvents } = useClickableDraggable({
   doubleClick: () => emit('enterNode'),
 })
 watch(isDragged, () => graph.db.moveNodeToTop(nodeId.value))
+// A node removed while it is being dragged (deleted, or undone) sends no pointer events any more:
+// end the drag here, or it would hold its undo step open.
+onBeforeUnmount(() => {
+  if (isPointerDown.value) emit('draggingCancelled')
+})
 
 const isRecordingOverridden = computed({
   get() {
