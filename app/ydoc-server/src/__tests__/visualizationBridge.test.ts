@@ -281,6 +281,36 @@ describe('VisualizationBridge', () => {
     expect(f.vis.getSlot(newRequest as VisRequestId)?.status).toBe('pending')
   })
 
+  // The GUI's modify (Note [A Modify Is One Transaction] in the GUI's `executionContext.ts`,
+  // #634): in one transaction, the new slot's attach comes before the old slot's detach, which is
+  // the order in which the Language Server's bridge drops the detach instead of detaching the
+  // visualization the attach has just upserted.
+  it('supersede in one transaction: attach of the new slot before detach of the old', () => {
+    const f = makeFixture()
+    const oldRequest = newVisRequestId()
+    const newRequest = newVisRequestId()
+    const spec = (args: string[]) => ({
+      visualizationId: VIS_ID,
+      contextId: CTX_ID,
+      nodeExternalId: NODE_ID,
+      request: { ...request(), positionalArgumentsExpressions: args },
+    })
+    f.vis.createSlot(spec(['a']), oldRequest)
+
+    f.visDoc.transact(() => {
+      f.vis.removeSlot(oldRequest)
+      f.vis.createSlot(spec(['a', 'b']), newRequest)
+    })
+
+    const parsed = f.controlFromBridge.map((m) => JSON.parse(m))
+    expect(parsed.map((m) => [m.kind, m.requestId])).toEqual([
+      ['attach', oldRequest],
+      ['attach', newRequest],
+      ['detach', oldRequest],
+    ])
+    expect(parsed[2]!.visualizationId).toBe(VIS_ID)
+  })
+
   it('prunes per-request state once a slot is removed', () => {
     const f = makeFixture()
     const rid = newVisRequestId()
