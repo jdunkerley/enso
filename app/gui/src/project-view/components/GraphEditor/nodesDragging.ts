@@ -184,6 +184,12 @@ export function useNodesDragging() {
     finishDragging(): void {
       this.stopPositionUpdate()
       this.updateNodesPosition()
+      // The drag is over: the nodes the dragged ones were pushing return, and a dragged node
+      // forgets the place it was pushed from. `updateNodesPosition` has dropped any node that
+      // something else moved meanwhile.
+      graph.value.setNodePositions(
+        Array.from(this.draggedNodes, ([id, dragged]) => [id, dragged.currentPos] as const),
+      )
     }
 
     /** Cancel drag and reset nodes' positions */

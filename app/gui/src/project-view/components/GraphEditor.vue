@@ -423,6 +423,7 @@ const actionHandlers = registerHandlers({
             const outerAst = edit.getVersion(node.outerAst)
             if (outerAst.isStatement()) Ast.deleteFromParentBlock(outerAst)
           }
+          graphStore.releasePushedBy(nodes.map(nodeId), edit)
           return Ok()
         })
       },
@@ -806,6 +807,8 @@ function collapseNodes(nodes: Node[]) {
         renameSchedule?.scheduleFunctionRename({ ...currentPointer, name: collapsedName })
       }
 
+      // The collapsed nodes leave this graph: what they were pushing returns.
+      graphStore.releasePushedBy(selected, edit)
       return Ok()
     })
   } catch (err) {

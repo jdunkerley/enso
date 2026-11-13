@@ -100,7 +100,11 @@ export type OngoingAiPromptsStore = ReturnType<typeof ongoingAiPromptsStoreFacto
 export interface OngoingAiPromptsDeps {
   readonly graphStore: Pick<
     GraphStore,
-    'db' | 'currentMethod' | 'registerExtraOccupiedAreas' | 'generateLocallyUniqueIdent'
+    | 'db'
+    | 'currentMethod'
+    | 'registerExtraOccupiedAreas'
+    | 'generateLocallyUniqueIdent'
+    | 'releasePushedBy'
   >
   readonly module: CurrentProjectStore['module']
   readonly ai: Pick<ReturnType<typeof useAI>, 'dispatch'>
@@ -424,7 +428,10 @@ export function ongoingAiPromptsStoreFactory(deps: OngoingAiPromptsDeps) {
         return
       }
       const assignmentId = node.outerAst.id
+      const editedNodeId = entry.editTarget.nodeId
       const editResult = module.value.edit((edit) => {
+        // The node is replaced by one with a new id: what the old one was pushing returns.
+        graphStore.releasePushedBy([editedNodeId], edit)
         const mutableTopLevel = edit.getVersion(topLevel)
         const mutableAssignment = edit.get(assignmentId)
         if (!(mutableAssignment instanceof Ast.MutableAssignment)) {

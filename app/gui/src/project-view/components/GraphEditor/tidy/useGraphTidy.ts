@@ -87,7 +87,7 @@ export function buildTidyModel(
 }
 
 /** Tidy up: lay out the whole graph, or the given selection, and write positions as one undoable edit. */
-export function useGraphTidy(graphStore: GraphStore, module: Ref<ModuleStore>) {
+export function useGraphTidy(graphStore: GraphStore, _module: Ref<ModuleStore>) {
   const defaultSize = new Vec2(theme.node.height * 4, theme.node.height)
   function tidy(selection?: readonly NodeId[]) {
     const scope = selection != null && selection.length > 1 ? new Set(selection) : undefined
@@ -103,9 +103,8 @@ export function useGraphTidy(graphStore: GraphStore, module: Ref<ModuleStore>) {
       horizontal: theme.node.horizontal_gap,
       vertical: theme.node.vertical_gap,
     })
-    module.value.batchEdits(() => {
-      for (const [id, position] of positions) graphStore.setNodePosition(id, position)
-    })
+    // A move by hand: the tidied layout is the new home of every node it places.
+    graphStore.setNodePositions(positions)
   }
   return { tidy }
 }
