@@ -3,6 +3,11 @@ import { proxyRefs } from '$/utils/reactivity'
 import { visualizationBindings } from '@/bindings'
 import type { RawDataSource } from '@/components/GraphEditor/GraphVisualization/visualizationData'
 import { useVisualizationData } from '@/components/GraphEditor/GraphVisualization/visualizationData'
+import {
+  handleResize,
+  visualizationSize,
+  type VisualizationResize,
+} from '@/components/GraphEditor/GraphVisualization/visualizationSize'
 import VisualizationToolbar from '@/components/GraphEditor/GraphVisualization/VisualizationToolbar.vue'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import { useResizeHandles } from '@/components/resizeHandles'
@@ -13,17 +18,8 @@ import { registerHandlers } from '@/providers/action'
 import type { VisualizationDataSource } from '@/stores/visualization'
 import type { Opt } from '@/util/data/opt'
 import { Vec2 } from '@/util/data/vec2'
-import { computed, nextTick, ref, toRef, watch, watchEffect } from 'vue'
+import { computed, nextTick, ref, toRef, watch } from 'vue'
 import { visIdentifierEquals, type VisualizationIdentifier } from 'ydoc-shared/yjsModel'
-
-/**
- * The minimum width must be at least the total width of:
- * - both of toolbars that are always visible (32px + 60px), and
- * - the 4px flex gap between the toolbars.
- */
-const MIN_WIDTH_PX = 200
-const MIN_CONTENT_HEIGHT_PX = 32
-const DEFAULT_CONTENT_HEIGHT_PX = 150
 
 const props = defineProps<{
   show: boolean
@@ -52,9 +48,8 @@ const emit = defineEmits<{
   'update:effectiveHeight': [height: number]
   'update:id': [id: VisualizationIdentifier]
   'update:enabled': [visible: boolean]
-  'update:width': [width: number]
-  'update:height': [height: number]
-  'update:nodePosition': [pos: Vec2]
+  /** A step of a handle drag. The left handle changes the width and the position together. */
+  resize: [change: VisualizationResize]
   'update:hovered': [hovered: boolean]
   'update:resizing': [resizing: boolean]
   createNodes: [options: NodeCreationOptions[]]
@@ -148,11 +143,9 @@ useEvent(globalEventRegistryPre, 'keydown', keydownHandler)
 // === Sizing and Fullscreen ===
 // =============================
 
-const vizWidth = computed<number>(() => Math.max(props.width ?? 0, props.nodeSize.x, MIN_WIDTH_PX))
-const vizHeight = computed<number>(() =>
-  Math.max(props.height ?? DEFAULT_CONTENT_HEIGHT_PX, MIN_CONTENT_HEIGHT_PX),
-)
-const vizSize = computed<Vec2>(() => new Vec2(vizWidth.value, vizHeight.value))
+const vizSize = computed<Vec2>(() => visualizationSize(props.width, props.height, props.nodeSize.x))
+const vizWidth = computed<number>(() => vizSize.value.x)
+const vizHeight = computed<number>(() => vizSize.value.y)
 
 watch(vizWidth, (width) => emit('update:effectiveWidth', width), { immediate: true })
 watch(vizHeight, (height) => emit('update:effectiveHeight', height), { immediate: true })
@@ -162,37 +155,26 @@ const resizeHandles = useResizeHandles({
   position: toRef(props, 'nodePosition'),
   scale: toRef(props, 'scale'),
 })
-resizeHandles.onResizeWidth((value) => emit('update:width', value))
-resizeHandles.onResizeHeight((value) => emit('update:height', value))
-resizeHandles.onMove((position) => emit('update:nodePosition', position))
+resizeHandles.onBoundsChange((bounds, sides) =>
+  emit('resize', handleResize(bounds, sides, props.nodeSize.x)),
+)
 
+const handlesShown = computed(() => props.show && !props.isPreview && props.isResizable)
 const handlesResizing = ref(false)
 resizeHandles.onResizingChange(
   (resizing) =>
     (handlesResizing.value =
       !!resizing.top || !!resizing.bottom || !!resizing.left || !!resizing.right),
 )
+// Handles removed mid-drag report its end as they unmount, but that report may not arrive: a drag
+// cannot outlive its handles either way.
+watch(handlesShown, (shown) => {
+  if (!shown) handlesResizing.value = false
+})
 
-const isClosedOrOpening = ref(false)
-watch(
-  toRef(props, 'show'),
-  (show) => {
-    if (!show) isClosedOrOpening.value = true
-  },
-  { immediate: true },
-)
-watchEffect(
-  () => {
-    if (isClosedOrOpening.value && props.show) {
-      if (vizWidth.value > 0 && vizHeight.value > 0) isClosedOrOpening.value = false
-    }
-  },
-  // Stop sending resize events *after* reporting the resize completion
-  { flush: 'post' },
-)
-
-const isResizing = computed(() => handlesResizing.value || isClosedOrOpening.value)
-watch(isResizing, (resizing) => emit('update:resizing', resizing), { immediate: true })
+// Only a handle drag counts: the graph makes room for a visualization that opens when its
+// metadata is written, not when it is drawn.
+watch(handlesResizing, (resizing) => emit('update:resizing', resizing))
 
 const style = computed(() => {
   return {
@@ -288,7 +270,7 @@ customElements.define(ensoVisualizationHost, defineCustomElement(VisualizationHo
         </div>
       </div>
     </WithFullscreenMode>
-    <ResizeHandles v-if="!isPreview && isResizable" left right bottom v-on="resizeHandles.events" />
+    <ResizeHandles v-if="handlesShown" left right bottom v-on="resizeHandles.events" />
   </div>
 </template>
 

@@ -163,13 +163,25 @@ export function writeClipboard(data: MimeData): Promise<void> {
 
 // === Serializing nodes ===
 
+/**
+ * The metadata a copy of a node gets. Where a node was pushed from belongs to the original: the
+ * copy is placed afresh and has no home to return to.
+ */
+export function copiedNodeMetadata<T extends { displaced?: unknown }>(
+  metadata: T,
+): Omit<T, 'displaced'> {
+  const copy = { ...metadata }
+  delete copy.displaced
+  return copy
+}
+
 function nodeStructuredData(node: Node): CopiedNode | undefined {
   return node.type === 'input' ?
       undefined
     : {
         expression: node.innerExpr.code(),
         documentation: nodeDocumentationText(node) || undefined,
-        metadata: node.rootExpr.serializeMetadata(),
+        metadata: copiedNodeMetadata(node.rootExpr.serializeMetadata()),
         ...(node.pattern ? { binding: node.pattern.code() } : {}),
       }
 }

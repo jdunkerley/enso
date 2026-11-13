@@ -1,3 +1,4 @@
+import { createDisplacement, repointDisplaced } from '$/providers/openedProjects/graph/displacement'
 import {
   GraphDb,
   nodeIdFromOuterAst,
@@ -44,7 +45,11 @@ import {
   type ShallowReactive,
   type ShallowRef,
 } from 'vue'
-import { normalizePosition, type CachedAppearance } from 'ydoc-shared/ast'
+import {
+  normalizePosition,
+  type CachedAppearance,
+  type NodeDisplacementMetadata,
+} from 'ydoc-shared/ast'
 import type { ExpressionUpdate } from 'ydoc-shared/languageServerTypes'
 import { reachable } from 'ydoc-shared/util/data/graph'
 import type { ExternalId, VisualizationMetadata } from 'ydoc-shared/yjsModel'
@@ -147,6 +152,8 @@ export function createGraphStore(
     nodeOutputHovered: useAssociatedFlag({ onCleanup }),
     nodeRects: useAssociatedValue<NodeId, Rect>({ onCleanup }),
     nodeOutputAnimations: useAssociatedValue<NodeId, number>({ onCleanup }),
+    /** Each node's measured size without its visualization, reported by `GraphNode`. */
+    nodeBareSizes: useAssociatedValue<NodeId, Vec2>({ onCleanup }),
   } as const
   const { nodeRects, nodeOutputAnimations } = nodeState
 
@@ -352,6 +359,7 @@ export function createGraphStore(
         deletedNodes.add(id)
         cleanup(id)
       }
+      displacement.afterRemoval(deletedNodes, edit)
       return Ok()
     })
   }
@@ -371,13 +379,32 @@ export function createGraphStore(
     })
   }
 
-  function setNodePosition(nodeId: NodeId, position: Vec2) {
-    const metadata = module.mutableNodeMetadata(db.idFromExternal(nodeId))
+  function setNodePosition(nodeId: NodeId, position: Vec2, edit?: MutableModule) {
+    const metadata = module.mutableNodeMetadata(db.idFromExternal(nodeId), edit)
     if (!metadata) return
     const oldPos = metadata.get('position')
     if (oldPos?.x !== position.x || oldPos?.y !== position.y)
       metadata.set('position', normalizePosition({ ...oldPos, ...position.xy() }))
   }
+
+  const displacement = createDisplacement({
+    nodes: function* () {
+      for (const [id, node] of db.nodeIdToNode.entries())
+        yield {
+          id,
+          position: node.position,
+          vis: node.vis,
+          fixed: node.type === 'input',
+        }
+    },
+    bareSize: (id) => nodeState.nodeBareSizes.get(id),
+    readDisplaced: (id, edit) =>
+      module.mutableNodeMetadata(db.idFromExternal(id), edit)?.get('displaced'),
+    write: (id, { position, displaced }, edit) => {
+      setNodePosition(id, position, edit)
+      module.mutableNodeMetadata(db.idFromExternal(id), edit)?.set('displaced', displaced)
+    },
+  })
 
   function setNodeHeight(nodeId: NodeId, height: number | undefined) {
     const metadata = module.mutableNodeMetadata(db.idFromExternal(nodeId))
@@ -415,12 +442,85 @@ export function createGraphStore(
     }, 'local:derivedMetadata')
   }
 
-  function setNodeVisualization(nodeId: NodeId, update: Partial<VisualizationMetadata>) {
-    const metadata = module.mutableNodeMetadata(db.idFromExternal(nodeId))
-    if (!metadata) return
-    const data = Object.assign({ ...VIS_METADATA_DEFAULTS }, metadata.get('visualization'), update)
-    const normalized = visMetadataEquals(data, VIS_METADATA_DEFAULTS) ? undefined : data
-    metadata.set('visualization', normalized)
+  /**
+   * Set nodes' visualization metadata, making room for a visualization that grows and letting the
+   * neighbours back when it shrinks, in the same edit. `positions` moves nodes in that edit too:
+   * the left resize handle changes a width and a position together.
+   *
+   * Call it at most once per outer transaction, passing every node in one call: do not call it, or
+   * `setNodeVisualization`, in a loop inside `batchEdits` or an edit, because the node database it
+   * lays out against is updated only when the transaction commits.
+   */
+  function setNodesVisualization(
+    updates: Iterable<readonly [NodeId, Partial<VisualizationMetadata>]>,
+    positions?: ReadonlyMap<NodeId, Vec2>,
+  ) {
+    module.batchEdits(() => {
+      const changes = new Map<NodeId, { vis: VisualizationMetadata | undefined; position?: Vec2 }>()
+      for (const [nodeId, update] of updates) {
+        const metadata = module.mutableNodeMetadata(db.idFromExternal(nodeId))
+        if (!metadata) continue
+        const data = Object.assign(
+          { ...VIS_METADATA_DEFAULTS },
+          metadata.get('visualization'),
+          update,
+        )
+        const vis = visMetadataEquals(data, VIS_METADATA_DEFAULTS) ? undefined : data
+        const position = positions?.get(nodeId)
+        changes.set(nodeId, { vis, ...(position ? { position } : {}) })
+      }
+      // Lay out first: until this edit commits, the node database describes the graph as it was.
+      displacement.afterChange(changes, true)
+      for (const [nodeId, { vis, position }] of changes) {
+        module.mutableNodeMetadata(db.idFromExternal(nodeId))?.set('visualization', vis)
+        if (position) setNodePosition(nodeId, position)
+      }
+    })
+  }
+
+  function setNodeVisualization(
+    nodeId: NodeId,
+    update: Partial<VisualizationMetadata>,
+    position?: Vec2,
+  ) {
+    setNodesVisualization([[nodeId, update]], position && new Map([[nodeId, position]]))
+  }
+
+  /**
+   * Move nodes by hand (a finished drag, Align, Spacing, Tidy up). The nodes they were pushing
+   * return, and every node given forgets the place it was pushed from, even one whose position
+   * does not change.
+   *
+   * Call it at most once per outer transaction, passing every node in one call: do not call it in a
+   * loop inside `batchEdits` or an edit, because the node database it lays out against is updated
+   * only when the transaction commits.
+   */
+  function setNodePositions(moves: Iterable<readonly [NodeId, Vec2]>) {
+    const positions = new Map(moves)
+    if (positions.size === 0) return
+    module.batchEdits(() => {
+      displacement.afterMove(positions)
+      for (const [id, position] of positions) setNodePosition(id, position)
+    })
+  }
+
+  /** The user removed these nodes: the nodes they were pushing return, in `edit` when given. */
+  function releasePushedBy(ids: Iterable<NodeId>, edit?: MutableModule) {
+    displacement.afterRemoval(ids, edit)
+  }
+
+  /**
+   * The node `oldId` is now `newId` (its expression was replaced): the nodes it pushes name the new
+   * id, in `edit`, so they stay where they are.
+   */
+  function repointPushedBy(oldId: NodeId, newId: NodeId, edit: MutableModule) {
+    for (const id of db.nodeIdToNode.keys()) {
+      const metadata = module.mutableNodeMetadata(db.idFromExternal(id), edit)
+      const displaced = metadata?.get('displaced')
+      const repointed = repointDisplaced(displaced, oldId, newId)
+      // Built from plain copies of the read-only view: it can stand for the mutable type.
+      if (repointed !== displaced) metadata?.set('displaced', repointed as NodeDisplacementMetadata)
+    }
   }
 
   function updateNodeRect(nodeId: NodeId, rect: Rect) {
@@ -720,6 +820,10 @@ export function createGraphStore(
     setNodeHeight,
     setNodeDisplayMode,
     setNodeVisualization,
+    setNodesVisualization,
+    setNodePositions,
+    releasePushedBy,
+    repointPushedBy,
     updateNodeRect,
     updateNodeOutputAnim,
     addPortInstance,

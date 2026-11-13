@@ -1,3 +1,4 @@
+import { holdUndoStep } from '$/providers/openedProjects/module/undoHold'
 import type { ProjectStore } from '$/providers/openedProjects/project'
 import { ConditionVariable } from '$/utils/ConditionVariable'
 import { proxyRefs } from '$/utils/reactivity'
@@ -216,6 +217,11 @@ export async function createModuleStore(
       },
       undoStackBoundary() {
         moduleModel.value?.undoManager.stopCapturing()
+      },
+      /** Keep the changes from now until the returned function is called in one undo step. */
+      holdStep(): () => void {
+        const manager = moduleModel.value?.undoManager
+        return manager ? holdUndoStep(manager) : () => {}
       },
       canUndo: computed(() => undoManagerStatus.canUndo),
       canRedo: computed(() => undoManagerStatus.canRedo),

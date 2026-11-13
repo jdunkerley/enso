@@ -142,12 +142,27 @@ export interface CachedAppearance {
   /** An icon name. */
   icon?: string
 }
+/**
+ * Where a node was before a neighbour's size change pushed it, and what is pushing it. See
+ * `docs/superpowers/specs/2026-11-13-node-displacement-design.md`.
+ */
+export interface NodeDisplacementMetadata {
+  /** The node's position before the first push. */
+  home: { x: number; y: number }
+  /** The position the push gave it. A node found anywhere else was moved by something else. */
+  at: { x: number; y: number }
+  /** The nodes whose rectangles reach it. */
+  by: { id: ExternalId; gap: number; dir: 'down' | 'right' }[]
+  /** The nodes it overlapped at home. They do not count as taking its home. */
+  under?: ExternalId[] | undefined
+}
 export interface NodeMetadataFields {
   position?: NodePositionMetadata | undefined
   visualization?: VisualizationMetadata | undefined
   colorOverride?: string | undefined
   displayMode?: 'expanded' | 'collapsed' | undefined
   cachedAppearance?: CachedAppearance | undefined
+  displaced?: NodeDisplacementMetadata | undefined
 }
 
 const nodeMetadataKeys = allKeys<NodeMetadataFields>({
@@ -156,6 +171,7 @@ const nodeMetadataKeys = allKeys<NodeMetadataFields>({
   colorOverride: null,
   displayMode: null,
   cachedAppearance: null,
+  displaced: null,
 })
 export type NodeMetadata = FixedMapView<NodeMetadataFields & MetadataFields>
 export type MutableNodeMetadata = FixedMap<NodeMetadataFields & MetadataFields>

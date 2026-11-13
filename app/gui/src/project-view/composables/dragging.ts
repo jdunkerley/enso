@@ -67,5 +67,7 @@ export function useClickableDraggable(on: ClickableDraggableOptions) {
     { pointerCapturedBy: 'target' },
   )
   const isDragged = computed(() => dragPointer.dragging && significantMove.value)
-  return { isDragged, pointerEvents: { ...dragPointer.events, click } }
+  /** The pointer is down: `dragMove` may have been called, and `dragCommit` or `dragCancel` is due. */
+  const isPointerDown = computed(() => dragPointer.dragging)
+  return { isDragged, isPointerDown, pointerEvents: { ...dragPointer.events, click } }
 }

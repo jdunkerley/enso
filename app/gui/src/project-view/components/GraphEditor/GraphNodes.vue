@@ -3,6 +3,7 @@ import { useCurrentProject } from '$/components/WithCurrentProject.vue'
 import type { NodeId } from '$/providers/openedProjects/graph'
 import AiPendingNode from '@/components/GraphEditor/AiPendingNode.vue'
 import GraphNode from '@/components/GraphEditor/GraphNode.vue'
+import type { VisualizationResize } from '@/components/GraphEditor/GraphVisualization/visualizationSize'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import { useNodesDragging } from '@/components/GraphEditor/nodesDragging'
 import UploadingFile from '@/components/GraphEditor/UploadingFile.vue'
@@ -27,6 +28,17 @@ const selection = useGraphSelection()
 const dragging = useNodesDragging()
 const navigator = injectGraphNavigator()
 const aiPrompts = useOngoingAiPrompts()
+
+function resizeVisualization(id: NodeId, { width, height, position }: VisualizationResize) {
+  graph.value.setNodeVisualization(
+    id,
+    {
+      ...(width != null ? { width } : {}),
+      ...(height != null ? { height } : {}),
+    },
+    position,
+  )
+}
 
 function nodeIsDragged(movedId: NodeId, offset: Vec2) {
   const scaledOffset = offset.scale(1 / (navigator?.scale ?? 1))
@@ -81,8 +93,7 @@ const layerStyle = computed(() => ({
         graph.setNodeVisualization(id, $event != null ? { identifier: $event } : {})
       "
       @update:visualizationEnabled="graph.setNodeVisualization(id, { visible: $event })"
-      @update:visualizationWidth="graph.setNodeVisualization(id, { width: $event })"
-      @update:visualizationHeight="graph.setNodeVisualization(id, { height: $event })"
+      @resizeVisualization="resizeVisualization(id, $event)"
     />
     <UploadingFile
       v-for="(nameAndFile, index) in uploadingFiles"

@@ -5,13 +5,12 @@ import {
   nodeIdFromOuterAst,
   type NodeId,
 } from '$/providers/openedProjects/graph/graphDatabase'
-import type { ModuleStore } from '$/providers/openedProjects/module/module'
 import { assert, assertDefined } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import { Vec2 } from '@/util/data/vec2'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import { expect, test, vi } from 'vitest'
-import { ref, watchEffect } from 'vue'
+import { watchEffect } from 'vue'
 import { buildForest } from '../streamLayout'
 import { buildTidyModel, useGraphTidy } from '../useGraphTidy'
 
@@ -65,18 +64,20 @@ function setUpDb(code: string = CODE) {
   return { db, func, nodeId }
 }
 
-/** A minimal fake `GraphStore`/`ModuleStore` pair exposing only what `useGraphTidy` uses. */
+/** A minimal fake `GraphStore` exposing only what `useGraphTidy` uses. */
 function setUpStores(db: GraphDb, func: Ast.FunctionDef) {
   const setNodePosition = vi.fn()
+  const setNodePositions = vi.fn((moves: Iterable<readonly [NodeId, Vec2]>) => {
+    for (const [id, position] of moves) setNodePosition(id, position)
+  })
   const graphStore = {
     db,
     visibleArea: () => undefined,
     setNodePosition,
+    setNodePositions,
     pickInCodeOrder: pickInCodeOrder(func),
   } as unknown as GraphStore
-  const batchEdits = vi.fn((f: () => void) => f())
-  const module = ref({ batchEdits } as unknown as ModuleStore)
-  return { graphStore, module, setNodePosition, batchEdits }
+  return { graphStore, setNodePosition, setNodePositions }
 }
 
 test('buildTidyModel: one component per node, in code order', () => {
@@ -225,40 +226,40 @@ test('buildTidyModel: a function argument becomes a root input component, wired 
 
 test('useGraphTidy: tidies the whole graph when nothing (or one node) is selected', () => {
   const { db, func, nodeId } = setUpDb()
-  const { graphStore, module, setNodePosition, batchEdits } = setUpStores(db, func)
+  const { graphStore, setNodePosition, setNodePositions } = setUpStores(db, func)
 
-  useGraphTidy(graphStore, module).tidy()
-  expect(batchEdits).toHaveBeenCalledTimes(1)
+  useGraphTidy(graphStore).tidy()
+  expect(setNodePositions).toHaveBeenCalledTimes(1)
   expect(setNodePosition).toHaveBeenCalledTimes(5)
 
   setNodePosition.mockClear()
-  batchEdits.mockClear()
+  setNodePositions.mockClear()
 
   // A single selected node is the same as no selection: the whole graph is tidied, not just it.
-  useGraphTidy(graphStore, module).tidy([nodeId('data')])
-  expect(batchEdits).toHaveBeenCalledTimes(1)
+  useGraphTidy(graphStore).tidy([nodeId('data')])
+  expect(setNodePositions).toHaveBeenCalledTimes(1)
   expect(setNodePosition).toHaveBeenCalledTimes(5)
 })
 
 test('useGraphTidy: tidies only the selection when more than one node is selected', () => {
   const { db, func, nodeId } = setUpDb()
-  const { graphStore, module, setNodePosition, batchEdits } = setUpStores(db, func)
+  const { graphStore, setNodePosition, setNodePositions } = setUpStores(db, func)
 
-  useGraphTidy(graphStore, module).tidy([nodeId('filtered'), nodeId('joined')])
+  useGraphTidy(graphStore).tidy([nodeId('filtered'), nodeId('joined')])
 
-  expect(batchEdits).toHaveBeenCalledTimes(1)
+  expect(setNodePositions).toHaveBeenCalledTimes(1)
   expect(setNodePosition).toHaveBeenCalledTimes(2)
 })
 
 test('useGraphTidy: writes real column positions — the child continuing a column shares its parent’s left x and sits below it', () => {
   const { db, func, nodeId } = setUpDb()
-  const { graphStore, module, setNodePosition } = setUpStores(db, func)
+  const { graphStore, setNodePosition } = setUpStores(db, func)
   // Components are left-aligned in their column, so this holds regardless of size; a fixed size
   // for every component just keeps the fixture simple.
   const size = new Vec2(100, 32)
   vi.spyOn(graphStore, 'visibleArea').mockReturnValue({ size } as any)
 
-  useGraphTidy(graphStore, module).tidy()
+  useGraphTidy(graphStore).tidy()
 
   const written = new Map(setNodePosition.mock.calls.map(([id, pos]) => [id, pos as Vec2]))
   const dataPos = written.get(nodeId('data'))
@@ -272,14 +273,14 @@ test('useGraphTidy: writes real column positions — the child continuing a colu
 
 test('useGraphTidy: a non-finite position is not written and does not crash the layout', () => {
   const { db, func, nodeId } = setUpDb()
-  const { graphStore, module, setNodePosition, batchEdits } = setUpStores(db, func)
+  const { graphStore, setNodePosition, setNodePositions } = setUpStores(db, func)
   const lonelyId = nodeId('lonely')
   // As a freshly-created, never-placed node would be (see `assignPositions`'s docstring above).
   db.nodeIdToNode.get(lonelyId)!.position = new Vec2(Infinity, Infinity)
 
-  expect(() => useGraphTidy(graphStore, module).tidy()).not.toThrow()
+  expect(() => useGraphTidy(graphStore).tidy()).not.toThrow()
 
-  expect(batchEdits).toHaveBeenCalledTimes(1)
+  expect(setNodePositions).toHaveBeenCalledTimes(1)
   expect(setNodePosition).toHaveBeenCalledTimes(4)
   expect(setNodePosition.mock.calls.map(([id]) => id)).not.toContain(lonelyId)
 })
@@ -288,10 +289,10 @@ test('useGraphTidy: does nothing with fewer than two in-scope components', () =>
   const { db, func } = setUpDb(`main =
     lonely = 42
 `)
-  const { graphStore, module, setNodePosition, batchEdits } = setUpStores(db, func)
+  const { graphStore, setNodePosition, setNodePositions } = setUpStores(db, func)
 
-  useGraphTidy(graphStore, module).tidy()
+  useGraphTidy(graphStore).tidy()
 
-  expect(batchEdits).not.toHaveBeenCalled()
+  expect(setNodePositions).not.toHaveBeenCalled()
   expect(setNodePosition).not.toHaveBeenCalled()
 })

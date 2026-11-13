@@ -238,6 +238,8 @@ export function updateAiNode(options: UpdateAiNodeOptions): Result {
     colorOverride: oldNodeMeta.get('colorOverride'),
     displayMode: oldNodeMeta.get('displayMode'),
     cachedAppearance: oldNodeMeta.get('cachedAppearance'),
+    // Copied as it is, never changed: the read-only view can stand for the mutable type.
+    displaced: oldNodeMeta.get('displaced') as Ast.NodeMetadataFields['displaced'],
   })
   for (const [widgetKey, widgetMeta] of oldCallExpr.widgetsMetadata()) {
     newCallAst.setWidgetMetadata(widgetKey, widgetMeta)

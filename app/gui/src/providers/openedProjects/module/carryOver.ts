@@ -6,18 +6,20 @@ import type { ExternalId } from 'ydoc-shared/yjsModel'
 import type * as Y from 'yjs'
 
 /**
- * The node metadata a session replacement carries over: what the user set on a node. The cached
- * appearance is left out; it is derived, and the new session computes it again.
+ * The node metadata a session replacement carries over: what the user set on a node, and where a
+ * pushed node came from (it travels with the position it explains). The cached appearance is left
+ * out; it is derived, and the new session computes it again.
  */
 export type CarriedNodeMetadata = Pick<
   NodeMetadataFields,
-  'position' | 'visualization' | 'colorOverride' | 'displayMode'
+  'position' | 'visualization' | 'colorOverride' | 'displayMode' | 'displaced'
 >
 const CARRIED_METADATA_KEYS = [
   'position',
   'visualization',
   'colorOverride',
   'displayMode',
+  'displaced',
 ] as const satisfies readonly (keyof CarriedNodeMetadata)[]
 
 /**

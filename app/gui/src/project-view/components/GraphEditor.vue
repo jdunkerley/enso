@@ -259,7 +259,7 @@ const { copyNodesToClipboard, createNodesFromClipboard } = useGraphEditorClipboa
 const showCodeEditor = ref(false)
 const dockTab = useDockTab()
 const codeTabFocus = provideCodeTabFocus()
-const graphTidy = useGraphTidy(graphStore, module)
+const graphTidy = useGraphTidy(graphStore)
 
 const localVersioning = useLocalVersioning()
 const { getText } = useText()
@@ -366,11 +366,9 @@ const actionHandlers = registerHandlers({
         selected,
         (id) => graphStore.db.nodeIdToNode.get(id)?.vis?.visible === true,
       )
-      module.value.batchEdits(() => {
-        for (const nodeId of selected) {
-          graphStore.setNodeVisualization(nodeId, { visible: !allVisible })
-        }
-      })
+      graphStore.setNodesVisualization(
+        Array.from(selected, (id) => [id, { visible: !allVisible }] as const),
+      )
     },
   },
   'graph.pasteNode': { action: createNodesFromClipboard },
@@ -396,7 +394,7 @@ const actionHandlers = registerHandlers({
     {
       collapseNodes,
       copyNodesToClipboard,
-      ...createSelectionAlignmentHandlers(graphStore, module),
+      ...createSelectionAlignmentHandlers(graphStore),
       deleteNodes: (nodes) => graphStore.deleteNodes(nodes.map(nodeId)),
       deleteAndConnectAround: (nodes) => {
         return module.value.edit(async (edit) => {
@@ -419,12 +417,18 @@ const actionHandlers = registerHandlers({
               'Errors occurred while connecting around removed components.',
             )
           }
+          const deleted: NodeId[] = []
           for (const node of nodes) {
             // We cannot call graphStore.deleteNodes, because it bases on the graphDb
             // which is not updated with reconnections above.
             const outerAst = edit.getVersion(node.outerAst)
-            if (outerAst.isStatement()) Ast.deleteFromParentBlock(outerAst)
+            if (outerAst.isStatement()) {
+              Ast.deleteFromParentBlock(outerAst)
+              deleted.push(nodeId(node))
+            }
           }
+          // Only the deleted nodes leave: what they were pushing returns.
+          graphStore.releasePushedBy(deleted, edit)
           return Ok()
         })
       },
@@ -808,6 +812,8 @@ function collapseNodes(nodes: Node[]) {
         renameSchedule?.scheduleFunctionRename({ ...currentPointer, name: collapsedName })
       }
 
+      // The collapsed nodes leave this graph: what they were pushing returns.
+      graphStore.releasePushedBy(selected, edit)
       return Ok()
     })
   } catch (err) {

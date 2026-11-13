@@ -17,6 +17,8 @@ export interface ResizeHandlesEventRegistry {
   onResize: RegisterCallback<Vec2>
   onResizeWidth: (callback: (value: number, delta: number) => void) => void
   onResizeHeight: RegisterCallback<number>
+  /** The bounds after each step of a drag, and the sides being dragged. */
+  onBoundsChange: (callback: (bounds: Rect, resizing: BoundsSet) => void) => void
 }
 
 /** Provides a higher-level API on top of the {@link ResizeHandles} component. */
@@ -28,6 +30,7 @@ export function useResizeHandles(options: ResizeHandlesOptions) {
   const onResize = useCallbackRegistry<[Vec2]>()
   const onResizeWidth = useCallbackRegistry<[number, number]>()
   const onResizeHeight = useCallbackRegistry<[number]>()
+  const onBoundsChange = useCallbackRegistry<[Rect, BoundsSet]>()
   const events = {
     'update:resizing': (value: BoundsSet) => {
       resizing = value
@@ -46,6 +49,7 @@ export function useResizeHandles(options: ResizeHandlesOptions) {
           right: initialBounds.right + scaled.x,
         }),
       )
+      onBoundsChange.run(bounds, resizing)
       onResize.run(bounds.size)
       if (resizing.left || resizing.right) onResizeWidth.run(bounds.size.x, delta.x)
       if (resizing.top || resizing.bottom) onResizeHeight.run(bounds.size.y)
@@ -60,6 +64,7 @@ export function useResizeHandles(options: ResizeHandlesOptions) {
     onResize: onResize.register,
     onResizeWidth: onResizeWidth.register,
     onResizeHeight: onResizeHeight.register,
+    onBoundsChange: onBoundsChange.register,
   }
   return {
     events,

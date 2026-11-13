@@ -1,6 +1,7 @@
 import type { Node } from '$/providers/openedProjects/graph'
 import testCases from '@/components/GraphEditor/__tests__/clipboardTestCases.json' with { type: 'json' }
 import {
+  copiedNodeMetadata,
   isSpreadsheetTsv,
   nodesFromClipboardContent,
   nodesToClipboardData,
@@ -114,4 +115,17 @@ test.each(spreadsheetTestCases)('Spreadsheet test case: $spreadsheet', async (te
       expect(nodes[0].expression).toBe(testCase.ensoCode)
     }
   }
+})
+
+test('a copied node does not carry the place it was pushed from', () => {
+  const metadata = {
+    position: { x: 0, y: 202 },
+    colorOverride: '#ff0000',
+    displaced: { home: { x: 0, y: 52 }, at: { x: 0, y: 202 }, by: [] },
+  }
+  expect(copiedNodeMetadata(metadata)).toEqual({
+    position: { x: 0, y: 202 },
+    colorOverride: '#ff0000',
+  })
+  expect(metadata.displaced).toBeDefined()
 })

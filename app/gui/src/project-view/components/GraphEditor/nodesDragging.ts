@@ -8,7 +8,15 @@ import { Rect } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
 import theme from '@/util/theme.json'
 import * as iter from 'enso-common/src/utilities/data/iter'
-import { computed, markRaw, ref, watchEffect, type ComputedRef, type WatchStopHandle } from 'vue'
+import {
+  computed,
+  markRaw,
+  onScopeDispose,
+  ref,
+  watchEffect,
+  type ComputedRef,
+  type WatchStopHandle,
+} from 'vue'
 
 const DRAG_SNAP_THRESHOLD = 16
 const VERTICAL_GAP = theme.node.vertical_gap
@@ -134,10 +142,16 @@ export function useNodesDragging() {
     draggedNodes: Map<NodeId, DraggedNode>
     grid: SnapGrid
     stopPositionUpdate: WatchStopHandle
+    /**
+     * The drag writes positions on every frame and the final ones when it ends: a pause before
+     * the release must not split it into two undo steps.
+     */
+    releaseUndoStep: () => void
 
     /** Start dragging: initialize all properties and animations above */
     constructor(movedId: NodeId) {
       markRaw(this)
+      this.releaseUndoStep = module.value.undoManager.holdStep()
       function* draggedNodes(): Generator<[NodeId, DraggedNode]> {
         const ids = selection?.isSelected(movedId) ? selection.selected : [movedId]
         for (const id of ids) {
@@ -183,7 +197,20 @@ export function useNodesDragging() {
     /** Finish dragging and set nodes' positions */
     finishDragging(): void {
       this.stopPositionUpdate()
-      this.updateNodesPosition()
+      try {
+        this.updateNodesPosition()
+        // The drag is over: the nodes the dragged ones were pushing return, and a dragged node
+        // forgets the place it was pushed from. `updateNodesPosition` has dropped any node that
+        // something else moved meanwhile. A node that did not move (a click is a drag that went
+        // nowhere) was not moved by hand, and keeps its home.
+        graph.value.setNodePositions(
+          Array.from(this.draggedNodes)
+            .filter(([, dragged]) => !dragged.currentPos.equals(dragged.initialPos))
+            .map(([id, dragged]) => [id, dragged.currentPos] as const),
+        )
+      } finally {
+        this.releaseUndoStep()
+      }
     }
 
     /** Cancel drag and reset nodes' positions */
@@ -194,7 +221,17 @@ export function useNodesDragging() {
       snapYTarget.value = 0
       snapX.skip()
       snapY.skip()
-      this.updateNodesPosition()
+      try {
+        this.updateNodesPosition()
+      } finally {
+        this.releaseUndoStep()
+      }
+    }
+
+    /** Drop the drag without writing anything: the editor is going away. */
+    abandon(): void {
+      this.stopPositionUpdate()
+      this.releaseUndoStep()
     }
 
     private createSnapGrid() {
@@ -226,6 +263,11 @@ export function useNodesDragging() {
   }
 
   let currentDrag: CurrentDrag | undefined
+  // A drag still open when the graph editor goes must not hold the undo step for what follows.
+  onScopeDispose(() => {
+    currentDrag?.abandon()
+    currentDrag = undefined
+  })
 
   return {
     startOrUpdate(movedId: NodeId, offset: Vec2) {

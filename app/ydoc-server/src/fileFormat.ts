@@ -27,6 +27,19 @@ const cachedAppearance = z.object({
   icon: z.string().max(64).optional(),
 })
 
+const displaced = z.object({
+  home: vector,
+  at: vector,
+  by: z.array(
+    z.object({
+      id: z.string().uuid(),
+      gap: z.number(),
+      dir: z.enum(['down', 'right']),
+    }),
+  ),
+  under: z.array(z.string().uuid()).optional(),
+})
+
 export type NodeMetadata = z.infer<typeof nodeMetadata>
 const nodeMetadata = z
   .object({
@@ -39,6 +52,8 @@ const nodeMetadata = z
     displayMode: z.enum(['expanded', 'collapsed']).optional(),
     // A cache: a malformed value drops only this field, never the whole node record.
     cachedAppearance: cachedAppearance.optional().catch(() => undefined),
+    // Layout state: a malformed value drops only this field, never the whole node record.
+    displaced: displaced.optional().catch(() => undefined),
   })
   .passthrough()
 

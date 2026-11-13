@@ -70,6 +70,41 @@ bottom dock is open, and an open component browser with its input
 outlive the view already. State added to the view that a user would miss after a
 reconnect belongs there too (#604).
 
+## Nodes make room
+
+Showing, hiding or resizing a node's visualization moves the nodes in its way
+and puts them back afterwards. The rule is the pure function
+`components/GraphEditor/nodeDisplacement.ts`; the graph store's side is
+`$/providers/openedProjects/graph/displacement.ts`. A pushed node's home is
+saved in its metadata (`displaced`). Four things to keep:
+
+- **Change a node's visualization or position through the store's setters**
+  (`setNodeVisualization`, `setNodesVisualization`, `setNodePositions` for a
+  move by hand, `releasePushedBy` for a removal inside an edit, and
+  `repointPushedBy` when a node is replaced in place, as an AI node is, so it
+  keeps what it pushes). They lay out before they write, in one edit, so the
+  pushes share the action's undo step. `setNodePosition` alone is for a drag's
+  frames. `setNodePositions` makes every node it is given forget its home, moved
+  or not (Tidy up over the whole graph clears every home), so a finished drag
+  passes only the nodes that actually moved: a click is not a move.
+- **Call a layout setter at most once per outer transaction**, passing every
+  node in that one call: the node database it lays out against is updated only
+  when the transaction commits, so a second call in the same `batchEdits` or
+  edit sees the graph as it was before the first.
+- **Rectangles are computed, not measured**: from metadata and
+  `graph.nodeBareSizes`. `graph.nodeRects` lags by a frame and includes a
+  Ctrl-hover preview. A change to how a visualization sizes itself goes in
+  `visualizationSize`, which the store shares with the component.
+- **A drag holds one undo step** (`module.undoManager.holdStep`): a
+  visualization handle drag, and a node drag by pointer or arrow keys
+  (`nodesDragging.ts`, so a pause before the release does not split it). It must
+  release the step on every way a drag can end: finish, cancel, the handles or
+  the dragged node unmounting, the editor going. Overlapping holds make one step
+  that ends with the last release; `stopCapturing()` from anything else (the
+  deselect-all boundary) still ends it.
+
+The design is `docs/superpowers/specs/2026-11-13-node-displacement-design.md`.
+
 ## Visualizations
 
 Each visualization in `components/visualizations/` is compiled as a **custom

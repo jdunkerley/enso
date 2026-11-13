@@ -68,6 +68,7 @@ function setupHarness(): Harness {
     },
     registerExtraOccupiedAreas: vi.fn(() => () => {}),
     generateLocallyUniqueIdent: (s: string) => s,
+    repointPushedBy: vi.fn(),
   } as unknown as OngoingAiPromptsDeps['graphStore']
 
   const module = computed(
