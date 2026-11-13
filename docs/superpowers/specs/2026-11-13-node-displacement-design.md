@@ -59,7 +59,7 @@ nothing.
 | Visualization previewed with Ctrl-hover             | No: transient. A change from today's behaviour |
 | Node content grows (new argument, longer text)      | No: nodes would shuffle during an edit         |
 | Node collapsed, expanded, or edited in place        | No: same reason                                |
-| Left edge dragged                                   | No: would push left. A change from today       |
+| Left edge dragged                                   | No: the right edge stays still. A change       |
 | Visualization type switched, fullscreen left        | No size change, so nothing to do               |
 
 Editing a node hides its visualization while the edit lasts. That moves nothing:
@@ -106,13 +106,23 @@ Each pushed node remembers its **home**: its position before the first push.
   them stops pushing it, it returns as far as the other allows, and goes home
   when neither pushes it.
 - **Tidy up** over the whole graph clears every home: the tidied layout is the
-  new home. Over a selection it clears the homes of the nodes it places.
-- **Removing a pusher** (delete, delete and reconnect, collapse into a function,
-  replacement by the AI node) counts as closing it: the nodes it pushed return
-  in the same undo step.
+  new home. Over a selection it clears the homes of the nodes it places. Any
+  move by hand does the same for the nodes it is given, moved or not.
+- **Removing a pusher** (delete, delete and reconnect, collapse into a function)
+  counts as closing it: the nodes it pushed return in the same undo step. Only
+  the nodes actually removed count: an input node in the selection stays.
+- **An AI node replaced in place** keeps its position and its open visualization
+  under a new id, so it keeps what it pushes: the nodes it pushed are re-pointed
+  at the new id, not released.
 - **Moving a pusher** by hand (a drag, the arrow keys, Align, Spacing, Tidy up):
-  when the move is committed, the nodes it was pushing return home, in the
-  move's undo step. The moved node pushes nothing at its new place.
+  when the move is committed, the nodes it was pushing are placed afresh from
+  where it now is, in the move's undo step. Moved away, they return home. Nudged
+  while still over them, they stay pushed, and one pushed further out pushes
+  what it reaches. The moved node pushes nothing new at its new place.
+- **A left-handle resize moves the node**, so a pushed node resized that way
+  forgets its own home, as for any move by hand.
+- **A node created or pasted with its visualization already open** pushes
+  nothing: only a change to an existing node does.
 - **Copy and paste** does not copy a home.
 
 The home is saved with the project, so closing a visualization that has been
@@ -194,8 +204,12 @@ to rectangle `new`, in one edit:
    position), or remove the field from a node that is home.
 
 A removed pusher is the same procedure with an empty `new`. A pusher moved by
-hand is the same procedure with adding switched off: step 2 recomputes the nodes
-that list it and adds no new entries, whichever way it moved.
+hand is the same procedure with adding switched off for the moved node itself:
+step 2 recomputes the nodes that list it and adds no new entries for it. A node
+that this recompute moves further out is put on the list with adding on, so it
+pushes what it reaches; without that it would land on its neighbours. A node
+never pushes one of its own pushers, directly or through a chain: that is the
+one contact that could loop.
 
 Which side N is on, its gap, and whether a pusher is in line with it are all
 judged where the nodes were at home; only how far a pusher reaches is read from
@@ -265,7 +279,10 @@ node's file metadata field by field:
 - **A pusher moved by hand:** the commit of a drag or arrow-key move, Align,
   Spacing and Tidy up call `relayout` for each moved node that others list in
   `by`, with its old and new rectangle. A move is not a growth, so step 2 adds
-  no new pushers; the nodes it was pushing recompute and return.
+  no new pushers for the moved node; the nodes it was pushing recompute. They
+  all go through `setNodePositions`, which also clears the field of every node
+  it is given. A node drag holds one undo step from its start to its end, as a
+  handle drag does.
 - **The table-editor widget** (`ResizableWidget.vue`). It has a right handle
   only, and its size is in the widget's metadata. The node's widget size after
   the change is not known until render, so the new widget width is taken as the
@@ -273,9 +290,15 @@ node's file metadata field by field:
   usual formula, and does not grow at all while its visualization is the wider
   part. Second pull request.
 - **Removal of a node by the user:** `graphStore.deleteNodes`,
-  `deleteAndConnectAround`, `collapseNodes` and the AI node's replacement. The
-  first is an asynchronous edit on a fork, so `relayout` takes the edit to write
-  into.
+  `deleteAndConnectAround` and `collapseNodes`, through `releasePushedBy`. The
+  first is an asynchronous edit on a fork, so `relayout` takes the edit to read
+  from and write into.
+- **Replacement of an AI node:** `repointPushedBy(oldId, newId, edit)` rewrites
+  the `by` and `under` entries that name the old id.
+- **Every layout call happens at most once per outer transaction.** The node
+  database the layout reads is updated only when the transaction commits, so a
+  second call in the same transaction would lay out against the old graph. An
+  action that changes several nodes passes them in one call.
 
 A pusher that disappears any other way (an edit in the code editor, a version
 restore) triggers nothing. The nodes it pushed stay where they are, and their
