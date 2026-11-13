@@ -12,17 +12,18 @@ import Standard.Base.System.Input_Stream.Input_Stream
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Text_Input
 
-import project.Internal.Java_Problems
+import Standard.Table.Internal.Java_Problems
 import Standard.Base.Internal.Telemetry
-import project.Internal.Widget_Helpers
-import project.Table.Table
-import project.In_Memory_Table.In_Memory_Table
-from project.In_Memory_Table import from_java_table
+import Standard.Table.Internal.Widget_Helpers
+import Standard.Table.Table.Table
+import Standard.Table.In_Memory_Table.In_Memory_Table
+from Standard.Table.Internal.In_Memory_Helpers import from_java_table
+import project.Main
 
 polyglot java import java.io.FileNotFoundException
 polyglot java import java.lang.IllegalArgumentException
 polyglot java import java.lang.IllegalStateException
-polyglot java import org.enso.table.read.YXDBReader
+polyglot java import org.enso.yxdb.YXDBReader
 
 ## A file format for reading YXDB files.
 type YXDB_Format

@@ -1,4 +1,4 @@
-package org.enso.table.read;
+package org.enso.yxdb;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;

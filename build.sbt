@@ -140,6 +140,7 @@ GatherLicenses.distributions := Seq(
     "Fixed_Width",
     Distribution.sbtProjects(`std-fixed-width`)
   ),
+  makeStdLibDistribution("YXDB", Distribution.sbtProjects(`std-yxdb`)),
   makeStdLibDistribution("Image", Distribution.sbtProjects(`std-image`)),
   makeStdLibDistribution("AWS", Distribution.sbtProjects(`std-aws`)),
   // A JAR wrapper whose output a library ships (`extraJars`,
@@ -292,7 +293,8 @@ ciBuildEngineDistribution := Def
             "Image",
             "Database",
             "SQLite",
-            "Postgres"
+            "Postgres",
+            "YXDB"
           )
         ) {
           GatherLicenses.verifyPackageAt(
@@ -529,6 +531,7 @@ lazy val enso = (project in file("."))
     `std-postgres`,
     `std-edi`,
     `std-fixed-width`,
+    `std-yxdb`,
     `std-duckdb`,
     `sqlite-wrapper`,
     `syntax-rust-definition`,
@@ -2726,6 +2729,7 @@ lazy val runtime = (project in file("engine/runtime"))
       .dependsOn(`std-postgres` / Compile / packageBin)
       .dependsOn(`std-edi` / Compile / packageBin)
       .dependsOn(`std-fixed-width` / Compile / packageBin)
+      .dependsOn(`std-yxdb` / Compile / packageBin)
       .dependsOn(`std-snowflake` / Compile / packageBin)
       .dependsOn(`std-table` / Compile / packageBin)
       .dependsOn(`std-tableau` / Compile / packageBin)
@@ -3956,6 +3960,7 @@ lazy val `std-benchmarks` = (project in file("std-bits/benchmarks"))
         (`std-postgres` / Compile / packageBin).value
         (`std-edi` / Compile / packageBin).value
         (`std-fixed-width` / Compile / packageBin).value
+        (`std-yxdb` / Compile / packageBin).value
         (`std-snowflake` / Compile / packageBin).value
         (`std-table` / Compile / packageBin).value
         (`std-tableau` / Compile / packageBin).value
@@ -4451,6 +4456,8 @@ val `edi-polyglot-root` =
   stdLibComponentRoot("EDI") / "polyglot" / "java"
 val `fixed-width-polyglot-root` =
   stdLibComponentRoot("Fixed_Width") / "polyglot" / "java"
+val `yxdb-polyglot-root` =
+  stdLibComponentRoot("YXDB") / "polyglot" / "java"
 val `database-test-suite-polyglot-root` =
   stdLibComponentRoot("Database_Test_Suite") / "polyglot" / "java"
 val `std-aws-polyglot-root` =
@@ -4677,7 +4684,6 @@ lazy val `std-table` = project
       "org.antlr"                % "antlr4-runtime"        % antlrVersion,
       "org.apache.logging.log4j" % "log4j"                 % "2.24.3",
       "org.apache.logging.log4j" % "log4j-to-slf4j"        % "2.24.3", // org.apache.poi uses log4j
-      "uk.co.jdunkerley"         % "yxdb-java"             % "0.1.4",
       "org.graalvm.truffle"      % "truffle-api"           % graalMavenPackagesVersion % Test,
       "junit"                    % "junit"                 % junitVersion              % Test,
       "com.github.sbt"           % "junit-interface"       % junitIfVersion            % Test,
@@ -5460,6 +5466,43 @@ lazy val `std-fixed-width` = project
     clean := Def.task {
       val _ = clean.value
       IO.delete(`fixed-width-polyglot-root`)
+    }.value
+  )
+  .dependsOn(`std-base` % "provided")
+  .dependsOn(`std-table` % "provided")
+
+lazy val `std-yxdb` = project
+  .in(file("std-bits") / "yxdb")
+  .settings(
+    frgaalJavaCompilerSetting,
+    autoScalaLibrary := false,
+    Compile / compile / compileInputs := (Compile / compile / compileInputs)
+      .dependsOn(SPIHelpers.ensureSPIConsistency)
+      .value,
+    Compile / packageBin / artifactPath :=
+      `yxdb-polyglot-root` / "std-yxdb.jar",
+    libraryDependencies ++= Seq(
+      "org.graalvm.polyglot" % "polyglot" % graalMavenPackagesVersion % "provided",
+      "uk.co.jdunkerley"     % "yxdb-java" % "0.1.4"
+    ),
+    Compile / packageBin := {
+      val result            = (Compile / packageBin).value
+      val cacheStoreFactory = streams.value.cacheStoreFactory
+      StdBits
+        .copyDependencies(
+          `yxdb-polyglot-root`,
+          Seq("std-yxdb.jar"),
+          ignoreScalaLibrary = true,
+          libraryUpdates     = (Compile / update).value,
+          unmanagedClasspath = (Compile / unmanagedClasspath).value,
+          logger             = streams.value.log,
+          cacheStoreFactory
+        )
+      result
+    },
+    clean := Def.task {
+      val _ = clean.value
+      IO.delete(`yxdb-polyglot-root`)
     }.value
   )
   .dependsOn(`std-base` % "provided")
