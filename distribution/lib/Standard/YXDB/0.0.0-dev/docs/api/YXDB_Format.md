@@ -1,5 +1,5 @@
 ## Enso Signatures 1.0
-## module Standard.Table.YXDB_Format
+## module Standard.YXDB.YXDB_Format
 - type YXDB_Format
     - YXDB_Format
     - for_file_write file:Standard.Base.Any.Any -> Standard.Base.Any.Any

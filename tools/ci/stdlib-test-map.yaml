@@ -39,6 +39,7 @@ libraries:
   Test: { stdBits: [], dependsOn: [Base] }
   Visualization: { stdBits: [], dependsOn: [Base, Database, Table] }
   XML: { stdBits: [], dependsOn: [Base, Table] }
+  YXDB: { stdBits: [yxdb], dependsOn: [Base, Table] }
 
 testProjects:
   AWS_Tests:
@@ -106,6 +107,9 @@ testProjects:
     testImports: []
   XML_Tests:
     imports: [Base, Table, Test, Visualization, XML]
+    testImports: []
+  YXDB_Tests:
+    imports: [Base, Table, Test, YXDB]
     testImports: []
 
 # The jobs a standard library suite that runs "every project but …" splits into; a suite with an

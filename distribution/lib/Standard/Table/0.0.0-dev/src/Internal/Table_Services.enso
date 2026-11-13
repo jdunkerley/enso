@@ -5,7 +5,6 @@ import Standard.Base.System.File_Format.File_Format_SPI
 
 import project.Delimited.Delimited_Format.Delimited_Format
 import project.Excel.Excel_Format.Excel_Format
-import project.YXDB_Format.YXDB_Format
 import project.Return_As_Table.Return_As_Table
 
 type Impl
@@ -14,8 +13,7 @@ File_Format_SPI.from (that:Impl) =
     _ = that
     excel = File_Format_SPI.new Excel_Format "excel"
     delim = File_Format_SPI.new Delimited_Format "delimited"
-    yxdb = File_Format_SPI.new YXDB_Format "yxdb"
-    excel+delim+yxdb
+    excel+delim
 
 Return_As.SPI.from (that:Impl) =
     _ = that

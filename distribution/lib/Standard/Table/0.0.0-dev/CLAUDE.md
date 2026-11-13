@@ -58,6 +58,9 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
 - Fixed-width text reading is not part of this library either: it moved to
   `Standard.Fixed_Width` (`from Standard.Fixed_Width import all`).
 
+- Alteryx `.yxdb` reading is not part of this library either: it moved to
+  `Standard.YXDB` (`from Standard.YXDB import all`).
+
 ## Where to read more
 
 - `src/Table.enso` — type definition with method docs.

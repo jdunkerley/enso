@@ -34,6 +34,7 @@ One directory per suite, typically:
 - `EDI_Tests/` — `Standard.EDI`: reading `.822`/`.edi` files with the default,
   raw and custom definitions.
 - `Fixed_Width_Tests/` — `Standard.Fixed_Width`: reading fixed-width text files.
+- `YXDB_Tests/` — `Standard.YXDB`: reading `.yxdb` files and spatial to GeoJSON.
 - `XML_Tests/` — `Standard.XML`: parsing, XPath, writing, `Table.to_xml`, the
   table conversions and the Table visualisation of XML values.
 - `Examples_Tests/` — runs the `Standard.Examples` workflows and asserts their
