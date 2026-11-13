@@ -293,8 +293,11 @@ const nodeEditHandler = nodeEditBindings.handler({
 let prevNodeRect: Rect | undefined = undefined
 watchEffect(() => {
   if (nodeDomSize.value.isZero()) return
-  const width = Math.max(nodeDomSize.value.x, visualizationWidth.value)
-  const height = nodeDomSize.value.y + vizHeight.value
+  // A previewed visualization (modifier held while hovering) floats over the graph: it is not part
+  // of the node's rectangle, so the node's edges and output port stay where they are.
+  const vizInRect = !isVisualizationPreviewed.value
+  const width = Math.max(nodeDomSize.value.x, vizInRect ? visualizationWidth.value : 0)
+  const height = nodeDomSize.value.y + (vizInRect ? vizHeight.value : 0)
   const newRect = new Rect(props.node.position, new Vec2(width, height))
   if (!prevNodeRect?.equals(newRect)) {
     emit('update:rect', newRect)

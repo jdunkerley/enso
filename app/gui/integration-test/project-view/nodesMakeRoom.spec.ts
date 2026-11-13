@@ -154,3 +154,33 @@ test('A visualization previewed with the modifier held moves no node', async ({
   expect(await positions(page)).toEqual(before)
   await editorPage.up('Mod')
 })
+
+/** The drawn path of every edge leaving the node with the given binding. */
+async function edgePathsFrom(page: Page, binding: string): Promise<(string | null)[]> {
+  const edges = await locate.connectedEdgesFromNodeWithBinding(page, binding)
+  return edges
+    .locator('path.edge.visible')
+    .evaluateAll((elements) => elements.map((element) => element.getAttribute('d')))
+}
+
+test('A previewed visualization leaves the edges alone; a pinned one reroutes them', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const before = await edgePathsFrom(page, OPENED)
+  expect(before.length).toBeGreaterThan(0)
+  const box = (await locate.graphNodeByBinding(page, OPENED).boundingBox())!
+  await editorPage.down('Mod')
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await expect(locate.anyVisualization(page)).toBeVisible()
+  // Give a reroute, if there were one, time to land.
+  await page.waitForTimeout(500)
+  expect(await edgePathsFrom(page, OPENED)).toEqual(before)
+  await editorPage.up('Mod')
+  await expect(locate.anyVisualization(page)).toBeHidden()
+
+  await toggleVisualization(page, OPENED)
+  await expect(locate.anyVisualization(page)).toBeVisible()
+  await expect.poll(() => edgePathsFrom(page, OPENED)).not.toEqual(before)
+})
