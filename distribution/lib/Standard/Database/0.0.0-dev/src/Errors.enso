@@ -155,7 +155,7 @@ type SQL_Timeout
        Convert the timeout error to a textual representation.
     to_text : Text
     to_text self =
-        query = if self.related_query.is_nothing.not then " [Query was: " + query + "]" else ""
+        query = if self.related_query.is_nothing.not then " [Query was: " + self.related_query + "]" else ""
         "The SQL connection timed out: " + self.java_exception.getMessage + "." + query
 
     ## ---
