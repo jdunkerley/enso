@@ -92,9 +92,13 @@ saved in its metadata (`displaced`). Four things to keep:
   when the transaction commits, so a second call in the same `batchEdits` or
   edit sees the graph as it was before the first.
 - **Rectangles are computed, not measured**: from metadata and
-  `graph.nodeBareSizes`. `graph.nodeRects` lags by a frame and includes a
-  Ctrl-hover preview. A change to how a visualization sizes itself goes in
-  `visualizationSize`, which the store shares with the component.
+  `graph.nodeBareSizes`. `graph.nodeRects` lags by a frame. A change to how a
+  visualization sizes itself goes in `visualizationSize`, which the store shares
+  with the component.
+- **A Ctrl-hover preview floats over the graph**: it is in neither the computed
+  rectangles nor `graph.nodeRects` (`GraphNode.vue`), so it moves no node and
+  the node's edges and output port stay on the bare node. Only a pinned
+  visualization reroutes edges.
 - **A drag holds one undo step** (`module.undoManager.holdStep`): a
   visualization handle drag, and a node drag by pointer or arrow keys
   (`nodesDragging.ts`, so a pause before the release does not split it). It must
