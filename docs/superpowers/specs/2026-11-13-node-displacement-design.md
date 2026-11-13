@@ -1,6 +1,7 @@
 # Nodes make room: pushing neighbours when a node changes size
 
-Date: 2026-11-13. Status: design, awaiting review.
+Date: 2026-11-13. Status: design, revised after review, awaiting the owner's
+answers to the open questions at the end.
 
 ## Summary
 
@@ -9,29 +10,38 @@ way move out of the way. When the visualization closes, or the node shrinks,
 they return to where they were.
 
 Upstream started this in enso-org/enso#14904 ("Move components when resizing
-viz"), which this fork carries as `nodesDisplacing.ts`. That work covers one
-trigger only, dragging a visualization's resize handle, and it moves more nodes
-than it needs to. This design replaces it.
+viz"), which this fork carries as `nodesDisplacing.ts`. It pushes on open and on
+a handle drag, but does not restore on close, moves more nodes than it needs to,
+and is outside undo. This design replaces it.
 
 ## What the code does today
 
 `app/gui/src/project-view/components/GraphEditor/nodesDisplacing.ts`, called
-from a watcher in `GraphNode/nodeVisualization.ts`.
+from a watcher on the visualization's size in `GraphNode/nodeVisualization.ts`.
+Read from the code; not run.
 
-- **One trigger.** The watcher returns early unless a visualization resize
-  handle is being dragged (its `resizing` flag). Opening or closing a
-  visualization, the node's own height handle, and the table-editor widget's
-  resize move nothing.
-- **Right and bottom edges only.** A drag that moves the top or left edge is
-  ignored.
+- **It pushes on a handle drag and on open, including the Ctrl-hover preview.**
+  The watcher acts only while `resizing` is set. `GraphVisualization.vue`
+  reports `resizing` during a handle drag and also from the moment a
+  visualization is hidden until it has next rendered (`isClosedOrOpening`), so
+  an open, or a preview, pushes.
+- **Closing probably pulls nothing back.** `resizing` is still false when the
+  size watcher runs on a close. This follows from the watchers' order and has
+  not been run.
+- **The node's height handle and the table-editor widget's resize move
+  nothing.**
+- **A left-handle drag pushes nodes to the right.** The pure function ignores a
+  change to the top or left edge, but the watcher builds both rectangles from
+  the node's current position, so a widening by the left handle reaches it as a
+  growth of the right edge.
 - **A block push.** If any node is within 32px of the growing edge, every node
   beyond that edge moves by the same amount, whether or not it would have
   overlapped.
-- **A session-only memory.** Shrinking pulls nodes back only as far as the point
-  where the push began, kept in one variable (`lastPushStart`). It is lost on
-  reload and when another node is resized.
+- **A per-component memory.** Shrinking pulls nodes back only as far as the
+  point where the push began, kept in one variable per `GraphNode`
+  (`lastPushStart`). It is lost when the component unmounts and on reload.
 - **Outside undo.** The moves are written with the `local:autoLayout` origin, so
-  undoing the resize leaves the neighbours pushed.
+  undoing a resize leaves the neighbours pushed.
 
 ## Behaviour
 
@@ -41,31 +51,40 @@ A node pushes its neighbours only when the user directly resizes it or shows or
 hides its visualization. A size change that is a side effect of editing pushes
 nothing.
 
-| Change                                              | Pushes                                 |
-| --------------------------------------------------- | -------------------------------------- |
-| Visualization shown or hidden (button or shortcut)  | Yes                                    |
-| Visualization resize handle dragged (right, bottom) | Yes                                    |
-| Node height handle dragged                          | Yes                                    |
-| Table-editor widget resized                         | Yes                                    |
-| Visualization previewed with Ctrl-hover             | No: transient, the graph would jump    |
-| Node content grows (new argument, longer text)      | No: nodes would shuffle during an edit |
-| Node collapsed, expanded, or edited in place        | No: same reason                        |
-| Top or left edge dragged                            | No: would push up or left              |
-| Visualization type switched, fullscreen left        | No size change, so nothing to do       |
+| Change                                              | Pushes                                         |
+| --------------------------------------------------- | ---------------------------------------------- |
+| Visualization shown or hidden (button or shortcut)  | Yes                                            |
+| Visualization resize handle dragged (right, bottom) | Yes                                            |
+| Node height handle dragged                          | Yes                                            |
+| Table-editor widget resized (its width)             | Yes                                            |
+| Visualization previewed with Ctrl-hover             | No: transient. A change from today's behaviour |
+| Node content grows (new argument, longer text)      | No: nodes would shuffle during an edit         |
+| Node collapsed, expanded, or edited in place        | No: same reason                                |
+| Left edge dragged                                   | No: would push left. A change from today       |
+| Visualization type switched, fullscreen left        | No size change, so nothing to do               |
+
+Editing a node hides its visualization while the edit lasts. That moves nothing:
+the neighbours stay pushed.
 
 ### Which nodes move, and where
 
-- A node moves only if the changed node's new rectangle, grown by a 32px gap,
-  would overlap it. It moves just far enough to clear the gap.
-- **Cascade.** If that move makes it overlap another node (with the gap), that
-  node moves too, and so on.
-- **Direction.** A node that starts below the changed node's old bottom edge
-  moves down. One that starts to the right of its old right edge moves right. A
-  node that is both (diagonal) moves down. Nothing moves up or left.
-- A node pushed by the cascade moves in the same direction as the node that
-  pushed it.
-- **Input nodes** (the function's arguments) are never moved, and nodes with no
-  measured rectangle are neither moved nor treated as obstacles.
+- A node moves only if the changed node's new rectangle, grown by a gap, would
+  overlap it. It moves just far enough to clear the gap.
+- **The gap** is 32px, or the gap the two nodes already had, whichever is
+  smaller. Nodes placed 20px apart (Tidy up's tight spacing) stay 20px apart
+  when pushed, and a node is never moved by a neighbour that merely grew near
+  it.
+- **Cascade.** If that move makes it overlap another node, that node moves too,
+  and so on.
+- **Direction.** When a growing node first reaches another: a node below its
+  bottom edge moves down, a node to the right of its right edge moves right, and
+  a node that is both (diagonal) moves down. The direction then stays fixed for
+  as long as that node is pushed. Nothing moves up or left.
+- A node pushed by the cascade gets its direction the same way, from its
+  position relative to the node that pushed it.
+- **Never moved:** input nodes (the function's arguments); nodes with no
+  position or no measured size; a node that already overlapped the changed node
+  before it grew.
 - The moves are immediate. There is no animation.
 
 ### Returning
@@ -75,19 +94,30 @@ Each pushed node remembers its **home**: its position before the first push.
 - When the visualization closes, or the node shrinks, each node it pushed
   returns towards its home as far as the gap allows. Closing returns them all
   the way.
-- **Moved by hand.** A pushed node that the user drags, or moves with the arrow
-  keys, forgets its home and stays where it was put.
-- **Home taken.** If another node, one that is not itself returning, now
-  overlaps the home, the pushed node stays where it is and forgets its home.
-- **Two pushers.** A node pushed by two nodes keeps its first home and returns
-  only when neither still pushes it.
-- **Tidy up** clears every home: the tidied layout is the new home.
-- **Deleting** a node counts as closing it: the nodes it pushed return in the
-  same undo step.
+- **Moved by hand.** A pushed node whose position is changed by anything other
+  than this feature (a drag, the arrow keys, Align, Spacing, Tidy up, the code
+  editor, a version restore) forgets its home and stays where it was put.
+- **Home taken.** If a node that is not one of its pushers now covers the place
+  it would return to, see open question 1.
+- **Two pushers.** A node pushed by two nodes keeps its first home. When one of
+  them stops pushing it, it returns as far as the other allows, and goes home
+  when neither pushes it.
+- **Tidy up** over the whole graph clears every home: the tidied layout is the
+  new home. Over a selection it clears the homes of the nodes it places.
+- **Removing a pusher** (delete, delete and reconnect, collapse into a function,
+  replacement by the AI node) counts as closing it: the nodes it pushed return
+  in the same undo step.
+- **Moving a pusher** by hand: see open question 2.
 - **Copy and paste** does not copy a home.
 
 The home is saved with the project, so closing a visualization that has been
 open for weeks still restores the layout.
+
+What is guaranteed is **reversal**: opening then closing, or growing then
+shrinking back, returns every node to its exact position, however the size got
+there. What is not guaranteed is that two different routes to the same size push
+a diagonal node the same way: its direction depends on which edge reached it
+first.
 
 ### Undo
 
@@ -95,138 +125,196 @@ The neighbours' moves belong to the same undo step as the action that caused
 them. Undoing "show visualization" hides it and puts the neighbours back in one
 step. A handle drag is one undo step from mouse down to mouse up.
 
+The moves are user edits like the action itself, so they clear the redo stack,
+as the action does.
+
 ## Design
 
 ### Saved state
 
-One optional field is added to `NodeMetadataFields`
-(`app/ydoc-shared/src/ast/tree.ts`):
+One optional field is added to the node metadata:
 
 ```ts
-displaced?: { home: { x: number; y: number }; by: ExternalId[] }
+displaced?: {
+  home: { x: number; y: number }
+  at: { x: number; y: number }
+  by: { id: ExternalId; gap: number; dir: 'down' | 'right' }[]
+}
 ```
 
 - `home`: the node's position before the first push.
-- `by`: the nodes whose size change pushed it, directly or through the cascade.
-- A node without the field is at home. Projects saved before this change have no
-  field, so they load unchanged, and a project saved with it opens in an older
-  build, which ignores the unknown field.
+- `at`: the position this feature last gave the node. If the node's position
+  differs from `at`, something else moved it, the field is ignored when read,
+  and it is removed at the next write. This is the whole of "moved by hand":
+  nothing that moves a node has to know about the field.
+- `by`: the nodes pushing it directly, each with the gap kept from it and the
+  direction of the push. In a cascade A → B → C, C lists B, not A.
+- An entry in `by` naming a node that no longer exists is ignored when read and
+  removed at the next write.
+- Pushed positions and homes are whole numbers, since the file rounds positions
+  and an unrounded `at` would not match after a reload.
 
-### One rule for open, resize and close
+**The position follows from the field.** A pushed node's position is its home
+plus, on each axis, the largest offset any of its pushers requires: the distance
+needed to clear that pusher's current rectangle by `gap` in `dir`, or zero. An
+entry whose offset is zero is dropped. A node with no entries left is at home
+and loses the field.
 
-Whenever node S changes size through one of the triggers, from rectangle `old`
-to rectangle `new`:
+That one statement gives the returning rules: a pusher that shrinks requires a
+smaller offset; one that closes requires none; with two pushers the larger
+offset wins, and the node comes back part of the way when the larger one goes.
 
-1. Every node whose `by` is exactly `[S]` is treated as being at its `home`.
-2. The cascade runs from `new`: any node within the gap of it moves just clear,
-   in the direction given by its position relative to `old`, and pushes what it
-   then overlaps.
-3. The results are written. A node that ends at its home loses the field. A node
-   that ends elsewhere keeps `home` (or gets its previous position as `home` if
-   it had none) and has S in `by`.
+### Recomputing
 
-Growing pushes; shrinking lets nodes return as far as the gap allows; closing is
-a shrink to the bare node. Because the rule always starts from the homes,
-applying it twice gives the same result as applying it once, and a resize made
-in many small steps ends in the same layout as one made in a single step. No
-state is kept outside the metadata.
+Whenever a node S changes size through one of the triggers, from rectangle `old`
+to rectangle `new`, in one edit:
 
-A node that lists S and another node in `by` is left where it is in step 1. It
-is moved in step 2 only if `new` reaches it. If `new` does not reach it, S is
-removed from its `by`.
+1. **Start a work list with S**, as (node, old rectangle, new rectangle).
+2. **For each item P on the list**, for every other eligible node N:
+   - If N lists P in `by`, recompute N's position from its field.
+   - Otherwise, if P's new rectangle is larger than its old one on the bottom or
+     right: let `g` be the smaller of 32 and the distance between P's old
+     rectangle and N. If that distance is negative (they already overlapped),
+     skip N. If P's new rectangle grown by `g` overlaps N, add P to N's `by`
+     with gap `g` and the direction given by N's position relative to P's old
+     rectangle, set N's `home` if it has none, and recompute N's position.
+   - If N's position changed, add N to the list with its old and new rectangle.
+3. **Write** each changed node's position and field (`at` set to the new
+   position), or remove the field from a node that is home.
 
-The home-taken rule is applied in step 3: a node whose result is its home, but
-whose home is overlapped by a node not moved in this pass, stays at its current
-position and loses the field.
+A removed pusher is the same procedure with an empty `new`.
+
+Positions only ever increase from the homes, and a pushed node is always below
+or to the right of its pusher, so the list cannot cycle. The implementation
+still caps the number of passes and stops with the positions it has, and a
+property test over random layouts checks that the cap is never reached and that
+reversal holds.
+
+Every rectangle used here is **computed, not measured**: a node's position and
+visualization metadata, plus its measured widget size (below). The rectangles in
+`graph.nodeRects` lag the metadata by a frame during a drag, include a
+Ctrl-hover preview, and do not reflect moves made earlier in the same edit, so
+they are not used. Node comments and messages are outside these rectangles, as
+they are outside `nodeRects` today.
+
+When several nodes change in one action (the shortcut on a multi-selection),
+they are processed top to bottom in one edit, each seeing the positions the
+previous one produced.
 
 ### Code
 
-| Piece                                          | Role                                                                                                                                                                                                        |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GraphEditor/nodeDisplacement.ts`              | The rule above as a pure function: S, `old`, `new`, and each other node's rectangle and `displaced` field in; new positions and fields out. No Vue and no store. Replaces `nodesDisplacing.ts`.             |
-| `visualizationSize`                            | The width and height formula now inside `GraphVisualization.vue` (`MIN_WIDTH_PX`, `MIN_CONTENT_HEIGHT_PX`, `DEFAULT_CONTENT_HEIGHT_PX`), moved to a shared function used by the component and by the store. |
-| Graph store (`providers/openedProjects/graph`) | An internal `relayoutAround(S, old, new)` that calls the pure function and writes positions and fields inside the caller's edit.                                                                            |
-| `nodeVisualization.ts`, `GraphNode.vue`        | The `visibleSize` watcher, the `resizing` flag and the `onResize` callback are removed.                                                                                                                     |
-
-A visualization's size is not measured from the DOM: it is computed from the
-saved width and height, the node's own size and the three constants. So the
-store knows the rectangle a visualization will have before it renders, and can
-write the size change and the moves in one edit.
+| Piece                                          | Role                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GraphEditor/nodeDisplacement.ts`              | The procedure above as a pure function: the changed nodes with their old and new rectangles, and every node's rectangle and `displaced` field in; new positions and fields out. No Vue and no store. Replaces `nodesDisplacing.ts`.                                                                                      |
+| `visualizationSize`                            | The width and height formula now inside `GraphVisualization.vue` (`MIN_WIDTH_PX`, `MIN_CONTENT_HEIGHT_PX`, `DEFAULT_CONTENT_HEIGHT_PX`), moved to a shared function used by the component and by the store.                                                                                                              |
+| Graph store (`providers/openedProjects/graph`) | A map of each node's measured widget size (the node without its visualization), reported by `GraphNode` beside `update:rect`. `nodeRects` cannot supply it: with a visualization open it holds only the larger of the two widths. An internal `relayout` that calls the pure function and writes into the caller's edit. |
+| Undo wrapper (`module.ts`)                     | A method that holds one undo step open and returns a function that closes it.                                                                                                                                                                                                                                            |
+| `nodeVisualization.ts`, `GraphNode.vue`        | The `visibleSize` watcher, the `resizing` flag and the `onResize` callback are removed.                                                                                                                                                                                                                                  |
+| `GraphVisualization.vue`                       | `isClosedOrOpening` and the `update:resizing` event are removed. The left handle reports the new width and position as one event.                                                                                                                                                                                        |
 
 The Ctrl-hover preview needs no special case. It never writes metadata, so it
 never reaches the store.
 
+**Saving the field** needs every one of these, since the ydoc server rebuilds a
+node's file metadata field by field:
+
+- `ydoc-shared/src/ast/tree.ts`: `NodeMetadataFields` and `nodeMetadataKeys`.
+- `ydoc-server/src/edits.ts`: `nodeMetadataToFile` (new key last, y negated and
+  values rounded as for `position`) and `applyNodeMetadataFromFile`.
+- `ydoc-server/src/fileFormat.ts`: the schema, tolerant of a malformed value as
+  `cachedAppearance` is.
+- `gui/src/providers/openedProjects/module/carryOver.ts`:
+  `CARRIED_METADATA_KEYS`, so a replaced session keeps the homes with the
+  positions.
+- `graphClipboard.ts`: the field is stripped from copied metadata.
+
 ### Triggers
 
-All go through the store, so every caller gets the behaviour:
+- **Show, hide and resize of a visualization:** `setNodeVisualization`, when
+  `visible`, `width` or `height` changes. The left handle's width and position
+  arrive in one call, so the store sees the right edge stay still and pushes
+  nothing. The `graph.toggleVisualization` shortcut gets a batch entry point
+  that sorts the selection top to bottom.
+- **The node's height handle:** `setNodeHeight`. Second pull request; see open
+  question 3.
+- **The table-editor widget** (`ResizableWidget.vue`). It has a right handle
+  only, and its size is in the widget's metadata. The node's widget size after
+  the change is not known until render, so the new widget width is taken as the
+  old one plus the drag's delta; the node's rectangle then follows from the
+  usual formula, and does not grow at all while its visualization is the wider
+  part. Second pull request.
+- **Removal of a node by the user:** `graphStore.deleteNodes`,
+  `deleteAndConnectAround`, `collapseNodes` and the AI node's replacement. The
+  first is an asynchronous edit on a fork, so `relayout` takes the edit to write
+  into.
 
-- `setNodeVisualization`, when `visible`, `width` or `height` changes. This
-  covers the visualization button, the `graph.toggleVisualization` shortcut on a
-  selection, and the handle drag.
-- `setNodeHeight`, for the node's height handle.
-- The table-editor widget's resize (`ResizableWidget.vue`). Its size is stored
-  in the expression, and the node's resulting size is known only after render,
-  so `new` is taken as `old` plus the drag's delta. That is exact for height,
-  and for width whenever the table is the node's widest part.
-- Node deletion: `relayoutAround` with `new` empty.
-- Tidy up, drag finish and arrow-key moves: clear the field on the nodes they
-  place.
-
-When several nodes change in one action (the shortcut on a multi-selection),
-they are processed top to bottom in one edit, each seeing the positions the
-previous one produced, so the result does not depend on selection order.
+A pusher that disappears any other way (an edit in the code editor, a version
+restore) triggers nothing. The nodes it pushed stay where they are, and their
+dangling entries are dropped at the next write.
 
 ### Undo
 
-- Show, hide, delete and Tidy up are each one edit already. The moves are
-  written in that edit, with the default user-action origin, not
-  `local:autoLayout`.
+- Show, hide, removal and Tidy up are each one edit already. The moves are
+  written in that edit with the default user-action origin, not
+  `local:autoLayout`. Nothing else is keyed on that origin for these writes: the
+  code editor's sync looks only at its own origin and at text changes.
 - A handle drag writes on every frame. Yjs merges edits into one undo step only
   while they arrive within its capture timeout (500ms by default), so a pause
-  mid-drag would split the step. The undo step is held open from the start of a
-  handle drag to its end, and closed with `undoStackBoundary` afterwards.
+  mid-drag splits the step. The wrapper's new method ends the current step, sets
+  the timeout to infinity for the drag, and on release restores it and ends the
+  step. The release runs on pointer up, pointer cancel and window blur, since a
+  missed release would merge every later edit into the drag.
 
-  This is the reading of Yjs's default behaviour, not a measurement: the
-  implementation must confirm how a drag is grouped today before changing it.
+  How a drag groups into undo steps today has been read from Yjs's defaults, not
+  measured. The implementation confirms it first.
 
 ### Edge cases
 
-- **A node that is pushed and also pushes.** When it is pushed, its whole
-  rectangle, open visualization included, is the obstacle in the cascade. The
-  nodes it had pushed are moved by the cascade like any other.
-- **A pusher removed by something other than the user's delete** (a code-editor
-  edit, a version restore). No layout runs. A `by` entry naming a node that no
-  longer exists is dropped when the field is next read, and the node stays where
-  it is.
-- **A project saved with a visualization already open by an older build.**
-  Nothing has a home, so closing it moves nothing. Pushing starts at the next
-  open or resize.
+- **A project saved by an older build with a visualization open.** Nothing has a
+  home, so closing it moves nothing. Pushing starts at the next open or resize.
+- **A project saved by this build, opened and saved by an older one.** The older
+  build does not read the field into the document, so its first save removes it
+  from every node. The nodes stay where they were pushed, with no home.
+  Accepted: there are no older builds in use.
+- **Two people in one project.** The field syncs like the rest of the metadata.
+  Two clients pushing the same node at once is not designed for.
+- **Nodes at identical positions** (the Playwright mock project has some, with
+  visualizations open). They overlap before any growth, so they are never pushed
+  by each other.
 
 ## Testing
 
 - **Unit tests on the pure function**, which holds most of the behaviour:
-  - push, cascade and the direction choice;
-  - open then close returns every node to its exact position;
-  - a grow then a shrink in steps equals one change to the final size;
-  - moved by hand, home taken, two pushers;
-  - Tidy up, delete, input nodes, unmeasured nodes.
-- **Unit tests on the store:** show, hide and a multi-frame drag are each one
-  undo step, and redo reverses each.
+  - push, cascade, the direction choice and the kept gap;
+  - open then close, and grow then shrink back, return every node to its exact
+    position, including with two pushers and a three-node cascade;
+  - a node pushed right by one node and down by another;
+  - moved by hand (`at` differs), a dangling pusher, two pushers closing in
+    either order;
+  - input nodes, unplaced nodes, nodes already overlapping;
+  - a property test over random layouts: the pass cap is never reached, and
+    reversal holds.
+- **Unit tests on the store:** show, hide and a multi-frame drag with a pause
+  are each one undo step, and redo reverses each; the left handle pushes
+  nothing.
+- **Unit tests on the ydoc server:** the field survives a save and a reload.
 - **Playwright:** a visualization opened above a node moves it and closing moves
   it back; Ctrl-hover moves nothing; a pushed node dragged by hand stays after
-  the close.
-- `__tests__/displacing.test.ts` is replaced, since the algorithm it tests is
-  removed.
+  the close. The existing specs that toggle a visualization and then act by
+  coordinates (`graphNodeVisualization`, `tableVisualisation`, `undoRedo`, and
+  the align, spacing and tidy specs) are run before and after.
+- `__tests__/displacing.test.ts` is removed with the algorithm it tests.
 
 ## Delivery
 
 Two pull requests:
 
-1. **The rule, and show and hide.** The metadata field, the pure function,
-   `visualizationSize`, the store wiring for show, hide and the visualization
-   handle drag, the returning rules, undo. Removes the old algorithm.
-2. **The remaining triggers.** The node height handle, the table-editor widget,
-   and the clearing on Tidy up and delete.
+1. **The rule, and visualizations.** The field and all its saving; the pure
+   function; the widget-size map; `visualizationSize`; show, hide and the
+   visualization's handles; moved by hand; Tidy up; removal of a pusher; undo,
+   including the held step. Removes the old algorithm.
+2. **The other two triggers.** The node's height handle and the table-editor
+   widget.
 
 Each is a feature: a `CHANGELOG.md` entry, and before and after screenshots.
 
@@ -235,6 +323,7 @@ Each is a feature: a `CHANGELOG.md` entry, and before and after screenshots.
 - Pushing up or left.
 - Pushing when a node's content grows.
 - Animating the moves.
+- Making room for node comments and messages.
 - Any change to how Tidy up lays nodes out.
 
 ## Decisions
@@ -247,3 +336,21 @@ Each is a feature: a `CHANGELOG.md` entry, and before and after screenshots.
 | Which size changes push       | Direct resizes and show or hide; never a side effect of editing      |
 | Undo                          | The moves are part of the causing action's undo step                 |
 | When the moves are computed   | At the action, in the same edit; not from a watcher on rendered size |
+
+## Open questions
+
+1. **Home taken.** The agreed rule was that the node stays where it is and
+   forgets its home. With two visualizations side by side, that can leave a node
+   hanging far below both: A pushes X, B opens over X's home without reaching X,
+   A closes, X stays at A's depth for good. Proposed instead: the node returns
+   as far as it can without overlapping what is in its way, then forgets its
+   home.
+2. **A pusher moved by hand.** Dragging away a node whose visualization is
+   pushing others. Proposed: at the drop, the nodes it was pushing return home,
+   in the drag's undo step, and the moved node pushes nothing at its new place.
+   The alternative is that they stay and forget their homes.
+3. **A node's height is not saved to the project file today** (the server writes
+   only the position's `vector`), so a node resized by its height handle shrinks
+   back on reload. With this feature its neighbours would stay pushed, with
+   homes, under a node that is no longer tall. Proposed: save the height, in the
+   second pull request.
