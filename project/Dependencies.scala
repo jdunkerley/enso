@@ -161,7 +161,7 @@ object Dependencies {
   // Held at 1.0.3: 1.0.4 relicensed reactive-streams from CC0 to MIT-0.
   val reactiveStreamsVersion = "1.0.3"
   val sprayJsonVersion       = "1.3.6"
-  val logbackClassicVersion  = "1.6.4"
+  val logbackClassicVersion  = "1.6.6"
   val javaDiffVersion        = "4.17"
   val logbackPkg = Seq(
     "ch.qos.logback" % "logback-classic" % logbackClassicVersion,
@@ -308,10 +308,10 @@ object Dependencies {
 
   // === Jackson ================================================================
 
-  val jacksonVersion = "2.22.3"
+  val jacksonVersion = "2.23.0"
   // Since 2.20, jackson-annotations is versioned by minor only ("2.22", no
   // patch), so it cannot share `jacksonVersion`. Keep it on the same minor.
-  val jacksonAnnotationsVersion = "2.22"
+  val jacksonAnnotationsVersion = "2.23"
 
   // === Guava ==================================================================
 
@@ -447,7 +447,7 @@ object Dependencies {
 
   // Also GraalPy's dependency: `GraalVM.pythonPkgs` ships these jars at this
   // version in the engine distribution, so the two must not drift apart.
-  val bouncyCastleVersion = "1.86"
+  val bouncyCastleVersion = "1.87"
   val bouncyCastle = Seq(
     "org.bouncycastle" % "bcutil-jdk18on" % bouncyCastleVersion,
     "org.bouncycastle" % "bcpkix-jdk18on" % bouncyCastleVersion,
@@ -529,7 +529,7 @@ object Dependencies {
   val diffsonVersion          = "4.6.1"
   val directoryWatcherVersion = "0.18.0"
   val flatbuffersVersion      = "24.3.25"
-  val guavaVersion            = "33.7.1-jre"
+  val guavaVersion            = "33.8.0-jre"
   val kindProjectorVersion    = "0.13.3"
   val mockitoScalaVersion     = "1.17.14"
   val mockitoJavaVersion      = "5.24.0"
