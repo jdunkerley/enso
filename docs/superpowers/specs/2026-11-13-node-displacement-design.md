@@ -67,8 +67,9 @@ the neighbours stay pushed.
 
 ### Which nodes move, and where
 
-- A node moves only if the changed node's new rectangle, grown by a gap, would
-  overlap it. It moves just far enough to clear the gap.
+- A node moves only if the changed node's new rectangle, grown by a gap in the
+  direction of the push, would overlap it. It moves just far enough to clear the
+  gap.
 - **The gap** is 32px, or the gap the two nodes already had, whichever is
   smaller. Nodes placed 20px apart (Tidy up's tight spacing) stay 20px apart
   when pushed, and a node is never moved by a neighbour that merely grew near
@@ -143,6 +144,7 @@ displaced?: {
   home: { x: number; y: number }
   at: { x: number; y: number }
   by: { id: ExternalId; gap: number; dir: 'down' | 'right' }[]
+  under?: ExternalId[]
 }
 ```
 
@@ -151,12 +153,15 @@ displaced?: {
   differs from `at`, something else moved it, the field is ignored when read,
   and it is removed at the next write. This is the whole of "moved by hand":
   nothing that moves a node has to know about the field.
-- `by`: the nodes pushing it directly, each with the gap kept from it and the
-  direction of the push. In a cascade A → B → C, C lists B, not A.
+- `by`: the nodes whose rectangles reach it, each with the gap kept from it and
+  the direction of the push. In a cascade A → B → C, C lists B, and lists A too
+  only if A's own rectangle would reach C.
+- `under`: the nodes it overlapped at home, if any. They do not count as taking
+  its home, so nodes that overlapped before a push return onto each other.
 - An entry in `by` naming a node that no longer exists is ignored when read and
   removed at the next write.
-- Pushed positions and homes are whole numbers, since the file rounds positions
-  and an unrounded `at` would not match after a reload.
+- A position within 1px of `at` on each axis is the same position: the file
+  rounds positions, so an exact comparison would fail after a reload.
 
 **The position follows from the field.** A pushed node's position is its home
 plus, on each axis, the largest offset any of its pushers requires: the distance
@@ -177,11 +182,13 @@ to rectangle `new`, in one edit:
 2. **For each item P on the list**, for every other eligible node N:
    - If N lists P in `by`, recompute N's position from its field.
    - Otherwise, if P's new rectangle is larger than its old one on the bottom or
-     right: let `g` be the smaller of 32 and the distance between P's old
-     rectangle and N. If that distance is negative (they already overlapped),
-     skip N. If P's new rectangle grown by `g` overlaps N, add P to N's `by`
-     with gap `g` and the direction given by N's position relative to P's old
-     rectangle, set N's `home` if it has none, and recompute N's position.
+     right: take both nodes where they were at home. If N is below P's old
+     rectangle the direction is down; otherwise, if N is right of it, right;
+     otherwise (they overlapped, or N is above or left) skip N. Let `g` be the
+     smaller of 32 and their distance in that direction. If P's new rectangle,
+     extended by `g` in that direction, reaches N, add P to N's `by` with `g`
+     and the direction, set N's `home` (and `under`) if it has none, and
+     recompute N's position.
    - If N's position changed, add N to the list with its old and new rectangle.
 3. **Write** each changed node's position and field (`at` set to the new
    position), or remove the field from a node that is home.
@@ -190,16 +197,23 @@ A removed pusher is the same procedure with an empty `new`. A pusher moved by
 hand is the same procedure with adding switched off: step 2 recomputes the nodes
 that list it and adds no new entries, whichever way it moved.
 
-**Home taken** is applied as a node is recomputed. If the position its field
-gives overlaps a node that is not in its `by` and is not itself being moved in
-this pass, the node is placed clear of that node by the gap, in the direction of
-the push it is returning from, and its field is removed.
+Which side N is on, its gap, and whether a pusher is in line with it are all
+judged where the nodes were at home; only how far a pusher reaches is read from
+where it is now. Judged on current positions, two nodes pushed in the same pass
+can each find the other in its way and push each other without end, and a node
+pushed right can fall out of line with a pusher that was pushed down. Both
+happened in the prototype.
 
-Positions only ever increase from the homes, and a pushed node is always below
-or to the right of its pusher, so the list cannot cycle. The implementation
-still caps the number of passes and stops with the positions it has, and a
-property test over random layouts checks that the cap is never reached and that
-reversal holds.
+**Home taken** is applied when the list is empty. If a node that moved back
+towards its home overlaps a node that is not in its `by` or its `under`, it is
+placed clear of that node by 32px, in the direction of the push it is returning
+from, and its field is removed.
+
+Positions only ever increase from the homes, and at home a pushed node is always
+below or to the right of its pusher, so the list cannot cycle. The
+implementation still caps the number of passes and stops with the positions it
+has, and a property test over random layouts checks that the cap is never
+reached and that reversal holds.
 
 Every rectangle used here is **computed, not measured**: a node's position and
 visualization metadata, plus its measured widget size (below). The rectangles in
@@ -338,7 +352,8 @@ Two pull requests:
    visualization's handles; moved by hand; Tidy up; removal of a pusher; undo,
    including the held step. Removes the old algorithm.
 2. **The other two triggers.** The node's height handle and the table-editor
-   widget.
+   widget. It gets its own plan once the first has merged, since it builds on
+   the measured-size map the first introduces.
 
 Each is a feature: a `CHANGELOG.md` entry, and before and after screenshots.
 
