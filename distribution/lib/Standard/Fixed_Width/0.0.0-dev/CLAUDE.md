@@ -6,10 +6,9 @@ The format is never chosen from a file extension; it is always given explicitly.
 
 ## Main entry points
 
-- `Fixed_Width_Format.Fixed_Width layout encoding skip_rows row_limit
-  on_invalid_rows line_endings on_empty_field value_formatter` — the file format
-  (`File_Format_SPI`). `layout` is `Infer_Layout`, a `Fixed_Width_Layout`, or a
-  `Vector`/`Table`/`Column` convertible to one.
+- `Fixed_Width_Format.Fixed_Width layout encoding skip_rows row_limit on_invalid_rows line_endings on_empty_field value_formatter`
+  — the file format (`File_Format_SPI`). `layout` is `Infer_Layout`, a
+  `Fixed_Width_Layout`, or a `Vector`/`Table`/`Column` convertible to one.
 - `Fixed_Width_Layout`, `Fixed_Width_Column_Description` — the column layout
   (`Start_And_Width`, `Width`, ...).
 - `Invalid_Fixed_Width_Rows` (`Keep_Invalid_Rows`, `Drop_Invalid_Rows`) and
