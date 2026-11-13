@@ -17,7 +17,7 @@ latest-release: 2025.3.4
 # - graalvm-jdk: the GraalVM JDK, `graalVersion` (what `java -version` prints; sbt refuses any other
 #   JDK). On 25.0.x it equals `graalvm`; on the innovation line it does not (25.5.5.0.3 ships JDK
 #   25.0.5.0.3), see Note [GraalVM Follows The Innovation Line] there;
-# - sbt: `sbt.version` in `project/build.properties` (HELD there, see its note);
+# - sbt: `sbt.version` in `project/build.properties`;
 # - flatc: `flatbuffersVersion` (checked when the language server compiles);
 # - graalpy: `graalPyVersion` (the standalone GraalPy that `test/Examples_Tests` runs; `setup-jvm`
 #   installs it when asked).
@@ -27,6 +27,6 @@ latest-release: 2025.3.4
 toolchain:
   graalvm: 25.5.5.0.3
   graalvm-jdk: 25.0.5.0.3
-  sbt: 1.10.6
+  sbt: 1.13.1
   flatc: 24.3.25
   graalpy: 25.5.5

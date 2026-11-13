@@ -54,6 +54,23 @@ ThisBuild / organization := "org.enso"
 ThisBuild / scalaVersion := scalacVersion
 ThisBuild / publish / skip := true
 ThisBuild / assembly / logLevel := Level.Warn
+// Note [Coursier Honours A Dependency's dependencyManagement]
+ThisBuild / csrMavenDependencyOverride := true
+
+/* Note [Coursier Honours A Dependency's dependencyManagement]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Up to sbt 1.10, Coursier applied the `dependencyManagement` section of a
+ * dependency's own POM (including imported BOMs) to that dependency's
+ * transitive dependencies. sbt 1.11+ (lm-coursier 2.1.13 in sbt 1.13) stopped
+ * doing so unless `csrMavenDependencyOverride` is set. Several libraries rely
+ * on it: `snowflake-jdbc-thin` 4.0.1 pins gRPC to 1.77.0 and protobuf to
+ * 4.28.2 only through the imported `grpc-bom` and `protobuf-bom`. Without the
+ * setting `std-snowflake` resolves gRPC 1.67.1 and protobuf 3.25.5 instead, the
+ * wrapper exclusions keyed on `grpc-netty-shaded:1.77.0` stop matching, and the
+ * raw `grpc-netty-shaded-1.67.1.jar` (with its native libraries) ships in the
+ * Snowflake library, failing `Embedded_Native_Libs_Spec`.
+ * The setting keeps resolution, and so the distribution, as it was on 1.10.
+ */
 
 /* Tag limiting the concurrent access to tools/simple-library-server in tests.
  */
