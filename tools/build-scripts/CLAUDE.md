@@ -40,9 +40,9 @@ prints one.
   drops files from an image that is too small without failing
   (`src/ide-build/verifyDmg.ts`). Locally, use `ide-local`.
 - `ide-local [--mode <vite mode>]` — the whole IDE from this checkout: sbt
-  `buildEngineBundle` (on Windows, from a Visual Studio developer prompt, which
-  it checks), the bundle copied to `dist/backend`, `pnpm install`, `build:gui`
-  into `dist/gui`, then `ide-build`'s packaging into `dist/ide`. It deletes
+  `buildEngineBundle` (no Visual Studio developer prompt needed on Windows since
+  #701), the bundle copied to `dist/backend`, `pnpm install`, `build:gui` into
+  `dist/gui`, then `ide-build`'s packaging into `dist/ide`. It deletes
   `dist/backend`, `dist/gui` and `dist/ide` when it starts, so it never reuses
   an old engine bundle and a failed run leaves no earlier installer behind; the
   engine itself builds incrementally (`sbt clean` first for a clean one). It

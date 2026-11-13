@@ -1,10 +1,14 @@
 import sbt._
 import sbt.internal.util.ManagedLogger
 
-/** What the retired build CLI did to the engine package right after `buildEngineDistribution`,
-  * on every platform: the IR cache size check, and on Windows the MSVC runtime DLL copy
-  * (`MsvcRuntime`). `ciBuildEngineDistribution` and `buildEngineBundle` both run it, so it is
-  * written once.
+/** The checks on the engine package right after `buildEngineDistribution`: `jvm.options` is
+  * there, and the IR cache size check. `ciBuildEngineDistribution` and `buildEngineBundle` both
+  * run it, so it is written once.
+  *
+  * On Windows this also copied the MSVC runtime DLLs next to the package's binaries
+  * (`MsvcRuntime`, from the native `enso.exe` days) until #701: every DLL left in the package is
+  * loaded into the bundled JDK's `java.exe`, which has already loaded that JDK's own
+  * `vcruntime140.dll`, so the copies were never used.
   */
 object EngineDistributionChecks {
 
@@ -23,6 +27,5 @@ object EngineDistributionChecks {
       ensoVersion = ensoVersion,
       log         = log
     )
-    if (Platform.isWindows) MsvcRuntime.copyCrtDlls(packageRoot, log)
   }
 }

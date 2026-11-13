@@ -107,9 +107,9 @@ jobs:
   # which is how sbt names the package. The distribution's launchers are the shell scripts
   # `bin/enso` and `bin/enso.bat`: the native image is no longer built (native-image removal C2,
   # #683), and with it went `ENSO_LAUNCHER` and the `(native,test)` in the job's and the artifact's
-  # names. `setup-msvc` replaces the retired build CLI's MSVC environment on Windows: the runtime
-  # DLL copy (`MsvcRuntime`) reads `VCToolsRedistDir`. The build
-  # compiles the Rust parser with several `cargo` calls at once, so `setup-jvm` installs the Rust
+  # names. The job needs no MSVC developer environment: the runtime DLL copy that needed one
+  # (`MsvcRuntime`) went with #701, `cargo` finds the MSVC linker itself, and `mt.exe` is found in
+  # the Windows SDK (Note [The Bundled java.exe Uses UTF-8]). The build compiles the Rust parser with several `cargo` calls at once, so `setup-jvm` installs the Rust
   # toolchain first (`rust`; Note [Install The Rust Toolchain Before sbt] in
   # `.github/actions/setup-jvm`). Gone from this job, because only the retired build CLI read them
   # here or nothing did: GraalPy, `GRAAL_EDITION`, `GITHUB_TOKEN` and the `GITHUB_ENV` copy of
@@ -160,8 +160,6 @@ jobs:
           shared-key: engine
           save: "true" # "false" in every job but build-engine-distribution
           workspaces: ". -> ../cargo-target"
-      - name: Set up MSVC
-        uses: ./.github/actions/setup-msvc
       - id: build
         name: Compute the version
         run: corepack pnpm --filter build-scripts run version
@@ -362,10 +360,6 @@ jobs:
           shared-key: engine
           save: "false"
           workspaces: ". -> ../cargo-target"
-      # `sbt test` built native images on Windows (os-environment's tests) until the native build went
-      # (#683); whether this job still needs MSVC is settled with `setup-msvc`'s follow-up.
-      - name: Set up MSVC
-        uses: ./.github/actions/setup-msvc
       - if: runner.os == 'Windows'
         name: Windows test settings
         shell: pwsh

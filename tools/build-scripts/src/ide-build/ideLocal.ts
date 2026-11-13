@@ -38,20 +38,6 @@ export function engineBuildEnv(env: NodeJS.ProcessEnv, versions: Versions): Node
   }
 }
 
-/**
- * Why the engine bundle cannot be built in this environment, or `null`. On Windows `MsvcRuntime`
- * copies the MSVC runtime DLLs into the engine package from `VCToolsRedistDir`, which only a Visual
- * Studio developer environment sets.
- */
-export function msvcProblem(platform: NodeJS.Platform, env: NodeJS.ProcessEnv): string | null {
-  if (platform !== 'win32' || (env.VCToolsRedistDir ?? '') !== '') return null
-  return (
-    'VCToolsRedistDir is not set. Run this from a Visual Studio "Developer PowerShell" or ' +
-    '"x64 Native Tools Command Prompt" (or after vcvars64.bat): the engine bundle\'s MSVC runtime ' +
-    'DLL copy needs the MSVC environment.'
-  )
-}
-
 /** The GUI build: `build:gui` in a Vite mode (CI builds `production`). */
 export function guiBuildArgs(mode: string): string[] {
   return ['run', 'build:gui', `--mode=${mode}`]

@@ -30,11 +30,10 @@ import scala.sys.process._
  * - Rewriting the resources drops the launchers' Authenticode signature (Oracle's). The fork
  *   ships unsigned; a signing step (electron-builder's) runs after this one, on the installer.
  *
- * `mt.exe` comes with the Windows SDK. It is taken from the PATH (a Visual Studio Developer Prompt;
- * CI's `setup-msvc`), else from the newest `Windows Kits\10\bin\<version>\x64` under `Program Files
- * (x86)`, where the runner images and a Visual Studio install put it: the standard library test
- * jobs build their small JDK (`buildSmallJdkForRelease`) without the MSVC environment. Without it
- * the build fails.
+ * `mt.exe` comes with the Windows SDK. It is taken from the PATH (a Visual Studio Developer
+ * Prompt), else from the newest `Windows Kits\10\bin\<version>\x64` under `Program Files (x86)`,
+ * where the runner images and a Visual Studio install put it: no CI job sets up the MSVC
+ * environment (`setup-msvc` went with #701). Without it the build fails.
  */
 
 /** Embeds the UTF-8 code page manifest in a Windows JDK's launchers (see the Note above). */

@@ -3,8 +3,8 @@ description: >-
   GraalVM CE and the sbt launcher at the versions pinned under `toolchain:` in `build-config.yaml`,
   `flatc`, the standalone GraalPy and the `rust-toolchain.toml` Rust toolchain too when asked, and
   the sbt / Coursier download cache (saved only on `develop`). What the retired build CLI
-  provisioned before an sbt call, minus the MSVC environment (`setup-msvc`). Expects the repository
-  to be checked out.
+  provisioned before an sbt call, minus the MSVC environment, which nothing needs since #701.
+  Expects the repository to be checked out.
 inputs:
   cache-key:
     description: >-

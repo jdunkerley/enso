@@ -3,10 +3,9 @@
  * engine bundle with sbt (`buildEngineBundle`), copies it to
  * `dist/backend`, installs the workspace, builds the GUI into `dist/gui`, and packages both into
  * `dist/ide`, as `ide-build` does in CI. It deletes `dist/backend`, `dist/gui` and `dist/ide` as it
- * starts, so a failed run never leaves a previous build's engine, GUI or installer there. On
- * Windows, run it from a Visual Studio developer prompt (`MsvcRuntime` copies the MSVC runtime DLLs
- * from it). Never run in
- * CI: it starts sbt, so the workflow policy would require `setup-jvm` first.
+ * starts, so a failed run never leaves a previous build's engine, GUI or installer there. It needs
+ * no Visual Studio developer prompt on Windows (#701). Never run in CI: it starts sbt, so the
+ * workflow policy would require `setup-jvm` first.
  *
  *     corepack pnpm --filter build-scripts run ide-local [--mode <vite mode>]
  */
@@ -19,7 +18,6 @@ import {
   engineBundleDir,
   guiBuildArgs,
   guiBuildEnv,
-  msvcProblem,
 } from '../ide-build/ideLocal.ts'
 import { commitHash, distDir, installWorkspace, packageIde } from '../ide-build/packageIde.ts'
 import { commandArguments, REPO_ROOT, runInherited } from '../lib/repo.ts'
@@ -36,8 +34,6 @@ try {
     args: commandArguments(),
     options: { mode: { type: 'string', default: 'production' } },
   })
-  const problem = msvcProblem(process.platform, process.env)
-  if (problem != null) throw new Error(problem)
   const versions = repositoryVersions()
   const version = versions.version.text
   console.log(`Building IDE ${version} from this checkout.`)

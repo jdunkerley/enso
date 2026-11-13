@@ -43,12 +43,17 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   startup.
 - `EnsoLint.scala` — Project-wide lint rules invoked as an SBT task.
 - `EnsoProjects.scala` — Shared project-configuration DSL used by `build.sbt`.
-- `SmallJDK.scala` — Builds a trimmed JDK image for the distribution. Its jlink
-  run passes `--generate-cds-archive`, so the image carries
-  `lib/server/classes*.jsa` (`bin/server` on Windows; class-data sharing for the
-  jlinked modules); `checkSharing` runs `java -Xshare:on -version` on it and
-  fails `buildEngineBundle` when the archive does not map. On Windows it embeds
-  `java-utf8.manifest` in the image's `java.exe` and `javaw.exe` first
+- `SmallJDK.scala` — Builds a trimmed JDK image for the distribution: jlink of
+  named JDK modules only, with no module path and nothing copied from the build
+  JDK's `lib/` (the native-image modules and `lib/svm`, `lib/static`,
+  `lib/graalvm`, `lib/truffle` went in #701). The modules Truffle's optimizing
+  runtime needs are listed explicitly (Note [The Release JDK's Truffle
+  Modules]); check `Truffle.getRuntime().getName()` (not `Interpreted`) after
+  changing them. Its jlink run passes `--generate-cds-archive`, so the image
+  carries `lib/server/classes*.jsa` (`bin/server` on Windows; class-data sharing
+  for the jlinked modules); `checkSharing` runs `java -Xshare:on -version` on it
+  and fails `buildEngineBundle` when the archive does not map. On Windows it
+  embeds `java-utf8.manifest` in the image's `java.exe` and `javaw.exe` first
   (`JavaUtf8Manifest.scala`, Note [The Bundled java.exe Uses UTF-8], #693): a
   UTF-8 `activeCodePage`, merged into their own manifest with `mt.exe`, so the
   JVM's options keep characters outside the ANSI code page. `mt.exe` comes from
