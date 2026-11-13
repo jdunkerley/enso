@@ -3,7 +3,10 @@ import { proxyRefs } from '$/utils/reactivity'
 import { visualizationBindings } from '@/bindings'
 import type { RawDataSource } from '@/components/GraphEditor/GraphVisualization/visualizationData'
 import { useVisualizationData } from '@/components/GraphEditor/GraphVisualization/visualizationData'
-import { visualizationSize } from '@/components/GraphEditor/GraphVisualization/visualizationSize'
+import {
+  visualizationSize,
+  type VisualizationResize,
+} from '@/components/GraphEditor/GraphVisualization/visualizationSize'
 import VisualizationToolbar from '@/components/GraphEditor/GraphVisualization/VisualizationToolbar.vue'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import { useResizeHandles } from '@/components/resizeHandles'
@@ -14,7 +17,7 @@ import { registerHandlers } from '@/providers/action'
 import type { VisualizationDataSource } from '@/stores/visualization'
 import type { Opt } from '@/util/data/opt'
 import { Vec2 } from '@/util/data/vec2'
-import { computed, nextTick, ref, toRef, watch, watchEffect } from 'vue'
+import { computed, nextTick, ref, toRef, watch } from 'vue'
 import { visIdentifierEquals, type VisualizationIdentifier } from 'ydoc-shared/yjsModel'
 
 const props = defineProps<{
@@ -44,9 +47,8 @@ const emit = defineEmits<{
   'update:effectiveHeight': [height: number]
   'update:id': [id: VisualizationIdentifier]
   'update:enabled': [visible: boolean]
-  'update:width': [width: number]
-  'update:height': [height: number]
-  'update:nodePosition': [pos: Vec2]
+  /** A step of a handle drag. The left handle changes the width and the position together. */
+  resize: [change: VisualizationResize]
   'update:hovered': [hovered: boolean]
   'update:resizing': [resizing: boolean]
   createNodes: [options: NodeCreationOptions[]]
@@ -152,9 +154,13 @@ const resizeHandles = useResizeHandles({
   position: toRef(props, 'nodePosition'),
   scale: toRef(props, 'scale'),
 })
-resizeHandles.onResizeWidth((value) => emit('update:width', value))
-resizeHandles.onResizeHeight((value) => emit('update:height', value))
-resizeHandles.onMove((position) => emit('update:nodePosition', position))
+resizeHandles.onBoundsChange((bounds, sides) =>
+  emit('resize', {
+    ...(sides.left || sides.right ? { width: bounds.width } : {}),
+    ...(sides.top || sides.bottom ? { height: bounds.height } : {}),
+    ...(sides.left || sides.top ? { position: bounds.pos } : {}),
+  }),
+)
 
 const handlesResizing = ref(false)
 resizeHandles.onResizingChange(
@@ -163,26 +169,9 @@ resizeHandles.onResizingChange(
       !!resizing.top || !!resizing.bottom || !!resizing.left || !!resizing.right),
 )
 
-const isClosedOrOpening = ref(false)
-watch(
-  toRef(props, 'show'),
-  (show) => {
-    if (!show) isClosedOrOpening.value = true
-  },
-  { immediate: true },
-)
-watchEffect(
-  () => {
-    if (isClosedOrOpening.value && props.show) {
-      if (vizWidth.value > 0 && vizHeight.value > 0) isClosedOrOpening.value = false
-    }
-  },
-  // Stop sending resize events *after* reporting the resize completion
-  { flush: 'post' },
-)
-
-const isResizing = computed(() => handlesResizing.value || isClosedOrOpening.value)
-watch(isResizing, (resizing) => emit('update:resizing', resizing), { immediate: true })
+// Only a handle drag counts: the graph makes room for a visualization that opens when its
+// metadata is written, not when it is drawn.
+watch(handlesResizing, (resizing) => emit('update:resizing', resizing))
 
 const style = computed(() => {
   return {

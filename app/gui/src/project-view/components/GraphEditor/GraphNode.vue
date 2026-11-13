@@ -28,14 +28,14 @@ import GraphNodeComment from '@/components/GraphEditor/GraphNodeComment.vue'
 import GraphNodeMessage from '@/components/GraphEditor/GraphNodeMessage.vue'
 import GraphNodeSubmenu from '@/components/GraphEditor/GraphNodeSubmenu.vue'
 import GraphVisualization from '@/components/GraphEditor/GraphVisualization.vue'
+import type { VisualizationResize } from '@/components/GraphEditor/GraphVisualization/visualizationSize'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
-import { useNodesDisplacing } from '@/components/GraphEditor/nodesDisplacing'
 import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import { useComponentColors } from '@/composables/componentColors'
 import { useClickableDraggable } from '@/composables/dragging'
-import { useResizeObserver } from '@/composables/events'
+import { useEvent, useResizeObserver } from '@/composables/events'
 import { useProgressBackground } from '@/composables/progressBar'
 import type { ActionHandler, DisplayableActionName } from '@/providers/action'
 import { registerHandlers, toggledAction } from '@/providers/action'
@@ -77,8 +77,7 @@ const emit = defineEmits<{
   'update:height': [height: number | undefined]
   'update:visualizationId': [id: Opt<VisualizationIdentifier>]
   'update:visualizationEnabled': [enabled: boolean]
-  'update:visualizationWidth': [width: number]
-  'update:visualizationHeight': [height: number]
+  resizeVisualization: [change: VisualizationResize]
 }>()
 
 const nodeSelection = useGraphSelection(true)
@@ -120,6 +119,15 @@ watch(widgetsDomSizeClientPx, (size) => (widgetsDomSize.value = size.scale(1 / s
 // - The size of the visualization affects the size of the node.
 const nodeDomSize = computed(() =>
   widgetsDomSize.value.add(new Vec2(NODE_CONTENT_PADDING * 2, NODE_CONTENT_PADDING * 2)),
+)
+// The graph store computes this node's rectangle from its metadata and this size: see
+// `displacement.ts`.
+watch(
+  nodeDomSize,
+  (size) => {
+    if (!widgetsDomSize.value.isZero()) graph.nodeBareSizes.set(nodeId.value, size)
+  },
+  { immediate: true },
 )
 
 providePopoverRoot(rootNode)
@@ -200,7 +208,16 @@ function ensureSelected() {
 
 const outputHovered = computed(() => graph.nodeOutputHovered.get(nodeId.value))
 
-const { displaceNodesForResize } = useNodesDisplacing()
+// A resize drag is one undo step, the nodes it pushes included.
+let releaseUndoStep: (() => void) | undefined
+function setVisualizationResizing(resizing: boolean) {
+  releaseUndoStep?.()
+  releaseUndoStep = resizing ? module.value.undoManager.holdStep() : undefined
+}
+// A drag that never reports its end (the window loses focus, the node goes) must not hold the
+// step open: every later edit would join it.
+useEvent(window, 'blur', () => setVisualizationResizing(false))
+onUnmounted(() => setVisualizationResizing(false))
 const {
   visualizationWidth,
   isVisualizationEnabled,
@@ -218,7 +235,7 @@ const {
   dataSource: () => ({ type: 'node', nodeId: props.node.rootExpr.externalId }) as const,
   hidden: toRef(props, 'edited'),
   emit,
-  onResize: (rect0, rect1) => displaceNodesForResize(nodeId.value, rect0, rect1),
+  onResizingChange: setVisualizationResizing,
 })
 
 watch(isVisualizationPreviewed, (newVal) => {
@@ -521,7 +538,6 @@ resizeHandles.onResizeHeight((value) => emit('update:height', value))
     />
     <GraphVisualization
       v-bind="visualization"
-      @update:nodePosition="graph.setNodePosition(nodeId, $event)"
       @createNodes="emit('createNodes', $event)"
       @click.capture="setSoleSelected"
     />

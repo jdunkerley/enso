@@ -2,21 +2,20 @@ import type { TypeInfo } from '$/providers/openedProjects/project/computedValueR
 import type { ToValue } from '$/utils/reactivity'
 import type GraphVisualization from '@/components/GraphEditor/GraphVisualization.vue'
 import type { RawDataSource } from '@/components/GraphEditor/GraphVisualization/visualizationData'
+import type { VisualizationResize } from '@/components/GraphEditor/GraphVisualization/visualizationSize'
 import { injectBubblingKeyboard } from '@/providers/keyboard'
 import type { VisualizationDataSource } from '@/stores/visualization'
 import type { Opt } from '@/util/data/opt'
-import { Rect } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
 import { computed, ref, toValue, watch } from 'vue'
 import type { ComponentProps } from 'vue-component-type-helpers'
 import type { VisualizationIdentifier, VisualizationMetadata } from 'ydoc-shared/yjsModel'
 
 interface Emit {
-  (event: 'update:visualizationWidth', width: number): void
   (event: 'update:visualizationEnabled', enabled: boolean): void
   (event: 'update:visualizationId', id: Opt<VisualizationIdentifier>): void
   (event: 'update:visualizationEnabled', enabled: boolean): void
-  (event: 'update:visualizationHeight', height: number): void
+  (event: 'resizeVisualization', change: VisualizationResize): void
 }
 
 interface NodeVisualizationOptions {
@@ -30,7 +29,8 @@ interface NodeVisualizationOptions {
   dataSource: ToValue<Opt<VisualizationDataSource | RawDataSource>>
   hidden: ToValue<boolean>
   emit: Emit
-  onResize?: (rect0: Rect, rect1: Rect) => void
+  /** A handle drag on the visualization started or ended. */
+  onResizingChange?: (resizing: boolean) => void
 }
 
 /** Composable managing the state of the visualization for a node. */
@@ -45,14 +45,11 @@ export function useNodeVisualization({
   dataSource,
   hidden,
   emit,
-  onResize,
+  onResizingChange,
 }: NodeVisualizationOptions) {
   const keyboard = injectBubblingKeyboard()
   const metadata = computed(() => toValue(vis))
-  const visualizationWidth = computed<number | null>({
-    get: () => metadata.value?.width ?? null,
-    set: (value) => value && emit('update:visualizationWidth', value),
-  })
+  const visualizationWidth = computed<number | null>(() => metadata.value?.width ?? null)
   const visualizationHeight = computed<number | null>(() => metadata.value?.height ?? null)
   const isVisualizationEnabled = computed<boolean>({
     get: () => metadata.value?.visible ?? false,
@@ -105,23 +102,6 @@ export function useNodeVisualization({
     if (!isVisualizationVisible.value || toValue(hidden)) return 0
     return effectiveWidth.value ?? 0
   })
-  const visibleSize = computed<Vec2 | undefined>((prev) => {
-    if (effectiveHeight.value == null || effectiveWidth.value == null) return
-    const size = new Vec2(visibleVisWidth.value, visibleVisHeight.value)
-    return prev?.equals(size) ? prev : size
-  })
-  let resizing = false
-  watch(visibleSize, (size1, size0) => {
-    if (!resizing || !size1 || !size0 || size1.equals(size0)) return
-    const widgets = toValue(nodeWidgetsSize)
-    const pos = toValue(nodePos)
-    const fullSize = (vizSize: Vec2) =>
-      new Vec2(Math.max(widgets.x, vizSize.x), widgets.y + vizSize.y)
-    const rect0 = new Rect(pos, fullSize(size0))
-    const rect1 = new Rect(pos, fullSize(size1))
-    onResize?.(rect0, rect1)
-  })
-
   const visualization = computed((): ComponentProps<typeof GraphVisualization> => {
     return {
       show: isVisualizationVisible.value,
@@ -142,9 +122,8 @@ export function useNodeVisualization({
       'onUpdate:effectiveWidth': (event) => (effectiveWidth.value = event),
       'onUpdate:id': (event) => emit('update:visualizationId', event),
       'onUpdate:enabled': (event) => emit('update:visualizationEnabled', event),
-      'onUpdate:height': (event) => emit('update:visualizationHeight', event),
-      'onUpdate:width': (event) => (visualizationWidth.value = event),
-      'onUpdate:resizing': (event) => (resizing = event),
+      onResize: (event) => emit('resizeVisualization', event),
+      'onUpdate:resizing': (event) => onResizingChange?.(event),
     }
   })
 
