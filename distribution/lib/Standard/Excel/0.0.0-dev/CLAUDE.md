@@ -8,7 +8,7 @@ Reads and writes Excel workbooks (`.xlsx`, `.xls`, `.xlsb`) as a `Table`.
 - `Excel_Format.Excel_Format` — the file format (`File_Format_SPI`):
   `..Workbook`, `..Sheet`, `..Range`.
 - `Excel_Workbook.Excel_Workbook` — an open workbook: `sheet_names`,
-  `range_names`, `read`, `write`, `tables` …
+  `named_ranges`, `read`, `write`, `tables` …
 - `Excel_Range.Excel_Range` — an Excel-style range (`Sheet1!A1:B2`, a named
   range or a single cell).
 - `Date.from_excel` and `Date_Time.from_excel` — convert an Excel serial date.

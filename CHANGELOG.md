@@ -425,7 +425,8 @@
   `from Standard.YXDB import all` to use `YXDB_Format` by name.][736]
 - [Excel workbooks are read and written by the new Standard.Excel library, and
   Standard.Table is about 25 MB smaller; add `from Standard.Excel import all` to
-  use `Excel_Workbook`, `Excel_Format` or `Date.from_excel`.][737]
+  use `Excel_Workbook` or `Excel_Format`, or `Date.from_excel` and
+  `Date_Time.from_excel`.][737]
 - [Standard.Database_Test_Suite: a conformance suite for database backends. A
   backend describes itself in a few lines and runs the same table and database
   tests as the built-in ones. The suite is not in the IDE installer; for now it

@@ -23,8 +23,8 @@ type Line_Ending_Style
         Line_Ending_Style.Windows -> '\r\n'
         Line_Ending_Style.Mac_Legacy -> '\r'
 
-## Represents a format that has no line endings, such as a `Fixed_Width_Format` (in the
-   `Standard.Fixed_Width` library) file.
+## Represents a format that has no line endings, such as the one used by
+   `Fixed_Width_Format` (in the `Standard.Fixed_Width` library).
 type No_Line_Ending
 
 ## Represents a format that has a nonstandard string as the line ending.
