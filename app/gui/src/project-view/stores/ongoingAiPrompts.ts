@@ -447,9 +447,10 @@ export function ongoingAiPromptsStoreFactory(deps: OngoingAiPromptsDeps) {
         if (!updated.ok) return updated
         // The node stays, under a new id (its expression was replaced): the nodes it pushes follow
         // the new id and stay where they are, below its visualization.
+        // Without a readable id they are left as they are: a layout detail is no reason to lose the
+        // update.
         const newNodeId = nodeIdFromOuterAst(mutableAssignment)
-        if (newNodeId == null) return Err('Cannot resolve the updated AI node.')
-        graphStore.repointPushedBy(editedNodeId, newNodeId, edit)
+        if (newNodeId != null) graphStore.repointPushedBy(editedNodeId, newNodeId, edit)
         return updated
       })
       if (!editResult.ok) {
