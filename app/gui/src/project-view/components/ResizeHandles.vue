@@ -2,6 +2,7 @@
 import { usePointer } from '@/composables/events'
 import type { BoundsSet } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
+import { onBeforeUnmount } from 'vue'
 
 const props = defineProps<BoundsSet>()
 const emit = defineEmits<{
@@ -35,14 +36,28 @@ function resizeHandler(resizeX: 'left' | 'right' | false, resizeY: 'top' | 'bott
   })
 }
 
-const handler = {
-  left: resizeHandler('left', false).events,
-  right: resizeHandler('right', false).events,
-  top: resizeHandler(false, 'top').events,
-  bottom: resizeHandler(false, 'bottom').events,
-  bottomLeft: resizeHandler('left', 'bottom').events,
-  bottomRight: resizeHandler('right', 'bottom').events,
+const pointers = {
+  left: resizeHandler('left', false),
+  right: resizeHandler('right', false),
+  top: resizeHandler(false, 'top'),
+  bottom: resizeHandler(false, 'bottom'),
+  bottomLeft: resizeHandler('left', 'bottom'),
+  bottomRight: resizeHandler('right', 'bottom'),
 }
+const handler = {
+  left: pointers.left.events,
+  right: pointers.right.events,
+  top: pointers.top.events,
+  bottom: pointers.bottom.events,
+  bottomLeft: pointers.bottomLeft.events,
+  bottomRight: pointers.bottomRight.events,
+}
+
+// A handle removed mid-drag gets neither `pointerup` nor `pointercancel`: report the end here, so
+// that a listener holding something for the drag's duration releases it.
+onBeforeUnmount(() => {
+  if (Object.values(pointers).some((pointer) => pointer.dragging)) emit('update:resizing', {})
+})
 </script>
 
 <template>

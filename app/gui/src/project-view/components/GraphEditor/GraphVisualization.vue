@@ -154,20 +154,27 @@ const resizeHandles = useResizeHandles({
   position: toRef(props, 'nodePosition'),
   scale: toRef(props, 'scale'),
 })
+// A side dragged onto the opposite one clamps the size to 0, which is not a size to save.
 resizeHandles.onBoundsChange((bounds, sides) =>
   emit('resize', {
-    ...(sides.left || sides.right ? { width: bounds.width } : {}),
-    ...(sides.top || sides.bottom ? { height: bounds.height } : {}),
+    ...((sides.left || sides.right) && bounds.width > 0 ? { width: bounds.width } : {}),
+    ...((sides.top || sides.bottom) && bounds.height > 0 ? { height: bounds.height } : {}),
     ...(sides.left || sides.top ? { position: bounds.pos } : {}),
   }),
 )
 
+const handlesShown = computed(() => props.show && !props.isPreview && props.isResizable)
 const handlesResizing = ref(false)
 resizeHandles.onResizingChange(
   (resizing) =>
     (handlesResizing.value =
       !!resizing.top || !!resizing.bottom || !!resizing.left || !!resizing.right),
 )
+// Handles removed mid-drag report its end as they unmount, but that report may not arrive: a drag
+// cannot outlive its handles either way.
+watch(handlesShown, (shown) => {
+  if (!shown) handlesResizing.value = false
+})
 
 // Only a handle drag counts: the graph makes room for a visualization that opens when its
 // metadata is written, not when it is drawn.
@@ -267,7 +274,7 @@ customElements.define(ensoVisualizationHost, defineCustomElement(VisualizationHo
         </div>
       </div>
     </WithFullscreenMode>
-    <ResizeHandles v-if="!isPreview && isResizable" left right bottom v-on="resizeHandles.events" />
+    <ResizeHandles v-if="handlesShown" left right bottom v-on="resizeHandles.events" />
   </div>
 </template>
 
