@@ -25,6 +25,7 @@ class SlowAttachVisualizationCmd(
       visualizationId,
       expressionId,
       config,
+      requestOrder,
       delay
     )
   }

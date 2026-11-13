@@ -1856,27 +1856,42 @@ class RuntimeVisualizationsTest
         )
       )
     )
-    val modifyVisualizationResponses = context.receiveN(3)
+    val modifyVisualizationResponses = receiveUntilQuiet(context, 5)
     modifyVisualizationResponses should contain allOf (
       Api.Response(requestId, Api.VisualizationModified()),
       Api.Response(requestId, Api.VisualizationDetached())
     )
-    val Some(dataAfterModification) =
-      modifyVisualizationResponses.collectFirst {
-        case Api.Response(
-              None,
-              Api.VisualizationUpdate(
-                Api.VisualizationContext(
-                  `visualizationId`,
-                  `contextId`,
-                  `expectedExpressionId`
-                ),
-                data
-              )
-            ) =>
-          data
-      }
-    dataAfterModification.sameElements("7".getBytes) shouldBe true
+    // The modified visualization sends an update only if it is evaluated
+    // before the detach takes effect. If it does, it is the modified one.
+    visualizationUpdates(
+      modifyVisualizationResponses,
+      visualizationId
+    ).filterNot(_ == "7") shouldBe empty
+
+    // The detach came last, so the visualization is gone (Note [Visualization
+    // Requests Take Effect In The Order They Arrived] in
+    // `VisualizationHolder`): recomputing `x` sends no update.
+    context.send(
+      Api.Request(
+        requestId,
+        Api.RecomputeContextRequest(
+          contextId,
+          Some(
+            Api.InvalidatedExpressions.Expressions(
+              Vector(context.Main.idMainX),
+              ""
+            )
+          ),
+          None,
+          Seq()
+        )
+      )
+    )
+    val recomputed = receiveUntilQuiet(context, 5)
+    recomputed should contain(
+      Api.Response(requestId, Api.RecomputeContextResponse(contextId))
+    )
+    visualizationUpdates(recomputed, visualizationId) shouldBe empty
   }
 
   it should "return ModuleNotFound error when attaching visualization" in withContext() {
@@ -5930,32 +5945,7 @@ class RuntimeVisualizationsTest
     )
     context.executionGate.awaitReached() shouldBe true
 
-    // The scheduler logs, at trace level, what it did with the ExecuteJob an
-    // attach asks for: submitted it, or found a duplicate of it running. The
-    // log sites in JobExecutionEngine say that this test relies on them.
-    val schedulerLogger = LoggerFactory.getLogger(
-      "org.enso.interpreter.instrument.execution.JobExecutionEngine"
-    ) match {
-      case logger: ch.qos.logback.classic.Logger => logger
-      case other =>
-        fail(s"Expected a logback logger, got ${other.getClass}")
-    }
-    val previousLevel = schedulerLogger.getLevel
-    val scheduled     = new CountDownLatch(on.size)
-    val observing = ObservedMessage.observe(
-      schedulerLogger,
-      { message: ObservedMessage =>
-        val text = message.getFormattedMessage
-        if (
-          text.contains("duplicate job [ExecuteJob") ||
-          text.startsWith("Submitting job: ExecuteJob")
-        ) {
-          scheduled.countDown()
-        }
-      }
-    )
-    schedulerLogger.setLevel(ch.qos.logback.classic.Level.TRACE)
-    try {
+    awaitScheduled(Seq.fill(on.size)(decidedOnExecuteJob)) {
       on.zip(visualizationIds).foreach { case (expressionId, visualizationId) =>
         context.send(
           Api.Request(
@@ -5976,12 +5966,58 @@ class RuntimeVisualizationsTest
           )
         )
       }
+    }
+    (contextId, requestId, visualizationIds)
+  }
+
+  /** Whether the scheduler's message says what it did with the ExecuteJob an
+    * attach asks for: submitted it, or found a duplicate of it running.
+    */
+  private def decidedOnExecuteJob(message: String): Boolean =
+    message.contains("duplicate job [ExecuteJob") ||
+    message.startsWith("Submitting job: ExecuteJob")
+
+  /** Runs `send` and waits until the scheduler has logged, for each of
+    * `expected`, a message it accepts.
+    *
+    * The scheduler logs these at trace level. The log sites in
+    * JobExecutionEngine say that this test relies on them.
+    */
+  private def awaitScheduled(expected: Seq[String => Boolean])(
+    send: => Unit
+  ): Unit = {
+    val schedulerLogger = LoggerFactory.getLogger(
+      "org.enso.interpreter.instrument.execution.JobExecutionEngine"
+    ) match {
+      case logger: ch.qos.logback.classic.Logger => logger
+      case other =>
+        fail(s"Expected a logback logger, got ${other.getClass}")
+    }
+    val previousLevel = schedulerLogger.getLevel
+    val remaining     = new java.util.ArrayList[String => Boolean]()
+    expected.foreach(remaining.add)
+    val scheduled = new CountDownLatch(expected.size)
+    val observing = ObservedMessage.observe(
+      schedulerLogger,
+      { message: ObservedMessage =>
+        val text = message.getFormattedMessage
+        remaining.synchronized {
+          val index = (0 until remaining.size()).find(remaining.get(_)(text))
+          index.foreach { i =>
+            remaining.remove(i)
+            scheduled.countDown()
+          }
+        }
+      }
+    )
+    schedulerLogger.setLevel(ch.qos.logback.classic.Level.TRACE)
+    try {
+      send
       scheduled.await(30, TimeUnit.SECONDS) shouldBe true
     } finally {
       schedulerLogger.setLevel(previousLevel)
       observing.close()
     }
-    (contextId, requestId, visualizationIds)
   }
 
   /** Every response until none arrives for `quietSeconds`. */
@@ -6180,6 +6216,80 @@ class RuntimeVisualizationsTest
       case Api.Response(_, Api.ExpressionUpdates(`contextId`, _)) => true
       case _                                                      => false
     } shouldBe empty
+  }
+
+  it should "keep a visualization that is detached and attached again while an execution runs" in withContext(
+    sequentialExecution = false
+  ) { context =>
+    // #715: the detach waited for the running execution (on the regular job
+    // pool), while the attach's upsert, a high-priority job, deferred the
+    // visualization at once. The detach then removed what the later attach
+    // had set up, and the visualization was never evaluated.
+    val idMainX = context.Main.idMainX
+    val (contextId, requestId, Seq(visualizationId)) =
+      attachWhileTheFirstExecutionIsHeld(context, Seq(idMainX))
+    try {
+      // Wait until both jobs are scheduled while the execution is held, so
+      // the detach is still waiting when the upsert has run.
+      awaitScheduled(
+        Seq(
+          _.startsWith("Submitting job: DetachVisualizationJob"),
+          decidedOnExecuteJob
+        )
+      ) {
+        context.send(
+          Api.Request(
+            requestId,
+            Api.DetachVisualization(contextId, visualizationId, idMainX)
+          )
+        )
+        context.send(
+          Api.Request(
+            requestId,
+            Api.AttachVisualization(
+              visualizationId,
+              idMainX,
+              Api.VisualizationConfiguration(
+                contextId,
+                Api.VisualizationExpression.Text(
+                  "Enso_Test.Test.Visualization",
+                  "x -> incAndEncode x",
+                  Vector()
+                ),
+                "Enso_Test.Test.Visualization"
+              )
+            )
+          )
+        )
+      }
+    } finally context.executionGate.release()
+
+    val responses = receiveUntilQuiet(context, 5)
+    responses should contain(
+      Api.Response(requestId, Api.VisualizationDetached())
+    )
+    // The update comes from the second attach's expression.
+    visualizationUpdates(responses, visualizationId) shouldEqual Seq("7")
+
+    // It is still attached: recomputing `x` updates it again.
+    context.send(
+      Api.Request(
+        requestId,
+        Api.RecomputeContextRequest(
+          contextId,
+          Some(
+            Api.InvalidatedExpressions.Expressions(Vector(idMainX), "")
+          ),
+          None,
+          Seq()
+        )
+      )
+    )
+    val recomputed = receiveUntilQuiet(context, 5)
+    recomputed should contain(
+      Api.Response(requestId, Api.RecomputeContextResponse(contextId))
+    )
+    visualizationUpdates(recomputed, visualizationId) shouldEqual Seq("7")
   }
 
 }

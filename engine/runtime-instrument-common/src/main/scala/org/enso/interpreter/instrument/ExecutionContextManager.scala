@@ -4,8 +4,7 @@ import org.enso.pkg.QualifiedName
 import org.enso.polyglot.runtime.Runtime.Api.{
   ContextId,
   ExpressionId,
-  StackItem,
-  VisualizationId
+  StackItem
 }
 
 import scala.collection.mutable
@@ -190,23 +189,6 @@ class ExecutionContextManager {
       } yield visualization
     }
   }
-
-  /** Removes a visualization from the holder.
-    *
-    * @param contextId the identifier of the execution context
-    * @param visualizationId the visualization identifier
-    * @param expressionId the id of expression that the visualization is
-    *                     attached to
-    */
-  def removeVisualization(
-    contextId: ContextId,
-    expressionId: ExpressionId,
-    visualizationId: VisualizationId
-  ): Unit =
-    synchronized {
-      val state = contexts(contextId)
-      state.visualizations.remove(visualizationId, expressionId)
-    }
 
   /** Registers a visualization for a subexpression of a potentially cached expression.
     *

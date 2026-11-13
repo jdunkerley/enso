@@ -1,5 +1,6 @@
 package org.enso.interpreter.instrument.command
 
+import org.enso.interpreter.instrument.VisualizationHolder
 import org.enso.interpreter.instrument.execution.RuntimeContext
 import org.enso.interpreter.instrument.job.{
   EnsureCompiledJob,
@@ -24,6 +25,11 @@ class ModifyVisualizationCmd(
       request.visualizationConfig.executionContextId,
       maybeRequestId
     ) {
+
+  /** Numbered on creation, in the order the requests arrive (Note
+    * [Visualization Requests Take Effect In The Order They Arrived]).
+    */
+  private val requestOrder = VisualizationHolder.nextRequestOrder()
 
   override protected def executeCmd()(implicit
     ctx: RuntimeContext,
@@ -70,7 +76,8 @@ class ModifyVisualizationCmd(
               maybeRequestId,
               request.visualizationId,
               expressionId,
-              request.visualizationConfig
+              request.visualizationConfig,
+              requestOrder
             )
           )
         maybeFutureExecutable flatMap {

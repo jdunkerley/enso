@@ -4,6 +4,7 @@ import org.enso.pkg.QualifiedName
 import org.enso.polyglot.runtime.Runtime.Api.{ExpressionId, VisualizationId}
 import com.oracle.truffle.api.CompilerDirectives
 
+import java.util.concurrent.atomic.AtomicLong
 import scala.collection.mutable
 
 /** A mutable holder of all visualizations attached to an execution context.
@@ -23,6 +24,113 @@ class VisualizationHolder {
 
   private val pendingSubExpressionVisualizations: mutable.Set[ExpressionId] =
     mutable.HashSet.empty
+
+  /** The number of the latest attach, modify or detach request that changed
+    * each visualization of an expression (Note [Visualization Requests Take
+    * Effect In The Order They Arrived]).
+    */
+  private val latestRequestOrder
+    : mutable.Map[(VisualizationId, ExpressionId), Long] =
+    mutable.Map.empty
+
+  /* Note [Visualization Requests Take Effect In The Order They Arrived]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * An attach or modify becomes an `UpsertVisualizationJob` and a detach a
+   * `DetachVisualizationJob`, and nothing ran them in the order the requests
+   * came in. The commands run on a thread pool, and the upsert is a
+   * high-priority job that never waits for the context lock (it defers the
+   * visualization when an execution holds it), while the detach is a regular
+   * job that waits for that lock. So a detach followed by an attach of the
+   * same visualization ended with the detach removing what the attach had
+   * just set up whenever an execution was running, as one is after every
+   * edit (#715). The other way round, an attach followed by a detach could
+   * leave the visualization attached.
+   *
+   * Running the two jobs one after the other would make an attach wait for
+   * the execution, which the deferral is there to avoid. Instead each request
+   * takes a number when its command is created, on the thread that receives
+   * the requests and so in their order (`nextRequestOrder`), and the jobs
+   * change a visualization only through the `*InRequestOrder` methods. These
+   * apply a change, and record its number, only when no later request has
+   * changed that visualization of that expression yet, all under this
+   * holder's lock. An overtaken change is dropped, which leaves the
+   * visualization as the later request left it: the outcome of running them
+   * in order.
+   *
+   * The key includes the expression because the visualizations of different
+   * expressions are separate entries here, and a detach of one does not touch
+   * the other. A key is kept after its detach, so that a stale attach is
+   * still dropped: one entry per visualization attached in the context,
+   * which go with the context.
+   *
+   * Changes that do not come from a request (an execution evaluating a
+   * deferred visualization, a recompilation re-evaluating one) do not take
+   * part: they work on what the requests left in the holder.
+   */
+
+  /** Applies a change made for the request numbered `requestOrder`, unless a
+    * later request has already changed the visualization.
+    *
+    * @return whether the change was applied
+    */
+  private def inRequestOrder(
+    visualizationId: VisualizationId,
+    expressionId: ExpressionId,
+    requestOrder: Long
+  )(change: => Unit): Boolean = synchronized {
+    val key = (visualizationId, expressionId)
+    if (latestRequestOrder.get(key).exists(_ > requestOrder)) {
+      false
+    } else {
+      latestRequestOrder.update(key, requestOrder)
+      change
+      true
+    }
+  }
+
+  /** Upserts a visualization for the request numbered `requestOrder`, unless
+    * a later request has already changed it (Note [Visualization Requests
+    * Take Effect In The Order They Arrived]).
+    *
+    * @return whether the visualization was upserted
+    */
+  def upsertInRequestOrder(
+    visualization: Visualization,
+    requestOrder: Long
+  ): Boolean =
+    inRequestOrder(visualization.id, visualization.expressionId, requestOrder)(
+      upsert(visualization)
+    )
+
+  /** Upserts an unevaluated visualization for the request numbered
+    * `requestOrder`, unless a later request has already changed it (Note
+    * [Visualization Requests Take Effect In The Order They Arrived]).
+    *
+    * @return whether the visualization was upserted
+    */
+  def upsertUnevaluatedInRequestOrder(
+    unevaluated: UnevaluatedVisualization,
+    requestOrder: Long
+  ): Boolean =
+    inRequestOrder(unevaluated.id, unevaluated.expressionId, requestOrder)(
+      upsertUnevaluated(unevaluated)
+    )
+
+  /** Removes a visualization, evaluated or not, for the request numbered
+    * `requestOrder`, unless a later request has already changed it (Note
+    * [Visualization Requests Take Effect In The Order They Arrived]).
+    *
+    * @return whether the visualization was removed
+    */
+  def removeInRequestOrder(
+    visualizationId: VisualizationId,
+    expressionId: ExpressionId,
+    requestOrder: Long
+  ): Boolean =
+    inRequestOrder(visualizationId, expressionId, requestOrder) {
+      removeUnevaluated(visualizationId, expressionId)
+      remove(visualizationId, expressionId)
+    }
 
   /** Upserts a visualization.
     *
@@ -196,6 +304,14 @@ class VisualizationHolder {
 }
 
 object VisualizationHolder {
+
+  private val requestCounter = new AtomicLong()
+
+  /** Numbers a visualization request in the order the requests arrive (Note
+    * [Visualization Requests Take Effect In The Order They Arrived]). Call it
+    * when the request's command is created.
+    */
+  def nextRequestOrder(): Long = requestCounter.incrementAndGet()
 
   /** Returns an empty visualization holder. */
   def empty = new VisualizationHolder

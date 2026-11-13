@@ -41,12 +41,15 @@ import scala.util.Try
   * @param visualizationId an identifier of visualization
   * @param expressionId an identifier of expression
   * @param config a visualization config
+  * @param requestOrder the number of the attach or modify request, from
+  *                     `VisualizationHolder.nextRequestOrder`
   */
 class UpsertVisualizationJob(
   @unused requestId: Option[Api.RequestId],
   val visualizationId: Api.VisualizationId,
   val expressionId: Api.ExpressionId,
-  config: Api.VisualizationConfiguration
+  config: Api.VisualizationConfiguration,
+  val requestOrder: Long
 ) extends Job[Option[Executable]](
       List(config.executionContextId),
       false,
@@ -169,7 +172,13 @@ class UpsertVisualizationJob(
 
     val holder =
       ctx.contextManager.getVisualizationHolder(config.executionContextId)
-    holder.upsertUnevaluated(unevaluated)
+    if (!holder.upsertUnevaluatedInRequestOrder(unevaluated, requestOrder)) {
+      UpsertVisualizationJob.logger.debug(
+        "Not deferring visualization {}: a later request changed it.",
+        visualizationId
+      )
+      return None
+    }
 
     // Mark as needing sync so it will be processed
     val stack = ctx.contextManager.getStack(config.executionContextId)
@@ -278,16 +287,26 @@ class UpsertVisualizationJob(
       )
     }
 
-    val visualization =
-      UpsertVisualizationJob.updateAttachedVisualization(
+    val maybeVisualization =
+      UpsertVisualizationJob.upsertRequestedVisualization(
         visualizationId,
         expressionId,
         optParentExpressionId,
         module,
         config,
         callable,
-        arguments
+        arguments,
+        requestOrder
       )
+    val visualization = maybeVisualization match {
+      case Some(visualization) => visualization
+      case None =>
+        UpsertVisualizationJob.logger.debug(
+          "Not upserting visualization {}: a later request changed it.",
+          visualizationId
+        )
+        return None
+    }
     val stack =
       ctx.contextManager.getStack(config.executionContextId)
     val runtimeCache = stack.headOption
@@ -738,6 +757,42 @@ object UpsertVisualizationJob {
     callback: AnyRef,
     arguments: Vector[AnyRef]
   )(implicit ctx: RuntimeContext): Visualization = {
+    val visualization = createVisualization(
+      visualizationId,
+      expressionId,
+      parentExpressionId,
+      module,
+      visualizationConfig,
+      callback,
+      arguments
+    )
+    ctx.contextManager.upsertVisualization(
+      visualizationConfig.executionContextId,
+      visualization
+    )
+    visualization
+  }
+
+  /** Creates the visualization state, without storing it.
+    *
+    * @param visualizationId the visualization identifier
+    * @param expressionId the expression to which the visualization is applied
+    * @param parentExpressionId optional parent expression id if this is a subexpression
+    * @param module the module containing the visualization
+    * @param visualizationConfig the visualization configuration
+    * @param callback the visualization callback function
+    * @param arguments the list of arugments that will be passed to the callback
+    * @return the visualization
+    */
+  private def createVisualization(
+    visualizationId: Api.VisualizationId,
+    expressionId: Api.ExpressionId,
+    parentExpressionId: Option[Api.ExpressionId],
+    module: Module,
+    visualizationConfig: Api.VisualizationConfiguration,
+    callback: AnyRef,
+    arguments: Vector[AnyRef]
+  ): Visualization = {
     val visualizationExpressionId =
       findVisualizationExpressionId(module, visualizationConfig.expression)
     val visualization =
@@ -756,11 +811,40 @@ object UpsertVisualizationJob {
     // Stop invalidating expressions, as visualizations for subexpressions
     // carry enough info to workaround cached values.
     //ctx.state.executionHooks.add(InvalidateCaches(expressionId))
-    ctx.contextManager.upsertVisualization(
-      visualizationConfig.executionContextId,
+    visualization
+  }
+
+  /** Stores the visualization an attach or modify request set up, unless a
+    * later request has already changed it (Note [Visualization Requests Take
+    * Effect In The Order They Arrived] in `VisualizationHolder`).
+    *
+    * @return the visualization, or `None` if it was not stored
+    */
+  private def upsertRequestedVisualization(
+    visualizationId: Api.VisualizationId,
+    expressionId: Api.ExpressionId,
+    parentExpressionId: Option[Api.ExpressionId],
+    module: Module,
+    visualizationConfig: Api.VisualizationConfiguration,
+    callback: AnyRef,
+    arguments: Vector[AnyRef],
+    requestOrder: Long
+  )(implicit ctx: RuntimeContext): Option[Visualization] = {
+    val visualization = createVisualization(
+      visualizationId,
+      expressionId,
+      parentExpressionId,
+      module,
+      visualizationConfig,
+      callback,
+      arguments
+    )
+    val holder = ctx.contextManager.getVisualizationHolder(
+      visualizationConfig.executionContextId
+    )
+    Option.when(holder.upsertInRequestOrder(visualization, requestOrder))(
       visualization
     )
-    visualization
   }
 
   /** Find the expressionId of visualization function.
