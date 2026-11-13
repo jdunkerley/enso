@@ -403,3 +403,56 @@ changing the rest of the design.
    make availability purely by type. It is a language-semantics change with
    reach well beyond visualisation, so this design does not depend on it.
    Recommendation: no, not as part of this work.
+
+## Changed while planning
+
+Found while writing the piece 1 plan
+(`docs/superpowers/plans/2026-11-14-visualization-data-types-piece1.md`,
+2026-11-14). Each keeps today's JSON; the plan's golden files check it.
+
+1. **`Viz_Table` has a required `table_view_json max_rows`.** The table view
+   draws many JSON shapes today (Vector, Matrix, Object_Matrix, Map,
+   Generic_Grid, Error, Table's Java-rendered JSON, Row and Dictionary maps
+   with their `get_child_node_action` templates). Each source renders its own,
+   moved as-is; `Viz_Table.from_view` covers values that have only a table
+   view (no columns), `Viz_Table.from_columns` the in-memory grids that Base's
+   `Table_Viz_Data.GenericGrid` produced.
+2. **The contract's operations are grouped as capabilities** listed by
+   `supported_operations`: required `column_names`, `column_kinds`,
+   `row_count`, `select_columns`, `slice`, `sample`; `"rows"`
+   (`rename_columns`, `add_row_number`, `filter_between`, `rows_json`,
+   `column_values`), which replaces `read`, so the charts' row work runs on
+   the library's own table operations and renders the same JSON;
+   `"server_rows"` (the table view's server-side row model, which is how the
+   sort, filter and distinct values of decision B reach the IDE); `"spatial"`
+   (the geo map's layers for a spatial database table). A chart takes a
+   bounded `sample` first when the source does not support `"rows"`, which is
+   what bounds every database read.
+3. **Base values keep their chart paths.** Scatter on a `Vector`/`Array`,
+   histogram on a `Vector`, and the geo map and charts on a value with no
+   columns keep `develop`'s code; only values that convert to a `Viz_Table`
+   with columns go through it. Image's `Histogram` needs no conversion (its
+   path is unchanged), so Image is not among the libraries that depend on
+   Visualization.
+4. **Cells:** `Viz_Cell` (data type, `render level` and record `pairs`),
+   converted to by Table's `Table`, `Column` and `Row`, keeps the cell JSON of
+   tables, columns and rows inside cells. `develop`'s `DB_Table{…}` and
+   `DB_Column{…}` cell branches are unreachable (a database table matches
+   `Table` first), so they are dropped without a change in output.
+5. **Heatmap needs no change:** it uses the table view's preprocessor, already
+   bounded at 1000 rows. **Neither Histogram nor Heatmap is registered in the
+   GUI** (`stores/visualization/index.ts` builtins), so the histogram bound is
+   invisible to users: step 4 takes `CI: No changelog needed`, and step 5
+   (the picker) takes the changelog entry.
+6. **Lazy text stays.** `Text.to_default_visualization_data` uses the lazy
+   text window, so only the lazy **table** code is deleted.
+7. **The geo map keeps reading an in-memory table whole**, as today; only a
+   database table is sampled (first 15000 rows, as today).
+8. **Availability: an `Any` conversion does not offer a chart.** Every value
+   converts to `Viz_Table` through the catch-all, so counting it would offer
+   scatter and geo map for every value. A chart is offered when one of the
+   value's types has its own conversion; the table view keeps its static
+   `Any` input type.
+9. **Step 3 has a temporary library cycle** (Table imports Visualization while
+   Visualization's chart modules still import Table). It resolves at run time
+   (tested on a distribution, 2026-11-14); step 4 removes it.
