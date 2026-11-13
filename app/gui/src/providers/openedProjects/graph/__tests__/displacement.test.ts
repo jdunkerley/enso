@@ -156,6 +156,29 @@ test('a pushed node moved by hand loses its home at the next layout', () => {
   expect(g.nodes.get('B' as NodeId)!.position).toEqual(new Vec2(300, 300))
 })
 
+test('a move by hand forgets the home of every node given, moved or not', () => {
+  const g = graph([
+    { id: 'A', x: 0, y: 0 },
+    { id: 'B', x: 0, y: 52 },
+    { id: 'C', x: 120, y: 52 },
+  ])
+  g.change('A', { vis: { ...SHOWN, width: 300 } })
+  expect(g.y('B')).toBe(202)
+  expect(g.y('C')).toBe(202)
+  // Tidy up gives B its current place and moves C: both are where the user wants them now.
+  g.displacement.afterMove(
+    new Map([
+      ['B' as NodeId, new Vec2(0, 202)],
+      ['C' as NodeId, new Vec2(400, 202)],
+    ]),
+  )
+  expect(g.displaced.size).toBe(0)
+  expect(g.y('B')).toBe(202)
+  expect(g.x('C')).toBe(400)
+  g.change('A', { vis: undefined })
+  expect(g.y('B')).toBe(202)
+})
+
 test('removing a pusher returns the nodes it pushed', () => {
   const g = graph([
     { id: 'A', x: 0, y: 0 },

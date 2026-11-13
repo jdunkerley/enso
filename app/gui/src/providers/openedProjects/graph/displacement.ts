@@ -127,22 +127,43 @@ export function createDisplacement(deps: DisplacementDeps) {
     }
   }
 
+  /**
+   * Lay out around nodes that are about to change. Call this before writing the change. With
+   * `adds` false the nodes were moved by hand: what they pushed is released and nothing new is
+   * pushed.
+   */
+  function afterChange(
+    updates: ReadonlyMap<NodeId, NodeChange>,
+    adds: boolean,
+    edit?: MutableModule,
+  ) {
+    const { nodes, oldBoxes } = layoutNodes(updates, new Set(), edit)
+    const changes = [...updates.keys()]
+      .flatMap((id): Change[] => {
+        const old = oldBoxes.get(id)
+        return old ? [{ id, old, adds }] : []
+      })
+      // Top to bottom, so the result does not depend on the order of a selection.
+      .sort((a, b) => a.old.top - b.old.top)
+    apply(nodes, changes, edit)
+  }
+
   return {
+    afterChange,
     /**
-     * Lay out around nodes that are about to change. Call this before writing the change. With
-     * `adds` false the nodes were moved by hand: what they pushed is released and nothing new is
-     * pushed.
+     * Lay out around nodes the user moved by hand to `positions` (a finished drag, Align, Spacing,
+     * Tidy up). Call this before writing the positions. What they pushed is released, nothing new
+     * is pushed, and every node given forgets its home, moved or not: it is where the user put it.
      */
-    afterChange(updates: ReadonlyMap<NodeId, NodeChange>, adds: boolean, edit?: MutableModule) {
-      const { nodes, oldBoxes } = layoutNodes(updates, new Set(), edit)
-      const changes = [...updates.keys()]
-        .flatMap((id): Change[] => {
-          const old = oldBoxes.get(id)
-          return old ? [{ id, old, adds }] : []
-        })
-        // Top to bottom, so the result does not depend on the order of a selection.
-        .sort((a, b) => a.old.top - b.old.top)
-      apply(nodes, changes, edit)
+    afterMove(positions: ReadonlyMap<NodeId, Vec2>, edit?: MutableModule) {
+      afterChange(
+        new Map(Array.from(positions, ([id, position]) => [id, { position }])),
+        false,
+        edit,
+      )
+      for (const [id, position] of positions)
+        if (deps.readDisplaced(id, edit) != null)
+          deps.write(id, { position, displaced: undefined }, edit)
     },
     /** Lay out after the user removed nodes: what they pushed returns. */
     afterRemoval(ids: Iterable<NodeId>, edit?: MutableModule) {

@@ -488,7 +488,8 @@ export function createGraphStore(
 
   /**
    * Move nodes by hand (a finished drag, Align, Spacing, Tidy up). The nodes they were pushing
-   * return, and a moved node forgets the place it was pushed from.
+   * return, and every node given forgets the place it was pushed from, even one whose position
+   * does not change.
    *
    * Call it at most once per outer transaction, passing every node in one call: do not call it in a
    * loop inside `batchEdits` or an edit, because the node database it lays out against is updated
@@ -498,10 +499,7 @@ export function createGraphStore(
     const positions = new Map(moves)
     if (positions.size === 0) return
     module.batchEdits(() => {
-      displacement.afterChange(
-        new Map(Array.from(positions, ([id, position]) => [id, { position }])),
-        false,
-      )
+      displacement.afterMove(positions)
       for (const [id, position] of positions) setNodePosition(id, position)
     })
   }
