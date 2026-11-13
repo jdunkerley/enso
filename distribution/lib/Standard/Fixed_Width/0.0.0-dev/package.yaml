@@ -1,0 +1,19 @@
+name: Fixed_Width
+namespace: Standard
+version: 0.0.0-dev
+license: Apache-2.0
+public-types:
+  [
+    Fixed_Width_Column_Description,
+    Fixed_Width_Format,
+    Fixed_Width_Layout,
+    Fixed_Width_Line_Too_Long,
+    Inconsistent_Fixed_Width_Lengths,
+    Invalid_Fixed_Width_Row,
+    Invalid_Fixed_Width_Rows,
+    On_Empty_Field,
+  ]
+
+services:
+  - provides: Standard.Base.System.File_Format.File_Format_SPI
+    with: Standard.Fixed_Width.Internal.Services.Impl

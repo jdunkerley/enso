@@ -32,10 +32,6 @@ export project.Extensions.Table_Conversions.write_table
 
 export project.Fill_With.Fill_With
 
-export project.Fixed_Width.Fixed_Width_Format.Fixed_Width_Column_Description
-export project.Fixed_Width.Fixed_Width_Format.Fixed_Width_Format
-export project.Fixed_Width.Fixed_Width_Format.Fixed_Width_Layout
-export project.Fixed_Width.On_Empty_Field.On_Empty_Field
 
 export project.Generate_Rows_Range.Generate_Rows_Range
 
@@ -71,4 +67,3 @@ export project.Value_Type.Auto
 export project.Value_Type.Bits
 export project.Value_Type.Value_Type
 
-export project.YXDB_Format.YXDB_Format

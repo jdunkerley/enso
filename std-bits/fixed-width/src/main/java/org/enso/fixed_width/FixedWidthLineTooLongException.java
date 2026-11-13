@@ -1,0 +1,12 @@
+package org.enso.fixed_width;
+
+/** An exception thrown when a problem occurred when reading a fixed-width file. */
+public class FixedWidthLineTooLongException extends RuntimeException {
+  public final long sourceLineNumber;
+  public final long maxLineLength;
+
+  public FixedWidthLineTooLongException(long sourceLineNumber, long maxLineLength) {
+    this.sourceLineNumber = sourceLineNumber;
+    this.maxLineLength = maxLineLength;
+  }
+}

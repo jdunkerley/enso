@@ -73,6 +73,9 @@ from Standard.Database import all
 from Standard.Postgres import all
 from Standard.SQLite import all
 from Standard.XML import all
+from Standard.EDI import all
+from Standard.Fixed_Width import all
+from Standard.YXDB import all
 from Standard.Visualization import all
 """;
 

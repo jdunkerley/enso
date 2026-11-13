@@ -1,0 +1,4 @@
+{
+  "structure": "[ISA,GS,ST,BGN,CUR,N1,N4,SE,GE,IEA]",
+  "field_map": { "BGN": ["Purpose", "Reference", "Date"] }
+}

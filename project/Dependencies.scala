@@ -352,8 +352,11 @@ object Dependencies {
 
   // === std-lib ================================================================
 
-  // Has to match Truffle's ANTLR dependency version to avoid spurious warnings in Native Image
-  val antlrVersion = "4.12.0"
+  // Used by `std-table` only (the expression grammar): the runtime and the
+  // generator (`Antlr4 / antlr4Version`) take this one version, so the
+  // generated parser never warns about a tool/runtime mismatch. Truffle does
+  // not depend on ANTLR, so nothing else constrains it.
+  val antlrVersion = "4.13.2"
   // `std-aws` uses AWS SDK for Java v2 only; every v2 artifact moves with this
   // (and the `bom` imported at the same version). v1 reached end of support in
   // December 2025 and is no longer shipped: it was only ever declared for the

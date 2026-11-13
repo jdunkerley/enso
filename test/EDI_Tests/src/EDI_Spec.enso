@@ -1,0 +1,39 @@
+from Standard.Base import all
+
+from Standard.Table import Table
+from Standard.EDI import all
+
+from Standard.Test import all
+
+add_specs suite_builder =
+    sample = enso_project.data / "sample.822"
+    suite_builder.group "EDI" group_builder->
+        group_builder.specify "is chosen by extension for .822 and .edi" <|
+            t1 = Data.read sample
+            t2 = Data.read (enso_project.data / "sample.edi")
+            t1.should_be_a Table
+            t1.row_count . should_equal t2.row_count
+            t1.column_names . should_equal t2.column_names
+
+        group_builder.specify "reads raw segments" <|
+            t = Data.read sample (EDI_Format.EDI definition=..Raw_Segments)
+            t.column_names . should_equal ["Segment", "Elements"]
+            t.at "Segment" . to_vector . should_equal ["ISA", "GS", "ST", "BGN", "CUR", "N1", "N4", "SE", "GE", "IEA"]
+
+        group_builder.specify "detects the segment terminator" <|
+            auto = Data.read sample (EDI_Format.EDI definition=..Raw_Segments)
+            explicit = Data.read sample (EDI_Format.EDI segment_end="~" definition=..Raw_Segments)
+            auto.row_count . should_equal explicit.row_count
+
+        group_builder.specify "maps 822 field names by default, not with map_fields=False" <|
+            mapped = Data.read sample
+            raw = Data.read sample (EDI_Format.EDI map_fields=False)
+            mapped.column_names.contains "Interchange Sender ID" . should_be_true
+            raw.column_names.contains "Interchange Sender ID" . should_be_false
+
+        group_builder.specify "reads with a custom definition from JSON" <|
+            t = Data.read sample (EDI_Format.EDI definition=(..From_Json (enso_project.data / "custom.json")))
+            t.should_be_a Table
+            t.column_names.contains "BGN" . should_be_true
+            (t.at "BGN" . at 0 . at "Purpose") . should_equal "00"
+            (t.at "BGN" . at 0 . at "Reference") . should_equal "REF1"

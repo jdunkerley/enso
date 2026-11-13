@@ -1,0 +1,8 @@
+name: Fixed_Width_Tests
+namespace: enso_dev
+version: 0.0.1
+enso-version: default
+license: MIT
+author: jdunkerley
+maintainer: jdunkerley
+prefer-local-libraries: true

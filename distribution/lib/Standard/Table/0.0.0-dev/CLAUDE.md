@@ -52,6 +52,15 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
 - Joins with mismatched key types silently produce mismatch markers — verify
   column types are compatible before joining.
 
+- EDI (ANSI X12) reading is not part of this library: it moved to `Standard.EDI`
+  (`from Standard.EDI import all`).
+
+- Fixed-width text reading is not part of this library either: it moved to
+  `Standard.Fixed_Width` (`from Standard.Fixed_Width import all`).
+
+- Alteryx `.yxdb` reading is not part of this library either: it moved to
+  `Standard.YXDB` (`from Standard.YXDB import all`).
+
 ## Where to read more
 
 - `src/Table.enso` — type definition with method docs.

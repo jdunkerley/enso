@@ -21,7 +21,9 @@ libraries:
   Database: { stdBits: [database], dependsOn: [Base, Table] }
   Database_Test_Suite: { stdBits: [database-test-suite], dependsOn: [Base, Database, SQLite, Table, Test] }
   DuckDB: { stdBits: [duckdb], dependsOn: [Base, Database, Table] }
+  EDI: { stdBits: [edi], dependsOn: [Base, Table] }
   Examples: { stdBits: [], dependsOn: [Base, Table] }
+  Fixed_Width: { stdBits: [fixed-width], dependsOn: [Base, Table] }
   Generic_JDBC: { stdBits: [], dependsOn: [Base, Database, Table] }
   Geo: { stdBits: [], dependsOn: [Base, Table] }
   Google: { stdBits: [google], dependsOn: [Base, Table] }
@@ -37,6 +39,7 @@ libraries:
   Test: { stdBits: [], dependsOn: [Base] }
   Visualization: { stdBits: [], dependsOn: [Base, Database, Table] }
   XML: { stdBits: [], dependsOn: [Base, Table] }
+  YXDB: { stdBits: [yxdb], dependsOn: [Base, Table] }
 
 testProjects:
   AWS_Tests:
@@ -50,7 +53,13 @@ testProjects:
   DuckDB_Tests:
     imports: [Base, Database, Database_Test_Suite, DuckDB, Table, Test]
     testImports: []
+  EDI_Tests:
+    imports: [Base, EDI, Table, Test]
+    testImports: []
   Examples_Tests: { imports: [Base, Examples, Test], testImports: [Base_Tests] }
+  Fixed_Width_Tests:
+    imports: [Base, Fixed_Width, Table, Test]
+    testImports: [Base_Tests]
   Generic_JDBC_Tests:
     imports:
       [Base, Database, Database_Test_Suite, Generic_JDBC, Postgres, SQLite, Test]
@@ -98,6 +107,9 @@ testProjects:
     testImports: []
   XML_Tests:
     imports: [Base, Table, Test, Visualization, XML]
+    testImports: []
+  YXDB_Tests:
+    imports: [Base, Table, Test, YXDB]
     testImports: []
 
 # The jobs a standard library suite that runs "every project but …" splits into; a suite with an

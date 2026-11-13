@@ -1,0 +1,11 @@
+private
+
+import Standard.Base.System.File_Format.File_Format_SPI
+
+import project.Fixed_Width_Format.Fixed_Width_Format
+
+type Impl
+
+File_Format_SPI.from (that:Impl) =
+    _ = that
+    File_Format_SPI.new Fixed_Width_Format "fixed_width"
