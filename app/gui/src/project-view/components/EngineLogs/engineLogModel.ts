@@ -173,6 +173,9 @@ export const STD_BITS_PACKAGE_ROOTS: readonly string[] = [
   'org.enso.database',
   'org.enso.database_test_suite',
   'org.enso.duckdb',
+  'org.enso.edi',
+  'org.enso.excel',
+  'org.enso.fixed_width',
   'org.enso.google',
   'org.enso.image',
   'org.enso.microsoft',
@@ -182,6 +185,7 @@ export const STD_BITS_PACKAGE_ROOTS: readonly string[] = [
   'org.enso.sqlite',
   'org.enso.table',
   'org.enso.tableau',
+  'org.enso.yxdb',
 ]
 
 /** Whether `name` is `root` or lies under it, by whole dot-separated segments. */

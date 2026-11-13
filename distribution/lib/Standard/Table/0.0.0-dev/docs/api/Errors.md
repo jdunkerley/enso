@@ -48,9 +48,6 @@
 - type Existing_Column
     - Error column_name:Standard.Base.Any.Any
     - to_display_text self -> Standard.Base.Any.Any
-- type Existing_Data
-    - Error message:Standard.Base.Any.Any
-    - to_display_text self -> Standard.Base.Any.Any
 - type Ignored_NaN_Values
     - Warning column:Standard.Base.Data.Text.Text rows:((Standard.Base.Data.Vector.Vector Standard.Base.Data.Numbers.Integer)|(Standard.Base.Data.Array.Array Standard.Base.Data.Numbers.Integer))
     - to_display_text self -> Standard.Base.Any.Any
@@ -156,9 +153,6 @@
     - to_display_text self -> Standard.Base.Any.Any
 - type Parser_Error
     - Error cause:Standard.Base.Any.Any
-- type Range_Exceeded
-    - Error message:Standard.Base.Any.Any
-    - to_display_text self -> Standard.Base.Any.Any
 - type Row_Count_Mismatch
     - Error left_rows:Standard.Base.Data.Numbers.Integer right_rows:Standard.Base.Data.Numbers.Integer
     - to_display_text self -> Standard.Base.Any.Any

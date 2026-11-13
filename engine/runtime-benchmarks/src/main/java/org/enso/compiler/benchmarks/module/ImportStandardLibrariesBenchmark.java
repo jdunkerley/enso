@@ -76,6 +76,7 @@ from Standard.XML import all
 from Standard.EDI import all
 from Standard.Fixed_Width import all
 from Standard.YXDB import all
+from Standard.Excel import all
 from Standard.Visualization import all
 """;
 

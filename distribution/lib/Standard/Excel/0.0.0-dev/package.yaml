@@ -1,0 +1,9 @@
+name: Excel
+namespace: Standard
+version: 0.0.0-dev
+license: Apache-2.0
+public-types: [Excel_Format, Excel_Workbook, Excel_Range]
+
+services:
+  - provides: Standard.Base.System.File_Format.File_Format_SPI
+    with: Standard.Excel.Internal.Services.Impl

@@ -2,7 +2,7 @@
 
 A columnar table library for in-memory and database-backed data. Provides
 `Table` and `Column` types with filtering, sorting, aggregation, joins, pivots,
-and reading/writing CSV/Excel/Parquet.
+and reading/writing delimited text (CSV/TSV).
 
 ## Main entry points
 
@@ -43,8 +43,6 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
 - `src/Aggregate_Column.enso` — aggregation specs (`..Count`, `..Sum`, …).
 - `src/Value_Type.enso` — column type system.
 - `src/Delimited/` — CSV/TSV reading and writing.
-- `src/Excel/` — Excel format handling.
-- `src/Parquet/` — Parquet support.
 - `src/Extensions/` — type-extension methods (e.g. `Vector.to_table`).
 
 ## Things to avoid in generated code
@@ -60,6 +58,10 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
 
 - Alteryx `.yxdb` reading is not part of this library either: it moved to
   `Standard.YXDB` (`from Standard.YXDB import all`).
+
+- Excel (`.xlsx`, `.xls`, `.xlsb`) reading and writing is not part of this
+  library either: it moved to `Standard.Excel`
+  (`from Standard.Excel import all`).
 
 ## Where to read more
 

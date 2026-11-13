@@ -34,6 +34,8 @@ there.
 - `EDI/` — ANSI X12 EDI reading (`EDI_Format`, `EDI_Definition`), `.edi` and
   `.822` files.
 - `Fixed_Width/` — fixed-width text reading (`Fixed_Width_Format`).
+- `Excel/` — Excel workbook reading and writing (`Excel_Format`,
+  `Excel_Workbook`, `Excel_Range`), `.xlsx`, `.xls` and `.xlsb`.
 - `YXDB/` — Alteryx `.yxdb` reading (`YXDB_Format`), including spatial to
   GeoJSON conversion.
 - `XML/` — XML documents (`XML_Document`, `XML_Element`, XPath), the `.xml` file

@@ -1,7 +1,6 @@
 package org.enso.google;
 
 import com.google.api.services.sheets.v4.model.RowData;
-import org.apache.poi.ss.util.CellReference;
 import org.enso.table.problems.ProblemAggregator;
 import org.enso.table.util.NameDeduplicator;
 
@@ -26,7 +25,7 @@ public class GoogleSheetsHeaders {
 
   public String get(int column) {
     if (names == null) {
-      return CellReference.convertNumToColString(column);
+      return columnLetters(column);
     }
 
     String name = column < names.length ? names[column] : "";
@@ -34,6 +33,15 @@ public class GoogleSheetsHeaders {
       name = deduplicator.makeUnique(name);
     }
     return name;
+  }
+
+  /** Spreadsheet column letters of a zero-based column index: 0 is A, 25 is Z, 26 is AA. */
+  private static String columnLetters(int column) {
+    var letters = new StringBuilder();
+    for (int n = column; n >= 0; n = n / 26 - 1) {
+      letters.insert(0, (char) ('A' + n % 26));
+    }
+    return letters.toString();
   }
 
   public int getRowsUsed() {

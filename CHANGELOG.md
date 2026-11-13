@@ -423,6 +423,9 @@
   `from Standard.Fixed_Width import all` to use `Fixed_Width_Format`.][734]
 - [Alteryx `.yxdb` files are read by the new Standard.YXDB library; add
   `from Standard.YXDB import all` to use `YXDB_Format` by name.][736]
+- [Excel workbooks are read and written by the new Standard.Excel library, and
+  Standard.Table is about 25 MB smaller; add `from Standard.Excel import all` to
+  use `Excel_Workbook`, `Excel_Format` or `Date.from_excel`.][NNN]
 - [Standard.Database_Test_Suite: a conformance suite for database backends. A
   backend describes itself in a few lines and runs the same table and database
   tests as the built-in ones. The suite is not in the IDE installer; for now it
@@ -488,6 +491,7 @@
 [733]: https://github.com/jdunkerley/enso/pull/733
 [734]: https://github.com/jdunkerley/enso/pull/734
 [736]: https://github.com/jdunkerley/enso/pull/736
+[NNN]: https://github.com/jdunkerley/enso/pull/NNN
 [654]: https://github.com/jdunkerley/enso/pull/654
 [666]: https://github.com/jdunkerley/enso/pull/666
 [694]: https://github.com/jdunkerley/enso/pull/694

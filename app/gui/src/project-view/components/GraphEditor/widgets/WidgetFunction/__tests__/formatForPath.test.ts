@@ -25,7 +25,7 @@ import {
 } from '../formatForPath'
 
 const SQLITE = 'Standard.SQLite.SQLite_Format.SQLite_Format'
-const TABLE_EXCEL = 'Standard.Table.Excel.Excel_Format.Excel_Format'
+const TABLE_EXCEL = 'Standard.Excel.Excel_Format.Excel_Format'
 const TABLE_DELIMITED = 'Standard.Table.Delimited.Delimited_Format.Delimited_Format'
 
 const option = (label: string, value: string, requires?: string, patterns?: string[]) => ({
