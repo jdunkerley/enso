@@ -7,7 +7,11 @@ from Standard.Test import all
 
 import project.Enso_Bin_Utils
 
+polyglot java import java.io.FileInputStream
+polyglot java import java.io.FileOutputStream
 polyglot java import java.lang.System.Logger.Level
+polyglot java import java.util.zip.GZIPInputStream
+polyglot java import java.util.zip.GZIPOutputStream
 polyglot java import org.enso.base_test_helpers.LoggerHelper
 
 type Type_In_Private_Module
@@ -27,6 +31,16 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
     group_builder.specify "should do nothing on logging" <|
         Type_In_Private_Module.log_message "Hidden message" Log_Level.Finest
         Type_In_Private_Module.log_message "Less hidden message" Log_Level.Fine
+
+    group_builder.specify "reads a rolled-over (gzipped) log file as well as a plain one" <|
+        plain = tmp_root / "plain.log"
+        "INFO Ahoj".write plain . should_succeed
+        read_log_text plain . should_equal "INFO Ahoj"
+
+        rolled = tmp_root / "rolled.0.log.gz"
+        out = GZIPOutputStream.new (FileOutputStream.new rolled.absolute.path)
+        Panic.with_finalizer out.close (out.write ("WARN Čau".bytes Encoding.utf_8))
+        read_log_text rolled . should_equal "WARN Čau"
 
     group_builder.specify "is logging asynchronously" <|
         LoggerHelper.isLoggableAsync Level.ERROR . should_be_true
@@ -164,7 +178,9 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
             Test.fail proc.stdout+proc.stderr+proc.exit_code.to_text
 
         # The log rolls daily (UTC), so a run crossing midnight leaves two files
-        # in this run's own fresh directory. Require at least one and read all.
+        # in this run's own fresh directory: the rolled one gzipped
+        # (`enso-cli-<date>.0.log.gz`) and a new `.log`. Require at least one
+        # and read all, decompressing the rolled one (#717).
         arr = logs_dir.list
         if arr.is_empty then Test.fail "No log file was written to "+logs_dir.to_text
         sorted = arr.sort on=(.name)
@@ -354,7 +370,10 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
         log . not_contains_line "Standard\.Database\.Connection.*Geheim2"
 
 read_log_text (f : File) -> Text =
-    Data.read f : Text
+    if f.name.ends_with ".gz" . not then Data.read f : Text else
+        stream = GZIPInputStream.new (FileInputStream.new f.absolute.path)
+        bytes = Panic.with_finalizer stream.close stream.readAllBytes
+        Text.from_bytes bytes Encoding.utf_8
 
 Text.contains_line self regex:Text =
     r = Regex.compile regex
