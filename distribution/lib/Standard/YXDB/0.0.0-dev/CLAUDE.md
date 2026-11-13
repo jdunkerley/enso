@@ -6,10 +6,10 @@ returns a `Table`. Read only. The format is chosen from the `.yxdb` extension.
 ## Main entry points
 
 - `YXDB_Format.YXDB_Format` — the file format (`File_Format_SPI`).
-- `YXDB_Format.spatial_to_geojson spatial_object` — converts one spatial
-  object (a byte array) to GeoJSON text.
-- `YXDB_Format.spatial_column_to_geojson table column` — converts a whole
-  column of spatial objects to GeoJSON.
+- `YXDB_Format.spatial_to_geojson spatial_object` — converts one spatial object
+  (a byte array) to GeoJSON text.
+- `YXDB_Format.spatial_column_to_geojson table column` — converts a whole column
+  of spatial objects to GeoJSON.
 
 ## Common usage
 

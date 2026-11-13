@@ -18,8 +18,8 @@ Each subdir mirrors a standard-library module name.
 - `edi/` — `Standard.EDI`. `EDIReader`, the ANSI X12 segment parser (JDK only).
 - `fixed-width/` — `Standard.Fixed_Width`. `FixedWidthReader` and its problem
   classes (`org.enso.fixed_width`).
-- `yxdb/` — `Standard.YXDB`. `YXDBReader` (`org.enso.yxdb`) and the
-  `yxdb-java` library.
+- `yxdb/` — `Standard.YXDB`. `YXDBReader` (`org.enso.yxdb`) and the `yxdb-java`
+  library.
 - `sqlite/` — `Standard.SQLite`. Packaging only: the `sqlite-jdbc` driver and
   its native library.
 - `aws/`, `google/`, `microsoft/`, `snowflake/`, `tableau/`, `duckdb/`, `saas/`

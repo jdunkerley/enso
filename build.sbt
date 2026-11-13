@@ -5482,7 +5482,7 @@ lazy val `std-yxdb` = project
     Compile / packageBin / artifactPath :=
       `yxdb-polyglot-root` / "std-yxdb.jar",
     libraryDependencies ++= Seq(
-      "org.graalvm.polyglot" % "polyglot" % graalMavenPackagesVersion % "provided",
+      "org.graalvm.polyglot" % "polyglot"  % graalMavenPackagesVersion % "provided",
       "uk.co.jdunkerley"     % "yxdb-java" % "0.1.4"
     ),
     Compile / packageBin := {
