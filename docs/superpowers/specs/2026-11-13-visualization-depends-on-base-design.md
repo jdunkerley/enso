@@ -111,11 +111,18 @@ Pieces 2 and 3 depend on piece 1's dependency flip and not on each other. Piece
   dataflow error raised inside a conversion passes through untouched.
 - **Tables are intersection values.** A table is `Table & In_Memory_Table`; a
   one-column table adds the column types, and a 1×1 one `& Integer`
-  (`Table_Refinements.enso:18-35`). Conversions and methods try the parts in
-  cast order with `Table` first, and each part's lookup falls back to `Any`
-  (`InvokeConversionNode.java:198-227`, `UnresolvedConversion.java:65`). So a
-  conversion or `default_visualization` defined on `In_Memory_Table` or
-  `DB_Table` may never be reached.
+  (`Table_Refinements.enso:18-35`); a database table is `Table & DB_Table`,
+  plus `Spatial_Table` and the column types where they apply
+  (`DB_Table_Refinements.enso`). A conversion tries only the value's **visible**
+  types, in cast order with `Table` first, and each type's lookup falls back to
+  `Any` (`InvokeConversionNode.java:198-227`, `UnresolvedConversion.java:65`).
+  The implementation types are normally hidden, and nothing in Base can list
+  hidden types. The spike (below) measured what this means.
+- **Table and Column reach their implementation** through
+  `self.implementation.<method> self.underlying` (`Table.Value underlying
+implementation`, `Table.enso:286`). The implementations are
+  `In_Memory_Table_Implementation`, `DB_Table_Implementation` and their column
+  counterparts, types with static methods, private to their libraries.
 - **The IDE knows all of a value's types**: the type info it gets carries
   `visibleTypes` and `hiddenTypes` (`stores/visualization/index.ts:243-246`).
 - **The IDE already lists a type's conversion targets**: the `to` widget scans
@@ -148,11 +155,46 @@ fail.
 A library supplies the data type by a conversion,
 `Viz_Table.from (that:My_Type) = …`, defined in `My_Type`'s module.
 
-**Intersection types:** a library defines conversions and `default_visualization`
-on its **public** type (`Table`, `Column`) and dispatches inside on its
-implementation (each implementation part supplies the method the conversion
-calls), never on `In_Memory_Table` or `DB_Table`. This is proven by a spike
-before anything else is built (see Delivery).
+**Intersection types (proven by the spike):** a library defines every
+conversion and `default_visualization` on its **public** type (`Table`,
+`Column`, `Row`) and dispatches inside through the existing implementation
+idiom:
+
+```
+Viz_Table.from (that:Table) = that.implementation.to_viz_table that.underlying
+SQL_Viz.from (that:Table) = that.implementation.to_sql_viz that.underlying
+Table.default_visualization self = self.implementation.default_visualization self.underlying
+```
+
+Database supplies the database answers in `DB_Table_Implementation` and
+`DB_Column_Implementation`, so Table never names a database type. An
+implementation that cannot supply a data type (the in-memory table for
+`SQL_Viz`) raises the `No_Such_Conversion` panic, which the preprocessor's
+helper treats exactly like a missing conversion. Never define a conversion on
+`In_Memory_Table`, `DB_Table`, `Spatial_Table` or another implementation or
+refinement type: with an `Any` catch-all visible it is never reached, and
+without one it is reached only after an explicit cast.
+
+#### The spike
+
+Run on a copy of the distribution built from `develop` on 2026-11-13, with a
+Base-only library standing in for Visualization (imported by Table and
+Database), and the conversion and `default_visualization` called from a
+Base-only helper module, as the IDE does:
+
+| Value                                    | On `Table`/`Column` via `implementation` | On `In_Memory_Table`, `Any` catch-all visible | On `DB_Table`, no catch-all                    |
+| ---------------------------------------- | ---------------------------------------- | --------------------------------------------- | ---------------------------------------------- |
+| in-memory table, 1-column, 1×1 `Integer` | `Table` → in-memory implementation ✔     | catch-all wins ✘                              | n/a                                            |
+| in-memory column                         | `Column` → in-memory implementation ✔    | catch-all wins ✘                              | n/a                                            |
+| database table, 1-column                 | `Table` → database implementation ✔      | catch-all wins ✘                              | not found ✘ (found only after `dt : DB_Table`) |
+| database column                          | `Column` → database implementation ✔     | catch-all wins ✘                              | not found ✘                                    |
+| vector, atom                             | catch-all ✔                              | catch-all ✔                                   | none ✔                                         |
+
+A single-column table, which is also a `Column`, goes to the `Table`
+conversion, not the `Column` one. `default_visualization` dispatches the same
+way as the conversions. Inside the `Table` conversion `that` is narrowed to
+`Table`, so implementation methods are reachable only through
+`that.implementation`, not by calling them on `that`.
 
 ### 2. `Viz_Table`, the table data type
 
@@ -200,6 +242,7 @@ tables, XML).
 | `Any`: one cell, as `_make_json_for_other` today                                | Visualization                                                       |
 | `Table`, `Column`, `Row` (in-memory and database, by implementation)            | Table, dispatching to Database's implementation for database values |
 | Connections, workbooks, Hyper files, XML                                        | each library, as today                                              |
+| Image's `Histogram` (one column of its values, as `value.to_vector` today)      | Image                                                               |
 
 Each conversion body is the code in today's `Table_Viz_Data.from` or the
 matching `case … of` branch in Visualization, moved, not rewritten, so the
@@ -209,8 +252,10 @@ table view's JSON for every source is unchanged. Because `Viz_Table.from
 ### 3. `SQL_Viz`, the SQL data type
 
 The SQL text and its interpolations, rendering the JSON `SQLVisualization.vue`
-gets today. Database table and column convert to it, by the same rule as above.
-No fallback: a value with no conversion does not offer the SQL view.
+gets today. By the rule in §1 the conversion is on `Table` and `Column`; the
+database implementations answer and the in-memory ones raise
+`No_Such_Conversion`. No fallback: the SQL preprocessor shows its unsupported
+state for a value with no SQL.
 
 ### 4. Charts
 
@@ -256,7 +301,8 @@ never catches an error raised inside a conversion.
   them.
 - **Libraries** that converted to Base's `Table_Viz_Data` import Visualization
   and convert to `Viz_Table`: Table, Database, AWS, DuckDB, Excel, Google,
-  Microsoft, Postgres, SQLite, Snowflake, Tableau, XML.
+  Microsoft, Postgres, SQLite, Snowflake, Tableau, XML, and Image (for its
+  `Histogram`).
 - `Standard.Visualization`'s `Main.enso` keeps exporting every name it exports
   today.
 
@@ -266,10 +312,19 @@ A Vue visualisation that has a data type names that type instead of a list of
 input types. The IDE offers it for a value when any of the value's types
 (visible and hidden) has a `from` conversion to it in the suggestion database,
 or an `Any` conversion exists (the same scan as the `to` widget, shared). So
-Table is offered for everything, SQL for database values, and scatter, geo map,
-histogram and heatmap for anything that converts to `Viz_Table`, which is
-everything. A chart with nothing suitable to draw (no numeric columns) shows
-its empty state with a reason.
+Table is offered for everything, and scatter, geo map, histogram and heatmap
+for anything that converts to `Viz_Table`, which is everything. A chart with
+nothing suitable to draw (no numeric columns) shows its empty state with a
+reason.
+
+**The SQL view is the exception and keeps its static `inputType`**
+(`DB_Table | DB_Column`, matched against hidden types as today). Its
+conversion has to sit on `Table` (§1), so a pure by-type rule would offer it
+for every in-memory table and then say "not available". Keeping the static
+type changes nothing users see. The rule for any future visualisation like it:
+when only some implementations of a public type can supply the data type, the
+visualisation names the implementation types statically. See open question 1
+for the engine change that would remove the exception.
 
 Visualisations without a data type (image, warnings, loading error, and JSON
 until piece 2) keep their static `inputType`.
@@ -291,11 +346,10 @@ other than Base, and over Base's for `Visualization`, is the check.
 
 Each step leaves every visualisation working.
 
-0. **Spike (precondition for the plan).** Prove the dispatch rule in §1 on
-   real values: an in-memory table, a one-column table, a 1×1 table, a database
-   table and column, with a `Viz_Table.from (that:Any)` visible. If a
-   conversion on the public type does not win for all of them, this design
-   changes before the plan is written.
+0. **Spike. Done 2026-11-13**, results in §1. The rule held for every value
+   shape. The spike also found that implementation-type conversions are
+   unreachable without a catch-all as well as with one, which moved the SQL
+   conversion onto `Table` and produced the SQL availability exception (§6).
 1. **Pin the current JSON.** Specs for every chart × source pair that has none
    today, so every later step is checked against today's behaviour.
 2. **The types.** `Viz_Table` with its in-memory implementation, and `SQL_Viz`,
@@ -335,3 +389,17 @@ Each step leaves every visualisation working.
 - Changelog: the histogram bound is a visible change, so step 4 takes an
   entry; the other steps take `CI: No changelog needed` unless a chart newly
   works for a data type.
+
+## Open questions for the owner
+
+Decided overnight on the conservative side; each can be revisited without
+changing the rest of the design.
+
+1. **Should conversions also try a value's hidden types?** The engine tries
+   only visible types (`InvokeConversionNode.doMultiValue` uses
+   `findAllTypesOrNull(that, false)`), which is why every conversion must sit
+   on the public type and the SQL view keeps a static input type. Trying hidden
+   types after visible ones would let `SQL_Viz.from (that:DB_Table)` work and
+   make availability purely by type. It is a language-semantics change with
+   reach well beyond visualisation, so this design does not depend on it.
+   Recommendation: no, not as part of this work.
