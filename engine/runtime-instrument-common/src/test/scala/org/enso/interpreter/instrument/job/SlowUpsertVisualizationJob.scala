@@ -10,12 +10,14 @@ class SlowUpsertVisualizationJob(
   visualizationId: Api.VisualizationId,
   expressionId: Api.ExpressionId,
   config: Api.VisualizationConfiguration,
+  order: Long,
   delay: Boolean
 ) extends UpsertVisualizationJob(
       requestId,
       visualizationId,
       expressionId,
-      config
+      config,
+      order
     ) {
 
   override val isCancellable: Boolean         = true

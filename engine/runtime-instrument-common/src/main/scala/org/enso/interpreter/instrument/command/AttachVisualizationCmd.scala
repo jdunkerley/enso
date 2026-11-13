@@ -1,5 +1,6 @@
 package org.enso.interpreter.instrument.command
 
+import org.enso.interpreter.instrument.VisualizationHolder
 import org.enso.interpreter.instrument.execution.RuntimeContext
 import org.enso.interpreter.instrument.job.{ExecuteJob, UpsertVisualizationJob}
 import org.enso.polyglot.runtime.Runtime.Api
@@ -18,6 +19,11 @@ class AttachVisualizationCmd(
       request.visualizationConfig.executionContextId,
       maybeRequestId
     ) {
+
+  /** Numbered on creation, in the order the requests arrive (Note
+    * [Visualization Requests Take Effect In The Order They Arrived]).
+    */
+  protected val requestOrder: Long = VisualizationHolder.nextRequestOrder()
 
   override protected def executeCmd()(implicit
     ctx: RuntimeContext,
@@ -65,7 +71,8 @@ class AttachVisualizationCmd(
       maybeRequestId,
       visualizationId,
       expressionId,
-      config
+      config,
+      requestOrder
     )
   }
 
