@@ -70,6 +70,34 @@ bottom dock is open, and an open component browser with its input
 outlive the view already. State added to the view that a user would miss after a
 reconnect belongs there too (#604).
 
+## Nodes make room
+
+Showing, hiding or resizing a node's visualization moves the nodes in its way
+and puts them back afterwards. The rule is the pure function
+`components/GraphEditor/nodeDisplacement.ts`; the graph store's side is
+`$/providers/openedProjects/graph/displacement.ts`. A pushed node's home is
+saved in its metadata (`displaced`). Four things to keep:
+
+- **Change a node's visualization or position through the store's setters**
+  (`setNodeVisualization`, `setNodesVisualization`, `setNodePositions` for a
+  move by hand, `releasePushedBy` for a removal inside an edit, and
+  `repointPushedBy` when a node is replaced in place, as an AI node is, so it
+  keeps what it pushes). They lay out before they write, in one edit, so the
+  pushes share the action's undo step. `setNodePosition` alone is for a drag's
+  frames.
+- **Call a layout setter at most once per outer transaction**, passing every
+  node in that one call: the node database it lays out against is updated only
+  when the transaction commits, so a second call in the same `batchEdits` or
+  edit sees the graph as it was before the first.
+- **Rectangles are computed, not measured**: from metadata and
+  `graph.nodeBareSizes`. `graph.nodeRects` lags by a frame and includes a
+  Ctrl-hover preview. A change to how a visualization sizes itself goes in
+  `visualizationSize`, which the store shares with the component.
+- **A handle drag holds one undo step** (`module.undoManager.holdStep`), and
+  must release it on every way a drag can end.
+
+The design is `docs/superpowers/specs/2026-11-13-node-displacement-design.md`.
+
 ## Visualizations
 
 Each visualization in `components/visualizations/` is compiled as a **custom
