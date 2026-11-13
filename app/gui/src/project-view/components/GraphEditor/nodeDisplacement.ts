@@ -220,6 +220,23 @@ export function relayout(
     }
   }
 
+  /** Whether `a` pushes `b`, directly or through nodes it pushes. */
+  function pushes(a: string, b: string): boolean {
+    const seen = new Set<string>()
+    const stack = [b]
+    while (stack.length > 0) {
+      const d = state.get(stack.pop()!)?.displaced
+      for (const e of d?.by ?? []) {
+        if (e.id === a) return true
+        if (!seen.has(e.id)) {
+          seen.add(e.id)
+          stack.push(e.id)
+        }
+      }
+    }
+    return false
+  }
+
   const cap = (state.size + 1) * (state.size + 1) * 4
   let steps = 0
   while (queue.length > 0) {
@@ -245,7 +262,7 @@ export function relayout(
       let moved = false
       if (s.displaced?.by.some((e) => e.id === item.id)) {
         moved = recompute(s)
-      } else if (item.adds && grew) {
+      } else if (item.adds && grew && !pushes(s.id, item.id)) {
         const atHome = homeBox(s)
         const contact = firstContact(oldAtHome, now, homeBox(state.get(item.id)!), atHome)
         if (contact) {
@@ -275,7 +292,10 @@ export function relayout(
           moved = recompute(s)
         }
       }
-      if (moved) queue.push({ id: s.id, old: before, adds: item.adds })
+      // A node pushed further out pushes what it reaches, even when its pusher was moved by hand
+      // (which itself adds nothing at its new place).
+      const further = s.pos.x > before.left + EPS || s.pos.y > before.top + EPS
+      if (moved) queue.push({ id: s.id, old: before, adds: item.adds || further })
     }
   }
 

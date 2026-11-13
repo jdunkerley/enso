@@ -204,6 +204,50 @@ test('a pusher moved by hand releases its nodes and pushes nothing at its new pl
   expect(pos(after, 'Q')).toEqual({ x: 500, y: 52 })
 })
 
+/** Move node `id` by hand to `to`, lay out, and return the graph with the result applied. */
+function moveByHand(
+  nodes: LayoutNode[],
+  id: string,
+  to: { x: number; y: number },
+  stats?: { capped: boolean },
+): LayoutNode[] {
+  const target = nodes.find((n) => n.id === id)!
+  const old = boxAt(target.pos, target.size)
+  const next = nodes.map((n) => (n.id === id ? { ...n, pos: to } : n))
+  return apply(next, relayout(next, [{ id, old, adds: false }], stats))
+}
+
+test('a node pushed further out by a pusher moved by hand pushes what it reaches', () => {
+  // D is 34px below where C is pushed to: out of reach until A is moved down by hand.
+  const start = [node('A', 0, 0), node('B', 0, 52), node('C', 0, 104), node('D', 0, 320)]
+  const open = resize(start, 'A', { x: 100, y: 182 })
+  expect(pos(open, 'B')).toEqual({ x: 0, y: 202 })
+  expect(pos(open, 'C')).toEqual({ x: 0, y: 254 })
+  expect(pos(open, 'D')).toEqual({ x: 0, y: 320 })
+  const nudged = moveByHand(open, 'A', { x: 0, y: 40 })
+  expect(pos(nudged, 'B')).toEqual({ x: 0, y: 242 })
+  expect(pos(nudged, 'C')).toEqual({ x: 0, y: 294 })
+  expect(pos(nudged, 'D')).toEqual({ x: 0, y: 358 })
+  const back = moveByHand(nudged, 'A', { x: 0, y: 0 })
+  expect(pos(back, 'B')).toEqual({ x: 0, y: 202 })
+  expect(pos(back, 'C')).toEqual({ x: 0, y: 254 })
+  expect(pos(back, 'D')).toEqual({ x: 0, y: 320 })
+  expect(field(back, 'D')).toBeUndefined()
+})
+
+test('a node pushed further out never pushes the node that pushes it', () => {
+  // A is moved below B's home: B is recomputed below A, and must not push A in turn.
+  const open = resize([node('A', 0, 0), node('B', 0, 52), node('C', 0, 104)], 'A', {
+    x: 100,
+    y: 182,
+  })
+  const stats = { capped: false }
+  const moved = moveByHand(open, 'A', { x: 0, y: 300 }, stats)
+  expect(stats.capped).toBe(false)
+  expect(pos(moved, 'A')).toEqual({ x: 0, y: 300 })
+  expect(field(moved, 'A')).toBeUndefined()
+})
+
 test('several nodes changing at once are laid out in the order given', () => {
   const start = [node('A', 0, 0), node('B', 0, 52), node('C', 0, 104)]
   const next = start.map((n) => (n.id === 'C' ? n : { ...n, size: { x: 100, y: 182 } }))
