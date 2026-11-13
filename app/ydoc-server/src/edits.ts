@@ -12,6 +12,7 @@ import {
   IdMap,
   ModuleDoc,
   visMetadataEquals,
+  type ExternalId,
   type VisualizationMetadata,
 } from 'ydoc-shared/yjsModel'
 import * as fileFormat from './fileFormat'
@@ -118,6 +119,30 @@ function copyCachedAppearance(
   }
 }
 
+type FileDisplaced = NonNullable<fileFormat.NodeMetadata['displaced']>
+
+function displacedToFile(
+  d: Ast.DeepReadonly<Ast.NodeDisplacementMetadata> | undefined,
+): FileDisplaced | undefined {
+  if (!d) return undefined
+  return {
+    home: [Math.round(d.home.x), Math.round(-d.home.y)],
+    at: [Math.round(d.at.x), Math.round(-d.at.y)],
+    by: d.by.map(({ id, gap, dir }) => ({ id, gap, dir })),
+    ...(d.under?.length ? { under: [...d.under] } : {}),
+  }
+}
+
+function displacedFromFile(d: FileDisplaced | undefined): Ast.NodeDisplacementMetadata | undefined {
+  if (!d) return undefined
+  return {
+    home: { x: d.home[0], y: -d.home[1] },
+    at: { x: d.at[0], y: -d.at[1] },
+    by: d.by.map(({ id, gap, dir }) => ({ id: id as ExternalId, gap, dir })),
+    ...(d.under?.length ? { under: d.under as ExternalId[] } : {}),
+  }
+}
+
 /**
  * The file representation of a node's metadata, or `undefined` if the node has nothing to save.
  * Only nodes with a position (or a visualization, which implies one) are saved.
@@ -136,6 +161,7 @@ export function nodeMetadataToFile(
     colorOverride: metadata.get('colorOverride'),
     displayMode: metadata.get('displayMode'),
     cachedAppearance: copyCachedAppearance(metadata.get('cachedAppearance')),
+    displaced: displacedToFile(metadata.get('displaced')),
   }
 }
 
@@ -160,6 +186,10 @@ export function applyNodeMetadataFromFile(
   const newCached = copyCachedAppearance(meta.cachedAppearance)
   if (oldCached?.color !== newCached?.color || oldCached?.icon !== newCached?.icon)
     metadata.set('cachedAppearance', newCached)
+  const oldDisplaced = metadata.get('displaced')
+  const newDisplaced = displacedFromFile(meta.displaced)
+  if (JSON.stringify(oldDisplaced ?? null) !== JSON.stringify(newDisplaced ?? null))
+    metadata.set('displaced', newDisplaced)
 }
 
 /**

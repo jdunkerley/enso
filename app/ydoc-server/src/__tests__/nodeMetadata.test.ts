@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import * as Ast from 'ydoc-shared/ast'
+import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { applyNodeMetadataFromFile, nodeMetadataToFile } from '../edits'
 import { tryParseMetadataOrFallback } from '../fileFormat'
 
@@ -134,4 +135,68 @@ test('loading a file without a cache clears a stale one', () => {
   expr.setNodeMetadata({ cachedAppearance: { icon: 'table' } })
   applyNodeMetadataFromFile(expr.mutableNodeMetadata(), entry)
   expect(expr.nodeMetadata.get('cachedAppearance')).toBeUndefined()
+})
+
+test('displaced survives a save and a load', () => {
+  const displaced: Ast.NodeDisplacementMetadata = {
+    home: { x: 10, y: 52 },
+    at: { x: 10, y: 202 },
+    by: [{ id: NODE_A as ExternalId, gap: 20, dir: 'down' }],
+    under: [NODE_B as ExternalId],
+  }
+  const saved = expression()
+  saved.mutableNodeMetadata().set('position', { x: 10, y: 202 })
+  saved.mutableNodeMetadata().set('displaced', displaced)
+  const file = nodeMetadataToFile(saved.nodeMetadata)
+  // The file's y axis points up, as for `position`.
+  expect(file?.displaced).toEqual({
+    home: [10, -52],
+    at: [10, -202],
+    by: [{ id: NODE_A, gap: 20, dir: 'down' }],
+    under: [NODE_B],
+  })
+  const parsed = parseIde({
+    node: { [NODE_A]: JSON.parse(JSON.stringify(file)) },
+  }).node[NODE_A]!
+  const loaded = expression()
+  applyNodeMetadataFromFile(loaded.mutableNodeMetadata(), parsed)
+  expect(loaded.nodeMetadata.get('displaced')).toEqual(displaced)
+})
+
+test('a node without displaced saves no such key', () => {
+  const saved = expression()
+  saved.mutableNodeMetadata().set('position', { x: 1, y: 2 })
+  expect(JSON.parse(JSON.stringify(nodeMetadataToFile(saved.nodeMetadata)))).toEqual({
+    position: { vector: [1, -2] },
+  })
+})
+
+test('a malformed displaced drops only that field', () => {
+  const ide = parseIde({
+    node: {
+      [NODE_A]: {
+        position: { vector: [1, 2] },
+        colorOverride: '#ff0000',
+        displaced: { home: 'x' },
+      },
+    },
+  })
+  expect(ide.node[NODE_A]).toEqual({
+    position: { vector: [1, 2] },
+    colorOverride: '#ff0000',
+  })
+})
+
+test('loading a file without displaced clears a field the document had', () => {
+  const ast = expression()
+  ast.mutableNodeMetadata().set('displaced', {
+    home: { x: 0, y: 0 },
+    at: { x: 0, y: 10 },
+    by: [],
+  })
+  applyNodeMetadataFromFile(
+    ast.mutableNodeMetadata(),
+    parseIde({ node: { [NODE_A]: { position: { vector: [0, -10] } } } }).node[NODE_A]!,
+  )
+  expect(ast.nodeMetadata.get('displaced')).toBeUndefined()
 })
