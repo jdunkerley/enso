@@ -2352,9 +2352,8 @@ its Table/Database code before continuing.
       and Database, run `stdlib-api-check`; in Visualization's `CLAUDE.md`
       add "How to add a chart: read `Viz_Table` (`Chart_Limits.local_rows`
       first); add a data type only when the chart needs something a table
-      cannot give." Commit `Geo map and SQL view read Visualization's data types;
-  Visualization depends only on Base` and open the PR with
-      `CI: No changelog needed`.
+      cannot give." Commit with the message "Geo map and SQL view read the data types" and
+      open the PR with `CI: No changelog needed`.
 
 ---
 
