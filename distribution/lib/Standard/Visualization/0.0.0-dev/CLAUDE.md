@@ -87,7 +87,9 @@ Visualization and not on each data library.
 - `Viz_Tree` (`src/Viz_Tree.enso`) - a value as the JSON visualization's lazy
   tree: a `Leaf` (scalar JSON) or a `Branch` (kind, size, label and
   `children start count`, one page of `Viz_Tree_Child` with key, tree and node
-  expression). Build branches with `Viz_Tree.paged`. Base values convert here
+  expression, and an optional `child_of key` that finds one child without
+  building a page). Build branches with `Viz_Tree.paged`, or with
+  `Viz_Tree.lookup_paged` when a key can be found directly. Base values convert here
   (any value: its `to_js_object`, with no node expressions); a library or a user
   type describes its own with `Viz_Tree.from (that:Its_Public_Type)` (Table: row
   count, columns and rows read a page at a time; Column, Row; XML: attributes

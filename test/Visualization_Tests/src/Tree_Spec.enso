@@ -129,6 +129,31 @@ add_specs suite_builder =
             object = Viz_Tree.from (JS_Object.from_pairs (0.up_to 150 . map i-> ["k" + i.to_text, i]))
             (child_tree object "k140").json_text . should_equal "140"
 
+        group_builder.specify "a large Vector's page at a high start has the right indices and values" <|
+            big = Viz_Tree.from (0.up_to 100000 . map i-> i * 2)
+            page = big.children 99950 100
+            page.map .key . should_equal (99950.up_to 100000 . to_vector)
+            page.map (c-> c.tree.json_text) . should_equal (99950.up_to 100000 . map i-> (i * 2).to_text)
+            page.map .node_expression . should_equal (99950.up_to 100000 . map i-> ".at " + i.to_text)
+            (child_tree big 99999).json_text . should_equal "199998"
+
+        group_builder.specify "child finds a key directly in each kind of object" <|
+            js = Viz_Tree.from (Json.parse '{"a":1,"b":{"c":2}}')
+            (child_tree js "a").json_text . should_equal "1"
+            (js.child "b").node_expression . should_equal (".get " + "b".pretty)
+            (js.child "z") . should_fail_with Illegal_Argument
+            (js.child 0) . should_fail_with Illegal_Argument
+            by_text = Viz_Tree.from (Dictionary.from_vector [["k", 1], [2, "two"], [2.5, "float"], [Date.new 2020 1 2, "date"]])
+            (child_tree by_text "k").json_text . should_equal "1"
+            (child_tree by_text 2).json_text . should_equal '"two"'
+            (by_text.child "2.5").node_expression . should_equal ".at 2.5"
+            (child_tree by_text "2.5").json_text . should_equal '"float"'
+            (by_text.child "2020-01-02").node_expression . should_equal (".at (" + (Date.new 2020 1 2).pretty + ")")
+            (by_text.child "nope") . should_fail_with Illegal_Argument
+            (by_text.child 7) . should_fail_with Illegal_Argument
+            ((Viz_Tree.from [10, 20]).child (-1)) . should_fail_with Illegal_Argument
+            ((Viz_Tree.from [10, 20]).child 2) . should_fail_with Illegal_Argument
+
         group_builder.specify "child of a missing key or of a leaf is an Illegal_Argument" <|
             (tree.child 250) . should_fail_with Illegal_Argument
             (tree.child "x") . should_fail_with Illegal_Argument
@@ -210,6 +235,34 @@ add_specs suite_builder =
             keys_of row . should_equal ["x", "label"]
             exprs_of row . should_equal [".at " + "x".pretty, ".at " + "label".pretty]
             (child_tree row "x").json_text . should_equal "2"
+
+        group_builder.specify "an in-memory Table's rows and columns pages at a high start have the right indices and values" <|
+            big = Table.new [["x", 0.up_to 1000 . to_vector], ["y", 0.up_to 1000 . map i-> "v" + i.to_text]]
+            rows = child_tree (Viz_Tree.from big) "rows"
+            page = rows.children 950 100
+            page.map .key . should_equal (950.up_to 1000 . to_vector)
+            page.map .node_expression . should_equal (950.up_to 1000 . map i-> ".at " + i.to_text)
+            (page.map c-> (c.tree.child "x").tree.json_text) . should_equal (950.up_to 1000 . map .to_text)
+            (page.map c-> (c.tree.child "y").tree.json_text) . should_equal (950.up_to 1000 . map i-> ("v" + i.to_text).to_json)
+            (rows.children 1000 100) . should_equal []
+            (child_tree rows 999 . child "y").tree.json_text . should_equal '"v999"'
+            (rows.child 1000) . should_fail_with Illegal_Argument
+            columns = child_tree (Viz_Tree.from big) "columns"
+            (child_tree columns 1).label . should_equal 'Column "y" (1,000 rows)'
+            (columns.child 2) . should_fail_with Illegal_Argument
+            row = child_tree rows 5
+            (child_tree row "y").json_text . should_equal '"v5"'
+            (row.child "z") . should_fail_with Illegal_Argument
+
+        group_builder.specify "an in-memory Column's page at a high start has the right indices and values" <|
+            column = Table.new [["c", 0.up_to 1000 . map i-> i * 3]] . at "c"
+            tree = Viz_Tree.from column
+            page = tree.children 920 100
+            page.map .key . should_equal (920.up_to 1000 . to_vector)
+            page.map (c-> c.tree.json_text) . should_equal (920.up_to 1000 . map i-> (i * 3).to_text)
+            page.map .node_expression . should_equal (920.up_to 1000 . map i-> ".at " + i.to_text)
+            (child_tree tree 999).json_text . should_equal "2997"
+            (tree.child 1000) . should_fail_with Illegal_Argument
 
         group_builder.specify "a Column is an array of its values" <|
             tree = Viz_Tree.from (table.at "label")

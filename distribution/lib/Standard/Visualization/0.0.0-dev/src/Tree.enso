@@ -15,7 +15,7 @@ prepare value = time_visualization Tree ("Tree.prepare: " + (short_display value
     tree = Viz_Tree.from (if value.is_error then value.catch else value)
     json = case tree of
         Viz_Tree.Leaf json_text -> '{"root":' + (leaf_json json_text) + '}'
-        Viz_Tree.Branch _ _ _ _ -> '{"root":' + (branch_json tree) + ',"children":' + (page_json tree 0 page_size) + '}'
+        Viz_Tree.Branch _ _ _ _ _ -> '{"root":' + (branch_json tree) + ',"children":' + (page_json tree 0 page_size) + '}'
     if json.is_error.not then json else
         '{"root":' + (leaf_json (Helpers.truncate value.to_display_text . to_json)) + '}'
 
@@ -34,7 +34,9 @@ children value (path : Vector) (start : Integer) (count : Integer) = time_visual
 ## A page: `{"start":…,"size":…,"entries":[…]}`.
 private page_json (tree : Viz_Tree) (start : Integer) (count : Integer) -> Text = case tree of
     Viz_Tree.Leaf _ -> Error.throw (Illegal_Argument.Error "A leaf has no children.")
-    Viz_Tree.Branch _ size _ children ->
+    Viz_Tree.Branch _ size _ children _ ->
+        ## The page and its entries' texts are the only vectors, both at most
+           one page long; `join` needs the texts together.
         entries = children start count . map entry_json
         '{"start":' + start.to_text + ',"size":' + size.to_text + ',"entries":[' + (entries.join ",") + ']}'
 

@@ -2713,11 +2713,17 @@ Viz_Json.from (that:Column) =
 Viz_Tree.from (that:Column) =
     size = that.row_count
     label = "Column " + that.name.to_json + " (" + (Viz_Tree.count_text size "row" "rows") + ")"
-    Viz_Tree.paged "array" size label start-> end->
-        ## A database column with no ordering cannot `take` a range, so it reads
-           the values up to the end of the page and drops those before it.
+    in_memory = that.is_a In_Memory_Column
+    value_child index value = Viz_Tree_Child.Value index (Viz_Tree.from value) (".at " + index.to_text)
+    ## An in-memory column reads each value of the page by index, and copies
+       nothing.
+    in_memory_page start end = start.up_to end . map index-> value_child index (that.at index)
+    ## A database column with no ordering cannot `take` a range, so it reads the
+       values up to the end of the page and drops those before it.
+    database_page start end =
         page = that.take (start.up_to end) . catch Illegal_Argument _->
             (that.read (..First end)).drop (..First start)
         page.to_vector.map_with_index i-> value->
-            index = start + i
-            Viz_Tree_Child.Value index (Viz_Tree.from value) (".at " + index.to_text)
+            value_child (start + i) value
+    in_memory_value key = if key.is_a Integer && key >= 0 && key < size then value_child key (that.at key) else Nothing
+    if in_memory then Viz_Tree.lookup_paged "array" size label in_memory_page in_memory_value else Viz_Tree.paged "array" size label database_page

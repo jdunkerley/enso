@@ -162,8 +162,10 @@ Viz_Json.from (that:Row) = Viz_Json.from that.to_vector
    ---
    The row's values by column name, each reached with `.at name`.
 Viz_Tree.from (that:Row) =
+    ## `column_names` is a view of the row's own names, not a copy.
     names = that.column_names
-    label = "Row (" + (Viz_Tree.count_text names.length "value" "values") + ")"
-    Viz_Tree.paged "object" names.length label start-> end->
-        names.slice start end . map name->
-            Viz_Tree_Child.Value name (Viz_Tree.from (that.get name)) (".at " + name.pretty)
+    label = "Row (" + (Viz_Tree.count_text that.length "value" "values") + ")"
+    name_child name = Viz_Tree_Child.Value name (Viz_Tree.from (that.get name)) (".at " + name.pretty)
+    page_of start end = start.up_to end . map index-> name_child (names.at index)
+    child_of key = if key.is_a Text && (names.contains key) then name_child key else Nothing
+    Viz_Tree.lookup_paged "object" that.length label page_of child_of

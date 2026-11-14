@@ -25,19 +25,35 @@ type Viz_Tree
        - `children start count`: its `Viz_Tree_Child`ren from `start`, at most
          `count` of them; none past the end. A child's tree is computed only
          when its page is asked for.
-    Branch (kind : Text) (size : Integer) (label : Text) (children : Integer -> Integer -> Vector)
+       - `child_of key`: the one `Viz_Tree_Child` with `key`, or `Nothing` if
+         there is none, without building a page. `child_of` itself is
+         `Nothing` for a branch with no such lookup, which `child` then finds
+         by scanning its pages.
+    Branch (kind : Text) (size : Integer) (label : Text) (children : Integer -> Integer -> Vector) (child_of : Any)
 
     ## ---
        private: true
        ---
        A branch whose children `page_of start end` reads, for
        `0 <= start < end <= size`. A start at or past the end gives no
-       children; a negative start or count is an `Illegal_Argument`.
+       children; a negative start or count is an `Illegal_Argument`. Its
+       children are found by scanning its pages; `lookup_paged` finds one
+       directly.
     paged (kind : Text) (size : Integer) (label : Text) (page_of : Integer -> Integer -> Vector) -> Viz_Tree =
-        Viz_Tree.Branch kind size label start-> count->
+        Viz_Tree.lookup_paged kind size label page_of Nothing
+
+    ## ---
+       private: true
+       ---
+       A `paged` branch that also finds one child directly: `child_of key` is
+       the `Viz_Tree_Child` with `key`, or `Nothing` (for any `key`, whatever
+       its type). `child_of` itself may be `Nothing`, as in `paged`.
+    lookup_paged (kind : Text) (size : Integer) (label : Text) (page_of : Integer -> Integer -> Vector) (child_of : Any) -> Viz_Tree =
+        children start count =
             if start < 0 || count < 0 then Error.throw (Illegal_Argument.Error "A page's start and count must not be negative.") else
                 end = (start + count).min size
                 if start >= end then [] else page_of start end
+        Viz_Tree.Branch kind size label children child_of
 
     ## ---
        private: true
@@ -67,11 +83,13 @@ type Viz_Tree
         missing = Illegal_Argument.Error ("No child has the key " + key.pretty + ".")
         case self of
             Viz_Tree.Leaf _ -> Error.throw missing
-            Viz_Tree.Branch kind size _ children -> case kind == "array" && (key.is_a Integer) of
-                True ->
-                    page = if key < 0 then [] else children key 1
-                    if page.is_empty then Error.throw missing else page.first
-                False -> find_child children size key 0 . if_nothing (Error.throw missing)
+            Viz_Tree.Branch kind size _ children child_of -> case child_of of
+                Nothing -> case kind == "array" && (key.is_a Integer) of
+                    True ->
+                        page = if key < 0 then [] else children key 1
+                        if page.is_empty then Error.throw missing else page.first
+                    False -> find_child children size key 0 . if_nothing (Error.throw missing)
+                _ -> (child_of key) . if_nothing (Error.throw missing)
 
     ## ---
        private: true
@@ -80,10 +98,15 @@ type Viz_Tree
        children come from its JSON: no expression reaches them.
     without_node_expressions self -> Viz_Tree = case self of
         Viz_Tree.Leaf _ -> self
-        Viz_Tree.Branch kind size label children ->
-            Viz_Tree.Branch kind size label start-> count->
-                children start count . map c->
-                    Viz_Tree_Child.Value c.key c.tree.without_node_expressions Nothing
+        Viz_Tree.Branch kind size label children child_of ->
+            stripped c = Viz_Tree_Child.Value c.key c.tree.without_node_expressions Nothing
+            ## A page is the underlying page with its expressions dropped, as
+               the one vector it must return.
+            page_of start count = children start count . map stripped
+            lookup_of key =
+                found = child_of key
+                if found.is_nothing then Nothing else stripped found
+            Viz_Tree.Branch kind size label page_of (if child_of.is_nothing then Nothing else lookup_of)
 
 ## ---
    private: true
@@ -170,20 +193,24 @@ Viz_Tree.from (that:Time_Of_Day) = Viz_Tree.Leaf that.to_display_text.to_json
    ---
    Its keys, each reached with `.get key`.
 Viz_Tree.from (that:JS_Object) =
+    ## `field_names` is the object's own cached array, not a copy.
     names = that.field_names
-    Viz_Tree.paged "object" names.length (Viz_Tree.keys_label names.length) start-> end->
-        names.slice start end . map name->
-            Viz_Tree_Child.Value name (Viz_Tree.from (that.get name)) (".get " + name.pretty)
+    name_child name = Viz_Tree_Child.Value name (Viz_Tree.from (that.get name)) (".get " + name.pretty)
+    page_of start end = start.up_to end . map index-> name_child (names.at index)
+    child_of key = if key.is_a Text && that.contains_key key then name_child key else Nothing
+    Viz_Tree.lookup_paged "object" that.length (Viz_Tree.keys_label that.length) page_of child_of
 
 ## ---
    private: true
    ---
    Its indices, each reached with `.at index`. An error item is its JSON.
 Viz_Tree.from (that:Vector) =
-    Viz_Tree.paged "array" that.length (Viz_Tree.items_label that.length) start-> end->
-        that.slice start end . map_with_index i-> item->
-            index = start + i
-            Viz_Tree_Child.Value index (element_tree item) (".at " + index.to_text)
+    item_child index =
+        item = that.at index
+        Viz_Tree_Child.Value index (element_tree item) (".at " + index.to_text)
+    page_of start end = start.up_to end . map item_child
+    child_of key = if key.is_a Integer && key >= 0 && key < that.length then item_child key else Nothing
+    Viz_Tree.lookup_paged "array" that.length (Viz_Tree.items_label that.length) page_of child_of
 
 ## ---
    private: true
@@ -196,11 +223,25 @@ Viz_Tree.from (that:Array) = Viz_Tree.from (Vector.from_polyglot_array that)
    Its keys, each reached with `.at key`. A key that is neither text nor an
    integer shows as its display text.
 Viz_Tree.from (that:Dictionary) =
-    pairs = that.to_vector
-    Viz_Tree.paged "object" pairs.length (Viz_Tree.keys_label pairs.length) start-> end->
-        pairs.slice start end . map pair->
-            key = pair.at 0
-            Viz_Tree_Child.Value (shown_key key) (Viz_Tree.from (pair.at 1)) (".at " + (key_argument key))
+    ## A Dictionary has no positional access, so a page (and the display-text
+       lookup below) still converts the whole dictionary to a vector of pairs;
+       building the node does not, as `size` is the dictionary's own.
+    pair_child pair =
+        key = pair.at 0
+        Viz_Tree_Child.Value (shown_key key) (Viz_Tree.from (pair.at 1)) (".at " + (key_argument key))
+    page_of start end =
+        pairs = that.to_vector
+        start.up_to end . map index-> pair_child (pairs.at index)
+    ## A text or integer key is a direct lookup; a text that is not a key may
+       be the display text of another key, which is found by a search that
+       builds only the pair it finds.
+    child_of key =
+        if (key.is_a Text || key.is_a Integer) && (that.contains_key key) then Viz_Tree_Child.Value key (Viz_Tree.from (that.get key)) (".at " + (key_argument key)) else
+            if key.is_a Text then
+                found = that.to_vector.find (pair-> (shown_key (pair.at 0)) == key) if_missing=Nothing
+                if found.is_nothing then Nothing else pair_child found
+            else Nothing
+    Viz_Tree.lookup_paged "object" that.size (Viz_Tree.keys_label that.size) page_of child_of
 
 ## The first child with `key` in the pages from `start` on, or `Nothing`.
 private find_child children size key start =
