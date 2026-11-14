@@ -1,0 +1,29 @@
+from Standard.Base import all
+from Standard.Table import Table
+
+from Standard.Test import all
+
+## This project imports only `Standard.Base`, `Standard.Table` and
+   `Standard.Test`, so none of the extension libraries is loaded by an import:
+   `Data.read` must find each format through `Meta.lookup_services`. Do not
+   add an import of `Standard.Excel`, `Standard.YXDB` or `Standard.EDI` here.
+   Fixed_Width has no spec: it registers a format but recognises no extension.
+add_specs suite_builder =
+    suite_builder.group "Format discovery without an import" group_builder->
+        group_builder.specify "Data.read finds Standard.EDI for .822" <|
+            table = Data.read (enso_project.data / "sample.822")
+            table.should_be_a Table
+            table.column_names.contains "Interchange Sender ID" . should_be_true
+            (table.row_count > 0) . should_be_true
+
+        group_builder.specify "Data.read finds Standard.YXDB for .yxdb" <|
+            table = Data.read (enso_project.data / "AllNormalFields.yxdb")
+            table.should_be_a Table
+            table.row_count . should_equal 1
+            table.column_names.first . should_equal "ByteField"
+
+        group_builder.specify "Data.read finds Standard.Excel for .xlsx" <|
+            workbook = Data.read (enso_project.data / "TestSheet.xlsx")
+            ## `Excel_Workbook` is not in scope, so name its type instead.
+            (Meta.type_of workbook . to_text) . should_equal "Excel_Workbook"
+            workbook.sheet_names . should_equal ["Sheet1", "Another", "NoHeaders", "Random"]

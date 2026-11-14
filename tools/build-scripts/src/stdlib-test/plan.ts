@@ -34,6 +34,8 @@ export interface StdlibTestMap {
       string,
       {
         readonly imports?: readonly string[]
+        /** Libraries the project uses without importing them (found by `Meta.lookup_services`). */
+        readonly loads?: readonly string[]
         readonly testImports?: readonly string[]
       }
     >
@@ -166,7 +168,8 @@ export function selectTestProjects(
       .map(([name]) => name)
   const affected = closure(libraries, dependents)
   for (const [name, entry] of Object.entries(map.testProjects)) {
-    if ((entry.imports ?? []).some((library) => affected.has(library))) direct.add(name)
+    if ([...(entry.imports ?? []), ...(entry.loads ?? [])].some((library) => affected.has(library)))
+      direct.add(name)
   }
   const importers = (project: string) =>
     Object.entries(map.testProjects)

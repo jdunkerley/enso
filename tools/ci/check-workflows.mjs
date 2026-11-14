@@ -1139,6 +1139,15 @@ export function checkStdlibTestMap({ stdlib }) {
       problems.push(`${at} no entry for test project \`${name}\` (${source})`)
       continue
     }
+    for (const loaded of entry.loads ?? []) {
+      if (!(loaded in libraries)) {
+        problems.push(`${at} \`testProjects.${name}.loads\` names \`${loaded}\`, which is not a library`)
+      } else if (imports.libraries.includes(loaded)) {
+        problems.push(
+          `${at} \`testProjects.${name}.loads\` lists \`${loaded}\`, which ${source} imports (list it in \`imports\`)`,
+        )
+      }
+    }
     compare(`testProjects.${name}.imports`, entry.imports, imports.libraries, source, 'Standard.')
     compare(`testProjects.${name}.testImports`, entry.testImports, imports.tests, source, 'enso_dev.')
   }

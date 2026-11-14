@@ -8,6 +8,8 @@
 # exactly the libraries its sources import (top-level `from`/`import Standard.X` lines).
 # Adding a test project: an entry under `testProjects`, with the `Standard.*` libraries it imports
 # (`imports`) and the `enso_dev.*` projects it imports (`testImports`).
+# A test project that must run when a library changes although it does not import it (it relies on
+# `Meta.lookup_services` finding the library) lists that library under `loads`.
 # develop runs every project whatever this file says.
 
 # A change to any of these runs every test project.
@@ -64,6 +66,10 @@ testProjects:
   Fixed_Width_Tests:
     imports: [Base, Fixed_Width, Table, Test]
     testImports: [Base_Tests]
+  Format_Discovery_Tests:
+    imports: [Base, Table, Test]
+    loads: [EDI, Excel, YXDB]
+    testImports: []
   Generic_JDBC_Tests:
     imports:
       [Base, Database, Database_Test_Suite, Generic_JDBC, Postgres, SQLite, Test]
