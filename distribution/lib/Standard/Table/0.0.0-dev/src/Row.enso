@@ -6,6 +6,8 @@ import project.Errors.No_Such_Column
 import Standard.Visualization.Viz_Cell.Viz_Cell
 import Standard.Visualization.Viz_Json.Viz_Json
 import Standard.Visualization.Viz_Table.Viz_Table
+import Standard.Visualization.Viz_Tree.Viz_Tree
+import Standard.Visualization.Viz_Tree.Viz_Tree_Child
 import project.Internal.Viz_Helpers
 import project.Internal.Widget_Helpers
 from project.Internal.Storage import java_to_enso
@@ -154,3 +156,14 @@ Viz_Cell.from (that:Row) =
    ---
    The row's values, as a vector.
 Viz_Json.from (that:Row) = Viz_Json.from that.to_vector
+
+## ---
+   private: true
+   ---
+   The row's values by column name, each reached with `.at name`.
+Viz_Tree.from (that:Row) =
+    names = that.column_names
+    label = "Row (" + (Viz_Tree.count_text names.length "value" "values") + ")"
+    Viz_Tree.paged "object" names.length label start-> end->
+        names.slice start end . map name->
+            Viz_Tree_Child.Value name (Viz_Tree.from (that.get name)) (".at " + name.pretty)

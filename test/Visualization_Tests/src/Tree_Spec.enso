@@ -1,6 +1,12 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 
+from Standard.Table import Table
+import Standard.Database.Connection.Database
+import Standard.Database.Extensions.Upload_Table
+from Standard.SQLite import SQLite
+from Standard.XML import XML_Document
+
 import Standard.Visualization.Tree
 import Standard.Visualization.Viz_Tree.Viz_Tree
 import Standard.Visualization.Viz_Tree.Viz_Tree_Child
@@ -180,6 +186,67 @@ add_specs suite_builder =
             exprs_of tree . should_equal [".name", ".age"]
             page = Json.parse (Tree.children [Person.Value "Ann" 41] [0] 0 100)
             page.get "entries" . map (e-> e.get "expr") . should_equal [".name", ".age"]
+
+    suite_builder.group "Viz_Tree of Table, Column, Row and XML" group_builder->
+        table = Table.new [["x", [1, 2, 3]], ["label", ["a", "b", "c"]]]
+
+        group_builder.specify "a Table is a summary of its row count, columns and rows" <|
+            tree = Viz_Tree.from table
+            tree.label . should_equal "Table (3 rows, 2 columns)"
+            keys_of tree . should_equal ["row_count", "columns", "rows"]
+            exprs_of tree . should_equal [".row_count", ".columns", ".rows"]
+            (child_tree tree "row_count").json_text . should_equal "3"
+            (child_tree tree "columns").label . should_equal "[2 columns]"
+            exprs_of (child_tree tree "columns") . should_equal [".at 0", ".at 1"]
+
+        group_builder.specify "a Table's rows are read a page at a time" <|
+            rows = child_tree (Viz_Tree.from table) "rows"
+            rows.label . should_equal "[3 rows]"
+            page = rows.children 1 100
+            page.map .key . should_equal [1, 2]
+            page.map .node_expression . should_equal [".at 1", ".at 2"]
+            row = page.first.tree
+            row.label . should_equal "Row (2 values)"
+            keys_of row . should_equal ["x", "label"]
+            exprs_of row . should_equal [".at " + "x".pretty, ".at " + "label".pretty]
+            (child_tree row "x").json_text . should_equal "2"
+
+        group_builder.specify "a Column is an array of its values" <|
+            tree = Viz_Tree.from (table.at "label")
+            tree.label . should_equal 'Column "label" (3 rows)'
+            keys_of tree 1 100 . should_equal [1, 2]
+            exprs_of tree 1 100 . should_equal [".at 1", ".at 2"]
+            (child_tree tree 2).json_text . should_equal '"c"'
+
+        group_builder.specify "a database table reads only the page of rows asked for, and has no .rows expression" <|
+            connection = Database.connect SQLite.In_Memory
+            db_table = table.select_into_database_table connection "tree_rows" temporary=True
+            tree = Viz_Tree.from db_table
+            tree.label . should_equal "Table (3 rows, 2 columns)"
+            exprs_of tree . should_equal [".row_count", ".columns", Nothing]
+            keys_of (child_tree tree "rows") 2 100 . should_equal [2]
+            keys_of (child_tree (child_tree tree "columns") 0) . should_equal [0, 1, 2]
+            connection.close
+
+        group_builder.specify "children walks into a Table's rows" <|
+            page = Json.parse (Tree.children table ["rows", 0] 0 100)
+            page.get "entries" . map (e-> e.get "value") . should_equal [1, "a"]
+
+        group_builder.specify "an XML document is its root element; an element is its attributes and children" <|
+            doc = XML_Document.parse '<foo id="10"><bar>hello</bar>text</foo>'
+            tree = Viz_Tree.from doc
+            tree.label . should_equal "XML_Document (<foo>)"
+            keys_of tree . should_equal ["foo"]
+            exprs_of tree . should_equal [".root_element"]
+            root = child_tree tree "foo"
+            root.label . should_equal "<foo> (1 attribute, 2 children)"
+            keys_of root . should_equal ["@id", 0, 1]
+            exprs_of root . should_equal [".at " + "@id".pretty, ".at 0", ".at 1"]
+            (child_tree root "@id").json_text . should_equal '"10"'
+            (child_tree root 1).json_text . should_equal '"text"'
+            keys_of root 1 100 . should_equal [0, 1]
+            keys_of root 2 1 . should_equal [1]
+            (child_tree root 0).label . should_equal "<bar> (0 attributes, 1 child)"
 
 main filter=Nothing =
     suite = Test.build suite_builder->

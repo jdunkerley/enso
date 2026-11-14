@@ -148,6 +148,8 @@ add_specs suite_builder =
         tree_children "atom" (Atom.Value 1 [2, 3]) ["y"] 0 100
         tree_prepare "error" (Error.throw (Illegal_Argument.Error "boom"))
         tree_children "missing" js ["nope"] 0 100
+        tree_prepare "mem_table" data.mem_table
+        tree_children "mem_table_rows" data.mem_table ["rows"] 0 100
 
     suite_builder.group "Pinned server-side row model" group_builder->
         group_builder.specify "rows" <|

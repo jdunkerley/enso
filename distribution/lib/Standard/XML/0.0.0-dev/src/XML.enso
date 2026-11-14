@@ -8,6 +8,7 @@ import Standard.Base.System.File.Generic.Writable_File.Writable_File
 import Standard.Base.System.Input_Stream.Input_Stream
 from Standard.Visualization.Viz_Json import Viz_Json
 from Standard.Visualization.Viz_Table import Viz_Table
+from Standard.Visualization.Viz_Tree import Viz_Tree, Viz_Tree_Child
 from Standard.Base.Metadata import Display, make_single_choice, Widget
 
 import Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns
@@ -997,6 +998,38 @@ Viz_Json.from (that:XML_Document) =
    private: true
    ---
 Viz_Json.from (that:XML_Element) = Viz_Json.Value (_element_js that False . to_json)
+
+## ---
+   private: true
+   ---
+   A document is an object of its root element, reached with `.root_element`.
+Viz_Tree.from (that:XML_Document) =
+    root = that.root_element
+    entry = Viz_Tree_Child.Value root.name (Viz_Tree.from root) ".root_element"
+    Viz_Tree.paged "object" 1 ("XML_Document (<" + root.name + ">)") start-> end->
+        [entry].slice start end
+
+## ---
+   private: true
+   ---
+   An element is an object of its attributes (`@name`) and then its children
+   (by index), each reached with `.at`.
+Viz_Tree.from (that:XML_Element) =
+    attributes = that.attribute_names.map name->
+        Viz_Tree_Child.Value ("@" + name) (Viz_Tree.from (that.attribute name)) (".at " + ("@" + name).pretty)
+    nodes = that.children
+    size = attributes.length + nodes.length
+    label = "<" + that.name + "> (" + (Viz_Tree.count_text attributes.length "attribute" "attributes") + ", " + (Viz_Tree.count_text nodes.length "child" "children") + ")"
+    page_of start end =
+        from_attributes = attributes.slice (start.min attributes.length) (end.min attributes.length)
+        first_node = (start - attributes.length).max 0
+        last_node = end - attributes.length
+        from_nodes = if last_node <= first_node then [] else
+            nodes.slice first_node last_node . map_with_index i-> node->
+                index = first_node + i
+                Viz_Tree_Child.Value index (Viz_Tree.from node) (".at " + index.to_text)
+        from_attributes + from_nodes
+    Viz_Tree.paged "object" size label page_of
 
 ## The JSON of an element: its tag, attributes and at most 50 children. A
    nested element's children are shown by their display text.

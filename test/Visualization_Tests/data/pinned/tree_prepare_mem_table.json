@@ -1,0 +1,1 @@
+{"root":{"kind":"object","size":3,"label":"Table (3 rows, 4 columns)"},"children":{"start":0,"size":3,"entries":[{"key":"row_count","kind":"leaf","value":3,"expr":".row_count"},{"key":"columns","kind":"array","size":4,"label":"[4 columns]","expr":".columns"},{"key":"rows","kind":"array","size":3,"label":"[3 rows]","expr":".rows"}]}}
