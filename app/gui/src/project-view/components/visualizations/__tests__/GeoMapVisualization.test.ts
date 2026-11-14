@@ -14,6 +14,12 @@ vi.mock('@/util/visualizationBuiltins', () => ({
   }),
 }))
 
+const appRouter = vi.hoisted(() => ({
+  push: vi.fn(() => Promise.resolve()),
+  currentRoute: { value: { query: { other: '1' } } },
+}))
+vi.mock('$/router', () => ({ default: appRouter }))
+
 const { getText } = useText()
 const MapMock = vi.fn(function (this: Record<string, unknown>) {
   Object.assign(this, {
@@ -45,21 +51,16 @@ describe('the map visualization', () => {
     expect(MapMock).not.toHaveBeenCalled()
   })
 
-  test('the empty state opens Settings on the Local tab', async () => {
-    const { wrapper, router } = await mountWithProviders(GeoMapVisualization, {
-      props: { data: DATA },
-      routes: [
-        {
-          name: 'settings',
-          path: '/settings',
-          component: { render: () => null },
-        },
-      ],
-    })
+  // A visualization renders in a custom element, a Vue app without the router plugin, so the
+  // button must reach the app's router instance rather than inject one.
+  test('the empty state opens Settings on the Local tab, with no router injected', async () => {
+    const { wrapper } = await mountWithProviders(GeoMapVisualization, { props: { data: DATA } })
     await wrapper.get('button').trigger('click')
     await flushPromises()
-    expect(router.currentRoute.value.name).toBe('settings')
-    expect(router.currentRoute.value.query['cloud-ide_SettingsTab']).toBe('"local"')
+    expect(appRouter.push).toHaveBeenCalledWith({
+      name: 'settings',
+      query: { other: '1', 'cloud-ide_SettingsTab': '"local"' },
+    })
   })
 
   test('with a token, builds the map with it; rebuilds it when the token changes; removes it when cleared', async () => {
