@@ -33,6 +33,9 @@ One directory per suite, typically:
 - `Geo_Tests/`, `Image_Tests/` — media suites.
 - `EDI_Tests/` — `Standard.EDI`: reading `.822`/`.edi` files with the default,
   raw and custom definitions.
+- `Format_Discovery_Tests/` — imports only Base and Table, and checks that
+  `Data.read` finds the `.822`, `.yxdb` and `.xlsx` formats of the extension
+  libraries without an import (`loads` in `tools/ci/stdlib-test-map.yaml`).
 - `Fixed_Width_Tests/` — `Standard.Fixed_Width`: reading fixed-width text files.
 - `YXDB_Tests/` — `Standard.YXDB`: reading `.yxdb` files and spatial to GeoJSON.
 - `Excel_Tests/` — `Standard.Excel`: reading and writing `.xlsx`, `.xls` and

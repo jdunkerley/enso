@@ -17,6 +17,7 @@ const MAP: StdlibTestMap = {
     Table: { stdBits: ['table'], dependsOn: ['Base'] },
     Database: { stdBits: ['database'], dependsOn: ['Base', 'Table'] },
     Geo: { stdBits: [], dependsOn: ['Base', 'Table'] },
+    Extra: { stdBits: ['extra'], dependsOn: [] },
     Tableau: { stdBits: ['tableau'], dependsOn: ['Base', 'Table'] },
     Test: { stdBits: [], dependsOn: ['Base'] },
   },
@@ -25,6 +26,7 @@ const MAP: StdlibTestMap = {
     Base_Tests: { imports: ['Base', 'Test'], testImports: [] },
     DuckDB_Tests: { imports: ['Database'], testImports: ['Table_Tests'] },
     Geo_Tests: { imports: ['Geo', 'Table'], testImports: [] },
+    Lookup_Tests: { imports: [], loads: ['Extra'], testImports: [] },
     Table_Tests: {
       imports: ['Database', 'Table'],
       testImports: ['Base_Tests'],
@@ -52,6 +54,9 @@ describe('selectTestProjects', () => {
     expect(sorted(['distribution/lib/Standard/Tableau/0.0.0-dev/src/Hyper_File.enso'])).toEqual([
       'Tableau_Tests',
     ])
+  })
+  test('a library a project loads without importing it selects the project', () => {
+    expect(sorted(['std-bits/extra/X.java'])).toContain('Lookup_Tests')
   })
   test('a std-bits directory counts as its library', () => {
     expect(sorted(['std-bits/tableau/src/main/java/X.java'])).toEqual(['Tableau_Tests'])
