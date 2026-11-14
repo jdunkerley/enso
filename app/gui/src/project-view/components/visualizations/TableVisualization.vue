@@ -7,12 +7,10 @@ import {
 } from '@/components/visualizations/TableVisualization/tableVizToolbar'
 import { Ast } from '@/util/ast'
 import { Pattern } from '@/util/ast/match'
-import { svgUseHref } from '@/util/icons'
 import { ProjectPath } from '@/util/projectPath'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
 import type {
   CellClassParams,
-  CellDoubleClickedEvent,
   ColDef,
   ColumnMovedEvent,
   ColumnVisibleEvent,
@@ -21,7 +19,6 @@ import type {
   ICellRendererParams,
   IDatasource,
   IGetRowsParams,
-  ITooltipParams,
   MenuItemDef,
   SetFilterValuesFuncParams,
   SortChangedEvent,
@@ -37,13 +34,6 @@ import {
   type Ref,
 } from 'vue'
 import type { ComponentExposed } from 'vue-component-type-helpers'
-import { TableVisualisationTooltip } from './TableVisualization/TableVisualisationTooltip'
-import {
-  isError,
-  isGenericGrid,
-  type Error,
-  type GenericGrid,
-} from './TableVisualization/TableVisualisationTypes'
 import {
   convertFilterModel,
   convertSortModel,
@@ -53,19 +43,20 @@ import {
   type ValueTypeArgumentChild,
   type ValueTypes,
 } from './TableVisualization/TableVizDataSourceUtils'
-import {
-  getCellDataType,
-  getFilterParams,
-  getFilterType,
-} from './TableVisualization/tableVizFilterSetUpUtils'
 import { makeFilterModelList, type GridFilterModel } from './TableVisualization/tableVizFilterUtils'
-
 import {
-  formatText,
-  getCellValueType,
-  isNumericType,
-  type ValueType,
-} from './TableVisualization/tableVizUtils'
+  buildTableView,
+  distinctValuesFromResponse,
+  getSvgTemplate,
+  INDEX_FIELD_NAME,
+  rowsFromPage,
+  tableViewFlags,
+  type Data,
+} from './TableVisualization/tableView'
+
+import { formatText, getCellValueType, isNumericType } from './TableVisualization/tableVizUtils'
+
+export type { DataQualityMetricValue } from './TableVisualization/tableView'
 
 export const name = 'Table'
 export const icon = 'table'
@@ -76,78 +67,6 @@ export const defaultPreprocessor = [
   'prepare_visualization',
   '1000',
 ] as const
-
-type Data = number | string | Error | Matrix | ObjectMatrix | EnsoTableOrColumn | GenericGrid
-
-interface Matrix {
-  type: 'Matrix'
-  column_count: number
-  all_rows_count: number
-  json: unknown[][]
-  value_type: ValueType[]
-  get_child_node_action: string
-  child_label: string
-  visualization_header: string
-}
-
-interface ObjectMatrix {
-  type: 'Object_Matrix'
-  column_count: number
-  all_rows_count: number
-  json: object[]
-  value_type: ValueType[]
-  get_child_node_action: string
-  child_label: string
-  visualization_header: string
-}
-
-interface EnsoTableOrColumn {
-  type: 'EnsoTableOrColumn'
-  json: unknown
-  all_rows_count?: number
-  header: string[] | undefined
-  data: unknown[][] | undefined
-  value_type: ValueType[]
-  has_index_col: boolean | undefined
-  links: string[] | undefined
-  get_child_node_action: string
-  get_child_node_link_name: string
-  child_label: string
-  visualization_header: string
-  data_quality_metrics?: DataQualityMetric[]
-  is_using_server_sort_and_filter: boolean
-  use_bottom_status_bar: boolean
-  enable_create_node: boolean
-  requires_number_format: boolean[]
-  is_using_multi_filter: boolean[]
-  table_version_hash?: string
-}
-
-type DataQualityMetricNumber = {
-  name: string
-  values: (number | null)[]
-  type: 'Percentage' | 'Count'
-}
-
-type DataQualityMetricText = {
-  name: string
-  values: (string | null)[]
-  type: 'Text'
-}
-
-type DataQualityMetric = DataQualityMetricNumber | DataQualityMetricText
-
-export type DataQualityMetricValue =
-  | {
-      name: string
-      value: number
-      displayType: 'Percentage' | 'Count'
-    }
-  | {
-      name: string
-      value: string
-      displayType: 'Text'
-    }
 
 export type TextFormatOptions = 'full' | 'partial' | 'off'
 
@@ -178,13 +97,11 @@ export function computeBottomStatusBar(
 const props = defineProps<{ data: Data }>()
 const config = useVisualizationConfig()
 
-const INDEX_FIELD_NAME = '#'
-
 const rowLimit = ref(0)
 const page = ref(0)
 const pageLimit = ref(0)
 const rowCount = ref(0)
-const filteredRowCount = ref(null)
+const filteredRowCount = ref<number | null>(null)
 const showRowCount = ref(true)
 const isTruncated = ref(false)
 const filterModel = ref<GridFilterModel[]>([])
@@ -206,9 +123,6 @@ const nodeType = ref<ProjectPath | undefined>(undefined)
 const grid = ref<
   ComponentInstance<typeof AgGridTableView> & ComponentExposed<typeof AgGridTableView>
 >()
-
-const getSvgTemplate = (icon: string) =>
-  `<svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="${svgUseHref(icon)}"/></svg>`
 
 const getContextMenuItems = (
   params: GetContextMenuItemsParams,
@@ -285,22 +199,13 @@ function createValueNode(columnId?: string | null, rowIndex?: number | null, act
   }
 }
 
-const allRowCount = computed(() =>
-  typeof props.data === 'object' && 'all_rows_count' in props.data ? props.data.all_rows_count : 0,
-)
+const viewFlags = computed(() => tableViewFlags(props.data))
 
-const tableVersionHash = computed(() =>
-  typeof props.data === 'object' && 'table_version_hash' in props.data ?
-    props.data.table_version_hash
-  : null,
-)
+const allRowCount = computed(() => viewFlags.value.allRowCount)
 
-const isSSRM = computed(
-  () =>
-    typeof props.data === 'object' &&
-    'is_using_server_sort_and_filter' in props.data &&
-    props.data.is_using_server_sort_and_filter,
-)
+const tableVersionHash = computed(() => viewFlags.value.versionHash)
+
+const isSSRM = computed(() => viewFlags.value.isSSRM)
 
 const bottomStatusBar = computed(() =>
   computeBottomStatusBar(
@@ -310,12 +215,7 @@ const bottomStatusBar = computed(() =>
   ),
 )
 
-const isCreateNewNodeEnabled = computed(
-  () =>
-    typeof props.data === 'object' &&
-    'enable_create_node' in props.data &&
-    props.data.enable_create_node,
-)
+const isCreateNewNodeEnabled = computed(() => viewFlags.value.createNodeEnabled)
 
 const ssrmServer = computed(() => {
   return isSSRM.value && createServer()
@@ -410,44 +310,27 @@ function formatNumber(params: ICellRendererParams) {
   return needsGrouping ? numberFormatGroupped.format(value) : numberFormat.format(value)
 }
 
-const createRowsForTable = (data: unknown[][], shift: number, isSSrm: boolean) => {
-  const rows = data && data.length > 0 ? (data[0]?.length ?? 0) : 0
-  const getIndexInfo = (i: number) => {
-    return isSSrm ? data?.[0]?.[i] : i
-  }
-  return Array.from({ length: rows }, (_, i) => {
-    return Object.fromEntries(
-      columnDefs.value.map((h, j) => {
-        return [h.field, h.field === INDEX_FIELD_NAME ? getIndexInfo(i) : data?.[j - shift]?.[i]]
-      }),
-    )
-  })
-}
-
 async function getFilterValues(params: SetFilterValuesFuncParams) {
   const colName = params.colDef.field
   const filters = params.api.getFilterModel()
-  const columnHeaders =
-    typeof props.data === 'object' && 'header' in props.data ? (props.data.header ?? []) : []
+  const columnHeaders = viewFlags.value.columnNames
   const gridFilterModelList: Array<GridFilterModel> = filters ? makeFilterModelList(filters) : []
   const { filterColumnIndexList, filterActions, valueList } = convertFilterModel(
     gridFilterModelList,
     columnHeaders,
     colTypeMap.value,
   )
-  if (typeof props.data === 'object' && 'header' in props.data) {
-    const index = props.data.header?.findIndex((h: string) => colName === h)
-    const server = ssrmServer.value
-    if (server) {
-      const response = await server.getSetFilterValues(
-        index!,
-        filterColumnIndexList,
-        filterActions,
-        valueList,
-      )
-      if (response.success) {
-        params.success(response.data)
-      }
+  const index = columnHeaders.findIndex((h: string) => colName === h)
+  const server = ssrmServer.value
+  if (server) {
+    const response = await server.getSetFilterValues(
+      index,
+      filterColumnIndexList,
+      filterActions,
+      valueList,
+    )
+    if (response.success) {
+      params.success(response.data)
     }
   }
 }
@@ -500,7 +383,7 @@ function createServer() {
         }
         return {
           success: true,
-          data: response.value.distinct_vals,
+          data: distinctValuesFromResponse(response.value),
         }
       } catch (error) {
         console.warn('Error loading filterValues for column.', error)
@@ -511,8 +394,7 @@ function createServer() {
       }
     },
     getData: async (request: RowsRequestParams) => {
-      const columnHeaders =
-        typeof props.data === 'object' && 'header' in props.data ? (props.data.header ?? []) : []
+      const columnHeaders = viewFlags.value.columnNames
 
       const { sortColIndexes, sortDirections } = convertSortModel(request, columnHeaders)
       const gridFilterModelList: Array<GridFilterModel> =
@@ -546,22 +428,19 @@ function createServer() {
         // and `Err` means the evaluation failed. Neither has a `value`, and reading one produced
         // the misleading "Cannot read properties of undefined (reading 'row_count')" that masked
         // the real failure.
-        if (response == null) return { success: false, data: null, rowCount: undefined }
+        if (response == null) return { success: false, rows: [], rowCount: undefined }
         if (!response.ok) {
           response.error.log('Error loading rows for table')
-          return { success: false, data: null, rowCount: undefined }
+          return { success: false, rows: [], rowCount: undefined }
         }
-        filteredRowCount.value = response.value.row_count
-        return {
-          success: true,
-          data: response.value.rows,
-          rowCount: response.value.row_count,
-        }
+        const page = rowsFromPage(columnDefs.value, response.value)
+        filteredRowCount.value = page.rowCount
+        return { success: true, rows: page.rows, rowCount: page.rowCount }
       } catch (error) {
         console.warn('Error loading rows for table.', error)
         return {
           success: false,
-          data: null,
+          rows: [],
           rowCount: undefined,
         }
       }
@@ -570,9 +449,9 @@ function createServer() {
 }
 
 interface Response {
-  data: unknown[][]
+  rows: Record<string, any>[]
   success: boolean
-  rowCount: number
+  rowCount: number | undefined
 }
 
 function createInfiniteDatasource(): IDatasource {
@@ -582,10 +461,9 @@ function createInfiniteDatasource(): IDatasource {
       if (server) {
         const serverResponse = await server.getData(params)
         const response: Response =
-          serverResponse ? serverResponse : { data: [], success: false, rowCount: 0 }
+          serverResponse ? serverResponse : { rows: [], success: false, rowCount: 0 }
         if (response.success) {
-          const rows = createRowsForTable(response.data, 0, true)
-          params.successCallback(rows, response.rowCount)
+          params.successCallback(response.rows, response.rowCount)
         } else {
           // The Infinite Row Model has no failed-load visual state to hook into and
           // `params.failCallback()` is a no-op here, so settle the grid to visibly empty rather
@@ -638,264 +516,9 @@ function cellRenderer(params: ICellRendererParams) {
   } else return escapeHTML(params.value.toString())
 }
 
-function addRowIndex(data: object[]): object[] {
-  return data.map((row, i) => ({ [INDEX_FIELD_NAME]: i, ...row }))
-}
-
-function getValueTypeIcon(valueType: string) {
-  switch (valueType) {
-    case 'Char':
-      return 'text_char'
-    case 'Boolean':
-      return 'check'
-    case 'Integer':
-    case 'Float':
-    case 'Decimal':
-    case 'Byte':
-      return 'math'
-    case 'Date':
-    case 'Date_Time':
-      return 'calendar'
-    case 'Time':
-      return 'time'
-    case 'Mixed':
-      return 'mixed'
-  }
-}
-
-/**
- * Generates the column definition for the table vizulization, including displaying the data value type and
- * data quality indicators.
- * @param name - The name which will be displayed in the table header and used to idenfiy the column.
- * @param [options.index] - The index of column the corresponds to the data in the `dataQuality` arrays
- * (`number_of_nothing` and `number_of_whitespace`). This identifies the correct indicators for each column
- * to be displayed in the toolip. If absent the data quality metrics will not be shown.
- * @param [options.valueType] - The data type of the column, displayed as an icon
- * and in text within the tooltip. If absent the value type icon and text will not be shown.
- */
-function toField(
-  name: string,
-  options: { index?: number; valueType?: ValueType | null | undefined } = {},
-): ColDef {
-  const { index, valueType } = options
-
-  const displayValue = valueType ? valueType.display_text : null
-  const icon = valueType ? getValueTypeIcon(valueType.constructor) : null
-  const cellValueType = valueType ? getCellDataType(valueType.constructor) : false
-
-  const usingMultiFilterLists =
-    typeof props.data === 'object' && 'is_using_multi_filter' in props.data ?
-      props.data.is_using_multi_filter
-    : []
-  const isUsingMultiFilter = usingMultiFilterLists[index!] ?? false
-
-  const filterType = valueType ? getFilterType(valueType.constructor, isUsingMultiFilter) : null
-
-  const filterParams = getFilterParams(isSSRM.value, valueType, getFilterValues)
-
-  const dataQualityMetrics =
-    typeof props.data === 'object' && 'data_quality_metrics' in props.data ?
-      props.data.data_quality_metrics
-        .map((metric: DataQualityMetric) => {
-          const result: DataQualityMetricValue =
-            metric.type === 'Text' ?
-              { name: metric.name, value: metric.values[index!] || '', displayType: 'Text' }
-            : { name: metric.name, displayType: metric.type, value: metric.values[index!] || 0 }
-          return (
-              metric.values[index!] === null ||
-                (result.displayType === 'Percentage' && result.value === 0)
-            ) ?
-              null
-            : result
-        })
-        .filter((obj) => obj !== null)
-    : []
-
-  const hasDataQualityMetrics = dataQualityMetrics.length > 0
-  const showDataQuality =
-    dataQualityMetrics.filter((obj) => obj.displayType === 'Percentage').length > 0
-
-  const svgTemplateWarning = showDataQuality ? getSvgTemplate('warning') : ''
-  const menu = `<span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span>`
-  const filterButton = `<span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span>`
-  const sort = `
-      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
-      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
-      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
-      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
-      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
-    `
-
-  const styles = 'display:flex; flex-direction:row; justify-content:space-between; width:inherit;'
-  const template =
-    icon ?
-      `<span style='${styles}'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='${styles}'><span data-ref="eText" class="ag-header-cell-text"></span></span>${menu} ${filterButton} ${sort} ${getSvgTemplate(icon)} ${svgTemplateWarning}</span>`
-    : `<span style='${styles}' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> ${menu} ${filterButton} ${sort} ${svgTemplateWarning}</span>`
-
-  const colDef = {
-    field: name,
-    headerName: name, // AGGrid would demangle it its own way if not specified.
-    filter: filterType,
-    filterParams: filterParams,
-    headerComponentParams: {
-      template,
-      setAriaSort: () => {},
-    },
-    tooltipComponent: TableVisualisationTooltip,
-    headerTooltip: displayValue ? displayValue : '',
-    tooltipComponentParams: {
-      dataQualityMetrics,
-      total: typeof props.data === 'object' ? props.data.all_rows_count : 0,
-      showDataQuality: hasDataQualityMetrics,
-    },
-    cellDataType: cellValueType,
-
-    sortable: valueType?.constructor !== 'Mixed',
-  }
-  if (valueType && ['Date', 'Date_Time', 'Time'].includes(valueType.constructor)) {
-    return {
-      ...colDef,
-      comparator: (valueA, valueB) => {
-        const textA =
-          valueA && typeof valueA === 'object' && '_display_text_' in valueA ?
-            valueA['_display_text_']
-          : valueA
-        const textB =
-          valueB && typeof valueB === 'object' && '_display_text_' in valueB ?
-            valueB['_display_text_']
-          : valueB
-
-        if (textA == null && textB == null) return 0
-        if (textA == null) return 1
-        if (textB == null) return -1
-
-        return textA.toString().localeCompare(textB.toString())
-      },
-    }
-  }
-  return colDef
-}
-
-type ParsedActionTemplate = {
-  pattern: string
-  selectors: { name: string; numeric: boolean }[]
-}
-
-function parseActionTemplate(input: string, defaultSelector: string): ParsedActionTemplate {
-  const regex = /{{([#@]?)(\w+)}}/g
-  const selectors: { name: string; numeric: boolean }[] = []
-  let pattern = input
-
-  pattern = pattern.replace(regex, (_, flag, key) => {
-    selectors.push({ name: key, numeric: flag === '#' })
-    return '__'
-  })
-
-  pattern = '__.' + pattern
-
-  // template didn't contain any {{}} placeholders so add a single default argument
-  if (selectors.length === 0) {
-    selectors.push({ name: defaultSelector, numeric: false })
-    pattern = pattern + ' __'
-  }
-
-  return { pattern, selectors }
-}
-
-function isNumber(value: unknown): value is number {
-  return typeof value === 'number' && !isNaN(value)
-}
-
-function getAstPattern(params: CellDoubleClickedEvent, action: string, defaultSelector: string) {
-  const parsedAction = parseActionTemplate(action, defaultSelector)
-
-  return Pattern.new<Ast.Expression>((ast) => {
-    const mappedExpressions = parsedAction.selectors.map(({ name, numeric }) => {
-      const value = params.data[name]
-      const castedValue = numeric && !isNaN(Number(value)) ? Number(value) : value
-      return isNumber(castedValue) ?
-          Ast.tryNumberToEnso(castedValue, ast.module)!
-        : Ast.TextLiteral.new(castedValue, ast.module)
-    })
-
-    const templatePattern = Pattern.parseExpression(parsedAction.pattern)
-    return templatePattern.instantiateCopied([ast, ...mappedExpressions])
-  })
-}
-
-/**
- * Creates a new node in the graph based on the given action template and data from a grid row.
- *
- * The action string should be of the format `at {{#fieldname}}` which will generate a Node `at 2`
- * or `at {{\@fieldname}}` which will generate a Node `at "2"`
- * If the action contains no placeholders then the defaultSelector is used like so
- * `action {{\@defaultSelector}}`
- * @param params - The grid cell event containing the clicked row's data.
- * @param defaultSelector - A fallback key used when the template contains no placeholders.
- * @param action - A template string with placeholders (e.g., `at {{\@name}}`, `at {{#value}}`) used to generate the AST.
- */
-function createNode(params: CellDoubleClickedEvent, defaultSelector: string, action: string) {
-  const pattern = getAstPattern(params, action, defaultSelector)
-
-  if (pattern) {
-    config.createNodes({
-      content: pattern,
-      commit: true,
-    })
-  }
-}
-
-interface LinkFieldOptions {
-  tooltipValue?: string | undefined
-  headerName?: string | undefined
-  getChildAction: string
-}
-
-function toLinkField(fieldName: string, options: LinkFieldOptions): ColDef {
-  const { tooltipValue, headerName, getChildAction } = options
-  return {
-    headerName: headerName ? headerName : fieldName,
-    field: fieldName,
-    onCellDoubleClicked: (params) => createNode(params, fieldName, getChildAction),
-    tooltipValueGetter: (params: ITooltipParams) =>
-      params.node?.rowPinned === 'top' ?
-        null
-      : `Double click to view this ${tooltipValue ?? 'value'} in a separate component`,
-    cellRenderer: (params: ICellRendererParams) =>
-      params.value !== null && params.value !== undefined ?
-        `<div class='link'> ${params.value} </div>`
-      : null,
-    cellStyle: { 'padding-left': '13px', 'border-right': '1px solid #C0C0C0' },
-    headerClass: 'indexColumnHeader',
-    filter: fieldName != INDEX_FIELD_NAME,
-  }
-}
-
-const DEFAULT_DATA = {
-  type: typeof props.data,
-  json: props.data,
-  // eslint-disable-next-line camelcase
-  all_rows_count: 1,
-  data: undefined,
-  header: undefined,
-  // eslint-disable-next-line camelcase
-  value_type: undefined,
-  // eslint-disable-next-line camelcase
-  has_index_col: false,
-  links: undefined,
-  // eslint-disable-next-line camelcase
-  get_child_node_action: '',
-  // eslint-disable-next-line camelcase
-  get_child_node_link_name: undefined,
-  // eslint-disable-next-line camelcase
-  child_label: undefined,
-  // eslint-disable-next-line camelcase
-  visualization_header: undefined,
-  // eslint-disable-next-line camelcase
-  is_using_server_sort_and_filter: undefined,
-  // eslint-disable-next-line camelcase
-  requires_number_format: undefined,
-}
+// The data the component was created with: what a value that is not a JSON object shows.
+// (Declared before the `watchEffect` below, whose first run reads it.)
+const initialData = props.data
 
 watchEffect(() => {
   try {
@@ -907,151 +530,20 @@ watchEffect(() => {
 
 // Update state computed from the input `data`.
 function refresh() {
-  // If the user switches from one visualization type to another, we can receive the raw object.
-  const data_ = typeof props.data === 'object' ? props.data : DEFAULT_DATA
-  if (isError(data_)) {
-    columnDefs.value = [
-      {
-        field: 'Error',
-        cellStyle: { 'white-space': 'normal' },
-      },
-    ]
-    rowData.value = [{ Error: data_.error }]
-  } else if (data_.type === 'Matrix') {
-    columnDefs.value = [
-      toLinkField(INDEX_FIELD_NAME, {
-        tooltipValue: data_.child_label,
-        headerName: data_.visualization_header,
-        getChildAction: data_.get_child_node_action,
-      }),
-    ]
-    for (let i = 0; i < data_.column_count; i++) {
-      columnDefs.value.push(toField(i.toString()))
-    }
-    rowData.value = addRowIndex(data_.json)
-    isTruncated.value = data_.all_rows_count !== data_.json.length
-  } else if (data_.type === 'Object_Matrix') {
-    columnDefs.value = [
-      toLinkField(INDEX_FIELD_NAME, {
-        tooltipValue: data_.child_label,
-        headerName: data_.visualization_header,
-        getChildAction: data_.get_child_node_action,
-      }),
-    ]
-    const keys = new Set<string>()
-    for (const val of data_.json) {
-      if (val != null) {
-        Object.keys(val).forEach((k, i) => {
-          if (!keys.has(k)) {
-            keys.add(k)
-            columnDefs.value.push(toField(k))
-          }
-        })
-      }
-    }
-    rowData.value = addRowIndex(data_.json)
-    isTruncated.value = data_.all_rows_count !== data_.json.length
-  } else if (isGenericGrid(data_)) {
-    columnDefs.value = data_.headers.map((header) => {
-      if (header.get_child_node_action) {
-        return toLinkField(header.visualization_header, {
-          tooltipValue: header.child_label,
-          headerName: header.visualization_header,
-          getChildAction: header.get_child_node_action,
-        })
-      } else {
-        return toField(header.visualization_header)
-      }
-    })
-    rowData.value = createRowsForTable(data_.data, 0, false)
-  } else if (Array.isArray(data_.json)) {
-    columnDefs.value = [
-      toLinkField(INDEX_FIELD_NAME, {
-        tooltipValue: data_.child_label,
-        headerName: data_.visualization_header,
-        getChildAction: data_.get_child_node_action,
-      }),
-      toField('Value'),
-    ]
-    rowData.value = data_.json.map((row, i) => ({ [INDEX_FIELD_NAME]: i, Value: row }))
-    isTruncated.value = data_.all_rows_count ? data_.all_rows_count !== data_.json.length : false
-  } else if (data_.json !== undefined) {
-    // single values like Integer or Text
-    columnDefs.value = [toField('Value')]
-    rowData.value = [{ Value: data_.json }]
-  } else {
-    const dataHeader =
-      ('header' in data_ ? data_.header : [])?.map((v, i) => {
-        const valueType = data_.value_type ? data_.value_type[i] : null
-        if (data_.get_child_node_link_name === v) {
-          return toLinkField(v, {
-            tooltipValue: data_.child_label,
-            headerName: data_.visualization_header,
-            getChildAction: data_.get_child_node_action,
-          })
-        }
-        return toField(v, { index: i, valueType })
-      }) ?? []
-
-    columnDefs.value =
-      data_.has_index_col ?
-        [
-          toLinkField(INDEX_FIELD_NAME, {
-            tooltipValue: data_.child_label,
-            headerName: data_.visualization_header,
-            getChildAction: data_.get_child_node_action,
-          }),
-          ...dataHeader,
-        ]
-      : dataHeader
-
-    if (!data_.is_using_server_sort_and_filter) {
-      const shift = data_.type === 'EnsoTableOrColumn' ? 1 : 0
-      rowData.value = data_.data ? createRowsForTable(data_.data, shift, false) : []
-    }
-  }
-  const headerGroupingMap = new Map()
-
-  const determineGrouping = (header: string) =>
-    rowData.value.some((row) => {
-      const value = row[header] && typeof row[header] === 'object' ? row[header].value : row[header]
-      return value > 999999 || value < -999999
-    })
-
-  if ('header' in data_) {
-    const headers = data_.header || []
-
-    if (data_.requires_number_format) {
-      columnDefs.value.forEach((col) => {
-        const colHeader = col.headerName
-        if (colHeader === INDEX_FIELD_NAME) {
-          headerGroupingMap.set(INDEX_FIELD_NAME, false)
-        }
-
-        if (typeof props.data === 'object' && 'header' in props.data) {
-          const dataHeaderIndex = props.data.header?.indexOf(colHeader ?? '')
-          const needsGrouping =
-            dataHeaderIndex !== -1 ? data_.requires_number_format[dataHeaderIndex!] : false
-          headerGroupingMap.set(colHeader, needsGrouping)
-        }
-      })
-    } else {
-      headers.forEach((header) => headerGroupingMap.set(header, determineGrouping(header)))
-    }
-  } else {
-    const headers = rowData.value[0] ? Object.keys(rowData.value[0]) : []
-    Object.keys(headers).forEach((header) =>
-      headerGroupingMap.set(header, determineGrouping(header)),
-    )
-  }
-
-  dataGroupingMap.value = headerGroupingMap
-
-  // Update paging
-  const newRowCount = data_.all_rows_count == null ? 1 : data_.all_rows_count
-  showRowCount.value = !(data_.all_rows_count == null)
-  rowCount.value = newRowCount
-  const newPageLimit = Math.ceil(newRowCount / rowLimit.value)
+  const view = buildTableView(props.data, {
+    isSSRM: isSSRM.value,
+    getFilterValues,
+    createNode: (pattern) => config.createNodes({ content: pattern, commit: true }),
+    previousRowData: rowData.value,
+    initialData,
+  })
+  columnDefs.value = view.columnDefs
+  if (view.rowData !== undefined) rowData.value = view.rowData
+  if (view.isTruncated !== undefined) isTruncated.value = view.isTruncated
+  dataGroupingMap.value = view.dataGrouping
+  rowCount.value = view.rowCount
+  showRowCount.value = view.showRowCount
+  const newPageLimit = Math.ceil(view.rowCount / rowLimit.value)
   pageLimit.value = newPageLimit
   if (page.value > newPageLimit) {
     page.value = newPageLimit
@@ -1062,19 +554,7 @@ function refresh() {
   defaultColDef.value.sortable = !isTruncated.value
 }
 
-const colTypeMap = computed(() => {
-  const colMap: Map<string, string> = new Map()
-  if (typeof props.data === 'object' && !('error' in props.data)) {
-    const valueTypes = 'value_type' in props.data ? props.data.value_type : []
-    const headers = 'header' in props.data ? props.data.header : []
-    headers?.forEach((header, index) => {
-      if (valueTypes[index]) {
-        colMap.set(header, valueTypes[index].constructor)
-      }
-    })
-  }
-  return colMap
-})
+const colTypeMap = computed(() => viewFlags.value.columnTypes)
 
 const getColumnValueToEnso = (columnName: string) => {
   const columnType = colTypeMap.value.get(columnName) ?? ''
@@ -1173,10 +653,7 @@ const onColumnStateChange = (e: ColumnVisibleEvent | ColumnMovedEvent) => {
   const gridColOrder = colState
     .filter((col) => col.colId != INDEX_FIELD_NAME)
     .map((col) => col.colId)
-  const defaultColOrder =
-    typeof props.data === 'object' && 'header' in props.data && props.data.header ?
-      props.data.header
-    : []
+  const defaultColOrder = viewFlags.value.columnNames
   if (gridColOrder.every((val, index) => val === defaultColOrder[index])) {
     vizColumnOrder.value = null
   } else {
