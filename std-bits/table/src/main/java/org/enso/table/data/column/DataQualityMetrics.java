@@ -215,7 +215,7 @@ public abstract class DataQualityMetrics {
                       .filter(Objects::nonNull)
                       .map(o -> JsonOperation.INSTANCE.objectToJson(o))
                       .sorted()
-                      .collect(Collectors.joining())
+                      .collect(Collectors.joining(","))
                   + "]";
         }
         return new Result(nothingCount, distinct.size(), distinctJson);
@@ -228,7 +228,7 @@ public abstract class DataQualityMetrics {
 
     public BaseQualityMetrics(ColumnStorage<?> storage) {
       if (StorageType.ofStorage(storage) instanceof NullType) {
-        result = CompletableFuture.completedFuture(new Result(0, 0, ""));
+        result = CompletableFuture.completedFuture(new Result(0, 0, "[]"));
       } else {
         result =
             DataQualityExecutor.supplyAsync(
