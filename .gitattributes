@@ -2,3 +2,6 @@
 *.png binary
 CHANGELOG.md merge=union
 *.bat text eol=crlf
+# The standard libraries' API signatures are generated (`## Enso Signatures 1.0`):
+# GitHub collapses them in diffs and leaves them out of the language statistics.
+distribution/lib/Standard/*/*/docs/api/** linguist-generated=true
