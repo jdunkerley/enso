@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+import Standard.Base.Runtime.Ref.Ref
 
 from Standard.Table import Table
 import Standard.Database.Connection.Database
@@ -176,6 +177,18 @@ add_specs suite_builder =
             (tree.child "x") . should_fail_with Illegal_Argument
             ((Viz_Tree.from 1).child 0) . should_fail_with Illegal_Argument
 
+        group_builder.specify "a Text key on a paged array misses without reading any page" <|
+            calls = Ref.new 0
+            page start end =
+                calls.put (calls.get + 1)
+                start.up_to end . map i-> Viz_Tree_Child.Value i (Viz_Tree.from i) (".at " + i.to_text)
+            big = Viz_Tree.paged "array" 1000000 "[1,000,000 items]" page
+            (big.child "x") . should_fail_with Illegal_Argument
+            (big.child "x").catch.message . should_equal "No child has the key 'x'."
+            calls.get . should_equal 0
+            (big.child 3).key . should_equal 3
+            calls.get . should_equal 1
+
     suite_builder.group "Tree.prepare and Tree.children" group_builder->
         value = Json.parse '{"name":"John","tags":["a","b"],"address":{"city":"Leeds"}}'
         keys_in json = json.get "entries" . map (e-> e.get "key")
@@ -304,6 +317,17 @@ add_specs suite_builder =
             exprs_of tree . should_equal [".row_count", ".columns", Nothing]
             keys_of (child_tree tree "rows") 2 100 . should_equal [2]
             keys_of (child_tree (child_tree tree "columns") 0) . should_equal [0, 1, 2]
+            connection.close
+
+        group_builder.specify "a Text key on a database table's rows misses at once, without reading the table" <|
+            connection = Database.connect SQLite.In_Memory
+            big = Table.new [["x", 0.up_to 3000 . to_vector]]
+            db_table = big.select_into_database_table connection "tree_big_rows" temporary=True
+            rows = child_tree (Viz_Tree.from db_table) "rows"
+            (rows.child "x") . should_fail_with Illegal_Argument
+            (rows.child "x").catch.message . should_equal "No child has the key 'x'."
+            (Json.parse (Tree.children db_table ["rows", "x"] 0 100)).get "error" . should_contain "x"
+            (rows.child 2999).key . should_equal 2999
             connection.close
 
         group_builder.specify "children walks into a Table's rows" <|

@@ -19,7 +19,17 @@ it either.
   - a page is `{"start":…,"size":…,"entries":[…]}`; `prepare` returns
     `{"root":…}` or `{"root":…,"children":<page>}`; `children` returns a page or
     `{"error":…}`. The goldens `test/Visualization_Tests/data/pinned/tree_*` pin
-    it.
+    it;
+  - a value that is a dataflow error shows its payload's tree as the root;
+  - `prepare` falls back to a leaf of the value's display text when building the
+    tree fails;
+  - a `path` walks an array's child by index and an object's by key (through its
+    `child_of`, else by looking through its pages); a key other than an Integer
+    on an array is a miss at once, reading no page. A missing key is an
+    `Illegal_Argument` ("No child has the key …");
+  - the GUI chains a child's `expr` after its ancestors' with the spaced dot
+    (`.get 'tags'` then `.at 1` on node `data` is `data.get 'tags' . at 1`); if
+    an ancestor has none (`null`), the child has none either.
 - `Geo_Map.process_to_json_text value` — IDE entry for the geo-map widget.
 - `Scatter_Plot.process_to_json_text value` — IDE entry for the scatter-plot
   widget.
@@ -90,10 +100,10 @@ Visualization and not on each data library.
   expression, and an optional `child_of key` that finds one child without
   building a page). Build branches with `Viz_Tree.paged`, or with
   `Viz_Tree.lookup_paged` when a key can be found directly. Base values convert
-  here (any value: its `to_js_object`, with no node expressions); a library or a
-  user type describes its own with `Viz_Tree.from (that:Its_Public_Type)`
-  (Table: row count, columns and rows read a page at a time; Column, Row; XML:
-  attributes and children).
+  here (any other value: its `to_js_object`, with no node expressions); a
+  library or a user type describes its own with
+  `Viz_Tree.from (that:Its_Public_Type)` (Table: row count, columns and rows
+  read a page at a time; Column, Row; XML: attributes and children).
 - `Id` (`src/Id.enso`) - which visualisation a node opens with. `Id.from`
   answers it: any value gives `Id.table`, a `JS_Object` `Id.json`; a library
   picks another for its type with `Id.from (that:Its_Public_Type)` (Table: SQL

@@ -84,10 +84,15 @@ type Viz_Tree
         case self of
             Viz_Tree.Leaf _ -> Error.throw missing
             Viz_Tree.Branch kind size _ children child_of -> case child_of of
-                Nothing -> case kind == "array" && (key.is_a Integer) of
-                    True ->
-                        page = if key < 0 then [] else children key 1
-                        if page.is_empty then Error.throw missing else page.first
+                Nothing -> case kind == "array" of
+                    ## An array has only Integer keys: any other key misses
+                       without reading a page (a database table's rows would
+                       otherwise be read again and again to search them).
+                    True -> case key.is_a Integer of
+                        True ->
+                            page = if key < 0 then [] else children key 1
+                            if page.is_empty then Error.throw missing else page.first
+                        False -> Error.throw missing
                     False -> find_child children size key 0 . if_nothing (Error.throw missing)
                 _ -> (child_of key) . if_nothing (Error.throw missing)
 
