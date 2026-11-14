@@ -114,7 +114,8 @@ The design is `docs/superpowers/specs/2026-11-13-node-displacement-design.md`.
 Each visualization in `components/visualizations/` is compiled as a **custom
 element** (see `customElement` matcher in `app/gui/vite.config.ts`). That means
 they run in the Shadow DOM and must not rely on global Tailwind classes bleeding
-in. Tags start with `enso-`.
+in. Tags start with `enso-`. The JSON visualization is a lazy tree whose pages
+Enso sends on demand (`components/visualizations/JSONVisualization/CLAUDE.md`).
 
 ## Reactivity rules
 
