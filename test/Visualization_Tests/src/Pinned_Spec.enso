@@ -120,6 +120,12 @@ add_specs suite_builder =
         default_data "vector" [1, [2, 3]]
         default_data "js_object" (JS_Object.from_pairs [["a", 1]])
         default_data "text" "hello"
+        default_data "nothing" Nothing
+        default_data "error" (Error.throw (Illegal_Argument.Error "boom"))
+        default_data "xml_document" (XML_Document.parse '<foo id="10"><bar a="1">hello<baz>deep</baz></bar>text</foo>')
+        default_data "xml_element" (XML_Document.parse '<foo id="10"><bar>hello</bar>text</foo>' . root_element)
+        default_data "vector_deep" [[[[[[[1]]]]]], (0.up_to 150 . to_vector)]
+        default_data "array" [1, [2, 3]].to_array
 
     suite_builder.group "Pinned server-side row model" group_builder->
         group_builder.specify "rows" <|
