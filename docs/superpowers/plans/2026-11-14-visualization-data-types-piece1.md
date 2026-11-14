@@ -46,8 +46,10 @@ vitest.
   `Standard.Visualization.Helpers` (`default_visualization` is evaluated there),
   `Standard.Visualization.Preprocessor`, `.Warnings`, `.Widgets`.
 - `Standard.Visualization`'s `Main.enso` keeps every export.
-- Every entity added to a library carries `## ---` / `private: true` / `---` doc
-  metadata (the component browser and catalogue skip them).
+- Every entity added to a library in a **non-private** module carries `## ---` /
+  `private: true` / `---` doc metadata (the component browser and catalogue skip
+  them). Entities inside a `private` module need none (repo convention, as in
+  `In_Memory_Table_Implementation`).
 - Database reads for charts are bounded: 15000 rows (`chart_row_bound`).
 - New projects keep `import Standard.Visualization` (piece 4 removes it).
 - Changelog: steps 1–4 take the `CI: No changelog needed` label; step 5 takes an
@@ -149,7 +151,8 @@ Every later step must leave these files byte-identical. They are generated from
 
 - Produces: `Pinned.expect_pinned name:Text ~json_text:Text` — compares
   `json_text` (normalised) with `data/pinned/<name>.json`; with the environment
-  variable `ENSO_UPDATE_PINNED=1` it writes the file instead.
+  variable `ENSO_UPDATE_PINNED=1` it writes the file and fails the test (update
+  mode checks nothing).
 
 - [ ] **Step 1: Write the helper**
 
@@ -166,7 +169,8 @@ normalise (text : Text) -> Text =
     text.replace (regex '"table_version_hash":"[^"]*"') '"table_version_hash":"<hash>"'
 
 ## Compares `json_text` with the pinned file `data/pinned/<name>.json`.
-   With `ENSO_UPDATE_PINNED=1` in the environment it (re)writes the file.
+   With `ENSO_UPDATE_PINNED=1` in the environment it (re)writes the file and then
+   fails the test, so a run that checked nothing is never green.
 expect_pinned (name : Text) ~json_text =
     dir = enso_project.data / "pinned"
     file = dir / (name + ".json")
@@ -175,6 +179,8 @@ expect_pinned (name : Text) ~json_text =
         "1" ->
             dir.create_directory
             actual.write file on_existing_file=..Overwrite . should_succeed
+            ## Update mode checks nothing, so it must never look like a pass.
+            Test.fail ("Regenerated " + file.path + "; run again without ENSO_UPDATE_PINNED")
         _ ->
             expected = file.read_text
             actual.should_equal expected
@@ -224,7 +230,7 @@ type Data
     cells_table self = self.data.at 9
 
     setup = Data.Value <|
-        mem_table = Table.new [["x", [1, 2, 3]], ["y", [4.5, 5.5, 6.5]], ["label", ["a", "b", "c"]], ["when", [Date.new 2020 1 1, Date.new 2021 2 2, Date.new 2022 3 3]]]
+        mem_table = warm <| Table.new [["x", [1, 2, 3]], ["y", [4.5, 5.5, 6.5]], ["label", ["a", "b", "c"]], ["when", [Date.new 2020 1 1, Date.new 2021 2 2, Date.new 2022 3 3]]]
         mem_column = mem_table.at "y"
         connection = Database.connect SQLite.In_Memory
         db_table = mem_table.select_into_database_table connection "pinned" temporary=True
@@ -233,8 +239,17 @@ type Data
         geo_table = Table.new [["Latitude", [51.5, 48.8]], ["lon", [-0.1, 2.3]], ["name", ["London", "Paris"]], ["colour", ["red", "blue"]]]
         big_table = Table.new [["x", 0.up_to 20000 . to_vector], ["y", 0.up_to 20000 . map (i-> i * 2)]]
         db_geo_table = geo_table.select_into_database_table connection "pinned_geo" temporary=True
-        cells_table = Table.new [["v", [mem_table, mem_column, row, [1, 2], Dictionary.from_vector [["k", 1]]]]]
+        cells_table = warm <| Table.new [["v", [mem_table, mem_column, row, [1, 2], Dictionary.from_vector [["k", 1]]]]]
         [mem_table, mem_column, db_table, db_column, row, connection, geo_table, big_table, db_geo_table, cells_table]
+
+## The table view JSON of an in-memory table embeds data-quality metrics that
+   are computed asynchronously. Asking for `column_info` waits for them (as
+   `Table_Spec` does before it checks them), so a golden never sees a
+   half-computed table. Every in-memory table whose table view is pinned goes
+   through it.
+warm (table : Table) -> Table =
+    table.column_info
+    table
 
 add_specs suite_builder =
     data = Data.setup
@@ -245,8 +260,8 @@ add_specs suite_builder =
                 expect_pinned ("table_" + name) (Visualization.prepare_visualization value max_rows)
         table_view "mem_table" data.mem_table
         table_view "mem_column" data.mem_column
-        table_view "mem_1col_table" (data.mem_table.select_columns ["y"])
-        table_view "mem_1x1_table" (Table.new [["n", [7]]])
+        table_view "mem_1col_table" (warm (data.mem_table.select_columns ["y"]))
+        table_view "mem_1x1_table" (warm (Table.new [["n", [7]]]))
         table_view "db_table" data.db_table 2
         table_view "db_column" data.db_column 2
         table_view "row" data.row
@@ -333,6 +348,11 @@ add_specs suite_builder =
         geo "mem_table_nothing_known" data.mem_table
         geo "db_table" data.db_geo_table
         geo "vector" [1, 2]
+        ## Not tables, so `develop` gives them `value.to_json`; Task 4.3 changes
+           these three on purpose and regenerates their files.
+        geo "mem_column" data.mem_column
+        geo "db_column" data.db_column
+        geo "connection" data.connection
 
     suite_builder.group "Pinned SQL JSON" group_builder->
         group_builder.specify "db_table" <|
@@ -375,10 +395,14 @@ fix the case, do not drop it.
 cd test && ENSO_UPDATE_PINNED=1 JAVA_TOOL_OPTIONS="-enableassertions -da:com.oracle.truffle.host.HostExecuteNode -da:com.oracle.graal.python.runtime.ExecutionContext" ../built-distribution/enso-engine-*/enso-*/bin/enso --no-ir-caches --run "$PWD/Visualization_Tests" Pinned
 ```
 
-Then run again **without** `ENSO_UPDATE_PINNED`. Expected: all `Pinned` tests
-PASS. Run it a third time to prove the files are stable (no run-dependent data
-apart from the normalised hash). If a file differs between runs, find the
-unstable field and add it to `normalise` with a comment saying why.
+Every test reports a failure in this mode: that is expected (see
+`expect_pinned`). Then run again **without** `ENSO_UPDATE_PINNED`. Expected: all
+`Pinned` tests PASS. Run it a third time, and run both a filtered (`Pinned`) and
+an unfiltered run, to prove the files are stable (no run-dependent data apart
+from the normalised hash; the in-memory data-quality metrics are warmed by
+`warm` in `Data.setup`, so a table view golden must not depend on timing). If a
+file differs between runs, find the unstable field and add it to `normalise`
+with a comment saying why.
 
 Open three or four of the generated files and check they hold real JSON (not an
 error text), especially `scatter_db_table`, `table_cells`, `geo_db_table` and
@@ -615,12 +639,17 @@ type Viz_Column_Kind
 
 - [ ] **Step 4: Write `Internal/Names.enso`**
 
-```enso
-private
+This module is **not** `private`: a test project cannot import another project's
+private module, and `Viz_Table_Spec` imports it. Its functions carry
+`private: true` metadata instead, which hides them from the component browser.
 
+```enso
 from Standard.Base import all
 
-## The names in `names` that equal (ignoring case) one in `wanted`, as
+## ---
+   private: true
+   ---
+   The names in `names` that equal (ignoring case) one in `wanted`, as
    `Table.select_columns … case_sensitivity=..Insensitive error_on_missing_columns=False`
    returns them: in the table's order, or with `reorder` in `wanted`'s order
    (each name once, at its first match).
@@ -629,7 +658,10 @@ select_insensitive (names : Vector Text) (wanted : Vector Text) (reorder : Boole
     if reorder.not then names.filter matches else
         wanted.flat_map (w-> names.filter (n-> n.equals_ignore_case w)) . distinct
 
-## The first name in `names` that equals (ignoring case) the earliest
+## ---
+   private: true
+   ---
+   The first name in `names` that equals (ignoring case) the earliest
    candidate that matches anything, or `Nothing`.
 find_insensitive (names : Vector Text) (candidates : Vector Text) -> Text | Nothing =
     found = select_insensitive names candidates True
@@ -1088,6 +1120,12 @@ git add distribution/lib/Standard/Visualization test/Visualization_Tests
 git commit -m "Visualization: SQL_Viz and Viz_Cell data types"
 ```
 
+PR 2 merges verbatim copies whose originals live on. Say in its description
+which later task deletes each: `_make_json_for_value` (Task 3.2), the body of
+`SQL/Visualization.prepare_visualization` (Task 4.3; it may call
+`SQL_Viz.Value … . to_json_text` already in this task, which is cheap) and
+Base's `_make_js_object_for_generic_grid` (Task 3.4).
+
 ### Task 2.3: API docs and the library guide
 
 **Files:**
@@ -1538,7 +1576,7 @@ PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add distribution/lib/Standard/Table test/Visualization_Tests
+git add distribution/lib/Standard/Table distribution/lib/Standard/Visualization/0.0.0-dev/src/Helpers.enso test/Visualization_Tests
 git commit -m "Table: convert tables, columns and rows to Visualization's data types"
 ```
 
@@ -1659,7 +1697,9 @@ name there before writing the import.)
 
 A conversion from `Number` must catch `Integer` and `Float` values: the
 `table_number` golden checks it. If it fails because 42 reached the `Any`
-catch-all, add the same conversion for `(that:Integer)` and `(that:Float)`.
+catch-all, do **not** add conversions for `Integer` and `Float` (Task 5.2 would
+then offer both charts for every number): keep `v : Number ->` as a `case`
+branch in `prepare_visualization`, as `Function` stays.
 
 - [ ] **Step 3: Slim `Table/Visualization.enso`**
 
@@ -1751,7 +1791,11 @@ uses the lazy text window.
 
 Rebuild; run `Visualization_Tests` unfiltered. Expected: all pass except the
 database `Pinned` cases and `Table_Spec`'s database cases, which fail until Task
-3.3 (the database table has no `to_viz_table` yet). Commit:
+3.3 (the database table has no `to_viz_table` yet), and the goldens
+`table_connection` and `table_xml_document` plus `XML_Tests`'
+`Visualization_Spec`, which fail until Task 3.4 (the SQLite connection and
+`XML_Document` still convert only to Base's `Table_Viz_Data`, so they fall to
+the `Any` conversion). Commit:
 
 ```bash
 git add -A distribution/lib/Standard/Visualization test/Visualization_Tests
@@ -1834,10 +1878,11 @@ In `DB_Table_Implementation` (imports
 
 ```enso
     to_viz_table (this_table : Table & DB_Table) =
-        refined = DB_Table_Refinements.refine_table this_table
-        spatial = case refined of
-            s : Spatial_Table -> s
-            _ -> Nothing
+        ## Refining a single-column table runs a type-inference query, so only a dialect with spatial support is refined.
+        spatial = if this_table.connection.dialect.is_feature_supported ..Spatial.not then Nothing else
+            case DB_Table_Refinements.refine_table this_table of
+                s : Spatial_Table -> s
+                _ -> Nothing
         Viz_Table.from_source (DB_Viz_Source.Value this_table Nothing spatial)
 
     to_sql_viz (this_table : Table & DB_Table) =
@@ -1904,8 +1949,11 @@ Add to `Table_Conversions_Spec.enso` a group using SQLite (copy the
 (imports: `import Standard.Database.Connection.Database`,
 `import Standard.Database.Extensions.Upload_Table`,
 `from Standard.SQLite import SQLite`, `import Standard.Visualization.Id.Id`.)
-Rebuild; run `Visualization_Tests` unfiltered. Expected: all pass, all goldens
-unchanged.
+Rebuild; run `Visualization_Tests` unfiltered. Expected: all pass and all
+goldens unchanged, except `table_connection`, `table_xml_document` and
+`XML_Tests`' `Visualization_Spec`, which still fail until Task 3.4
+(`Connections_Helpers` now returns a `Viz_Table`, but the SQLite connection
+reaches it only through `Table_Viz_Data.from` until then).
 
 - [ ] **Step 5: Commit** —
       `git add distribution/lib/Standard/Database test/Visualization_Tests`,
@@ -1931,6 +1979,13 @@ unchanged.
   `Base/0.0.0-dev/src/Data/Json.enso`
 - Modify: `Visualization/0.0.0-dev/src/Helpers.enso` (receives
   `JS_Object.to_default_visualization_data`)
+- Modify: `distribution/lib/Standard/XML/0.0.0-dev/CLAUDE.md` (line 39 names
+  `Table_Viz_Data`: say `Viz_Table`) and
+  `app/gui/src/project-view/components/visualizations/TableVisualization/TableVisualisationTypes.ts`
+  (line 1 says its types are kept in sync with `Table_Viz_Data.enso`: say
+  `Viz_Table.enso` and its sources)
+- Modify: `test/Table_Tests/src/IO/Json_Spec.enso` (cells render without the
+  Visualization import)
 - Delete: `Base/0.0.0-dev/src/Visualization/Table_Viz_Data.enso`
 
 - [ ] **Step 1: Mechanical rewrite in each library.** In every file listed:
@@ -1978,7 +2033,7 @@ unchanged.
       Then confirm nothing in the repository still names it:
 
   ```bash
-  git grep -n "Table_Viz_Data\|Table_Viz_Header\|Base.Visualization" -- distribution test ':!*/docs/api/*'
+  git grep -n "Table_Viz_Data\|Table_Viz_Header\|Base.Visualization" -- distribution test app/gui/src ':!*/docs/api/*'
   ```
 
   Expected: no output.
@@ -1989,9 +2044,27 @@ unchanged.
       `Base_Tests`, `Table_Tests`. Record each project's test count and compare
       with `develop`.
 
-- [ ] **Step 4: Check cells render without the import.** Create a throwaway
-      project outside the repository (in your scratch directory) whose
-      `Main.enso` imports only `Standard.Base` and `Standard.Table`:
+- [ ] **Step 4: Check cells render without the import.** First commit a
+      regression spec. In `test/Table_Tests/src/IO/Json_Spec.enso` (it does not
+      import `Standard.Visualization`) add to the `JSON Columns` group:
+
+  ```enso
+          group_builder.specify 'should render a nested vector cell with to_json_data' <|
+              json = (Table.new [['v', [[1, 2]]]]).at 'v' . to_json_data
+              json.contains "[1, 2]" . should_be_true
+              json.contains "null" . should_be_false
+  ```
+
+  Run `Table_Tests` filtered to `JSON Columns`. Caveat: `Table_Spec.enso` and
+  `Widget_Helpers_Spec.enso` in the same project import
+  `Standard.Visualization`, so inside `Table_Tests` the module is always loaded
+  and this spec pins the rendering but cannot fail on a missing import. It is
+  still worth keeping; the throwaway project below is what proves the claim,
+  once.
+
+  Then create a throwaway project outside the repository (in your scratch
+  directory) whose `Main.enso` imports only `Standard.Base` and
+  `Standard.Table`:
 
   ```enso
   from Standard.Base import all
@@ -2015,7 +2088,7 @@ unchanged.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add -A distribution/lib/Standard
+git add -A distribution/lib/Standard test/Table_Tests app/gui/src/project-view/components/visualizations/TableVisualization/TableVisualisationTypes.ts
 git commit -m "Libraries convert to Visualization's Viz_Table; Base drops Table_Viz_Data"
 ```
 
@@ -2057,7 +2130,9 @@ deleted in step 0.
 - Produces: `Chart_Limits.chart_row_bound = 15000`,
   `Chart_Limits.chart_sample_seed = 15975382`,
   `Chart_Limits.local_rows (vt : Viz_Table) (bound : Integer) -> Viz_Table` (the
-  table itself when it supports `"rows"`, else its bounded sample).
+  table itself when it supports `"rows"`, else its bounded sample, which
+  supports `"rows"` only when the source is a database table: a caller checks
+  `.supports "rows"` on the result).
 
 - [ ] **Step 1: `Internal/Chart_Limits.enso`**
 
@@ -2076,7 +2151,11 @@ chart_row_bound = 15000
 chart_sample_seed = 15975382
 
 ## `vt` when it can work on its rows in place; otherwise a bounded sample of
-   it, which can. A database table therefore reads at most `bound` rows.
+   it. A database table's sample is an in-memory table, which can work on its
+   rows, so a database table reads at most `bound` rows. A source made by
+   `Viz_Table.from_columns` or `from_view` (a connection, a workbook) samples to
+   another source without `"rows"`: the result still does not support `"rows"`,
+   and the chart shows its empty state (see the callers).
 local_rows (vt : Viz_Table) (bound : Integer) -> Viz_Table =
     if vt.supports "rows" then vt else vt.sample bound chart_sample_seed
 ```
@@ -2154,6 +2233,15 @@ json_from_viz_table vt bounds limit =
 ## ---
    private: true
    ---
+   The JSON of a scatter plot with nothing to draw. `json_from_viz_table` uses it
+   too, where it checks for at least one numeric column (replace its inline copy
+   of this text).
+no_numeric_json : Text
+no_numeric_json = '{"data":[],"axis":{},"is_multi_series":false,"get_row_method":"get_row","x_value_type":"Integer","error_message":"At least one numeric (other than X) must be provided for a scatter plot."}'
+
+## ---
+   private: true
+   ---
    Default preprocessor for the scatter-plot visualization.
    Generates JSON text describing the scatter-plot visualization.
 
@@ -2168,7 +2256,9 @@ process_to_json_text value bounds=Nothing limit=Nothing = time_visualization Sca
             vt = Viz_Table.from value
             if vt.column_names.is_empty then json_from_vector value.to_vector bounds limit else
                 ## A database reads at most `limit` rows (15000 when there is no limit) before anything else, as before.
-                json_from_viz_table (Chart_Limits.local_rows vt (limit.if_nothing Chart_Limits.chart_row_bound)) bounds limit
+                rows = Chart_Limits.local_rows vt (limit.if_nothing Chart_Limits.chart_row_bound)
+                ## A source made of columns only (a connection, a workbook) cannot work on rows: show the chart's empty state.
+                if rows.supports "rows" then json_from_viz_table rows bounds limit else no_numeric_json
 ```
 
 Notes for the implementer, each mirrors `develop`'s `json_from_table`:
@@ -2180,9 +2270,14 @@ Notes for the implementer, each mirrors `develop`'s `json_from_table`:
   selecting the source column and renaming it to `color` through `field_names`
   yields the same JSON keys. Row JSON keys come from `field_names`, which are
   what `develop` renamed to.
-- `develop`'s `data_columns` excluded `core_table.column_names` (which hold
-  `"color"`, not the source name), so a numeric column named `Colour` stays a
-  data column there and here (`core_names` holds `"color"`).
+- A **numeric** colour column named other than `color` (say `Colour`) diverges
+  from `develop`: there `data_columns` excluded `core_table.column_names`, which
+  hold `"color"`, so `Colour` also stayed a data column next to its `color`
+  copy. Here `core_sources` holds `"Colour"` and `data_names` does too, so
+  `select_columns` returns it once and `rename_columns field_names` has one name
+  too many. The case is not pinned; either accept the difference, as for the
+  left-of-x case, or filter `data_names` by `core_sources` as well and pin a
+  `scatter mem_numeric_colour` golden on `develop`. Say which in the PR.
 - The pathological case where the colour or row-number column is to the **left**
   of `x` (then `develop`'s `get 1` picks `x` itself) duplicates a column there
   and cannot here; it is not pinned and is accepted.
@@ -2257,14 +2352,18 @@ process_to_json_text value = time_visualization Geo_Map ("process_to_json_text: 
     vt = Viz_Table.from value
     if vt.supports "spatial" then vt.spatial_layers_json else
         if vt.column_names.is_empty then value.to_json else
-            json_from_viz_table (Chart_Limits.local_rows vt Chart_Limits.chart_row_bound) . to_text
+            rows = Chart_Limits.local_rows vt Chart_Limits.chart_row_bound
+            ## A source made of columns only (a connection, a workbook) cannot work on rows: nothing to map.
+            if rows.supports "rows" then json_from_viz_table rows . to_text else '{}'
 ```
 
-`develop`'s `json_from_table` selected `["X"]+set` with `reorder=True` after
-adding a column `X`, then took the second column: that is the first table column
-matching the earliest name in the set, which `find_insensitive` returns. An
-in-memory table is read whole, as before; only a database table is sampled
-(first 15000 rows, as before).
+A source made by `from_columns` supplies the required part of the contract only
+(Task 2.1), so a connection or workbook reaches `'{}'` here, not an error;
+Changed-while-planning 10 in the spec records it. `develop`'s `json_from_table`
+selected `["X"]+set` with `reorder=True` after adding a column `X`, then took
+the second column: that is the first table column matching the earliest name in
+the set, which `find_insensitive` returns. An in-memory table is read whole, as
+before; only a database table is sampled (first 15000 rows, as before).
 
 A `Vector` today reached `_ -> value.to_json`; it now converts to a view-only
 `Viz_Table` (no columns) and reaches the same `value.to_json`.
@@ -2321,25 +2420,85 @@ prepare_visualization table = time_visualization Visualization ("prepare_visuali
 ```
 
 - [ ] **Step 4: Run** — rebuild; `Visualization_Tests` unfiltered (every golden
-      unchanged, `Geo_Map_Spec`, `SQL_Spec` pass), `SQLite_Tests`,
-      `DuckDB_Tests`.
+      unchanged except `geo_mem_column`, `geo_db_column` and `geo_connection`;
+      `Geo_Map_Spec`, `SQL_Spec` pass), `SQLite_Tests`, `DuckDB_Tests`.
+
+      The three geo goldens change **on purpose**: on `develop` the geo map takes
+      the table path only for `Spatial_Table`, `DB_Table` and `In_Memory_Table`
+      and gives every other value `value.to_json`; now any value with columns
+      takes it (the GUI's geo map has `inputType` `Standard.Table.Table.Table`
+      today, so a column or connection never reached it in the IDE). Regenerate
+      exactly those three: run with `ENSO_UPDATE_PINNED=1` filtered to
+      `Pinned geo map`, then restore the other `geo_*` files with
+      `git checkout -- <file>` for any that changed (none should), open the three
+      and check they hold `{}` or the columns JSON, and run again without the
+      variable. The spec's "Changed while planning" records the change; say so in
+      the PR description (and in the commit message).
 
 - [ ] **Step 5: The layering check**
 
 ```bash
 git grep -nE "^(import|from) Standard\.(Table|Database|[A-Z][A-Za-z_]*)" -- distribution/lib/Standard/Visualization/0.0.0-dev/src | grep -v "Standard\.Base"
-git grep -n "Visualization" -- distribution/lib/Standard/Base/0.0.0-dev/src
+git grep -nE "^(import|from) .*Visualization|Viz_Data" -- distribution/lib/Standard/Base/0.0.0-dev/src
 ```
 
-Expected: no output from either. If the first lists a module, finish moving its
-Table/Database code before continuing.
+Expected: no output from either (the second looks for imports and `Viz_Data`
+names, not documentation that mentions the word). If the first lists a module,
+finish moving its Table/Database code before continuing. `Widgets.enso` is
+handled by Task 4.4: until that task is done (or if it takes the exception
+described there), the first grep lists `Widgets.enso` and nothing else.
 
 - [ ] **Step 6: Docs, guide, commit** — regenerate API docs for Visualization
       and Database, run `stdlib-api-check`; in Visualization's `CLAUDE.md` add
       "How to add a chart: read `Viz_Table` (`Chart_Limits.local_rows` first);
       add a data type only when the chart needs something a table cannot give."
-      Commit with the message "Geo map and SQL view read the data types" and
-      open the PR with `CI: No changelog needed`.
+      Commit with the message "Geo map and SQL view read the data types" (add
+      `distribution/lib/Standard/Visualization`,
+      `distribution/lib/Standard/Database`,
+      `test/Visualization_Tests/data/pinned/geo_mem_column.json`,
+      `geo_db_column.json` and `geo_connection.json`) and open the PR with
+      `CI: No changelog needed`. The PR description states: the geo map reaches
+      a database only through `Chart_Limits.local_rows` (a bounded `sample`,
+      whose bound `Table_Conversions_Spec` already checks), the spatial layers
+      path is moved verbatim without a golden, and the three geo goldens that
+      changed and why.
+
+### Task 4.4: Widgets imports
+
+`Visualization/src/Widgets.enso` still has `from Standard.Table import all` and
+`from Standard.Database import all`. The spec says Visualization drops every
+`Standard.Table` and `Standard.Database` import; widgets are otherwise piece
+4's. Try to drop them, and fall back to a written exception if the widget specs
+need them.
+
+**Files:**
+
+- Modify: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Widgets.enso`
+- Modify (only on the fallback):
+  `docs/superpowers/specs/2026-11-13-visualization-depends-on-base-design.md`
+
+- [ ] **Step 1: Delete the two imports** `from Standard.Table import all` and
+      `from Standard.Database import all` from
+      `distribution/lib/Standard/Visualization/0.0.0-dev/src/Widgets.enso`.
+- [ ] **Step 2: Run the widget specs.** Rebuild; run `Visualization_Tests`
+      filtered to `Widgets` (this covers `Widgets_Spec` and
+      `Widgets/Table_Widgets_Spec`, `Widgets/Database_Widgets_Spec`,
+      `Widgets/Text_Widgets_Spec`, `Widgets/File_Format_Widgets_Spec`,
+      `Widgets/Widget_Helpers_Spec`) and `Table_Tests` filtered to
+      `Widget_Helpers`. Compare the counts with `develop`.
+- [ ] **Step 3: Decide by the outcome.**
+  - All pass: re-run the layering grep of Task 4.3 Step 5; the first command now
+    prints nothing. Commit (`git add distribution/lib/Standard/Visualization`,
+    message `Visualization: Widgets no longer imports Table and Database`).
+  - Any fail: restore the two imports (`git checkout -- <Widgets.enso>`), do not
+    stall. Add a "Changed while planning" entry to the spec: "Widgets.enso keeps
+    its `Standard.Table` and `Standard.Database` imports until piece 4, which
+    owns the widgets; `Meta.get_annotation` needs the extension methods in
+    scope" (name the failing specs). Commit the spec with
+    `Spec: Widgets keep their Table and Database imports until piece 4`, and
+    change the first grep of Task 4.3 Step 5 to
+    `… | grep -v "Standard\.Base" | grep -v "src/Widgets.enso"`. Mention the
+    exception in the PR.
 
 ---
 
@@ -2489,7 +2648,9 @@ compare with type **keys**: if `ANY_TYPE_QN` is not a key, use `ANY_TYPE.key()`
 (both are exported from `@/util/ensoTypes`).
 
 - [ ] **Step 4: `SuggestionDb.conversionSources`** — in
-      `suggestionDatabase/index.ts`, next to `methodOnTypeIndex`:
+      `suggestionDatabase/index.ts` (add `parseAbsoluteProjectPathRaw` to its
+      import from `@/util/projectPath`, which today has `ProjectPath` only),
+      next to `methodOnTypeIndex`:
 
 ```ts
   /**
@@ -2530,7 +2691,9 @@ key.
 
 - [ ] **Step 1: The store** — the factory takes the suggestion database:
       `(proj: ProjectStore, suggestionDb?: SuggestionDb) =>`; the builtin loop
-      also copies `dataType`; `byType` becomes:
+      also copies `dataType`, and so does the `metadata.set` for current-project
+      visualizations (`dataType: viz.dataType`, next to `inputType`), so a
+      custom visualization may declare one; `byType` becomes:
 
 ```ts
 function* byType(
@@ -2569,12 +2732,28 @@ argument (it is optional).
 - [ ] **Step 4: Check in the IDE** (build with `ide-local` or run the dev GUI
       against a built engine): a Table offers Table, Scatter Plot, Geo Map (as
       before); a DuckDB table also offers SQL Query; a Vector offers Scatter
-      Plot (as before) and now Geo Map; an Integer offers neither chart; a
-      DuckDB **connection** now offers Scatter Plot and Geo Map, which show
-      their empty state. If a Table offers no chart, the language server did not
-      send `Viz_Table.from` entries: check `suggestionDb.conversionSources` in
-      the devtools before anything else. Attach before/after screenshots of the
-      picker for a Table and a Vector to the PR (standing rule for UI PRs).
+      Plot (as before) and now Geo Map; an Integer offers neither chart if
+      `Number` is handled by the `case` branch of Task 3.2 (its fallback), and
+      both charts if `Number` has its own conversion. Under the availability
+      rule (a type offers a chart when it has its own conversion to `Viz_Table`;
+      Changed-while-planning 8) these types also newly offer **Scatter Plot and
+      Geo Map**: Row, Array, Dictionary, Hashset, JS_Object, Number (only with
+      its own conversion), `Send_Response`, every SQL connection (DuckDB,
+      SQLite, Postgres, Redshift, SQL Server, Snowflake), Excel and Google
+      workbooks, Hyper files, and XML element and document. Open each and write
+      down the result: a connection, workbook, Hyper file, XML value and
+      `Send_Response` show the **empty state** (Scatter Plot: its "At least one
+      numeric" message; Geo Map: an empty map), because a `from_columns` or
+      `from_view` source has no rows to chart; Row, Dictionary, JS_Object and
+      Array show the chart of their vector form or its empty state. Any other
+      result (an error panel) is a bug in Tasks 3.x or 4.x, not something to
+      accept. The PR description lists every newly offered type, and names the
+      view-only Base types (Row, Dictionary, JS_Object, Hashset) for the owner's
+      decision on whether they should offer charts at all (the feature gate
+      drops some at review). If a Table offers no chart, the language server did
+      not send `Viz_Table.from` entries: check `suggestionDb.conversionSources`
+      in the devtools before anything else. Attach before/after screenshots of
+      the picker for a Table and a Vector to the PR (standing rule for UI PRs).
 
 - [ ] **Step 5: Changelog** — under `# Next Release` / `#### Enso IDE`:
 
@@ -2602,7 +2781,9 @@ with the link definition `[NNN]: https://github.com/jdunkerley/enso/pull/NNN`
 - §5 moves and deletions: Tasks 3.2 (lazy table, Helpers), 3.4 (Base,
   libraries), cell rendering 2.2/3.1/3.2, Java callback unchanged.
 - §6 availability: Tasks 5.1, 5.2 (SQL keeps its static type).
-- §7 layering note and grep: Tasks 3.5, 4.3 Step 5.
-- Verification: goldens (1.1) for "JSON unchanged", database bounded reads (3.3
-  Step 4, 4.1), cells without the import (3.4 Step 4), layering grep (4.3),
-  `stdlib-api-check` (2.3, 3.4, 4.3), IDE check (5.2).
+- §7 layering note and grep: Tasks 3.5, 4.3 Step 5, 4.4 (Widgets).
+- Verification: goldens (1.1; the geo map's column and connection cases change
+  on purpose in 4.3) for "JSON unchanged", database bounded reads (3.3 Step 4,
+  4.1), cells without the import (3.4 Step 4, a `Table_Tests` spec plus a
+  one-off check), layering grep (4.3), `stdlib-api-check` (2.3, 3.4, 4.3), IDE
+  check (5.2).
