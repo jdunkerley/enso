@@ -16,8 +16,6 @@ add_specs suite_builder = suite_builder.group "Serializable Visualization Identi
         json_for_name n = JS_Object.from_pairs [["library", Nothing], ["name", n]] . to_text
         Visualization.Id.json.to_json . should_equal (json_for_name "JSON")
         Visualization.Id.scatter_plot.to_json . should_equal (json_for_name "Scatter Plot")
-        Visualization.Id.histogram.to_json . should_equal (json_for_name "Histogram")
-        Visualization.Id.heatmap.to_json . should_equal (json_for_name "Heatmap")
         Visualization.Id.table.to_json . should_equal (json_for_name "Table")
         Visualization.Id.sql_query.to_json . should_equal (json_for_name "SQL Query")
         Visualization.Id.geo_map.to_json . should_equal (json_for_name "Geo Map")

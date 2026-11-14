@@ -5,8 +5,6 @@
     - Library project:Standard.Base.Any.Any name:Standard.Base.Any.Any
     - from_module module:Standard.Base.Any.Any visualization_name:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - geo_map -> Standard.Base.Any.Any
-    - heatmap -> Standard.Base.Any.Any
-    - histogram -> Standard.Base.Any.Any
     - image -> Standard.Base.Any.Any
     - json -> Standard.Base.Any.Any
     - scatter_plot -> Standard.Base.Any.Any

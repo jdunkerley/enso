@@ -482,11 +482,6 @@
     <path d="M9.9 7.6C10.25 6.5 11.05 5.75 12 5.75C13.24 5.75 14.25 6.65 14.25 7.75C14.25 8.85 13.24 9.5 12 9.5C13.24 9.5 14.25 10.15 14.25 11.25C14.25 12.35 13.24 13.25 12 13.25C11.05 13.25 10.25 12.5 9.9 11.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
 
-  <symbol id="heatmap" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M1 6H5V10H1V6ZM1 11H5V15H1V11ZM6 11H10V15H6V11Z" fill="currentColor"/>
-    <path opacity="0.3" d="M1 1H5V5H1V1ZM6 1H10V5H6V1ZM11 1H15V5H11V1ZM6 6H10V10H6V6ZM11 6H15V10H11V6ZM11 11H15V15H11V11Z" fill="currentColor"/>
-  </symbol>
-
   <symbol id="help" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" fill="currentColor" d="M8 1A7 7 0 1 0 8 15A7 7 0 1 0 8 1ZM5 6A3 3 0 1 1 9 8.83V9.5H7V7H8A1 1 0 1 0 7 6H5ZM7 11H9V13H7V11Z"/>
   </symbol>

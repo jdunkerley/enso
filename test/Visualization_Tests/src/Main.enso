@@ -5,7 +5,6 @@ from Standard.Test import all
 import project.Default_Visualizations_Spec
 import project.Geo_Map_Spec
 import project.Helpers_Spec
-import project.Histogram_Spec
 import project.Id_Spec
 import project.Lazy_Text_Spec
 import project.Scatter_Plot_Spec
@@ -21,7 +20,6 @@ main filter=Nothing =
         Default_Visualizations_Spec.add_specs suite_builder
         Geo_Map_Spec.add_specs suite_builder
         Helpers_Spec.add_specs suite_builder
-        Histogram_Spec.add_specs suite_builder
         Id_Spec.add_specs suite_builder
         Lazy_Table_Spec.add_specs suite_builder
         Lazy_Text_Spec.add_specs suite_builder
