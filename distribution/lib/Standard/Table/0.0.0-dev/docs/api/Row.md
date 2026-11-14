@@ -3,9 +3,11 @@
 - type Row
     - at self column:(Standard.Base.Data.Numbers.Integer|Standard.Base.Data.Text.Text)= -> Standard.Base.Any.Any
     - column_names self -> Standard.Base.Any.Any
+    - default_visualization self -> Standard.Visualization.Id.Id
     - get self column:(Standard.Base.Data.Numbers.Integer|Standard.Base.Data.Text.Text)= ~if_missing:Standard.Base.Any.Any= -> Standard.Base.Any.Any
     - index self -> Standard.Base.Any.Any
     - length self -> Standard.Base.Any.Any
+    - to_default_visualization_data self -> Standard.Base.Data.Text.Text
     - to_dictionary self -> Standard.Base.Any.Any
     - to_js_object self -> Standard.Base.Any.Any
     - to_json_data self -> Standard.Base.Data.Text.Text
@@ -15,3 +17,5 @@
     - hash obj:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - Standard.Base.Data.Vector.Vector.from that:Standard.Table.Row.Row -> Standard.Base.Data.Vector.Vector
 - Standard.Base.Data.Ordering.Comparable.from that:Standard.Table.Row.Row -> Standard.Base.Data.Ordering.Comparable
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Cell.Viz_Cell.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Cell.Viz_Cell

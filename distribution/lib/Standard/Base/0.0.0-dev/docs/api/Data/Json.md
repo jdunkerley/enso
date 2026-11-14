@@ -18,7 +18,6 @@
     - new object_node:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - not_empty self -> Standard.Base.Any.Any
     - set_value self key:Standard.Base.Data.Text.Text value:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - to_default_visualization_data self -> Standard.Base.Any.Any
     - to_display_text self -> Standard.Base.Any.Any
     - to_js_object self -> Standard.Base.Any.Any
     - to_json self -> Standard.Base.Any.Any

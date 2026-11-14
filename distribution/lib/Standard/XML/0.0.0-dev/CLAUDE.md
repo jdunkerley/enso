@@ -36,8 +36,8 @@ xml = table.to_xml ["Year"] ["Author"] "Title" "Books" "Book"
 ## Layout
 
 - `src/XML.enso` — `XML_Document`, `XML_Element`, `XML_Error`, and their
-  conversions to `Table`, `Convertible_To_Columns` and `Table_Viz_Data` (the
-  Table visualisation).
+  conversions to `Table`, `Convertible_To_Columns` and `Viz_Table` (the Table
+  visualisation).
 - `src/XML_Format.enso` — the file format.
 - `src/Table_Extensions.enso` — `Table.to_xml`.
 - `src/Internal/Dom.enso` — the calls into the JDK's XML APIs.

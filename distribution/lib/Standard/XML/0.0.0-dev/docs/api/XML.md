@@ -58,5 +58,5 @@
 - Standard.Table.Table.Table.from that:Standard.XML.XML.XML_Element -> Standard.Table.Table.Table
 - Standard.Table.Table.Table.from that:Standard.XML.XML.XML_Document -> Standard.Table.Table.Table
 - Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns.from that:Standard.XML.XML.XML_Element -> Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns
-- Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data.from that:Standard.XML.XML.XML_Element -> Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
-- Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data.from that:Standard.XML.XML.XML_Document -> Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.XML.XML.XML_Element -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.XML.XML.XML_Document -> Standard.Visualization.Viz_Table.Viz_Table

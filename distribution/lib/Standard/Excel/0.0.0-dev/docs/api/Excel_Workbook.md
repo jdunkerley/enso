@@ -30,4 +30,4 @@
     - Table_Of_Tables
 - build_sheet_selector workbook:Standard.Excel.Excel_Workbook.Excel_Workbook display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
 - Standard.Table.Internal.Read_Many_As_Merged_Table_Strategy.Read_Many_As_Merged_Table_Strategy.from that:Standard.Excel.Excel_Workbook.Excel_Workbook -> Standard.Table.Internal.Read_Many_As_Merged_Table_Strategy.Read_Many_As_Merged_Table_Strategy
-- Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data.from that:Standard.Excel.Excel_Workbook.Excel_Workbook -> Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Excel.Excel_Workbook.Excel_Workbook -> Standard.Visualization.Viz_Table.Viz_Table

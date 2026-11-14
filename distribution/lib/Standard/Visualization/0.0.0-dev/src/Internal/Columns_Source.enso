@@ -7,7 +7,7 @@ import project.Viz_Table.Viz_Header
 import project.Viz_Table.Viz_Table
 
 ## Columns held in memory; the table view is a `Generic_Grid`, exactly as
-   Base's `Table_Viz_Data.GenericGrid` rendered it.
+   the old Base generic grid rendered it.
 type Columns_Source
     Value (headers : Vector Viz_Header) (columns : Vector Vector)
 

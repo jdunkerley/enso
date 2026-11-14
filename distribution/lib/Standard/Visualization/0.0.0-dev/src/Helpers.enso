@@ -26,6 +26,13 @@ JS_Object.default_visualization self = Id.json
 ## ---
    private: true
    ---
+   Transform the JS_Object into text for displaying as part of its default
+   visualization.
+JS_Object.to_default_visualization_data self -> Text = render self
+
+## ---
+   private: true
+   ---
    Returns a Text used to display this value in the IDE.
    The particular representation is left unspecified and subject to change in the
    future. The current implementation uses JSON serialization as the default.

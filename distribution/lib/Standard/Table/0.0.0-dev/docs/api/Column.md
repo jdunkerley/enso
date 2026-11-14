@@ -33,6 +33,7 @@
     - day self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)!Standard.Table.Errors.Invalid_Value_Type
     - day_of_week self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)!Standard.Table.Errors.Invalid_Value_Type
     - day_of_year self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)!Standard.Table.Errors.Invalid_Value_Type
+    - default_visualization self -> Standard.Visualization.Id.Id
     - display self show_rows:Standard.Base.Data.Numbers.Integer= format_terminal:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Text.Text
     - drop self range:(Standard.Base.Data.Index_Sub_Range.Index_Sub_Range|Standard.Base.Data.Range.Range|Standard.Base.Data.Numbers.Integer)= -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
     - duplicate_count self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
@@ -93,6 +94,7 @@
     - text_mid self start:(Standard.Table.Column.Column|Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing) length:(Standard.Table.Column.Column|Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing|Standard.Table.Column.Rest_Of_String)= -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
     - text_replace self term:(Standard.Base.Data.Text.Text|Standard.Base.Data.Text.Regex.Regex|Standard.Table.Column.Column)= new_text:(Standard.Base.Data.Text.Text|Standard.Table.Column.Column)= case_sensitivity:Standard.Base.Data.Text.Case_Sensitivity.Case_Sensitivity= only_first:Standard.Base.Data.Boolean.Boolean= -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
     - text_right self n:(Standard.Table.Column.Column|Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)= -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
+    - to_default_visualization_data self -> Standard.Base.Data.Text.Text
     - to_js_object self -> Standard.Base.Data.Json.JS_Object
     - to_table self -> (Standard.Table.Table.Table|Standard.Base.Any.Any)
     - to_text self -> Standard.Base.Data.Text.Text
@@ -113,3 +115,6 @@
 - Standard.Table.Column.Column.from that:Standard.Base.Data.Time.Date_Range.Date_Range name:Standard.Base.Data.Text.Text= -> Standard.Table.Column.Column
 - Standard.Base.Data.Text.Text_Cleanse.Cleansable_Text.from that:Standard.Table.Column.Column -> Standard.Base.Data.Text.Text_Cleanse.Cleansable_Text
 - Standard.Base.Data.Read.Many_Files_List.Many_Files_List.from that:Standard.Table.Column.Column -> Standard.Base.Data.Read.Many_Files_List.Many_Files_List
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Table.Column.Column -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.SQL_Viz.SQL_Viz.from that:Standard.Table.Column.Column -> Standard.Visualization.SQL_Viz.SQL_Viz
+- Standard.Visualization.Viz_Cell.Viz_Cell.from that:Standard.Table.Column.Column -> Standard.Visualization.Viz_Cell.Viz_Cell

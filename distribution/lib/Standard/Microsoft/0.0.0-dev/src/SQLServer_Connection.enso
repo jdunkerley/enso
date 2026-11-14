@@ -2,8 +2,7 @@ from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
 import Standard.Base.Metadata.File_Type
-import Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
-import Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Header
+from Standard.Visualization.Viz_Table import Viz_Table, Viz_Header
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import File_Browse, Single_Choice, Text_Input
 
@@ -452,9 +451,9 @@ type SQLServer_Connection
 ## ---
    private: true
    ---
-Table_Viz_Data.from (that:SQLServer_Connection) =
+Viz_Table.from (that:SQLServer_Connection) =
     tables = that.tables schema="*" . filter "Schema" (..Is_In schema_black_list ..Remove)
-    Table_Viz_Data.GenericGrid [Table_Viz_Header.Link "Table" "table" "query (..Table_Name {{@Table}} {{@Schema}})", Table_Viz_Header.Label "Schema"] [tables.at "Name" . to_vector, tables.at "Schema" . to_vector]
+    Viz_Table.from_columns [Viz_Header.Link "Table" "table" "query (..Table_Name {{@Table}} {{@Schema}})", Viz_Header.Label "Schema"] [tables.at "Name" . to_vector, tables.at "Schema" . to_vector]
 
 ## ---
    private: true

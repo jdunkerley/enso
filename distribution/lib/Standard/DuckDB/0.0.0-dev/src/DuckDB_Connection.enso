@@ -5,8 +5,7 @@ import Standard.Base.Errors.File_Error.File_Error
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Runtime.Context
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
-import Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
-import Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Header
+from Standard.Visualization.Viz_Table import Viz_Table, Viz_Header
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Multiple_Choice, Single_Choice, Text_Input, Vector_Editor
 
@@ -818,14 +817,14 @@ schema_black_list =
 ## ---
    private: true
    ---
-Table_Viz_Data.from (that:DuckDB_Connection) =
+Viz_Table.from (that:DuckDB_Connection) =
     tables = that.tables schema="*" . filter "Schema" (..Is_In schema_black_list ..Remove)
     multi_schema = tables.at "Schema" . to_vector . any s-> s != that.schema
     case multi_schema of
         True  ->
-            Table_Viz_Data.GenericGrid [Table_Viz_Header.Link "Table" "table" "query (..Table_Name {{@Table}} {{@Schema}})", Table_Viz_Header.Label "Schema"] [tables.at "Name" . to_vector, tables.at "Schema" . to_vector]
+            Viz_Table.from_columns [Viz_Header.Link "Table" "table" "query (..Table_Name {{@Table}} {{@Schema}})", Viz_Header.Label "Schema"] [tables.at "Name" . to_vector, tables.at "Schema" . to_vector]
         False ->
-            Table_Viz_Data.GenericGrid [Table_Viz_Header.Link "Table" "table" "query (..Table_Name {{@Table}})"] [tables.at "Name" . to_vector]
+            Viz_Table.from_columns [Viz_Header.Link "Table" "table" "query (..Table_Name {{@Table}})"] [tables.at "Name" . to_vector]
 
 private _resolve_table connection table = case table of
     _ : Text -> table

@@ -20,4 +20,4 @@
     - to_display_text self -> Standard.Base.Any.Any
     - to_js_object self -> Standard.Base.Any.Any
     - to_text self -> Standard.Base.Any.Any
-- Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data.from that:Standard.Google.Google_Sheets_Workbook.Google_Sheets_Workbook -> Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Google.Google_Sheets_Workbook.Google_Sheets_Workbook -> Standard.Visualization.Viz_Table.Viz_Table

@@ -1,6 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Metadata.Display
-import Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
+from Standard.Visualization.Viz_Table import Viz_Table
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Single_Choice, Text_Input
 
@@ -417,5 +417,5 @@ type SQLite_Connection
 ## ---
    private: true
    ---
-Table_Viz_Data.from (that:SQLite_Connection) = 
+Viz_Table.from (that:SQLite_Connection) = 
     Connections_Helpers.get_table_viz_data (that.connection.tables.at "Name" . to_vector)

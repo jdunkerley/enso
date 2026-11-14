@@ -8,15 +8,10 @@
 - Standard.Base.Any.Any.to_lazy_visualization_data self text_window_position:Standard.Base.Any.Any text_window_size:Standard.Base.Any.Any chunk_size:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - Standard.Base.Data.Array.Array.default_visualization self -> Standard.Base.Any.Any
 - Standard.Base.Data.Array.Array.to_default_visualization_data self -> Standard.Base.Any.Any
-- Standard.Table.Column.Column.default_visualization self -> Standard.Base.Any.Any
-- Standard.Table.Column.Column.to_default_visualization_data self -> Standard.Base.Any.Any
 - Standard.Base.Error.Error.to_default_visualization_data self -> Standard.Base.Any.Any
 - Standard.Base.Data.Json.JS_Object.default_visualization self -> Standard.Base.Any.Any
+- Standard.Base.Data.Json.JS_Object.to_default_visualization_data self -> Standard.Base.Data.Text.Text
 - Standard.Base.Nothing.Nothing.to_default_visualization_data self -> Standard.Base.Any.Any
-- Standard.Table.Row.Row.default_visualization self -> Standard.Base.Any.Any
-- Standard.Table.Row.Row.to_default_visualization_data self -> Standard.Base.Any.Any
-- Standard.Table.Table.Table.default_visualization self -> Standard.Base.Any.Any
-- Standard.Table.Table.Table.to_lazy_visualization_data self table_cell_position:Standard.Base.Any.Any text_window_position:Standard.Base.Any.Any text_window_size:Standard.Base.Any.Any chunk_size:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - Standard.Base.Data.Text.Text.to_default_visualization_data self -> Standard.Base.Any.Any
 - Standard.Base.Data.Text.Text.to_lazy_visualization_data self text_window_position:Standard.Base.Any.Any text_window_size:Standard.Base.Any.Any chunk_size:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - Standard.Base.Data.Vector.Vector.default_visualization self -> Standard.Base.Any.Any

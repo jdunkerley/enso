@@ -27,3 +27,11 @@
 - type Viz_Unsupported
     - Error operation:Standard.Base.Data.Text.Text
     - to_display_text self -> Standard.Base.Data.Text.Text
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Base.Any.Any -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Base.Data.Vector.Vector -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Base.Data.Array.Array -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Base.Data.Dictionary.Dictionary -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Base.Data.Hashset.Hashset -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Base.Data.Json.JS_Object -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Base.Data.Numbers.Number -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Base.Network.Email.Email_Send_Response.Send_Response -> Standard.Visualization.Viz_Table.Viz_Table

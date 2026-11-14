@@ -43,4 +43,4 @@
     - type_mapping self -> Standard.Base.Any.Any
     - warehouse self -> Standard.Base.Any.Any
     - warehouses self -> Standard.Base.Any.Any
-- Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data.from that:Standard.Snowflake.Snowflake_Connection.Snowflake_Connection -> Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Snowflake.Snowflake_Connection.Snowflake_Connection -> Standard.Visualization.Viz_Table.Viz_Table
