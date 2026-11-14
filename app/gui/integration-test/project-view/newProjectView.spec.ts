@@ -93,3 +93,33 @@ test('a reopened project keeps its saved view', async ({ drivePage, page }) => {
     .expectProjectEditorOpened(PROJECT)
   await expect.poll(() => nodeView(page)).toEqual(panned)
 })
+
+test.describe('a graph too tall for the viewport', () => {
+  // The standard mock project, many nodes in a column, in a window too short for them.
+  test.use({ setupApi: {}, viewport: { width: 1920, height: 800 } })
+
+  test('opens at 100%, from its top edge', async ({ drivePage, page }) => {
+    await drivePage.driveTable.openProject('Mock Project').expectProjectEditorOpened('Mock Project')
+    const viewportBox = await locate.graphEditor(page).locator('.viewport').boundingBox()
+    expect(viewportBox).not.toBeNull()
+    const nodes = locate.graphNode(page)
+    await expect(nodes.first()).toBeVisible()
+    const layer = nodes.first().locator('xpath=..')
+    // Polled: the graph is shown once its nodes have positions, and follows them as they are
+    // measured.
+    await expect
+      .poll(async () => {
+        const style = await layer.getAttribute('style')
+        const boxes = await Promise.all((await nodes.all()).map((node) => node.boundingBox()))
+        const tops = boxes.flatMap((box) => (box ? [box.y] : []))
+        const bottoms = boxes.flatMap((box) => (box ? [box.y + box.height] : []))
+        return {
+          scale: Number(/scale\(([^)]+)\)/.exec(style ?? '')?.[1]),
+          // The top node one margin (32 px) below the viewport's top edge.
+          topMargin: Math.round(Math.min(...tops) - viewportBox!.y),
+          overflowsBottom: Math.max(...bottoms) > viewportBox!.y + viewportBox!.height,
+        }
+      })
+      .toEqual({ scale: 1, topMargin: expect.closeTo(32, -1), overflowsBottom: true })
+  })
+})

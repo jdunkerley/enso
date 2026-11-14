@@ -77,9 +77,10 @@ Each graph's pan and zoom is saved in `localStorage` (`stores/persisted.ts`,
 `.enso/project.json`) and the method. Not by the asset id: a local asset id is
 the project's path, which a new "New Project 1" takes over from a deleted one,
 saved view included. A graph with no saved view is shown by
-`components/GraphEditor/initialView.ts`: at 100% when it fits or is a single
-node (centred, or from its left/top edge when too big), otherwise fitted. The
-view keeps following the graph until the first key, press or wheel, because node
+`components/GraphEditor/initialView.ts`, always at 100%, however many nodes it
+has: centred on each axis where it fits, otherwise from its left/top edge (one
+margin in), overflowing right/bottom. It is never zoomed out to fit. The view
+keeps following the graph until the first key, press or wheel, because node
 sizes are measured from widgets that render after the graph first appears.
 
 ## Nodes make room

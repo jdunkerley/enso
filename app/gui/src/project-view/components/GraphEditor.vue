@@ -38,11 +38,7 @@ import { performCollapse, prepareCollapsedInfo } from '@/components/GraphEditor/
 import { helpActionHandlers } from '@/components/GraphEditor/helpActions'
 import { useGraphEditorClipboard } from '@/components/GraphEditor/graphClipboard'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
-import {
-  fitsAtFullSize,
-  keepInitialView,
-  placeAtFullSize,
-} from '@/components/GraphEditor/initialView'
+import { keepInitialView, placeAtFullSize } from '@/components/GraphEditor/initialView'
 import type {
   CarriedComponentBrowserInput,
   ViewCarryOver,
@@ -192,26 +188,12 @@ function zoomToSelected() {
   if (bounds) graphNavigator.panAndZoomTo(bounds, 0.1, Math.max(1, graphNavigator.targetScale))
 }
 
-function zoomToAll(skipAnimation: boolean = false) {
-  const bounds = scrollBounds.value
-  if (bounds)
-    graphNavigator.panAndZoomTo(bounds, 0.1, Math.max(1, graphNavigator.targetScale), skipAnimation)
-}
-
-/**
- * Show a graph that has no saved view: at 100% when it fits, or when it is a single node (one too
- * big to fit overflows to the right and the bottom); otherwise all of it, zoomed out to fit.
- */
+/** Show a graph that has no saved view, at 100% (see {@link placeAtFullSize}). */
 function showInitialView() {
   const elem = viewportElem.value
-  const bounds = scrollBounds.value
   if (!elem || elem.clientWidth === 0 || elem.clientHeight === 0) return
   const viewportSize = new Vec2(elem.clientWidth, elem.clientHeight)
-  if (graphStore.db.nodeIdToNode.size <= 1 || fitsAtFullSize(bounds, viewportSize)) {
-    graphNavigator.setPosAndScale(placeAtFullSize(bounds, viewportSize), 1)
-  } else {
-    zoomToAll(true)
-  }
+  graphNavigator.setPosAndScale(placeAtFullSize(scrollBounds.value, viewportSize), 1)
 }
 
 function panToSelected() {

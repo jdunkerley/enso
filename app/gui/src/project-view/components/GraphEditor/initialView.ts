@@ -6,17 +6,10 @@ import { watch, type WatchSource } from 'vue'
 /** The space, in screen pixels, kept between a graph that does not fit and the viewport's edge. */
 export const INITIAL_VIEW_MARGIN = 32
 
-/** Whether `bounds` fit in a viewport of `viewportSize` at 100%, with the margin on every side. */
-export function fitsAtFullSize(bounds: Rect, viewportSize: Vec2): boolean {
-  return (
-    bounds.width + 2 * INITIAL_VIEW_MARGIN <= viewportSize.x &&
-    bounds.height + 2 * INITIAL_VIEW_MARGIN <= viewportSize.y
-  )
-}
-
 /**
- * The viewport's left-top corner, in scene coordinates, that shows `bounds` at 100%. On each axis
- * the bounds are centred when they fit, and otherwise their start (left, top) is shown, one
+ * The viewport's left-top corner, in scene coordinates, that shows `bounds` at 100%: how a graph
+ * with no saved view is first shown, whatever its size. On each axis the bounds are centred when
+ * they fit with the margin on both sides, and otherwise their start (left, top) is shown, one
  * margin in from the viewport's edge, so that they overflow to the right or the bottom.
  */
 export function placeAtFullSize(bounds: Rect, viewportSize: Vec2): Vec2 {
