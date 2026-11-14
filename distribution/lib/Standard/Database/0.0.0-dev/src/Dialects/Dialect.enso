@@ -130,7 +130,7 @@ type Dialect
        get the column types.
        In most backends, the `getMetaData` may be called on a `PreparedStatement`
        directly, to infer column types without actually executing the query. In
-       some however, like SQLite, this is insufficient and will yield incorrect
+       some backends however, this is insufficient and will yield incorrect
        results, so the query needs to be executed (even though the full results
        may not need to be streamed).
        The function takes the statement as an argument which can be used in
@@ -169,7 +169,7 @@ type Dialect
        the types. For example, in most databases, it is fine to add `WHERE FALSE`
        to the query - ensuring that the engine will not do any actual work, but
        the resulting type will still be the same. There are exceptions though,
-       like SQLite, where the best we can do is add `LIMIT 1`.
+       where the best we can do is add `LIMIT 1`.
     prepare_fetch_types_query : SQL_IR_Expression -> SQL_IR_Source -> SQL_Statement
     prepare_fetch_types_query self expression context =
         _ = [expression, context]

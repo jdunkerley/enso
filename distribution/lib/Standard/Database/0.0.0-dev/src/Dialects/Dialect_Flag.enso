@@ -242,11 +242,11 @@ type Dialect_Flag
        ---
        Specifies if reading a table without an ordering returns its rows in the
        order they were inserted. SQL does not promise it; most backends do it
-       for small tables, Snowflake does not.
+       for small tables, some do not.
     Reads_Rows_In_Insertion_Order
     ## ---
        private: true
        ---
        Specifies if the database rejects rows that break the uniqueness of a
-       `PRIMARY KEY`. Snowflake accepts them.
+       `PRIMARY KEY`. Some backends accept them.
     Enforces_Primary_Key_Uniqueness

@@ -601,7 +601,7 @@ type DB_Table_Implementation
                                         internal_named_column = Internal_Column.from column . rename column_name
                                         ## We cast if the result type is different.
                                           This is a bit on the safe side. In some cases the cast is not needed
-                                          (for example, most databases will allow union of int2 and int4 without casts; or SQLite does not need casts at all).
+                                          (for example, most databases will allow union of int2 and int4 without casts; or some backends do not need casts at all).
                                           However, we do this for simplicity as determining the rules when the cast is needed or not is adding a lot of complication.
                                           This is a possible future improvement to make queries lighter, but the benefit is unlikely to be worth it.
                                         needs_cast = column.value_type != result_type
