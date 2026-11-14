@@ -14,7 +14,7 @@ add_specs suite_builder =
             table = Data.read (enso_project.data / "sample.822")
             table.should_be_a Table
             table.column_names.contains "Interchange Sender ID" . should_be_true
-            table.row_count . should_be_greater_than 0
+            (table.row_count > 0) . should_be_true
 
         group_builder.specify "Data.read finds Standard.YXDB for .yxdb" <|
             table = Data.read (enso_project.data / "AllNormalFields.yxdb")
