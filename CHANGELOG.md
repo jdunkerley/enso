@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [The JSON visualization is a tree that loads each branch when you open it, a
+  page at a time, with no limit on size or depth. It explores any value, and
+  double-clicking an entry adds a component for it.][771]
 - [A component whose value is an image opens in the Image visualization.][758]
 - [Charts are offered for every value whose library can draw them, not a fixed
   list of types.][751]
@@ -495,6 +498,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[771]: https://github.com/jdunkerley/enso/pull/771
 [735]: https://github.com/jdunkerley/enso/pull/735
 [758]: https://github.com/jdunkerley/enso/pull/758
 [751]: https://github.com/jdunkerley/enso/pull/751
