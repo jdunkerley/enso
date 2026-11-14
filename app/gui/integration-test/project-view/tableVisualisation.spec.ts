@@ -387,28 +387,28 @@ test.describe('Table_Visualisation_Integration_Spec and clipboard', () => {
   test('Datetime test - sorting and copying', async ({ editorPage, localApi, page, context }) => {
     await loadData(editorPage, localApi, singleColumnDatetimes)
     await expectCellDataToBe(page, 'Value', [
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-01 12:13:14.123[MET]',
-      '2025-01-03 12:13:14.123[MET]',
+      '2025-01-02 12:13:14.123[UTC]',
+      '2025-01-01 12:13:14.123[UTC]',
+      '2025-01-03 12:13:14.123[UTC]',
     ])
     const value = getHeaderLocator(page, { colHeaderName: 'Value' })
     await value.click() // Sort ascending
     await expectCellDataToBe(page, 'Value', [
-      '2025-01-01 12:13:14.123[MET]',
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-03 12:13:14.123[MET]',
+      '2025-01-01 12:13:14.123[UTC]',
+      '2025-01-02 12:13:14.123[UTC]',
+      '2025-01-03 12:13:14.123[UTC]',
     ])
     await value.click() // Sort descending
     await expectCellDataToBe(page, 'Value', [
-      '2025-01-03 12:13:14.123[MET]',
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-01 12:13:14.123[MET]',
+      '2025-01-03 12:13:14.123[UTC]',
+      '2025-01-02 12:13:14.123[UTC]',
+      '2025-01-01 12:13:14.123[UTC]',
     ])
     await value.click() // remove sort
     await expectCellDataToBe(page, 'Value', [
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-01 12:13:14.123[MET]',
-      '2025-01-03 12:13:14.123[MET]',
+      '2025-01-02 12:13:14.123[UTC]',
+      '2025-01-01 12:13:14.123[UTC]',
+      '2025-01-03 12:13:14.123[UTC]',
     ])
     await expectCopyingColumnClipboardToBe(
       editorPage,
@@ -416,7 +416,7 @@ test.describe('Table_Visualisation_Integration_Spec and clipboard', () => {
       'Value',
       0,
       1,
-      '2025-01-02 12:13:14.123[MET]\r\n2025-01-01 12:13:14.123[MET]',
+      '2025-01-02 12:13:14.123[UTC]\r\n2025-01-01 12:13:14.123[UTC]',
     )
   })
 

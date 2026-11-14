@@ -1,6 +1,7 @@
 from Standard.Base import all
 
 from Standard.Table import Table, Aggregate_Column, Value_Type
+import Standard.Table.In_Memory_Column.In_Memory_Column
 
 from Standard.Database import all
 from Standard.SQLite import all
@@ -11,6 +12,7 @@ from Standard.Test import all
 
 
 polyglot java import java.util.UUID
+polyglot java import org.enso.table.util.TableValueCache
 
 type Data
     Value ~data
@@ -189,6 +191,36 @@ add_specs suite_builder =
             value_type_int = JS_Object.from_pairs [["constructor", "Integer"], ["display_text", "Integer (64 bits)"]]
             json = make_json header=["A", "B", "C"] data=[[1, 2, 3], [12345678, 5,6], [-12345678, -5,6]] all_rows=3 value_type=[value_type_int, value_type_int, value_type_int] has_index_col=True is_ssrm=False get_child_node="get_row" range=["1 - 3","5 - 12345678","-12345678 - 6"] number_of_distinct=[3,3,3] number_of_nothing=[0,0,0] requires_number_format=[False, True, True] is_using_multi_filter=[True, True, True] use_bottom_status_bar=True enable_create_node=True table_version_hash=num_table.table_version_hash
             vis.parse_json . should_equal json
+
+    suite_builder.group "Table view cache" group_builder->
+        group_builder.specify "should serve a second view of the same table from the cache" <|
+            table = Table.new [["A", [1, 2, 3]], ["B", ["x", "y", "z"]]]
+            table.columns.each c-> (c:In_Memory_Column).await_metrics
+            key = "table_view:" + table.table_version_hash
+            TableValueCache.get key . should_equal Nothing
+
+            first = Visualization.prepare_visualization table 1000
+            TableValueCache.get key . should_equal first
+
+            ## A marker in the cache comes back as the view: it is served from the cache, as Text.
+            marker = '{"kind":"error","error":"served from the cache"}'
+            TableValueCache.put key marker
+            second = Visualization.prepare_visualization table 1000
+            second . should_equal marker
+            second . should_be_a Text
+
+        group_builder.specify "should not store a view built while the metrics are incomplete" <|
+            ## The metrics of a large text column are computed in the background and are
+               still incomplete when the view is first built.
+            table = Table.new [["A", (0.up_to 1500000).map i-> "text " + i.to_text]]
+            key = "table_view:" + table.table_version_hash
+            first = Visualization.prepare_visualization table 1000
+            if first.contains "Still computing indicators" then
+                TableValueCache.get key . should_equal Nothing
+            table.columns.each c-> (c:In_Memory_Column).await_metrics
+            complete = Visualization.prepare_visualization table 1000
+            complete.contains "Still computing indicators" . should_be_false
+            TableValueCache.get key . should_equal complete
 
     suite_builder.group "Table view cells" group_builder->
         cells = Table.new [["when", [Date.new 2020 1 2]], ["d", [Decimal.new "1.50"]], ["big", [9007199254740993]]]

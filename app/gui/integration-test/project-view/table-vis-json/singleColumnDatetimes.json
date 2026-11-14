@@ -8,7 +8,7 @@
       "metrics": [
         {
           "name": "Range",
-          "value": "2025-01-01 12:13:14.123[MET] - 2025-01-03 12:13:14.123[MET]",
+          "value": "2025-01-01 12:13:14.123[UTC] - 2025-01-03 12:13:14.123[UTC]",
           "type": "Text"
         },
         { "name": "Number of distinct", "value": 3, "type": "Count" },
@@ -22,7 +22,7 @@
   "data": [
     [
       {
-        "_display_text_": "2025-01-02 12:13:14.123[CET]",
+        "_display_text_": "2025-01-02 12:13:14.123[UTC]",
         "type": "Date_Time",
         "constructor": "new",
         "year": 2025,
@@ -32,10 +32,10 @@
         "minute": 13,
         "second": 14,
         "nanosecond": 123004005,
-        "zone": { "type": "Time_Zone", "constructor": "parse", "id": "MET" }
+        "zone": { "type": "Time_Zone", "constructor": "parse", "id": "UTC" }
       },
       {
-        "_display_text_": "2025-01-01 12:13:14.123[CET]",
+        "_display_text_": "2025-01-01 12:13:14.123[UTC]",
         "type": "Date_Time",
         "constructor": "new",
         "year": 2025,
@@ -45,10 +45,10 @@
         "minute": 13,
         "second": 14,
         "nanosecond": 123004005,
-        "zone": { "type": "Time_Zone", "constructor": "parse", "id": "MET" }
+        "zone": { "type": "Time_Zone", "constructor": "parse", "id": "UTC" }
       },
       {
-        "_display_text_": "2025-01-03 12:13:14.123[CET]",
+        "_display_text_": "2025-01-03 12:13:14.123[UTC]",
         "type": "Date_Time",
         "constructor": "new",
         "year": 2025,
@@ -58,10 +58,10 @@
         "minute": 13,
         "second": 14,
         "nanosecond": 123004005,
-        "zone": { "type": "Time_Zone", "constructor": "parse", "id": "MET" }
+        "zone": { "type": "Time_Zone", "constructor": "parse", "id": "UTC" }
       }
     ]
   ],
-  "version_hash": "e0f3dfa4-8919-486d-a7a1-e798ef41ecb2",
+  "version_hash": "69bcd378-edb4-4f07-8073-77123e1aa8d7",
   "options": { "status_bar": true, "create_node": true }
 }

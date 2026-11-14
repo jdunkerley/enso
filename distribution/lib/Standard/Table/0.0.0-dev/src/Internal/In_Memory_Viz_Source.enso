@@ -7,6 +7,7 @@ import Standard.Visualization.Viz_Table.Viz_Table
 from Standard.Visualization.Internal.View_Json import Table_View
 
 import project.In_Memory_Column.In_Memory_Column
+import project.In_Memory_Table.In_Memory_Table
 import project.Internal.Viz_Helpers
 import project.Sort_Column.Sort_Column
 import project.Table.Table
@@ -48,10 +49,12 @@ type In_Memory_Viz_Source
             Nothing -> Table_View.Value index_action self.table.row_count self.version_hash (["status_bar"] + create_node) True
             n -> Table_View.Value index_action n Nothing create_node False
 
-    java_columns self -> Vector = self.table.columns.map c-> (c:In_Memory_Column).java_column
+    # The Java columns, the table's own array (no copy).
+    java_columns self = (self.table:In_Memory_Table).java_table.getColumns
 
     column_metrics_json self -> Vector Text =
         display = self.table.columns.map c-> c.value_type.to_display_text
+        # `to_vector` wraps the Java array, it does not copy it.
         (TableVizOperation.viewColumnsJson self.java_columns display (Nothing == self.db_row_count)).to_vector
 
     column_cells_json self (name : Text) (start : Integer) (count : Integer) -> Text =
@@ -81,8 +84,9 @@ type In_Memory_Viz_Source
         table_with_index_ordered = table_with_index.reorder_columns [col_name] ..Before_Other_Columns
         filtered_table = if filter_col.is_nothing then table_with_index_ordered else _apply_filter_to_table table_with_index_ordered 0 filter_col filter_condition True
         sorted_table = if sort_col_index_list.is_nothing then filtered_table else _apply_sort_to_table filtered_table sort_col_index_list sort_direction_list
-        sliced_json = sorted_table.columns.map (c-> c.to_json_data start_number max_rows)
-        View_Json.rows_page_json filtered_table.row_count sliced_json.first (sliced_json.drop 1)
+        columns = sorted_table.columns
+        page_json i = (columns.at i).to_json_data start_number max_rows
+        View_Json.rows_page_json filtered_table.row_count (page_json 0) ((1.up_to columns.length).map page_json)
 
     distinct_values_json self (column_index : Integer) filter_col filter_condition -> Text =
         filtered_table = if filter_col.is_nothing then self.table else _apply_filter_to_table self.table 0 filter_col filter_condition False

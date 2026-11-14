@@ -14,6 +14,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -185,19 +186,18 @@ public class TableVizOperation {
    * @param withMetrics false for the first rows of a database table, which have no metrics
    */
   public static String[] viewColumnsJson(
-      List<Column> columns, List<String> valueTypeDisplay, boolean withMetrics) {
-    var metrics = new ArrayList<Map<String, Object>>(columns.size());
+      Column[] columns, List<String> valueTypeDisplay, boolean withMetrics) {
+    var metrics = new ArrayList<Map<String, Object>>(columns.length);
     for (Column column : columns) {
       metrics.add(withMetrics ? DataQualityMetrics.get(column) : Map.of());
     }
     var entries = metricEntries(metrics);
-    var result = new String[columns.size()];
-    for (int i = 0; i < columns.size(); i++) {
+    var result = new String[columns.length];
+    for (int i = 0; i < columns.length; i++) {
       var builder = new StringBuilder();
       builder
           .append("\"value_type\":{\"constructor\":")
-          .append(
-              JSON_OPERATION.objectToJson(columns.get(i).getStorageType().ensoConstructorName()))
+          .append(JSON_OPERATION.objectToJson(columns[i].getStorageType().ensoConstructorName()))
           .append(",\"display_text\":")
           .append(JSON_OPERATION.objectToJson(valueTypeDisplay.get(i)))
           .append("},\"metrics\":[");
@@ -231,8 +231,8 @@ public class TableVizOperation {
   }
 
   /** Whether any column's data quality metrics are still being computed. */
-  public static boolean metricsIncomplete(List<Column> columns) {
-    return columns.stream()
+  public static boolean metricsIncomplete(Column[] columns) {
+    return Arrays.stream(columns)
         .anyMatch(c -> DataQualityMetrics.get(c).get(DataQualityMetrics.IS_INCOMPLETE) != null);
   }
 
