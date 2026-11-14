@@ -44,6 +44,7 @@ jobs:
         uses: step-security/changed-files@v45
         with:
           files: |
+            test/Visualization_Tests/data/pinned/tree_*.json
             app/**
             docs-site/**
             lib/rust/**
@@ -73,6 +74,9 @@ jobs:
       # and minus `docs-site/`: the user documentation site is checked by the GUI checks' typecheck,
       # lint and unit tests (the root `ci:*` scripts run every workspace package's), but it is not
       # part of the IDE, so a change to it alone does not package the IDE. Keep the two lists in sync.
+# The one exception is `test/Visualization_Tests/data/pinned/tree_*.json`, which only the first
+# list has: the GUI's `treeWire.test.ts` reads those Enso goldens to pin the lazy tree's wire format,
+# so a change to them must run the GUI checks, but they are test data the IDE package never contains.
       - name: Get changed files, excluding GUI tests
         id: gui-changed-files-excluding-tests
         uses: step-security/changed-files@v45
