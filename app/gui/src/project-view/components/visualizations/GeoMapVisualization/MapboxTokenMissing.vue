@@ -9,8 +9,10 @@ import Result from '$/components/Result/Result.vue'
 import SettingsTabType from '$/configurations/settingsTabs'
 import { useText } from '$/providers/text'
 import router from '$/router'
+import { computed } from 'vue'
 
 const { getText } = useText()
+const openLabel = computed(() => getText('openMapboxTokenSetting'))
 
 /**
  * Open Settings on the Local tab. The app's router instance is used directly: a visualization
@@ -36,9 +38,7 @@ function openSetting() {
       :title="getText('mapboxTokenMissing')"
       :subtitle="getText('mapboxTokenMissingDescription')"
     >
-      <Button variant="outline" @press="openSetting">{{
-        getText('openMapboxTokenSetting')
-      }}</Button>
+      <Button variant="outline" @press="openSetting">{{ openLabel }}</Button>
     </Result>
   </div>
 </template>
