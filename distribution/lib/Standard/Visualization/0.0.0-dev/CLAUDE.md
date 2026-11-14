@@ -9,6 +9,17 @@ it either.
 
 - `Preprocessor.default_preprocessor value` — IDE entry: encode an arbitrary
   value as JSON for visualization; it returns `(Viz_Json.from value).json_text`.
+- `Tree.prepare value` and `Tree.children value path start count` — IDE entries
+  of the JSON visualization: the root of `Viz_Tree.from value` with its first
+  page of 100 children, and one page of the branch that `path` (keys and
+  indices) leads to. Both return JSON text:
+  - a node is `{"kind":"leaf","value":…}` or
+    `{"kind":"object"|"array","size":…,"label":…}`; an entry is
+    `{"key":…,<node fields>,"expr":<node expression or null>}`;
+  - a page is `{"start":…,"size":…,"entries":[…]}`; `prepare` returns
+    `{"root":…}` or `{"root":…,"children":<page>}`; `children` returns a page or
+    `{"error":…}`. The goldens `test/Visualization_Tests/data/pinned/tree_*` pin
+    it.
 - `Geo_Map.process_to_json_text value` — IDE entry for the geo-map widget.
 - `Scatter_Plot.process_to_json_text value` — IDE entry for the scatter-plot
   widget.
@@ -21,6 +32,7 @@ components and workflows should not.
 ## Layout
 
 - `src/Preprocessor.enso` — default visualization preprocessor.
+- `src/Tree.enso` — the JSON visualization's entry points over `Viz_Tree`.
 - `src/Helpers.enso` — display utilities (truncation, formatting, timing).
 - `src/Internal/Columns_Source.enso`, `src/Internal/View_Source.enso`,
   `src/Internal/Names.enso`, `src/Internal/View_Json.enso` — the in-memory
@@ -72,6 +84,14 @@ Visualization and not on each data library.
   items and 5 levels), a library's large types by
   `Viz_Json.from (that:Its_Public_Type)` (Table: 10 rows; Column: 100 values;
   XML: the element tree).
+- `Viz_Tree` (`src/Viz_Tree.enso`) - a value as the JSON visualization's lazy
+  tree: a `Leaf` (scalar JSON) or a `Branch` (kind, size, label and
+  `children start count`, one page of `Viz_Tree_Child` with key, tree and node
+  expression). Build branches with `Viz_Tree.paged`. Base values convert here
+  (any value: its `to_js_object`, with no node expressions); a library or a user
+  type describes its own with `Viz_Tree.from (that:Its_Public_Type)` (Table: row
+  count, columns and rows read a page at a time; Column, Row; XML: attributes
+  and children).
 - `Id` (`src/Id.enso`) - which visualisation a node opens with. `Id.from`
   answers it: any value gives `Id.table`, a `JS_Object` `Id.json`; a library
   picks another for its type with `Id.from (that:Its_Public_Type)` (Table: SQL
