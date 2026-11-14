@@ -15,7 +15,13 @@ import project.Internal.Pgpass
 polyglot java import org.postgresql.Driver
 
 type Postgres
-    ## Connect to a PostgreSQL database.
+    ## ---
+       macro_for:
+        - target: Standard.Database.Connection.Database.connect
+          macros:
+           - postgres: details=Postgres.Server
+       ---
+       Connect to a PostgreSQL database.
 
        ## Arguments
         - `host`: The hostname of the database server (defaults to localhost).

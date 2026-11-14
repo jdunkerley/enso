@@ -10,7 +10,13 @@ import project.DuckDB_Connection.DuckDB_Connection
 polyglot java import org.duckdb.DuckDBDriver
 
 type DuckDB
-    ## Connect to a DuckDB database file.
+    ## ---
+       macro_for:
+        - target: Standard.Database.Connection.Database.connect
+          macros:
+           - duckdb: details=DuckDB.From_File
+       ---
+       Connect to a DuckDB database file.
 
        ## Arguments:
         - 'location': The file path to the DuckDB database file.

@@ -5,7 +5,13 @@ import Standard.Database.Connection.Connection_Options.Connection_Options
 import project.SQLite_Connection.SQLite_Connection
 
 type SQLite
-    ## Connect to a SQLite DB File.
+    ## ---
+       macro_for:
+        - target: Standard.Database.Connection.Database.connect
+          macros:
+           - sqlite: details=SQLite.From_File
+       ---
+       Connect to a SQLite DB File.
 
        ## Arguments
         - `location`: Location of the SQLite database to connect to.

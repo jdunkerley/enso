@@ -68,6 +68,9 @@ abstract class BaseSuggestionEntry implements SuggestionEntryCommon {
   get aliasesAndMacros() {
     return this.documentationData.aliasesAndMacros
   }
+  get macroFor() {
+    return this.documentationData.macroFor
+  }
   get macros() {
     return this.documentationData.macros
   }

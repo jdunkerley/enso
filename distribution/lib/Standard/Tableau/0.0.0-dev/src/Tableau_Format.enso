@@ -24,7 +24,13 @@ polyglot java import org.enso.tableau.HyperFormat
 
 ## Read the file to a `Hyper_File` object.
 type Tableau_Format
-    ## Read the file to a `Hyper_File` object.
+    ## ---
+       macro_for:
+        - target: Standard.Base.Data.read
+          macros:
+           - tableau_hyper: format=..Hyper_File
+       ---
+       Read the file to a `Hyper_File` object.
 
        ## Arguments
         - `schema`: The schema to read or `*` for all schemas.

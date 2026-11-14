@@ -11,7 +11,11 @@ The component browser's list: what is shown and in which order.
   `compareSuggestions`: score; then, while searching, entries of the libraries
   the module imports and of the project itself (`importedLibraries` in
   `module/imports.ts`); then group, kind, module and id. The main view (no
-  search text) is not reordered by imports.
+  search text) is not reordered by imports. A macro another library contributed
+  (`macro_for`) is found through `SuggestionDb.macrosOf`; the component carries
+  `macroContributor`, and accepting it adds that entry's import (`macroImports`
+  in `input.ts`, kept while the code holds the macro, since `..Workbook` names
+  no type).
 - `ComponentList.vue` — renders the lists; it reads the module's imports from
   the module store.
 - `input.ts` — the browser's input and what accepting an entry inserts,

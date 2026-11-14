@@ -68,7 +68,15 @@ doc block. Doc blocks carry:
 - `## Examples` — runnable snippets, each prefaced by a sentence describing what
   it shows. **These are the authoritative usage reference.**
 - `## ---` metadata block (appears before the description on flagged entries):
-  `private: true`, `advanced: true`, `group: "..."`, `icon: "..."`.
+  `private: true`, `advanced: true`, `group: "..."`, `icon: "..."`. `macros:`
+  lists search shortcuts of the entry itself (`- sqlite: details=...`: typing
+  `sqlite` offers the entry with that code appended). A library adds shortcuts
+  to a component of **another** library with `macro_for:`, on one of its own
+  documented entries, so the core names no extension:
+  `macro_for: [{target: Standard.Base.Data.read, macros: [{excel: format=..Workbook}]}]`
+  (written as a YAML block list). The target is the entry's qualified name; the
+  IDE adds the contributing entry's import when the shortcut is accepted. On a
+  clash the target's own macro wins, then the library that sorts first.
 
 When unsure of a method's name, signature, or correct call shape, `Read` the
 source file and consult its doc block. Inventing names is the dominant failure

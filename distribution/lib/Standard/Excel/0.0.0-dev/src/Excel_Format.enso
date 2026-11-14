@@ -36,7 +36,13 @@ resolve_xl_format xl_format file:File_Format_Metadata =
 
 ## Read the file to a `Table` from an Excel file
 type Excel_Format
-    ## Reads an Excel file as a connection to an `Excel_Workbook`.
+    ## ---
+       macro_for:
+        - target: Standard.Base.Data.read
+          macros:
+           - excel: format=..Workbook
+       ---
+       Reads an Excel file as a connection to an `Excel_Workbook`.
 
        ## Arguments
         - `xls_format`: The Excel file format. XLSX for Excel 2007 and later, XLS for
