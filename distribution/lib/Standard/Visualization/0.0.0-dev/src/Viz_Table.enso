@@ -89,7 +89,7 @@ type Viz_Table
        private: true
        ---
        The optional capabilities the source supports: any of `"rows"`,
-       `"server_rows"`, `"spatial"`.
+       `"server_rows"`, `"spatial"`, `"view_pieces"`.
     supported_operations self -> Vector Text = self.source.supported_operations
 
     ## ---
@@ -139,6 +139,21 @@ type Viz_Table
        ---
     distinct_values_json self (column_index : Integer) filter_columns filter_conditions -> Text =
         self.require "server_rows" <| self.source.distinct_values_json column_index filter_columns filter_conditions
+
+    ## ---
+       private: true
+       ---
+       One column's cells from `start`, at most `count`, as a JSON array.
+    column_cells_json self (name : Text) (start : Integer) (count : Integer) -> Text =
+        self.require "view_pieces" <| self.source.column_cells_json name start count
+
+    ## ---
+       private: true
+       ---
+       Each column's view details as JSON object fields: its `value_type`,
+       `metrics`, `multi_filter` and `number_format`.
+    column_metrics_json self -> Vector Text =
+        self.require "view_pieces" <| self.source.column_metrics_json
 
     ## ---
        private: true

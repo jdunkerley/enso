@@ -1,0 +1,58 @@
+from Standard.Base import all
+
+from Standard.Visualization.Internal.View_Json import all
+import Standard.Visualization.Internal.View_Json
+import Standard.Visualization.Viz_Table.Viz_Table
+
+from Standard.Test import all
+
+## A source with the `"view_pieces"` capability and nothing else.
+type Pieces_Source
+    Value rows
+
+    column_names self = ["a", "b"]
+    row_count self = self.rows
+    supported_operations self = ["view_pieces"]
+    column_metrics_json self = ['"value_type":{"constructor":"Integer","display_text":"Integer (64 bits)"},"metrics":[],"multi_filter":false,"number_format":false', '"metrics":[]']
+    column_cells_json self name start count = '["' + name + '",' + start.to_text + ',' + count.to_text + ']'
+
+add_specs suite_builder =
+    suite_builder.group "The table view writer" group_builder->
+        group_builder.specify "writes a grid with links, a row count, an index and options" <|
+            columns = [View_Column.Value "key" (View_Link.Value "at {{#key}}" "value"), View_Column.Value "value" number_format=False]
+            text = grid_json (columns.map .to_json_text) ['["a"]', '[1]'] 1 (View_Link.Value "at {{#index}}") options=["disable_sort_when_partial"]
+            text . should_equal '{"kind":"grid","row_count":1,"columns":[{"name":"key","link":{"action":"at {{#key}}","label":"value"}},{"name":"value","number_format":false}],"index":{"action":"at {{#index}}"},"data":[["a"],[1]],"options":{"disable_sort_when_partial":true}}'
+
+        group_builder.specify "writes a minimal grid" <|
+            grid_json [(View_Column.Value "x").to_json_text] ['[]'] . should_equal '{"kind":"grid","columns":[{"name":"x"}],"data":[[]]}'
+
+        group_builder.specify "renders cells with Viz_Cell" <|
+            cells_json [1, "a", Nothing, Date.new 2020 1 2] . should_equal '[1,"a",null,{"_display_text_":"2020-01-02","type":"Date","constructor":"new","day":2,"month":1,"year":2020}]'
+
+        group_builder.specify "writes a value, an error, a page and distinct values" <|
+            value_json "hello" . should_equal '{"kind":"value","value":"hello"}'
+            error_json 'a "b"' . should_equal '{"kind":"error","error":"a \\"b\\""}'
+            rows_page_json 3 "[2,1]" ['["c","b"]'] . should_equal '{"row_count":3,"index":[2,1],"data":[["c","b"]]}'
+            distinct_json '["a"]' . should_equal '{"values":["a"]}'
+            distinct_json Nothing . should_equal '{"values":null}'
+
+        group_builder.specify "writes a source's table view from its pieces" <|
+            view = Table_View.Value "get_row {{#index}}" 3 "v1" ["status_bar"] True
+            table_view (Viz_Table.from_source (Pieces_Source.Value 3)) view . should_equal '{"kind":"grid","row_count":3,"columns":[{"name":"a","value_type":{"constructor":"Integer","display_text":"Integer (64 bits)"},"metrics":[],"multi_filter":false,"number_format":false},{"name":"b","metrics":[]}],"index":{"action":"get_row {{#index}}","label":"row"},"data":[["a",0,3],["b",0,3]],"version_hash":"v1","options":{"status_bar":true}}'
+
+        group_builder.specify "lets the server page a large table" <|
+            view = Table_View.Value "get_row {{#index}}" 2000 "v1" [] True
+            text = table_view (Viz_Table.from_source (Pieces_Source.Value 2000)) view
+            text.contains '"data":null' . should_be_true
+            text.contains '"server":true' . should_be_true
+
+        group_builder.specify "never pages when the server is not allowed" <|
+            view = Table_View.Value "at {{#index}}" 2000 Nothing [] False
+            text = table_view (Viz_Table.from_source (Pieces_Source.Value 2000)) view
+            text.contains '"server"' . should_be_false
+            text.contains '"version_hash"' . should_be_false
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

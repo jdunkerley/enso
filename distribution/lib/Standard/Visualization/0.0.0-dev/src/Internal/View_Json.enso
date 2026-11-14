@@ -1,9 +1,8 @@
-private
-
 from Standard.Base import all
 import Standard.Base.Data.Vector.Builder
 
 import project.Viz_Cell.Viz_Cell
+import project.Viz_Table.Viz_Table
 
 ## ---
    private: true
@@ -150,3 +149,146 @@ make_json_for_other x =
         False ->
             json = JS_Object.from_pairs [["_display_text_", x.to_display_text], ["_to_js_object_error_", js_value.catch.to_display_text]]
             JS_Object.from_pairs [["json", json]]
+
+## ---
+   private: true
+   ---
+   The most cells a table view sends inline; above it the server sorts,
+   filters and pages the rows.
+max_inline_cells = 2500
+
+## ---
+   private: true
+   ---
+   A cell its row does not have (a short row of a vector of vectors, a
+   `Nothing` row, a record without that field). The IDE shows it empty, unlike
+   `Nothing`.
+missing_cell = JS_Object.from_pairs [["_missing_", True]]
+
+## ---
+   private: true
+   ---
+   A link: double-clicking a cell creates a node from `action`, a template in
+   which `{{#field}}` is the row's value of `field` (a number when it reads as
+   one), `{{@field}}` the value as it is, and `{{#index}}` the row number.
+   `label` names what the new node holds in the tooltip ("value" when
+   `Nothing`).
+type View_Link
+    ## ---
+       private: true
+       ---
+    Value (action : Text) (label : Text | Nothing = Nothing)
+
+    ## ---
+       private: true
+       ---
+    to_json_text self -> Text =
+        label = if self.label.is_nothing then "" else ',"label":' + self.label.to_json
+        '{"action":' + self.action.to_json + label + '}'
+
+## ---
+   private: true
+   ---
+   A column of a grid view. `number_format` says whether the IDE groups the
+   column's digits; `Nothing` lets it decide from the values.
+type View_Column
+    ## ---
+       private: true
+       ---
+    Value (name : Text) (link : View_Link | Nothing = Nothing) (number_format : Boolean | Nothing = Nothing)
+
+    ## ---
+       private: true
+       ---
+    to_json_text self -> Text =
+        link = if self.link.is_nothing then "" else ',"link":' + self.link.to_json_text
+        format = if self.number_format.is_nothing then "" else ',"number_format":' + self.number_format.to_json
+        '{"name":' + self.name.to_json + link + format + '}'
+
+## ---
+   private: true
+   ---
+   How a source with the `"view_pieces"` capability is shown.
+   - `index_action`: the row-number column's link template.
+   - `row_count`: the rows the value has (a database table's, which can be
+     more than the rows read).
+   - `version_hash`: the table's version, or `Nothing` (a database table).
+   - `options`: as in `grid_json`.
+   - `allow_server`: whether the server may sort, filter and page the rows
+     (above `max_inline_cells` cells).
+type Table_View
+    ## ---
+       private: true
+       ---
+    Value (index_action : Text) (row_count : Integer) (version_hash : Text | Nothing) (options : Vector Text) (allow_server : Boolean)
+
+## ---
+   private: true
+   ---
+   The view message of a grid.
+   - `columns`: one JSON object per column (`View_Column.to_json_text`, or a
+     source's fragments).
+   - `data`: one JSON array per column, or `Nothing` when the server pages.
+   - `row_count`: the rows the value has; `Nothing` shows no row count.
+   - `index`: the row-number column's link, or `Nothing` for none.
+   - `version_hash`: the table's version, or `Nothing`.
+   - `server`: whether the server sorts, filters and pages the rows.
+   - `options`: the options that are on, among `"status_bar"` (the row counts
+     below the grid), `"create_node"` (the toolbar's create-node button) and
+     `"disable_sort_when_partial"` (no sorting or filtering when fewer rows are
+     sent than the value has).
+grid_json (columns : Vector Text) (data : Vector Text | Nothing) (row_count : Integer | Nothing = Nothing) (index : View_Link | Nothing = Nothing) (version_hash : Text | Nothing = Nothing) (server : Boolean = False) (options : Vector Text = []) -> Text =
+    count_part = if row_count.is_nothing then "" else ',"row_count":' + row_count.to_text
+    index_part = if index.is_nothing then "" else ',"index":' + index.to_json_text
+    data_part = if data.is_nothing then ',"data":null' else ',"data":[' + (data.join ",") + ']'
+    version_part = if version_hash.is_nothing then "" else ',"version_hash":' + version_hash.to_json
+    server_part = if server then ',"server":true' else ""
+    options_part = if options.is_empty then "" else ',"options":{' + (options.map (o-> o.to_json + ':true') . join ",") + '}'
+    '{"kind":"grid"' + count_part + ',"columns":[' + (columns.join ",") + ']' + index_part + data_part + version_part + server_part + options_part + '}'
+
+## ---
+   private: true
+   ---
+   One column's cells as a JSON array, each rendered by `Viz_Cell.render_value`.
+cells_json (values : Vector) -> Text = (values.map Viz_Cell.render_value) . to_json
+
+## ---
+   private: true
+   ---
+   The view of a source with the `"view_pieces"` capability: one loop over
+   the columns, the cells and per-column details from the source.
+table_view (viz : Viz_Table) (view : Table_View) -> Text =
+    names = viz.column_names
+    details = viz.column_metrics_json
+    columns = names.zip details (name-> fields-> '{"name":' + name.to_json + ',' + fields + '}')
+    server = view.allow_server && (view.row_count * names.length > max_inline_cells)
+    rows = viz.row_count
+    data = if server then Nothing else names.map (name-> viz.column_cells_json name 0 rows)
+    grid_json columns data view.row_count (View_Link.Value view.index_action "row") view.version_hash server view.options
+
+## ---
+   private: true
+   ---
+   The view of one value: its JSON in one cell.
+value_json value -> Text = '{"kind":"value","value":' + value.to_json + '}'
+
+## ---
+   private: true
+   ---
+   The view of an error.
+error_json (message : Text) -> Text = '{"kind":"error","error":' + message.to_json + '}'
+
+## ---
+   private: true
+   ---
+   A page of the server-side rows: `index` holds each row's number (in the
+   table before sorting and filtering), `data` one JSON array per column.
+rows_page_json (row_count : Integer) (index : Text) (data : Vector Text) -> Text =
+    '{"row_count":' + row_count.to_text + ',"index":' + index + ',"data":[' + (data.join ",") + ']}'
+
+## ---
+   private: true
+   ---
+   A column's distinct values, a JSON array, or `Nothing` when there are too
+   many to list.
+distinct_json (values : Text | Nothing) -> Text = '{"values":' + (values.if_nothing "null") + '}'

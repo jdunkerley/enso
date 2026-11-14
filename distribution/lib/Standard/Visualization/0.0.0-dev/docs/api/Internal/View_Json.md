@@ -1,0 +1,28 @@
+## Enso Signatures 1.0
+## module Standard.Visualization.Internal.View_Json
+- type Table_View
+    - Value index_action:Standard.Base.Data.Text.Text row_count:Standard.Base.Data.Numbers.Integer version_hash:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing) options:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) allow_server:Standard.Base.Data.Boolean.Boolean
+- type View_Column
+    - Value name:Standard.Base.Data.Text.Text link:(Standard.Visualization.Internal.View_Json.View_Link|Standard.Base.Nothing.Nothing)= number_format:(Standard.Base.Data.Boolean.Boolean|Standard.Base.Nothing.Nothing)=
+    - to_json_text self -> Standard.Base.Data.Text.Text
+- type View_Link
+    - Value action:Standard.Base.Data.Text.Text label:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)=
+    - to_json_text self -> Standard.Base.Data.Text.Text
+- cells_json values:Standard.Base.Data.Vector.Vector -> Standard.Base.Data.Text.Text
+- distinct_json values:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing) -> Standard.Base.Data.Text.Text
+- error_json message:Standard.Base.Data.Text.Text -> Standard.Base.Data.Text.Text
+- grid_json columns:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) data:((Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)|Standard.Base.Nothing.Nothing) row_count:(Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)= index:(Standard.Visualization.Internal.View_Json.View_Link|Standard.Base.Nothing.Nothing)= version_hash:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)= server:Standard.Base.Data.Boolean.Boolean= options:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)= -> Standard.Base.Data.Text.Text
+- make_json_for_dictionary dict:Standard.Base.Any.Any max_items:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- make_json_for_error error:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- make_json_for_hashset hashset:Standard.Base.Data.Hashset.Hashset max_items:Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text
+- make_json_for_js_object js_object:Standard.Base.Any.Any max_items:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- make_json_for_matrix current:Standard.Base.Any.Any vector:Standard.Base.Any.Any idx:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+- make_json_for_object_matrix current:Standard.Base.Any.Any vector:Standard.Base.Any.Any idx:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+- make_json_for_other x:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- make_json_for_vector vector:Standard.Base.Any.Any max_rows:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- max_columns -> Standard.Base.Any.Any
+- max_inline_cells -> Standard.Base.Any.Any
+- missing_cell -> Standard.Base.Any.Any
+- rows_page_json row_count:Standard.Base.Data.Numbers.Integer index:Standard.Base.Data.Text.Text data:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) -> Standard.Base.Data.Text.Text
+- table_view viz:Standard.Visualization.Viz_Table.Viz_Table view:Standard.Visualization.Internal.View_Json.Table_View -> Standard.Base.Data.Text.Text
+- value_json value:Standard.Base.Any.Any -> Standard.Base.Data.Text.Text
