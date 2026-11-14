@@ -117,3 +117,4 @@
 - Standard.Visualization.SQL_Viz.SQL_Viz.from that:Standard.Table.Column.Column -> Standard.Visualization.SQL_Viz.SQL_Viz
 - Standard.Visualization.Viz_Cell.Viz_Cell.from that:Standard.Table.Column.Column -> Standard.Visualization.Viz_Cell.Viz_Cell
 - Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.Table.Column.Column -> Standard.Visualization.Viz_Json.Viz_Json
+- Standard.Visualization.Viz_Tree.Viz_Tree.from that:Standard.Table.Column.Column -> Standard.Visualization.Viz_Tree.Viz_Tree
