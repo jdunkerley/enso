@@ -16,7 +16,13 @@ import project.Snowflake_Connection.Snowflake_Connection
 polyglot java import net.snowflake.client.jdbc.SnowflakeDriver
 
 type Snowflake_Details
-    ## Connect to a Snowflake database.
+    ## ---
+       macro_for:
+        - target: Standard.Database.Connection.Database.connect
+          macros:
+           - snowflake: details=..Snowflake
+       ---
+       Connect to a Snowflake database.
 
        ## Arguments
         - `account`: The name of the account to connect to.

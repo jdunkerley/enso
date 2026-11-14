@@ -35,6 +35,8 @@ export interface Component extends ComponentLabel {
   icon: Icon
   group?: number | undefined
   macroSuffix?: string | undefined
+  /** The entry that contributed the macro (`macro_for`), when it is not the component's own. */
+  macroContributor?: SuggestionId | undefined
 }
 
 export interface SuggestedComponent extends Component {
@@ -135,10 +137,21 @@ export function compareSuggestions(
 }
 
 /** Create {@link Component} from information about suggestion and matching. */
-export function makeComponent({ id, entry, match }: MatchedSuggestion): Component {
-  const macroSuffix = (match.matchedAlias && entry.macros[match.matchedAlias]) || undefined
+export function makeComponent(
+  { id, entry, match }: MatchedSuggestion,
+  db?: SuggestionDb,
+): Component {
+  const macro =
+    match.matchedAlias ?
+      db ? db.macrosOf(entry).get(match.matchedAlias)
+      : entry.macros[match.matchedAlias] != null ? { value: entry.macros[match.matchedAlias]! }
+      : undefined
+    : undefined
+  const macroSuffix = macro?.value || undefined
+  const macroContributor = macroSuffix ? macro?.contributor : undefined
 
   return {
+    ...(macroContributor != null ? { macroContributor } : {}),
     ...formatLabel(labelOfEntry(entry, match)),
     suggestionId: id,
     icon: displayedIconOf(entry),
@@ -178,7 +191,7 @@ export function makeComponentLists(
       if (!entry) continue
       const match = filtering.filter(entry, db)
       if (isSome(match)) {
-        const component = makeComponent({ id, entry, match })
+        const component = makeComponent({ id, entry, match }, db)
         yield { id, entry, match, component }
       }
     }

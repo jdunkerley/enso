@@ -421,6 +421,7 @@ class Fixture {
     groupIndex: undefined,
     documentationSummary: 'A base module',
     macros: {},
+    macroFor: [],
     suggestedRank: undefined,
     fromCatalogue: false,
   })
@@ -441,6 +442,7 @@ class Fixture {
     groupIndex: undefined,
     documentationSummary: 'Type',
     macros: {},
+    macroFor: [],
     suggestedRank: undefined,
     fromCatalogue: false,
   })
@@ -462,6 +464,7 @@ class Fixture {
     groupIndex: undefined,
     documentationSummary: 'A Constructor',
     macros: {},
+    macroFor: [],
     suggestedRank: undefined,
     fromCatalogue: false,
   })
@@ -484,6 +487,7 @@ class Fixture {
     reexportedIn: undefined,
     documentationSummary: 'An instance method',
     macros: {},
+    macroFor: [],
     suggestedRank: undefined,
     fromCatalogue: false,
   })
@@ -506,6 +510,7 @@ class Fixture {
     selfType: undefined,
     documentationSummary: 'A static method',
     macros: {},
+    macroFor: [],
     suggestedRank: undefined,
     fromCatalogue: false,
   })
@@ -525,6 +530,7 @@ class Fixture {
     groupIndex: undefined,
     documentationSummary: 'A local function',
     macros: {},
+    macroFor: [],
     suggestedRank: undefined,
     fromCatalogue: false,
   })
@@ -543,6 +549,7 @@ class Fixture {
     groupIndex: undefined,
     documentationSummary: 'A local variable',
     macros: {},
+    macroFor: [],
     suggestedRank: undefined,
     fromCatalogue: false,
   })
@@ -574,6 +581,7 @@ class Fixture {
     reexportedIn: undefined,
     documentationSummary: undefined,
     macros: {},
+    macroFor: [],
     suggestedRank: undefined,
     fromCatalogue: false,
   })

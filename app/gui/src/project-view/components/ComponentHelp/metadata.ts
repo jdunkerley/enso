@@ -19,6 +19,19 @@ function orUndefined(ctx: { error: z.ZodError }) {
   return undefined
 }
 
+/** A `macros` array: each element holds exactly one macro, `description: value`. */
+const macrosSchema = z.array(
+  z
+    .record(z.string(), z.string())
+    .refine((obj) => Object.keys(obj).length === 1, {
+      message: 'Only a single macro per `macros` array element is allowed',
+    })
+    .transform((obj) => {
+      const [key, value] = Object.entries(obj)[0]!
+      return { description: key, value } satisfies Macro
+    }),
+)
+
 /** The documentation metadata schema. It is based on the representation of the parsed YAML object. */
 export const documentationMetadataSchema = z.object({
   advanced: z.boolean().optional().catch(orUndefined),
@@ -29,18 +42,11 @@ export const documentationMetadataSchema = z.object({
   private: z.boolean().optional().catch(orUndefined),
   unstable: z.boolean().optional().catch(orUndefined),
   suggested: z.number().optional().catch(orUndefined),
-  macros: z
-    .array(
-      z
-        .record(z.string(), z.string())
-        .refine((obj) => Object.keys(obj).length === 1, {
-          message: 'Only a single macro per `macros` array element is allowed',
-        })
-        .transform((obj) => {
-          const [key, value] = Object.entries(obj)[0]!
-          return { description: key, value } satisfies Macro
-        }),
-    )
+  macros: macrosSchema.optional().catch(orUndefined),
+  /** Macros this entry contributes to components defined elsewhere. */
+  // eslint-disable-next-line camelcase -- the front-matter key
+  macro_for: z
+    .array(z.object({ target: z.string(), macros: macrosSchema }))
     .optional()
     .catch(orUndefined),
   added: z.string().optional().catch(orUndefined),

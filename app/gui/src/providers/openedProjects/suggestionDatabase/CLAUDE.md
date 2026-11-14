@@ -28,6 +28,10 @@ component browser, the documentation panel and the widgets.
   (`apiPath` from `enso-common`, the function the site's generator uses);
   nothing for entries outside the `Standard.*` libraries.
 - `documentation.ts` — parses an entry's documentation (front matter: icon,
-  group, aliases, `private`, …).
+  group, aliases, `private`, …). `macro_for` lets an entry contribute macros to
+  a component of another library; `SuggestionDb.macrosOf` / `aliasesAndMacrosOf`
+  merge them into the target's own (an index by target path, so arrival order,
+  removal and modification need no handling). Its own macro wins a clash, then
+  the library that sorts first; a clash is logged once.
 - `mockSuggestion.ts` — test entries, built through the update processor.
 - Design: `docs/superpowers/specs/2026-10-31-library-catalogue-design.md`.

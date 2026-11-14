@@ -137,7 +137,13 @@ interface DocOptions {
   group?: string
   icon?: string
 }
-function makeDocumentation({ aliases, group, icon }: DocOptions): string {
+function makeDocumentation({
+  aliases,
+  group,
+  icon,
+  documentation,
+}: DocOptions & CommonOptions): string {
+  if (documentation != null) return documentation
   return frontmatter({ aliases, group, ...(icon != null ? { icon } : {}) })
 }
 

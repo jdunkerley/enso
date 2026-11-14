@@ -21,11 +21,20 @@ function warnUnknownIconNameOnce(iconName: string) {
   }
 }
 
+/** The macros one entry contributes to the component named `target`. */
+export interface MacroContribution {
+  /** The target component's fully qualified name. */
+  target: string
+  macros: Record<string, string>
+}
+
 export interface DocumentationData {
   documentation: string
   documentationSummary: string | undefined
   aliasesAndMacros: string[]
   macros: Record<string, string>
+  /** Macros this entry contributes to components of other libraries, by target qualified name. */
+  macroFor: MacroContribution[]
   /** A name of a custom icon to use when displaying the entry. */
   iconName: Icon | undefined
   /** An index of a group from group list in suggestionDb store this entry belongs to. */
@@ -100,6 +109,10 @@ export function documentationData(
       },
       {} as Record<string, string>,
     ),
+    macroFor: (metadata?.macro_for ?? []).map(({ target, macros }) => ({
+      target,
+      macros: Object.fromEntries(macros.map((macro) => [macro.description, macro.value])),
+    })),
     isPrivate: isPrivate,
     isUnstable: isUnstable,
     suggestedRank: suggestedRank,

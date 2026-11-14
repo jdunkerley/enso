@@ -86,9 +86,67 @@ export class SuggestionDb extends ReactiveDb<SuggestionId, SuggestionEntry> {
     return Array.from(fieldKeys, (key) => [key, id])
   })
 
+  /**
+   * The entries that contribute macros to a component (`macro_for`), keyed by the target's
+   * normalized definition path. An index, so a contributor counts whether it arrives before or
+   * after its target, and stops counting when it is removed or modified.
+   */
+  private readonly macroContributors = new ReactiveIndex(
+    this,
+    (id, entry): [string, SuggestionId][] =>
+      entry.macroFor.flatMap(({ target }) => {
+        const path = parseAbsoluteProjectPathRaw(target)
+        return path.ok ? [[path.value.normalized().key(), id] as [string, SuggestionId]] : []
+      }),
+  )
+
   /** Constructor. */
   constructor() {
     super()
+  }
+
+  /**
+   * The macros that search offers for `entry`: its own, and those other entries contribute to it
+   * with `macro_for`. On a clash the entry's own macro wins, then the contributor from the library
+   * that sorts first by name.
+   */
+  macrosOf(entry: SuggestionEntry): ReadonlyMap<string, EntryMacro> {
+    const result = new Map<string, EntryMacro>(
+      Object.entries(entry.macros).map(([name, value]) => [name, { value }]),
+    )
+    const targetKey = entry.definitionPath.normalized().key()
+    const contributors = [...this.macroContributors.lookup(targetKey)]
+      .flatMap((id) => {
+        const contributor = this.get(id)
+        return contributor ? [{ id, contributor }] : []
+      })
+      .sort(
+        (a, b) =>
+          (a.contributor.definedIn.project ?? '').localeCompare(
+            b.contributor.definedIn.project ?? '',
+          ) || a.id - b.id,
+      )
+    for (const { id, contributor } of contributors) {
+      for (const contribution of contributor.macroFor) {
+        const path = parseAbsoluteProjectPathRaw(contribution.target)
+        if (!path.ok || path.value.normalized().key() !== targetKey) continue
+        for (const [name, value] of Object.entries(contribution.macros)) {
+          if (result.has(name)) {
+            warnMacroConflict(targetKey, name, contributor)
+          } else {
+            result.set(name, { value, contributor: id })
+          }
+        }
+      }
+    }
+    return result
+  }
+
+  /** The names that search matches `entry` by: its aliases, own macros and contributed macros. */
+  aliasesAndMacrosOf(entry: SuggestionEntry): readonly string[] {
+    if (this.macroContributors.lookup(entry.definitionPath.normalized().key()).size === 0)
+      return entry.aliasesAndMacros
+    return [...new Set([...entry.aliasesAndMacros, ...this.macrosOf(entry).keys()])].sort()
   }
 
   /** Create database filled with entries. */
@@ -219,6 +277,27 @@ export class SuggestionDb extends ReactiveDb<SuggestionId, SuggestionEntry> {
       entry = parent
     }
   }
+}
+
+/** A macro offered for an entry: its code and, if another entry contributed it, that entry. */
+export interface EntryMacro {
+  /** The code the macro appends to the component. */
+  value: string
+  /** The entry that contributed the macro with `macro_for`. */
+  contributor?: SuggestionId
+}
+
+/** Conflicts already logged: the macros are recomputed on every keystroke. */
+const warnedMacroConflicts = new Set<string>()
+
+function warnMacroConflict(target: string, name: string, contributor: SuggestionEntry) {
+  const library = contributor.definedIn.project
+  const key = `${target}\0${name}\0${library}`
+  if (warnedMacroConflicts.has(key)) return
+  warnedMacroConflicts.add(key)
+  console.warn(
+    `Macro "${name}" contributed by ${library} to ${target} is ignored: another macro has that name`,
+  )
 }
 
 /** Helper for serializing keys of `constructorFields` index. */

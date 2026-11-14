@@ -10,7 +10,13 @@ import project.Connection.SQLServer_Credentials.SQLServer_Credentials
 import project.SQLServer_Connection.SQLServer_Connection
 
 type SQLServer_Details
-    ## Connect to a SQLServer database.
+    ## ---
+       macro_for:
+        - target: Standard.Database.Connection.Database.connect
+          macros:
+           - sql_server: details=..SQLServer
+       ---
+       Connect to a SQLServer database.
 
        ## Arguments
         - `host`: The name of the server to connect to.

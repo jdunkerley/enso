@@ -25,7 +25,15 @@ import project.Table.Table
 
 ## Read delimited files such as CSVs into a Table.
 type Delimited_Format
-    ## Read delimited files such as CSVs into a Table.
+    ## ---
+       macro_for:
+        - target: Standard.Base.Data.read
+          macros:
+           - delimited: format=..Delimited
+           - csv: format=..Delimited
+           - tab_delimited: format=(..Delimited '\t')
+       ---
+       Read delimited files such as CSVs into a Table.
        When reading this format, the following problems may occur:
        - If a row does not match the first row's column count, the function
          raises an `Invalid_Row`.

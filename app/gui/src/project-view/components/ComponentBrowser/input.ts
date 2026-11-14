@@ -96,6 +96,12 @@ export function useComponentBrowserInput(
   const cbUsage = ref<Usage>()
   const selection = ref(Range.empty)
   const imports = shallowRef<RequiredImport[]>([])
+  /**
+   * Imports of the libraries whose macros were applied, with the macro's code. They name no
+   * identifier of the text (`..Workbook` does not name `Excel_Format`), so they are kept while the
+   * code still holds the macro, not while it names the imported identifier.
+   */
+  const macroImports = shallowRef<{ code: string; imports: RequiredImport[] }[]>([])
   const sourceNodeIdentifier = ref<Ast.Identifier>()
   /**
    * The suggestion the user just accepted, if any. Surfaced through {@link interpretation} so the
@@ -191,7 +197,11 @@ export function useComponentBrowserInput(
   })
 
   /** Apply given suggested entry to the input. */
-  function applySuggestion(id: SuggestionId, suffix: string | undefined): Result {
+  function applySuggestion(
+    id: SuggestionId,
+    suffix: string | undefined,
+    contributor?: SuggestionId,
+  ): Result {
     const suggestionDbValue = toValue(suggestionDb)
     const entry = suggestionDbValue.get(id)
     if (!entry) return Err(`No entry with id ${id}`)
@@ -211,6 +221,13 @@ export function useComponentBrowserInput(
       }
     } else {
       imports.value = imports.value.concat(requiredImports(suggestionDbValue, entry))
+    }
+    const contributingEntry = contributor != null ? suggestionDbValue.get(contributor) : undefined
+    if (suffix && contributingEntry) {
+      macroImports.value = macroImports.value.concat({
+        code: suffix,
+        imports: requiredImports(suggestionDbValue, contributingEntry),
+      })
     }
     return Ok()
   }
@@ -298,6 +315,13 @@ export function useComponentBrowserInput(
         finalImports.push(anImport)
       }
     }
+    for (const macro of macroImports.value) {
+      if (!text.value.includes(macro.code.trim())) continue
+      for (const anImport of macro.imports) {
+        if (!finalImports.some((existing) => requiredImportEquals(existing, anImport)))
+          finalImports.push(anImport)
+      }
+    }
     return finalImports
   }
 
@@ -339,6 +363,7 @@ export function useComponentBrowserInput(
       }
     }
     imports.value = []
+    macroImports.value = []
   }
 
   /**

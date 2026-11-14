@@ -28,7 +28,13 @@ polyglot java import org.enso.fixed_width.FixedWidthReader.Justification
    A fixed-width format defines its columns as fixed column offsets and widths.
    The columns are defined in a `Fixed_Width_Layout` object.
 type Fixed_Width_Format
-    ## Read fixed-width files into a Table.
+    ## ---
+       macro_for:
+        - target: Standard.Base.Data.read
+          macros:
+           - fixed_width: format=..Fixed_Width
+       ---
+       Read fixed-width files into a Table.
        Fixed-width files require have a `Fixed_Width_Layout` that specifies the
        start and width of each column, along with an optional column name. This
        layout can be defined using the `Fixed_Width_Column_Description` type, or
