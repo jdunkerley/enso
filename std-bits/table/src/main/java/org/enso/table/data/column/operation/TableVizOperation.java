@@ -137,7 +137,9 @@ public class TableVizOperation {
         builder.append(",");
       }
       builder.append(
-          longStorage.isNothing(i) ? "null" : JsonOperation.toJson(longStorage.getItemAsLong(i)));
+          longStorage.isNothing(i)
+              ? "null"
+              : JsonOperation.toJson(longStorage.getItemAsLong(i), true));
       context.safepoint();
     }
     builder.append("]");
