@@ -1,0 +1,22 @@
+from Standard.Base import all
+
+## ---
+   private: true
+   ---
+   The names in `names` that equal (ignoring case) one in `wanted`, as
+   `Table.select_columns … case_sensitivity=..Insensitive error_on_missing_columns=False`
+   returns them: in the table's order, or with `reorder` in `wanted`'s order
+   (each name once, at its first match).
+select_insensitive (names : Vector Text) (wanted : Vector Text) (reorder : Boolean) -> Vector Text =
+    matches name = wanted.any (w-> w.equals_ignore_case name)
+    if reorder.not then names.filter matches else
+        wanted.flat_map (w-> names.filter (n-> n.equals_ignore_case w)) . distinct
+
+## ---
+   private: true
+   ---
+   The first name in `names` that equals (ignoring case) the earliest
+   candidate that matches anything, or `Nothing`.
+find_insensitive (names : Vector Text) (candidates : Vector Text) -> Text | Nothing =
+    found = select_insensitive names candidates True
+    if found.is_empty then Nothing else found.first

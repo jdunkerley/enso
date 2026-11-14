@@ -13,6 +13,7 @@ import project.SQL_Spec
 import project.Table_Spec
 import project.Table_Visualisation_Integration_Spec
 import project.Visualization_Spec
+import project.Viz_Table_Spec
 import project.Widgets_Spec
 import project.Lazy_Table_Spec
 
@@ -30,5 +31,6 @@ main filter=Nothing =
         Table_Spec.add_specs suite_builder
         Table_Visualisation_Integration_Spec.add_specs suite_builder
         Visualization_Spec.add_specs suite_builder
+        Viz_Table_Spec.add_specs suite_builder
         Widgets_Spec.add_specs suite_builder
     suite.run_with_filter filter

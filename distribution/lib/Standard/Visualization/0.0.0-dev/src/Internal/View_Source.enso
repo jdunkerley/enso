@@ -1,0 +1,18 @@
+private
+
+from Standard.Base import all
+
+import project.Viz_Table.Viz_Table
+
+## A value that has only a table view.
+type View_Source
+    Value (make_json : Integer -> Text)
+
+    table_view_json self (max_rows : Integer) -> Text = (self.make_json) max_rows
+    column_names self -> Vector Text = []
+    column_kinds self -> Vector = []
+    row_count self -> Nothing = Nothing
+    select_columns self _ -> Viz_Table = Viz_Table.from_view self.make_json
+    slice self _ _ -> Viz_Table = Viz_Table.from_view self.make_json
+    sample self _ _ -> Viz_Table = Viz_Table.from_view self.make_json
+    supported_operations self -> Vector Text = []

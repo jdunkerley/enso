@@ -1,0 +1,67 @@
+from Standard.Base import all
+
+import Standard.Visualization.Internal.Names
+from Standard.Visualization.Viz_Column_Kind import Viz_Column_Kind, Viz_Kind
+from Standard.Visualization.Viz_Table import Viz_Table, Viz_Header, Viz_Unsupported
+
+from Standard.Test import all
+
+add_specs suite_builder =
+    suite_builder.group "Viz_Table from columns" group_builder->
+        grid = Viz_Table.from_columns [Viz_Header.Link "Table" "table" "query", Viz_Header.Label "Rows"] [["a", "b", "c"], [1, 2, 3]]
+
+        group_builder.specify "renders the Generic_Grid table view" <|
+            json = grid.table_view_json . parse_json
+            json.get "type" . should_equal "Generic_Grid"
+            json.get "data" . should_equal [["a", "b", "c"], [1, 2, 3]]
+            json.get "headers" . at 0 . get "get_child_node_action" . should_equal "query"
+            json.get "headers" . at 1 . get "visualization_header" . should_equal "Rows"
+
+        group_builder.specify "describes its columns" <|
+            grid.column_names . should_equal ["Table", "Rows"]
+            grid.column_kinds . map .kind . should_equal [Viz_Kind.Textual, Viz_Kind.Numeric]
+            grid.column_kinds . map .display_name . should_equal ["Char", "Integer"]
+            grid.row_count . should_equal 3
+
+        group_builder.specify "selects, slices and samples" <|
+            grid.select_columns ["Rows", "Missing"] . column_names . should_equal ["Rows"]
+            grid.slice 1 5 . table_view_json . parse_json . get "data" . should_equal [["b", "c"], [2, 3]]
+            grid.sample 10 42 . row_count . should_equal 3
+            grid.sample 2 42 . row_count . should_equal 2
+
+        group_builder.specify "says the optional operations are unsupported" <|
+            grid.supported_operations . should_equal []
+            grid.supports "rows" . should_be_false
+            grid.rows_json . should_fail_with Viz_Unsupported
+
+    suite_builder.group "Viz_Table from a view" group_builder->
+        view = Viz_Table.from_view (max_rows-> '{"rows":' + max_rows.to_text + '}')
+
+        group_builder.specify "passes the row limit to the view" <|
+            view.table_view_json 7 . should_equal '{"rows":7}'
+            view.table_view_json . should_equal '{"rows":1000}'
+
+        group_builder.specify "has no columns" <|
+            view.column_names . should_equal []
+            view.row_count . should_equal Nothing
+            view.select_columns ["a"] . table_view_json 3 . should_equal '{"rows":3}'
+            view.sample 5 1 . column_names . should_equal []
+
+    suite_builder.group "Viz_Column_Kind.infer" group_builder->
+        group_builder.specify "classifies vectors" <|
+            Viz_Column_Kind.infer [1, Nothing, 2] . display_name . should_equal "Integer"
+            Viz_Column_Kind.infer [1, 2.5] . display_name . should_equal "Float"
+            Viz_Column_Kind.infer [True] . kind . should_equal Viz_Kind.Logical
+            Viz_Column_Kind.infer [Date.new 2020] . kind . should_equal Viz_Kind.Date_Only
+            Viz_Column_Kind.infer [1, "a"] . kind . should_equal Viz_Kind.Other
+            Viz_Column_Kind.infer [] . kind . should_equal Viz_Kind.Other
+
+    suite_builder.group "Names" group_builder->
+        names = ["x", "Colour", "label", "Row_Number", "y"]
+        group_builder.specify "select_insensitive keeps table order without reorder" <|
+            Names.select_insensitive names ["row_number", "x"] False . should_equal ["x", "Row_Number"]
+        group_builder.specify "select_insensitive follows the wanted order with reorder" <|
+            Names.select_insensitive names ["row_number", "x"] True . should_equal ["Row_Number", "x"]
+        group_builder.specify "find_insensitive takes the first candidate that matches" <|
+            Names.find_insensitive names ["color", "colour"] . should_equal "Colour"
+            Names.find_insensitive names ["size"] . should_equal Nothing

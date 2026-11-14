@@ -1,0 +1,180 @@
+from Standard.Base import all
+
+import project.Internal.Columns_Source.Columns_Source
+import project.Internal.View_Source.View_Source
+import project.Viz_Column_Kind.Viz_Column_Kind
+
+## ---
+   private: true
+   ---
+   The table every value can be shown as, and the data the table view and the
+   charts read. A library makes its values drawable by a conversion
+   `Viz_Table.from (that:Its_Public_Type)` defined in the module of that type,
+   returning `Viz_Table.from_source` of its own source, or `from_columns` /
+   `from_view` when its data is a few in-memory columns or only a table view.
+   The source's methods are the contract; see this library's `CLAUDE.md`.
+type Viz_Table
+    ## ---
+       private: true
+       ---
+    private Value source
+
+    ## ---
+       private: true
+       ---
+       Wraps a library's implementation of the contract.
+    from_source source -> Viz_Table = Viz_Table.Value source
+
+    ## ---
+       private: true
+       ---
+       In-memory columns, shown as a `Generic_Grid`.
+    from_columns (headers : Vector Viz_Header) (columns : Vector Vector) -> Viz_Table =
+        Viz_Table.Value (Columns_Source.Value headers columns)
+
+    ## ---
+       private: true
+       ---
+       A value with a table view and no columns; `make_json` takes the row
+       limit the view shows.
+    from_view (make_json : Integer -> Text) -> Viz_Table =
+        Viz_Table.Value (View_Source.Value make_json)
+
+    ## ---
+       private: true
+       ---
+       The JSON the table view draws.
+    table_view_json self (max_rows : Integer = 1000) -> Text =
+        self.source.table_view_json max_rows
+
+    ## ---
+       private: true
+       ---
+    column_names self -> Vector Text = self.source.column_names
+
+    ## ---
+       private: true
+       ---
+    column_kinds self -> Vector Viz_Column_Kind = self.source.column_kinds
+
+    ## ---
+       private: true
+       ---
+       The number of rows, or `Nothing` when it is not cheap to know.
+    row_count self -> Integer | Nothing = self.source.row_count
+
+    ## ---
+       private: true
+       ---
+       The named columns, in the given order; names that are not columns are
+       skipped.
+    select_columns self (names : Vector Text) -> Viz_Table = self.source.select_columns names
+
+    ## ---
+       private: true
+       ---
+    slice self (start : Integer) (count : Integer) -> Viz_Table = self.source.slice start count
+
+    ## ---
+       private: true
+       ---
+       At most `count` rows: the library's quick sample (a random sample in
+       memory, the first rows in a database). Bounded, always.
+    sample self (count : Integer) (seed : Integer) -> Viz_Table = self.source.sample count seed
+
+    ## ---
+       private: true
+       ---
+       The optional capabilities the source supports: any of `"rows"`,
+       `"server_rows"`, `"spatial"`.
+    supported_operations self -> Vector Text = self.source.supported_operations
+
+    ## ---
+       private: true
+       ---
+    supports self (operation : Text) -> Boolean = self.supported_operations.contains operation
+
+    ## ---
+       private: true
+       ---
+    rename_columns self (names : Vector Text) -> Viz_Table =
+        self.require "rows" <| self.source.rename_columns names
+
+    ## ---
+       private: true
+       ---
+       Appends a column of row numbers starting at 0.
+    add_row_number self (name : Text) -> Viz_Table =
+        self.require "rows" <| self.source.add_row_number name
+
+    ## ---
+       private: true
+       ---
+    filter_between self (name : Text) low high -> Viz_Table =
+        self.require "rows" <| self.source.filter_between name low high
+
+    ## ---
+       private: true
+       ---
+       Each row as a JSON object keyed by column name, rendered by the library.
+    rows_json self -> Vector Text = self.require "rows" <| self.source.rows_json
+
+    ## ---
+       private: true
+       ---
+    column_values self (name : Text) -> Vector = self.require "rows" <| self.source.column_values name
+
+    ## ---
+       private: true
+       ---
+       A page of the table view's server-side row model.
+    server_rows_json self (start : Integer) sort_columns sort_directions filter_columns filter_conditions -> Text =
+        self.require "server_rows" <| self.source.server_rows_json start sort_columns sort_directions filter_columns filter_conditions
+
+    ## ---
+       private: true
+       ---
+    distinct_values_json self (column_index : Integer) filter_columns filter_conditions -> Text =
+        self.require "server_rows" <| self.source.distinct_values_json column_index filter_columns filter_conditions
+
+    ## ---
+       private: true
+       ---
+       The geo map's layers for a spatial table.
+    spatial_layers_json self -> Text = self.require "spatial" <| self.source.spatial_layers_json
+
+    private require self (operation : Text) ~action =
+        if self.supports operation then action else Error.throw (Viz_Unsupported.Error operation)
+
+## ---
+   private: true
+   ---
+   A column header of a `from_columns` table.
+type Viz_Header
+    ## ---
+       private: true
+       ---
+       Column whose cells create child nodes with `action`.
+    Link name tooltip action
+
+    ## ---
+       private: true
+       ---
+    Label name
+
+## ---
+   private: true
+   ---
+   Raised when a visualisation asks a value for an operation its library does
+   not support.
+type Viz_Unsupported
+    ## ---
+       private: true
+       ---
+    Error (operation : Text)
+
+    ## ---
+       private: true
+       ---
+    to_display_text self -> Text =
+        "The visualised value does not support `" + self.operation + "`."

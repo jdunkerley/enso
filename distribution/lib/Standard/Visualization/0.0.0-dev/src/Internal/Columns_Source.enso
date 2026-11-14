@@ -1,0 +1,40 @@
+private
+
+from Standard.Base import all
+
+import project.Viz_Column_Kind.Viz_Column_Kind
+import project.Viz_Table.Viz_Header
+import project.Viz_Table.Viz_Table
+
+## Columns held in memory; the table view is a `Generic_Grid`, exactly as
+   Base's `Table_Viz_Data.GenericGrid` rendered it.
+type Columns_Source
+    Value (headers : Vector Viz_Header) (columns : Vector Vector)
+
+    table_view_json self _ -> Text =
+        header_json header = case header of
+            Viz_Header.Label _ -> JS_Object.from_pairs [["visualization_header", header.name]]
+            Viz_Header.Link _ _ _ -> JS_Object.from_pairs [["visualization_header", header.name], ["child_label", header.tooltip], ["get_child_node_action", header.action]]
+        JS_Object.from_pairs [["type", "Generic_Grid"], ["data", self.columns], ["headers", self.headers.map header_json]] . to_json
+
+    column_names self -> Vector Text = self.headers.map .name
+
+    column_kinds self -> Vector Viz_Column_Kind = self.columns.map Viz_Column_Kind.infer
+
+    row_count self -> Integer = if self.columns.is_empty then 0 else self.columns.first.length
+
+    select_columns self (names : Vector Text) -> Viz_Table =
+        all_names = self.column_names
+        kept = names.map (n-> all_names.index_of n) . filter (i-> i.is_nothing.not)
+        Viz_Table.from_columns (kept.map (i-> self.headers.at i)) (kept.map (i-> self.columns.at i))
+
+    slice self (start : Integer) (count : Integer) -> Viz_Table =
+        Viz_Table.from_columns self.headers (self.columns.map (c-> c.drop start . take count))
+
+    sample self (count : Integer) (seed : Integer) -> Viz_Table =
+        n = self.row_count
+        if n <= count then Viz_Table.from_columns self.headers self.columns else
+            picked = (0.up_to n).to_vector.take (..Sample count seed=seed)
+            Viz_Table.from_columns self.headers (self.columns.map (c-> picked.map (i-> c.at i)))
+
+    supported_operations self -> Vector Text = []
