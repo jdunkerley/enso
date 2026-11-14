@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import SvgIcon from '@/components/SvgIcon.vue'
 import { PAGE_SIZE, type TreeRow } from '@/components/visualizations/JSONVisualization/lazyTree'
+import { svgUseHref } from '@/util/icons'
 import { computed } from 'vue'
 
 const { row } = defineProps<{ row: TreeRow }>()
@@ -39,6 +39,10 @@ const title = computed(() => {
     : 'No expression reaches this entry, so double-clicking it adds nothing.'
   return leafText.value != null ? `${leafText.value}\n\n${action}` : action
 })
+/** A double-click creates a node; stop it also selecting a word. Single-click drags still select. */
+function preventWordSelection(event: MouseEvent) {
+  if (event.detail > 1) event.preventDefault()
+}
 const moreText = computed(() =>
   row.kind === 'more' ?
     `Show ${Math.min(PAGE_SIZE, row.total - row.shown)} more (of ${row.total.toLocaleString('en-US')})`
@@ -57,10 +61,15 @@ const moreText = computed(() =>
         :aria-expanded="row.expanded"
         @click.stop="emit('toggle')"
       >
-        <SvgIcon name="chevron_right" />
+        <svg class="chevron" viewBox="0 0 16 16"><use :href="svgUseHref('chevron_right')" /></svg>
       </button>
       <span v-else class="arrow" />
-      <span class="content" :title="title" @dblclick.stop="emit('activate', $event.shiftKey)">
+      <span
+        class="content"
+        :title="title"
+        @mousedown="preventWordSelection"
+        @dblclick.stop="emit('activate', $event.shiftKey)"
+      >
         <!-- Vue drops the whitespace between these spans (it holds a newline), so the text reads
              `key: value` exactly; the Playwright spec matches it. -->
         <span v-if="row.kind === 'entry'" class="key" v-text="String(row.entry.key)" />
@@ -103,15 +112,19 @@ const moreText = computed(() =>
   padding: 0;
   border: none;
   background: none;
-  --icon-size: 12px;
+}
+
+.chevron {
+  width: 12px;
+  height: 12px;
 }
 
 button.arrow {
   cursor: pointer;
 }
 
-.arrow.open {
-  --icon-transform: rotate(90deg);
+.arrow.open .chevron {
+  transform: rotate(90deg);
 }
 
 .content {
