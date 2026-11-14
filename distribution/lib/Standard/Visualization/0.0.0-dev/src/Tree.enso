@@ -44,7 +44,7 @@ private page_json (tree : Viz_Tree) (start : Integer) (count : Integer) -> Text 
 private entry_json (child : Viz_Tree_Child) -> Text =
     node = case child.tree of
         Viz_Tree.Leaf json_text -> '"kind":"leaf","value":' + json_text
-        Viz_Tree.Branch kind size label _ -> '"kind":' + kind.to_json + ',"size":' + size.to_text + ',"label":' + label.to_json
+        Viz_Tree.Branch kind size label _ _ -> '"kind":' + kind.to_json + ',"size":' + size.to_text + ',"label":' + label.to_json
     '{"key":' + child.key.to_json + ',' + node + ',"expr":' + child.node_expression.to_json + '}'
 
 ## A leaf node.
