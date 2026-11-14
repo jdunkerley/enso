@@ -96,7 +96,7 @@ type DB_Table_Implementation
         prepared = this_table.to_sql.prepare
         SQL_Viz.Value this_table.dialect_name prepared.first prepared.second
 
-    default_visualization (this_table : Table & DB_Table) = Id.sql_query
+    default_visualization (_ : Table & DB_Table) = Id.sql_query
 
     name (this_table : Table & DB_Table) = this_table.internal_name
 

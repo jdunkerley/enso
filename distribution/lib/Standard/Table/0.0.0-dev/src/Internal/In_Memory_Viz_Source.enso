@@ -4,7 +4,6 @@ from Standard.Base import all
 
 import Standard.Visualization.Viz_Table.Viz_Table
 
-import project.Column.Column
 import project.In_Memory_Column.In_Memory_Column
 import project.In_Memory_Table.In_Memory_Table
 import project.Internal.Viz_Helpers

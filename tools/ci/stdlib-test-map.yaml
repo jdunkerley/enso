@@ -16,30 +16,30 @@ everything:
   stdBits: [benchmarks, tests]
 
 libraries:
-  AWS: { stdBits: [aws], dependsOn: [Base, Database, Table] }
+  AWS: { stdBits: [aws], dependsOn: [Base, Database, Table, Visualization] }
   Base: { stdBits: [base], dependsOn: [] }
-  Database: { stdBits: [database], dependsOn: [Base, Table] }
+  Database: { stdBits: [database], dependsOn: [Base, Table, Visualization] }
   Database_Test_Suite: { stdBits: [database-test-suite], dependsOn: [Base, Database, SQLite, Table, Test] }
-  DuckDB: { stdBits: [duckdb], dependsOn: [Base, Database, Table] }
+  DuckDB: { stdBits: [duckdb], dependsOn: [Base, Database, Table, Visualization] }
   EDI: { stdBits: [edi], dependsOn: [Base, Table] }
   Examples: { stdBits: [], dependsOn: [Base, Table] }
-  Excel: { stdBits: [excel], dependsOn: [Base, Table] }
+  Excel: { stdBits: [excel], dependsOn: [Base, Table, Visualization] }
   Fixed_Width: { stdBits: [fixed-width], dependsOn: [Base, Table] }
   Generic_JDBC: { stdBits: [], dependsOn: [Base, Database, Table] }
   Geo: { stdBits: [], dependsOn: [Base, Table] }
-  Google: { stdBits: [google], dependsOn: [Base, Table] }
+  Google: { stdBits: [google], dependsOn: [Base, Table, Visualization] }
   Google_Api: { stdBits: [], dependsOn: [] }
   Image: { stdBits: [image], dependsOn: [Base] }
-  Microsoft: { stdBits: [microsoft], dependsOn: [Base, Database, Table] }
-  Postgres: { stdBits: [postgres], dependsOn: [Base, Database, Table] }
+  Microsoft: { stdBits: [microsoft], dependsOn: [Base, Database, Table, Visualization] }
+  Postgres: { stdBits: [postgres], dependsOn: [Base, Database, Table, Visualization] }
   Saas: { stdBits: [saas], dependsOn: [Base, Table] }
-  Snowflake: { stdBits: [snowflake], dependsOn: [Base, Database, Table] }
-  SQLite: { stdBits: [sqlite], dependsOn: [Base, Database, Table] }
-  Table: { stdBits: [table], dependsOn: [Base] }
-  Tableau: { stdBits: [tableau], dependsOn: [Base, Table] }
+  Snowflake: { stdBits: [snowflake], dependsOn: [Base, Database, Table, Visualization] }
+  SQLite: { stdBits: [sqlite], dependsOn: [Base, Database, Table, Visualization] }
+  Table: { stdBits: [table], dependsOn: [Base, Visualization] }
+  Tableau: { stdBits: [tableau], dependsOn: [Base, Table, Visualization] }
   Test: { stdBits: [], dependsOn: [Base] }
   Visualization: { stdBits: [], dependsOn: [Base, Database, Table] }
-  XML: { stdBits: [], dependsOn: [Base, Table] }
+  XML: { stdBits: [], dependsOn: [Base, Table, Visualization] }
   YXDB: { stdBits: [yxdb], dependsOn: [Base, Table] }
 
 testProjects:
