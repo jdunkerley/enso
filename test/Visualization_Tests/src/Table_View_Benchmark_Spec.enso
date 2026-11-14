@@ -42,7 +42,7 @@ time_ms (input : Any) -> Float =
     start = System.nano_time
     result = Visualization.prepare_visualization input 1000
     elapsed = System.nano_time - start
-    if result.starts_with '{"type":"Error"' then Panic.throw ("The benchmark input is an error, not a table view: " + result.take 200)
+    if (result.starts_with '{"type":"Error"') || (result.starts_with '{"error":') then Panic.throw ("The benchmark input is an error, not a table view: " + result.take 200)
     elapsed.to_float / 1000000.0
 
 ## Times `prepare_visualization` on `prepare` (evaluated afresh, untimed, for
