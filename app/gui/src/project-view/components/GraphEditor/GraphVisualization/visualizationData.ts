@@ -73,8 +73,8 @@ export function useVisualizationData({
       const dataSourceValue = toValue(dataSource)
       if (dataSourceValue?.type !== 'node') return
       return {
-        visualizationModule: 'Standard.Visualization.Helpers',
-        expression: 'a -> a.default_visualization.to_js_object.to_json',
+        visualizationModule: 'Standard.Visualization.Id',
+        expression: 'a -> (Id.from a).to_js_object.to_json',
         expressionId: dataSourceValue.nodeId,
       }
     },

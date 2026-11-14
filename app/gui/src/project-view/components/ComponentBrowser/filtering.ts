@@ -363,8 +363,8 @@ export class Filtering {
 
 /**
  * Libraries that exist only for the IDE: they prepare visualization data and are never components
- * a user picks. Their modules are public, since the IDE calls them by name. They also add methods
- * to other types (`default_visualization`), so these are hidden even when a self type is known.
+ * a user picks. Their modules are public, since the IDE calls them by name. They may also add
+ * methods to other types, so these are hidden even when a self type is known.
  */
 const IDE_ONLY_LIBRARIES = new Set(['Standard.Visualization'])
 
