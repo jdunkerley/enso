@@ -67,6 +67,11 @@ export function useLazyTree(fetchPage: FetchPage) {
   const root = shallowRef<TreeNode>()
   const pages = shallowReactive(new Map<string, PageState>())
   const expanded = shallowReactive(new Map<string, readonly TreeKey[]>())
+  /**
+   * How many entries each branch (and the root) last had loaded. Unlike `pages`, it survives a new
+   * payload, so a payload arriving while a refetch is still in flight refetches the full count.
+   */
+  const extent = new Map<string, number>()
   /** Bumped by each payload, so that a page asked for under an older one is dropped. */
   let generation = 0
 
@@ -82,7 +87,12 @@ export function useLazyTree(fetchPage: FetchPage) {
       error: undefined,
       failed: undefined,
     })
-    const result = await fetchPage(path, start, count)
+    let result: PageResult
+    try {
+      result = await fetchPage(path, start, count)
+    } catch (e) {
+      result = { ok: false, message: e instanceof Error ? e.message : String(e) }
+    }
     const current = pages.get(key)
     if (asked !== generation || current == null) return
     if (!result.ok) {
@@ -94,9 +104,11 @@ export function useLazyTree(fetchPage: FetchPage) {
       })
       return
     }
+    const entries = [...current.entries.slice(0, start), ...result.page.entries]
+    extent.set(key, entries.length)
     pages.set(key, {
       size: result.page.size,
-      entries: [...current.entries.slice(0, start), ...result.page.entries],
+      entries,
       loading: false,
       error: undefined,
       failed: undefined,
@@ -105,11 +117,11 @@ export function useLazyTree(fetchPage: FetchPage) {
 
   function setRoot(prepared: Prepared | undefined) {
     generation += 1
-    const shown = new Map(Array.from(pages, ([key, page]) => [key, page.entries.length]))
     pages.clear()
     root.value = prepared?.root
     if (prepared == null || !('children' in prepared)) {
       expanded.clear()
+      extent.clear()
       return
     }
     const first = prepared.children
@@ -120,10 +132,13 @@ export function useLazyTree(fetchPage: FetchPage) {
       error: undefined,
       failed: undefined,
     })
-    const rootShown = shown.get(pathKey([])) ?? 0
+    const rootKey = pathKey([])
+    const rootShown = extent.get(rootKey) ?? 0
     if (rootShown > first.entries.length && first.entries.length < first.size)
       void load([], first.entries.length, rootShown - first.entries.length)
-    for (const [key, path] of expanded) void load(path, 0, Math.max(PAGE_SIZE, shown.get(key) ?? 0))
+    else extent.set(rootKey, first.entries.length)
+    for (const [key, path] of expanded)
+      void load(path, 0, Math.max(PAGE_SIZE, extent.get(key) ?? 0))
   }
 
   function toggle(path: readonly TreeKey[]) {

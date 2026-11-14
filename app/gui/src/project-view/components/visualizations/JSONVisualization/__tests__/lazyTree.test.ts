@@ -201,6 +201,132 @@ describe('useLazyTree', () => {
     expect(fetchPage).toHaveBeenCalledTimes(2)
   })
 
+  test('a second payload during a refetch still refetches the full count of a branch', async () => {
+    const resolvers: ((result: PageResult) => void)[] = []
+    let hold = false
+    const base = fakeFetch()
+    const fetchPage = vi.fn<FetchPage>((path, start, count) =>
+      hold ? new Promise((resolve) => resolvers.push(resolve)) : base(path, start, count),
+    )
+    const tree = useLazyTree(fetchPage)
+    tree.setRoot(prepared)
+    tree.toggle(['items'])
+    await flushPromises()
+    tree.showMore(['items'])
+    await flushPromises()
+    hold = true
+    tree.setRoot(prepared)
+    tree.setRoot(prepared)
+    expect(fetchPage).toHaveBeenLastCalledWith(['items'], 0, 200)
+    expect(resolvers).toHaveLength(2)
+    resolvers[1]!({ ok: true, page: { start: 0, size: 250, entries: items(0, 200) } })
+    await flushPromises()
+    const rows = summaries(tree.rows.value)
+    expect(rows).toContain('2 199: 199')
+    expect(rows).toContain('2 more 200/250')
+  })
+
+  test('a second payload during a refetch still extends the root to the shown count', async () => {
+    const big: Prepared = {
+      root: { kind: 'array', size: 300, label: '[300 items]' },
+      children: { start: 0, size: 300, entries: items(0, 100) },
+    }
+    const resolvers: ((result: PageResult) => void)[] = []
+    let hold = false
+    const fetchPage = vi.fn<FetchPage>((_path, start, count) =>
+      hold ?
+        new Promise((resolve) => resolvers.push(resolve))
+      : Promise.resolve({
+          ok: true,
+          page: { start, size: 300, entries: items(start, Math.min(300, start + count)) },
+        }),
+    )
+    const tree = useLazyTree(fetchPage)
+    tree.setRoot(big)
+    tree.showMore([])
+    await flushPromises()
+    tree.showMore([])
+    await flushPromises()
+    expect(summaries(tree.rows.value)).toContain('1 299: 299')
+    hold = true
+    tree.setRoot(big)
+    expect(fetchPage).toHaveBeenLastCalledWith([], 100, 200)
+    tree.setRoot(big)
+    expect(fetchPage).toHaveBeenLastCalledWith([], 100, 200)
+    expect(resolvers).toHaveLength(2)
+    resolvers[1]!({ ok: true, page: { start: 100, size: 300, entries: items(100, 300) } })
+    await flushPromises()
+    expect(summaries(tree.rows.value)).toContain('1 299: 299')
+  })
+
+  test('a rejected fetch shows the error row, and retry recovers', async () => {
+    let reject = true
+    const base = fakeFetch()
+    const fetchPage = vi.fn<FetchPage>((path, start, count) =>
+      reject ? Promise.reject(new Error('timed out')) : base(path, start, count),
+    )
+    const tree = useLazyTree(fetchPage)
+    tree.setRoot(prepared)
+    tree.toggle(['items'])
+    await flushPromises()
+    expect(summaries(tree.rows.value)).toEqual([
+      'root {4 keys}',
+      '1 name: "John"',
+      '1 items: [250 items] (open)',
+      '2 error timed out',
+      '1 raw: [1 item]',
+      '1 broken: {1 key}',
+    ])
+    reject = false
+    tree.retry(['items'])
+    expect(summaries(tree.rows.value)).toContain('2 loading')
+    await flushPromises()
+    const rows = summaries(tree.rows.value)
+    expect(rows).toContain('2 99: 99')
+    expect(rows).toContain('2 more 100/250')
+    expect(rows.some((row) => row.includes('error'))).toBe(false)
+  })
+
+  test('a rejection that arrives after a new payload is ignored', async () => {
+    const pending: { resolve: (r: PageResult) => void; reject: (e: unknown) => void }[] = []
+    const fetchPage = vi.fn<FetchPage>(
+      () => new Promise((resolve, reject) => pending.push({ resolve, reject })),
+    )
+    const tree = useLazyTree(fetchPage)
+    tree.setRoot(prepared)
+    tree.toggle(['items'])
+    tree.setRoot(prepared)
+    expect(pending).toHaveLength(2)
+    pending[0]!.reject(new Error('late'))
+    await flushPromises()
+    expect(summaries(tree.rows.value)).toContain('2 loading')
+    expect(summaries(tree.rows.value).some((row) => row.includes('error'))).toBe(false)
+    pending[1]!.resolve({ ok: true, page: { start: 0, size: 250, entries: items(0, 2) } })
+    await flushPromises()
+    expect(summaries(tree.rows.value)).toContain('2 1: 1')
+  })
+
+  test('a failed show more keeps the entries already loaded', async () => {
+    let failing = false
+    const base = fakeFetch()
+    const fetchPage = vi.fn<FetchPage>(async (path, start, count) =>
+      failing ? { ok: false, message: 'nope' } : base(path, start, count),
+    )
+    const tree = useLazyTree(fetchPage)
+    tree.setRoot(prepared)
+    tree.toggle(['items'])
+    await flushPromises()
+    failing = true
+    tree.showMore(['items'])
+    await flushPromises()
+    const rows = summaries(tree.rows.value)
+    expect(rows).toContain('2 99: 99')
+    expect(rows).toContain('2 error nope')
+    failing = false
+    tree.retry(['items'])
+    expect(fetchPage).toHaveBeenLastCalledWith(['items'], 100, PAGE_SIZE)
+  })
+
   test('node expressions chain from the root and stop under an entry with none', async () => {
     const tree = useLazyTree(fakeFetch())
     tree.setRoot(prepared)
