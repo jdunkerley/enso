@@ -63,7 +63,8 @@ export class SuggestionDb extends ReactiveDb<SuggestionId, SuggestionEntry> {
   )
   /**
    * Static conversion methods `Target.from (that:Source)` (the target is the method's owner): the
-   * target type's key to the keys of its source
+   * target type's key to the keys of its source types. Visualizations use it to offer a chart for
+   * every type that converts to its data type.
    */
   readonly conversionSources = new ReactiveIndex(this, (_id, entry): [string, string][] => {
     if (entry.kind !== SuggestionKind.Method || entry.name !== 'from' || entry.selfType != null)
