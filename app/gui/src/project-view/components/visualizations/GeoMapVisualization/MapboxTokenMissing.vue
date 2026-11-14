@@ -8,17 +8,20 @@ import Button from '$/components/Button/Button.vue'
 import Result from '$/components/Result/Result.vue'
 import SettingsTabType from '$/configurations/settingsTabs'
 import { useText } from '$/providers/text'
-import { useRoute, useRouter } from 'vue-router'
+import router from '$/router'
 
 const { getText } = useText()
-const router = useRouter()
-const route = useRoute()
 
+/**
+ * Open Settings on the Local tab. The app's router instance is used directly: a visualization
+ * renders inside a custom element, a separate Vue app that the router plugin is not installed in,
+ * so `useRouter()` there returns `undefined`. The router's guard opens the Settings tab.
+ */
 function openSetting() {
   void router.push({
     name: 'settings',
     query: {
-      ...route.query,
+      ...router.currentRoute.value.query,
       [`${SEARCH_PARAMS_PREFIX}SettingsTab`]: JSON.stringify(SettingsTabType.local),
     },
   })
@@ -26,13 +29,25 @@ function openSetting() {
 </script>
 
 <template>
-  <Result
-    class="MapboxTokenMissing"
-    status="info"
-    centered
-    :title="getText('mapboxTokenMissing')"
-    :subtitle="getText('mapboxTokenMissingDescription')"
-  >
-    <Button variant="outline" @press="openSetting">{{ getText('openMapboxTokenSetting') }}</Button>
-  </Result>
+  <div class="MapboxTokenMissing">
+    <Result
+      status="info"
+      centered
+      :title="getText('mapboxTokenMissing')"
+      :subtitle="getText('mapboxTokenMissingDescription')"
+    >
+      <Button variant="outline" @press="openSetting">{{
+        getText('openMapboxTokenSetting')
+      }}</Button>
+    </Result>
+  </div>
 </template>
+
+<style scoped>
+.MapboxTokenMissing {
+  height: 100%;
+  /* Clears the visualization toolbar, which overlays the top of the map (`setToolbarOverlay`):
+   * its 4px margin plus a section of about 40px. */
+  padding-top: 48px;
+}
+</style>
