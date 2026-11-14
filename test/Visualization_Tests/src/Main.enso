@@ -17,7 +17,6 @@ import project.Visualization_Spec
 import project.Viz_Cell_Spec
 import project.Viz_Table_Spec
 import project.Widgets_Spec
-import project.Lazy_Table_Spec
 
 main filter=Nothing =
     suite = Test.build suite_builder->
@@ -25,7 +24,6 @@ main filter=Nothing =
         Geo_Map_Spec.add_specs suite_builder
         Helpers_Spec.add_specs suite_builder
         Id_Spec.add_specs suite_builder
-        Lazy_Table_Spec.add_specs suite_builder
         Lazy_Text_Spec.add_specs suite_builder
         Pinned_Spec.add_specs suite_builder
         Scatter_Plot_Spec.add_specs suite_builder

@@ -1,8 +1,11 @@
 from Standard.Base import all
+import Standard.Base.Network.Email.Email_Send_Response.Send_Response
 
 import project.Internal.Columns_Source.Columns_Source
 import project.Internal.View_Source.View_Source
+import project.Internal.View_Json
 import project.Viz_Column_Kind.Viz_Column_Kind
+import project.Viz_Cell.Viz_Cell
 
 ## ---
    private: true
@@ -178,3 +181,45 @@ type Viz_Unsupported
        ---
     to_display_text self -> Text =
         "The visualised value does not support `" + self.operation + "`."
+
+## ---
+   private: true
+   ---
+Viz_Table.from (that:Any) = Viz_Table.from_view (_-> View_Json.make_json_for_other that . to_json)
+
+## ---
+   private: true
+   ---
+Viz_Table.from (that:Vector) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_vector that max_rows . to_json)
+
+## ---
+   private: true
+   ---
+Viz_Table.from (that:Array) = Viz_Table.from that.to_vector
+
+## ---
+   private: true
+   ---
+Viz_Table.from (that:Dictionary) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_dictionary that max_rows)
+
+## ---
+   private: true
+   ---
+Viz_Table.from (that:Hashset) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_hashset that max_rows)
+
+## ---
+   private: true
+   ---
+Viz_Table.from (that:JS_Object) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_js_object that max_rows)
+
+## ---
+   private: true
+   ---
+Viz_Table.from (that:Number) = Viz_Table.from_view (_-> JS_Object.from_pairs [["json", Viz_Cell.render_value that]] . to_json)
+
+## ---
+   private: true
+   ---
+   The response to sending an email (Base cannot depend on Visualization).
+Viz_Table.from (that:Send_Response) =
+    Viz_Table.from_columns [Viz_Header.Label "Status", Viz_Header.Label "Email"] [[that.to_text], [that.email.to_text]]
