@@ -36,7 +36,7 @@ public class GoogleSheetsHeaders {
   }
 
   /** Spreadsheet column letters of a zero-based column index: 0 is A, 25 is Z, 26 is AA. */
-  private static String columnLetters(int column) {
+  static String columnLetters(int column) {
     var letters = new StringBuilder();
     for (int n = column; n >= 0; n = n / 26 - 1) {
       letters.insert(0, (char) ('A' + n % 26));

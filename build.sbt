@@ -5266,7 +5266,9 @@ lazy val `std-google` = project
       "com.google.analytics"  % "google-analytics-data"      % googleAnalyticsDataVersion exclude ("com.google.code.findbugs", "jsr305") exclude ("io.grpc", "grpc-xds"),
       "io.grpc"               % "grpc-netty-shaded"          % grpcVersion exclude ("com.google.code.findbugs", "jsr305"),
       // See Note [Google Libraries Move With gRPC].
-      "javax.annotation" % "javax.annotation-api" % javaxAnnotationApiVersion
+      "javax.annotation" % "javax.annotation-api" % javaxAnnotationApiVersion,
+      "junit"            % "junit"                % junitVersion   % Test,
+      "com.github.sbt"   % "junit-interface"      % junitIfVersion % Test
     ),
     // See Note [Google Libraries Move With gRPC].
     dependencyOverrides += "org.conscrypt" % "conscrypt-openjdk-uber" % conscryptVersion,
