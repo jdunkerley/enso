@@ -1,0 +1,65 @@
+from Standard.Base import all
+
+from Standard.Table import Table
+import Standard.Table.In_Memory_Column.In_Memory_Column
+import Standard.Database.Connection.Database
+import Standard.Database.Extensions.Upload_Table
+from Standard.SQLite import SQLite
+
+import Standard.Visualization.Table.Visualization
+
+from Standard.Test import all
+
+## Times the table view (`prepare_visualization`) for the cases of the spec B
+   performance spike. Not a CI gate: it is pending unless `ENSO_VIZ_BENCH=1`.
+   Run it on `develop` and on the branch and compare the printed lines,
+   `BENCH|<case>|<mode>|<median ms>|<p90 ms>`.
+   - `first`: a new table for each call (its metrics awaited, untimed).
+   - `repeat`: the same table for each call (a view shown before).
+   `c2_1x2500` thrashes Java's 1000-entry caches on both sides: noisy.
+
+make_table (rows : Integer) (cols : Integer) -> Table =
+    ints = (0.up_to rows).map r-> r * 3
+    floats = (0.up_to rows).map r-> if r % 10 == 7 then Nothing else r * 0.5 + 0.25
+    texts_small = (0.up_to 97).map r-> "text " + r.to_text
+    texts = (0.up_to rows).map r-> if r % 13 == 5 then Nothing else texts_small.at (r % 97)
+    dates_small = (0.up_to 365).map r-> (Date.new 2020 1 1) + (Period.new days=r)
+    dates = (0.up_to rows).map r-> dates_small.at (r % 365)
+    columns = (0.up_to cols).map i-> case i % 4 of
+        0 -> ["i" + i.to_text, ints]
+        1 -> ["f" + i.to_text, floats]
+        2 -> ["t" + i.to_text, texts]
+        _ -> ["d" + i.to_text, dates]
+    table = Table.new columns
+    table.columns.each c-> (c:In_Memory_Column).await_metrics
+    table
+
+time_ms (input : Any) -> Float =
+    start = System.nano_time
+    result = Visualization.prepare_visualization input 1000
+    elapsed = System.nano_time - start
+    if result.length < 0 then Panic.throw "unreachable"
+    elapsed.to_float / 1000000.0
+
+## Times `prepare_visualization` on `prepare` (evaluated afresh, untimed, for
+   each call): 10 warm-ups, then 30 timed calls.
+bench (name : Text) ~prepare =
+    times = (0.up_to 40).map _-> time_ms prepare
+    sorted = times.drop 10 . sort
+    median = sorted.at (sorted.length.div 2)
+    p90 = sorted.at ((sorted.length * 9).div 10)
+    IO.println ("BENCH|" + name + "|" + median.to_text + "|" + p90.to_text)
+
+add_specs suite_builder =
+    pending = if Environment.get "ENSO_VIZ_BENCH" == "1" then Nothing else "Set ENSO_VIZ_BENCH=1 to time the table view."
+    suite_builder.group "Table view timings" group_builder->
+        group_builder.specify "prints the timings" pending=pending <|
+            [["a_50x50", 50, 50], ["c1_10x1000", 10, 1000], ["c2_1x2500", 1, 2500]].each c->
+                bench (c.at 0 + "|first") (make_table (c.at 1) (c.at 2))
+                table = make_table (c.at 1) (c.at 2)
+                bench (c.at 0 + "|repeat") table
+            big = make_table 1000000 20
+            bench "b_1Mx20|repeat" big
+            connection = Database.connect SQLite.In_Memory
+            db_table = (make_table 1000 50).select_into_database_table connection "bench" temporary=True
+            bench "d_1000x50_db|repeat" db_table
