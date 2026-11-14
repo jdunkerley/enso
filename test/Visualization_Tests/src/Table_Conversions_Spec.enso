@@ -1,0 +1,43 @@
+from Standard.Base import all
+import Standard.Base.Errors.Common.No_Such_Conversion
+
+from Standard.Table import Table
+from Standard.Visualization.SQL_Viz import SQL_Viz
+from Standard.Visualization.Viz_Cell import Viz_Cell
+from Standard.Visualization.Viz_Column_Kind import Viz_Kind
+from Standard.Visualization.Viz_Table import Viz_Table
+
+from Standard.Test import all
+
+add_specs suite_builder =
+    suite_builder.group "Table to Viz_Table" group_builder->
+        t = Table.new [["x", [1, 2, 3]], ["s", ["a", "b", "c"]]]
+
+        group_builder.specify "describes an in-memory table" <|
+            vt = Viz_Table.from t
+            vt.column_names . should_equal ["x", "s"]
+            vt.column_kinds . map .kind . should_equal [Viz_Kind.Numeric, Viz_Kind.Textual]
+            vt.column_kinds . map .display_name . should_equal ["Integer", "Char"]
+            vt.row_count . should_equal 3
+            vt.supported_operations . should_equal ["rows", "server_rows"]
+
+        group_builder.specify "a one-column and a 1x1 table are tables, not columns" <|
+            Viz_Table.from (t.select_columns ["x"]) . column_names . should_equal ["x"]
+            Viz_Table.from (Table.new [["n", [7]]]) . column_names . should_equal ["n"]
+
+        group_builder.specify "row operations act like Table's own" <|
+            vt = Viz_Table.from t . add_row_number "rn" . filter_between "x" 2 3 . select_columns ["rn", "x"]
+            vt.column_values "rn" . should_equal [1, 2]
+            vt.rename_columns ["a", "b"] . column_names . should_equal ["a", "b"]
+            vt.rows_json . length . should_equal 2
+
+        group_builder.specify "a column converts with its table" <|
+            Viz_Table.from (t.at "s") . column_names . should_equal ["s"]
+
+        group_builder.specify "an in-memory table has no SQL" <|
+            Panic.catch No_Such_Conversion (SQL_Viz.from t) (_-> "none") . should_equal "none"
+
+        group_builder.specify "cells of tables, columns and rows" <|
+            (Viz_Cell.from t).render 1 . should_equal "Table{3 rows x 2 columns}"
+            (Viz_Cell.from (t.at "x")).render 1 . should_equal "Column{x: 3 rows}"
+            (Viz_Cell.from (t.rows.at 0)).pairs . should_equal [["x", 1], ["s", "a"]]

@@ -8,6 +8,11 @@ import Standard.Base.Errors.Common.Additional_Warnings
 import Standard.Base.Errors.Common.Floating_Point_Equality
 import Standard.Base.Errors.Common.Incomparable_Values
 import Standard.Base.Errors.Common.Index_Out_Of_Bounds
+import Standard.Base.Errors.Common.No_Such_Conversion
+import Standard.Visualization.Id.Id
+import Standard.Visualization.SQL_Viz.SQL_Viz
+import Standard.Visualization.Viz_Table.Viz_Table
+import project.Internal.In_Memory_Viz_Source.In_Memory_Viz_Source
 import Standard.Base.Errors.Common.No_Such_Method
 import Standard.Base.Errors.Common.Out_Of_Memory
 import Standard.Base.Errors.Common.Type_Error
@@ -97,6 +102,14 @@ polyglot java import org.enso.table.error.UnmatchedRow
 polyglot java import org.enso.table.parsing.problems.ParseProblemAggregator
 
 type In_Memory_Table_Implementation
+    to_viz_table (this_table : Table & In_Memory_Table) =
+        Viz_Table.from_source (In_Memory_Viz_Source.Value this_table Nothing)
+
+    to_sql_viz (this_table : Table & In_Memory_Table) =
+        Panic.throw (No_Such_Conversion.Error SQL_Viz this_table Nothing)
+
+    default_visualization (this_table : Table & In_Memory_Table) = Id.table
+
     display (this_table : Table & In_Memory_Table) show_rows:Integer format_terminal:Boolean =
         Display_Helpers.display_table this_table add_row_index=True max_rows_to_show=show_rows all_rows_count=this_table.row_count format_terminal=format_terminal
 

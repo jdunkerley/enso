@@ -4,12 +4,7 @@ import Standard.Base.Runtime.State
 from Standard.Base.Data.Json import render
 from Standard.Base.Logging import all
 
-import Standard.Table.In_Memory_Table.In_Memory_Table
-import Standard.Table.Row.Row
-from Standard.Table import Column, Table
-
 import project.Id.Id
-import project.Table as Table_Visualization
 from project.Text import get_lazy_visualization_text_window
 
 polyglot java import org.enso.base.Text_Utils
@@ -131,23 +126,6 @@ Array.to_default_visualization_data self =
 ## ---
    private: true
    ---
-   Guides the visualization system to display the most suitable graphical
-   representation for this table.
-Table.default_visualization : Id
-Table.default_visualization self =
-    if self.is_a In_Memory_Table then Id.table else Id.sql_query
-
-## ---
-   private: true
-   ---
-   Guides the visualization system to display the most suitable graphical
-   representation for this Column.
-Column.default_visualization : Id
-Column.default_visualization self = Id.table
-
-## ---
-   private: true
-   ---
    Returns the data requested to render a lazy view of the default visualization.
    Decides whether to return a simplified version of the lazy data format.
 make_lazy_visualization_data : Text -> Vector Integer -> Vector Integer -> Integer -> Text
@@ -185,45 +163,6 @@ Text.to_lazy_visualization_data self text_window_position text_window_size chunk
         ## Workaround so that the JS String is converted to a Text
                https://www.pivotaltracker.com/story/show/184061302
         "" + get_lazy_visualization_text_window self text_window_position text_window_size chunk_size
-
-## ---
-   private: true
-   ---
-   Shows a JSON serialization of a truncated version of this column, for the
-   benefit of visualization in the IDE.
-Column.to_default_visualization_data : Text
-Column.to_default_visualization_data self =
-    size = ['length', self.row_count]
-    name = ['name', self.name]
-    max_data = 100
-    data = ['data', self.to_vector.take (..First max_data)]
-    JS_Object.from_pairs [size, name, data] . to_text
-
-## ---
-   private: true
-   ---
-   Guides the visualization system to display the most suitable graphical
-   representation for this Row.
-Row.default_visualization : Id
-Row.default_visualization self = Id.table
-
-## ---
-   private: true
-   ---
-   Returns a Text used to display this table in the IDE by default.
-   Returns a JSON object containing useful metadata and previews of column
-   values.
-Row.to_default_visualization_data : Text
-Row.to_default_visualization_data self =
-    self.to_vector.to_default_visualization_data
-
-## ---
-   private: true
-   ---
-   Returns the data requested to render a lazy view of the default visualization.
-Table.to_lazy_visualization_data : Vector Integer ->  Vector Integer -> Vector Integer -> Integer -> Text
-Table.to_lazy_visualization_data self table_cell_position text_window_position text_window_size chunk_size =
-    Table_Visualization.get_lazy_visualization_data self table_cell_position text_window_position text_window_size chunk_size
 
 ## ---
    private: true

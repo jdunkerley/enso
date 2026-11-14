@@ -10,6 +10,7 @@ import project.Lazy_Text_Spec
 import project.Pinned_Spec
 import project.Scatter_Plot_Spec
 import project.SQL_Spec
+import project.Table_Conversions_Spec
 import project.Table_Spec
 import project.Table_Visualisation_Integration_Spec
 import project.Visualization_Spec
@@ -29,6 +30,7 @@ main filter=Nothing =
         Pinned_Spec.add_specs suite_builder
         Scatter_Plot_Spec.add_specs suite_builder
         SQL_Spec.add_specs suite_builder
+        Table_Conversions_Spec.add_specs suite_builder
         Table_Spec.add_specs suite_builder
         Table_Visualisation_Integration_Spec.add_specs suite_builder
         Visualization_Spec.add_specs suite_builder

@@ -3,6 +3,11 @@ import Standard.Base.Data.Array_Proxy.Array_Proxy
 import Standard.Base.Errors.Common.Index_Out_Of_Bounds
 
 import project.Errors.No_Such_Column
+import Standard.Visualization.Helpers
+import Standard.Visualization.Id.Id
+import Standard.Visualization.Viz_Cell.Viz_Cell
+import Standard.Visualization.Viz_Table.Viz_Table
+import project.Internal.Viz_Helpers
 import project.Internal.Widget_Helpers
 from project.Internal.Storage import java_to_enso
 
@@ -132,3 +137,26 @@ type Row_Comparator
    private: true
    ---
 Comparable.from (that:Row) = Comparable.new that Row_Comparator
+
+## ---
+   private: true
+   ---
+Viz_Table.from (that:Row) = Viz_Table.from_view (_-> Viz_Helpers.row_table_view_json that)
+
+## ---
+   private: true
+   ---
+Viz_Cell.from (that:Row) =
+    pairs = that.column_names.map (n-> [n, that.get n])
+    Viz_Cell.Value (level-> Viz_Helpers.row_cell that level) pairs
+
+## ---
+   private: true
+   ---
+Row.default_visualization self -> Id = Id.table
+
+## ---
+   private: true
+   ---
+   Returns a Text used to display this row in the IDE by default.
+Row.to_default_visualization_data self -> Text = Helpers.render_vector self.to_vector
