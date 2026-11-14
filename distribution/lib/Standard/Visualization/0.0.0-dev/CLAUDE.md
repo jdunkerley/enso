@@ -12,7 +12,6 @@ it either.
 - `Geo_Map.process_to_json_text value` — IDE entry for the geo-map widget.
 - `Scatter_Plot.process_to_json_text value` — IDE entry for the scatter-plot
   widget.
-- `Table.<helpers>` — lazy/chunked rendering helpers for the IDE table widget.
 
 ## Common usage
 
@@ -27,6 +26,13 @@ components and workflows should not.
   `src/Internal/Names.enso`, `src/Internal/View_Json.enso` — the in-memory
   sources, name matching and view JSON behind `Viz_Table`.
 - `src/Geo_Map.enso`, `src/Scatter_Plot.enso` — per-visualization preprocessors.
+- `src/Table/Visualization.enso` — IDE entry points of the table view
+  (`prepare_visualization`, `get_rows_for_table`,
+  `get_distinct_values_for_column`), written against `Viz_Table`.
+- `src/SQL/Visualization.enso` — IDE entry point of the SQL view, written
+  against `SQL_Viz`.
+- `src/Internal/Chart_Limits.enso` — the row bounds and `local_rows`, which the
+  charts use to read a bounded number of rows from any `Viz_Table`.
 - `src/Widgets.enso`, `src/Id.enso`, `src/Warnings.enso`, `src/File_Upload.enso`
   — supporting IDE utilities.
 
@@ -61,6 +67,10 @@ Visualization and not on each data library.
   interpolations.
 - `Viz_Cell` (`src/Viz_Cell.enso`) - how a value renders inside a table cell;
   Base values render here, a library renders its own types by a conversion.
+
+Layering rule: Visualization imports only `Standard.Base`; Base knows nothing
+about visualisation. Libraries (`Table`, `Database`, ...) import Visualization
+and convert their values to its data types, so nothing here may import them.
 
 Rule: conversions are on the public types (`Viz_Table.from (that:Table)`), and
 an implementation raises `No_Such_Conversion` when it cannot supply a type.

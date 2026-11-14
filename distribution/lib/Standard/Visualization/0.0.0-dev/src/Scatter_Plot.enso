@@ -123,7 +123,11 @@ process_to_json_text value bounds=Nothing limit=Nothing = time_visualization Sca
         _ : Array -> json_from_vector value bounds limit
         _ ->
             vt = Viz_Table.from value
-            if vt.column_names.is_empty then json_from_vector value.to_vector bounds limit else
+            if vt.column_names.is_empty then
+                ## A value with no columns is charted through its `to_vector`; one without it, or with nothing in it, shows the empty state.
+                as_vector = Panic.catch Any (value.to_vector.catch Any _->Nothing) _->Nothing
+                if as_vector.is_nothing || as_vector.is_empty then no_numeric_json else json_from_vector as_vector bounds limit
+            else
                 ## A database reads at most `limit` rows (15000 when there is no limit) before anything else, as before.
                 rows = Chart_Limits.local_rows vt (limit.if_nothing Chart_Limits.chart_row_bound)
                 ## A source made of columns only (a connection, a workbook) cannot work on rows: show the chart's empty state.

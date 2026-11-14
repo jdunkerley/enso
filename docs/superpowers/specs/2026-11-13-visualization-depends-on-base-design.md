@@ -485,4 +485,8 @@ Found while writing the piece 1 plan
   and heatmap rows in §4 and note 5 above. Image's `Histogram` data type stays.
 - **Spatial geo maps** stay as they are, without a golden file; they are
   addressed later.
+- Golden changes made on purpose. `geo_mem_table_nothing_known` changed: develop
+  filled every role with a placeholder all-"X" column when the table had a
+  column named `x`. `geo_mem_column`, `geo_db_column` and `geo_connection`
+  changed: columns and connections now take the table path and give `{}`.
 - Steps 4 and 5 otherwise as planned; step 5 keeps the changelog entry.

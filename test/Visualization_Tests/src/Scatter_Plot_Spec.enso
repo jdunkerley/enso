@@ -126,6 +126,11 @@ add_specs suite_builder =
             value = 2.up_to 5
             expect value no_labels '[{"x":0,"y":2, "row_number": 0},{"x":1,"y":3, "row_number": 1},{"x":2,"y":4, "row_number": 2}]' '"at"'
 
+        group_builder.specify "a value with nothing to chart shows the empty state" <|
+            empty_state = '{"data":[],"axis":{},"is_multi_series":false,"get_row_method":"get_row","x_value_type":"Integer","error_message":"At least one numeric (other than X) must be provided for a scatter plot."}'
+            Scatter_Plot.process_to_json_text 42 . should_equal empty_state
+            Scatter_Plot.process_to_json_text Nothing . should_equal empty_state
+
 main filter=Nothing =
     suite = Test.build suite_builder->
         add_specs suite_builder
