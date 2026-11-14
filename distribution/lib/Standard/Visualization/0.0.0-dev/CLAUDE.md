@@ -65,6 +65,9 @@ Visualization and not on each data library.
 Rule: conversions are on the public types (`Viz_Table.from (that:Table)`), and
 an implementation raises `No_Such_Conversion` when it cannot supply a type.
 
+How to add a chart: read `Viz_Table` (`Chart_Limits.local_rows` first); add a
+data type only when the chart needs something a table cannot give.
+
 ## Things to avoid in generated code
 
 - **Do not import `Standard.Visualization` in user code.** It is internal to the
