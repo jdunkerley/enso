@@ -1,0 +1,220 @@
+from Standard.Base import all
+import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+
+import project.Viz_Json.Viz_Json
+
+## ---
+   private: true
+   ---
+   A value as a tree that the JSON visualization loads a page at a time. Base
+   values are converted here; a library or a user type describes its own with
+   `Viz_Tree.from (that:Its_Type)` in its own module.
+type Viz_Tree
+    ## ---
+       private: true
+       ---
+       A scalar. `json_text` is its JSON: a number, boolean, `null` or text.
+    Leaf (json_text : Text)
+
+    ## ---
+       private: true
+       ---
+       An object (`kind` is `"object"`) or an array (`"array"`).
+       - `size`: how many children it has.
+       - `label`: the text of its row, such as `{12 keys}` or `[1,234 items]`.
+       - `children start count`: its `Viz_Tree_Child`ren from `start`, at most
+         `count` of them; none past the end. A child's tree is computed only
+         when its page is asked for.
+    Branch (kind : Text) (size : Integer) (label : Text) (children : Integer -> Integer -> Vector)
+
+    ## ---
+       private: true
+       ---
+       A branch whose children `page_of start end` reads, for
+       `0 <= start < end <= size`. A start at or past the end gives no
+       children; a negative start or count is an `Illegal_Argument`.
+    paged (kind : Text) (size : Integer) (label : Text) (page_of : Integer -> Integer -> Vector) -> Viz_Tree =
+        Viz_Tree.Branch kind size label start-> count->
+            if start < 0 || count < 0 then Error.throw (Illegal_Argument.Error "A page's start and count must not be negative.") else
+                end = (start + count).min size
+                if start >= end then [] else page_of start end
+
+    ## ---
+       private: true
+       ---
+       A count with a thousands separator: `1 row`, `1,234 rows`.
+    count_text (n : Integer) (singular : Text) (plural : Text) -> Text =
+        (n.format "#,##0" Locale.us) + " " + (if n == 1 then singular else plural)
+
+    ## ---
+       private: true
+       ---
+       The label of an object of `n` keys: `{1 key}`, `{12 keys}`.
+    keys_label (n : Integer) -> Text = "{" + (Viz_Tree.count_text n "key" "keys") + "}"
+
+    ## ---
+       private: true
+       ---
+       The label of an array of `n` items: `[1 item]`, `[1,234 items]`.
+    items_label (n : Integer) -> Text = "[" + (Viz_Tree.count_text n "item" "items") + "]"
+
+    ## ---
+       private: true
+       ---
+       The child with `key`: an array's by its index, an object's by looking
+       through its pages. `Illegal_Argument` if there is none.
+    child self (key : Text | Integer) -> Viz_Tree_Child ! Illegal_Argument =
+        missing = Illegal_Argument.Error ("No child has the key " + key.pretty + ".")
+        case self of
+            Viz_Tree.Leaf _ -> Error.throw missing
+            Viz_Tree.Branch kind size _ children -> case kind == "array" && (key.is_a Integer) of
+                True ->
+                    page = if key < 0 then [] else children key 1
+                    if page.is_empty then Error.throw missing else page.first
+                False -> find_child children size key 0 . if_nothing (Error.throw missing)
+
+    ## ---
+       private: true
+       ---
+       The same tree with no node expressions at any depth, for a value whose
+       children come from its JSON: no expression reaches them.
+    without_node_expressions self -> Viz_Tree = case self of
+        Viz_Tree.Leaf _ -> self
+        Viz_Tree.Branch kind size label children ->
+            Viz_Tree.Branch kind size label start-> count->
+                children start count . map c->
+                    Viz_Tree_Child.Value c.key c.tree.without_node_expressions Nothing
+
+## ---
+   private: true
+   ---
+   One child of a `Viz_Tree.Branch`.
+type Viz_Tree_Child
+    ## ---
+       private: true
+       ---
+       - `key`: its object key or array index.
+       - `tree`: its tree.
+       - `node_expression`: what a double-click appends to its parent's
+         expression to reach it (`.at 3`, `.get 'name'`, `.name`), or
+         `Nothing` when no expression reaches it.
+    Value (key : Text | Integer) (tree : Viz_Tree) (node_expression : Text | Nothing)
+
+## ---
+   private: true
+   ---
+   How many children one page of the JSON visualization holds.
+page_size = 100
+
+## ---
+   private: true
+   ---
+   Any value: the tree of its `to_js_object`, with no node expressions. If
+   `to_js_object` fails, its display text and the error.
+Viz_Tree.from (that:Any) =
+    js = Panic.recover Any that.to_js_object . catch Any err->
+        JS_Object.from_pairs [["value", that.to_display_text], ["_to_js_object_error_", err.to_display_text]]
+    tree = case js of
+        _ : JS_Object -> Viz_Tree.from js
+        _ : Vector -> Viz_Tree.from js
+        _ : Text -> Viz_Tree.from js
+        _ : Number -> Viz_Tree.from js
+        _ : Boolean -> Viz_Tree.from js
+        Nothing -> Viz_Tree.Leaf "null"
+        _ -> Viz_Tree.Leaf that.to_display_text.to_json
+    tree.without_node_expressions
+
+## ---
+   private: true
+   ---
+Viz_Tree.from (that:Nothing) =
+    _ = that
+    Viz_Tree.Leaf "null"
+
+## ---
+   private: true
+   ---
+   Text over 2000 characters is cut, plus `…`, as `Viz_Json` cuts it.
+Viz_Tree.from (that:Text) = Viz_Tree.Leaf (Viz_Json.from that).json_text
+
+## ---
+   private: true
+   ---
+Viz_Tree.from (that:Number) = Viz_Tree.Leaf that.to_json
+
+## ---
+   private: true
+   ---
+Viz_Tree.from (that:Boolean) = Viz_Tree.Leaf that.to_json
+
+## ---
+   private: true
+   ---
+   A date is a leaf of its display text.
+Viz_Tree.from (that:Date) = Viz_Tree.Leaf that.to_display_text.to_json
+
+## ---
+   private: true
+   ---
+   A date-time is a leaf of its display text.
+Viz_Tree.from (that:Date_Time) = Viz_Tree.Leaf that.to_display_text.to_json
+
+## ---
+   private: true
+   ---
+   A time of day is a leaf of its display text.
+Viz_Tree.from (that:Time_Of_Day) = Viz_Tree.Leaf that.to_display_text.to_json
+
+## ---
+   private: true
+   ---
+   Its keys, each reached with `.get key`.
+Viz_Tree.from (that:JS_Object) =
+    names = that.field_names
+    Viz_Tree.paged "object" names.length (Viz_Tree.keys_label names.length) start-> end->
+        names.slice start end . map name->
+            Viz_Tree_Child.Value name (Viz_Tree.from (that.get name)) (".get " + name.pretty)
+
+## ---
+   private: true
+   ---
+   Its indices, each reached with `.at index`. An error item is its JSON.
+Viz_Tree.from (that:Vector) =
+    Viz_Tree.paged "array" that.length (Viz_Tree.items_label that.length) start-> end->
+        that.slice start end . map_with_index i-> item->
+            index = start + i
+            Viz_Tree_Child.Value index (element_tree item) (".at " + index.to_text)
+
+## ---
+   private: true
+   ---
+Viz_Tree.from (that:Array) = Viz_Tree.from (Vector.from_polyglot_array that)
+
+## ---
+   private: true
+   ---
+   Its keys, each reached with `.at key`. A key that is neither text nor an
+   integer shows as its display text.
+Viz_Tree.from (that:Dictionary) =
+    pairs = that.to_vector
+    Viz_Tree.paged "object" pairs.length (Viz_Tree.keys_label pairs.length) start-> end->
+        pairs.slice start end . map pair->
+            key = pair.at 0
+            Viz_Tree_Child.Value (shown_key key) (Viz_Tree.from (pair.at 1)) (".at " + (key_argument key))
+
+## The first child with `key` in the pages from `start` on, or `Nothing`.
+private find_child children size key start =
+    if start >= size then Nothing else
+        found = children start page_size . find (c-> c.key == key) if_missing=Nothing
+        if found.is_nothing.not then found else
+            @Tail_Call find_child children size key (start + page_size)
+
+## A vector's item: a dataflow error shows as its JSON.
+private element_tree item =
+    if item.is_error then (Viz_Tree.from item.to_js_object).without_node_expressions else Viz_Tree.from item
+
+## A dictionary key as a child's key.
+private shown_key key = if key.is_a Text || key.is_a Integer then key else key.to_display_text
+
+## A dictionary key as the argument of `.at`.
+private key_argument key = if key.is_a Text || key.is_a Number then key.pretty else "(" + key.pretty + ")"
