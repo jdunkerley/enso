@@ -27,6 +27,13 @@ polyglot java import org.enso.yxdb.YXDBReader
 
 ## A file format for reading YXDB files.
 type YXDB_Format
+    ## ---
+       macro_for:
+        - target: Standard.Base.Data.read
+          macros:
+           - yxdb: format=..YXDB_Format
+       ---
+       Reads an Alteryx `.yxdb` file into a Table.
     YXDB_Format
 
     ## ---
