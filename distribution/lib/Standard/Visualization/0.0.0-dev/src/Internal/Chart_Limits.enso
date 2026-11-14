@@ -1,0 +1,21 @@
+private
+
+from Standard.Base import all
+
+import project.Viz_Table.Viz_Table
+
+## How many rows a chart reads from a source that cannot work on its rows in
+   place (a database).
+chart_row_bound = 15000
+
+## The seed every chart samples with, so a chart is stable between updates.
+chart_sample_seed = 15975382
+
+## `vt` when it can work on its rows in place; otherwise a bounded sample of
+   it. A database table's sample is an in-memory table, which can work on its
+   rows, so a database table reads at most `bound` rows. A source made by
+   `Viz_Table.from_columns` or `from_view` (a connection, a workbook) samples to
+   another source without `"rows"`: the result still does not support `"rows"`,
+   and the chart shows its empty state (see the callers).
+local_rows (vt : Viz_Table) (bound : Integer) -> Viz_Table =
+    if vt.supports "rows" then vt else vt.sample bound chart_sample_seed
