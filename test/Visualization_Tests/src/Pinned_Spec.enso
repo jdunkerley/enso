@@ -16,6 +16,7 @@ import Standard.Visualization.Table.Visualization
 
 from Standard.Test import all
 
+import project.Pinned_Fixtures
 from project.Pinned import expect_pinned
 
 type Atom
@@ -80,7 +81,7 @@ add_specs suite_builder =
         table_view "dictionary" (Dictionary.from_vector [["a", 1], ["b", [1, 2]]])
         table_view "hashset" (Hashset.from_vector [3, 1, 2])
         table_view "js_object" (JS_Object.from_pairs [["a", 1], ["b", "two"]])
-        table_view "function" (x-> x + 1)
+        table_view "function" Pinned_Fixtures.increment
         table_view "number" 42
         table_view "text" "hello"
         table_view "atom" (Atom.Value 1 [2, 3])
