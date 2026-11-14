@@ -145,6 +145,17 @@ Two PRs, each its own branch from `develop`:
 - Installer check (PR 1): an Image node opens in the Image visualisation; a
   table, a database table (SQL Query) and a `JS_Object` (JSON) open as before.
 
+## Changed while planning
+
+- The GUI evaluates `a -> (Id.from a).to_js_object.to_json` in module
+  `Standard.Visualization.Id`, not `Helpers`: once `Helpers` loses its
+  `default_visualization` methods, an `Id` import kept only for the GUI would be
+  unused and fail the `-Werror` lint. The engine test uses the same module.
+- Text of exactly 2000 characters stays whole (`<= 2000`); today's lazy path
+  started at 2000.
+- More goldens pinned before the change: `data_xml_element` and `data_array` as
+  well.
+
 ## Non-goals
 
 - The table visualisation's formats (next spec).
