@@ -2,10 +2,6 @@ from Standard.Base import all
 import Standard.Base.Metadata.Widget
 from Standard.Base.Logging import all
 
-from Standard.Table import all
-
-from Standard.Database import all
-
 from project.Helpers import time_visualization, short_display
 
 ## ---

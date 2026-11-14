@@ -38,7 +38,7 @@ libraries:
   Table: { stdBits: [table], dependsOn: [Base, Visualization] }
   Tableau: { stdBits: [tableau], dependsOn: [Base, Table, Visualization] }
   Test: { stdBits: [], dependsOn: [Base] }
-  Visualization: { stdBits: [], dependsOn: [Base, Database, Table] }
+  Visualization: { stdBits: [], dependsOn: [Base] }
   XML: { stdBits: [], dependsOn: [Base, Table, Visualization] }
   YXDB: { stdBits: [yxdb], dependsOn: [Base, Table] }
 
