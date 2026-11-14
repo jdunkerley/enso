@@ -1,0 +1,61 @@
+from Standard.Base import all
+
+## ---
+   private: true
+   ---
+   How a value appears inside a table view cell. Base values are rendered
+   here; a library renders its own types by a conversion
+   `Viz_Cell.from (that:Its_Public_Type)`.
+type Viz_Cell
+    ## ---
+       private: true
+       ---
+       - `render`: the cell's JSON at a nesting level (0 for a top-level cell).
+       - `pairs`: for a record shown as one row of an object matrix, its
+         name/value pairs; otherwise `Nothing`.
+    Value (render : Integer -> Any) (pairs : Vector | Nothing)
+
+    ## ---
+       private: true
+       ---
+       The JSON of `value` in a table view cell.
+    render_value value (level : Integer = 0) -> Any = case value of
+        Nothing -> Nothing
+        txt : Text -> txt
+        num : Number ->
+            js_version = if num.is_finite then num.to_js_object else JS_Object.from_pairs [["type", "Float"], ["value", num.to_text]]
+            if js_version.is_a JS_Object . not then js_version else
+                pairs = [['_display_text_', num.to_display_text]] + js_version.field_names.map f-> [f, js_version.get f]
+                JS_Object.from_pairs pairs
+        boolean : Boolean -> boolean
+        vec : Vector ->
+            if level != 0 then "[… "+vec.length.to_text+" items]" else
+                truncated = vec.take 5 . map v-> (Viz_Cell.render_value v level+1).to_text
+                prepared = if vec.length > 5 then truncated + ["… " + (vec.length - 5).to_text+ " items"] else truncated
+                "[" + (prepared.join ", ") + "]"
+        array : Array -> Viz_Cell.render_value array.to_vector level
+        dict : Dictionary ->
+            if level != 0 then "{… "+dict.length.to_text+" items}" else
+                truncated = dict.keys.take 5 . map k-> k.to_text + ": " + (Viz_Cell.render_value (value.get k) level+1).to_text
+                prepared = if dict.length > 5 then truncated + ["… " + (dict.length - 5).to_text+ " items"] else truncated
+                "{" + (prepared.join ", ") + "}"
+        set : Hashset ->
+            if level != 0 then "{… "+set.length.to_text+" items}" else
+                truncated = set.to_vector.take 5 . map k-> (Viz_Cell.render_value k level+1).to_text
+                prepared = if set.length > 5 then truncated + ["… " + (set.length - 5).to_text+ " items"] else truncated
+                "{" + (prepared.join ", ") + "}"
+        f : Function -> "[Function "+f.to_text+"]"
+        date : Date -> _with_display_text date
+        date_time : Date_Time -> _with_display_text date_time
+        time : Time_Of_Day -> _with_display_text time
+        _ -> (Viz_Cell.from value).render level
+
+## ---
+   private: true
+   ---
+Viz_Cell.from (that:Any) = Viz_Cell.Value (_-> that.to_display_text) Nothing
+
+private _with_display_text value =
+    js_version = value.to_js_object
+    pairs = [['_display_text_', value.to_display_text]] + js_version.field_names.map f-> [f, js_version.get f]
+    JS_Object.from_pairs pairs
