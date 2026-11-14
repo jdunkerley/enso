@@ -217,3 +217,8 @@ playwright/.cache/
 
 /.claude/worktrees
 /.worktrees
+
+# Agents' scratch space. Left untracked, it is swept into every T3 checkpoint
+# snapshot of the working tree; at tens of GB those snapshots were killed
+# part-way and left their temporary object directories in .git/objects.
+/scratchpad
