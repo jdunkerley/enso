@@ -3,7 +3,6 @@ import Standard.Base.Data.Array_Proxy.Array_Proxy
 import Standard.Base.Errors.Common.Index_Out_Of_Bounds
 
 import project.Errors.No_Such_Column
-import Standard.Visualization.Helpers
 import Standard.Visualization.Viz_Cell.Viz_Cell
 import Standard.Visualization.Viz_Json.Viz_Json
 import Standard.Visualization.Viz_Table.Viz_Table
@@ -155,9 +154,3 @@ Viz_Cell.from (that:Row) =
    ---
    The row's values, as a vector.
 Viz_Json.from (that:Row) = Viz_Json.from that.to_vector
-
-## ---
-   private: true
-   ---
-   Returns a Text used to display this row in the IDE by default.
-Row.to_default_visualization_data self -> Text = Helpers.render_vector self.to_vector

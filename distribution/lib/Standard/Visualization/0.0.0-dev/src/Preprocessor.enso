@@ -16,14 +16,6 @@ default_preprocessor x = time_visualization Preprocessor ("default_preprocessor:
         True -> Helpers.truncate x.to_display_text . to_json
         False -> result
 
-
-## ---
-   private: true
-   ---
-   Lazy visualization preprocessor.
-lazy_preprocessor x = x.to_lazy_visualization_data
-
-
 ## ---
    private: true
    ---

@@ -2702,16 +2702,3 @@ Viz_Json.from (that:Column) =
     name = ['name', that.name]
     data = ['data', that.read (..First 100) . to_vector]
     Viz_Json.Value (JS_Object.from_pairs [size, name, data] . to_text)
-
-## ---
-   private: true
-   ---
-   Shows a JSON serialization of a truncated version of this column, for the
-   benefit of visualization in the IDE. Reads at most 100 values, also from a
-   database.
-Column.to_default_visualization_data self -> Text =
-    size = ['length', self.row_count]
-    name = ['name', self.name]
-    max_data = 100
-    data = ['data', self.read (..First max_data) . to_vector]
-    JS_Object.from_pairs [size, name, data] . to_text

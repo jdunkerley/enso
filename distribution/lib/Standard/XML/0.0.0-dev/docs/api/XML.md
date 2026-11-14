@@ -23,7 +23,6 @@
     - parse xml_string:Standard.Base.Data.Text.Text= -> Standard.XML.XML.XML_Document!Standard.XML.XML.XML_Error
     - root_element self -> Standard.XML.XML.XML_Element
     - text self -> Standard.Base.Data.Text.Text!Standard.XML.XML.XML_Error
-    - to_default_visualization_data self -> Standard.Base.Data.Text.Text
     - to_display_text self -> Standard.Base.Data.Text.Text
     - to_js_object self -> Standard.Base.Data.Json.JS_Object!Standard.XML.XML.XML_Error
     - to_table self -> Standard.Table.Table.Table!Standard.Base.Errors.Common.Type_Error
@@ -45,7 +44,6 @@
     - name self -> Standard.Base.Data.Text.Text
     - outer_xml self -> Standard.Base.Data.Text.Text!Standard.XML.XML.XML_Error
     - text self -> Standard.Base.Data.Text.Text!Standard.XML.XML.XML_Error
-    - to_default_visualization_data self nested:Standard.Base.Data.Boolean.Boolean= as_js_object:Standard.Base.Data.Boolean.Boolean= -> (Standard.Base.Data.Text.Text|Standard.Base.Data.Json.JS_Object)
     - to_display_text self -> Standard.Base.Data.Text.Text
     - to_js_object self -> Standard.Base.Data.Json.JS_Object!Standard.XML.XML.XML_Error
     - to_table self -> Standard.Table.Table.Table!Standard.Base.Errors.Common.Type_Error
@@ -60,3 +58,5 @@
 - Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns.from that:Standard.XML.XML.XML_Element -> Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns
 - Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.XML.XML.XML_Element -> Standard.Visualization.Viz_Table.Viz_Table
 - Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.XML.XML.XML_Document -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.XML.XML.XML_Document -> Standard.Visualization.Viz_Json.Viz_Json
+- Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.XML.XML.XML_Element -> Standard.Visualization.Viz_Json.Viz_Json

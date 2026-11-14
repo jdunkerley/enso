@@ -93,7 +93,6 @@
     - text_mid self start:(Standard.Table.Column.Column|Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing) length:(Standard.Table.Column.Column|Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing|Standard.Table.Column.Rest_Of_String)= -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
     - text_replace self term:(Standard.Base.Data.Text.Text|Standard.Base.Data.Text.Regex.Regex|Standard.Table.Column.Column)= new_text:(Standard.Base.Data.Text.Text|Standard.Table.Column.Column)= case_sensitivity:Standard.Base.Data.Text.Case_Sensitivity.Case_Sensitivity= only_first:Standard.Base.Data.Boolean.Boolean= -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
     - text_right self n:(Standard.Table.Column.Column|Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)= -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
-    - to_default_visualization_data self -> Standard.Base.Data.Text.Text
     - to_js_object self -> Standard.Base.Data.Json.JS_Object
     - to_table self -> (Standard.Table.Table.Table|Standard.Base.Any.Any)
     - to_text self -> Standard.Base.Data.Text.Text
@@ -117,3 +116,4 @@
 - Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Table.Column.Column -> Standard.Visualization.Viz_Table.Viz_Table
 - Standard.Visualization.SQL_Viz.SQL_Viz.from that:Standard.Table.Column.Column -> Standard.Visualization.SQL_Viz.SQL_Viz
 - Standard.Visualization.Viz_Cell.Viz_Cell.from that:Standard.Table.Column.Column -> Standard.Visualization.Viz_Cell.Viz_Cell
+- Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.Table.Column.Column -> Standard.Visualization.Viz_Json.Viz_Json
