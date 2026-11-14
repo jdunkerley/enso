@@ -54,9 +54,7 @@ test('Standard.Visualization methods are hidden even with a self type', () => {
     },
   })
   expect(filtering.filter(entry, new SuggestionDb())).toBeNull()
-  expect(
-    new Filtering({ pattern: 'ide_only_method' }).filter(entry, new SuggestionDb()),
-  ).toBeNull()
+  expect(new Filtering({ pattern: 'ide_only_method' }).filter(entry, new SuggestionDb())).toBeNull()
 })
 
 test.each`
