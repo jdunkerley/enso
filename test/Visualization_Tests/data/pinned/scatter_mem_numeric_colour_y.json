@@ -1,0 +1,1 @@
+{"data":[{"x":1,"color":4,"row_number":0,"y":7,"(y_multi 0)":4},{"x":2,"color":5,"row_number":1,"y":8,"(y_multi 0)":5},{"x":3,"color":6,"row_number":2,"y":9,"(y_multi 0)":6}],"axis":{"x":{"label":"x"},"y":{"label":"y"},"(y_multi 0)":{"label":"Colour"}},"is_multi_series":true,"get_row_method":"get_row","x_value_type":"Integer","error_message":null}

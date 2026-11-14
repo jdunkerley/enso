@@ -140,6 +140,8 @@ add_specs suite_builder =
         scatter "mem_1col_x" (Table.new [["X", [5, 6, 7]]])
         scatter "mem_no_x" (Table.new [["a", ["p", "q"]], ["b", [1, 2]]])
         scatter "mem_colour_rownumber" (Table.new [["x", [1, 2]], ["Colour", ["r", "g"]], ["Row_Number", [10, 11]], ["y", [3, 4]], ["z", [5, 6]]])
+        scatter "mem_numeric_color" (Table.new [["x", [1, 2, 3]], ["Color", [4, 5, 6]]])
+        scatter "mem_numeric_colour_y" (Table.new [["x", [1, 2, 3]], ["y", [7, 8, 9]], ["Colour", [4, 5, 6]]])
         scatter "mem_bounds" data.mem_table [1, 2, 0, 10]
         scatter "mem_sampled" data.big_table limit=100
         scatter "db_table" data.db_table

@@ -31,6 +31,22 @@ no_numeric_json = '{"data":[],"axis":{},"is_multi_series":false,"get_row_method"
 ## ---
    private: true
    ---
+   Each row as a JSON object with the keys `fields`, the value of each from the
+   column `sources` names at the same position. A column can be the source of
+   several fields: the fields are rendered in runs that use each column once
+   (a table cannot hold a column twice) and the runs' objects are joined.
+rows_by_field : Viz_Table -> Vector Text -> Vector Text -> Vector Text
+rows_by_field vt sources fields =
+    runs = sources.zip fields . fold [] acc-> pair->
+        if acc.not_empty && (acc.last.map .first . contains pair.first . not) then acc.drop (..Last 1) + [acc.last + [pair]] else acc + [[pair]]
+    run_rows = runs.map run->
+        vt.select_columns (run.map .first) . rename_columns (run.map .second) . rows_json
+    run_rows.drop 1 . fold run_rows.first acc-> next->
+        acc.zip next a-> b-> (a.drop (..Last 1)) + "," + (b.drop 1)
+
+## ---
+   private: true
+   ---
 json_from_viz_table : Viz_Table -> Vector Integer | Nothing -> Integer | Nothing -> Text
 json_from_viz_table vt bounds limit =
     names = vt.column_names
@@ -50,7 +66,8 @@ json_from_viz_table vt bounds limit =
             core_sources = base_names + (if Nothing == color then [] else [color]) + [row_number_name]
             data_names = names.zip kinds . filter (p-> core_names.contains p.first . not && p.second.is_numeric) . map .first
             if data_names.length == 0 then no_numeric_json else
-                merged = with_row_number.select_columns core_sources+data_names
+                ## One column can feed two fields (a numeric colour column is also a data column), so each source column is selected once.
+                merged = with_row_number.select_columns (core_sources+data_names).distinct
                 ## Bound Data
                 bounded = if bounds.is_nothing then merged else
                     x_filtered = merged.filter_between x (bounds.at 0) (bounds.at 1)
@@ -62,10 +79,11 @@ json_from_viz_table vt bounds limit =
                 ## Create the JSON for the data rows
                 field_names = ["x"] + (core_names.drop 1 . map c-> c.to_case ..Lower) + ["y"] + (1.up_to data_names.length . map i-> "(y_multi " + (i-1).to_text + ")")
                 merged_names = [x] + core_names.drop 1 + data_names
+                field_sources = core_sources + data_names
                 name_map = merged_names.zip field_names
                 filtered = name_map.take 1 + name_map.drop core_names.length
                 axes_json = '{' + ((filtered.map p-> p.second.to_json + ':{"label":' + p.first.to_json + '}') . join ',') + '}'
-                data_json = "[" + (limited.rename_columns field_names . rows_json . join ',') + "]"
+                data_json = "[" + (rows_by_field limited field_sources field_names . join ',') + "]"
                 '{"data":' + data_json + ',"axis":' + axes_json + ',"is_multi_series":' + (data_names.length > 1).to_json + ',"get_row_method":"get_row","x_value_type":"' + x_kind.display_name + '","error_message":null}'
 
 
