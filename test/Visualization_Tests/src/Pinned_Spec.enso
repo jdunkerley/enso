@@ -1,0 +1,173 @@
+from Standard.Base import all
+import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+
+from Standard.Table import Table, Column
+import Standard.Database.Connection.Database
+import Standard.Database.Extensions.Upload_Table
+from Standard.SQLite import SQLite
+from Standard.XML import XML_Document
+
+import Standard.Visualization.Geo_Map
+import Standard.Visualization.Helpers
+import Standard.Visualization.Preprocessor
+import Standard.Visualization.Scatter_Plot
+import Standard.Visualization.SQL.Visualization as SQL_Visualization
+import Standard.Visualization.Table.Visualization
+
+from Standard.Test import all
+
+from project.Pinned import expect_pinned
+
+type Atom
+    Value x y
+
+type Data
+    Value ~data
+
+    mem_table self = self.data.at 0
+    mem_column self = self.data.at 1
+    db_table self = self.data.at 2
+    db_column self = self.data.at 3
+    row self = self.data.at 4
+    connection self = self.data.at 5
+    geo_table self = self.data.at 6
+    big_table self = self.data.at 7
+    db_geo_table self = self.data.at 8
+    cells_table self = self.data.at 9
+
+    setup = Data.Value <|
+        mem_table = warm <| Table.new [["x", [1, 2, 3]], ["y", [4.5, 5.5, 6.5]], ["label", ["a", "b", "c"]], ["when", [Date.new 2020 1 1, Date.new 2021 2 2, Date.new 2022 3 3]]]
+        mem_column = mem_table.at "y"
+        connection = Database.connect SQLite.In_Memory
+        ## SQLite has no Date/time column type, so the database copy omits `when`.
+        db_table = (mem_table.select_columns ["x", "y", "label"]).select_into_database_table connection "pinned" temporary=True
+        db_column = db_table.at "y"
+        row = mem_table.rows.at 1
+        geo_table = Table.new [["Latitude", [51.5, 48.8]], ["lon", [-0.1, 2.3]], ["name", ["London", "Paris"]], ["colour", ["red", "blue"]]]
+        big_table = Table.new [["x", 0.up_to 20000 . to_vector], ["y", 0.up_to 20000 . map (i-> i * 2)]]
+        db_geo_table = geo_table.select_into_database_table connection "pinned_geo" temporary=True
+        cells_table = warm <| Table.new [["v", [mem_table, mem_column, row, [1, 2], Dictionary.from_vector [["k", 1]]]]]
+        [mem_table, mem_column, db_table, db_column, row, connection, geo_table, big_table, db_geo_table, cells_table]
+
+## The table view JSON of an in-memory table embeds data-quality metrics that
+   are computed asynchronously. Asking for `column_info` waits for them (as
+   `Table_Spec` does before it checks them), so a golden never sees a
+   half-computed table. Every in-memory table whose table view is pinned goes
+   through it.
+warm (table : Table) -> Table =
+    table.column_info
+    table
+
+add_specs suite_builder =
+    data = Data.setup
+
+    suite_builder.group "Pinned table view JSON" group_builder->
+        table_view name ~value max_rows=1000 =
+            group_builder.specify name <|
+                expect_pinned ("table_" + name) (Visualization.prepare_visualization value max_rows)
+        table_view "mem_table" data.mem_table
+        table_view "mem_column" data.mem_column
+        table_view "mem_1col_table" (warm (data.mem_table.select_columns ["y"]))
+        table_view "mem_1x1_table" (warm (Table.new [["n", [7]]]))
+        table_view "db_table" data.db_table 2
+        table_view "db_column" data.db_column 2
+        table_view "row" data.row
+        table_view "vector" [1, 2, 3] 2
+        table_view "matrix" [[1, 2], [3, 4]]
+        table_view "object_matrix" [Atom.Value 1 "a", Atom.Value 2 "b"]
+        table_view "rows_matrix" data.mem_table.rows.to_vector
+        table_view "array" [1, 2, 3].to_array 2
+        table_view "dictionary" (Dictionary.from_vector [["a", 1], ["b", [1, 2]]])
+        table_view "hashset" (Hashset.from_vector [3, 1, 2])
+        table_view "js_object" (JS_Object.from_pairs [["a", 1], ["b", "two"]])
+        table_view "function" (x-> x + 1)
+        table_view "number" 42
+        table_view "text" "hello"
+        table_view "atom" (Atom.Value 1 [2, 3])
+        table_view "error" (Error.throw (Illegal_Argument.Error "boom"))
+        table_view "connection" data.connection
+        table_view "xml_document" (XML_Document.parse '<foo id="10"><bar>hello</bar>text</foo>')
+        table_view "cells" data.cells_table
+        table_view "cells_vector" [data.mem_table, data.mem_column, data.row, data.db_table, data.db_column]
+
+    suite_builder.group "Pinned default visualisation" group_builder->
+        default name ~value =
+            group_builder.specify name <|
+                expect_pinned ("default_" + name) value.default_visualization.to_js_object.to_json
+        default "mem_table" data.mem_table
+        default "db_table" data.db_table
+        default "mem_column" data.mem_column
+        default "db_column" data.db_column
+        default "row" data.row
+        default "vector" [1, 2]
+        default "array" [1, 2].to_array
+        default "js_object" (JS_Object.from_pairs [["a", 1]])
+        default "atom" (Atom.Value 1 2)
+
+    suite_builder.group "Pinned default preprocessor JSON" group_builder->
+        default_data name ~value =
+            group_builder.specify name <|
+                expect_pinned ("data_" + name) (Preprocessor.default_preprocessor value)
+        default_data "mem_table" data.mem_table
+        default_data "db_table" data.db_table
+        default_data "mem_column" data.mem_column
+        default_data "db_column" data.db_column
+        default_data "row" data.row
+        default_data "vector" [1, [2, 3]]
+        default_data "js_object" (JS_Object.from_pairs [["a", 1]])
+        default_data "text" "hello"
+
+    suite_builder.group "Pinned server-side row model" group_builder->
+        group_builder.specify "rows" <|
+            expect_pinned "ssrm_rows" (Visualization.get_rows_for_table data.mem_table 0)
+        group_builder.specify "rows of a column" <|
+            expect_pinned "ssrm_rows_column" (Visualization.get_rows_for_table data.mem_column 1)
+        group_builder.specify "sorted rows" <|
+            expect_pinned "ssrm_rows_sorted" (Visualization.get_rows_for_table data.mem_table 0 [0] [-1])
+        group_builder.specify "filtered rows" <|
+            expect_pinned "ssrm_rows_filtered" (Visualization.get_rows_for_table data.mem_table 0 Nothing Nothing [0] [Filter_Condition.Greater 1])
+        group_builder.specify "distinct values" <|
+            expect_pinned "ssrm_distinct" (Visualization.get_distinct_values_for_column data.mem_table 2)
+
+    suite_builder.group "Pinned scatter plot JSON" group_builder->
+        scatter name ~value bounds=Nothing limit=Nothing =
+            group_builder.specify name <|
+                expect_pinned ("scatter_" + name) (Scatter_Plot.process_to_json_text value bounds limit)
+        scatter "mem_table" data.mem_table
+        scatter "mem_table_limit" data.mem_table limit=15000
+        scatter "mem_column" data.mem_column
+        scatter "mem_1col_x" (Table.new [["X", [5, 6, 7]]])
+        scatter "mem_no_x" (Table.new [["a", ["p", "q"]], ["b", [1, 2]]])
+        scatter "mem_colour_rownumber" (Table.new [["x", [1, 2]], ["Colour", ["r", "g"]], ["Row_Number", [10, 11]], ["y", [3, 4]], ["z", [5, 6]]])
+        scatter "mem_bounds" data.mem_table [1, 2, 0, 10]
+        scatter "mem_sampled" data.big_table limit=100
+        scatter "db_table" data.db_table
+        scatter "db_table_limit" data.db_table limit=2
+        scatter "db_column" data.db_column
+        scatter "vector" [3, 1, 2]
+        scatter "vector_bounds" [3, 1, 2, 5] [0, 2, 0, 10]
+
+    suite_builder.group "Pinned geo map JSON" group_builder->
+        geo name ~value =
+            group_builder.specify name <|
+                expect_pinned ("geo_" + name) (Geo_Map.process_to_json_text value)
+        geo "mem_table" data.geo_table
+        geo "mem_table_nothing_known" data.mem_table
+        geo "db_table" data.db_geo_table
+        geo "vector" [1, 2]
+        ## Not tables, so `develop` gives them `value.to_json`; Task 4.3 changes
+           these three on purpose and regenerates their files.
+        geo "mem_column" data.mem_column
+        geo "db_column" data.db_column
+        geo "connection" data.connection
+
+    suite_builder.group "Pinned SQL JSON" group_builder->
+        group_builder.specify "db_table" <|
+            expect_pinned "sql_db_table" (SQL_Visualization.prepare_visualization (data.db_table.filter "x" (..Greater 1)))
+        group_builder.specify "db_column" <|
+            expect_pinned "sql_db_column" (SQL_Visualization.prepare_visualization (data.db_column + 1))
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

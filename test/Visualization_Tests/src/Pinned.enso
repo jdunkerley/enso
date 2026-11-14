@@ -1,0 +1,25 @@
+from Standard.Base import all
+
+from Standard.Test import all
+
+## Replaces the parts of the JSON that change between runs.
+   `table_version_hash` embeds a storage key that differs on every run.
+normalise (text : Text) -> Text =
+    text.replace (regex '"table_version_hash":"[^"]*"') '"table_version_hash":"<hash>"'
+
+## Compares `json_text` with the pinned file `data/pinned/<name>.json`.
+   With `ENSO_UPDATE_PINNED=1` in the environment it (re)writes the file and then
+   fails the test, so a run that checked nothing is never green.
+expect_pinned (name : Text) ~json_text =
+    dir = enso_project.data / "pinned"
+    file = dir / (name + ".json")
+    actual = normalise json_text
+    case Environment.get "ENSO_UPDATE_PINNED" of
+        "1" ->
+            dir.create_directory
+            actual.write file on_existing_file=..Overwrite . should_succeed
+            ## Update mode checks nothing, so it must never look like a pass.
+            Test.fail ("Regenerated " + file.path + "; run again without ENSO_UPDATE_PINNED")
+        _ ->
+            expected = file.read_text
+            actual.should_equal expected
