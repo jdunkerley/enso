@@ -1,7 +1,7 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 
-from Standard.Table import Table, Column
+from Standard.Table import Table
 import Standard.Database.Connection.Database
 import Standard.Database.Extensions.Upload_Table
 from Standard.SQLite import SQLite
