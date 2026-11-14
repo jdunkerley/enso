@@ -51,6 +51,8 @@ raw = conn.query (..Raw_SQL "SELECT id, name FROM users WHERE active = true")
 - `src/Postgres_Family/` — the PostgreSQL dialect, type mapping, error mapper
   and encoding helpers that Postgres, DuckDB and Redshift share. Not exported
   from `Main.enso`; other libraries import the modules directly.
+- `src/Internal/DB_Viz_Source.enso` — the conversion of `DB_Table` to
+  `Viz_Table` and `SQL_Viz`.
 
 ## Things to avoid in generated code
 

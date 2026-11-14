@@ -1,4 +1,4 @@
-// IMPORTANT - The types here must be kept in sync with those in Table_Viz_Data.enso
+// IMPORTANT - The types here must be kept in sync with those in Viz_Table.enso and its sources
 // AND the mocks in tableVisualisation.spec.ts
 
 /** Table Viz for errors. */

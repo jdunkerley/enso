@@ -12,6 +12,11 @@ from Standard.Base.Metadata.Widget import Numeric_Input, Text_Input
 from Standard.Base.Widget_Helpers import make_data_cleanse_vector_selector, make_regex_text_widget
 
 import project.Constants.Previous_Value
+import Standard.Visualization.Id.Id
+import Standard.Visualization.SQL_Viz.SQL_Viz
+import Standard.Visualization.Viz_Cell.Viz_Cell
+import Standard.Visualization.Viz_Table.Viz_Table
+import project.Internal.Viz_Helpers
 import project.Data_Formatter.Data_Formatter
 import project.Fill_With.Fill_With
 import project.In_Memory_Column.In_Memory_Column
@@ -2672,3 +2677,36 @@ default_date_period column = if column.value_type.has_date then Date_Period.Day 
    Returns the default row limit for `read` depending on the backend.
 default_row_limit_for_read column =
     column.implementation.default_row_limit_for_read
+
+## ---
+   private: true
+   ---
+Viz_Table.from (that:Column) = that.implementation.to_viz_table that.underlying
+
+## ---
+   private: true
+   ---
+SQL_Viz.from (that:Column) = that.implementation.to_sql_viz that.underlying
+
+## ---
+   private: true
+   ---
+Viz_Cell.from (that:Column) = Viz_Cell.Value (level-> Viz_Helpers.column_cell that level) Nothing
+
+## ---
+   private: true
+   ---
+Column.default_visualization self -> Id = Id.table
+
+## ---
+   private: true
+   ---
+   Shows a JSON serialization of a truncated version of this column, for the
+   benefit of visualization in the IDE. Reads at most 100 values, also from a
+   database.
+Column.to_default_visualization_data self -> Text =
+    size = ['length', self.row_count]
+    name = ['name', self.name]
+    max_data = 100
+    data = ['data', self.read (..First max_data) . to_vector]
+    JS_Object.from_pairs [size, name, data] . to_text

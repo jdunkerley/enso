@@ -46,8 +46,10 @@ there.
 - `Test/` — Testing framework used in `test/` projects.
 - `Database_Test_Suite/` — The conformance suite database backends run against
   themselves (test-only; `catalogue: false`).
-- `Visualization/` — IDE-only visualisation preprocessors. **Do not import in
-  user code.**
+- `Visualization/` — IDE-only visualisation preprocessors and the data types
+  other libraries convert to (`Viz_Table`, `SQL_Viz`, `Viz_Cell`). Its data
+  types depend only on `Base`; the chart modules still import `Table` and
+  `Database` until they move off them. **Do not import in user code.**
 
 ## Universal conventions
 
@@ -129,6 +131,9 @@ Patterns that come up in more than one library:
   query plan, not data); call `.read` to materialise. In-memory `Standard.Table`
   and `DB_Table` don't interop without an explicit boundary (`.read` or
   `.select_into_database_table`).
+- **Visualisation.** Base knows nothing about visualisation. A library makes its
+  values drawable by a conversion to a Visualization data type (`Viz_Table`,
+  `SQL_Viz`, `Viz_Cell`), defined in the module of its **public** type.
 - **Autoscope (`..Constructor`).** Only resolves when the parameter's expected
   type is a single type. For union-typed parameters (e.g.
   `Filter_Condition | Text`) use the qualified `Type.Constructor` form.

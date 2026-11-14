@@ -29,4 +29,4 @@
     - truncate_table self table_name:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - type_mapping self -> Standard.Base.Any.Any
 - schema_black_list -> Standard.Base.Any.Any
-- Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data.from that:Standard.Microsoft.SQLServer_Connection.SQLServer_Connection -> Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Microsoft.SQLServer_Connection.SQLServer_Connection -> Standard.Visualization.Viz_Table.Viz_Table

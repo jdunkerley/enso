@@ -2,7 +2,7 @@ from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Single_Choice
-from Standard.Base.Visualization.Table_Viz_Data import Table_Viz_Data, Table_Viz_Header
+from Standard.Visualization.Viz_Table import Viz_Table, Viz_Header
 
 import Standard.Table.Rows_To_Read.Rows_To_Read
 from Standard.Table import Table
@@ -128,8 +128,8 @@ make_table_selector hyper_file:Hyper_File cache=Nothing =
 ## ---
    private: true
    ---
-Table_Viz_Data.from (that:Hyper_File) = 
+Viz_Table.from (that:Hyper_File) = 
     schemas = that.tables.map t->t.schema.to_text
     tables = that.tables.map t->t.table.to_text
-    if schemas.distinct.length <= 1 then (Table_Viz_Data.GenericGrid [Table_Viz_Header.Link "Table" "Table" "read {{@Table}}"] [tables]) else
-        (Table_Viz_Data.GenericGrid [Table_Viz_Header.Label "Schema", Table_Viz_Header.Link "Table" "Table" "read {{@Table}} {{@Schema}}"] [schemas, tables])
+    if schemas.distinct.length <= 1 then (Viz_Table.from_columns [Viz_Header.Link "Table" "Table" "read {{@Table}}"] [tables]) else
+        (Viz_Table.from_columns [Viz_Header.Label "Schema", Viz_Header.Link "Table" "Table" "read {{@Table}} {{@Schema}}"] [schemas, tables])

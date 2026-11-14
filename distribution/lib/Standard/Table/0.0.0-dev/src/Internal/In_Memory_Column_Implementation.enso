@@ -8,6 +8,10 @@ import Standard.Base.Errors.Common.Arithmetic_Error
 import Standard.Base.Errors.Common.Floating_Point_Equality
 import Standard.Base.Errors.Common.Incomparable_Values
 import Standard.Base.Errors.Common.Index_Out_Of_Bounds
+import Standard.Base.Errors.Common.No_Such_Conversion
+import Standard.Visualization.SQL_Viz.SQL_Viz
+import Standard.Visualization.Viz_Table.Viz_Table
+import project.Internal.In_Memory_Viz_Source.In_Memory_Viz_Source
 import Standard.Base.Errors.Common.No_Such_Method
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
@@ -77,6 +81,12 @@ polyglot java import org.enso.table.operations.OrderBuilder
 polyglot java import org.enso.table.parsing.problems.ParseProblemAggregator
 
 type In_Memory_Column_Implementation
+    to_viz_table (this_column : Column & In_Memory_Column) =
+        Viz_Table.from_source (In_Memory_Viz_Source.Value this_column.to_table this_column)
+
+    to_sql_viz (this_column : Column & In_Memory_Column) =
+        Panic.throw (No_Such_Conversion.Error SQL_Viz this_column Nothing)
+
     table_version_hash (this_column : Column & In_Memory_Column) = "Column-" + this_column.java_column.getStorage.uniqueKey.to_text
 
     display (this_column : Column & In_Memory_Column) show_rows:Integer format_terminal:Boolean =

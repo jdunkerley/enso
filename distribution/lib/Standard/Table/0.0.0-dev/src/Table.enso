@@ -21,6 +21,11 @@ from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Widget_Helpers import make_any_selector, make_data_cleanse_vector_selector, make_delimiter_selector
 
 import project.Aggregate_Column.Aggregate_Column
+import Standard.Visualization.Id.Id
+import Standard.Visualization.SQL_Viz.SQL_Viz
+import Standard.Visualization.Viz_Cell.Viz_Cell
+import Standard.Visualization.Viz_Table.Viz_Table
+import project.Internal.Viz_Helpers
 import project.Blank_Selector.Blank_Selector
 import project.Column.Column
 import project.Column_Ref.Column_Ref
@@ -4062,3 +4067,27 @@ Many_Files_List.from (that : Table) = case that of
 private _profile_time_execution ~label:Text ~function =
     Progress.run handle_name=label label=label up_to=1 action=_->
         function
+
+## ---
+   private: true
+   ---
+   The table view and charts read a table through its implementation.
+Viz_Table.from (that:Table) = that.implementation.to_viz_table that.underlying
+
+## ---
+   private: true
+   ---
+   Only a database table has SQL; an in-memory one raises `No_Such_Conversion`.
+SQL_Viz.from (that:Table) = that.implementation.to_sql_viz that.underlying
+
+## ---
+   private: true
+   ---
+Viz_Cell.from (that:Table) = Viz_Cell.Value (level-> Viz_Helpers.table_cell that level) Nothing
+
+## ---
+   private: true
+   ---
+   Guides the visualization system to display the most suitable graphical
+   representation for this table.
+Table.default_visualization self -> Id = self.implementation.default_visualization self.underlying

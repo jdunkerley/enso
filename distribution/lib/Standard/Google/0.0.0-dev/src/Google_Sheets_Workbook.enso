@@ -7,7 +7,7 @@ from Standard.Base.Enso_Cloud.Enso_Secret import as_credential_reference
 from Standard.Base.Metadata import make_single_choice
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Multiple_Choice, Single_Choice
-from Standard.Base.Visualization.Table_Viz_Data import Table_Viz_Data, Table_Viz_Header
+from Standard.Visualization.Viz_Table import Viz_Table, Viz_Header
 
 import Standard.Table.Internal.Java_Exports
 import Standard.Table.Return_As_Table.Return_As_Table
@@ -186,8 +186,8 @@ type Google_Sheets_Workbook
 ## ---
    private: true
    ---
-Table_Viz_Data.from (that:Google_Sheets_Workbook) = 
-    Table_Viz_Data.GenericGrid [Table_Viz_Header.Link "worksheets" "worksheet" "read"] [that.sheet_names.to_vector]
+Viz_Table.from (that:Google_Sheets_Workbook) = 
+    Viz_Table.from_columns [Viz_Header.Link "worksheets" "worksheet" "read"] [that.sheet_names.to_vector]
 
 ## Error occurred when calling the Google Sheets API
 type Google_API_Error

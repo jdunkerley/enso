@@ -16,6 +16,8 @@ import Standard.Table.Internal.Value_Type_Checks
 import Standard.Table.Internal.Value_Type_Helpers
 import Standard.Table.Refined_Types.Text_Column.Text_Column
 import Standard.Table.Rows_To_Read.Rows_To_Read
+import Standard.Visualization.SQL_Viz.SQL_Viz
+import Standard.Visualization.Viz_Table.Viz_Table
 from Standard.Table import Auto, Column, Data_Formatter, Previous_Value, Table, Value_Type
 from Standard.Table.Errors import Inexact_Type_Coercion, Invalid_Value_Type
 from Standard.Table.Internal.Cast_Helpers import check_cast_compatibility
@@ -24,6 +26,7 @@ from Standard.Table.Internal.Column_Type_Helpers import get_underlying_from_colu
 import project.Connection.Connection.Connection
 import project.DB_Column.DB_Column
 import project.DB_Table.DB_Table
+import project.Internal.DB_Viz_Source.DB_Viz_Source
 import project.Internal.Helpers
 import project.Internal.IR.Internal_Column.Internal_Column
 import project.Internal.IR.SQL_IR_Expression.SQL_IR_Expression
@@ -37,6 +40,13 @@ import project.SQL.SQL_Type
 from project.Errors import Implicit_DB_Table_Read, Integrity_Error, Unsupported_Database_Operation
 
 type DB_Column_Implementation
+    to_viz_table (this_column : Column & DB_Column) =
+        Viz_Table.from_source (DB_Viz_Source.Value this_column.to_table this_column Nothing)
+
+    to_sql_viz (this_column : Column & DB_Column) =
+        prepared = this_column.to_sql.prepare
+        SQL_Viz.Value this_column.dialect_name prepared.first prepared.second
+
     name (this_column : Column & DB_Column) = this_column.internal_name
 
     dialect_name (this_column : Column & DB_Column) = this_column.connection.dialect.name

@@ -44,6 +44,8 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
 - `src/Value_Type.enso` — column type system.
 - `src/Delimited/` — CSV/TSV reading and writing.
 - `src/Extensions/` — type-extension methods (e.g. `Vector.to_table`).
+- `src/Internal/Viz_Helpers.enso`, `src/Internal/In_Memory_Viz_Source.enso` —
+  the conversion of `Table` to `Viz_Table`.
 
 ## Things to avoid in generated code
 

@@ -1,0 +1,70 @@
+private
+
+from Standard.Base import all
+
+import Standard.Visualization.Viz_Table.Viz_Table
+
+import project.In_Memory_Column.In_Memory_Column
+import project.In_Memory_Table.In_Memory_Table
+import project.Internal.Viz_Helpers
+import project.Sort_Column.Sort_Column
+import project.Table.Table
+
+## The `Viz_Table` source of an in-memory table or column. `column` is the
+   original column when the value was a column (its table view differs), else
+   `Nothing`; `table` is the table operations act on.
+type In_Memory_Viz_Source
+    Value table column
+
+    table_view_json self _ -> Text = case self.column of
+        Nothing -> (self.table:In_Memory_Table).to_table_viz_json
+        column -> (column:In_Memory_Column).to_table_viz_json
+
+    column_names self -> Vector Text = self.table.column_names
+    column_kinds self -> Vector = Viz_Helpers.column_kinds self.table
+    row_count self -> Integer = self.table.row_count
+    select_columns self (names : Vector Text) -> Viz_Table = _wrap (self.table.select_columns names reorder=True error_on_missing_columns=False on_problems=..Ignore)
+    slice self (start : Integer) (count : Integer) -> Viz_Table = _wrap (self.table.take (start.up_to start+count))
+    sample self (count : Integer) (seed : Integer) -> Viz_Table = _wrap (self.table.take (..Sample count seed=seed))
+    supported_operations self -> Vector Text = ["rows", "server_rows"]
+    rename_columns self (names : Vector Text) -> Viz_Table = _wrap (self.table.rename_columns names)
+    add_row_number self (name : Text) -> Viz_Table = _wrap (self.table.add_row_number name)
+    filter_between self (name : Text) low high -> Viz_Table = _wrap (self.table.filter name (..Between low high))
+    rows_json self -> Vector Text = self.table.rows . map .to_json_data
+    column_values self (name : Text) -> Vector = self.table.at name . to_vector
+
+    server_rows_json self (start_number : Integer) sort_col_index_list sort_direction_list filter_col filter_condition -> Text =
+        # Must stay in sync with the IDE's `cacheBlockSize` in AgGridTableView.vue
+        # (app/gui/src/project-view/components/shared/AgGridTableView.vue) — a one-sided change would silently break paging.
+        max_rows=1000
+        table = self.table
+        col_name = table.make_temp_column_name
+        table_with_index = table.add_row_number col_name
+        table_with_index_ordered = table_with_index.reorder_columns [col_name] ..Before_Other_Columns
+        filtered_table = if filter_col.is_nothing then table_with_index_ordered else _apply_filter_to_table table_with_index_ordered 0 filter_col filter_condition True
+        sorted_table = if sort_col_index_list.is_nothing then filtered_table else _apply_sort_to_table filtered_table sort_col_index_list sort_direction_list
+        sliced_json = sorted_table.columns.map (c-> c.to_json_data start_number max_rows)
+        '{"rows":[' + (sliced_json.join ",") + '], "row_count":' + filtered_table.row_count.to_text + '}'
+
+    distinct_values_json self (column_index : Integer) filter_col filter_condition -> Text =
+        filtered_table = if filter_col.is_nothing then self.table else _apply_filter_to_table self.table 0 filter_col filter_condition False
+        filtered_column = (filtered_table.columns.at column_index):In_Memory_Column
+        filtered_column.await_metrics
+        distinct_json = filtered_column.distinct_values_json . if_nothing "null"
+        '{"distinct_vals":' + distinct_json + '}'
+
+private _wrap table = Viz_Table.from (table:Table)
+
+private _apply_sort_to_table table sort_col_index_list sort_direction_list =
+    parse_direction d = if d == -1 then Sort_Direction.Descending else Sort_Direction.Ascending
+    get_pattern i = (Sort_Column.Index ((sort_col_index_list.get i)+1) (parse_direction (sort_direction_list.get i)))
+    sort_pattern = ((0.up_to sort_col_index_list.length).map idx-> get_pattern idx)
+    table.sort sort_pattern
+
+private _apply_filter_to_table table i filter_cols filter_conditions has_index_col =
+    if i == filter_cols.length then table else
+        col = filter_cols.get i
+        condition = filter_conditions.get i
+        correct_index = if has_index_col then col+1 else col
+        filtered_table = table.filter (correct_index) (condition)
+        @Tail_Call _apply_filter_to_table filtered_table i+1 filter_cols filter_conditions has_index_col

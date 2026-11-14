@@ -355,15 +355,6 @@ type JS_Object
 
     ## ---
        private: true
-       ---
-       Transform the vector into text for displaying as part of its default
-       visualization.
-    to_default_visualization_data : Text
-    to_default_visualization_data self =
-        render self
-
-    ## ---
-       private: true
        icon: convert
        ---
        Creates an Enso object from the JS_Object.

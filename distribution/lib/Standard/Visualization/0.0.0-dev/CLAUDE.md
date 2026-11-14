@@ -23,7 +23,9 @@ components and workflows should not.
 
 - `src/Preprocessor.enso` — default visualization preprocessor.
 - `src/Helpers.enso` — display utilities (truncation, formatting, timing).
-- `src/Table.enso` — IDE-side table rendering.
+- `src/Internal/Columns_Source.enso`, `src/Internal/View_Source.enso`,
+  `src/Internal/Names.enso`, `src/Internal/View_Json.enso` — the in-memory
+  sources, name matching and view JSON behind `Viz_Table`.
 - `src/Geo_Map.enso`, `src/Scatter_Plot.enso` — per-visualization preprocessors.
 - `src/Widgets.enso`, `src/Id.enso`, `src/Warnings.enso`, `src/File_Upload.enso`
   — supporting IDE utilities.

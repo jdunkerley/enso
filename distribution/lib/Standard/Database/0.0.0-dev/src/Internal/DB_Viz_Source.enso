@@ -1,0 +1,35 @@
+private
+
+from Standard.Base import all
+
+import Standard.Table.In_Memory_Column.In_Memory_Column
+import Standard.Table.In_Memory_Table.In_Memory_Table
+import Standard.Table.Internal.Viz_Helpers
+import Standard.Visualization.Viz_Table.Viz_Table
+
+## The `Viz_Table` source of a database table or column. Only a bounded
+   `sample` reads data; the row operations are not supported, so a chart
+   samples first and works on the in-memory result.
+type DB_Viz_Source
+    Value table column spatial
+
+    table_view_json self (max_rows : Integer) -> Text =
+        _db_table_view_json self.table max_rows is_column=(Nothing != self.column)
+
+    column_names self -> Vector Text = self.table.column_names
+    column_kinds self -> Vector = Viz_Helpers.column_kinds self.table
+    row_count self -> Integer = self.table.row_count
+    select_columns self (names : Vector Text) -> Viz_Table = Viz_Table.from (self.table.select_columns names reorder=True error_on_missing_columns=False on_problems=..Ignore)
+    slice self (start : Integer) (count : Integer) -> Viz_Table = Viz_Table.from (self.table.take (start.up_to start+count))
+    sample self (count : Integer) _ -> Viz_Table = Viz_Table.from (self.table.read (..First count))
+    supported_operations self -> Vector Text = if Nothing == self.spatial then [] else ["spatial"]
+
+private _db_table_view_json t max_rows is_column =
+    dataframe = t.read (..First max_rows)
+    case dataframe.is_error of
+        False ->
+            all_rows_count = t.row_count
+            in_memory = if is_column then (dataframe.at 0):In_Memory_Column else dataframe:In_Memory_Table
+            in_memory.to_table_viz_json all_rows_count False
+        True ->
+            JS_Object.from_pairs [["error", 'Error querying the database:\n' + dataframe.catch.to_display_text]] . to_json

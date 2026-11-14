@@ -1,0 +1,152 @@
+private
+
+from Standard.Base import all
+import Standard.Base.Data.Vector.Builder
+
+import project.Viz_Cell.Viz_Cell
+
+## ---
+   private: true
+   ---
+   Column Limit
+max_columns = 250
+
+
+## ---
+   private: true
+   ---
+   Render Error to JSON
+make_json_for_error : Any -> Text
+make_json_for_error error =
+    JS_Object.from_pairs [["type", "Error"], ["error", error.to_display_text]] . to_json
+
+## ---
+   private: true
+   ---
+   Render Vector to JSON
+make_json_for_vector : Vector -> Integer -> JS_Object
+make_json_for_vector vector max_rows =
+    all_rows = ["all_rows_count", vector.length]
+    get_child_node_action = ["get_child_node_action", "at"]
+    truncated = vector.take max_rows
+    some_values = truncated.any (v-> Nothing!=v)
+    if some_values.not then JS_Object.from_pairs [["type", "Vector"], all_rows, ["json", truncated.map Viz_Cell.render_value], get_child_node_action] else
+        matrix = make_json_for_matrix (Builder.new truncated.length) truncated
+        if matrix.is_nothing.not then JS_Object.from_pairs [["type", "Matrix"], all_rows, ["json", matrix], ["column_count", matrix.fold 0 c->v-> if v.is_nothing then c else c.max v.length], get_child_node_action] else
+            object_matrix = make_json_for_object_matrix (Builder.new truncated.length) truncated
+            if object_matrix.is_nothing.not then JS_Object.from_pairs [["type", "Object_Matrix"], all_rows, ["json", object_matrix], get_child_node_action] else
+                JS_Object.from_pairs [["type", "Vector"], all_rows, ["json", truncated.map Viz_Cell.render_value], get_child_node_action, ["child_label", "value"]]
+
+## ---
+   private: true
+   ---
+   Render Vector of Vector / Array to JSON
+make_json_for_matrix : Builder -> Vector -> Integer -> Vector | Nothing
+make_json_for_matrix current vector idx=0 = if idx == vector.length then current.to_vector else
+    row = vector.at idx
+    to_append = case row of
+        Nothing -> Nothing
+        _ : Vector -> row.take max_columns . map Viz_Cell.render_value
+        _ : Array -> row.to_vector.take max_columns . map Viz_Cell.render_value
+        _ -> False
+    if to_append == False then Nothing else
+        current.append to_append
+        @Tail_Call make_json_for_matrix current vector idx+1
+
+## ---
+   private: true
+   ---
+   Render Vector of Objects to JSON
+make_json_for_object_matrix : Builder -> Vector -> Integer -> Vector | Nothing
+make_json_for_object_matrix current vector idx=0 = if idx == vector.length then current.to_vector else
+    row = vector.at idx
+    to_append = case row of
+        Nothing -> Nothing
+        _ : Date -> False
+        _ : Time_Of_Day -> False
+        _ : Date_Time -> False
+        _ : Duration -> False
+        _ : Period -> False
+        _ : Dictionary ->
+            pairs = row.keys.map k-> [k.to_text, Viz_Cell.render_value (row.get k)]
+            JS_Object.from_pairs pairs
+        _ ->
+            record = (Viz_Cell.from row).pairs
+            if record.is_nothing.not then JS_Object.from_pairs (record.map p-> [p.first, Viz_Cell.render_value p.second]) else
+                js_object = row.to_js_object
+                if js_object.is_a JS_Object . not then False else
+                    if js_object.field_names.sort == ["constructor", "type"] then False else
+                        pairs = js_object.field_names.map f-> [f, Viz_Cell.render_value (js_object.get f)]
+                        JS_Object.from_pairs pairs
+    if to_append == False then Nothing else
+        current.append to_append
+        @Tail_Call make_json_for_object_matrix current vector idx+1
+
+## ---
+   private: true
+   ---
+   Render Dictionary to JSON
+make_json_for_dictionary : Dictionary -> Integer -> Text
+make_json_for_dictionary dict max_items =
+    header = ["header", ["key", "value"]]
+    all_rows = ["all_rows_count", dict.size]
+    as_vector = Warning.clear (dict.to_vector.take max_items)
+    mapped = as_vector . map p-> [p.first.to_text, Viz_Cell.render_value p.second]
+    data = ["data", [mapped.map .first, mapped.map .second]]
+    links = ["get_child_node_action", "at {{#key}}"]
+    get_child_node_action_link_name = ["get_child_node_link_name", "key"]
+    JS_Object.from_pairs [header, data, all_rows, links, get_child_node_action_link_name, ["type", "Map"], ["child_label", "value"]] . to_json
+
+## ---
+   private: true
+   ---
+   Render Hashset to JSON
+make_json_for_hashset hashset:Hashset max_items:Integer -> Text =
+    header = ["header", ["key"]]
+    all_rows = ["all_rows_count", hashset.size]
+    as_vector = Warning.clear (hashset.to_vector.take max_items)
+    mapped = as_vector . map Viz_Cell.render_value
+    data = ["data", [mapped]]
+    JS_Object.from_pairs [header, data, all_rows, ["type", "Map"]] . to_json
+
+## ---
+   private: true
+   ---
+   Render JS_Object to JSON
+make_json_for_js_object : JS_Object -> Integer -> Text
+make_json_for_js_object js_object max_items =
+    fields = js_object.field_names
+    header = ["header", ["key", "value"]]
+    all_rows = ["all_rows_count", fields.length]
+    map_vector = Warning.clear (fields.take max_items)
+    mapped = map_vector . map p-> [p, Viz_Cell.render_value (js_object.get p)]
+    data = ["data", [mapped.map .first, mapped.map .second]]
+    JS_Object.from_pairs [header, data, all_rows, ["type", "Map"]] . to_json
+
+## ---
+   private: true
+   ---
+   Create JSON serialization of values.
+make_json_for_other : Any -> JS_Object
+make_json_for_other x =
+    js_value = Panic.recover Any x.to_js_object
+    supports_js_object = js_value.is_error.not
+    case supports_js_object of
+        True ->
+            value = if js_value.is_a JS_Object . not then js_value else
+                pairs = [['_display_text_', x.to_display_text]] + js_value.field_names.map f-> [f, Viz_Cell.render_value (js_value.get f)]
+                JS_Object.from_pairs pairs
+            link_fields = if js_value.is_a JS_Object . not then [] else
+                if js_value.contains_key 'links' then [["links", js_value.get 'links']] else []
+            additional_fields = if js_value.is_a JS_Object . not then [] else
+                if js_value.contains_key 'get_child_node_action' then [["get_child_node_action", js_value.get 'get_child_node_action']] else []
+            label = if js_value.is_a JS_Object . not then [] else
+                if js_value.contains_key 'child_label' then [["child_label", js_value.get 'child_label']] else []
+            header = if js_value.is_a JS_Object . not then [] else
+                if js_value.contains_key 'visualization_header' then [["visualization_header", js_value.get 'visualization_header']] else []
+            JS_Object.from_pairs <| [["json", value]] + additional_fields + link_fields + label + header
+
+        # Fallback for objects that fail to be serialized through `to_js_object`.
+        False ->
+            json = JS_Object.from_pairs [["_display_text_", x.to_display_text], ["_to_js_object_error_", js_value.catch.to_display_text]]
+            JS_Object.from_pairs [["json", json]]

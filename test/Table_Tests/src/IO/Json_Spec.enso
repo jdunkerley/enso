@@ -34,6 +34,11 @@ add_specs suite_builder =
     suite_builder.group 'JSON Columns' group_builder->
         data = Data.setup
 
+        group_builder.specify 'should render a nested vector cell with to_json_data' <|
+            json = (Table.new [['v', [[1, 2]]]]).at 'v' . to_json_data
+            json.contains "[1, 2]" . should_be_true
+            json.contains "null" . should_be_false
+
         group_builder.specify 'should convert columns to JSON using to_json_data (Text)' <|
             name_column = data.clothes.at 'Name'
             name_column.to_json_data . should_equal name_column.to_vector.to_json

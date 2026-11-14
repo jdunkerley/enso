@@ -28,4 +28,4 @@
     - to_js_object self -> Standard.Base.Any.Any
     - truncate_table self table_name:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - type_mapping self -> Standard.Base.Any.Any
-- Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data.from that:Standard.Postgres.Postgres_Connection.Postgres_Connection -> Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
+- Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Postgres.Postgres_Connection.Postgres_Connection -> Standard.Visualization.Viz_Table.Viz_Table
