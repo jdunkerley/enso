@@ -10,8 +10,8 @@ it either.
 - `Preprocessor.default_preprocessor value` — IDE entry: encode an arbitrary
   value as JSON for visualization.
 - `Geo_Map.process_to_json_text value` — IDE entry for the geo-map widget.
-- `Histogram.process_to_json_text value`,
-  `Scatter_Plot.process_to_json_text value` — IDE entries for chart widgets.
+- `Scatter_Plot.process_to_json_text value` — IDE entry for the scatter-plot
+  widget.
 - `Table.<helpers>` — lazy/chunked rendering helpers for the IDE table widget.
 
 ## Common usage
@@ -24,8 +24,7 @@ components and workflows should not.
 - `src/Preprocessor.enso` — default visualization preprocessor.
 - `src/Helpers.enso` — display utilities (truncation, formatting, timing).
 - `src/Table.enso` — IDE-side table rendering.
-- `src/Geo_Map.enso`, `src/Histogram.enso`, `src/Scatter_Plot.enso` —
-  per-visualization preprocessors.
+- `src/Geo_Map.enso`, `src/Scatter_Plot.enso` — per-visualization preprocessors.
 - `src/Widgets.enso`, `src/Id.enso`, `src/Warnings.enso`, `src/File_Upload.enso`
   — supporting IDE utilities.
 

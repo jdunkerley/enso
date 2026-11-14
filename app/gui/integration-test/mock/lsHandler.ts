@@ -210,17 +210,6 @@ const mockVizPreprocessors: Record<string, Uint8Array | ((params: string[]) => U
         },
       ],
     }),
-    'Standard.Visualization.Histogram.process_to_json_text': encodeJSON({
-      axis: {
-        x: { label: 'x-axis label', scale: 'linear' },
-        y: { label: 'y-axis label', scale: 'logarithmic' },
-      },
-      color: 'rgb(1.0,0.0,0.0)',
-      bins: 10,
-      data: {
-        values: [0.1, 0.2, 0.1, 0.15, 0.7],
-      },
-    }),
     'Standard.Visualization.Table.Visualization.prepare_visualization': encodeJSON({
       type: 'Matrix',
       // eslint-disable-next-line camelcase
@@ -249,11 +238,6 @@ IDAgMCAxIDkuNzcgMjAuMzZzMS41NSAyLjA4IDQuNTcgMi4wOGMzLjAxIDAgNC4zNi0xLjE0IDUuNi0y
 uMDktMyA1LjItMyAuNzMgMCAxLjQ2LjIgMS45OC40WiIvPjwvZz48ZGVmcz48Y2xpcFBhdGggaWQ9ImEiPjxwYXRoIGZpbGw9Ii\
 NmZmYiIGQ9Ik0wIDBoNDB2NDBIMHoiLz48L2NsaXBQYXRoPjwvZGVmcz48L3N2Zz4=`,
     }),
-    Heatmap: encodeJSON([
-      ['A', 'B', 'C', 'D', 'A'],
-      ['D', 'E', 'D', 'X', 'Z'],
-      [50, 25, 40, 20, 10],
-    ]),
     'Standard.Visualization.Widgets.column_names_json': encodeJSON(['Column A', 'Column B']),
   }
 

@@ -7,20 +7,20 @@
 
 **Goal:** Make `Standard.Visualization` depend only on `Standard.Base`, with
 every data library supplying its values to the visualisations through
-conversions to data types that Visualization defines, without changing the
-JSON any visualisation receives today (except the histogram's new row bound).
+conversions to data types that Visualization defines, without changing the JSON
+any visualisation receives today.
 
-**Architecture:** Visualization defines `Viz_Table` (a wrapper whose methods
-are the contract, delegating to a library-supplied _source_), `SQL_Viz` and
+**Architecture:** Visualization defines `Viz_Table` (a wrapper whose methods are
+the contract, delegating to a library-supplied _source_), `SQL_Viz` and
 `Viz_Cell`. Table and Database define conversions to them on their **public**
 types (`Table`, `Column`, `Row`) and dispatch inside through the existing
 `that.implementation.<method> that.underlying` idiom. The preprocessors convert
 once and read the data type; Base types keep their existing renderers, now
 reached through conversions defined in Visualization.
 
-**Tech Stack:** Enso standard library (`distribution/lib/Standard/*`), the
-Enso test framework (`test/*_Tests`), TypeScript/Vue in `app/gui` (step 5
-only), vitest.
+**Tech Stack:** Enso standard library (`distribution/lib/Standard/*`), the Enso
+test framework (`test/*_Tests`), TypeScript/Vue in `app/gui` (step 5 only),
+vitest.
 
 **Spec:**
 `docs/superpowers/specs/2026-11-13-visualization-depends-on-base-design.md`
@@ -42,25 +42,24 @@ only), vitest.
   (called by name from `TableVizOperation.java:36`),
   `Standard.Visualization.Scatter_Plot.process_to_json_text`,
   `Standard.Visualization.Geo_Map.process_to_json_text`,
-  `Standard.Visualization.Histogram.process_to_json_text`,
   `Standard.Visualization.SQL.Visualization.prepare_visualization`,
-  `Standard.Visualization.Helpers` (`default_visualization` is evaluated
-  there), `Standard.Visualization.Preprocessor`, `.Warnings`, `.Widgets`.
+  `Standard.Visualization.Helpers` (`default_visualization` is evaluated there),
+  `Standard.Visualization.Preprocessor`, `.Warnings`, `.Widgets`.
 - `Standard.Visualization`'s `Main.enso` keeps every export.
-- Every entity added to a library carries `## ---` / `private: true` / `---`
-  doc metadata (the component browser and catalogue skip them).
+- Every entity added to a library carries `## ---` / `private: true` / `---` doc
+  metadata (the component browser and catalogue skip them).
 - Database reads for charts are bounded: 15000 rows (`chart_row_bound`).
 - New projects keep `import Standard.Visualization` (piece 4 removes it).
-- Changelog: steps 1–4 take the `CI: No changelog needed` label; step 5 takes
-  an entry (see its task).
+- Changelog: steps 1–4 take the `CI: No changelog needed` label; step 5 takes an
+  entry (see its task).
 
 ## Working environment
 
-- Work on a branch per step from `develop` (step N's branch from step N−1's
-  once it merged). Use a worktree; never `git stash`.
-- Enso tests need a built engine distribution containing your library
-  changes. After **any** edit under `distribution/lib/`, rebuild it (sbt
-  copies the changed library sources; it is incremental):
+- Work on a branch per step from `develop` (step N's branch from step N−1's once
+  it merged). Use a worktree; never `git stash`.
+- Enso tests need a built engine distribution containing your library changes.
+  After **any** edit under `distribution/lib/`, rebuild it (sbt copies the
+  changed library sources; it is incremental):
 
   ```bash
   sbt buildEngineDistribution
@@ -79,8 +78,8 @@ only), vitest.
     ../built-distribution/enso-engine-*/enso-*/bin/enso --no-ir-caches --run "$PWD/Visualization_Tests" FILTER
   ```
 
-  Projects this plan uses: `Visualization_Tests`, `Table_Tests`,
-  `XML_Tests`, `SQLite_Tests`, `DuckDB_Tests`, `Base_Tests`.
+  Projects this plan uses: `Visualization_Tests`, `Table_Tests`, `XML_Tests`,
+  `SQLite_Tests`, `DuckDB_Tests`, `Base_Tests`.
 
 - API docs: each library with `docs/api` is checked by
   `corepack pnpm --filter build-scripts run stdlib-api-check` (stops at the
@@ -96,10 +95,46 @@ only), vitest.
 
 ---
 
+## Step 0 — Delete Histogram and Heatmap (PR 0, label `CI: No changelog needed`)
+
+Owner decision (2026-11-14): the Histogram and Heatmap visualisations are not
+registered in the GUI (`stores/visualization/index.ts` builtins), so they are
+deleted rather than moved onto `Viz_Table`.
+
+### Task 0.1: Delete them
+
+**Files:**
+
+- Delete:
+  `app/gui/src/project-view/components/visualizations/HistogramVisualization.vue`,
+  `HeatmapVisualization.vue`, and anything only they use (their icons in
+  `app/gui/src/project-view/assets/icons.svg` if no other user, keybinds).
+- Modify: `app/gui/integration-test/mock/lsHandler.ts` (their mock responses),
+  `app/gui/integration-test/project-view/locate.ts` (their locators), only where
+  nothing else uses them.
+- Delete:
+  `distribution/lib/Standard/Visualization/0.0.0-dev/src/Histogram.enso`, its
+  `docs/api/Histogram.md`, the histogram/heatmap entries in `Id.enso` (and its
+  `docs/api/Id.md`), `test/Visualization_Tests/src/Histogram_Spec.enso` and its
+  registration in `test/Visualization_Tests/src/Main.enso` and any `Id_Spec`
+  cases for them. Update `Visualization/0.0.0-dev/CLAUDE.md`.
+- Keep: Image's `Histogram` data type (`Standard.Image`, `std-bits/image`) — it
+  is image data, not a visualisation.
+
+- [ ] **Step 1:** `git grep -i "histogram\|heatmap"` and remove every reference
+      that belongs to the visualisations (not Image's type, not changelogs or
+      old release notes).
+- [ ] **Step 2: Verify** — `Visualization_Tests` passes; `stdlib-api-check`
+      passes for Visualization; GUI `typecheck`, `lint` and `test:unit` pass.
+- [ ] **Step 3: Commit** —
+      `Visualization: delete the unregistered Histogram and Heatmap`.
+
+---
+
 ## Step 1 — Pin today's JSON (PR 1, label `CI: No changelog needed`)
 
-Every later step must leave these files byte-identical. They are generated
-from `develop` before anything changes.
+Every later step must leave these files byte-identical. They are generated from
+`develop` before anything changes.
 
 ### Task 1.1: Golden-file helper and the pinned cases
 
@@ -147,8 +182,8 @@ expect_pinned (name : Text) ~json_text =
 
 - [ ] **Step 2: Write the cases**
 
-`test/Visualization_Tests/src/Pinned_Spec.enso`. Each case is one value
-through one preprocessor. The database values use SQLite in memory.
+`test/Visualization_Tests/src/Pinned_Spec.enso`. Each case is one value through
+one preprocessor. The database values use SQLite in memory.
 
 ```enso
 from Standard.Base import all
@@ -162,7 +197,6 @@ from Standard.XML import XML_Document
 
 import Standard.Visualization.Geo_Map
 import Standard.Visualization.Helpers
-import Standard.Visualization.Histogram
 import Standard.Visualization.Preprocessor
 import Standard.Visualization.Scatter_Plot
 import Standard.Visualization.SQL.Visualization as SQL_Visualization
@@ -300,17 +334,6 @@ add_specs suite_builder =
         geo "db_table" data.db_geo_table
         geo "vector" [1, 2]
 
-    suite_builder.group "Pinned histogram JSON" group_builder->
-        histogram name ~value =
-            group_builder.specify name <|
-                expect_pinned ("histogram_" + name) (Histogram.process_to_json_text value)
-        histogram "mem_table" data.mem_table
-        histogram "mem_value_column" (Table.new [["a", [1, 2]], ["Value", [9, 8]]])
-        histogram "mem_column" data.mem_column
-        histogram "db_table" data.db_table
-        histogram "vector" [1, 2, 3]
-        histogram "range" (2.up_to 5)
-
     suite_builder.group "Pinned SQL JSON" group_builder->
         group_builder.specify "db_table" <|
             expect_pinned "sql_db_table" (SQL_Visualization.prepare_visualization (data.db_table.filter "x" (..Greater 1)))
@@ -323,9 +346,9 @@ main filter=Nothing =
     suite.run_with_filter filter
 ```
 
-Every helper takes its value suspended (`~value`), so that the dataflow error
-of the `error` case reaches the preprocessor instead of short-circuiting the
-helper call.
+Every helper takes its value suspended (`~value`), so that the dataflow error of
+the `error` case reaches the preprocessor instead of short-circuiting the helper
+call.
 
 - [ ] **Step 3: Register the spec**
 
@@ -343,8 +366,8 @@ cd test && JAVA_TOOL_OPTIONS="-enableassertions -da:com.oracle.truffle.host.Host
 ```
 
 Expected: every `Pinned …` test FAILS with a `File_Error` (the files do not
-exist). If any case fails with a different error, the value expression is
-wrong: fix the case, do not drop it.
+exist). If any case fails with a different error, the value expression is wrong:
+fix the case, do not drop it.
 
 - [ ] **Step 5: Generate the goldens on `develop` code**
 
@@ -353,18 +376,18 @@ cd test && ENSO_UPDATE_PINNED=1 JAVA_TOOL_OPTIONS="-enableassertions -da:com.ora
 ```
 
 Then run again **without** `ENSO_UPDATE_PINNED`. Expected: all `Pinned` tests
-PASS. Run it a third time to prove the files are stable (no run-dependent
-data apart from the normalised hash). If a file differs between runs, find
-the unstable field and add it to `normalise` with a comment saying why.
+PASS. Run it a third time to prove the files are stable (no run-dependent data
+apart from the normalised hash). If a file differs between runs, find the
+unstable field and add it to `normalise` with a comment saying why.
 
-Open three or four of the generated files and check they hold real JSON (not
-an error text), especially `scatter_db_table`, `table_cells`,
-`geo_db_table` and `sql_db_table`.
+Open three or four of the generated files and check they hold real JSON (not an
+error text), especially `scatter_db_table`, `table_cells`, `geo_db_table` and
+`sql_db_table`.
 
 - [ ] **Step 6: Run the whole project**
 
-Run `Visualization_Tests` unfiltered. Expected: everything passes, and the
-count is the previous count plus the new cases.
+Run `Visualization_Tests` unfiltered. Expected: everything passes, and the count
+is the previous count plus the new cases.
 
 - [ ] **Step 7: Commit**
 
@@ -385,11 +408,15 @@ Visualization gains its data types. Nothing calls them yet.
 
 **Files:**
 
-- Create: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Viz_Column_Kind.enso`
+- Create:
+  `distribution/lib/Standard/Visualization/0.0.0-dev/src/Viz_Column_Kind.enso`
 - Create: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Viz_Table.enso`
-- Create: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Internal/Columns_Source.enso`
-- Create: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Internal/View_Source.enso`
-- Create: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Internal/Names.enso`
+- Create:
+  `distribution/lib/Standard/Visualization/0.0.0-dev/src/Internal/Columns_Source.enso`
+- Create:
+  `distribution/lib/Standard/Visualization/0.0.0-dev/src/Internal/View_Source.enso`
+- Create:
+  `distribution/lib/Standard/Visualization/0.0.0-dev/src/Internal/Names.enso`
 - Test: `test/Visualization_Tests/src/Viz_Table_Spec.enso`, `Main.enso`
 
 **Interfaces:**
@@ -398,8 +425,8 @@ Visualization gains its data types. Nothing calls them yet.
   - `Viz_Column_Kind.Viz_Kind` constructors `Numeric`, `Textual`, `Logical`,
     `Date_Only`, `Date_And_Time`, `Time_Only`, `Other`.
   - `Viz_Column_Kind.Viz_Column_Kind.Value (kind : Viz_Kind) (display_name : Text)`,
-    `.is_numeric -> Boolean`, `.is_date_or_time -> Boolean`,
-    static `Viz_Column_Kind.infer (values : Vector) -> Viz_Column_Kind`.
+    `.is_numeric -> Boolean`, `.is_date_or_time -> Boolean`, static
+    `Viz_Column_Kind.infer (values : Vector) -> Viz_Column_Kind`.
   - `Viz_Table.Viz_Table` with statics `from_source source`,
     `from_columns (headers : Vector Viz_Header) (columns : Vector Vector)`,
     `from_view (make_json : Integer -> Text)` and methods
@@ -417,11 +444,11 @@ Visualization gains its data types. Nothing calls them yet.
   - `Viz_Table.Viz_Unsupported.Error operation`.
   - `Internal.Names.select_insensitive (names : Vector Text) (wanted : Vector Text) (reorder : Boolean) -> Vector Text`,
     `Internal.Names.find_insensitive (names : Vector Text) (candidates : Vector Text) -> Text | Nothing`.
-- The source contract every library implements (methods on the source):
-  required `table_view_json max_rows`, `column_names`, `column_kinds`,
-  `row_count`, `select_columns names`, `slice start count`,
-  `sample count seed`, `supported_operations`; and the methods of each
-  capability it lists. Methods returning a table return a `Viz_Table`.
+- The source contract every library implements (methods on the source): required
+  `table_view_json max_rows`, `column_names`, `column_kinds`, `row_count`,
+  `select_columns names`, `slice start count`, `sample count seed`,
+  `supported_operations`; and the methods of each capability it lists. Methods
+  returning a table return a `Viz_Table`.
 
 - [ ] **Step 1: Write the failing spec**
 
@@ -864,8 +891,8 @@ type View_Source
     supported_operations self -> Vector Text = []
 ```
 
-`Viz_Table.enso` and the two sources import each other; Enso resolves
-module cycles inside a library.
+`Viz_Table.enso` and the two sources import each other; Enso resolves module
+cycles inside a library.
 
 - [ ] **Step 7: Run the spec**
 
@@ -889,7 +916,8 @@ git commit -m "Visualization: Viz_Table, its column kinds and the two in-memory 
 
 **Interfaces:**
 
-- Produces: `SQL_Viz.SQL_Viz.Value (dialect : Text) (code : Text) (interpolations : Vector)`
+- Produces:
+  `SQL_Viz.SQL_Viz.Value (dialect : Text) (code : Text) (interpolations : Vector)`
   and `.to_json_text -> Text` (the exact JSON
   `SQL.Visualization.prepare_visualization` returns today);
   `Viz_Cell.Viz_Cell.Value (render : Integer -> Any) (pairs : Vector | Nothing)`,
@@ -1052,8 +1080,8 @@ differences are the five deleted branches, the last branch and the names.
 
 - [ ] **Step 4: Run, commit**
 
-Rebuild; run `Visualization_Tests` filtered to `Viz_Cell` and `SQL_Viz`
-(PASS), then unfiltered (all pass, goldens unchanged).
+Rebuild; run `Visualization_Tests` filtered to `Viz_Cell` and `SQL_Viz` (PASS),
+then unfiltered (all pass, goldens unchanged).
 
 ```bash
 git add distribution/lib/Standard/Visualization test/Visualization_Tests
@@ -1072,11 +1100,11 @@ git commit -m "Visualization: SQL_Viz and Viz_Cell data types"
       command from "Working environment", then run
       `corepack pnpm --filter build-scripts run stdlib-api-check` and expect it
       to pass.
-- [ ] **Step 2:** In Visualization's `CLAUDE.md`, add a section `## Data
-types` listing `Viz_Table` (with the source contract from Task 2.1's
-      Interfaces, required and per capability), `SQL_Viz` and `Viz_Cell`, and
-      the rule "conversions on public types, implementations raise
-      `No_Such_Conversion` when they cannot supply a type".
+- [ ] **Step 2:** In Visualization's `CLAUDE.md`, add a section `## Data types`
+      listing `Viz_Table` (with the source contract from Task 2.1's Interfaces,
+      required and per capability), `SQL_Viz` and `Viz_Cell`, and the rule
+      "conversions on public types, implementations raise `No_Such_Conversion`
+      when they cannot supply a type".
 - [ ] **Step 3:** Commit (`git add distribution/lib/Standard/Visualization`,
       message `Visualization: API docs and guide for the data types`) and open
       the PR with `CI: No changelog needed`.
@@ -1085,42 +1113,47 @@ types` listing `Viz_Table` (with the source contract from Task 2.1's
 
 ## Step 3 — The flip (PR 3, label `CI: No changelog needed`)
 
-Table, Database and the other data libraries import Visualization and convert
-to its types; Base loses `Table_Viz_Data`; the table view and its server-side
-row model run on `Viz_Table`. Until step 4, Visualization's chart modules
-still import Table and Database, so the two libraries import each other; that
-cycle resolves (checked on a distribution, 2026-11-14) and step 4 removes it.
+Table, Database and the other data libraries import Visualization and convert to
+its types; Base loses `Table_Viz_Data`; the table view and its server-side row
+model run on `Viz_Table`. Until step 4, Visualization's chart modules still
+import Table and Database, so the two libraries import each other; that cycle
+resolves (checked on a distribution, 2026-11-14) and step 4 removes it.
 
 ### Task 3.1: Table's sources, cells and methods
 
 **Files:**
 
-- Create: `distribution/lib/Standard/Table/0.0.0-dev/src/Internal/Viz_Helpers.enso`
-- Create: `distribution/lib/Standard/Table/0.0.0-dev/src/Internal/In_Memory_Viz_Source.enso`
+- Create:
+  `distribution/lib/Standard/Table/0.0.0-dev/src/Internal/Viz_Helpers.enso`
+- Create:
+  `distribution/lib/Standard/Table/0.0.0-dev/src/Internal/In_Memory_Viz_Source.enso`
 - Modify: `distribution/lib/Standard/Table/0.0.0-dev/src/Table.enso`
 - Modify: `distribution/lib/Standard/Table/0.0.0-dev/src/Column.enso`
 - Modify: `distribution/lib/Standard/Table/0.0.0-dev/src/Row.enso`
-- Modify: `distribution/lib/Standard/Table/0.0.0-dev/src/Internal/In_Memory_Table_Implementation.enso`
-- Modify: `distribution/lib/Standard/Table/0.0.0-dev/src/Internal/In_Memory_Column_Implementation.enso`
-- Modify: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Helpers.enso` (remove what Table now owns)
+- Modify:
+  `distribution/lib/Standard/Table/0.0.0-dev/src/Internal/In_Memory_Table_Implementation.enso`
+- Modify:
+  `distribution/lib/Standard/Table/0.0.0-dev/src/Internal/In_Memory_Column_Implementation.enso`
+- Modify: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Helpers.enso`
+  (remove what Table now owns)
 - Test: `test/Visualization_Tests/src/Table_Conversions_Spec.enso`, `Main.enso`
 
 **Interfaces:**
 
-- Consumes: `Viz_Table`, `Viz_Column_Kind`, `Viz_Kind`, `SQL_Viz`,
-  `Viz_Cell` (step 2); `Standard.Visualization.Id.Id`.
+- Consumes: `Viz_Table`, `Viz_Column_Kind`, `Viz_Kind`, `SQL_Viz`, `Viz_Cell`
+  (step 2); `Standard.Visualization.Id.Id`.
 - Produces:
-  - `Standard.Table.Internal.Viz_Helpers` (a non-`private` module so
-    Database can import it): `column_kind (value_type : Value_Type) -> Viz_Column_Kind`,
+  - `Standard.Table.Internal.Viz_Helpers` (a non-`private` module so Database
+    can import it): `column_kind (value_type : Value_Type) -> Viz_Column_Kind`,
     `column_kinds table -> Vector Viz_Column_Kind`,
     `table_cell table level -> Text`, `column_cell column level -> Text`,
     `row_cell row level -> Text`, `row_table_view_json row -> Text`.
-  - `In_Memory_Viz_Source.Value table column` (column is the original
-    `Column` or `Nothing`), supporting `["rows", "server_rows"]`.
+  - `In_Memory_Viz_Source.Value table column` (column is the original `Column`
+    or `Nothing`), supporting `["rows", "server_rows"]`.
   - On the implementation types (static, like their other methods):
     `to_viz_table`, `to_sql_viz`, `default_visualization`.
-  - Conversions `Viz_Table.from`, `SQL_Viz.from`, `Viz_Cell.from` on `Table`
-    and `Column`; `Viz_Table.from` and `Viz_Cell.from` on `Row`.
+  - Conversions `Viz_Table.from`, `SQL_Viz.from`, `Viz_Cell.from` on `Table` and
+    `Column`; `Viz_Table.from` and `Viz_Cell.from` on `Row`.
   - Methods `default_visualization` on `Table`, `Column`, `Row`;
     `to_default_visualization_data` on `Column` and `Row`.
 
@@ -1182,9 +1215,9 @@ Rebuild and run filtered to `Table to Viz_Table`; expected: FAIL with
 - [ ] **Step 2: Write `Internal/Viz_Helpers.enso`**
 
 `table_cell`, `column_cell` and `row_cell` are the `table : Table`,
-`col : Column` and `row : Row` branches of `_make_json_for_value` on
-`develop`, unchanged except that the recursive call becomes
-`Viz_Cell.render_value`. `row_table_view_json` is `make_json_for_row` from
+`col : Column` and `row : Row` branches of `_make_json_for_value` on `develop`,
+unchanged except that the recursive call becomes `Viz_Cell.render_value`.
+`row_table_view_json` is `make_json_for_row` from
 `Visualization/src/Table/Visualization.enso`, with `_make_json_for_value`
 replaced the same way. (The `db_table`/`db_col` branches on `develop` are
 unreachable, because a database table also matches `table : Table` first, so
@@ -1265,11 +1298,11 @@ row_table_view_json row -> Text =
 
 - [ ] **Step 3: Write `Internal/In_Memory_Viz_Source.enso`**
 
-`server_rows_json` is the body of `get_rows_for_table` (from `max_rows=1000`
-on) and `distinct_values_json` the body of `get_distinct_values_for_column`
-(after the logging wrapper), both from `Visualization/src/Table/Visualization.enso`
-on `develop`, with `table` replaced by `self.table`. `apply_sort_to_table`
-and `apply_filter_to_table` move here unchanged as private functions.
+`server_rows_json` is the body of `get_rows_for_table` (from `max_rows=1000` on)
+and `distinct_values_json` the body of `get_distinct_values_for_column` (after
+the logging wrapper), both from `Visualization/src/Table/Visualization.enso` on
+`develop`, with `table` replaced by `self.table`. `apply_sort_to_table` and
+`apply_filter_to_table` move here unchanged as private functions.
 
 ```enso
 private
@@ -1345,8 +1378,8 @@ private _apply_filter_to_table table i filter_cols filter_conditions has_index_c
         @Tail_Call _apply_filter_to_table filtered_table i+1 filter_cols filter_conditions has_index_col
 ```
 
-`select_columns` passes `error_on_missing_columns=False on_problems=..Ignore`
-so that a missing name is skipped, as the contract says.
+`select_columns` passes `error_on_missing_columns=False on_problems=..Ignore` so
+that a missing name is skipped, as the contract says.
 
 - [ ] **Step 4: Implementation methods**
 
@@ -1384,7 +1417,8 @@ Append to `In_Memory_Column_Implementation` (same imports):
 - [ ] **Step 5: Conversions and methods on the public types**
 
 At the end of `Table.enso` (imports at the top:
-`import Standard.Visualization.Id.Id`, `import Standard.Visualization.SQL_Viz.SQL_Viz`,
+`import Standard.Visualization.Id.Id`,
+`import Standard.Visualization.SQL_Viz.SQL_Viz`,
 `import Standard.Visualization.Viz_Cell.Viz_Cell`,
 `import Standard.Visualization.Viz_Table.Viz_Table`,
 `import project.Internal.Viz_Helpers`):
@@ -1453,8 +1487,10 @@ Column.to_default_visualization_data self -> Text =
 ```
 
 At the end of `Row.enso` (imports `import Standard.Visualization.Helpers`,
-`import Standard.Visualization.Id.Id`, `import Standard.Visualization.Viz_Cell.Viz_Cell`,
-`import Standard.Visualization.Viz_Table.Viz_Table`, `import project.Internal.Viz_Helpers`):
+`import Standard.Visualization.Id.Id`,
+`import Standard.Visualization.Viz_Cell.Viz_Cell`,
+`import Standard.Visualization.Viz_Table.Viz_Table`,
+`import project.Internal.Viz_Helpers`):
 
 ```enso
 ## ---
@@ -1487,8 +1523,8 @@ Row.to_default_visualization_data self -> Text = Helpers.render_vector self.to_v
 
 - [ ] **Step 6: Run the spec**
 
-In `Visualization/src/Helpers.enso` delete the definitions that Table now
-owns, so that no method is defined twice: `Table.default_visualization`,
+In `Visualization/src/Helpers.enso` delete the definitions that Table now owns,
+so that no method is defined twice: `Table.default_visualization`,
 `Column.default_visualization`, `Column.to_default_visualization_data`,
 `Row.default_visualization`, `Row.to_default_visualization_data` and
 `Table.to_lazy_visualization_data`, and the imports
@@ -1510,12 +1546,14 @@ git commit -m "Table: convert tables, columns and rows to Visualization's data t
 
 **Files:**
 
-- Create: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Internal/View_Json.enso`
+- Create:
+  `distribution/lib/Standard/Visualization/0.0.0-dev/src/Internal/View_Json.enso`
 - Modify: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Viz_Table.enso`
-- Modify: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Table/Visualization.enso`
+- Modify:
+  `distribution/lib/Standard/Visualization/0.0.0-dev/src/Table/Visualization.enso`
 - Delete: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Table.enso`
-- Delete: `test/Visualization_Tests/src/Lazy_Table_Spec.enso` (and its two
-  lines in `Main.enso`)
+- Delete: `test/Visualization_Tests/src/Lazy_Table_Spec.enso` (and its two lines
+  in `Main.enso`)
 
 **Interfaces:**
 
@@ -1530,13 +1568,13 @@ git commit -m "Table: convert tables, columns and rows to Visualization's data t
 
 Create `Internal/View_Json.enso` (first line `private`; imports
 `from Standard.Base import all`, `import Standard.Base.Data.Vector.Builder`,
-`import project.Viz_Cell.Viz_Cell`) and **move** into it, unchanged except
-as listed, from `Table/Visualization.enso`: `max_columns`,
-`make_json_for_error`, `make_json_for_vector`, `make_json_for_matrix`,
-`make_json_for_object_matrix`, `make_json_for_dictionary`,
-`_make_json_for_hashset` (rename to `make_json_for_hashset`, drop `private`),
-`make_json_for_js_object`, `_make_json_for_other` (rename to
-`make_json_for_other`, drop `private`). Changes:
+`import project.Viz_Cell.Viz_Cell`) and **move** into it, unchanged except as
+listed, from `Table/Visualization.enso`: `max_columns`, `make_json_for_error`,
+`make_json_for_vector`, `make_json_for_matrix`, `make_json_for_object_matrix`,
+`make_json_for_dictionary`, `_make_json_for_hashset` (rename to
+`make_json_for_hashset`, drop `private`), `make_json_for_js_object`,
+`_make_json_for_other` (rename to `make_json_for_other`, drop `private`).
+Changes:
 
 - every `_make_json_for_value x` becomes `Viz_Cell.render_value x`;
 - `make_json_for_error` becomes
@@ -1567,7 +1605,8 @@ as listed, from `Table/Visualization.enso`: `max_columns`,
 
 - [ ] **Step 2: Base conversions in `Viz_Table.enso`**
 
-Add the imports `import Standard.Base.Network.Email.Email_Send_Response.Send_Response`,
+Add the imports
+`import Standard.Base.Network.Email.Email_Send_Response.Send_Response`,
 `import project.Internal.View_Json`, `import project.Viz_Cell.Viz_Cell`, and
 append:
 
@@ -1624,9 +1663,8 @@ catch-all, add the same conversion for `(that:Integer)` and `(that:Float)`.
 
 - [ ] **Step 3: Slim `Table/Visualization.enso`**
 
-The module keeps `Helper`, `prepare_visualization`,
-`get_rows_for_table` and `get_distinct_values_for_column`. Replace its
-imports with:
+The module keeps `Helper`, `prepare_visualization`, `get_rows_for_table` and
+`get_distinct_values_for_column`. Replace its imports with:
 
 ```enso
 from Standard.Base import all
@@ -1691,29 +1729,29 @@ get_rows_for_table table_or_column start_number sort_col_index_list=Nothing sort
         (Viz_Table.from table_or_column).server_rows_json start_number sort_col_index_list sort_direction_list filter_col filter_condition
 ```
 
-Delete everything else in the module: `_make_json_for_db_table` (Task 3.3
-moves it to Database), `apply_sort_to_table`, `apply_filter_to_table`
-(moved in Task 3.1), the `Table_Viz_Data.from (that:Any)` conversion (now
+Delete everything else in the module: `_make_json_for_db_table` (Task 3.3 moves
+it to Database), `apply_sort_to_table`, `apply_filter_to_table` (moved in Task
+3.1), the `Table_Viz_Data.from (that:Any)` conversion (now
 `Viz_Table.from (that:Any)`), `_make_json_for_value` and
 `_to_js_object_with_display_text` (now in `Viz_Cell`).
 
-Function stays a branch before the conversion: a `Function` value passed to
-a conversion is the one case this plan does not want to discover at run time.
+Function stays a branch before the conversion: a `Function` value passed to a
+conversion is the one case this plan does not want to discover at run time.
 
 - [ ] **Step 4: Delete the lazy table code**
 
-`git rm distribution/lib/Standard/Visualization/0.0.0-dev/src/Table.enso
-test/Visualization_Tests/src/Lazy_Table_Spec.enso` and remove
-`import project.Lazy_Table_Spec` and `Lazy_Table_Spec.add_specs suite_builder`
-from `test/Visualization_Tests/src/Main.enso`. Keep `Text.enso`,
-`Lazy_Text_Spec` and `Preprocessor.lazy_preprocessor`: the default
-visualisation of a long `Text` uses the lazy text window.
+`git rm distribution/lib/Standard/Visualization/0.0.0-dev/src/Table.enso test/Visualization_Tests/src/Lazy_Table_Spec.enso`
+and remove `import project.Lazy_Table_Spec` and
+`Lazy_Table_Spec.add_specs suite_builder` from
+`test/Visualization_Tests/src/Main.enso`. Keep `Text.enso`, `Lazy_Text_Spec` and
+`Preprocessor.lazy_preprocessor`: the default visualisation of a long `Text`
+uses the lazy text window.
 
 - [ ] **Step 5: Run, commit**
 
 Rebuild; run `Visualization_Tests` unfiltered. Expected: all pass except the
-database `Pinned` cases and `Table_Spec`'s database cases, which fail until
-Task 3.3 (the database table has no `to_viz_table` yet). Commit:
+database `Pinned` cases and `Table_Spec`'s database cases, which fail until Task
+3.3 (the database table has no `to_viz_table` yet). Commit:
 
 ```bash
 git add -A distribution/lib/Standard/Visualization test/Visualization_Tests
@@ -1724,17 +1762,21 @@ git commit -m "Visualization: the table view reads Viz_Table; lazy table code re
 
 **Files:**
 
-- Create: `distribution/lib/Standard/Database/0.0.0-dev/src/Internal/DB_Viz_Source.enso`
-- Modify: `distribution/lib/Standard/Database/0.0.0-dev/src/Internal/DB_Table_Implementation.enso`
-- Modify: `distribution/lib/Standard/Database/0.0.0-dev/src/Internal/DB_Column_Implementation.enso`
-- Modify: `distribution/lib/Standard/Database/0.0.0-dev/src/Internal/Common/Connections_Helpers.enso`
+- Create:
+  `distribution/lib/Standard/Database/0.0.0-dev/src/Internal/DB_Viz_Source.enso`
+- Modify:
+  `distribution/lib/Standard/Database/0.0.0-dev/src/Internal/DB_Table_Implementation.enso`
+- Modify:
+  `distribution/lib/Standard/Database/0.0.0-dev/src/Internal/DB_Column_Implementation.enso`
+- Modify:
+  `distribution/lib/Standard/Database/0.0.0-dev/src/Internal/Common/Connections_Helpers.enso`
 
 **Interfaces:**
 
 - Consumes: Task 3.1's `Viz_Helpers.column_kinds`; Visualization's types.
 - Produces: `DB_Viz_Source.Value table column spatial` (spatial is the
-  `Spatial_Table` refinement of the table, or `Nothing`); implementation
-  statics `to_viz_table`, `to_sql_viz`, `default_visualization` (table only).
+  `Spatial_Table` refinement of the table, or `Nothing`); implementation statics
+  `to_viz_table`, `to_sql_viz`, `default_visualization` (table only).
 
 - [ ] **Step 1: Write `Internal/DB_Viz_Source.enso`**
 
@@ -1783,8 +1825,9 @@ private _db_table_view_json t max_rows is_column =
 
 - [ ] **Step 2: Implementation methods**
 
-In `DB_Table_Implementation` (imports `import Standard.Table.Spatial_Table.Spatial_Table`
-if missing, `import Standard.Visualization.Id.Id`,
+In `DB_Table_Implementation` (imports
+`import Standard.Table.Spatial_Table.Spatial_Table` if missing,
+`import Standard.Visualization.Id.Id`,
 `import Standard.Visualization.SQL_Viz.SQL_Viz`,
 `import Standard.Visualization.Viz_Table.Viz_Table`,
 `import project.Internal.DB_Viz_Source.DB_Viz_Source`):
@@ -1861,11 +1904,13 @@ Add to `Table_Conversions_Spec.enso` a group using SQLite (copy the
 (imports: `import Standard.Database.Connection.Database`,
 `import Standard.Database.Extensions.Upload_Table`,
 `from Standard.SQLite import SQLite`, `import Standard.Visualization.Id.Id`.)
-Rebuild; run `Visualization_Tests` unfiltered. Expected: all pass, all
-goldens unchanged.
+Rebuild; run `Visualization_Tests` unfiltered. Expected: all pass, all goldens
+unchanged.
 
-- [ ] **Step 5: Commit** — `git add distribution/lib/Standard/Database test/Visualization_Tests`,
-      message `Database: convert database tables and columns to Visualization's data types`.
+- [ ] **Step 5: Commit** —
+      `git add distribution/lib/Standard/Database test/Visualization_Tests`,
+      message
+      `Database: convert database tables and columns to Visualization's data types`.
 
 ### Task 3.4: The other libraries, and Base loses `Table_Viz_Data`
 
@@ -1880,8 +1925,8 @@ goldens unchanged.
   `Postgres/0.0.0-dev/src/Postgres_Connection.enso`,
   `SQLite/0.0.0-dev/src/SQLite_Connection.enso`,
   `Snowflake/0.0.0-dev/src/Snowflake_Connection.enso`,
-  `Tableau/0.0.0-dev/src/Hyper_File.enso`, `XML/0.0.0-dev/src/XML.enso`
-  (all under `distribution/lib/Standard/`)
+  `Tableau/0.0.0-dev/src/Hyper_File.enso`, `XML/0.0.0-dev/src/XML.enso` (all
+  under `distribution/lib/Standard/`)
 - Modify: `Base/0.0.0-dev/src/Network/Email/Email_Send_Response.enso`,
   `Base/0.0.0-dev/src/Data/Json.enso`
 - Modify: `Visualization/0.0.0-dev/src/Helpers.enso` (receives
@@ -1889,10 +1934,10 @@ goldens unchanged.
 - Delete: `Base/0.0.0-dev/src/Visualization/Table_Viz_Data.enso`
 
 - [ ] **Step 1: Mechanical rewrite in each library.** In every file listed:
-  - the import `Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data`
-    (and `Table_Viz_Header`) becomes
-    `from Standard.Visualization.Viz_Table import Viz_Table, Viz_Header`
-    (keep only the names the file uses);
+  - the import `Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data` (and
+    `Table_Viz_Header`) becomes
+    `from Standard.Visualization.Viz_Table import Viz_Table, Viz_Header` (keep
+    only the names the file uses);
   - `Table_Viz_Data.from (that:X) =` becomes `Viz_Table.from (that:X) =`;
   - `Table_Viz_Data.GenericGrid` becomes `Viz_Table.from_columns`;
   - `Table_Viz_Header.Link` / `.Label` become `Viz_Header.Link` / `.Label`;
@@ -1918,8 +1963,8 @@ goldens unchanged.
       `Table_Viz_Data` import and the `Table_Viz_Data.from (that:Send_Response)`
       conversion (Task 3.2 Step 2 moved it). In `Json.enso` delete
       `JS_Object.to_default_visualization_data`, and in the same commit add it
-      to `Visualization/src/Helpers.enso`, after `JS_Object.default_visualization`
-      (`render` is already imported there):
+      to `Visualization/src/Helpers.enso`, after
+      `JS_Object.default_visualization` (`render` is already imported there):
 
   ```enso
   ## ---
@@ -1941,8 +1986,8 @@ goldens unchanged.
 - [ ] **Step 3: Run the affected test projects** after a rebuild:
       `Visualization_Tests` (all pass, goldens unchanged), `XML_Tests` (its
       `Visualization_Spec` passes unchanged), `SQLite_Tests`, `DuckDB_Tests`,
-      `Base_Tests`, `Table_Tests`. Record each project's test count and
-      compare with `develop`.
+      `Base_Tests`, `Table_Tests`. Record each project's test count and compare
+      with `develop`.
 
 - [ ] **Step 4: Check cells render without the import.** Create a throwaway
       project outside the repository (in your scratch directory) whose
@@ -1958,14 +2003,14 @@ goldens unchanged.
   ```
 
   Run it (`cd <scratch> && <dist>/bin/enso --no-ir-caches --run <Project>`).
-  Expected: the vector cell prints as `"[1, 2]"`, not `null`. On `develop`
-  the same program prints `null` for it (Visualization is not loaded); try it
-  there to see the difference.
+  Expected: the vector cell prints as `"[1, 2]"`, not `null`. On `develop` the
+  same program prints `null` for it (Visualization is not loaded); try it there
+  to see the difference.
 
-- [ ] **Step 5: Regenerate API docs** for Base, Visualization, Table,
-      Database, AWS, DuckDB, Excel, Google, Microsoft, Postgres, SQLite,
-      Snowflake, Tableau and XML with the `--docs=api` command, then run
-      `stdlib-api-check` until it passes.
+- [ ] **Step 5: Regenerate API docs** for Base, Visualization, Table, Database,
+      AWS, DuckDB, Excel, Google, Microsoft, Postgres, SQLite, Snowflake,
+      Tableau and XML with the `--docs=api` command, then run `stdlib-api-check`
+      until it passes.
 
 - [ ] **Step 6: Commit**
 
@@ -1978,41 +2023,41 @@ git commit -m "Libraries convert to Visualization's Viz_Table; Base drops Table_
 
 - [ ] **Step 1:** `distribution/lib/Standard/CLAUDE.md`, the `Visualization/`
       line of the library index: "IDE-only visualisation preprocessors and the
-      data types other libraries convert to (`Viz_Table`, `SQL_Viz`, `Viz_Cell`).
-      Depends only on `Base`; **do not import in user code**." Add a
-      "Cross-library pitfalls" bullet: Base knows nothing about visualisation;
+      data types other libraries convert to (`Viz_Table`, `SQL_Viz`,
+      `Viz_Cell`). Depends only on `Base`; **do not import in user code**." Add
+      a "Cross-library pitfalls" bullet: Base knows nothing about visualisation;
       a library makes its values drawable by a conversion to a Visualization
       data type, defined in the module of its **public** type.
 - [ ] **Step 2:** Visualization's `CLAUDE.md` Layout: remove `src/Table.enso`,
       add the new modules; Table's and Database's `CLAUDE.md`: one line each
       naming `Internal/Viz_Helpers.enso` / `Internal/In_Memory_Viz_Source.enso`
       / `Internal/DB_Viz_Source.enso`.
-- [ ] **Step 3:** Commit (`Guides: visualisation data types and layering`),
-      open the PR with `CI: No changelog needed`.
+- [ ] **Step 3:** Commit (`Guides: visualisation data types and layering`), open
+      the PR with `CI: No changelog needed`.
 
 ---
 
 ## Step 4 — The charts (PR 4, label `CI: No changelog needed`)
 
-Scatter, geo map and histogram read `Viz_Table`; SQL reads `SQL_Viz`;
-Visualization's last `Standard.Table`/`Standard.Database` imports go. The
-histogram gains a row bound. **The GUI does not register the Histogram (or
-Heatmap) visualisation** (`stores/visualization/index.ts` builtins), so no
-user sees that change; hence the label, not a changelog entry.
+Scatter and geo map read `Viz_Table`; SQL reads `SQL_Viz`; Visualization's last
+`Standard.Table`/`Standard.Database` imports go. Histogram and Heatmap were
+deleted in step 0.
 
 ### Task 4.1: Chart constants and the scatter plot
 
 **Files:**
 
-- Create: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Internal/Chart_Limits.enso`
-- Modify: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Scatter_Plot.enso`
+- Create:
+  `distribution/lib/Standard/Visualization/0.0.0-dev/src/Internal/Chart_Limits.enso`
+- Modify:
+  `distribution/lib/Standard/Visualization/0.0.0-dev/src/Scatter_Plot.enso`
 
 **Interfaces:**
 
 - Produces: `Chart_Limits.chart_row_bound = 15000`,
   `Chart_Limits.chart_sample_seed = 15975382`,
-  `Chart_Limits.local_rows (vt : Viz_Table) (bound : Integer) -> Viz_Table`
-  (the table itself when it supports `"rows"`, else its bounded sample).
+  `Chart_Limits.local_rows (vt : Viz_Table) (bound : Integer) -> Viz_Table` (the
+  table itself when it supports `"rows"`, else its bounded sample).
 
 - [ ] **Step 1: `Internal/Chart_Limits.enso`**
 
@@ -2038,8 +2083,8 @@ local_rows (vt : Viz_Table) (bound : Integer) -> Viz_Table =
 
 - [ ] **Step 2: Rewrite `Scatter_Plot.enso`**
 
-The goldens from step 1 are the test: `scatter_*` must stay byte-identical.
-Keep `json_from_vector` unchanged. Replace the imports and `x_column`,
+The goldens from step 1 are the test: `scatter_*` must stay byte-identical. Keep
+`json_from_vector` unchanged. Replace the imports and `x_column`,
 `json_from_table` and `process_to_json_text` with:
 
 ```enso
@@ -2129,18 +2174,18 @@ process_to_json_text value bounds=Nothing limit=Nothing = time_visualization Sca
 Notes for the implementer, each mirrors `develop`'s `json_from_table`:
 
 - `merged` must have the same columns in the same order as `develop`'s
-  `core_table.zip (Table.new data_columns)`: `x`, the matched
-  shape/label/size, the colour column, the row-number column, then the data
-  columns. When `color` was matched under another name (`Colour`), `develop`
-  copied it as `color`; selecting the source column and renaming it to
-  `color` through `field_names` yields the same JSON keys. Row JSON keys come
-  from `field_names`, which are what `develop` renamed to.
+  `core_table.zip (Table.new data_columns)`: `x`, the matched shape/label/size,
+  the colour column, the row-number column, then the data columns. When `color`
+  was matched under another name (`Colour`), `develop` copied it as `color`;
+  selecting the source column and renaming it to `color` through `field_names`
+  yields the same JSON keys. Row JSON keys come from `field_names`, which are
+  what `develop` renamed to.
 - `develop`'s `data_columns` excluded `core_table.column_names` (which hold
   `"color"`, not the source name), so a numeric column named `Colour` stays a
   data column there and here (`core_names` holds `"color"`).
-- The pathological case where the colour or row-number column is to the
-  **left** of `x` (then `develop`'s `get 1` picks `x` itself) duplicates a
-  column there and cannot here; it is not pinned and is accepted.
+- The pathological case where the colour or row-number column is to the **left**
+  of `x` (then `develop`'s `get 1` picks `x` itself) duplicates a column there
+  and cannot here; it is not pinned and is accepted.
 
 - [ ] **Step 3: Run**
 
@@ -2153,78 +2198,19 @@ anything else. Never regenerate a golden in this step.
 - [ ] **Step 4: Commit** — `git add distribution/lib/Standard/Visualization`,
       message `Scatter plot reads Viz_Table`.
 
-### Task 4.2: Histogram with its bound
+### Task 4.2: (removed)
 
-**Files:**
-
-- Modify: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Histogram.enso`
-- Test: `test/Visualization_Tests/src/Histogram_Spec.enso`
-
-- [ ] **Step 1: Write the failing bound test** — append to
-      `Histogram_Spec.enso`'s group:
-
-```enso
-        group_builder.specify "reads at most 15000 values of a large table" <|
-            table = Table.new [["value", 0.up_to 20000 . to_vector]]
-            json = Histogram.process_to_json_text table . parse_json
-            json.get "data" . get "values" . length . should_equal 15000
-```
-
-Run filtered to `reads at most`; expected: FAIL (20000 values).
-
-- [ ] **Step 2: Rewrite** — replace `from_table` and `from_value` and the
-      imports (`Update`, `from_vector`, `process_to_json_text` stay):
-
-```enso
-from Standard.Base import all
-
-import project.Helpers
-import project.Internal.Chart_Limits
-import project.Internal.Names
-import project.Viz_Table.Viz_Table
-from project.Helpers import time_visualization, short_display
-
-## ---
-   private: true
-   ---
-   Plots the column named 'value' (any case), else the first numeric column,
-   reading at most 15000 values.
-from_viz_table : Viz_Table -> Update
-from_viz_table vt =
-    names = vt.column_names
-    by_name = Names.find_insensitive names ["value"]
-    first_numeric = names.zip vt.column_kinds . find if_missing=Nothing (p-> p.second.is_numeric)
-    chosen = if Nothing != by_name then by_name else
-        if Nothing == first_numeric then Nothing else first_numeric.first
-    if Nothing == chosen then Update.Value [] Nothing else
-        bound = Chart_Limits.chart_row_bound
-        local = Chart_Limits.local_rows (vt.select_columns [chosen]) bound
-        bounded = if local.row_count <= bound then local else local.sample bound Chart_Limits.chart_sample_seed
-        Update.Value (bounded.column_values chosen) chosen
-
-## ---
-   private: true
-   ---
-from_value : Any -> Update
-from_value value =
-    case value of
-        _ : Vector -> from_vector value
-        _ ->
-            vt = Viz_Table.from value
-            if vt.column_names.is_empty then from_vector value.to_vector else from_viz_table vt
-```
-
-- [ ] **Step 3: Run** — the new test passes; all `Pinned histogram …`
-      goldens pass unchanged (they are all under the bound); `Histogram_Spec`
-      passes. Commit: `Histogram reads Viz_Table, at most 15000 values`.
+Histogram and Heatmap were deleted in step 0 (owner decision, 2026-11-14).
 
 ### Task 4.3: Geo map, spatial layers and SQL
 
 **Files:**
 
 - Modify: `distribution/lib/Standard/Visualization/0.0.0-dev/src/Geo_Map.enso`
-- Modify: `distribution/lib/Standard/Visualization/0.0.0-dev/src/SQL/Visualization.enso`
-- Modify: `distribution/lib/Standard/Database/0.0.0-dev/src/Internal/DB_Viz_Source.enso`
+- Modify:
+  `distribution/lib/Standard/Visualization/0.0.0-dev/src/SQL/Visualization.enso`
+- Modify:
+  `distribution/lib/Standard/Database/0.0.0-dev/src/Internal/DB_Viz_Source.enso`
 
 - [ ] **Step 1: Geo map** — `name_sets` becomes public (drop `private`, add
       `## --- private: true ---`) so Database can use it. Replace the imports,
@@ -2275,13 +2261,13 @@ process_to_json_text value = time_visualization Geo_Map ("process_to_json_text: 
 ```
 
 `develop`'s `json_from_table` selected `["X"]+set` with `reorder=True` after
-adding a column `X`, then took the second column: that is the first table
-column matching the earliest name in the set, which `find_insensitive`
-returns. An in-memory table is read whole, as before; only a database table
-is sampled (first 15000 rows, as before).
+adding a column `X`, then took the second column: that is the first table column
+matching the earliest name in the set, which `find_insensitive` returns. An
+in-memory table is read whole, as before; only a database table is sampled
+(first 15000 rows, as before).
 
-A `Vector` today reached `_ -> value.to_json`; it now converts to a
-view-only `Viz_Table` (no columns) and reaches the same `value.to_json`.
+A `Vector` today reached `_ -> value.to_json`; it now converts to a view-only
+`Viz_Table` (no columns) and reaches the same `value.to_json`.
 
 - [ ] **Step 2: Spatial layers in Database** — in `DB_Viz_Source.enso` add
       `import Standard.Visualization.Geo_Map` and the method (the body is
@@ -2334,8 +2320,8 @@ prepare_visualization table = time_visualization Visualization ("prepare_visuali
     sql.to_json_text
 ```
 
-- [ ] **Step 4: Run** — rebuild; `Visualization_Tests` unfiltered (every
-      golden unchanged, `Geo_Map_Spec`, `SQL_Spec` pass), `SQLite_Tests`,
+- [ ] **Step 4: Run** — rebuild; `Visualization_Tests` unfiltered (every golden
+      unchanged, `Geo_Map_Spec`, `SQL_Spec` pass), `SQLite_Tests`,
       `DuckDB_Tests`.
 
 - [ ] **Step 5: The layering check**
@@ -2345,23 +2331,23 @@ git grep -nE "^(import|from) Standard\.(Table|Database|[A-Z][A-Za-z_]*)" -- dist
 git grep -n "Visualization" -- distribution/lib/Standard/Base/0.0.0-dev/src
 ```
 
-Expected: no output from either. If the first lists a module, finish moving
-its Table/Database code before continuing.
+Expected: no output from either. If the first lists a module, finish moving its
+Table/Database code before continuing.
 
 - [ ] **Step 6: Docs, guide, commit** — regenerate API docs for Visualization
-      and Database, run `stdlib-api-check`; in Visualization's `CLAUDE.md`
-      add "How to add a chart: read `Viz_Table` (`Chart_Limits.local_rows`
-      first); add a data type only when the chart needs something a table
-      cannot give." Commit with the message "Geo map and SQL view read the data types" and
+      and Database, run `stdlib-api-check`; in Visualization's `CLAUDE.md` add
+      "How to add a chart: read `Viz_Table` (`Chart_Limits.local_rows` first);
+      add a data type only when the chart needs something a table cannot give."
+      Commit with the message "Geo map and SQL view read the data types" and
       open the PR with `CI: No changelog needed`.
 
 ---
 
 ## Step 5 — Availability by type in the GUI (PR 5, changelog entry)
 
-A chart with a data type is offered when one of the value's types (visible
-or hidden) has a conversion to that type, other than the `Any` catch-all. The
-table view keeps its static `inputType` (`Any`), the SQL view keeps
+A chart with a data type is offered when one of the value's types (visible or
+hidden) has a conversion to that type, other than the `Any` catch-all. The table
+view keeps its static `inputType` (`Any`), the SQL view keeps
 `DB_Table | DB_Column` (spec §6).
 
 ### Task 5.1: The conversion index and the matching rule
@@ -2371,7 +2357,8 @@ table view keeps its static `inputType` (`Any`), the SQL view keeps
 - Modify: `app/gui/src/providers/openedProjects/suggestionDatabase/index.ts`
 - Modify: `app/gui/src/project-view/stores/visualization/runtimeTypes.ts`
 - Modify: `app/gui/src/project-view/stores/visualization/metadata.ts`
-- Test: `app/gui/src/project-view/stores/visualization/__tests__/metadata.test.ts`
+- Test:
+  `app/gui/src/project-view/stores/visualization/__tests__/metadata.test.ts`
 
 **Interfaces:**
 
@@ -2427,15 +2414,16 @@ Imports to add: `assert` from `vitest`, `parseAbsoluteProjectPathRaw` from
 `@/util/projectPath`, `visualizationsForTypes` from
 `@/stores/visualization/metadata`.
 
-Run `corepack pnpm --filter enso-gui test:unit -- src/project-view/stores/visualization/__tests__/metadata.test.ts`;
+Run
+`corepack pnpm --filter enso-gui test:unit -- src/project-view/stores/visualization/__tests__/metadata.test.ts`;
 expected: FAIL (`visualizationsForTypes` is not exported; `dataType` is not a
 field).
 
-- [ ] **Step 2: `runtimeTypes.ts`** — in the `VisualizationModule` zod
-      object, next to `inputType`, add
-      `dataType: z.string().optional(),` with a comment: "The Enso type the
-      visualisation's preprocessor reads (`Standard.Visualization.*`); the
-      visualisation is offered for every value whose type converts to it."
+- [ ] **Step 2: `runtimeTypes.ts`** — in the `VisualizationModule` zod object,
+      next to `inputType`, add `dataType: z.string().optional(),` with a
+      comment: "The Enso type the visualisation's preprocessor reads
+      (`Standard.Visualization.*`); the visualisation is offered for every value
+      whose type converts to it."
 
 - [ ] **Step 3: `metadata.ts`**
 
@@ -2495,9 +2483,10 @@ export function visualizationsForTypes(
 ```
 
 If `ReactiveDb` has no `entries()`, iterate `metadata.keys()` and
-`metadata.get(id)`; check `app/gui/src/project-view/util/database/reactiveDb.ts`.
-`ANY_TYPE_QN` must compare with type **keys**: if `ANY_TYPE_QN` is not a key,
-use `ANY_TYPE.key()` (both are exported from `@/util/ensoTypes`).
+`metadata.get(id)`; check
+`app/gui/src/project-view/util/database/reactiveDb.ts`. `ANY_TYPE_QN` must
+compare with type **keys**: if `ANY_TYPE_QN` is not a key, use `ANY_TYPE.key()`
+(both are exported from `@/util/ensoTypes`).
 
 - [ ] **Step 4: `SuggestionDb.conversionSources`** — in
       `suggestionDatabase/index.ts`, next to `methodOnTypeIndex`:
@@ -2520,9 +2509,9 @@ use `ANY_TYPE.key()` (both are exported from `@/util/ensoTypes`).
 Add a test in `suggestionDatabase`'s `__tests__` (create
 `conversionSources.test.ts`) using `SuggestionDb.createMock` with one
 `Viz_Table.from (that:Standard.Table.Table.Table)` entry and one unrelated
-method, built with the entry factories the existing tests in that directory
-use; assert `db.conversionSources.lookup(<Viz_Table key>)` is the set with
-the Table key.
+method, built with the entry factories the existing tests in that directory use;
+assert `db.conversionSources.lookup(<Viz_Table key>)` is the set with the Table
+key.
 
 - [ ] **Step 5: Run** both tests; expected PASS. Commit
       (`GUI: index conversions; offer a visualization by its data type`).
@@ -2533,13 +2522,15 @@ the Table key.
 
 - Modify: `app/gui/src/project-view/stores/visualization/index.ts`
 - Modify: `app/gui/src/project-view/components/GraphEditor.vue`
-- Modify: `app/gui/src/project-view/components/visualizations/ScatterplotVisualization.vue`
-- Modify: `app/gui/src/project-view/components/visualizations/GeoMapVisualization.vue`
+- Modify:
+  `app/gui/src/project-view/components/visualizations/ScatterplotVisualization.vue`
+- Modify:
+  `app/gui/src/project-view/components/visualizations/GeoMapVisualization.vue`
 - Modify: `CHANGELOG.md`
 
 - [ ] **Step 1: The store** — the factory takes the suggestion database:
-      `(proj: ProjectStore, suggestionDb?: SuggestionDb) =>`; the builtin
-      loop also copies `dataType`; `byType` becomes:
+      `(proj: ProjectStore, suggestionDb?: SuggestionDb) =>`; the builtin loop
+      also copies `dataType`; `byType` becomes:
 
 ```ts
 function* byType(
@@ -2561,8 +2552,9 @@ function* byType(
 }
 ```
 
-`GraphEditor.vue`: `provideVisualizationStore(projectStore, suggestionDb.entries)`.
-Find any other `provideVisualizationStore(` call (tests, mocks) with
+`GraphEditor.vue`:
+`provideVisualizationStore(projectStore, suggestionDb.entries)`. Find any other
+`provideVisualizationStore(` call (tests, mocks) with
 `git grep -n "provideVisualizationStore("` and leave them without the second
 argument (it is optional).
 
@@ -2574,22 +2566,21 @@ argument (it is optional).
       `corepack pnpm --filter enso-gui lint`,
       `corepack pnpm --filter enso-gui test:unit`. Expected: clean, all pass.
 
-- [ ] **Step 4: Check in the IDE** (build with `ide-local` or run the dev
-      GUI against a built engine): a Table offers Table, Scatter Plot, Geo Map
-      (as before); a DuckDB table also offers SQL Query; a Vector offers
-      Scatter Plot (as before) and now Geo Map; an Integer offers neither
-      chart; a DuckDB **connection** now offers Scatter Plot and Geo Map,
-      which show their empty state. If a Table offers no chart, the language
-      server did not send `Viz_Table.from` entries: check
-      `suggestionDb.conversionSources` in the devtools before anything else.
-      Attach before/after screenshots of the picker for a Table and a Vector
-      to the PR (standing rule for UI PRs).
+- [ ] **Step 4: Check in the IDE** (build with `ide-local` or run the dev GUI
+      against a built engine): a Table offers Table, Scatter Plot, Geo Map (as
+      before); a DuckDB table also offers SQL Query; a Vector offers Scatter
+      Plot (as before) and now Geo Map; an Integer offers neither chart; a
+      DuckDB **connection** now offers Scatter Plot and Geo Map, which show
+      their empty state. If a Table offers no chart, the language server did not
+      send `Viz_Table.from` entries: check `suggestionDb.conversionSources` in
+      the devtools before anything else. Attach before/after screenshots of the
+      picker for a Table and a Vector to the PR (standing rule for UI PRs).
 
 - [ ] **Step 5: Changelog** — under `# Next Release` / `#### Enso IDE`:
 
 ```markdown
-- [Charts are offered for every value whose library can draw them, not a
-  fixed list of types.][NNN]
+- [Charts are offered for every value whose library can draw them, not a fixed
+  list of types.][NNN]
 ```
 
 with the link definition `[NNN]: https://github.com/jdunkerley/enso/pull/NNN`
@@ -2604,16 +2595,14 @@ with the link definition `[NNN]: https://github.com/jdunkerley/enso/pull/NNN`
 
 - §1 pattern, public-type rule: Tasks 3.1, 3.3 (conversions on `Table`,
   `Column`, `Row`; implementations; `No_Such_Conversion`).
-- §2 `Viz_Table` contract, in-memory implementation, conversions table:
-  Tasks 2.1, 3.1–3.4 (contract extended, see the spec's "Changed while
-  planning").
+- §2 `Viz_Table` contract, in-memory implementation, conversions table: Tasks
+  2.1, 3.1–3.4 (contract extended, see the spec's "Changed while planning").
 - §3 `SQL_Viz`: Tasks 2.2, 3.3, 4.3.
-- §4 charts: Tasks 4.1–4.3; heatmap needs no change (it uses the table view,
-  already bounded at 1000 rows).
+- §4 charts: Tasks 4.1 and 4.3; Histogram and Heatmap deleted in step 0.
 - §5 moves and deletions: Tasks 3.2 (lazy table, Helpers), 3.4 (Base,
   libraries), cell rendering 2.2/3.1/3.2, Java callback unchanged.
 - §6 availability: Tasks 5.1, 5.2 (SQL keeps its static type).
 - §7 layering note and grep: Tasks 3.5, 4.3 Step 5.
-- Verification: goldens (1.1) for "JSON unchanged", database bounded reads
-  (3.3 Step 4, 4.1, 4.2), cells without the import (3.4 Step 4), layering
-  grep (4.3), `stdlib-api-check` (2.3, 3.4, 4.3), IDE check (5.2).
+- Verification: goldens (1.1) for "JSON unchanged", database bounded reads (3.3
+  Step 4, 4.1), cells without the import (3.4 Step 4), layering grep (4.3),
+  `stdlib-api-check` (2.3, 3.4, 4.3), IDE check (5.2).

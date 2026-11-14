@@ -151,8 +151,6 @@ function visualizationLocator(visSelector: string) {
 export const jsonVisualization = visualizationLocator('.JSONVisualization')
 export const tableVisualization = visualizationLocator('.TableVisualization')
 export const scatterplotVisualization = visualizationLocator('.ScatterplotVisualization')
-export const histogramVisualization = visualizationLocator('.HistogramVisualization')
-export const heatmapVisualization = visualizationLocator('.HeatmapVisualization')
 export const sqlVisualization = visualizationLocator('.SqlVisualization')
 export const geoMapVisualization = visualizationLocator('.GeoMapVisualization')
 export const imageBase64Visualization = visualizationLocator('.ImageBase64Visualization')
