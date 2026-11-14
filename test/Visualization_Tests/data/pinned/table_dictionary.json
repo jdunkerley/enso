@@ -1,0 +1,1 @@
+{"header":["key","value"],"data":[["a","b"],[1,"[1, 2]"]],"all_rows_count":2,"get_child_node_action":"at {{#key}}","get_child_node_link_name":"key","type":"Map","child_label":"value"}

@@ -1,0 +1,1 @@
+{"header":["key","type","value"],"data":[["@id","0","1"],["Attribute","Element","Text"],["10","<bar>hello</bar>","text"]],"all_rows_count":3,"type":"XML_Document","get_child_node_action":"get_child_element {{#key}}","get_child_node_link_name":"key"}

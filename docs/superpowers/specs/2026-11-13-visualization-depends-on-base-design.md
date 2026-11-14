@@ -454,6 +454,30 @@ Found while writing the piece 1 plan
    Visualization's chart modules still import Table). It resolves at run time
    (tested on a distribution, 2026-11-14); step 4 removes it.
 
+10. **A source without `"rows"` shows the chart's empty state.**
+    `Viz_Table.from_columns` and `from_view` sources (connections, workbooks,
+    Hyper files, XML, a `Send_Response`) supply the required part of the
+    contract only. After `Chart_Limits.local_rows`, a scatter plot or geo map
+    whose source still lacks `"rows"` returns its existing empty JSON (the "At
+    least one numeric" message, `{}`) instead of raising `Viz_Unsupported`.
+11. **The geo map's JSON changes for values with columns that are not tables.**
+    On `develop` only `Spatial_Table`, `DB_Table` and `In_Memory_Table` take the
+    table path and everything else gets `value.to_json`; now any value with
+    columns does (an in-memory or database column, a connection, a workbook).
+    The plan pins the old output (`geo_mem_column`, `geo_db_column`,
+    `geo_connection`) and regenerates those three files in the step that changes
+    it. The GUI geo map's `inputType` is `Standard.Table.Table.Table` today, so
+    these values never reached it in the IDE.
+12. **Widgets may keep their Table and Database imports until piece 4.**
+    `Widgets.enso` imports both. The plan tries to drop them (Task 4.4); if a
+    widget spec fails without them, `Widgets.enso` keeps them as the one
+    exception to the layering rule, until piece 4 moves the widgets, and the
+    layering grep excludes it.
+13. **The conversion index is not shared with `WidgetAnyToTarget`.** Spec §6
+    says "the same scan as the `to` widget, shared". The plan adds
+    `SuggestionDb.conversionSources` for the visualization picker and leaves
+    `WidgetAnyToTarget.vue`'s linear scan alone; sharing it is left to piece 4.
+
 ## Decided at review (2026-11-14)
 
 - **Histogram and Heatmap are deleted** (a new step 0), not moved onto

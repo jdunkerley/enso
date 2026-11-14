@@ -118,6 +118,7 @@ testProjects:
         Table,
         Test,
         Visualization,
+        XML,
       ]
     testImports: []
   XML_Tests:

@@ -1,0 +1,7 @@
+from Standard.Base import all
+
+## Values whose JSON embeds a source location. They live in their own small
+   module so that editing `Pinned_Spec` cannot move them: the golden that pins
+   `increment` names this file and its line, so keep it at the top and do not
+   insert anything above it.
+increment = x-> x + 1

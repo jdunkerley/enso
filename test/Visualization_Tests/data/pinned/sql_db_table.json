@@ -1,0 +1,1 @@
+{"dialect":"SQLite","code":"SELECT \"pinned\".\"x\" AS \"x\", \"pinned\".\"y\" AS \"y\", \"pinned\".\"label\" AS \"label\" FROM \"pinned\" AS \"pinned\" WHERE (\"pinned\".\"x\" > ?)","interpolations":[{"value":1,"enso_type":"Standard.Base.Data.Numbers.Integer"}]}
