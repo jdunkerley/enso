@@ -24,6 +24,7 @@ import project.Aggregate_Column.Aggregate_Column
 import Standard.Visualization.Id.Id
 import Standard.Visualization.SQL_Viz.SQL_Viz
 import Standard.Visualization.Viz_Cell.Viz_Cell
+import Standard.Visualization.Viz_Json.Viz_Json
 import Standard.Visualization.Viz_Table.Viz_Table
 import project.Internal.Viz_Helpers
 import project.Blank_Selector.Blank_Selector
@@ -4084,6 +4085,23 @@ SQL_Viz.from (that:Table) = that.implementation.to_sql_viz that.underlying
    private: true
    ---
 Viz_Cell.from (that:Table) = Viz_Cell.Value (level-> Viz_Helpers.table_cell that level) Nothing
+
+## ---
+   private: true
+   ---
+   The row count and the first 10 values of each column. A database table
+   reads 10 rows first.
+Viz_Json.from (that:Table) = case that.is_a In_Memory_Table of
+    True ->
+        text = Widget_Helpers._with_table_cache that "viz_json" <|
+            max_size = 10
+            cols = that.columns.map c->
+                name = c.name.to_json
+                items = c.to_json_data 0 max_size
+                '{"name":'+name+',"data":' + items + '}'
+            '{"number_of_rows":' + that.row_count.to_text + ',"columns":[' + (cols.join ",") + ']}'
+        Viz_Json.Value text
+    False -> Viz_Json.from (that.read 10)
 
 ## ---
    private: true

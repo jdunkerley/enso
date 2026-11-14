@@ -2,12 +2,10 @@ from Standard.Base import all
 
 from Standard.Table import Table
 
-import Standard.Visualization.Helpers
+import Standard.Visualization.Preprocessor
+from Standard.Visualization.Viz_Json import Viz_Json
 
 from Standard.Test import all
-
-
-from project.Helpers import all
 
 polyglot java import java.util.LinkedHashSet
 
@@ -15,15 +13,17 @@ type My_Type
     Value foo
 
 add_specs suite_builder =
+    json_of value = (Viz_Json.from value).json_text
+
     suite_builder.group "Table.rows" group_builder->
         table = Table.new [["X", [1, 2, 3, 4]], ["Y", [5, 6, 7, 8]], ["Z", ["A", "B", "C", "D"]]]
         group_builder.specify "should visualize nicely" <|
-            Json.parse (table.rows . to_default_visualization_data) . should_equal <|
+            Json.parse (json_of table.rows) . should_equal <|
                 Json.parse '[[1,5,"A"],[2,6,"B"],[3,7,"C"],[4,8,"D"]]'
 
-            # We limit to at most 100 rows, in the future we should add some kind of 'and N more rows' to the visualization, like is done for Table - or just integrate the lazy vis.
+            # At most 100 rows.
             t2 = Table.new [["X", 0.up_to 200 . to_vector]]
-            t2.rows.to_default_visualization_data . should_equal (0.up_to 100 . map (x -> [x])).to_default_visualization_data
+            json_of t2.rows . should_equal (json_of (0.up_to 100 . map (x -> [x])))
 
     suite_builder.group "Vector and Arrays" group_builder->
         ## Returns an array with the same contents as the given vector, surely backed by
@@ -35,34 +35,32 @@ add_specs suite_builder =
             builder.toArray
 
         group_builder.specify "should be able to be efficiently visualise a Vector" <|
-            vec = Vector.fill 1000 0
-            text = vec.to_default_visualization_data
-            json = Json.parse text
-            json.should_equal <| Vector.fill 100 0
+            Json.parse (json_of (Vector.fill 1000 0)) . should_equal <| Vector.fill 100 0
 
         group_builder.specify "should be able to visualize an Enso Array" <|
-            arr = Vector.fill 1000 0 . to_array
-            text = arr.to_default_visualization_data
-            json = Json.parse text
-            json.should_equal <| Vector.fill 100 0
+            Json.parse (json_of (Vector.fill 1000 0 . to_array)) . should_equal <| Vector.fill 100 0
 
-        group_builder.specify "should be able to visualize a Polyglot Array" pending="`to_default_visualization_data` does not work for polyglot arrays" <|
-            arr = make_java_array (Vector.fill 1000 0)
-            text = arr.to_default_visualization_data
-            json = Json.parse text
-            json.should_equal <| Vector.fill 100 0
+        group_builder.specify "should be able to visualize a Polyglot Array" pending="`Viz_Json.from` does not work for polyglot arrays" <|
+            Json.parse (json_of (make_java_array (Vector.fill 1000 0))) . should_equal <| Vector.fill 100 0
+
+    suite_builder.group "Text" group_builder->
+        group_builder.specify "short text is its JSON" <|
+            json_of "hello" . should_equal '"hello"'
+
+        group_builder.specify "text over 2000 characters is cut, with an ellipsis" <|
+            long = 0.up_to 2500 . map (_-> "a") . join ""
+            expected = (0.up_to 2000 . map (_-> "a") . join "") + "…"
+            json_of long . should_equal expected.to_json
 
     suite_builder.group "Dataflow Error Visualization" group_builder->
         group_builder.specify "should be able to be shown in the default visualization" <|
-            json = (Error.throw <| My_Type.Value "aaa").to_default_visualization_data
+            json = Preprocessor.default_preprocessor (Error.throw <| My_Type.Value "aaa")
             Json.parse json . should_equal <|
                 JS_Object.from_pairs [["type", "My_Type"], ["constructor", "Value"], ["foo", "aaa"]]
 
         group_builder.specify "should be able to be shown in the default vector visualization" <|
             vec = [My_Type.Value "bar", Error.throw (My_Type.Value 42)]
-            visualization_text = vec.to_default_visualization_data
-
-            Json.parse visualization_text . should_equal <|
+            Json.parse (json_of vec) . should_equal <|
                 expected_json = '''
                     [
                       {
@@ -82,4 +80,3 @@ main filter=Nothing =
     suite = Test.build suite_builder->
         add_specs suite_builder
     suite.run_with_filter filter
-

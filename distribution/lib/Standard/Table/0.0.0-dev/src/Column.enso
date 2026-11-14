@@ -14,6 +14,7 @@ from Standard.Base.Widget_Helpers import make_data_cleanse_vector_selector, make
 import project.Constants.Previous_Value
 import Standard.Visualization.SQL_Viz.SQL_Viz
 import Standard.Visualization.Viz_Cell.Viz_Cell
+import Standard.Visualization.Viz_Json.Viz_Json
 import Standard.Visualization.Viz_Table.Viz_Table
 import project.Internal.Viz_Helpers
 import project.Data_Formatter.Data_Formatter
@@ -2691,6 +2692,16 @@ SQL_Viz.from (that:Column) = that.implementation.to_sql_viz that.underlying
    private: true
    ---
 Viz_Cell.from (that:Column) = Viz_Cell.Value (level-> Viz_Helpers.column_cell that level) Nothing
+
+## ---
+   private: true
+   ---
+   The column's length, name and first 100 values (also read from a database).
+Viz_Json.from (that:Column) =
+    size = ['length', that.row_count]
+    name = ['name', that.name]
+    data = ['data', that.read (..First 100) . to_vector]
+    Viz_Json.Value (JS_Object.from_pairs [size, name, data] . to_text)
 
 ## ---
    private: true

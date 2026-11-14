@@ -1,6 +1,7 @@
 from Standard.Base import all
 
 import project.Helpers
+import project.Viz_Json.Viz_Json
 from project.Helpers import time_visualization, short_display
 
 ## ---
@@ -8,7 +9,9 @@ from project.Helpers import time_visualization, short_display
    ---
    Default visualization preprocessor.
 default_preprocessor x = time_visualization Preprocessor ("default_preprocessor: " + (short_display x)) <|
-    result = x.to_default_visualization_data
+    ## A dataflow error shows its payload.
+    value = if x.is_error then x.catch else x
+    result = (Viz_Json.from value).json_text
     case result.is_error of
         True -> Helpers.truncate x.to_display_text . to_json
         False -> result

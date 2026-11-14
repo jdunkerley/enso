@@ -126,6 +126,7 @@ add_specs suite_builder =
         default_data "xml_element" (XML_Document.parse '<foo id="10"><bar>hello</bar>text</foo>' . root_element)
         default_data "vector_deep" [[[[[[[1]]]]]], (0.up_to 150 . to_vector)]
         default_data "array" [1, [2, 3]].to_array
+        default_data "long_text" (0.up_to 2500 . map (_-> "a") . join "")
 
     suite_builder.group "Pinned server-side row model" group_builder->
         group_builder.specify "rows" <|

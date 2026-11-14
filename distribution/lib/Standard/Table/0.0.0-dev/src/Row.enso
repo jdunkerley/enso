@@ -5,6 +5,7 @@ import Standard.Base.Errors.Common.Index_Out_Of_Bounds
 import project.Errors.No_Such_Column
 import Standard.Visualization.Helpers
 import Standard.Visualization.Viz_Cell.Viz_Cell
+import Standard.Visualization.Viz_Json.Viz_Json
 import Standard.Visualization.Viz_Table.Viz_Table
 import project.Internal.Viz_Helpers
 import project.Internal.Widget_Helpers
@@ -148,6 +149,12 @@ Viz_Table.from (that:Row) = Viz_Table.from_view (_-> Viz_Helpers.row_table_view_
 Viz_Cell.from (that:Row) =
     pairs = that.column_names.map (n-> [n, that.get n])
     Viz_Cell.Value (level-> Viz_Helpers.row_cell that level) pairs
+
+## ---
+   private: true
+   ---
+   The row's values, as a vector.
+Viz_Json.from (that:Row) = Viz_Json.from that.to_vector
 
 ## ---
    private: true
