@@ -436,7 +436,7 @@ test('Visualization preview: user visualization selection', async ({ editorPage,
   await expect(content).toHaveText('4')
   await page.keyboard.press(`Shift+Enter`)
   await expect(locate.jsonVisualization(page)).toBeVisible()
-  await expect(locate.jsonVisualization(page)).toContainText('"visualizedExpr": "4"')
+  await expect(locate.jsonVisualization(page)).toContainText('visualizedExpr: "4"')
   await locate.toggleVisualizationSelectorButton(page).click()
   await page
     .getByTestId('visualization-selector-entries')

@@ -1,7 +1,5 @@
-import assert from 'assert'
 import { expect, test } from 'integration-test/base'
 import * as actions from './actions'
-import { computedContent } from './css'
 import { mockExpressionUpdate } from './expressionUpdates'
 import * as locate from './locate'
 
@@ -17,12 +15,8 @@ test('Node can open and load visualization', async ({ editorPage, page }) => {
   await page.getByText('JSON').click()
   const vis = locate.jsonVisualization(page)
   await expect(vis).toExist()
-  // The default JSON viz data contains an object.
-  const element = await vis.elementHandle()
-  assert(element != null)
-  const textContent = await computedContent(element)
-  const jsonContent = JSON.parse(textContent)
-  expect(typeof jsonContent).toBe('object')
+  // The JSON visualization is the tree of `Tree.prepare`'s mock.
+  await expect(vis).toContainText('items: [150 items]')
   const nodeType = await locate.visualisationNodeType(page)
   await expect(nodeType).toHaveText('Unknown')
   await mockExpressionUpdate(page, 'final', { type: ['Standard.Table.Table.Table'] })
