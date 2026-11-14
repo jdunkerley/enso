@@ -154,6 +154,23 @@ add_specs suite_builder =
             ((Viz_Tree.from [10, 20]).child (-1)) . should_fail_with Illegal_Argument
             ((Viz_Tree.from [10, 20]).child 2) . should_fail_with Illegal_Argument
 
+        group_builder.specify "a Dictionary's Float key is found by an equal Integer and by its display text" <|
+            floaty = Viz_Tree.from (Dictionary.from_vector [[2.0, "f"]])
+            keys_of floaty . should_equal ["2.0"]
+            ## An Integer key is a direct lookup, and Enso treats `2` and `2.0`
+               as the same key, so it finds the entry; the child is shown under
+               the key that was asked for.
+            by_integer = floaty.child 2
+            by_integer.key . should_equal 2
+            by_integer.node_expression . should_equal ".at 2"
+            by_integer.tree.json_text . should_equal '"f"'
+            ## The display text finds it through the search and keeps the
+               stored key's expression.
+            by_text = floaty.child "2.0"
+            by_text.key . should_equal "2.0"
+            by_text.node_expression . should_equal ".at 2.0"
+            by_text.tree.json_text . should_equal '"f"'
+
         group_builder.specify "child of a missing key or of a leaf is an Illegal_Argument" <|
             (tree.child 250) . should_fail_with Illegal_Argument
             (tree.child "x") . should_fail_with Illegal_Argument
@@ -236,6 +253,14 @@ add_specs suite_builder =
             exprs_of row . should_equal [".at " + "x".pretty, ".at " + "label".pretty]
             (child_tree row "x").json_text . should_equal "2"
 
+        group_builder.specify "a Row's child finds a column holding Nothing, and a missing name or index is an error" <|
+            sparse = Table.new [["x", [1, Nothing]], ["y", ["a", "b"]]]
+            row = child_tree (child_tree (Viz_Tree.from sparse) "rows") 1
+            (child_tree row "x").json_text . should_equal "null"
+            (row.child "x").node_expression . should_equal (".at " + "x".pretty)
+            (row.child "z") . should_fail_with Illegal_Argument
+            (row.child 0) . should_fail_with Illegal_Argument
+
         group_builder.specify "an in-memory Table's rows and columns pages at a high start have the right indices and values" <|
             big = Table.new [["x", 0.up_to 1000 . to_vector], ["y", 0.up_to 1000 . map i-> "v" + i.to_text]]
             rows = child_tree (Viz_Tree.from big) "rows"
@@ -300,6 +325,16 @@ add_specs suite_builder =
             keys_of root 1 100 . should_equal [0, 1]
             keys_of root 2 1 . should_equal [1]
             (child_tree root 0).label . should_equal "<bar> (0 attributes, 1 child)"
+
+        group_builder.specify "child of an XML element misses with the same error as a page scan" <|
+            root = child_tree (Viz_Tree.from (XML_Document.parse '<foo id="10"><bar>hello</bar>text</foo>')) "foo"
+            (root.child "@nope") . should_fail_with Illegal_Argument
+            (root.child "id") . should_fail_with Illegal_Argument
+            (root.child 2) . should_fail_with Illegal_Argument
+            (root.child (-1)) . should_fail_with Illegal_Argument
+            (root.child "@nope").catch.message . should_equal "No child has the key '@nope'."
+            (root.child "id").catch.message . should_equal "No child has the key 'id'."
+            (root.child 2).catch.message . should_equal "No child has the key 2."
 
 main filter=Nothing =
     suite = Test.build suite_builder->

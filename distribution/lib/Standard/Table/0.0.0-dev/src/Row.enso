@@ -162,10 +162,16 @@ Viz_Json.from (that:Row) = Viz_Json.from that.to_vector
    ---
    The row's values by column name, each reached with `.at name`.
 Viz_Tree.from (that:Row) =
-    ## `column_names` is a view of the row's own names, not a copy.
-    names = that.column_names
+    ## The node needs only the column count; a page reads the names it shows
+       one at a time and a lookup reads the one column it is asked for, so no
+       vector of all the names is built.
     label = "Row (" + (Viz_Tree.count_text that.length "value" "values") + ")"
-    name_child name = Viz_Tree_Child.Value name (Viz_Tree.from (that.get name)) (".at " + name.pretty)
-    page_of start end = start.up_to end . map index-> name_child (names.at index)
-    child_of key = if key.is_a Text && (names.contains key) then name_child key else Nothing
+    name_child name value = Viz_Tree_Child.Value name (Viz_Tree.from value) (".at " + name.pretty)
+    page_of start end = start.up_to end . map index->
+        name = that.java_row.get_name index
+        name_child name (that.get name)
+    ## A missing column is an error value, which no cell can be.
+    child_of key = if key.is_a Text . not then Nothing else
+        value = that.get key if_missing=(Error.throw (No_Such_Column.Error key))
+        if value.is_error then Nothing else name_child key value
     Viz_Tree.lookup_paged "object" that.length label page_of child_of
