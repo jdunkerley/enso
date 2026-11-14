@@ -1089,7 +1089,7 @@ add_specs suite_builder =
             table_4.row_count . should_equal 6
 
         group_builder.specify "should let you `read_many` Excel sheets and other tabular files into a Table" <|
-            with_temp_dir base_dir->
+            with_temp_dir "readmany" base_dir->
                 (Table.new [["A", [1, 2]], ["B", [3, 4]]]).write (base_dir / "1.tsv") . should_succeed
                 (Table.new [["A", [10, 20]], ["B", [30, 40]]]).write (base_dir / "2.xlsx") . should_succeed
 
@@ -1136,7 +1136,7 @@ add_specs suite_builder =
                     r3.at "A" . to_vector . should_equal [10, 20, 100, 400, 500, 600]
 
         group_builder.specify "during `read_many`, should not mix metadata columns with data columns with same name or when matching by position" <|
-            with_temp_dir base_dir->
+            with_temp_dir "readmanymeta" base_dir->
                 (Table.new [["Z", [1, 2]], ["Sheet Name", ['data column', 'data column']]]).write (base_dir / "1.tsv") . should_succeed
                 (Table.new [["Z", [10]], ["X", [20]]]).write (base_dir / "2.xlsx") . should_succeed
 
@@ -1205,7 +1205,7 @@ add_specs suite_builder =
                     Problems.expect_warning Column_Count_Mismatch r3
 
         group_builder.specify "during `read_many`, should correctly handle empty sheets" <|
-            with_temp_dir base_dir->
+            with_temp_dir "readmanyempty" base_dir->
                 tsv_file = base_dir / "1.tsv"
                 (Table.new [["A", [1, 2]], ["B", [3, 4]]]).write tsv_file . should_succeed
                 xls_file = Examples.xls
