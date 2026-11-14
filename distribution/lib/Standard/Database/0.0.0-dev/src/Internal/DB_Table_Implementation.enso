@@ -44,6 +44,10 @@ import Standard.Table.Refined_Types.Spatial_Column.Spatial_Column
 import Standard.Table.Row_Limit.Row_Limit
 import Standard.Table.Rows_To_Read.Rows_To_Read
 import Standard.Table.Spatial_Table.Lat_Long_Type
+import Standard.Table.Spatial_Table.Spatial_Table
+import Standard.Visualization.Id.Id
+import Standard.Visualization.SQL_Viz.SQL_Viz
+import Standard.Visualization.Viz_Table.Viz_Table
 import Standard.Table.SQL_Function.SQL_Function
 import Standard.Table.Value_Type.By_Type
 from Standard.Table import Aggregate_Column, Auto, Blank_Selector, Column, Column_Ref, Data_Formatter, Fill_With, Generate_Rows_Range, Join_Condition, Join_Kind, Match_Columns, Position, Previous_Value, Set_Mode, Simple_Expression, Sort_Column, Table, Value_Type
@@ -61,6 +65,7 @@ import project.Internal.Common.Offset_Helpers
 import project.Internal.Common.Ordering_Helpers
 import project.Internal.Common.Row_Number_Helpers
 import project.Internal.DB_Data_Link_Helpers
+import project.Internal.DB_Viz_Source.DB_Viz_Source
 import project.Internal.Helpers
 import project.Internal.IR.Internal_Column.Internal_Column
 import project.Internal.IR.SQL_IR_Expression.SQL_IR_Expression
@@ -79,6 +84,20 @@ from project.Internal.DB_Column_Implementation import make_unary_op
 from project.Internal.Type_Refinements.DB_Table_Conversions import all
 
 type DB_Table_Implementation
+    to_viz_table (this_table : Table & DB_Table) =
+        ## Refining a single-column table runs a type-inference query, so only a dialect with spatial support is refined.
+        spatial = if this_table.connection.dialect.is_feature_supported ..Spatial . not then Nothing else
+            case DB_Table_Refinements.refine_table this_table of
+                s : Spatial_Table -> s
+                _ -> Nothing
+        Viz_Table.from_source (DB_Viz_Source.Value this_table Nothing spatial)
+
+    to_sql_viz (this_table : Table & DB_Table) =
+        prepared = this_table.to_sql.prepare
+        SQL_Viz.Value this_table.dialect_name prepared.first prepared.second
+
+    default_visualization (this_table : Table & DB_Table) = Id.sql_query
+
     name (this_table : Table & DB_Table) = this_table.internal_name
 
     pretty_implementation (this_table : Table & DB_Table) =

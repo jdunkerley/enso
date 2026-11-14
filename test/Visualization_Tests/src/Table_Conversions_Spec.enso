@@ -2,6 +2,10 @@ from Standard.Base import all
 import Standard.Base.Errors.Common.No_Such_Conversion
 
 from Standard.Table import Table
+import Standard.Database.Connection.Database
+import Standard.Database.Extensions.Upload_Table
+from Standard.SQLite import SQLite
+import Standard.Visualization.Id.Id
 from Standard.Visualization.SQL_Viz import SQL_Viz
 from Standard.Visualization.Viz_Cell import Viz_Cell
 from Standard.Visualization.Viz_Column_Kind import Viz_Kind
@@ -41,3 +45,20 @@ add_specs suite_builder =
             (Viz_Cell.from t).render 1 . should_equal "Table{3 rows x 2 columns}"
             (Viz_Cell.from (t.at "x")).render 1 . should_equal "Column{x: 3 rows}"
             (Viz_Cell.from (t.rows.at 0)).pairs . should_equal [["x", 1], ["s", "a"]]
+
+    suite_builder.group "Database values to Viz_Table" group_builder->
+        connection = Database.connect SQLite.In_Memory
+        dt = (Table.new [["x", [1, 2, 3]]]).select_into_database_table connection "conv" temporary=True
+
+        group_builder.specify "a database table samples by reading its first rows" <|
+            vt = Viz_Table.from dt
+            vt.supports "rows" . should_be_false
+            sampled = vt.sample 2 0
+            sampled.supports "rows" . should_be_true
+            sampled.column_values "x" . should_equal [1, 2]
+
+        group_builder.specify "a database table has SQL" <|
+            (SQL_Viz.from dt).dialect . should_equal "SQLite"
+
+        group_builder.specify "the default visualisation of a database table is the SQL view" <|
+            dt.default_visualization . should_equal Id.sql_query
