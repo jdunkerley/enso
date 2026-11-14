@@ -1,0 +1,29 @@
+## Enso Signatures 1.0
+## module Standard.Visualization.Viz_Table
+- type Viz_Header
+    - Label name:Standard.Base.Any.Any
+    - Link name:Standard.Base.Any.Any tooltip:Standard.Base.Any.Any action:Standard.Base.Any.Any
+- type Viz_Table
+    - add_row_number self name:Standard.Base.Data.Text.Text -> Standard.Visualization.Viz_Table.Viz_Table
+    - column_kinds self -> (Standard.Base.Data.Vector.Vector Standard.Visualization.Viz_Column_Kind.Viz_Column_Kind)
+    - column_names self -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)
+    - column_values self name:Standard.Base.Data.Text.Text -> Standard.Base.Data.Vector.Vector
+    - distinct_values_json self column_index:Standard.Base.Data.Numbers.Integer filter_columns:Standard.Base.Any.Any filter_conditions:Standard.Base.Any.Any -> Standard.Base.Data.Text.Text
+    - filter_between self name:Standard.Base.Data.Text.Text low:Standard.Base.Any.Any high:Standard.Base.Any.Any -> Standard.Visualization.Viz_Table.Viz_Table
+    - from_columns headers:(Standard.Base.Data.Vector.Vector Standard.Visualization.Viz_Table.Viz_Header) columns:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Vector.Vector) -> Standard.Visualization.Viz_Table.Viz_Table
+    - from_source source:Standard.Base.Any.Any -> Standard.Visualization.Viz_Table.Viz_Table
+    - from_view make_json:(Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text) -> Standard.Visualization.Viz_Table.Viz_Table
+    - rename_columns self names:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) -> Standard.Visualization.Viz_Table.Viz_Table
+    - row_count self -> (Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)
+    - rows_json self -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)
+    - sample self count:Standard.Base.Data.Numbers.Integer seed:Standard.Base.Data.Numbers.Integer -> Standard.Visualization.Viz_Table.Viz_Table
+    - select_columns self names:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) -> Standard.Visualization.Viz_Table.Viz_Table
+    - server_rows_json self start:Standard.Base.Data.Numbers.Integer sort_columns:Standard.Base.Any.Any sort_directions:Standard.Base.Any.Any filter_columns:Standard.Base.Any.Any filter_conditions:Standard.Base.Any.Any -> Standard.Base.Data.Text.Text
+    - slice self start:Standard.Base.Data.Numbers.Integer count:Standard.Base.Data.Numbers.Integer -> Standard.Visualization.Viz_Table.Viz_Table
+    - spatial_layers_json self -> Standard.Base.Data.Text.Text
+    - supported_operations self -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)
+    - supports self operation:Standard.Base.Data.Text.Text -> Standard.Base.Data.Boolean.Boolean
+    - table_view_json self max_rows:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Data.Text.Text
+- type Viz_Unsupported
+    - Error operation:Standard.Base.Data.Text.Text
+    - to_display_text self -> Standard.Base.Data.Text.Text
