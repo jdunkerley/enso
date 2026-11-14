@@ -18,18 +18,22 @@ from Standard.Test import all
    - `repeat`: the same table for each call (a view shown before).
    `c2_1x2500` thrashes Java's 1000-entry caches on both sides: noisy.
 
-make_table (rows : Integer) (cols : Integer) -> Table =
+## Makes the benchmark table: integer, float, text and then date columns, in
+   turn. With `with_dates=False` the fourth kind is a boolean column: SQLite has no
+   date type, so a table for the database case cannot hold dates.
+make_table (rows : Integer) (cols : Integer) (with_dates : Boolean = True) -> Table =
     ints = (0.up_to rows).map r-> r * 3
     floats = (0.up_to rows).map r-> if r % 10 == 7 then Nothing else r * 0.5 + 0.25
     texts_small = (0.up_to 97).map r-> "text " + r.to_text
     texts = (0.up_to rows).map r-> if r % 13 == 5 then Nothing else texts_small.at (r % 97)
     dates_small = (0.up_to 365).map r-> (Date.new 2020 1 1) + (Period.new days=r)
     dates = (0.up_to rows).map r-> dates_small.at (r % 365)
+    flags = (0.up_to rows).map r-> r % 2 == 0
     columns = (0.up_to cols).map i-> case i % 4 of
         0 -> ["i" + i.to_text, ints]
         1 -> ["f" + i.to_text, floats]
         2 -> ["t" + i.to_text, texts]
-        _ -> ["d" + i.to_text, dates]
+        _ -> if with_dates then ["d" + i.to_text, dates] else ["b" + i.to_text, flags]
     table = Table.new columns
     table.columns.each c-> (c:In_Memory_Column).await_metrics
     table
@@ -38,7 +42,7 @@ time_ms (input : Any) -> Float =
     start = System.nano_time
     result = Visualization.prepare_visualization input 1000
     elapsed = System.nano_time - start
-    if result.length < 0 then Panic.throw "unreachable"
+    if result.starts_with '{"type":"Error"' then Panic.throw ("The benchmark input is an error, not a table view: " + result.take 200)
     elapsed.to_float / 1000000.0
 
 ## Times `prepare_visualization` on `prepare` (evaluated afresh, untimed, for
@@ -61,5 +65,5 @@ add_specs suite_builder =
             big = make_table 1000000 20
             bench "b_1Mx20|repeat" big
             connection = Database.connect SQLite.In_Memory
-            db_table = (make_table 1000 50).select_into_database_table connection "bench" temporary=True
+            db_table = (make_table 1000 50 with_dates=False).select_into_database_table connection "bench" temporary=True
             bench "d_1000x50_db|repeat" db_table
