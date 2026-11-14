@@ -18,7 +18,7 @@ import { assert } from '@/util/assert'
 import { ReactiveDb, ReactiveIndex } from '@/util/database/reactiveDb'
 import type { MethodPointer } from '@/util/methodPointer'
 import { AsyncQueue } from '@/util/net'
-import { ProjectPath } from '@/util/projectPath'
+import { parseAbsoluteProjectPathRaw, ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
@@ -61,6 +61,18 @@ export class SuggestionDb extends ReactiveDb<SuggestionId, SuggestionEntry> {
         [[methodOnTypeKey(entry.selfType, entry.name), id]]
       : [],
   )
+  /**
+   * Static conversion methods `Target.from (that:Source)` (the target is the method's owner): the
+   * target type's key to the keys of its source
+   */
+  readonly conversionSources = new ReactiveIndex(this, (_id, entry): [string, string][] => {
+    if (entry.kind !== SuggestionKind.Method || entry.name !== 'from' || entry.selfType != null)
+      return []
+    const that = entry.arguments[0]
+    if (that == null || that.name !== 'that') return []
+    const source = parseAbsoluteProjectPathRaw(that.reprType)
+    return source.ok ? [[entry.memberOf.key(), source.value.key()]] : []
+  })
   private readonly suggestionsByKind = new ReactiveIndex(this, (id, entry) => [[entry.kind, id]])
   private readonly constructorFields = new ReactiveIndex(this, (id, entry) => {
     if (entry.kind !== SuggestionKind.Constructor) return []
