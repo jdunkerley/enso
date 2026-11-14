@@ -744,7 +744,7 @@ const customLocale = {
   >
     <!-- The `cacheBlockSize` value of `1000` below must stay in sync with the backend's
          `max_rows` in `get_rows_for_table`
-         (distribution/lib/Standard/Visualization/0.0.0-dev/src/Table/Visualization.enso) —
+         (distribution/lib/Standard/Table/0.0.0-dev/src/Internal/In_Memory_Viz_Source.enso) —
          nothing currently links them, so a one-sided change would silently break paging. -->
     <AgGridVue
       v-bind="{ ...$attrs, ...conditionalGridOptions }"

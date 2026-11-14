@@ -1,36 +1,21 @@
 from Standard.Base import all
-
-import Standard.Database.DB_Column.DB_Column
-import Standard.Database.DB_Table.DB_Table
+import Standard.Base.Errors.Common.No_Such_Conversion
+import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 
 import project.Helpers
+import project.SQL_Viz.SQL_Viz
 from project.Helpers import time_visualization, short_display
 
 ## ---
    private: true
    ---
-   Prepares the database table for visualization.
-
-   For each interpolation it provides its value, its actual type name, its
-   expected SQL type name and if it was possible to infer it, its expected Enso
-   typename.
-   Expected Enso types are inferred based on known SQL types and their mapping to
-   Enso types.
+   Prepares a database value for the SQL visualization: its SQL text and, for
+   each interpolation, its value and Enso type name.
 
    ## Arguments
-    - `table`: The database table to prepare for visualization.
-prepare_visualization : DB_Table -> Text
+    - `table`: The database table or column to prepare for visualization.
+prepare_visualization : Any -> Text
 prepare_visualization table = time_visualization Visualization ("prepare_visualization: " + (short_display table)) <|
-    prepared = (table:DB_Table|DB_Column).to_sql.prepare
-    code = prepared.first.replace (regex "::variant, \{'enso-null-replacement-marker'.*?\}::variant") ", NULL"
-    interpolations = prepared.second
-    mapped = interpolations.map value->
-        enso_type = value.to Meta.Type . qualified_name
-        used_value = case value of
-            _ : Date -> value.to_text
-            _ : Time_Of_Day -> value.to_text
-            _ : Date_Time -> value.to_text
-            _ -> value
-        JS_Object.from_pairs [["value", used_value], ["enso_type", enso_type]]
-    dialect = (table:DB_Table|DB_Column).dialect_name
-    JS_Object.from_pairs [["dialect", dialect], ["code", code], ["interpolations", mapped]] . to_text
+    sql = Panic.catch No_Such_Conversion (SQL_Viz.from table) _->
+        Error.throw (Illegal_Argument.Error "This value has no SQL to show.")
+    sql.to_json_text

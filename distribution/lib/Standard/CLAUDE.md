@@ -48,8 +48,9 @@ there.
   themselves (test-only; `catalogue: false`).
 - `Visualization/` — IDE-only visualisation preprocessors and the data types
   other libraries convert to (`Viz_Table`, `SQL_Viz`, `Viz_Cell`). Its data
-  types depend only on `Base`; the chart modules still import `Table` and
-  `Database` until they move off them. **Do not import in user code.**
+  types depend only on `Base`; the whole library imports only `Standard.Base`
+  (`Table` and `Database` import it, never the reverse). **Do not import in user
+  code.**
 
 ## Universal conventions
 

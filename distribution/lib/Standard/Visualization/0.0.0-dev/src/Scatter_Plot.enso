@@ -1,70 +1,91 @@
 from Standard.Base import all
 
-import Standard.Table.In_Memory_Table.In_Memory_Table
-from Standard.Table import Column, Table
-
-import Standard.Database.DB_Column.DB_Column
-import Standard.Database.DB_Table.DB_Table
-
 import project.Helpers
+import project.Internal.Chart_Limits
+import project.Internal.Names
+import project.Viz_Table.Viz_Table
 from project.Helpers import time_visualization, short_display
 
 ## ---
    private: true
    ---
-   Gets the x column from a table.
-   This is either the column named 'X' or the left most column.
-x_column : Table -> Column
-x_column table = if table.column_count==1 then Nothing else
-    by_name = table.get 'X' (table.get 'x')
+   The name of the x column: the column named 'X' or 'x', else the left-most
+   column when it is numeric or a date or time and not named 'Y'/'y'.
+x_column_name : Viz_Table -> Text | Nothing
+x_column_name vt = if vt.column_names.length == 1 then Nothing else
+    names = vt.column_names
+    by_name = if names.contains "X" then "X" else if names.contains "x" then "x" else Nothing
     if Nothing != by_name then by_name else
-        c = table.at 0
-        is_good = (c.value_type.is_numeric || c.value_type.is_date_or_time) && c.name != "Y" && c.name != "y"
-        if is_good then c else Nothing
+        first = names.first
+        kind = vt.column_kinds.first
+        is_good = (kind.is_numeric || kind.is_date_or_time) && first != "Y" && first != "y"
+        if is_good then first else Nothing
 
 ## ---
    private: true
    ---
-json_from_table : Table -> Vector Integer | Nothing -> Integer | Nothing -> Text
-json_from_table table bounds limit = if table.column_count==1 && table.column_names.first.equals_ignore_case "x" then json_from_table (table.rename_columns ["Value"] . add_row_number "Index" . reorder_columns ["Index","Value"]) bounds limit else
-    ## Get the x column
-    col_x = x_column table
-    if Nothing == col_x then json_from_table (table.add_row_number "x") bounds limit else
-        x_value_type = col_x.value_type
+   The JSON of a scatter plot with nothing to draw.
+no_numeric_json : Text
+no_numeric_json = '{"data":[],"axis":{},"is_multi_series":false,"get_row_method":"get_row","x_value_type":"Integer","error_message":"At least one numeric (other than X) must be provided for a scatter plot."}'
 
-        ## Structure the table (X, Color?, Shape?, Label?, Size?, Row_Number, Data)
-        col_color = table.select_columns [col_x.name, "color", "colour"] case_sensitivity=..Insensitive error_on_missing_columns=False on_problems=..Ignore . get 1
-        col_row_number = table.select_columns [col_x.name, "row_number"] case_sensitivity=..Insensitive error_on_missing_columns=False on_problems=..Ignore . get 1
-        base_table = table.select_columns [col_x.name, "shape", "label", "size"] case_sensitivity=..Insensitive error_on_missing_columns=False reorder=True on_problems=..Ignore
-        with_color = if Nothing==col_color then base_table else base_table.set col_color "color"
-        core_table = if Nothing==col_row_number then with_color.add_row_number "row_number" else with_color.set col_row_number
+## ---
+   private: true
+   ---
+   Each row as a JSON object with the keys `fields`, the value of each from the
+   column `sources` names at the same position. A column can be the source of
+   several fields: the fields are rendered in runs that use each column once
+   (a table cannot hold a column twice) and the runs' objects are joined.
+rows_by_field : Viz_Table -> Vector Text -> Vector Text -> Vector Text
+rows_by_field vt sources fields =
+    runs = sources.zip fields . fold [] acc-> pair->
+        if acc.not_empty && (acc.last.map .first . contains pair.first . not) then acc.drop (..Last 1) + [acc.last + [pair]] else acc + [[pair]]
+    run_rows = runs.map run->
+        vt.select_columns (run.map .first) . rename_columns (run.map .second) . rows_json
+    run_rows.drop 1 . fold run_rows.first acc-> next->
+        acc.zip next a-> b-> (a.drop (..Last 1)) + "," + (b.drop 1)
 
-        ## Find the data columns
-        data_columns = table.remove_columns core_table.column_names on_problems=..Ignore . columns . filter c-> c.value_type.is_numeric
-        if data_columns.length == 0 then '{"data":[],"axis":{},"is_multi_series":false,"get_row_method":"get_row","x_value_type":"Integer","error_message":"At least one numeric (other than X) must be provided for a scatter plot."}' else
-            merged_table = core_table.zip (Table.new data_columns)
+## ---
+   private: true
+   ---
+json_from_viz_table : Viz_Table -> Vector Integer | Nothing -> Integer | Nothing -> Text
+json_from_viz_table vt bounds limit =
+    names = vt.column_names
+    if names.length == 1 && names.first.equals_ignore_case "x" then json_from_viz_table (vt.rename_columns ["Value"] . add_row_number "Index" . select_columns ["Index", "Value"]) bounds limit else
+        x = x_column_name vt
+        if Nothing == x then json_from_viz_table (vt.add_row_number "x") bounds limit else
+            kinds = vt.column_kinds
+            x_kind = kinds.at (names.index_of x)
+            ## The same columns `Table.select_columns … . get 1` found: the second
+               match in table order, which is not always the colour column.
+            color = Names.select_insensitive names [x, "color", "colour"] False . get 1
+            row_number = Names.select_insensitive names [x, "row_number"] False . get 1
+            base_names = Names.select_insensitive names [x, "shape", "label", "size"] True
+            with_row_number = if Nothing == row_number then vt.add_row_number "row_number" else vt
+            row_number_name = row_number.if_nothing "row_number"
+            core_names = base_names + (if Nothing == color then [] else ["color"]) + [row_number_name]
+            core_sources = base_names + (if Nothing == color then [] else [color]) + [row_number_name]
+            data_names = names.zip kinds . filter (p-> core_names.contains p.first . not && p.second.is_numeric) . map .first
+            if data_names.length == 0 then no_numeric_json else
+                ## One column can feed two fields (a numeric colour column is also a data column), so each source column is selected once.
+                merged = with_row_number.select_columns (core_sources+data_names).distinct
+                ## Bound Data
+                bounded = if bounds.is_nothing then merged else
+                    x_filtered = merged.filter_between x (bounds.at 0) (bounds.at 1)
+                    if data_names.length != 1 then x_filtered else
+                        x_filtered.filter_between data_names.first (bounds.at 2) (bounds.at 3)
+                ## Limit the number of rows to be visualized.
+                limited = if limit.is_nothing || bounded.row_count<=limit then bounded else
+                    bounded.sample limit Chart_Limits.chart_sample_seed
+                ## Create the JSON for the data rows
+                field_names = ["x"] + (core_names.drop 1 . map c-> c.to_case ..Lower) + ["y"] + (1.up_to data_names.length . map i-> "(y_multi " + (i-1).to_text + ")")
+                merged_names = [x] + core_names.drop 1 + data_names
+                field_sources = core_sources + data_names
+                name_map = merged_names.zip field_names
+                filtered = name_map.take 1 + name_map.drop core_names.length
+                axes_json = '{' + ((filtered.map p-> p.second.to_json + ':{"label":' + p.first.to_json + '}') . join ',') + '}'
+                data_json = "[" + (rows_by_field limited field_sources field_names . join ',') + "]"
+                '{"data":' + data_json + ',"axis":' + axes_json + ',"is_multi_series":' + (data_names.length > 1).to_json + ',"get_row_method":"get_row","x_value_type":"' + x_kind.display_name + '","error_message":null}'
 
-            ## Bound Data
-            bounded = if bounds.is_nothing then merged_table else
-                x_filtered = merged_table.filter col_x (..Between (bounds.at 0) (bounds.at 1))
-                if data_columns.length != 1 then x_filtered else
-                    x_filtered.filter data_columns.first (..Between (bounds.at 2) (bounds.at 3))
-
-            ## Limit the number of rows to be visualized.
-            limited = if limit.is_nothing || bounded.row_count<=limit then bounded else
-                bounded.take (..Sample limit seed=15975382)
-
-            ## Create the JSON for the data rows
-            field_names = ["x"] + (core_table.column_names.drop 1 . map c-> c.to_case ..Lower) + ["y"] + (1.up_to data_columns.length . map i-> "(y_multi " + (i-1).to_text + ")")
-            name_map = merged_table.column_names.zip field_names
-            filtered = name_map.take 1 + name_map.drop core_table.column_count
-            axes_json = '{' + ((filtered.map p-> p.second.to_json + ':{"label":' + p.first.to_json + '}') . join ',') + '}'
-
-            ## Create the data JSON
-            data_json = "[" + (limited.rename_columns name_map . rows . map .to_json_data . join ',') + "]"
-
-            ## Render structure
-            '{"data":' + data_json + ',"axis":' + axes_json + ',"is_multi_series":' + (data_columns.length > 1).to_json + ',"get_row_method":"get_row","x_value_type":"' + x_value_type.to_name + '","error_message":null}'
 
 ## ---
    private: true
@@ -97,13 +118,17 @@ json_from_vector vec bounds limit =
     - `value`: the value to be visualized.
 process_to_json_text : Any -> Integer | Nothing -> Integer | Nothing -> Text
 process_to_json_text value bounds=Nothing limit=Nothing = time_visualization Scatter_Plot ("process_to_json_text: " + (short_display value)) <|
-    ## If limit is Nothing will use 15,000 for in database operations
-    json = case value of
-        _ : DB_Table -> json_from_table (value.read (..First (limit.if_nothing 15000))) bounds limit
-        _ : DB_Column -> json_from_table (value.to_table.read (..First (limit.if_nothing 15000))) bounds limit
-        _ : In_Memory_Table -> json_from_table value bounds limit
-        _ : Column -> json_from_table value.to_table bounds limit
+    case value of
         _ : Vector -> json_from_vector value bounds limit
         _ : Array -> json_from_vector value bounds limit
-        _ -> json_from_vector value.to_vector bounds limit
-    json
+        _ ->
+            vt = Viz_Table.from value
+            if vt.column_names.is_empty then
+                ## A value with no columns is charted through its `to_vector`; one without it, or with nothing in it, shows the empty state.
+                as_vector = Panic.catch Any (value.to_vector.catch Any _->Nothing) _->Nothing
+                if as_vector.is_nothing || as_vector.is_empty then no_numeric_json else json_from_vector as_vector bounds limit
+            else
+                ## A database reads at most `limit` rows (15000 when there is no limit) before anything else, as before.
+                rows = Chart_Limits.local_rows vt (limit.if_nothing Chart_Limits.chart_row_bound)
+                ## A source made of columns only (a connection, a workbook) cannot work on rows: show the chart's empty state.
+                if rows.supports "rows" then json_from_viz_table rows bounds limit else no_numeric_json
