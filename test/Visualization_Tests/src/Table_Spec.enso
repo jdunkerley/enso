@@ -7,8 +7,6 @@ from Standard.SQLite import all
 
 import Standard.Visualization.Table.Visualization
 
-import Standard.Visualization.Helpers
-
 from Standard.Test import all
 
 

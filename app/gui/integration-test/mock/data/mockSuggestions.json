@@ -1420,10 +1420,10 @@
     "type": "method",
     "reexport": "Standard.Visualization.Helpers",
     "module": "Standard.Visualization.Helpers",
-    "name": "render_vector",
+    "name": "truncate",
     "arguments": [
       {
-        "name": "object",
+        "name": "message",
         "reprType": "Standard.Base.Any.Any",
         "isSuspended": false,
         "hasDefault": false,
@@ -1434,7 +1434,7 @@
     "selfType": "Standard.Visualization.Helpers",
     "returnType": "Standard.Base.Data.Text.Text",
     "isStatic": true,
-    "documentation": " Renders a vector for the table visualization.",
+    "documentation": " Truncate message to the provided max length.",
     "annotations": [],
     "reexports": ["Standard.Visualization"]
   }

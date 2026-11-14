@@ -28,6 +28,7 @@ Viz_Json.from (that:Any) =
 ## ---
    private: true
    ---
+   The JSON object `{"type": "Nothing"}`.
 Viz_Json.from (that:Nothing) =
     _ = that
     Viz_Json.Value '{"type": "Nothing"}'
@@ -35,6 +36,7 @@ Viz_Json.from (that:Nothing) =
 ## ---
    private: true
    ---
+   The JSON object itself, rendered as it is.
 Viz_Json.from (that:JS_Object) = Viz_Json.Value (render that)
 
 ## ---

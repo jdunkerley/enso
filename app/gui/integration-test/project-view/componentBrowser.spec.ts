@@ -289,8 +289,8 @@ test('Standard.Visualization is not listed', async ({ editorPage, page }) => {
   await editorPage
   await locate.addNewNodeButton(page).click()
   await expect(locate.componentBrowser(page)).toExist()
-  // `render_vector` is in Standard.Visualization, which the IDE uses internally.
-  await locate.componentBrowserInput(page).fill('render_vector')
+  // `truncate` is in Standard.Visualization, which the IDE uses internally.
+  await locate.componentBrowserInput(page).fill('truncate')
   await expect(page.locator('[data-transitioning]')).toHaveCount(0)
   await expect(locate.componentBrowserEntry(page)).toHaveCount(0)
 })

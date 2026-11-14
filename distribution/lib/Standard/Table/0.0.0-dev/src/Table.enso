@@ -4080,7 +4080,7 @@ Viz_Json.from (that:Table) = case that.is_a In_Memory_Table of
                 '{"name":'+name+',"data":' + items + '}'
             '{"number_of_rows":' + that.row_count.to_text + ',"columns":[' + (cols.join ",") + ']}'
         Viz_Json.Value text
-    False -> Viz_Json.from (that.read 10)
+    False -> Viz_Json.from (that.read 10 . catch)
 
 ## ---
    private: true

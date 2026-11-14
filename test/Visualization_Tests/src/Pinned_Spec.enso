@@ -9,7 +9,6 @@ from Standard.Image import Image
 from Standard.XML import XML_Document
 
 import Standard.Visualization.Geo_Map
-import Standard.Visualization.Helpers
 import Standard.Visualization.Id.Id
 import Standard.Visualization.Preprocessor
 import Standard.Visualization.Scatter_Plot

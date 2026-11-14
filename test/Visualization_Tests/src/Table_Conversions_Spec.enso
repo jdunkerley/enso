@@ -6,6 +6,7 @@ import Standard.Database.Connection.Database
 import Standard.Database.Extensions.Upload_Table
 from Standard.SQLite import SQLite
 import Standard.Visualization.Id.Id
+import Standard.Visualization.Preprocessor
 from Standard.Visualization.SQL_Viz import SQL_Viz
 from Standard.Visualization.Viz_Cell import Viz_Cell
 from Standard.Visualization.Viz_Column_Kind import Viz_Kind
@@ -62,3 +63,13 @@ add_specs suite_builder =
 
         group_builder.specify "the default visualisation of a database table is the SQL view" <|
             Id.from dt . should_equal Id.sql_query
+
+        group_builder.specify "a database table whose read fails shows the error as JSON" <|
+            gone_connection = Database.connect SQLite.In_Memory
+            gone = (Table.new [["x", [1, 2, 3]]]).select_into_database_table gone_connection "gone" temporary=True
+            gone_connection.close
+            (gone.read 10).is_error . should_be_true
+            json = Preprocessor.default_preprocessor gone
+            ## The error's payload, as for any dataflow error, not the display
+               text of the table (which would parse as a JSON string).
+            Json.parse json . should_be_a JS_Object
