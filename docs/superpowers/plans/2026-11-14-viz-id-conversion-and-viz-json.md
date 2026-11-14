@@ -54,10 +54,14 @@ test (`RuntimeVisualizationsTest`), TypeScript/Vue in `app/gui`, vitest.
   `C:\Repos\Enso\ide-viz-json` (branch `viz/viz-json` from `viz/id-conversion`).
   Never `git stash`.
 - Enso builds and tests run in the WSL clone `~/vizwork`. Before each build,
-  sync the worktree into it (replace `<wt>` with the worktree folder name):
+  sync the worktree into it (replace `<wt>` with the worktree folder name and
+  `<branch>` with its branch). The clone's `origin` is the Windows checkout,
+  whose local `develop` is stale, so fetch the branch ref itself, never
+  `origin/develop`:
 
   ```bash
-  wsl -e bash -lc '. ~/.enso-toolchain.sh && cd ~/vizwork && git fetch -q origin && git checkout -qf origin/develop && \
+  wsl -e bash -lc '. ~/.enso-toolchain.sh && cd ~/vizwork && git fetch -q /mnt/c/Repos/Enso/ide refs/heads/<branch> && git checkout -qf FETCH_HEAD && \
+    rsync -a --delete /mnt/c/Repos/Enso/<wt>/std-bits/ std-bits/ && \
     rsync -a --delete /mnt/c/Repos/Enso/<wt>/distribution/lib/ distribution/lib/ && \
     rsync -a --delete /mnt/c/Repos/Enso/<wt>/test/ test/ && \
     rsync -a --delete /mnt/c/Repos/Enso/<wt>/engine/runtime-integration-tests/ engine/runtime-integration-tests/ && \
