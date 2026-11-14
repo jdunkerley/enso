@@ -64,9 +64,15 @@ test('a Table is offered every chart, and its Table view', () => {
   expect(offered('Standard.Table.Table.Table')).toEqual(['Geo Map', 'Scatter Plot', 'Table'])
 })
 
-test('a Vector and a Number, which convert to the data type, are offered the charts', () => {
+test('a Vector, which converts to the data type, is offered the charts', () => {
   expect(offered('Standard.Base.Data.Vector.Vector')).toEqual(['Geo Map', 'Scatter Plot', 'Table'])
-  expect(offered('Standard.Base.Data.Numbers.Number')).toEqual(['Geo Map', 'Scatter Plot', 'Table'])
+})
+
+// A value reports its own type (`Integer`, `Float`), never `Number`, and the store does not climb
+// the type hierarchy: only the `Number` conversion exists, so a number gets just the Table view.
+test('an Integer or a Float, as a number node reports them, is offered only the Table view', () => {
+  expect(offered('Standard.Base.Data.Numbers.Integer')).toEqual(['Table'])
+  expect(offered('Standard.Base.Data.Numbers.Float')).toEqual(['Table'])
 })
 
 test('a value with only the `Any` conversion is not offered the charts', () => {

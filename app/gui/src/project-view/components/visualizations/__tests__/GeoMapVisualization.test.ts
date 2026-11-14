@@ -80,6 +80,15 @@ describe('the map visualization', () => {
     expect(MapMock).toHaveBeenCalledTimes(2)
   })
 
+  test.each([{}, [1, 2], 5, null])(
+    'data that is not a map (%j) shows the empty map',
+    async (data) => {
+      mapboxSettingsStore.setState({ accessToken: 'pk.one' })
+      await mountWithProviders(GeoMapVisualization, { props: { data: data as never } })
+      expect(MapMock).toHaveBeenCalledTimes(1)
+    },
+  )
+
   test('the map is not recorded by Sentry Replay', async () => {
     mapboxSettingsStore.setState({ accessToken: 'pk.one' })
     const { wrapper } = await mountWithProviders(GeoMapVisualization, { props: { data: DATA } })
