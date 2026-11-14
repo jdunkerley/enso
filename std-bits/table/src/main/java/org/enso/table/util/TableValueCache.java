@@ -27,4 +27,14 @@ public class TableValueCache {
     cache.put(key, value);
     return value;
   }
+
+  /** The value cached under `key`, or null when there is none. */
+  public static Value get(String key) {
+    return cache().get(key);
+  }
+
+  /** Caches `value` under `key`. */
+  public static void put(String key, Value value) {
+    cache().put(key, value);
+  }
 }

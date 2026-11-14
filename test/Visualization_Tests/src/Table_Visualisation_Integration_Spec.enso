@@ -30,11 +30,11 @@ type TestData
     check_equal self vis filename =
         ## Comment this line in and run the tests to regen the test data if you change the API
         ## But don't commit with the next line commented in
-        ## vis.write (json_dir / (filename + '.json')) on_existing_file=..Overwrite
+        ## vis.to_json.write (json_dir / (filename + '.json')) on_existing_file=..Overwrite
         expected = self.data.at filename
         vis.field_names.should_equal_ignoring_order expected.field_names
-        vis.field_names.should_contain "table_version_hash"
-        names_exc_hash = vis.field_names.filter (..Not_Equal "table_version_hash")
+        vis.field_names.should_contain "version_hash"
+        names_exc_hash = vis.field_names.filter (..Not_Equal "version_hash")
         names_exc_hash.each name->
             vis_value = vis.at name
             exp_value = expected.at name

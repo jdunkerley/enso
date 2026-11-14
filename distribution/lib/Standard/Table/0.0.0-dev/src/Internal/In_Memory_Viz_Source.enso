@@ -2,23 +2,61 @@ private
 
 from Standard.Base import all
 
+import Standard.Visualization.Internal.View_Json
 import Standard.Visualization.Viz_Table.Viz_Table
+from Standard.Visualization.Internal.View_Json import Table_View
 
 import project.In_Memory_Column.In_Memory_Column
-import project.In_Memory_Table.In_Memory_Table
 import project.Internal.Viz_Helpers
 import project.Sort_Column.Sort_Column
 import project.Table.Table
 
+polyglot java import org.enso.table.data.column.operation.TableVizOperation
+polyglot java import org.enso.table.util.TableValueCache
+
 ## The `Viz_Table` source of an in-memory table or column. `column` is the
    original column when the value was a column (its table view differs), else
-   `Nothing`; `table` is the table operations act on.
+   `Nothing`; `table` is the table operations act on. `db_row_count` is
+   `Nothing`, or the row count of the database table whose first rows `table`
+   holds: that view has no metrics, version, status bar or server paging.
 type In_Memory_Viz_Source
-    Value table column
+    Value table column (db_row_count : Integer | Nothing = Nothing)
 
-    table_view_json self _ -> Text = case self.column of
-        Nothing -> (self.table:In_Memory_Table).to_table_viz_json
-        column -> (column:In_Memory_Column).to_table_viz_json
+    ## The view is cached by table version, above the display types (the
+       costly part of a wide table), and only once every column's metrics are
+       complete.
+    table_view_json self _ -> Text = case self.db_row_count of
+        Nothing ->
+            key = "table_view:" + self.version_hash
+            cached = TableValueCache.get key
+            if Nothing != cached then cached else
+                complete = (TableVizOperation.metricsIncomplete self.java_columns).not
+                text = View_Json.table_view (Viz_Table.from_source self) self.view_settings
+                if complete then TableValueCache.put key text
+                text
+        _ -> View_Json.table_view (Viz_Table.from_source self) self.view_settings
+
+    version_hash self -> Text = case self.column of
+        Nothing -> self.table.table_version_hash
+        column -> column.table_version_hash
+
+    view_settings self -> Table_View =
+        is_table = Nothing == self.column
+        index_action = if is_table then "get_row {{#index}}" else "at {{#index}}"
+        create_node = if is_table then ["create_node"] else []
+        case self.db_row_count of
+            Nothing -> Table_View.Value index_action self.table.row_count self.version_hash (["status_bar"] + create_node) True
+            n -> Table_View.Value index_action n Nothing create_node False
+
+    java_columns self -> Vector = self.table.columns.map c-> (c:In_Memory_Column).java_column
+
+    column_metrics_json self -> Vector Text =
+        display = self.table.columns.map c-> c.value_type.to_display_text
+        (TableVizOperation.viewColumnsJson self.java_columns display (Nothing == self.db_row_count)).to_vector
+
+    column_cells_json self (name : Text) (start : Integer) (count : Integer) -> Text =
+        column = self.table.at name
+        (column:In_Memory_Column).to_json_data start count
 
     column_names self -> Vector Text = self.table.column_names
     column_kinds self -> Vector = Viz_Helpers.column_kinds self.table
@@ -26,7 +64,7 @@ type In_Memory_Viz_Source
     select_columns self (names : Vector Text) -> Viz_Table = _wrap (self.table.select_columns names reorder=True error_on_missing_columns=False on_problems=..Ignore)
     slice self (start : Integer) (count : Integer) -> Viz_Table = _wrap (self.table.take (start.up_to start+count))
     sample self (count : Integer) (seed : Integer) -> Viz_Table = _wrap (self.table.take (..Sample count seed=seed))
-    supported_operations self -> Vector Text = ["rows", "server_rows"]
+    supported_operations self -> Vector Text = ["rows", "server_rows", "view_pieces"]
     rename_columns self (names : Vector Text) -> Viz_Table = _wrap (self.table.rename_columns names)
     add_row_number self (name : Text) -> Viz_Table = _wrap (self.table.add_row_number name)
     filter_between self (name : Text) low high -> Viz_Table = _wrap (self.table.filter name (..Between low high))
@@ -44,14 +82,13 @@ type In_Memory_Viz_Source
         filtered_table = if filter_col.is_nothing then table_with_index_ordered else _apply_filter_to_table table_with_index_ordered 0 filter_col filter_condition True
         sorted_table = if sort_col_index_list.is_nothing then filtered_table else _apply_sort_to_table filtered_table sort_col_index_list sort_direction_list
         sliced_json = sorted_table.columns.map (c-> c.to_json_data start_number max_rows)
-        '{"rows":[' + (sliced_json.join ",") + '], "row_count":' + filtered_table.row_count.to_text + '}'
+        View_Json.rows_page_json filtered_table.row_count sliced_json.first (sliced_json.drop 1)
 
     distinct_values_json self (column_index : Integer) filter_col filter_condition -> Text =
         filtered_table = if filter_col.is_nothing then self.table else _apply_filter_to_table self.table 0 filter_col filter_condition False
         filtered_column = (filtered_table.columns.at column_index):In_Memory_Column
         filtered_column.await_metrics
-        distinct_json = filtered_column.distinct_values_json . if_nothing "null"
-        '{"distinct_vals":' + distinct_json + '}'
+        View_Json.distinct_json filtered_column.distinct_values_json
 
 private _wrap table = Viz_Table.from (table:Table)
 

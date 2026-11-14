@@ -171,7 +171,7 @@ add_specs suite_builder =
             expect_pinned "ssrm_distinct" (Visualization.get_distinct_values_for_column data.mem_table 2)
         group_builder.specify "distinct values are valid JSON" <|
             json = Json.parse (Visualization.get_distinct_values_for_column data.mem_table 2)
-            json.get "distinct_vals" . should_equal ["a", "b", "c"]
+            json.get "values" . should_equal ["a", "b", "c"]
         group_builder.specify "distinct values of an all-Nothing column" <|
             expect_pinned "ssrm_distinct_nothing" (Visualization.get_distinct_values_for_column (warm (Table.new [["n", [Nothing, Nothing]]])) 0)
 

@@ -1,15 +1,28 @@
 {
-  "header": ["Value"],
-  "value_type": [
+  "kind": "grid",
+  "row_count": 3,
+  "columns": [
     {
-      "constructor": "Date_Time",
-      "display_text": "Date_Time (with timezone)"
+      "name": "Value",
+      "value_type": { "constructor": "Date_Time", "display_text": "Date_Time (with timezone)" },
+      "metrics": [
+        {
+          "name": "Range",
+          "value": "2025-01-01 12:13:14.123[MET] - 2025-01-03 12:13:14.123[MET]",
+          "type": "Text"
+        },
+        { "name": "Number of distinct", "value": 3, "type": "Count" },
+        { "name": "% nothing", "value": 0, "type": "Percentage" }
+      ],
+      "multi_filter": true,
+      "number_format": false
     }
   ],
+  "index": { "action": "get_row {{#index}}", "label": "row" },
   "data": [
     [
       {
-        "_display_text_": "2025-01-02 12:13:14.123[MET]",
+        "_display_text_": "2025-01-02 12:13:14.123[CET]",
         "type": "Date_Time",
         "constructor": "new",
         "year": 2025,
@@ -19,14 +32,10 @@
         "minute": 13,
         "second": 14,
         "nanosecond": 123004005,
-        "zone": {
-          "type": "Time_Zone",
-          "constructor": "parse",
-          "id": "MET"
-        }
+        "zone": { "type": "Time_Zone", "constructor": "parse", "id": "MET" }
       },
       {
-        "_display_text_": "2025-01-01 12:13:14.123[MET]",
+        "_display_text_": "2025-01-01 12:13:14.123[CET]",
         "type": "Date_Time",
         "constructor": "new",
         "year": 2025,
@@ -36,14 +45,10 @@
         "minute": 13,
         "second": 14,
         "nanosecond": 123004005,
-        "zone": {
-          "type": "Time_Zone",
-          "constructor": "parse",
-          "id": "MET"
-        }
+        "zone": { "type": "Time_Zone", "constructor": "parse", "id": "MET" }
       },
       {
-        "_display_text_": "2025-01-03 12:13:14.123[MET]",
+        "_display_text_": "2025-01-03 12:13:14.123[CET]",
         "type": "Date_Time",
         "constructor": "new",
         "year": 2025,
@@ -53,40 +58,10 @@
         "minute": 13,
         "second": 14,
         "nanosecond": 123004005,
-        "zone": {
-          "type": "Time_Zone",
-          "constructor": "parse",
-          "id": "MET"
-        }
+        "zone": { "type": "Time_Zone", "constructor": "parse", "id": "MET" }
       }
     ]
   ],
-  "all_rows_count": 3,
-  "has_index_col": true,
-  "get_child_node_action": "get_row",
-  "use_bottom_status_bar": true,
-  "enable_create_node": true,
-  "data_quality_metrics": [
-    {
-      "name": "Range",
-      "values": ["2025-01-01 12:13:14.123[MET] - 2025-01-03 12:13:14.123[MET]"],
-      "type": "Text"
-    },
-    {
-      "name": "Number of distinct",
-      "values": [3],
-      "type": "Count"
-    },
-    {
-      "name": "% nothing",
-      "values": [0],
-      "type": "Percentage"
-    }
-  ],
-  "type": "EnsoTableOrColumn",
-  "child_label": "row",
-  "is_using_server_sort_and_filter": false,
-  "requires_number_format": [false],
-  "table_version_hash": null,
-  "is_using_multi_filter": [true]
+  "version_hash": "e0f3dfa4-8919-486d-a7a1-e798ef41ecb2",
+  "options": { "status_bar": true, "create_node": true }
 }

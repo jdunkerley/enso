@@ -24,7 +24,7 @@ add_specs suite_builder =
             vt.column_kinds . map .kind . should_equal [Viz_Kind.Numeric, Viz_Kind.Textual]
             vt.column_kinds . map .display_name . should_equal ["Integer", "Char"]
             vt.row_count . should_equal 3
-            vt.supported_operations . should_equal ["rows", "server_rows"]
+            vt.supported_operations . should_equal ["rows", "server_rows", "view_pieces"]
 
         group_builder.specify "a one-column and a 1x1 table are tables, not columns" <|
             Viz_Table.from (t.select_columns ["x"]) . column_names . should_equal ["x"]
