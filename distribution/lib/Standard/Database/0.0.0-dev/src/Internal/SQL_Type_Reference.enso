@@ -45,8 +45,8 @@ type SQL_Type_Reference
        Creates an `SQL_Type_Reference` from a known constant.
        This is useful when the type is already known (for example in
        `Database.make_table`, because the column types were already fetched) or
-       when the type is overridden (for example when pretending that SQLite has a
-       boolean type).
+       when the type is overridden (for example when pretending that a backend has a
+       boolean type it lacks natively).
     from_constant : SQL_Type -> SQL_Type_Reference
     from_constant sql_type = SQL_Type_Reference.Overridden sql_type
 

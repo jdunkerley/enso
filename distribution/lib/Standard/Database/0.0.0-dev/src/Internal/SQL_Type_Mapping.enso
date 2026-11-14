@@ -22,7 +22,7 @@ type SQL_Type_Mapping
        ---
        Converts the given Value_Type to its corresponding SQL_Type.
        Some SQL dialects may not support all Value_Types (in fact most will have
-       at least a few exceptions, and some like SQLite may have very limited
+       at least a few exceptions, and some may have very limited
        support). If an SQL_Type that matches the Value_Type cannot be found, a
        closest approximate match is returned instead. If an exact match cannot be
        found, an `Inexact_Type_Coercion` warning is reported according to the
@@ -74,7 +74,7 @@ type SQL_Type_Mapping
        In most cases this will just delegate to `infer_from_database_callback`
        which should ask the particular database backend to infer the type, but
        some specific cases may override the default behavior. The notable example
-       is the ability to support Boolean types in SQLite.
+       is a backend that has no native Boolean type but can emulate one.
        The particular operation is identified by its name. It also gets a vector
        of supplied arguments in case the result type may depend on them. The
        arguments are passed as-is, i.e. they may be Database columns or raw Enso
@@ -95,7 +95,7 @@ type SQL_Type_Mapping
        This is used to customize type override behavior - most backends will
        correctly infer types from metadata, so unless specifically overridden, we
        can rely on the `ResultSet` metadata and reduce any overhead. However, in
-       some backends (SQLite) the metadata may not be as useful (in SQLite, the
+       some backends the metadata may not be as useful (for example when the
        metadata is changing depending on the result row, so the first row that is
        usually used may not reflect the needs of the whole column) - this method
        allows to provide custom overrides in such case.
@@ -115,7 +115,7 @@ type SQL_Type_Mapping
        implicitly in the given backend.
        Conversions marked as implicit will not raise Inexact_Type_Coercion
        warnings.
-       For example, the Snowflake database converts all integer types to
+       For example, some databases convert all integer types to
        NUMERIC(38, 0).
        This conversion is a property of the database, so warning about it would
        only be annoying.
@@ -137,7 +137,7 @@ type SQL_Type_Mapping
        ---
        Specifies if this backend recognizes the given type as an integer type.
        For most backends, this should just be `.is_integer`.
-       However, in some backends (e.g. Snowflake), the Decimal type is treated as
+       However, in some backends (e.g. those with a single NUMERIC type), the Decimal type is treated as
        the main Integer type, so this method can be used to specify that.
        We don't make Decimal type an integer type by default, as in other
        backends we do want to keep the distinction (for example in Postgres,
@@ -152,7 +152,7 @@ type SQL_Type_Mapping
        Checks if the two types are to be considered the same by the `By_Type`
        selector.
        In most backends this can just delegate to `Value_Type.is_same_type`. But
-       e.g. in Snowflake this can be used to make Decimal and Integer types
+       e.g. in such a backend this can be used to make Decimal and Integer types
        interchangeable.
     is_same_type (value_type1 : Value_Type) (value_type2 : Value_Type) -> Boolean =
         _ = [value_type1, value_type2]

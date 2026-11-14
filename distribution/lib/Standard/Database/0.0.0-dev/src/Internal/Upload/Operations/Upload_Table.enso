@@ -37,7 +37,7 @@ create_table_structure connection table_name structure primary_key temporary on_
 
 ## Ensures the table has a valid temporary name for databases that have special
    naming rules for temporary tables.
-   Like SQLServer, where temporary tables must start with `#`.
+   For example, in some backends temporary tables must start with `#`.
 resolve_temp_table_name connection temporary:Boolean table_name:Text -> Text =
     case temporary of
         False -> case table_name.starts_with "#" of

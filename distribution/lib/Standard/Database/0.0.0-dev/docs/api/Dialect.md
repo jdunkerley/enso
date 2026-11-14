@@ -35,4 +35,3 @@
     - Temporary_Table
 - default_fetch_primary_key connection:Standard.Base.Any.Any table_name:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - postgres -> Standard.Base.Any.Any
-- sqlite -> Standard.Base.Any.Any
