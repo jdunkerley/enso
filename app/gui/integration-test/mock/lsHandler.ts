@@ -203,6 +203,9 @@ const treePrepare = (params: string[]) =>
     },
   })
 
+/** How many times the `broken` branch was asked for: its first page fails, a retry succeeds. */
+let brokenPageRequests = 0
+
 /** `Tree.children _ (path) start count <| node`: its arguments are `[node, path, start, count]`. */
 const treeChildren = (params: string[]) => {
   const path = JSON.parse((params[1] ?? '[]').replaceAll("'", '"')) as (string | number)[]
@@ -218,6 +221,12 @@ const treeChildren = (params: string[]) => {
         start,
         start + count,
       ),
+    })
+  if (path.length === 1 && path[0] === 'broken' && brokenPageRequests++ > 0)
+    return encodeJSON({
+      start,
+      size: 1,
+      entries: [{ key: 'recovered', kind: 'leaf', value: true, expr: ".get 'recovered'" }],
     })
   return encodeJSON({ error: 'boom' })
 }

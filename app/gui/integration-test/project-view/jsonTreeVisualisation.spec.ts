@@ -42,7 +42,8 @@ test('Expanding a branch loads its first page, and Show more the next', async ({
   await items.getByRole('button', { name: 'Expand' }).click()
   await expect(vis).toContainText('0: 0')
   await expect(items.getByRole('button', { name: 'Collapse' })).toBeVisible()
-  await expect.poll(() => chevronTransform(items)).not.toBe('none')
+  // The open chevron is turned a quarter turn: `rotate(90deg)` computes to this matrix.
+  await expect.poll(() => chevronTransform(items)).toBe('matrix(0, 1, -1, 0, 0, 0)')
   await scrollToBottom(vis)
   const more = vis.getByRole('button', { name: 'Show 50 more (of 150)' })
   await expect(more).toBeVisible()
@@ -72,12 +73,33 @@ test('Double-click on an entry creates a node for it', async ({ editorPage, page
 test('An entry with no expression creates nothing', async ({ editorPage, page }) => {
   await editorPage
   const vis = await openTree(page)
+  await entry(vis, 'items: [150 items]').getByRole('button', { name: 'Expand' }).click()
   const nodeCount = await locate.graphNode(page).count()
   await vis
     .locator('.TreeRow.entry .content')
     .filter({ hasText: /^visualizedExpr:/ })
     .dblclick()
-  await expect(locate.graphNode(page)).toHaveCount(nodeCount)
+  // A node would be created asynchronously, so a count taken right away proves nothing. A valid
+  // entry afterwards shows the first double-click was handled: exactly one node, not two.
+  await vis
+    .locator('.TreeRow.entry .content')
+    .filter({ hasText: /^3: 3$/ })
+    .dblclick()
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
+})
+
+test('Shift+double-click creates a node for each entry beside it that has an expression', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  const nodeCount = await locate.graphNode(page).count()
+  // Of the four root entries, `visualizedExpr` has no expression: `items`, `nested` and `broken` do.
+  await entry(vis, 'nested: {1 key}')
+    .locator('.content')
+    .dblclick({ modifiers: ['Shift'] })
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 3)
 })
 
 test('A failed page shows its message and a retry, and the rest stays usable', async ({
@@ -91,4 +113,18 @@ test('A failed page shows its message and a retry, and the rest stays usable', a
   await expect(vis.getByRole('button', { name: 'Retry' })).toBeVisible()
   await entry(vis, 'nested: {1 key}').getByRole('button', { name: 'Expand' }).click()
   await expect(vis).toContainText('deep: true')
+})
+
+test('Retry on a failed page loads it when the next request succeeds', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  await entry(vis, 'broken: {1 key}').getByRole('button', { name: 'Expand' }).click()
+  await expect(vis).toContainText("couldn't load: boom")
+  await vis.getByRole('button', { name: 'Retry' }).click()
+  await expect(vis).toContainText('recovered: true')
+  await expect(vis).not.toContainText("couldn't load")
+  await expect(vis.getByRole('button', { name: 'Retry' })).toHaveCount(0)
 })
