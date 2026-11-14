@@ -3,7 +3,7 @@
 #### Enso IDE
 
 - [Charts are offered for every value whose library can draw them, not a fixed
-  list of types.][NNN]
+  list of types.][751]
 - [Showing or resizing a visualization moves the components in its way, and
   hiding it puts them back where they were. The moves are part of the same undo
   step.][735]
@@ -495,7 +495,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [735]: https://github.com/jdunkerley/enso/pull/735
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[751]: https://github.com/jdunkerley/enso/pull/751
 [733]: https://github.com/jdunkerley/enso/pull/733
 [734]: https://github.com/jdunkerley/enso/pull/734
 [736]: https://github.com/jdunkerley/enso/pull/736
