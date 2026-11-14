@@ -1,0 +1,79 @@
+from Standard.Base import all
+import Standard.Base.Data.Array_Proxy.Array_Proxy
+from Standard.Base.Data.Json import render
+
+## ---
+   private: true
+   ---
+   The JSON the JSON visualization receives for a value. It must be small and
+   quick to compute: a library converts a large value of its own type to a
+   preview with `Viz_Json.from (that:Its_Public_Type)` in its own module.
+type Viz_Json
+    ## ---
+       private: true
+       ---
+       - `json_text`: the JSON, as text.
+    Value (json_text : Text)
+
+## ---
+   private: true
+   ---
+   The JSON of the value; if its `to_js_object` panics, its display text and
+   the error.
+Viz_Json.from (that:Any) =
+    text = Panic.recover Any that.to_json . catch Any err->
+        (JS_Object.from_pairs [["value", that.to_display_text], ["_to_js_object_error_", err.to_display_text]]).to_json
+    Viz_Json.Value text
+
+## ---
+   private: true
+   ---
+   The JSON object `{"type": "Nothing"}`.
+Viz_Json.from (that:Nothing) =
+    _ = that
+    Viz_Json.Value '{"type": "Nothing"}'
+
+## ---
+   private: true
+   ---
+   The JSON object itself, rendered as it is.
+Viz_Json.from (that:JS_Object) = Viz_Json.Value (render that)
+
+## ---
+   private: true
+   ---
+   At most 100 items per level and 5 levels.
+Viz_Json.from (that:Vector) = Viz_Json.Value (render_vector that)
+
+## ---
+   private: true
+   ---
+   At most 100 items per level and 5 levels.
+Viz_Json.from (that:Array) = Viz_Json.Value (render_vector (Vector.from_polyglot_array that))
+
+## ---
+   private: true
+   ---
+   Text over `max_text_length` characters is cut to that length, plus `…`.
+Viz_Json.from (that:Text) =
+    shown = if that.length <= max_text_length then that else (that.take max_text_length) + "…"
+    Viz_Json.Value shown.to_json
+
+## ---
+   private: true
+   ---
+   The longest text the JSON visualization receives whole.
+max_text_length = 2000
+
+## The JSON of a vector: at most `max_length` items per level; deeper than
+   `max_depth` levels it is `"[...]"`.
+private render_vector object depth=0 max_depth=5 max_length=100 =
+    case object of
+        _ : Vector -> if depth == max_depth then "[...]" else
+            result = object.take max_length . map (elem-> if elem.is_error then elem.to_json else render_vector elem (depth+1) max_depth max_length)
+            "[" + result.join ", " + "]"
+        _ : Array ->
+            proxy = Array_Proxy.new object.length object.at
+            @Tail_Call render_vector (Vector.from_polyglot_array proxy) depth max_depth max_length
+        _ : JS_Object -> render object depth max_depth max_length
+        _ -> (Viz_Json.from object).json_text

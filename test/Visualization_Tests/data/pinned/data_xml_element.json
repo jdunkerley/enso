@@ -1,0 +1,1 @@
+{"type":"XML_Element","tag":"foo","attributes":[["id","10"]],"children":[{"type":"XML_Element","tag":"bar","children":["hello"],"children_count":1},"text"],"children_count":2}

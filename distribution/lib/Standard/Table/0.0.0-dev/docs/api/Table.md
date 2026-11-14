@@ -86,7 +86,6 @@
     - text_cleanse self columns:Standard.Table.Table_Selector.Table_Selector= remove:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Regex.Named_Pattern.Named_Pattern)= error_on_missing_columns:Standard.Base.Data.Boolean.Boolean= -> (Standard.Table.Table.Table&Standard.Base.Any.Any)
     - text_replace self columns:Standard.Table.Table_Selector.Table_Selector= term:(Standard.Base.Data.Text.Text|Standard.Table.Column.Column|Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Text.Regex.Regex)= new_text:(Standard.Base.Data.Text.Text|Standard.Table.Column.Column|Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression)= case_sensitivity:Standard.Base.Data.Text.Case_Sensitivity.Case_Sensitivity= only_first:Standard.Base.Data.Boolean.Boolean= error_on_missing_columns:Standard.Base.Data.Boolean.Boolean= -> (Standard.Table.Table.Table&Standard.Base.Any.Any)
     - to_csv self -> Standard.Base.Data.Text.Text
-    - to_default_visualization_data self -> Standard.Base.Data.Text.Text
     - to_js_object self -> Standard.Base.Any.Any
     - tokenize_to_columns self columns:Standard.Table.Table_Selector.Table_Selector= pattern:Standard.Base.Data.Text.Text= case_sensitivity:Standard.Base.Data.Text.Case_Sensitivity.Case_Sensitivity= column_count:Standard.Table.Columns_To_Add.Columns_To_Add= on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior= error_on_missing_columns:Standard.Base.Data.Boolean.Boolean= -> (Standard.Table.Table.Table&Standard.Base.Any.Any)
     - tokenize_to_rows self column:(Standard.Base.Data.Text.Text|Standard.Base.Data.Numbers.Integer)= pattern:Standard.Base.Data.Text.Text= case_sensitivity:Standard.Base.Data.Text.Case_Sensitivity.Case_Sensitivity= at_least_one_row:Standard.Base.Data.Boolean.Boolean= -> (Standard.Table.Table.Table&Standard.Base.Any.Any)
@@ -106,4 +105,5 @@
 - Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Table.Viz_Table
 - Standard.Visualization.SQL_Viz.SQL_Viz.from that:Standard.Table.Table.Table -> Standard.Visualization.SQL_Viz.SQL_Viz
 - Standard.Visualization.Viz_Cell.Viz_Cell.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Cell.Viz_Cell
+- Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Json.Viz_Json
 - Standard.Visualization.Id.Id.from that:Standard.Table.Table.Table -> Standard.Visualization.Id.Id

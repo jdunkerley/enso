@@ -24,6 +24,7 @@ import project.Aggregate_Column.Aggregate_Column
 import Standard.Visualization.Id.Id
 import Standard.Visualization.SQL_Viz.SQL_Viz
 import Standard.Visualization.Viz_Cell.Viz_Cell
+import Standard.Visualization.Viz_Json.Viz_Json
 import Standard.Visualization.Viz_Table.Viz_Table
 import project.Internal.Viz_Helpers
 import project.Blank_Selector.Blank_Selector
@@ -3974,27 +3975,6 @@ type Table
     pretty self =
         self.implementation.pretty_implementation self.underlying
 
-    ## ---
-       private: true
-       ---
-       Returns a Text used to display this table in the IDE by default.
-       Returns a JSON object containing useful metadata and previews of column
-       values.
-    to_default_visualization_data self -> Text =
-        case self.is_a In_Memory_Table of
-            True ->
-                Widget_Helpers._with_table_cache self "to_default_visualization_data" <|
-                    max_size = 10
-                    row_count = ['number_of_rows', self.row_count]
-                    cols = self.columns.map c->
-                        name = c.name.to_json
-                        items = c.to_json_data 0 max_size
-                        '{"name":'+name+',"data":' + items + '}'
-                    JS_Object.from_pairs [row_count, ['columns', cols]] . to_text
-                    '{"number_of_rows":' + self.row_count.to_text + ',"columns":[' + (cols.join ",") + ']}'
-            False ->
-                self.read 10 . to_default_visualization_data
-
 ## ---
    private: true
    ---
@@ -4084,6 +4064,23 @@ SQL_Viz.from (that:Table) = that.implementation.to_sql_viz that.underlying
    private: true
    ---
 Viz_Cell.from (that:Table) = Viz_Cell.Value (level-> Viz_Helpers.table_cell that level) Nothing
+
+## ---
+   private: true
+   ---
+   The row count and the first 10 values of each column. A database table
+   reads 10 rows first.
+Viz_Json.from (that:Table) = case that.is_a In_Memory_Table of
+    True ->
+        text = Widget_Helpers._with_table_cache that "viz_json" <|
+            max_size = 10
+            cols = that.columns.map c->
+                name = c.name.to_json
+                items = c.to_json_data 0 max_size
+                '{"name":'+name+',"data":' + items + '}'
+            '{"number_of_rows":' + that.row_count.to_text + ',"columns":[' + (cols.join ",") + ']}'
+        Viz_Json.Value text
+    False -> Viz_Json.from (that.read 10 . catch)
 
 ## ---
    private: true

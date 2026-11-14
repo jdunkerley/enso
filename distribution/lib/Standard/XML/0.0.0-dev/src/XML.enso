@@ -6,6 +6,7 @@ import Standard.Base.Errors.File_Error.File_Error
 import Standard.Base.Errors.No_Such_Key.No_Such_Key
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
 import Standard.Base.System.Input_Stream.Input_Stream
+from Standard.Visualization.Viz_Json import Viz_Json
 from Standard.Visualization.Viz_Table import Viz_Table
 from Standard.Base.Metadata import Display, make_single_choice, Widget
 
@@ -456,17 +457,6 @@ type XML_Document
        Convert to a display representation of this XML_Document.
     to_display_text self -> Text = "XML_Document (" + self.root_element.to_display_text + ")"
 
-    ## ---
-       private: true
-       ---
-       Transform the XML document into text for displaying as part of its default
-       visualization.
-    to_default_visualization_data self -> Text =
-        outer_vec = Vector.build initial_capacity=2 builder->
-            builder.append ["type", "XML_Document"]
-            builder.append ["root_element", self.root_element.to_default_visualization_data as_js_object=True]
-        JS_Object.from_pairs outer_vec . to_json
-
 type XML_Element
     ## ---
        group: Metadata
@@ -837,28 +827,6 @@ type XML_Element
        ---
     private Value java_element (~children_cache:(Vector (XML_Element | Text)))
 
-    ## ---
-       private: true
-       ---
-       Transform the vector into text for displaying as part of its default
-       visualization.
-    to_default_visualization_data self nested:Boolean=False as_js_object:Boolean=False -> Text | JS_Object =
-        vec = Vector.build initial_capacity=4 builder->
-            builder.append ["type", "XML_Element"]
-            builder.append ["tag", self.name]
-            if self.attributes.length > 0 then builder.append ["attributes", self.attributes.to_js_object]
-            if self.children_cache.length > 0 then
-                inner_render = if nested then _.to_display_text else
-                    c-> case c of
-                        _ : XML_Element -> c.to_default_visualization_data nested=True as_js_object=True
-                        _ -> c
-
-                ## Limit to 50 children to avoid excessive rendering.
-                builder.append ["children", self.children_cache.take 50 . map inner_render + (if self.children_cache.length > 50 then ["..."] else [])]
-                builder.append ["children_count", self.children_cache.length]
-        js_object = JS_Object.from_pairs vec
-        if as_js_object then js_object else js_object.to_json
-
 type XML_Error
     ## An error that indicates that the XML data could not be parsed.
 
@@ -1017,3 +985,31 @@ private _table_viz_json xml_element:XML_Element type:Text max_items:Integer -> J
     child_node_action = if type == "XML_Element" then "get" else "get_child_element"
     get_child_node_fields = [["get_child_node_action", child_node_action + " {{#key}}"], ["get_child_node_link_name", "key"]]
     JS_Object.from_pairs <| [header, data, all_rows, ["type", type]] + get_child_node_fields
+
+## ---
+   private: true
+   ---
+Viz_Json.from (that:XML_Document) =
+    pairs = [["type", "XML_Document"], ["root_element", _element_js that.root_element False]]
+    Viz_Json.Value (JS_Object.from_pairs pairs . to_json)
+
+## ---
+   private: true
+   ---
+Viz_Json.from (that:XML_Element) = Viz_Json.Value (_element_js that False . to_json)
+
+## The JSON of an element: its tag, attributes and at most 50 children. A
+   nested element's children are shown by their display text.
+private _element_js (element : XML_Element) (nested : Boolean) -> JS_Object =
+    vec = Vector.build initial_capacity=4 builder->
+        builder.append ["type", "XML_Element"]
+        builder.append ["tag", element.name]
+        if element.attributes.length > 0 then builder.append ["attributes", element.attributes.to_js_object]
+        if element.children_cache.length > 0 then
+            inner_render = if nested then _.to_display_text else
+                c-> case c of
+                    _ : XML_Element -> _element_js c True
+                    _ -> c
+            builder.append ["children", element.children_cache.take 50 . map inner_render + (if element.children_cache.length > 50 then ["..."] else [])]
+            builder.append ["children_count", element.children_cache.length]
+    JS_Object.from_pairs vec

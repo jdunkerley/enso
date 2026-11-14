@@ -8,7 +8,7 @@ it either.
 ## Main entry points (IDE-facing only)
 
 - `Preprocessor.default_preprocessor value` — IDE entry: encode an arbitrary
-  value as JSON for visualization.
+  value as JSON for visualization; it returns `(Viz_Json.from value).json_text`.
 - `Geo_Map.process_to_json_text value` — IDE entry for the geo-map widget.
 - `Scatter_Plot.process_to_json_text value` — IDE entry for the scatter-plot
   widget.
@@ -67,6 +67,11 @@ Visualization and not on each data library.
   interpolations.
 - `Viz_Cell` (`src/Viz_Cell.enso`) - how a value renders inside a table cell;
   Base values render here, a library renders its own types by a conversion.
+- `Viz_Json` (`src/Viz_Json.enso`) - the JSON the JSON visualization receives,
+  kept small: Base values here (text over 2000 characters is cut, vectors to 100
+  items and 5 levels), a library's large types by
+  `Viz_Json.from (that:Its_Public_Type)` (Table: 10 rows; Column: 100 values;
+  XML: the element tree).
 - `Id` (`src/Id.enso`) - which visualisation a node opens with. `Id.from`
   answers it: any value gives `Id.table`, a `JS_Object` `Id.json`; a library
   picks another for its type with `Id.from (that:Its_Public_Type)` (Table: SQL
