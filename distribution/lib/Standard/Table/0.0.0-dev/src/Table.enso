@@ -4088,6 +4088,6 @@ Viz_Cell.from (that:Table) = Viz_Cell.Value (level-> Viz_Helpers.table_cell that
 ## ---
    private: true
    ---
-   Guides the visualization system to display the most suitable graphical
-   representation for this table.
-Table.default_visualization self -> Id = self.implementation.default_visualization self.underlying
+   An in-memory table opens in the Table visualization, a database table in
+   the SQL Query visualization.
+Id.from (that:Table) = that.implementation.default_viz_id that.underlying

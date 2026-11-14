@@ -16,22 +16,11 @@ type Id
     ## ---
        private: true
        ---
-       A visualization implemented in a library.
-    Library project name
-
-    ## ---
-       private: true
-       ---
        Serializes this ID to a JSON format understandable by the graphical
-       interface.
+       interface. `library` is always `null`: only builtin visualisations exist.
     to_js_object : JS_Object
     to_js_object self =
-        project = case self of
-            Id.Builtin _ -> Nothing
-            Id.Library project _ ->
-                full_name = project.namespace + "." + project.name
-                JS_Object.from_pairs [["name", full_name]]
-        JS_Object.from_pairs [["library", project], ["name", self.name]]
+        JS_Object.from_pairs [["library", Nothing], ["name", self.name]]
 
     ## ---
        private: true
@@ -75,23 +64,19 @@ type Id
     image : Id
     image = Id.Builtin "Image"
 
-    ## ---
-       private: true
-       ---
-       Creates an ID for a library-defined visualization
+## ---
+   private: true
+   ---
+   Any value opens in the Table visualization, unless its type picks another
+   one with a conversion `Id.from (that:Its_Type)` in its own module.
+Id.from (that:Any) =
+    _ = that
+    Id.table
 
-       ## Arguments
-        - `module`: the module defining this visualization
-        - `visualization_name`: the name of the visualization
-
-       ## Examples
-       ### Identify the `"My Visualization"` visualization defined in `Standard.Base`.
-
-       ```
-                import Standard.Base
-                import Standard.Visualization
-
-                example_id = Visualization.Id.from_module Base "My Visualization"
-       ```
-    from_module module visualization_name =
-        Id.Library (Project_Description.new module) visualization_name
+## ---
+   private: true
+   ---
+   A JS_Object opens in the JSON visualization.
+Id.from (that:JS_Object) =
+    _ = that
+    Id.json

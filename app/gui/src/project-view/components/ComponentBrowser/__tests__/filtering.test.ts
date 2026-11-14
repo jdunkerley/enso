@@ -45,7 +45,7 @@ test.each([
 })
 
 test('Standard.Visualization methods are hidden even with a self type', () => {
-  const entry = makeMethod('Standard.Visualization.Helpers.Any.default_visualization')
+  const entry = makeMethod('Standard.Visualization.Helpers.Any.ide_only_method')
   const filtering = new Filtering({
     selfArg: {
       type: 'known',
@@ -54,9 +54,7 @@ test('Standard.Visualization methods are hidden even with a self type', () => {
     },
   })
   expect(filtering.filter(entry, new SuggestionDb())).toBeNull()
-  expect(
-    new Filtering({ pattern: 'default_visualization' }).filter(entry, new SuggestionDb()),
-  ).toBeNull()
+  expect(new Filtering({ pattern: 'ide_only_method' }).filter(entry, new SuggestionDb())).toBeNull()
 })
 
 test.each`

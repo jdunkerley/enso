@@ -2,6 +2,7 @@
 
 #### Enso IDE
 
+- [A component whose value is an image opens in the Image visualization.][758]
 - [Charts are offered for every value whose library can draw them, not a fixed
   list of types.][751]
 - [Showing or resizing a visualization moves the components in its way, and
@@ -495,6 +496,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [735]: https://github.com/jdunkerley/enso/pull/735
+[758]: https://github.com/jdunkerley/enso/pull/758
 [751]: https://github.com/jdunkerley/enso/pull/751
 [733]: https://github.com/jdunkerley/enso/pull/733
 [734]: https://github.com/jdunkerley/enso/pull/734

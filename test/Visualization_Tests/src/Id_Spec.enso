@@ -1,15 +1,23 @@
 from Standard.Base import all
-import Standard.Base
 
 from Standard.Table import Table
+from Standard.Image import Image
 
 import Standard.Visualization
+import Standard.Visualization.Id.Id
 
 from Standard.Test import all
 
-
 type My_Type
     Value my_field
+
+type My_Json_Type
+    Value my_field
+
+## A user type picks its default visualisation in its own module.
+Id.from (that:My_Json_Type) =
+    _ = that
+    Id.json
 
 add_specs suite_builder = suite_builder.group "Serializable Visualization Identifiers" group_builder->
     group_builder.specify "serializes builtin visualizations in the correct format" <|
@@ -21,47 +29,33 @@ add_specs suite_builder = suite_builder.group "Serializable Visualization Identi
         Visualization.Id.geo_map.to_json . should_equal (json_for_name "Geo Map")
         Visualization.Id.image.to_json . should_equal (json_for_name "Image")
 
-    group_builder.specify "serializes library visualizations in the correct format" <|
-        expected p_name v_name =
-            lib = JS_Object.from_pairs [["name", p_name]]
-            JS_Object.from_pairs [["library", lib], ["name", v_name]] . to_text
-        v_1 = Visualization.Id.from_module Id_Spec "My Vis"
-        v_2 = Visualization.Id.from_module Base "Other Vis"
-        v_1.to_json.should_equal (expected "enso_dev.Visualization_Tests" "My Vis")
-        v_2.to_json.should_equal (expected "Standard.Base" "Other Vis")
+    group_builder.specify "converts any value to the Table visualization" <|
+        Id.from (My_Type.Value 30) . should_equal Id.table
+        Id.from "foobar" . should_equal Id.table
+        Id.from True . should_equal Id.table
+        Id.from 42 . should_equal Id.table
+        Id.from Nothing . should_equal Id.table
 
-    group_builder.specify "specifies default Table visualization for any type" <|
-        My_Type.Value 30 . default_visualization . should_equal Visualization.Id.table
-        "foobar".default_visualization.should_equal Visualization.Id.table
-        True.default_visualization.should_equal Visualization.Id.table
+    group_builder.specify "converts a JS_Object to the JSON visualization" <|
+        Id.from (Json.parse '{"name":"John","age":25,"email":"john@example.com"}') . should_equal Id.json
 
-    group_builder.specify "specifies default json visualization JS_Object type" <|
-        (Json.parse '{"name":"John","age":25,"email":"john@example.com"}') . default_visualization . should_equal Visualization.Id.json
+    group_builder.specify "converts a Vector and an Array to the Table visualization" <|
+        Id.from [1,2,3] . should_equal Id.table
+        Id.from [1,2,3].to_array . should_equal Id.table
 
-    group_builder.specify "specifies default Table visualization for Vector and Array type" <|
-        [1,2,3].default_visualization.should_equal Visualization.Id.table
-        [1,2,3].to_array.default_visualization.should_equal Visualization.Id.table
+    group_builder.specify "converts an in-memory Table, Column and Row to the Table visualization" <|
+        t = Table.new [['latitude', [5,2,5]], ['Y', [2,4,2]], ['name', ["foo", "bar", "baz"]]]
+        Id.from t . should_equal Id.table
+        Id.from (t.at "Y") . should_equal Id.table
+        Id.from (t.rows.at 0) . should_equal Id.table
 
+    group_builder.specify "converts an Image to the Image visualization" <|
+        Id.from (Image.from_vector [0, 0, 0, 0] rows=2 channels=1) . should_equal Id.image
 
-    group_builder.specify "should specify Table's default visualizations correctly" <|
-        c_1_1 = ['x', [1, 2, 3]]
-        c_1_2 = ['Y', [5.3, 56.2, 6.3]]
-        t_1 = Table.new [c_1_1, c_1_2]
-        t_1.default_visualization.should_equal Visualization.Id.table
-
-        c_2_1 = ['LaTituDe', [5,3,2]]
-        c_2_2 = ['longitude', [6,7,8]]
-        t_2 = Table.new [c_2_1, c_2_2]
-        t_2.default_visualization.should_equal Visualization.Id.table
-
-        c_3_1 = ['latitude', [5,2,5]]
-        c_3_2 = ['Y', [2,4,2]]
-        c_3_3 = ['name', ["foo", "bar", "baz"]]
-        t_3 = Table.new [c_3_1, c_3_2, c_3_3]
-        t_3.default_visualization.should_equal Visualization.Id.table
+    group_builder.specify "lets a user type pick its visualization by a conversion" <|
+        Id.from (My_Json_Type.Value 1) . should_equal Id.json
 
 main filter=Nothing =
     suite = Test.build suite_builder->
         add_specs suite_builder
     suite.run_with_filter filter
-

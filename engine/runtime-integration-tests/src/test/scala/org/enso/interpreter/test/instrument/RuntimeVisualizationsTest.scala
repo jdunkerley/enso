@@ -2022,11 +2022,11 @@ class RuntimeVisualizationsTest
             Api.VisualizationConfiguration(
               contextId,
               Api.VisualizationExpression.Text(
-                "Standard.Visualization.Main",
-                "x -> x.default_visualization.to_text",
+                "Standard.Visualization.Id",
+                "x -> (Id.from x).to_text",
                 Vector()
               ),
-              "Standard.Visualization.Main"
+              "Standard.Visualization.Id"
             )
           )
         )
