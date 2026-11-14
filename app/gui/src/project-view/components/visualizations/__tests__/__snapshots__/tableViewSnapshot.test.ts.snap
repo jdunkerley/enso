@@ -10,6 +10,126 @@ exports[`Distinct values of each pinned response > ssrm_distinct 1`] = `
 
 exports[`Distinct values of each pinned response > ssrm_distinct_nothing 1`] = `null`;
 
+exports[`Link cells and created nodes of each pinned server page > ssrm_rows 1`] = `
+[
+  {
+    "colDef": {
+      "cellRenderer": "[function]",
+      "cellStyle": {
+        "border-right": "1px solid #C0C0C0",
+        "padding-left": "13px",
+      },
+      "field": "#",
+      "filter": false,
+      "headerClass": "indexColumnHeader",
+      "headerName": "#",
+      "onCellDoubleClicked": "[function]",
+      "tooltipValueGetter": "[function]",
+    },
+    "createdNodes": [
+      "operator1.get_row 0",
+      "operator1.get_row 1",
+      "operator1.get_row 2",
+    ],
+    "linkCells": [
+      "<div class='link'> 0 </div>",
+      "<div class='link'> 1 </div>",
+      "<div class='link'> 2 </div>",
+    ],
+    "linkTooltip": "Double click to view this row in a separate component",
+  },
+]
+`;
+
+exports[`Link cells and created nodes of each pinned server page > ssrm_rows_column 1`] = `
+[
+  {
+    "colDef": {
+      "cellRenderer": "[function]",
+      "cellStyle": {
+        "border-right": "1px solid #C0C0C0",
+        "padding-left": "13px",
+      },
+      "field": "#",
+      "filter": false,
+      "headerClass": "indexColumnHeader",
+      "headerName": "#",
+      "onCellDoubleClicked": "[function]",
+      "tooltipValueGetter": "[function]",
+    },
+    "createdNodes": [
+      "operator1.at 1",
+      "operator1.at 2",
+    ],
+    "linkCells": [
+      "<div class='link'> 1 </div>",
+      "<div class='link'> 2 </div>",
+    ],
+    "linkTooltip": "Double click to view this row in a separate component",
+  },
+]
+`;
+
+exports[`Link cells and created nodes of each pinned server page > ssrm_rows_filtered 1`] = `
+[
+  {
+    "colDef": {
+      "cellRenderer": "[function]",
+      "cellStyle": {
+        "border-right": "1px solid #C0C0C0",
+        "padding-left": "13px",
+      },
+      "field": "#",
+      "filter": false,
+      "headerClass": "indexColumnHeader",
+      "headerName": "#",
+      "onCellDoubleClicked": "[function]",
+      "tooltipValueGetter": "[function]",
+    },
+    "createdNodes": [
+      "operator1.get_row 1",
+      "operator1.get_row 2",
+    ],
+    "linkCells": [
+      "<div class='link'> 1 </div>",
+      "<div class='link'> 2 </div>",
+    ],
+    "linkTooltip": "Double click to view this row in a separate component",
+  },
+]
+`;
+
+exports[`Link cells and created nodes of each pinned server page > ssrm_rows_sorted 1`] = `
+[
+  {
+    "colDef": {
+      "cellRenderer": "[function]",
+      "cellStyle": {
+        "border-right": "1px solid #C0C0C0",
+        "padding-left": "13px",
+      },
+      "field": "#",
+      "filter": false,
+      "headerClass": "indexColumnHeader",
+      "headerName": "#",
+      "onCellDoubleClicked": "[function]",
+      "tooltipValueGetter": "[function]",
+    },
+    "createdNodes": [
+      "operator1.get_row 2",
+      "operator1.get_row 1",
+      "operator1.get_row 0",
+    ],
+    "linkCells": [
+      "<div class='link'> 2 </div>",
+      "<div class='link'> 1 </div>",
+      "<div class='link'> 0 </div>",
+    ],
+    "linkTooltip": "Double click to view this row in a separate component",
+  },
+]
+`;
+
 exports[`Rows of each pinned server page > ssrm_rows 1`] = `
 {
   "rowCount": 3,
@@ -226,6 +346,7 @@ exports[`Table view of each pinned golden > table_array 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -291,6 +412,7 @@ exports[`Table view of each pinned golden > table_atom 1`] = `
   "flags": {
     "allRowCount": 0,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -399,6 +521,9 @@ exports[`Table view of each pinned golden > table_cells 1`] = `
   "flags": {
     "allRowCount": 5,
     "bottomStatusBarRequested": true,
+    "columnNames": [
+      "v",
+    ],
     "columnTypes": {
       "v": "Mixed",
     },
@@ -508,6 +633,7 @@ exports[`Table view of each pinned golden > table_cells_vector 1`] = `
   "flags": {
     "allRowCount": 5,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -576,6 +702,7 @@ exports[`Table view of each pinned golden > table_connection 1`] = `
   "flags": {
     "allRowCount": 0,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -674,6 +801,9 @@ exports[`Table view of each pinned golden > table_db_column 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": false,
+    "columnNames": [
+      "y",
+    ],
     "columnTypes": {
       "y": "Float",
     },
@@ -707,6 +837,7 @@ exports[`Table view of each pinned golden > table_db_read_error 1`] = `
   "flags": {
     "allRowCount": 0,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -884,6 +1015,11 @@ exports[`Table view of each pinned golden > table_db_table 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": false,
+    "columnNames": [
+      "x",
+      "y",
+      "label",
+    ],
     "columnTypes": {
       "label": "Char",
       "x": "Integer",
@@ -983,6 +1119,10 @@ exports[`Table view of each pinned golden > table_dictionary 1`] = `
   "flags": {
     "allRowCount": 2,
     "bottomStatusBarRequested": false,
+    "columnNames": [
+      "key",
+      "value",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -1023,6 +1163,7 @@ exports[`Table view of each pinned golden > table_error 1`] = `
   "flags": {
     "allRowCount": 0,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -1082,6 +1223,7 @@ exports[`Table view of each pinned golden > table_function 1`] = `
   "flags": {
     "allRowCount": 0,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -1143,6 +1285,9 @@ exports[`Table view of each pinned golden > table_hashset 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": false,
+    "columnNames": [
+      "key",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -1241,6 +1386,10 @@ exports[`Table view of each pinned golden > table_js_object 1`] = `
   "flags": {
     "allRowCount": 2,
     "bottomStatusBarRequested": false,
+    "columnNames": [
+      "key",
+      "value",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -1363,6 +1512,7 @@ exports[`Table view of each pinned golden > table_matrix 1`] = `
   "flags": {
     "allRowCount": 2,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -1480,6 +1630,9 @@ exports[`Table view of each pinned golden > table_mem_1col_table 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": true,
+    "columnNames": [
+      "y",
+    ],
     "columnTypes": {
       "y": "Float",
     },
@@ -1596,6 +1749,9 @@ exports[`Table view of each pinned golden > table_mem_1x1_table 1`] = `
   "flags": {
     "allRowCount": 1,
     "bottomStatusBarRequested": true,
+    "columnNames": [
+      "n",
+    ],
     "columnTypes": {
       "n": "Integer",
     },
@@ -1708,6 +1864,9 @@ exports[`Table view of each pinned golden > table_mem_column 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": true,
+    "columnNames": [
+      "y",
+    ],
     "columnTypes": {
       "y": "Float",
     },
@@ -1876,6 +2035,10 @@ exports[`Table view of each pinned golden > table_mem_server_table 1`] = `
   "flags": {
     "allRowCount": 20000,
     "bottomStatusBarRequested": true,
+    "columnNames": [
+      "x",
+      "y",
+    ],
     "columnTypes": {
       "x": "Integer",
       "y": "Integer",
@@ -2151,6 +2314,12 @@ exports[`Table view of each pinned golden > table_mem_table 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": true,
+    "columnNames": [
+      "x",
+      "y",
+      "label",
+      "when",
+    ],
     "columnTypes": {
       "label": "Char",
       "when": "Date",
@@ -2258,6 +2427,7 @@ exports[`Table view of each pinned golden > table_number 1`] = `
   "flags": {
     "allRowCount": 0,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -2440,6 +2610,7 @@ exports[`Table view of each pinned golden > table_object_matrix 1`] = `
   "flags": {
     "allRowCount": 2,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -2542,6 +2713,10 @@ exports[`Table view of each pinned golden > table_row 1`] = `
   "flags": {
     "allRowCount": 4,
     "bottomStatusBarRequested": false,
+    "columnNames": [
+      "column",
+      "value",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -2747,6 +2922,7 @@ exports[`Table view of each pinned golden > table_rows_matrix 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -2849,6 +3025,7 @@ exports[`Table view of each pinned golden > table_text 1`] = `
   "flags": {
     "allRowCount": 0,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -2932,6 +3109,7 @@ exports[`Table view of each pinned golden > table_vector 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": false,
+    "columnNames": [],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -3056,6 +3234,11 @@ exports[`Table view of each pinned golden > table_xml_document 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": false,
+    "columnNames": [
+      "key",
+      "type",
+      "value",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,

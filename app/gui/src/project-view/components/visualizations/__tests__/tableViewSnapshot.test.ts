@@ -118,6 +118,7 @@ function viewSnapshot(name: string) {
       isSSRM: flags.isSSRM,
       bottomStatusBarRequested: flags.bottomStatusBarRequested,
       createNodeEnabled: flags.createNodeEnabled,
+      columnNames: flags.columnNames,
       columnTypes: flags.columnTypes,
     }),
   }
@@ -134,6 +135,26 @@ describe('Rows of each pinned server page', () => {
     const data = readPinned(view)
     const { columnDefs } = buildTableView(data, makeContext(data, []))
     expect(plain(rowsFromPage(columnDefs, readPinned(page)))).toMatchSnapshot()
+  })
+})
+
+/** Each server row page, with the view golden whose link definition its rows are clicked through. */
+const linkPageGoldens = [
+  ['ssrm_rows', 'table_mem_server_table'],
+  ['ssrm_rows_sorted', 'table_mem_server_table'],
+  ['ssrm_rows_filtered', 'table_mem_server_table'],
+  ['ssrm_rows_column', 'table_mem_column'],
+] as const
+
+describe('Link cells and created nodes of each pinned server page', () => {
+  test.each(linkPageGoldens)('%s', (page, view) => {
+    const data = readPinned(view)
+    const created: string[] = []
+    const { columnDefs } = buildTableView(data, makeContext(data, created))
+    const { rows } = rowsFromPage(columnDefs, readPinned(page))
+    expect(
+      describeColumns(columnDefs, rows, created).filter((col) => 'createdNodes' in col),
+    ).toMatchSnapshot()
   })
 })
 
