@@ -19,7 +19,7 @@ export const [providePersisted, usePersisted] = createContextStore(
     projectId: ToValue<string>,
     graphStore: GraphStore,
     graphNavigator: GraphNavigator,
-    onRestore: () => void,
+    onRestore: (signal: AbortSignal) => void,
   ) => {
     /**
      * JSON serializable representation of graph state saved in localStorage. The names of fields here
@@ -76,7 +76,7 @@ export const [providePersisted, usePersisted] = createContextStore(
         } else {
           await until(visibleAreasReady).toBe(true)
           await until(visible).toBe(true)
-          if (!abort.aborted) onRestore()
+          if (!abort.aborted) onRestore(abort)
         }
       },
     })

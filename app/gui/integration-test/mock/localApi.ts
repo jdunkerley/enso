@@ -555,7 +555,8 @@ export async function mockLocalApi(page: Page) {
       }
       unsafeMutable(project.entry.metadata).lastOpened = toRfc3339(new Date())
       const result: OpenProject = {
-        projectId: UUID(crypto.randomUUID()),
+        // As the shim does: the project's own id, the same at every open.
+        projectId: params.projectId,
         languageServerJsonAddress,
         languageServerYdocAddress,
         projectNamespace: 'local',

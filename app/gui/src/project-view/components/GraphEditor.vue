@@ -38,6 +38,11 @@ import { performCollapse, prepareCollapsedInfo } from '@/components/GraphEditor/
 import { helpActionHandlers } from '@/components/GraphEditor/helpActions'
 import { useGraphEditorClipboard } from '@/components/GraphEditor/graphClipboard'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
+import {
+  fitsAtFullSize,
+  keepInitialView,
+  placeAtFullSize,
+} from '@/components/GraphEditor/initialView'
 import type {
   CarriedComponentBrowserInput,
   ViewCarryOver,
@@ -144,11 +149,30 @@ const graphNavigator: GraphNavigator = provideGraphNavigator(viewportNode, keybo
 
 // === Client saved state ===
 
+// Saved views are keyed by the project's own id (its `.enso/project.json` UUID), not by its asset id:
+// a local asset id is the project's path, which a new project takes over from a deleted one of the
+// same name ("New Project 1"), together with the deleted project's saved view.
+const currentProject = useCurrentProject()
+let stopKeepingInitialView = () => {}
+onScopeDispose(() => stopKeepingInitialView())
 providePersisted(
-  () => projectStore.id,
+  () => currentProject.maybeRef.value?.details.value.internalId ?? projectStore.id,
   graphStore,
   graphNavigator,
-  () => zoomToAll(true),
+  (signal) => {
+    stopKeepingInitialView()
+    stopKeepingInitialView = keepInitialView({
+      show: showInitialView,
+      inputs: () => {
+        const bounds = scrollBounds.value
+        const viewport = graphNavigator.viewport.size.scale(graphNavigator.scale)
+        // A string, so that an unchanged layout does not count as a change.
+        return `${bounds.left} ${bounds.top} ${bounds.width} ${bounds.height} ${viewport.x} ${viewport.y}`
+      },
+      target: () => ({ pos: graphNavigator.targetLeftTop, scale: graphNavigator.targetScale }),
+      signal,
+    })
+  },
 )
 
 // === Zoom/pan ===
@@ -172,6 +196,22 @@ function zoomToAll(skipAnimation: boolean = false) {
   const bounds = scrollBounds.value
   if (bounds)
     graphNavigator.panAndZoomTo(bounds, 0.1, Math.max(1, graphNavigator.targetScale), skipAnimation)
+}
+
+/**
+ * Show a graph that has no saved view: at 100% when it fits, or when it is a single node (one too
+ * big to fit overflows to the right and the bottom); otherwise all of it, zoomed out to fit.
+ */
+function showInitialView() {
+  const elem = viewportElem.value
+  const bounds = scrollBounds.value
+  if (!elem || elem.clientWidth === 0 || elem.clientHeight === 0) return
+  const viewportSize = new Vec2(elem.clientWidth, elem.clientHeight)
+  if (graphStore.db.nodeIdToNode.size <= 1 || fitsAtFullSize(bounds, viewportSize)) {
+    graphNavigator.setPosAndScale(placeAtFullSize(bounds, viewportSize), 1)
+  } else {
+    zoomToAll(true)
+  }
 }
 
 function panToSelected() {
