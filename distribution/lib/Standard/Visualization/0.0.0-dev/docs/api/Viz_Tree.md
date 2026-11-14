@@ -1,12 +1,13 @@
 ## Enso Signatures 1.0
 ## module Standard.Visualization.Viz_Tree
 - type Viz_Tree
-    - Branch kind:Standard.Base.Data.Text.Text size:Standard.Base.Data.Numbers.Integer label:Standard.Base.Data.Text.Text children:(Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Vector.Vector)
+    - Branch kind:Standard.Base.Data.Text.Text size:Standard.Base.Data.Numbers.Integer label:Standard.Base.Data.Text.Text children:(Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Vector.Vector) child_of:Standard.Base.Any.Any
     - Leaf json_text:Standard.Base.Data.Text.Text
     - child self key:(Standard.Base.Data.Text.Text|Standard.Base.Data.Numbers.Integer) -> Standard.Visualization.Viz_Tree.Viz_Tree_Child!Standard.Base.Errors.Illegal_Argument.Illegal_Argument
     - count_text n:Standard.Base.Data.Numbers.Integer singular:Standard.Base.Data.Text.Text plural:Standard.Base.Data.Text.Text -> Standard.Base.Data.Text.Text
     - items_label n:Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text
     - keys_label n:Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text
+    - lookup_paged kind:Standard.Base.Data.Text.Text size:Standard.Base.Data.Numbers.Integer label:Standard.Base.Data.Text.Text page_of:(Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Vector.Vector) child_of:Standard.Base.Any.Any -> Standard.Visualization.Viz_Tree.Viz_Tree
     - paged kind:Standard.Base.Data.Text.Text size:Standard.Base.Data.Numbers.Integer label:Standard.Base.Data.Text.Text page_of:(Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Vector.Vector) -> Standard.Visualization.Viz_Tree.Viz_Tree
     - without_node_expressions self -> Standard.Visualization.Viz_Tree.Viz_Tree
 - type Viz_Tree_Child

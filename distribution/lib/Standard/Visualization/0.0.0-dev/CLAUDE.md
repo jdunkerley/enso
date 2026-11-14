@@ -89,11 +89,11 @@ Visualization and not on each data library.
   `children start count`, one page of `Viz_Tree_Child` with key, tree and node
   expression, and an optional `child_of key` that finds one child without
   building a page). Build branches with `Viz_Tree.paged`, or with
-  `Viz_Tree.lookup_paged` when a key can be found directly. Base values convert here
-  (any value: its `to_js_object`, with no node expressions); a library or a user
-  type describes its own with `Viz_Tree.from (that:Its_Public_Type)` (Table: row
-  count, columns and rows read a page at a time; Column, Row; XML: attributes
-  and children).
+  `Viz_Tree.lookup_paged` when a key can be found directly. Base values convert
+  here (any value: its `to_js_object`, with no node expressions); a library or a
+  user type describes its own with `Viz_Tree.from (that:Its_Public_Type)`
+  (Table: row count, columns and rows read a page at a time; Column, Row; XML:
+  attributes and children).
 - `Id` (`src/Id.enso`) - which visualisation a node opens with. `Id.from`
   answers it: any value gives `Id.table`, a `JS_Object` `Id.json`; a library
   picks another for its type with `Id.from (that:Its_Public_Type)` (Table: SQL
