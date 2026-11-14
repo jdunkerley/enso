@@ -3,6 +3,7 @@ import Standard.Base.Errors.File_Error.File_Error
 import Standard.Base.Runtime.Context
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
 from Standard.Base.Metadata import Display, Widget
+import Standard.Visualization.Id.Id
 
 import project.Histogram.Histogram
 import project.Matrix.Matrix
@@ -576,3 +577,11 @@ type Image_Comparator
    private: true
    ---
 Comparable.from (that:Image) = Comparable.new that Image_Comparator
+
+## ---
+   private: true
+   ---
+   An image opens in the Image visualization.
+Id.from (that:Image) =
+    _ = that
+    Id.image

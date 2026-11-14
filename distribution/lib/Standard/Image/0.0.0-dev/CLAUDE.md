@@ -50,6 +50,8 @@ diff = img - mat
 - `src/Read_Flag.enso`, `src/Write_Flag.enso` — flag enums for read/write.
 - `src/Image_File_Format.enso` — file format SPI for `Data.read` / `Data.write`.
 - `src/Image_Services.enso` — internal SPI implementation.
+- Image imports `Standard.Visualization` only for
+  `Id.from (that:Image) = Id.image`.
 
 ## Things to avoid in generated code
 

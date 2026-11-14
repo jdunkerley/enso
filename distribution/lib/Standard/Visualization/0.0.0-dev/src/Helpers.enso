@@ -4,24 +4,9 @@ import Standard.Base.Runtime.State
 from Standard.Base.Data.Json import render
 from Standard.Base.Logging import all
 
-import project.Id.Id
 from project.Text import get_lazy_visualization_text_window
 
 polyglot java import org.enso.base.Text_Utils
-
-## ---
-   private: true
-   ---
-   Specifies that the builtin Table visualization should be used for any type,
-   unless specified otherwise.
-Any.default_visualization self = Id.table
-
-## ---
-   private: true
-   ---
-   Specifies that the builtin JSON visualization should be used for any
-   JS_Objects
-JS_Object.default_visualization self = Id.json
 
 ## ---
    private: true
@@ -77,14 +62,6 @@ Error.to_default_visualization_data self = self.catch . to_default_visualization
 ## ---
    private: true
    ---
-   Guides the visualization system to display the most suitable graphical
-   representation for this table.
-Vector.default_visualization : Id
-Vector.default_visualization self = Id.table
-
-## ---
-   private: true
-   ---
    Transform the vector into text for displaying as part of its default
    visualization.
 Vector.to_default_visualization_data : Text
@@ -104,14 +81,6 @@ render_vector object depth=0 max_depth=5 max_length=100 =
             @Tail_Call render_vector (Vector.from_polyglot_array proxy) depth max_depth max_length
         _ : JS_Object -> render object depth max_depth max_length
         _ -> object.to_default_visualization_data
-
-## ---
-   private: true
-   ---
-   Guides the visualization system to display the most suitable graphical
-   representation for this table.
-Array.default_visualization : Id
-Array.default_visualization self = Id.table
 
 ## ---
    private: true

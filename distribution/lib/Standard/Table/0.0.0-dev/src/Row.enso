@@ -4,7 +4,6 @@ import Standard.Base.Errors.Common.Index_Out_Of_Bounds
 
 import project.Errors.No_Such_Column
 import Standard.Visualization.Helpers
-import Standard.Visualization.Id.Id
 import Standard.Visualization.Viz_Cell.Viz_Cell
 import Standard.Visualization.Viz_Table.Viz_Table
 import project.Internal.Viz_Helpers
@@ -149,11 +148,6 @@ Viz_Table.from (that:Row) = Viz_Table.from_view (_-> Viz_Helpers.row_table_view_
 Viz_Cell.from (that:Row) =
     pairs = that.column_names.map (n-> [n, that.get n])
     Viz_Cell.Value (level-> Viz_Helpers.row_cell that level) pairs
-
-## ---
-   private: true
-   ---
-Row.default_visualization self -> Id = Id.table
 
 ## ---
    private: true

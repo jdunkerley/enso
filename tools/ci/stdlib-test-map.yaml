@@ -29,7 +29,7 @@ libraries:
   Geo: { stdBits: [], dependsOn: [Base, Table] }
   Google: { stdBits: [google], dependsOn: [Base, Table, Visualization] }
   Google_Api: { stdBits: [], dependsOn: [] }
-  Image: { stdBits: [image], dependsOn: [Base] }
+  Image: { stdBits: [image], dependsOn: [Base, Visualization] }
   Microsoft: { stdBits: [microsoft], dependsOn: [Base, Database, Table, Visualization] }
   Postgres: { stdBits: [postgres], dependsOn: [Base, Database, Table, Visualization] }
   Saas: { stdBits: [saas], dependsOn: [Base, Table] }

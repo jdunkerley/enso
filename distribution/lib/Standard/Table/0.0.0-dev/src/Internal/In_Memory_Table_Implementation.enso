@@ -108,7 +108,7 @@ type In_Memory_Table_Implementation
     to_sql_viz (this_table : Table & In_Memory_Table) =
         Panic.throw (No_Such_Conversion.Error SQL_Viz this_table Nothing)
 
-    default_visualization (this_table : Table & In_Memory_Table) =
+    default_viz_id (this_table : Table & In_Memory_Table) =
         _ = this_table
         Id.table
 

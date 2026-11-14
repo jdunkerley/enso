@@ -5,10 +5,12 @@ from Standard.Table import Table
 import Standard.Database.Connection.Database
 import Standard.Database.Extensions.Upload_Table
 from Standard.SQLite import SQLite
+from Standard.Image import Image
 from Standard.XML import XML_Document
 
 import Standard.Visualization.Geo_Map
 import Standard.Visualization.Helpers
+import Standard.Visualization.Id.Id
 import Standard.Visualization.Preprocessor
 import Standard.Visualization.Scatter_Plot
 import Standard.Visualization.SQL.Visualization as SQL_Visualization
@@ -94,7 +96,7 @@ add_specs suite_builder =
     suite_builder.group "Pinned default visualisation" group_builder->
         default name ~value =
             group_builder.specify name <|
-                expect_pinned ("default_" + name) value.default_visualization.to_js_object.to_json
+                expect_pinned ("default_" + name) (Id.from value).to_js_object.to_json
         default "mem_table" data.mem_table
         default "db_table" data.db_table
         default "mem_column" data.mem_column
@@ -104,6 +106,7 @@ add_specs suite_builder =
         default "array" [1, 2].to_array
         default "js_object" (JS_Object.from_pairs [["a", 1]])
         default "atom" (Atom.Value 1 2)
+        default "image" (Image.from_vector [0, 0, 0, 0] rows=2 channels=1)
 
     suite_builder.group "Pinned default preprocessor JSON" group_builder->
         default_data name ~value =

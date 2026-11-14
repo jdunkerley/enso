@@ -3,7 +3,6 @@
 - type Row
     - at self column:(Standard.Base.Data.Numbers.Integer|Standard.Base.Data.Text.Text)= -> Standard.Base.Any.Any
     - column_names self -> Standard.Base.Any.Any
-    - default_visualization self -> Standard.Visualization.Id.Id
     - get self column:(Standard.Base.Data.Numbers.Integer|Standard.Base.Data.Text.Text)= ~if_missing:Standard.Base.Any.Any= -> Standard.Base.Any.Any
     - index self -> Standard.Base.Any.Any
     - length self -> Standard.Base.Any.Any

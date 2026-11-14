@@ -61,4 +61,4 @@ add_specs suite_builder =
             (SQL_Viz.from dt).dialect . should_equal "SQLite"
 
         group_builder.specify "the default visualisation of a database table is the SQL view" <|
-            dt.default_visualization . should_equal Id.sql_query
+            Id.from dt . should_equal Id.sql_query

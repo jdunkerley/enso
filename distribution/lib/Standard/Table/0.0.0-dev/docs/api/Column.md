@@ -33,7 +33,6 @@
     - day self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)!Standard.Table.Errors.Invalid_Value_Type
     - day_of_week self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)!Standard.Table.Errors.Invalid_Value_Type
     - day_of_year self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)!Standard.Table.Errors.Invalid_Value_Type
-    - default_visualization self -> Standard.Visualization.Id.Id
     - display self show_rows:Standard.Base.Data.Numbers.Integer= format_terminal:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Text.Text
     - drop self range:(Standard.Base.Data.Index_Sub_Range.Index_Sub_Range|Standard.Base.Data.Range.Range|Standard.Base.Data.Numbers.Integer)= -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
     - duplicate_count self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)

@@ -23,3 +23,4 @@
 - core_op mat:Standard.Base.Any.Any value:Standard.Base.Any.Any function:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - core_op_handler error:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - Standard.Base.Data.Ordering.Comparable.from that:Standard.Image.Image.Image -> Standard.Base.Data.Ordering.Comparable
+- Standard.Visualization.Id.Id.from that:Standard.Image.Image.Image -> Standard.Visualization.Id.Id
