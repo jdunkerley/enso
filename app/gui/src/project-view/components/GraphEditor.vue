@@ -114,7 +114,7 @@ const graphStore = useGraphStore()
 const { id: assetId, info: projectInfo, module } = useCurrentProject()
 const widgetRegistry = useWidgetRegistry()
 const suggestionDb = useSuggestionDbStore()
-provideVisualizationStore(projectStore)
+provideVisualizationStore(projectStore, suggestionDb.entries)
 provideLanguageSupportExtensions({
   project: projectStore,
   projectNames,

@@ -18,8 +18,9 @@ import { assert } from '@/util/assert'
 import { ReactiveDb, ReactiveIndex } from '@/util/database/reactiveDb'
 import type { MethodPointer } from '@/util/methodPointer'
 import { AsyncQueue } from '@/util/net'
-import { ProjectPath } from '@/util/projectPath'
+import { parseAbsoluteProjectPathRaw, ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
+import { isConversion } from 'enso-common/src/docsSite/apiPath'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { computed, markRaw, readonly, ref, shallowRef } from 'vue'
@@ -61,6 +62,21 @@ export class SuggestionDb extends ReactiveDb<SuggestionId, SuggestionEntry> {
         [[methodOnTypeKey(entry.selfType, entry.name), id]]
       : [],
   )
+  /**
+   * Conversion methods `Target.from (that:Source)` (the target is the entry's `selfType`): the
+   * target type's key to the keys of its source types. Visualizations use it to offer a chart for
+   * every type that converts to its data type.
+   */
+  readonly conversionSources = new ReactiveIndex(this, (_id, entry): [string, string][] => {
+    if (
+      entry.kind !== SuggestionKind.Method ||
+      entry.selfType == null ||
+      !isConversion({ name: entry.name, isStatic: false, arguments: entry.arguments })
+    )
+      return []
+    const source = parseAbsoluteProjectPathRaw(entry.arguments[0]!.reprType)
+    return source.ok ? [[entry.selfType.key(), source.value.key()]] : []
+  })
   private readonly suggestionsByKind = new ReactiveIndex(this, (id, entry) => [[entry.kind, id]])
   private readonly constructorFields = new ReactiveIndex(this, (id, entry) => {
     if (entry.kind !== SuggestionKind.Constructor) return []

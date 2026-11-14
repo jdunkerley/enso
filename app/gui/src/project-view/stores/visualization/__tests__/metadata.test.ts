@@ -1,11 +1,13 @@
 import { fc, test } from '@fast-check/vitest'
-import { expect } from 'vitest'
+import { assert, expect } from 'vitest'
 
 import {
   fromVisualizationId,
   toVisualizationId,
   VisualizationMetadataDb,
+  visualizationsForTypes,
 } from '@/stores/visualization/metadata'
+import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
 import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
 
 test.prop({
@@ -56,4 +58,23 @@ test('metadata index', () => {
   expect(db.visualizationIdToType.reverseLookup(makePath('C'))).toEqual(new Set([a]))
   expect(db.visualizationIdToType.reverseLookup(makePath('D'))).toEqual(new Set())
   expect(db.visualizationIdToType.reverseLookup(makePath('E'))).toEqual(new Set())
+})
+
+test('a visualization with a data type is offered for types that convert to it', () => {
+  const db = new VisualizationMetadataDb()
+  const scatter = toVisualizationId({ module: { kind: 'Builtin' }, name: 'Scatter Plot' })
+  const table = toVisualizationId({ module: { kind: 'Builtin' }, name: 'Table' })
+  db.set(scatter, { name: 'Scatter Plot', dataType: 'Standard.Visualization.Viz_Table.Viz_Table' })
+  db.set(table, { name: 'Table', inputType: 'Standard.Base.Any.Any' })
+  const vizTable = parseAbsoluteProjectPathRaw('Standard.Visualization.Viz_Table.Viz_Table')
+  const tableType = parseAbsoluteProjectPathRaw('Standard.Table.Table.Table')
+  const any = parseAbsoluteProjectPathRaw('Standard.Base.Any.Any')
+  const intType = parseAbsoluteProjectPathRaw('Standard.Base.Data.Numbers.Integer')
+  assert(vizTable.ok && tableType.ok && any.ok && intType.ok)
+  const sources = (target: string) =>
+    target === vizTable.value.key() ? new Set([tableType.value.key(), any.value.key()]) : undefined
+
+  expect(visualizationsForTypes(db, [tableType.value.key()], sources)).toEqual([table, scatter])
+  // The `Any` catch-all does not offer a chart for every value.
+  expect(visualizationsForTypes(db, [intType.value.key()], sources)).toEqual([table])
 })

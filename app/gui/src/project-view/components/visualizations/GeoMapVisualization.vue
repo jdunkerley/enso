@@ -1,7 +1,7 @@
 <script lang="ts">
 export const name = 'Geo Map'
 export const icon = 'compass'
-export const inputType = 'Standard.Table.Table.Table'
+export const dataType = 'Standard.Visualization.Viz_Table.Viz_Table'
 export const defaultPreprocessor = [
   'Standard.Visualization.Geo_Map',
   'process_to_json_text',
@@ -77,12 +77,17 @@ const mapboxToken = useMapboxToken()
 const mapNode = useTemplateRef('mapNode')
 
 const dataAsGeoJSONs = computed(() => {
+  const data: unknown = props.data
+  // Values that are not a map (a number, a vector, `{}` for a column) show the empty map.
+  if (data == null || typeof data !== 'object') return []
   if ('type' in props.data) {
     return [layerToGeoJSON(props.data)]
   } else if ('df_latitude' in props.data) {
     return [dataframeToGeoJSON(props.data)]
-  } else {
+  } else if ('layers' in props.data && Array.isArray(props.data.layers)) {
     return props.data.layers.map(layerToGeoJSON)
+  } else {
+    return []
   }
 })
 

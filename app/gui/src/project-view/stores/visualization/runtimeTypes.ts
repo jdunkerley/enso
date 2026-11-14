@@ -49,6 +49,11 @@ export const VisualizationModule = z.object({
     })
     .optional(),
   inputType: z.string().optional(),
+  /**
+   * The Enso type the visualisation's preprocessor reads (`Standard.Visualization.*`); the
+   * visualisation is offered for every value whose type converts to it.
+   */
+  dataType: z.string().optional(),
   defaultPreprocessor: (
     z.string().array().min(2) as unknown as z.ZodType<
       [module: string, method: string, ...args: string[]]
