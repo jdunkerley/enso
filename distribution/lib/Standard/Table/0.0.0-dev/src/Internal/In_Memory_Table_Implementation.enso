@@ -108,7 +108,9 @@ type In_Memory_Table_Implementation
     to_sql_viz (this_table : Table & In_Memory_Table) =
         Panic.throw (No_Such_Conversion.Error SQL_Viz this_table Nothing)
 
-    default_visualization (_ : Table & In_Memory_Table) = Id.table
+    default_visualization (this_table : Table & In_Memory_Table) =
+        _ = this_table
+        Id.table
 
     display (this_table : Table & In_Memory_Table) show_rows:Integer format_terminal:Boolean =
         Display_Helpers.display_table this_table add_row_index=True max_rows_to_show=show_rows all_rows_count=this_table.row_count format_terminal=format_terminal
