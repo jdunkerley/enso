@@ -1,0 +1,30 @@
+from Standard.Base import all
+
+from Standard.Visualization.SQL_Viz import SQL_Viz
+from Standard.Visualization.Viz_Cell import Viz_Cell
+
+from Standard.Test import all
+
+type Thing
+    Value x
+
+add_specs suite_builder =
+    suite_builder.group "Viz_Cell" group_builder->
+        group_builder.specify "renders Base values as the table view does" <|
+            Viz_Cell.render_value Nothing . should_equal Nothing
+            Viz_Cell.render_value "a" . should_equal "a"
+            Viz_Cell.render_value [1, 2, 3, 4, 5, 6] . should_equal "[1, 2, 3, 4, 5, … 1 items]"
+            Viz_Cell.render_value [1, 2] 1 . should_equal "[… 2 items]"
+            Viz_Cell.render_value (Thing.Value 1) . should_equal (Thing.Value 1).to_display_text
+
+        group_builder.specify "has no record pairs for an ordinary value" <|
+            (Viz_Cell.from (Thing.Value 1)).pairs . should_equal Nothing
+
+    suite_builder.group "SQL_Viz" group_builder->
+        group_builder.specify "renders the SQL view JSON" <|
+            viz = SQL_Viz.Value "SQLite" 'SELECT ? AS "x"' [2, Date.new 2020 1 2]
+            json = viz.to_json_text . parse_json
+            json.get "dialect" . should_equal "SQLite"
+            json.get "code" . should_equal 'SELECT ? AS "x"'
+            json.get "interpolations" . at 0 . get "enso_type" . should_equal "Standard.Base.Data.Numbers.Integer"
+            json.get "interpolations" . at 1 . get "value" . should_equal "2020-01-02"

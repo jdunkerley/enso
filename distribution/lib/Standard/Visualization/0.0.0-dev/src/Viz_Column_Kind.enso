@@ -1,0 +1,76 @@
+from Standard.Base import all
+
+## ---
+   private: true
+   ---
+   The broad kind of values in a visualised column. Charts choose columns by
+   kind; the kinds are Visualization's own, as Base cannot name Table's
+   `Value_Type`.
+type Viz_Kind
+    ## ---
+       private: true
+       ---
+    Numeric
+    ## ---
+       private: true
+       ---
+    Textual
+    ## ---
+       private: true
+       ---
+    Logical
+    ## ---
+       private: true
+       ---
+    Date_Only
+    ## ---
+       private: true
+       ---
+    Date_And_Time
+    ## ---
+       private: true
+       ---
+    Time_Only
+    ## ---
+       private: true
+       ---
+    Other
+
+## ---
+   private: true
+   ---
+   A column's kind, and the name the column's library gives its type (Table's
+   `Value_Type.to_name`), which charts put in their JSON.
+type Viz_Column_Kind
+    ## ---
+       private: true
+       ---
+    Value (kind : Viz_Kind) (display_name : Text)
+
+    ## ---
+       private: true
+       ---
+    is_numeric self -> Boolean = self.kind == Viz_Kind.Numeric
+
+    ## ---
+       private: true
+       ---
+    is_date_or_time self -> Boolean =
+        [Viz_Kind.Date_Only, Viz_Kind.Date_And_Time, Viz_Kind.Time_Only].contains self.kind
+
+    ## ---
+       private: true
+       ---
+       Infers the kind of a vector of values held in memory. `Nothing` values
+       are ignored; an empty or mixed vector is `Other`.
+    infer (values : Vector) -> Viz_Column_Kind =
+        present = values.filter (v-> v.is_nothing.not)
+        all_are predicate = present.not_empty && (present.all predicate)
+        if all_are (v-> v.is_a Integer) then Viz_Column_Kind.Value Viz_Kind.Numeric "Integer" else
+            if all_are (v-> v.is_a Number) then Viz_Column_Kind.Value Viz_Kind.Numeric "Float" else
+                if all_are (v-> v.is_a Text) then Viz_Column_Kind.Value Viz_Kind.Textual "Char" else
+                    if all_are (v-> v.is_a Boolean) then Viz_Column_Kind.Value Viz_Kind.Logical "Boolean" else
+                        if all_are (v-> v.is_a Date_Time) then Viz_Column_Kind.Value Viz_Kind.Date_And_Time "Date_Time" else
+                            if all_are (v-> v.is_a Date) then Viz_Column_Kind.Value Viz_Kind.Date_Only "Date" else
+                                if all_are (v-> v.is_a Time_Of_Day) then Viz_Column_Kind.Value Viz_Kind.Time_Only "Time" else
+                                    Viz_Column_Kind.Value Viz_Kind.Other "Mixed"

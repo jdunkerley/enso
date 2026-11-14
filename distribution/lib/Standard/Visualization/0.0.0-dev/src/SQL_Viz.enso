@@ -1,0 +1,30 @@
+from Standard.Base import all
+
+## ---
+   private: true
+   ---
+   What the SQL view shows: the query's text and its interpolated values.
+   Database tables and columns convert to it (`SQL_Viz.from (that:Table)`, in
+   `Standard.Table`, dispatching to the database implementation).
+type SQL_Viz
+    ## ---
+       private: true
+       ---
+    Value (dialect : Text) (code : Text) (interpolations : Vector)
+
+    ## ---
+       private: true
+       ---
+       The JSON the SQL view draws. For each interpolation it gives its value
+       and its Enso type name.
+    to_json_text self -> Text =
+        code = self.code.replace (regex "::variant, \{'enso-null-replacement-marker'.*?\}::variant") ", NULL"
+        mapped = self.interpolations.map value->
+            enso_type = value.to Meta.Type . qualified_name
+            used_value = case value of
+                _ : Date -> value.to_text
+                _ : Time_Of_Day -> value.to_text
+                _ : Date_Time -> value.to_text
+                _ -> value
+            JS_Object.from_pairs [["value", used_value], ["enso_type", enso_type]]
+        JS_Object.from_pairs [["dialect", self.dialect], ["code", code], ["interpolations", mapped]] . to_text
