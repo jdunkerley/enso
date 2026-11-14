@@ -10,6 +10,8 @@ export project.Preprocessor
 
 export project.Table.Visualization
 
+export project.Tree
+
 export project.Warnings
 
 export project.Widgets

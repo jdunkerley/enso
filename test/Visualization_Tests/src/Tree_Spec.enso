@@ -1,7 +1,9 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 
+import Standard.Visualization.Tree
 import Standard.Visualization.Viz_Tree.Viz_Tree
+import Standard.Visualization.Viz_Tree.Viz_Tree_Child
 
 from Standard.Test import all
 
@@ -12,6 +14,14 @@ type Bad
     Value
 
     to_js_object self = Panic.throw "no JSON"
+
+type Person
+    Value name age
+
+## A user type describes its own tree in its own module.
+Viz_Tree.from (that:Person) =
+    fields = [Viz_Tree_Child.Value "name" (Viz_Tree.from that.name) ".name", Viz_Tree_Child.Value "age" (Viz_Tree.from that.age) ".age"]
+    Viz_Tree.paged "object" fields.length ("Person " + that.name) start-> end-> fields.slice start end
 
 ## The keys of one page of `tree`.
 keys_of tree start=0 count=100 = tree.children start count . map .key
@@ -117,6 +127,59 @@ add_specs suite_builder =
             (tree.child 250) . should_fail_with Illegal_Argument
             (tree.child "x") . should_fail_with Illegal_Argument
             ((Viz_Tree.from 1).child 0) . should_fail_with Illegal_Argument
+
+    suite_builder.group "Tree.prepare and Tree.children" group_builder->
+        value = Json.parse '{"name":"John","tags":["a","b"],"address":{"city":"Leeds"}}'
+        keys_in json = json.get "entries" . map (e-> e.get "key")
+        values_in json = json.get "entries" . map (e-> e.get "value")
+
+        group_builder.specify "prepare sends the root and its first page" <|
+            json = Json.parse (Tree.prepare value)
+            json.get "root" . get "kind" . should_equal "object"
+            json.get "root" . get "label" . should_equal "{3 keys}"
+            keys_in (json.get "children") . should_equal ["name", "tags", "address"]
+
+        group_builder.specify "prepare of a scalar is a leaf with no children" <|
+            json = Json.parse (Tree.prepare 42)
+            json.get "root" . get "value" . should_equal 42
+            json.contains_key "children" . should_be_false
+
+        group_builder.specify "prepare sends at most one page" <|
+            json = Json.parse (Tree.prepare (0.up_to 1000 . to_vector))
+            json.get "root" . get "size" . should_equal 1000
+            (json.get "children" . get "entries").length . should_equal 100
+
+        group_builder.specify "children walks a path of keys and indices" <|
+            page = Json.parse (Tree.children value ["tags"] 1 100)
+            page.get "start" . should_equal 1
+            page.get "size" . should_equal 2
+            values_in page . should_equal ["b"]
+            values_in (Json.parse (Tree.children [[1, [2, 3]]] [0, 1] 0 100)) . should_equal [2, 3]
+
+        group_builder.specify "children walks through a Dictionary" <|
+            values_in (Json.parse (Tree.children (Dictionary.from_vector [["k", [7, 8]]]) ["k"] 0 100)) . should_equal [7, 8]
+
+        group_builder.specify "a start past the end is an empty page" <|
+            page = Json.parse (Tree.children value ["tags"] 5 100)
+            page.get "entries" . should_equal []
+
+        group_builder.specify "a missing key, a leaf, or a negative start is an error message" <|
+            (Json.parse (Tree.children value ["nope"] 0 100)).get "error" . should_contain "nope"
+            (Json.parse (Tree.children value ["name"] 0 100)).get "error" . should_contain "leaf"
+            (Json.parse (Tree.children value ["name", 0] 0 100)).get "error" . should_contain "0"
+            (Json.parse (Tree.children value ["tags"] (-1) 100)).get "error" . should_contain "negative"
+
+        group_builder.specify "a dataflow error shows its payload" <|
+            json = Json.parse (Tree.prepare (Error.throw (Illegal_Argument.Error "boom")))
+            keys_in (json.get "children") . should_contain "message"
+
+        group_builder.specify "a user type's own conversion picks its children, label and node expressions" <|
+            tree = Viz_Tree.from (Person.Value "Ann" 41)
+            tree.label . should_equal "Person Ann"
+            keys_of tree . should_equal ["name", "age"]
+            exprs_of tree . should_equal [".name", ".age"]
+            page = Json.parse (Tree.children [Person.Value "Ann" 41] [0] 0 100)
+            page.get "entries" . map (e-> e.get "expr") . should_equal [".name", ".age"]
 
 main filter=Nothing =
     suite = Test.build suite_builder->
