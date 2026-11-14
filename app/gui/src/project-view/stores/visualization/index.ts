@@ -1,5 +1,6 @@
 import type { ProjectStore } from '$/providers/openedProjects/project'
 import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegistry'
+import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import * as geoMapVisualization from '@/components/visualizations/GeoMapVisualization.vue'
 import * as imageBase64Visualization from '@/components/visualizations/ImageBase64Visualization.vue'
 import * as jsonVisualization from '@/components/visualizations/JSONVisualization'
@@ -18,12 +19,12 @@ import {
   fromVisualizationId,
   toVisualizationId,
   VisualizationMetadataDb,
+  visualizationsForTypes,
   type VisualizationId,
 } from '@/stores/visualization/metadata'
 import type { VisualizationModule } from '@/stores/visualization/runtimeTypes'
 import type { Opt } from '@/util/data/opt'
 import { isUrlString } from '@/util/data/urlString'
-import { ANY_TYPE_QN } from '@/util/ensoTypes'
 import { isIconName } from '@/util/iconMetadata/iconName'
 import { computed, reactive } from 'vue'
 import { ErrorCode, LsRpcError, RemoteRpcError } from 'ydoc-shared/languageServer'
@@ -78,7 +79,7 @@ const builtinVisualizationsByName = Object.fromEntries(
 
 export const [provideVisualizationStore, useVisualizationStore] = createContextStore(
   'visualization',
-  (proj: ProjectStore) => {
+  (proj: ProjectStore, suggestionDb?: SuggestionDb) => {
     const cache = reactive(new Map<VisualizationId, Promise<VisualizationModule>>())
     /**
      * A map from file path to {@link AbortController}, so that a file change event can stop previous
@@ -93,10 +94,11 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
     const metadata = new VisualizationMetadataDb()
     const projectRoot = proj.projectRootId
 
-    for (const { name, inputType, icon } of builtinVisualizations) {
+    for (const { name, inputType, dataType, icon } of builtinVisualizations) {
       metadata.set(toVisualizationId({ module: { kind: 'Builtin' }, name }), {
         name,
         inputType,
+        dataType,
         icon,
       })
     }
@@ -186,6 +188,7 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
             metadata.set(toVisualizationId(id), {
               name: viz.name,
               inputType: viz.inputType,
+              dataType: viz.dataType,
               icon: viz.icon,
             })
           } catch (error) {
@@ -247,12 +250,11 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
       const vizzes =
         types.length === 0 ?
           metadata.keys()
-        : new Set([
-            ...types.flatMap((type) => [
-              ...(metadata.visualizationIdToType.reverseLookup(type.key()) ?? []),
-            ]),
-            ...(metadata.visualizationIdToType.reverseLookup(ANY_TYPE_QN) ?? []),
-          ])
+        : visualizationsForTypes(
+            metadata,
+            types.map((type) => type.key()),
+            (target) => suggestionDb?.conversionSources.lookup(target),
+          )
       for (const viz of vizzes) yield fromVisualizationId(viz)
     }
 

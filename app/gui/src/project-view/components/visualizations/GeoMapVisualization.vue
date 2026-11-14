@@ -1,7 +1,7 @@
 <script lang="ts">
 export const name = 'Geo Map'
 export const icon = 'compass'
-export const inputType = 'Standard.Table.Table.Table'
+export const dataType = 'Standard.Visualization.Viz_Table.Viz_Table'
 export const defaultPreprocessor = [
   'Standard.Visualization.Geo_Map',
   'process_to_json_text',

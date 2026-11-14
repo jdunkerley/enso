@@ -12,8 +12,7 @@ import type { ToolbarItem } from './toolbar'
 
 export const name = 'Scatter Plot'
 export const icon = 'points'
-export const inputType =
-  'Standard.Table.Table.Table | Standard.Table.Column.Column | Standard.Base.Data.Vector.Vector'
+export const dataType = 'Standard.Visualization.Viz_Table.Viz_Table'
 
 // The number of points to display by default.
 const DEFAULT_LIMIT = 15000
