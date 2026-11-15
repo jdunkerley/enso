@@ -55,7 +55,7 @@ function isValidDate({ year, month, day }: YearMonthDay): boolean {
 
 /**
  * The choice that the code stands for, or `undefined` when the code is not one of the four shapes:
- * `Date.today`, `Date.today.previous`, `Date.today.next` and `Date.new <year> <month> <day>`, with
+ * `Date.today`, `Date.yesterday`, `Date.tomorrow` and `Date.new <year> <month> <day>`, with
  * three integer literals that make a real date (year 100 to 9999). Anything else (a variable, a computed argument, an
  * impossible date such as `Date.new 2020 2 30`) is not ours.
  */
@@ -65,9 +65,9 @@ export function parseDateExpression(code: string | undefined): DateChoice | unde
   switch (text) {
     case 'Date.today':
       return { kind: 'today' }
-    case 'Date.today.previous':
+    case 'Date.yesterday':
       return { kind: 'yesterday' }
-    case 'Date.today.next':
+    case 'Date.tomorrow':
       return { kind: 'tomorrow' }
   }
   const match = DATE_NEW.exec(text)
@@ -82,9 +82,9 @@ export function dateExpressionCode(choice: DateChoice): string {
     case 'today':
       return 'Date.today'
     case 'yesterday':
-      return 'Date.today.previous'
+      return 'Date.yesterday'
     case 'tomorrow':
-      return 'Date.today.next'
+      return 'Date.tomorrow'
     case 'date':
       return `Date.new ${choice.year} ${choice.month} ${choice.day}`
   }

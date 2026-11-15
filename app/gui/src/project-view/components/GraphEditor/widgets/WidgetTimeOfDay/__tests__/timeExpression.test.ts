@@ -10,8 +10,6 @@ import {
 describe('parseTimeExpression', () => {
   test.each([
     ['Time_Of_Day.now', { kind: 'now' }],
-    ['Time_Of_Day.new', { kind: 'time', hour: 0, minute: 0, second: 0 }],
-    ['Time_Of_Day.new 14', { kind: 'time', hour: 14, minute: 0, second: 0 }],
     ['Time_Of_Day.new 14 30', { kind: 'time', hour: 14, minute: 30, second: 0 }],
     ['Time_Of_Day.new 14 30 15', { kind: 'time', hour: 14, minute: 30, second: 15 }],
     ['  Time_Of_Day.new   23  59  59 ', { kind: 'time', hour: 23, minute: 59, second: 59 }],
@@ -23,6 +21,8 @@ describe('parseTimeExpression', () => {
   test.each([
     undefined,
     '',
+    'Time_Of_Day.new',
+    'Time_Of_Day.new 14',
     'time1',
     'Time_Of_Day.new 24',
     'Time_Of_Day.new 14 60',

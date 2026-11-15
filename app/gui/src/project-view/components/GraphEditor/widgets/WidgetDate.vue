@@ -38,12 +38,20 @@ const dateImport = computed(() =>
 
 const choice = computed(() => parseDateExpression(WidgetInput.valueRepr(props.input)))
 const label = computed(() => (choice.value ? dateLabel(choice.value) : 'Pick a date'))
+/** An unset argument is drawn dimmed, as other widgets draw a default; its label is the default's. */
+const dimmed = computed(() => choice.value == null || WidgetInput.isPlaceholder(props.input))
+/** A default that is not one of the shapes (`Nothing`) is shown beside `Pick a date`, as code. */
+const hint = computed(() =>
+  choice.value == null && WidgetInput.isPlaceholder(props.input) ?
+    WidgetInput.valueRepr(props.input)
+  : undefined,
+)
 
 /** One choice is one edit, so one undo step: the import and the new code go in together. */
 function choose(picked: DateChoice, done: () => void) {
   module.value.edit((edit) => {
     module.value.addMissingImports(edit, dateImport.value)
-    const value = codeToWrite(picked, props.input.value)
+    const value = codeToWrite(picked, props.input.value, props.input.portId)
     return props.updateCallback({
       edit,
       portUpdate: { origin: props.input.portId, value },
@@ -56,9 +64,13 @@ function choose(picked: DateChoice, done: () => void) {
 
 <script lang="ts">
 /** The code a choice writes: `Date.new 2020 1 15` is an application, so it may need parentheses. */
-function codeToWrite(choice: DateChoice, current: WidgetInput['value']): string {
+function codeToWrite(
+  choice: DateChoice,
+  current: WidgetInput['value'],
+  portId: WidgetInput['portId'],
+): string {
   const code = dateExpressionCode(choice)
-  return choice.kind === 'date' ? parenthesisedApplication(code, current) : code
+  return choice.kind === 'date' ? parenthesisedApplication(code, current, portId) : code
 }
 
 function isDateTyped(input: WidgetInput): boolean {
@@ -95,7 +107,13 @@ export const widgetDefinition = defineWidget(
 </script>
 
 <template>
-  <ChipMenuShell class="WidgetDate" :widget="props" :label="label" :placeholder="choice == null">
+  <ChipMenuShell
+    class="WidgetDate"
+    :widget="props"
+    :label="label"
+    :placeholder="dimmed"
+    :hint="hint"
+  >
     <template #menu="{ close, done }">
       <DateMenu :choice="choice" @choose="choose($event, done)" @close="close" />
     </template>

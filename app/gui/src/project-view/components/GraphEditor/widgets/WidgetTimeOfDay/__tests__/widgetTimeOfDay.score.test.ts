@@ -36,15 +36,12 @@ const typedArgument = (reprType: string | undefined) =>
   }) as Partial<WidgetInput>
 
 describe('the time-of-day widget scores', () => {
-  test.each([
-    'Time_Of_Day.now',
-    'Time_Of_Day.new',
-    'Time_Of_Day.new 14',
-    'Time_Of_Day.new 14 30',
-    'Time_Of_Day.new 14 30 15',
-  ])('%s Perfect', (code) => {
-    expect(score(inputFor(code))).toBe(Score.Perfect)
-  })
+  test.each(['Time_Of_Day.now', 'Time_Of_Day.new 14 30', 'Time_Of_Day.new 14 30 15'])(
+    '%s Perfect',
+    (code) => {
+      expect(score(inputFor(code))).toBe(Score.Perfect)
+    },
+  )
 
   test('a Time_Of_Day-typed placeholder Perfect, by reprType or expected type', () => {
     expect(score(placeholder(typedArgument(TIME_OF_DAY_TYPE)))).toBe(Score.Perfect)
@@ -58,6 +55,8 @@ describe('the time-of-day widget scores', () => {
   test.each([
     'time1',
     'Time_Of_Day.new 24',
+    'Time_Of_Day.new',
+    'Time_Of_Day.new 14',
     'Time_Of_Day.new 14 30 15 7',
     'Time_Of_Day.new hour=14',
     'Time_Of_Day.new h 30',
@@ -85,8 +84,10 @@ describe('the time-of-day widget scores', () => {
     // `Time_Of_Day.now` here is the call's target; only the whole expression would be a value.
     expect(score(inputFor('Time_Of_Day.now.add_hours 3', 'Time_Of_Day.now'))).toBe(Score.Mismatch)
     expect(score(inputFor('Time_Of_Day.now + x', 'Time_Of_Day.now'))).toBe(Score.Mismatch)
-    // The inner application of `Time_Of_Day.new 14 30` is its callee, not a value.
-    expect(score(inputFor('Time_Of_Day.new 14 30', 'Time_Of_Day.new 14'))).toBe(Score.Mismatch)
+    // The inner application of `Time_Of_Day.new 14 30 15` is its callee, not a value.
+    expect(score(inputFor('Time_Of_Day.new 14 30 15', 'Time_Of_Day.new 14 30'))).toBe(
+      Score.Mismatch,
+    )
   })
 })
 

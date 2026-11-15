@@ -13,8 +13,8 @@ import {
 describe('parseDateExpression', () => {
   test.each([
     ['Date.today', { kind: 'today' }],
-    ['Date.today.previous', { kind: 'yesterday' }],
-    ['Date.today.next', { kind: 'tomorrow' }],
+    ['Date.yesterday', { kind: 'yesterday' }],
+    ['Date.tomorrow', { kind: 'tomorrow' }],
     ['Date.new 2020 1 15', { kind: 'date', year: 2020, month: 1, day: 15 }],
     ['  Date.new 2024  2   29 ', { kind: 'date', year: 2024, month: 2, day: 29 }],
   ] satisfies [string, DateChoice][])('%j is a date choice', (code, expected) => {
@@ -25,7 +25,9 @@ describe('parseDateExpression', () => {
     undefined,
     '',
     'date1',
-    'Date.today.previous ..Week',
+    'Date.yesterday ..Week',
+    'Date.today.previous',
+    'Date.today.next',
     'Date.today.add_days 3',
     'Date.new',
     'Date.new 2020',
@@ -55,8 +57,8 @@ describe('parseDateExpression', () => {
 describe('dateExpressionCode', () => {
   test.each([
     [{ kind: 'today' }, 'Date.today'],
-    [{ kind: 'yesterday' }, 'Date.today.previous'],
-    [{ kind: 'tomorrow' }, 'Date.today.next'],
+    [{ kind: 'yesterday' }, 'Date.yesterday'],
+    [{ kind: 'tomorrow' }, 'Date.tomorrow'],
     [{ kind: 'date', year: 2020, month: 1, day: 15 }, 'Date.new 2020 1 15'],
   ] satisfies [DateChoice, string][])('%j writes %s', (choice, code) => {
     expect(dateExpressionCode(choice)).toBe(code)

@@ -57,23 +57,36 @@ is already on the row, drawn by `WidgetIcon` at the root.
   inline icon in front of a child widget.
 - `WidgetDate.vue` — a chip (`Today`, `Yesterday`, `Tomorrow`, `2020-01-15`, or
   `Pick a date`) for a `Date`-typed argument or item and for the four shapes
-  `Date.today`, `Date.today.previous`, `Date.today.next` and
-  `Date.new <y> <m> <d>`, with a menu (`WidgetDate/DateMenu.vue`: the three
-  relative days, then a Reka calendar). Priority 140: after
-  `WidgetArgumentName`, before `WidgetFunction`; its comment explains it.
-  `WidgetDate/dateExpression.ts` is the framework-free expression <-> label
-  mapping. A specific date is written parenthesised (`(Date.new 2020 1 15)`)
-  wherever it becomes an argument: an unparenthesised application written as a
-  string splits into one group per argument. Design:
+  `Date.today`, `Date.yesterday`, `Date.tomorrow` and `Date.new <y> <m> <d>`,
+  with a menu (`WidgetDate/DateMenu.vue`: the three relative days, then a Reka
+  calendar). Priority 140: after `WidgetArgumentName`, before `WidgetFunction`;
+  its comment explains it. `WidgetDate/dateExpression.ts` is the framework-free
+  expression <-> label mapping. **A whole node is never a chip**
+  (`date1 = Date.new 2020 1 15` keeps `WidgetFunction`'s fields, whose ports an
+  edge can reach): `isPickableShape` scores `Mismatch` for a shape that is a
+  node's expression. A specific date is written parenthesised
+  (`(Date.new 2020 1 15)`) wherever it becomes an argument: an unparenthesised
+  application written as a string splits into one group per argument. The
+  decision is made on the AST the _port_ names
+  (`parenthesisedApplication(code, value, portId)`), not on the value's parent:
+  `WidgetGroup` hands the chip its inner expression with the Group's port, so
+  the write replaces the parentheses too. Only a node's expression and a vector
+  item are written bare. An unset argument whose default is a shape shows the
+  chip dimmed with the default's label; any other default shows after
+  `Pick a date`, dimmed. The chip's accessible name is `name: label`. Design:
   `docs/superpowers/specs/2026-11-15-date-widget-design.md`.
 - `WidgetTimeOfDay.vue` — the same chip for a `Time_Of_Day`-typed argument or
-  item and for `Time_Of_Day.now` (`Now`) and `Time_Of_Day.new` with 0 to 3
-  integer literals (`14:30`, `14:30:15`, or `Pick a time`). Its menu
+  item and for `Time_Of_Day.now` (`Now`) and `Time_Of_Day.new` with 2 or 3
+  integer literals (`14:30`, `14:30:15`, or `Pick a time`); `Time_Of_Day.new`
+  and `Time_Of_Day.new 14` stay `WidgetFunction`'s, as a chip would hide the
+  placeholders of the arguments left out. Its menu
   (`WidgetTimeOfDay/TimeOfDayMenu.vue`) is `Now` and a Reka `TimeField` (hours
-  and minutes, seconds on request, written only when not zero): Enter or leaving
-  the field writes it, Escape does not. `timeExpression.ts` is the mapping. The
-  chip, its floating menu and the interaction are
-  `WidgetChip/ChipMenuShell.vue`, the menu frame is
+  and minutes, seconds on request, written only when not zero): Enter in the
+  field, leaving it or a click outside the menu writes it (the shell calls the
+  handler the menu registers with `setAccept` before it ends the interaction),
+  Escape and the chip's toggle do not. A cleared segment blocks the write until
+  it is filled in. `timeExpression.ts` is the mapping. The chip, its floating
+  menu and the interaction are `WidgetChip/ChipMenuShell.vue`, the menu frame is
   `WidgetChip/ChipMenuFrame.vue` and the "is this a value to pick" and
   parenthesising rules are `WidgetChip/shape.ts`, all shared with `WidgetDate`.
   Same priority (140) and rules.

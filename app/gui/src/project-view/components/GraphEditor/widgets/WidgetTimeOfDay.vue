@@ -41,13 +41,24 @@ const timeImport = computed(() =>
 
 const choice = computed(() => parseTimeExpression(WidgetInput.valueRepr(props.input)))
 const label = computed(() => (choice.value ? timeLabel(choice.value) : 'Pick a time'))
+/** An unset argument is drawn dimmed, as other widgets draw a default; its label is the default's. */
+const dimmed = computed(() => choice.value == null || WidgetInput.isPlaceholder(props.input))
+/** A default that is not one of the shapes (`Nothing`) is shown beside `Pick a time`, as code. */
+const hint = computed(() =>
+  choice.value == null && WidgetInput.isPlaceholder(props.input) ?
+    WidgetInput.valueRepr(props.input)
+  : undefined,
+)
 
 /** One choice is one edit, so one undo step: the import and the new code go in together. */
 function choose(picked: TimeChoice, done: () => void) {
   module.value.edit((edit) => {
     module.value.addMissingImports(edit, timeImport.value)
     const code = timeExpressionCode(picked)
-    const value = picked.kind === 'time' ? parenthesisedApplication(code, props.input.value) : code
+    const value =
+      picked.kind === 'time' ?
+        parenthesisedApplication(code, props.input.value, props.input.portId)
+      : code
     return props.updateCallback({
       edit,
       portUpdate: { origin: props.input.portId, value },
@@ -72,7 +83,7 @@ function isTimeTyped(input: WidgetInput): boolean {
  * would otherwise take `Time_Of_Day.new 14 30` as a call with number fields, and before the text and
  * number widgets (1001). `WidgetSelection` (50) and `WidgetFileBrowser` (49) come first.
  *
- * The score is `Perfect` for the shapes (`Time_Of_Day.now`, `Time_Of_Day.new` with up to three
+ * The score is `Perfect` for the shapes (`Time_Of_Day.now`, `Time_Of_Day.new` with two or three
  * integer literals) and for an unset Time_Of_Day-typed argument, and `Mismatch` for everything else.
  */
 export const widgetDefinition = defineWidget(
@@ -97,10 +108,16 @@ export const widgetDefinition = defineWidget(
     class="WidgetTimeOfDay"
     :widget="props"
     :label="label"
-    :placeholder="choice == null"
+    :placeholder="dimmed"
+    :hint="hint"
   >
-    <template #menu="{ close, done }">
-      <TimeOfDayMenu :choice="choice" @choose="choose($event, done)" @close="close" />
+    <template #menu="{ close, done, setAccept }">
+      <TimeOfDayMenu
+        :choice="choice"
+        :registerAccept="setAccept"
+        @choose="choose($event, done)"
+        @close="close"
+      />
     </template>
   </ChipMenuShell>
 </template>

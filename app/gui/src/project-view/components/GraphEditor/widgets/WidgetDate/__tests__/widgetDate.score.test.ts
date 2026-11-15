@@ -36,7 +36,7 @@ const typedArgument = (reprType: string | undefined) =>
   }) as Partial<WidgetInput>
 
 describe('the date widget scores', () => {
-  test.each(['Date.today', 'Date.today.previous', 'Date.today.next', 'Date.new 2020 1 15'])(
+  test.each(['Date.today', 'Date.yesterday', 'Date.tomorrow', 'Date.new 2020 1 15'])(
     '%s Perfect',
     (code) => {
       expect(score(inputFor(code))).toBe(Score.Perfect)

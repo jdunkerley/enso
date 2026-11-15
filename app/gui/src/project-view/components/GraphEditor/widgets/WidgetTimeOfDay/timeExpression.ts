@@ -17,8 +17,8 @@ export interface HourMinuteSecond {
 /** What the chip stands for: the current time, or a specific one. */
 export type TimeChoice = { readonly kind: 'now' } | ({ readonly kind: 'time' } & HourMinuteSecond)
 
-/** `Time_Of_Day.new` and up to three integer literals: hour, minute, second. */
-const TIME_NEW = /^Time_Of_Day\.new((?:\s+\d+){0,3})$/
+/** `Time_Of_Day.new` and two or three integer literals: hour, minute, second. */
+const TIME_NEW = /^Time_Of_Day\.new((?:\s+\d+){2,3})$/
 
 function isValidTime({ hour, minute, second }: HourMinuteSecond): boolean {
   return (
@@ -34,7 +34,7 @@ function isValidTime({ hour, minute, second }: HourMinuteSecond): boolean {
 
 /**
  * The choice that the code stands for, or `undefined` when the code is not one of the shapes:
- * `Time_Of_Day.now` and `Time_Of_Day.new` with zero to three integer literals (hour, minute,
+ * `Time_Of_Day.now` and `Time_Of_Day.new` with two or three integer literals (hour, minute,
  * second; the ones left out are zero). Anything else (a variable, a computed argument, a named
  * argument such as `hour=14`, an hour of 24) is not ours.
  */
