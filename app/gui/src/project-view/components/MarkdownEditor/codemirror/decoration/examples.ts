@@ -3,16 +3,17 @@ import { syntaxTree } from '@codemirror/language'
 import { type EditorState, type Extension, type Range, StateField } from '@codemirror/state'
 import { Decoration, type DecorationSet, EditorView, WidgetType } from '@codemirror/view'
 
-/** The fenced code blocks under a `## Examples` heading (until the next `##`). */
-export function exampleBlocks(state: EditorState): { from: number; code: string }[] {
-  const blocks: { from: number; code: string }[] = []
+/** The fenced code blocks under a `## Examples` heading (until the next `##`): where each starts and ends, and its code. */
+export function exampleBlocks(state: EditorState): { from: number; to: number; code: string }[] {
+  const blocks: { from: number; to: number; code: string }[] = []
   let inExamples = false
   for (let node = syntaxTree(state).topNode.firstChild; node; node = node.nextSibling) {
     if (node.name === 'ATXHeading2') {
       inExamples = /^##\s*Examples\s*$/.test(state.sliceDoc(node.from, node.to))
     } else if (inExamples && node.name === 'FencedCode') {
       const text = node.getChild('CodeText')
-      if (text) blocks.push({ from: node.from, code: state.sliceDoc(text.from, text.to) })
+      if (text)
+        blocks.push({ from: node.from, to: node.to, code: state.sliceDoc(text.from, text.to) })
     }
   }
   return blocks
@@ -58,7 +59,7 @@ function decorations(state: EditorState, onCopy: (code: string) => void): Decora
       )
     }
     const first = state.doc.lineAt(block.from).number
-    const last = state.doc.lineAt(block.from + block.code.length + 4).number
+    const last = state.doc.lineAt(block.to).number
     for (let n = first; n <= last; n++) {
       const line = state.doc.line(n)
       if (RESULT_LINE.test(line.text))

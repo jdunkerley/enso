@@ -47,3 +47,35 @@ test('a Copy button per example, which copies that example', () => {
   expect(view.dom.querySelectorAll('.cm-exampleResult')).toHaveLength(1)
   view.destroy()
 })
+
+const MIXED = [
+  '## Examples',
+  '```',
+  'a = 1',
+  '```',
+  '```',
+  'x = = 1',
+  '# → 1',
+  '```',
+  '```enso',
+  'b = 2',
+  '# → 2',
+  '```',
+].join('\n')
+
+test('an example that does not parse gets no Copy button but keeps its result style', () => {
+  const copied: string[] = []
+  const view = new EditorView({
+    state: EditorState.create({
+      doc: MIXED,
+      extensions: [markdown(), exampleDecoratorExt((c) => copied.push(c))],
+    }),
+  })
+  const buttons = view.dom.querySelectorAll('.cm-exampleCopy')
+  expect(buttons).toHaveLength(2)
+  for (const b of buttons) (b as HTMLButtonElement).click()
+  expect(copied).toEqual(['a = 1', 'b = 2\n# → 2'])
+  // The unparseable block's line and the language-tagged block's line.
+  expect(view.dom.querySelectorAll('.cm-exampleResult')).toHaveLength(2)
+  view.destroy()
+})
