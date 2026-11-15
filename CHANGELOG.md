@@ -4,7 +4,7 @@
 
 - [Agents connected over MCP can create and open projects and add, edit, remove
   and group nodes; each run of changes is one undo step. Settings → AI can also
-  set up Claude Desktop.][784]
+  set up Claude Desktop.][790]
 - [External agent apps (Claude Code, Codex, GitHub Copilot) can connect to the
   IDE over MCP and read the open project. Turn it on in Settings → AI.][782]
 - [The help panel shows each argument's type, default, widget and description in
@@ -509,7 +509,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[784]: https://github.com/jdunkerley/enso/pull/784
+[790]: https://github.com/jdunkerley/enso/pull/790
 [782]: https://github.com/jdunkerley/enso/pull/782
 [788]: https://github.com/jdunkerley/enso/pull/788
 [771]: https://github.com/jdunkerley/enso/pull/771
