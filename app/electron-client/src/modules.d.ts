@@ -4,6 +4,12 @@
  * This file MUST NOT `export {}` so that the modules are visible to other files.
  */
 
+/** Markdown files are bundled as their text (esbuild `loader`, and a Vitest plugin). */
+declare module '*.md' {
+  const text: string
+  export default text
+}
+
 declare module 'create-servers' {
   import type * as http from 'node:http'
   import type * as https from 'node:https'
