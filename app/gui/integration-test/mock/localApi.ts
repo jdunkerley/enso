@@ -40,6 +40,7 @@ import {
   type VersioningMockContext,
 } from './localVersioning'
 import {
+  clearMockExecutionContexts,
   clearPreprocessorOverrides,
   mockDataHandler,
   mockLSHandler,
@@ -135,6 +136,7 @@ export async function mockLocalApi(page: Page) {
   // `clearMockWidgetConfigurations()` before the fixture runs; resetting to
   // the initial set here would undo that.
   clearPreprocessorOverrides()
+  clearMockExecutionContexts()
   resetMockYdocServer()
 
   const fileSystem = new Map<string, FileSystemEntryWithData>()

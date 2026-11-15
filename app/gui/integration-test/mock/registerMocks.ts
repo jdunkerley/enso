@@ -229,9 +229,37 @@ async function mockElectronApi(
                   error: null,
                   lockedByEnvironment: false,
                 }
+              // A spec delivers a tool call as main would, and awaits the window's reply:
+              // `window.__mcpCall(tool, args, caller?)` resolves with the `McpToolResult`.
+              type Reply = { requestId: string; result: unknown }
+              type Request = { requestId: string; tool: string; args: unknown; caller: unknown }
+              let toolCallHandler: ((request: Request) => void) | undefined
+              const pendingReplies = new Map<string, (result: unknown) => void>()
+              let nextRequest = 0
+              ;(window as unknown as { __mcpCall: unknown }).__mcpCall = (
+                tool: string,
+                args: unknown,
+                caller: unknown = { kind: 'external', name: 'claude-code' },
+              ): Promise<unknown> => {
+                const handler = toolCallHandler
+                if (handler == null) return Promise.reject(new Error('No MCP tool dispatcher'))
+                const requestId = `mock-${++nextRequest}`
+                return new Promise((resolve) => {
+                  pendingReplies.set(requestId, resolve)
+                  handler({ requestId, tool, args, caller })
+                })
+              }
               return {
-                onToolCall: (): (() => void) => () => {},
-                replyToolCall: (): void => {},
+                onToolCall: (handler: (request: Request) => void): (() => void) => {
+                  toolCallHandler = handler
+                  return () => {
+                    if (toolCallHandler === handler) toolCallHandler = undefined
+                  }
+                },
+                replyToolCall: (reply: Reply): void => {
+                  pendingReplies.get(reply.requestId)?.(reply.result)
+                  pendingReplies.delete(reply.requestId)
+                },
                 status: async (): Promise<Status> => current(),
                 onStatusChanged: (): (() => void) => () => {},
                 setEnabled: async (enabled: boolean): Promise<Status> => {

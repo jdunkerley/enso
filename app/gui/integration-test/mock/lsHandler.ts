@@ -502,6 +502,32 @@ function mockWidgetConfiguration(method: string | undefined) {
   return mockWidgetConfigurations.get(method) ?? null
 }
 
+/** The execution contexts created on the open pages, each with the channel that notifies it. */
+const executionContexts = new Map<
+  ContextId,
+  (message: { method: string; params: object }) => void
+>()
+
+/**
+ * Sends `executionComplete` for every execution context, as the engine does when an execution
+ * ends. The mock never executes on its own after an edit: a spec that waits for an execution calls
+ * this.
+ */
+export function mockExecutionComplete() {
+  for (const [contextId, sendMessage] of executionContexts) {
+    try {
+      sendMessage({ method: 'executionContext/executionComplete', params: { contextId } })
+    } catch {
+      executionContexts.delete(contextId)
+    }
+  }
+}
+
+/** Forgets the execution contexts of an earlier test's page. */
+export function clearMockExecutionContexts() {
+  executionContexts.clear()
+}
+
 export const mockLSHandler = async (
   method: string,
   params: object,
@@ -517,6 +543,7 @@ export const mockLSHandler = async (
       const data_ = params as {
         contextId: ContextId
       }
+      executionContexts.set(data_.contextId, sendMessage)
       setTimeout(
         () =>
           sendMessage({
