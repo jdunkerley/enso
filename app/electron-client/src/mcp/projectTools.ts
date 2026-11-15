@@ -95,7 +95,10 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'expressions that may produce a DataflowError wrap with ' +
         '`.catch_primitive (e -> e.to_display_text)` so the result is still Text. ' +
         'Returns the text the expression produced, or an error string if the scope is ' +
-        'unavailable or evaluation fails. Runs in the Design environment: it cannot write files.',
+        'unavailable or evaluation fails. Runs only in the Design environment, where output is ' +
+        'off: nothing is written to the file, database or service an expression names. A write ' +
+        'that supports a dry run writes to a temporary file instead and returns that ' +
+        "file's path; other writes fail. When the project is in Live mode the tool is refused.",
       inputSchema: {
         expression: z.string().max(EXPRESSION_CHARS),
         node_id: z.string().max(NAME_CHARS).optional(),

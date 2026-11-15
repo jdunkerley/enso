@@ -2,9 +2,9 @@
 
 An Enso project is a graph. Each node is an Enso expression bound to a name, and
 the connections between nodes are the names one expression uses from another.
-The tools here read the project that is open in the IDE. They are read-only:
-none of them changes the project, the execution environment, settings or
-secrets.
+The tools here read the project that is open in the IDE. None of these tools
+edits the project or changes its execution environment, settings or secrets;
+`evaluate_expression` runs code, but only in the Design environment.
 
 ## How to work
 
@@ -38,7 +38,12 @@ Examples, with `table` standing for a binding in scope:
   expression may produce a DataflowError; otherwise the call returns the error
   wrapped in a hint rather than the value.
 
-Evaluation runs in the Design environment, which cannot write files.
+Evaluation runs only in the Design environment, where output is off: an
+expression never writes to the file, database or service it names. A write that
+supports a dry run (such as `.write` on Text or a Table) writes to a temporary
+file instead and returns that file's path; other writes fail. While the user has
+the project in Live mode, `evaluate_expression` is refused. Do not use it to
+save data.
 
 ## Cap reads at the lowest layer
 
@@ -49,8 +54,8 @@ reader or the SQL itself when you only want to look at the data.
 
 - CSV / TSV: `Data.read "<path>" (..Delimited row_limit=(..First 100))`. The
   parser stops at row 100.
-- Excel: see the `row_limit` parameter on the Sheet and Range constructors in
-  `Excel/0.0.0-dev/src/Excel_Format.enso` (read the `library/Excel` guide).
+- Excel: `Data.read "<path>" (..Sheet 1 row_limit=(..First 100))` (the `Range`
+  constructor takes `row_limit` too; `get_component_docs` has both).
 - Database table: `.limit N` is pushed down until `.read`:
   `connection.query "MyTable" . limit 100`. Do not pull the whole table and then
   `.take`.

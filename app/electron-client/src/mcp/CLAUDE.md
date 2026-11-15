@@ -2,15 +2,19 @@
 
 The IDE's MCP server for external agent apps (Claude Code, Codex, GitHub
 Copilot): with it turned on, an agent the user has pointed at it can read the
-project open in the IDE. It is off by default. The tools are read-only: none
-changes the project, the execution environment, settings or secrets.
+project open in the IDE. It is off by default. No tool edits the project or
+changes the execution environment, settings or secrets.
 
 ## The parts
 
 - `toolRegistry.ts` — `ToolRegistry`: every tool's name, title, description and
   zod argument schema. `call` validates the arguments strictly (unknown keys are
   refused) and never throws: an unknown tool, bad arguments or a throwing tool
-  give `{ ok: false, error }`.
+  give `{ ok: false, error }`. Over HTTP the SDK validates first, against
+  `z.object(inputSchema)`, and passes the tool the parsed data, so unknown keys
+  are stripped before the registry sees them (`McpServer.validateToolInput` in
+  `@modelcontextprotocol/sdk` 1.30; `mcpServer.test.ts` checks it). The
+  registry's strict check binds callers that do not go through the SDK.
 - `projectTools.ts` — the definitions of the five project tools (`get_graph`,
   `get_node`, `search_components`, `get_component_docs`, `evaluate_expression`).
   Each only forwards its arguments to the window.
@@ -124,14 +128,14 @@ evaluation does not interrupt the execution context on timeout;
 `evaluate_expression` does (25 s). The window bridge gives up after 30 s.
 Details in `app/gui/src/project-view/mcp/CLAUDE.md`.
 
-`evaluate_expression` runs in the Design environment, where the output context
-is off, so an expression cannot write to the path it names; `tests/mcp.spec.ts`
-checks that against the packaged app. It is not a guarantee that nothing is
-written: as anywhere in the Design environment, the standard library's dry run
-writes the data to a temporary file instead (`<name>_ensodryrun<digits>.<ext>`
-in the system temporary directory) and returns that file's path. The tool
-description and `guides/overview.md` say "cannot write files", which is true of
-the named path only.
+`evaluate_expression` runs only in the Design environment: the window refuses it
+while the project is in Live mode, because an evaluation runs in the execution
+context's environment. In Design the output context is off, so an expression
+cannot write to the path it names (`tests/mcp.spec.ts` checks this against the
+packaged app). Writes that support a dry run still write their data to a
+temporary file (`<name>_ensodryrun<digits>.<ext>` in the system temporary
+directory) and return its path; the tool description and `guides/overview.md`
+say so. This prevents accidental writes; it is not a sandbox.
 
 ## Not the AI mode's server
 
@@ -148,5 +152,9 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   `mcpClientConfigs.test.ts`.
 - `tests/mcp.spec.ts` — the packaged app: an SDK client lists the six tools,
   reads the guide and the graph of a new project, searches components,
-  evaluates, checks that an evaluation does not write the file it names, and
-  that a request without the token is `401`.
+  evaluates, checks that an evaluation does not write the file it names (the
+  answer names the dry-run file, which the test deletes), and that a request
+  without the token is `401`. It cannot check the Live-mode refusal: nothing in
+  the UI switches a project to Live (the project's `executionMode` setting is
+  only read from its settings), so `app/gui/src/project-view/mcp/__tests__/`
+  covers that.

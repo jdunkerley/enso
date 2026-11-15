@@ -3,7 +3,7 @@
 #### Enso IDE
 
 - [External agent apps (Claude Code, Codex, GitHub Copilot) can connect to the
-  IDE over MCP and read the open project][776]
+  IDE over MCP and read the open project. Turn it on in Settings → AI.][776]
 - [A component whose value is an image opens in the Image visualization.][758]
 - [Charts are offered for every value whose library can draw them, not a fixed
   list of types.][751]

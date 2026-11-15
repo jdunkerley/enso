@@ -199,6 +199,17 @@ describe('McpHttpServer', () => {
     expect(callers).toEqual([{ kind: 'external', name: 'test-agent' }])
   })
 
+  test('the SDK strips unknown argument keys before the registry sees them', async () => {
+    const result = await (
+      await connect()
+    ).callTool({
+      name: 'echo',
+      arguments: { text: 'hi', extra: 'dropped' },
+    })
+    expect(result.isError).toBeFalsy()
+    expect(result.content).toEqual([{ type: 'text', text: 'hi' }])
+  })
+
   test('reports a failing tool as an error result', async () => {
     const result = await (await connect()).callTool({ name: 'fail', arguments: {} })
     expect(result.isError).toBe(true)

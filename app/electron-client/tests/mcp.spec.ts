@@ -103,8 +103,11 @@ test('an MCP client reads the open project and cannot write a file', async ({
     expect(sum.isError, textOf(sum)).toBeFalsy()
     expect(textOf(sum)).toBe('3')
 
-    // The Write rule: evaluation runs in the Design environment, where the output context is off,
-    // so an expression cannot write a file. An error answer is fine; the assertion is on the file.
+    // The Write rule: evaluation runs only in the Design environment, where the output context is
+    // off, so an expression cannot write the file it names. The standard library's dry run writes
+    // the data to `<name>_ensodryrun<digits>.<ext>` in the temporary directory instead and returns
+    // that path; the test deletes it. (The project cannot be switched to Live from the UI, so the
+    // Live refusal is covered by the unit tests in `app/gui/src/project-view/mcp/__tests__`.)
     const target = path.join(os.tmpdir(), `enso-mcp-write-rule-${Date.now()}.txt`)
     await fs.rm(target, { force: true })
     const enso = target.replace(/\\/g, '/')
@@ -114,11 +117,19 @@ test('an MCP client reads the open project and cannot write a file', async ({
     const answer = `isError=${String(write.isError ?? false)}: ${textOf(write)}`
     console.log(`[${testRunId}] Write rule: evaluate_expression answered ${answer}`)
     await testInfo.attach('write-rule-answer', { body: answer, contentType: 'text/plain' })
-    // Give a write that the engine might finish late a moment to land.
-    await page.waitForTimeout(2_000)
-    const written = existsSync(target)
-    await fs.rm(target, { force: true })
-    expect(written, `${target} must not exist; the tool answered ${answer}`).toBe(false)
+    const dryRun = /\S*_ensodryrun\d+\.txt/.exec(textOf(write))?.[0]
+    try {
+      expect(write.isError, answer).toBeFalsy()
+      expect(dryRun, `the answer names the dry-run file: ${answer}`).toBeDefined()
+      // Give a write that the engine might finish late a moment to land.
+      await page.waitForTimeout(2_000)
+      expect(existsSync(target), `${target} must not exist; the tool answered ${answer}`).toBe(
+        false,
+      )
+    } finally {
+      await fs.rm(target, { force: true })
+      if (dryRun != null) await fs.rm(dryRun, { force: true })
+    }
   } finally {
     await client.close()
   }
