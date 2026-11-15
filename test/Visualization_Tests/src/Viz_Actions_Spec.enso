@@ -15,9 +15,6 @@ Viz_Actions.from (that:Thing) =
     _ = that
     Viz_Actions.Value [Viz_Action.new_node "describe" "Describe" "" "Thing.describe {{node}}"]
 
-## The ids of a value's actions.
-ids_of value = (Viz_Actions.from value).actions.map .id
-
 add_specs suite_builder =
     suite_builder.group "Viz_Actions" group_builder->
         group_builder.specify "an action is written as one JSON object" <|
@@ -36,6 +33,7 @@ add_specs suite_builder =
 
         group_builder.specify "a user type offers its own, a standalone node among them" <|
             (Viz_Actions.from (Thing.Value "a")).to_json_text . should_equal '[{"id":"describe","label":"Describe","icon":"","kind":"new_node","template":"Thing.describe {{node}}"}]'
+            (Viz_Actions.for (Thing.Value "a")).actions.map .id . should_equal ["describe"]
 
         group_builder.specify "a dataflow error offers none" <|
             (Viz_Actions.for (Error.throw "boom")).actions . should_equal []
@@ -45,6 +43,12 @@ add_specs suite_builder =
             actions = Viz_Actions.from [1]
             actions.add_to_json '{"kind":"grid","columns":[]}' . should_equal ('{"actions":' + actions.to_json_text + ',"kind":"grid","columns":[]}')
             Viz_Actions.none.add_to_json '{"kind":"grid"}' . should_equal '{"kind":"grid"}'
+
+        group_builder.specify "an empty object stays valid JSON" <|
+            actions = Viz_Actions.from [1]
+            text = actions.add_to_json '{}'
+            text . should_equal ('{"actions":' + actions.to_json_text + '}')
+            text.parse_json.get "actions" . length . should_equal 1
 
         group_builder.specify "an error message never carries it" <|
             (Viz_Actions.from [1]).add_to_json '{"kind":"error","error":"x"}' . should_equal '{"kind":"error","error":"x"}'

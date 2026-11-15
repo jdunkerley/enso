@@ -31,7 +31,7 @@ type Viz_Actions
        ---
        The actions as the IDE reads them: a JSON array.
     to_json_text self -> Text =
-        ## A handful of actions: the texts are joined, so they are built once.
+        # A handful of actions: the texts are joined, so they are built once.
         '[' + (self.actions.map .to_json_text . join ",") + ']'
 
     ## ---
@@ -39,10 +39,14 @@ type Viz_Actions
        ---
        `json_text`, the JSON object a visualisation receives, with an
        `"actions"` field first. Unchanged when there are no actions, and for
-       an error message (`{"kind":"error",…}`).
+       an error message (`{"kind":"error",…}`). An empty object `{}` becomes
+       `{"actions":[…]}`.
     add_to_json self (json_text : Text) -> Text =
         if self.actions.is_empty || (json_text.starts_with '{"kind":"error"') then json_text else
-            '{"actions":' + self.to_json_text + ',' + (json_text.drop 1)
+            if json_text == '{}' then '{"actions":' + self.to_json_text + '}' else
+                # `drop 1` copies the message once: Text has no splice that does
+                # not, and the rope concatenation around it is free.
+                '{"actions":' + self.to_json_text + ',' + (json_text.drop 1)
 
 ## ---
    private: true
