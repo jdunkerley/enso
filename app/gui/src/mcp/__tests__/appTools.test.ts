@@ -76,6 +76,23 @@ describe('isAllowedPath on Windows', () => {
     expect(isAllowedPath('C:/kdrive/x', ['C:/Kdrive'])).toBe(true)
   })
 
+  // Windows drops a trailing space or dot from a name, so `Drive ` and `Drive.` open `Drive`: a
+  // name spelt so is refused rather than compared, in the path and in a root alike.
+  test('a trailing space or dot on the path is refused', () => {
+    expect(isAllowedPath('C:/Users/me/Drive ', roots)).toBe(false)
+    expect(isAllowedPath('C:/Users/me/Drive.', roots)).toBe(false)
+    expect(isAllowedPath('C:/Users/me/Drive/a ', roots)).toBe(false)
+    expect(isAllowedPath('C:/Users/me/Drive/a.', roots)).toBe(false)
+    expect(isAllowedPath('C:/Users/me/Drive/a /b', roots)).toBe(false)
+  })
+
+  test('a root with a trailing space or dot allows nothing', () => {
+    expect(isAllowedPath('C:/Users/me/Drive/a', ['C:/Users/me/Drive '])).toBe(false)
+    expect(isAllowedPath('C:/Users/me/Drive /a', ['C:/Users/me/Drive '])).toBe(false)
+    expect(isAllowedPath('C:/Users/me/Drive/a', ['C:/Users/me/Drive.'])).toBe(false)
+    expect(isAllowedPath('C:/Users/me/Drive./a', ['C:/Users/me/Drive.'])).toBe(false)
+  })
+
   test('a saved folder is a root too', () => {
     expect(isAllowedPath('E:/Data/x.csv', ['C:/Drive', 'E:/Data'])).toBe(true)
     expect(isAllowedPath('E:/Other', ['C:/Drive', 'E:/Data'])).toBe(false)
@@ -100,6 +117,22 @@ describe('isAllowedPath on POSIX', () => {
     ['a doubled separator', '//home/me/enso', true],
   ])('%s', (_name, path, allowed) => {
     expect(isAllowedPath(path, roots)).toBe(allowed)
+  })
+
+  // On POSIX a trailing space or dot is part of the name: another folder.
+  test('a trailing space or dot on the path names another folder', () => {
+    expect(isAllowedPath('/home/me/enso ', roots)).toBe(false)
+    expect(isAllowedPath('/home/me/enso.', roots)).toBe(false)
+    expect(isAllowedPath('/home/me/enso /a', roots)).toBe(false)
+    expect(isAllowedPath('/home/me/enso/a ', roots)).toBe(true)
+    expect(isAllowedPath('/home/me/enso/a.', roots)).toBe(true)
+  })
+
+  test('a root with a trailing space or dot is that folder only', () => {
+    expect(isAllowedPath('/home/me/enso /a', ['/home/me/enso '])).toBe(true)
+    expect(isAllowedPath('/home/me/enso/a', ['/home/me/enso '])).toBe(false)
+    expect(isAllowedPath('/home/me/enso./a', ['/home/me/enso.'])).toBe(true)
+    expect(isAllowedPath('/home/me/enso/a', ['/home/me/enso.'])).toBe(false)
   })
 
   test('the filesystem root as a root', () => {
