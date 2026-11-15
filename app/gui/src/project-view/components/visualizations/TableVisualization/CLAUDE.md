@@ -25,3 +25,8 @@ The table visualisation (`../TableVisualization.vue`) and its helpers.
   `CommunitySetFilter.ts`: the filters. `TableVisualisationTooltip.ts`: the
   header tooltip with the data quality metrics. `tableVizToolbar.ts`: the
   toolbar.
+- `columnValueToEnso.ts`: a cell's text as an Enso value of its column's type
+  (the toolbar's filters). `tableContextMenu.ts`: the right-click menu's nodes.
+  Both, the scatter plot's `scatterNodes.ts` and the Warnings visualisation's
+  node are pinned by `../__tests__/vizNodeTextSnapshot.test.ts`: a change to the
+  text of a created node is a visible change.

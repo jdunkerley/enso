@@ -1,8 +1,7 @@
 <script lang="ts">
-import { Ast } from '@/util/ast'
-import { Pattern } from '@/util/ast/match'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
 import { computed } from 'vue'
+import { removeWarningsPattern } from './warningsNodes'
 
 export const name = 'Warnings'
 export const icon = 'exclamation'
@@ -12,11 +11,7 @@ export const defaultPreprocessor = [
   'process_to_json_text',
 ] as const
 
-const removeWarnings = computed(() =>
-  Pattern.new<Ast.Expression>((ast) =>
-    Ast.PropertyAccess.new(ast.module, ast, Ast.identifier('remove_warnings')!),
-  ),
-)
+const removeWarnings = computed(() => removeWarningsPattern())
 </script>
 
 <script setup lang="ts">

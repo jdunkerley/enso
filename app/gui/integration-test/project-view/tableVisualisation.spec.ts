@@ -577,3 +577,46 @@ async function expectCellDataToBe(page: Page, colId: string, expectedValues: str
     await expect(getCellLocator(page, colId, i)).toHaveText(expectedValues[i]!)
   }
 }
+
+/** The toolbar button that turns the grid's sort and filter state into components. */
+const CREATE_COMPONENTS =
+  "Create new component(s) with the current grid's state applied to the workflow"
+
+/** A table view of two columns, as `prepare_visualization` sends it for a table. */
+const SORTABLE_TABLE = {
+  kind: 'grid',
+  row_count: 3,
+  columns: [
+    { name: 'a', value_type: { constructor: 'Integer', display_text: 'Integer (64 bits)' } },
+    { name: 'b', value_type: { constructor: 'Char', display_text: 'Char' } },
+  ],
+  index: { action: 'get_row {{#index}}', label: 'row' },
+  data: [
+    [3, 1, 2],
+    ['c', 'a', 'b'],
+  ],
+  options: { create_node: true },
+}
+
+/** Scenario: the grid is sorted by a header click, and the toolbar button makes a `sort` node of it. */
+test('Sorting a table and creating components makes a sort node', async ({
+  editorPage,
+  page,
+  localApi,
+}) => {
+  await initGraph(editorPage)
+  await graphNodeByBinding(page, 'aggregated').click()
+  await editorPage.press('Space')
+  const tableVisualization = locate.tableVisualization(page)
+  await expect(tableVisualization).toExist()
+  await localApi.updateVisualization(
+    'Standard.Visualization.Table.Visualization.prepare_visualization',
+    SORTABLE_TABLE,
+  )
+  await expect(tableVisualization).toContainText('c')
+  await tableVisualization.locator('.ag-header-cell-text', { hasText: /^a$/ }).click()
+  const nodeCount = await locate.graphNode(page).count()
+  await page.getByRole('button', { name: CREATE_COMPONENTS }).click()
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
+  await expect(locate.graphNode(page).last()).toContainText(/sort.*Name.*Ascending/)
+})
