@@ -7,8 +7,7 @@ import {
   defineWidget,
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
-import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
-import { ArgumentNameShownKey } from '@/components/GraphEditor/widgets/WidgetArgumentName.vue'
+import ChipMenuShell from '@/components/GraphEditor/widgets/WidgetChip/ChipMenuShell.vue'
 import DateMenu from '@/components/GraphEditor/widgets/WidgetDate/DateMenu.vue'
 import {
   DATE_TYPE,
@@ -17,28 +16,14 @@ import {
   parseDateExpression,
   type DateChoice,
 } from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
-import { activityDropdownStyles } from '@/components/GraphEditor/widgets/WidgetSelection/styles'
-import { unrefElement } from '@/composables/events'
-import { usePopoverRoot } from '@/providers/popoverRoot'
-import { useTopLevelArgument } from '@/providers/topLevelArgument'
-import { injectWidgetTree } from '@/providers/widgetTree'
 import { Ast } from '@/util/ast'
-import { targetIsOutside } from '@/util/autoBlur'
 import { ArgumentInfoKey } from '@/util/callTree'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
-import { computed, useTemplateRef } from 'vue'
+import { computed } from 'vue'
 
 const props = defineProps(widgetProps(widgetDefinition))
 const { suggestionDb, module } = useCurrentProject()
-
-const tree = injectWidgetTree()
-const popoverRoot = usePopoverRoot()
-const topLevelArgument = useTopLevelArgument(true)
-
-const widgetRoot = useTemplateRef<HTMLElement>('widgetRoot')
-const chip = useTemplateRef<HTMLElement>('chip')
-const menuElement = useTemplateRef<HTMLElement>('menuElement')
 
 const dateImport = computed(() =>
   requiredImportsByProjectPath(
@@ -50,41 +35,8 @@ const dateImport = computed(() =>
 const choice = computed(() => parseDateExpression(WidgetInput.valueRepr(props.input)))
 const label = computed(() => (choice.value ? dateLabel(choice.value) : 'Pick a date'))
 
-const argumentName = computed(() => {
-  if (ArgumentNameShownKey in props.input) return
-  return props.input[ArgumentInfoKey]?.info?.name
-})
-
-const floatReference = computed(
-  () =>
-    topLevelArgument?.enclosingTopLevelArgument(widgetRoot.value, tree.rootElement) ??
-    widgetRoot.value,
-)
-const { floatingStyles } = activityDropdownStyles(floatReference, menuElement, popoverRoot)
-
-const interaction = WidgetEditHandler.New(props, {
-  pointerdown: (e) => {
-    if (
-      targetIsOutside(e, unrefElement(menuElement)) &&
-      targetIsOutside(e, unrefElement(widgetRoot)) &&
-      targetIsOutside(e, document.getElementById('floatingLayer'))
-    )
-      interaction.value.end()
-  },
-})
-
-function toggleMenu() {
-  if (interaction.value.isActive()) interaction.value.cancel()
-  else interaction.value.start()
-}
-
-function closeMenu() {
-  interaction.value.cancel()
-  chip.value?.focus()
-}
-
 /** One choice is one edit, so one undo step: the import and the new code go in together. */
-function choose(picked: DateChoice) {
+function choose(picked: DateChoice, done: () => void) {
   module.value.edit((edit) => {
     module.value.addMissingImports(edit, dateImport.value)
     const value = codeToWrite(picked, props.input.value)
@@ -94,8 +46,7 @@ function choose(picked: DateChoice) {
       directInteraction: true,
     })
   })
-  interaction.value.end()
-  chip.value?.focus()
+  done()
 }
 </script>
 
@@ -163,56 +114,9 @@ export const widgetDefinition = defineWidget(
 </script>
 
 <template>
-  <div ref="widgetRoot" class="WidgetDate widgetSingleLine">
-    <span v-if="argumentName" class="name widgetApplyPadding" v-text="argumentName" />
-    <button
-      ref="chip"
-      type="button"
-      class="chip widgetRounded widgetPill clickable"
-      :class="{ placeholder: choice == null }"
-      aria-haspopup="dialog"
-      :aria-expanded="interaction.isActive()"
-      @pointerdown.stop.prevent
-      @click.stop="toggleMenu"
-      @keydown.enter.stop
-    >
-      <span class="widgetApplyPadding" v-text="label" />
-    </button>
-    <Teleport v-if="interaction.isActive()" :to="popoverRoot">
-      <div ref="menuElement" class="menuElement widgetOutOfLayout" :style="floatingStyles">
-        <DateMenu :choice="choice" @choose="choose" @close="closeMenu" />
-      </div>
-    </Teleport>
-  </div>
+  <ChipMenuShell class="WidgetDate" :widget="props" :label="label" :placeholder="choice == null">
+    <template #menu="{ close, done }">
+      <DateMenu :choice="choice" @choose="choose($event, done)" @close="close" />
+    </template>
+  </ChipMenuShell>
 </template>
-
-<style scoped>
-.WidgetDate {
-  display: inline-flex;
-  align-items: center;
-}
-
-.name {
-  opacity: 0.5;
-  margin-right: var(--widget-token-pad-unit);
-}
-
-.chip {
-  height: var(--node-port-height);
-  white-space: nowrap;
-  background: var(--color-widget);
-
-  &.placeholder {
-    opacity: 0.6;
-  }
-
-  &:hover,
-  &[aria-expanded='true'] {
-    background: var(--color-widget-focus);
-  }
-}
-
-.menuElement {
-  z-index: calc(var(--z-index-component-menu) + 1);
-}
-</style>

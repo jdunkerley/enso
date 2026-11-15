@@ -7,6 +7,8 @@
  * The calendar is Reka's `Calendar` (as the dashboard's `DatePicker` uses for its popover): arrows
  * move between days, Enter chooses one, PageUp and PageDown change the month. Escape asks to close.
  */
+import ChipMenuFrame from '@/components/GraphEditor/widgets/WidgetChip/ChipMenuFrame.vue'
+import { unrefElement } from '@/composables/events'
 import { CalendarDate, type DateValue } from '@internationalized/date'
 import {
   CalendarCell,
@@ -43,7 +45,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const root = useTemplateRef<HTMLElement>('root')
+const root = useTemplateRef('root')
 const today = computed(() => props.today ?? localToday())
 const toCalendarDate = ({ year, month, day }: YearMonthDay) => new CalendarDate(year, month, day)
 
@@ -62,7 +64,9 @@ function chooseDay(value: unknown) {
 onMounted(() =>
   nextTick(() => {
     // Put the keyboard on the calendar: the chosen day, else today, else the day it opened on.
-    const days = root.value?.querySelectorAll<HTMLElement>('[data-reka-calendar-cell-trigger]')
+    const days = unrefElement(root)?.querySelectorAll<HTMLElement>(
+      '[data-reka-calendar-cell-trigger]',
+    )
     const inMonth = Array.from(days ?? []).filter((d) => !d.hasAttribute('data-outside-view'))
     const target =
       inMonth.find((d) => d.hasAttribute('data-selected')) ??
@@ -75,16 +79,7 @@ onMounted(() =>
 </script>
 
 <template>
-  <div
-    ref="root"
-    class="DateMenu"
-    role="dialog"
-    aria-label="Pick a date"
-    @keydown.escape.stop.prevent="emit('close')"
-    @keydown.stop
-    @click.stop
-    @wheel.stop.passive
-  >
+  <ChipMenuFrame ref="root" class="DateMenu" ariaLabel="Pick a date" @close="emit('close')">
     <ul class="relative">
       <li v-for="relative in RELATIVE_CHOICES" :key="relative.kind">
         <button
@@ -130,47 +125,10 @@ onMounted(() =>
         </CalendarGridBody>
       </CalendarGrid>
     </CalendarRoot>
-  </div>
+  </ChipMenuFrame>
 </template>
 
 <style scoped>
-.DateMenu {
-  --item-height: 23px;
-  --dropdown-padding: 6px;
-  min-width: 200px;
-  padding: var(--dropdown-padding);
-  user-select: none;
-  background-color: var(--dropdown-bg);
-  color: var(--dropdown-fg);
-  border: 1px solid color-mix(in oklab, var(--dropdown-bg), black 5%);
-  border-radius: calc(var(--item-height) / 2 + var(--dropdown-padding));
-}
-
-.item {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: var(--item-height);
-  padding: 0 8px;
-  border-radius: calc(var(--item-height) / 2);
-  text-align: left;
-
-  &:hover,
-  &:focus-visible {
-    background-color: var(--dropdown-item-hover-bg);
-  }
-
-  &.selected {
-    background-color: var(--dropdown-item-selected-bg);
-  }
-}
-
-.divider {
-  margin: 4px 0;
-  border: none;
-  border-top: 1px solid color-mix(in oklab, var(--dropdown-bg), black 12%);
-}
-
 .calendarHeader {
   display: flex;
   align-items: center;
