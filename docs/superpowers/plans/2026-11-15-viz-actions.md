@@ -31,15 +31,18 @@ and AG Grid Community in `app/gui`, vitest, Playwright.
 **Spec:** `docs/superpowers/specs/2026-11-14-viz-actions-design.md` (approved by
 the owner), within the parent design
 `docs/superpowers/specs/2026-11-13-visualization-depends-on-base-design.md`.
-Read the spec first, then "Open questions for the owner" and "Spec gaps resolved
+Read the spec first, then "Owner decisions" and "Spec gaps resolved
 while planning" below: the spec was written against `develop` at 7ccf3be658,
 before spec B (#769, #776, #780) and piece 2 (#768, #771) merged, and the plan
 departs from its text where today's code requires it.
 
-## Open questions for the owner
+## Owner decisions
 
-The plan is written to the recommendation of each. If the owner chooses
-otherwise, the tasks named change as stated; nothing else does.
+Asked while planning; the owner chose the recommendation on all four
+(2026-11-15), and the plan is written to them: the links stay in the view, the
+tree keeps its per-child `expr`, filter and sort arguments stay in the GUI, and
+the tree's menu offers Get Value and Get All Loaded Values Here. The questions
+and their reasoning follow.
 
 1. **Do the table's links stay in the view, or become references to an
    `open_child` action?** The spec says spec B's per-column `link` and the
