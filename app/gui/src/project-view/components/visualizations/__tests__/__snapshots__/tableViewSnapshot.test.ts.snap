@@ -346,7 +346,9 @@ exports[`Table view of each pinned golden > table_array 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": false,
-    "columnNames": [],
+    "columnNames": [
+      "Value",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -633,7 +635,9 @@ exports[`Table view of each pinned golden > table_cells_vector 1`] = `
   "flags": {
     "allRowCount": 5,
     "bottomStatusBarRequested": false,
-    "columnNames": [],
+    "columnNames": [
+      "Value",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -702,7 +706,9 @@ exports[`Table view of each pinned golden > table_connection 1`] = `
   "flags": {
     "allRowCount": 0,
     "bottomStatusBarRequested": false,
-    "columnNames": [],
+    "columnNames": [
+      "Table",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -1528,7 +1534,10 @@ exports[`Table view of each pinned golden > table_matrix 1`] = `
   "flags": {
     "allRowCount": 2,
     "bottomStatusBarRequested": false,
-    "columnNames": [],
+    "columnNames": [
+      "0",
+      "1",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -2626,7 +2635,12 @@ exports[`Table view of each pinned golden > table_object_matrix 1`] = `
   "flags": {
     "allRowCount": 2,
     "bottomStatusBarRequested": false,
-    "columnNames": [],
+    "columnNames": [
+      "type",
+      "constructor",
+      "x",
+      "y",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -2938,7 +2952,12 @@ exports[`Table view of each pinned golden > table_rows_matrix 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": false,
-    "columnNames": [],
+    "columnNames": [
+      "x",
+      "y",
+      "label",
+      "when",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
@@ -3125,7 +3144,9 @@ exports[`Table view of each pinned golden > table_vector 1`] = `
   "flags": {
     "allRowCount": 3,
     "bottomStatusBarRequested": false,
-    "columnNames": [],
+    "columnNames": [
+      "Value",
+    ],
     "columnTypes": {},
     "createNodeEnabled": false,
     "isSSRM": false,
