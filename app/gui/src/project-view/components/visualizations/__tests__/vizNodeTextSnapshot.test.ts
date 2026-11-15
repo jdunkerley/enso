@@ -102,8 +102,15 @@ const TOOLBAR_CASES: Record<string, ToolbarCase> = {
       }),
     ],
   },
+  // KNOWN DEFECT, issue #785: the recorded text `..Equal Time_Of_Day.parse ('10:30:00')` is not
+  // parenthesised, so Enso reads it as `Equal` with two arguments. This entry (and the single
+  // date-time one below) pins today's text on purpose; do not "correct" the snapshot. It changes
+  // when #785 is fixed, after PR 3.2.
   'set of a time': {
     filters: [filter({ columnName: 't', filterType: 'set', values: ['10:30:00'] })],
+  },
+  'set of one date-time (known defect, #785)': {
+    filters: [filter({ columnName: 'dt', filterType: 'set', values: ['2024-01-02 10:30:00'] })],
   },
   'set of a date-time': {
     filters: [
@@ -120,6 +127,40 @@ const TOOLBAR_CASES: Record<string, ToolbarCase> = {
   'set of a boolean': {
     filters: [filter({ columnName: 'bo', filterType: 'set', values: ['false'] })],
   },
+  'set of a boolean, true': {
+    filters: [filter({ columnName: 'bo', filterType: 'set', values: ['true'] })],
+  },
+  ...Object.fromEntries(
+    (['notEqual', 'greaterThanOrEqual', 'lessThanOrEqual'] as const).map((filterAction) => [
+      `number ${filterAction}`,
+      {
+        filters: [filter({ columnName: 'a', filterType: 'number', filterAction, filter: '3' })],
+      },
+    ]),
+  ),
+  ...Object.fromEntries(
+    (['notEqual', 'startsWith', 'endsWith'] as const).map((filterAction) => [
+      `text ${filterAction}`,
+      {
+        filters: [filter({ columnName: 'b', filterType: 'text', filterAction, filter: 'ab' })],
+      },
+    ]),
+  ),
+  ...Object.fromEntries(
+    (['notEqual', 'greaterThan', 'lessThan'] as const).map((filterAction) => [
+      `date ${filterAction}`,
+      {
+        filters: [
+          filter({
+            columnName: 'd',
+            filterType: 'date',
+            filterAction,
+            dateFrom: '2024-01-02 00:00:00',
+          }),
+        ],
+      },
+    ]),
+  ),
   'text contains': {
     filters: [
       filter({
@@ -252,6 +293,11 @@ function treeNode(chain: string[]) {
   return text(nodeExpressionPattern(chain))
 }
 
+/** The nodes of the tree's "all siblings" gesture, from the chain of each sibling entry. */
+function treeNodes(chains: string[][]) {
+  return chains.flatMap((chain) => nodeExpressionPattern(chain) ?? []).map(text)
+}
+
 // ---- end of DRIVERS ----
 
 describe('Table toolbar: create components', () => {
@@ -260,19 +306,41 @@ describe('Table toolbar: create components', () => {
   })
 })
 
+describe('Table toolbar: filters the toolbar cannot build', () => {
+  // A Date column offers `inRange`, but the range falls through to the single-value branch of
+  // `buildFilterExpression`, which formats an object as a date string: clicking the button throws.
+  // Pinned as a throw, not a snapshot. PR 3.2.3 may fix it on purpose; then this test changes.
+  test('date in range throws a TypeError', () => {
+    const c: ToolbarCase = {
+      filters: [
+        filter({
+          columnName: 'd',
+          filterType: 'date',
+          filterAction: 'inRange',
+          dateFrom: '2024-01-02 00:00:00',
+          dateTo: '2024-02-03 00:00:00',
+        }),
+      ],
+    }
+    expect(() => toolbarNodes(c)).toThrow(TypeError)
+  })
+})
+
 describe('Table right-click menu, on a table', () => {
   test.each([
-    ['Get Column', 'b', 2],
-    ['Get Row', 'b', 2],
-    ['Get Value', 'b', 2],
-    ['Get Column on the row-number column', null, 2],
-    ['Get Value on the row-number column', null, 2],
-  ] as const)('%s', (item, column, row) => {
-    const name =
-      item.startsWith('Get Column') ? 'Get Column'
-      : item.startsWith('Get Row') ? 'Get Row'
-      : 'Get Value'
-    expect(menuNode(column, row, name)).toMatchSnapshot()
+    ['Get Column', 'Get Column', 'b', 2],
+    ['Get Row', 'Get Row', 'b', 2],
+    ['Get Value', 'Get Value', 'b', 2],
+    ['Get Row at row 0', 'Get Row', 'b', 0],
+    ['Get Value at row 0', 'Get Value', 'b', 0],
+    // The row-number column is a real column, with the id `#` (`INDEX_FIELD_NAME`). Right-clicking
+    // it builds these nodes, which are probably broken (no table has a column `#`): recorded as is.
+    ['Get Column on the row-number column', 'Get Column', '#', 2],
+    ['Get Value on the row-number column', 'Get Value', '#', 2],
+    ['Get Column with no column under the click', 'Get Column', null, 2],
+    ['Get Value with no column under the click', 'Get Value', null, 2],
+  ] as const)('%s', (title, item, column, row) => {
+    expect(menuNode(column, row, item)).toMatchSnapshot()
   })
 })
 
@@ -306,5 +374,13 @@ describe('Tree', () => {
     ['an XML attribute', [".at '@id'"]],
   ] as const)('%s', (_, chain) => {
     expect(treeNode([...chain])).toMatchSnapshot()
+  })
+
+  // The gesture with all the sibling entries (`activate(row, all = true)` in `JSONVisualization.vue`):
+  // one node per chain, in order, dropping those that are not method calls.
+  test('all the siblings, one of them not a method call', () => {
+    expect(
+      treeNodes([[".get 'a'"], ['not a method call'], [".get 'b'", '.at 1'], ['.row_count']]),
+    ).toMatchSnapshot()
   })
 })

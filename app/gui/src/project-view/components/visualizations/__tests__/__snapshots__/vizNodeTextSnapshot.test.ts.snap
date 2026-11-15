@@ -10,13 +10,21 @@ exports[`Scatter plot > point of a vector 1`] = `"operator1.at 3"`;
 
 exports[`Table right-click menu, on a table > Get Column 1`] = `"operator1.at 'b'"`;
 
-exports[`Table right-click menu, on a table > Get Column on the row-number column 1`] = `undefined`;
+exports[`Table right-click menu, on a table > Get Column on the row-number column 1`] = `"operator1.at '#'"`;
+
+exports[`Table right-click menu, on a table > Get Column with no column under the click 1`] = `undefined`;
 
 exports[`Table right-click menu, on a table > Get Row 1`] = `"operator1.get_row 2"`;
 
+exports[`Table right-click menu, on a table > Get Row at row 0 1`] = `"operator1.get_row 0"`;
+
 exports[`Table right-click menu, on a table > Get Value 1`] = `"operator1.get_value 'b' 2"`;
 
-exports[`Table right-click menu, on a table > Get Value on the row-number column 1`] = `undefined`;
+exports[`Table right-click menu, on a table > Get Value at row 0 1`] = `"operator1.get_value 'b' 0"`;
+
+exports[`Table right-click menu, on a table > Get Value on the row-number column 1`] = `"operator1.get_value '#' 2"`;
+
+exports[`Table right-click menu, on a table > Get Value with no column under the click 1`] = `undefined`;
 
 exports[`Table toolbar: create components > blank 1`] = `
 [
@@ -27,6 +35,24 @@ exports[`Table toolbar: create components > blank 1`] = `
 exports[`Table toolbar: create components > date equals 1`] = `
 [
   "operator1 . filter 'd' (..Equal (Date.new 2024 1 2))",
+]
+`;
+
+exports[`Table toolbar: create components > date greaterThan 1`] = `
+[
+  "operator1 . filter 'd' (..Greater (Date.new 2024 1 2))",
+]
+`;
+
+exports[`Table toolbar: create components > date lessThan 1`] = `
+[
+  "operator1 . filter 'd' (..Less (Date.new 2024 1 2))",
+]
+`;
+
+exports[`Table toolbar: create components > date notEqual 1`] = `
+[
+  "operator1 . filter 'd' (..Not_Equal (Date.new 2024 1 2))",
 ]
 `;
 
@@ -63,9 +89,27 @@ exports[`Table toolbar: create components > number equals 1`] = `
 ]
 `;
 
+exports[`Table toolbar: create components > number greaterThanOrEqual 1`] = `
+[
+  "operator1 . filter 'a' (..Equal_Or_Greater 3)",
+]
+`;
+
 exports[`Table toolbar: create components > number in range 1`] = `
 [
   "operator1 . filter 'a' (..Between 1 5)",
+]
+`;
+
+exports[`Table toolbar: create components > number lessThanOrEqual 1`] = `
+[
+  "operator1 . filter 'a' (..Equal_Or_Less 3)",
+]
+`;
+
+exports[`Table toolbar: create components > number notEqual 1`] = `
+[
+  "operator1 . filter 'a' (..Not_Equal 3)",
 ]
 `;
 
@@ -78,6 +122,12 @@ exports[`Table toolbar: create components > reordered columns 1`] = `
 exports[`Table toolbar: create components > set of a boolean 1`] = `
 [
   "operator1 . filter 'bo' (..Equal False)",
+]
+`;
+
+exports[`Table toolbar: create components > set of a boolean, true 1`] = `
+[
+  "operator1 . filter 'bo' (..Equal True)",
 ]
 `;
 
@@ -111,6 +161,12 @@ exports[`Table toolbar: create components > set of one 1`] = `
 ]
 `;
 
+exports[`Table toolbar: create components > set of one date-time (known defect, #785) 1`] = `
+[
+  "operator1 . filter 'dt' (..Equal Date_Time.parse ('2024-01-02 10:30:00'))",
+]
+`;
+
 exports[`Table toolbar: create components > set of two 1`] = `
 [
   "operator1 . filter 'b' (..Is_In ['x', 'y'])",
@@ -135,6 +191,24 @@ exports[`Table toolbar: create components > text contains 1`] = `
 ]
 `;
 
+exports[`Table toolbar: create components > text endsWith 1`] = `
+[
+  "operator1 . filter 'b' (..Ends_With 'ab')",
+]
+`;
+
+exports[`Table toolbar: create components > text notEqual 1`] = `
+[
+  "operator1 . filter 'b' (..Not_Equal 'ab')",
+]
+`;
+
+exports[`Table toolbar: create components > text startsWith 1`] = `
+[
+  "operator1 . filter 'b' (..Starts_With 'ab')",
+]
+`;
+
 exports[`Table toolbar: create components > two filters in one node 1`] = `
 [
   "operator1 . filter 'a' (..Greater 1) . filter 'b' (..Contains 'x')",
@@ -148,6 +222,14 @@ exports[`Tree > a key then an index 1`] = `"operator1.get 'tags' . at 1"`;
 exports[`Tree > a table row value 1`] = `"operator1.rows . at 0 . at 'x'"`;
 
 exports[`Tree > a table summary entry 1`] = `"operator1.row_count"`;
+
+exports[`Tree > all the siblings, one of them not a method call 1`] = `
+[
+  "operator1.get 'a'",
+  "operator1.get 'b' . at 1",
+  "operator1.row_count",
+]
+`;
 
 exports[`Tree > an XML attribute 1`] = `"operator1.at '@id'"`;
 
