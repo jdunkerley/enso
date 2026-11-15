@@ -1,7 +1,8 @@
 import DocsSignature from '@/components/ComponentHelp/DocsSignature.vue'
 import type { Signature } from '@/components/ComponentHelp/signature'
 import { mount } from '@vue/test-utils'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
+import { nextTick } from 'vue'
 
 const SIGNATURE: Signature = {
   name: 'work_days_until',
@@ -60,4 +61,61 @@ test('the toggle asks to expand; expanded shows a row per argument and the retur
   expect(open.find('.returnsRow').text()).toContain('Integer')
   w.unmount()
   open.unmount()
+})
+
+const pointer = (type: string, pointerType = 'mouse') => {
+  const event = new Event(type, { bubbles: type === 'pointerdown' })
+  Object.defineProperty(event, 'pointerType', { value: pointerType })
+  return event
+}
+const tooltipEl = () => document.body.querySelector('.DocsParamPill-tooltip')
+
+test('hover opens the tooltip; it stays while the pointer crosses onto it, and closes after leaving', async () => {
+  vi.useFakeTimers()
+  try {
+    const w = mountIt(false)
+    const wrapper = w.find('.DocsParamPill')
+    wrapper.element.dispatchEvent(pointer('pointerenter'))
+    await nextTick()
+    expect(tooltipEl()).not.toBeNull()
+    wrapper.element.dispatchEvent(pointer('pointerleave'))
+    vi.advanceTimersByTime(50)
+    tooltipEl()!.dispatchEvent(pointer('pointerenter'))
+    vi.advanceTimersByTime(500)
+    await nextTick()
+    expect(tooltipEl()).not.toBeNull()
+    tooltipEl()!.dispatchEvent(pointer('pointerleave'))
+    vi.advanceTimersByTime(150)
+    await nextTick()
+    expect(tooltipEl()).toBeNull()
+    w.unmount()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('a click pins the tooltip open and a second click unpins it', async () => {
+  const w = mountIt(false)
+  const pill = w.find('.param')
+  pill.element.dispatchEvent(pointer('pointerdown'))
+  await pill.trigger('click')
+  expect(tooltipEl()).not.toBeNull()
+  pill.element.dispatchEvent(pointer('pointerdown'))
+  await pill.trigger('click')
+  expect(tooltipEl()).toBeNull()
+  w.unmount()
+})
+
+test('a press on the tooltip does not unpin it; a press elsewhere does', async () => {
+  const w = mountIt(false)
+  const pill = w.find('.param')
+  pill.element.dispatchEvent(pointer('pointerdown'))
+  await pill.trigger('click')
+  tooltipEl()!.dispatchEvent(pointer('pointerdown'))
+  await nextTick()
+  expect(tooltipEl()).not.toBeNull()
+  document.body.dispatchEvent(pointer('pointerdown'))
+  await nextTick()
+  expect(tooltipEl()).toBeNull()
+  w.unmount()
 })

@@ -39,7 +39,8 @@ function onKey(event: KeyboardEvent) {
   }
 }
 function onPointer(event: PointerEvent) {
-  if (!wrapper.value?.contains(event.target as Node)) pinned.value = false
+  const target = event.target as Node
+  if (!wrapper.value?.contains(target) && !tooltip.value?.contains(target)) pinned.value = false
 }
 function stopListening() {
   document.removeEventListener('keydown', onKey)
@@ -52,12 +53,28 @@ watch(open, (isOpen) => {
     document.addEventListener('pointerdown', onPointer)
   }
 })
-onBeforeUnmount(stopListening)
+onBeforeUnmount(() => {
+  stopListening()
+  clearTimeout(leaveTimer)
+})
+
+/**
+ * How long the pointer may be away from both the pill and the tooltip before the tooltip closes, so
+ * that it can cross the gap between them (WCAG 1.4.13: the tooltip stays while hovered).
+ */
+const LEAVE_DELAY_MS = 100
+let leaveTimer: ReturnType<typeof setTimeout> | undefined
 
 function onPointerEnter(event: PointerEvent) {
   if (event.pointerType !== 'mouse') return
+  clearTimeout(leaveTimer)
   dismissed.value = false
   hovered.value = true
+}
+
+function onPointerLeave() {
+  clearTimeout(leaveTimer)
+  leaveTimer = setTimeout(() => (hovered.value = false), LEAVE_DELAY_MS)
 }
 
 function onClick() {
@@ -73,7 +90,7 @@ function onClick() {
     ref="wrapper"
     class="DocsParamPill"
     @pointerenter="onPointerEnter"
-    @pointerleave="hovered = false"
+    @pointerleave="onPointerLeave"
   >
     <button
       ref="button"
@@ -95,6 +112,8 @@ function onClick() {
         role="tooltip"
         class="DocsParamPill-tooltip"
         :style="floatingStyles"
+        @pointerenter="onPointerEnter"
+        @pointerleave="onPointerLeave"
       >
         <div class="meta">
           <code class="type" v-text="param.type" />
