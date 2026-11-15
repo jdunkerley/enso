@@ -147,13 +147,16 @@ describe('McpSettingsSection', () => {
   test('shows the server error under the switch', async () => {
     fake.status.mockResolvedValue({ ...ON, running: false, error: 'Port 39417 is in use.' })
     await mountSection()
-    expect(document.body.textContent).toContain('Port 39417 is in use.')
+    expect(required(document.querySelector('[role="alert"]')).textContent).toContain(
+      'Port 39417 is in use.',
+    )
   })
 
   test('shows no error when there is none', async () => {
     fake.status.mockResolvedValue(ON)
     await mountSection()
     expect(document.querySelector('[data-testid="mcp-error"]')).toBeNull()
+    expect(document.querySelector('[role="alert"]')).toBeNull()
   })
 
   test('submitting a valid port calls setPort', async () => {
@@ -212,5 +215,6 @@ describe('McpSettingsSection', () => {
     await user.click(switchInput())
     await flushPromises()
     expect(fake.show).toHaveBeenCalledWith('no keychain', { type: 'error' })
+    expect(switchInput().checked).toBe(false)
   })
 })

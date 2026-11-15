@@ -9,6 +9,7 @@
  * The token never reaches this component: "Copy setup" goes through Electron main, which writes the
  * text to the clipboard.
  */
+import Alert from '$/components/Alert/Alert.vue'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -130,7 +131,9 @@ async function askReplaceToken() {
     >
       <Switch name="enabled" :label="getText('mcpEnabledSetting')" />
     </Form>
-    <Text v-if="status.error != null" color="danger" testId="mcp-error">{{ status.error }}</Text>
+    <Alert v-if="status.error != null" variant="error">
+      <Text testId="mcp-error">{{ status.error }}</Text>
+    </Alert>
     <Text>{{ getText('mcpWarning') }}</Text>
     <template v-if="status.enabled">
       <div class="flex flex-col gap-1">
