@@ -50,10 +50,13 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       name: 'search_components',
       title: 'Search components',
       description:
-        'Search the component browser for functions, methods and types matching `query`. ' +
-        'Pass `self_type` (a qualified type name) to list only methods callable on a value ' +
-        'of that type. Returns up to `limit` (1-50) matches, each with its qualified name ' +
-        'and a one-line summary. Pass a qualified name to `get_component_docs` for details.',
+        'Search the component browser for methods matching `query`, best match first. ' +
+        'Without `self_type` it finds the functions called on a module or type ' +
+        '(`Data.read`, `Table.new`); pass `self_type` (a qualified type name, as `get_graph` ' +
+        'prints a node type) to find the methods callable on a value of that type instead. ' +
+        'Returns up to `limit` (1-50, default 20) `results`, each with its qualified `name`, ' +
+        'its `signature` and a one-line `summary`, and `total`, the number of matches. Pass a ' +
+        '`name` to `get_component_docs` for details.',
       inputSchema: {
         query: z.string(),
         self_type: z.string().optional(),
@@ -65,8 +68,9 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       name: 'get_component_docs',
       title: 'Get component documentation',
       description:
-        'Read the documentation of one component: its signature, arguments with defaults, ' +
-        'and description. `name` is a qualified name returned by `search_components`.',
+        'Read the documentation of one component: its signature, its arguments (type, ' +
+        'default, whether optional, and the values offered for it), its return type and its ' +
+        'description. `name` is a qualified name returned by `search_components`.',
       inputSchema: { name: z.string() },
       run: forward('get_component_docs'),
     },

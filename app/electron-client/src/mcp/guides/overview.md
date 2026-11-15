@@ -17,10 +17,11 @@ secrets.
    `get_node` for the full expression, documentation, a longer value preview and
    the error text of one node, and to `evaluate_expression` to run in that
    node's scope.
-3. Before naming a method or type you have not seen in the project, call
-   `search_components` (optionally with `self_type` to list the methods callable
-   on a value of a type), then `get_component_docs` with a qualified name from
-   the results. Do not guess signatures from a name alone.
+3. Before naming a method you have not seen in the project, call
+   `search_components`: without `self_type` it finds the functions called on a
+   module or type (`Data.read`), with `self_type` (a node's `type`) the methods
+   callable on a value of that type. Then call `get_component_docs` with a
+   `name` from the results. Do not guess signatures from a name alone.
 4. Use `evaluate_expression` to look at data: column names, row counts, a few
    rows, join shapes. Each call is a real language server round-trip, so ask for
    what you need and do not fan out. The expression must evaluate to Text:

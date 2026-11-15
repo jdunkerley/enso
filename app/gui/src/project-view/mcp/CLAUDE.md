@@ -43,5 +43,16 @@ too).
   id is the right-hand side's id, where the node's own name is still
   uninitialized (wiki: Infrastructure-Ydoc, "Scope semantics of
   `nodeExternalId`").
+- `catalogueTools.ts` (`search_components`, `get_component_docs`) searches the
+  suggestion database as the Component Browser does (`Filtering`,
+  `makeComponentLists`, the module's imported libraries): methods only; without
+  `self_type` the static ones, with it the methods of that type (its `SelfArg`
+  built as `ComponentBrowser/input.ts` builds it for a source node). Names are
+  printed with the project's `Main` module elided (`ProjectPath.normalized`, not
+  `printProjectPath`, whose pattern also cuts a `Main_…` module's name); a name
+  or `self_type` is looked up as given, then in the project's `Main` module, so
+  both the printed and the full form resolve. Until the database has loaded,
+  both answer an error. Summaries are cut at 500 characters, documentation at
+  20,000.
 - No tool here changes the project, the execution environment, settings or
   secrets.
