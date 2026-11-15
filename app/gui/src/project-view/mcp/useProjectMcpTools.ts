@@ -32,7 +32,12 @@ import {
 import { evaluateExpression } from './evaluate'
 import { getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
 import { createMcpNodes } from './nodeCreation'
-import { afterGraphUpdate, onUserModuleTransaction, watchExecution } from './projectEvents'
+import {
+  afterGraphUpdate,
+  onUserModuleTransaction,
+  watchExecution,
+  watchGraphUpdate,
+} from './projectEvents'
 import { addFunction, collapseNodesTool, type StructureToolDeps } from './structureTools'
 import { openMethod, selectNodes, type ViewToolDeps } from './viewTools'
 
@@ -41,12 +46,6 @@ import { openMethod, selectNodes, type ViewToolDeps } from './viewTools'
  * error reaches the caller first.
  */
 const EVALUATE_TIMEOUT_MS = 25_000
-/**
- * How long an edit waits for the node database to reflect it. An edit that changes only metadata
- * (a visualization) may cause no update at all.
- */
-const GRAPH_UPDATE_WAIT_MS = 2_000
-
 /** What only the graph editor has: its selection, its view and its navigation. */
 export interface McpEditorDeps {
   readonly selectedNodes: () => Iterable<NodeId>
@@ -110,7 +109,7 @@ export function useProjectMcpTools(
       ),
     saveVersion: (comment) =>
       localVersioning.saveIfEnabled(currentProject.store.value.assetId, comment),
-    afterGraphUpdate: () => afterGraphUpdate(currentProject.graph.value, GRAPH_UPDATE_WAIT_MS),
+    watchGraphUpdate: () => watchGraphUpdate(currentProject.graph.value),
     watchExecution: () => watchExecution(currentProject.store.value.executionContext),
     setTimeout: (f, ms) => setTimeout(f, ms),
     clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),

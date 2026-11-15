@@ -164,7 +164,7 @@ test('collapse_nodes in Live mode is refused by the session', async () => {
     holdUndoStep: () => () => {},
     onForeignEdit: () => () => {},
     saveVersion: async () => {},
-    afterGraphUpdate: async () => {},
+    watchGraphUpdate: () => ({ updated: async () => true, cancel: () => {} }),
     watchExecution: () => ({ settled: async () => true, cancel: () => {} }),
     setTimeout: () => undefined,
     clearTimeout: () => {},

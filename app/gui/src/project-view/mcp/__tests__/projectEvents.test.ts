@@ -7,6 +7,8 @@ import {
   isUserTransaction,
   onUserModuleTransaction,
   watchExecution,
+  watchGraphUpdate,
+  type ExpressionUpdateLike,
 } from '../projectEvents'
 
 beforeEach(() => {
@@ -98,12 +100,21 @@ test('afterGraphUpdate resolves on the update, or at the timeout without one', a
 class FakeContext extends ObservableV2<{
   executionComplete(): void
   executionFailed(message: string): void
+  expressionUpdates(updates: readonly ExpressionUpdateLike[]): void
 }> {
+  /** The listeners on the events a watch follows; `executionComplete` is not one of them. */
   count() {
     return (
       (this._observers.get('executionComplete')?.size ?? 0) +
-      (this._observers.get('executionFailed')?.size ?? 0)
+      (this._observers.get('executionFailed')?.size ?? 0) +
+      (this._observers.get('expressionUpdates')?.size ?? 0)
     )
+  }
+  /** The engine reports these expressions, each with a payload of this type. */
+  report(type: string, ...ids: string[]) {
+    this.emit('expressionUpdates', [
+      ids.map((expressionId) => ({ expressionId, payload: { type } })),
+    ])
   }
 }
 
@@ -117,59 +128,229 @@ test('after the timeout, the left-behind update callback does nothing', async ()
   clear.mockRestore()
 })
 
-test('a watch resolves true on a completion or a failure after settled is called, and removes both listeners', async () => {
+/** Expects `promise` to resolve with `value` without any timer advancing. */
+async function resolvesAtOnce<T>(promise: Promise<T>, value: T) {
+  const done = vi.fn()
+  void promise.then(done)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(done).toHaveBeenCalledWith(value)
+}
+
+test('an executionComplete alone (from an earlier evaluation) does not settle a run with affected ids', async () => {
+  const context = new FakeContext()
+  const watch = watchExecution(context)
+  watch.editApplied()
+  context.emit('executionComplete', [])
+  const settled = watch.settled(['a'], 1_000)
+  context.emit('executionComplete', [])
+  await vi.advanceTimersByTimeAsync(999)
+  context.emit('executionComplete', [])
+  await vi.advanceTimersByTimeAsync(1)
+  expect(await settled).toBe(false)
+  expect(context.count()).toBe(0)
+})
+
+test('values reported for every affected id settle the run without an executionComplete', async () => {
   const context = new FakeContext()
   const watch = watchExecution(context)
   expect(context.count()).toBe(2)
-  const complete = watch.settled(1_000)
-  context.emit('executionComplete', [])
-  expect(await complete).toBe(true)
+  watch.editApplied()
+  const settled = watch.settled(['a', 'b'], 1_000)
+  context.report('Value', 'a')
+  await vi.advanceTimersByTimeAsync(0)
+  context.report('DataflowError', 'b')
+  expect(await settled).toBe(true)
   expect(context.count()).toBe(0)
-
-  const failing = watchExecution(context)
-  const failed = failing.settled(1_000)
-  context.emit('executionFailed', ['boom'])
-  expect(await failed).toBe(true)
-  expect(context.count()).toBe(0)
+  expect(vi.getTimerCount()).toBe(0)
 })
 
-test('a completion before settled is called is not missed: settled resolves true at once', async () => {
+test('an update for one of two affected ids does not settle; the second does', async () => {
   const context = new FakeContext()
   const watch = watchExecution(context)
-  context.emit('executionComplete', [])
+  watch.editApplied()
   const settled = vi.fn()
-  void watch.settled(1_000).then(settled)
-  // No timer is advanced.
+  void watch.settled(['a', 'b'], 1_000).then(settled)
+  context.report('Value', 'a', 'other')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(settled).not.toHaveBeenCalled()
+  context.report('Panic', 'b')
   await vi.advanceTimersByTimeAsync(0)
   expect(settled).toHaveBeenCalledWith(true)
+})
+
+test('a Pending payload does not count; a later value does', async () => {
+  const context = new FakeContext()
+  const watch = watchExecution(context)
+  watch.editApplied()
+  const settled = vi.fn()
+  void watch.settled(['a'], 1_000).then(settled)
+  context.report('Pending', 'a')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(settled).not.toHaveBeenCalled()
+  context.report('Value', 'a')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(settled).toHaveBeenCalledWith(true)
+})
+
+test('a value reported and then Pending again does not count until the next value', async () => {
+  const context = new FakeContext()
+  const watch = watchExecution(context)
+  context.report('Value', 'a')
+  context.report('Pending', 'a')
+  watch.editApplied()
+  const settled = vi.fn()
+  void watch.settled(['a'], 1_000).then(settled)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(settled).not.toHaveBeenCalled()
+  context.report('Value', 'a')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(settled).toHaveBeenCalledWith(true)
+})
+
+test('a mostly-Pending batch and then an executionComplete do not settle (collapse_nodes in the packaged app)', async () => {
+  const context = new FakeContext()
+  const watch = watchExecution(context)
+  watch.editApplied()
+  const settled = vi.fn()
+  void watch.settled(['call'], 1_000).then(settled)
+  // The engine has started: the affected node and others pending, an unrelated value.
+  context.report('Pending', 'call', 'x', 'y')
+  context.report('Value', 'other')
+  // A completion that follows an earlier evaluation.
+  context.emit('executionComplete', [])
+  await vi.advanceTimersByTimeAsync(0)
+  expect(settled).not.toHaveBeenCalled()
+  // The call node's value, 0.7 s later in the packaged app.
+  context.report('Value', 'call')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(settled).toHaveBeenCalledWith(true)
+})
+
+test('an executionFailed after the edit settles; one before it does not', async () => {
+  const context = new FakeContext()
+  const before = watchExecution(context)
+  context.emit('executionFailed', ['earlier'])
+  before.editApplied()
+  const notYet = before.settled(['a'], 1_000)
+  await vi.advanceTimersByTimeAsync(1_000)
+  expect(await notYet).toBe(false)
+
+  const watch = watchExecution(context)
+  watch.editApplied()
+  const settled = watch.settled(['a'], 1_000)
+  context.emit('executionFailed', ['boom'])
+  expect(await settled).toBe(true)
   expect(context.count()).toBe(0)
 })
 
-test('a watch resolves false at the timeout and removes both listeners', async () => {
+test('no affected ids: settled true at once, with no timer armed', async () => {
   const context = new FakeContext()
   const watch = watchExecution(context)
-  const settled = watch.settled(1_000)
+  watch.editApplied()
+  await resolvesAtOnce(watch.settled([], 1_000), true)
+  expect(vi.getTimerCount()).toBe(0)
+  expect(context.count()).toBe(0)
+})
+
+test('updates that arrive during the edit, for ids known only after it, are remembered', async () => {
+  const context = new FakeContext()
+  const watch = watchExecution(context)
+  // The engine reports the new node before the edit's callback has returned its id.
+  context.report('Value', 'new')
+  watch.editApplied()
+  await resolvesAtOnce(watch.settled(['new'], 1_000), true)
+  expect(context.count()).toBe(0)
+})
+
+test('the timeout gives false and removes the listeners', async () => {
+  const context = new FakeContext()
+  const watch = watchExecution(context)
+  watch.editApplied()
+  const settled = watch.settled(['a'], 1_000)
   await vi.advanceTimersByTimeAsync(999)
   expect(context.count()).toBe(2)
   await vi.advanceTimersByTimeAsync(1)
   expect(await settled).toBe(false)
   expect(context.count()).toBe(0)
-  context.emit('executionComplete', [])
+  context.report('Value', 'a')
 })
 
-test('cancel removes both listeners, before or during settled, and is idempotent', async () => {
+test('cancel removes the listeners, before or during settled, and is idempotent', async () => {
   const context = new FakeContext()
   const early = watchExecution(context)
   early.cancel()
   expect(context.count()).toBe(0)
-  expect(await early.settled(1_000)).toBe(false)
+  expect(await early.settled(['a'], 1_000)).toBe(false)
   early.cancel()
 
   const waiting = watchExecution(context)
-  const settled = waiting.settled(1_000)
+  waiting.editApplied()
+  const settled = waiting.settled(['a'], 1_000)
   waiting.cancel()
   expect(await settled).toBe(false)
   expect(context.count()).toBe(0)
-  // The cancelled watch's timer is gone too.
   expect(vi.getTimerCount()).toBe(0)
+})
+
+/** `doAfterUpdate` as `graph.ts` has it: the next update runs the queued callbacks. */
+function queueingGraph() {
+  const callbacks: (() => void)[] = []
+  return {
+    doAfterUpdate: (f: () => void) => {
+      callbacks.push(f)
+    },
+    update: () => {
+      for (const callback of callbacks.splice(0)) callback()
+    },
+  }
+}
+
+test('a graph update before updated is called is not missed: updated resolves true at once', async () => {
+  const graph = queueingGraph()
+  const watch = watchGraphUpdate(graph)
+  graph.update()
+  const updated = vi.fn()
+  void watch.updated(1_000).then(updated)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(updated).toHaveBeenCalledWith(true)
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+test('a graph update after updated is called resolves it true', async () => {
+  const graph = queueingGraph()
+  const watch = watchGraphUpdate(graph)
+  const updated = watch.updated(1_000)
+  graph.update()
+  expect(await updated).toBe(true)
+  expect(vi.getTimerCount()).toBe(0)
+})
+
+test('without a graph update, updated resolves false at the timeout; a later update does nothing', async () => {
+  const graph = queueingGraph()
+  const watch = watchGraphUpdate(graph)
+  const updated = vi.fn()
+  void watch.updated(1_000).then(updated)
+  await vi.advanceTimersByTimeAsync(999)
+  expect(updated).not.toHaveBeenCalled()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(updated).toHaveBeenCalledWith(false)
+  const clear = vi.spyOn(globalThis, 'clearTimeout')
+  graph.update()
+  expect(clear).not.toHaveBeenCalled()
+  clear.mockRestore()
+})
+
+test('a cancelled graph watch answers false, keeps no timer, and ignores a later update', async () => {
+  const graph = queueingGraph()
+  const early = watchGraphUpdate(graph)
+  early.cancel()
+  expect(await early.updated(1_000)).toBe(false)
+  early.cancel()
+
+  const waiting = watchGraphUpdate(graph)
+  const updated = waiting.updated(1_000)
+  waiting.cancel()
+  expect(await updated).toBe(false)
+  expect(vi.getTimerCount()).toBe(0)
+  graph.update()
 })

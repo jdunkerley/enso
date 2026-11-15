@@ -68,7 +68,10 @@ export async function collapseNodesTool(
     }
     if (!ids.includes(id)) ids.push(id)
   }
-  const outcome = await deps.session.run(deps.caller, () => deps.collapseNodes(ids, name))
+  const outcome = await deps.session.run(deps.caller, () => deps.collapseNodes(ids, name), {
+    // The engine reports a value for the new node that calls the function.
+    affected: ({ callNode }) => (callNode != null ? [callNode] : []),
+  })
   if (!outcome.ok) return errorResult(outcome)
   const { name: functionName, callNode } = outcome.value.value
   const node = callNode != null ? deps.db.nodeIdToNode.get(callNode) : undefined
@@ -131,6 +134,8 @@ export async function addFunction(
   const parsed = parseFunctionDefinition(args.source)
   if (!parsed.ok) return errorResult(parsed)
   const name = parsed.value
+  // A definition alone affects nothing the engine runs: the nodes that will call it are added
+  // later, and their own edit waits for their values.
   const outcome = await deps.session.run(deps.caller, () =>
     deps.editModule((topLevel) => insertFunction(deps, topLevel, args.source, name)),
   )

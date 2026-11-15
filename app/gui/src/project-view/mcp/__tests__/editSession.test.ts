@@ -3,14 +3,20 @@ import { ObservableV2 } from 'lib0/observable'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   EDIT_SETTLE_MS,
-  EDIT_SHORT_SETTLE_MS,
   EDIT_STEP_IDLE_MS,
   EditSession,
+  GRAPH_UPDATE_WAIT_MS,
   LIVE_EDIT_ERROR,
   NOT_ON_SCREEN_ERROR,
   type EditSessionDeps,
 } from '../editSession'
-import { watchExecution, type ExecutionWatch } from '../projectEvents'
+import {
+  watchExecution,
+  watchGraphUpdate,
+  type ExecutionWatch,
+  type ExpressionUpdateLike,
+  type GraphUpdateWatch,
+} from '../projectEvents'
 
 const claude = { kind: 'external', name: 'claude-code' } as const
 const codex = { kind: 'external', name: 'codex' } as const
@@ -21,21 +27,34 @@ function errorOf(result: Result<unknown>): string {
 }
 
 interface FakeWatch extends ExecutionWatch {
+  readonly editApplied: ReturnType<typeof vi.fn>
+  readonly cancel: ReturnType<typeof vi.fn>
+  done: boolean
+}
+
+interface FakeGraphWatch extends GraphUpdateWatch {
   readonly cancel: ReturnType<typeof vi.fn>
   done: boolean
 }
 
 /**
- * The session over fakes. `settle` answers each watch's `settled` (true by default); `watches` are
- * the watches the session started, `openWatches()` those neither settled nor cancelled.
+ * The session over fakes. `settle` answers each execution watch's `settled`, and `graphUpdated`
+ * each graph watch's `updated` (both true by default); `watches` and `graphWatches` are the watches
+ * the session started, `openWatches()` those of either kind neither finished nor cancelled.
  */
 function setup({
   settle: settleImpl = async () => true,
+  graphUpdated: graphUpdatedImpl = async () => true,
   ...overrides
-}: Partial<EditSessionDeps> & { settle?: (timeoutMs: number) => Promise<boolean> } = {}) {
+}: Partial<EditSessionDeps> & {
+  settle?: (affected: readonly string[], timeoutMs: number) => Promise<boolean>
+  graphUpdated?: (timeoutMs: number) => Promise<boolean>
+} = {}) {
   const log: string[] = []
   const settle = vi.fn(settleImpl)
+  const updated = vi.fn(graphUpdatedImpl)
   const watches: FakeWatch[] = []
+  const graphWatches: FakeGraphWatch[] = []
   let live = false
   let active = true
   let foreign: (() => void) | undefined
@@ -59,12 +78,26 @@ function setup({
     saveVersion: vi.fn(async (comment: string) => {
       log.push(`save:${comment}`)
     }),
-    afterGraphUpdate: vi.fn(async () => {}),
+    watchGraphUpdate: vi.fn(() => {
+      const watch: FakeGraphWatch = {
+        done: false,
+        updated: (timeoutMs) =>
+          updated(timeoutMs).finally(() => {
+            watch.done = true
+          }),
+        cancel: vi.fn(() => {
+          watch.done = true
+        }),
+      }
+      graphWatches.push(watch)
+      return watch
+    }),
     watchExecution: vi.fn(() => {
       const watch: FakeWatch = {
         done: false,
-        settled: (timeoutMs) =>
-          settle(timeoutMs).finally(() => {
+        editApplied: vi.fn(),
+        settled: (affected, timeoutMs) =>
+          settle(affected, timeoutMs).finally(() => {
             watch.done = true
           }),
         cancel: vi.fn(() => {
@@ -97,7 +130,9 @@ function setup({
     log,
     settle,
     watches,
-    openWatches: () => watches.filter((watch) => !watch.done),
+    updated,
+    graphWatches,
+    openWatches: () => [...watches, ...graphWatches].filter((watch) => !watch.done),
     release,
     unsubscribe,
     pending,
@@ -178,7 +213,7 @@ describe('EditSession', () => {
       settle: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
     })
     const running = t2.session.run(claude, () => Ok(1))
-    await vi.waitFor(() => expect(t2.deps.afterGraphUpdate).toHaveBeenCalled())
+    await vi.waitFor(() => expect(t2.updated).toHaveBeenCalled())
     expect(t2.pending()).toHaveLength(0)
     expect(t2.release).not.toHaveBeenCalled()
     finishSettle(true)
@@ -188,7 +223,7 @@ describe('EditSession', () => {
     // A second run by the same caller before the timer fires joins the step.
     const second = t2.session.run(claude, () => Ok(2))
     await vi.waitFor(() => expect(t2.pending()).toHaveLength(0))
-    await vi.waitFor(() => expect(t2.deps.afterGraphUpdate).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(t2.updated).toHaveBeenCalledTimes(2))
     await Promise.resolve()
     finishSettle(true)
     await second
@@ -215,7 +250,7 @@ describe('EditSession', () => {
       settle: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
     })
     const running = t2.session.run(claude, () => Ok(1))
-    await vi.waitFor(() => expect(t2.deps.afterGraphUpdate).toHaveBeenCalled())
+    await vi.waitFor(() => expect(t2.updated).toHaveBeenCalled())
     t2.foreign()
     expect(t2.release).toHaveBeenCalledTimes(1)
     finishSettle(true)
@@ -236,7 +271,7 @@ describe('EditSession', () => {
     const first = t2.session.run(claude, () => Ok(1))
     const secondEdit = vi.fn(() => Ok(2))
     const second = t2.session.run(claude, secondEdit)
-    await vi.waitFor(() => expect(t2.deps.afterGraphUpdate).toHaveBeenCalled())
+    await vi.waitFor(() => expect(t2.updated).toHaveBeenCalled())
     t2.session.dispose()
     finishSettle(true)
     expect((await first).ok).toBe(true)
@@ -334,14 +369,16 @@ describe('EditSession', () => {
     const t2 = setup({ settle: async () => false })
     const result = await t2.session.run(claude, () => Ok('x'))
     expect(result).toEqual(Ok({ value: 'x', settled: false }))
-    expect(t2.settle).toHaveBeenCalledWith(EDIT_SETTLE_MS)
+    expect(t2.settle).toHaveBeenCalledWith([], EDIT_SETTLE_MS)
   })
 
-  test('a run may wait a shorter time for the execution to settle', async () => {
-    const result = await t.session.run(claude, () => Ok('x'), { settleMs: EDIT_SHORT_SETTLE_MS })
-    expect(result).toEqual(Ok({ value: 'x', settled: true }))
-    expect(t.settle).toHaveBeenCalledWith(EDIT_SHORT_SETTLE_MS)
-    expect(EDIT_SHORT_SETTLE_MS).toBeLessThan(EDIT_SETTLE_MS)
+  test("the affected ids come from the edit's value, after the edit is applied", async () => {
+    const result = await t.session.run(claude, () => Ok(['n1', 'n2']), {
+      affected: (ids) => ids,
+    })
+    expect(result).toEqual(Ok({ value: ['n1', 'n2'], settled: true }))
+    expect(t.settle).toHaveBeenCalledWith(['n1', 'n2'], EDIT_SETTLE_MS)
+    expect(t.watches[0]!.editApplied).toHaveBeenCalledTimes(1)
   })
 
   test('an Err from edit is returned, leaves the step open, and skips the settle wait', async () => {
@@ -444,13 +481,21 @@ describe('EditSession', () => {
 class FakeContext extends ObservableV2<{
   executionComplete(): void
   executionFailed(message: string): void
+  expressionUpdates(updates: readonly ExpressionUpdateLike[]): void
 }> {
-  /** The listeners on the two events the session watches. */
+  /** The listeners on the events the session watches; `executionComplete` is not one of them. */
   count() {
     return (
       (this._observers.get('executionComplete')?.size ?? 0) +
-      (this._observers.get('executionFailed')?.size ?? 0)
+      (this._observers.get('executionFailed')?.size ?? 0) +
+      (this._observers.get('expressionUpdates')?.size ?? 0)
     )
+  }
+  /** The engine reports these expressions, each with a payload of this type. */
+  report(type: string, ...ids: string[]) {
+    this.emit('expressionUpdates', [
+      ids.map((expressionId) => ({ expressionId, payload: { type } })),
+    ])
   }
 }
 
@@ -458,9 +503,10 @@ describe('watching the execution', () => {
   test('the watch starts before the edit is applied, and is settled after the graph update', async () => {
     const order: string[] = []
     const t = setup({
-      afterGraphUpdate: vi.fn(async () => {
+      graphUpdated: async () => {
         order.push('graph')
-      }),
+        return true
+      },
       settle: async () => {
         order.push('settled')
         return true
@@ -468,14 +514,18 @@ describe('watching the execution', () => {
     })
     vi.mocked(t.deps.watchExecution).mockImplementationOnce(() => {
       order.push('watch')
-      return { settled: t.settle, cancel: () => order.push('cancel') }
+      return {
+        editApplied: () => order.push('applied'),
+        settled: t.settle,
+        cancel: () => order.push('cancel'),
+      }
     })
     await t.session.run(claude, () => {
       order.push('edit')
       return Ok(1)
     })
     expect(order[0]).toBe('watch')
-    expect(order.slice(1, 4)).toEqual(['edit', 'graph', 'settled'])
+    expect(order.slice(1, 5)).toEqual(['edit', 'applied', 'graph', 'settled'])
   })
 
   describe('against the real watch', () => {
@@ -492,39 +542,114 @@ describe('watching the execution', () => {
       return { ...t, context }
     }
 
-    test('an execution that completes before the graph update settles the edit without waiting', async () => {
+    /** A run of an edit whose value is the ids it affects. */
+    function runAffecting(t: ReturnType<typeof realSetup>, ids: string[], during?: () => void) {
+      const done = vi.fn()
+      void t.session
+        .run(
+          claude,
+          () => {
+            during?.()
+            return Ok(ids)
+          },
+          { affected: (value) => value },
+        )
+        .then(done)
+      return done
+    }
+
+    test('an executionComplete alone (from an earlier evaluation) does not settle a run with affected ids', async () => {
+      const t = realSetup()
+      const done = runAffecting(t, ['n'])
+      await vi.advanceTimersByTimeAsync(0)
+      t.context.emit('executionComplete', [])
+      await vi.advanceTimersByTimeAsync(EDIT_SETTLE_MS - 1)
+      expect(done).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(done).toHaveBeenCalledWith(Ok({ value: ['n'], settled: false }))
+      expect(t.context.count()).toBe(0)
+    })
+
+    test('values for all affected ids settle the run without an executionComplete', async () => {
+      const t = realSetup()
+      const done = runAffecting(t, ['a', 'b'])
+      await vi.advanceTimersByTimeAsync(0)
+      t.context.report('Value', 'a')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).not.toHaveBeenCalled()
+      t.context.report('Value', 'b')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).toHaveBeenCalledWith(Ok({ value: ['a', 'b'], settled: true }))
+      expect(t.context.count()).toBe(0)
+    })
+
+    test('a Pending payload for an affected id does not count; a later value does', async () => {
+      const t = realSetup()
+      const done = runAffecting(t, ['a'])
+      await vi.advanceTimersByTimeAsync(0)
+      t.context.report('Pending', 'a')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).not.toHaveBeenCalled()
+      t.context.report('Value', 'a')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).toHaveBeenCalledWith(Ok({ value: ['a'], settled: true }))
+    })
+
+    test('a Pending batch and an executionComplete do not settle; the value does', async () => {
+      const t = realSetup()
+      const done = runAffecting(t, ['a'])
+      await vi.advanceTimersByTimeAsync(0)
+      t.context.report('Pending', 'a', 'b')
+      t.context.report('Value', 'someone-else')
+      t.context.emit('executionComplete', [])
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).not.toHaveBeenCalled()
+      t.context.report('Value', 'a')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).toHaveBeenCalledWith(Ok({ value: ['a'], settled: true }))
+    })
+
+    test('an executionFailed after the edit settles', async () => {
+      const t = realSetup()
+      const done = runAffecting(t, ['a'])
+      await vi.advanceTimersByTimeAsync(0)
+      t.context.emit('executionFailed', ['boom'])
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).toHaveBeenCalledWith(Ok({ value: ['a'], settled: true }))
+      expect(t.context.count()).toBe(0)
+    })
+
+    test('no affected ids: settled at once, with no timer armed', async () => {
+      const t = realSetup()
+      const done = runAffecting(t, [])
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).toHaveBeenCalledWith(Ok({ value: [], settled: true }))
+      expect(vi.getTimerCount()).toBe(0)
+      expect(t.context.count()).toBe(0)
+    })
+
+    test('updates that arrive during the edit, for ids it returns, are remembered', async () => {
+      const t = realSetup()
+      const done = runAffecting(t, ['new'], () => t.context.report('Value', 'new'))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).toHaveBeenCalledWith(Ok({ value: ['new'], settled: true }))
+      expect(t.context.count()).toBe(0)
+    })
+
+    test('the values may come before the graph update is awaited', async () => {
       const context = new FakeContext()
       const t = setup({
         watchExecution: () => watchExecution(context),
-        afterGraphUpdate: async () => {
-          // The engine finished the edit's execution before the node database was updated.
-          context.emit('executionComplete', [])
+        graphUpdated: async () => {
+          context.report('Value', 'n')
+          return true
         },
       })
-      const settled = vi.fn()
-      void t.session.run(claude, () => Ok(1)).then(settled)
-      // No timer is advanced: the result does not wait for the settle timeout.
+      const done = vi.fn()
+      void t.session.run(claude, () => Ok(['n']), { affected: (ids) => ids }).then(done)
       await vi.advanceTimersByTimeAsync(0)
-      expect(settled).toHaveBeenCalledWith(Ok({ value: 1, settled: true }))
+      expect(done).toHaveBeenCalledWith(Ok({ value: ['n'], settled: true }))
       expect(context.count()).toBe(0)
-    })
-
-    test('an execution after the graph update settles it; the listeners are removed', async () => {
-      const t = realSetup()
-      const result = t.session.run(claude, () => Ok(1))
-      await vi.advanceTimersByTimeAsync(0)
-      expect(t.context.count()).toBe(2)
-      t.context.emit('executionComplete', [])
-      expect(await result).toEqual(Ok({ value: 1, settled: true }))
-      expect(t.context.count()).toBe(0)
-    })
-
-    test('no execution: settled false at EDIT_SETTLE_MS; the listeners are removed', async () => {
-      const t = realSetup()
-      const result = t.session.run(claude, () => Ok(1))
-      await vi.advanceTimersByTimeAsync(EDIT_SETTLE_MS)
-      expect(await result).toEqual(Ok({ value: 1, settled: false }))
-      expect(t.context.count()).toBe(0)
     })
 
     test('an edit that returns Err or throws leaves no listener', async () => {
@@ -576,5 +701,111 @@ describe('watching the execution', () => {
     expect(t.watches[1]!.cancel).toHaveBeenCalled()
     expect(t.openWatches()).toHaveLength(0)
     expect(t.settle).not.toHaveBeenCalled()
+  })
+})
+
+/** A graph like `graph.ts`'s: `doAfterUpdate` queues a callback that the next update runs. */
+function fakeGraph() {
+  const callbacks: (() => void)[] = []
+  return {
+    doAfterUpdate: (f: () => void) => {
+      callbacks.push(f)
+    },
+    /** The node database update, as Vue's effect runs it after a module change. */
+    update: () => {
+      for (const callback of callbacks.splice(0)) callback()
+    },
+    queued: () => callbacks.length,
+  }
+}
+
+describe('waiting for the graph update', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  test('the graph watch starts before the edit, and is awaited after it', async () => {
+    const order: string[] = []
+    const t = setup({
+      graphUpdated: async () => {
+        order.push('updated')
+        return true
+      },
+    })
+    vi.mocked(t.deps.watchGraphUpdate).mockImplementationOnce(() => {
+      order.push('watch')
+      return { updated: t.updated, cancel: () => order.push('cancel') }
+    })
+    await t.session.run(claude, () => {
+      order.push('edit')
+      return Ok(1)
+    })
+    expect(order.slice(0, 3)).toEqual(['watch', 'edit', 'updated'])
+    expect(t.updated).toHaveBeenCalledWith(GRAPH_UPDATE_WAIT_MS)
+  })
+
+  test('an update that runs during the edit, before the wait is awaited, ends the wait at once', async () => {
+    const graph = fakeGraph()
+    const t = setup({ watchGraphUpdate: () => watchGraphUpdate(graph) })
+    const done = vi.fn()
+    void t.session
+      .run(claude, () => {
+        // The module change: Vue runs the update effect before the session continues.
+        queueMicrotask(graph.update)
+        return Ok(1)
+      })
+      .then(done)
+    // No timer is advanced.
+    await vi.advanceTimersByTimeAsync(0)
+    expect(done).toHaveBeenCalledWith(Ok({ value: 1, settled: true }))
+  })
+
+  test('an update after the edit ends the wait; without one, it ends at GRAPH_UPDATE_WAIT_MS', async () => {
+    const graph = fakeGraph()
+    const t = setup({ watchGraphUpdate: () => watchGraphUpdate(graph) })
+    const first = vi.fn()
+    void t.session.run(claude, () => Ok(1)).then(first)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(first).not.toHaveBeenCalled()
+    graph.update()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(first).toHaveBeenCalled()
+
+    const second = vi.fn()
+    void t.session.run(claude, () => Ok(2)).then(second)
+    await vi.advanceTimersByTimeAsync(GRAPH_UPDATE_WAIT_MS - 1)
+    expect(second).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(second).toHaveBeenCalledWith(Ok({ value: 2, settled: true }))
+  })
+
+  test('Err, a throw or a refusal cancels the graph wait: no timer and no live callback is left', async () => {
+    const graph = fakeGraph()
+    const t = setup({ watchGraphUpdate: () => watchGraphUpdate(graph) })
+    await t.session.run(claude, () => Err('nope'))
+    await t.session.run(claude, () => {
+      throw new Error('boom')
+    })
+    t.setLive(true)
+    await t.session.run(claude, () => Ok(1))
+    expect(vi.getTimerCount()).toBe(0)
+    expect(t.updated).not.toHaveBeenCalled()
+    // A cancelled watch's callback stays queued until the next update, which it ignores.
+    graph.update()
+    expect(graph.queued()).toBe(0)
+  })
+
+  test('a fake graph watch is cancelled on Err and on a throw, and none is left open', async () => {
+    const t = setup()
+    await t.session.run(claude, () => Err('nope'))
+    await t.session.run(claude, () => {
+      throw new Error('boom')
+    })
+    expect(t.graphWatches).toHaveLength(2)
+    for (const watch of t.graphWatches) expect(watch.cancel).toHaveBeenCalled()
+    expect(t.openWatches()).toHaveLength(0)
   })
 })

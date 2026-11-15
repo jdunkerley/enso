@@ -11,12 +11,7 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
-import {
-  EDIT_SHORT_SETTLE_MS,
-  EditSession,
-  LIVE_EDIT_ERROR,
-  type EditOutcome,
-} from '../editSession'
+import { EditSession, LIVE_EDIT_ERROR, type EditOutcome, type EditRunOptions } from '../editSession'
 import {
   MISSING_NODES_NOTE,
   UNSETTLED_NOTE,
@@ -95,12 +90,23 @@ const pointer: MethodPointer = {
 
 const caller = { kind: 'external', name: 'claude-code' } as const
 
-/** A session that runs each edit at once and reports `settled`. */
-function fakeSession(settled = true): Pick<EditSession, 'run'> {
+/**
+ * A session that runs each edit at once and reports `settled`. `affected` lists, per successful
+ * run, the expression ids the tool said its edit affects.
+ */
+function fakeSession(settled = true): Pick<EditSession, 'run'> & { affected: string[][] } {
+  const affected: string[][] = []
   return {
-    async run<T>(_caller: unknown, edit: () => Result<T> | Promise<Result<T>>) {
+    affected,
+    async run<T>(
+      _caller: unknown,
+      edit: () => Result<T> | Promise<Result<T>>,
+      options?: EditRunOptions<T>,
+    ) {
       const result = await edit()
-      return result.ok ? Ok<EditOutcome<T>>({ value: result.value, settled }) : result
+      if (!result.ok) return result
+      affected.push([...(options?.affected?.(result.value) ?? [])])
+      return Ok<EditOutcome<T>>({ value: result.value, settled })
     },
   }
 }
@@ -258,7 +264,7 @@ test('add_nodes in Live mode is refused by the session, and nothing is created',
     holdUndoStep: () => () => {},
     onForeignEdit: () => () => {},
     saveVersion: async () => {},
-    afterGraphUpdate: async () => {},
+    watchGraphUpdate: () => ({ updated: async () => true, cancel: () => {} }),
     watchExecution: () => ({ settled: async () => true, cancel: () => {} }),
     setTimeout: () => undefined,
     clearTimeout: () => {},
@@ -274,7 +280,7 @@ test('add_nodes adds a note when execution has not finished', async () => {
   expect(result.settled).toBe(false)
   expect(result.note).toBe(UNSETTLED_NOTE)
   expect(UNSETTLED_NOTE).toBe(
-    'Execution has not finished. Call get_node later for the types and values.',
+    'The engine had not reported results for the changed nodes within 20 seconds: call get_node later.',
   )
 })
 
@@ -388,13 +394,46 @@ test('set_visualization shows the visualization and answers with the node', asyn
   )
 })
 
-test('set_node_comment and set_visualization wait only briefly for an execution', async () => {
+test('set_node_comment and set_visualization affect no expression, so they do not wait', async () => {
   const session = fakeSession()
-  const run = vi.spyOn(session, 'run')
   const { deps, db } = makeDeps({ session })
   const a = nodeNamed(db, 'a')
   await setNodeComment(deps, { node_id: a, text: 'Hello' })
   await setVisualization(deps, { node_id: a, visible: true })
-  expect(run).toHaveBeenCalledTimes(2)
-  for (const call of run.mock.calls) expect(call[2]).toEqual({ settleMs: EDIT_SHORT_SETTLE_MS })
+  expect(session.affected).toEqual([[], []])
+})
+
+test('add_nodes waits for the new nodes; edit_node for the edited node', async () => {
+  const session = fakeSession()
+  const { deps, db } = makeDeps({ session })
+  const added = valueOf(await addNodes(deps, { statements: ['c = 1', 'd = c + 1'] }))
+  expect(session.affected[0]).toEqual(added.nodes.map((n: { id: string }) => n.id))
+  expect(session.affected[0]).toHaveLength(2)
+  const a = nodeNamed(db, 'a')
+  await editNode(deps, { node_id: a, expression: '7' })
+  expect(session.affected[1]).toEqual([a])
+})
+
+test('remove_nodes waits for the nodes that used a removed one, read before the deletion', async () => {
+  const session = fakeSession()
+  const { deps, db } = makeDeps({ session })
+  const a = nodeNamed(db, 'a')
+  const b = nodeNamed(db, 'b')
+  vi.mocked(deps.deleteNodes).mockImplementation(async (ids) => {
+    // Once deleted, a node has no users to look up.
+    for (const id of ids) db.nodeIdToNode.delete(id)
+    return Ok()
+  })
+  await removeNodes(deps, { node_ids: [a] })
+  expect(session.affected[0]).toEqual([b])
+})
+
+test('remove_nodes of a node nothing else uses, or of a node and its only user, waits for nothing', async () => {
+  const session = fakeSession()
+  const { deps, db } = makeDeps({ session })
+  const a = nodeNamed(db, 'a')
+  const b = nodeNamed(db, 'b')
+  await removeNodes(deps, { node_ids: [a, b] })
+  // `b` is used only by the method's output, which is not removed: it is the one user.
+  expect(session.affected[0]).toEqual([outputNode(db)])
 })

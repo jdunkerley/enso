@@ -5,17 +5,18 @@
  */
 import type { McpCaller } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
-import type { ExecutionWatch } from './projectEvents'
+import type { ExecutionWatch, GraphUpdateWatch } from './projectEvents'
 
 /** How long a caller's undo step stays open without a further edit by that caller. */
 export const EDIT_STEP_IDLE_MS = 10_000
-/** How long an edit waits for the execution to complete or fail. */
-export const EDIT_SETTLE_MS = 20_000
 /**
- * How long an edit that changes no code the engine runs (a comment, a visualization) waits for an
- * execution, which may never come.
+ * How long an edit waits for the node database to reflect it. A safety net: every edit tool's
+ * change updated it at once in the packaged app; when it fires, the result may describe the graph
+ * from before the edit.
  */
-export const EDIT_SHORT_SETTLE_MS = 2_000
+export const GRAPH_UPDATE_WAIT_MS = 2_000
+/** How long an edit waits for the engine to report results for the expressions it affects. */
+export const EDIT_SETTLE_MS = 20_000
 /** The answer to every edit tool while the project is in Live mode. */
 export const LIVE_EDIT_ERROR =
   'The project is in Live mode. Edits by an agent are refused there. Ask the user to switch the project back to Design.'
@@ -34,8 +35,11 @@ export interface EditSessionDeps {
   readonly onForeignEdit: (listener: () => void) => () => void
   /** Rejects when the version cannot be saved. Resolves without doing anything when versions are off. */
   readonly saveVersion: (comment: string) => Promise<void>
-  /** Resolves when the node database reflects the last edit. */
-  readonly afterGraphUpdate: () => Promise<void>
+  /**
+   * Starts waiting for the node database's next update, before the edit is applied, so that an
+   * update that runs during the edit is not missed. The session awaits or cancels every watch.
+   */
+  readonly watchGraphUpdate: () => GraphUpdateWatch
   /**
    * Starts watching the execution context, before the edit is applied, so that an execution that
    * ends before the graph update is not missed. The session settles or cancels every watch.
@@ -45,9 +49,14 @@ export interface EditSessionDeps {
   readonly clearTimeout: (handle: unknown) => void
 }
 
-export interface EditRunOptions {
-  /** How long to wait for the execution to settle; {@link EDIT_SETTLE_MS} by default. */
-  readonly settleMs?: number
+export interface EditRunOptions<T> {
+  /**
+   * The external ids of the expressions the edit makes the engine compute again (new nodes, an
+   * edited node, the users of a removed node), from the edit's value. None by default: an edit
+   * that affects nothing the engine runs (a comment, a visualization, a function definition on its
+   * own) settles at once.
+   */
+  readonly affected?: (value: T) => readonly string[]
 }
 
 export interface EditOutcome<T> {
@@ -99,12 +108,10 @@ export class EditSession {
   run<T>(
     caller: McpCaller,
     edit: () => Result<T> | Promise<Result<T>>,
-    options: EditRunOptions = {},
+    options: EditRunOptions<T> = {},
   ): Promise<Result<EditOutcome<T>>> {
     // `execute` never rejects, so the queue cannot stall.
-    const task = this.tail.then(() =>
-      this.execute(caller, edit, options.settleMs ?? EDIT_SETTLE_MS),
-    )
+    const task = this.tail.then(() => this.execute(caller, edit, options.affected ?? (() => [])))
     this.tail = task
     return task
   }
@@ -144,9 +151,10 @@ export class EditSession {
   private async execute<T>(
     caller: McpCaller,
     edit: () => Result<T> | Promise<Result<T>>,
-    settleMs: number,
+    affected: (value: T) => readonly string[],
   ): Promise<Result<EditOutcome<T>>> {
     let watch: ExecutionWatch | undefined
+    let graphWatch: GraphUpdateWatch | undefined
     try {
       if (this.disposed) return Err(PROJECT_CLOSED_ERROR)
       if (!this.deps.isActive()) return Err(NOT_ON_SCREEN_ERROR)
@@ -168,8 +176,9 @@ export class EditSession {
         this.stepCaller = key
       }
       let result: Result<T>
-      // Watching starts before the edit: the engine may finish executing it before the graph
-      // update below resolves.
+      // Both watches start before the edit: the node database may update during it, and the
+      // engine may report the edit's results before the graph update is awaited.
+      graphWatch = this.deps.watchGraphUpdate()
       watch = this.deps.watchExecution()
       this.inEdit = true
       try {
@@ -178,13 +187,15 @@ export class EditSession {
         this.inEdit = false
       }
       if (!result.ok) return result
-      await this.deps.afterGraphUpdate()
-      const settled = await watch.settled(settleMs)
+      watch.editApplied()
+      await graphWatch.updated(GRAPH_UPDATE_WAIT_MS)
+      const settled = await watch.settled(affected(result.value), EDIT_SETTLE_MS)
       return Ok({ value: result.value, settled })
     } catch (error) {
       return Err(errorText(error))
     } finally {
       // A refused, failed or thrown edit leaves no listener behind; after `settled`, a no-op.
+      graphWatch?.cancel()
       watch?.cancel()
       try {
         this.armIdleTimer()

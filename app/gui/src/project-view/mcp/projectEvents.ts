@@ -75,53 +75,152 @@ export function afterGraphUpdate(
   })
 }
 
-/** The part of an execution context {@link watchExecution} listens to. */
-export interface ExecutionEvents {
-  on(event: 'executionComplete' | 'executionFailed', listener: () => void): unknown
-  off(event: 'executionComplete' | 'executionFailed', listener: () => void): unknown
+/** A wait for the node database's next update, started before an edit is applied. */
+export interface GraphUpdateWatch {
+  /**
+   * Resolves true once the node database has updated since the watch started (at once if it
+   * already has), false after `timeoutMs` (from this call).
+   */
+  updated(timeoutMs: number): Promise<boolean>
+  /** Ends the watch; a later or pending `updated` resolves false. Idempotent. */
+  cancel(): void
 }
 
-/** A watch on the execution context, started before an edit is applied. */
+/**
+ * Queues a callback for the graph's next node-database update at once, so that an update which
+ * runs before {@link GraphUpdateWatch.updated} is awaited is not missed: a module change made
+ * synchronously by an edit queues Vue's update effect, which runs in a microtask before the code
+ * after `await edit()`.
+ *
+ * `doAfterUpdate` has no way to unqueue a callback: after a timeout or `cancel`, it stays queued
+ * until the next update, which drains the queue, and does nothing then.
+ */
+export function watchGraphUpdate(graph: {
+  doAfterUpdate: (f: () => void) => void
+}): GraphUpdateWatch {
+  let seen = false
+  let done = false
+  let finish: ((updated: boolean) => void) | undefined
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const stop = () => {
+    done = true
+    if (timer !== undefined) clearTimeout(timer)
+  }
+  graph.doAfterUpdate(() => {
+    if (done) return
+    seen = true
+    finish?.(true)
+  })
+  return {
+    updated(timeoutMs) {
+      if (done) return Promise.resolve(false)
+      if (seen) {
+        stop()
+        return Promise.resolve(true)
+      }
+      return new Promise((resolve) => {
+        finish = (updated) => {
+          finish = undefined
+          stop()
+          resolve(updated)
+        }
+        timer = setTimeout(() => finish?.(false), timeoutMs)
+      })
+    },
+    cancel() {
+      if (done) return
+      stop()
+      finish?.(false)
+    },
+  }
+}
+
+/** What a watch reads of one `expressionUpdates` entry. */
+export interface ExpressionUpdateLike {
+  readonly expressionId: string
+  readonly payload: { readonly type: string }
+}
+
+/** The part of an execution context {@link watchExecution} listens to. */
+export interface ExecutionEvents {
+  on(event: 'executionFailed', listener: () => void): unknown
+  on(
+    event: 'expressionUpdates',
+    listener: (updates: readonly ExpressionUpdateLike[]) => void,
+  ): unknown
+  off(event: 'executionFailed', listener: () => void): unknown
+  off(
+    event: 'expressionUpdates',
+    listener: (updates: readonly ExpressionUpdateLike[]) => void,
+  ): unknown
+}
+
+/** A watch on the engine's reports, started before an edit is applied. */
 export interface ExecutionWatch {
+  /** The edit has returned: from now on an `executionFailed` settles the watch. */
+  editApplied(): void
   /**
-   * Resolves true once an execution has completed or failed since the watch started (at once if
-   * one already has), false after `timeoutMs` (from this call). Removes the listeners either way.
+   * Resolves true once the engine has reported results for the `affected` expressions since the
+   * watch started (at once if it already has, or if there are none), false after `timeoutMs`
+   * (from this call). Removes the listeners either way. See {@link watchExecution}.
    */
-  settled(timeoutMs: number): Promise<boolean>
+  settled(affected: readonly string[], timeoutMs: number): Promise<boolean>
   /** Removes the listeners; a later or pending `settled` resolves false. Idempotent. */
   cancel(): void
 }
 
 /**
- * Starts listening to the context's `executionComplete` and `executionFailed` at once, so that an
- * execution which finishes before {@link ExecutionWatch.settled} is called is not missed: the
- * engine often finishes a small edit's execution before the node database has been updated.
+ * Starts recording the context's `expressionUpdates` and `executionFailed` at once, so that a report
+ * which comes before {@link ExecutionWatch.settled} is called is not missed.
  *
- * Any execution that ends after the watch starts counts, including one that was already running
- * when the edit was made, or the evaluation of a preview: the context reports no more than that an
- * execution ended (see "The edit session" in `CLAUDE.md`).
+ * An edit has settled when:
+ * - it affects no expression; or
+ * - every affected expression's latest update since the watch started has a payload that is not
+ *   `Pending` (the engine has computed it: a value, an error or a panic); or
+ * - an `executionFailed` came after the edit was applied (the whole execution failed).
+ *
+ * `executionComplete` plays no part: one follows each evaluation (a `get_graph` preview), so a
+ * stray one arrives while the engine is still computing the edit (see `CLAUDE.md`).
  */
 export function watchExecution(context: ExecutionEvents): ExecutionWatch {
-  let ended = false
+  const latest = new Map<string, string>()
+  let applied = false
+  let failedAfterEdit = false
   let done = false
-  let finish: ((settled: boolean) => void) | undefined
+  let check: (() => void) | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
-  const onEvent = () => {
-    ended = true
-    finish?.(true)
+  const onUpdates = (updates: readonly ExpressionUpdateLike[]) => {
+    for (const update of updates) latest.set(update.expressionId, update.payload.type)
+    check?.()
+  }
+  const onFailed = () => {
+    if (applied) failedAfterEdit = true
+    check?.()
   }
   const stop = () => {
     done = true
+    check = undefined
     if (timer !== undefined) clearTimeout(timer)
-    context.off('executionComplete', onEvent)
-    context.off('executionFailed', onEvent)
+    context.off('expressionUpdates', onUpdates)
+    context.off('executionFailed', onFailed)
   }
-  context.on('executionComplete', onEvent)
-  context.on('executionFailed', onEvent)
+  context.on('expressionUpdates', onUpdates)
+  context.on('executionFailed', onFailed)
+  let finish: ((settled: boolean) => void) | undefined
   return {
-    settled(timeoutMs) {
+    editApplied() {
+      applied = true
+    },
+    settled(affected, timeoutMs) {
       if (done) return Promise.resolve(false)
-      if (ended) {
+      const reported = () =>
+        affected.length === 0 ||
+        failedAfterEdit ||
+        affected.every((id) => {
+          const type = latest.get(id)
+          return type != null && type !== 'Pending'
+        })
+      if (reported()) {
         stop()
         return Promise.resolve(true)
       }
@@ -131,13 +230,17 @@ export function watchExecution(context: ExecutionEvents): ExecutionWatch {
           stop()
           resolve(settled)
         }
+        check = () => {
+          if (reported()) finish?.(true)
+        }
         timer = setTimeout(() => finish?.(false), timeoutMs)
       })
     },
     cancel() {
       if (done) return
+      const pending = finish
       stop()
-      finish?.(false)
+      pending?.(false)
     },
   }
 }

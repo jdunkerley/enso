@@ -10,7 +10,7 @@ import { nodeMutableDocumentation } from '@/util/ast/node'
 import { isIdentifier, type Identifier } from '@/util/qualifiedName'
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
-import { EDIT_SHORT_SETTLE_MS, type EditOutcome, type EditSession } from './editSession'
+import type { EditOutcome, EditSession } from './editSession'
 import {
   capNodeTexts,
   findNode,
@@ -24,7 +24,7 @@ import { hasSyntaxError, parseImportLines, quote } from './importLines'
 
 /** Added to a result whose edit was not followed by a finished execution in time. */
 export const UNSETTLED_NOTE =
-  'Execution has not finished. Call get_node later for the types and values.'
+  'The engine had not reported results for the changed nodes within 20 seconds: call get_node later.'
 /** Added to an `add_nodes` result when some new nodes are not in the node database yet. */
 export const MISSING_NODES_NOTE =
   'Some new nodes are not in the graph on screen yet. Call get_graph for them.'
@@ -173,17 +173,22 @@ export async function addNodes(
     }
     nodes.push(parsed.value)
   }
-  const outcome = await deps.session.run(deps.caller, () => {
-    // Checked at the call's turn in the queue: an earlier edit may have taken the name since.
-    const taken = [...bound].find((name) => deps.db.identifierUsed(name))
-    if (taken != null) {
-      return Err(
-        `The name \`${quote(taken)}\` is already used in the method. ` +
-          'Choose another name, or change that node with edit_node.',
-      )
-    }
-    return deps.createNodes(nodes, after, imports)
-  })
+  const outcome = await deps.session.run(
+    deps.caller,
+    () => {
+      // Checked at the call's turn in the queue: an earlier edit may have taken the name since.
+      const taken = [...bound].find((name) => deps.db.identifierUsed(name))
+      if (taken != null) {
+        return Err(
+          `The name \`${quote(taken)}\` is already used in the method. ` +
+            'Choose another name, or change that node with edit_node.',
+        )
+      }
+      return deps.createNodes(nodes, after, imports)
+    },
+    // The engine reports a value for each new node.
+    { affected: (ids) => ids },
+  )
   if (!outcome.ok) return errorResult(outcome)
   const summaries: NodeSummary[] = []
   for (const id of outcome.value.value) {
@@ -214,8 +219,10 @@ export async function editNode(
   }
   const expression = parseNodeExpression(args.expression)
   if (!expression.ok) return errorResult(expression)
-  const outcome = await deps.session.run(deps.caller, () =>
-    deps.setNodeContent(id, expression.value),
+  const outcome = await deps.session.run(
+    deps.caller,
+    () => deps.setNodeContent(id, expression.value),
+    { affected: () => [id] },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult({ nodes: [currentSummary(deps, found.value)] }, outcome.value)
@@ -240,7 +247,17 @@ export async function removeNodes(
     }
     if (!ids.includes(id)) ids.push(id)
   }
-  const outcome = await deps.session.run(deps.caller, () => deps.deleteNodes(ids))
+  // The nodes that used a removed one lose that input and are computed again. Read at the call's
+  // turn, before the deletion, from the usages `deleteNodes` disconnects.
+  let users: NodeId[] = []
+  const outcome = await deps.session.run(
+    deps.caller,
+    () => {
+      users = dependentsOf(deps, ids)
+      return deps.deleteNodes(ids)
+    },
+    { affected: () => users },
+  )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult({ removed: ids }, outcome.value)
 }
@@ -257,9 +274,8 @@ export async function setNodeComment(
   }
   const outcome = await deps.session.run(
     deps.caller,
+    // A comment changes nothing the engine runs: no expression is affected.
     () => deps.setNodeComment(found.value.id, args.text),
-    // A comment changes nothing the engine runs: an execution may never come.
-    { settleMs: EDIT_SHORT_SETTLE_MS },
   )
   if (!outcome.ok) return errorResult(outcome)
   return jsonResult({ node: currentSummary(deps, found.value) })
@@ -274,11 +290,22 @@ export async function setVisualization(
   if (!found.ok) return found
   const outcome = await deps.session.run(
     deps.caller,
+    // A visualization changes nothing the engine runs for the graph: no expression is affected.
     () => deps.setVisualization(found.value.id, args.visible),
-    { settleMs: EDIT_SHORT_SETTLE_MS },
   )
   if (!outcome.ok) return errorResult(outcome)
   return jsonResult({ node: currentSummary(deps, found.value) })
+}
+
+/** The nodes, other than `removed`, that use any of `removed`. */
+function dependentsOf(deps: EditToolDeps, removed: readonly NodeId[]): NodeId[] {
+  const users = new Set<NodeId>()
+  for (const id of removed) {
+    for (const user of deps.db.nodeDependents.lookup(id)) {
+      if (!removed.includes(user)) users.add(user)
+    }
+  }
+  return [...users]
 }
 
 /** The node's summary, its texts capped as `get_graph` caps them. */
