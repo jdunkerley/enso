@@ -110,4 +110,65 @@ describe('the time-of-day menu', () => {
     mounted = undefined
     expect(wrapper.emitted('choose')).toBeUndefined()
   })
+
+  test('the accept hook, called on a click outside, writes an edited time', async () => {
+    let accept: (() => void) | undefined
+    mounted?.unmount()
+    mounted = mount(TimeOfDayMenu, {
+      props: {
+        choice: { kind: 'time', hour: 14, minute: 30, second: 0 },
+        now: NOW,
+        registerAccept: (handler: () => void) => (accept = handler),
+      },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    await userEvent.keyboard('{ArrowUp}')
+    accept!()
+    expect(chosenCodes(mounted)).toEqual(['Time_Of_Day.new 15 30'])
+    accept!()
+    expect(chosenCodes(mounted)).toHaveLength(1)
+  })
+
+  test('the accept hook writes nothing without an edit', async () => {
+    let accept: (() => void) | undefined
+    mounted?.unmount()
+    mounted = mount(TimeOfDayMenu, {
+      props: {
+        choice: { kind: 'time', hour: 14, minute: 30, second: 0 },
+        now: NOW,
+        registerAccept: (handler: () => void) => (accept = handler),
+      },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    accept!()
+    expect(mounted.emitted('choose')).toBeUndefined()
+  })
+
+  test('a cleared segment makes the time incomplete: Enter and leaving write nothing', async () => {
+    const wrapper = await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    await userEvent.keyboard('{ArrowUp}{Backspace}{Backspace}{Enter}')
+    await userEvent.click(document.body)
+    expect(wrapper.emitted('choose')).toBeUndefined()
+  })
+
+  test('a cleared segment filled in again can be written', async () => {
+    const wrapper = await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    await userEvent.keyboard('{Backspace}{Backspace}{Enter}')
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    await userEvent.keyboard('09{Enter}')
+    expect(chosenCodes(wrapper)).toEqual(['Time_Of_Day.new 9 30'])
+  })
+
+  test('Enter on Add seconds toggles the seconds and writes nothing', async () => {
+    const wrapper = await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    await userEvent.keyboard('{ArrowUp}')
+    const toggle = wrapper.get('[data-action="seconds"]').element as HTMLElement
+    toggle.focus()
+    await userEvent.keyboard('{Enter}')
+    await flushPromises()
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    expect(segments()).toHaveLength(3)
+  })
 })

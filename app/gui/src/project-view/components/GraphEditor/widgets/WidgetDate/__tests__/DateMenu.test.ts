@@ -34,8 +34,8 @@ const day = (n: number) =>
 describe('the date menu', () => {
   test.each([
     ['today', 'Date.today'],
-    ['yesterday', 'Date.today.previous'],
-    ['tomorrow', 'Date.today.next'],
+    ['yesterday', 'Date.yesterday'],
+    ['tomorrow', 'Date.tomorrow'],
   ])('%s writes %s', async (kind, code) => {
     const wrapper = await mountMenu(undefined)
     await wrapper.get(`[data-choice="${kind}"]`).trigger('click')
@@ -89,5 +89,25 @@ describe('the date menu', () => {
     await userEvent.keyboard('{Escape}')
     expect(wrapper.emitted('close')).toHaveLength(1)
     expect(wrapper.emitted('choose')).toBeUndefined()
+  })
+
+  test('clicking the day that is already chosen closes the menu and writes nothing', async () => {
+    const wrapper = await mountMenu({ kind: 'date', year: 2026, month: 11, day: 10 })
+    await userEvent.click(day(10))
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    expect(wrapper.emitted('close')).toHaveLength(1)
+  })
+
+  test('clicking another day writes it and does not ask to close', async () => {
+    const wrapper = await mountMenu({ kind: 'date', year: 2026, month: 11, day: 10 })
+    await userEvent.click(day(11))
+    expect(chosenCodes(wrapper)).toEqual(['Date.new 2026 11 11'])
+    expect(wrapper.emitted('close')).toBeUndefined()
+  })
+
+  test('the calendar stops at year 100, the earliest the widget recognises', async () => {
+    await mountMenu({ kind: 'date', year: 100, month: 1, day: 10 })
+    const previous = document.querySelector('[aria-label="Previous month"]')
+    expect(previous?.hasAttribute('data-disabled')).toBe(true)
   })
 })

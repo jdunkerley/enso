@@ -54,10 +54,15 @@ const selected = computed(() =>
   props.choice?.kind === 'date' ? toCalendarDate(props.choice) : null,
 )
 const placeholder = shallowRef<DateValue>(toCalendarDate(shownDay.value))
+/** The dates `Date.new` takes and the chip recognises (`isValidDate`): years 100 to 9999. */
+const minValue = new CalendarDate(100, 1, 1)
+const maxValue = new CalendarDate(9999, 12, 31)
 
+/** Choosing the day that is already chosen changes nothing, so it only closes the menu. */
 function chooseDay(value: unknown) {
-  if (value instanceof CalendarDate)
-    emit('choose', { kind: 'date', year: value.year, month: value.month, day: value.day })
+  if (!(value instanceof CalendarDate)) return
+  if (selected.value?.compare(value) === 0) emit('close')
+  else emit('choose', { kind: 'date', year: value.year, month: value.month, day: value.day })
 }
 
 onMounted(() =>
@@ -98,6 +103,8 @@ onMounted(() =>
       v-model:placeholder="placeholder"
       class="calendar"
       :modelValue="selected"
+      :minValue="minValue"
+      :maxValue="maxValue"
       :preventDeselect="true"
       :fixedWeeks="true"
       @update:modelValue="chooseDay"

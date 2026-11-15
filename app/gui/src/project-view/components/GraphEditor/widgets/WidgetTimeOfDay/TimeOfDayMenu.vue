@@ -5,8 +5,11 @@
  * emits the one that is made. Choosing writes nothing here; `WidgetTimeOfDay.vue` does that.
  *
  * The field is Reka's `TimeField` (as the dashboard's time inputs are): digits fill a segment,
- * ArrowUp and ArrowDown change it, ArrowLeft and ArrowRight move between segments. Enter, or
- * leaving the field, chooses the time as it stands if it was edited; Escape asks to close without it.
+ * ArrowUp and ArrowDown change it, ArrowLeft and ArrowRight move between segments. Enter in the
+ * field, leaving the field, or a click outside the menu (the shell calls the handler given to
+ * `registerAccept`) chooses the time as it stands if it was edited and is complete; Escape asks to
+ * close without it. A segment that was cleared makes the time incomplete: nothing is written until
+ * it is filled in again.
  */
 import ChipMenuFrame from '@/components/GraphEditor/widgets/WidgetChip/ChipMenuFrame.vue'
 import { Time } from '@internationalized/date'
@@ -19,6 +22,11 @@ const props = defineProps<{
   choice: TimeChoice | undefined
   /** The time the field shows for `Now` or an unset argument; the browser's by default. A test sets it. */
   now?: HourMinuteSecond | undefined
+  /**
+   * Called once with the function that writes the field's time, for the shell's click-outside path:
+   * the shell ends the interaction on the click and the menu would unmount before the field's blur.
+   */
+  registerAccept?: ((accept: () => void) => void) | undefined
 }>()
 const emit = defineEmits<{
   choose: [choice: TimeChoice]
@@ -37,11 +45,18 @@ const showSeconds = shallowRef(props.choice?.kind === 'time' && props.choice.sec
 const granularity = computed(() => (showSeconds.value ? 'second' : 'minute'))
 /** Whether the field was changed since the menu opened: only an edit is written. */
 const dirty = shallowRef(false)
+/** Whether a segment was cleared and not filled in again: the field then holds no time. */
+const incomplete = shallowRef(false)
 /** Set when the menu has chosen or closes, so that the field's blur does not write afterwards. */
 let settled = false
 
 function edit(value: unknown) {
-  if (!(value instanceof Time)) return
+  // Reka reports a cleared segment as `undefined`; the draft keeps the last whole time, which must not be written.
+  if (!(value instanceof Time)) {
+    incomplete.value = true
+    return
+  }
+  incomplete.value = false
   // The field reports its value as it opens, too: only a different time is an edit.
   if (draft.value == null || draft.value.compare(value) !== 0) dirty.value = true
   draft.value = value
@@ -61,7 +76,7 @@ function chooseNow() {
 /** Write the field's time, once, if it was edited and is complete. */
 function commit() {
   const time = draft.value
-  if (settled || !dirty.value || time == null) return
+  if (settled || !dirty.value || incomplete.value || time == null) return
   settled = true
   emit('choose', {
     kind: 'time',
@@ -91,9 +106,10 @@ function close() {
 // unmounts with the field focused, and the browser reports that as a blur: it is not a choice.
 onBeforeUnmount(() => (settled = true))
 
-onMounted(() =>
-  nextTick(() => field.value?.querySelector<HTMLElement>('[role="spinbutton"]')?.focus()),
-)
+onMounted(() => {
+  props.registerAccept?.(commit)
+  void nextTick(() => field.value?.querySelector<HTMLElement>('[role="spinbutton"]')?.focus())
+})
 </script>
 
 <template>
@@ -112,7 +128,7 @@ onMounted(() =>
       </li>
     </ul>
     <hr class="divider" />
-    <div ref="field" class="field" @keydown.enter.prevent="commit" @focusout="onFocusOut">
+    <div ref="field" class="field" @focusout="onFocusOut">
       <TimeFieldRoot
         v-slot="{ segments }"
         :modelValue="draft"
@@ -120,6 +136,7 @@ onMounted(() =>
         :hourCycle="24"
         aria-label="Time"
         class="timeField"
+        @keydown.enter.prevent="commit"
         @update:modelValue="edit"
       >
         <template v-for="(segment, i) in segments" :key="i">
