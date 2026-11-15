@@ -15,6 +15,8 @@ help (read-only), shown as rendered text except on the line being edited.
   styles use the `--docs-*` tokens in `assets/base.css`. Change the tokens, not
   the panel that hosts the editor. Dark mode is the page-wide invert filter
   (#105), so code block lines are inverted back to stay dark as on the site.
+- `decoration/examples.ts` — Copy buttons, only under `## Examples` and only for
+  examples that parse; `# →` result lines get `cm-exampleResult`.
 - `TableEditor.vue` — GFM tables (`decoration/table.ts` replaces a table with
   it): nested read-only editors in the cells, styled like the site's tables
   (`--docs-table-*`). A wide table scrolls inside the editor's width
