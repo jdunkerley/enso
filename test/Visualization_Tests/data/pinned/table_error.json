@@ -1,1 +1,1 @@
-{"type":"Error","error":"Illegal Argument: boom"}
+{"kind":"error","error":"Illegal Argument: boom"}

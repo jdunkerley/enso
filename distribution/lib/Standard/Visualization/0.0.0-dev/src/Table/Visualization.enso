@@ -28,13 +28,10 @@ type Helper
     - `max_rows`: The maximum number of rows to display.
 prepare_visualization : Any -> Integer -> Text
 prepare_visualization y max_rows=1000 = time_visualization Visualization ("prepare_visualization: " + (short_display y)) <|
-    if y.is_error then View_Json.make_json_for_error y.catch else
+    if y.is_error then View_Json.error_json y.catch.to_display_text else
         x = Warning.set y []
         case x of
-            f : Function ->
-                pairs = [['_display_text_', '[Function '+f.to_text+']']]
-                value = JS_Object.from_pairs pairs
-                JS_Object.from_pairs [["json", value]] . to_json
+            f : Function -> View_Json.value_json (JS_Object.from_pairs [['_display_text_', '[Function '+f.to_text+']']])
             _ -> (Viz_Table.from x).table_view_json max_rows
 
 ## ---

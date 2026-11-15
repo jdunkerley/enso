@@ -200,12 +200,12 @@ type Viz_Unsupported
 ## ---
    private: true
    ---
-Viz_Table.from (that:Any) = Viz_Table.from_view (_-> View_Json.make_json_for_other that . to_json)
+Viz_Table.from (that:Any) = Viz_Table.from_view (_-> View_Json.value_view that)
 
 ## ---
    private: true
    ---
-Viz_Table.from (that:Vector) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_vector that max_rows . to_json)
+Viz_Table.from (that:Vector) = Viz_Table.from_view (max_rows-> View_Json.vector_view that max_rows)
 
 ## ---
    private: true
@@ -215,22 +215,22 @@ Viz_Table.from (that:Array) = Viz_Table.from that.to_vector
 ## ---
    private: true
    ---
-Viz_Table.from (that:Dictionary) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_dictionary that max_rows)
+Viz_Table.from (that:Dictionary) = Viz_Table.from_view (max_rows-> View_Json.dictionary_view that max_rows)
 
 ## ---
    private: true
    ---
-Viz_Table.from (that:Hashset) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_hashset that max_rows)
+Viz_Table.from (that:Hashset) = Viz_Table.from_view (max_rows-> View_Json.hashset_view that max_rows)
 
 ## ---
    private: true
    ---
-Viz_Table.from (that:JS_Object) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_js_object that max_rows)
+Viz_Table.from (that:JS_Object) = Viz_Table.from_view (max_rows-> View_Json.js_object_view that max_rows)
 
 ## ---
    private: true
    ---
-Viz_Table.from (that:Number) = Viz_Table.from_view (_-> JS_Object.from_pairs [["json", Viz_Cell.render_value that]] . to_json)
+Viz_Table.from (that:Number) = Viz_Table.from_view (_-> View_Json.value_json (Viz_Cell.render_value that))
 
 ## ---
    private: true

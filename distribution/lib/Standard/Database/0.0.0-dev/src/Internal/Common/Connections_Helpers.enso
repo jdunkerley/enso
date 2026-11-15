@@ -5,4 +5,4 @@ from Standard.Visualization.Viz_Table import Viz_Table, Viz_Header
    private: true
    ---
 get_table_viz_data tables =
-    Viz_Table.from_columns [Viz_Header.Link "Table" "table" "query"] [tables]
+    Viz_Table.from_columns [Viz_Header.Link "Table" "table" "query {{@Table}}"] [tables]

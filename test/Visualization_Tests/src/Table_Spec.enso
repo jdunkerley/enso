@@ -101,40 +101,43 @@ add_specs suite_builder =
 
         group_builder.specify "should handle Vectors" <|
             vis = Visualization.prepare_visualization [1, 2, 3] 2
-            json = JS_Object.from_pairs [["type", "Vector"], ["all_rows_count", 3], ["json", [1, 2]], ["get_child_node_action", "at"], ["child_label", "value"]]
-            vis . should_equal json.to_text
+            vis.parse_json . should_equal <| Json.parse '{"kind":"grid","row_count":3,"columns":[{"name":"Value","number_format":false}],"index":{"action":"at {{#index}}"},"data":[[1,2]],"options":{"disable_sort_when_partial":true}}'
 
             vis2 = Visualization.prepare_visualization [[1, 2], [3, 4]] 2
-            json2 = JS_Object.from_pairs [["type", "Matrix"], ["all_rows_count", 2], ["json", [[1, 2], [3, 4]]], ["column_count", 2], ["get_child_node_action", "at"]]
-            vis2 . should_equal json2.to_text
+            vis2.parse_json . should_equal <| Json.parse '{"kind":"grid","row_count":2,"columns":[{"name":"0"},{"name":"1"}],"index":{"action":"at {{#index}}"},"data":[[1,3],[2,4]],"options":{"disable_sort_when_partial":true}}'
+
+        group_builder.specify "should mark the cells a short or Nothing row lacks" <|
+            vis = Visualization.prepare_visualization [[1, 2], Nothing, [3]]
+            vis.parse_json.get "data" . should_equal <| Json.parse '[[1,{"_missing_":true},3],[2,{"_missing_":true},{"_missing_":true}]]'
+
+        group_builder.specify "should order record fields as the IDE always has" <|
+            vis = Visualization.prepare_visualization [JS_Object.from_pairs [["b", 1], ["10", 2], ["2", 3]], JS_Object.from_pairs [["a", 4]]]
+            vis.parse_json.get "columns" . map (c-> c.get "name") . should_equal ["2", "10", "b", "a"]
 
         group_builder.specify "should handle Arrays" <|
             vis = Visualization.prepare_visualization ([1, 2, 3] . to_array) 2
-            json = JS_Object.from_pairs [["type", "Vector"], ["all_rows_count", 3], ["json", [1, 2]], ["get_child_node_action", "at"], ["child_label", "value"]]
-            vis . should_equal json.to_text
+            vis.parse_json . should_equal <| Json.parse '{"kind":"grid","row_count":3,"columns":[{"name":"Value","number_format":false}],"index":{"action":"at {{#index}}"},"data":[[1,2]],"options":{"disable_sort_when_partial":true}}'
 
         group_builder.specify "should handle other datatypes" <|
             vis = Visualization.prepare_visualization (Foo.Value 42) 2
-            json = JS_Object.from_pairs [["json", JS_Object.from_pairs [["_display_text_", (Foo.Value 42).to_display_text],["x", 42]]]]
-            vis . should_equal json.to_text
+            vis.parse_json . should_equal <| JS_Object.from_pairs [["kind", "value"], ["value", JS_Object.from_pairs [["_display_text_", (Foo.Value 42).to_display_text], ["x", 42]]]]
 
-        group_builder.specify "should handle datatypes with links" <|
+        group_builder.specify "should show a value's links as one of its fields" <|
             example = Foo_Link.Value "test-value"
             vis = Visualization.prepare_visualization example
-            json = JS_Object.from_pairs [["json", JS_Object.from_pairs [["_display_text_", example.to_display_text],["x", "test-value"], ["links", "[a, b, c]"]]], ["links", ["a", "b", "c"]]]
-            vis . should_equal json.to_text    
+            vis.parse_json . should_equal <| JS_Object.from_pairs [["kind", "value"], ["value", JS_Object.from_pairs [["_display_text_", example.to_display_text], ["x", "test-value"], ["links", "[a, b, c]"]]]]
 
         group_builder.specify "should visualize value type info" <|
             make_json vt =
                 js_object = vt.to_js_object
                 pairs = [["_display_text_", vt.to_display_text]] + vt.to_js_object.field_names.map f-> [f, js_object.get f]
-                JS_Object.from_pairs [["json", JS_Object.from_pairs pairs]] . to_text
+                JS_Object.from_pairs [["kind", "value"], ["value", JS_Object.from_pairs pairs]]
 
-            Visualization.prepare_visualization Value_Type.Boolean . should_equal (make_json Value_Type.Boolean)
-            Visualization.prepare_visualization Value_Type.Float . should_equal (make_json Value_Type.Float)
-            Visualization.prepare_visualization Value_Type.Decimal . should_equal (make_json Value_Type.Decimal)
-            Visualization.prepare_visualization Value_Type.Char . should_equal (make_json Value_Type.Char)
-            Visualization.prepare_visualization Value_Type.Unsupported_Data_Type . should_equal (make_json Value_Type.Unsupported_Data_Type)
+            Visualization.prepare_visualization Value_Type.Boolean . parse_json . should_equal (make_json Value_Type.Boolean)
+            Visualization.prepare_visualization Value_Type.Float . parse_json . should_equal (make_json Value_Type.Float)
+            Visualization.prepare_visualization Value_Type.Decimal . parse_json . should_equal (make_json Value_Type.Decimal)
+            Visualization.prepare_visualization Value_Type.Char . parse_json . should_equal (make_json Value_Type.Char)
+            Visualization.prepare_visualization Value_Type.Unsupported_Data_Type . parse_json . should_equal (make_json Value_Type.Unsupported_Data_Type)
 
         group_builder.specify "should indicate number of Nothing/Nulls" <|
             vis = Visualization.prepare_visualization data.t3_with_nulls 3

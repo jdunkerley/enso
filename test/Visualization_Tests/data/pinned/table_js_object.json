@@ -1,1 +1,1 @@
-{"header":["key","value"],"data":[["a","b"],[1,"two"]],"all_rows_count":2,"type":"Map"}
+{"kind":"grid","row_count":2,"columns":[{"name":"key"},{"name":"value"}],"data":[["a","b"],[1,"two"]]}
