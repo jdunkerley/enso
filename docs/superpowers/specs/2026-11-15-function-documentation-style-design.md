@@ -285,4 +285,71 @@ Follow-up tickets:
 
 ## Appendix: Date widget assessment
 
-To be filled in by PR 3 (before and after).
+### Before
+
+Taken on: _date_, commit _sha_ (develop after #788), by the owner in the
+installed IDE with a real engine.
+
+**Setup.** New project. Place `date1 = Date.new 2020 1 15`. Place the static
+functions (`today`, `new`, `parse`) on their own; connect every instance method
+to `date1` (drag from its output, or type `date1.` in the component browser).
+
+**For each row:** open the argument's widget, set a value, and check the node
+evaluates. Fill in:
+
+- **Widget seen:** what the IDE shows (number, dropdown, date picker, checkbox,
+  text box, nothing…).
+- **Result:** **works**; **missing** (a plain text box where a picker or
+  dropdown is expected); or **broken** (a widget appears but setting it gives a
+  wrong or invalid expression, an error, or nothing).
+- For a dropdown, pick **every entry once**, in particular `Date_Period.Week`,
+  which takes `first_day`. Note any entry that fails.
+- Rows with no argument (—): just check the function is in the component
+  browser, its help panel looks right, and the node evaluates. Put "hidden" in
+  Note for any that is not in the component browser.
+
+| Function                                                            | Argument         | Type (declared)             | Expected widget                               | Widget seen               | Result  | Note                                                                          |
+| ------------------------------------------------------------------- | ---------------- | --------------------------- | --------------------------------------------- | ------------------------- | ------- | ----------------------------------------------------------------------------- |
+| today                                                               | —                | —                           | —                                             | —                         | n/a     | No arguments, so no widget to assess.                                         |
+| new                                                                 | year             | Integer                     | number                                        | number                    | works   |                                                                               |
+| new                                                                 | month            | Integer                     | number, 1–12                                  | number with a 1–12 slider | works   | The slider is barely visible: a design fault in the numeric widget, not Date. |
+| new                                                                 | day              | Integer                     | day picker (`make_day_picker`)                | day picker                | works   |                                                                               |
+| parse                                                               | text             | Text                        | text                                          | text                      | works   |                                                                               |
+| parse                                                               | format           | Date_Time_Formatter         | format dropdown (`make_date_format_selector`) | format dropdown           | works   |                                                                               |
+| year · month · day                                                  | —                | —                           | —                                             | —                         | n/a     | No arguments, so no widget to assess.                                         |
+| week_of_year                                                        | locale           | Locale \| Nothing (untyped) | locale dropdown                               | locale selector           | broken  | Choosing a locale does not work.                                              |
+| is_leap_year · length_of_year · century · quarter · length_of_month | —                | —                           | —                                             | —                         | n/a     | No arguments, so no widget to assess.                                         |
+| first_of_month · end_of_month                                       | —                | —                           | — (declared `Integer`, returns a Date)        | —                         | n/a     | No arguments, so no widget to assess.                                         |
+| day_of_year · day_of_week                                           | —                | —                           | —                                             | —                         | n/a     | No arguments, so no widget to assess.                                         |
+| start_of                                                            | period           | Date_Period (untyped)       | Date_Period dropdown                          | Date_Period dropdown      | works   | Inserts the full name (`Date_Period.Month`), not the auto-scoped `..Month`.   |
+| end_of                                                              | period           | Date_Period (untyped)       | Date_Period dropdown                          | Date_Period dropdown      | works   | Inserts the full name (`Date_Period.Month`), not the auto-scoped `..Month`.   |
+| next                                                                | period           | Date_Period                 | Date_Period dropdown                          | Date_Period dropdown      | works   |                                                                               |
+| previous                                                            | period           | Date_Period                 | Date_Period dropdown                          | Date_Period dropdown      | works   |                                                                               |
+| until                                                               | end              | Date (untyped)              | date picker                                   | text box                  | missing | Needs a date picker.                                                          |
+| days_until                                                          | end              | Date (untyped)              | date picker                                   | text box                  | missing | Needs a date picker.                                                          |
+| days_until                                                          | include_end_date | Boolean (untyped)           | checkbox                                      | checkbox                  | works   |                                                                               |
+| date_part                                                           | period           | Date_Period                 | Date_Period dropdown                          | Date_Period dropdown      | works   |                                                                               |
+| date_diff                                                           | end              | Date                        | date picker                                   |                           |         |                                                                               |
+| date_diff                                                           | period           | Date_Period                 | Date_Period dropdown                          |                           |         |                                                                               |
+| date_add                                                            | amount           | Integer                     | number                                        |                           |         |                                                                               |
+| date_add                                                            | period           | Date_Period                 | Date_Period dropdown                          |                           |         |                                                                               |
+| work_days_until                                                     | end              | Date (untyped)              | date picker                                   |                           |         |                                                                               |
+| work_days_until                                                     | holidays         | Vector Date (untyped)       | list of dates                                 |                           |         |                                                                               |
+| work_days_until                                                     | include_end_date | Boolean (untyped)           | checkbox                                      |                           |         |                                                                               |
+| add_work_days                                                       | days             | Integer (untyped)           | number                                        |                           |         |                                                                               |
+| add_work_days                                                       | holidays         | Vector Date (untyped)       | list of dates                                 |                           |         |                                                                               |
+| to_date_time                                                        | time_of_day      | Time_Of_Day                 | time widget (`Time_Of_Day.default_widget`)    |                           |         |                                                                               |
+| to_date_time                                                        | zone             | Time_Zone                   | time zone dropdown                            |                           |         |                                                                               |
+| up_to                                                               | end              | Date                        | date picker                                   |                           |         |                                                                               |
+| up_to                                                               | include_end      | Boolean                     | checkbox                                      |                           |         |                                                                               |
+| up_to                                                               | step             | Date_Period \| Period       | Date_Period dropdown / period                 |                           |         |                                                                               |
+| down_to                                                             | end              | Date                        | date picker                                   |                           |         |                                                                               |
+| down_to                                                             | include_end      | Boolean                     | checkbox                                      |                           |         |                                                                               |
+| down_to                                                             | step             | Date_Period \| Period       | Date_Period dropdown / period                 |                           |         |                                                                               |
+| format                                                              | format           | Date_Time_Formatter         | format dropdown (`make_date_format_selector`) |                           |         |                                                                               |
+| + · -                                                               | amount           | Period \| Date_Period       | only if in the component browser              |                           |         |                                                                               |
+| > · >= · < · <=                                                     | that             | (untyped)                   | only if in the component browser              |                           |         |                                                                               |
+
+**Other Date functions in the component browser** (not listed above):
+
+**User-facing vs hidden** (spec §5's last row; filled in from the Note column):
