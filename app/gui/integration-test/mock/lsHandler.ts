@@ -179,10 +179,64 @@ const scatterplotJson = (params: string[]) =>
     ],
   })
 
+/** The 150 items of the mocked tree's `items` branch. */
+const treeItems = Array.from({ length: 150 }, (_, i) => ({
+  key: i,
+  kind: 'leaf',
+  value: i,
+  expr: `.at ${i}`,
+}))
+
+/** `Tree.prepare`: `visualizedExpr` echoes the expression it was applied to, as the JSON mock does. */
+const treePrepare = (params: string[]) =>
+  encodeJSON({
+    root: { kind: 'object', size: 4, label: '{4 keys}' },
+    children: {
+      start: 0,
+      size: 4,
+      entries: [
+        { key: 'visualizedExpr', kind: 'leaf', value: params[0] ?? 'node', expr: null },
+        { key: 'items', kind: 'array', size: 150, label: '[150 items]', expr: ".get 'items'" },
+        { key: 'nested', kind: 'object', size: 1, label: '{1 key}', expr: ".get 'nested'" },
+        { key: 'broken', kind: 'object', size: 1, label: '{1 key}', expr: ".get 'broken'" },
+      ],
+    },
+  })
+
+/** How many times the `broken` branch was asked for: its first page fails, a retry succeeds. */
+let brokenPageRequests = 0
+
+/** `Tree.children _ (path) start count <| node`: its arguments are `[node, path, start, count]`. */
+const treeChildren = (params: string[]) => {
+  const path = JSON.parse((params[1] ?? '[]').replaceAll("'", '"')) as (string | number)[]
+  const start = Number(params[2])
+  const count = Number(params[3])
+  if (path.length === 1 && path[0] === 'items')
+    return encodeJSON({ start, size: 150, entries: treeItems.slice(start, start + count) })
+  if (path.length === 1 && path[0] === 'nested')
+    return encodeJSON({
+      start,
+      size: 1,
+      entries: [{ key: 'deep', kind: 'leaf', value: true, expr: ".get 'deep'" }].slice(
+        start,
+        start + count,
+      ),
+    })
+  if (path.length === 1 && path[0] === 'broken' && brokenPageRequests++ > 0)
+    return encodeJSON({
+      start,
+      size: 1,
+      entries: [{ key: 'recovered', kind: 'leaf', value: true, expr: ".get 'recovered'" }],
+    })
+  return encodeJSON({ error: 'boom' })
+}
+
 const mockVizPreprocessors: Record<string, Uint8Array | ((params: string[]) => Uint8Array | null)> =
   {
     // JSON
     'Standard.Visualization.Preprocessor.default_preprocessor': scatterplotJson,
+    'Standard.Visualization.Tree.prepare': treePrepare,
+    'Standard.Visualization.Tree.children': treeChildren,
     'Standard.Visualization.Scatter_Plot.process_to_json_text': scatterplotJson,
     'Standard.Visualization.SQL.Visualization.prepare_visualization': encodeJSON({
       dialect: 'sql',

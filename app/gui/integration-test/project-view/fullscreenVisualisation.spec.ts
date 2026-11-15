@@ -1,6 +1,5 @@
 import assert from 'assert'
 import { expect, test } from 'integration-test/base'
-import { computedContent } from './css'
 import * as locate from './locate'
 import { graphNodeByBinding } from './locate'
 
@@ -25,43 +24,8 @@ test('Load Fullscreen Visualisation', async ({ editorPage, page }) => {
   // Wait for entering-fullscreen animation.
   await expect.poll(async () => (await vis.boundingBox())?.width).toBe(1920)
   await expect.poll(async () => (await vis.boundingBox())?.height).toBeGreaterThan(600)
-  const element = await vis.elementHandle()
-  assert(element != null)
-  const textContent = await computedContent(element)
-  const jsonContent = JSON.parse(textContent)
-  expect(jsonContent).toEqual({
-    axis: {
-      x: {
-        label: 'x-axis label',
-        scale: 'linear',
-      },
-      y: {
-        label: 'y-axis label',
-        scale: 'logarithmic',
-      },
-    },
-    points: {
-      labels: 'visible',
-    },
-    data: [
-      {
-        x: 0.1,
-        y: 0.7,
-        label: 'foo',
-        color: '#FF0000',
-        shape: 'circle',
-        size: 0.2,
-      },
-      {
-        x: 0.4,
-        y: 0.2,
-        label: 'baz',
-        color: '#0000FF',
-        shape: 'square',
-        size: 0.3,
-      },
-    ],
-  })
+  await expect(vis).toContainText('items: [150 items]')
+  await expect(vis).toContainText('nested: {1 key}')
 
   // We can switch visualization type to Table
   await locate.toggleVisualizationSelectorButton(page).click()
