@@ -36,12 +36,29 @@ describe('clientConfig', () => {
     })
   })
 
-  test.each(['copilotCli', 'json'] as const)('%s is JSON under "mcpServers"', (kind) => {
-    const parsed: unknown = JSON.parse(clientConfig(kind, URL, TOKEN))
+  test('copilotCli is JSON under "mcpServers" with tools ["*"]', () => {
+    const parsed: unknown = JSON.parse(clientConfig('copilotCli', URL, TOKEN))
+    expect(parsed).toEqual({
+      mcpServers: {
+        enso: {
+          type: 'http',
+          url: URL,
+          headers: { Authorization: `Bearer ${TOKEN}` },
+          tools: ['*'],
+        },
+      },
+    })
+  })
+
+  test('json is JSON under "mcpServers" with no tools key', () => {
+    const parsed = JSON.parse(clientConfig('json', URL, TOKEN)) as {
+      mcpServers: { enso: Record<string, unknown> }
+    }
     expect(parsed).toEqual({
       mcpServers: {
         enso: { type: 'http', url: URL, headers: { Authorization: `Bearer ${TOKEN}` } },
       },
     })
+    expect(parsed.mcpServers.enso).not.toHaveProperty('tools')
   })
 })
