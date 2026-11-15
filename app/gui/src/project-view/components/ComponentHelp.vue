@@ -164,7 +164,13 @@ function handleBreadcrumbClick(index: number) {
     <h2 v-if="documentation.kind === 'Placeholder'">{{ documentation.text }}</h2>
     <template v-else>
       <div class="markdownDocs">
-        <DocsSignature v-if="signature" :signature="signature" :icon="icon" :color="color" />
+        <DocsSignature
+          v-if="signature"
+          :signature="signature"
+          :icon="icon"
+          :color="color"
+          :expanded="false"
+        />
         <span v-if="documentation.documentation.length == 0">No documentation available.</span>
         <MarkdownEditor
           v-else

@@ -1,17 +1,11 @@
-import { isRequiredArgument } from '$/providers/openedProjects/suggestionDatabase/argument'
 import type { CallableSuggestionEntry } from '$/providers/openedProjects/suggestionDatabase/entry'
-import { unqualifiedType } from '@/components/ComponentHelp/arguments'
+import {
+  docArguments,
+  unqualifiedType,
+  type DocArgument,
+} from '@/components/ComponentHelp/arguments'
 
 export { unqualifiedType } from '@/components/ComponentHelp/arguments'
-
-/** One argument of a {@link Signature}. */
-export interface SignatureParam {
-  name: string
-  /** `<type>` or `<type> = <default>`, `~` before the type of a suspended argument. */
-  detail: string
-  /** It has a default, which the user need not replace. */
-  optional: boolean
-}
 
 /**
  * A function's signature drawn as the documentation site draws it, as a component node: its name
@@ -19,27 +13,22 @@ export interface SignatureParam {
  */
 export interface Signature {
   name: string
-  params: SignatureParam[]
+  params: DocArgument[]
+  /** The unqualified return type. */
+  returns: string
   /** The whole signature in text, for screen readers. */
   label: string
 }
 
 /** The {@link Signature} of a callable entry, given its return type. */
 export function entrySignature(entry: CallableSuggestionEntry, returnType: string): Signature {
-  const params = entry.arguments
-    .filter((arg) => arg.name !== 'self')
-    .map((arg): SignatureParam => {
-      const type = (arg.isSuspended ? '~' : '') + unqualifiedType(arg.reprType)
-      return {
-        name: arg.name,
-        detail: arg.hasDefault && arg.defaultValue != null ? `${type} = ${arg.defaultValue}` : type,
-        optional: arg.hasDefault && !isRequiredArgument(arg),
-      }
-    })
+  const params = docArguments(entry)
   const returns = unqualifiedType(returnType)
+  const detail = (p: DocArgument) => (p.default != null ? `${p.type} = ${p.default}` : p.type)
   return {
     name: entry.name,
     params,
-    label: `${entry.name}(${params.map((p) => `${p.name}: ${p.detail}`).join(', ')}) -> ${returns}`,
+    returns,
+    label: `${entry.name}(${params.map((p) => `${p.name}: ${detail(p)}`).join(', ')}) -> ${returns}`,
   }
 }

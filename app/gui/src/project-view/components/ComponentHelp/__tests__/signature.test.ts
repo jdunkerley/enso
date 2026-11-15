@@ -28,11 +28,19 @@ test('the signature drops `self` and marks optional arguments, as the docs site 
   })
   const signature = entrySignature(entry, 'Standard.Base.Any.Any')
   expect(signature.name).toBe('read')
-  expect(signature.params).toEqual([
-    { name: 'path', detail: 'Text = Missing_Argument.throw "path"', optional: false },
-    { name: 'format', detail: 'File_Format = Auto_Detect', optional: true },
-    { name: 'action', detail: '~Any', optional: false },
+  expect(
+    signature.params.map((p) => ({
+      name: p.name,
+      type: p.type,
+      default: p.default,
+      optional: p.optional,
+    })),
+  ).toEqual([
+    { name: 'path', type: 'Text', default: 'Missing_Argument.throw "path"', optional: false },
+    { name: 'format', type: 'File_Format', default: 'Auto_Detect', optional: true },
+    { name: 'action', type: '~Any', default: undefined, optional: false },
   ])
+  expect(signature.returns).toBe('Any')
   expect(signature.label).toBe(
     'read(path: Text = Missing_Argument.throw "path", format: File_Format = Auto_Detect, action: ~Any) -> Any',
   )
