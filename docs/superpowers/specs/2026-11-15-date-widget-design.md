@@ -1,0 +1,63 @@
+# Date widget
+
+The owner's ask from the Date widget assessment (2026-11-15, in
+`2026-11-15-function-documentation-style-design.md`'s appendix): `until`,
+`days_until` and `work_days_until` show a plain text box for `end`, and
+`holidays` has no way to enter dates. "Let's include creating a date picker
+widget — it should let you choose today, yesterday, tomorrow or a specific date.
+We can then use that more widely."
+
+## Decisions (the owner's, 2026-11-15)
+
+- **Relative dates write the short methods.** Today, Yesterday and Tomorrow
+  write `Date.today`, `Date.today.previous` and `Date.today.next` (`previous`
+  and `next` default to `..Day`). A specific date writes `Date.new 2020 1 15`.
+- **One chip.** An argument holding one of these shows as a single chip with the
+  date's label (`Today`, `Yesterday`, `Tomorrow`, or `2020-01-15`), not as
+  `Date.new` with three number fields. Clicking it opens a menu: Today,
+  Yesterday, Tomorrow, a divider, then a month calendar.
+
+## Behaviour
+
+- **Where it appears.** On any argument whose expected type is
+  `Standard.Base.Data.Time.Date.Date` (the argument's `reprType` or the input's
+  `expectedType`), and on any expression of one of the four shapes above
+  wherever it appears, as `WidgetCheckbox` does for `True`/`False`. Typed `Date`
+  arguments get it with no `@` annotation in the library.
+- **Placeholder.** An unset argument shows the chip as `Pick a date` (the
+  argument name shown as other widgets show it).
+- **Other values.** A connected port, a variable (`date1`) or any other
+  expression is left to the widgets that show it today; the date widget scores
+  `Mismatch` for it, except that an empty (placeholder) argument of Date type
+  still gets the chip.
+- **The calendar** opens on the chip's current date (today for a relative or
+  unset value), marks today, and is navigable by keyboard (arrows, Enter,
+  Escape) as the dashboard's `DatePicker` is. Choosing a day writes
+  `Date.new y m d` and closes the menu.
+- **Imports.** `Date` is exported by `Standard.Base`'s main module; the widget
+  adds the import if missing, as `WidgetCheckbox` does for `True`.
+- **Inside a vector editor.** An item whose expected type is `Date` gets the
+  same chip, so `holidays : Vector Date` with a `Widget.Vector_Editor` whose
+  `item_default` is `Date.today` gives a list of date chips (the Date PR adds
+  that annotation).
+- **Undo.** One choice is one undo step.
+
+## Out of scope (follow-up tickets)
+
+- `Date_Time` and `Time_Of_Day` pickers (the "more widely" part): the same
+  pattern with a time field; separate tickets.
+- Replacing `Date.default_widget` (`<Fixed Date>` / `<Today>`) in the library:
+  only `Standard.Google` uses it; the Date PR or a follow-up switches it.
+- The numeric widget's barely visible slider (the assessment's `month` note).
+
+## Testing
+
+- Unit: the expression ↔ label mapping (each shape, malformed `Date.new`
+  arguments, non-literal arguments → not ours); the matcher's score for each
+  shape, a typed placeholder, and a non-date expression.
+- Component: choosing Today, Yesterday, Tomorrow and a calendar day each writes
+  the expected code; keyboard opens, navigates and closes the calendar.
+- Playwright (`integration-test/project-view/widgets.spec.ts`): a Date-typed
+  argument in the mock suggestion database shows the chip, and a calendar choice
+  updates the node's code.
+- Screenshots on the PR (before: text box; after: chip, open menu).
