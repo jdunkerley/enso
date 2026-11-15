@@ -8,7 +8,7 @@
   `Date.today`, `Date.yesterday`, `Date.tomorrow` or `Date.new`. Items of a list
   of dates get the chip too. A time-of-day argument likewise shows a chip, `Now`
   or a time such as `14:30`, whose menu has `Now` and a time field you can type
-  into; it writes `Time_Of_Day.now` or `Time_Of_Day.new`.][NNN]
+  into; it writes `Time_Of_Day.now` or `Time_Of_Day.new`.][789]
 - [The help panel shows each argument's type, default, widget and description in
   a tooltip on the component's node, and can expand the node to list them.
   Examples have a Copy button that pastes them into the graph as
@@ -439,6 +439,8 @@
 
 #### Enso Standard Library
 
+- [`Date.yesterday` and `Date.tomorrow` give the day before and after
+  today.][789]
 - [EDI files are read by the new Standard.EDI library; add
   `from Standard.EDI import all` to use `EDI_Format` by name.][733]
 - [Fixed-width text files are read by the new Standard.Fixed_Width library; add
@@ -511,7 +513,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[789]: https://github.com/jdunkerley/enso/pull/789
 [788]: https://github.com/jdunkerley/enso/pull/788
 [771]: https://github.com/jdunkerley/enso/pull/771
 [735]: https://github.com/jdunkerley/enso/pull/735
