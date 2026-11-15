@@ -2,7 +2,9 @@ import type EditorPageActions from 'integration-test/actions/EditorPageActions'
 import { expect, test, type Locator, type Page } from 'integration-test/base'
 import {
   clearMockWidgetConfigurations,
+  restoreMockMainFile,
   restoreMockWidgetConfigurations,
+  setMockMainFile,
 } from 'integration-test/mock/lsHandler'
 import * as actions from './actions'
 import { mockMethodCallInfo } from './expressionUpdates'
@@ -1091,4 +1093,110 @@ test('Text widget can be refocused after focus is lost in an unexpected way (#12
   await expect(textInput).not.toBeFocused()
   await textInput.click()
   await expect(textInput).toBeFocused()
+})
+
+test.describe('Date widget', () => {
+  const DATE_TYPE = 'Standard.Base.Data.Time.Date.Date'
+  test.afterEach(restoreMockMainFile)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile('from Standard.Base import Data\n\nmain =\n    since = Data.days_since\n'),
+    },
+  })
+
+  /** A `Data.days_since` call whose only argument, `date`, is a `Date` with no `@` annotation. */
+  async function dateNode(editorPage: EditorPageActions, page: Page) {
+    await editorPage
+      .mockSuggestion({
+        type: 'type',
+        module: 'Standard.Base.Data.Time.Date',
+        name: 'Date',
+        params: [],
+        reexport: 'Standard.Base.Main',
+      })
+      .mockSuggestion({
+        type: 'method',
+        module: 'Standard.Base.Data',
+        name: 'days_since',
+        arguments: [
+          {
+            name: 'date',
+            reprType: DATE_TYPE,
+            isSuspended: false,
+            hasDefault: false,
+          },
+        ],
+        selfType: 'Standard.Base.Data',
+        returnType: 'Standard.Base.Data.Numbers.Integer',
+        isStatic: true,
+        annotations: [],
+      })
+    await mockMethodCallInfo(page, 'since', {
+      methodPointer: {
+        module: 'Standard.Base.Data',
+        definedOnType: 'Standard.Base.Data',
+        name: 'days_since',
+      },
+      notAppliedArguments: [0],
+    })
+    const node = locate.graphNodeByBinding(page, 'since')
+    const chip = node.locator('.WidgetDate .chip')
+    await expect(chip).toHaveCount(1)
+    return { node, chip }
+  }
+
+  async function moduleCode(page: Page): Promise<string> {
+    await page.keyboard.press('ControlOrMeta+`')
+    await expect(page.locator('.CodeEditor')).toBeVisible()
+    return page.evaluate(() => (window as any).__codeEditorApi.textContent())
+  }
+
+  test('a Date-typed argument shows the chip, and a relative choice writes the short method', async ({
+    editorPage,
+    page,
+  }) => {
+    const { node, chip } = await dateNode(editorPage, page)
+    await expect(chip).toHaveText('Pick a date')
+    await expect(node.locator('.WidgetNumber, .WidgetText')).toHaveCount(0)
+    await chip.click()
+    const menu = page.locator('.DateMenu')
+    await expect(menu).toBeVisible()
+    await expect(menu.locator('.item')).toHaveText(['Today', 'Yesterday', 'Tomorrow'])
+    await menu.getByRole('button', { name: 'Yesterday' }).click()
+    await expect(menu).toBeHidden()
+    await expect(chip).toHaveText('Yesterday')
+    const code = await moduleCode(page)
+    expect(code).toContain('since = Data.days_since Date.today.previous')
+    expect(code).toContain('from Standard.Base import Date')
+  })
+
+  test('a calendar choice writes Date.new, which the chip shows as an ISO date', async ({
+    editorPage,
+    page,
+  }) => {
+    const { chip } = await dateNode(editorPage, page)
+    await chip.click()
+    const menu = page.locator('.DateMenu')
+    await expect(menu).toBeVisible()
+    await menu.locator('[data-reka-calendar-cell-trigger]:not([data-outside-view])').nth(14).click()
+    await expect(menu).toBeHidden()
+    await expect(chip).toHaveText(/^\d{4}-\d{2}-15$/)
+    expect(await moduleCode(page)).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 15\)\n/)
+    await page.keyboard.press('ControlOrMeta+`')
+    // Reopened, the calendar marks the chosen day, and the keyboard closes it.
+    await chip.click()
+    await expect(menu.locator('[aria-selected="true"]')).toHaveText('15')
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+  })
+
+  test('one choice is one undo step', async ({ editorPage, page }) => {
+    const { node, chip } = await dateNode(editorPage, page)
+    await chip.click()
+    await page.locator('.DateMenu').getByRole('button', { name: 'Tomorrow' }).click()
+    await expect(chip).toHaveText('Tomorrow')
+    await page.keyboard.press('ControlOrMeta+Z')
+    await expect(node.locator('.WidgetDate .chip')).toHaveText('Pick a date')
+  })
 })
