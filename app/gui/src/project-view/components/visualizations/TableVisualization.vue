@@ -325,8 +325,9 @@ async function getFilterValues(params: SetFilterValuesFuncParams) {
       valueList,
     )
     // `null` data: too many distinct values to list, so the set filter has none to offer.
+    // The values go to AG Grid as the engine sent them (Booleans stay Booleans; #778).
     if (response.success && response.data != null) {
-      params.success(response.data.map((value) => (value == null ? null : String(value))))
+      params.success(response.data as (string | null)[])
     }
   }
 }
