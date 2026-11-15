@@ -25,6 +25,13 @@ what its handler returns and refuses.
     no wait behind. `open_project` and `create_project` wait on it with the
     opened project's id: from then on the agent's next `get_graph` reads that
     project, not another tab that happened to activate meanwhile.
+  - **A call carries its timeout.** Main sends `timeoutMs` with each call
+    (`McpToolCallRequest`: 30 s to read, 60 s to edit, 120 s to open); the
+    dispatcher passes each handler a `deadline`, `now()` at receipt plus
+    `timeoutMs` (the clock is injectable). After it, main has told the caller
+    the call timed out, so an edit must not be applied then: the edit session
+    refuses a run with too little time left (see
+    `src/project-view/mcp/CLAUDE.md`). Handlers that do not edit ignore it.
 - `appTools.ts` — `get_app_state`, `list_projects`, `list_files`,
   `create_project`, `open_project`, `close_project`: pure functions over
   `AppToolDeps`, tested with fakes. Names are cut at `NAME_CHARS` (300), lists

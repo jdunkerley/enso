@@ -94,7 +94,8 @@ export function appTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
         'are kept: the project is saved to disk as it is edited, and a save still pending is ' +
         'written as it closes. When the project keeps versions, closing also saves a version ' +
         '("Saved on close"); otherwise none is saved, and the user is not asked whether to ' +
-        'start keeping them. It does not delete the project. Returns `{ closed, page, project }`: the ' +
+        'start keeping them. Anything the user is in the middle of typing in that project is ' +
+        'lost. It does not delete the project. Returns `{ closed, page, project }`: the ' +
         'project closed and what is on screen now (another tab, or the dashboard). An error ' +
         'when no project is on screen.',
       inputSchema: {},

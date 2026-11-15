@@ -39,13 +39,17 @@ No tool changes the execution environment, settings or secrets;
    `name = expression`, and later statements may use the names of earlier ones.
    Pass whole import lines in `imports`. Use `add_function` for a top-level
    function and call it from a node as `Main.<name> args`.
-4. Read the result of every edit: it lists the affected nodes with their types
-   and errors. `settled: true`: the engine has reported results for the changed
-   nodes, so the types and errors in this result are current. `settled: false`:
-   it had not within 20 seconds; call `get_node` later. When a node has an error
-   or the wrong type, fix it with `edit_node`; use `remove_nodes` to drop a
-   node. Check with `get_node` or `evaluate_expression` before building on a
-   node.
+4. Read the result of every edit. `add_nodes` and `edit_node` return the nodes
+   they made or changed, with their types and errors; `collapse_nodes` returns
+   the function's name and the node that calls it; `set_node_comment` and
+   `set_visualization` return the node; `remove_nodes` returns only the ids it
+   removed and `add_function` only the function's name, so after either call
+   `get_graph` to see the nodes they affected. `settled: true`: the engine has
+   reported results for the changed nodes, so the types and errors in this
+   result are current. `settled: false`: it had not within 20 seconds; call
+   `get_node` later. When a node has an error or the wrong type, fix it with
+   `edit_node`; use `remove_nodes` to drop a node. Check with `get_node` or
+   `evaluate_expression` before building on a node.
 5. Group a run of nodes that does one job with `collapse_nodes`, and explain a
    node with `set_node_comment`.
 6. `select_nodes` and `open_method` are the only project tools that change the
@@ -54,13 +58,19 @@ No tool changes the execution environment, settings or secrets;
 7. Every tool that changes the project is refused while it is in Live mode: ask
    the user to switch it back to Design. Reading, selecting and navigating
    (`select_nodes`, `open_method`) still work there.
-8. Your edits are saved with the project as you make them, but nothing writes
-   the nodes' output (a file, a database table): only the user's Write does. Do
-   not tell the user that data was written.
-9. Your edits form one undo step for the user until you pause for 10 seconds or
-   the user edits the project; then the next edit starts a new step. Edits from
-   several agents run one at a time. There is no undo tool: to take a change
-   back, edit or remove the nodes.
+8. Your edits are saved with the project as you make them, but nothing you add
+   writes the nodes' output (a file, a database table): code that turns the
+   output context on (`with_enabled_context`, `with_enabled`) is refused by
+   every tool that takes code, and only the user turns Write on, by clicking it
+   on a node; `edit_node` refuses a node they did. Do not tell the user that
+   data was written. This keeps outputs off; it is not a sandbox (Enso code can
+   call Java).
+9. Your edits form one undo step for the user until you pause for 10 seconds,
+   the user edits the project or leaves its tab, or `open_method` changes the
+   method; then the next edit starts a new step. Edits from several agents run
+   one at a time. An edit whose turn comes after the method on screen changed is
+   refused with nothing changed: call `get_graph` and try again. There is no
+   undo tool: to take a change back, edit or remove the nodes.
 
 ## Evaluating expressions
 
@@ -76,9 +86,10 @@ Examples, with `table` standing for a binding in scope:
 Evaluation runs only in the Design environment, where output is off: an
 expression never writes to the file, database or service it names. A write that
 supports a dry run (such as `.write` on Text or a Table) writes to a temporary
-file instead and returns that file's path; other writes fail. While the user has
-the project in Live mode, `evaluate_expression` is refused. Do not use it to
-save data.
+file instead and returns that file's path; other writes fail. An expression that
+turns the output context on (`with_enabled_context`, `with_enabled`) is refused.
+While the user has the project in Live mode, `evaluate_expression` is refused.
+Do not use it to save data.
 
 ## Cap reads at the lowest layer
 

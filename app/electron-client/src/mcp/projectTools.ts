@@ -1,4 +1,7 @@
-/** @file Definitions of the tools that read the open project. They run in the window; main forwards. */
+/**
+ * @file Definitions of the project tools: those that read the open project and those that edit or
+ * navigate it. They run in the window; main forwards.
+ */
 /* eslint-disable camelcase -- tool argument names are snake_case on the wire */
 import { z } from 'zod'
 import type { ToolDefinition } from './toolRegistry'
@@ -40,12 +43,16 @@ const nodeId = () => z.string().max(NAME_CHARS)
 
 /** The refusal and undo rules every edit tool shares, appended to its description. */
 const EDIT_RULES =
-  ' Refused while the project is in Live mode. Your run of changes is one undo step for the ' +
-  'user, until you pause for 10 seconds or the user edits; there is no undo tool. The project ' +
-  'is saved as it is edited; nothing runs with output on (no Write), so no file, database or ' +
-  'service the nodes name is written. `settled: true`: the engine has reported results for the ' +
-  'changed nodes, so the types and errors in this result are current. `settled: false`: it had ' +
-  'not within 20 seconds; call `get_node` later.'
+  ' Refused while the project is in Live mode, and, with nothing changed, when the method on ' +
+  'screen changed before the edit ran (call `get_graph` and try again). Your run of changes is ' +
+  'one undo step for the user, until you pause for 10 seconds, the user edits or leaves the ' +
+  "project's tab, or `open_method` changes the method; there is no undo tool. The project is " +
+  'saved as it is edited. Code that turns the output context on (`with_enabled_context`, ' +
+  '`with_enabled`) is refused, so nothing you add runs with Write: only the user turns Write on, ' +
+  'by clicking it on a node. This keeps outputs off; it is not a sandbox (Enso code can call ' +
+  'Java). `settled: true`: the engine has reported results for the changed nodes, so the types ' +
+  'and errors in this result are current. `settled: false`: it had not within 20 seconds; call ' +
+  '`get_node` later.'
 
 /**
  * The project tools (the five that read, the nine that edit or navigate), each forwarding its
@@ -130,7 +137,10 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'unavailable or evaluation fails. Runs only in the Design environment, where output is ' +
         'off: nothing is written to the file, database or service an expression names. A write ' +
         'that supports a dry run writes to a temporary file instead and returns that ' +
-        "file's path; other writes fail. When the project is in Live mode the tool is refused.",
+        "file's path; other writes fail. Code that turns the output context on " +
+        '(`with_enabled_context`, `with_enabled`) is refused: only the user turns Write on. This ' +
+        'keeps outputs off; it is not a sandbox. When the project is in Live mode the tool is ' +
+        'refused.',
       inputSchema: {
         expression: z.string().max(EXPRESSION_CHARS),
         node_id: z.string().max(NAME_CHARS).optional(),
@@ -144,8 +154,9 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'Add nodes to the graph of the open project. Each of `statements` is one Enso ' +
         'statement: `name = expression` (the name becomes the node name) or a bare ' +
         'expression (a name is generated). Later statements may use the names of earlier ' +
-        'ones and of existing nodes. `after_node` (an id from `get_graph`) places the new ' +
-        'nodes after that node; without it they go at the end. `imports` are whole import ' +
+        'ones and of existing nodes. In the code the new nodes are always added at the end of ' +
+        'the method; `after_node` (an id from `get_graph`) only sets where they are drawn, below ' +
+        'that node (without it, below the last node). `imports` are whole import ' +
         'lines (`from Standard.Table import Table`) added to the module if missing. Returns ' +
         'each new node with its id, name, expression and type and any error or panic, and ' +
         '`settled` (see below): check the types and errors, ' +
@@ -167,7 +178,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'Replace the expression of the node `node_id` (from `get_graph`) with `expression`. ' +
         '`expression` is the new right-hand side only, not `name = expression`: the node ' +
         'keeps its name, so the nodes that use it stay connected. An argument node of the ' +
-        'method is refused. Returns `nodes`, a list holding the node with its new type and ' +
+        'method is refused, and so is a node the user turned Write on for. Returns `nodes`, a ' +
+        'list holding the node with its new type and ' +
         'any error or panic, and `settled` (see below); call ' +
         '`get_graph` for the nodes that use it.' +
         EDIT_RULES,
@@ -228,7 +240,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       description:
         'Set the documentation comment of the node `node_id` (from `get_graph`) to `text`. ' +
         'An empty `text` removes the comment. A node that cannot have a comment (an argument ' +
-        'of the method) is refused. Returns `node`, the node with its comment.' +
+        'of the method) is refused. Returns `node`, the node with its comment, and `settled` ' +
+        '(always true: nothing is computed again).' +
         EDIT_RULES,
       inputSchema: { node_id: nodeId(), text: z.string().max(5_000) },
       run: forward('set_node_comment', EDIT_TOOL_TIMEOUT_MS),
@@ -238,7 +251,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       title: 'Show or hide a visualization',
       description:
         'Show (`visible` true) or hide the visualization of the node `node_id` (from ' +
-        '`get_graph`) in the graph editor, for the user to look at. Returns `node`, the node.' +
+        '`get_graph`) in the graph editor, for the user to look at. Returns `node`, the node, ' +
+        'and `settled` (always true: nothing is computed again).' +
         EDIT_RULES,
       inputSchema: { node_id: nodeId(), visible: z.boolean() },
       run: forward('set_visualization', EDIT_TOOL_TIMEOUT_MS),

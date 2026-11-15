@@ -75,8 +75,42 @@ too).
   both the printed and the full form resolve. Until the database has loaded,
   both answer an error. Summaries are cut at 500 characters, documentation at
   20,000.
-- No tool here changes the execution environment, settings or secrets, saves the
-  project to disk, or deletes a project or file.
+- No tool here changes the execution environment, settings or secrets, runs
+  Write, or deletes a project or file. The edits reach the project's file as the
+  user's do: within a few seconds while the project is open (4–7 s in the
+  packaged spec).
+
+## Write stays the user's (`writeGuard.ts`)
+
+The GUI's per-node Write is a code prefix (`util/ast/node.ts`:
+`Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output "design" <| …`),
+so code an agent supplies could switch the output context on by itself. One
+check, `enablesOutput`, with one list, `OUTPUT_ENABLING_IDENTIFIERS`, refuses it
+(`WRITE_REFUSED_ERROR`) everywhere an agent's code enters: a node statement
+(`parseNodeStatement`, `add_nodes`), a node expression (`parseNodeExpression`,
+`edit_node`), a function definition (`parseFunctionDefinition`, `add_function`),
+an import line (`parseImportLines`, `add_nodes`) and an evaluated expression
+(`evaluate_expression`, parsed with `Ast.parseBlock`).
+
+- It walks the whole tree (`Ast.visitRecursive`, as `hasSyntaxError` does) and
+  matches every `Ident` token named `with_enabled_context` or `with_enabled`:
+  plain, qualified, as a method after a dot, as an argument, in a lambda, an
+  operator section or a text interpolation, and in an import (also under an
+  alias). Text and comments are not identifiers.
+- The list is every public way to ENABLE a context in
+  `distribution/lib/Standard/Base/0.0.0-dev/src/Runtime.enso`: the module
+  function `with_enabled_context` and the method `Context.with_enabled`. Both
+  call `Context_Helpers.with_context` in `src/Internal/Context_Helpers.enso`, a
+  `private` module a project cannot import. `with_disabled_context` and
+  `with_disabled` are harmless and allowed. A new enabling function in
+  `Runtime.enso` must be added to the list.
+- `edit_node` also refuses a node the user turned Write on for
+  (`prefixes.enableRecording`, `writeOnNodeError`), at validation and again at
+  its turn: `setNodeContent` replaces only the `innerExpr` inside the user's
+  prefix, so the agent's expression would run with output. The user's switch is
+  never changed by a tool. Its comment and visualization can still be set.
+- This keeps outputs off; it is not a sandbox: Enso code can call Java, which
+  can do anything the IDE's process can.
 
 ## Edit, structure and view tools
 
@@ -125,13 +159,13 @@ too).
 One per mounted graph editor, built in `useProjectMcpTools`: `releaseStep()` on
 `onDeactivated`, `dispose()` on scope dispose (a later edit answers
 `PROJECT_CLOSED_ERROR`). It runs the edits one at a time and refuses them in
-Live (`LIVE_EDIT_ERROR`, read at the call's turn). Before a caller's first edit
-of a step it saves a version (`Before changes by <caller>`; the edit is refused
-when that fails) and holds an undo step, which the same caller's further edits
-join. Just before the edit is applied it starts two watches, one for the node
-database's next update and one for the engine's reports; after the edit it
-awaits the first, then the second (see "When an edit has settled" below). A
-refused or failed edit cancels both.
+Live (`LIVE_EDIT_ERROR`, read at the call's turn and again after the version
+save). Before a caller's first edit of a step it saves a version
+(`Before changes by <caller>`; the edit is refused when that fails) and holds an
+undo step, which the same caller's further edits join. Just before the edit is
+applied it starts two watches, one for the node database's next update and one
+for the engine's reports; after the edit it awaits the first, then the second
+(see "When an edit has settled" below). A refused or failed edit cancels both.
 
 **A hidden editor never edits.** Removing the handlers on `onDeactivated` stops
 new calls, but not the ones already in the session: one queued behind a running
@@ -143,12 +177,39 @@ screen."), takes no hold and does not call `edit`. A run already past both
 checks, which is editing or waiting to settle, finishes normally; deactivation
 then releases its step.
 
+**An edit is never applied after its caller was told it timed out.** Main's
+timer for a call starts when it sends it (60 s for an edit); time in the queue
+and the version save count against it. So each tool passes `run` the call's
+`deadline` (from the dispatcher, `$/mcp/CLAUDE.md`), and the session refuses
+with `TIMED_OUT_BEFORE_RUN_ERROR` ("The call timed out before it ran. Nothing
+was changed; try again.") when less than `EDIT_MIN_REMAINING_MS` (25 s: the 2 s
+graph wait, a full 20 s settle, a margin) is left at the run's turn or after the
+version save. The save is raced against that budget (`raceDeadline`, through the
+injected `setTimeout`): if it has not returned in time the run is refused (the
+save may still finish; that is harmless). The settle wait is capped at the time
+left minus `EDIT_ANSWER_MARGIN_MS` (3 s). The clock is `now` (`Date.now`). A run
+without a deadline (tests) has no limit.
+
+**An edit lands in the method it was validated against.** `after_node` and node
+ids are resolved when the call arrives, but the edit runs at its turn, after
+`open_method` or the user may have changed the method or removed a node. Every
+edit and structure tool records the method on screen (`methodOnScreen`) when it
+validates and calls `checkAtTurn` first thing inside its edit, before any
+change: a different method refuses with `METHOD_CHANGED_ERROR` ("The method on
+screen changed before this edit ran. Nothing was changed; call get_graph and try
+again."), a node id no longer in the method with the unknown-id error (otherwise
+`deleteNodes` skipped it silently and `remove_nodes` still listed it as
+removed). `add_function` checks the method only.
+
 Constants:
 
 - `EDIT_STEP_IDLE_MS` (10 s): a step ends after that long without an edit by its
   caller, measured from the end of a run.
 - `EDIT_SETTLE_MS` (20 s): how long an edit waits for the engine to report on
-  the expressions it affects; `settled: false` after it.
+  the expressions it affects (less when the deadline is nearer);
+  `settled: false` after it.
+- `EDIT_MIN_REMAINING_MS` (25 s) and `EDIT_ANSWER_MARGIN_MS` (3 s): see the
+  deadline above.
 - `GRAPH_UPDATE_WAIT_MS` (2 s, `editSession.ts`): a safety net. In the packaged
   app every edit tool's change (comment and visualization included) updated the
   node database within a few milliseconds, so no tool skips the wait. When it
@@ -205,30 +266,51 @@ from `useCurrentProject()`):
 
 `settled: true` means the engine has reported results for the nodes the edit
 changed, so the types and errors in the result are current. Each tool passes
-`run` the expression ids its edit affects (`affected: (value) => ids`, from the
-edit's value, since new ids are known only when it returns):
+`run` the expression ids its edit affects
+(`affected: (value) => AffectedExpressions`, from the edit's value, since new
+ids are known only when it returns), split by whether they existed before the
+edit:
 
-- `add_nodes`: the new nodes; `edit_node`: the node; `collapse_nodes`: the new
-  call node; `remove_nodes`: the nodes that used a removed one (from
-  `db.nodeDependents`, the usages `deleteNodes` disconnects, read before the
-  deletion);
+- `added`: `add_nodes`'s new nodes, `collapse_nodes`'s new call node;
+- `changed`: `edit_node`'s node (none when the new text is the code the node
+  already has: nothing changes and the engine reports nothing, so the call would
+  otherwise wait the full 20 s), and `remove_nodes`' users of a removed node
+  (from `db.nodeDependents`, the usages `deleteNodes` disconnects, read before
+  the deletion);
 - none for `add_function`, `set_node_comment` and `set_visualization`: they
-  change nothing the engine computes, and settle at once.
+  change nothing the engine computes, and settle at once (`settled: true` in
+  their results too, so every edit result has the field).
 
-The watch records every `expressionUpdates` batch and `executionFailed` from the
-moment it is made (just before the edit). The run is settled when:
+The watch listens from the moment it is made (just before the edit) but counts
+only what arrives after `editApplied()`: a report from before belongs to an
+earlier run. The run is settled when:
 
 - it affects nothing; or
-- every affected id's latest update since the watch started has a payload that
-  is not `Pending` (a value, a dataflow error or a panic); or
+- every `added` id's latest report since the edit is not `Pending` (a value, a
+  dataflow error or a panic), and every `changed` id has had a `Pending` since
+  the edit followed by a report that is not `Pending`; or
 - an `executionFailed` arrives after the edit returned;
 - otherwise `settled: false` at `EDIT_SETTLE_MS`.
+
+**Why a `Pending` for a node that existed before.** `edit_node(X)` then at once
+`edit_node(Y)` on X's user: Y is still being computed for X's change when the
+second edit lands, and that run's value for Y can arrive after the second edit
+was applied, describing the code before it. The engine reports a node it
+computes again as `Pending` and then its result; the `Pending` after the edit
+shows the engine has taken this edit up. In the packaged app it did so every
+time: for an edited node (also with the same type and a `Value` payload,
+`fold 0` to `fold 10`), for a node and its user edited back to back, and for the
+user of a removed node (`base + 1` becoming `_ + 1`). A new node's id cannot
+carry a stale report, so any non-`Pending` report after the edit counts; no
+report ever came for any id before `editApplied()` (each edit applies within one
+task, and the engine's messages are separate tasks). An edit to the text a node
+already has changes nothing and the engine sends nothing at all, which is why
+`edit_node` passes no id then.
 
 A node's id is the external id of its root expression, and the engine's updates
 are keyed by exactly that (`computedValueRegistry.processUpdates`); the packaged
 spec's trace showed each affected id reported, the collapse's call node
-included. An edit to a node with the same type and a `Value` payload (`fold 0`
-to `fold 10`) still gets a fresh `Pending` then `Value` update naming it.
+included.
 
 `executionFailed` and `executionComplete` both come only from the engine's
 `ExecuteJob`, once per program run: `executionFailed` when the run itself fails
@@ -262,11 +344,16 @@ error.
 editor. `window.__mcpCall(tool, args, caller?)` (`mock/registerMocks.ts`)
 delivers a call as main would. The mock never evaluates by itself, so while an
 edit tool's call runs, the spec has the mock report a value for every node of
-the method (`mockExpressionValues`, an `expressionUpdates` notification, as the
-engine sends) and an `executionComplete` (`mockExecutionComplete`), both in
-`mock/lsHandler.ts`. `_mockExpressionUpdate` cannot stand in: it writes to the
-registry directly, which the watch does not see. Against the real engine,
+the method (`mockExpressionValues`: `Pending`, then a `Value`, two
+`expressionUpdates` notifications, as the engine sends) and an
+`executionComplete` (`mockExecutionComplete`), both in `mock/lsHandler.ts`.
+`_mockExpressionUpdate` cannot stand in: it writes to the registry directly,
+which the watch does not see. Against the real engine,
 `app/electron-client/tests/mcp.spec.ts` builds a project through every edit and
 view tool in the packaged app, undoes one call with `Mod+Z`, and checks that
 each code-running edit answers `settled: true` with current types and states, in
-under 10 s.
+under 10 s (two `edit_node` calls back to back on a node and its user, the
+second's type current in its own result; the same text again; a removed node's
+user). It also checks that code wrapped in the Write prefix is refused by
+`add_nodes`, `edit_node` and `evaluate_expression` and that the file it names is
+never written.

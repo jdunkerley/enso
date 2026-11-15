@@ -25,7 +25,9 @@ default. No tool changes the execution environment, settings or secrets.
   the first one) over `Channel.mcpToolCall` and resolves with the reply
   (`Channel.mcpToolReply`, matched by `requestId`), or with an error when there
   is no window or the call's timeout passes (`WINDOW_TOOL_TIMEOUT_MS` 30 s by
-  default, `EDIT_TOOL_TIMEOUT_MS` 60 s, `OPEN_TOOL_TIMEOUT_MS` 120 s).
+  default, `EDIT_TOOL_TIMEOUT_MS` 60 s, `OPEN_TOOL_TIMEOUT_MS` 120 s). The
+  request carries that timeout (`McpToolCallRequest.timeoutMs`), so that the
+  window never applies an edit after main has answered that it timed out.
 - `guides.ts` and `guides/*.md` — the `get_guide` tool, the guides as MCP
   resources (`enso://guide/<topic>`) and the server `instructions`
   (`guides/instructions.md`). Built-in topics (`overview`, `language`,
@@ -45,25 +47,30 @@ default. No tool changes the execution environment, settings or secrets.
   not an object. A zero-byte or whitespace-only file counts as empty and a UTF-8
   BOM is ignored; comments or a trailing comma stay unreadable. It saves
   `claude_desktop_config.json.enso-backup` only on first set-up (the file has
-  content and no `enso` entry), so the backup stays the user's file from before
-  Enso touched it; replacing an entry never writes or changes a backup. It
-  writes a temporary file beside the file and renames, removing the temporary
-  file if the rename fails. The controller (`claudeDesktopStatus`,
-  `setUpClaudeDesktop`) runs these on its queue. Status checks the folder first
-  and never creates a token: with none stored an `enso` entry is `outOfDate`; a
-  keychain read failure gives `unreadable`. Only `setUpClaudeDesktop` (a click)
-  creates the token. `replaceToken` and `setPort` read the status with the OLD
-  address and token first and rewrite the entry afterwards only if it was
-  `setUp` (Enso's own): a hand-edited entry is left alone and a missing one is
-  never created; a rewrite failure is logged. Nothing is written on
-  `setEnabled`. The token never reaches the renderer: the IPC calls return only
-  a `ClaudeDesktopSetup`. Settings → AI offers the set-up only while the server
-  is on (`app/gui/src/dashboard/layouts/Settings/CLAUDE.md`, "AI"). Tests inject
-  a temporary folder; never point one at the real Claude folder.
+  content and no `enso` entry), as the file's exact bytes, so the backup stays
+  the user's file from before Enso touched it; replacing an entry never writes
+  or changes a backup, so an older backup is overwritten only when the entry was
+  removed and is set up again. It writes through a symbolic link to its target
+  (`fs.realpath`), writes a temporary file beside the target with the target's
+  permission bits, and renames, removing the temporary file if the rename fails.
+  The controller (`claudeDesktopStatus`, `setUpClaudeDesktop`) runs these on its
+  queue. Status checks the folder first and never creates a token: with none
+  stored an `enso` entry is `outOfDate`; a keychain read failure gives
+  `unreadable`. Only `setUpClaudeDesktop` (a click) creates the token.
+  `replaceToken` and `setPort` read the status with the OLD address and token
+  first and rewrite the entry afterwards only if it was `setUp` (Enso's own): a
+  hand-edited entry is left alone and a missing one is never created; a rewrite
+  failure is logged. Nothing is written on `setEnabled`. The token never reaches
+  the renderer: the IPC calls return only a `ClaudeDesktopSetup`. Settings → AI
+  offers the set-up only while the server is on
+  (`app/gui/src/dashboard/layouts/Settings/CLAUDE.md`, "AI"). Tests inject a
+  temporary folder; never point one at the real Claude folder.
 - `clientConfigs.ts` — that setup text per client (`claude mcp add` command,
   Claude Desktop `mcp-remote` JSON, Codex TOML, Copilot JSON for VS Code and the
   CLI, a generic `mcpServers` block), each checked against the vendor's
-  documentation (dates in the code).
+  documentation (dates in the code). The Codex block sets
+  `tool_timeout_sec = 120` (Codex's default is 60 s, which an edit or an open
+  can take).
 
 `electron.ts`'s `initMcp` wires them together at start-up and registers the IPC
 the Settings → AI tab uses (`Channel.mcp*`); `index.ts` calls `shutdownMcp` on
@@ -102,11 +109,20 @@ details). Its rules, which the tool descriptions and `guides/overview.md` state:
 - **One writer at a time**: the session queues edits and runs one at a time,
   whoever calls.
 - **Refused in Live** (`LIVE_EDIT_ERROR`: "The project is in Live mode. Edits by
-  an agent are refused there. …"), read at the edit's turn, and **refused when
-  the project is not on screen** (its tab was hidden while the call waited).
+  an agent are refused there. …"), read at the edit's turn and after the version
+  save, and **refused when the project is not on screen** (its tab was hidden
+  while the call waited).
+- **Refused too late**: an edit with less than 25 s of its call's timeout left
+  at its turn, or after the version save, is refused ("The call timed out before
+  it ran. Nothing was changed; try again."), so it is never applied after main
+  has answered that the call timed out.
+- **Refused in another method**: an edit whose turn comes after the method on
+  screen changed, or after one of its nodes was removed, changes nothing and
+  says so.
 - **One undo step per caller**: a caller's edits join one undo step until it has
   made no edit for 10 s, measured from the end of its last run, or until the
-  user edits the project (or the agent opens a method), which ends the step.
+  user edits the project, the user leaves the project's tab, or the agent opens
+  a method, which ends the step.
 - **A version first**: before a step's first edit the session saves a version
   (`Before changes by <caller>`) when the project keeps versions; the edit is
   refused if that save fails.
@@ -123,8 +139,11 @@ settled") says exactly what counts and what does not.
 
 Edits are saved with the project as they are made, as the user's are: in the
 packaged spec the edit's text was in `src/Main.enso` on disk about 4–7 s after
-the call answered, with the project still open. No tool runs Write (the output
-context stays off).
+the call answered, with the project still open. No tool runs Write: code that
+turns the output context on (`with_enabled_context`, `with_enabled`) is refused
+by every tool that takes code, and `edit_node` refuses a node the user turned
+Write on for (`app/gui/src/project-view/mcp/CLAUDE.md`, "Write stays the
+user's"). That keeps outputs off; it is not a sandbox (Enso code can call Java).
 
 ## The caller checks
 
@@ -206,10 +225,11 @@ reading tool, 60 s for an edit (which waits up to 20 s for the execution) and
 while the project is in Live mode, because an evaluation runs in the execution
 context's environment. In Design the output context is off, so an expression
 cannot write to the path it names (`tests/mcp.spec.ts` checks this against the
-packaged app). Writes that support a dry run still write their data to a
-temporary file (`<name>_ensodryrun<digits>.<ext>` in the system temporary
-directory) and return its path; the tool description and `guides/overview.md`
-say so. This prevents accidental writes; it is not a sandbox.
+packaged app), and an expression that turns the output context on is refused.
+Writes that support a dry run still write their data to a temporary file
+(`<name>_ensodryrun<digits>.<ext>` in the system temporary directory) and return
+its path; the tool description and `guides/overview.md` say so. This prevents
+accidental writes; it is not a sandbox.
 
 ## Not the AI mode's server
 
@@ -231,14 +251,17 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   names (the answer names the dry-run file, which the test deletes), and that a
   request without the token is `401`. The second builds a project from the
   dashboard against the real engine: `create_project`, `add_nodes` (with an
-  import line, and with a node in error that `edit_node` fixes),
-  `set_node_comment`, `set_visualization`, `select_nodes`, `collapse_nodes`,
-  `open_method` in and out, `add_function`, one `Mod+Z` in the window taking
-  back a whole `add_nodes` call, `remove_nodes`, `list_files`, the path rule,
-  `close_project` (the edits are in `Main.enso` on disk) and `open_project`; it
-  deletes the project it made. Neither can check the Live-mode refusals: nothing
-  in the UI switches a project to Live (the project's `executionMode` setting is
-  only read from its settings), so `app/gui/src/project-view/mcp/__tests__/`
-  covers them. The GUI side has its own Playwright specs:
-  `app/gui/integration-test/project-view/mcpEdit.spec.ts` and
-  `integration-test/dashboard/mcpApp.spec.ts`.
+  import line, and with a node in error that `edit_node` fixes), code in the
+  Write prefix refused by `add_nodes`, `edit_node` and `evaluate_expression`
+  with the file it names never written, `edit_node` back to back on a node and
+  its user (the second result current) and to the same text, a `remove_nodes` of
+  a node with a user, `set_node_comment`, `set_visualization`, `select_nodes`,
+  `collapse_nodes`, `open_method` in and out, `add_function`, one `Mod+Z` in the
+  window taking back a whole `add_nodes` call, `remove_nodes`, `list_files`, the
+  path rule, `close_project` (the edits are in `Main.enso` on disk) and
+  `open_project`; it deletes the project it made. Neither can check the
+  Live-mode refusals: nothing in the UI switches a project to Live (the
+  project's `executionMode` setting is only read from its settings), so
+  `app/gui/src/project-view/mcp/__tests__/` covers them. The GUI side has its
+  own Playwright specs: `app/gui/integration-test/project-view/mcpEdit.spec.ts`
+  and `integration-test/dashboard/mcpApp.spec.ts`.
