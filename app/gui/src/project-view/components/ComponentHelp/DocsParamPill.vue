@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { WIDGET_LABELS, type DocArgument } from '@/components/ComponentHelp/arguments'
-import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue'
+import { autoUpdate, flip, offset, shift, size, useFloating } from '@floating-ui/vue'
 import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 
 /**
@@ -27,9 +27,29 @@ const open = computed(() => !dismissed.value && (hovered.value || focused.value 
  */
 let openAtPointerDown: boolean | undefined
 
+/** The tooltip's widest, narrowed to the help panel. */
+const TOOLTIP_MAX_WIDTH = 320
+
+/** The tooltip stays inside the help panel, not over the graph beside it. */
+const middleware = computed(() => {
+  const boundary = button.value?.closest<HTMLElement>('.ComponentHelp') ?? 'clippingAncestors'
+  return [
+    offset(6),
+    flip({ boundary }),
+    shift({ boundary, padding: 8 }),
+    size({
+      boundary,
+      padding: 8,
+      apply({ availableWidth, elements }) {
+        elements.floating.style.maxWidth = `${Math.min(TOOLTIP_MAX_WIDTH, availableWidth)}px`
+      },
+    }),
+  ]
+})
+
 const { floatingStyles } = useFloating(button, tooltip, {
   placement: 'bottom-start',
-  middleware: [offset(6), flip(), shift({ padding: 8 })],
+  middleware,
   whileElementsMounted: autoUpdate,
 })
 
@@ -167,7 +187,7 @@ function onClick() {
 /* Teleported to `body`, so not scoped. */
 .DocsParamPill-tooltip {
   z-index: 10000;
-  max-width: 320px;
+  max-width: 320px; /* Narrowed to the panel by the `size` middleware. */
   padding: 7px 9px;
   border: 1px solid var(--docs-table-border);
   border-radius: 8px;
