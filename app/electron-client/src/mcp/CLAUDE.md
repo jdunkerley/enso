@@ -139,11 +139,21 @@ settled") says exactly what counts and what does not.
 
 Edits are saved with the project as they are made, as the user's are: in the
 packaged spec the edit's text was in `src/Main.enso` on disk about 4–7 s after
-the call answered, with the project still open. No tool runs Write: code that
-turns the output context on (`with_enabled_context`, `with_enabled`) is refused
-by every tool that takes code, and `edit_node` refuses a node the user turned
-Write on for (`app/gui/src/project-view/mcp/CLAUDE.md`, "Write stays the
-user's"). That keeps outputs off; it is not a sandbox (Enso code can call Java).
+the call answered, with the project still open. Every tool that takes code
+refuses code that enables the output context (`with_enabled_context`,
+`with_enabled`, `Meta.meta` for a method name built by reflection, an
+`@Builtin_Method` binding), and `edit_node` and `collapse_nodes` refuse a node
+the user turned Write on for. The guard is a list of names over the AST: it
+stops an agent turning Write on by accident or by following an instruction
+naively, and it is **not a security boundary**. Deliberately obfuscated Enso
+code (dynamic dispatch, Java interop) can still reach the output context, the
+user's own Write-enabled functions and nodes can be driven by an agent's edits,
+and a real guarantee needs engine-side enforcement (an execution-level lock on
+the output context), which is not built. The list, its history and the two
+routes review found (both now refused) are in
+`app/gui/src/project-view/mcp/CLAUDE.md`, "Write stays the user's". The tool
+descriptions (`WRITE_RULE` in `projectTools.ts`) and the guides tell the agent
+the same, and name the two ways its edits can still cause a write.
 
 ## The caller checks
 
@@ -223,13 +233,15 @@ reading tool, 60 s for an edit (which waits up to 20 s for the execution) and
 
 `evaluate_expression` runs only in the Design environment: the window refuses it
 while the project is in Live mode, because an evaluation runs in the execution
-context's environment. In Design the output context is off, so an expression
-cannot write to the path it names (`tests/mcp.spec.ts` checks this against the
-packaged app), and an expression that turns the output context on is refused.
-Writes that support a dry run still write their data to a temporary file
-(`<name>_ensodryrun<digits>.<ext>` in the system temporary directory) and return
-its path; the tool description and `guides/overview.md` say so. This prevents
-accidental writes; it is not a sandbox.
+context's environment. In Design the output context is off, so a plain write
+does not reach the path it names (`tests/mcp.spec.ts` checks this against the
+packaged app), and code that enables the output context is refused by the same
+guard as the edits. Writes that support a dry run still write their data to a
+temporary file (`<name>_ensodryrun<digits>.<ext>` in the system temporary
+directory) and return its path; the tool description and `guides/overview.md`
+say so. This prevents accidental writes; it is not a security boundary (see
+"Edits" above): an expression can still call a function of the user's project
+that enables output.
 
 ## Not the AI mode's server
 

@@ -41,16 +41,28 @@ export const PROJECT_TOOL_NAMES = [...VIEW_TOOL_NAMES, ...EDIT_TOOL_NAMES] as co
 
 const nodeId = () => z.string().max(NAME_CHARS)
 
+/**
+ * The Write rule, in the tool descriptions that take code. It says what the Write guard
+ * (`app/gui/src/project-view/mcp/writeGuard.ts`) refuses and the two ways an edit can still cause
+ * a write, which the guard does not stop.
+ */
+const WRITE_RULE =
+  'Do not turn Write on. Code that enables the output context (`with_enabled_context`, ' +
+  '`with_enabled`, binding a runtime builtin, or building a method name by reflection) is ' +
+  'refused. Only the user turns Write on, by clicking it on a node. Your edits can still cause ' +
+  "a write in two ways you should avoid: calling a function in the user's project that itself " +
+  'enables output, and changing a node upstream of one the user has switched Write on for (it ' +
+  're-runs with your change). Ask the user before doing either.'
+
 /** The refusal and undo rules every edit tool shares, appended to its description. */
 const EDIT_RULES =
   ' Refused while the project is in Live mode, and, with nothing changed, when the method on ' +
   'screen changed before the edit ran (call `get_graph` and try again). Your run of changes is ' +
   'one undo step for the user, until you pause for 10 seconds, the user edits or leaves the ' +
   "project's tab, or `open_method` changes the method; there is no undo tool. The project is " +
-  'saved as it is edited. Code that turns the output context on (`with_enabled_context`, ' +
-  '`with_enabled`) is refused, so nothing you add runs with Write: only the user turns Write on, ' +
-  'by clicking it on a node. This keeps outputs off; it is not a sandbox (Enso code can call ' +
-  'Java). `settled: true`: the engine has reported results for the changed nodes, so the types ' +
+  'saved as it is edited. ' +
+  WRITE_RULE +
+  ' `settled: true`: the engine has reported results for the changed nodes, so the types ' +
   'and errors in this result are current. `settled: false`: it had not within 20 seconds; call ' +
   '`get_node` later.'
 
@@ -135,12 +147,11 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         '`.catch_primitive (e -> e.to_display_text)` so the result is still Text. ' +
         'Returns the text the expression produced, or an error string if the scope is ' +
         'unavailable or evaluation fails. Runs only in the Design environment, where output is ' +
-        'off: nothing is written to the file, database or service an expression names. A write ' +
-        'that supports a dry run writes to a temporary file instead and returns that ' +
-        "file's path; other writes fail. Code that turns the output context on " +
-        '(`with_enabled_context`, `with_enabled`) is refused: only the user turns Write on. This ' +
-        'keeps outputs off; it is not a sandbox. When the project is in Live mode the tool is ' +
-        'refused.',
+        'off: a write does not reach the file, database or service the expression names. A ' +
+        'write that supports a dry run writes to a temporary file instead and returns that ' +
+        "file's path; other writes fail. When the project is in Live mode the tool is " +
+        'refused. ' +
+        WRITE_RULE,
       inputSchema: {
         expression: z.string().max(EXPRESSION_CHARS),
         node_id: z.string().max(NAME_CHARS).optional(),
@@ -211,6 +222,7 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'name such as `clean_names` (a name is generated without it; a number is added when ' +
         'the name is taken). Use it to keep a long graph readable. Refused when more than ' +
         'one of the nodes is used by nodes outside the group: the function returns one value. ' +
+        'A node the user turned Write on for is refused, and then nothing is collapsed. ' +
         'Returns `name`, the name the function got, `node`, the new node ' +
         'with its type and any error, and `settled`.' +
         EDIT_RULES,

@@ -1,9 +1,9 @@
-Enso is a visual data language. A project is a graph of nodes, each an Enso
-expression bound to a name. These tools read and edit the project open in the
-Enso IDE, and open or create projects. Call `get_guide` before doing anything
-else: it explains how to work with the graph and where to find the language and
-library references. Edits are made as ordinary nodes, in one undo step the user
-controls, and saved with the project. Code that turns output on is refused: only
-the user turns Write on. This is not a sandbox. No tool changes the execution
-environment, settings or secrets; `evaluate_expression` runs code, but only in
-the Design environment.
+A project in the Enso IDE is a graph of nodes, each an Enso expression bound to
+a name. These tools read and edit the open project. Call `get_guide` first. Do
+not turn Write on. Code that enables the output context (`with_enabled_context`,
+`with_enabled`, binding a runtime builtin, or building a method name by
+reflection) is refused. Only the user turns Write on, by clicking it on a node.
+Your edits can still cause a write in two ways you should avoid: calling a
+function in the user's project that itself enables output, and changing a node
+upstream of one the user has switched Write on for (it re-runs with your
+change). Ask the user before doing either.

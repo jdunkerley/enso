@@ -85,32 +85,72 @@ too).
 The GUI's per-node Write is a code prefix (`util/ast/node.ts`:
 `Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output "design" <| …`),
 so code an agent supplies could switch the output context on by itself. One
-check, `enablesOutput`, with one list, `OUTPUT_ENABLING_IDENTIFIERS`, refuses it
-(`WRITE_REFUSED_ERROR`) everywhere an agent's code enters: a node statement
-(`parseNodeStatement`, `add_nodes`), a node expression (`parseNodeExpression`,
-`edit_node`), a function definition (`parseFunctionDefinition`, `add_function`),
-an import line (`parseImportLines`, `add_nodes`) and an evaluated expression
-(`evaluate_expression`, parsed with `Ast.parseBlock`).
+check, `writeRefusal`, refuses such code everywhere an agent's code enters: a
+node statement (`parseNodeStatement`, `add_nodes`), a node expression
+(`parseNodeExpression`, `edit_node`), a function definition
+(`parseFunctionDefinition`, `add_function`), an import line (`parseImportLines`,
+`add_nodes`) and an evaluated expression (`evaluate_expression`, parsed with
+`Ast.parseBlock`).
 
-- It walks the whole tree (`Ast.visitRecursive`, as `hasSyntaxError` does) and
-  matches every `Ident` token named `with_enabled_context` or `with_enabled`:
-  plain, qualified, as a method after a dot, as an argument, in a lambda, an
-  operator section or a text interpolation, and in an import (also under an
-  alias). Text and comments are not identifiers.
-- The list is every public way to ENABLE a context in
-  `distribution/lib/Standard/Base/0.0.0-dev/src/Runtime.enso`: the module
-  function `with_enabled_context` and the method `Context.with_enabled`. Both
-  call `Context_Helpers.with_context` in `src/Internal/Context_Helpers.enso`, a
-  `private` module a project cannot import. `with_disabled_context` and
-  `with_disabled` are harmless and allowed. A new enabling function in
-  `Runtime.enso` must be added to the list.
-- `edit_node` also refuses a node the user turned Write on for
-  (`prefixes.enableRecording`, `writeOnNodeError`), at validation and again at
-  its turn: `setNodeContent` replaces only the `innerExpr` inside the user's
-  prefix, so the agent's expression would run with output. The user's switch is
-  never changed by a tool. Its comment and visualization can still be set.
-- This keeps outputs off; it is not a sandbox: Enso code can call Java, which
-  can do anything the IDE's process can.
+**What it is.** A list of names matched over the AST. It walks the whole tree
+(`Ast.visitRecursive`, as `hasSyntaxError` does) and refuses:
+
+- an `Ident` token in `OUTPUT_ENABLING_IDENTIFIERS` (`WRITE_REFUSED_ERROR`):
+  `with_enabled_context` (the module function in
+  `distribution/lib/Standard/Base/0.0.0-dev/src/Runtime.enso`, which the Write
+  prefix calls) and `with_enabled` (the method `Context.with_enabled`). Both
+  call `Context_Helpers.with_context` in a `private` module. The disabling
+  functions are allowed;
+- an `Ident` token in `REFLECTION_IDENTIFIERS` (`REFLECTION_REFUSED_ERROR`):
+  `meta`. `Meta.meta` of an unresolved symbol (`.x`) gives a `Meta.Unresolved`,
+  whose `rename` makes a method symbol from any Text (`src/Meta.enso`); the
+  `Symbol` constructor is private, so `Meta.meta` is the only way to get one.
+  `rename` is not refused (`Column.rename` shares the name), nor is the rest of
+  `Meta` (`Meta.type_of`, `Meta.is_a`, …), which only inspects values;
+- an `@Builtin_Method` annotation (`BUILTIN_REFUSED_ERROR`): the parser's
+  `AnnotatedBuiltin` reaches the GUI's AST as a `Generic` node whose children
+  are an `AnnotationOperator` token and the `Ident` token `Builtin_Method`; the
+  check matches that pair, so a Text mentioning it passes, as does `@Tail_Call`.
+
+It matches plain and qualified names, a method after a dot, an argument, a
+lambda, an operator section, a text interpolation, and an import (also under an
+alias). Text and comments are not identifiers.
+
+**What it is not.** It stops an agent turning Write on by accident or by
+following an instruction naively. It is **not a security boundary**:
+
+- deliberately obfuscated Enso code (dynamic dispatch, Java interop) can still
+  reach the output context;
+- the user's own Write-enabled functions and nodes can be driven by an agent's
+  edits: a node that calls a function of the project which enables output, or an
+  edit upstream of a node the user switched Write on for (it re-runs with the
+  change; `remove_nodes` also rewrites such a node's use of a removed one);
+- a real guarantee needs engine-side enforcement (an execution-level lock on the
+  output context), which is not built.
+
+**History of the list.** It began with the two enabling names. The final review
+of the edit tools found two routes past them, both of which wrote their file in
+the packaged app: a method name built by reflection
+(`(Meta.meta .x).rename ("with_" + "enabled") . value Context.Output …`) and a
+function bound to the runtime's builtin
+(`go c e ~a = @Builtin_Method "Runtime.with_context_builtin"`, then
+`Main.go Context.Output True …`). Both are now refused. A new route found later
+is added the same way, with a test in `__tests__/writeGuard.test.ts`.
+
+**A node the user turned Write on for** (`prefixes.enableRecording`,
+`writeOnNodeError`):
+
+- `edit_node` refuses it, at validation and again at its turn: `setNodeContent`
+  replaces only the `innerExpr` inside the user's prefix, so the agent's
+  expression would run with output;
+- `collapse_nodes` refuses it, at validation and again at its turn: collapsing
+  moves the whole statement, prefix included, into the new function, and the
+  call node left in the method shows no Write and runs it again at once;
+- `remove_nodes` deletes the whole statement, prefix and all;
+- `set_node_comment` changes only the statement's documentation and
+  `set_visualization` only the node's metadata; the prefix stays as it was.
+
+The user's switch is never changed by a tool.
 
 ## Edit, structure and view tools
 
