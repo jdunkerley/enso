@@ -6,11 +6,13 @@
  */
 import type { CatalogueEntry } from './catalogue'
 import {
+  argumentDescriptions,
   colorFromString,
   entryIcon,
   groupColorVar,
   isRequiredArgument,
   projectPathKey,
+  splitSections,
 } from './gui'
 import type { Page, SiteModel } from './model'
 import { QUALIFIED_NAME, unqualifiedType } from './typeText'
@@ -20,6 +22,8 @@ export interface NodeParam {
   /** `<type>` or `<type> = <default>`, `~` before the type of a suspended argument. */
   tooltip: string
   optional: boolean
+  /** The argument's description from the doc's `## Arguments` section (Markdown), or `''`. */
+  description: string
 }
 
 export interface ComponentNodeProps {
@@ -66,12 +70,20 @@ export function nodeProps(
 ): ComponentNodeProps {
   const entry = page.entry
   const args = 'arguments' in entry ? entry.arguments.filter((arg) => arg.name !== 'self') : []
+  const argumentsText =
+    splitSections(page.doc.documentation).sections.find((s) => s.heading === 'Arguments')?.text ??
+    ''
+  const { byName } = argumentDescriptions(
+    argumentsText,
+    args.map((arg) => arg.name),
+  )
   const params = args.map((arg): NodeParam => {
     const type = (arg.isSuspended ? '~' : '') + unqualifiedType(arg.reprType)
     return {
       name: arg.name,
       tooltip: arg.hasDefault && arg.defaultValue != null ? `${type} = ${arg.defaultValue}` : type,
       optional: arg.hasDefault && !isRequiredArgument(arg),
+      description: byName.get(arg.name) ?? '',
     }
   })
   const returnType = 'returnType' in entry ? unqualifiedType(entry.returnType) : 'Any'

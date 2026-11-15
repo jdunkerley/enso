@@ -2,9 +2,9 @@
 import { posix } from 'node:path'
 import type { CatalogueEntry } from './catalogue'
 import { nodeJsx, nodeProps } from './componentNode'
+import { argumentDescriptions, KNOWN_SECTIONS, splitSections } from './gui'
 import { escapeMdxText, escapeTableCell, linkedType, markdownToMdx } from './mdx'
 import { isFunctionPage, isMethodFromOtherModule, type Page, type SiteModel } from './model'
-import { argumentDescriptions, KNOWN_SECTIONS, splitSections } from './sections'
 import { simpleName } from './typeText'
 
 /** Front matter limiting the table of contents to `##` headings (Docusaurus's snake_case key). */

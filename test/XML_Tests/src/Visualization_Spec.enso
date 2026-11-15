@@ -32,15 +32,25 @@ add_specs suite_builder =
             json.get "columns" . at 0 . get "link" . get "action" . should_equal "get {{#key}}"
             json.get "data" . at 0 . should_equal ["@id", "0", "1"]
 
-        group_builder.specify "Attributes count towards the row limit and are read in document order" <|
-            attrs = (0.up_to 6).map i-> "a" + i.to_text + "='v" + i.to_text + "'"
+        group_builder.specify "Attributes count towards the row limit and are read in the DOM's order" <|
+            ## The DOM keeps an element's attributes sorted by name, whatever order the document
+               wrote them in, and the view reads them by position.
+            names = ["zeta", "mid", "alpha", "beta", "omega", "gamma"]
+            attrs = names.map n-> n + "='v" + n + "'"
             many = XML_Document.parse ("<root " + (attrs.join " ") + "><c/><d/></root>")
             json = Visualization.prepare_visualization many 4 . parse_json
             json.get "row_count" . should_equal 8
-            json.get "data" . should_equal [["@a0", "@a1", "@a2", "@a3"], ["Attribute", "Attribute", "Attribute", "Attribute"], ["v0", "v1", "v2", "v3"]]
+            json.get "data" . should_equal [["@alpha", "@beta", "@gamma", "@mid"], ["Attribute", "Attribute", "Attribute", "Attribute"], ["valpha", "vbeta", "vgamma", "vmid"]]
             all = Visualization.prepare_visualization many 8 . parse_json
-            all.get "data" . at 0 . should_equal ["@a0", "@a1", "@a2", "@a3", "@a4", "@a5", "0", "1"]
-            all.get "data" . at 2 . should_equal ["v0", "v1", "v2", "v3", "v4", "v5", "<c/>", "<d/>"]
+            all.get "data" . at 0 . should_equal ["@alpha", "@beta", "@gamma", "@mid", "@omega", "@zeta", "0", "1"]
+            all.get "data" . at 2 . should_equal ["valpha", "vbeta", "vgamma", "vmid", "vomega", "vzeta", "<c/>", "<d/>"]
+
+        group_builder.specify "A namespaced attribute shows under its qualified name" <|
+            ns_doc = XML_Document.parse '<root xmlns:p="urn:p" p:b="1" a="2"><c p:x="3"/></root>'
+            json = Visualization.prepare_visualization ns_doc . parse_json
+            json.get "data" . at 0 . should_equal ["@a", "@p:b", "@xmlns:p", "0"]
+            json.get "data" . at 1 . should_equal ["Attribute", "Attribute", "Attribute", "Element"]
+            json.get "data" . at 2 . should_equal ["2", "1", "urn:p", '<c p:x="3"/>']
 
         group_builder.specify "A child shows at most five of its attributes" <|
             attrs = (0.up_to 7).map i-> "a" + i.to_text + "='v" + i.to_text + "'"

@@ -7,6 +7,10 @@
   set up Claude Desktop.][784]
 - [External agent apps (Claude Code, Codex, GitHub Copilot) can connect to the
   IDE over MCP and read the open project. Turn it on in Settings → AI.][782]
+- [The help panel shows each argument's type, default, widget and description in
+  a tooltip on the component's node, and can expand the node to list them.
+  Examples have a Copy button that pastes them into the graph as
+  components.][788]
 - [The JSON visualization is a tree that loads each branch when you open it, a
   page at a time, with no limit on size or depth. It explores any value, and
   double-clicking an entry adds a component for it.][771]
@@ -507,6 +511,7 @@
 
 [784]: https://github.com/jdunkerley/enso/pull/784
 [782]: https://github.com/jdunkerley/enso/pull/782
+[788]: https://github.com/jdunkerley/enso/pull/788
 [771]: https://github.com/jdunkerley/enso/pull/771
 [735]: https://github.com/jdunkerley/enso/pull/735
 [776]: https://github.com/jdunkerley/enso/pull/776

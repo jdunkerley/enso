@@ -15,11 +15,17 @@ test("a grouped function: the group's colour, its icon, every argument but self"
     color: 'var(--group-color-Standard-Fixture-Selections)',
     returns: 'Returns Float',
     params: [
-      { name: 'units', tooltip: 'Text | Nothing = Nothing', optional: true },
+      {
+        name: 'units',
+        tooltip: 'Text | Nothing = Nothing',
+        optional: true,
+        description: 'The units.',
+      },
       {
         name: 'scale',
         tooltip: '~Float = Missing_Argument.throw "scale"',
         optional: false,
+        description: 'How much to scale by.',
       },
     ],
     label:
@@ -59,7 +65,7 @@ test('an unknown icon falls back to the logo and is counted', () => {
 test('static methods and constructors are labelled Type.name', () => {
   expect(nodeProps(fn('Standard.Fixture/Shapes/Shape.unit'), model).name).toBe('Shape.unit')
   expect(nodeProps(fn('Standard.Fixture/Shapes/Square.Value'), model).params).toEqual([
-    { name: 'side', tooltip: 'Float', optional: false },
+    { name: 'side', tooltip: 'Float', optional: false, description: '' },
   ])
 })
 

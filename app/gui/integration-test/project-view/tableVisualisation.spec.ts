@@ -38,6 +38,53 @@ test('Load Table Visualisation', async ({ editorPage, page }) => {
   await expect(tableVisualization).toContainText('3,0')
 })
 
+const GET_ROWS = 'Standard.Visualization.Table.Visualization.get_rows_for_table'
+
+/** Longer than the 5 s default `executeExpression` timeout that row pages once had. */
+const PAST_OLD_ROW_TIMEOUT_MS = 6000
+
+/**
+ Scenario (#777): a table large enough to be paged from the engine is opened while the engine is busy,
+    so its first rows come after more than 5 s. The table must show them when they come, not settle to
+    AG Grid's "No Rows To Show" before.
+ */
+test('Paged table shows rows the engine sends late', async ({ editorPage, page, localApi }) => {
+  // It waits past the old 5 s limit on a row request.
+  test.slow()
+  await initGraph(editorPage)
+  await localApi.updateVisualization(
+    'Standard.Visualization.Table.Visualization.prepare_visualization',
+    {
+      kind: 'grid',
+      row_count: 3,
+      columns: [{ name: 'Name' }],
+      index: { action: 'get_row {{#index}}' },
+      data: null,
+      version_hash: 'busy-engine',
+      server: true,
+      options: { status_bar: true },
+    },
+  )
+
+  await graphNodeByBinding(page, 'aggregated').click()
+  await editorPage.press('Space')
+  const tableVisualization = locate.tableVisualization(page)
+  await expect(tableVisualization).toExist()
+
+  // The engine is busy: the request for the rows waits past the 5 s it was once given.
+  await expect.poll(() => localApi.pendingVisualizationRequests(GET_ROWS)).toBe(1)
+  await page.waitForTimeout(PAST_OLD_ROW_TIMEOUT_MS)
+  await expect(tableVisualization).not.toContainText('No Rows To Show')
+
+  await localApi.updateVisualization(GET_ROWS, {
+    row_count: 3,
+    index: [0, 1, 2],
+    data: [['alpha', 'beta', 'gamma']],
+  })
+  await expect(tableVisualization).toContainText('gamma', { timeout: 15000 })
+  await expect(tableVisualization).not.toContainText('No Rows To Show')
+})
+
 test('Column size can be set and is retained', async ({ editorPage, page, localApi }) => {
   await initGraph(editorPage)
 
@@ -179,11 +226,11 @@ test('Single Column Of Actions Table Visualisation Test', async ({
     'Standard.Visualization.Table.Visualization.prepare_visualization',
     {
       kind: 'grid',
+      row_count: 3,
       columns: [
         {
           name: 'table',
           link: { action: 'read {{@table}}', label: 'table' },
-          number_format: false,
         },
       ],
       data: [['Sheet1', 'Sheet2', 'Sheet3']],
@@ -229,11 +276,11 @@ test('Link template Test as number', async ({ editorPage, page, localApi }) => {
     'Standard.Visualization.Table.Visualization.prepare_visualization',
     {
       kind: 'grid',
+      row_count: 3,
       columns: [
         {
           name: 'table',
           link: { action: 'read {{#table}}', label: 'table' },
-          number_format: false,
         },
       ],
       data: [['1', '2', '3']],
@@ -265,11 +312,11 @@ test('Link template Test as text', async ({ editorPage, page, localApi }) => {
     'Standard.Visualization.Table.Visualization.prepare_visualization',
     {
       kind: 'grid',
+      row_count: 3,
       columns: [
         {
           name: 'table',
           link: { action: 'read {{@table}}', label: 'table' },
-          number_format: false,
         },
       ],
       data: [['1', '2', '3']],
@@ -331,9 +378,10 @@ test('GenericGrid Table Visualisation Test - two column - link on second', async
     'Standard.Visualization.Table.Visualization.prepare_visualization',
     {
       kind: 'grid',
+      row_count: 3,
       columns: [
         { name: 'table', number_format: false },
-        { name: 'number', link: { action: 'read {{#number}} {{@table}}' }, number_format: false },
+        { name: 'number', link: { action: 'read {{#number}} {{@table}}' } },
       ],
       data: [
         ['SheetA', 'SheetB', 'SheetC'],
@@ -529,3 +577,46 @@ async function expectCellDataToBe(page: Page, colId: string, expectedValues: str
     await expect(getCellLocator(page, colId, i)).toHaveText(expectedValues[i]!)
   }
 }
+
+/** The toolbar button that turns the grid's sort and filter state into components. */
+const CREATE_COMPONENTS =
+  "Create new component(s) with the current grid's state applied to the workflow"
+
+/** A table view of two columns, as `prepare_visualization` sends it for a table. */
+const SORTABLE_TABLE = {
+  kind: 'grid',
+  row_count: 3,
+  columns: [
+    { name: 'a', value_type: { constructor: 'Integer', display_text: 'Integer (64 bits)' } },
+    { name: 'b', value_type: { constructor: 'Char', display_text: 'Char' } },
+  ],
+  index: { action: 'get_row {{#index}}', label: 'row' },
+  data: [
+    [3, 1, 2],
+    ['c', 'a', 'b'],
+  ],
+  options: { create_node: true },
+}
+
+/** Scenario: the grid is sorted by a header click, and the toolbar button makes a `sort` node of it. */
+test('Sorting a table and creating components makes a sort node', async ({
+  editorPage,
+  page,
+  localApi,
+}) => {
+  await initGraph(editorPage)
+  await graphNodeByBinding(page, 'aggregated').click()
+  await editorPage.press('Space')
+  const tableVisualization = locate.tableVisualization(page)
+  await expect(tableVisualization).toExist()
+  await localApi.updateVisualization(
+    'Standard.Visualization.Table.Visualization.prepare_visualization',
+    SORTABLE_TABLE,
+  )
+  await expect(tableVisualization).toContainText('c')
+  await tableVisualization.locator('.ag-header-cell-text', { hasText: /^a$/ }).click()
+  const nodeCount = await locate.graphNode(page).count()
+  await page.getByRole('button', { name: CREATE_COMPONENTS }).click()
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
+  await expect(locate.graphNode(page).last()).toContainText(/sort.*Name.*Ascending/)
+})

@@ -739,6 +739,19 @@ function responseBytesFor(
  */
 const visSlotsMaps = new Set<YMap<YMap<unknown>>>()
 
+/** Test entry point: how many requests for `preprocessor` are waiting for an answer. */
+export function pendingVisualizationRequests(preprocessor: string): number {
+  let pending = 0
+  for (const slots of visSlotsMaps) {
+    for (const [, slot] of slots.entries()) {
+      const request = slot.get(VIS_SLOT_FIELDS.request) as VisRequestPreprocessor | undefined
+      if (!request || slotPreprocessorKey(request) !== preprocessor) continue
+      if (slot.get(VIS_SLOT_FIELDS.status) === 'pending') pending++
+    }
+  }
+  return pending
+}
+
 /** Write response bytes + `status: 'ready'` into `slot`. */
 function writeSlotResponse(slot: YMap<unknown>, bytes: Uint8Array): void {
   const doc = slot.doc

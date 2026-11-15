@@ -5,8 +5,6 @@ import {
   useTableVizToolbar,
   type SortModel,
 } from '@/components/visualizations/TableVisualization/tableVizToolbar'
-import { Ast } from '@/util/ast'
-import { Pattern } from '@/util/ast/match'
 import { ProjectPath } from '@/util/projectPath'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
 import type {
@@ -43,6 +41,8 @@ import {
   type ValueTypeArgumentChild,
   type ValueTypes,
 } from './TableVisualization/TableVizDataSourceUtils'
+import { columnValueToEnso } from './TableVisualization/columnValueToEnso'
+import { valueNodePattern, type ValueNodeAction } from './TableVisualization/tableContextMenu'
 import { makeFilterModelList, type GridFilterModel } from './TableVisualization/tableVizFilterUtils'
 import {
   buildTableView,
@@ -53,14 +53,14 @@ import {
   tableViewFlags,
 } from './TableVisualization/tableView'
 
-import { formatText, getCellValueType, isNumericType } from './TableVisualization/tableVizUtils'
+import { formatText, isNumericType } from './TableVisualization/tableVizUtils'
 
 export type { DataQualityMetricValue } from './TableVisualization/tableView'
 
 export const name = 'Table'
 export const icon = 'table'
 export const inputType =
-  'Standard.Table.Table.Table | Standard.Table.Column.Column | Standard.Table.Row.Row | Standard.Base.Data.Vector.Vector | Standard.Base.Data.Array.Array | Standard.Base.Data.Map.Map | Standard.Base.Any.Any'
+  'Standard.Table.Table.Table | Standard.Table.Column.Column | Standard.Table.Row.Row | Standard.Base.Data.Vector.Vector | Standard.Base.Data.Array.Array | Standard.Base.Any.Any'
 export const defaultPreprocessor = [
   'Standard.Visualization.Table.Visualization',
   'prepare_visualization',
@@ -126,9 +126,9 @@ const getContextMenuItems = (
   const { rowIndex } = params.node ?? {}
 
   const actions = [
-    { name: 'Get Column', action: 'at', colId, icon: 'select_column' },
-    { name: 'Get Row', action: 'get_row', rowIndex, icon: 'select_row' },
-    { name: 'Get Value', action: 'get_value', colId, rowIndex, icon: 'select_cell' },
+    { name: 'Get Column', action: 'at' as const, colId, icon: 'select_column' },
+    { name: 'Get Row', action: 'get_row' as const, rowIndex, icon: 'select_row' },
+    { name: 'Get Value', action: 'get_value' as const, colId, rowIndex, icon: 'select_cell' },
   ]
 
   const createMenuItem = ({ name, action, colId, rowIndex, icon }: (typeof actions)[number]) => ({
@@ -146,52 +146,13 @@ const getContextMenuItems = (
   ]
 }
 
-function getAstValuePattern(value?: string | number, action?: string) {
-  if (action && value != null) {
-    return Pattern.new<Ast.Expression>((ast) =>
-      Ast.App.positional(
-        Ast.PropertyAccess.new(ast.module, ast, Ast.identifier(action)!),
-        typeof value === 'number' ?
-          Ast.tryNumberToEnso(value, ast.module)!
-        : Ast.TextLiteral.new(value, ast.module),
-      ),
-    )
-  }
-}
-
-function getAstGetValuePattern(columnId?: string, rowIndex?: number, action?: string) {
-  if (action && columnId && rowIndex != undefined) {
-    const pattern = Pattern.parseExpression('__ __')
-    return Pattern.new<Ast.Expression>((ast) =>
-      Ast.App.positional(
-        Ast.PropertyAccess.new(ast.module, ast, Ast.identifier('get_value')!),
-        pattern.instantiateCopied([
-          Ast.TextLiteral.new(columnId as string, ast.module),
-          Ast.tryNumberToEnso(rowIndex as number, ast.module)!,
-        ]),
-      ),
-    )
-  }
-}
-
-function createValueNode(columnId?: string | null, rowIndex?: number | null, action?: string) {
-  let pattern
-  if (action === 'at' && columnId != null) {
-    pattern = getAstValuePattern(columnId, action)
-  }
-  if (action === 'get_row' && rowIndex != null) {
-    pattern = getAstValuePattern(rowIndex, action)
-  }
-  if (action === 'get_value' && columnId != null && rowIndex != null) {
-    pattern = getAstGetValuePattern(columnId, rowIndex, action)
-  }
-
-  if (pattern) {
-    config.createNodes({
-      content: pattern,
-      commit: true,
-    })
-  }
+function createValueNode(
+  columnId: string | null | undefined,
+  rowIndex: number | null | undefined,
+  action: ValueNodeAction,
+) {
+  const pattern = valueNodePattern(columnId, rowIndex, action)
+  if (pattern) config.createNodes({ content: pattern, commit: true })
 }
 
 const viewFlags = computed(() => tableViewFlags(props.data))
@@ -324,8 +285,10 @@ async function getFilterValues(params: SetFilterValuesFuncParams) {
       filterActions,
       valueList,
     )
-    if (response.success) {
-      params.success(response.data)
+    // `null` data: too many distinct values to list, so the set filter has none to offer.
+    // The values go to AG Grid as the engine sent them (Booleans stay Booleans; #778).
+    if (response.success && response.data != null) {
+      params.success(response.data as (string | null)[])
     }
   }
 }
@@ -418,7 +381,12 @@ function createServer() {
       )
 
       try {
-        const response = await config.executeExpression(expressionFunction)
+        // No deadline (Note [Row Pages Wait For The Engine]), so the answer can belong to a table
+        // that has since been replaced: its block is dead, and it must not set the row count.
+        const version = tableVersionHash.value
+        const response = await config.executeExpression(expressionFunction, null)
+        if (version !== tableVersionHash.value)
+          return { success: false, rows: [], rowCount: undefined }
         // See the note on the `getFilterValues` call above: `null` means "subdoc not synced yet"
         // and `Err` means the evaluation failed. Neither has a `value`, and reading one produced
         // the misleading "Cannot read properties of undefined (reading 'row_count')" that masked
@@ -442,6 +410,24 @@ function createServer() {
     },
   }
 }
+
+/*
+ * Note [Row Pages Wait For The Engine]
+ * ====================================
+ * A row page is requested with no timeout. The engine answers requests in turn, so right after a
+ * project opens, or while a node evaluates, the first page can take far longer than the usual 5 s
+ * (#777). A page that timed out was settled as an empty one, and AG Grid showed "No Rows To Show"
+ * over a table with rows until the table changed. Asking again would not help either: the engine
+ * still evaluates a request whose slot the GUI removed (a one-shot `inFrame` request is never
+ * detached), so each retry would add work to an engine that is already behind. Until the page
+ * comes, AG Grid shows its rows as loading.
+ *
+ * There is no cancellation either: a request the engine never answers (a lost language server
+ * connection) stays pending, holding one slot and its observer on a visualization document that
+ * is discarded with the session. The 5 s timeout was the only clean-up for that case; a grid that
+ * keeps loading is the better failure than one claiming the table is empty. An answer that comes
+ * after the table changed is dropped (`getData` compares `tableVersionHash`).
+ */
 
 interface Response {
   rows: Record<string, any>[]
@@ -545,67 +531,7 @@ function refresh() {
 
 const colTypeMap = computed(() => viewFlags.value.columnTypes)
 
-const getColumnValueToEnso = (columnName: string) => {
-  const columnType = colTypeMap.value.get(columnName) ?? ''
-  if (isNumericType(columnType)) {
-    return (item: string, module: Ast.MutableModule) => Ast.tryNumberToEnso(Number(item), module)!
-  }
-  if (columnType === 'Date') {
-    return (item: string, module: Ast.MutableModule) => createDateValue(item, module)
-  }
-  if (columnType === 'Time') {
-    return (item: string, module: Ast.MutableModule) =>
-      createDateTimeValue('Time_Of_Day.parse (__)', item, module)
-  }
-  if (columnType === 'Date_Time') {
-    return (item: string, module: Ast.MutableModule) =>
-      createDateTimeValue('Date_Time.parse (__)', item, module)
-  }
-  if (columnType === 'Mixed') {
-    return (item: string, module: Ast.MutableModule) => {
-      const parsedCellType = getCellValueType(item)
-      return getFormattedValueForCell(item, module, parsedCellType)
-    }
-  }
-  if (columnType === 'Boolean') {
-    return (item: string, module: Ast.MutableModule) => {
-      return item === 'false' ?
-          Ast.Ident.new(module, Ast.identifier('False')!)
-        : Ast.Ident.new(module, Ast.identifier('True')!)
-    }
-  }
-  return (item: string) => Ast.TextLiteral.new(item)
-}
-
-const getFormattedValueForCell = (item: string, module: Ast.MutableModule, cellType: string) => {
-  if (isNumericType(cellType)) {
-    return Ast.tryNumberToEnso(Number(item), module)!
-  }
-  if (cellType === 'Date') {
-    return createDateValue(item, module)
-  }
-  if (cellType === 'Time') {
-    return createDateTimeValue('Time_Of_Day.parse (__)', item, module)
-  }
-  if (cellType === 'Date_Time') {
-    return createDateTimeValue('Date_Time.parse (__)', item, module)
-  }
-  return Ast.TextLiteral.new(item)
-}
-
-const createDateTimeValue = (patternString: string, item: string, module: Ast.MutableModule) => {
-  const pattern = Pattern.parseExpression(patternString)!
-  return pattern.instantiateCopied([Ast.TextLiteral.new(item, module)])
-}
-
-const createDateValue = (item: string, module: Ast.MutableModule) => {
-  const dateOrTimePattern = Pattern.parseExpression('(Date.new __ __ __)')
-  const dateTimeParts = item
-    .match(/\d+/g)!
-    .filter((part, i) => i < 3)
-    .map((part) => Ast.tryNumberToEnso(Number(part), module)!)
-  return dateOrTimePattern.instantiateCopied([...dateTimeParts])
-}
+const getColumnValueToEnso = (columnName: string) => columnValueToEnso(colTypeMap.value)(columnName)
 
 function checkSortAndFilter(e: SortChangedEvent) {
   const gridApi = e.api

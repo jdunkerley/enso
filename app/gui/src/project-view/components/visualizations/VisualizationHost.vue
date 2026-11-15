@@ -18,7 +18,7 @@ export interface VisualizationHostParams {
   toolbarOverflow?: boolean
   executeExpression: (
     expressionFunction: (nodeIdentifier: string) => Ast.Owned<Ast.Expression>,
-    timeoutMs?: number,
+    timeoutMs?: number | null,
   ) => any
 }
 
@@ -62,7 +62,7 @@ provideVisualizationConfig({
   createNodes: (...nodes) => emit('createNodes', nodes),
   executeExpression: (
     expressionFunction: (nodeIdentifier: string) => Ast.Owned<Ast.Expression>,
-    timeoutMs?: number,
+    timeoutMs?: number | null,
   ) => props.params.executeExpression(expressionFunction, timeoutMs),
 })
 

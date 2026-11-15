@@ -27,9 +27,13 @@ export interface VisualizationConfig {
    * it. By default, this is `false`.
    */
   setToolbarOverlay: (enableOverlay: boolean) => void
+  /**
+   * Evaluate an expression on the visualized node. It gives up after `timeoutMs` (5 s when
+   * omitted); `null` waits for the engine's answer however long it takes.
+   */
   executeExpression: (
     expressionFunction: (nodeIdentifier: string) => Ast.Owned<Ast.Expression>,
-    timeoutMs?: number,
+    timeoutMs?: number | null,
   ) => any
 }
 

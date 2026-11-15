@@ -81,12 +81,12 @@ test('search_components returns the matches best first, with signature and summa
     results: [
       {
         name: 'Standard.Base.Data.read',
-        signature: 'read(path: Text, format: Any = ..Auto_Detect) -> Table',
+        signature: 'Data.read(path: Text, format: Any = ..Auto_Detect) -> Table',
         summary: 'Reads a file.',
       },
       {
         name: 'Standard.Base.Data.read_text',
-        signature: 'read_text() -> Any',
+        signature: 'Data.read_text() -> Any',
         summary: 'Reads a file as text.',
       },
     ],
@@ -121,7 +121,7 @@ test('get_component_docs reads a component by the name search_components printed
   const [found] = value(searchComponents(deps, { query: 'read' })).results
   expect(value(getComponentDocs(deps, { name: found.name }))).toEqual({
     name: 'Standard.Base.Data.read',
-    signature: 'read(path: Text, format: Any = ..Auto_Detect) -> Table',
+    signature: 'Data.read(path: Text, format: Any = ..Auto_Detect) -> Table',
     arguments: [
       {
         name: 'path',
