@@ -12,7 +12,21 @@ component, or of the entry highlighted in the component browser. F1
   and the lists below the text.
 - `DocsSignature.vue` / `signature.ts` — a function's signature drawn as the
   docs site draws it (`docs-site/src/components/ComponentNode.tsx`): name and
-  arguments on the group colour, optional ones in italics, types in tooltips.
+  arguments on the group colour, optional ones in italics, each argument a pill
+  with its tooltip. ▸ details expands to one row per argument plus the return
+  type; the choice persists in the `expandHelpArguments` user setting.
+- `DocsParamPill.vue` — one argument's pill and tooltip: hover (including over
+  the tooltip), focus, tap and Escape, ported from the docs site's `Pill`. Not
+  `TooltipTrigger`, which has no keyboard-focus support.
+- `arguments.ts` — the arguments merged from the signature and the doc comment,
+  and `unqualifiedType`. The widget kind is inferred statically: the engine
+  builds `@` widgets at run time, so the panel cannot ask it.
+- `sections.ts` — a doc comment's `##` sections, found on the Lezer tree. It is
+  shared with the docs site's generator, which imports it through
+  `docs-site/generator/src/gui.ts`. `panelText` drops a `## Arguments` the
+  signature already shows and splits off `## Remarks` (a collapsed `<details>`).
+- `examples.ts` — an example's Copy button turns its code into clipboard nodes.
+  It imports no graph-editor values, so the docs-site generator can load it.
 - `DocsSiteLink.vue` — "View on docs site ↗", only for entries with a page
   (`suggestionDocumentationUrl`: the `Standard.*` libraries; not the user's code
   or conversions).
