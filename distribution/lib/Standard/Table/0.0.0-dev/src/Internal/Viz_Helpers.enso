@@ -91,13 +91,7 @@ table_actions -> Viz_Actions = Viz_Actions.Value <|
    The node actions of a table, as `table_actions` but with their JSON kept:
    it is the same for every table, and writing it costs more than the rest of
    adding it to a message.
-cached_table_actions -> Viz_Actions =
-    key = "viz_actions:table"
-    cached = TableValueCache.get key
-    if Nothing != cached then Viz_Actions.Json cached table_actions.actions else
-        text = table_actions.to_json_text
-        TableValueCache.put key text
-        Viz_Actions.Json text table_actions.actions
+cached_table_actions -> Viz_Actions = cached_actions "viz_actions:table" table_actions
 
 ## ---
    private: true
@@ -106,3 +100,23 @@ cached_table_actions -> Viz_Actions =
    number.
 column_actions -> Viz_Actions =
     Viz_Actions.Value [Viz_Action.chain "open_row" "Get Value" "select_cell" "at {{#index}}"]
+
+## ---
+   private: true
+   ---
+   The node actions of a column, as `column_actions` but with their JSON kept.
+cached_column_actions -> Viz_Actions = cached_actions "viz_actions:column" column_actions
+
+## ---
+   private: true
+   ---
+   `actions` with their JSON written once per engine, kept in the shared
+   `TableValueCache` under `key`. A message touches the key, so it stays
+   recent. Only the text is kept: `actions` itself is built only when its
+   `actions` vector is read.
+private cached_actions (key : Text) ~actions -> Viz_Actions =
+    cached = TableValueCache.get key
+    if Nothing != cached then Viz_Actions.Json cached actions.actions else
+        text = actions.to_json_text
+        TableValueCache.put key text
+        Viz_Actions.Json text actions.actions

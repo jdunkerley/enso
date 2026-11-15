@@ -2735,4 +2735,4 @@ Viz_Tree.from (that:Column) =
    The same actions for an in-memory and a database column.
 Viz_Actions.from (that:Column) =
     _ = that
-    Viz_Helpers.column_actions
+    Viz_Helpers.cached_column_actions
