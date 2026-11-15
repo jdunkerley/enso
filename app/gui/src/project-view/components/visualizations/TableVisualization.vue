@@ -51,7 +51,6 @@ import {
   INDEX_FIELD_NAME,
   rowsFromPage,
   tableViewFlags,
-  type Data,
 } from './TableVisualization/tableView'
 
 import { formatText, getCellValueType, isNumericType } from './TableVisualization/tableVizUtils'
@@ -71,7 +70,7 @@ export const defaultPreprocessor = [
 export type TextFormatOptions = 'full' | 'partial' | 'off'
 
 /**
- * The row counts shown below the grid, or `undefined` when the backend did not ask for a bottom
+ * The row counts shown below the grid, or `undefined` when the view did not ask for a bottom
  * status bar. `gettingStarted.spec.ts` asserts on them, for a user-facing workflow.
  *
  * The filtered line appears only when it differs from the total.
@@ -80,21 +79,17 @@ export type TextFormatOptions = 'full' | 'partial' | 'off'
  * be displayed twice.
  */
 export function computeBottomStatusBar(
-  data: Data,
+  requested: boolean,
   total: number | undefined,
   filtered: number | null,
 ): { total: number | undefined; filtered: number | null; showFiltered: boolean } | undefined {
-  const requested =
-    typeof data === 'object' &&
-    'use_bottom_status_bar' in data &&
-    Boolean(data.use_bottom_status_bar)
   if (!requested) return undefined
   return { total, filtered, showFiltered: filtered != null && filtered !== total }
 }
 </script>
 
 <script setup lang="ts">
-const props = defineProps<{ data: Data }>()
+const props = defineProps<{ data: unknown }>()
 const config = useVisualizationConfig()
 
 const rowLimit = ref(0)
@@ -209,7 +204,7 @@ const isSSRM = computed(() => viewFlags.value.isSSRM)
 
 const bottomStatusBar = computed(() =>
   computeBottomStatusBar(
-    props.data,
+    viewFlags.value.bottomStatusBarRequested,
     allRowCount.value,
     isSSRM.value ? filteredRowCount.value : null,
   ),
@@ -516,10 +511,6 @@ function cellRenderer(params: ICellRendererParams) {
   } else return escapeHTML(params.value.toString())
 }
 
-// The data the component was created with: what a value that is not a JSON object shows.
-// (Declared before the `watchEffect` below, whose first run reads it.)
-const initialData = props.data
-
 watchEffect(() => {
   try {
     refresh()
@@ -534,12 +525,10 @@ function refresh() {
     isSSRM: isSSRM.value,
     getFilterValues,
     createNode: (pattern) => config.createNodes({ content: pattern, commit: true }),
-    previousRowData: rowData.value,
-    initialData,
   })
   columnDefs.value = view.columnDefs
   if (view.rowData !== undefined) rowData.value = view.rowData
-  if (view.isTruncated !== undefined) isTruncated.value = view.isTruncated
+  isTruncated.value = view.isTruncated
   dataGroupingMap.value = view.dataGrouping
   rowCount.value = view.rowCount
   showRowCount.value = view.showRowCount

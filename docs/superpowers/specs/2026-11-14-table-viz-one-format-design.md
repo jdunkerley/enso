@@ -198,7 +198,8 @@ with display text) is brought to the same field order as `Viz_Cell`.
   all three messages from a `Viz_Table` (piece 1's contract): names, kinds,
   `row_count`, `select_columns`/`slice`, and the capabilities.
 - A source may supply bulk pieces as optional methods, which the writer uses
-  when present: `column_cells_json name start count -> Text` (a JSON array) and
+  when present: `column_cells_json index start count -> Text` (a JSON array;
+  `index` is the column's position in `column_names`) and
   `column_metrics_json -> Vector Text` (one JSON fragment per column). The
   in-memory source implements both through Java; other sources leave them out
   and the writer renders cells with `Viz_Cell.render_value`.

@@ -1,1 +1,1 @@
-{"type":"Generic_Grid","data":[["pinned","pinned_geo"]],"headers":[{"visualization_header":"Table","child_label":"table","get_child_node_action":"query"}]}
+{"kind":"grid","columns":[{"name":"Table","link":{"action":"query {{@Table}}","label":"table"},"number_format":false}],"data":[["pinned","pinned_geo"]]}

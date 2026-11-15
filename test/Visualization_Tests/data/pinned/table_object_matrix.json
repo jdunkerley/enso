@@ -1,1 +1,1 @@
-{"type":"Object_Matrix","all_rows_count":2,"json":[{"type":"Atom","constructor":"Value","x":1,"y":"a"},{"type":"Atom","constructor":"Value","x":2,"y":"b"}],"get_child_node_action":"at"}
+{"kind":"grid","row_count":2,"columns":[{"name":"type","number_format":false},{"name":"constructor","number_format":false},{"name":"x","number_format":false},{"name":"y","number_format":false}],"index":{"action":"at {{#index}}"},"data":[["Atom","Atom"],["Value","Value"],[1,2],["a","b"]],"options":{"disable_sort_when_partial":true}}

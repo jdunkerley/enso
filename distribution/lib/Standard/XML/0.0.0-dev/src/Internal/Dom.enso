@@ -131,6 +131,17 @@ attribute_names element -> Vector Text =
     map = element.getAttributes
     Vector.new map.getLength i-> (map.item i).getNodeName
 
+## How many attributes `element` has.
+attribute_count element -> Integer = element.getAttributes.getLength
+
+## The name of the attribute at `index` (from 0, in the DOM's order) of
+   `element`.
+attribute_name_at element index:Integer -> Text = (element.getAttributes.item index).getNodeName
+
+## The value of the attribute at `index` (from 0, in the DOM's order) of
+   `element`.
+attribute_value_at element index:Integer -> Text = (element.getAttributes.item index).getNodeValue
+
 ## The attributes of `element`, in the DOM's order.
 attributes element -> Dictionary Text Text =
     map = element.getAttributes

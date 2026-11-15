@@ -1,6 +1,10 @@
+// The table view format's field names are snake_case (`number_format`, …).
+/* eslint-disable camelcase */
+
 import type EditorPageActions from 'integration-test/actions/EditorPageActions'
 import { expect, test, type BrowserContext, type Locator, type Page } from 'integration-test/base'
 import type { MockLocalApi } from 'integration-test/mock/localApi'
+import { matrixView } from 'integration-test/mock/tableView'
 import * as actions from './actions'
 import { mockMethodCallInfo } from './expressionUpdates'
 import * as locate from './locate'
@@ -50,14 +54,9 @@ test('Column size can be set and is retained', async ({ editorPage, page, localA
   // A data update causes column autosizing to run
   await localApi.updateVisualization(
     'Standard.Visualization.Table.Visualization.prepare_visualization',
-    {
-      type: 'Matrix',
-      // eslint-disable-next-line camelcase
-      column_count: 5,
-      // eslint-disable-next-line camelcase
-      all_rows_count: 10,
-      json: Array.from({ length: 10 }, (_, i) => Array.from({ length: 5 }, (_, j) => `${i},${j}b`)),
-    },
+    matrixView(
+      Array.from({ length: 10 }, (_, i) => Array.from({ length: 5 }, (_, j) => `${i},${j}b`)),
+    ),
   )
   await expect(tableVisualization).toContainText('0,0b')
 
@@ -178,15 +177,17 @@ test('Single Column Of Actions Table Visualisation Test', async ({
 
   await localApi.updateVisualization(
     'Standard.Visualization.Table.Visualization.prepare_visualization',
-    /* eslint-disable camelcase */
     {
-      type: 'Generic_Grid',
-      headers: [
-        { visualization_header: 'table', child_label: 'table', get_child_node_action: 'read' },
+      kind: 'grid',
+      columns: [
+        {
+          name: 'table',
+          link: { action: 'read {{@table}}', label: 'table' },
+          number_format: false,
+        },
       ],
       data: [['Sheet1', 'Sheet2', 'Sheet3']],
     },
-    /* eslint-enable camelcase */
   )
   await expect(tableVisualization).toContainText('table')
   await expect(tableVisualization).toContainText('Sheet1')
@@ -210,15 +211,12 @@ test('Error Visualisation Test', async ({ editorPage, page, localApi }) => {
 
   await localApi.updateVisualization(
     'Standard.Visualization.Table.Visualization.prepare_visualization',
-    {
-      type: 'Error',
-      error: 'This is an error message.',
-    },
+    { kind: 'error', error: 'This is an error message.' },
   )
   await expect(tableVisualization).toContainText('This is an error message.')
 })
 
-test('get_child_node_action temmplate Test as number', async ({ editorPage, page, localApi }) => {
+test('Link template Test as number', async ({ editorPage, page, localApi }) => {
   await initGraph(editorPage)
 
   const aggregatedNode = graphNodeByBinding(page, 'aggregated')
@@ -229,19 +227,17 @@ test('get_child_node_action temmplate Test as number', async ({ editorPage, page
 
   await localApi.updateVisualization(
     'Standard.Visualization.Table.Visualization.prepare_visualization',
-    /* eslint-disable camelcase */
     {
-      type: 'Generic_Grid',
-      headers: [
+      kind: 'grid',
+      columns: [
         {
-          visualization_header: 'table',
-          child_label: 'table',
-          get_child_node_action: 'read {{#table}}',
+          name: 'table',
+          link: { action: 'read {{#table}}', label: 'table' },
+          number_format: false,
         },
       ],
       data: [['1', '2', '3']],
     },
-    /* eslint-enable camelcase */
   )
   await expect(tableVisualization).toContainText('table')
   await expect(tableVisualization).toContainText('1')
@@ -256,7 +252,7 @@ test('get_child_node_action temmplate Test as number', async ({ editorPage, page
   await expect(numberWidget).toHaveValue('2')
 })
 
-test('get_child_node_action temmplate Test as text', async ({ editorPage, page, localApi }) => {
+test('Link template Test as text', async ({ editorPage, page, localApi }) => {
   await initGraph(editorPage)
 
   const aggregatedNode = graphNodeByBinding(page, 'aggregated')
@@ -267,19 +263,17 @@ test('get_child_node_action temmplate Test as text', async ({ editorPage, page, 
 
   await localApi.updateVisualization(
     'Standard.Visualization.Table.Visualization.prepare_visualization',
-    /* eslint-disable camelcase */
     {
-      type: 'Generic_Grid',
-      headers: [
+      kind: 'grid',
+      columns: [
         {
-          visualization_header: 'table',
-          child_label: 'table',
-          get_child_node_action: 'read {{@table}}',
+          name: 'table',
+          link: { action: 'read {{@table}}', label: 'table' },
+          number_format: false,
         },
       ],
       data: [['1', '2', '3']],
     },
-    /* eslint-enable camelcase */
   )
   await expect(tableVisualization).toContainText('table')
   await expect(tableVisualization).toContainText('1')
@@ -308,13 +302,11 @@ test('GenericGrid Table Visualisation Test - single column - no links', async ({
 
   await localApi.updateVisualization(
     'Standard.Visualization.Table.Visualization.prepare_visualization',
-    /* eslint-disable camelcase */
     {
-      type: 'Generic_Grid',
-      headers: [{ visualization_header: 'table' }],
+      kind: 'grid',
+      columns: [{ name: 'table', number_format: false }],
       data: [['Sheet1', 'Sheet2', 'Sheet3']],
     },
-    /* eslint-enable camelcase */
   )
   await expect(tableVisualization).toContainText('table')
   await expect(tableVisualization).toContainText('Sheet1')
@@ -337,19 +329,17 @@ test('GenericGrid Table Visualisation Test - two column - link on second', async
 
   await localApi.updateVisualization(
     'Standard.Visualization.Table.Visualization.prepare_visualization',
-    /* eslint-disable camelcase */
     {
-      type: 'Generic_Grid',
-      headers: [
-        { visualization_header: 'table' },
-        { visualization_header: 'number', get_child_node_action: 'read {{#number}} {{@table}}' },
+      kind: 'grid',
+      columns: [
+        { name: 'table', number_format: false },
+        { name: 'number', link: { action: 'read {{#number}} {{@table}}' }, number_format: false },
       ],
       data: [
         ['SheetA', 'SheetB', 'SheetC'],
         ['1', '2', '3'],
       ],
     },
-    /* eslint-enable camelcase */
   )
   await expect(tableVisualization).toContainText('table')
   await expect(tableVisualization).toContainText('SheetA')
@@ -387,28 +377,28 @@ test.describe('Table_Visualisation_Integration_Spec and clipboard', () => {
   test('Datetime test - sorting and copying', async ({ editorPage, localApi, page, context }) => {
     await loadData(editorPage, localApi, singleColumnDatetimes)
     await expectCellDataToBe(page, 'Value', [
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-01 12:13:14.123[MET]',
-      '2025-01-03 12:13:14.123[MET]',
+      '2025-01-02 12:13:14.123[UTC]',
+      '2025-01-01 12:13:14.123[UTC]',
+      '2025-01-03 12:13:14.123[UTC]',
     ])
     const value = getHeaderLocator(page, { colHeaderName: 'Value' })
     await value.click() // Sort ascending
     await expectCellDataToBe(page, 'Value', [
-      '2025-01-01 12:13:14.123[MET]',
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-03 12:13:14.123[MET]',
+      '2025-01-01 12:13:14.123[UTC]',
+      '2025-01-02 12:13:14.123[UTC]',
+      '2025-01-03 12:13:14.123[UTC]',
     ])
     await value.click() // Sort descending
     await expectCellDataToBe(page, 'Value', [
-      '2025-01-03 12:13:14.123[MET]',
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-01 12:13:14.123[MET]',
+      '2025-01-03 12:13:14.123[UTC]',
+      '2025-01-02 12:13:14.123[UTC]',
+      '2025-01-01 12:13:14.123[UTC]',
     ])
     await value.click() // remove sort
     await expectCellDataToBe(page, 'Value', [
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-01 12:13:14.123[MET]',
-      '2025-01-03 12:13:14.123[MET]',
+      '2025-01-02 12:13:14.123[UTC]',
+      '2025-01-01 12:13:14.123[UTC]',
+      '2025-01-03 12:13:14.123[UTC]',
     ])
     await expectCopyingColumnClipboardToBe(
       editorPage,
@@ -416,7 +406,7 @@ test.describe('Table_Visualisation_Integration_Spec and clipboard', () => {
       'Value',
       0,
       1,
-      '2025-01-02 12:13:14.123[MET]\r\n2025-01-01 12:13:14.123[MET]',
+      '2025-01-02 12:13:14.123[UTC]\r\n2025-01-01 12:13:14.123[UTC]',
     )
   })
 

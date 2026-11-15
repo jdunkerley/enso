@@ -5,6 +5,7 @@ import Standard.Base.Runtime.Context
 
 import project.Column.Column
 import project.Internal.In_Memory_Column_Implementation.In_Memory_Column_Implementation
+import project.Internal.In_Memory_Viz_Source.In_Memory_Viz_Source
 import project.Internal.Java_Problems
 import project.Internal.Storage
 import project.Internal.Type_Refinements.In_Memory_Column_Refinements
@@ -36,11 +37,11 @@ type In_Memory_Column
     ## ---
        private: true
        ---
-       Gets the Table Visualization for an In_Memory_Column.
-       This method implements caching to allow for quicker rendering of the same table.
-    to_table_viz_json self all_row_count:Integer=-1 use_server_mode:Boolean=True -> Text =
-        display_type = [(self:Column).value_type.to_display_text]
-        self.internal_java_column.tableVizJSON display_type all_row_count use_server_mode
+       The table view of the first rows of a database column with
+       `db_row_count` rows, or (`Nothing`) of this column.
+    to_table_viz_json self (db_row_count : Integer | Nothing = Nothing) -> Text =
+        column = self:Column
+        (In_Memory_Viz_Source.Value column.to_table column db_row_count).table_view_json 0
 
     ## ---
        private: true

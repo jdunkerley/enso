@@ -31,6 +31,7 @@ import { DistributedProject, VISUALIZATIONS_SUBDOC_KEY } from 'ydoc-shared/yjsMo
 import { Doc, Map as YMap } from 'yjs'
 import mockDb from './data/mockSuggestions.json' with { type: 'json' }
 import { mockDataWSHandler } from './dataServer'
+import { matrixView } from './tableView'
 
 const mockProjectId = crypto.randomUUID() as Uuid
 const standardBase = 'Standard.Base' as QualifiedName
@@ -264,14 +265,11 @@ const mockVizPreprocessors: Record<string, Uint8Array | ((params: string[]) => U
         },
       ],
     }),
-    'Standard.Visualization.Table.Visualization.prepare_visualization': encodeJSON({
-      type: 'Matrix',
-      // eslint-disable-next-line camelcase
-      column_count: 5,
-      // eslint-disable-next-line camelcase
-      all_rows_count: 10,
-      json: Array.from({ length: 10 }, (_, i) => Array.from({ length: 5 }, (_, j) => `${i},${j}`)),
-    }),
+    'Standard.Visualization.Table.Visualization.prepare_visualization': encodeJSON(
+      matrixView(
+        Array.from({ length: 10 }, (_, i) => Array.from({ length: 5 }, (_, j) => `${i},${j}`)),
+      ),
+    ),
     'Standard.Visualization.Warnings.process_to_json_text': encodeJSON([
       'warning 1',
       "warning 2!!&<>;'\x22",

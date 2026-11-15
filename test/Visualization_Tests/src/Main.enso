@@ -14,6 +14,7 @@ import project.Table_Spec
 import project.Table_View_Benchmark_Spec
 import project.Table_Visualisation_Integration_Spec
 import project.Tree_Spec
+import project.View_Json_Spec
 import project.Visualization_Spec
 import project.Viz_Cell_Spec
 import project.Viz_Table_Spec
@@ -33,6 +34,7 @@ main filter=Nothing =
         Table_View_Benchmark_Spec.add_specs suite_builder
         Table_Visualisation_Integration_Spec.add_specs suite_builder
         Tree_Spec.add_specs suite_builder
+        View_Json_Spec.add_specs suite_builder
         Visualization_Spec.add_specs suite_builder
         Viz_Cell_Spec.add_specs suite_builder
         Viz_Table_Spec.add_specs suite_builder

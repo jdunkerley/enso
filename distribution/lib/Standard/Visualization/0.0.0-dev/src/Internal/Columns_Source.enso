@@ -2,20 +2,22 @@ private
 
 from Standard.Base import all
 
+import project.Internal.View_Json
+from project.Internal.View_Json import View_Column, View_Link
 import project.Viz_Column_Kind.Viz_Column_Kind
 import project.Viz_Table.Viz_Header
 import project.Viz_Table.Viz_Table
 
-## Columns held in memory; the table view is a `Generic_Grid`, exactly as
-   the old Base generic grid rendered it.
+## Columns held in memory; the table view is a grid of the columns.
 type Columns_Source
     Value (headers : Vector Viz_Header) (columns : Vector Vector)
 
+    ## A grid of the columns; no row count and no row numbers, as before.
     table_view_json self _ -> Text =
-        header_json header = case header of
-            Viz_Header.Label _ -> JS_Object.from_pairs [["visualization_header", header.name]]
-            Viz_Header.Link _ _ _ -> JS_Object.from_pairs [["visualization_header", header.name], ["child_label", header.tooltip], ["get_child_node_action", header.action]]
-        JS_Object.from_pairs [["type", "Generic_Grid"], ["data", self.columns], ["headers", self.headers.map header_json]] . to_json
+        column_json header = case header of
+            Viz_Header.Label name -> View_Column.Value name number_format=False
+            Viz_Header.Link name tooltip action -> View_Column.Value name (View_Link.Value action tooltip) number_format=False
+        View_Json.grid_json (self.headers.map h-> (column_json h).to_json_text) (self.columns.map View_Json.cells_json)
 
     column_names self -> Vector Text = self.headers.map .name
 

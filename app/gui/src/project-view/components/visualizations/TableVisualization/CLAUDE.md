@@ -6,7 +6,10 @@ The table visualisation (`../TableVisualization.vue`) and its helpers.
   sends into AG Grid's column definitions and rows, the digit grouping, the row
   counts and the flags the component reads; it also reads a server row page and
   a column's distinct values. The component owns state, AG Grid and the server
-  calls and passes the rest in (`TableViewContext`).
+  calls and passes the rest in (`TableViewContext`). It parses the message with
+  zod (`viewMessageSchema`); the format is described in
+  `distribution/lib/Standard/Visualization/0.0.0-dev/CLAUDE.md`, "Table view
+  message".
 - `../__tests__/tableViewSnapshot.test.ts`: the gate on that model. It runs
   every pinned golden of `test/Visualization_Tests/data/pinned` (`table_*`,
   `ssrm_*`) through `tableView.ts` and snapshots the result, including each

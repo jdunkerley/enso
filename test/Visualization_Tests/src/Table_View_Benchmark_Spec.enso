@@ -16,7 +16,7 @@ from Standard.Test import all
    `BENCH|<case>|<mode>|<median ms>|<p90 ms>`.
    - `first`: a new table for each call (its metrics awaited, untimed).
    - `repeat`: the same table for each call (a view shown before).
-   `c2_1x2500` thrashes Java's 1000-entry caches on both sides: noisy.
+   `c2_1x2500` thrashes the 100-entry shared `TableValueCache` (the view's cache) and Java's 1000-entry cell cache on both sides: noisy.
 
 ## Makes the benchmark table: integer, float, text and then date columns, in
    turn. With `with_dates=False` the fourth kind is a boolean column: SQLite has no

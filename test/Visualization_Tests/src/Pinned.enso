@@ -3,9 +3,9 @@ from Standard.Base import all
 from Standard.Test import all
 
 ## Replaces the parts of the JSON that change between runs.
-   `table_version_hash` embeds a storage key that differs on every run.
+   `version_hash` embeds a storage key that differs on every run.
 normalise (text : Text) -> Text =
-    text.replace (regex '"table_version_hash":"[^"]*"') '"table_version_hash":"<hash>"'
+    text.replace (regex '"version_hash":"[^"]*"') '"version_hash":"<hash>"'
 
 ## Compares `json_text` with the pinned file `data/pinned/<name>.json`.
    With `ENSO_UPDATE_PINNED=1` in the environment it (re)writes the file and then

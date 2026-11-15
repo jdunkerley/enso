@@ -8,14 +8,15 @@ from Standard.Test import all
 
 add_specs suite_builder =
     suite_builder.group "Viz_Table from columns" group_builder->
-        grid = Viz_Table.from_columns [Viz_Header.Link "Table" "table" "query", Viz_Header.Label "Rows"] [["a", "b", "c"], [1, 2, 3]]
+        grid = Viz_Table.from_columns [Viz_Header.Link "Table" "table" "query {{@Table}}", Viz_Header.Label "Rows"] [["a", "b", "c"], [1, 2, 3]]
 
-        group_builder.specify "renders the Generic_Grid table view" <|
+        group_builder.specify "renders a grid of its columns, links included" <|
             json = grid.table_view_json . parse_json
-            json.get "type" . should_equal "Generic_Grid"
+            json.get "kind" . should_equal "grid"
             json.get "data" . should_equal [["a", "b", "c"], [1, 2, 3]]
-            json.get "headers" . at 0 . get "get_child_node_action" . should_equal "query"
-            json.get "headers" . at 1 . get "visualization_header" . should_equal "Rows"
+            json.get "columns" . at 0 . get "link" . should_equal (JS_Object.from_pairs [["action", "query {{@Table}}"], ["label", "table"]])
+            json.get "columns" . at 1 . get "name" . should_equal "Rows"
+            json.contains_key "row_count" . should_be_false
 
         group_builder.specify "describes its columns" <|
             grid.column_names . should_equal ["Table", "Rows"]

@@ -18,7 +18,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.enso.table.data.column.DataQualityMetrics;
 import org.enso.table.data.column.builder.Builder;
 import org.enso.table.data.column.operation.unary.JsonOperation;
@@ -28,14 +27,11 @@ import org.enso.table.data.table.Column;
 import org.enso.table.data.table.Row;
 import org.enso.table.util.LeastRecentlyUsedCache;
 import org.graalvm.polyglot.Context;
-import org.slf4j.Logger;
 
 /** Extension to JsonOperation for TableViz JSON code. */
 public class TableVizOperation {
   private static JsonOperation JSON_OPERATION =
       new JsonOperation("Standard.Visualization.Table.Visualization", "Helper", "make_json", true);
-
-  private static final Logger LOGGER = org.slf4j.LoggerFactory.getLogger(TableVizOperation.class);
 
   private record CacheKey(long storageKey, long start, long length) {}
 
@@ -47,17 +43,6 @@ public class TableVizOperation {
     }
     return _jsonCache;
   }
-
-  private static LeastRecentlyUsedCache<String, String> _tableVizCache;
-
-  private static LeastRecentlyUsedCache<String, String> tableVizCache() {
-    if (_tableVizCache == null) {
-      _tableVizCache = new LeastRecentlyUsedCache<>(1000);
-    }
-    return _tableVizCache;
-  }
-
-  private static final int MAX_CELLS_FOR_INLINE = 2500;
 
   /** Creates a JSON string representing a single Row */
   public static String makeJSONForRow(Row row) {
@@ -137,7 +122,9 @@ public class TableVizOperation {
         builder.append(",");
       }
       builder.append(
-          longStorage.isNothing(i) ? "null" : JsonOperation.toJson(longStorage.getItemAsLong(i)));
+          longStorage.isNothing(i)
+              ? "null"
+              : JsonOperation.toJson(longStorage.getItemAsLong(i), true));
       context.safepoint();
     }
     builder.append("]");
@@ -189,198 +176,139 @@ public class TableVizOperation {
   }
 
   /**
-   * Creates a JSON string representing the table visualization metadata, including column headers,
-   * value types, and various properties related to the table's structure and behavior.
+   * The table view's details of each column, as JSON object fields without the column's name: its
+   * value type, its data quality metrics, and whether it uses the multi-value filter and digit
+   * grouping, e.g. {@code
+   * "value_type":{…},"metrics":[…],"multi_filter":true,"number_format":false}.
+   *
+   * @param columns the columns
+   * @param valueTypeDisplay each column's value type as the user sees it
+   * @param withMetrics false for the first rows of a database table, which have no metrics
    */
-  public static String makeJSON(
-      String versionId,
-      Column[] columns,
-      long allRowsCount,
-      boolean useServerMode,
-      List<String> valueTypeDisplay,
-      String getChildMethod) {
-    if (allRowsCount == -1) {
-      final boolean finalUseServerMode = useServerMode;
-
-      if (tableVizCache().containsKey(versionId)) {
-        return tableVizCache().get(versionId);
-      }
-
-      var incomplete =
-          Arrays.stream(columns)
-              .anyMatch(
-                  c -> DataQualityMetrics.get(c).get(DataQualityMetrics.IS_INCOMPLETE) != null);
-      if (incomplete) {
-        LOGGER.info("Table version {} is incomplete, skipping cache", versionId);
-        allRowsCount = columns[0].getSize();
-      } else {
-        LOGGER.info("Table version {} generating JSON", versionId);
-        return tableVizCache()
-            .computeIfAbsent(
-                versionId,
-                _ ->
-                    makeJSON(
-                        versionId,
-                        columns,
-                        columns[0].getSize(),
-                        finalUseServerMode,
-                        valueTypeDisplay,
-                        getChildMethod));
-      }
-    }
-
-    boolean isColumn = !"get_row".equals(getChildMethod);
-    boolean isDBMode = !useServerMode;
-    boolean useServer = useServerMode && (allRowsCount * columns.length) > MAX_CELLS_FOR_INLINE;
-
-    var jsonBuilder = new StringBuilder();
-    jsonBuilder.append("{");
-
-    var headers = new StringBuilder();
-    var valueTypes = new StringBuilder();
+  public static String[] viewColumnsJson(
+      Column[] columns, List<String> valueTypeDisplay, boolean withMetrics) {
     var metrics = new ArrayList<Map<String, Object>>(columns.length);
+    for (Column column : columns) {
+      metrics.add(withMetrics ? DataQualityMetrics.get(column) : Map.of());
+    }
+    var entries = metricEntries(metrics);
+    var result = new String[columns.length];
     for (int i = 0; i < columns.length; i++) {
-      if (!headers.isEmpty()) {
-        headers.append(",");
-        valueTypes.append(",");
+      var builder = new StringBuilder();
+      builder
+          .append("\"value_type\":{\"constructor\":")
+          .append(JSON_OPERATION.objectToJson(columns[i].getStorageType().ensoConstructorName()))
+          .append(",\"display_text\":")
+          .append(JSON_OPERATION.objectToJson(valueTypeDisplay.get(i)))
+          .append("},\"metrics\":[");
+      for (int m = 0; m < entries.size(); m++) {
+        var entry = entries.get(m);
+        if (m > 0) {
+          builder.append(",");
+        }
+        builder
+            .append("{\"name\":")
+            .append(JSON_OPERATION.objectToJson(entry.name()))
+            .append(",\"value\":")
+            .append(entry.values().get(i))
+            .append(",\"type\":\"")
+            .append(entry.type())
+            .append("\"}");
       }
-      headers.append(JSON_OPERATION.objectToJson(columns[i].getName()));
-
-      var columnType = columns[i].getStorageType().ensoConstructorName();
-      valueTypes
-          .append("{\"constructor\":\"")
-          .append(columnType)
-          .append("\",\"display_text\":\"")
-          .append(valueTypeDisplay.get(i))
-          .append("\"}");
-
-      metrics.add(isDBMode ? Map.of() : DataQualityMetrics.get(columns[i]));
+      var columnMetrics = metrics.get(i);
+      builder
+          .append("],\"multi_filter\":")
+          .append(
+              JSON_OPERATION.objectToJson(
+                  columnMetrics.getOrDefault(DataQualityMetrics.USE_MULTI_FILTER, false)))
+          .append(",\"number_format\":")
+          .append(
+              JSON_OPERATION.objectToJson(
+                  columnMetrics.getOrDefault(DataQualityMetrics.NEEDS_FORMATTING, false)));
+      result[i] = builder.toString();
     }
-    jsonBuilder.append("\"header\":[").append(headers).append("]");
-    jsonBuilder.append(",\"value_type\":[").append(valueTypes).append("]");
-
-    appendProperty(jsonBuilder, "all_rows_count", allRowsCount);
-    appendProperty(jsonBuilder, "has_index_col", true);
-    appendProperty(jsonBuilder, "get_child_node_action", getChildMethod);
-    appendProperty(jsonBuilder, "use_bottom_status_bar", !isDBMode);
-    appendProperty(jsonBuilder, "enable_create_node", !isColumn);
-
-    jsonBuilder.append(",\"data_quality_metrics\":[");
-    makeDataQualityMetrics(jsonBuilder, metrics);
-    jsonBuilder.append("]");
-
-    appendProperty(jsonBuilder, "type", "EnsoTableOrColumn");
-    appendProperty(jsonBuilder, "child_label", "row");
-    appendProperty(jsonBuilder, "is_using_server_sort_and_filter", useServer);
-    appendMetric(
-        jsonBuilder, "requires_number_format", metrics, DataQualityMetrics.NEEDS_FORMATTING, false);
-    appendProperty(jsonBuilder, "table_version_hash", isDBMode ? null : versionId);
-    appendMetric(
-        jsonBuilder, "is_using_multi_filter", metrics, DataQualityMetrics.USE_MULTI_FILTER, false);
-    jsonBuilder.append(",\"data\":").append(useServer ? "null" : dataToJson(columns));
-
-    jsonBuilder.append("}");
-    return jsonBuilder.toString();
+    return result;
   }
 
-  private static void appendProperty(StringBuilder builder, String name, Object value) {
-    if (builder.length() > 1) {
-      builder.append(",");
-    }
-    builder.append("\"").append(name).append("\":").append(JSON_OPERATION.objectToJson(value));
+  /** Whether any column's data quality metrics are still being computed. */
+  public static boolean metricsIncomplete(Column[] columns) {
+    return Arrays.stream(columns)
+        .anyMatch(c -> DataQualityMetrics.get(c).get(DataQualityMetrics.IS_INCOMPLETE) != null);
   }
 
-  private static void makeDataQualityMetrics(StringBuilder json, List<Map<String, Object>> dqs) {
-    boolean f = true;
-    f = addMetric(json, dqs, "", DataQualityMetrics.IS_INCOMPLETE_TEXT, "Text", f, "");
-    f = addRange(json, dqs, f);
-    f =
-        addMetric(
-            json, dqs, "Number of distinct", DataQualityMetrics.DISTINCT_COUNT, "Count", f, 0);
-    f = addMetric(json, dqs, "% nothing", DataQualityMetrics.NOTHING_COUNT, "Percentage", f, null);
-    f = addMetric(json, dqs, "", DataQualityMetrics.TYPE_RECORD, "Text", f, null);
+  /** A metric the view shows: its name, its kind, and each column's value as JSON. */
+  private record MetricEntry(String name, String type, List<String> values) {}
 
+  /**
+   * The metrics a table view shows, in order: those at least one column has, each with every
+   * column's value (the default for a column without it).
+   */
+  private static List<MetricEntry> metricEntries(List<Map<String, Object>> metrics) {
+    var entries = new ArrayList<MetricEntry>();
+    addMetric(entries, metrics, "", DataQualityMetrics.IS_INCOMPLETE_TEXT, "Text", "");
+    addRange(entries, metrics);
+    addMetric(
+        entries, metrics, "Number of distinct", DataQualityMetrics.DISTINCT_COUNT, "Count", 0);
+    addMetric(entries, metrics, "% nothing", DataQualityMetrics.NOTHING_COUNT, "Percentage", null);
+    addMetric(entries, metrics, "", DataQualityMetrics.TYPE_RECORD, "Text", null);
     var sampled =
-        dqs.stream().anyMatch(m -> Boolean.TRUE.equals(m.get(DataQualityMetrics.SAMPLED)));
+        metrics.stream().anyMatch(m -> Boolean.TRUE.equals(m.get(DataQualityMetrics.SAMPLED)));
     var suffix = sampled ? " (sampled)" : "";
-
-    f =
-        addMetric(
-            json, dqs, "% empty" + suffix, DataQualityMetrics.EMPTY_COUNT, "Percentage", f, null);
-    f =
-        addMetric(
-            json,
-            dqs,
-            "% untrimmed" + suffix,
-            DataQualityMetrics.UNTRIMMED_COUNT,
-            "Percentage",
-            f,
-            null);
-    f =
-        addMetric(
-            json,
-            dqs,
-            "% with odd whitespace" + suffix,
-            DataQualityMetrics.ODD_SPACE_COUNT,
-            "Percentage",
-            f,
-            null);
+    addMetric(
+        entries, metrics, "% empty" + suffix, DataQualityMetrics.EMPTY_COUNT, "Percentage", null);
+    addMetric(
+        entries,
+        metrics,
+        "% untrimmed" + suffix,
+        DataQualityMetrics.UNTRIMMED_COUNT,
+        "Percentage",
+        null);
+    addMetric(
+        entries,
+        metrics,
+        "% with odd whitespace" + suffix,
+        DataQualityMetrics.ODD_SPACE_COUNT,
+        "Percentage",
+        null);
+    return entries;
   }
 
-  private static boolean addMetric(
-      StringBuilder builder,
+  private static void addMetric(
+      List<MetricEntry> entries,
       List<Map<String, Object>> metrics,
-      String label,
-      String fieldName,
+      String name,
+      String field,
       String type,
-      boolean first,
       Object defaultValue) {
-    if (!hasMetric(metrics, fieldName)) {
-      return first;
+    if (metrics.stream().noneMatch(m -> m.get(field) != null)) {
+      return;
     }
-
-    if (!first) {
-      builder.append(",");
+    var values = new ArrayList<String>(metrics.size());
+    for (var metric : metrics) {
+      values.add(JSON_OPERATION.objectToJson(metric.getOrDefault(field, defaultValue)));
     }
-
-    builder.append("{\"name\":\"").append(label).append("\"");
-    appendMetric(builder, "values", metrics, fieldName, defaultValue);
-    builder.append(",\"type\":\"").append(type).append("\"}");
-    return false;
+    entries.add(new MetricEntry(name, type, values));
   }
 
-  private static boolean addRange(
-      StringBuilder builder, List<Map<String, Object>> metrics, boolean first) {
+  private static void addRange(List<MetricEntry> entries, List<Map<String, Object>> metrics) {
     boolean hasRange = false;
-    List<String> ranges = new ArrayList<>();
-
+    var values = new ArrayList<String>(metrics.size());
     for (var metric : metrics) {
       var min = metric.get(DataQualityMetrics.MINIMUM);
       if (min == null) {
-        ranges.add(null);
+        values.add("null");
         continue;
       }
-
       hasRange = true;
-      String rangeValue =
+      String range =
           Boolean.TRUE.equals(metric.get(DataQualityMetrics.SINGLE_VALUE))
               ? toDisplayText(min)
               : toDisplayText(min) + " - " + toDisplayText(metric.get(DataQualityMetrics.MAXIMUM));
-      ranges.add(JSON_OPERATION.objectToJson(rangeValue));
+      values.add(JSON_OPERATION.objectToJson(range));
     }
-
-    if (!hasRange) {
-      return first;
+    if (hasRange) {
+      entries.add(new MetricEntry("Range", "Text", values));
     }
-
-    if (!first) {
-      builder.append(",");
-    }
-    builder
-        .append("{\"name\":\"Range\",\"values\":[")
-        .append(String.join(",", ranges))
-        .append("],\"type\":\"Text\"}");
-    return false;
   }
 
   private static final DateTimeFormatter DATE_TIME_FORMATTER =
@@ -425,37 +353,5 @@ public class TableVizOperation {
     } else {
       return value.toString();
     }
-  }
-
-  private static boolean hasMetric(List<Map<String, Object>> metrics, String metric) {
-    return metrics.stream().anyMatch(dqm -> dqm.get(metric) != null);
-  }
-
-  private static void appendMetric(
-      StringBuilder builder,
-      String name,
-      List<Map<String, Object>> metrics,
-      String metric,
-      Object defaultValue) {
-    if (builder.length() > 1) {
-      builder.append(",");
-    }
-    builder.append("\"").append(name).append("\":[");
-    for (int i = 0; i < metrics.size(); i++) {
-      if (i != 0) {
-        builder.append(",");
-      }
-      builder.append(
-          JSON_OPERATION.objectToJson(metrics.get(i).getOrDefault(metric, defaultValue)));
-    }
-    builder.append("]");
-  }
-
-  private static String dataToJson(Column[] columns) {
-    var output = new ArrayList<String>();
-    for (Column column : columns) {
-      output.add(makeJSONForColumn(column, 0, column.getSize()));
-    }
-    return output.stream().collect(Collectors.joining(",", "[", "]"));
   }
 }

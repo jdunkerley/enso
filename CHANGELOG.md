@@ -5,6 +5,8 @@
 - [The JSON visualization is a tree that loads each branch when you open it, a
   page at a time, with no limit on size or depth. It explores any value, and
   double-clicking an entry adds a component for it.][771]
+- [A database table whose rows cannot be read shows the database's error in the
+  table visualization instead of an empty table.][776]
 - [A component whose value is an image opens in the Image visualization.][758]
 - [Charts are offered for every value whose library can draw them, not a fixed
   list of types.][751]
@@ -500,6 +502,7 @@
 
 [771]: https://github.com/jdunkerley/enso/pull/771
 [735]: https://github.com/jdunkerley/enso/pull/735
+[776]: https://github.com/jdunkerley/enso/pull/776
 [758]: https://github.com/jdunkerley/enso/pull/758
 [751]: https://github.com/jdunkerley/enso/pull/751
 [733]: https://github.com/jdunkerley/enso/pull/733

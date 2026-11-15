@@ -1,6 +1,7 @@
 from Standard.Base import all
 
 from Standard.Table import Table, Aggregate_Column, Value_Type
+import Standard.Table.In_Memory_Column.In_Memory_Column
 
 from Standard.Database import all
 from Standard.SQLite import all
@@ -11,6 +12,7 @@ from Standard.Test import all
 
 
 polyglot java import java.util.UUID
+polyglot java import org.enso.table.util.TableValueCache
 
 type Data
     Value ~data
@@ -48,30 +50,19 @@ type Foo_Link
 
 add_specs suite_builder =
     make_json header data all_rows value_type has_index_col get_child_node is_ssrm range=Nothing number_of_distinct=Nothing number_of_nothing=Nothing number_of_empty=Nothing number_of_empty_sampled=Nothing number_of_untrimmed_whitespace=Nothing number_of_untrimmed_whitespace_sampled=Nothing number_non_trivial_ws=Nothing number_non_trivial_ws_sampled=Nothing requires_number_format table_version_hash=Nothing use_bottom_status_bar=True enable_create_node=True is_using_multi_filter =
-        p_header      = ["header", header]
-        p_data        = ["data",   data]
-        p_all_rows    = ["all_rows_count", all_rows]
-        p_value_type  = ["value_type", value_type]
-        p_has_index_col = ["has_index_col", has_index_col]
-        p_get_child_node = ["get_child_node_action", get_child_node]
-        p_use_bottom_status_bar = ["use_bottom_status_bar", use_bottom_status_bar]
-        p_enable_create_node    = ["enable_create_node", enable_create_node]
-        p_is_ssrm       = ["is_using_server_sort_and_filter", is_ssrm]
-        p_requires_number_format = ["requires_number_format", requires_number_format]
-        p_table_version_hash = ["table_version_hash", table_version_hash]
-        p_is_using_multi_filter = ["is_using_multi_filter", is_using_multi_filter]
-        p_range = if range.is_nothing then [] else [JS_Object.from_pairs [["name", "Range"], ["values", range], ["type", "Text"]]]
-        p_number_of_distinct = if number_of_distinct.is_nothing then [] else [JS_Object.from_pairs [["name", "Number of distinct"], ["values", number_of_distinct], ["type", "Count"]]]
-        p_number_of_nothing = if number_of_nothing.is_nothing then [] else [JS_Object.from_pairs [["name", "% nothing"], ["values", number_of_nothing], ["type", "Percentage"]]]
-        p_number_of_empty = if number_of_empty.is_nothing then [] else [JS_Object.from_pairs [["name", "% empty"], ["values", number_of_empty], ["type", "Percentage"]]]
-        p_number_of_untrimmed_whitespace = if number_of_untrimmed_whitespace.is_nothing then [] else [JS_Object.from_pairs [["name", "% untrimmed"], ["values", number_of_untrimmed_whitespace], ["type", "Percentage"]]]
-        p_number_non_trivial_ws = if number_non_trivial_ws.is_nothing then [] else [JS_Object.from_pairs [["name", "% with odd whitespace"], ["values", number_non_trivial_ws], ["type", "Percentage"]]]
-        p_number_of_empty_sampled = if number_of_empty_sampled.is_nothing then [] else [JS_Object.from_pairs [["name", "% empty (sampled)"], ["values", number_of_empty_sampled], ["type", "Percentage"]]]
-        p_number_of_untrimmed_whitespace_sampled = if number_of_untrimmed_whitespace_sampled.is_nothing then [] else [JS_Object.from_pairs [["name", "% untrimmed (sampled)"], ["values", number_of_untrimmed_whitespace_sampled], ["type", "Percentage"]]]
-        p_number_non_trivial_ws_sampled = if number_non_trivial_ws_sampled.is_nothing then [] else [JS_Object.from_pairs [["name", "% with odd whitespace (sampled)"], ["values", number_non_trivial_ws_sampled], ["type", "Percentage"]]]
-        data_quality_metrics = p_range + p_number_of_distinct + p_number_of_nothing + p_number_of_empty + p_number_of_empty_sampled + p_number_of_untrimmed_whitespace + p_number_of_untrimmed_whitespace_sampled + p_number_non_trivial_ws + p_number_non_trivial_ws_sampled
-        pairs    = [p_header, p_value_type, p_all_rows, p_has_index_col, p_get_child_node, p_use_bottom_status_bar, p_enable_create_node, ["data_quality_metrics", data_quality_metrics], ["type", "EnsoTableOrColumn"], ["child_label", "row"], p_is_ssrm, p_requires_number_format, p_table_version_hash, p_is_using_multi_filter, p_data]
-        JS_Object.from_pairs pairs . to_text
+        _ = has_index_col
+        metric name values type = if values.is_nothing then Nothing else [name, values, type]
+        all_metrics = [metric "Range" range "Text", metric "Number of distinct" number_of_distinct "Count", metric "% nothing" number_of_nothing "Percentage", metric "% empty" number_of_empty "Percentage", metric "% empty (sampled)" number_of_empty_sampled "Percentage", metric "% untrimmed" number_of_untrimmed_whitespace "Percentage", metric "% untrimmed (sampled)" number_of_untrimmed_whitespace_sampled "Percentage", metric "% with odd whitespace" number_non_trivial_ws "Percentage", metric "% with odd whitespace (sampled)" number_non_trivial_ws_sampled "Percentage"]
+        metrics = all_metrics.filter (m-> m.is_nothing.not)
+        columns = header.map_with_index i-> name->
+            column_metrics = metrics.map m-> JS_Object.from_pairs [["name", m.at 0], ["value", m.at 1 . at i], ["type", m.at 2]]
+            JS_Object.from_pairs [["name", name], ["value_type", value_type.at i], ["metrics", column_metrics], ["multi_filter", is_using_multi_filter.at i], ["number_format", requires_number_format.at i]]
+        options = (if use_bottom_status_bar then [["status_bar", True]] else []) + (if enable_create_node then [["create_node", True]] else [])
+        index = JS_Object.from_pairs [["action", get_child_node + " {{#index}}"], ["label", "row"]]
+        version = if table_version_hash.is_nothing then [] else [["version_hash", table_version_hash]]
+        server = if is_ssrm then [["server", True]] else []
+        options_pair = if options.is_empty then [] else [["options", JS_Object.from_pairs options]]
+        JS_Object.from_pairs ([["kind", "grid"], ["row_count", all_rows], ["columns", columns], ["index", index], ["data", data]] + version + server + options_pair)
     
     suite_builder.group "Table Visualization" group_builder->
         data = Data.setup
@@ -81,89 +72,92 @@ add_specs suite_builder =
             value_type_int = JS_Object.from_pairs [["constructor", "Integer"], ["display_text", "Integer (64 bits)"]]
             value_type_char = JS_Object.from_pairs [["constructor", "Char"], ["display_text", "Char (variable length, max_size=unlimited)"]]
             json = make_json header=["A", "B", "C"] data=[['a'], [2], [3]] all_rows=3 value_type=[value_type_char, value_type_int, value_type_int] has_index_col=True get_child_node="get_row" is_ssrm=False requires_number_format=[False, False, False] use_bottom_status_bar=False enable_create_node=True is_using_multi_filter=[False, False, False]
-            vis . should_equal json
+            vis.parse_json . should_equal json
 
         group_builder.specify "should visualize database columns" <|
             vis = Visualization.prepare_visualization (data.t.at "A") 2
             value_type_char = JS_Object.from_pairs [["constructor", "Char"], ["display_text", "Char (variable length, max_size=unlimited)"]]
             value_type_float = JS_Object.from_pairs [["constructor", "Float"], ["display_text", "Float (64 bits)"]]
             json = make_json header=["A"] data=[['a', 'a']] all_rows=3 value_type=[value_type_char] has_index_col=True get_child_node="at" is_ssrm=False requires_number_format=[False] use_bottom_status_bar=False enable_create_node=False is_using_multi_filter=[False]
-            vis . should_equal json
+            vis.parse_json . should_equal json
 
             g = data.t.aggregate ["A", "B"] [Aggregate_Column.Average "C"] . at "Average C"
             vis2 = Visualization.prepare_visualization g 1
             json2 = make_json header=["Average C"] data=[[4.0]] all_rows=2 value_type=[value_type_float] has_index_col=True get_child_node="at" is_ssrm=False requires_number_format=[False] use_bottom_status_bar=False enable_create_node=False is_using_multi_filter=[False]
-            vis2 . should_equal json2
+            vis2.parse_json . should_equal json2
 
         group_builder.specify "should visualize dataframe tables" <|
             vis = Visualization.prepare_visualization data.t2 1000
             value_type_int = JS_Object.from_pairs [["constructor", "Integer"], ["display_text", "Integer (64 bits)"]]
             json = make_json header=["A", "B", "C"] data=[[1,2,3], [4,5,6], [7,8,9]] all_rows=3 value_type=[value_type_int, value_type_int, value_type_int] has_index_col=True get_child_node="get_row" is_ssrm=False range=["1 - 3","4 - 6","7 - 9"] number_of_distinct=[3,3,3] number_of_nothing=[0,0,0] requires_number_format=[False, False, False] use_bottom_status_bar=True enable_create_node=True is_using_multi_filter=[True, True, True] table_version_hash=data.t2.table_version_hash
-            vis . should_equal json
+            vis.parse_json . should_equal json
 
         group_builder.specify "should visualize dataframe columns" <|
             col = data.t2.at "A"
             vis = Visualization.prepare_visualization col 1000
             value_type_int = JS_Object.from_pairs [["constructor", "Integer"], ["display_text", "Integer (64 bits)"]]
             json = make_json header=["A"] data=[[1,2,3]] all_rows=3 value_type=[value_type_int] has_index_col=True get_child_node="at" is_ssrm=False number_of_nothing=[0] range=["1 - 3"] number_of_distinct=[3] requires_number_format=[False] use_bottom_status_bar=True enable_create_node=False is_using_multi_filter=[True] table_version_hash=col.table_version_hash
-            vis . should_equal json
+            vis.parse_json . should_equal json
 
         group_builder.specify "should handle Vectors" <|
             vis = Visualization.prepare_visualization [1, 2, 3] 2
-            json = JS_Object.from_pairs [["type", "Vector"], ["all_rows_count", 3], ["json", [1, 2]], ["get_child_node_action", "at"], ["child_label", "value"]]
-            vis . should_equal json.to_text
+            vis.parse_json . should_equal <| Json.parse '{"kind":"grid","row_count":3,"columns":[{"name":"Value","number_format":false}],"index":{"action":"at {{#index}}"},"data":[[1,2]],"options":{"disable_sort_when_partial":true}}'
 
             vis2 = Visualization.prepare_visualization [[1, 2], [3, 4]] 2
-            json2 = JS_Object.from_pairs [["type", "Matrix"], ["all_rows_count", 2], ["json", [[1, 2], [3, 4]]], ["column_count", 2], ["get_child_node_action", "at"]]
-            vis2 . should_equal json2.to_text
+            vis2.parse_json . should_equal <| Json.parse '{"kind":"grid","row_count":2,"columns":[{"name":"0"},{"name":"1"}],"index":{"action":"at {{#index}}"},"data":[[1,3],[2,4]],"options":{"disable_sort_when_partial":true}}'
+
+        group_builder.specify "should mark the cells a short or Nothing row lacks" <|
+            vis = Visualization.prepare_visualization [[1, 2], Nothing, [3]]
+            vis.parse_json.get "data" . should_equal <| Json.parse '[[1,{"_missing_":true},3],[2,{"_missing_":true},{"_missing_":true}]]'
+
+        group_builder.specify "should order record fields as the IDE always has" <|
+            vis = Visualization.prepare_visualization [JS_Object.from_pairs [["b", 1], ["10", 2], ["2", 3]], JS_Object.from_pairs [["a", 4]]]
+            vis.parse_json.get "columns" . map (c-> c.get "name") . should_equal ["2", "10", "b", "a"]
 
         group_builder.specify "should handle Arrays" <|
             vis = Visualization.prepare_visualization ([1, 2, 3] . to_array) 2
-            json = JS_Object.from_pairs [["type", "Vector"], ["all_rows_count", 3], ["json", [1, 2]], ["get_child_node_action", "at"], ["child_label", "value"]]
-            vis . should_equal json.to_text
+            vis.parse_json . should_equal <| Json.parse '{"kind":"grid","row_count":3,"columns":[{"name":"Value","number_format":false}],"index":{"action":"at {{#index}}"},"data":[[1,2]],"options":{"disable_sort_when_partial":true}}'
 
         group_builder.specify "should handle other datatypes" <|
             vis = Visualization.prepare_visualization (Foo.Value 42) 2
-            json = JS_Object.from_pairs [["json", JS_Object.from_pairs [["_display_text_", (Foo.Value 42).to_display_text],["x", 42]]]]
-            vis . should_equal json.to_text
+            vis.parse_json . should_equal <| JS_Object.from_pairs [["kind", "value"], ["value", JS_Object.from_pairs [["_display_text_", (Foo.Value 42).to_display_text], ["x", 42]]]]
 
-        group_builder.specify "should handle datatypes with links" <|
+        group_builder.specify "should show a value's links as one of its fields" <|
             example = Foo_Link.Value "test-value"
             vis = Visualization.prepare_visualization example
-            json = JS_Object.from_pairs [["json", JS_Object.from_pairs [["_display_text_", example.to_display_text],["x", "test-value"], ["links", "[a, b, c]"]]], ["links", ["a", "b", "c"]]]
-            vis . should_equal json.to_text    
+            vis.parse_json . should_equal <| JS_Object.from_pairs [["kind", "value"], ["value", JS_Object.from_pairs [["_display_text_", example.to_display_text], ["x", "test-value"], ["links", "[a, b, c]"]]]]
 
         group_builder.specify "should visualize value type info" <|
             make_json vt =
                 js_object = vt.to_js_object
                 pairs = [["_display_text_", vt.to_display_text]] + vt.to_js_object.field_names.map f-> [f, js_object.get f]
-                JS_Object.from_pairs [["json", JS_Object.from_pairs pairs]] . to_text
+                JS_Object.from_pairs [["kind", "value"], ["value", JS_Object.from_pairs pairs]]
 
-            Visualization.prepare_visualization Value_Type.Boolean . should_equal (make_json Value_Type.Boolean)
-            Visualization.prepare_visualization Value_Type.Float . should_equal (make_json Value_Type.Float)
-            Visualization.prepare_visualization Value_Type.Decimal . should_equal (make_json Value_Type.Decimal)
-            Visualization.prepare_visualization Value_Type.Char . should_equal (make_json Value_Type.Char)
-            Visualization.prepare_visualization Value_Type.Unsupported_Data_Type . should_equal (make_json Value_Type.Unsupported_Data_Type)
+            Visualization.prepare_visualization Value_Type.Boolean . parse_json . should_equal (make_json Value_Type.Boolean)
+            Visualization.prepare_visualization Value_Type.Float . parse_json . should_equal (make_json Value_Type.Float)
+            Visualization.prepare_visualization Value_Type.Decimal . parse_json . should_equal (make_json Value_Type.Decimal)
+            Visualization.prepare_visualization Value_Type.Char . parse_json . should_equal (make_json Value_Type.Char)
+            Visualization.prepare_visualization Value_Type.Unsupported_Data_Type . parse_json . should_equal (make_json Value_Type.Unsupported_Data_Type)
 
         group_builder.specify "should indicate number of Nothing/Nulls" <|
             vis = Visualization.prepare_visualization data.t3_with_nulls 3
             value_type_int = JS_Object.from_pairs [["constructor", "Integer"], ["display_text", "Integer (64 bits)"]]
             json = make_json header=["A", "B", "C"] data=[[1, Nothing, 3], [4, Nothing, Nothing], [7, Nothing, Nothing]] all_rows=3 value_type=[value_type_int, value_type_int, value_type_int] has_index_col=True get_child_node="get_row" is_ssrm=False range=["1 - 3", "4", "7"] number_of_distinct=[2, 1, 1] number_of_nothing=[1, 2, 2] requires_number_format=[False, False, False] is_using_multi_filter=[True, True, True] table_version_hash=data.t3_with_nulls.table_version_hash
-            vis . should_equal json
+            vis.parse_json . should_equal json
 
         group_builder.specify "should indicate number of leading/trailing whitespace" <|
             vis = Visualization.prepare_visualization data.t4_with_space 3
             value_type_char = JS_Object.from_pairs [["constructor", "Char"], ["display_text", "Char (variable length, max_size=unlimited)"]]
             value_type_int = JS_Object.from_pairs [["constructor", "Integer"], ["display_text", "Integer (64 bits)"]]
             json = make_json header=["A", "B", "C"] data=[['hello', '   leading space', 'trailing space    '], ['a', 'b', 'c'], [7, 8, 9]] all_rows=3 value_type=[value_type_char, value_type_char, value_type_int] has_index_col=True get_child_node="get_row" is_ssrm=False range=["   leading space - trailing space    ","a - c","7 - 9"] number_of_distinct=[3, 3, 3] number_of_nothing=[0, 0, 0] number_of_empty=[0, 0, Nothing] number_of_untrimmed_whitespace=[2, 0, Nothing] number_non_trivial_ws=[0, 0, Nothing] requires_number_format=[False, False, False] is_using_multi_filter=[True, True, True] table_version_hash=data.t4_with_space.table_version_hash
-            vis . should_equal json
+            vis.parse_json . should_equal json
 
         group_builder.specify "should indicate number of non trivial whitespace" <|
             vis = Visualization.prepare_visualization data.t5_with_non_trivial_ws 3
             value_type_char = JS_Object.from_pairs [["constructor", "Char"], ["display_text", "Char (variable length, max_size=unlimited)"]]
             value_type_int = JS_Object.from_pairs [["constructor", "Integer"], ["display_text", "Integer (64 bits)"]]
             json = make_json header=["A", "B", "C"] data=[['hello', 'extra \r space', 'world'], ['a', 'b', 'c'], [7, 8, 9]] all_rows=3 value_type=[value_type_char, value_type_char, value_type_int] has_index_col=True get_child_node="get_row" is_ssrm=False range=['extra \r space - world',"a - c","7 - 9"] number_of_distinct=[3, 3, 3] number_of_nothing=[0, 0, 0] number_of_empty=[0, 0, Nothing] number_of_untrimmed_whitespace=[0,0,Nothing] number_non_trivial_ws=[1, 0, Nothing] requires_number_format=[False, False, False] is_using_multi_filter=[True, True, True] table_version_hash=data.t5_with_non_trivial_ws.table_version_hash
-            vis . should_equal json
+            vis.parse_json . should_equal json
 
         group_builder.specify "should indicate number of leading/trailing whitespace with sample if more than 10000 rows" <|
             space_data = 0.up_to 11000 . map i-> case i % 4 of
@@ -177,7 +171,7 @@ add_specs suite_builder =
             vis = Visualization.prepare_visualization space_table 1000
             value_type_char = JS_Object.from_pairs [["constructor", "Char"], ["display_text", "Char (variable length, max_size=unlimited)"]]
             json = make_json header=["A"] data=Nothing all_rows=11000 value_type=[value_type_char] has_index_col=True get_child_node="get_row" is_ssrm=True range=["   leading and trailing space     - trailing space    "] number_of_distinct=[4] number_of_nothing=[0] number_of_empty_sampled=[0] number_of_untrimmed_whitespace_sampled=[7515] number_non_trivial_ws_sampled=[0] requires_number_format=[False] table_version_hash=space_table.table_version_hash is_using_multi_filter=[True]
-            vis . should_equal json
+            vis.parse_json . should_equal json
 
         group_builder.specify "should indicate number of non trivial whitespace with sample if more than 10000 rows" <|
             space_data = 0.up_to 11000 . map i-> case i % 3 of
@@ -190,7 +184,7 @@ add_specs suite_builder =
             vis = Visualization.prepare_visualization space_table 1000
             value_type_char = JS_Object.from_pairs [["constructor", "Char"], ["display_text", "Char (variable length, max_size=unlimited)"]]
             json = make_json header=["A"] data=Nothing all_rows=11000 value_type=[value_type_char] has_index_col=True get_child_node="get_row" is_ssrm=True range=['I have a \r space - hello'] number_of_distinct=[3] number_of_nothing=[0] number_of_empty_sampled=[0] number_of_untrimmed_whitespace_sampled=[3326] number_non_trivial_ws_sampled=[6714] requires_number_format=[False] table_version_hash=space_table.table_version_hash is_using_multi_filter=[True]
-            vis . should_equal json
+            vis.parse_json . should_equal json
         
         group_builder.specify "should set required numeric formatting to true if one or more entry is greater than/ less than +/999999" <|
             num_table = Table.new [["A", [1, 2, 3]], ["B", [12345678, 5,6]], ["C", [-12345678, -5,6]]]
@@ -199,7 +193,54 @@ add_specs suite_builder =
             vis = Visualization.prepare_visualization num_table 1000
             value_type_int = JS_Object.from_pairs [["constructor", "Integer"], ["display_text", "Integer (64 bits)"]]
             json = make_json header=["A", "B", "C"] data=[[1, 2, 3], [12345678, 5,6], [-12345678, -5,6]] all_rows=3 value_type=[value_type_int, value_type_int, value_type_int] has_index_col=True is_ssrm=False get_child_node="get_row" range=["1 - 3","5 - 12345678","-12345678 - 6"] number_of_distinct=[3,3,3] number_of_nothing=[0,0,0] requires_number_format=[False, True, True] is_using_multi_filter=[True, True, True] use_bottom_status_bar=True enable_create_node=True table_version_hash=num_table.table_version_hash
-            vis . should_equal json
+            vis.parse_json . should_equal json
+
+    suite_builder.group "Table view cache" group_builder->
+        group_builder.specify "should serve a second view of the same table from the cache" <|
+            table = Table.new [["A", [1, 2, 3]], ["B", ["x", "y", "z"]]]
+            table.columns.each c-> (c:In_Memory_Column).await_metrics
+            key = "table_view:" + table.table_version_hash
+            TableValueCache.get key . should_equal Nothing
+
+            first = Visualization.prepare_visualization table 1000
+            TableValueCache.get key . should_equal first
+
+            ## A marker in the cache comes back as the view: it is served from the cache, as Text.
+            marker = '{"kind":"error","error":"served from the cache"}'
+            TableValueCache.put key marker
+            second = Visualization.prepare_visualization table 1000
+            second . should_equal marker
+            second . should_be_a Text
+
+        group_builder.specify "should not store a view built while the metrics are incomplete" <|
+            ## The metrics of a large text column are computed in the background and are
+               still incomplete when the view is first built.
+            table = Table.new [["A", (0.up_to 1500000).map i-> "text " + i.to_text]]
+            key = "table_view:" + table.table_version_hash
+            first = Visualization.prepare_visualization table 1000
+            if first.contains "Still computing indicators" then
+                TableValueCache.get key . should_equal Nothing
+            table.columns.each c-> (c:In_Memory_Column).await_metrics
+            complete = Visualization.prepare_visualization table 1000
+            complete.contains "Still computing indicators" . should_be_false
+            TableValueCache.get key . should_equal complete
+
+    suite_builder.group "Table view cells" group_builder->
+        cells = Table.new [["when", [Date.new 2020 1 2]], ["d", [Decimal.new "1.50"]], ["big", [9007199254740993]]]
+        cells.column_info
+
+        group_builder.specify "put the display text first" <|
+            page = Visualization.get_rows_for_table cells 0
+            page.contains '{"_display_text_":"2020-01-02","type":"Date","constructor":"new","day":2,"month":1,"year":2020}' . should_be_true
+
+        group_builder.specify "give a decimal and a big integer a display text" <|
+            page = Visualization.get_rows_for_table cells 0
+            page.contains '{"_display_text_":"1.50","type":"Decimal","value":"1.50","scale":2,"precision":3}' . should_be_true
+            page.contains '{"_display_text_":"9007199254740993","type":"Integer","value":"9007199254740993"}' . should_be_true
+
+        group_builder.specify "give distinct values a display text" <|
+            distinct = Visualization.get_distinct_values_for_column cells 0
+            distinct.contains '"_display_text_":"2020-01-02"' . should_be_true
 
 main filter=Nothing =
     suite = Test.build suite_builder->

@@ -1,11 +1,20 @@
 {
-  "header": ["Value"],
-  "value_type": [
+  "kind": "grid",
+  "row_count": 3,
+  "columns": [
     {
-      "constructor": "Time",
-      "display_text": "Time"
+      "name": "Value",
+      "value_type": { "constructor": "Time", "display_text": "Time" },
+      "metrics": [
+        { "name": "Range", "value": "12:13:14.123004 - 12:15:14.123004", "type": "Text" },
+        { "name": "Number of distinct", "value": 3, "type": "Count" },
+        { "name": "% nothing", "value": 0, "type": "Percentage" }
+      ],
+      "multi_filter": true,
+      "number_format": false
     }
   ],
+  "index": { "action": "get_row {{#index}}", "label": "row" },
   "data": [
     [
       {
@@ -37,32 +46,6 @@
       }
     ]
   ],
-  "all_rows_count": 3,
-  "has_index_col": true,
-  "get_child_node_action": "get_row",
-  "use_bottom_status_bar": true,
-  "enable_create_node": true,
-  "data_quality_metrics": [
-    {
-      "name": "Range",
-      "values": ["12:13:14.123004 - 12:15:14.123004"],
-      "type": "Text"
-    },
-    {
-      "name": "Number of distinct",
-      "values": [3],
-      "type": "Count"
-    },
-    {
-      "name": "% nothing",
-      "values": [0],
-      "type": "Percentage"
-    }
-  ],
-  "type": "EnsoTableOrColumn",
-  "child_label": "row",
-  "is_using_server_sort_and_filter": false,
-  "requires_number_format": [false],
-  "table_version_hash": null,
-  "is_using_multi_filter": [true]
+  "version_hash": "0a31bbc5-99f5-4f0b-ba50-88042ac907ba",
+  "options": { "status_bar": true, "create_node": true }
 }

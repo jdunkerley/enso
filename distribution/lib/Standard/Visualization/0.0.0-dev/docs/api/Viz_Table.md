@@ -5,7 +5,9 @@
     - Link name:Standard.Base.Any.Any tooltip:Standard.Base.Any.Any action:Standard.Base.Any.Any
 - type Viz_Table
     - add_row_number self name:Standard.Base.Data.Text.Text -> Standard.Visualization.Viz_Table.Viz_Table
+    - column_cells_json self index:Standard.Base.Data.Numbers.Integer start:Standard.Base.Data.Numbers.Integer count:Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text
     - column_kinds self -> (Standard.Base.Data.Vector.Vector Standard.Visualization.Viz_Column_Kind.Viz_Column_Kind)
+    - column_metrics_json self -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)
     - column_names self -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)
     - column_values self name:Standard.Base.Data.Text.Text -> Standard.Base.Data.Vector.Vector
     - distinct_values_json self column_index:Standard.Base.Data.Numbers.Integer filter_columns:Standard.Base.Any.Any filter_conditions:Standard.Base.Any.Any -> Standard.Base.Data.Text.Text

@@ -18,7 +18,6 @@ import org.enso.base.text.TextFoldingStrategy;
 import org.enso.table.aggregations.Aggregator;
 import org.enso.table.data.column.builder.Builder;
 import org.enso.table.data.column.operation.StorageIterators;
-import org.enso.table.data.column.operation.TableVizOperation;
 import org.enso.table.data.column.operation.masks.IndexMapper;
 import org.enso.table.data.column.storage.ColumnBooleanStorage;
 import org.enso.table.data.column.storage.ColumnStorage;
@@ -666,11 +665,5 @@ public final class Table {
       newColumns[i] = columns[i].mask(indexMapper);
     }
     return new Table(newColumns);
-  }
-
-  public String tableVizJSON(
-      List<String> valueTypeDisplay, long allRowsCount, boolean useServerMode) {
-    return TableVizOperation.makeJSON(
-        versionId, columns, allRowsCount, useServerMode, valueTypeDisplay, "get_row");
   }
 }
