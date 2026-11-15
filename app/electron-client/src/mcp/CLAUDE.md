@@ -109,8 +109,13 @@ evaluation does not interrupt the execution context on timeout;
 Details in `app/gui/src/project-view/mcp/CLAUDE.md`.
 
 `evaluate_expression` runs in the Design environment, where the output context
-is off, so an expression cannot write a file; `tests/mcp.spec.ts` checks that
-against the packaged app.
+is off, so an expression cannot write to the path it names; `tests/mcp.spec.ts`
+checks that against the packaged app. It is not a guarantee that nothing is
+written: as anywhere in the Design environment, the standard library's dry run
+writes the data to a temporary file instead (`<name>_ensodryrun<digits>.<ext>`
+in the system temporary directory) and returns that file's path. The tool
+description and `guides/overview.md` say "cannot write files", which is true of
+the named path only.
 
 ## Not the AI mode's server
 
@@ -127,5 +132,5 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   `mcpClientConfigs.test.ts`.
 - `tests/mcp.spec.ts` — the packaged app: an SDK client lists the six tools,
   reads the guide and the graph of a new project, searches components,
-  evaluates, checks that an evaluation cannot write a file, and that a request
-  without the token is `401`.
+  evaluates, checks that an evaluation does not write the file it names, and
+  that a request without the token is `401`.
