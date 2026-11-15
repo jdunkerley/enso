@@ -8,7 +8,6 @@
  * move between days, Enter chooses one, PageUp and PageDown change the month. Escape asks to close.
  */
 import ChipMenuFrame from '@/components/GraphEditor/widgets/WidgetChip/ChipMenuFrame.vue'
-import { unrefElement } from '@/composables/events'
 import { CalendarDate, type DateValue } from '@internationalized/date'
 import {
   CalendarCell,
@@ -64,7 +63,7 @@ function chooseDay(value: unknown) {
 onMounted(() =>
   nextTick(() => {
     // Put the keyboard on the calendar: the chosen day, else today, else the day it opened on.
-    const days = unrefElement(root)?.querySelectorAll<HTMLElement>(
+    const days = (root.value?.$el as HTMLElement | undefined)?.querySelectorAll<HTMLElement>(
       '[data-reka-calendar-cell-trigger]',
     )
     const inMonth = Array.from(days ?? []).filter((d) => !d.hasAttribute('data-outside-view'))

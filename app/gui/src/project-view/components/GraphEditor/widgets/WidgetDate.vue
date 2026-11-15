@@ -8,6 +8,10 @@ import {
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
 import ChipMenuShell from '@/components/GraphEditor/widgets/WidgetChip/ChipMenuShell.vue'
+import {
+  isPickableShape,
+  parenthesisedApplication,
+} from '@/components/GraphEditor/widgets/WidgetChip/shape'
 import DateMenu from '@/components/GraphEditor/widgets/WidgetDate/DateMenu.vue'
 import {
   DATE_TYPE,
@@ -51,34 +55,10 @@ function choose(picked: DateChoice, done: () => void) {
 </script>
 
 <script lang="ts">
-/**
- * The code a choice writes. `Date.new 2020 1 15` is an application, so where it becomes an argument
- * it needs its parentheses: an unset argument, or a value that is itself an argument or an operand.
- * (As a string the new code is parsed in place; an application inserted unparenthesised there is
- * split into one group per argument.) Inside parentheses already, or on its own, it is bare.
- */
+/** The code a choice writes: `Date.new 2020 1 15` is an application, so it may need parentheses. */
 function codeToWrite(choice: DateChoice, current: WidgetInput['value']): string {
   const code = dateExpressionCode(choice)
-  if (choice.kind !== 'date') return code
-  const parent = current instanceof Ast.Ast ? current.parent() : undefined
-  const needsParens =
-    !(current instanceof Ast.Ast) || parent instanceof Ast.App || parent instanceof Ast.OprApp
-  return needsParens ? `(${code})` : code
-}
-
-/**
- * Whether the expression is one of the four shapes the chip shows, and nothing is built on it.
- * `Date.today.add_days 3` and `Date.today + x` have a shape's code inside them, but their `Date.today`
- * is the target of a call, not a value to pick: the chip would replace the target.
- */
-function isDateShape(ast: Ast.Ast): boolean {
-  if (!(ast instanceof Ast.App || ast instanceof Ast.PropertyAccess)) return false
-  if (parseDateExpression(ast.code()) == null) return false
-  const parent = ast.parent()
-  if (parent instanceof Ast.PropertyAccess) return parent.lhs?.id !== ast.id
-  if (parent instanceof Ast.App) return parent.function.id !== ast.id
-  if (parent instanceof Ast.OprApp) return parent.lhs?.id !== ast.id
-  return true
+  return choice.kind === 'date' ? parenthesisedApplication(code, current) : code
 }
 
 function isDateTyped(input: WidgetInput): boolean {
@@ -103,7 +83,8 @@ export const widgetDefinition = defineWidget(
     priority: 140,
     score: (props) => {
       const value = props.input.value
-      if (value instanceof Ast.Ast) return isDateShape(value) ? Score.Perfect : Score.Mismatch
+      if (value instanceof Ast.Ast)
+        return isPickableShape(value, parseDateExpression) ? Score.Perfect : Score.Mismatch
       return isDateTyped(props.input) || parseDateExpression(value) != null ?
           Score.Perfect
         : Score.Mismatch
