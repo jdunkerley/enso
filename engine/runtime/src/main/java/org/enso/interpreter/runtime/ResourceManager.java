@@ -502,6 +502,17 @@ public final class ResourceManager {
      * finalizer runs to completion and the thread is interrupted at its next poll
      * after it. Cancelling the context does not use a side-effecting action, so a
      * finalizer that never ends can still be cancelled.
+     *
+     * The cost: this holds for every `finalizeNow`, including `Managed_Resource.finalize`
+     * and the end of `Managed_Resource.with` on the user's thread. A finalizer that
+     * blocks (a close hanging on the network) or never ends now delays
+     * `interruptThreads`, which the IDE uses to interrupt and cancel jobs, until it
+     * returns; only closing or cancelling the context stops it. Accepted because
+     * finalizers are expected to be short, and an interrupt that abandons one leaks
+     * the resource. Rethrowing the interrupt from the catch instead would be worse:
+     * it still abandons the finalizer, and from inside `ProcessItems` it would drop
+     * the remaining queued items and leave the safepoint request set, stopping every
+     * later GC finalizer for the context.
      */
 
     private void park() {

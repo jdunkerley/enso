@@ -199,6 +199,11 @@ class RuntimeManagementTest extends InterpreterTest {
         System.gc()
         Thread.sleep(10)
       }
+      // The flag is set right after the interrupt, so without the fix the guest
+      // could in rare runs read it and leave `wait_for` before its next poll; the
+      // root-node return and `IO.println "Finalized."` still poll inside the
+      // finalizer, so the unfixed code almost always fails here. With the fix the
+      // test is deterministic.
       langCtx.getThreadManager.interruptThreads()
       flag.set(true)
 
