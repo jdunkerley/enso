@@ -189,6 +189,14 @@ test('get_node with an unknown id says so', async () => {
   )
 })
 
+test('An unknown id is quoted back cut to 200 characters', async () => {
+  const { deps } = makeDeps()
+  const result = await getNode(deps, { node_id: 'x'.repeat(500) })
+  expect(result.ok ? '' : result.error).toBe(
+    `No node with id ${'x'.repeat(200)}… in the method on screen. Call get_graph for the current ids.`,
+  )
+})
+
 test('get_node previews with `to_text` and explains an error', async () => {
   const { deps, db, registry, evaluate } = makeDeps()
   const a = nodeNamed(db, 'a')

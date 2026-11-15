@@ -225,9 +225,12 @@ export async function getNode(
   return jsonResult(summary)
 }
 
+/** Most characters of a `node_id` quoted back in {@link unknownNodeError}. */
+const NODE_ID_QUOTE_CHARS = 200
+
 /** The error a tool returns for a `node_id` that is not a node of the method on screen. */
 export function unknownNodeError(nodeId: string): string {
-  return `No node with id ${nodeId} in the method on screen. Call get_graph for the current ids.`
+  return `No node with id ${truncate(nodeId, NODE_ID_QUOTE_CHARS)} in the method on screen. Call get_graph for the current ids.`
 }
 
 /** The node of the method on screen with the given id, or the tool's error for an unknown id. */

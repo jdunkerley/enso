@@ -44,18 +44,13 @@ export interface ParsedStatement {
  */
 export function parseNodeStatement(statement: string): Result<ParsedStatement> {
   const quoted = quote(statement)
-  const ast = Ast.parseBlockStatement(statement)
-  if (ast == null) {
-    return Err(
-      `\`${quoted}\` is not one statement. ` +
-        'Pass one statement per entry: `name = expression` or an expression.',
-    )
-  }
-  // In a method body an import line parses as an ordinary expression; at the top level it is one.
-  if (Ast.parseModuleStatement(statement) instanceof Ast.Import) {
-    return Err(`\`${quoted}\` is an import. Pass import lines in \`imports\`.`)
-  }
-  if (hasSyntaxError(ast)) return Err(`\`${quoted}\` has a syntax error.`)
+  const parsed = parseMethodStatement(
+    statement,
+    `\`${quoted}\` is not one statement. ` +
+      'Pass one statement per entry: `name = expression` or an expression.',
+  )
+  if (!parsed.ok) return parsed
+  const ast = parsed.value
   if (ast instanceof Ast.Assignment) {
     const name = ast.pattern.code()
     if (!(ast.pattern instanceof Ast.Ident) || !isPlainName(name)) {
@@ -69,12 +64,54 @@ export function parseNodeStatement(statement: string): Result<ParsedStatement> {
   if (ast instanceof Ast.ExpressionStatement) {
     return Ok({ binding: undefined, expression: ast.expression.code() })
   }
-  if (ast instanceof Ast.FunctionDef) {
-    return ast.body == null ?
-        Err(`\`${quoted}\` has no expression after \`=\`.`)
-      : Err(`\`${quoted}\` is a function definition. Add functions with add_function.`)
-  }
+  if (ast instanceof Ast.FunctionDef) return functionDefError(ast, quoted)
   return Err(`\`${quoted}\` is not a node statement. Pass \`name = expression\` or an expression.`)
+}
+
+/**
+ * The text of an expression a node can hold, as its new right-hand side; it may continue on
+ * indented lines. Err for anything else: an assignment (the node keeps its name), an import, a
+ * function or type definition, several statements, an empty text, or a syntax error.
+ *
+ * It is checked as a statement of a method body, not with `Ast.parseExpression`, which takes an
+ * import line for an expression.
+ */
+export function parseNodeExpression(expression: string): Result<string> {
+  const quoted = quote(expression)
+  const parsed = parseMethodStatement(
+    expression,
+    `\`${quoted}\` is not one expression. Pass the new right-hand side only.`,
+  )
+  if (!parsed.ok) return parsed
+  const ast = parsed.value
+  if (ast instanceof Ast.ExpressionStatement) return Ok(ast.expression.code())
+  if (ast instanceof Ast.Assignment) {
+    return Err(`\`${quoted}\` is an assignment. Give only the expression; the node keeps its name.`)
+  }
+  if (ast instanceof Ast.FunctionDef) return functionDefError(ast, quoted)
+  return Err(`\`${quoted}\` is not an expression. Pass the new right-hand side only.`)
+}
+
+/**
+ * `text` parsed as one statement of a method body. Err (`notOne` when it is not one statement)
+ * for an import line and for anything the parser marks invalid.
+ */
+function parseMethodStatement(text: string, notOne: string): Result<Ast.Statement> {
+  const quoted = quote(text)
+  const ast = Ast.parseBlockStatement(text)
+  if (ast == null) return Err(notOne)
+  // In a method body an import line parses as an ordinary expression; at the top level it is one.
+  if (Ast.parseModuleStatement(text) instanceof Ast.Import) {
+    return Err(`\`${quoted}\` is an import. Pass import lines in \`imports\` of add_nodes.`)
+  }
+  if (hasSyntaxError(ast)) return Err(`\`${quoted}\` has a syntax error.`)
+  return Ok(ast)
+}
+
+function functionDefError(ast: Ast.FunctionDef, quoted: string): Result<never> {
+  return ast.body == null ?
+      Err(`\`${quoted}\` has no expression after \`=\`.`)
+    : Err(`\`${quoted}\` is a function definition. Add functions with add_function.`)
 }
 
 /** A lexical identifier starting with a lowercase letter: what a node can be named. */
@@ -105,7 +142,8 @@ type FoundNode = { id: NodeId; node: Node }
 /**
  * Adds one node per statement, all in one module edit, after `after_node` when given, and adds
  * the import lines the module lacks. Refused, before anything changes, when a statement or import
- * does not parse, a name is already used in the method or bound twice, or `after_node` is unknown.
+ * does not parse, a name is bound twice, or `after_node` is unknown; and, at the call's turn in
+ * the edit session, when a name is already used in the method.
  * Answers with the new nodes, in order, without previews.
  */
 export async function addNodes(
@@ -128,12 +166,6 @@ export async function addNodes(
     if (!parsed.ok) return errorResult(parsed, `Statement ${index + 1}`)
     const { binding } = parsed.value
     if (binding != null) {
-      if (deps.db.identifierUsed(binding)) {
-        return toolError(
-          `The name \`${quote(binding)}\` is already used in the method. ` +
-            'Choose another name, or change that node with edit_node.',
-        )
-      }
       if (bound.has(binding)) {
         return toolError(`The name \`${quote(binding)}\` is bound twice in this call.`)
       }
@@ -141,7 +173,17 @@ export async function addNodes(
     }
     nodes.push(parsed.value)
   }
-  const outcome = await deps.session.run(deps.caller, () => deps.createNodes(nodes, after, imports))
+  const outcome = await deps.session.run(deps.caller, () => {
+    // Checked at the call's turn in the queue: an earlier edit may have taken the name since.
+    const taken = [...bound].find((name) => deps.db.identifierUsed(name))
+    if (taken != null) {
+      return Err(
+        `The name \`${quote(taken)}\` is already used in the method. ` +
+          'Choose another name, or change that node with edit_node.',
+      )
+    }
+    return deps.createNodes(nodes, after, imports)
+  })
   if (!outcome.ok) return errorResult(outcome)
   const summaries: NodeSummary[] = []
   for (const id of outcome.value.value) {
@@ -170,16 +212,10 @@ export async function editNode(
   if (node.type === 'input') {
     return toolError(`Node ${args.node_id} is an argument of the method and cannot be edited.`)
   }
-  const quoted = quote(args.expression)
-  const expression = Ast.parseExpression(args.expression)
-  if (expression == null) {
-    return toolError(
-      `\`${quoted}\` is not one expression. Pass the new right-hand side only: the node keeps its name.`,
-    )
-  }
-  if (hasSyntaxError(expression)) return toolError(`\`${quoted}\` has a syntax error.`)
+  const expression = parseNodeExpression(args.expression)
+  if (!expression.ok) return errorResult(expression)
   const outcome = await deps.session.run(deps.caller, () =>
-    deps.setNodeContent(id, args.expression),
+    deps.setNodeContent(id, expression.value),
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult({ nodes: [currentSummary(deps, found.value)] }, outcome.value)

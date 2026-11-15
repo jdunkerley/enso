@@ -6,7 +6,7 @@ import { Ast } from '@/util/ast'
 import type { MethodPointer } from '@/util/methodPointer'
 import { stdPath } from '@/util/projectPath'
 import type { Identifier } from '@/util/qualifiedName'
-import type { McpToolResult } from 'enso-common/src/mcp'
+import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
@@ -17,6 +17,7 @@ import {
   UNSETTLED_NOTE,
   addNodes,
   editNode,
+  parseNodeExpression,
   parseNodeStatement,
   removeNodes,
   setNodeComment,
@@ -201,6 +202,23 @@ test('add_nodes refuses a name already used in the method', async () => {
   expect(createNodes).not.toHaveBeenCalled()
 })
 
+test('add_nodes refuses a name taken while the call waited in the queue', async () => {
+  const graph: { db?: GraphDb } = {}
+  const queued: Pick<EditSession, 'run'> = {
+    async run<T>(callerArg: McpCaller, edit: () => Result<T> | Promise<Result<T>>) {
+      // An earlier edit in the queue adds a node named `c` before this call's turn.
+      graph.db!.mockNode('c', asNodeId(crypto.randomUUID() as ExternalId), '0')
+      return fakeSession().run(callerArg, edit)
+    },
+  }
+  const fixture = makeDeps({ session: queued })
+  graph.db = fixture.db
+  const result = await addNodes(fixture.deps, { statements: ['c = 1'] })
+  expect(toolError(result)).toContain('`c`')
+  expect(toolError(result)).toContain('already')
+  expect(fixture.createNodes).not.toHaveBeenCalled()
+})
+
 test('add_nodes refuses a name bound twice in the call', async () => {
   const { deps, createNodes } = makeDeps()
   const result = await addNodes(deps, { statements: ['c = 1', 'c = 2'] })
@@ -277,12 +295,48 @@ test('edit_node refuses an unknown node, a statement and a syntax error', async 
   )
   const a = nodeNamed(db, 'a')
   expect(toolError(await editNode(deps, { node_id: a, expression: 'x = 1' }))).toContain(
-    'not one expression',
+    'Give only the expression; the node keeps its name.',
   )
   expect(toolError(await editNode(deps, { node_id: a, expression: 'foo (' }))).toContain(
     'syntax error',
   )
+  expect(
+    toolError(await editNode(deps, { node_id: a, expression: 'import Standard.Base' })),
+  ).toContain('is an import')
   expect(deps.setNodeContent).not.toHaveBeenCalled()
+})
+
+test('edit_node passes a multi-line expression on', async () => {
+  const { deps, db } = makeDeps()
+  const a = nodeNamed(db, 'a')
+  const expression = 'foo\n    . bar\n    . baz'
+  valueOf(await editNode(deps, { node_id: a, expression }))
+  expect(deps.setNodeContent).toHaveBeenCalledWith(a, expression)
+})
+
+// What the parser makes of statement-like text, which is why an expression is checked as a
+// block statement: `parseExpression` takes an import line for an expression.
+test('The parser takes an import line for an expression, and an assignment for none', () => {
+  expect(Ast.parseExpression('import Standard.Base')?.code()).toBe('import Standard.Base')
+  expect(Ast.parseBlockStatement('import Standard.Base')).toBeInstanceOf(Ast.ExpressionStatement)
+  expect(Ast.parseModuleStatement('import Standard.Base')).toBeInstanceOf(Ast.Import)
+  expect(Ast.parseExpression('x = 1')).toBeUndefined()
+  expect(Ast.parseBlockStatement('x = 1')).toBeInstanceOf(Ast.Assignment)
+})
+
+test('parseNodeExpression accepts exactly what a node can hold', () => {
+  expect(parseNodeExpression('1 + 2')).toEqual(Ok('1 + 2'))
+  expect(parseNodeExpression('foo\n    . bar')).toEqual(Ok('foo\n    . bar'))
+  expect(errorOf(parseNodeExpression('import Standard.Base'))).toContain('is an import')
+  expect(errorOf(parseNodeExpression('from Standard.Table import all'))).toContain('is an import')
+  expect(errorOf(parseNodeExpression('x = 1'))).toContain(
+    'Give only the expression; the node keeps its name.',
+  )
+  expect(errorOf(parseNodeExpression('f x = x + 1'))).toContain('function definition')
+  expect(errorOf(parseNodeExpression('type T'))).toContain('not an expression')
+  expect(errorOf(parseNodeExpression('a\nb'))).toContain('not one expression')
+  expect(errorOf(parseNodeExpression('   '))).toContain('not one expression')
+  expect(errorOf(parseNodeExpression('foo ('))).toContain('syntax error')
 })
 
 test('remove_nodes with one unknown id removes nothing', async () => {
