@@ -21,7 +21,7 @@ interface ClipboardData {
 }
 
 /** Node data that is copied to the clipboard. Used for serializing and deserializing the node information. */
-interface CopiedNode {
+export interface CopiedNode {
   expression: string
   binding?: string
   documentation?: string | undefined
@@ -186,13 +186,16 @@ function nodeStructuredData(node: Node): CopiedNode | undefined {
       }
 }
 
-/** TODO: Add docs */
+/**
+ * The clipboard payload (Enso MIME type only) that pastes the given nodes in the graph editor. Used
+ * for content that is not a selection of existing nodes, e.g. documentation examples.
+ */
 export function clipboardNodeData(nodes: CopiedNode[]): MimeData {
   const clipboardData: ClipboardData = { nodes }
   return { [ENSO_MIME_TYPE]: JSON.stringify(clipboardData) }
 }
 
-/** TODO: Add docs */
+/** The clipboard payload for copying the given graph nodes: Enso node data plus their code as plain text. */
 export function nodesToClipboardData(nodes: Node[]): MimeData {
   return {
     ...clipboardNodeData(nodes.map(nodeStructuredData).filter<CopiedNode>((data) => data != null)),

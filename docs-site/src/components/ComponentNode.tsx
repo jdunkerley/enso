@@ -9,7 +9,13 @@ import type { ComponentNodeProps } from '@site/generator/src/componentNode'
 import { useEffect, useId, useRef, useState, type CSSProperties, type JSX } from 'react'
 import styles from './ComponentNode.module.css'
 
-function Pill(props: { className: string; text: string; tooltip: string }): JSX.Element {
+function Pill(props: {
+  className: string
+  text: string
+  tooltip: string
+  /** Plain text under the type line, as the IDE's help panel shows it. */
+  description?: string
+}): JSX.Element {
   const id = useId()
   const wrapper = useRef<HTMLSpanElement>(null)
   const [hydrated, setHydrated] = useState(false)
@@ -83,6 +89,9 @@ function Pill(props: { className: string; text: string; tooltip: string }): JSX.
         data-open={hydrated ? String(open) : undefined}
       >
         {props.tooltip}
+        {props.description ?
+          <span className={styles.description}>{props.description}</span>
+        : null}
       </span>
     </span>
   )
@@ -108,6 +117,7 @@ export default function ComponentNode(props: ComponentNodeProps): JSX.Element {
           className={`${styles.param} ${param.optional ? styles.optional : ''}`}
           text={param.name}
           tooltip={param.tooltip}
+          description={param.description}
         />
       ))}
     </div>

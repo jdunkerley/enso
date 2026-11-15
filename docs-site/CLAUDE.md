@@ -17,10 +17,12 @@ design is its section 6); plan:
   generator; everything else under `docs/api/` is generated and git-ignored.
 - `generator/src/` — the generator (TypeScript, run under `vite-node`):
   `catalogue.ts` and `groups.ts` read a distribution's `lib`; `model.ts`
-  classifies entries into pages, paths and indexes; `sections.ts` and `mdx.ts`
-  turn doc comments into MDX; `componentNode.ts` computes the node's props;
-  `pages.ts` writes each page; `sidebarData.ts`, `output.ts`, `report.ts` and
-  `main.ts` write the rest and print the report. A `*.test.ts` sits beside each.
+  classifies entries into pages, paths and indexes; `mdx.ts` turns doc comments
+  into MDX (their `##` sections are split by the GUI's
+  `ComponentHelp/sections.ts`, imported through `gui.ts`); `componentNode.ts`
+  computes the node's props; `pages.ts` writes each page; `sidebarData.ts`,
+  `output.ts`, `report.ts` and `main.ts` write the rest and print the report. A
+  `*.test.ts` sits beside each.
 - `generator/fixtures/` — `lib/` (two small fixture libraries covering every
   case) and `golden/` (`Table.filter`'s real catalogue entry and its reviewed
   page, `Table.filter.mdx`).

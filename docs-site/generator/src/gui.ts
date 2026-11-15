@@ -12,6 +12,14 @@ export {
 } from '$/providers/openedProjects/suggestionDatabase/documentation'
 export type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase/groupInfo'
 export { extractMetadata, type DocumentationMetadata } from '@/components/ComponentHelp/metadata'
+export {
+  KNOWN_SECTIONS,
+  argumentDescriptions,
+  panelText,
+  sectionRanges,
+  splitSections,
+  type DocSections,
+} from '@/components/ComponentHelp/sections'
 export { colorFromString } from '@/util/colors'
 export { DEFAULT_ICON, entryIcon } from '@/util/entryIcon'
 export { groupColor, groupColorVar } from '@/util/groupColors'

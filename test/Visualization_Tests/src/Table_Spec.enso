@@ -218,8 +218,11 @@ add_specs suite_builder =
             table = Table.new [["A", (0.up_to 1500000).map i-> "text " + i.to_text]]
             key = "table_view:" + table.table_version_hash
             first = Visualization.prepare_visualization table 1000
-            if first.contains "Still computing indicators" then
-                TableValueCache.get key . should_equal Nothing
+            ## Either way an assertion runs: an unfinished view must not be cached, and a view
+               that happened to finish at once may be.
+            incomplete = first.contains "Still computing indicators"
+            cached = TableValueCache.get key
+            if incomplete then cached . should_equal Nothing else [Nothing, first].should_contain cached
             table.columns.each c-> (c:In_Memory_Column).await_metrics
             complete = Visualization.prepare_visualization table 1000
             complete.contains "Still computing indicators" . should_be_false

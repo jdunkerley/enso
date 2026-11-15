@@ -3,11 +3,11 @@ import { useEvent } from '@/composables/events'
 import { useVisualizationConfig } from '@/providers/visualizationConfig'
 import { Ast } from '@/util/ast'
 import { tryNumberToEnso } from '@/util/ast/abstract'
-import { Pattern } from '@/util/ast/match'
 import { partition } from '@/util/data/array'
 import { getComputedFont, getTextWidthByFont } from '@/util/measurement'
 import { defineKeybinds } from '@/util/visualizationBuiltins'
 import { computed, ref, watch, watchEffect, watchPostEffect } from 'vue'
+import { brushFilterPattern, rowPattern } from './ScatterplotVisualization/scatterNodes'
 import type { ToolbarItem } from './toolbar'
 
 export const name = 'Scatter Plot'
@@ -605,49 +605,8 @@ function getPlotData(data: Data): Point[] {
   return data.data
 }
 
-const filterPattern = computed(() => Pattern.parseExpression('__ (..Between __ __)'))
-const makeFilterPattern = (
-  module: Ast.MutableModule,
-  columnName: string,
-  min: number,
-  max: number,
-) => {
-  return filterPattern.value.instantiateCopied([
-    Ast.TextLiteral.new(columnName),
-    Ast.tryNumberToEnso(min, module)!,
-    Ast.tryNumberToEnso(max, module)!,
-  ])
-}
-
 const errorMessage = computed(() => data.value.error_message)
 
-function getAstPatternFilterAndSort(
-  series: string[],
-  xColName: string,
-  minX: number,
-  maxX: number,
-  minY: number,
-  maxY: number,
-) {
-  return Pattern.new<Ast.Expression>((ast) =>
-    series.reduce<Ast.Owned<Ast.MutableExpression>>(
-      (pattern, s) =>
-        Ast.OprApp.new(
-          ast.module,
-          pattern,
-          '.',
-          Ast.App.positional(
-            Ast.Ident.new(ast.module, Ast.identifier('filter')!),
-            makeFilterPattern(ast.module, s!, minY, maxY),
-          ),
-        ),
-      Ast.App.positional(
-        Ast.PropertyAccess.new(ast.module, ast, Ast.identifier('filter')!),
-        makeFilterPattern(ast.module, xColName, minX, maxX),
-      ),
-    ),
-  )
-}
 const createNewFilterNode = () => {
   const seriesLabels = Object.keys(data.value.axis)
     .filter((s) => s != 'x')
@@ -663,27 +622,16 @@ const createNewFilterNode = () => {
   const yItemsVal = yItems.map((k) => Object.values(k)).flat(1)
   const minY = Math.min(...yItemsVal)
   const maxY = Math.max(...yItemsVal)
-  const pattern = getAstPatternFilterAndSort(seriesLabels, xColName, minX, maxX, minY, maxY)
+  const pattern = brushFilterPattern(seriesLabels, xColName, minX, maxX, minY, maxY)
   config.createNodes({
     content: pattern,
     commit: true,
   })
 }
 
-function getAstPattern(selector?: number, action?: string) {
-  if (action && selector != null) {
-    return Pattern.new<Ast.Expression>((ast) =>
-      Ast.App.positional(
-        Ast.PropertyAccess.new(ast.module, ast, Ast.identifier(action)!),
-        Ast.tryNumberToEnso(selector, ast.module)!,
-      ),
-    )
-  }
-}
-
 function createNode(rowNumber: number) {
   const selector = data.value.get_row_method
-  const pattern = getAstPattern(rowNumber, selector)
+  const pattern = rowPattern(rowNumber, selector)
   if (pattern) {
     config.createNodes({
       content: pattern,

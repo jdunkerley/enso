@@ -100,7 +100,7 @@ export function useVisualizationData({
 
   const executeExpression = async (
     expressionFunction: (nodeIdentifier: string) => Ast.Owned<Ast.Expression>,
-    timeoutMs?: number,
+    timeoutMs?: number | null,
   ) => {
     const dataSourceValue = toValue(dataSource)
     if (dataSourceValue?.type !== 'node') return
@@ -116,6 +116,8 @@ export function useVisualizationData({
     if (contextId === undefined) return
 
     const expression = expressionFunction(identifier)
+    if (timeoutMs === null)
+      return await projectStore.executeExpression(contextId, expression.code())
     return timeoutMs ?
         await projectStore.queuedExecuteExpression(contextId, expression.code(), timeoutMs)
       : await projectStore.queuedExecuteExpression(contextId, expression.code())

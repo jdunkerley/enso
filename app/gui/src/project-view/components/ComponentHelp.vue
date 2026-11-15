@@ -9,11 +9,16 @@ import DocsHeader from '@/components/ComponentHelp/DocsHeader.vue'
 import DocsList from '@/components/ComponentHelp/DocsList.vue'
 import DocsSignature from '@/components/ComponentHelp/DocsSignature.vue'
 import DocsSiteLink from '@/components/ComponentHelp/DocsSiteLink.vue'
+import { useHelpArgumentsExpanded } from '@/components/ComponentHelp/expanded'
 import { HistoryStack } from '@/components/ComponentHelp/history'
 import type { Docs, FunctionDocs, TypeDocs } from '@/components/ComponentHelp/ir'
 import { lookupDocumentation, placeholder } from '@/components/ComponentHelp/ir'
+import { exampleCodeText, exampleToNodes } from '@/components/ComponentHelp/examples'
+import { panelText, withoutFrontMatterGroup } from '@/components/ComponentHelp/sections'
 import { resultTablesAsTables } from '@/components/ComponentHelp/resultTables'
 import { entrySignature } from '@/components/ComponentHelp/signature'
+import { clipboardNodeData, writeClipboard } from '@/components/GraphEditor/graphClipboard'
+import { exampleDecoratorExt } from '@/components/MarkdownEditor/codemirror/decoration/examples'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { groupColorStyle } from '@/composables/nodeColors'
 import { tryGetIndex } from '@/util/data/array'
@@ -38,23 +43,38 @@ const documentation = computed<Docs>(() => {
     : placeholder('No suggestion selected.')
 })
 
-function syncMarkdownDocumentation(view: EditorView) {
-  watch(
-    documentation,
-    (docs) => {
-      if (docs.kind !== 'Placeholder') {
-        view.dispatch({
-          changes: {
-            from: 0,
-            to: view.state.doc.length,
-            insert: resultTablesAsTables(docs.documentation),
-          },
-        })
-      }
-    },
-    { immediate: true },
-  )
+const expanded = useHelpArgumentsExpanded()
+
+/** The editor's text and the collapsed Remarks, the Arguments section dropped when the node shows it all. */
+const text = computed(() => {
+  const docs = documentation.value
+  if (docs.kind === 'Placeholder') return { main: '', remarks: '' }
+  const names = signature.value?.params.map((p) => p.name) ?? []
+  const { main, remarks } = panelText(withoutFrontMatterGroup(docs.documentation), names)
+  return { main: resultTablesAsTables(main), remarks: resultTablesAsTables(remarks) }
+})
+
+/** An example's Copy: its nodes as the Enso clipboard type, and its text without the result line. */
+const exampleCopy = exampleDecoratorExt((code) => {
+  const nodes = exampleToNodes(code)
+  if (nodes)
+    void writeClipboard({
+      ...clipboardNodeData(nodes),
+      'text/plain': exampleCodeText(code),
+    })
+})
+
+function syncEditor(select: (t: { main: string; remarks: string }) => string) {
+  return (view: EditorView) =>
+    watch(
+      () => select(text.value),
+      (content) =>
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } }),
+      { immediate: true },
+    )
 }
+const syncMain = syncEditor((t) => t.main)
+const syncRemarks = syncEditor((t) => t.remarks)
 
 const methods = computed<FunctionDocs[]>(() => {
   const docs = documentation.value
@@ -87,6 +107,9 @@ const suggestion = computed(() =>
 const color = computed(() =>
   groupColorStyle(tryGetIndex(db.value.groups, suggestion.value?.groupIndex)),
 )
+
+/** The entry's component group, shown at the top right; the node takes its colour from it. */
+const category = computed(() => tryGetIndex(db.value.groups, suggestion.value?.groupIndex)?.name)
 
 const style = computed(() => ({
   '--enso-docs-group-color': color.value,
@@ -159,20 +182,45 @@ function handleBreadcrumbClick(index: number) {
           @backward="historyStack.backward()"
         />
       </div>
-      <DocsSiteLink :entry="suggestion" />
+      <div class="topBarEnd">
+        <DocsSiteLink :entry="suggestion" />
+        <span
+          v-if="category"
+          class="category"
+          :style="{ backgroundColor: color }"
+          v-text="category"
+        />
+      </div>
     </div>
     <h2 v-if="documentation.kind === 'Placeholder'">{{ documentation.text }}</h2>
     <template v-else>
       <div class="markdownDocs">
-        <DocsSignature v-if="signature" :signature="signature" :icon="icon" :color="color" />
-        <span v-if="documentation.documentation.length == 0">No documentation available.</span>
-        <MarkdownEditor
-          v-else
-          :content="documentation.documentation"
-          :toolbar="false"
-          :readonly="true"
-          :editorReadyCallback="syncMarkdownDocumentation"
+        <DocsSignature
+          v-if="signature"
+          v-model:expanded="expanded"
+          :signature="signature"
+          :icon="icon"
+          :color="color"
         />
+        <span v-if="documentation.documentation.length == 0">No documentation available.</span>
+        <template v-else>
+          <MarkdownEditor
+            :content="text.main"
+            :toolbar="false"
+            :readonly="true"
+            :extensions="exampleCopy"
+            :editorReadyCallback="syncMain"
+          />
+          <details v-if="text.remarks" class="remarks">
+            <summary>Remarks</summary>
+            <MarkdownEditor
+              :content="text.remarks"
+              :toolbar="false"
+              :readonly="true"
+              :editorReadyCallback="syncRemarks"
+            />
+          </details>
+        </template>
       </div>
       <div class="sections">
         <DocsHeader v-if="types.length > 0" kind="types" label="Types" />
@@ -232,6 +280,18 @@ function handleBreadcrumbClick(index: number) {
   align-self: stretch;
 }
 
+.remarks {
+  border-top: 1px solid var(--docs-table-border);
+  padding-top: 4px;
+}
+
+.remarks summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin: 8px 0 4px;
+  font-size: var(--docs-h3-size);
+}
+
 .tags {
   margin: 4px 0 0 8px;
 }
@@ -248,6 +308,22 @@ function handleBreadcrumbClick(index: number) {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+
+.topBarEnd {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.category {
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
 .breadcrumbsWrapper {

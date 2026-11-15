@@ -29,6 +29,9 @@ add_specs suite_builder =
         group_builder.specify "writes a minimal grid" <|
             grid_json [(View_Column.Value "x").to_json_text] ['[]'] . should_equal '{"kind":"grid","columns":[{"name":"x"}],"data":[[]]}'
 
+        group_builder.specify "writes several options in order" <|
+            grid_json [(View_Column.Value "x").to_json_text] ['[]'] options=["status_bar", "create_node"] . should_equal '{"kind":"grid","columns":[{"name":"x"}],"data":[[]],"options":{"status_bar":true,"create_node":true}}'
+
         group_builder.specify "renders cells with Viz_Cell" <|
             cells_json [1, "a", Nothing, Date.new 2020 1 2] . should_equal '[1,"a",null,{"_display_text_":"2020-01-02","type":"Date","constructor":"new","day":2,"month":1,"year":2020}]'
 

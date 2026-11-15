@@ -40,19 +40,21 @@ const linkSchema = z.object({
   label: z.string().optional(),
 })
 
+/** A data quality metric: its value matches its type. */
+const metricSchema = z.discriminatedUnion('type', [
+  z.object({ name: z.string(), type: z.literal('Text'), value: z.string().nullable() }),
+  z.object({
+    name: z.string(),
+    type: z.enum(['Count', 'Percentage']),
+    value: z.number().nullable(),
+  }),
+])
+
 const columnSchema = z.object({
   name: z.string(),
   value_type: z.object({ constructor: z.string(), display_text: z.string() }).optional(),
   link: linkSchema.optional(),
-  metrics: z
-    .array(
-      z.object({
-        name: z.string(),
-        value: z.union([z.string(), z.number(), z.null()]),
-        type: z.enum(['Text', 'Count', 'Percentage']),
-      }),
-    )
-    .optional(),
+  metrics: z.array(metricSchema).optional(),
   multi_filter: z.boolean().optional(),
   number_format: z.boolean().optional(),
 })
@@ -218,8 +220,8 @@ function toField(name: string, options: FieldOptions, ctx: TableViewContext): Co
     if (metric.value === null) return []
     const result: DataQualityMetricValue =
       metric.type === 'Text' ?
-        { name: metric.name, value: (metric.value as string) || '', displayType: 'Text' }
-      : { name: metric.name, displayType: metric.type, value: (metric.value as number) || 0 }
+        { name: metric.name, value: metric.value || '', displayType: 'Text' }
+      : { name: metric.name, displayType: metric.type, value: metric.value || 0 }
     return result.displayType === 'Percentage' && result.value === 0 ? [] : [result]
   })
 
@@ -357,11 +359,7 @@ function toLinkField(fieldName: string, options: LinkFieldOptions, ctx: TableVie
 }
 
 function isMissing(cell: unknown): boolean {
-  return (
-    typeof cell === 'object' &&
-    cell !== null &&
-    (cell as Record<string, unknown>)._missing_ === true
-  )
+  return typeof cell === 'object' && cell !== null && '_missing_' in cell && cell._missing_ === true
 }
 
 /**
@@ -438,7 +436,10 @@ function buildGrid(message: GridMessage, ctx: TableViewContext): TableView {
     columnDefs,
     rowData,
     isTruncated:
-      message.options?.disable_sort_when_partial === true && total != null && total !== rowsSent,
+      message.options?.disable_sort_when_partial === true &&
+      message.data != null &&
+      total != null &&
+      total !== rowsSent,
     dataGrouping,
     rowCount: total ?? 1,
     showRowCount: total != null,
@@ -524,6 +525,6 @@ export function rowsFromPage(
 }
 
 /** A column's distinct values, for its set filter; `null` when there are too many to list. */
-export function distinctValuesFromResponse(response: unknown): any {
+export function distinctValuesFromResponse(response: unknown): unknown[] | null {
   return distinctValuesSchema.parse(response).values
 }
