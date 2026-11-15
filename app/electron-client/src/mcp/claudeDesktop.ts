@@ -59,8 +59,8 @@ function isMissing(error: unknown): boolean {
 type Parsed =
   | {
       readonly ok: true
-      /** The file's text, or null when it is absent or empty (nothing to back up). */
-      readonly text: string | null
+      /** The file's bytes, or null when it is absent or empty (nothing to back up). */
+      readonly bytes: Buffer | null
       readonly config: Record<string, unknown>
     }
   | { readonly ok: false; readonly reason: string }
@@ -70,15 +70,16 @@ type Parsed =
  * configuration; a UTF-8 byte order mark is ignored.
  */
 async function parseConfig(file: string): Promise<Parsed> {
-  let text: string
+  let bytes: Buffer
   try {
-    text = await fs.readFile(file, 'utf8')
+    bytes = await fs.readFile(file)
   } catch (e) {
-    if (isMissing(e)) return { ok: true, text: null, config: {} }
+    if (isMissing(e)) return { ok: true, bytes: null, config: {} }
     return { ok: false, reason: `The configuration file could not be read: ${messageOf(e)}` }
   }
+  let text = bytes.toString('utf8')
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1)
-  if (text.trim() === '') return { ok: true, text: null, config: {} }
+  if (text.trim() === '') return { ok: true, bytes: null, config: {} }
   let config: unknown
   try {
     config = JSON.parse(text)
@@ -91,7 +92,7 @@ async function parseConfig(file: string): Promise<Parsed> {
   if ('mcpServers' in config && !isRecord(config.mcpServers)) {
     return { ok: false, reason: 'The configuration file’s mcpServers is not an object.' }
   }
-  return { ok: true, text, config }
+  return { ok: true, bytes, config }
 }
 
 function messageOf(error: unknown): string {
@@ -129,10 +130,36 @@ export async function readClaudeDesktopSetup(
 }
 
 /**
+ * Where to write `file`: the target of a symbolic link (an editor writes through a link; renaming
+ * over it would replace the link with a file), else the file itself, absent or not.
+ */
+async function writeTarget(file: string): Promise<string> {
+  try {
+    return await fs.realpath(file)
+  } catch (e) {
+    if (isMissing(e)) return file
+    throw e
+  }
+}
+
+/** The file's permission bits, or undefined when it does not exist. */
+async function modeOf(file: string): Promise<number | undefined> {
+  try {
+    return (await fs.stat(file)).mode & 0o777
+  } catch (e) {
+    if (isMissing(e)) return undefined
+    throw e
+  }
+}
+
+/**
  * Adds or replaces only `mcpServers.enso`, keeping every other key and server. When it adds the
- * entry to a file that has content, it saves that file beside it first (an older backup is
- * overwritten); replacing an existing entry leaves any backup alone. Refuses (`unreadable`) a file it cannot parse. If the final rename fails the
- * original is untouched, the temporary file is removed and the error is thrown.
+ * entry to a file that has content and no `enso` entry, it first saves that file's bytes, exactly,
+ * beside it (`claude_desktop_config.json.enso-backup`); replacing an existing entry leaves any
+ * backup alone. So an older backup is overwritten only when the entry was removed and is then set
+ * up again. Refuses (`unreadable`) a file it cannot parse. A symbolic link is written through to
+ * its target, which keeps its permission bits. If the final rename fails the original is
+ * untouched, the temporary file is removed and the error is thrown.
  */
 export async function writeClaudeDesktopSetup(
   directory: string,
@@ -140,7 +167,8 @@ export async function writeClaudeDesktopSetup(
   token: string,
 ): Promise<ClaudeDesktopSetup> {
   const file = path.join(directory, CONFIG_FILE)
-  const parsed = await parseConfig(file)
+  const target = await writeTarget(file)
+  const parsed = await parseConfig(target)
   if (!parsed.ok) return { state: 'unreadable', reason: parsed.reason }
   const servers = isRecord(parsed.config.mcpServers) ? parsed.config.mcpServers : {}
   const updated = {
@@ -149,12 +177,15 @@ export async function writeClaudeDesktopSetup(
   }
   // The backup is the user's file from before Enso first touched it: made only when adding the
   // entry, never when replacing one.
-  if (parsed.text != null && !(CLAUDE_DESKTOP_SERVER_NAME in servers))
-    await fs.writeFile(`${file}${BACKUP_SUFFIX}`, parsed.text, 'utf8')
-  const temporary = `${file}.tmp`
+  if (parsed.bytes != null && !(CLAUDE_DESKTOP_SERVER_NAME in servers))
+    await fs.writeFile(`${file}${BACKUP_SUFFIX}`, parsed.bytes)
+  const mode = await modeOf(target)
+  // Beside the target, so that the rename stays on one file system.
+  const temporary = `${target}.tmp`
   try {
     await fs.writeFile(temporary, `${JSON.stringify(updated, null, 2)}\n`, 'utf8')
-    await fs.rename(temporary, file)
+    if (mode !== undefined) await fs.chmod(temporary, mode)
+    await fs.rename(temporary, target)
   } catch (e) {
     await fs.rm(temporary, { force: true }).catch(() => {})
     throw e

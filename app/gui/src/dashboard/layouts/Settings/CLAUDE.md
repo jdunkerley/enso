@@ -92,7 +92,9 @@ the manual route through the Claude Desktop copy button). The button asks first
 (`McpClaudeDesktopConfirmModal.vue`: a non-destructive `AlertDialog` titled like
 the button; `ConfirmDeleteModal` is styled as destructive), then
 `setUpClaudeDesktop()` has main edit Claude Desktop's configuration file. The
-block always says Claude Desktop needs Node.js and that its Add custom connector
+block then shows the state main returns; only `setUp` also gets the "Done" toast
+(any other state means nothing was written, and the block says why). The block
+always says Claude Desktop needs Node.js and that its Add custom connector
 screen cannot work. Tests: `__tests__/McpSettingsSection.test.ts` and
 `integration-test/dashboard/mcpSettings.spec.ts`.
 

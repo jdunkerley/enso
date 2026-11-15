@@ -142,7 +142,9 @@ const setUpClaudeDesktop = useMutation({
     const next = await window.api?.mcp?.setUpClaudeDesktop()
     if (next == null) return
     claudeDesktop.value = next
-    toasts.show(getText('mcpClaudeDesktopDone'), { type: 'success' })
+    // Only an entry now in place is done; otherwise the block shows the state the file is in (for
+    // `unreadable`, why), as it does on mount.
+    if (next.state === 'setUp') toasts.show(getText('mcpClaudeDesktopDone'), { type: 'success' })
   },
   onError: showError,
 })

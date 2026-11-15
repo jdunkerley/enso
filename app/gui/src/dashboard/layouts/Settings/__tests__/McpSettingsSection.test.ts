@@ -371,6 +371,36 @@ describe('McpSettingsSection', () => {
       expect(fake.show).toHaveBeenCalledWith(getText('mcpClaudeDesktopDone'), { type: 'success' })
     })
 
+    test.each([
+      [{ state: 'notInstalled' }, () => getText('mcpClaudeDesktopNotInstalled')],
+      [{ state: 'outOfDate' }, () => getText('mcpClaudeDesktopOutOfDate')],
+      [
+        { state: 'unreadable', reason: 'The file changed: not valid JSON.' },
+        () => 'The file changed: not valid JSON.',
+      ],
+    ] as const)(
+      'a set-up that did not end set up (%o) shows that state, not Done',
+      async (returned, text) => {
+        fake.setUpClaudeDesktop.mockResolvedValue(returned)
+        await withState({ state: 'notSetUp' })
+        const user = userEvent.setup()
+        await user.click(button(getText('mcpClaudeDesktopSetUpButton')))
+        await vi.waitFor(dialog)
+        await user.click(button(getText('mcpClaudeDesktopSetUpButton'), dialog()))
+        await flushPromises()
+        expect(fake.setUpClaudeDesktop).toHaveBeenCalledOnce()
+        expect(fake.show).not.toHaveBeenCalled()
+        expect(document.body.textContent).toContain(text())
+        expect(document.body.textContent).not.toContain(getText('mcpClaudeDesktopIsSetUp'))
+      },
+    )
+
+    test('the Done text says to quit Claude Desktop completely and open it again', () => {
+      expect(getText('mcpClaudeDesktopDone')).toBe(
+        'Done. Quit Claude Desktop completely and open it again.',
+      )
+    })
+
     test('the Update dialog says it replaces the entry, and is titled Update', async () => {
       await withState({ state: 'outOfDate' })
       const user = userEvent.setup()

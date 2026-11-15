@@ -192,6 +192,42 @@ describe('Claude Desktop config file', () => {
       expect(text.startsWith('{')).toBe(true)
       expect(JSON.parse(text)).toMatchObject({ a: 1 })
     })
+    test('the first backup is the old file byte for byte, a BOM and CRLF line ends included', async () => {
+      const bytes = Buffer.from('﻿{\r\n  "a": 1\r\n}\r\n', 'utf8')
+      await fs.writeFile(file, bytes)
+      expect(await writeClaudeDesktopSetup(dir, URL, TOKEN)).toEqual({ state: 'setUp' })
+      expect((await fs.readFile(`${file}.enso-backup`)).equals(bytes)).toBe(true)
+    })
+    test('the file keeps its mode (POSIX permission bits; on Windows only the read-only bit, which a writable file lacks)', async () => {
+      await fs.writeFile(file, '{"a":1}')
+      await fs.chmod(file, 0o600)
+      const before = (await fs.stat(file)).mode & 0o777
+      await writeClaudeDesktopSetup(dir, URL, TOKEN)
+      expect((await fs.stat(file)).mode & 0o777).toBe(before)
+      if (process.platform !== 'win32') expect(before).toBe(0o600)
+    })
+    // Creating a symbolic link on Windows needs administrator rights or Developer Mode, which a
+    // test cannot assume.
+    test.skipIf(process.platform === 'win32')(
+      'a symbolic link is written through to its target, and stays a link',
+      async () => {
+        const elsewhere = await fs.mkdtemp(path.join(os.tmpdir(), 'mcp-claude-desktop-target-'))
+        try {
+          const target = path.join(elsewhere, 'real.json')
+          await fs.writeFile(target, '{"a":1}')
+          await fs.symlink(target, file)
+          expect(await writeClaudeDesktopSetup(dir, URL, TOKEN)).toEqual({ state: 'setUp' })
+          expect((await fs.lstat(file)).isSymbolicLink()).toBe(true)
+          expect(JSON.parse(await fs.readFile(target, 'utf8'))).toMatchObject({
+            a: 1,
+            mcpServers: { enso: claudeDesktopEntry(URL, TOKEN) },
+          })
+          expect(await fs.readdir(elsewhere)).toEqual(['real.json'])
+        } finally {
+          await fs.rm(elsewhere, { recursive: true, force: true })
+        }
+      },
+    )
     test('comments or a trailing comma stay unreadable', async () => {
       await fs.writeFile(file, '{ "a": 1, }')
       expect((await writeClaudeDesktopSetup(dir, URL, TOKEN)).state).toBe('unreadable')

@@ -534,7 +534,7 @@
   "mcpClaudeDesktopUpdateButton": "Update Claude Desktop",
   "mcpClaudeDesktopConfirm": "Enso will add an entry named enso to Claude Desktop's configuration file. The rest of the file is kept, and a backup copy is saved beside it.",
   "mcpClaudeDesktopUpdateConfirm": "Enso will replace the entry named enso in Claude Desktop's configuration file with its own. The rest of the file is kept.",
-  "mcpClaudeDesktopDone": "Done. Quit Claude Desktop from its tray icon and open it again.",
+  "mcpClaudeDesktopDone": "Done. Quit Claude Desktop completely and open it again.",
   "mcpClaudeDesktopNeeds": "Claude Desktop needs Node.js installed. Do not use its Add custom connector screen: that connects from Anthropic's servers and cannot reach this computer.",
   "mcpNewToken": "New token",
   "mcpNewTokenActionText": "replace the token for external agents",
