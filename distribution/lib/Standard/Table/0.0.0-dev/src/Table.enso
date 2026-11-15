@@ -4136,4 +4136,4 @@ Id.from (that:Table) = that.implementation.default_viz_id that.underlying
    The same actions for an in-memory and a database table.
 Viz_Actions.from (that:Table) =
     _ = that
-    Viz_Helpers.table_actions
+    Viz_Helpers.cached_table_actions

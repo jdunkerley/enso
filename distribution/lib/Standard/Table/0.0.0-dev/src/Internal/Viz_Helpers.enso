@@ -9,6 +9,8 @@ from Standard.Visualization.Viz_Column_Kind import Viz_Column_Kind, Viz_Kind
 
 import project.Value_Type.Value_Type
 
+polyglot java import org.enso.table.util.TableValueCache
+
 ## ---
    private: true
    ---
@@ -82,6 +84,20 @@ table_actions -> Viz_Actions = Viz_Actions.Value <|
     reorder_columns = Viz_Action.chain "reorder_columns" "Reorder Columns" "" "reorder_columns {{@columns*}}"
     brush_filter = Viz_Action.chain "brush_filter" "Filter To Selection" "" "filter {{@column}} (..Between {{#min}} {{#max}})"
     [open_row, open_column, open_cell, sort, filter, remove_columns, reorder_columns, brush_filter]
+
+## ---
+   private: true
+   ---
+   The node actions of a table, as `table_actions` but with their JSON kept:
+   it is the same for every table, and writing it costs more than the rest of
+   adding it to a message.
+cached_table_actions -> Viz_Actions =
+    key = "viz_actions:table"
+    cached = TableValueCache.get key
+    if Nothing != cached then Viz_Actions.Json cached table_actions.actions else
+        text = table_actions.to_json_text
+        TableValueCache.put key text
+        Viz_Actions.Json text table_actions.actions
 
 ## ---
    private: true

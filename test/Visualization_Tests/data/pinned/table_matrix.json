@@ -1,1 +1,1 @@
-{"kind":"grid","row_count":2,"columns":[{"name":"0"},{"name":"1"}],"index":{"action":"at {{#index}}"},"data":[[1,3],[2,4]],"options":{"disable_sort_when_partial":true}}
+{"actions":[{"id":"open_row","label":"Get Item","icon":"select_row","kind":"chain","template":"at {{#index}}"}],"kind":"grid","row_count":2,"columns":[{"name":"0"},{"name":"1"}],"index":{"action":"at {{#index}}"},"data":[[1,3],[2,4]],"options":{"disable_sort_when_partial":true}}
