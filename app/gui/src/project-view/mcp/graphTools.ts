@@ -139,7 +139,7 @@ export async function getGraph(
 }
 
 /** The summary with its `code`, `comment` and `message` cut to {@link GRAPH_NODE_TEXT_CHARS}. */
-function capNodeTexts(summary: NodeSummary): NodeSummary {
+export function capNodeTexts(summary: NodeSummary): NodeSummary {
   summary.code = truncate(summary.code, GRAPH_NODE_TEXT_CHARS)
   if (summary.comment != null) summary.comment = truncate(summary.comment, GRAPH_NODE_TEXT_CHARS)
   if (summary.message != null) summary.message = truncate(summary.message, GRAPH_NODE_TEXT_CHARS)
