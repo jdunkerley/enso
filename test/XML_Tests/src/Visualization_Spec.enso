@@ -33,14 +33,20 @@ add_specs suite_builder =
             json.get "data" . at 0 . should_equal ["@id", "0", "1"]
 
         group_builder.specify "Attributes count towards the row limit and are read in document order" <|
-            attrs = (0.up_to 6).map i-> "a" + i.to_text + "='v" + i.to_text + "'"
+            names = ["zeta", "mid", "alpha", "beta", "omega", "gamma"]
+            attrs = names.map n-> n + "='v" + n + "'"
             many = XML_Document.parse ("<root " + (attrs.join " ") + "><c/><d/></root>")
             json = Visualization.prepare_visualization many 4 . parse_json
             json.get "row_count" . should_equal 8
-            json.get "data" . should_equal [["@a0", "@a1", "@a2", "@a3"], ["Attribute", "Attribute", "Attribute", "Attribute"], ["v0", "v1", "v2", "v3"]]
+            json.get "data" . should_equal [["@zeta", "@mid", "@alpha", "@beta"], ["Attribute", "Attribute", "Attribute", "Attribute"], ["vzeta", "vmid", "valpha", "vbeta"]]
             all = Visualization.prepare_visualization many 8 . parse_json
-            all.get "data" . at 0 . should_equal ["@a0", "@a1", "@a2", "@a3", "@a4", "@a5", "0", "1"]
-            all.get "data" . at 2 . should_equal ["v0", "v1", "v2", "v3", "v4", "v5", "<c/>", "<d/>"]
+            all.get "data" . at 0 . should_equal ["@zeta", "@mid", "@alpha", "@beta", "@omega", "@gamma", "0", "1"]
+            all.get "data" . at 2 . should_equal ["vzeta", "vmid", "valpha", "vbeta", "vomega", "vgamma", "<c/>", "<d/>"]
+
+        group_builder.specify "A namespaced attribute shows under its qualified name" <|
+            ns_doc = XML_Document.parse '<root xmlns:p="urn:p" p:b="1" a="2"><c p:x="3"/></root>'
+            json = Visualization.prepare_visualization ns_doc . parse_json
+            json.get "data" . at 0 . should_equal ["TODO"]
 
         group_builder.specify "A child shows at most five of its attributes" <|
             attrs = (0.up_to 7).map i-> "a" + i.to_text + "='v" + i.to_text + "'"

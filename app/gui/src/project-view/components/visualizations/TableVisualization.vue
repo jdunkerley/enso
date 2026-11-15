@@ -60,7 +60,7 @@ export type { DataQualityMetricValue } from './TableVisualization/tableView'
 export const name = 'Table'
 export const icon = 'table'
 export const inputType =
-  'Standard.Table.Table.Table | Standard.Table.Column.Column | Standard.Table.Row.Row | Standard.Base.Data.Vector.Vector | Standard.Base.Data.Array.Array | Standard.Base.Data.Map.Map | Standard.Base.Any.Any'
+  'Standard.Table.Table.Table | Standard.Table.Column.Column | Standard.Table.Row.Row | Standard.Base.Data.Vector.Vector | Standard.Base.Data.Array.Array | Standard.Base.Any.Any'
 export const defaultPreprocessor = [
   'Standard.Visualization.Table.Visualization',
   'prepare_visualization',
@@ -324,8 +324,9 @@ async function getFilterValues(params: SetFilterValuesFuncParams) {
       filterActions,
       valueList,
     )
-    if (response.success) {
-      params.success(response.data)
+    // `null` data: too many distinct values to list, so the set filter has none to offer.
+    if (response.success && response.data != null) {
+      params.success(response.data.map((value) => (value == null ? null : String(value))))
     }
   }
 }

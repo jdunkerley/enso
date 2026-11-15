@@ -8,6 +8,7 @@ from Standard.Visualization.Internal.View_Json import Table_View
 
 import project.In_Memory_Column.In_Memory_Column
 import project.In_Memory_Table.In_Memory_Table
+import project.Internal.Storage
 import project.Internal.Viz_Helpers
 import project.Sort_Column.Sort_Column
 import project.Table.Table
@@ -53,7 +54,8 @@ type In_Memory_Viz_Source
     java_columns self = (self.table:In_Memory_Table).java_table.getColumns
 
     column_metrics_json self -> Vector Text =
-        display = self.table.columns.map c-> c.value_type.to_display_text
+        # The display types come from the Java columns, so no Enso column is built for each.
+        display = self.java_columns.map jc-> (Storage.to_value_type jc.getStorageType).to_display_text
         # `to_vector` wraps the Java array, it does not copy it.
         (TableVizOperation.viewColumnsJson self.java_columns display (Nothing == self.db_row_count)).to_vector
 

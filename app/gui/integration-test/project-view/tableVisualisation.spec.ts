@@ -179,11 +179,11 @@ test('Single Column Of Actions Table Visualisation Test', async ({
     'Standard.Visualization.Table.Visualization.prepare_visualization',
     {
       kind: 'grid',
+      row_count: 3,
       columns: [
         {
           name: 'table',
           link: { action: 'read {{@table}}', label: 'table' },
-          number_format: false,
         },
       ],
       data: [['Sheet1', 'Sheet2', 'Sheet3']],
@@ -229,11 +229,11 @@ test('Link template Test as number', async ({ editorPage, page, localApi }) => {
     'Standard.Visualization.Table.Visualization.prepare_visualization',
     {
       kind: 'grid',
+      row_count: 3,
       columns: [
         {
           name: 'table',
           link: { action: 'read {{#table}}', label: 'table' },
-          number_format: false,
         },
       ],
       data: [['1', '2', '3']],
@@ -265,11 +265,11 @@ test('Link template Test as text', async ({ editorPage, page, localApi }) => {
     'Standard.Visualization.Table.Visualization.prepare_visualization',
     {
       kind: 'grid',
+      row_count: 3,
       columns: [
         {
           name: 'table',
           link: { action: 'read {{@table}}', label: 'table' },
-          number_format: false,
         },
       ],
       data: [['1', '2', '3']],
@@ -331,9 +331,10 @@ test('GenericGrid Table Visualisation Test - two column - link on second', async
     'Standard.Visualization.Table.Visualization.prepare_visualization',
     {
       kind: 'grid',
+      row_count: 3,
       columns: [
         { name: 'table', number_format: false },
-        { name: 'number', link: { action: 'read {{#number}} {{@table}}' }, number_format: false },
+        { name: 'number', link: { action: 'read {{#number}} {{@table}}' } },
       ],
       data: [
         ['SheetA', 'SheetB', 'SheetC'],
