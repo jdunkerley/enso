@@ -190,6 +190,12 @@ interface Graph {
 /** How quickly an edit that runs code must answer, against its 20 s settle timeout. */
 const EDIT_ANSWER_MS = 10_000
 
+/** The GUI's per-node Write prefix (`app/gui/src/project-view/util/ast/node.ts`). */
+const WRITE_PREFIX =
+  'Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output "design" <| '
+/** The start of the refusal of code that turns the output context on. */
+const WRITE_REFUSED = 'Only the user can turn Write on.'
+
 /** The states of a node that is neither an error nor a panic. */
 const NOT_FAILED = ['value', 'pending', 'unknown']
 
@@ -300,6 +306,41 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     note('get_node total preview', totalPreview)
     expect(totalPreview).toContain('6')
 
+    // An agent can never turn Write on: code wrapped in the Write prefix (or calling
+    // `with_enabled_context` / `with_enabled` anywhere) is refused by every tool that takes code,
+    // and the file it names is never written.
+    const writeTarget = path.join(os.tmpdir(), `enso-mcp-write-prefix-${Date.now()}.txt`)
+    const writeTargetEnso = writeTarget.replace(/\\/g, '/')
+    await fs.rm(writeTarget, { force: true })
+    try {
+      const writeCode = `${WRITE_PREFIX}"x".write "${writeTargetEnso}"`
+      const addRefused = await callError('add_nodes', { statements: [`w = ${writeCode}`] })
+      note('add_nodes with the Write prefix', addRefused)
+      expect(addRefused).toContain(WRITE_REFUSED)
+      const editRefused = await callError('edit_node', {
+        node_id: numbersId,
+        expression: writeCode,
+      })
+      note('edit_node with the Write prefix', editRefused)
+      expect(editRefused).toContain(WRITE_REFUSED)
+      const evaluateRefused = await callError('evaluate_expression', {
+        expression: `(${writeCode}).to_text`,
+      })
+      note('evaluate_expression with the Write prefix', evaluateRefused)
+      expect(evaluateRefused).toContain(WRITE_REFUSED)
+      const methodRefused = await callError('evaluate_expression', {
+        expression: `(Context.Output.with_enabled <| "x".write "${writeTargetEnso}").to_text`,
+      })
+      note('evaluate_expression with Context.Output.with_enabled', methodRefused)
+      expect(methodRefused).toContain(WRITE_REFUSED)
+      // Give a write that the engine might finish late a moment to land.
+      await page.waitForTimeout(2_000)
+      expect(existsSync(writeTarget), `${writeTarget} must not exist`).toBe(false)
+      expect(names(await getGraph())).not.toContain('w')
+    } finally {
+      await fs.rm(writeTarget, { force: true })
+    }
+
     // 3. A new expression; the node keeps its name.
     const edited = await callJson<{ nodes: NodeSummary[]; settled: boolean }>('edit_node', {
       node_id: totalId,
@@ -319,6 +360,42 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     const editedPreview = await previewOf(totalId)
     note('get_node total preview after edit_node', editedPreview)
     expect(editedPreview).toContain('16')
+
+    // Two edits back to back, on a node and then on its user, while the user is still being
+    // computed for the first: the second result must describe the second edit, not a value the
+    // engine computed for the first one.
+    const firstOfTwo = await callJson<{ nodes: NodeSummary[]; settled: boolean }>('edit_node', {
+      node_id: numbersId,
+      expression: '[1, 2, 3, 4]',
+    })
+    note('edit_node numbers (first of two)', firstOfTwo)
+    expectSettled('edit_node numbers (first of two)', firstOfTwo)
+    const secondOfTwo = await callJson<{ nodes: NodeSummary[]; settled: boolean }>('edit_node', {
+      node_id: totalId,
+      expression: 'numbers.length.to_text',
+    })
+    note('edit_node total (second of two)', secondOfTwo)
+    expectSettled('edit_node total (second of two)', secondOfTwo)
+    expect(secondOfTwo.nodes[0]!.state).toBe('value')
+    expect(secondOfTwo.nodes[0]!.type).toMatch(/Text/)
+    expect(await previewOf(totalId)).toContain('4')
+    const restored = await callJson<{ nodes: NodeSummary[]; settled: boolean }>('edit_node', {
+      node_id: totalId,
+      expression: 'numbers.fold 10 (+)',
+    })
+    note('edit_node total back to a fold', restored)
+    expectSettled('edit_node total back to a fold', restored)
+    expect(restored.nodes[0]!.state).toBe('value')
+    expect(restored.nodes[0]!.type).toMatch(/Integer/)
+    // The same text again: the code does not change.
+    const sameText = await callJson<{ nodes: NodeSummary[]; settled: boolean }>('edit_node', {
+      node_id: totalId,
+      expression: 'numbers.fold 10 (+)',
+    })
+    note('edit_node total to the same text', sameText)
+    expectSettled('edit_node total to the same text', sameText)
+    expect(sameText.nodes[0]!.type).toMatch(/Integer/)
+    expect(await previewOf(totalId)).toContain('20')
 
     // 4. A node that needs a library the new project does not import, with its import line.
     const xmlImport = 'from Standard.XML import all'
@@ -440,7 +517,22 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     expect(names(afterUndo)).not.toContain('undo_b')
     expect(names(afterUndo)).toEqual(expect.arrayContaining(['doubled', 'tag', 'pair']))
 
-    // 10. Removing, listing, the Drive's path rule, closing and reopening.
+    // 10. Removing a node with a user: the user is computed again, and the result waits for it.
+    const pairOfNodes = await callJson<{ nodes: NodeSummary[]; settled: boolean }>('add_nodes', {
+      statements: ['base = 5', 'uses_base = base + 1'],
+    })
+    note('add_nodes base, uses_base', pairOfNodes)
+    expectSettled('add_nodes base, uses_base', pairOfNodes)
+    const removedWithUser = await callJson<{ removed: string[]; settled: boolean }>(
+      'remove_nodes',
+      { node_ids: [pairOfNodes.nodes[0]!.id] },
+    )
+    note('remove_nodes base (used by uses_base)', removedWithUser)
+    expectSettled('remove_nodes base (used by uses_base)', removedWithUser)
+    const usesBase = nodeNamed(await getGraph(), 'uses_base')
+    note('uses_base after its input was removed', usesBase)
+
+    // 11. Removing, listing, the Drive's path rule, closing and reopening.
     const removed = await callJson<{ removed: string[]; settled: boolean }>('remove_nodes', {
       node_ids: [pairId],
     })
