@@ -11,17 +11,18 @@ import type { Identifier } from '@/util/qualifiedName'
 import type { McpToolResult } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import {
-  MISSING_NODES_NOTE,
-  UNSETTLED_NOTE,
   cappedSummary,
   errorResult,
   isPlainName,
+  MISSING_NODES_NOTE,
   settledResult,
   toolError,
+  UNSETTLED_NOTE,
   type EditToolDeps,
 } from './editTools'
 import { findNode, jsonResult, type GraphToolDeps } from './graphTools'
 import { hasSyntaxError, quote } from './importLines'
+import { enablesOutput, WRITE_REFUSED_ERROR } from './writeGuard'
 
 export interface StructureToolDeps extends GraphToolDeps, Pick<EditToolDeps, 'session' | 'caller'> {
   /**
@@ -92,7 +93,8 @@ export async function collapseNodesTool(
  * The name of the function `source` defines. Err for anything that is not exactly one top-level
  * function definition with a body and a lowercase name: an expression, an import, a type
  * definition, several statements, an empty text, a syntax error, an extension method or an
- * operator. `name = value` is accepted: at the top level it is a method without arguments.
+ * operator; and code that turns the output context on ({@link enablesOutput}). `name = value` is
+ * accepted: at the top level it is a method without arguments.
  */
 export function parseFunctionDefinition(source: string): Result<Identifier> {
   const quoted = quote(source)
@@ -104,6 +106,7 @@ export function parseFunctionDefinition(source: string): Result<Identifier> {
     return Err(`\`${quoted}\` is an import. Pass import lines in \`imports\` of add_nodes.`)
   }
   if (hasSyntaxError(ast)) return Err(`\`${quoted}\` has a syntax error.`)
+  if (enablesOutput(ast)) return Err(WRITE_REFUSED_ERROR)
   if (!(ast instanceof Ast.FunctionDef)) {
     return Err(
       `\`${quoted}\` is not a function definition. ` +

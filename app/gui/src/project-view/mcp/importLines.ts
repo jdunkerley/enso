@@ -6,6 +6,7 @@ import { newImportsLocation, recognizeImport } from '$/providers/openedProjects/
 import { Ast } from '@/util/ast'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { truncate } from './graphTools'
+import { enablesOutput, WRITE_REFUSED_ERROR } from './writeGuard'
 
 /** Most characters of a statement or line quoted back in an error. */
 export const QUOTE_CHARS = 200
@@ -27,7 +28,8 @@ export function hasSyntaxError(ast: Ast.Ast): boolean {
 
 /**
  * Parses whole import lines (`from Standard.Excel import all`, `import Standard.Base.Data.Text`).
- * Err names the first line that is not an import.
+ * Err names the first line that is not an import; a line that imports a function enabling the
+ * output context ({@link enablesOutput}) is refused too.
  */
 export function parseImportLines(
   lines: readonly string[],
@@ -35,6 +37,7 @@ export function parseImportLines(
   const imports: Ast.Owned<Ast.MutableStatement>[] = []
   for (const line of lines) {
     const statement = Ast.parseModuleStatement(line)
+    if (statement != null && enablesOutput(statement)) return Err(WRITE_REFUSED_ERROR)
     if (
       !(statement instanceof Ast.Import) ||
       hasSyntaxError(statement) ||

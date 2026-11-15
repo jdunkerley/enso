@@ -3,10 +3,12 @@
  * the method on screen or of one of its nodes.
  */
 import { formatLsError, translateEngineError } from '@/components/ComponentBrowser/aiToolHandler'
+import { Ast } from '@/util/ast'
 import type { McpToolResult } from 'enso-common/src/mcp'
 import type { Result } from 'enso-common/src/utilities/data/result'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { findNode, truncate, type GraphToolDeps } from './graphTools'
+import { enablesOutput, WRITE_REFUSED_ERROR } from './writeGuard'
 
 export const STILL_LOADING_ERROR = 'The project is still loading. Try again in a moment.'
 /** The answer while the project is in Live mode: evaluation runs only in Design. */
@@ -24,6 +26,8 @@ export const EVALUATE_ERROR_CHARS = 2_000
  * environment, and in Live an expression's writes are real. With `node_id`, it runs at that node's
  * statement, where the node's own binding and every earlier one are in scope; without, it runs in
  * the method body, where all of the method's bindings are (as `aiToolHandler.ts` anchors it).
+ * Code that turns the output context on ({@link enablesOutput}) is refused, before anything is
+ * evaluated.
  */
 export async function evaluateExpression(
   deps: Pick<GraphToolDeps, 'db' | 'currentMethod'> & {
@@ -34,6 +38,9 @@ export async function evaluateExpression(
   args: { expression: string; node_id?: string },
 ): Promise<McpToolResult> {
   if (deps.isLive()) return { ok: false, error: LIVE_MODE_ERROR }
+  if (enablesOutput(Ast.parseBlock(args.expression))) {
+    return { ok: false, error: WRITE_REFUSED_ERROR }
+  }
   let scope: ExternalId
   if (args.node_id != null) {
     const found = findNode(deps.db, args.node_id)

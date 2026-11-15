@@ -19,6 +19,8 @@ import {
   parseFunctionDefinition,
   type StructureToolDeps,
 } from '../structureTools'
+import { WRITE_REFUSED_ERROR } from '../writeGuard'
+import { ENABLING_EXPRESSIONS, ENABLING_FUNCTION, HARMLESS_EXPRESSIONS } from './outputEnablingCode'
 
 const CODE = `## A helper.
 helper x = x
@@ -266,4 +268,35 @@ test('add_function reports an unsettled execution', async () => {
   const { deps } = makeDeps({ session: fakeSession(false) })
   const result = valueOf(await addFunction(deps, { source: 'double x = x * 2' }))
   expect(result).toEqual({ name: 'double', settled: false, note: UNSETTLED_NOTE })
+})
+
+// === Code that turns the output context on ===
+
+test('parseFunctionDefinition refuses a body that turns the output context on, in every form', () => {
+  expect(errorOf(parseFunctionDefinition(ENABLING_FUNCTION))).toBe(WRITE_REFUSED_ERROR)
+  for (const expression of ENABLING_EXPRESSIONS) {
+    expect(errorOf(parseFunctionDefinition(`f x = ${expression}`)), expression).toBe(
+      WRITE_REFUSED_ERROR,
+    )
+    expect(
+      errorOf(parseFunctionDefinition(`f x =\n    y = x\n    ${expression}`)),
+      expression,
+    ).toBe(WRITE_REFUSED_ERROR)
+  }
+})
+
+test('parseFunctionDefinition accepts similar names that do not turn it on', () => {
+  for (const expression of HARMLESS_EXPRESSIONS) {
+    expect(parseFunctionDefinition(`f x = ${expression}`), expression).toEqual(Ok('f'))
+  }
+})
+
+test('add_function refuses a body that turns the output context on, before the session', async () => {
+  const { deps, topLevel, session } = makeDeps()
+  const before = topLevel.code()
+  expect(toolError(await addFunction(deps, { source: ENABLING_FUNCTION }))).toBe(
+    WRITE_REFUSED_ERROR,
+  )
+  expect(session.run).not.toHaveBeenCalled()
+  expect(topLevel.code()).toBe(before)
 })

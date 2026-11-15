@@ -22,8 +22,16 @@ import {
   removeNodes,
   setNodeComment,
   setVisualization,
+  writeOnNodeError,
   type EditToolDeps,
 } from '../editTools'
+import { WRITE_REFUSED_ERROR } from '../writeGuard'
+import {
+  ENABLING_EXPRESSIONS,
+  ENABLING_IMPORTS,
+  HARMLESS_EXPRESSIONS,
+  WRITE_PREFIX,
+} from './outputEnablingCode'
 
 // === parseNodeStatement ===
 
@@ -111,15 +119,15 @@ function fakeSession(settled = true): Pick<EditSession, 'run'> & { affected: str
   }
 }
 
-function makeDeps(overrides: Partial<EditToolDeps> = {}) {
+function makeDeps(overrides: Partial<EditToolDeps> = {}, code = CODE) {
   const projectNames = mockProjectNameStore()
   const db = GraphDb.Mock(undefined, undefined, projectNames)
-  const { root, getSpan } = Ast.parseUpdatingIdMap(CODE)
+  const { root, getSpan } = Ast.parseUpdatingIdMap(code)
   const func = [...root.statements()].find((s) => s instanceof Ast.FunctionDef)
   assert(func instanceof Ast.MutableFunctionDef)
   db.updateExternalIds(root)
   db.updateNodes(func, { watchEffect })
-  db.updateBindings(func, { text: CODE, getSpan })
+  db.updateBindings(func, { text: code, getSpan })
   const createNodes = vi.fn<EditToolDeps['createNodes']>(async (nodes) =>
     Ok(
       nodes.map((n, i) => {
@@ -436,4 +444,79 @@ test('remove_nodes of a node nothing else uses, or of a node and its only user, 
   await removeNodes(deps, { node_ids: [a, b] })
   // `b` is used only by the method's output, which is not removed: it is the one user.
   expect(session.affected[0]).toEqual([outputNode(db)])
+})
+
+// === Code that turns the output context on ===
+
+test('parseNodeStatement and parseNodeExpression refuse code that turns the output context on', () => {
+  for (const expression of ENABLING_EXPRESSIONS) {
+    expect(errorOf(parseNodeStatement(expression)), expression).toBe(WRITE_REFUSED_ERROR)
+    expect(errorOf(parseNodeStatement(`x = ${expression}`)), expression).toBe(WRITE_REFUSED_ERROR)
+    expect(errorOf(parseNodeExpression(expression)), expression).toBe(WRITE_REFUSED_ERROR)
+    expect(
+      errorOf(
+        parseNodeExpression(`foo
+    . bar (${expression})`),
+      ),
+      expression,
+    ).toBe(WRITE_REFUSED_ERROR)
+  }
+})
+
+test('parseNodeStatement and parseNodeExpression accept similar names that do not turn it on', () => {
+  for (const expression of HARMLESS_EXPRESSIONS) {
+    expect(parseNodeStatement(`x = ${expression}`).ok, expression).toBe(true)
+    expect(parseNodeExpression(expression).ok, expression).toBe(true)
+  }
+  expect(parseNodeStatement('enabled = True')).toEqual(
+    Ok({ binding: 'enabled', expression: 'True' }),
+  )
+})
+
+test('add_nodes refuses a statement wrapped in the Write prefix, and creates nothing', async () => {
+  const { deps, createNodes } = makeDeps()
+  const result = await addNodes(deps, {
+    statements: ['c = 1', `w = ${WRITE_PREFIX}"x".write "x.txt"`],
+  })
+  expect(toolError(result)).toBe(`Statement 2: ${WRITE_REFUSED_ERROR}`)
+  expect(createNodes).not.toHaveBeenCalled()
+})
+
+test.each(ENABLING_IMPORTS)(
+  'add_nodes refuses an import of the enabling function, and creates nothing: %s',
+  async (line) => {
+    const { deps, createNodes } = makeDeps()
+    const result = await addNodes(deps, { statements: ['c = 1'], imports: [line] })
+    expect(toolError(result)).toBe(WRITE_REFUSED_ERROR)
+    expect(createNodes).not.toHaveBeenCalled()
+  },
+)
+
+test('edit_node refuses an expression that turns the output context on', async () => {
+  const { deps, db } = makeDeps()
+  const a = nodeNamed(db, 'a')
+  for (const expression of ENABLING_EXPRESSIONS) {
+    expect(toolError(await editNode(deps, { node_id: a, expression })), expression).toBe(
+      WRITE_REFUSED_ERROR,
+    )
+  }
+  expect(deps.setNodeContent).not.toHaveBeenCalled()
+})
+
+const WRITE_ON_CODE = `main =
+    a = 1 + 2
+    w = ${WRITE_PREFIX}a.to_text.write "x.txt"
+    w`
+
+test('edit_node refuses a node the user turned Write on for, and leaves it as it is', async () => {
+  const { deps, db } = makeDeps({}, WRITE_ON_CODE)
+  const w = nodeNamed(db, 'w')
+  expect(db.nodeIdToNode.get(w)!.prefixes.enableRecording).toBeDefined()
+  expect(toolError(await editNode(deps, { node_id: w, expression: 'a.to_text' }))).toBe(
+    writeOnNodeError(w),
+  )
+  expect(deps.setNodeContent).not.toHaveBeenCalled()
+  // Its comment and visualization are not code: those still work.
+  expect((await setNodeComment(deps, { node_id: w, text: 'Saved' })).ok).toBe(true)
+  expect((await setVisualization(deps, { node_id: w, visible: true })).ok).toBe(true)
 })

@@ -21,6 +21,7 @@ import {
   type NodeSummary,
 } from './graphTools'
 import { hasSyntaxError, parseImportLines, quote } from './importLines'
+import { enablesOutput, WRITE_REFUSED_ERROR } from './writeGuard'
 
 /** Added to a result whose edit was not followed by a finished execution in time. */
 export const UNSETTLED_NOTE =
@@ -94,7 +95,8 @@ export function parseNodeExpression(expression: string): Result<string> {
 
 /**
  * `text` parsed as one statement of a method body. Err (`notOne` when it is not one statement)
- * for an import line and for anything the parser marks invalid.
+ * for an import line, for anything the parser marks invalid, and for code that turns the output
+ * context on ({@link enablesOutput}).
  */
 function parseMethodStatement(text: string, notOne: string): Result<Ast.Statement> {
   const quoted = quote(text)
@@ -105,6 +107,7 @@ function parseMethodStatement(text: string, notOne: string): Result<Ast.Statemen
     return Err(`\`${quoted}\` is an import. Pass import lines in \`imports\` of add_nodes.`)
   }
   if (hasSyntaxError(ast)) return Err(`\`${quoted}\` has a syntax error.`)
+  if (enablesOutput(ast)) return Err(WRITE_REFUSED_ERROR)
   return Ok(ast)
 }
 
@@ -206,7 +209,22 @@ export async function addNodes(
   })
 }
 
-/** Replaces the expression of a node, which keeps its name. Answers with the node. */
+/**
+ * The answer to `edit_node` on a node the user turned Write on for. Its expression runs with the
+ * output context on, so an expression an agent put there would write: only the user changes it.
+ */
+export function writeOnNodeError(nodeId: string): string {
+  return (
+    `Node ${quote(nodeId)} runs with Write on, which only the user turns on or off. ` +
+    'Ask the user to turn Write off on it before you change it.'
+  )
+}
+
+/**
+ * Replaces the expression of a node, which keeps its name. Answers with the node. A node the user
+ * turned Write on for is refused ({@link writeOnNodeError}): the edit would replace only the
+ * expression inside the user's Write prefix, which would then run the agent's code with output.
+ */
 export async function editNode(
   deps: EditToolDeps,
   args: { node_id: string; expression: string },
@@ -217,6 +235,7 @@ export async function editNode(
   if (node.type === 'input') {
     return toolError(`Node ${args.node_id} is an argument of the method and cannot be edited.`)
   }
+  if (node.prefixes.enableRecording != null) return toolError(writeOnNodeError(args.node_id))
   const expression = parseNodeExpression(args.expression)
   if (!expression.ok) return errorResult(expression)
   const outcome = await deps.session.run(
