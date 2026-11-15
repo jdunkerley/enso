@@ -12,7 +12,7 @@ import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { EditSession, LIVE_EDIT_ERROR, type EditOutcome, type EditRunOptions } from '../editSession'
-import { MISSING_NODES_NOTE, UNSETTLED_NOTE } from '../editTools'
+import { METHOD_CHANGED_ERROR, MISSING_NODES_NOTE, UNSETTLED_NOTE } from '../editTools'
 import {
   addFunction,
   collapseNodesTool,
@@ -316,4 +316,62 @@ test("collapse_nodes and add_function pass the call's deadline to the session", 
   await collapseNodesTool(deps, { node_ids: [nodeNamed(db, 'a')] })
   await addFunction(deps, { source: 'double x = x * 2' })
   expect(session.run.mock.calls.map((call) => call[2]?.deadline)).toEqual([DEADLINE, DEADLINE])
+})
+
+// === The method on screen and the nodes, checked again at the edit's turn ===
+
+const otherPointer: MethodPointer = { ...pointer, name: 'other' as Identifier }
+
+/** A session where `before` runs before the edit's turn (the user or open_method acts). */
+function sessionWith(before: () => void) {
+  const inner = fakeSession()
+  return {
+    run: vi.fn(
+      async <T>(
+        callerArg: unknown,
+        edit: () => Result<T> | Promise<Result<T>>,
+        options?: EditRunOptions<T>,
+      ) => {
+        before()
+        return inner.run(callerArg, edit, options)
+      },
+    ),
+  }
+}
+
+test('collapse_nodes and add_function refuse when the method on screen changed, before changing anything', async () => {
+  const fixture: { deps?: StructureToolDeps } = {}
+  const { deps, db, topLevel } = makeDeps({
+    session: sessionWith(() => {
+      fixture.deps!.currentMethod.pointer = Ok(otherPointer)
+    }),
+  })
+  fixture.deps = deps
+  const before = topLevel.code()
+  expect(toolError(await collapseNodesTool(deps, { node_ids: [nodeNamed(db, 'a')] }))).toBe(
+    METHOD_CHANGED_ERROR,
+  )
+  // Validated with `main` on screen again; `other` is on screen at the edit's turn.
+  deps.currentMethod.pointer = Ok(pointer)
+  expect(toolError(await addFunction(deps, { source: 'double x = x * 2' }))).toBe(
+    METHOD_CHANGED_ERROR,
+  )
+  expect(deps.collapseNodes).not.toHaveBeenCalled()
+  expect(topLevel.code()).toBe(before)
+})
+
+test('collapse_nodes refuses a node removed before its turn, as an unknown id', async () => {
+  const fixture: { db?: GraphDb; id?: NodeId } = {}
+  const { deps, db } = makeDeps({
+    session: sessionWith(() => {
+      fixture.db!.nodeIdToNode.delete(fixture.id!)
+    }),
+  })
+  fixture.db = db
+  const a = nodeNamed(db, 'a')
+  fixture.id = a
+  expect(toolError(await collapseNodesTool(deps, { node_ids: [a] }))).toBe(
+    `No node with id ${a} in the method on screen. Call get_graph for the current ids.`,
+  )
+  expect(deps.collapseNodes).not.toHaveBeenCalled()
 })

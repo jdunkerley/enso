@@ -7,6 +7,7 @@
 import type { Node, NodeId } from '$/providers/openedProjects/graph/graphDatabase'
 import { Ast } from '@/util/ast'
 import { nodeMutableDocumentation } from '@/util/ast/node'
+import { methodPointerEquals, type MethodPointer } from '@/util/methodPointer'
 import { isIdentifier, type Identifier } from '@/util/qualifiedName'
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
@@ -17,6 +18,7 @@ import {
   jsonResult,
   summarizeNode,
   truncate,
+  unknownNodeError,
   type GraphToolDeps,
   type NodeSummary,
 } from './graphTools'
@@ -29,6 +31,9 @@ export const UNSETTLED_NOTE =
 /** Added to an `add_nodes` result when some new nodes are not in the node database yet. */
 export const MISSING_NODES_NOTE =
   'Some new nodes are not in the graph on screen yet. Call get_graph for them.'
+/** The answer to an edit whose turn comes after the method on screen changed. */
+export const METHOD_CHANGED_ERROR =
+  'The method on screen changed before this edit ran. Nothing was changed; call get_graph and try again.'
 /** Most characters of an error from the session or a dependency. */
 export const EDIT_ERROR_CHARS = 2_000
 
@@ -144,11 +149,36 @@ export interface EditToolDeps extends GraphToolDeps {
 
 type FoundNode = { id: NodeId; node: Node }
 
+/** The method on screen now, as a tool records it when it validates its arguments. */
+export function methodOnScreen(deps: Pick<GraphToolDeps, 'currentMethod'>): MethodPointer | null {
+  const pointer = deps.currentMethod.pointer
+  return pointer.ok ? pointer.value : null
+}
+
+/**
+ * Checked inside an edit, at its turn in the session's queue and before it changes anything: the
+ * user or `open_method` may have changed the method on screen since the call was validated, or
+ * removed one of its nodes. Err ({@link METHOD_CHANGED_ERROR}) when the method on screen is not
+ * `method`, or the unknown-id error for the first of `ids` no longer in the method.
+ */
+export function checkAtTurn(
+  deps: Pick<GraphToolDeps, 'currentMethod' | 'db'>,
+  method: MethodPointer | null,
+  ids: readonly NodeId[] = [],
+): Result<void> {
+  const now = methodOnScreen(deps)
+  const same = now == null || method == null ? now === method : methodPointerEquals(now, method)
+  if (!same) return Err(METHOD_CHANGED_ERROR)
+  const gone = ids.find((id) => !deps.db.nodeIdToNode.has(id))
+  return gone != null ? Err(unknownNodeError(gone)) : Ok()
+}
+
 /**
  * Adds one node per statement, all in one module edit, after `after_node` when given, and adds
  * the import lines the module lacks. Refused, before anything changes, when a statement or import
  * does not parse, a name is bound twice, or `after_node` is unknown; and, at the call's turn in
- * the edit session, when a name is already used in the method.
+ * the edit session, when a name is already used in the method, the method on screen changed or
+ * `after_node` is gone ({@link checkAtTurn}).
  * Answers with the new nodes, in order, without previews.
  */
 export async function addNodes(
@@ -161,6 +191,7 @@ export async function addNodes(
     if (!found.ok) return found
     after = found.value.id
   }
+  const method = methodOnScreen(deps)
   const imports = args.imports ?? []
   const parsedImports = parseImportLines(imports)
   if (!parsedImports.ok) return errorResult(parsedImports)
@@ -181,6 +212,8 @@ export async function addNodes(
   const outcome = await deps.session.run(
     deps.caller,
     () => {
+      const unchanged = checkAtTurn(deps, method, after != null ? [after] : [])
+      if (!unchanged.ok) return unchanged
       // Checked at the call's turn in the queue: an earlier edit may have taken the name since.
       const taken = [...bound].find((name) => deps.db.identifierUsed(name))
       if (taken != null) {
@@ -240,9 +273,18 @@ export async function editNode(
   if (node.prefixes.enableRecording != null) return toolError(writeOnNodeError(args.node_id))
   const expression = parseNodeExpression(args.expression)
   if (!expression.ok) return errorResult(expression)
+  const method = methodOnScreen(deps)
   const outcome = await deps.session.run(
     deps.caller,
-    () => deps.setNodeContent(id, expression.value),
+    () => {
+      const unchanged = checkAtTurn(deps, method, [id])
+      if (!unchanged.ok) return unchanged
+      // The user may have turned Write on for it while the edit waited.
+      if (deps.db.nodeIdToNode.get(id)?.prefixes.enableRecording != null) {
+        return Err(writeOnNodeError(args.node_id))
+      }
+      return deps.setNodeContent(id, expression.value)
+    },
     { affected: () => [id], deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
@@ -271,9 +313,13 @@ export async function removeNodes(
   // The nodes that used a removed one lose that input and are computed again. Read at the call's
   // turn, before the deletion, from the usages `deleteNodes` disconnects.
   let users: NodeId[] = []
+  const method = methodOnScreen(deps)
   const outcome = await deps.session.run(
     deps.caller,
     () => {
+      // Else `deleteNodes` skips an id that is gone, and the answer would list it as removed.
+      const unchanged = checkAtTurn(deps, method, ids)
+      if (!unchanged.ok) return unchanged
       users = dependentsOf(deps, ids)
       return deps.deleteNodes(ids)
     },
@@ -283,7 +329,10 @@ export async function removeNodes(
   return settledResult({ removed: ids }, outcome.value)
 }
 
-/** Sets a node's documentation comment; an empty text removes it. Answers with the node. */
+/**
+ * Sets a node's documentation comment; an empty text removes it. Answers with the node and
+ * `settled: true` (nothing is computed again).
+ */
 export async function setNodeComment(
   deps: EditToolDeps,
   args: { node_id: string; text: string },
@@ -293,31 +342,45 @@ export async function setNodeComment(
   if (nodeMutableDocumentation(found.value.node) == null) {
     return toolError(`Node ${args.node_id} cannot have a comment.`)
   }
+  const method = methodOnScreen(deps)
   const outcome = await deps.session.run(
     deps.caller,
-    // A comment changes nothing the engine runs: no expression is affected.
-    () => deps.setNodeComment(found.value.id, args.text),
+    // A comment changes nothing the engine runs: no expression is affected, so it settles at once.
+    () => {
+      const unchanged = checkAtTurn(deps, method, [found.value.id])
+      if (!unchanged.ok) return unchanged
+      return deps.setNodeComment(found.value.id, args.text)
+    },
     { deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
-  return jsonResult({ node: currentSummary(deps, found.value) })
+  return settledResult({ node: currentSummary(deps, found.value) }, outcome.value)
 }
 
-/** Shows or hides a node's visualization. Answers with the node. */
+/**
+ * Shows or hides a node's visualization. Answers with the node and `settled: true` (nothing is
+ * computed again).
+ */
 export async function setVisualization(
   deps: EditToolDeps,
   args: { node_id: string; visible: boolean },
 ): Promise<McpToolResult> {
   const found = findNode(deps.db, args.node_id)
   if (!found.ok) return found
+  const method = methodOnScreen(deps)
   const outcome = await deps.session.run(
     deps.caller,
-    // A visualization changes nothing the engine runs for the graph: no expression is affected.
-    () => deps.setVisualization(found.value.id, args.visible),
+    // A visualization changes nothing the engine runs for the graph: no expression is affected,
+    // so it settles at once.
+    () => {
+      const unchanged = checkAtTurn(deps, method, [found.value.id])
+      if (!unchanged.ok) return unchanged
+      return deps.setVisualization(found.value.id, args.visible)
+    },
     { deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
-  return jsonResult({ node: currentSummary(deps, found.value) })
+  return settledResult({ node: currentSummary(deps, found.value) }, outcome.value)
 }
 
 /** The nodes, other than `removed`, that use any of `removed`. */

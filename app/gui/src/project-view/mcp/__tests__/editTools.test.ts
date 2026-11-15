@@ -8,11 +8,12 @@ import { stdPath } from '@/util/projectPath'
 import type { Identifier } from '@/util/qualifiedName'
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
-import { expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { EditSession, LIVE_EDIT_ERROR, type EditOutcome, type EditRunOptions } from '../editSession'
 import {
+  METHOD_CHANGED_ERROR,
   MISSING_NODES_NOTE,
   UNSETTLED_NOTE,
   addNodes,
@@ -397,7 +398,8 @@ test('set_node_comment writes the comment and answers with the node', async () =
   const b = nodeNamed(db, 'b')
   const result = valueOf(await setNodeComment(deps, { node_id: b, text: 'Hello' }))
   expect(deps.setNodeComment).toHaveBeenCalledWith(b, 'Hello')
-  expect(result).toEqual({ node: expect.objectContaining({ id: b, name: 'b' }) })
+  // Nothing is computed again, so it has settled: every edit result has the field.
+  expect(result).toEqual({ node: expect.objectContaining({ id: b, name: 'b' }), settled: true })
 })
 
 test('set_visualization shows the visualization and answers with the node', async () => {
@@ -405,7 +407,7 @@ test('set_visualization shows the visualization and answers with the node', asyn
   const a = nodeNamed(db, 'a')
   const result = valueOf(await setVisualization(deps, { node_id: a, visible: true }))
   expect(deps.setVisualization).toHaveBeenCalledWith(a, true)
-  expect(result).toEqual({ node: expect.objectContaining({ id: a }) })
+  expect(result).toEqual({ node: expect.objectContaining({ id: a }), settled: true })
   expect(toolError(await setVisualization(deps, { node_id: 'nope', visible: false }))).toContain(
     'No node with id nope',
   )
@@ -445,7 +447,7 @@ test('remove_nodes waits for the nodes that used a removed one, read before the 
   expect(session.affected[0]).toEqual([b])
 })
 
-test('remove_nodes of a node nothing else uses, or of a node and its only user, waits for nothing', async () => {
+test("remove_nodes of a node and its only user waits for the method's output node, which used it", async () => {
   const session = fakeSession()
   const { deps, db } = makeDeps({ session })
   const a = nodeNamed(db, 'a')
@@ -540,4 +542,126 @@ test("Every edit tool passes the call's deadline to the session", async () => {
   await setVisualization(deps, { node_id: a, visible: true })
   await removeNodes(deps, { node_ids: [a] })
   expect(session.deadlines).toEqual([DEADLINE, DEADLINE, DEADLINE, DEADLINE, DEADLINE])
+})
+
+// === The method on screen and the nodes, checked again at the edit's turn ===
+
+const otherPointer: MethodPointer = { ...pointer, name: 'other' as Identifier }
+
+/** A session where, before the edit's turn, `before` runs (the user or open_method acts). */
+function sessionWith(before: () => void): Pick<EditSession, 'run'> {
+  return {
+    async run<T>(
+      callerArg: McpCaller,
+      edit: () => Result<T> | Promise<Result<T>>,
+      options?: EditRunOptions<T>,
+    ) {
+      before()
+      return fakeSession().run(callerArg, edit, options)
+    },
+  }
+}
+
+describe('at the turn of a queued edit', () => {
+  function changedMethodDeps() {
+    const fixture: { deps?: EditToolDeps } = {}
+    const made = makeDeps({
+      session: sessionWith(() => {
+        fixture.deps!.currentMethod.pointer = Ok(otherPointer)
+      }),
+    })
+    fixture.deps = made.deps
+    return made
+  }
+
+  test('the method-changed text', () => {
+    expect(METHOD_CHANGED_ERROR).toBe(
+      'The method on screen changed before this edit ran. Nothing was changed; call get_graph and try again.',
+    )
+  })
+
+  test('every node tool refuses when the method on screen changed, before changing anything', async () => {
+    const { deps, db, createNodes } = changedMethodDeps()
+    const a = nodeNamed(db, 'a')
+    const calls: [string, () => Promise<McpToolResult>][] = [
+      ['add_nodes', () => addNodes(deps, { statements: ['c = 1'] })],
+      ['add_nodes after', () => addNodes(deps, { statements: ['c = 1'], after_node: a })],
+      ['edit_node', () => editNode(deps, { node_id: a, expression: '7' })],
+      ['remove_nodes', () => removeNodes(deps, { node_ids: [a] })],
+      ['set_node_comment', () => setNodeComment(deps, { node_id: a, text: 'x' })],
+      ['set_visualization', () => setVisualization(deps, { node_id: a, visible: true })],
+    ]
+    for (const [name, call] of calls) {
+      // Validated with `main` on screen; `other` is on screen at the edit's turn.
+      deps.currentMethod.pointer = Ok(pointer)
+      expect(toolError(await call()), name).toBe(METHOD_CHANGED_ERROR)
+    }
+    expect(createNodes).not.toHaveBeenCalled()
+    expect(deps.setNodeContent).not.toHaveBeenCalled()
+    expect(deps.deleteNodes).not.toHaveBeenCalled()
+    expect(deps.setNodeComment).not.toHaveBeenCalled()
+    expect(deps.setVisualization).not.toHaveBeenCalled()
+  })
+
+  test('every node tool refuses a node removed before its turn, as an unknown id', async () => {
+    const fixture: { db?: GraphDb; id?: NodeId } = {}
+    const { deps, db, createNodes } = makeDeps({
+      session: sessionWith(() => {
+        fixture.db!.nodeIdToNode.delete(fixture.id!)
+      }),
+    })
+    fixture.db = db
+    const a = nodeNamed(db, 'a')
+    const b = nodeNamed(db, 'b')
+    const unknown = (id: string) =>
+      `No node with id ${id} in the method on screen. Call get_graph for the current ids.`
+    const check = async (id: NodeId, call: () => Promise<McpToolResult>) => {
+      // Each call is validated with the node present; the session removes it before the turn.
+      db.nodeIdToNode.set(id, original.get(id)!)
+      fixture.id = id
+      expect(toolError(await call())).toBe(unknown(id))
+    }
+    const original = new Map([
+      [a, db.nodeIdToNode.get(a)!],
+      [b, db.nodeIdToNode.get(b)!],
+    ])
+    await check(a, () => addNodes(deps, { statements: ['c = 1'], after_node: a }))
+    await check(a, () => editNode(deps, { node_id: a, expression: '7' }))
+    await check(b, () => removeNodes(deps, { node_ids: [a, b] }))
+    await check(a, () => setNodeComment(deps, { node_id: a, text: 'x' }))
+    await check(a, () => setVisualization(deps, { node_id: a, visible: true }))
+    expect(createNodes).not.toHaveBeenCalled()
+    expect(deps.setNodeContent).not.toHaveBeenCalled()
+    expect(deps.deleteNodes).not.toHaveBeenCalled()
+    expect(deps.setNodeComment).not.toHaveBeenCalled()
+    expect(deps.setVisualization).not.toHaveBeenCalled()
+  })
+
+  test('the same method, entered again, is not a change', async () => {
+    const { deps, db } = makeDeps({
+      session: sessionWith(() => {
+        deps.currentMethod.pointer = Ok({ ...pointer })
+      }),
+    })
+    expect((await editNode(deps, { node_id: nodeNamed(db, 'a'), expression: '7' })).ok).toBe(true)
+  })
+})
+
+test('edit_node refuses a node the user turned Write on for while the edit waited', async () => {
+  const fixture: { db?: GraphDb; id?: NodeId } = {}
+  const { deps, db } = makeDeps({
+    session: sessionWith(() => {
+      // As the GUI's Write switch does: the node is read again with the prefix.
+      const node = fixture.db!.nodeIdToNode.get(fixture.id!)!
+      fixture.db!.nodeIdToNode.set(fixture.id!, {
+        ...node,
+        prefixes: { enableRecording: [] },
+      })
+    }),
+  })
+  fixture.db = db
+  const a = nodeNamed(db, 'a')
+  fixture.id = a
+  expect(toolError(await editNode(deps, { node_id: a, expression: '7' }))).toBe(writeOnNodeError(a))
+  expect(deps.setNodeContent).not.toHaveBeenCalled()
 })

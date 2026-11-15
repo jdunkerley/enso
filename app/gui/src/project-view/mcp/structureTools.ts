@@ -12,8 +12,10 @@ import type { McpToolResult } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import {
   cappedSummary,
+  checkAtTurn,
   errorResult,
   isPlainName,
+  methodOnScreen,
   MISSING_NODES_NOTE,
   settledResult,
   toolError,
@@ -70,11 +72,20 @@ export async function collapseNodesTool(
     }
     if (!ids.includes(id)) ids.push(id)
   }
-  const outcome = await deps.session.run(deps.caller, () => deps.collapseNodes(ids, name), {
-    // The engine reports a value for the new node that calls the function.
-    affected: ({ callNode }) => (callNode != null ? [callNode] : []),
-    deadline: deps.deadline,
-  })
+  const method = methodOnScreen(deps)
+  const outcome = await deps.session.run(
+    deps.caller,
+    () => {
+      const unchanged = checkAtTurn(deps, method, ids)
+      if (!unchanged.ok) return unchanged
+      return deps.collapseNodes(ids, name)
+    },
+    {
+      // The engine reports a value for the new node that calls the function.
+      affected: ({ callNode }) => (callNode != null ? [callNode] : []),
+      deadline: deps.deadline,
+    },
+  )
   if (!outcome.ok) return errorResult(outcome)
   const { name: functionName, callNode } = outcome.value.value
   const node = callNode != null ? deps.db.nodeIdToNode.get(callNode) : undefined
@@ -141,9 +152,15 @@ export async function addFunction(
   const name = parsed.value
   // A definition alone affects nothing the engine runs: the nodes that will call it are added
   // later, and their own edit waits for their values.
+  const method = methodOnScreen(deps)
   const outcome = await deps.session.run(
     deps.caller,
-    () => deps.editModule((topLevel) => insertFunction(deps, topLevel, args.source, name)),
+    () => {
+      // The function goes before the method on screen: the one the call was validated against.
+      const unchanged = checkAtTurn(deps, method)
+      if (!unchanged.ok) return unchanged
+      return deps.editModule((topLevel) => insertFunction(deps, topLevel, args.source, name))
+    },
     { deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
