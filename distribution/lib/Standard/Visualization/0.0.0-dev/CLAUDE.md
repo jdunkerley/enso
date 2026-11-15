@@ -87,10 +87,11 @@ Visualization and not on each data library.
     `distinct_values_json column_index filter_columns filter_conditions`.
   - Capability `"spatial"`: `spatial_layers_json`.
   - Capability `"view_pieces"`: `column_cells_json index start count` (a JSON
-    array of cells) and `column_metrics_json` (per column, the `value_type`,
-    `metrics`, `multi_filter` and `number_format` fields), which
-    `View_Json.table_view` assembles. The in-memory source implements them in
-    Java.
+    array of cells; `index` is the column's position in `column_names`, read by
+    position because a lookup by name cost ~100 ms on 2,500 columns) and
+    `column_metrics_json` (per column, the `value_type`, `metrics`,
+    `multi_filter` and `number_format` fields), which `View_Json.table_view`
+    assembles. The in-memory source implements them in Java.
 
   A source lists the capabilities it has in `supported_operations`; calling an
   operation it lacks gives `Viz_Unsupported.Error operation`. `Viz_Column_Kind`
@@ -135,18 +136,22 @@ data type only when the chart needs something a table cannot give.
 
 ## Table view message
 
-`{"kind":"grid"|"value"|"error", …}`. A grid has `columns` (`name`, optional
-`link` `{action, label}`, `value_type`, `metrics`, `multi_filter`,
-`number_format`), column-major `data` (or `null` when `server` is true),
-optional `row_count`, `index` (the row-number column's link), `version_hash` and
-`options` (`status_bar`, `create_node`, `disable_sort_when_partial`). A link
-action is an explicit template: `{{#field}}` (a number when it reads as one),
-`{{@field}}` (as it is), `{{#index}}` (the row number). A cell is `null`, a
-boolean, a finite number, text, or an object starting with `_display_text_`;
-`{"_missing_":true}` is a cell its row lacks. A row page is
-`{"row_count","index","data"}`; distinct values `{"values"}`. Changing it means
-regenerating the goldens and keeping the GUI snapshot
-(`__tests__/tableViewSnapshot.test.ts`) unchanged.
+`{"kind":"grid"|"value"|"error", …}`. A value is `{"kind":"value","value":c}`
+with `c` one cell (below); an error is `{"kind":"error","error":text}`. A grid
+has `columns` (`name`, optional `link` `{action, label}` where `label` names the
+link column, optional `value_type` `{constructor, display_text}`, optional
+`metrics` `[{name, value, type}]` with `type` one of `Text`/`Count`/`Percentage`
+and `value` possibly `null`, `multi_filter`, `number_format`), column-major
+`data`, optional `row_count`, `index` (the row-number column's link),
+`version_hash`, `server` (`true` when the GUI pages rows from the engine; `data`
+is then `null` and rows come as row pages) and `options` (`status_bar`,
+`create_node`, `disable_sort_when_partial`). A link action is an explicit
+template: `{{#field}}` (a number when it reads as one), `{{@field}}` (as it is),
+`{{#index}}` (the row number). A cell is `null`, a boolean, a finite number,
+text, or an object starting with `_display_text_`; `{"_missing_":true}` is a
+cell its row lacks. A row page is `{"row_count","index","data"}`; distinct
+values `{"values"}`. Changing it means regenerating the goldens and keeping the
+GUI snapshot (`__tests__/tableViewSnapshot.test.ts`) unchanged.
 
 ## Things to avoid in generated code
 
