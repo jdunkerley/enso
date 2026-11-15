@@ -23,11 +23,14 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       name: 'get_graph',
       title: 'Get the open graph',
       description:
-        'Read the graph of the open project: its nodes (with their ids, expressions, ' +
-        'types and, unless `previews` is false, a short preview of their current value), ' +
-        'the connections between them, and any problems. Call this first to see what the ' +
-        'project does. Each `node_id` is stable across edits, so you can pass it to ' +
-        '`get_node` and `evaluate_expression` later.',
+        'Read the graph of the open project: the method source, the module imports, and ' +
+        'its nodes (with their ids, names, expressions, types, evaluation state, any panic ' +
+        'message and, unless `previews` is false, a short preview of their current value). ' +
+        'There is no separate edge list: a node uses another by its name, so read the ' +
+        'connections from each node `code` and from `source`. When previews run out of ' +
+        'time, `previews_skipped` counts the nodes left without one. Call this first to ' +
+        'see what the project does. Each `node_id` is stable across edits, so you can pass ' +
+        'it to `get_node` and `evaluate_expression` later.',
       inputSchema: { previews: z.boolean().optional() },
       run: forward('get_graph'),
     },

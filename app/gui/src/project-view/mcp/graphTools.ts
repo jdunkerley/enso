@@ -3,6 +3,7 @@
  * functions over {@link GraphToolDeps}, which `useProjectMcpTools` builds from the open project's
  * stores at call time.
  */
+/* eslint-disable camelcase -- result field names are snake_case on the wire, as the arguments are */
 import {
   asNodeId,
   type GraphDb,
@@ -22,6 +23,13 @@ import type { ExternalId } from 'ydoc-shared/yjsModel'
 export const GRAPH_PREVIEW_CHARS = 2_000
 /** Most characters of a node's value preview in `get_node`. */
 export const NODE_PREVIEW_CHARS = 20_000
+/** Most `get_graph` previews evaluating at once. */
+export const GRAPH_PREVIEW_CONCURRENCY = 8
+/**
+ * How long after its first preview starts `get_graph` may start more. Previews in flight then
+ * still finish (or time out); the nodes not yet started are counted in `previews_skipped`.
+ */
+export const GRAPH_PREVIEW_DEADLINE_MS = 15_000
 
 const GRAPH_PREVIEW_TIMEOUT_MS = 5_000
 const NODE_PREVIEW_TIMEOUT_MS = 10_000
@@ -41,6 +49,8 @@ export interface GraphToolDeps {
     expression: string,
     timeoutMs: number,
   ) => Promise<Result<string> | null>
+  /** The clock for the previews' deadline, in milliseconds; `Date.now` by default. */
+  readonly now?: () => number
 }
 
 export interface NodeSummary {
@@ -93,7 +103,8 @@ export function summarizeNode(deps: GraphToolDeps, id: NodeId, node: Node): Node
 
 /**
  * The method on screen: its name and source, the module's imports, and a summary of each node,
- * with a short preview of each value unless `previews` is false.
+ * with a short preview of each value unless `previews` is false. `previews_skipped` counts the
+ * value nodes left without a preview because the previews' deadline passed (only when non-zero).
  */
 export async function getGraph(
   deps: GraphToolDeps,
@@ -106,27 +117,54 @@ export async function getGraph(
     node,
     summary: summarizeNode(deps, id, node),
   }))
-  if (args.previews !== false) {
-    await Promise.all(
-      nodes.map(async ({ node, summary }) => {
-        if (summary.state !== 'value') return
-        const preview = await evaluateOnNode(
-          deps,
-          node,
-          summary.name,
-          'to_display_text',
-          GRAPH_PREVIEW_TIMEOUT_MS,
-        )
-        if (preview != null) summary.preview = truncate(preview, GRAPH_PREVIEW_CHARS)
-      }),
-    )
-  }
+  const previewsSkipped = args.previews !== false ? await addGraphPreviews(deps, nodes) : 0
   return jsonResult({
     method: pointer.value.name,
     source: ast.value.code(),
     imports: moduleImports(deps.moduleRoot()),
     nodes: nodes.map(({ summary }) => summary),
+    ...(previewsSkipped > 0 ? { previews_skipped: previewsSkipped } : {}),
   })
+}
+
+/**
+ * Adds a preview to each value node with a plain name: at most {@link GRAPH_PREVIEW_CONCURRENCY}
+ * evaluating at once, and none started after {@link GRAPH_PREVIEW_DEADLINE_MS}. Returns how many
+ * were not started because of the deadline.
+ */
+async function addGraphPreviews(
+  deps: GraphToolDeps,
+  nodes: readonly { node: Node; summary: NodeSummary }[],
+): Promise<number> {
+  const now = deps.now ?? Date.now
+  const queue = nodes.filter(
+    ({ summary }) =>
+      summary.state === 'value' && summary.name != null && isIdentifier(summary.name),
+  )
+  const deadline = now() + GRAPH_PREVIEW_DEADLINE_MS
+  let next = 0
+  let skipped = 0
+  async function worker() {
+    while (next < queue.length) {
+      const { node, summary } = queue[next++]!
+      if (now() >= deadline) {
+        skipped += 1
+        continue
+      }
+      const preview = await evaluateOnNode(
+        deps,
+        node,
+        summary.name,
+        'to_display_text',
+        GRAPH_PREVIEW_TIMEOUT_MS,
+      )
+      if (preview != null) summary.preview = truncate(preview, GRAPH_PREVIEW_CHARS)
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(GRAPH_PREVIEW_CONCURRENCY, queue.length) }, worker),
+  )
+  return skipped
 }
 
 /**
@@ -158,7 +196,7 @@ export async function getNode(
       'catch_primitive (e -> e.to_display_text)',
       NODE_PREVIEW_TIMEOUT_MS,
     )
-    if (error != null) summary.error = error
+    if (error != null) summary.error = truncate(error, NODE_PREVIEW_CHARS)
   }
   return jsonResult(summary)
 }
@@ -201,8 +239,16 @@ async function evaluateOnNode(
   return result?.ok ? result.value : null
 }
 
-function truncate(text: string, limit: number): string {
-  return text.length > limit ? `${text.slice(0, limit)}…` : text
+/**
+ * `text` cut to `limit` characters, followed by `ending(text.length)` (by default `…`) when it was
+ * cut; shorter text unchanged.
+ */
+export function truncate(
+  text: string,
+  limit: number,
+  ending: (totalLength: number) => string = () => '…',
+): string {
+  return text.length > limit ? text.slice(0, limit) + ending(text.length) : text
 }
 
 /** The module's import statements, collected as `composables/ai.ts` does. */

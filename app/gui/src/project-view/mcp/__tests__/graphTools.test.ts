@@ -10,12 +10,14 @@ import { Ast } from '@/util/ast'
 import type { MethodPointer } from '@/util/methodPointer'
 import { stdPath } from '@/util/projectPath'
 import type { Identifier } from '@/util/qualifiedName'
-import { Err, Ok } from 'enso-common/src/utilities/data/result'
+import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExpressionUpdatePayload } from 'ydoc-shared/languageServerTypes'
 import {
   GRAPH_PREVIEW_CHARS,
+  GRAPH_PREVIEW_CONCURRENCY,
+  GRAPH_PREVIEW_DEADLINE_MS,
   NODE_PREVIEW_CHARS,
   getGraph,
   getNode,
@@ -38,16 +40,16 @@ const pointer: MethodPointer = {
   name: 'main' as Identifier,
 }
 
-function makeDeps(overrides: Partial<GraphToolDeps> = {}) {
+function makeDeps(overrides: Partial<GraphToolDeps> = {}, code = CODE) {
   const registry = ComputedValueRegistry.Mock()
   const projectNames = mockProjectNameStore()
   const db = GraphDb.Mock(registry, undefined, projectNames)
-  const { root, getSpan } = Ast.parseUpdatingIdMap(CODE)
+  const { root, getSpan } = Ast.parseUpdatingIdMap(code)
   const func = [...root.statements()].find((s) => s instanceof Ast.FunctionDef)
   assert(func instanceof Ast.MutableFunctionDef)
   db.updateExternalIds(root)
   db.updateNodes(func, { watchEffect })
-  db.updateBindings(func, { text: CODE, getSpan })
+  db.updateBindings(func, { text: code, getSpan })
   const evaluate = vi.fn<GraphToolDeps['evaluate']>(async () => Ok('text'))
   const deps: GraphToolDeps = {
     db,
@@ -204,4 +206,83 @@ test('get_node previews with `to_text` and explains an error', async () => {
   expect(nodeA.preview).toBe('y'.repeat(NODE_PREVIEW_CHARS) + '…')
   const nodeB = parseValue(await getNode(deps, { node_id: b }))
   expect(nodeB).toMatchObject({ state: 'error', error: 'Division by zero' })
+})
+
+test("get_node cuts a long error's text to the preview limit", async () => {
+  const { deps, db, registry, evaluate } = makeDeps()
+  const b = nodeNamed(db, 'b')
+  setPayload(registry, b, { type: 'DataflowError', trace: [] })
+  evaluate.mockResolvedValue(Ok('e'.repeat(30_000)))
+  const node = parseValue(await getNode(deps, { node_id: b }))
+  expect(node.error).toBe('e'.repeat(NODE_PREVIEW_CHARS) + '…')
+})
+
+const MANY_NODES = 20
+
+/** A graph of `MANY_NODES` value nodes, whose previews the test resolves one by one. */
+function manyValueNodes() {
+  const lines = Array.from({ length: MANY_NODES }, (_, i) => `    n${i} = ${i}`)
+  let clock = 0
+  const fixture = makeDeps({ now: () => clock }, `main =\n${lines.join('\n')}`)
+  for (let i = 0; i < MANY_NODES; i++) {
+    setPayload(fixture.registry, nodeNamed(fixture.db, `n${i}`), { type: 'Value' })
+  }
+  const pending: ((result: Result<string>) => void)[] = []
+  let inFlight = 0
+  let maxInFlight = 0
+  fixture.evaluate.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        inFlight += 1
+        maxInFlight = Math.max(maxInFlight, inFlight)
+        pending.push((result) => {
+          inFlight -= 1
+          resolve(result)
+        })
+      }),
+  )
+  return {
+    ...fixture,
+    pending,
+    maxInFlight: () => maxInFlight,
+    setClock: (ms: number) => (clock = ms),
+  }
+}
+
+/** Lets the tool's promise chains run until they wait on the next evaluation. */
+async function settle() {
+  await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+test('get_graph runs at most a fixed number of previews at once', async () => {
+  const { deps, evaluate, pending, maxInFlight } = manyValueNodes()
+  const graphPromise = getGraph(deps, {})
+  await settle()
+  while (pending.length > 0) {
+    pending.shift()!(Ok('v'))
+    await settle()
+  }
+  const graph = parseValue(await graphPromise)
+  expect(evaluate).toHaveBeenCalledTimes(MANY_NODES)
+  expect(maxInFlight()).toBe(GRAPH_PREVIEW_CONCURRENCY)
+  expect(graph.nodes.filter((n: { preview?: string }) => n.preview === 'v')).toHaveLength(
+    MANY_NODES,
+  )
+  expect(graph).not.toHaveProperty('previews_skipped')
+})
+
+test('get_graph starts no more previews once its deadline has passed', async () => {
+  const { deps, evaluate, pending, setClock } = manyValueNodes()
+  const graphPromise = getGraph(deps, {})
+  await settle()
+  expect(pending).toHaveLength(GRAPH_PREVIEW_CONCURRENCY)
+  setClock(GRAPH_PREVIEW_DEADLINE_MS)
+  for (const resolve of pending.splice(0)) resolve(Ok('v'))
+  await settle()
+  const graph = parseValue(await graphPromise)
+  expect(evaluate).toHaveBeenCalledTimes(GRAPH_PREVIEW_CONCURRENCY)
+  expect(graph.previews_skipped).toBe(MANY_NODES - GRAPH_PREVIEW_CONCURRENCY)
+  expect(graph.nodes.filter((n: { preview?: string }) => n.preview != null)).toHaveLength(
+    GRAPH_PREVIEW_CONCURRENCY,
+  )
 })

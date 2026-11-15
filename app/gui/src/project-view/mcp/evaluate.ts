@@ -6,9 +6,13 @@ import { formatLsError, translateEngineError } from '@/components/ComponentBrows
 import type { McpToolResult } from 'enso-common/src/mcp'
 import type { Result } from 'enso-common/src/utilities/data/result'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
-import { findNode, type GraphToolDeps } from './graphTools'
+import { findNode, truncate, type GraphToolDeps } from './graphTools'
 
 export const STILL_LOADING_ERROR = 'The project is still loading. Try again in a moment.'
+/** Most characters of a result; a longer one is cut and says how long it was. */
+export const EVALUATE_RESULT_CHARS = 20_000
+/** Most characters of an evaluation's error text. */
+export const EVALUATE_ERROR_CHARS = 2_000
 
 /**
  * Evaluates `expression` and returns the text it produced. With `node_id`, it runs at that node's
@@ -36,9 +40,23 @@ export async function evaluateExpression(
   try {
     const result = await deps.evaluateRaw(scope, args.expression)
     if (result == null) return { ok: false, error: STILL_LOADING_ERROR }
-    if (!result.ok) return { ok: false, error: translateEngineError(formatLsError(result.error)) }
-    return { ok: true, value: result.value }
+    if (!result.ok) return evaluationError(result.error)
+    return { ok: true, value: truncate(result.value, EVALUATE_RESULT_CHARS, truncationNote) }
   } catch (err) {
-    return { ok: false, error: translateEngineError(formatLsError(err)) }
+    return evaluationError(err)
   }
+}
+
+function evaluationError(err: unknown): McpToolResult {
+  return {
+    ok: false,
+    error: truncate(translateEngineError(formatLsError(err)), EVALUATE_ERROR_CHARS),
+  }
+}
+
+function truncationNote(totalLength: number): string {
+  return (
+    `\n… [truncated: ${totalLength} characters in total. ` +
+    'Narrow the expression, e.g. with .take or a row limit.]'
+  )
 }

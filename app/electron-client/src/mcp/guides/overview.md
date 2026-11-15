@@ -8,8 +8,10 @@ secrets.
 
 ## How to work
 
-1. Call `get_graph` first. It lists every node with its id, expression, type, a
-   short preview of its current value, the connections and any problems. Pass
+1. Call `get_graph` first. It gives the method's `source` and lists every node
+   with its id, name, expression (`code`), type, state and a short preview of
+   its current value. There is no edge list: read the connections from each
+   node's `code` (a node uses another by its `name`) and from `source`. Pass
    `previews: false` for a smaller answer.
 2. Node ids are stable across edits. Pass a `node_id` from `get_graph` to
    `get_node` for the full expression, documentation, a longer value preview and

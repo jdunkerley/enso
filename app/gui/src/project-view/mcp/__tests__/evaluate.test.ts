@@ -9,7 +9,7 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
-import { evaluateExpression } from '../evaluate'
+import { EVALUATE_RESULT_CHARS, evaluateExpression } from '../evaluate'
 
 const CODE = `main =
     a = 1 + 2
@@ -81,5 +81,34 @@ test('No result means the project is still loading', async () => {
   expect(await evaluateExpression(deps, { expression: 'a' })).toEqual({
     ok: false,
     error: 'The project is still loading. Try again in a moment.',
+  })
+})
+
+test('A long result is cut, with a line saying how long it was', async () => {
+  const { deps, evaluateRaw } = makeDeps()
+  evaluateRaw.mockResolvedValue(Ok('r'.repeat(30_000)))
+  const result = await evaluateExpression(deps, { expression: 'table.to_text' })
+  assert(result.ok)
+  expect(result.value.startsWith('r'.repeat(EVALUATE_RESULT_CHARS) + '\n')).toBe(true)
+  expect(result.value.slice(EVALUATE_RESULT_CHARS)).toBe(
+    '\n… [truncated: 30000 characters in total. Narrow the expression, e.g. with .take or a row limit.]',
+  )
+})
+
+test('A short result is returned as it is', async () => {
+  const { deps, evaluateRaw } = makeDeps()
+  evaluateRaw.mockResolvedValue(Ok('r'.repeat(EVALUATE_RESULT_CHARS)))
+  expect(await evaluateExpression(deps, { expression: 'a' })).toEqual({
+    ok: true,
+    value: 'r'.repeat(EVALUATE_RESULT_CHARS),
+  })
+})
+
+test('A long error is cut to 2,000 characters', async () => {
+  const { deps, evaluateRaw } = makeDeps()
+  evaluateRaw.mockResolvedValue(Err('x'.repeat(5_000)))
+  expect(await evaluateExpression(deps, { expression: 'a' })).toEqual({
+    ok: false,
+    error: 'x'.repeat(2_000) + '…',
   })
 })

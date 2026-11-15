@@ -27,6 +27,17 @@ too).
   A longer text is cut and ends with `…`; a failed preview is left out. Previews
   do not interrupt the execution context on timeout; `evaluate_expression` does
   (25 s budget, as `aiToolHandler.ts`).
+- **Nothing else limits the evaluations**: `queuedExecuteExpressionRaw` starts
+  each one at once, and main does not cap a tool's result. So `get_graph` runs
+  at most `GRAPH_PREVIEW_CONCURRENCY` (8) previews at a time and starts none
+  after `GRAPH_PREVIEW_DEADLINE_MS` (15 s from the first); the value nodes it
+  did not start are counted in the result's `previews_skipped` (present only
+  when non-zero). The clock is `GraphToolDeps.now`, injected in tests.
+- Every text that comes from an evaluation is bounded, through the one
+  `truncate` helper in `graphTools.ts`: `get_node`'s `error` to 20,000
+  characters; `evaluate_expression`'s result to `EVALUATE_RESULT_CHARS` (20,000)
+  followed by a line `… [truncated: <N> characters in total. …]`, and its error
+  text to `EVALUATE_ERROR_CHARS` (2,000) with `…`.
 - Expressions on a node run at the node's statement (`outerAst.externalId`),
   where its own binding is in scope; without a node, in the method body. A node
   id is the right-hand side's id, where the node's own name is still
