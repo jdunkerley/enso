@@ -38,6 +38,27 @@ describe('Guides', () => {
     ])
   })
 
+  test('does not offer the test and example libraries as guides', async () => {
+    const withTestLibraries = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-guides-tests-'))
+    try {
+      for (const name of ['Base', 'Database_Test_Suite', 'Test', 'Examples']) {
+        write(path.join(withTestLibraries, name, '0.0.0-dev', 'CLAUDE.md'), `# ${name} guide`)
+      }
+      const guides = new Guides(withTestLibraries)
+      expect(await topics(guides)).toEqual([
+        'overview',
+        'language',
+        'data-pitfalls',
+        'library/Base',
+      ])
+      expect(await guides.read('library/Test')).toBeUndefined()
+      expect(await guides.read('library/Examples')).toBeUndefined()
+      expect(await guides.read('library/Database_Test_Suite')).toBeUndefined()
+    } finally {
+      fs.rmSync(withTestLibraries, { recursive: true, force: true })
+    }
+  })
+
   test('lists only the built-in topics without a bundled standard library', async () => {
     expect(await topics(new Guides(undefined))).toEqual(['overview', 'language', 'data-pitfalls'])
   })

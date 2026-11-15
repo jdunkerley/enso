@@ -21,12 +21,26 @@ interface Pending {
   readonly timer: ReturnType<typeof setTimeout>
 }
 
+/**
+ * Whether a message from the window is a well-formed reply: a string `requestId` and a `result`
+ * that is `ok: true` with a string `value` or `ok: false` with a string `error`. Anything else is
+ * ignored; the call it might belong to times out.
+ */
+function isReply(reply: unknown): reply is McpToolCallReply {
+  if (typeof reply !== 'object' || reply == null) return false
+  const { requestId, result } = reply as { requestId?: unknown; result?: unknown }
+  if (typeof requestId !== 'string' || typeof result !== 'object' || result == null) return false
+  const { ok, value, error } = result as { ok?: unknown; value?: unknown; error?: unknown }
+  return (ok === true && typeof value === 'string') || (ok === false && typeof error === 'string')
+}
+
 /** Sends project tool calls to the IDE window over IPC and awaits the replies. */
 export class WindowBridge {
   private readonly pending = new Map<string, Pending>()
   /** Settles the pending call a window reply belongs to. */
-  private readonly replyListener = (_event: unknown, reply: McpToolCallReply) =>
-    this.handleReply(reply)
+  private readonly replyListener = (_event: unknown, reply: unknown) => {
+    if (isReply(reply)) this.handleReply(reply)
+  }
 
   /** `resolveWindow` is asked afresh on each call, so a reopened window is found. */
   constructor(

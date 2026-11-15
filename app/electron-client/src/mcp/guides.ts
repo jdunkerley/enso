@@ -15,6 +15,11 @@ export interface GuideTopic {
 
 const LIBRARY_PREFIX = 'library/'
 const LIBRARY_NAME = /^[A-Za-z0-9_]+$/
+/**
+ * Bundled libraries that are not offered as guides: they are the standard library's own test
+ * harness and example data, not libraries an agent should build a project on.
+ */
+const NOT_GUIDES: ReadonlySet<string> = new Set(['Database_Test_Suite', 'Test', 'Examples'])
 
 const BUILT_IN: readonly (GuideTopic & { readonly text: string })[] = [
   { topic: 'overview', title: 'How to work with an Enso project', text: overview },
@@ -44,7 +49,9 @@ export class Guides {
   constructor(private readonly stdlibRoot: string | undefined) {}
 
   private libraryGuide(name: string): string | undefined {
-    if (this.stdlibRoot == null || !LIBRARY_NAME.test(name)) return undefined
+    if (this.stdlibRoot == null || !LIBRARY_NAME.test(name) || NOT_GUIDES.has(name)) {
+      return undefined
+    }
     return path.join(this.stdlibRoot, name, '0.0.0-dev', 'CLAUDE.md')
   }
 

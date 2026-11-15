@@ -4,6 +4,13 @@ import { z } from 'zod'
 import type { ToolDefinition } from './toolRegistry'
 import type { WindowBridge } from './windowBridge'
 
+/** Most characters of a node id, a component name or a type name. */
+const NAME_CHARS = 200
+/** Most characters of a `search_components` query. */
+const QUERY_CHARS = 500
+/** Most characters of an expression to evaluate. */
+const EXPRESSION_CHARS = 100_000
+
 export const PROJECT_TOOL_NAMES = [
   'get_graph',
   'get_node',
@@ -44,7 +51,7 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'message of a panic and the number of warnings), a longer preview of its current ' +
         'value, and the text of its error when it evaluated to one. Use it when ' +
         '`get_graph` is too brief.',
-      inputSchema: { node_id: z.string() },
+      inputSchema: { node_id: z.string().max(NAME_CHARS) },
       run: forward('get_node'),
     },
     {
@@ -59,8 +66,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'its `signature` and a one-line `summary`, and `total`, the number of matches. Pass a ' +
         '`name` to `get_component_docs` for details.',
       inputSchema: {
-        query: z.string(),
-        self_type: z.string().optional(),
+        query: z.string().max(QUERY_CHARS),
+        self_type: z.string().max(NAME_CHARS).optional(),
         limit: z.number().int().min(1).max(50).optional(),
       },
       run: forward('search_components'),
@@ -72,7 +79,7 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'Read the documentation of one component: its signature, its arguments (type, ' +
         'default, whether optional, and the values offered for it), its return type and its ' +
         'description. `name` is a qualified name returned by `search_components`.',
-      inputSchema: { name: z.string() },
+      inputSchema: { name: z.string().max(NAME_CHARS) },
       run: forward('get_component_docs'),
     },
     {
@@ -89,7 +96,10 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         '`.catch_primitive (e -> e.to_display_text)` so the result is still Text. ' +
         'Returns the text the expression produced, or an error string if the scope is ' +
         'unavailable or evaluation fails. Runs in the Design environment: it cannot write files.',
-      inputSchema: { expression: z.string(), node_id: z.string().optional() },
+      inputSchema: {
+        expression: z.string().max(EXPRESSION_CHARS),
+        node_id: z.string().max(NAME_CHARS).optional(),
+      },
       run: forward('evaluate_expression'),
     },
   ]
