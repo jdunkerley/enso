@@ -108,3 +108,4 @@
 - Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Json.Viz_Json
 - Standard.Visualization.Viz_Tree.Viz_Tree.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Tree.Viz_Tree
 - Standard.Visualization.Id.Id.from that:Standard.Table.Table.Table -> Standard.Visualization.Id.Id
+- Standard.Visualization.Viz_Actions.Viz_Actions.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Actions.Viz_Actions
