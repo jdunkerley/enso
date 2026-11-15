@@ -107,6 +107,11 @@ export function useProjectMcpTools(
             project.queuedExecuteExpressionRaw(scope, text, EVALUATE_TIMEOUT_MS, () => {
               void project.lsRpcConnection.interruptExecutionContext(project.executionContext.id)
             }),
+          // The mode, and the context's environment too: the watch in `project.ts` that moves the
+          // environment after the mode runs later, so for a moment the two can differ.
+          isLive: () =>
+            project.executionMode === 'live' ||
+            project.executionContext.executionEnvironment === 'Live',
         },
         node_id != null ? { expression, node_id } : { expression },
       )

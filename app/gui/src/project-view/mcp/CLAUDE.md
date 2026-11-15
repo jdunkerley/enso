@@ -38,6 +38,12 @@ too).
   characters; `evaluate_expression`'s result to `EVALUATE_RESULT_CHARS` (20,000)
   followed by a line `… [truncated: <N> characters in total. …]`, and its error
   text to `EVALUATE_ERROR_CHARS` (2,000) with `…`.
+- `evaluate_expression` is refused while the project is in Live mode
+  (`LIVE_MODE_ERROR`), before anything is evaluated: an evaluation runs in the
+  execution context's environment, and in Live an expression's writes are real.
+  `useProjectMcpTools` reads the mode (and the context's environment) at call
+  time. The `get_graph` and `get_node` previews still run in Live: they are
+  fixed expressions (`to_display_text`, `to_text`, `catch_primitive`).
 - Expressions on a node run at the node's statement (`outerAst.externalId`),
   where its own binding is in scope; without a node, in the method body. A node
   id is the right-hand side's id, where the node's own name is still

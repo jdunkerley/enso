@@ -9,7 +9,7 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
-import { EVALUATE_RESULT_CHARS, evaluateExpression } from '../evaluate'
+import { EVALUATE_RESULT_CHARS, LIVE_MODE_ERROR, evaluateExpression } from '../evaluate'
 
 const CODE = `main =
     a = 1 + 2
@@ -31,8 +31,10 @@ function makeDeps() {
   const evaluateRaw = vi.fn<
     (scope: ExternalId, expression: string) => Promise<Result<string> | null>
   >(async () => Ok('3'))
+  const isLive = vi.fn(() => false)
   return {
-    deps: { db, currentMethod: { ast: Ok(func), pointer: Ok(pointer) }, evaluateRaw },
+    deps: { db, currentMethod: { ast: Ok(func), pointer: Ok(pointer) }, evaluateRaw, isLive },
+    isLive,
     db,
     func,
     evaluateRaw,
@@ -111,4 +113,31 @@ test('A long error is cut to 2,000 characters', async () => {
     ok: false,
     error: 'x'.repeat(2_000) + '…',
   })
+})
+
+test('In Live mode the expression is refused before anything is evaluated', async () => {
+  const { deps, evaluateRaw, isLive } = makeDeps()
+  isLive.mockReturnValue(true)
+  expect(await evaluateExpression(deps, { expression: '"x".write "out.txt"' })).toEqual({
+    ok: false,
+    error:
+      'The project is in Live mode, and evaluate_expression runs only in Design. ' +
+      'Ask the user to switch the project back to Design.',
+  })
+  expect(LIVE_MODE_ERROR).toBe(
+    'The project is in Live mode, and evaluate_expression runs only in Design. Ask the user to switch the project back to Design.',
+  )
+  expect(evaluateRaw).not.toHaveBeenCalled()
+})
+
+test('The mode is read at call time: in Design the same expression runs', async () => {
+  const { deps, evaluateRaw, isLive } = makeDeps()
+  isLive.mockReturnValueOnce(true)
+  assert(!(await evaluateExpression(deps, { expression: 'a.to_text' })).ok)
+  expect(await evaluateExpression(deps, { expression: 'a.to_text' })).toEqual({
+    ok: true,
+    value: '3',
+  })
+  expect(evaluateRaw).toHaveBeenCalledOnce()
+  expect(isLive).toHaveBeenCalledTimes(2)
 })
