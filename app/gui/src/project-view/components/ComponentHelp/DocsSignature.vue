@@ -34,8 +34,11 @@ const emit = defineEmits<{ 'update:expanded': [value: boolean] }>()
         class="toggle"
         :aria-expanded="expanded"
         @click="emit('update:expanded', !expanded)"
-        v-text="expanded ? '▾ hide' : '▸ details'"
-      />
+      >
+        <span aria-hidden="true" v-text="expanded ? '▾ ' : '▸ '" />{{
+          expanded ? 'hide' : 'details'
+        }}
+      </button>
     </div>
     <div v-if="expanded" class="rows">
       <div v-for="param in signature.params" :key="param.name" class="row">

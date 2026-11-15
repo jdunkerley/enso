@@ -9,6 +9,7 @@ import DocsHeader from '@/components/ComponentHelp/DocsHeader.vue'
 import DocsList from '@/components/ComponentHelp/DocsList.vue'
 import DocsSignature from '@/components/ComponentHelp/DocsSignature.vue'
 import DocsSiteLink from '@/components/ComponentHelp/DocsSiteLink.vue'
+import { useHelpArgumentsExpanded } from '@/components/ComponentHelp/expanded'
 import { HistoryStack } from '@/components/ComponentHelp/history'
 import type { Docs, FunctionDocs, TypeDocs } from '@/components/ComponentHelp/ir'
 import { lookupDocumentation, placeholder } from '@/components/ComponentHelp/ir'
@@ -20,7 +21,6 @@ import { clipboardNodeData, writeClipboard } from '@/components/GraphEditor/grap
 import { exampleDecoratorExt } from '@/components/MarkdownEditor/codemirror/decoration/examples'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { groupColorStyle } from '@/composables/nodeColors'
-import { useSettings } from '@/stores/settings'
 import { tryGetIndex } from '@/util/data/array'
 import type { Opt } from '@/util/data/opt'
 import type { Icon as IconName } from '@/util/iconMetadata/iconName'
@@ -43,11 +43,7 @@ const documentation = computed<Docs>(() => {
     : placeholder('No suggestion selected.')
 })
 
-const settings = useSettings()
-const expanded = computed({
-  get: () => settings.user.value.expandHelpArguments,
-  set: (value) => (settings.user.value = { ...settings.user.value, expandHelpArguments: value }),
-})
+const expanded = useHelpArgumentsExpanded()
 
 /** The editor's text and the collapsed Remarks, the Arguments section dropped when the node shows it all. */
 const text = computed(() => {

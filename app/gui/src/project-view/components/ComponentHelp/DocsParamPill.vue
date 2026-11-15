@@ -12,6 +12,7 @@ import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 const { param } = defineProps<{ param: DocArgument }>()
 
 const id = useId()
+const descriptionId = `${id}-description`
 const wrapper = ref<HTMLElement>()
 const button = ref<HTMLElement>()
 const tooltip = ref<HTMLElement>()
@@ -97,13 +98,18 @@ function onClick() {
       type="button"
       class="param"
       :class="{ optional: param.optional }"
-      :aria-describedby="id"
+      :aria-describedby="descriptionId"
       @focus="((dismissed = false), (focused = true))"
       @blur="focused = false"
       @pointerdown="openAtPointerDown = open"
       @click="onClick"
       v-text="param.name"
     />
+    <span :id="descriptionId" class="visuallyHidden">
+      {{ param.type }}<template v-if="param.default != null">, default {{ param.default }}</template
+      >, {{ WIDGET_LABELS[param.widget] }}.
+      <template v-if="param.description">{{ param.description }}</template>
+    </span>
     <Teleport to="body">
       <div
         v-if="open"
@@ -131,6 +137,15 @@ function onClick() {
 </template>
 
 <style scoped>
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .param {
   padding: 0 2px 0 4px;
   margin: 0 0 0 4px;

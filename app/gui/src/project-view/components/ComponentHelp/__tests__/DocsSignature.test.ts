@@ -119,3 +119,23 @@ test('a press on the tooltip does not unpin it; a press elsewhere does', async (
   expect(tooltipEl()).toBeNull()
   w.unmount()
 })
+
+test('a closed pill is described by an always-present element with its type', () => {
+  const w = mountIt(false)
+  const pill = w.findAll('.param')[1]!
+  const described = document.getElementById(pill.attributes('aria-describedby')!)
+  expect(described?.textContent).toContain('Boolean')
+  expect(described?.textContent).toContain('False')
+  expect(described?.textContent).toContain('Count it too.')
+  expect(tooltipEl()).toBeNull()
+  w.unmount()
+})
+
+test("the toggle's accessible name leaves out its glyph", () => {
+  const w = mountIt(false)
+  const toggle = w.find('.toggle')
+  const glyph = toggle.find('[aria-hidden="true"]')
+  expect(glyph.exists()).toBe(true)
+  expect(toggle.text().replace(glyph.text(), '').trim()).toBe('details')
+  w.unmount()
+})

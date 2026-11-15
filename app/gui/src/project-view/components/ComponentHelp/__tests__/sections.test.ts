@@ -99,3 +99,7 @@ test('panelText keeps the Arguments section when a bullet matches no argument', 
 test('panelText without sections returns the text unchanged', () => {
   expect(panelText('Just text.', [])).toEqual({ main: 'Just text.', remarks: '' })
 })
+
+test('panelText gives an empty body to a section whose heading is the last line', () => {
+  expect(panelText('Text.\n\n## Remarks', [])).toEqual({ main: 'Text.', remarks: '' })
+})

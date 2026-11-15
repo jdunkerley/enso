@@ -111,7 +111,7 @@ export function panelText(
   // From the end, so that earlier offsets stay valid as later sections are cut.
   for (const range of sectionRanges(prerendered).reverse()) {
     const sectionText = prerendered.slice(range.from, range.to)
-    const bodyText = sectionText.slice(sectionText.indexOf('\n') + 1).trim()
+    const bodyText = sectionText.slice(sectionText.indexOf('\n') + 1 || sectionText.length).trim()
     if (range.heading === 'Remarks') {
       remarks = bodyText
       main = main.slice(0, range.from) + main.slice(range.to)

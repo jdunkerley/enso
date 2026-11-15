@@ -6,13 +6,10 @@ import { ref } from 'vue'
 export interface UserSettings {
   /** Whether to show Help panel when Component Browser is opened or not. */
   showHelpForCB: boolean
-  /** Whether the help panel shows a function's node expanded, one row per argument. */
-  expandHelpArguments: boolean
 }
 
 const defaultUserSettings = {
   showHelpForCB: true,
-  expandHelpArguments: false,
 }
 
 export const [provideSettings, useSettings] = createContextStore('settings', () => {
