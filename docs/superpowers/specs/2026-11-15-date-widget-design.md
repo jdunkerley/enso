@@ -42,10 +42,26 @@ We can then use that more widely."
   that annotation).
 - **Undo.** One choice is one undo step.
 
+## Time_Of_Day (same PR, after the date chip)
+
+The owner, 2026-11-15: `to_date_time`'s `time_of_day` "should have a time
+picker", done "similarly for Time_Of_Day — I don't think it needs as many
+prebuilt special cases".
+
+- **Where it appears.** The same rule keyed to
+  `Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day`: every argument of that
+  type, and the expressions it writes, wherever they appear.
+- **Shapes.** `Time_Of_Day.now` (label `Now`) and
+  `Time_Of_Day.new <h> [<m> [<s>]]` with integer literals (label `14:30`, or
+  `14:30:15` when seconds are set; `Time_Of_Day.new` alone is `00:00`).
+- **The menu** has one shortcut, `Now`, then a time field (hours and minutes,
+  seconds optional), keyboard-editable like the dashboard's date segments.
+  Setting the field writes `Time_Of_Day.new 14 30`, adding seconds only when
+  they are not zero.
+
 ## Out of scope (follow-up tickets)
 
-- `Date_Time` and `Time_Of_Day` pickers (the "more widely" part): the same
-  pattern with a time field; separate tickets.
+- A `Date_Time` picker (the date chip and the time field together).
 - Replacing `Date.default_widget` (`<Fixed Date>` / `<Today>`) in the library:
   only `Standard.Google` uses it; the Date PR or a follow-up switches it.
 - The numeric widget's barely visible slider (the assessment's `month` note).
