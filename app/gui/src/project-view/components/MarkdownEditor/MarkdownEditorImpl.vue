@@ -346,6 +346,29 @@ defineExpose({
   filter: invert(90%) hue-rotate(180deg) brightness(1.2);
 }
 
+:global(.cm-line.cm-codeBlock-first) {
+  position: relative;
+}
+:global(.cm-exampleCopy) {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  padding: 1px 8px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+  font: 11px var(--font-sans, system-ui);
+  cursor: pointer;
+}
+:global(.cm-exampleCopy:hover) {
+  background: rgb(255 255 255 / 0.2);
+}
+:global(.cm-exampleResult) {
+  color: #676e95;
+  font-style: italic;
+}
+
 /* A table's own width must not widen the editor: it scrolls inside its share of the width. */
 :global(.cm-table-editor) {
   contain: inline-size;
