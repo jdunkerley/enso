@@ -268,7 +268,7 @@ describe('McpSettingsSection', () => {
     await user.type(portInput(), '40000')
     await user.click(button(getText('save')))
     await flushPromises()
-    expect(document.body.textContent?.split('Port refused')).toHaveLength(2)
+    expect(document.body.textContent.split('Port refused')).toHaveLength(2)
     expect(fake.show).not.toHaveBeenCalled()
   })
 
