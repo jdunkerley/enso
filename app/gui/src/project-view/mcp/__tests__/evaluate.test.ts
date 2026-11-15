@@ -10,11 +10,20 @@ import { describe, expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { EVALUATE_RESULT_CHARS, LIVE_MODE_ERROR, evaluateExpression } from '../evaluate'
-import { BUILTIN_REFUSED_ERROR, REFLECTION_REFUSED_ERROR, WRITE_REFUSED_ERROR } from '../writeGuard'
+import {
+  BUILTIN_REFUSED_ERROR,
+  EVAL_REFUSED_ERROR,
+  NAME_LOOKUP_REFUSED_ERROR,
+  REFLECTION_REFUSED_ERROR,
+  WRITE_REFUSED_ERROR,
+} from '../writeGuard'
 import {
   BUILTIN_STATEMENTS,
   ENABLING_EXPRESSIONS,
+  EVAL_EXPRESSIONS,
+  EVAL_TWO_STATEMENTS,
   HARMLESS_EXPRESSIONS,
+  NAME_LOOKUP_EXPRESSIONS,
   REFLECTION_EXPRESSIONS,
   REFLECTION_TWO_STATEMENTS,
 } from './outputEnablingCode'
@@ -178,6 +187,34 @@ describe('code that turns the output context on', () => {
       expect(await evaluateExpression(deps, { expression: code })).toEqual({
         ok: false,
         error: REFLECTION_REFUSED_ERROR,
+      })
+      expect(evaluateRaw).not.toHaveBeenCalled()
+    },
+  )
+
+  test.each([
+    ...EVAL_EXPRESSIONS,
+    `(${EVAL_EXPRESSIONS[0]}).to_text`,
+    EVAL_TWO_STATEMENTS.join('\n'),
+  ])(
+    'code that evaluates text as code is refused before anything is evaluated: %s',
+    async (code) => {
+      const { deps, evaluateRaw } = makeDeps()
+      expect(await evaluateExpression(deps, { expression: code })).toEqual({
+        ok: false,
+        error: EVAL_REFUSED_ERROR,
+      })
+      expect(evaluateRaw).not.toHaveBeenCalled()
+    },
+  )
+
+  test.each(NAME_LOOKUP_EXPRESSIONS)(
+    'a method looked up by a name in text is refused before anything is evaluated: %s',
+    async (code) => {
+      const { deps, evaluateRaw } = makeDeps()
+      expect(await evaluateExpression(deps, { expression: code })).toEqual({
+        ok: false,
+        error: NAME_LOOKUP_REFUSED_ERROR,
       })
       expect(evaluateRaw).not.toHaveBeenCalled()
     },

@@ -45,6 +45,35 @@ export const OUTPUT_ENABLING_IDENTIFIERS: ReadonlySet<string> = new Set([
  */
 export const REFLECTION_IDENTIFIERS: ReadonlySet<string> = new Set(['meta'])
 
+/**
+ * The identifiers through which Enso code can evaluate Text as Enso code, so that the enabling
+ * names appear only inside a Text (`Debug.eval ("…with_" + "enabled_context … <| …")`):
+ * - `eval`: `Debug.eval expression:Text = @Builtin_Method "Debug.eval"`
+ *   (`distribution/lib/Standard/Base/0.0.0-dev/src/Runtime/Debug.enso:45`), which evaluates the
+ *   Text in the caller's frame. It is the only public function in `Standard.Base` that compiles
+ *   Text as Enso code.
+ *
+ * `Debug.breakpoint` (`Runtime/Debug.enso:22`) is allowed: it opens the engine's debugger REPL,
+ * which reads from the user's terminal, not from the code.
+ */
+export const EVAL_IDENTIFIERS: ReadonlySet<string> = new Set(['eval'])
+
+/**
+ * The identifiers through which Enso code can look a method up by a Text name through polyglot
+ * interop, which Enso values answer (`Atom.java` and `Type.java` in `engine/runtime` export
+ * `readMember` and `invokeMember` for their methods), from
+ * `distribution/lib/Standard/Base/0.0.0-dev/src/Polyglot.enso`:
+ * - `get_member`: `Polyglot.get_member object member_name:Text` (`:68`). Of `Context.Output` and
+ *   `"with_" + "enabled"` it gives the method with `self` applied; calling that keeps its action
+ *   lazy, so the action runs with output.
+ * - `invoke`: `Polyglot.invoke target name:Text arguments` (`:114`), the same lookup, called at
+ *   once with the arguments already evaluated.
+ *
+ * The rest of `Polyglot` (`execute`, `new`, `get_members`, `lookup_class`, …) names no Enso method
+ * by Text and stays allowed; Java interop is not covered by this guard at all.
+ */
+export const NAME_LOOKUP_IDENTIFIERS: ReadonlySet<string> = new Set(['get_member', 'invoke'])
+
 /** The annotation that binds a function to one of the runtime's builtins. */
 const BUILTIN_ANNOTATION = 'Builtin_Method'
 
@@ -55,6 +84,14 @@ export const WRITE_REFUSED_ERROR =
 /** The answer to every tool given code that looks a method up by reflection. */
 export const REFLECTION_REFUSED_ERROR =
   'Code that looks a method up by reflection (Meta.meta) is refused. Only the user can turn Write on, by clicking it on a node.'
+
+/** The answer to every tool given code that evaluates Text as code. */
+export const EVAL_REFUSED_ERROR =
+  'Code that evaluates text as code (Debug.eval) is refused. Only the user can turn Write on, by clicking it on a node.'
+
+/** The answer to every tool given code that looks a method up by a name in Text. */
+export const NAME_LOOKUP_REFUSED_ERROR =
+  'Code that looks a method up by a name in text (Polyglot.get_member, Polyglot.invoke) is refused. Only the user can turn Write on, by clicking it on a node.'
 
 /**
  * The answer to every tool given code that binds a runtime builtin: `f c e ~a = @Builtin_Method
@@ -69,6 +106,8 @@ export const BUILTIN_REFUSED_ERROR =
  * text interpolation):
  * - an identifier token in {@link OUTPUT_ENABLING_IDENTIFIERS} ({@link WRITE_REFUSED_ERROR});
  * - an identifier token in {@link REFLECTION_IDENTIFIERS} ({@link REFLECTION_REFUSED_ERROR});
+ * - an identifier token in {@link EVAL_IDENTIFIERS} ({@link EVAL_REFUSED_ERROR});
+ * - an identifier token in {@link NAME_LOOKUP_IDENTIFIERS} ({@link NAME_LOOKUP_REFUSED_ERROR});
  * - an `@Builtin_Method` annotation: the parser's annotation operator token followed by that
  *   identifier ({@link BUILTIN_REFUSED_ERROR}).
  *
@@ -87,6 +126,8 @@ export function writeRefusal(ast: Ast.Ast): string | undefined {
         const name = child.code()
         if (OUTPUT_ENABLING_IDENTIFIERS.has(name)) refusal ??= WRITE_REFUSED_ERROR
         else if (REFLECTION_IDENTIFIERS.has(name)) refusal ??= REFLECTION_REFUSED_ERROR
+        else if (EVAL_IDENTIFIERS.has(name)) refusal ??= EVAL_REFUSED_ERROR
+        else if (NAME_LOOKUP_IDENTIFIERS.has(name)) refusal ??= NAME_LOOKUP_REFUSED_ERROR
         else if (name === BUILTIN_ANNOTATION && previous?.typeName === 'AnnotationOperator') {
           refusal ??= BUILTIN_REFUSED_ERROR
         }

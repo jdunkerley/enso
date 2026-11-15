@@ -76,6 +76,42 @@ export const BUILTIN_STATEMENTS = [
   '@Builtin_Method "Runtime.with_context_builtin"',
 ] as const
 
+/** Code for `Debug.eval` that switches Write on and writes `x.txt`, with no refused name in it. */
+const EVAL_SOURCE =
+  '("Standard.Base.Runtime.with_" + "enabled_context Standard.Base.Runtime.Context.Output <| \'x\'.write \'x.txt\'")'
+
+/**
+ * Expressions that evaluate Text as Enso code with `Debug.eval` (the third route review found: the
+ * first one wrote its file in the packaged app, through `evaluate_expression` and `add_nodes`).
+ */
+export const EVAL_EXPRESSIONS = [
+  `Standard.Base.Runtime.Debug.eval ${EVAL_SOURCE}`,
+  `Debug.eval ${EVAL_SOURCE}`,
+  // The enabling names in plain text: Text is not code to the guard.
+  `Runtime.Debug.eval "Standard.Base.Runtime.Context.Output.with_enabled <| 'x'.write 'x.txt'"`,
+  // After `from Standard.Base.Runtime.Debug import eval`.
+  `eval ${EVAL_SOURCE}`,
+] as const
+
+/** `Debug.eval` bound to a name, then applied. The first statement is refused. */
+export const EVAL_TWO_STATEMENTS = [
+  'e = Standard.Base.Runtime.Debug.eval',
+  `r = e ${EVAL_SOURCE}`,
+] as const
+
+/** The import that brings `Debug.eval` in under a plain name. */
+export const EVAL_IMPORT = 'from Standard.Base.Runtime.Debug import eval'
+
+/**
+ * Expressions that look a method up by a Text name through polyglot interop, which Enso values
+ * answer: the first wrote its file in the packaged app (`Polyglot.get_member` gives the method with
+ * `self` applied, and calling it keeps the action lazy).
+ */
+export const NAME_LOOKUP_EXPRESSIONS = [
+  '(Polyglot.get_member Standard.Base.Runtime.Context.Output ("with_" + "enabled")) ("x".write "x.txt")',
+  'Polyglot.invoke Standard.Base.Runtime.Context.Output ("with_" + "enabled") ["x"]',
+] as const
+
 /** Expressions that mention similar names but do not turn the output context on. */
 export const HARMLESS_EXPRESSIONS = [
   'with_disabled_context Context.Output <| "x".write "x.txt"',
@@ -90,4 +126,8 @@ export const HARMLESS_EXPRESSIONS = [
   'Meta.is_a 1 Integer',
   // A Text that mentions the annotation is not one.
   '"@Builtin_Method"',
+  // A Text with the word eval, and identifiers that only contain it: whole identifiers count.
+  '"eval this: Debug.eval"',
+  'evaluate_total + retrieval',
+  'Polyglot.get_members 1',
 ] as const

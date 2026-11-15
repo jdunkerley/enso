@@ -2,6 +2,8 @@ import { Ast } from '@/util/ast'
 import type { Result } from 'enso-common/src/utilities/data/result'
 import { expect, test } from 'vitest'
 import { addImportLines, parseImportLines } from '../importLines'
+import { EVAL_REFUSED_ERROR } from '../writeGuard'
+import { EVAL_IMPORT } from './outputEnablingCode'
 
 function errorOf(result: Result<unknown>): string {
   if (result.ok) throw new Error('expected Err')
@@ -33,6 +35,12 @@ test('A line that is not an import is refused, naming it', () => {
   const result = parseImportLines(['import Standard.Base', 'x = 1'])
   expect(errorOf(result)).toBe(
     'Not an import line: `x = 1`. Pass whole import lines, such as `from Standard.Table import all`.',
+  )
+})
+
+test('An import of Debug.eval is refused', () => {
+  expect(errorOf(parseImportLines(['from Standard.Table import all', EVAL_IMPORT]))).toBe(
+    EVAL_REFUSED_ERROR,
   )
 })
 

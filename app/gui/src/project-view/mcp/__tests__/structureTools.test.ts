@@ -24,12 +24,20 @@ import {
   parseFunctionDefinition,
   type StructureToolDeps,
 } from '../structureTools'
-import { BUILTIN_REFUSED_ERROR, REFLECTION_REFUSED_ERROR, WRITE_REFUSED_ERROR } from '../writeGuard'
+import {
+  BUILTIN_REFUSED_ERROR,
+  EVAL_REFUSED_ERROR,
+  NAME_LOOKUP_REFUSED_ERROR,
+  REFLECTION_REFUSED_ERROR,
+  WRITE_REFUSED_ERROR,
+} from '../writeGuard'
 import {
   BUILTIN_FUNCTION,
   ENABLING_EXPRESSIONS,
   ENABLING_FUNCTION,
+  EVAL_EXPRESSIONS,
   HARMLESS_EXPRESSIONS,
+  NAME_LOOKUP_EXPRESSIONS,
   REFLECTION_EXPRESSIONS,
   WRITE_PREFIX,
 } from './outputEnablingCode'
@@ -370,6 +378,29 @@ test('parseFunctionDefinition refuses a body that builds a method name by reflec
       REFLECTION_REFUSED_ERROR,
     )
   }
+})
+
+test('parseFunctionDefinition refuses a body that evaluates text as code', () => {
+  for (const expression of EVAL_EXPRESSIONS) {
+    expect(errorOf(parseFunctionDefinition(`f x = ${expression}`)), expression).toBe(
+      EVAL_REFUSED_ERROR,
+    )
+  }
+  for (const expression of NAME_LOOKUP_EXPRESSIONS) {
+    expect(errorOf(parseFunctionDefinition(`f x = ${expression}`)), expression).toBe(
+      NAME_LOOKUP_REFUSED_ERROR,
+    )
+  }
+})
+
+test('add_function refuses a body that evaluates text as code, before the session', async () => {
+  const { deps, topLevel, session } = makeDeps()
+  const before = topLevel.code()
+  expect(toolError(await addFunction(deps, { source: `f x = ${EVAL_EXPRESSIONS[0]}` }))).toBe(
+    EVAL_REFUSED_ERROR,
+  )
+  expect(session.run).not.toHaveBeenCalled()
+  expect(topLevel.code()).toBe(before)
 })
 
 test("collapse_nodes and add_function pass the call's deadline to the session", async () => {

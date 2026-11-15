@@ -27,12 +27,22 @@ import {
   type EditToolDeps,
 } from '../editTools'
 import type { AffectedExpressions } from '../projectEvents'
-import { BUILTIN_REFUSED_ERROR, REFLECTION_REFUSED_ERROR, WRITE_REFUSED_ERROR } from '../writeGuard'
+import {
+  BUILTIN_REFUSED_ERROR,
+  EVAL_REFUSED_ERROR,
+  NAME_LOOKUP_REFUSED_ERROR,
+  REFLECTION_REFUSED_ERROR,
+  WRITE_REFUSED_ERROR,
+} from '../writeGuard'
 import {
   BUILTIN_STATEMENTS,
   ENABLING_EXPRESSIONS,
   ENABLING_IMPORTS,
+  EVAL_EXPRESSIONS,
+  EVAL_IMPORT,
+  EVAL_TWO_STATEMENTS,
   HARMLESS_EXPRESSIONS,
+  NAME_LOOKUP_EXPRESSIONS,
   REFLECTION_EXPRESSIONS,
   REFLECTION_IMPORT,
   REFLECTION_TWO_STATEMENTS,
@@ -530,6 +540,36 @@ test('add_nodes refuses a renamed symbol bound in one statement and applied in t
   const { deps, createNodes } = makeDeps()
   const result = await addNodes(deps, { statements: [...REFLECTION_TWO_STATEMENTS] })
   expect(toolError(result)).toBe(`Statement 1: ${REFLECTION_REFUSED_ERROR}`)
+  expect(createNodes).not.toHaveBeenCalled()
+})
+
+test('parseNodeStatement and parseNodeExpression refuse code that evaluates text as code', () => {
+  for (const expression of EVAL_EXPRESSIONS) {
+    expect(errorOf(parseNodeStatement(`x = ${expression}`)), expression).toBe(EVAL_REFUSED_ERROR)
+    expect(errorOf(parseNodeExpression(expression)), expression).toBe(EVAL_REFUSED_ERROR)
+  }
+})
+
+test('parseNodeStatement and parseNodeExpression refuse a method looked up by a name in text', () => {
+  for (const expression of NAME_LOOKUP_EXPRESSIONS) {
+    expect(errorOf(parseNodeStatement(`x = ${expression}`)), expression).toBe(
+      NAME_LOOKUP_REFUSED_ERROR,
+    )
+    expect(errorOf(parseNodeExpression(expression)), expression).toBe(NAME_LOOKUP_REFUSED_ERROR)
+  }
+})
+
+test('add_nodes refuses Debug.eval bound in one statement and applied in the next', async () => {
+  const { deps, createNodes } = makeDeps()
+  const result = await addNodes(deps, { statements: [...EVAL_TWO_STATEMENTS] })
+  expect(toolError(result)).toBe(`Statement 1: ${EVAL_REFUSED_ERROR}`)
+  expect(createNodes).not.toHaveBeenCalled()
+})
+
+test('add_nodes refuses an import of Debug.eval under a plain name', async () => {
+  const { deps, createNodes } = makeDeps()
+  const result = await addNodes(deps, { statements: ['c = 1'], imports: [EVAL_IMPORT] })
+  expect(toolError(result)).toBe(EVAL_REFUSED_ERROR)
   expect(createNodes).not.toHaveBeenCalled()
 })
 

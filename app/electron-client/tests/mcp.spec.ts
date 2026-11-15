@@ -199,6 +199,11 @@ const WRITE_REFUSED = 'Only the user can turn Write on.'
 const REFLECTION_REFUSED = 'Code that looks a method up by reflection (Meta.meta) is refused.'
 /** The refusal of code that binds a runtime builtin. */
 const BUILTIN_REFUSED = 'Code that binds a runtime builtin (@Builtin_Method) is refused.'
+/** The start of the refusal of code that evaluates text as code. */
+const EVAL_REFUSED = 'Code that evaluates text as code (Debug.eval) is refused.'
+/** The start of the refusal of code that looks a method up by a name in text. */
+const NAME_LOOKUP_REFUSED =
+  'Code that looks a method up by a name in text (Polyglot.get_member, Polyglot.invoke) is refused.'
 
 /** The states of a node that is neither an error nor a panic. */
 const NOT_FAILED = ['value', 'pending', 'unknown']
@@ -311,8 +316,9 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     expect(totalPreview).toContain('6')
 
     // Code that turns Write on by the routes the guard knows (the Write prefix, `with_enabled_context`
-    // / `with_enabled` anywhere, reflection, a runtime builtin) is refused by every tool that takes
-    // code, and the file it names is not written.
+    // / `with_enabled` anywhere, reflection, a runtime builtin, text evaluated as code, a method
+    // looked up by a name in text) is refused by every tool that takes code, and the file it names
+    // is not written.
     const writeTarget = path.join(os.tmpdir(), `enso-mcp-write-prefix-${Date.now()}.txt`)
     const writeTargetEnso = writeTarget.replace(/\\/g, '/')
     await fs.rm(writeTarget, { force: true })
@@ -354,12 +360,35 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
       })
       note('add_function bound to a runtime builtin', builtinAdded)
       expect(builtinAdded).toBe(BUILTIN_REFUSED)
+      // Two more that a later review found, both of which wrote the file before they were refused:
+      // text evaluated as code, with the enabling names only inside the text, and the enabling
+      // method looked up by a name in text through polyglot interop.
+      const evaluated = `Standard.Base.Runtime.Debug.eval ("Standard.Base.Runtime.with_" + "enabled_context Standard.Base.Runtime.Context.Output <| 'x'.write '${writeTargetEnso}'")`
+      const evalEvaluated = await callError('evaluate_expression', {
+        expression: `(${evaluated}).to_text`,
+      })
+      note('evaluate_expression with Debug.eval', evalEvaluated)
+      expect(evalEvaluated).toContain(EVAL_REFUSED)
+      const evalAdded = await callError('add_nodes', { statements: [`d = ${evaluated}`] })
+      note('add_nodes with Debug.eval', evalAdded)
+      expect(evalAdded).toContain(EVAL_REFUSED)
+      const lookup = `(Polyglot.get_member Standard.Base.Runtime.Context.Output ("with_" + "enabled")) ("x".write "${writeTargetEnso}")`
+      const lookupEvaluated = await callError('evaluate_expression', {
+        expression: `(${lookup}).to_text`,
+      })
+      note('evaluate_expression with Polyglot.get_member', lookupEvaluated)
+      expect(lookupEvaluated).toContain(NAME_LOOKUP_REFUSED)
+      const lookupAdded = await callError('add_nodes', { statements: [`g = ${lookup}`] })
+      note('add_nodes with Polyglot.get_member', lookupAdded)
+      expect(lookupAdded).toContain(NAME_LOOKUP_REFUSED)
       // Give a write that the engine might finish late a moment to land.
       await page.waitForTimeout(2_000)
       expect(existsSync(writeTarget), `${writeTarget} must not exist`).toBe(false)
       const afterRefusals = await getGraph()
       expect(names(afterRefusals)).not.toContain('w')
       expect(names(afterRefusals)).not.toContain('r')
+      expect(names(afterRefusals)).not.toContain('d')
+      expect(names(afterRefusals)).not.toContain('g')
       expect(afterRefusals.source).not.toContain('Builtin_Method')
     } finally {
       await fs.rm(writeTarget, { force: true })
