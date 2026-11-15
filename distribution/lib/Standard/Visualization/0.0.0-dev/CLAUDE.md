@@ -46,7 +46,11 @@ components and workflows should not.
 - `src/Helpers.enso` — display utilities (truncation, formatting, timing).
 - `src/Internal/Columns_Source.enso`, `src/Internal/View_Source.enso`,
   `src/Internal/Names.enso`, `src/Internal/View_Json.enso` — the in-memory
-  sources, name matching and view JSON behind `Viz_Table`.
+  sources, name matching and view JSON behind `Viz_Table`. `View_Json` writes
+  every table view (`grid_json`, `value_json`, `error_json`), and holds the
+  views of the built-in values: `vector_view` (also arrays), `dictionary_view`,
+  `hashset_view`, `js_object_view` and `value_view` (any other value). Libraries
+  write their own with `Viz_Table.from_columns` or `from_view`.
 - `src/Geo_Map.enso`, `src/Scatter_Plot.enso` — per-visualization preprocessors.
 - `src/Table/Visualization.enso` — IDE entry points of the table view
   (`prepare_visualization`, `get_rows_for_table`,

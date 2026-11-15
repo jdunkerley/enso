@@ -31,7 +31,7 @@ type Viz_Table
     ## ---
        private: true
        ---
-       In-memory columns, shown as a `Generic_Grid`.
+       In-memory columns, shown as a grid of those columns.
     from_columns (headers : Vector Viz_Header) (columns : Vector Vector) -> Viz_Table =
         Viz_Table.Value (Columns_Source.Value headers columns)
 
@@ -172,7 +172,11 @@ type Viz_Header
     ## ---
        private: true
        ---
-       Column whose cells create child nodes with `action`.
+       Column whose cells create child nodes with `action`, a full link
+       template: `{{#field}}` is the row's value of `field` (a number when it
+       reads as one), `{{@field}}` the value as it is, `{{#index}}` the row
+       number (for example `query {{@Table}}`). The IDE sends it as it is, and
+       does not complete a bare action.
     Link name tooltip action
 
     ## ---

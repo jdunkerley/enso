@@ -18,8 +18,8 @@ max_columns = 250
    has one column per item (at most `max_columns`), a vector of records one
    per field, any other vector one `Value` column. Shows at most `max_rows`
    rows.
-vector_view (vector : Vector) (max_rows : Integer) -> Text =
-    shown = vector.length.min max_rows
+vector_view (vector : Vector) (max_rows : Integer) -> Text = Warning.clear <|
+    shown = vector.length.min max_rows . max 0
     some_values = (0.up_to shown).any (i-> Nothing != vector.at i)
     if some_values.not then _values_view vector shown else
         if (0.up_to shown).all (i-> _is_matrix_row (vector.at i)) then _matrix_view vector shown else
@@ -112,9 +112,10 @@ private _record_view (rows : Vector) (row_count : Integer) -> Text =
    IDE has always shown them (`JSON.parse` puts integer-like names first, in
    ascending order), a name not seen before appended.
 private _record_columns (rows : Vector) -> Vector Text =
-    rows.fold [] seen-> r-> if r.is_nothing then seen else
-        fresh = (_browser_order r.names).filter (n-> (seen.contains n).not)
-        if fresh.is_empty then seen else seen + fresh
+    names = Vector.build builder->
+        rows.each r-> if r.is_nothing.not then
+            (_browser_order r.names).each n-> builder.append n
+    names.distinct
 
 private _browser_order (names : Vector Text) -> Vector Text =
     is_index n = n.match "0|[1-9][0-9]{0,8}"
@@ -129,7 +130,7 @@ private _browser_order (names : Vector Text) -> Vector Text =
    `value` column. Shows at most `max_items` entries.
 dictionary_view (dict : Dictionary) (max_items : Integer) -> Text =
     pairs = dict.to_vector
-    shown = pairs.length.min max_items
+    shown = pairs.length.min max_items . max 0
     columns = [View_Column.Value "key" (View_Link.Value "at {{#key}}" "value"), View_Column.Value "value"]
     keys = (0.up_to shown . map i-> (pairs.at i . first).to_text) . to_json
     Warning.clear <| grid_json (columns.map .to_json_text) [keys, _rendered_json shown (i-> pairs.at i . second)] dict.size
@@ -140,7 +141,7 @@ dictionary_view (dict : Dictionary) (max_items : Integer) -> Text =
    The view of a Hashset: one `key` column. Shows at most `max_items` items.
 hashset_view (hashset : Hashset) (max_items : Integer) -> Text =
     items = hashset.to_vector
-    shown = items.length.min max_items
+    shown = items.length.min max_items . max 0
     Warning.clear <| grid_json [(View_Column.Value "key").to_json_text] [_rendered_json shown (i-> items.at i)] hashset.size
 
 ## ---
@@ -150,7 +151,7 @@ hashset_view (hashset : Hashset) (max_items : Integer) -> Text =
    `max_items` fields.
 js_object_view (js_object : JS_Object) (max_items : Integer) -> Text =
     fields = js_object.field_names
-    shown = fields.length.min max_items
+    shown = fields.length.min max_items . max 0
     columns = [View_Column.Value "key", View_Column.Value "value"]
     keys = (0.up_to shown . map i-> fields.at i) . to_json
     Warning.clear <| grid_json (columns.map .to_json_text) [keys, _rendered_json shown (i-> js_object.get (fields.at i))] fields.length

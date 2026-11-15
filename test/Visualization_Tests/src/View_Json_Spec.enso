@@ -6,6 +6,9 @@ import Standard.Visualization.Viz_Table.Viz_Table
 
 from Standard.Test import all
 
+type Point
+    Value x y
+
 ## A source with the `"view_pieces"` capability and nothing else.
 type Pieces_Source
     Value rows
@@ -51,6 +54,97 @@ add_specs suite_builder =
             text = table_view (Viz_Table.from_source (Pieces_Source.Value 2000)) view
             text.contains '"server"' . should_be_false
             text.contains '"version_hash"' . should_be_false
+
+    suite_builder.group "The table views of vectors and collections" group_builder->
+        index = '"index":{"action":"at {{#index}}"}'
+        options = '"options":{"disable_sort_when_partial":true}'
+        value_column = '[{"name":"Value","number_format":false}]'
+
+        group_builder.specify "shows an empty vector as an empty Value column" <|
+            expected = '{"kind":"grid","row_count":0,"columns":' + value_column + ',' + index + ',"data":[[]],' + options + '}'
+            vector_view [] 1000 . should_equal expected
+
+        group_builder.specify "shows a vector of only Nothing as Value cells" <|
+            expected = '{"kind":"grid","row_count":2,"columns":' + value_column + ',' + index + ',"data":[[null,null]],' + options + '}'
+            vector_view [Nothing, Nothing] 1000 . should_equal expected
+
+        group_builder.specify "does not pad or fail when the row limit exceeds the length" <|
+            expected = '{"kind":"grid","row_count":2,"columns":' + value_column + ',' + index + ',"data":[[1,2]],' + options + '}'
+            vector_view [1, 2] 10 . should_equal expected
+            (vector_view [[1, 2], [3, 4]] 10 . parse_json) . get "data" . should_equal [[1, 3], [2, 4]]
+
+        group_builder.specify "shows no rows, but counts them, for a limit of zero or less" <|
+            expected = '{"kind":"grid","row_count":3,"columns":' + value_column + ',' + index + ',"data":[[]],' + options + '}'
+            vector_view [1, 2, 3] 0 . should_equal expected
+            vector_view [1, 2, 3] -5 . should_equal expected
+            vector_view [[1, 2], [3, 4], [5, 6]] 0 . should_equal expected
+            vector_view [Point.Value 1 2, Point.Value 3 4, Point.Value 5 6] -1 . should_equal expected
+
+        group_builder.specify "pins a vector whose rows are all empty or Nothing: a grid with no columns" <|
+            expected = '{"kind":"grid","row_count":2,"columns":[],' + index + ',"data":[],' + options + '}'
+            vector_view [[], []] 1000 . should_equal expected
+            vector_view [[], Nothing] 1000 . should_equal expected
+
+        group_builder.specify "shows a vector of records, Nothing and atoms with missing cells" <|
+            dict = Dictionary.from_vector [["a", 1]]
+            json = vector_view [dict, Nothing, Point.Value 3 4] 1000 . parse_json
+            json.get "row_count" . should_equal 3
+            names = json.get "columns" . map (c-> c.get "name")
+            names . should_equal ["a", "type", "constructor", "x", "y"]
+            missing = Json.parse '{"_missing_":true}'
+            json.get "data" . at 0 . should_equal [1, missing, missing]
+            json.get "data" . at 3 . should_equal [missing, missing, 3]
+
+        group_builder.specify "gives each record column once, even for keys that read the same as text" <|
+            dict = Dictionary.from_vector [[1, "int"], ["1", "text"]]
+            json = vector_view [dict] 1000 . parse_json
+            json.get "columns" . map (c-> c.get "name") . should_equal ["1"]
+            json.get "data" . should_equal [[dict.to_vector.last.second]]
+
+        group_builder.specify "orders new record columns after the ones seen" <|
+            rows = [JS_Object.from_pairs [["b", 1], ["a", 2]], JS_Object.from_pairs [["c", 3], ["b", 4]]]
+            vector_view rows 1000 . parse_json . get "columns" . map (c-> c.get "name") . should_equal ["b", "a", "c"]
+
+        group_builder.specify "shows an empty Dictionary, Hashset and JS_Object" <|
+            dictionary_view Dictionary.empty 10 . parse_json . get "data" . should_equal [[], []]
+            dictionary_view Dictionary.empty 10 . parse_json . get "row_count" . should_equal 0
+            hashset_view Hashset.empty 10 . parse_json . get "data" . should_equal [[]]
+            hashset_view Hashset.empty 10 . parse_json . get "row_count" . should_equal 0
+            js_object_view (JS_Object.from_pairs []) 10 . parse_json . get "data" . should_equal [[], []]
+            js_object_view (JS_Object.from_pairs []) 10 . parse_json . get "row_count" . should_equal 0
+
+        group_builder.specify "counts the entries past the limit of a Dictionary, Hashset and JS_Object" <|
+            dict = Dictionary.from_vector [["a", 1], ["b", 2], ["c", 3]]
+            dict_json = dictionary_view dict 2 . parse_json
+            dict_json.get "row_count" . should_equal 3
+            dict_json.get "data" . map .length . should_equal [2, 2]
+            hashset_json = hashset_view (Hashset.from_vector [1, 2, 3]) 2 . parse_json
+            hashset_json.get "row_count" . should_equal 3
+            hashset_json.get "data" . map .length . should_equal [2]
+            object = JS_Object.from_pairs [["a", 1], ["b", 2], ["c", 3]]
+            object_json = js_object_view object 2 . parse_json
+            object_json.get "row_count" . should_equal 3
+            object_json.get "data" . should_equal [["a", "b"], [1, 2]]
+            dictionary_view dict 0 . parse_json . get "data" . should_equal [[], []]
+            dictionary_view dict -1 . parse_json . get "row_count" . should_equal 3
+            hashset_view (Hashset.from_vector [1, 2, 3]) -1 . parse_json . get "data" . should_equal [[]]
+            js_object_view object -1 . parse_json . get "data" . should_equal [[], []]
+
+        group_builder.specify "leaves no warning on a view" <|
+            warned = Warning.attach "w" [1, 2, 3]
+            Warning.get_all warned . length . should_equal 1
+            Warning.get_all (vector_view warned 10) . should_equal []
+            vector_view warned 10 . parse_json . get "data" . should_equal [[1, 2, 3]]
+            element_warned = [1, Warning.attach "w" 2, 3]
+            Warning.get_all (vector_view element_warned 10) . should_equal []
+            records_warned = [Warning.attach "w" (Dictionary.from_vector [["a", 1]])]
+            Warning.get_all (vector_view records_warned 10) . should_equal []
+            matrix_warned = Warning.attach "w" [[1, 2], [3, 4]]
+            Warning.get_all (vector_view matrix_warned 10) . should_equal []
+            Warning.get_all (dictionary_view (Warning.attach "w" (Dictionary.from_vector [["a", 1]])) 10) . should_equal []
+            Warning.get_all (dictionary_view (Dictionary.from_vector [["a", Warning.attach "w" 1]]) 10) . should_equal []
+            Warning.get_all (hashset_view (Warning.attach "w" (Hashset.from_vector [1])) 10) . should_equal []
+            Warning.get_all (js_object_view (Warning.attach "w" (JS_Object.from_pairs [["a", 1]])) 10) . should_equal []
 
 main filter=Nothing =
     suite = Test.build suite_builder->
