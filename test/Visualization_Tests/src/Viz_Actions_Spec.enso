@@ -1,8 +1,12 @@
 from Standard.Base import all
 
+import Standard.Visualization.Scatter_Plot
+import Standard.Visualization.Table.Visualization
+import Standard.Visualization.Tree
 import Standard.Visualization.Viz_Action.Viz_Action
 import Standard.Visualization.Viz_Actions.Viz_Actions
 from Standard.Visualization.Viz_Actions import remove_warnings_action
+import Standard.Visualization.Warnings
 
 from Standard.Table import Table
 import Standard.Database.Connection.Database
@@ -79,6 +83,30 @@ add_specs suite_builder =
         group_builder.specify "a column offers its values by number, in memory and in a database" <|
             (Viz_Actions.from (mem_table.at "x")).to_json_text . should_equal '[{"id":"open_row","label":"Get Value","icon":"select_cell","kind":"chain","template":"at {{#index}}"}]'
             (Viz_Actions.from (db_table.at "x")).to_json_text . should_equal (Viz_Actions.from (mem_table.at "x")).to_json_text
+
+    suite_builder.group "The actions field" group_builder->
+        table = Table.new [["x", [1, 2]], ["y", [3, 4]]]
+        table_actions = (Viz_Actions.from table).to_json_text
+
+        group_builder.specify "the table view of a table starts with its actions" <|
+            Visualization.prepare_visualization table . should_start_with ('{"actions":' + table_actions + ',"kind":"grid"')
+
+        group_builder.specify "a value without actions is unchanged" <|
+            Visualization.prepare_visualization 42 . should_start_with '{"kind":"value"'
+
+        group_builder.specify "an error has no actions" <|
+            Visualization.prepare_visualization (Error.throw "boom") . should_start_with '{"kind":"error"'
+
+        group_builder.specify "the scatter plot of a table carries them" <|
+            Scatter_Plot.process_to_json_text table . should_start_with ('{"actions":' + table_actions + ',"data":')
+
+        group_builder.specify "the tree of a vector carries them" <|
+            Tree.prepare [1, 2] . should_start_with '{"actions":[{"id":"open_row"'
+
+        group_builder.specify "the warnings message lists the warnings and offers to remove them" <|
+            value = Warning.attach "Uh oh" 42
+            Warnings.process_to_json_text value . should_equal ('{"warnings":["Uh oh"],"actions":[' + remove_warnings_action.to_json_text + ']}')
+            Warnings.process_to_json_text 42 . should_equal ('{"warnings":[],"actions":[' + remove_warnings_action.to_json_text + ']}')
 
 main filter=Nothing =
     suite = Test.build suite_builder->
