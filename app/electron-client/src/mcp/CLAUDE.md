@@ -57,8 +57,9 @@ default. No tool changes the execution environment, settings or secrets.
   `setUp` (Enso's own): a hand-edited entry is left alone and a missing one is
   never created; a rewrite failure is logged. Nothing is written on
   `setEnabled`. The token never reaches the renderer: the IPC calls return only
-  a `ClaudeDesktopSetup`. Tests inject a temporary folder; never point one at
-  the real Claude folder.
+  a `ClaudeDesktopSetup`. Settings → AI offers the set-up only while the server
+  is on (`app/gui/src/dashboard/layouts/Settings/CLAUDE.md`, "AI"). Tests inject
+  a temporary folder; never point one at the real Claude folder.
 - `clientConfigs.ts` — that setup text per client (`claude mcp add` command,
   Claude Desktop `mcp-remote` JSON, Codex TOML, Copilot JSON for VS Code and the
   CLI, a generic `mcpServers` block), each checked against the vendor's
@@ -81,6 +82,42 @@ removes it when hidden). With no project showing (the dashboard, or none open)
 the dispatcher answers that no project is open. Add, rename or change a tool on
 both sides, and keep its description and `guides/overview.md` in step with what
 the handler returns. Only `get_guide` runs entirely in main.
+
+The app tools run in the window too (`app/gui/src/mcp/appTools.ts`, registered
+once by the app shell), so they answer on any page. Every path an agent passes
+them must be the Drive's root folder, a local folder the user added to the
+Drive, or inside one (`resolveAllowedPath`): anything else is refused with "That
+folder is outside the Drive", before anything is listed or opened.
+`create_project` and `open_project` answer once the opened project's own tools
+answer, waited for by its project id (`whenProjectToolsActive`), so the agent's
+next call reads that project and not another tab; main gives them 120 s, the
+window 100 s.
+
+## Edits
+
+The edit tools run through one edit session per open graph editor
+(`app/gui/src/project-view/mcp/editSession.ts`; its `CLAUDE.md` has the
+details). Its rules, which the tool descriptions and `guides/overview.md` state:
+
+- **One writer at a time**: the session queues edits and runs one at a time,
+  whoever calls.
+- **Refused in Live** (`LIVE_EDIT_ERROR`: "The project is in Live mode. Edits by
+  an agent are refused there. …"), read at the edit's turn, and **refused when
+  the project is not on screen** (its tab was hidden while the call waited).
+- **One undo step per caller**: a caller's edits join one undo step until it has
+  made no edit for 10 s, measured from the end of its last run, or until the
+  user edits the project (or the agent opens a method), which ends the step.
+- **A version first**: before a step's first edit the session saves a version
+  (`Before changes by <caller>`) when the project keeps versions; the edit is
+  refused if that save fails.
+- `add_nodes` creates all its nodes and import lines in one module edit, or none
+  of them: a statement that does not parse, a name already used or an unknown
+  `after_node` refuses the whole call.
+- An edit never moves the view or changes the selection; only `select_nodes` and
+  `open_method` do.
+
+Edits are saved with the project as they are made, as the user's are; no tool
+runs Write (the output context stays off).
 
 ## The caller checks
 
@@ -153,8 +190,10 @@ none started after 15 s or once 40,000 characters of previews are collected,
 with the rest counted in `previews_skipped`; it also caps the `source` (50,000)
 and each node's `code`, `comment` and panic `message` (2,000). A preview
 evaluation does not interrupt the execution context on timeout;
-`evaluate_expression` does (25 s). The window bridge gives up after 30 s.
-Details in `app/gui/src/project-view/mcp/CLAUDE.md`.
+`evaluate_expression` does (25 s). The window bridge gives up after 30 s for a
+reading tool, 60 s for an edit (which waits up to 20 s for the execution) and
+120 s for opening or creating a project. Details in
+`app/gui/src/project-view/mcp/CLAUDE.md`.
 
 `evaluate_expression` runs only in the Design environment: the window refuses it
 while the project is in Live mode, because an evaluation runs in the execution
@@ -177,12 +216,22 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
 - `tests/headless/mcpToolRegistry.test.ts`, `mcpWindowBridge.test.ts`,
   `mcpGuides.test.ts`, `mcpServer.test.ts` (a real SDK client against the
   server), `mcpController.test.ts` (fake keyring and server),
-  `mcpClientConfigs.test.ts`.
-- `tests/mcp.spec.ts` — the packaged app: an SDK client lists the six tools,
-  reads the guide and the graph of a new project, searches components,
-  evaluates, checks that an evaluation does not write the file it names (the
-  answer names the dry-run file, which the test deletes), and that a request
-  without the token is `401`. It cannot check the Live-mode refusal: nothing in
-  the UI switches a project to Live (the project's `executionMode` setting is
+  `mcpClientConfigs.test.ts`, `mcpClaudeDesktop.test.ts` (a temporary folder,
+  never the real Claude folder).
+- `tests/mcp.spec.ts` — the packaged app, two tests. The first: an SDK client
+  lists the 21 tools, reads the guide and the graph of a new project, searches
+  components, evaluates, checks that an evaluation does not write the file it
+  names (the answer names the dry-run file, which the test deletes), and that a
+  request without the token is `401`. The second builds a project from the
+  dashboard against the real engine: `create_project`, `add_nodes` (with an
+  import line, and with a node in error that `edit_node` fixes),
+  `set_node_comment`, `set_visualization`, `select_nodes`, `collapse_nodes`,
+  `open_method` in and out, `add_function`, one `Mod+Z` in the window taking
+  back a whole `add_nodes` call, `remove_nodes`, `list_files`, the path rule,
+  `close_project` (the edits are in `Main.enso` on disk) and `open_project`; it
+  deletes the project it made. Neither can check the Live-mode refusals: nothing
+  in the UI switches a project to Live (the project's `executionMode` setting is
   only read from its settings), so `app/gui/src/project-view/mcp/__tests__/`
-  covers that.
+  covers them. The GUI side has its own Playwright specs:
+  `app/gui/integration-test/project-view/mcpEdit.spec.ts` and
+  `integration-test/dashboard/mcpApp.spec.ts`.

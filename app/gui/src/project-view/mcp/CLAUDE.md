@@ -199,4 +199,7 @@ error.
 editor. `window.__mcpCall(tool, args, caller?)` (`mock/registerMocks.ts`)
 delivers a call as main would, and `mockExecutionComplete()`
 (`mock/lsHandler.ts`) stands for the engine finishing an execution, which the
-mock never does by itself.
+mock never does by itself. Against the real engine,
+`app/electron-client/tests/mcp.spec.ts` builds a project through every edit and
+view tool in the packaged app, undoes one call with `Mod+Z`, and checks each
+edit's `settled`.

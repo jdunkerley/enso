@@ -52,8 +52,13 @@ No tool changes the execution environment, settings or secrets;
 7. Every tool that changes the project is refused while it is in Live mode: ask
    the user to switch it back to Design. Reading, selecting and navigating
    (`select_nodes`, `open_method`) still work there.
-8. Never assume a change reached disk. The edits are in the IDE; the user clicks
-   Write to save them.
+8. Your edits are saved with the project as you make them, but nothing writes
+   the nodes' output (a file, a database table): only the user's Write does. Do
+   not tell the user that data was written.
+9. Your edits form one undo step for the user until you pause for 10 seconds or
+   the user edits the project; then the next edit starts a new step. Edits from
+   several agents run one at a time. There is no undo tool: to take a change
+   back, edit or remove the nodes.
 
 ## Evaluating expressions
 

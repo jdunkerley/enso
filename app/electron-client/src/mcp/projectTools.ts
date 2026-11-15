@@ -40,8 +40,10 @@ const nodeId = () => z.string().max(NAME_CHARS)
 
 /** The refusal and undo rules every edit tool shares, appended to its description. */
 const EDIT_RULES =
-  ' Refused while the project is in Live mode. The change is one undo step for the user; ' +
-  'there is no undo tool. It changes the project in the IDE only: the user writes it to disk.'
+  ' Refused while the project is in Live mode. Your run of changes is one undo step for the ' +
+  'user, until you pause for 10 seconds or the user edits; there is no undo tool. The project ' +
+  'is saved as it is edited; nothing runs with output on (no Write), so no file, database or ' +
+  'service the nodes name is written.'
 
 /**
  * The project tools (the five that read, the nine that edit or navigate), each forwarding its

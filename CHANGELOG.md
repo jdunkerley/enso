@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [Agents connected over MCP can create and open projects and add, edit, remove
+  and group nodes; each run of changes is one undo step. Settings → AI can also
+  set up Claude Desktop.][783]
 - [External agent apps (Claude Code, Codex, GitHub Copilot) can connect to the
   IDE over MCP and read the open project. Turn it on in Settings → AI.][782]
 - [The JSON visualization is a tree that loads each branch when you open it, a
@@ -502,6 +505,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[783]: https://github.com/jdunkerley/enso/pull/783
 [782]: https://github.com/jdunkerley/enso/pull/782
 [771]: https://github.com/jdunkerley/enso/pull/771
 [735]: https://github.com/jdunkerley/enso/pull/735
