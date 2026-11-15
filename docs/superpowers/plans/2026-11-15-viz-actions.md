@@ -31,10 +31,10 @@ and AG Grid Community in `app/gui`, vitest, Playwright.
 **Spec:** `docs/superpowers/specs/2026-11-14-viz-actions-design.md` (approved by
 the owner), within the parent design
 `docs/superpowers/specs/2026-11-13-visualization-depends-on-base-design.md`.
-Read the spec first, then "Owner decisions" and "Spec gaps resolved
-while planning" below: the spec was written against `develop` at 7ccf3be658,
-before spec B (#769, #776, #780) and piece 2 (#768, #771) merged, and the plan
-departs from its text where today's code requires it.
+Read the spec first, then "Owner decisions" and "Spec gaps resolved while
+planning" below: the spec was written against `develop` at 7ccf3be658, before
+spec B (#769, #776, #780) and piece 2 (#768, #771) merged, and the plan departs
+from its text where today's code requires it.
 
 ## Owner decisions
 
