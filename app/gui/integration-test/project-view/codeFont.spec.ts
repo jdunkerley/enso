@@ -11,6 +11,7 @@
 import type EditorPageActions from 'integration-test/actions/EditorPageActions'
 import { expect, test, type Locator, type Page } from 'integration-test/base'
 import type { MockLocalApi } from 'integration-test/mock/localApi'
+import { matrixView } from 'integration-test/mock/tableView'
 import { expectScreenshot } from 'integration-test/screenshot'
 import { createTableNode } from './actions'
 import { DELETE_KEY } from './keyboard'
@@ -440,14 +441,7 @@ const TABLE_SAMPLE = [
 async function openSampleTable(editorPage: EditorPageActions, page: Page, localApi: MockLocalApi) {
   await localApi.updateVisualization(
     'Standard.Visualization.Table.Visualization.prepare_visualization',
-    {
-      type: 'Matrix',
-      // eslint-disable-next-line camelcase
-      column_count: TABLE_SAMPLE[0]!.length,
-      // eslint-disable-next-line camelcase
-      all_rows_count: TABLE_SAMPLE.length,
-      json: TABLE_SAMPLE,
-    },
+    matrixView(TABLE_SAMPLE),
   )
   await editorPage.mockExpressionUpdate('aggregated', { type: ['Standard.Table.Table.Table'] })
   const aggregatedNode = locate.graphNodeByBinding(page, 'aggregated')
