@@ -15,9 +15,12 @@ import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExpressionUpdatePayload } from 'ydoc-shared/languageServerTypes'
 import {
+  GRAPH_NODE_TEXT_CHARS,
   GRAPH_PREVIEW_CHARS,
   GRAPH_PREVIEW_CONCURRENCY,
   GRAPH_PREVIEW_DEADLINE_MS,
+  GRAPH_PREVIEW_TOTAL_CHARS,
+  GRAPH_SOURCE_CHARS,
   NODE_PREVIEW_CHARS,
   getGraph,
   getNode,
@@ -285,4 +288,61 @@ test('get_graph starts no more previews once its deadline has passed', async () 
   expect(graph.nodes.filter((n: { preview?: string }) => n.preview != null)).toHaveLength(
     GRAPH_PREVIEW_CONCURRENCY,
   )
+})
+
+test('get_graph starts no more previews once the collected previews reach the total budget', async () => {
+  const count = 30
+  const lines = Array.from({ length: count }, (_, i) => `    n${i} = ${i}`)
+  const { deps, db, registry, evaluate } = makeDeps({}, `main =\n${lines.join('\n')}`)
+  for (let i = 0; i < count; i++) setPayload(registry, nodeNamed(db, `n${i}`), { type: 'Value' })
+  evaluate.mockResolvedValue(Ok('p'.repeat(GRAPH_PREVIEW_CHARS)))
+  const graph = parseValue(await getGraph(deps, {}))
+  const started = evaluate.mock.calls.length
+  const fullBudget = GRAPH_PREVIEW_TOTAL_CHARS / GRAPH_PREVIEW_CHARS
+  expect(started).toBeGreaterThanOrEqual(fullBudget)
+  // Only the previews already in flight when the budget filled may finish after it.
+  expect(started).toBeLessThanOrEqual(fullBudget + GRAPH_PREVIEW_CONCURRENCY - 1)
+  expect(started).toBeLessThan(count)
+  expect(graph.previews_skipped).toBe(count - started)
+  expect(graph.nodes.filter((n: { preview?: string }) => n.preview != null)).toHaveLength(started)
+})
+
+test('get_graph caps each comment, panic message and expression, and the source', async () => {
+  const long = 'q'.repeat(60_000)
+  const code = `main =
+    ## ${'c'.repeat(3_000)}
+    a = "${long}"
+    b = a`
+  const { deps, db, registry } = makeDeps({}, code)
+  setPayload(registry, nodeNamed(db, 'b'), { type: 'Panic', message: 'm'.repeat(3_000), trace: [] })
+  const graph = parseValue(await getGraph(deps, { previews: false }))
+  expect(graph.source).toBe(code.slice(code.indexOf('main')).slice(0, GRAPH_SOURCE_CHARS) + '…')
+  const [a, b] = graph.nodes
+  expect(a.comment).toBe('c'.repeat(GRAPH_NODE_TEXT_CHARS) + '…')
+  expect(a.code).toBe(`"${long}"`.slice(0, GRAPH_NODE_TEXT_CHARS) + '…')
+  expect(b.message).toBe('m'.repeat(GRAPH_NODE_TEXT_CHARS) + '…')
+  expect([GRAPH_SOURCE_CHARS, GRAPH_NODE_TEXT_CHARS]).toEqual([50_000, 2_000])
+})
+
+test('get_graph leaves a node whose preview rejects without one, and still answers', async () => {
+  const { deps, db, registry, evaluate } = makeDeps()
+  setPayload(registry, nodeNamed(db, 'a'), { type: 'Value' })
+  setPayload(registry, nodeNamed(db, 'b'), { type: 'Value' })
+  evaluate.mockImplementation(async (_scope, expression) => {
+    if (expression.startsWith('a.')) throw new Error('connection lost')
+    return Ok('fine')
+  })
+  const graph = parseValue(await getGraph(deps, {}))
+  expect(graph.nodes[0]).not.toHaveProperty('preview')
+  expect(graph.nodes[1].preview).toBe('fine')
+})
+
+test('get_node leaves a node whose preview rejects without one, and still answers', async () => {
+  const { deps, db, registry, evaluate } = makeDeps()
+  const a = nodeNamed(db, 'a')
+  setPayload(registry, a, { type: 'Value' })
+  evaluate.mockRejectedValue(new Error('connection lost'))
+  const node = parseValue(await getNode(deps, { node_id: a }))
+  expect(node).toMatchObject({ name: 'a', state: 'value' })
+  expect(node).not.toHaveProperty('preview')
 })

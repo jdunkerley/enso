@@ -38,7 +38,14 @@ too).
   at most `GRAPH_PREVIEW_CONCURRENCY` (8) previews at a time and starts none
   after `GRAPH_PREVIEW_DEADLINE_MS` (15 s from the first); the value nodes it
   did not start are counted in the result's `previews_skipped` (present only
-  when non-zero). The clock is `GraphToolDeps.now`, injected in tests.
+  when non-zero). It also starts none once the previews collected reach
+  `GRAPH_PREVIEW_TOTAL_CHARS` (40,000 characters); those nodes count in
+  `previews_skipped` too. The clock is `GraphToolDeps.now`, injected in tests.
+- `get_graph` caps its other texts as well: the method's `source` at
+  `GRAPH_SOURCE_CHARS` (50,000), and each node's `code`, `comment` and panic
+  `message` at `GRAPH_NODE_TEXT_CHARS` (2,000). `get_node` gives one node in
+  full (its preview and error at 20,000). A preview evaluation that rejects or
+  throws leaves its node without a preview; the tool still answers.
 - Every text that comes from an evaluation is bounded, through the one
   `truncate` helper in `graphTools.ts`: `get_node`'s `error` to 20,000
   characters; `evaluate_expression`'s result to `EVALUATE_RESULT_CHARS` (20,000)

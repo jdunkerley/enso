@@ -117,7 +117,9 @@ Main does not cap a tool's result; the window does. Every text that comes from
 an evaluation is truncated there (`get_graph` previews 2,000 characters,
 `get_node` 20,000, `evaluate_expression` 20,000 with a note saying how long it
 was), and `get_graph` runs its value previews in batches: at most 8 at a time,
-none started after 15 s, with the rest counted in `previews_skipped`. A preview
+none started after 15 s or once 40,000 characters of previews are collected,
+with the rest counted in `previews_skipped`; it also caps the `source` (50,000)
+and each node's `code`, `comment` and panic `message` (2,000). A preview
 evaluation does not interrupt the execution context on timeout;
 `evaluate_expression` does (25 s). The window bridge gives up after 30 s.
 Details in `app/gui/src/project-view/mcp/CLAUDE.md`.

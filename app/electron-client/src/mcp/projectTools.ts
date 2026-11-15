@@ -28,7 +28,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'message and, unless `previews` is false, a short preview of their current value). ' +
         'There is no separate edge list: a node uses another by its name, so read the ' +
         'connections from each node `code` and from `source`. When previews run out of ' +
-        'time, `previews_skipped` counts the nodes left without one. Call this first to ' +
+        'time or space, `previews_skipped` counts the nodes left without one: a long graph ' +
+        'returns fewer previews and cut texts, and `get_node` gives one node in full. Call this first to ' +
         'see what the project does. Each `node_id` is stable across edits, so you can pass ' +
         'it to `get_node` and `evaluate_expression` later.',
       inputSchema: { previews: z.boolean().optional() },

@@ -21,6 +21,15 @@ import type { ExternalId } from 'ydoc-shared/yjsModel'
 
 /** Most characters of a node's value preview in `get_graph`. */
 export const GRAPH_PREVIEW_CHARS = 2_000
+/**
+ * Most characters of all `get_graph` previews together: once the previews collected reach it, no
+ * more start, and the nodes left without one count in `previews_skipped`.
+ */
+export const GRAPH_PREVIEW_TOTAL_CHARS = 40_000
+/** Most characters of a node's `code`, `comment` and panic `message` in `get_graph`. */
+export const GRAPH_NODE_TEXT_CHARS = 2_000
+/** Most characters of the method's `source` in `get_graph`. */
+export const GRAPH_SOURCE_CHARS = 50_000
 /** Most characters of a node's value preview in `get_node`. */
 export const NODE_PREVIEW_CHARS = 20_000
 /** Most `get_graph` previews evaluating at once. */
@@ -104,7 +113,9 @@ export function summarizeNode(deps: GraphToolDeps, id: NodeId, node: Node): Node
 /**
  * The method on screen: its name and source, the module's imports, and a summary of each node,
  * with a short preview of each value unless `previews` is false. `previews_skipped` counts the
- * value nodes left without a preview because the previews' deadline passed (only when non-zero).
+ * value nodes left without a preview because the previews' deadline passed or their total budget
+ * was spent (only when non-zero). The source and each node's texts are capped; `get_node` gives one
+ * node in full.
  */
 export async function getGraph(
   deps: GraphToolDeps,
@@ -115,22 +126,31 @@ export async function getGraph(
   if (!pointer.ok) return { ok: false, error: pointer.error.message('') }
   const nodes = Array.from(deps.db.nodeIdToNode.entries(), ([id, node]) => ({
     node,
-    summary: summarizeNode(deps, id, node),
+    summary: capNodeTexts(summarizeNode(deps, id, node)),
   }))
   const previewsSkipped = args.previews !== false ? await addGraphPreviews(deps, nodes) : 0
   return jsonResult({
     method: pointer.value.name,
-    source: ast.value.code(),
+    source: truncate(ast.value.code(), GRAPH_SOURCE_CHARS),
     imports: moduleImports(deps.moduleRoot()),
     nodes: nodes.map(({ summary }) => summary),
     ...(previewsSkipped > 0 ? { previews_skipped: previewsSkipped } : {}),
   })
 }
 
+/** The summary with its `code`, `comment` and `message` cut to {@link GRAPH_NODE_TEXT_CHARS}. */
+function capNodeTexts(summary: NodeSummary): NodeSummary {
+  summary.code = truncate(summary.code, GRAPH_NODE_TEXT_CHARS)
+  if (summary.comment != null) summary.comment = truncate(summary.comment, GRAPH_NODE_TEXT_CHARS)
+  if (summary.message != null) summary.message = truncate(summary.message, GRAPH_NODE_TEXT_CHARS)
+  return summary
+}
+
 /**
  * Adds a preview to each value node with a plain name: at most {@link GRAPH_PREVIEW_CONCURRENCY}
- * evaluating at once, and none started after {@link GRAPH_PREVIEW_DEADLINE_MS}. Returns how many
- * were not started because of the deadline.
+ * evaluating at once, none started after {@link GRAPH_PREVIEW_DEADLINE_MS}, and none started once
+ * the previews collected reach {@link GRAPH_PREVIEW_TOTAL_CHARS}. Returns how many were not started
+ * for either reason.
  */
 async function addGraphPreviews(
   deps: GraphToolDeps,
@@ -144,10 +164,11 @@ async function addGraphPreviews(
   const deadline = now() + GRAPH_PREVIEW_DEADLINE_MS
   let next = 0
   let skipped = 0
+  let collected = 0
   async function worker() {
     while (next < queue.length) {
       const { node, summary } = queue[next++]!
-      if (now() >= deadline) {
+      if (now() >= deadline || collected >= GRAPH_PREVIEW_TOTAL_CHARS) {
         skipped += 1
         continue
       }
@@ -158,7 +179,10 @@ async function addGraphPreviews(
         'to_display_text',
         GRAPH_PREVIEW_TIMEOUT_MS,
       )
-      if (preview != null) summary.preview = truncate(preview, GRAPH_PREVIEW_CHARS)
+      if (preview != null) {
+        summary.preview = truncate(preview, GRAPH_PREVIEW_CHARS)
+        collected += summary.preview.length
+      }
     }
   }
   await Promise.all(
@@ -225,7 +249,8 @@ export function jsonResult(value: unknown): McpToolResult {
 
 /**
  * Evaluates `<name>.<method>` in the scope of the node's statement, where its own binding is in
- * scope. The text, or null when the node has no plain name or the evaluation failed.
+ * scope. The text, or null when the node has no plain name or the evaluation failed, rejected or
+ * threw: one bad preview leaves its node without one, it does not fail the tool.
  */
 async function evaluateOnNode(
   deps: GraphToolDeps,
@@ -235,8 +260,12 @@ async function evaluateOnNode(
   timeoutMs: number,
 ): Promise<string | null> {
   if (name == null || !isIdentifier(name)) return null
-  const result = await deps.evaluate(node.outerAst.externalId, `${name}.${method}`, timeoutMs)
-  return result?.ok ? result.value : null
+  try {
+    const result = await deps.evaluate(node.outerAst.externalId, `${name}.${method}`, timeoutMs)
+    return result?.ok ? result.value : null
+  } catch {
+    return null
+  }
 }
 
 /**
