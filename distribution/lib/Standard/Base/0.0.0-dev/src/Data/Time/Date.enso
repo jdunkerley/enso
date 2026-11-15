@@ -58,6 +58,36 @@ type Date
     today -> Date = Date_Helpers.today
 
     ## ---
+       aliases: [previous day]
+       group: DateTime
+       icon: calendar
+       ---
+       The day before today, from the system clock in the system timezone.
+
+       ## Examples
+       ### The day before today.
+
+       ```
+       day = Date.yesterday
+       ```
+    yesterday -> Date = Date.today.previous
+
+    ## ---
+       aliases: [next day]
+       group: DateTime
+       icon: calendar
+       ---
+       The day after today, from the system clock in the system timezone.
+
+       ## Examples
+       ### The day after today.
+
+       ```
+       day = Date.tomorrow
+       ```
+    tomorrow -> Date = Date.today.next
+
+    ## ---
        group: Constants
        icon: calendar
        ---

@@ -33,6 +33,10 @@ spec_with suite_builder name create_new_date parse_date pending=Nothing =
             date . month . should_equal 1
             date . day . should_equal 1
 
+        group_builder.specify "should give yesterday and tomorrow relative to today" <|
+            Date.yesterday . should_equal (Date.today - (Period.new days=1))
+            Date.tomorrow . should_equal (Date.today + (Period.new days=1))
+
         group_builder.specify "should handle errors when creating local date" <|
             case create_new_date 2020 30 30 . catch of
                 Time_Error.Error msg _ ->
