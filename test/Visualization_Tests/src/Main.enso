@@ -15,6 +15,7 @@ import project.Table_Visualisation_Integration_Spec
 import project.Tree_Spec
 import project.View_Json_Spec
 import project.Visualization_Spec
+import project.Viz_Actions_Spec
 import project.Viz_Cell_Spec
 import project.Viz_Table_Spec
 import project.Widgets_Spec
@@ -34,6 +35,7 @@ main filter=Nothing =
         Tree_Spec.add_specs suite_builder
         View_Json_Spec.add_specs suite_builder
         Visualization_Spec.add_specs suite_builder
+        Viz_Actions_Spec.add_specs suite_builder
         Viz_Cell_Spec.add_specs suite_builder
         Viz_Table_Spec.add_specs suite_builder
         Widgets_Spec.add_specs suite_builder

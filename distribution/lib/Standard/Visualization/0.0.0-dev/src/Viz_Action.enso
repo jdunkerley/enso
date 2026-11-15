@@ -1,0 +1,50 @@
+from Standard.Base import all
+
+import project.Viz_Action_Kind.Viz_Action_Kind
+
+## ---
+   private: true
+   ---
+   A node a visualisation can create from the visualised value. A
+   visualisation finds the actions it understands by `id` and fills in the
+   values the template asks for:
+   - `{{#x}}`: the value of `x`, a number when it reads as one, else text;
+   - `{{@x}}`: the value as it is (a number stays a number, else text);
+   - `{{x}}`: an Enso expression the visualisation builds (a filter
+     condition, a sort column);
+   - `{{#x*}}`, `{{@x*}}`, `{{x*}}`: a vector of such values;
+   - `{{node}}`: the visualised node, in a `New_Node` template only.
+   An action whose template has no placeholder (other than `{{node}}`) is a
+   plain action: a visualisation shows it as a toolbar button.
+type Viz_Action
+    ## ---
+       private: true
+       ---
+       - `id`: the name a visualisation looks for (`open_row`, `sort`, ...).
+       - `label`: what a menu or a button's tooltip says.
+       - `icon`: an icon of the IDE, or empty.
+       - `kind`: whether the node chains on the visualised node.
+       - `template`: the expression, with placeholders.
+    Value (id : Text) (label : Text) (icon : Text) (kind : Viz_Action_Kind) (template : Text)
+
+    ## ---
+       private: true
+       ---
+       An action that chains on the visualised node.
+    chain (id : Text) (label : Text) (icon : Text) (template : Text) -> Viz_Action =
+        Viz_Action.Value id label icon Viz_Action_Kind.Chain template
+
+    ## ---
+       private: true
+       ---
+       An action whose template is a whole expression naming the node with
+       `{{node}}`.
+    new_node (id : Text) (label : Text) (icon : Text) (template : Text) -> Viz_Action =
+        Viz_Action.Value id label icon Viz_Action_Kind.New_Node template
+
+    ## ---
+       private: true
+       ---
+       The action as the IDE reads it.
+    to_json_text self -> Text =
+        '{"id":' + self.id.to_json + ',"label":' + self.label.to_json + ',"icon":' + self.icon.to_json + ',"kind":' + self.kind.wire_name.to_json + ',"template":' + self.template.to_json + '}'

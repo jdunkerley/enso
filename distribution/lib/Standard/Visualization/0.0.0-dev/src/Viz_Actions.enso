@@ -1,0 +1,79 @@
+from Standard.Base import all
+
+import project.Viz_Action.Viz_Action
+
+## ---
+   private: true
+   ---
+   The node actions a value offers its visualisations. Base values are
+   converted here; a library or a user type offers its own with
+   `Viz_Actions.from (that:Its_Public_Type)` in its own module.
+type Viz_Actions
+    ## ---
+       private: true
+       ---
+    Value (actions : Vector Viz_Action)
+
+    ## ---
+       private: true
+       ---
+       No actions.
+    none -> Viz_Actions = Viz_Actions.Value []
+
+    ## ---
+       private: true
+       ---
+       The actions of `value`; none for a dataflow error.
+    for value -> Viz_Actions = if value.is_error then Viz_Actions.none else Viz_Actions.from value
+
+    ## ---
+       private: true
+       ---
+       The actions as the IDE reads them: a JSON array.
+    to_json_text self -> Text =
+        ## A handful of actions: the texts are joined, so they are built once.
+        '[' + (self.actions.map .to_json_text . join ",") + ']'
+
+    ## ---
+       private: true
+       ---
+       `json_text`, the JSON object a visualisation receives, with an
+       `"actions"` field first. Unchanged when there are no actions, and for
+       an error message (`{"kind":"error",…}`).
+    add_to_json self (json_text : Text) -> Text =
+        if self.actions.is_empty || (json_text.starts_with '{"kind":"error"') then json_text else
+            '{"actions":' + self.to_json_text + ',' + (json_text.drop 1)
+
+## ---
+   private: true
+   ---
+   Removes the visualised node's warnings. Sent by the Warnings visualisation's
+   preprocessor: a conversion cannot see a value's warnings.
+remove_warnings_action -> Viz_Action =
+    Viz_Action.chain "remove_warnings" "Remove Warnings" "not_exclamation" "remove_warnings"
+
+## ---
+   private: true
+   ---
+   Any other value offers no actions.
+Viz_Actions.from (that:Any) =
+    _ = that
+    Viz_Actions.none
+
+## ---
+   private: true
+   ---
+   A vector's items, by number.
+Viz_Actions.from (that:Vector) =
+    _ = that
+    Viz_Actions.Value [_item_action]
+
+## ---
+   private: true
+   ---
+   An array's items, by number.
+Viz_Actions.from (that:Array) =
+    _ = that
+    Viz_Actions.Value [_item_action]
+
+private _item_action = Viz_Action.chain "open_row" "Get Item" "select_row" "at {{#index}}"

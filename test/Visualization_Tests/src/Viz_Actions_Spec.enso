@@ -1,0 +1,58 @@
+from Standard.Base import all
+
+import Standard.Visualization.Viz_Action.Viz_Action
+import Standard.Visualization.Viz_Actions.Viz_Actions
+from Standard.Visualization.Viz_Actions import remove_warnings_action
+
+from Standard.Test import all
+
+type Thing
+    Value name
+
+## A user type offers its own actions in its own module: here one that
+   creates a standalone node from a static call taking the node.
+Viz_Actions.from (that:Thing) =
+    _ = that
+    Viz_Actions.Value [Viz_Action.new_node "describe" "Describe" "" "Thing.describe {{node}}"]
+
+## The ids of a value's actions.
+ids_of value = (Viz_Actions.from value).actions.map .id
+
+add_specs suite_builder =
+    suite_builder.group "Viz_Actions" group_builder->
+        group_builder.specify "an action is written as one JSON object" <|
+            action = Viz_Action.chain "open_row" "Get Item" "select_row" "at {{#index}}"
+            action.to_json_text . should_equal '{"id":"open_row","label":"Get Item","icon":"select_row","kind":"chain","template":"at {{#index}}"}'
+
+        group_builder.specify "a value no conversion describes offers none" <|
+            (Viz_Actions.from 42).actions . should_equal []
+            (Viz_Actions.from "text").to_json_text . should_equal "[]"
+            (Viz_Actions.from Nothing).actions . should_equal []
+
+        group_builder.specify "a vector or an array offers its items by number" <|
+            json = '[{"id":"open_row","label":"Get Item","icon":"select_row","kind":"chain","template":"at {{#index}}"}]'
+            (Viz_Actions.from [1, 2, 3]).to_json_text . should_equal json
+            (Viz_Actions.from [1, 2, 3].to_array).to_json_text . should_equal json
+
+        group_builder.specify "a user type offers its own, a standalone node among them" <|
+            (Viz_Actions.from (Thing.Value "a")).to_json_text . should_equal '[{"id":"describe","label":"Describe","icon":"","kind":"new_node","template":"Thing.describe {{node}}"}]'
+
+        group_builder.specify "a dataflow error offers none" <|
+            (Viz_Actions.for (Error.throw "boom")).actions . should_equal []
+            (Viz_Actions.for [1]).actions.length . should_equal 1
+
+        group_builder.specify "the field goes first in a message, and only when there are actions" <|
+            actions = Viz_Actions.from [1]
+            actions.add_to_json '{"kind":"grid","columns":[]}' . should_equal ('{"actions":' + actions.to_json_text + ',"kind":"grid","columns":[]}')
+            Viz_Actions.none.add_to_json '{"kind":"grid"}' . should_equal '{"kind":"grid"}'
+
+        group_builder.specify "an error message never carries it" <|
+            (Viz_Actions.from [1]).add_to_json '{"kind":"error","error":"x"}' . should_equal '{"kind":"error","error":"x"}'
+
+        group_builder.specify "remove warnings is a plain chain" <|
+            remove_warnings_action.to_json_text . should_equal '{"id":"remove_warnings","label":"Remove Warnings","icon":"not_exclamation","kind":"chain","template":"remove_warnings"}'
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter
