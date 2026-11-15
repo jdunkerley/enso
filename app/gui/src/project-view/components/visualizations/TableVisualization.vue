@@ -5,8 +5,6 @@ import {
   useTableVizToolbar,
   type SortModel,
 } from '@/components/visualizations/TableVisualization/tableVizToolbar'
-import { Ast } from '@/util/ast'
-import { Pattern } from '@/util/ast/match'
 import { ProjectPath } from '@/util/projectPath'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
 import type {
@@ -43,6 +41,8 @@ import {
   type ValueTypeArgumentChild,
   type ValueTypes,
 } from './TableVisualization/TableVizDataSourceUtils'
+import { columnValueToEnso } from './TableVisualization/columnValueToEnso'
+import { valueNodePattern, type ValueNodeAction } from './TableVisualization/tableContextMenu'
 import { makeFilterModelList, type GridFilterModel } from './TableVisualization/tableVizFilterUtils'
 import {
   buildTableView,
@@ -53,7 +53,7 @@ import {
   tableViewFlags,
 } from './TableVisualization/tableView'
 
-import { formatText, getCellValueType, isNumericType } from './TableVisualization/tableVizUtils'
+import { formatText, isNumericType } from './TableVisualization/tableVizUtils'
 
 export type { DataQualityMetricValue } from './TableVisualization/tableView'
 
@@ -126,9 +126,9 @@ const getContextMenuItems = (
   const { rowIndex } = params.node ?? {}
 
   const actions = [
-    { name: 'Get Column', action: 'at', colId, icon: 'select_column' },
-    { name: 'Get Row', action: 'get_row', rowIndex, icon: 'select_row' },
-    { name: 'Get Value', action: 'get_value', colId, rowIndex, icon: 'select_cell' },
+    { name: 'Get Column', action: 'at' as const, colId, icon: 'select_column' },
+    { name: 'Get Row', action: 'get_row' as const, rowIndex, icon: 'select_row' },
+    { name: 'Get Value', action: 'get_value' as const, colId, rowIndex, icon: 'select_cell' },
   ]
 
   const createMenuItem = ({ name, action, colId, rowIndex, icon }: (typeof actions)[number]) => ({
@@ -146,52 +146,13 @@ const getContextMenuItems = (
   ]
 }
 
-function getAstValuePattern(value?: string | number, action?: string) {
-  if (action && value != null) {
-    return Pattern.new<Ast.Expression>((ast) =>
-      Ast.App.positional(
-        Ast.PropertyAccess.new(ast.module, ast, Ast.identifier(action)!),
-        typeof value === 'number' ?
-          Ast.tryNumberToEnso(value, ast.module)!
-        : Ast.TextLiteral.new(value, ast.module),
-      ),
-    )
-  }
-}
-
-function getAstGetValuePattern(columnId?: string, rowIndex?: number, action?: string) {
-  if (action && columnId && rowIndex != undefined) {
-    const pattern = Pattern.parseExpression('__ __')
-    return Pattern.new<Ast.Expression>((ast) =>
-      Ast.App.positional(
-        Ast.PropertyAccess.new(ast.module, ast, Ast.identifier('get_value')!),
-        pattern.instantiateCopied([
-          Ast.TextLiteral.new(columnId as string, ast.module),
-          Ast.tryNumberToEnso(rowIndex as number, ast.module)!,
-        ]),
-      ),
-    )
-  }
-}
-
-function createValueNode(columnId?: string | null, rowIndex?: number | null, action?: string) {
-  let pattern
-  if (action === 'at' && columnId != null) {
-    pattern = getAstValuePattern(columnId, action)
-  }
-  if (action === 'get_row' && rowIndex != null) {
-    pattern = getAstValuePattern(rowIndex, action)
-  }
-  if (action === 'get_value' && columnId != null && rowIndex != null) {
-    pattern = getAstGetValuePattern(columnId, rowIndex, action)
-  }
-
-  if (pattern) {
-    config.createNodes({
-      content: pattern,
-      commit: true,
-    })
-  }
+function createValueNode(
+  columnId: string | null | undefined,
+  rowIndex: number | null | undefined,
+  action: ValueNodeAction,
+) {
+  const pattern = valueNodePattern(columnId, rowIndex, action)
+  if (pattern) config.createNodes({ content: pattern, commit: true })
 }
 
 const viewFlags = computed(() => tableViewFlags(props.data))
@@ -570,67 +531,7 @@ function refresh() {
 
 const colTypeMap = computed(() => viewFlags.value.columnTypes)
 
-const getColumnValueToEnso = (columnName: string) => {
-  const columnType = colTypeMap.value.get(columnName) ?? ''
-  if (isNumericType(columnType)) {
-    return (item: string, module: Ast.MutableModule) => Ast.tryNumberToEnso(Number(item), module)!
-  }
-  if (columnType === 'Date') {
-    return (item: string, module: Ast.MutableModule) => createDateValue(item, module)
-  }
-  if (columnType === 'Time') {
-    return (item: string, module: Ast.MutableModule) =>
-      createDateTimeValue('Time_Of_Day.parse (__)', item, module)
-  }
-  if (columnType === 'Date_Time') {
-    return (item: string, module: Ast.MutableModule) =>
-      createDateTimeValue('Date_Time.parse (__)', item, module)
-  }
-  if (columnType === 'Mixed') {
-    return (item: string, module: Ast.MutableModule) => {
-      const parsedCellType = getCellValueType(item)
-      return getFormattedValueForCell(item, module, parsedCellType)
-    }
-  }
-  if (columnType === 'Boolean') {
-    return (item: string, module: Ast.MutableModule) => {
-      return item === 'false' ?
-          Ast.Ident.new(module, Ast.identifier('False')!)
-        : Ast.Ident.new(module, Ast.identifier('True')!)
-    }
-  }
-  return (item: string) => Ast.TextLiteral.new(item)
-}
-
-const getFormattedValueForCell = (item: string, module: Ast.MutableModule, cellType: string) => {
-  if (isNumericType(cellType)) {
-    return Ast.tryNumberToEnso(Number(item), module)!
-  }
-  if (cellType === 'Date') {
-    return createDateValue(item, module)
-  }
-  if (cellType === 'Time') {
-    return createDateTimeValue('Time_Of_Day.parse (__)', item, module)
-  }
-  if (cellType === 'Date_Time') {
-    return createDateTimeValue('Date_Time.parse (__)', item, module)
-  }
-  return Ast.TextLiteral.new(item)
-}
-
-const createDateTimeValue = (patternString: string, item: string, module: Ast.MutableModule) => {
-  const pattern = Pattern.parseExpression(patternString)!
-  return pattern.instantiateCopied([Ast.TextLiteral.new(item, module)])
-}
-
-const createDateValue = (item: string, module: Ast.MutableModule) => {
-  const dateOrTimePattern = Pattern.parseExpression('(Date.new __ __ __)')
-  const dateTimeParts = item
-    .match(/\d+/g)!
-    .filter((part, i) => i < 3)
-    .map((part) => Ast.tryNumberToEnso(Number(part), module)!)
-  return dateOrTimePattern.instantiateCopied([...dateTimeParts])
-}
+const getColumnValueToEnso = (columnName: string) => columnValueToEnso(colTypeMap.value)(columnName)
 
 function checkSortAndFilter(e: SortChangedEvent) {
   const gridApi = e.api
