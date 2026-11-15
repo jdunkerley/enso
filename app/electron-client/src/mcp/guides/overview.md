@@ -61,12 +61,13 @@ No tool changes the execution environment, settings or secrets;
 8. Your edits are saved with the project as you make them. Do not turn Write on
    (writing a node's output: a file, a database table). Code that enables the
    output context (`with_enabled_context`, `with_enabled`, binding a runtime
-   builtin, or building a method name by reflection) is refused. Only the user
-   turns Write on, by clicking it on a node; `edit_node` and `collapse_nodes`
-   refuse a node they did. Your edits can still cause a write in two ways you
-   should avoid: calling a function in the user's project that itself enables
-   output, and changing a node upstream of one the user has switched Write on
-   for (it re-runs with your change). Ask the user before doing either.
+   builtin, building a method name by reflection, looking a method up by a name
+   in text, or evaluating text as code) is refused. Only the user turns Write
+   on, by clicking it on a node; `edit_node` and `collapse_nodes` refuse a node
+   they did. Your edits can still cause a write in two ways you should avoid:
+   calling a function in the user's project that itself enables output, and
+   changing a node upstream of one the user has switched Write on for (it
+   re-runs with your change). Ask the user before doing either.
 9. Your edits form one undo step for the user until you pause for 10 seconds,
    the user edits the project or leaves its tab, or `open_method` changes the
    method; then the next edit starts a new step. Edits from several agents run

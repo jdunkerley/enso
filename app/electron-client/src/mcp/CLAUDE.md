@@ -140,17 +140,20 @@ settled") says exactly what counts and what does not.
 Edits are saved with the project as they are made, as the user's are: in the
 packaged spec the edit's text was in `src/Main.enso` on disk about 4–7 s after
 the call answered, with the project still open. Every tool that takes code
-refuses code that enables the output context (`with_enabled_context`,
-`with_enabled`, `Meta.meta` for a method name built by reflection, an
-`@Builtin_Method` binding), and `edit_node` and `collapse_nodes` refuse a node
-the user turned Write on for. The guard is a list of names over the AST: it
-stops an agent turning Write on by accident or by following an instruction
-naively, and it is **not a security boundary**. Deliberately obfuscated Enso
-code (dynamic dispatch, Java interop) can still reach the output context, the
-user's own Write-enabled functions and nodes can be driven by an agent's edits,
-and a real guarantee needs engine-side enforcement (an execution-level lock on
-the output context), which is not built. The list, its history and the two
-routes review found (both now refused) are in
+refuses code that enables the output context by the routes that are known: the
+two enabling functions (`with_enabled_context`, `with_enabled`), an
+`@Builtin_Method` binding, reflection by `Meta.meta`, evaluating text with
+`Debug.eval`, and looking a method up by a name in text (`Polyglot.get_member`,
+`Polyglot.invoke`). `edit_node` and `collapse_nodes` refuse a node the user
+turned Write on for. Three of those routes were found only by review after the
+first version, and a fourth while fixing the third; each really wrote a file in
+the packaged app. The guard is a list of names over the AST, so others may
+exist, and it is **not a security boundary**: Java and other polyglot code
+(`foreign python`, `foreign js`) are not covered at all and can write a file
+directly, the user's own Write-enabled functions and nodes can be driven by an
+agent's edits, and a real guarantee needs engine-side enforcement (an
+execution-level lock on the output context), which is not built. The list, its
+history and the routes review found (all now refused) are in
 `app/gui/src/project-view/mcp/CLAUDE.md`, "Write stays the user's". The tool
 descriptions (`WRITE_RULE` in `projectTools.ts`) and the guides tell the agent
 the same, and name the two ways its edits can still cause a write.

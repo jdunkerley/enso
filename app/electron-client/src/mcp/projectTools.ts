@@ -48,8 +48,8 @@ const nodeId = () => z.string().max(NAME_CHARS)
  */
 const WRITE_RULE =
   'Do not turn Write on. Code that enables the output context (`with_enabled_context`, ' +
-  '`with_enabled`, binding a runtime builtin, or building a method name by reflection) is ' +
-  'refused. Only the user turns Write on, by clicking it on a node. Your edits can still cause ' +
+  '`with_enabled`, binding a runtime builtin, building a method name by reflection, looking a ' +
+  'method up by a name in text, or evaluating text as code) is refused. Only the user turns Write on, by clicking it on a node. Your edits can still cause ' +
   "a write in two ways you should avoid: calling a function in the user's project that itself " +
   'enables output, and changing a node upstream of one the user has switched Write on for (it ' +
   're-runs with your change). Ask the user before doing either.'
@@ -205,7 +205,9 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       title: 'Remove nodes',
       description:
         'Remove the nodes in `node_ids` (from `get_graph`) from the graph. The nodes that used ' +
-        'a removed node lose that input, as when the user deletes a node. The argument and ' +
+        'a removed node lose that input, as when the user deletes a node. Removing a node ' +
+        'rewrites the nodes that used it, and if the user switched Write on for one of those, it ' +
+        're-runs with output: ask the user first. The argument and ' +
         'output nodes of the method are refused, and then nothing is removed. Returns ' +
         '`removed`, the ids removed, and `settled`; call `get_graph` for the nodes that used ' +
         'them.' +

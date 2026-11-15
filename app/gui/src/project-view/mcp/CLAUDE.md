@@ -107,6 +107,21 @@ node statement (`parseNodeStatement`, `add_nodes`), a node expression
   `Symbol` constructor is private, so `Meta.meta` is the only way to get one.
   `rename` is not refused (`Column.rename` shares the name), nor is the rest of
   `Meta` (`Meta.type_of`, `Meta.is_a`, …), which only inspects values;
+- an `Ident` token in `EVAL_IDENTIFIERS` (`EVAL_REFUSED_ERROR`): `eval`.
+  `Debug.eval expression:Text` (`src/Runtime/Debug.enso:45`, a builtin) compiles
+  and runs Text as Enso code in the caller's frame, so the enabling names can
+  sit inside a Text. It is the only public function in `Standard.Base` that
+  does; `Debug.breakpoint` (`:22`) opens the engine's REPL on the user's
+  terminal and is allowed;
+- an `Ident` token in `NAME_LOOKUP_IDENTIFIERS` (`NAME_LOOKUP_REFUSED_ERROR`):
+  `get_member` and `invoke`. `Polyglot.get_member object name:Text` and
+  `Polyglot.invoke target name:Text args` (`src/Polyglot.enso:68`, `:114`) look
+  a member up by Text through interop, and Enso atoms and types answer with
+  their methods (`readMember` / `invokeMember` in `engine/runtime`'s `Atom.java`
+  and `Type.java`). `get_member` gives the method with `self` applied, and
+  calling it keeps the action lazy; `invoke` evaluates its arguments first, so
+  it did not write in the probe, but it is the same lookup. The rest of
+  `Polyglot` stays allowed;
 - an `@Builtin_Method` annotation (`BUILTIN_REFUSED_ERROR`): the parser's
   `AnnotatedBuiltin` reaches the GUI's AST as a `Generic` node whose children
   are an `AnnotationOperator` token and the `Ident` token `Builtin_Method`; the
@@ -116,11 +131,19 @@ It matches plain and qualified names, a method after a dot, an argument, a
 lambda, an operator section, a text interpolation, and an import (also under an
 alias). Text and comments are not identifiers.
 
-**What it is not.** It stops an agent turning Write on by accident or by
-following an instruction naively. It is **not a security boundary**:
+**What it is not.** It refuses the routes that are known: the two enabling
+functions, binding a runtime builtin, reflection with `Meta.meta`, evaluating
+text with `Debug.eval`, and looking a method up by a name in text with
+`Polyglot.get_member` / `invoke`. Three of those were found only by review after
+the first version, and a fourth while fixing the third; each really wrote a file
+in the packaged app, and `Debug.eval` took one public call. It is **not a
+security boundary**:
 
-- deliberately obfuscated Enso code (dynamic dispatch, Java interop) can still
-  reach the output context;
+- it is a list, so other routes may exist;
+- Java and other polyglot code are not covered at all. The engine's context
+  allows all access (`ContextFactory.java`, `allowAllAccess(true)`), so a
+  `foreign python` or `foreign js` function, or `Java.lookup_class`, can write a
+  file directly without the output context;
 - the user's own Write-enabled functions and nodes can be driven by an agent's
   edits: a node that calls a function of the project which enables output, or an
   edit upstream of a node the user switched Write on for (it re-runs with the
@@ -134,8 +157,14 @@ the packaged app: a method name built by reflection
 (`(Meta.meta .x).rename ("with_" + "enabled") . value Context.Output …`) and a
 function bound to the runtime's builtin
 (`go c e ~a = @Builtin_Method "Runtime.with_context_builtin"`, then
-`Main.go Context.Output True …`). Both are now refused. A new route found later
-is added the same way, with a test in `__tests__/writeGuard.test.ts`.
+`Main.go Context.Output True …`). A re-review found a third, text evaluated as
+code
+(`Standard.Base.Runtime.Debug.eval ("Standard.Base.Runtime.with_" + "enabled_context Standard.Base.Runtime.Context.Output <| 'x'.write p")`),
+and its fix a fourth,
+`(Polyglot.get_member Context.Output ("with_" + "enabled")) ("x".write p)`; both
+wrote their file through `evaluate_expression` and `add_nodes`. All four are now
+refused. A new route found later is added the same way, with a test in
+`__tests__/writeGuard.test.ts`.
 
 **A node the user turned Write on for** (`prefixes.enableRecording`,
 `writeOnNodeError`):

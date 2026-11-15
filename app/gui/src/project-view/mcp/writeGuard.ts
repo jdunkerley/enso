@@ -7,10 +7,15 @@
  * (`add_function`), an import line (`add_nodes`) and an evaluated expression
  * (`evaluate_expression`).
  *
- * The check is a list of names matched over the parsed code. It stops an agent turning Write on by
- * accident or by following an instruction naively; it is not a security boundary. Deliberately
- * obfuscated code (dynamic dispatch, Java interop) can still reach the output context, and only
- * engine-side enforcement could guarantee otherwise.
+ * The check is a list of names matched over the parsed code, and it refuses the routes that are
+ * known: the two enabling functions, binding a runtime builtin, reflection with `Meta.meta`,
+ * evaluating text with `Debug.eval`, and looking a method up by a name in text with
+ * `Polyglot.get_member` / `Polyglot.invoke`. Three of those (builtin, `Meta.meta`, `Debug.eval`)
+ * were found only by review after the first version and a fourth (`Polyglot.get_member`) while
+ * fixing the third; each really wrote a file in the packaged app, and `Debug.eval` took one public
+ * call. Because it is a list, other routes may exist. Java and other polyglot code (a `foreign`
+ * JavaScript or Python function) is not covered at all: it can write a file directly. It is not a
+ * security boundary; a real guarantee needs engine-side enforcement.
  */
 import { Ast } from '@/util/ast'
 
