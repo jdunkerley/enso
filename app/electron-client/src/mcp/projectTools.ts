@@ -43,7 +43,9 @@ const EDIT_RULES =
   ' Refused while the project is in Live mode. Your run of changes is one undo step for the ' +
   'user, until you pause for 10 seconds or the user edits; there is no undo tool. The project ' +
   'is saved as it is edited; nothing runs with output on (no Write), so no file, database or ' +
-  'service the nodes name is written.'
+  'service the nodes name is written. `settled: true`: the engine has reported results for the ' +
+  'changed nodes, so the types and errors in this result are current. `settled: false`: it had ' +
+  'not within 20 seconds; call `get_node` later.'
 
 /**
  * The project tools (the five that read, the nine that edit or navigate), each forwarding its
@@ -146,7 +148,7 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'nodes after that node; without it they go at the end. `imports` are whole import ' +
         'lines (`from Standard.Table import Table`) added to the module if missing. Returns ' +
         'each new node with its id, name, expression and type and any error or panic, and ' +
-        '`settled`, whether the engine finished evaluating them: check the types and errors, ' +
+        '`settled` (see below): check the types and errors, ' +
         'and fix a wrong node with `edit_node`. Add a few nodes at a time. The call is ' +
         'all-or-nothing: if any statement or import does not parse, a name is already ' +
         'taken, or `after_node` is unknown, nothing is added and the error says which.' +
@@ -166,7 +168,7 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         '`expression` is the new right-hand side only, not `name = expression`: the node ' +
         'keeps its name, so the nodes that use it stay connected. An argument node of the ' +
         'method is refused. Returns `nodes`, a list holding the node with its new type and ' +
-        'any error or panic, and `settled`, whether the engine finished evaluating it; call ' +
+        'any error or panic, and `settled` (see below); call ' +
         '`get_graph` for the nodes that use it.' +
         EDIT_RULES,
       inputSchema: {

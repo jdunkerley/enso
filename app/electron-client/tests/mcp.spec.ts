@@ -234,9 +234,10 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     return node!
   }
   /**
-   * The edit that was just called saw the engine finish executing it (`settled`), and answered well
-   * inside the 20 s settle timeout: it took 0.8-2.1 s on a desktop (an edit with no node-database
-   * update waits out the 2 s graph wait), against 20-22 s when the execution was missed.
+   * The edit that was just called saw the engine report results for the nodes it changed
+   * (`settled`), and answered well inside the 20 s settle timeout: 0.13-1.4 s on a desktop,
+   * against 20-22 s when the engine's report was missed. The 10 s bound leaves room for a slower
+   * machine (CI's Windows runner has 2 CPUs).
    */
   const expectSettled = (step: string, result: { settled?: boolean }) => {
     expect(result.settled, `${step}: settled`).toBe(true)
@@ -281,8 +282,17 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     })
     note('add_nodes numbers, total', added)
     expectSettled('add_nodes', added)
+    // The edit reaches the project's file while the project is open: no close, no Write.
+    const mainFile = path.join(created.path, 'src', 'Main.enso')
+    const savingSince = Date.now()
+    await expect
+      .poll(async () => fs.readFile(mainFile, 'utf8'), { timeout: 30_000, intervals: [100] })
+      .toContain('total = numbers.fold 0 (+)')
+    note('the edit in Main.enso on disk, ms after add_nodes answered', Date.now() - savingSince)
     expect(added.nodes.map((node) => node.name)).toEqual(['numbers', 'total'])
-    for (const node of added.nodes) expect(NOT_FAILED, JSON.stringify(node)).toContain(node.state)
+    // Read just after a get_graph preview: the result itself, not a re-read, has the values.
+    for (const node of added.nodes) expect(node.state, JSON.stringify(node)).toBe('value')
+    expect(added.nodes[0]!.type).toMatch(/Vector/)
     expect(added.nodes[1]!.type).toMatch(/Integer/)
     const numbersId = added.nodes[0]!.id
     const totalId = added.nodes[1]!.id
@@ -297,8 +307,15 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     })
     note('edit_node total', edited)
     expectSettled('edit_node total', edited)
+    const editSavingSince = Date.now()
+    await expect
+      .poll(async () => fs.readFile(mainFile, 'utf8'), { timeout: 30_000, intervals: [100] })
+      .toContain('total = numbers.fold 10 (+)')
+    note('the edit_node in Main.enso on disk, ms after it answered', Date.now() - editSavingSince)
     expect(edited.nodes[0]?.name).toBe('total')
     expect(edited.nodes[0]?.code).toBe('numbers.fold 10 (+)')
+    expect(edited.nodes[0]?.state).toBe('value')
+    expect(edited.nodes[0]?.type).toMatch(/Integer/)
     const editedPreview = await previewOf(totalId)
     note('get_node total preview after edit_node', editedPreview)
     expect(editedPreview).toContain('16')
@@ -335,7 +352,7 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     })
     note('edit_node fixing it', fixed)
     expectSettled('edit_node fixing it', fixed)
-    expect(NOT_FAILED, JSON.stringify(fixed.nodes[0])).toContain(fixed.nodes[0]!.state)
+    expect(fixed.nodes[0]!.state).toBe('value')
     expect(await previewOf(pairId)).toContain('2')
 
     // 6. A comment, a visualization and a selection.

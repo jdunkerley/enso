@@ -523,6 +523,28 @@ export function mockExecutionComplete() {
   }
 }
 
+/**
+ * Sends one `expressionUpdates` batch to every execution context, reporting a computed value (no
+ * type) for each of the expressions, as the engine does when it has evaluated them. The mock never
+ * evaluates by itself: a spec that waits for an edit's results calls this.
+ */
+export function mockExpressionValues(expressionIds: readonly string[]) {
+  const updates = expressionIds.map((expressionId) => ({
+    expressionId,
+    type: [],
+    profilingInfo: [],
+    fromCache: false,
+    payload: { type: 'Value' },
+  }))
+  for (const [contextId, sendMessage] of executionContexts) {
+    try {
+      sendMessage({ method: 'executionContext/expressionUpdates', params: { contextId, updates } })
+    } catch {
+      executionContexts.delete(contextId)
+    }
+  }
+}
+
 /** Forgets the execution contexts of an earlier test's page. */
 export function clearMockExecutionContexts() {
   executionContexts.clear()

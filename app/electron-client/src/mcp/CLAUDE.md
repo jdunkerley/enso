@@ -116,8 +116,15 @@ details). Its rules, which the tool descriptions and `guides/overview.md` state:
 - An edit never moves the view or changes the selection; only `select_nodes` and
   `open_method` do.
 
-Edits are saved with the project as they are made, as the user's are; no tool
-runs Write (the output context stays off).
+An edit answers once the engine has reported results for the nodes it changed
+(`settled: true`, the types and errors in the result are current) or after 20 s
+(`settled: false`); `app/gui/src/project-view/mcp/CLAUDE.md` ("When an edit has
+settled") says exactly what counts and what does not.
+
+Edits are saved with the project as they are made, as the user's are: in the
+packaged spec the edit's text was in `src/Main.enso` on disk about 4–7 s after
+the call answered, with the project still open. No tool runs Write (the output
+context stays off).
 
 ## The caller checks
 

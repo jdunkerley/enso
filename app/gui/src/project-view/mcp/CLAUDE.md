@@ -128,9 +128,10 @@ One per mounted graph editor, built in `useProjectMcpTools`: `releaseStep()` on
 Live (`LIVE_EDIT_ERROR`, read at the call's turn). Before a caller's first edit
 of a step it saves a version (`Before changes by <caller>`; the edit is refused
 when that fails) and holds an undo step, which the same caller's further edits
-join. It starts watching the execution just before the edit is applied, then
-waits for the graph update, then for the execution; a refused or failed edit
-cancels the watch.
+join. Just before the edit is applied it starts two watches, one for the node
+database's next update and one for the engine's reports; after the edit it
+awaits the first, then the second (see "When an edit has settled" below). A
+refused or failed edit cancels both.
 
 **A hidden editor never edits.** Removing the handlers on `onDeactivated` stops
 new calls, but not the ones already in the session: one queued behind a running
@@ -146,12 +147,13 @@ Constants:
 
 - `EDIT_STEP_IDLE_MS` (10 s): a step ends after that long without an edit by its
   caller, measured from the end of a run.
-- `EDIT_SETTLE_MS` (20 s): how long an edit waits for an execution.
-- `EDIT_SHORT_SETTLE_MS` (2 s): passed by `set_node_comment` and
-  `set_visualization` (`run(…, { settleMs })`). They change nothing the engine
-  runs, so an execution may never come.
-- `GRAPH_UPDATE_WAIT_MS` (2 s, `useProjectMcpTools`): a metadata-only edit may
-  cause no node-database update.
+- `EDIT_SETTLE_MS` (20 s): how long an edit waits for the engine to report on
+  the expressions it affects; `settled: false` after it.
+- `GRAPH_UPDATE_WAIT_MS` (2 s, `editSession.ts`): a safety net. In the packaged
+  app every edit tool's change (comment and visualization included) updated the
+  node database within a few milliseconds, so no tool skips the wait. When it
+  fires, the result may describe the graph from before the edit (`add_nodes`
+  then says some new nodes are missing).
 
 Where each dependency comes from (`useProjectMcpTools.ts`, all read at call time
 from `useCurrentProject()`):
@@ -186,26 +188,69 @@ from `useCurrentProject()`):
   - The window between an async edit's `await` and its commit
     (`graph.deleteNodes` awaits the port updates) counts as the session's own.
 - `saveVersion` → `localVersioning.saveIfEnabled(projectStore.assetId, …)`.
-- `afterGraphUpdate` → `graph.doAfterUpdate`, raced with `GRAPH_UPDATE_WAIT_MS`.
-- `watchExecution` → `watchExecution(executionContext)` (`projectEvents.ts`): it
-  listens to `executionComplete` and `executionFailed` from the moment it is
-  made, so an execution that ends before `settled` is called still counts.
-  `settled(ms)` is then true at once, otherwise on the next event, and false at
-  the timeout; settling, the timeout and `cancel()` all remove both listeners.
-  **Why before the edit**: against the real engine, a small edit's execution
-  ended 0.2–0.5 s after the edit, often before the graph update resolved (which
-  can take its full 2 s: `setNodeContent` causes no node-database update).
-  Listening only after the graph update missed it, and nearly every edit waited
-  the full 20 s and answered `settled: false` (the packaged spec,
-  `tests/mcp.spec.ts`, measured it).
-- **Limitation**: the context only says that _an_ execution ended. Any one that
-  ends after the watch starts settles the edit: one already running when the
-  edit was made, or a preview evaluation still running from an earlier
-  `get_graph` (in the packaged app, `executionComplete` events followed each
-  `get_node` and `get_graph` preview, with no edit). The result may then show
-  types from before the edit. No cheaper signal was found: in the packaged app
-  no node of the method was ever in the `Pending` state, at the watch's start,
-  at each event or at the settle, so "no node pending" adds nothing.
+- `watchGraphUpdate` → `watchGraphUpdate(graph)` (`projectEvents.ts`): it queues
+  a `graph.doAfterUpdate` callback when it is made, so an update that runs
+  during the edit counts. **Why before the edit**: `graph.ts` runs the update
+  (and then the queued callbacks) in a Vue effect, which a synchronous module
+  change schedules for a microtask that runs before the code after
+  `await edit()`. Queued only after the edit, the callback waited for the next
+  update, which came about 0.8 s later or never, so `edit_node`,
+  `set_node_comment`, `add_function` and `remove_nodes` each waited out the 2 s.
+  `doAfterUpdate` cannot unqueue: a timed-out or cancelled watch's callback
+  stays queued until the next update and does nothing then. (`open_method` still
+  uses `afterGraphUpdate`: nothing it does is awaited before it queues.)
+- `watchExecution` → `watchExecution(executionContext)` (`projectEvents.ts`).
+
+## When an edit has settled
+
+`settled: true` means the engine has reported results for the nodes the edit
+changed, so the types and errors in the result are current. Each tool passes
+`run` the expression ids its edit affects (`affected: (value) => ids`, from the
+edit's value, since new ids are known only when it returns):
+
+- `add_nodes`: the new nodes; `edit_node`: the node; `collapse_nodes`: the new
+  call node; `remove_nodes`: the nodes that used a removed one (from
+  `db.nodeDependents`, the usages `deleteNodes` disconnects, read before the
+  deletion);
+- none for `add_function`, `set_node_comment` and `set_visualization`: they
+  change nothing the engine computes, and settle at once.
+
+The watch records every `expressionUpdates` batch and `executionFailed` from the
+moment it is made (just before the edit). The run is settled when:
+
+- it affects nothing; or
+- every affected id's latest update since the watch started has a payload that
+  is not `Pending` (a value, a dataflow error or a panic); or
+- an `executionFailed` arrives after the edit returned;
+- otherwise `settled: false` at `EDIT_SETTLE_MS`.
+
+A node's id is the external id of its root expression, and the engine's updates
+are keyed by exactly that (`computedValueRegistry.processUpdates`); the packaged
+spec's trace showed each affected id reported, the collapse's call node
+included. An edit to a node with the same type and a `Value` payload (`fold 0`
+to `fold 10`) still gets a fresh `Pending` then `Value` update naming it.
+
+`executionFailed` and `executionComplete` both come only from the engine's
+`ExecuteJob`, once per program run: `executionFailed` when the run itself fails
+(an exception, a module that does not compile), never for a node's own error or
+panic, which is an expression update. A run started before the edit (one an
+evaluation triggered) can fail after it, so a failure counts only after the edit
+returned; even then it may belong to that earlier run. That is the remaining
+imprecision, and it only applies when the whole program fails.
+
+**Two designs that were wrong; do not bring them back:**
+
+- **Listening only after the graph update.** A small edit's execution ended
+  0.2–0.5 s after the edit, often before the graph wait resolved, so nearly
+  every edit waited the full 20 s and answered `settled: false`. Both watches
+  start before the edit.
+- **Settling on `executionComplete`.** One follows every evaluation (each
+  `get_node` or `get_graph` preview), so a stray one arrives while the engine is
+  still computing the edit. Settling on it gave `add_nodes` results with
+  `type: null`. A variant that required an update batch after the edit first
+  still failed: `collapse_nodes` settled on a mostly-`Pending` batch followed by
+  a stray completion, 0.7 s before the call node's value came, and the next
+  `open_method` on the node failed. `executionComplete` plays no part now.
 
 `useProjectMcpTools(editor)` takes what only `GraphEditor.vue` has
 (`McpEditorDeps`: the selection, `panToSelected`, the stack navigator, the
@@ -215,9 +260,13 @@ error.
 
 `integration-test/project-view/mcpEdit.spec.ts` drives the tools in the real
 editor. `window.__mcpCall(tool, args, caller?)` (`mock/registerMocks.ts`)
-delivers a call as main would, and `mockExecutionComplete()`
-(`mock/lsHandler.ts`) stands for the engine finishing an execution, which the
-mock never does by itself. Against the real engine,
+delivers a call as main would. The mock never evaluates by itself, so while an
+edit tool's call runs, the spec has the mock report a value for every node of
+the method (`mockExpressionValues`, an `expressionUpdates` notification, as the
+engine sends) and an `executionComplete` (`mockExecutionComplete`), both in
+`mock/lsHandler.ts`. `_mockExpressionUpdate` cannot stand in: it writes to the
+registry directly, which the watch does not see. Against the real engine,
 `app/electron-client/tests/mcp.spec.ts` builds a project through every edit and
-view tool in the packaged app, undoes one call with `Mod+Z`, and checks each
-edit's `settled`.
+view tool in the packaged app, undoes one call with `Mod+Z`, and checks that
+each code-running edit answers `settled: true` with current types and states, in
+under 10 s.

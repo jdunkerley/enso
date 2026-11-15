@@ -40,10 +40,12 @@ No tool changes the execution environment, settings or secrets;
    Pass whole import lines in `imports`. Use `add_function` for a top-level
    function and call it from a node as `Main.<name> args`.
 4. Read the result of every edit: it lists the affected nodes with their types
-   and errors, and `settled` says whether the engine finished evaluating them.
-   When a node has an error or the wrong type, fix it with `edit_node`; use
-   `remove_nodes` to drop a node. Check with `get_node` or `evaluate_expression`
-   before building on a node.
+   and errors. `settled: true`: the engine has reported results for the changed
+   nodes, so the types and errors in this result are current. `settled: false`:
+   it had not within 20 seconds; call `get_node` later. When a node has an error
+   or the wrong type, fix it with `edit_node`; use `remove_nodes` to drop a
+   node. Check with `get_node` or `evaluate_expression` before building on a
+   node.
 5. Group a run of nodes that does one job with `collapse_nodes`, and explain a
    node with `set_node_comment`.
 6. `select_nodes` and `open_method` are the only project tools that change the

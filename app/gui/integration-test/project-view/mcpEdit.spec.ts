@@ -7,7 +7,7 @@
  */
 import assert from 'assert'
 import { expect, test, type Page } from 'integration-test/base'
-import { mockExecutionComplete } from 'integration-test/mock/lsHandler'
+import { mockExecutionComplete, mockExpressionValues } from 'integration-test/mock/lsHandler'
 import * as locate from './locate'
 
 // Each test opens the project and makes several edits, each waiting for the graph and an
@@ -32,29 +32,43 @@ interface Graph {
   selection: string[]
 }
 
-/** How often the mock engine reports a finished execution while a call is running. */
+/** How often the mock engine reports results while a call is running. */
 const EXECUTION_INTERVAL_MS = 200
 
+/** The tools that wait for the engine's results for the nodes they change. */
+const EDIT_TOOLS = new Set(['add_nodes', 'edit_node', 'remove_nodes', 'collapse_nodes'])
+
+/** Delivers the tool call as Electron main would, and resolves with its result. */
+function deliver(page: Page, tool: string, args: object): Promise<ToolResult> {
+  return page.evaluate(
+    ([tool, args]) =>
+      (
+        window as unknown as {
+          __mcpCall: (tool: string, args: unknown) => Promise<ToolResult>
+        }
+      ).__mcpCall(tool as string, args),
+    [tool, args] as const,
+  )
+}
+
 /**
- * Delivers the tool call and resolves with its result. Meanwhile the mock engine reports a finished
- * execution every {@link EXECUTION_INTERVAL_MS}, as the engine does after an edit (the mock never
- * executes by itself), so that an edit settles.
+ * Delivers the tool call and resolves with its result. The mock never evaluates by itself, so
+ * meanwhile, every {@link EXECUTION_INTERVAL_MS}, it does what the engine does after an edit: an
+ * edit tool's call gets a value reported for every node of the method on screen (an edit settles
+ * once its own nodes are reported), and every call an `executionComplete`.
  */
 async function call(page: Page, tool: string, args: object = {}): Promise<ToolResult> {
   let done = false
-  const result = page
-    .evaluate(
-      ([tool, args]) =>
-        (
-          window as unknown as {
-            __mcpCall: (tool: string, args: unknown) => Promise<ToolResult>
-          }
-        ).__mcpCall(tool as string, args),
-      [tool, args] as const,
-    )
-    .finally(() => (done = true))
+  const result = deliver(page, tool, args).finally(() => (done = true))
   while (!done) {
     await new Promise((resolve) => setTimeout(resolve, EXECUTION_INTERVAL_MS))
+    if (done) break
+    if (EDIT_TOOLS.has(tool)) {
+      const graph = await deliver(page, 'get_graph', { previews: false })
+      if (graph.ok && !done) {
+        mockExpressionValues((JSON.parse(graph.value!) as Graph).nodes.map((node) => node.id))
+      }
+    }
     if (!done) mockExecutionComplete()
   }
   return result
