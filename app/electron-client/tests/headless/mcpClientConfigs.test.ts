@@ -27,6 +27,10 @@ describe('clientConfig', () => {
     expect(text).toContain(`http_headers = { "Authorization" = "Bearer ${TOKEN}" }`)
   })
 
+  test('codex waits 120 s for a tool, longer than the IDE gives an edit or an open', () => {
+    expect(clientConfig('codex', URL, TOKEN).split('\n')).toContain('tool_timeout_sec = 120')
+  })
+
   test('copilotVsCode is JSON under "servers"', () => {
     const parsed: unknown = JSON.parse(clientConfig('copilotVsCode', URL, TOKEN))
     expect(parsed).toEqual({

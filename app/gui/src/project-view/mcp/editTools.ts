@@ -125,6 +125,8 @@ export function isPlainName(name: string): name is Identifier {
 export interface EditToolDeps extends GraphToolDeps {
   readonly session: Pick<EditSession, 'run'>
   readonly caller: McpCaller
+  /** When the caller stops waiting (the tool dispatcher's deadline), passed to the session. */
+  readonly deadline: number
   /**
    * Creates the nodes in one module edit, placed without overlapping each other or existing nodes,
    * near `after` when given; resolves with their ids in order. Does not select or pan.
@@ -190,7 +192,7 @@ export async function addNodes(
       return deps.createNodes(nodes, after, imports)
     },
     // The engine reports a value for each new node.
-    { affected: (ids) => ids },
+    { affected: (ids) => ids, deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
   const summaries: NodeSummary[] = []
@@ -241,7 +243,7 @@ export async function editNode(
   const outcome = await deps.session.run(
     deps.caller,
     () => deps.setNodeContent(id, expression.value),
-    { affected: () => [id] },
+    { affected: () => [id], deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult({ nodes: [currentSummary(deps, found.value)] }, outcome.value)
@@ -275,7 +277,7 @@ export async function removeNodes(
       users = dependentsOf(deps, ids)
       return deps.deleteNodes(ids)
     },
-    { affected: () => users },
+    { affected: () => users, deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult({ removed: ids }, outcome.value)
@@ -295,6 +297,7 @@ export async function setNodeComment(
     deps.caller,
     // A comment changes nothing the engine runs: no expression is affected.
     () => deps.setNodeComment(found.value.id, args.text),
+    { deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
   return jsonResult({ node: currentSummary(deps, found.value) })
@@ -311,6 +314,7 @@ export async function setVisualization(
     deps.caller,
     // A visualization changes nothing the engine runs for the graph: no expression is affected.
     () => deps.setVisualization(found.value.id, args.visible),
+    { deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
   return jsonResult({ node: currentSummary(deps, found.value) })

@@ -60,6 +60,7 @@ describe('WindowBridge', () => {
       tool: 'get_node',
       args: { node_id: 'a' },
       caller,
+      timeoutMs: WINDOW_TOOL_TIMEOUT_MS,
     })
     ipc.emit(Channel.mcpToolReply, undefined, {
       requestId: request.requestId,
@@ -143,6 +144,13 @@ describe('WindowBridge', () => {
     await vi.advanceTimersByTimeAsync(EDIT_TOOL_TIMEOUT_MS - WINDOW_TOOL_TIMEOUT_MS)
     const result = await pending
     expect(!result.ok && result.error).toContain('timed out after 60000ms')
+  })
+
+  test('sends the timeout with the call, so that the window can refuse an edit too late to run', () => {
+    const win = fakeWindow()
+    const { bridge } = setup(win)
+    void bridge.call('add_nodes', {}, caller, EDIT_TOOL_TIMEOUT_MS)
+    expect(sentRequest(win).timeoutMs).toBe(EDIT_TOOL_TIMEOUT_MS)
   })
 
   test('dispose resolves pending calls with an error and removes the listener', async () => {

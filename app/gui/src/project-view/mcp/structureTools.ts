@@ -24,7 +24,8 @@ import { findNode, jsonResult, type GraphToolDeps } from './graphTools'
 import { hasSyntaxError, quote } from './importLines'
 import { enablesOutput, WRITE_REFUSED_ERROR } from './writeGuard'
 
-export interface StructureToolDeps extends GraphToolDeps, Pick<EditToolDeps, 'session' | 'caller'> {
+export interface StructureToolDeps
+  extends GraphToolDeps, Pick<EditToolDeps, 'session' | 'caller' | 'deadline'> {
   /**
    * Collapses the component nodes into a new function named `name` (a generated name without it;
    * a number is added when the name is taken), in one module edit. See `collapseNodes` in
@@ -72,6 +73,7 @@ export async function collapseNodesTool(
   const outcome = await deps.session.run(deps.caller, () => deps.collapseNodes(ids, name), {
     // The engine reports a value for the new node that calls the function.
     affected: ({ callNode }) => (callNode != null ? [callNode] : []),
+    deadline: deps.deadline,
   })
   if (!outcome.ok) return errorResult(outcome)
   const { name: functionName, callNode } = outcome.value.value
@@ -139,8 +141,10 @@ export async function addFunction(
   const name = parsed.value
   // A definition alone affects nothing the engine runs: the nodes that will call it are added
   // later, and their own edit waits for their values.
-  const outcome = await deps.session.run(deps.caller, () =>
-    deps.editModule((topLevel) => insertFunction(deps, topLevel, args.source, name)),
+  const outcome = await deps.session.run(
+    deps.caller,
+    () => deps.editModule((topLevel) => insertFunction(deps, topLevel, args.source, name)),
+    { deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult({ name }, outcome.value)

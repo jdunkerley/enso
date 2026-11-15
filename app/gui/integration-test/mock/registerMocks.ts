@@ -236,7 +236,13 @@ async function mockElectronApi(
               // A spec delivers a tool call as main would, and awaits the window's reply:
               // `window.__mcpCall(tool, args, caller?)` resolves with the `McpToolResult`.
               type Reply = { requestId: string; result: unknown }
-              type Request = { requestId: string; tool: string; args: unknown; caller: unknown }
+              type Request = {
+                requestId: string
+                tool: string
+                args: unknown
+                caller: unknown
+                timeoutMs: number
+              }
               let toolCallHandler: ((request: Request) => void) | undefined
               const pendingReplies = new Map<string, (result: unknown) => void>()
               let nextRequest = 0
@@ -250,7 +256,9 @@ async function mockElectronApi(
                 const requestId = `mock-${++nextRequest}`
                 return new Promise((resolve) => {
                   pendingReplies.set(requestId, resolve)
-                  handler({ requestId, tool, args, caller })
+                  // Main's longest per-call timeout (`OPEN_TOOL_TIMEOUT_MS`): the window refuses
+                  // an edit with less than 25 s of it left.
+                  handler({ requestId, tool, args, caller, timeoutMs: 120_000 })
                 })
               }
               return {

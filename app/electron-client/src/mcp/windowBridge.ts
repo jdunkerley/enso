@@ -81,7 +81,7 @@ export class WindowBridge {
         }
       }, timeoutMs)
       this.pending.set(requestId, { resolve, timer })
-      const request: McpToolCallRequest = { requestId, tool, args, caller }
+      const request: McpToolCallRequest = { requestId, tool, args, caller, timeoutMs }
       try {
         win.send(Channel.mcpToolCall, request)
       } catch (error) {

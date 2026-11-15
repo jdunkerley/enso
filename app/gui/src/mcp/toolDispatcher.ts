@@ -10,9 +10,15 @@
 import type { McpApi } from '$/electronApi'
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 
+/**
+ * A tool's handler. `deadline` is when Electron main stops waiting for the reply (the call's
+ * receipt time plus its timeout, in `Date.now()` milliseconds): an edit must not be applied after
+ * it, since the caller has been told the call timed out by then.
+ */
 export type McpToolHandler = (
   args: Readonly<Record<string, unknown>>,
   caller: McpCaller,
+  deadline: number,
 ) => Promise<McpToolResult>
 
 export const NO_PROJECT_ERROR = 'No project is open in Enso. Ask the user to open one.'
@@ -144,15 +150,17 @@ function handlerFor(tool: string): McpToolHandler | undefined {
 }
 
 /**
- * Subscribes to `api.onToolCall`, runs the handler, replies. No handler →
- * `{ ok: false, error: NO_PROJECT_ERROR }`. A throwing handler → `{ ok: false }` with its message.
- * Returns the unsubscribe function.
+ * Subscribes to `api.onToolCall`, runs the handler with the call's deadline (`now()` at receipt
+ * plus the call's `timeoutMs`), replies. No handler → `{ ok: false, error: NO_PROJECT_ERROR }`. A
+ * throwing handler → `{ ok: false }` with its message. Returns the unsubscribe function.
  */
 export function startMcpToolDispatcher(
   api: Pick<McpApi, 'onToolCall' | 'replyToolCall'>,
+  now: () => number = Date.now,
 ): () => void {
   return api.onToolCall((request) => {
-    void runHandler(request.tool, request.args, request.caller).then((result) =>
+    const deadline = now() + request.timeoutMs
+    void runHandler(request.tool, request.args, request.caller, deadline).then((result) =>
       api.replyToolCall({ requestId: request.requestId, result }),
     )
   })
@@ -162,11 +170,12 @@ async function runHandler(
   tool: string,
   args: Readonly<Record<string, unknown>>,
   caller: McpCaller,
+  deadline: number,
 ): Promise<McpToolResult> {
   const handler = handlerFor(tool)
   if (handler == null) return { ok: false, error: NO_PROJECT_ERROR }
   try {
-    return await handler(args, caller)
+    return await handler(args, caller, deadline)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return { ok: false, error: `The tool ${tool} failed: ${message}` }

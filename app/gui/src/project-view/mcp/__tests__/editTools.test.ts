@@ -97,20 +97,27 @@ const pointer: MethodPointer = {
 }
 
 const caller = { kind: 'external', name: 'claude-code' } as const
+/** The call's deadline, which each tool passes on to the session. */
+const DEADLINE = 123_456
 
 /**
  * A session that runs each edit at once and reports `settled`. `affected` lists, per successful
  * run, the expression ids the tool said its edit affects.
  */
-function fakeSession(settled = true): Pick<EditSession, 'run'> & { affected: string[][] } {
+function fakeSession(
+  settled = true,
+): Pick<EditSession, 'run'> & { affected: string[][]; deadlines: (number | undefined)[] } {
   const affected: string[][] = []
+  const deadlines: (number | undefined)[] = []
   return {
     affected,
+    deadlines,
     async run<T>(
       _caller: unknown,
       edit: () => Result<T> | Promise<Result<T>>,
       options?: EditRunOptions<T>,
     ) {
+      deadlines.push(options?.deadline)
       const result = await edit()
       if (!result.ok) return result
       affected.push([...(options?.affected?.(result.value) ?? [])])
@@ -145,6 +152,7 @@ function makeDeps(overrides: Partial<EditToolDeps> = {}, code = CODE) {
     evaluate: vi.fn(async () => Ok('text')),
     session: fakeSession(),
     caller,
+    deadline: DEADLINE,
     createNodes,
     setNodeContent: vi.fn(() => Ok()),
     deleteNodes: vi.fn(async () => Ok()),
@@ -274,6 +282,7 @@ test('add_nodes in Live mode is refused by the session, and nothing is created',
     saveVersion: async () => {},
     watchGraphUpdate: () => ({ updated: async () => true, cancel: () => {} }),
     watchExecution: () => ({ settled: async () => true, cancel: () => {} }),
+    now: () => 0,
     setTimeout: () => undefined,
     clearTimeout: () => {},
   })
@@ -519,4 +528,16 @@ test('edit_node refuses a node the user turned Write on for, and leaves it as it
   // Its comment and visualization are not code: those still work.
   expect((await setNodeComment(deps, { node_id: w, text: 'Saved' })).ok).toBe(true)
   expect((await setVisualization(deps, { node_id: w, visible: true })).ok).toBe(true)
+})
+
+test("Every edit tool passes the call's deadline to the session", async () => {
+  const session = fakeSession()
+  const { deps, db } = makeDeps({ session })
+  const a = nodeNamed(db, 'a')
+  await addNodes(deps, { statements: ['c = 1'] })
+  await editNode(deps, { node_id: a, expression: '7' })
+  await setNodeComment(deps, { node_id: a, text: 'x' })
+  await setVisualization(deps, { node_id: a, visible: true })
+  await removeNodes(deps, { node_ids: [a] })
+  expect(session.deadlines).toEqual([DEADLINE, DEADLINE, DEADLINE, DEADLINE, DEADLINE])
 })

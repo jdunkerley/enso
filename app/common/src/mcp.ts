@@ -13,6 +13,11 @@ export interface McpToolCallRequest {
   readonly tool: string
   readonly args: Readonly<Record<string, unknown>>
   readonly caller: McpCaller
+  /**
+   * How long main waits for the reply before it answers the caller that the call timed out. The
+   * window must not apply an edit after that: it refuses a run whose turn comes too late.
+   */
+  readonly timeoutMs: number
 }
 
 /** Window → main. */

@@ -2,12 +2,15 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { ObservableV2 } from 'lib0/observable'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
+  EDIT_ANSWER_MARGIN_MS,
+  EDIT_MIN_REMAINING_MS,
   EDIT_SETTLE_MS,
   EDIT_STEP_IDLE_MS,
   EditSession,
   GRAPH_UPDATE_WAIT_MS,
   LIVE_EDIT_ERROR,
   NOT_ON_SCREEN_ERROR,
+  TIMED_OUT_BEFORE_RUN_ERROR,
   type EditSessionDeps,
 } from '../editSession'
 import {
@@ -107,6 +110,7 @@ function setup({
       watches.push(watch)
       return watch
     }),
+    now: () => 0,
     setTimeout: (f, ms) => {
       if (failNextSetTimeout) {
         failNextSetTimeout = false
@@ -470,11 +474,126 @@ describe('EditSession', () => {
     expect(secondEdit).not.toHaveBeenCalled()
   })
 
+  test('switched to Live while the version was saving: refused, no hold, no edit', async () => {
+    let finishSave: () => void = () => {}
+    const t2 = setup({
+      saveVersion: vi.fn(() => new Promise<void>((resolve) => (finishSave = resolve))),
+    })
+    const edit = vi.fn(() => Ok(1))
+    const result = t2.session.run(claude, edit)
+    await vi.waitFor(() => expect(t2.deps.saveVersion).toHaveBeenCalled())
+    t2.setLive(true)
+    finishSave()
+    expect(errorOf(await result)).toBe(LIVE_EDIT_ERROR)
+    expect(t2.deps.holdUndoStep).not.toHaveBeenCalled()
+    expect(edit).not.toHaveBeenCalled()
+  })
+
   test('after reactivation runs work again', async () => {
     t.setActive(false)
     expect((await t.session.run(claude, () => Ok(1))).ok).toBe(false)
     t.setActive(true)
     expect(await t.session.run(claude, () => Ok(2))).toEqual(Ok({ value: 2, settled: true }))
+  })
+})
+
+describe('the deadline', () => {
+  const TEXT = 'The call timed out before it ran. Nothing was changed; try again.'
+
+  test('the constants and the refusal text', () => {
+    expect(EDIT_MIN_REMAINING_MS).toBe(25_000)
+    expect(EDIT_ANSWER_MARGIN_MS).toBe(3_000)
+    expect(TIMED_OUT_BEFORE_RUN_ERROR).toBe(TEXT)
+  })
+
+  test('a run whose turn comes with less than 25 s left is refused, and edit is not called', async () => {
+    let clock = 0
+    const t = setup({ now: () => clock })
+    let finishSettle: (settled: boolean) => void = () => {}
+    vi.mocked(t.deps.watchExecution).mockImplementationOnce(() => ({
+      editApplied: () => {},
+      settled: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
+      cancel: () => {},
+    }))
+    const first = t.session.run(claude, () => Ok(1), { deadline: 60_000 })
+    const secondEdit = vi.fn(() => Ok(2))
+    // Queued at 0 with a 60 s budget; its turn comes 36 s later.
+    const second = t.session.run(claude, secondEdit, { deadline: 60_000 })
+    await vi.waitFor(() => expect(t.updated).toHaveBeenCalled())
+    clock = 36_000
+    finishSettle(true)
+    expect((await first).ok).toBe(true)
+    expect(errorOf(await second)).toBe(TEXT)
+    expect(secondEdit).not.toHaveBeenCalled()
+  })
+
+  test('exactly 25 s left at the turn is enough', async () => {
+    const t = setup({ now: () => 35_000 })
+    expect(await t.session.run(claude, () => Ok(1), { deadline: 60_000 })).toEqual(
+      Ok({ value: 1, settled: true }),
+    )
+  })
+
+  test('a version save that outlasts the budget refuses the run; a late save changes nothing', async () => {
+    let clock = 0
+    let finishSave: () => void = () => {}
+    const t = setup({
+      now: () => clock,
+      saveVersion: vi.fn(() => new Promise<void>((resolve) => (finishSave = resolve))),
+    })
+    const edit = vi.fn(() => Ok(1))
+    const result = t.session.run(claude, edit, { deadline: 60_000 })
+    await vi.waitFor(() => expect(t.deps.saveVersion).toHaveBeenCalled())
+    // The save may take until 25 s are left: 35 s.
+    const race = t.pending().find((timer) => timer.ms === 35_000)
+    expect(race).toBeDefined()
+    clock = 35_000
+    race!.cleared = true
+    race!.f()
+    expect(errorOf(await result)).toBe(TEXT)
+    finishSave()
+    await Promise.resolve()
+    expect(edit).not.toHaveBeenCalled()
+    expect(t.deps.holdUndoStep).not.toHaveBeenCalled()
+  })
+
+  test('a save that returns in time clears its race timer', async () => {
+    const t = setup({ now: () => 0 })
+    await t.session.run(claude, () => Ok(1), { deadline: 60_000 })
+    // Only the step's idle timer is left.
+    expect(t.pending().map((timer) => timer.ms)).toEqual([EDIT_STEP_IDLE_MS])
+  })
+
+  test('a save that returns with less than 25 s left refuses the run', async () => {
+    let clock = 0
+    const t = setup({
+      now: () => clock,
+      saveVersion: vi.fn(async () => {
+        clock = 40_000
+      }),
+    })
+    const edit = vi.fn(() => Ok(1))
+    expect(errorOf(await t.session.run(claude, edit, { deadline: 60_000 }))).toBe(TEXT)
+    expect(edit).not.toHaveBeenCalled()
+  })
+
+  test('the settle wait is capped at the time left minus 3 s', async () => {
+    let clock = 0
+    const t = setup({
+      now: () => clock,
+      graphUpdated: async () => {
+        clock = 30_000
+        return true
+      },
+    })
+    await t.session.run(claude, () => Ok(['n']), { deadline: 50_000, affected: (ids) => ids })
+    expect(t.settle).toHaveBeenCalledWith(['n'], 50_000 - 30_000 - EDIT_ANSWER_MARGIN_MS)
+  })
+
+  test('with time to spare the settle wait is EDIT_SETTLE_MS', async () => {
+    const t = setup({ now: () => 0 })
+    await t.session.run(claude, () => Ok(1), { deadline: 120_000 })
+    expect(t.settle).toHaveBeenCalledWith([], EDIT_SETTLE_MS)
   })
 })
 

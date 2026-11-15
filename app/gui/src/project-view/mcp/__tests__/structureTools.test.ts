@@ -11,7 +11,7 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
-import { EditSession, LIVE_EDIT_ERROR, type EditOutcome } from '../editSession'
+import { EditSession, LIVE_EDIT_ERROR, type EditOutcome, type EditRunOptions } from '../editSession'
 import { MISSING_NODES_NOTE, UNSETTLED_NOTE } from '../editTools'
 import {
   addFunction,
@@ -37,13 +37,21 @@ const pointer: MethodPointer = {
 }
 
 const caller = { kind: 'external', name: 'claude-code' } as const
+/** The call's deadline, which each tool passes on to the session. */
+const DEADLINE = 123_456
 
 function fakeSession(settled = true) {
   return {
-    run: vi.fn(async <T>(_caller: unknown, edit: () => Result<T> | Promise<Result<T>>) => {
-      const result = await edit()
-      return result.ok ? Ok<EditOutcome<T>>({ value: result.value, settled }) : result
-    }),
+    run: vi.fn(
+      async <T>(
+        _caller: unknown,
+        edit: () => Result<T> | Promise<Result<T>>,
+        _options?: EditRunOptions<T>,
+      ) => {
+        const result = await edit()
+        return result.ok ? Ok<EditOutcome<T>>({ value: result.value, settled }) : result
+      },
+    ),
   }
 }
 
@@ -69,6 +77,7 @@ function makeDeps(overrides: Partial<StructureToolDeps> = {}) {
     evaluate: vi.fn(async () => Ok('text')),
     session,
     caller,
+    deadline: DEADLINE,
     collapseNodes: vi.fn<StructureToolDeps['collapseNodes']>((_ids, name) => {
       const id = asNodeId(crypto.randomUUID() as ExternalId)
       const functionName = name ?? ('user_defined_component' as Identifier)
@@ -168,6 +177,7 @@ test('collapse_nodes in Live mode is refused by the session', async () => {
     saveVersion: async () => {},
     watchGraphUpdate: () => ({ updated: async () => true, cancel: () => {} }),
     watchExecution: () => ({ settled: async () => true, cancel: () => {} }),
+    now: () => 0,
     setTimeout: () => undefined,
     clearTimeout: () => {},
   })
@@ -299,4 +309,11 @@ test('add_function refuses a body that turns the output context on, before the s
   )
   expect(session.run).not.toHaveBeenCalled()
   expect(topLevel.code()).toBe(before)
+})
+
+test("collapse_nodes and add_function pass the call's deadline to the session", async () => {
+  const { deps, db, session } = makeDeps()
+  await collapseNodesTool(deps, { node_ids: [nodeNamed(db, 'a')] })
+  await addFunction(deps, { source: 'double x = x * 2' })
+  expect(session.run.mock.calls.map((call) => call[2]?.deadline)).toEqual([DEADLINE, DEADLINE])
 })

@@ -43,9 +43,11 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup()
 })
 
-function start() {
+const TIMEOUT_MS = 30_000
+
+function start(now?: () => number) {
   const fake = fakeApi()
-  cleanups.push(startMcpToolDispatcher(fake.api))
+  cleanups.push(startMcpToolDispatcher(fake.api, now))
   return fake
 }
 
@@ -62,7 +64,15 @@ function project(name: string) {
 
 let nextId = 0
 async function graphFrom(call: (request: McpToolCallRequest) => Promise<McpToolCallReply>) {
-  return (await call({ requestId: `g${nextId++}`, tool: 'get_graph', args: {}, caller })).result
+  return (
+    await call({
+      requestId: `g${nextId++}`,
+      tool: 'get_graph',
+      args: {},
+      caller,
+      timeoutMs: TIMEOUT_MS,
+    })
+  ).result
 }
 
 test('A registered handler gets the arguments and caller, and its result is the reply', async () => {
@@ -74,14 +84,33 @@ test('A registered handler gets the arguments and caller, and its result is the 
     tool: 'get_graph',
     args: { previews: false },
     caller,
+    timeoutMs: TIMEOUT_MS,
   })
-  expect(handler).toHaveBeenCalledWith({ previews: false }, caller)
+  expect(handler).toHaveBeenCalledWith({ previews: false }, caller, expect.any(Number))
   expect(reply).toEqual({ requestId: 'r1', result: { ok: true, value: 'graph' } })
+})
+
+test("A handler's deadline is the call's receipt time plus its timeout, from the clock", async () => {
+  let clock = 1_000
+  const { call } = start(() => clock)
+  const handler = vi.fn<McpToolHandler>(async () => ({ ok: true, value: 'done' }))
+  register({ add_nodes: handler })
+  await call({ requestId: 'd1', tool: 'add_nodes', args: {}, caller, timeoutMs: 60_000 })
+  expect(handler).toHaveBeenCalledWith({}, caller, 61_000)
+  clock = 5_000
+  await call({ requestId: 'd2', tool: 'add_nodes', args: {}, caller, timeoutMs: 30_000 })
+  expect(handler).toHaveBeenLastCalledWith({}, caller, 35_000)
 })
 
 test('A tool with no handler says that no project is open', async () => {
   const { call } = start()
-  const reply = await call({ requestId: 'r2', tool: 'get_graph', args: {}, caller })
+  const reply = await call({
+    requestId: 'r2',
+    tool: 'get_graph',
+    args: {},
+    caller,
+    timeoutMs: TIMEOUT_MS,
+  })
   expect(reply).toEqual({ requestId: 'r2', result: { ok: false, error: NO_PROJECT_ERROR } })
 })
 
@@ -92,7 +121,13 @@ test('A handler that throws is answered with its message', async () => {
       throw new Error('boom')
     },
   })
-  const reply = await call({ requestId: 'r3', tool: 'get_node', args: {}, caller })
+  const reply = await call({
+    requestId: 'r3',
+    tool: 'get_node',
+    args: {},
+    caller,
+    timeoutMs: TIMEOUT_MS,
+  })
   expect(reply.result.ok).toBe(false)
   expect(reply.result.ok ? undefined : reply.result.error).toContain('boom')
 })
@@ -153,9 +188,17 @@ function app(handlers: Record<string, McpToolHandler>) {
 test('App tools answer on the dashboard, while project tools there still say no project is open', async () => {
   const { call } = start()
   app({ get_app_state: async () => ({ ok: true, value: 'dashboard' }) })
-  expect((await call({ requestId: 'a1', tool: 'get_app_state', args: {}, caller })).result).toEqual(
-    { ok: true, value: 'dashboard' },
-  )
+  expect(
+    (
+      await call({
+        requestId: 'a1',
+        tool: 'get_app_state',
+        args: {},
+        caller,
+        timeoutMs: TIMEOUT_MS,
+      })
+    ).result,
+  ).toEqual({ ok: true, value: 'dashboard' })
   expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR })
 })
 
@@ -164,7 +207,15 @@ test('App tools answer whichever project is on screen or hidden', async () => {
   app({ get_app_state: async () => ({ ok: true, value: 'app' }) })
   const a = project('A')
   const appState = async () =>
-    (await call({ requestId: `s${nextId++}`, tool: 'get_app_state', args: {}, caller })).result
+    (
+      await call({
+        requestId: `s${nextId++}`,
+        tool: 'get_app_state',
+        args: {},
+        caller,
+        timeoutMs: TIMEOUT_MS,
+      })
+    ).result
   expect(await appState()).toEqual({ ok: true, value: 'app' })
   expect(await graphFrom(call)).toEqual({ ok: true, value: 'A' })
   a.remove()
@@ -185,9 +236,17 @@ test('Unregistering the app tools stops them answering', async () => {
   const { call } = start()
   const unregister = app({ list_projects: async () => ({ ok: true, value: '[]' }) })
   unregister()
-  expect((await call({ requestId: 'a2', tool: 'list_projects', args: {}, caller })).result).toEqual(
-    { ok: false, error: NO_PROJECT_ERROR },
-  )
+  expect(
+    (
+      await call({
+        requestId: 'a2',
+        tool: 'list_projects',
+        args: {},
+        caller,
+        timeoutMs: TIMEOUT_MS,
+      })
+    ).result,
+  ).toEqual({ ok: false, error: NO_PROJECT_ERROR })
 })
 
 // === Waiting for a project's tools ===

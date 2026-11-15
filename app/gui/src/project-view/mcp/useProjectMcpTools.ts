@@ -111,6 +111,7 @@ export function useProjectMcpTools(
       localVersioning.saveIfEnabled(currentProject.store.value.assetId, comment),
     watchGraphUpdate: () => watchGraphUpdate(currentProject.graph.value),
     watchExecution: () => watchExecution(currentProject.store.value.executionContext),
+    now: () => Date.now(),
     setTimeout: (f, ms) => setTimeout(f, ms),
     clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
   })
@@ -155,13 +156,14 @@ export function useProjectMcpTools(
    * The edit tools' dependencies. Each function reads the stores when it is called: an edit runs at
    * its turn in the session's queue, which may be after other edits.
    */
-  function editDeps(caller: McpCaller): EditToolDeps {
+  function editDeps(caller: McpCaller, deadline: number): EditToolDeps {
     const graph = () => currentProject.graph.value
     const module = () => currentProject.module.value
     return {
       ...graphDeps(),
       session,
       caller,
+      deadline,
       createNodes: async (nodes, after, importLines) => {
         const g = graph()
         const m = module()
@@ -212,12 +214,13 @@ export function useProjectMcpTools(
     }
   }
 
-  function structureDeps(caller: McpCaller): StructureToolDeps {
+  function structureDeps(caller: McpCaller, deadline: number): StructureToolDeps {
     const module = () => currentProject.module.value
     return {
       ...graphDeps(),
       session,
       caller,
+      deadline,
       collapseNodes: editor.collapseNodes,
       editModule: (f) =>
         module().edit((edit) => {
@@ -306,7 +309,7 @@ export function useProjectMcpTools(
         node_id != null ? { expression, node_id } : { expression },
       )
     },
-    add_nodes: async (args, caller) => {
+    add_nodes: async (args, caller, deadline) => {
       const { statements, after_node, imports } = args
       if (!isStringArray(statements)) return invalidArgument('statements', 'a list of strings')
       if (after_node != null && typeof after_node !== 'string') {
@@ -315,48 +318,48 @@ export function useProjectMcpTools(
       if (imports != null && !isStringArray(imports)) {
         return invalidArgument('imports', 'a list of strings')
       }
-      return addNodes(editDeps(caller), {
+      return addNodes(editDeps(caller, deadline), {
         statements,
         ...(after_node != null ? { after_node } : {}),
         ...(imports != null ? { imports } : {}),
       })
     },
-    edit_node: async (args, caller) => {
+    edit_node: async (args, caller, deadline) => {
       const { node_id, expression } = args
       if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
       if (typeof expression !== 'string') return invalidArgument('expression', 'a string')
-      return editNode(editDeps(caller), { node_id, expression })
+      return editNode(editDeps(caller, deadline), { node_id, expression })
     },
-    remove_nodes: async (args, caller) => {
+    remove_nodes: async (args, caller, deadline) => {
       const node_ids = args.node_ids
       if (!isStringArray(node_ids)) return invalidArgument('node_ids', 'a list of strings')
-      return removeNodes(editDeps(caller), { node_ids })
+      return removeNodes(editDeps(caller, deadline), { node_ids })
     },
-    set_node_comment: async (args, caller) => {
+    set_node_comment: async (args, caller, deadline) => {
       const { node_id, text } = args
       if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
       if (typeof text !== 'string') return invalidArgument('text', 'a string')
-      return setNodeComment(editDeps(caller), { node_id, text })
+      return setNodeComment(editDeps(caller, deadline), { node_id, text })
     },
-    set_visualization: async (args, caller) => {
+    set_visualization: async (args, caller, deadline) => {
       const { node_id, visible } = args
       if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
       if (typeof visible !== 'boolean') return invalidArgument('visible', 'a boolean')
-      return setVisualization(editDeps(caller), { node_id, visible })
+      return setVisualization(editDeps(caller, deadline), { node_id, visible })
     },
-    collapse_nodes: async (args, caller) => {
+    collapse_nodes: async (args, caller, deadline) => {
       const { node_ids, name } = args
       if (!isStringArray(node_ids)) return invalidArgument('node_ids', 'a list of strings')
       if (name != null && typeof name !== 'string') return invalidArgument('name', 'a string')
-      return collapseNodesTool(structureDeps(caller), {
+      return collapseNodesTool(structureDeps(caller, deadline), {
         node_ids,
         ...(name != null ? { name } : {}),
       })
     },
-    add_function: async (args, caller) => {
+    add_function: async (args, caller, deadline) => {
       const source = args.source
       if (typeof source !== 'string') return invalidArgument('source', 'a string')
-      return addFunction(structureDeps(caller), { source })
+      return addFunction(structureDeps(caller, deadline), { source })
     },
     select_nodes: async (args) => {
       const node_ids = args.node_ids
