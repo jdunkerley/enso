@@ -3,6 +3,7 @@ import {
   panelText,
   sectionRanges,
   splitSections,
+  withoutFrontMatterGroup,
 } from '@/components/ComponentHelp/sections'
 import { expect, test } from 'vitest'
 
@@ -102,4 +103,19 @@ test('panelText without sections returns the text unchanged', () => {
 
 test('panelText gives an empty body to a section whose heading is the last line', () => {
   expect(panelText('Text.\n\n## Remarks', [])).toEqual({ main: 'Text.', remarks: '' })
+})
+
+test('withoutFrontMatterGroup drops only the group key of the front matter', () => {
+  const doc = [
+    '---',
+    'aliases: [now]',
+    'group: Standard.Base.DateTime',
+    'icon: calendar',
+    '---',
+    'group: stays in the body',
+  ].join('\n')
+  expect(withoutFrontMatterGroup(doc)).toBe(
+    ['---', 'aliases: [now]', 'icon: calendar', '---', 'group: stays in the body'].join('\n'),
+  )
+  expect(withoutFrontMatterGroup('No front matter.')).toBe('No front matter.')
 })

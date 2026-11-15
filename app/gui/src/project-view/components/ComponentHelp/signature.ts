@@ -1,4 +1,8 @@
-import type { CallableSuggestionEntry } from '$/providers/openedProjects/suggestionDatabase/entry'
+import {
+  entryDisplayPath,
+  entryIsStatic,
+  type CallableSuggestionEntry,
+} from '$/providers/openedProjects/suggestionDatabase/entry'
 import {
   docArguments,
   unqualifiedType,
@@ -12,6 +16,7 @@ export { unqualifiedType } from '@/components/ComponentHelp/arguments'
  * and its arguments (but `self`), the optional ones apart.
  */
 export interface Signature {
+  /** A static method or constructor is named with its type (`Date.new`), as a node calls it. */
   name: string
   params: DocArgument[]
   /** The unqualified return type. */
@@ -24,11 +29,12 @@ export interface Signature {
 export function entrySignature(entry: CallableSuggestionEntry, returnType: string): Signature {
   const params = docArguments(entry)
   const returns = unqualifiedType(returnType)
+  const name = entryIsStatic(entry) ? entryDisplayPath(entry) : entry.name
   const detail = (p: DocArgument) => (p.default != null ? `${p.type} = ${p.default}` : p.type)
   return {
-    name: entry.name,
+    name,
     params,
     returns,
-    label: `${entry.name}(${params.map((p) => `${p.name}: ${detail(p)}`).join(', ')}) -> ${returns}`,
+    label: `${name}(${params.map((p) => `${p.name}: ${detail(p)}`).join(', ')}) -> ${returns}`,
   }
 }

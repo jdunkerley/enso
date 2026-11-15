@@ -14,7 +14,7 @@ import { HistoryStack } from '@/components/ComponentHelp/history'
 import type { Docs, FunctionDocs, TypeDocs } from '@/components/ComponentHelp/ir'
 import { lookupDocumentation, placeholder } from '@/components/ComponentHelp/ir'
 import { exampleCodeText, exampleToNodes } from '@/components/ComponentHelp/examples'
-import { panelText } from '@/components/ComponentHelp/sections'
+import { panelText, withoutFrontMatterGroup } from '@/components/ComponentHelp/sections'
 import { resultTablesAsTables } from '@/components/ComponentHelp/resultTables'
 import { entrySignature } from '@/components/ComponentHelp/signature'
 import { clipboardNodeData, writeClipboard } from '@/components/GraphEditor/graphClipboard'
@@ -50,7 +50,7 @@ const text = computed(() => {
   const docs = documentation.value
   if (docs.kind === 'Placeholder') return { main: '', remarks: '' }
   const names = signature.value?.params.map((p) => p.name) ?? []
-  const { main, remarks } = panelText(docs.documentation, names)
+  const { main, remarks } = panelText(withoutFrontMatterGroup(docs.documentation), names)
   return { main: resultTablesAsTables(main), remarks: resultTablesAsTables(remarks) }
 })
 
@@ -107,6 +107,9 @@ const suggestion = computed(() =>
 const color = computed(() =>
   groupColorStyle(tryGetIndex(db.value.groups, suggestion.value?.groupIndex)),
 )
+
+/** The entry's component group, shown at the top right; the node takes its colour from it. */
+const category = computed(() => tryGetIndex(db.value.groups, suggestion.value?.groupIndex)?.name)
 
 const style = computed(() => ({
   '--enso-docs-group-color': color.value,
@@ -179,7 +182,15 @@ function handleBreadcrumbClick(index: number) {
           @backward="historyStack.backward()"
         />
       </div>
-      <DocsSiteLink :entry="suggestion" />
+      <div class="topBarEnd">
+        <DocsSiteLink :entry="suggestion" />
+        <span
+          v-if="category"
+          class="category"
+          :style="{ backgroundColor: color }"
+          v-text="category"
+        />
+      </div>
     </div>
     <h2 v-if="documentation.kind === 'Placeholder'">{{ documentation.text }}</h2>
     <template v-else>
@@ -297,6 +308,22 @@ function handleBreadcrumbClick(index: number) {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+
+.topBarEnd {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.category {
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
 .breadcrumbsWrapper {

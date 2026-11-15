@@ -53,7 +53,8 @@ test('collapsed: a pill per argument; focus shows its tooltip, Escape hides it',
 
 test('the toggle asks to expand; expanded shows a row per argument and the return type', async () => {
   const w = mountIt(false)
-  await w.find('.toggle').trigger('click')
+  expect(w.find('.footer .returnsLine').text()).toBe('→ Integer')
+  await w.find('.footer .toggle').trigger('click')
   expect(w.emitted('update:expanded')).toEqual([[true]])
   const open = mountIt(true)
   expect(open.findAll('.param')).toHaveLength(0)

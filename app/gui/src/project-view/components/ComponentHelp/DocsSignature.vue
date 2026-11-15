@@ -15,19 +15,41 @@ const emit = defineEmits<{ 'update:expanded': [value: boolean] }>()
 </script>
 
 <template>
-  <div
-    class="DocsSignature"
-    :class="{ expanded }"
-    role="group"
-    :aria-label="signature.label"
-    :style="{ backgroundColor: color }"
-  >
-    <div class="head">
-      <SvgIcon :name="icon" class="icon" />
-      <span class="name" v-text="signature.name" />
-      <template v-if="!expanded">
-        <DocsParamPill v-for="param in signature.params" :key="param.name" :param="param" />
-      </template>
+  <div class="DocsSignature" :class="{ expanded }">
+    <div
+      class="node"
+      role="group"
+      :aria-label="signature.label"
+      :style="{ backgroundColor: color }"
+    >
+      <div class="head">
+        <SvgIcon :name="icon" class="icon" />
+        <span class="name" v-text="signature.name" />
+        <template v-if="!expanded">
+          <DocsParamPill v-for="param in signature.params" :key="param.name" :param="param" />
+        </template>
+      </div>
+      <div v-if="expanded" class="rows">
+        <div v-for="param in signature.params" :key="param.name" class="row">
+          <span class="argName" :class="{ optional: param.optional }" v-text="param.name" />
+          <span class="argDetail">
+            <span class="meta">
+              <code class="type" v-text="param.type" />
+              <span v-if="param.default != null" class="default" v-text="`= ${param.default}`" />
+              <span
+                class="widget"
+                :class="{ inferred: param.widgetInferred }"
+                v-text="WIDGET_LABELS[param.widget]"
+              />
+            </span>
+            <span v-if="param.description" class="description" v-text="param.description" />
+          </span>
+        </div>
+        <div class="returnsRow">→ <code class="type" v-text="signature.returns" /></div>
+      </div>
+    </div>
+    <div class="footer">
+      <span v-if="!expanded" class="returnsLine">→ {{ signature.returns }}</span>
       <button
         v-if="signature.params.length > 0"
         type="button"
@@ -40,44 +62,33 @@ const emit = defineEmits<{ 'update:expanded': [value: boolean] }>()
         }}
       </button>
     </div>
-    <div v-if="expanded" class="rows">
-      <div v-for="param in signature.params" :key="param.name" class="row">
-        <span class="argName" :class="{ optional: param.optional }" v-text="param.name" />
-        <span class="argDetail">
-          <span class="meta">
-            <code class="type" v-text="param.type" />
-            <span v-if="param.default != null" class="default" v-text="`= ${param.default}`" />
-            <span
-              class="widget"
-              :class="{ inferred: param.widgetInferred }"
-              v-text="WIDGET_LABELS[param.widget]"
-            />
-          </span>
-          <span v-if="param.description" class="description" v-text="param.description" />
-        </span>
-      </div>
-      <div class="returnsRow">→ <code class="type" v-text="signature.returns" /></div>
-    </div>
   </div>
-  <div v-if="!expanded" class="returnsLine">→ {{ signature.returns }}</div>
 </template>
 
 <style scoped>
 /* The docs site's component node (`docs-site/src/components/ComponentNode.module.css`): white on
  * the group colour, its arguments wrapping onto more lines rather than widening the panel. */
 .DocsSignature {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   width: fit-content;
   max-width: 100%;
-  border-radius: 14px;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.4;
 }
 
 .DocsSignature.expanded {
   width: 100%;
+}
+
+/* A graph node's look (`GraphNode.vue`, `WidgetFunctionName.vue`): the code font on the group colour.
+ * The arguments wrap onto more lines rather than widening the panel, as on the docs site. */
+.node {
+  border-radius: 14px;
+  color: #fff;
+  font-family: var(--font-code);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .head {
@@ -97,21 +108,36 @@ const emit = defineEmits<{ 'update:expanded': [value: boolean] }>()
 }
 
 .name {
-  font-weight: 600;
+  font-weight: 800;
   padding: 0 2px;
   margin-left: 2px;
 }
 
+/* Under the node: its return type on the left, the details toggle on the right. */
+.footer {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 0 8px;
+  color: #666;
+  font-family: var(--font-code);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
 .toggle {
   margin-left: auto;
-  padding: 0 0 0 8px;
+  padding: 0;
   border: none;
   background: none;
   color: inherit;
   font: inherit;
-  font-size: 11px;
-  opacity: 0.85;
+  white-space: nowrap;
   cursor: pointer;
+
+  &:hover {
+    color: #333;
+  }
 }
 
 .rows {
@@ -172,6 +198,7 @@ const emit = defineEmits<{ 'update:expanded': [value: boolean] }>()
 }
 
 .description {
+  font-family: var(--font-sans);
   font-weight: 400;
 }
 
@@ -179,11 +206,5 @@ const emit = defineEmits<{ 'update:expanded': [value: boolean] }>()
   grid-column: 1 / -1;
   padding-top: 6px;
   border-top: 1px solid #fff3;
-}
-
-.returnsLine {
-  margin: 4px 0 0 4px;
-  color: #666;
-  font-size: 11px;
 }
 </style>

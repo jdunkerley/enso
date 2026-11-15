@@ -9,12 +9,17 @@ component, or of the entry highlighted in the component browser. F1
 - `ir.ts` — the documentation of an entry, with its types, constructors and
   methods; `history.ts` — the panel's back/forward stack.
 - `DocsBreadcrumbs.vue`, `DocsHeader.vue`, `DocsList.vue` — the top bar's path
-  and the lists below the text.
+  and the lists below the text. The entry's component group (its category) sits
+  at the top bar's right, so the text's front-matter tags leave it out
+  (`withoutFrontMatterGroup` in `sections.ts`).
 - `DocsSignature.vue` / `signature.ts` — a function's signature drawn as the
-  docs site draws it (`docs-site/src/components/ComponentNode.tsx`): name and
-  arguments on the group colour, optional ones in italics, each argument a pill
-  with its tooltip. ▸ details expands to one row per argument plus the return
-  type; the choice persists in local storage (`expanded.ts`, key
+  docs site draws it (`docs-site/src/components/ComponentNode.tsx`), in a graph
+  node's font (`--font-code`): name and arguments on the group colour, optional
+  ones in italics, each argument a pill with its tooltip. A static method or
+  constructor is named with its type (`Date.new`), as the component browser
+  inserts it. Under the node, the return type sits on the left and ▸ details on
+  the right; details expands to one row per argument plus the return type; the
+  choice persists in local storage (`expanded.ts`, key
   `enso-help-arguments-expanded`; the panel is outside the settings provider's
   subtree, so it is not a user setting).
 - `DocsParamPill.vue` — one argument's pill and tooltip: hover (including over

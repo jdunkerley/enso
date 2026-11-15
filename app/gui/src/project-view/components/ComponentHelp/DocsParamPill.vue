@@ -189,6 +189,7 @@ function onClick() {
 
   .type {
     padding: 0 4px;
+    font-family: var(--font-code);
     border: 1px solid var(--docs-code-border);
     border-radius: var(--docs-code-radius);
     background: var(--docs-code-bg);

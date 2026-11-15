@@ -124,3 +124,21 @@ export function panelText(
   }
   return { main: main.trimEnd(), remarks }
 }
+
+/**
+ * Prerendered Markdown with the `group` key dropped from its front matter: the help panel shows the
+ * category in its top bar instead.
+ */
+export function withoutFrontMatterGroup(prerendered: string): string {
+  const front = children(ensoMarkdownParser.parse(prerendered).topNode).find(
+    (block) => block.name === 'YAMLFrontMatter',
+  )
+  const content = front?.getChild('YAMLContent')
+  if (!content) return prerendered
+  const yaml = prerendered
+    .slice(content.from, content.to)
+    .split('\n')
+    .filter((line) => !/^group\s*:/.test(line))
+    .join('\n')
+  return prerendered.slice(0, content.from) + yaml + prerendered.slice(content.to)
+}
