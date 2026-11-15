@@ -7,6 +7,9 @@ import org.enso.common.{LanguageInfo, MethodNames}
 import scala.ref.WeakReference
 import org.graalvm.polyglot.Context
 import org.enso.common.RuntimeOptions
+import org.enso.runtime.utils.ThreadUtils
+
+import java.util.concurrent.TimeUnit
 
 class RuntimeManagementTest extends InterpreterTest {
   private def parallelism = 5
@@ -18,6 +21,56 @@ class RuntimeManagementTest extends InterpreterTest {
       b.allowCreateThread(true)
         .option(RuntimeOptions.GUEST_PARALLELISM, "" + parallelism)
     })
+
+  /** How long any single wait in these tests may take. A passing run takes
+    * about two seconds per test, even on Windows CI.
+    */
+  private val waitTimeoutSeconds = 120L
+
+  private def failWithThreadDump(message: String): Nothing =
+    fail(ThreadUtils.dumpAllStacktraces(message))
+
+  /** Waits for `f` and returns how it ended: `Left` with the exception it
+    * failed with, or `Right` with its value. A timeout fails the test with a
+    * thread dump. It must not run inside `intercept`, which would replace the
+    * dump with its own message.
+    */
+  private def awaitOutcome[T](
+    f: java.util.concurrent.Future[T]
+  ): Either[java.util.concurrent.ExecutionException, T] =
+    try {
+      Right(f.get(waitTimeoutSeconds, TimeUnit.SECONDS))
+    } catch {
+      case ex: java.util.concurrent.ExecutionException => Left(ex)
+      case _: java.util.concurrent.TimeoutException =>
+        failWithThreadDump(
+          s"A guest thread did not finish within $waitTimeoutSeconds seconds."
+        )
+    }
+
+  /** Waits until `marker` occurs `count` times in the output so far. It never
+    * resets the output, so it cannot lose a write; see Note [Waiting For The
+    * Guest Threads To Start].
+    */
+  private def awaitOutput(marker: String, count: Int)(implicit
+    interpreterContext: InterpreterContext
+  ): Unit = {
+    val deadline =
+      System.nanoTime() + TimeUnit.SECONDS.toNanos(waitTimeoutSeconds)
+    def seen = java.util.regex.Pattern
+      .compile(java.util.regex.Pattern.quote(marker))
+      .matcher(interpreterContext.output().toString)
+      .results()
+      .count()
+    while (seen < count) {
+      if (System.nanoTime() > deadline) {
+        failWithThreadDump(
+          s"Saw $seen of $count '$marker' within $waitTimeoutSeconds seconds."
+        )
+      }
+      Thread.sleep(10)
+    }
+  }
 
   override def specify(implicit
     interpreterContext: InterpreterContext
@@ -51,31 +104,118 @@ class RuntimeManagementTest extends InterpreterTest {
           main.execute()
         })
 
+      // Note [Waiting For The Guest Threads To Start]
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // The threads must all be running `foo` before `interruptThreads` is
+      // called: a thread that has not started yet is not flagged, so it is
+      // never interrupted and loops forever, and `f.get()` waits for it
+      // forever. This used to be decided by counting the lines that
+      // `consumeOut` returned, which races with the guest threads (#741):
+      // - `consumeOut` is `toString` followed by `reset`, two separate calls,
+      //   so a "Start." written between them is thrown away. The count then
+      //   never reaches `parallelism` and the loop spins forever. This is the
+      //   hang seen on Windows CI: a stress run of the old loop lost a line
+      //   in about 1 in 600 rounds with the JVM pinned to 4 CPUs, as on the
+      //   CI runners, and never with 32.
+      // - `println` writes the text and the line separator as two writes, so
+      //   a `toString` between them sees "Start." and, on the next round, a
+      //   bare separator, which `linesIterator` counts as a second (empty)
+      //   line. The count can then reach `parallelism` while a thread has not
+      //   started, and that thread is never interrupted. Not observed, but
+      //   nothing prevents it.
+      // Counting complete "Start." markers in the whole output, without
+      // resetting it, is immune to both. Every wait is bounded and fails with
+      // a thread dump.
       def runTest(): Unit = {
-        val futures       = 0.until(parallelism).map(_ => runMain())
-        var reportedCount = 0
-        while (reportedCount < parallelism) {
-          Thread.sleep(100)
-          reportedCount += consumeOut.length
-        }
-        val expectedOut = List.fill(parallelism)("Interrupted.")
+        val futures = 0.until(parallelism).map(_ => runMain())
+        awaitOutput("Start.", parallelism)
         langCtx.getThreadManager.interruptThreads()
         futures.foreach(f => {
-          try {
-            val v = f.get()
-            fail("Unexpected value: " + v)
-          } catch {
-            case ex1: java.util.concurrent.ExecutionException => {
-              ex1.getMessage() shouldEqual "org.enso.interpreter.test.InterpreterException: org.enso.interpreter.runtime.control.ThreadInterruptedException"
-            }
+          val ex = awaitOutcome(f) match {
+            case Left(ex) => ex
+            case Right(v) => fail("Unexpected value: " + v)
           }
+          ex.getMessage() shouldEqual "org.enso.interpreter.test.InterpreterException: org.enso.interpreter.runtime.control.ThreadInterruptedException"
         })
-        consumeOut shouldEqual expectedOut
+        val out = consumeOut
+        out.filter(_ == "Start.") shouldEqual List.fill(parallelism)("Start.")
+        out.filter(
+          _ != "Start."
+        ) shouldEqual List.fill(parallelism)("Interrupted.")
         futures.forall(_.isDone) shouldBe true
       }
 
       runTest()
       runTest()
+    }
+
+    "Interrupt a thread that is running a finalizer" in {
+      // See Note [A Finalizer Delays Thread Interrupts] in ResourceManager.
+      val langCtx = interpreterContext
+        .ctx()
+        .getBindings(LanguageInfo.ID)
+        .invokeMember(MethodNames.TopScope.LEAK_CONTEXT)
+        .asHostObject[EnsoContext]()
+
+      val code =
+        """import Standard.Base.Runtime.Thread
+          |import Standard.Base.IO
+          |import Standard.Base.Nothing
+          |import Standard.Base.Data.Numbers.Number
+          |from Standard.Base.Runtime.Managed_Resource import Managed_Resource
+          |
+          |type Mock_File
+          |    Value i
+          |
+          |wait_for flag = if flag.get then Nothing else @Tail_Call wait_for flag
+          |
+          |finalizer flag _ =
+          |    IO.println "Finalizing."
+          |    wait_for flag
+          |    IO.println "Finalized."
+          |
+          |foo flag x =
+          |    if x == 0 then Managed_Resource.register (Mock_File.Value x) (finalizer flag) else Nothing
+          |    @Tail_Call foo flag x+1
+          |
+          |main flag =
+          |    Thread.with_interrupt_handler (foo flag 0) (IO.println "Interrupted.")
+          |""".stripMargin
+
+      consumeOut
+      val main = getMain(code)
+      // The finalizer runs on the guest thread and does not return until the
+      // interrupt has been requested, so the interrupt arrives while it runs.
+      val flag   = new java.util.concurrent.atomic.AtomicBoolean(false)
+      val future = langCtx.getThreadManager.submit(() => main.execute(flag))
+      val deadline =
+        System.nanoTime() + TimeUnit.SECONDS.toNanos(waitTimeoutSeconds)
+      while (!interpreterContext.output().toString.contains("Finalizing.")) {
+        if (System.nanoTime() > deadline) {
+          failWithThreadDump(
+            s"The finalizer did not start within $waitTimeoutSeconds seconds."
+          )
+        }
+        System.gc()
+        Thread.sleep(10)
+      }
+      // The flag is set right after the interrupt, so without the fix the guest
+      // could in rare runs read it and leave `wait_for` before its next poll; the
+      // root-node return and `IO.println "Finalized."` still poll inside the
+      // finalizer, so the unfixed code almost always fails here. With the fix the
+      // test is deterministic.
+      langCtx.getThreadManager.interruptThreads()
+      flag.set(true)
+
+      val ex = awaitOutcome(future) match {
+        case Left(ex) => ex
+        case Right(v) => fail("Unexpected value: " + v)
+      }
+      ex.getMessage() shouldEqual "org.enso.interpreter.test.InterpreterException: org.enso.interpreter.runtime.control.ThreadInterruptedException"
+      consumeOut shouldEqual List("Finalizing.", "Finalized.", "Interrupted.")
+      interpreterContext
+        .err()
+        .toString should not include "Exception in finalizer"
     }
 
     /** Don't use this in production code, ever.
