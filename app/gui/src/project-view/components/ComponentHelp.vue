@@ -12,10 +12,15 @@ import DocsSiteLink from '@/components/ComponentHelp/DocsSiteLink.vue'
 import { HistoryStack } from '@/components/ComponentHelp/history'
 import type { Docs, FunctionDocs, TypeDocs } from '@/components/ComponentHelp/ir'
 import { lookupDocumentation, placeholder } from '@/components/ComponentHelp/ir'
+import { exampleCodeText, exampleToNodes } from '@/components/ComponentHelp/examples'
+import { panelText } from '@/components/ComponentHelp/sections'
 import { resultTablesAsTables } from '@/components/ComponentHelp/resultTables'
 import { entrySignature } from '@/components/ComponentHelp/signature'
+import { clipboardNodeData, writeClipboard } from '@/components/GraphEditor/graphClipboard'
+import { exampleDecoratorExt } from '@/components/MarkdownEditor/codemirror/decoration/examples'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { groupColorStyle } from '@/composables/nodeColors'
+import { useSettings } from '@/stores/settings'
 import { tryGetIndex } from '@/util/data/array'
 import type { Opt } from '@/util/data/opt'
 import type { Icon as IconName } from '@/util/iconMetadata/iconName'
@@ -38,23 +43,42 @@ const documentation = computed<Docs>(() => {
     : placeholder('No suggestion selected.')
 })
 
-function syncMarkdownDocumentation(view: EditorView) {
-  watch(
-    documentation,
-    (docs) => {
-      if (docs.kind !== 'Placeholder') {
-        view.dispatch({
-          changes: {
-            from: 0,
-            to: view.state.doc.length,
-            insert: resultTablesAsTables(docs.documentation),
-          },
-        })
-      }
-    },
-    { immediate: true },
-  )
+const settings = useSettings()
+const expanded = computed({
+  get: () => settings.user.value.expandHelpArguments,
+  set: (value) => (settings.user.value = { ...settings.user.value, expandHelpArguments: value }),
+})
+
+/** The editor's text and the collapsed Remarks, the Arguments section dropped when the node shows it all. */
+const text = computed(() => {
+  const docs = documentation.value
+  if (docs.kind === 'Placeholder') return { main: '', remarks: '' }
+  const names = signature.value?.params.map((p) => p.name) ?? []
+  const { main, remarks } = panelText(docs.documentation, names)
+  return { main: resultTablesAsTables(main), remarks: resultTablesAsTables(remarks) }
+})
+
+/** An example's Copy: its nodes as the Enso clipboard type, and its text without the result line. */
+const exampleCopy = exampleDecoratorExt((code) => {
+  const nodes = exampleToNodes(code)
+  if (nodes)
+    void writeClipboard({
+      ...clipboardNodeData(nodes),
+      'text/plain': exampleCodeText(code),
+    })
+})
+
+function syncEditor(select: (t: { main: string; remarks: string }) => string) {
+  return (view: EditorView) =>
+    watch(
+      () => select(text.value),
+      (content) =>
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } }),
+      { immediate: true },
+    )
 }
+const syncMain = syncEditor((t) => t.main)
+const syncRemarks = syncEditor((t) => t.remarks)
 
 const methods = computed<FunctionDocs[]>(() => {
   const docs = documentation.value
@@ -166,19 +190,30 @@ function handleBreadcrumbClick(index: number) {
       <div class="markdownDocs">
         <DocsSignature
           v-if="signature"
+          v-model:expanded="expanded"
           :signature="signature"
           :icon="icon"
           :color="color"
-          :expanded="false"
         />
         <span v-if="documentation.documentation.length == 0">No documentation available.</span>
-        <MarkdownEditor
-          v-else
-          :content="documentation.documentation"
-          :toolbar="false"
-          :readonly="true"
-          :editorReadyCallback="syncMarkdownDocumentation"
-        />
+        <template v-else>
+          <MarkdownEditor
+            :content="text.main"
+            :toolbar="false"
+            :readonly="true"
+            :extensions="exampleCopy"
+            :editorReadyCallback="syncMain"
+          />
+          <details v-if="text.remarks" class="remarks">
+            <summary>Remarks</summary>
+            <MarkdownEditor
+              :content="text.remarks"
+              :toolbar="false"
+              :readonly="true"
+              :editorReadyCallback="syncRemarks"
+            />
+          </details>
+        </template>
       </div>
       <div class="sections">
         <DocsHeader v-if="types.length > 0" kind="types" label="Types" />
@@ -236,6 +271,18 @@ function handleBreadcrumbClick(index: number) {
 
 .markdownDocs > :not(.DocsSignature) {
   align-self: stretch;
+}
+
+.remarks {
+  border-top: 1px solid var(--docs-table-border);
+  padding-top: 4px;
+}
+
+.remarks summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin: 8px 0 4px;
+  font-size: var(--docs-h3-size);
 }
 
 .tags {
