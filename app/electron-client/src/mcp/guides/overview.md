@@ -12,8 +12,9 @@ secrets.
    short preview of its current value, the connections and any problems. Pass
    `previews: false` for a smaller answer.
 2. Node ids are stable across edits. Pass a `node_id` from `get_graph` to
-   `get_node` for the full expression, documentation, neighbours and error of
-   one node, and to `evaluate_expression` to run in that node's scope.
+   `get_node` for the full expression, documentation, a longer value preview and
+   the error text of one node, and to `evaluate_expression` to run in that
+   node's scope.
 3. Before naming a method or type you have not seen in the project, call
    `search_components` (optionally with `self_type` to list the methods callable
    on a value of a type), then `get_component_docs` with a qualified name from

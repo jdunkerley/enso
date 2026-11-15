@@ -64,6 +64,7 @@ import { useDoubleClick } from '@/composables/doubleClick'
 import { unrefElement, useEventConditional } from '@/composables/events'
 import { useGraphPaletteActions } from '@/composables/graphPaletteActions'
 import { useNodeAppearanceCache } from '@/composables/nodeAppearanceCache'
+import { useProjectMcpTools } from '@/mcp/useProjectMcpTools'
 import type { PlacementStrategy } from '@/composables/nodeCreation'
 import { registerHandlers, toggledAction, type DisplayableActionName } from '@/providers/action'
 import { useGlobalEventRegistry } from '@/providers/globalEventRegistry'
@@ -125,6 +126,7 @@ provideLanguageSupportExtensions({
 const nodeExecution = provideNodeExecution(projectStore)
 const aiPrompts = provideOngoingAiPrompts()
 useAiToolHandler(aiPrompts)
+useProjectMcpTools()
 ;(window as any)._mockSuggestion = suggestionDb.mockSuggestion
 
 onMounted(() => {

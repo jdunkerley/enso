@@ -35,9 +35,11 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       name: 'get_node',
       title: 'Get one node',
       description:
-        'Read one node of the open graph by `node_id` (from `get_graph`): its full ' +
-        'expression, type, documentation, the nodes it reads from and feeds, any error, ' +
-        'and a preview of its current value. Use it when `get_graph` is too brief.',
+        'Read one node of the open graph by `node_id` (from `get_graph`): its name, full ' +
+        'expression, kind, type, documentation comment and evaluation state (with the ' +
+        'message of a panic and the number of warnings), a longer preview of its current ' +
+        'value, and the text of its error when it evaluated to one. Use it when ' +
+        '`get_graph` is too brief.',
       inputSchema: { node_id: z.string() },
       run: forward('get_node'),
     },
