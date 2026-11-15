@@ -62,3 +62,19 @@ describe('clientConfig', () => {
     expect(parsed.mcpServers.enso).not.toHaveProperty('tools')
   })
 })
+
+describe('clientConfig claudeDesktop', () => {
+  test('is the mcp-remote bridge, with the token only in env', () => {
+    const text = clientConfig('claudeDesktop', URL, TOKEN)
+    const parsed = JSON.parse(text) as {
+      mcpServers: { enso: { command: string; args: string[]; env: Record<string, string> } }
+    }
+    const { enso } = parsed.mcpServers
+    expect(enso.command).toBe('npx')
+    expect(enso.args).toContain(URL)
+    expect(enso.args).toContain('Authorization:${ENSO_AUTH}')
+    expect(enso.env).toEqual({ ENSO_AUTH: `Bearer ${TOKEN}` })
+    expect(JSON.stringify(enso.args)).not.toContain(TOKEN)
+    expect(text).toBe(JSON.stringify(parsed, null, 2))
+  })
+})

@@ -39,9 +39,23 @@ export interface McpStatus {
 
 export const MCP_CLIENT_KINDS = [
   'claudeCode',
+  'claudeDesktop',
   'codex',
   'copilotVsCode',
   'copilotCli',
   'json',
 ] as const
 export type McpClientKind = (typeof MCP_CLIENT_KINDS)[number]
+
+/** Where Claude Desktop's configuration file stands, for the Settings "Claude Desktop" block. */
+export type ClaudeDesktopSetup =
+  /** Claude Desktop's configuration folder does not exist. */
+  | { readonly state: 'notInstalled' }
+  /** The folder exists; the file has no `enso` entry. */
+  | { readonly state: 'notSetUp' }
+  /** An `enso` entry with the current address and token. */
+  | { readonly state: 'setUp' }
+  /** An `enso` entry with another address or token. */
+  | { readonly state: 'outOfDate' }
+  /** The file cannot be used (not valid JSON, not the expected shape). */
+  | { readonly state: 'unreadable'; readonly reason: string }

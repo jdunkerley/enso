@@ -29,3 +29,28 @@ test('turning the server on shows its address, and a setup button copies that cl
     .poll(() => page.evaluate(() => (window as unknown as { __mcpCopied?: string }).__mcpCopied))
     .toBe('json')
 })
+
+test('the Claude Desktop block offers set-up, asks first, and then says it is set up', async ({
+  page,
+  drivePage,
+}) => {
+  await drivePage.goToPage.settings()
+  await page.getByRole('button', { name: TEXT.aiSettingsTab }).getByText(TEXT.aiSettingsTab).click()
+  const section = page.getByTestId('mcp-settings-section')
+  await section.getByText(TEXT.mcpEnabledSetting, { exact: true }).click()
+  const block = section.getByTestId('mcp-claude-desktop')
+  await expect(block).toContainText(TEXT.mcpClaudeDesktopNeeds)
+  await block.getByRole('button', { name: TEXT.mcpClaudeDesktopSetUpButton }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toContainText(TEXT.mcpClaudeDesktopConfirm)
+  await dialog.getByRole('button', { name: TEXT.mcpClaudeDesktopSetUpButton }).click()
+  await expect(block).toContainText(TEXT.mcpClaudeDesktopIsSetUp)
+  await expect(block.getByRole('button', { name: TEXT.mcpClaudeDesktopSetUpButton })).toHaveCount(0)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __mcpClaudeDesktopSetUp?: boolean }).__mcpClaudeDesktopSetUp,
+      ),
+    )
+    .toBe(true)
+})

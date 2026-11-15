@@ -36,9 +36,23 @@ default. No tool changes the execution environment, settings or secrets.
 - `mcpServer.ts` — `McpHttpServer`, the HTTP server on `127.0.0.1:<port>/mcp`.
 - `mcpController.ts` — `McpController`: the on/off setting and port, the token,
   start and stop, the status, and the setup text each client pastes.
+- `claudeDesktop.ts` — setting up Claude Desktop: reads and edits its
+  `claude_desktop_config.json` (folder from `claudeDesktopConfigDirectory`:
+  `%APPDATA%Claude`, or `~/Library/Application Support/Claude` on macOS; none
+  elsewhere). It adds only `mcpServers.enso`, the `mcp-remote` bridge with the
+  token in `env` (Claude Desktop on Windows mishandles arguments with spaces).
+  It never writes a file it cannot parse or whose top level or `mcpServers` is
+  not an object; it saves `claude_desktop_config.json.enso-backup` first, writes
+  a temporary file beside it and renames, and removes the temporary file if the
+  rename fails. The controller (`claudeDesktopStatus`, `setUpClaudeDesktop`)
+  runs these on its queue, rewrites an outdated entry after `replaceToken` and
+  `setPort`, and writes nothing on `setEnabled`. The token never reaches the
+  renderer: the IPC calls return only a `ClaudeDesktopSetup`. Tests inject a
+  temporary folder; never point one at the real Claude folder.
 - `clientConfigs.ts` — that setup text per client (`claude mcp add` command,
-  Codex TOML, Copilot JSON for VS Code and the CLI, a generic `mcpServers`
-  block), each checked against the vendor's documentation (dates in the code).
+  Claude Desktop `mcp-remote` JSON, Codex TOML, Copilot JSON for VS Code and the
+  CLI, a generic `mcpServers` block), each checked against the vendor's
+  documentation (dates in the code).
 
 `electron.ts`'s `initMcp` wires them together at start-up and registers the IPC
 the Settings → AI tab uses (`Channel.mcp*`); `index.ts` calls `shutdownMcp` on

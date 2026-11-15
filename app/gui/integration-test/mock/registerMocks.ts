@@ -220,7 +220,11 @@ async function mockElectronApi(
                 error: string | null
                 lockedByEnvironment: boolean
               }
-              const w = window as unknown as { __mcpMockStatus?: Status; __mcpCopied?: string }
+              const w = window as unknown as {
+                __mcpMockStatus?: Status
+                __mcpCopied?: string
+                __mcpClaudeDesktopSetUp?: boolean
+              }
               const current = (): Status =>
                 w.__mcpMockStatus ?? {
                   enabled: false,
@@ -279,6 +283,14 @@ async function mockElectronApi(
                 replaceToken: async (): Promise<Status> => current(),
                 copyConfig: async (client: string): Promise<void> => {
                   w.__mcpCopied = client
+                },
+                // Not set up until the spec presses the button; then `__mcpClaudeDesktopSetUp` is true.
+                claudeDesktopStatus: async (): Promise<{ state: string }> => ({
+                  state: w.__mcpClaudeDesktopSetUp === true ? 'setUp' : 'notSetUp',
+                }),
+                setUpClaudeDesktop: async (): Promise<{ state: string }> => {
+                  w.__mcpClaudeDesktopSetUp = true
+                  return { state: 'setUp' }
                 },
               }
             })(),

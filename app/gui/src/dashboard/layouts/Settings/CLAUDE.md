@@ -84,7 +84,14 @@ effect), the switch, the port field and its Save are disabled, with a note
 (`mcpLockedByEnvironment`); main refuses both changes then anyway. A change that
 resolves with a status other than the one asked for, or fails, re-keys the forms
 so they show the server's state. A failed `setPort` shows in the port form only,
-not as a toast. Tests: `__tests__/McpSettingsSection.test.ts` and
+not as a toast. Under the copy buttons a Claude Desktop block shows the
+`ClaudeDesktopSetup` state read with `claudeDesktopStatus()` on mount and after
+each server status change: not installed (one line), not set up (a Set up
+button), set up, out of date (an Update button), or unreadable (the reason, and
+the manual route through the Claude Desktop copy button). The button asks first,
+then `setUpClaudeDesktop()` has main edit Claude Desktop's configuration file.
+The block always says Claude Desktop needs Node.js and that its Add custom
+connector screen cannot work. Tests: `__tests__/McpSettingsSection.test.ts` and
 `integration-test/dashboard/mcpSettings.spec.ts`.
 
 ## Engine logs

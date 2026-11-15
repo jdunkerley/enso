@@ -10,6 +10,7 @@ import type {
 import type { DownloadUrlOptions } from 'enso-common/src/download'
 import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
 import type {
+  ClaudeDesktopSetup,
   McpClientKind,
   McpStatus,
   McpToolCallReply,
@@ -171,6 +172,10 @@ export interface McpApi {
   readonly replaceToken: () => Promise<McpStatus>
   /** Main writes the client's config, token included, to the clipboard. */
   readonly copyConfig: (client: McpClientKind) => Promise<void>
+  /** Where Claude Desktop's configuration file stands. Main reads it; the token never comes here. */
+  readonly claudeDesktopStatus: () => Promise<ClaudeDesktopSetup>
+  /** Main adds the `enso` entry to Claude Desktop's configuration file, and returns the new status. */
+  readonly setUpClaudeDesktop: () => Promise<ClaudeDesktopSetup>
 }
 
 export interface ElectronApi {

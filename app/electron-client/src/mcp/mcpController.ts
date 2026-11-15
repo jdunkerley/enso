@@ -6,10 +6,16 @@
  * The token never leaves this module except inside {@link McpController.config}'s text, which the
  * caller writes to the clipboard from main.
  */
-import { MCP_DEFAULT_PORT, type McpClientKind, type McpStatus } from 'enso-common/src/mcp'
+import {
+  MCP_DEFAULT_PORT,
+  type ClaudeDesktopSetup,
+  type McpClientKind,
+  type McpStatus,
+} from 'enso-common/src/mcp'
 import { randomBytes } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import type { KeyringEntryLike } from '../secretsKey'
+import { readClaudeDesktopSetup, writeClaudeDesktopSetup } from './claudeDesktop'
 import { clientConfig } from './clientConfigs'
 
 /** The keychain account of the MCP token. The service is always `Enso`. */
@@ -25,6 +31,8 @@ export const MCP_LOCKED_BY_ENVIRONMENT_ERROR =
 export interface McpControllerOptions {
   /** `<userData>/mcp-settings.json`. */
   readonly settingsPath: string
+  /** The folder holding Claude Desktop's `claude_desktop_config.json`; undefined where there is none. */
+  readonly claudeDesktopDirectory: string | undefined
   readonly entry: (account: string) => Promise<KeyringEntryLike>
   /**
    * The app environment (`process.env`). Narrower than `NodeJS.ProcessEnv`, whose index signature
@@ -155,7 +163,9 @@ export class McpController {
       }
       await this.save({ enabled: this.fileEnabled, port })
       this.filePort = port
-      return this.apply()
+      const status = await this.apply()
+      await this.refreshClaudeDesktop()
+      return status
     })
   }
 
@@ -173,7 +183,9 @@ export class McpController {
       } catch (e) {
         throw new Error(`The system keychain is not available: ${messageOf(e)}`, { cause: e })
       }
-      return this.apply()
+      const status = await this.apply()
+      await this.refreshClaudeDesktop()
+      return status
     })
   }
 
@@ -181,7 +193,30 @@ export class McpController {
   config(client: McpClientKind): Promise<string> {
     return this.serialised(async () => {
       const token = await this.token()
-      return clientConfig(client, `http://127.0.0.1:${this.port}/mcp`, token)
+      return clientConfig(client, this.url, token)
+    })
+  }
+
+  /**
+   * Where Claude Desktop's configuration stands against the current address and token. Creates the
+   * token if there is none.
+   */
+  claudeDesktopStatus(): Promise<ClaudeDesktopSetup> {
+    return this.serialised(async () =>
+      readClaudeDesktopSetup(this.options.claudeDesktopDirectory, this.url, await this.token()),
+    )
+  }
+
+  /**
+   * Add or replace the `enso` entry in Claude Desktop's configuration file, with the current
+   * address and token, whether or not the server is enabled. Resolves with the status read back.
+   */
+  setUpClaudeDesktop(): Promise<ClaudeDesktopSetup> {
+    return this.serialised(async () => {
+      const token = await this.token()
+      const directory = this.options.claudeDesktopDirectory
+      if (directory == null) return { state: 'notInstalled' }
+      return writeClaudeDesktopSetup(directory, this.url, token)
     })
   }
 
@@ -194,6 +229,27 @@ export class McpController {
     await this.serialised(async () => {
       await this.stopServer()
     })
+  }
+
+  /** The address the server listens on, or would. */
+  private get url(): string {
+    return `http://127.0.0.1:${this.port}/mcp`
+  }
+
+  /**
+   * After the address or token changed: if Claude Desktop has an `enso` entry that no longer
+   * matches, rewrite it so it keeps working. A failure is logged, never thrown.
+   */
+  private async refreshClaudeDesktop(): Promise<void> {
+    const directory = this.options.claudeDesktopDirectory
+    if (directory == null) return
+    try {
+      const token = await this.token()
+      const current = await readClaudeDesktopSetup(directory, this.url, token)
+      if (current.state === 'outOfDate') await writeClaudeDesktopSetup(directory, this.url, token)
+    } catch (e) {
+      console.warn('[MCP] could not update the Claude Desktop entry:', e)
+    }
   }
 
   /** The token from the environment or the keychain, created when there is neither. */
