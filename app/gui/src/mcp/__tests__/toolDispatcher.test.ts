@@ -46,9 +46,19 @@ function start() {
 }
 
 function register(handlers: Record<string, McpToolHandler>) {
-  const dispose = registerMcpToolHandlers(handlers)
-  cleanups.push(dispose)
-  return dispose
+  const registration = registerMcpToolHandlers(handlers)
+  cleanups.push(registration.remove)
+  return registration
+}
+
+/** A registration whose `get_graph` answers `name`. */
+function project(name: string) {
+  return register({ get_graph: async () => ({ ok: true, value: name }) })
+}
+
+let nextId = 0
+async function graphFrom(call: (request: McpToolCallRequest) => Promise<McpToolCallReply>) {
+  return (await call({ requestId: `g${nextId++}`, tool: 'get_graph', args: {}, caller })).result
 }
 
 test('A registered handler gets the arguments and caller, and its result is the reply', async () => {
@@ -83,13 +93,40 @@ test('A handler that throws is answered with its message', async () => {
   expect(reply.result.ok ? undefined : reply.result.error).toContain('boom')
 })
 
-test('Disposing a registration removes only the handlers it registered', async () => {
+test('Removing a registration removes only the handlers it registered', async () => {
   const { call } = start()
-  const disposeA = register({ get_graph: async () => ({ ok: true, value: 'A' }) })
-  register({ get_graph: async () => ({ ok: true, value: 'B' }) })
-  disposeA()
-  const reply = await call({ requestId: 'r4', tool: 'get_graph', args: {}, caller })
-  expect(reply.result).toEqual({ ok: true, value: 'B' })
+  const a = project('A')
+  project('B')
+  a.remove()
+  expect(await graphFrom(call)).toEqual({ ok: true, value: 'B' })
+})
+
+test('The most recently registered project answers; removing it falls back', async () => {
+  const { call } = start()
+  project('A')
+  const b = project('B')
+  expect(await graphFrom(call)).toEqual({ ok: true, value: 'B' })
+  b.remove()
+  expect(await graphFrom(call)).toEqual({ ok: true, value: 'A' })
+})
+
+test('A project activated again answers while a later one is registered', async () => {
+  const { call } = start()
+  const a = project('A')
+  project('B')
+  a.activate()
+  expect(await graphFrom(call)).toEqual({ ok: true, value: 'A' })
+})
+
+test('A removed (deactivated) project does not answer, and activating it restores it', async () => {
+  const { call } = start()
+  const a = project('A')
+  const b = project('B')
+  b.remove()
+  a.remove()
+  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR })
+  b.activate()
+  expect(await graphFrom(call)).toEqual({ ok: true, value: 'B' })
 })
 
 test('Stopping the dispatcher unsubscribes from the api', () => {

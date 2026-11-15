@@ -11,12 +11,18 @@ rename one on both sides, and keep the description in step with what the handler
 returns (`app/electron-client/src/mcp/guides/overview.md` describes the tools
 too).
 
-- `useProjectMcpTools.ts` registers the handlers while the graph editor is
-  mounted (`GraphEditor.vue`) and removes them on scope dispose, so with no
-  project open the dispatcher answers `NO_PROJECT_ERROR`. It narrows the
-  arguments, which arrive as `unknown` (main has validated them already), and
-  builds the dependencies from the current project's stores **at call time**: a
-  handler never keeps a store or a snapshot of the graph between calls.
+- **The project on screen answers.** Every open project's `GraphEditor.vue`
+  stays mounted (the tabs in `MiddlePanel.vue` are under `<KeepAlive>`), so each
+  registers its own handlers. `useProjectMcpTools.ts` registers them on setup,
+  puts them first on `onActivated`, and removes them on `onDeactivated` and on
+  scope dispose. The dispatcher answers with the most recently registered or
+  activated set, falling back to the next most recent when one is removed. While
+  the dashboard (or any page that is not a project) is showing, no set is
+  registered and the dispatcher answers `NO_PROJECT_ERROR`: a hidden project
+  never answers. It narrows the arguments, which arrive as `unknown` (main has
+  validated them already), and builds the dependencies from the current
+  project's stores **at call time**: a handler never keeps a store or a snapshot
+  of the graph between calls.
 - `graphTools.ts` (`get_graph`, `get_node`) and `evaluate.ts`
   (`evaluate_expression`) are pure functions over `GraphToolDeps`, which is what
   makes them testable with `GraphDb.Mock()`. Results are JSON text

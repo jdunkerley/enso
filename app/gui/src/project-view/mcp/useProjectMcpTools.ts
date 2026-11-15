@@ -7,7 +7,7 @@ import { useCurrentProject, type CurrentProjectStore } from '$/components/WithCu
 import { registerMcpToolHandlers, type McpToolHandler } from '$/mcp/toolDispatcher'
 import { importedLibraries } from '$/providers/openedProjects/module/imports'
 import type { McpToolResult } from 'enso-common/src/mcp'
-import { onScopeDispose } from 'vue'
+import { onActivated, onDeactivated, onScopeDispose } from 'vue'
 import { getComponentDocs, searchComponents, type CatalogueDeps } from './catalogueTools'
 import { evaluateExpression } from './evaluate'
 import { getGraph, getNode, type GraphToolDeps } from './graphTools'
@@ -20,7 +20,10 @@ const EVALUATE_TIMEOUT_MS = 25_000
 
 /**
  * Registers get_graph, get_node, search_components, get_component_docs and evaluate_expression for
- * the open project; removes them on scope dispose. Each call reads the project's stores when it
+ * the open project. Every open project's graph editor stays mounted (the tabs are under
+ * `<KeepAlive>`), so the tools must answer for the one on screen: this project's handlers are put
+ * first on activation and removed on deactivation (another tab, or the dashboard, is showing) and on
+ * scope dispose. Each call reads the project's stores when it
  * runs, so it sees the graph and the catalogue as they are then.
  */
 export function useProjectMcpTools(
@@ -117,7 +120,10 @@ export function useProjectMcpTools(
       )
     },
   }
-  onScopeDispose(registerMcpToolHandlers(handlers))
+  const registration = registerMcpToolHandlers(handlers)
+  onActivated(registration.activate)
+  onDeactivated(registration.remove)
+  onScopeDispose(registration.remove)
 }
 
 function invalidArgument(name: string, expected: string): McpToolResult {

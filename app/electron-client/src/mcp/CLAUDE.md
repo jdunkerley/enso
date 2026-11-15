@@ -42,10 +42,13 @@ the Settings → AI tab uses (`Channel.mcp*`); `index.ts` calls `shutdownMcp` on
 A project tool has its definition (name, description, schema) here in main and
 its handler in the window: `app/gui/src/project-view/mcp/` (see its
 `CLAUDE.md`), registered while the graph editor is mounted, and run by
-`app/gui/src/mcp/toolDispatcher.ts`. With no project open the dispatcher answers
-that no project is open. Add, rename or change a tool on both sides, and keep
-its description and `guides/overview.md` in step with what the handler returns.
-Only `get_guide` runs entirely in main.
+`app/gui/src/mcp/toolDispatcher.ts`. The project whose tab is showing answers:
+every open project registers its handlers, and the most recently registered or
+activated set answers (a project activates its set when its tab shows and
+removes it when hidden). With no project showing (the dashboard, or none open)
+the dispatcher answers that no project is open. Add, rename or change a tool on
+both sides, and keep its description and `guides/overview.md` in step with what
+the handler returns. Only `get_guide` runs entirely in main.
 
 ## The caller checks
 
