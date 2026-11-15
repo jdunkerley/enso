@@ -225,6 +225,7 @@ describe('McpSettingsSection', () => {
     await mountSection()
     expect(switchInput().disabled).toBe(true)
     expect(portInput().disabled).toBe(true)
+    expect((button(getText('save')) as HTMLButtonElement).disabled).toBe(true)
     expect(document.body.textContent).toContain(getText('mcpLockedByEnvironment'))
   })
 

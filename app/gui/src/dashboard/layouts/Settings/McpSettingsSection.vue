@@ -168,7 +168,10 @@ async function askReplaceToken() {
       >
         <Input name="port" type="number" :label="getText('mcpPortLabel')" :isDisabled="locked" />
         <ButtonGroup class="grow-0">
-          <Submit size="small" variant="outline" :isDisabled="locked">{{ getText('save') }}</Submit>
+          <!-- `undefined` when unlocked, so that the button keeps its own disabled-while-submitting. -->
+          <Submit size="small" variant="outline" :isDisabled="locked || undefined">
+            {{ getText('save') }}
+          </Submit>
         </ButtonGroup>
         <FormError />
       </Form>
