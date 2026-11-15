@@ -2,8 +2,8 @@
 
 The IDE's MCP server for external agent apps (Claude Code, Codex, GitHub
 Copilot): with it turned on, an agent the user has pointed at it can read the
-project open in the IDE. It is off by default. No tool edits the project or
-changes the execution environment, settings or secrets.
+project open in the IDE and edit it, and open or create projects. It is off by
+default. No tool changes the execution environment, settings or secrets.
 
 ## The parts
 
@@ -15,13 +15,17 @@ changes the execution environment, settings or secrets.
   are stripped before the registry sees them (`McpServer.validateToolInput` in
   `@modelcontextprotocol/sdk` 1.30; `mcpServer.test.ts` checks it). The
   registry's strict check binds callers that do not go through the SDK.
-- `projectTools.ts` — the definitions of the five project tools (`get_graph`,
-  `get_node`, `search_components`, `get_component_docs`, `evaluate_expression`).
+- `projectTools.ts` — the definitions of the project tools: the five that read
+  (`VIEW_TOOL_NAMES`) and the nine that edit or navigate (`EDIT_TOOL_NAMES`).
   Each only forwards its arguments to the window.
+- `appTools.ts` — the six app tools (`get_app_state`, `list_projects`,
+  `list_files`, `create_project`, `open_project`, `close_project`), forwarded
+  the same way.
 - `windowBridge.ts` — `WindowBridge` forwards a call to the focused window (or
   the first one) over `Channel.mcpToolCall` and resolves with the reply
   (`Channel.mcpToolReply`, matched by `requestId`), or with an error when there
-  is no window or 30 s pass (`WINDOW_TOOL_TIMEOUT_MS`).
+  is no window or the call's timeout passes (`WINDOW_TOOL_TIMEOUT_MS` 30 s by
+  default, `EDIT_TOOL_TIMEOUT_MS` 60 s, `OPEN_TOOL_TIMEOUT_MS` 120 s).
 - `guides.ts` and `guides/*.md` — the `get_guide` tool, the guides as MCP
   resources (`enso://guide/<topic>`) and the server `instructions`
   (`guides/instructions.md`). Built-in topics (`overview`, `language`,

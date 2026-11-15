@@ -2,8 +2,9 @@
 
 An Enso project is a graph. Each node is an Enso expression bound to a name, and
 the connections between nodes are the names one expression uses from another.
-The tools here read the project that is open in the IDE. None of these tools
-edits the project or changes its execution environment, settings or secrets;
+The tools here read and edit the project that is open in the IDE, and open or
+create projects. Edits are made as ordinary nodes, and the user can undo them.
+No tool changes the execution environment, settings or secrets;
 `evaluate_expression` runs code, but only in the Design environment.
 
 ## How to work
@@ -26,6 +27,31 @@ edits the project or changes its execution environment, settings or secrets;
    rows, join shapes. Each call is a real language server round-trip, so ask for
    what you need and do not fan out. The expression must evaluate to Text:
    choose the encoding with `.to_text`, `.to_display_text` or `.to_json`.
+
+## Building
+
+1. Read the graph with `get_graph` first, so you build on what is there. With no
+   project open, `get_app_state` tells you, `list_projects` finds one and
+   `open_project` or `create_project` opens it.
+2. Look components up (`search_components`, then `get_component_docs`) before
+   using them.
+3. Add a few nodes at a time with `add_nodes`: each statement is
+   `name = expression`, and later statements may use the names of earlier ones.
+   Pass whole import lines in `imports`. Use `add_function` for a top-level
+   function and call it from a node as `Main.<name> args`.
+4. Read the result of every edit: it lists the affected nodes with their types
+   and errors, and `settled` says whether the engine finished evaluating them.
+   When a node has an error or the wrong type, fix it with `edit_node`; use
+   `remove_nodes` to drop a node. Check with `get_node` or `evaluate_expression`
+   before building on a node.
+5. Group a run of nodes that does one job with `collapse_nodes`, and explain a
+   node with `set_node_comment`.
+6. `select_nodes` and `open_method` move what the user sees; the other edits do
+   not. `set_visualization` shows or hides a node's visualization.
+7. Edits are refused while the project is in Live mode: ask the user to switch
+   it back to Design.
+8. Never assume a change reached disk. The edits are in the IDE; the user clicks
+   Write to save them.
 
 ## Evaluating expressions
 

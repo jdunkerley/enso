@@ -2,6 +2,7 @@ import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
 import { initJvmAotIpc } from '@/jvmAotIpc'
 import { resolveLogFileToReveal } from '@/logFileReveal'
+import { appTools } from '@/mcp/appTools'
 import { Guides, guideTool } from '@/mcp/guides'
 import { McpController } from '@/mcp/mcpController'
 import { McpHttpServer } from '@/mcp/mcpServer'
@@ -101,6 +102,7 @@ function initMcp(electron: Electron | undefined, electronIsDev: boolean) {
   const guides = new Guides(paths.stdlibRoot(electron, electronIsDev))
   const registry = new ToolRegistry()
   for (const tool of projectTools(bridge)) registry.register(tool)
+  for (const tool of appTools(bridge)) registry.register(tool)
   registry.register(guideTool(guides))
   const controller = new McpController({
     settingsPath: join(app.getPath('userData'), 'mcp-settings.json'),
