@@ -50,8 +50,6 @@ function makeContext(data: unknown, created: string[]): TableViewContext {
     getFilterValues: async () => {},
     createNode: (pattern) =>
       created.push(pattern.instantiateCopied([Ast.parseExpression(SOURCE_NODE)!]).code()),
-    previousRowData: [], // B0 only: B1.5 deletes this line.
-    initialData: data, // B0 only: B1.5 deletes this line.
   }
 }
 

@@ -833,7 +833,16 @@ exports[`Table view of each pinned golden > table_db_column 1`] = `
 
 exports[`Table view of each pinned golden > table_db_read_error 1`] = `
 {
-  "columns": [],
+  "columns": [
+    {
+      "colDef": {
+        "cellStyle": {
+          "white-space": "normal",
+        },
+        "field": "Error",
+      },
+    },
+  ],
   "flags": {
     "allRowCount": 0,
     "bottomStatusBarRequested": false,
@@ -844,9 +853,16 @@ exports[`Table view of each pinned golden > table_db_read_error 1`] = `
     "versionHash": null,
   },
   "isTruncated": false,
-  "numberGrouping": {},
+  "numberGrouping": {
+    "Error": false,
+  },
   "rowCount": 1,
-  "rowData": [],
+  "rowData": [
+    {
+      "Error": "Error querying the database:
+There was an SQL error: [SQLITE_ERROR] SQL error or missing database (no such table: pinned_gone). [Query was: SELECT "pinned_gone"."a" AS "a" FROM "pinned_gone" AS "pinned_gone" LIMIT 1000]",
+    },
+  ],
   "showRowCount": false,
 }
 `;

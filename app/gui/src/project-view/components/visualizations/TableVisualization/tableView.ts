@@ -4,6 +4,8 @@
  * passes in what it owns), so that `__tests__/tableViewSnapshot.test.ts` can run it over the
  * pinned goldens in `test/Visualization_Tests/data/pinned`.
  */
+/* eslint-disable camelcase */
+// The schema spells the wire format's snake_case field names (`row_count`, `value_type`, …).
 import { Ast } from '@/util/ast'
 import { Pattern } from '@/util/ast/match'
 import { svgUseHref } from '@/util/icons'
@@ -14,72 +16,12 @@ import type {
   ITooltipParams,
   SetFilterValuesFuncParams,
 } from 'ag-grid-community'
+import { z } from 'zod'
 import { TableVisualisationTooltip } from './TableVisualisationTooltip'
-import { isError, isGenericGrid, type Error, type GenericGrid } from './TableVisualisationTypes'
 import { getCellDataType, getFilterParams, getFilterType } from './tableVizFilterSetUpUtils'
 import type { ValueType } from './tableVizUtils'
 
 export const INDEX_FIELD_NAME = '#'
-
-export type Data = number | string | Error | Matrix | ObjectMatrix | EnsoTableOrColumn | GenericGrid
-
-interface Matrix {
-  type: 'Matrix'
-  column_count: number
-  all_rows_count: number
-  json: unknown[][]
-  value_type: ValueType[]
-  get_child_node_action: string
-  child_label: string
-  visualization_header: string
-}
-
-interface ObjectMatrix {
-  type: 'Object_Matrix'
-  column_count: number
-  all_rows_count: number
-  json: object[]
-  value_type: ValueType[]
-  get_child_node_action: string
-  child_label: string
-  visualization_header: string
-}
-
-interface EnsoTableOrColumn {
-  type: 'EnsoTableOrColumn'
-  json: unknown
-  all_rows_count?: number
-  header: string[] | undefined
-  data: unknown[][] | undefined
-  value_type: ValueType[]
-  has_index_col: boolean | undefined
-  links: string[] | undefined
-  get_child_node_action: string
-  get_child_node_link_name: string
-  child_label: string
-  visualization_header: string
-  data_quality_metrics?: DataQualityMetric[]
-  is_using_server_sort_and_filter: boolean
-  use_bottom_status_bar: boolean
-  enable_create_node: boolean
-  requires_number_format: boolean[]
-  is_using_multi_filter: boolean[]
-  table_version_hash?: string
-}
-
-type DataQualityMetricNumber = {
-  name: string
-  values: (number | null)[]
-  type: 'Percentage' | 'Count'
-}
-
-type DataQualityMetricText = {
-  name: string
-  values: (string | null)[]
-  type: 'Text'
-}
-
-type DataQualityMetric = DataQualityMetricNumber | DataQualityMetricText
 
 export type DataQualityMetricValue =
   | {
@@ -93,6 +35,68 @@ export type DataQualityMetricValue =
       displayType: 'Text'
     }
 
+const linkSchema = z.object({
+  action: z.string(),
+  label: z.string().optional(),
+})
+
+const columnSchema = z.object({
+  name: z.string(),
+  value_type: z.object({ constructor: z.string(), display_text: z.string() }).optional(),
+  link: linkSchema.optional(),
+  metrics: z
+    .array(
+      z.object({
+        name: z.string(),
+        value: z.union([z.string(), z.number(), z.null()]),
+        type: z.enum(['Text', 'Count', 'Percentage']),
+      }),
+    )
+    .optional(),
+  multi_filter: z.boolean().optional(),
+  number_format: z.boolean().optional(),
+})
+
+const gridSchema = z.object({
+  kind: z.literal('grid'),
+  row_count: z.number().optional(),
+  columns: z.array(columnSchema),
+  index: linkSchema.optional(),
+  data: z.array(z.array(z.unknown())).nullable(),
+  version_hash: z.string().optional(),
+  server: z.boolean().optional(),
+  options: z
+    .object({
+      status_bar: z.boolean().optional(),
+      create_node: z.boolean().optional(),
+      disable_sort_when_partial: z.boolean().optional(),
+    })
+    .optional(),
+})
+
+/** The table view message (`Standard.Visualization.Internal.View_Json`). */
+const viewMessageSchema = z.discriminatedUnion('kind', [
+  gridSchema,
+  z.object({ kind: z.literal('value'), value: z.unknown() }),
+  z.object({ kind: z.literal('error'), error: z.string() }),
+])
+
+/** A server-side page (`get_rows_for_table`). */
+const rowsPageSchema = z.object({
+  row_count: z.number(),
+  index: z.array(z.unknown()),
+  data: z.array(z.array(z.unknown())),
+})
+
+/** A column's distinct values (`get_distinct_values_for_column`). */
+const distinctValuesSchema = z.object({
+  values: z.array(z.unknown()).nullable(),
+})
+
+type ViewMessage = z.infer<typeof viewMessageSchema>
+type GridMessage = z.infer<typeof gridSchema>
+type ViewColumn = z.infer<typeof columnSchema>
+
 /** What `buildTableView` needs from the component. */
 export interface TableViewContext {
   /** Whether the server sorts, filters and pages the rows. */
@@ -101,19 +105,14 @@ export interface TableViewContext {
   getFilterValues: (params: SetFilterValuesFuncParams<any, string>) => Promise<void>
   /** Creates a node from a link's pattern; the pattern is applied to the visualised node. */
   createNode: (pattern: Pattern<Ast.Expression>) => void
-  /** The rows of the previous refresh: a server-side view keeps them. */
-  previousRowData: Record<string, any>[]
-  /** The data the component was created with: what a value that is not a JSON object shows. */
-  initialData: unknown
 }
 
 /** What a refresh gives AG Grid and the status bar. */
 export interface TableView {
   columnDefs: ColDef[]
-  /** `undefined`: keep the previous rows (the server-side row model). */
+  /** `undefined`: the server pages the rows. */
   rowData: Record<string, any>[] | undefined
-  /** `undefined`: keep the previous value. */
-  isTruncated: boolean | undefined
+  isTruncated: boolean
   /** Per column: whether its numbers group their digits. */
   dataGrouping: Map<string, boolean>
   rowCount: number
@@ -123,7 +122,7 @@ export interface TableView {
 /** What the component reads from the data outside a refresh. */
 export interface TableViewFlags {
   allRowCount: number | undefined
-  versionHash: string | null | undefined
+  versionHash: string | null
   isSSRM: boolean
   bottomStatusBarRequested: boolean
   createNodeEnabled: boolean
@@ -133,12 +132,40 @@ export interface TableViewFlags {
   columnTypes: Map<string, string>
 }
 
+const parsedMessages = new WeakMap<object, ViewMessage | undefined>()
+
+/**
+ * The message `data` holds. A value that is not an object is shown as one value. An object
+ * without a `kind` is another visualisation's data, received briefly while the visualisation is
+ * switched: `undefined`, an empty grid. A message that fails the schema becomes an error saying
+ * why. Parsed once per object (the flags and the refresh both ask).
+ */
+function parseViewMessage(data: unknown): ViewMessage | undefined {
+  if (typeof data !== 'object' || data === null) return { kind: 'value', value: data }
+  if (parsedMessages.has(data)) return parsedMessages.get(data)
+  let message: ViewMessage | undefined = undefined
+  if ('kind' in data) {
+    const parsed = viewMessageSchema.safeParse(data)
+    message =
+      parsed.success ?
+        parsed.data
+      : {
+          kind: 'error',
+          error: `Invalid table visualization data: ${describeIssues(parsed.error)}`,
+        }
+  }
+  parsedMessages.set(data, message)
+  return message
+}
+
+function describeIssues(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => `${issue.path.join('.') || '(message)'}: ${issue.message}`)
+    .join('; ')
+}
+
 export const getSvgTemplate = (icon: string) =>
   `<svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="${svgUseHref(icon)}"/></svg>`
-
-function addRowIndex(data: object[]): object[] {
-  return data.map((row, i) => ({ [INDEX_FIELD_NAME]: i, ...row }))
-}
 
 function getValueTypeIcon(valueType: string) {
   switch (valueType) {
@@ -161,53 +188,40 @@ function getValueTypeIcon(valueType: string) {
   }
 }
 
+interface FieldOptions {
+  valueType?: ValueType | undefined
+  metrics?: ViewColumn['metrics']
+  multiFilter?: boolean | undefined
+  total: number | undefined
+}
+
 /**
  * Generates the column definition for the table vizulization, including displaying the data value type and
  * data quality indicators.
  * @param name - The name which will be displayed in the table header and used to idenfiy the column.
- * @param [options.index] - The index of column the corresponds to the data in the `dataQuality` arrays
- * (`number_of_nothing` and `number_of_whitespace`). This identifies the correct indicators for each column
- * to be displayed in the toolip. If absent the data quality metrics will not be shown.
  * @param [options.valueType] - The data type of the column, displayed as an icon
  * and in text within the tooltip. If absent the value type icon and text will not be shown.
+ * @param [options.metrics] - The column's data quality metrics, shown in the tooltip.
  */
-function toField(
-  name: string,
-  options: { index?: number; valueType?: ValueType | null | undefined } = {},
-  data: Data,
-  ctx: TableViewContext,
-): ColDef {
-  const { index, valueType } = options
+function toField(name: string, options: FieldOptions, ctx: TableViewContext): ColDef {
+  const { valueType, metrics, multiFilter = false, total } = options
 
   const displayValue = valueType ? valueType.display_text : null
   const icon = valueType ? getValueTypeIcon(valueType.constructor) : null
   const cellValueType = valueType ? getCellDataType(valueType.constructor) : false
 
-  const usingMultiFilterLists =
-    typeof data === 'object' && 'is_using_multi_filter' in data ? data.is_using_multi_filter : []
-  const isUsingMultiFilter = usingMultiFilterLists[index!] ?? false
-
-  const filterType = valueType ? getFilterType(valueType.constructor, isUsingMultiFilter) : null
+  const filterType = valueType ? getFilterType(valueType.constructor, multiFilter) : null
 
   const filterParams = getFilterParams(ctx.isSSRM, valueType, ctx.getFilterValues)
 
-  const dataQualityMetrics =
-    typeof data === 'object' && 'data_quality_metrics' in data ?
-      data.data_quality_metrics
-        .map((metric: DataQualityMetric) => {
-          const result: DataQualityMetricValue =
-            metric.type === 'Text' ?
-              { name: metric.name, value: metric.values[index!] || '', displayType: 'Text' }
-            : { name: metric.name, displayType: metric.type, value: metric.values[index!] || 0 }
-          return (
-              metric.values[index!] === null ||
-                (result.displayType === 'Percentage' && result.value === 0)
-            ) ?
-              null
-            : result
-        })
-        .filter((obj) => obj !== null)
-    : []
+  const dataQualityMetrics = (metrics ?? []).flatMap((metric): DataQualityMetricValue[] => {
+    if (metric.value === null) return []
+    const result: DataQualityMetricValue =
+      metric.type === 'Text' ?
+        { name: metric.name, value: (metric.value as string) || '', displayType: 'Text' }
+      : { name: metric.name, displayType: metric.type, value: (metric.value as number) || 0 }
+    return result.displayType === 'Percentage' && result.value === 0 ? [] : [result]
+  })
 
   const hasDataQualityMetrics = dataQualityMetrics.length > 0
   const showDataQuality =
@@ -243,7 +257,7 @@ function toField(
     headerTooltip: displayValue ? displayValue : '',
     tooltipComponentParams: {
       dataQualityMetrics,
-      total: typeof data === 'object' ? data.all_rows_count : 0,
+      total,
       showDataQuality: hasDataQualityMetrics,
     },
     cellDataType: cellValueType,
@@ -279,24 +293,14 @@ type ParsedActionTemplate = {
   selectors: { name: string; numeric: boolean }[]
 }
 
-function parseActionTemplate(input: string, defaultSelector: string): ParsedActionTemplate {
-  const regex = /{{([#@]?)(\w+)}}/g
+function parseActionTemplate(input: string): ParsedActionTemplate {
   const selectors: { name: string; numeric: boolean }[] = []
-  let pattern = input
-
-  pattern = pattern.replace(regex, (_, flag, key) => {
-    selectors.push({ name: key, numeric: flag === '#' })
-    return '__'
-  })
-
-  pattern = '__.' + pattern
-
-  // template didn't contain any {{}} placeholders so add a single default argument
-  if (selectors.length === 0) {
-    selectors.push({ name: defaultSelector, numeric: false })
-    pattern = pattern + ' __'
-  }
-
+  const pattern =
+    '__.' +
+    input.replace(/{{([#@]?)(\w+)}}/g, (_, flag, key) => {
+      selectors.push({ name: key, numeric: flag === '#' })
+      return '__'
+    })
   return { pattern, selectors }
 }
 
@@ -304,12 +308,17 @@ function isNumber(value: unknown): value is number {
   return typeof value === 'number' && !isNaN(value)
 }
 
-function getAstPattern(params: CellDoubleClickedEvent, action: string, defaultSelector: string) {
-  const parsedAction = parseActionTemplate(action, defaultSelector)
+/**
+ * The node a link creates from a row: `action` with `{{#field}}` replaced by the row's value of
+ * `field` (a number when it reads as one), `{{\@field}}` by the value as it is, and `{{#index}}`
+ * by the row number.
+ */
+function getAstPattern(params: CellDoubleClickedEvent, action: string) {
+  const parsedAction = parseActionTemplate(action)
 
   return Pattern.new<Ast.Expression>((ast) => {
     const mappedExpressions = parsedAction.selectors.map(({ name, numeric }) => {
-      const value = params.data[name]
+      const value = name === 'index' ? params.data[INDEX_FIELD_NAME] : params.data[name]
       const castedValue = numeric && !isNaN(Number(value)) ? Number(value) : value
       return isNumber(castedValue) ?
           Ast.tryNumberToEnso(castedValue, ast.module)!
@@ -319,28 +328,6 @@ function getAstPattern(params: CellDoubleClickedEvent, action: string, defaultSe
     const templatePattern = Pattern.parseExpression(parsedAction.pattern)
     return templatePattern.instantiateCopied([ast, ...mappedExpressions])
   })
-}
-
-/**
- * Creates a new node in the graph based on the given action template and data from a grid row.
- *
- * The action string should be of the format `at {{#fieldname}}` which will generate a Node `at 2`
- * or `at {{\@fieldname}}` which will generate a Node `at "2"`
- * If the action contains no placeholders then the defaultSelector is used like so
- * `action {{\@defaultSelector}}`
- * @param params - The grid cell event containing the clicked row's data.
- * @param defaultSelector - A fallback key used when the template contains no placeholders.
- * @param action - A template string with placeholders (e.g., `at {{\@name}}`, `at {{#value}}`) used to generate the AST.
- * @param ctx - The component's context, which creates the node.
- */
-function createNode(
-  params: CellDoubleClickedEvent,
-  defaultSelector: string,
-  action: string,
-  ctx: TableViewContext,
-) {
-  const pattern = getAstPattern(params, action, defaultSelector)
-  if (pattern) ctx.createNode(pattern)
 }
 
 interface LinkFieldOptions {
@@ -354,7 +341,7 @@ function toLinkField(fieldName: string, options: LinkFieldOptions, ctx: TableVie
   return {
     headerName: headerName ? headerName : fieldName,
     field: fieldName,
-    onCellDoubleClicked: (params) => createNode(params, fieldName, getChildAction, ctx),
+    onCellDoubleClicked: (params) => ctx.createNode(getAstPattern(params, getChildAction)),
     tooltipValueGetter: (params: ITooltipParams) =>
       params.node?.rowPinned === 'top' ?
         null
@@ -369,280 +356,174 @@ function toLinkField(fieldName: string, options: LinkFieldOptions, ctx: TableVie
   }
 }
 
-/** What a value that is not a JSON object shows: the value itself, in one cell. */
-function defaultData(value: unknown) {
-  return {
-    type: typeof value,
-    json: value,
-    // eslint-disable-next-line camelcase
-    all_rows_count: 1,
-    data: undefined,
-    header: undefined,
-    // eslint-disable-next-line camelcase
-    value_type: undefined,
-    // eslint-disable-next-line camelcase
-    has_index_col: false,
-    links: undefined,
-    // eslint-disable-next-line camelcase
-    get_child_node_action: '',
-    // eslint-disable-next-line camelcase
-    get_child_node_link_name: undefined,
-    // eslint-disable-next-line camelcase
-    child_label: undefined,
-    // eslint-disable-next-line camelcase
-    visualization_header: undefined,
-    // eslint-disable-next-line camelcase
-    is_using_server_sort_and_filter: undefined,
-    // eslint-disable-next-line camelcase
-    requires_number_format: undefined,
-  }
+function isMissing(cell: unknown): boolean {
+  return (
+    typeof cell === 'object' &&
+    cell !== null &&
+    (cell as Record<string, unknown>)._missing_ === true
+  )
 }
 
-/** Rows from column-major `data`; the index column holds the row number (or, for a server page, `data[0]`). */
-export function createRowsForTable(
+/**
+ * Rows from column-major `data`, one array per column after the index column. The index column
+ * holds `index[i]` when given (a server page), else the row number. A missing cell becomes
+ * `undefined` (an empty cell).
+ */
+function createRows(
   columnDefs: ColDef[],
   data: unknown[][],
-  shift: number,
-  isSSrm: boolean,
-) {
-  const rows = data && data.length > 0 ? (data[0]?.length ?? 0) : 0
-  const getIndexInfo = (i: number) => {
-    return isSSrm ? data?.[0]?.[i] : i
-  }
-  return Array.from({ length: rows }, (_, i) => {
-    return Object.fromEntries(
-      columnDefs.map((h, j) => {
-        return [h.field, h.field === INDEX_FIELD_NAME ? getIndexInfo(i) : data?.[j - shift]?.[i]]
+  index?: readonly unknown[],
+): Record<string, any>[] {
+  const rows = index ? index.length : (data[0]?.length ?? 0)
+  const shift = columnDefs[0]?.field === INDEX_FIELD_NAME ? 1 : 0
+  return Array.from({ length: rows }, (_, i) =>
+    Object.fromEntries(
+      columnDefs.map((col, j) => {
+        if (col.field === INDEX_FIELD_NAME) return [col.field, index ? index[i] : i]
+        const cell = data[j - shift]?.[i]
+        return [col.field, isMissing(cell) ? undefined : cell]
       }),
-    )
+    ),
+  )
+}
+
+/** Whether a column's values call for digit grouping (beyond ±999999). */
+function needsGrouping(rows: Record<string, any>[], field: string): boolean {
+  return rows.some((row) => {
+    const value = row[field] && typeof row[field] === 'object' ? row[field].value : row[field]
+    return value > 999999 || value < -999999
   })
 }
 
-/** The view of `value`, the data `prepare_visualization` sent. */
-export function buildTableView(value: unknown, ctx: TableViewContext): TableView {
-  const data = value as Data
-  // If the user switches from one visualization type to another, we can receive the raw object.
-  const data_ = typeof data === 'object' ? data : defaultData(ctx.initialData)
-  let columnDefs: ColDef[] = []
-  let rowData: Record<string, any>[] | undefined = undefined
-  let isTruncated: boolean | undefined = undefined
-  if (isError(data_)) {
-    columnDefs = [
-      {
-        field: 'Error',
-        cellStyle: { 'white-space': 'normal' },
-      },
-    ]
-    rowData = [{ Error: data_.error }]
-  } else if (data_.type === 'Matrix') {
-    columnDefs = [
+function buildGrid(message: GridMessage, ctx: TableViewContext): TableView {
+  const total = message.row_count
+  const columnDefs: ColDef[] = []
+  if (message.index) {
+    columnDefs.push(
       toLinkField(
         INDEX_FIELD_NAME,
-        {
-          tooltipValue: data_.child_label,
-          headerName: data_.visualization_header,
-          getChildAction: data_.get_child_node_action,
-        },
+        { tooltipValue: message.index.label, getChildAction: message.index.action },
         ctx,
       ),
-    ]
-    for (let i = 0; i < data_.column_count; i++) {
-      columnDefs.push(toField(i.toString(), {}, data, ctx))
-    }
-    rowData = addRowIndex(data_.json)
-    isTruncated = data_.all_rows_count !== data_.json.length
-  } else if (data_.type === 'Object_Matrix') {
-    columnDefs = [
-      toLinkField(
-        INDEX_FIELD_NAME,
-        {
-          tooltipValue: data_.child_label,
-          headerName: data_.visualization_header,
-          getChildAction: data_.get_child_node_action,
-        },
-        ctx,
-      ),
-    ]
-    const keys = new Set<string>()
-    for (const val of data_.json) {
-      if (val != null) {
-        Object.keys(val).forEach((k) => {
-          if (!keys.has(k)) {
-            keys.add(k)
-            columnDefs.push(toField(k, {}, data, ctx))
-          }
-        })
-      }
-    }
-    rowData = addRowIndex(data_.json)
-    isTruncated = data_.all_rows_count !== data_.json.length
-  } else if (isGenericGrid(data_)) {
-    columnDefs = data_.headers.map((header) => {
-      if (header.get_child_node_action) {
-        return toLinkField(
-          header.visualization_header,
-          {
-            tooltipValue: header.child_label,
-            headerName: header.visualization_header,
-            getChildAction: header.get_child_node_action,
-          },
-          ctx,
-        )
-      } else {
-        return toField(header.visualization_header, {}, data, ctx)
-      }
-    })
-    rowData = createRowsForTable(columnDefs, data_.data, 0, false)
-  } else if (Array.isArray(data_.json)) {
-    columnDefs = [
-      toLinkField(
-        INDEX_FIELD_NAME,
-        {
-          tooltipValue: data_.child_label,
-          headerName: data_.visualization_header,
-          getChildAction: data_.get_child_node_action,
-        },
-        ctx,
-      ),
-      toField('Value', {}, data, ctx),
-    ]
-    rowData = data_.json.map((row, i) => ({ [INDEX_FIELD_NAME]: i, Value: row }))
-    isTruncated = data_.all_rows_count ? data_.all_rows_count !== data_.json.length : false
-  } else if (data_.json !== undefined) {
-    // single values like Integer or Text
-    columnDefs = [toField('Value', {}, data, ctx)]
-    rowData = [{ Value: data_.json }]
-  } else {
-    const dataHeader =
-      ('header' in data_ ? data_.header : [])?.map((v, i) => {
-        const valueType = data_.value_type ? data_.value_type[i] : null
-        if (data_.get_child_node_link_name === v) {
-          return toLinkField(
-            v,
-            {
-              tooltipValue: data_.child_label,
-              headerName: data_.visualization_header,
-              getChildAction: data_.get_child_node_action,
-            },
-            ctx,
-          )
-        }
-        return toField(v, { index: i, valueType }, data, ctx)
-      }) ?? []
-
-    columnDefs =
-      data_.has_index_col ?
-        [
-          toLinkField(
-            INDEX_FIELD_NAME,
-            {
-              tooltipValue: data_.child_label,
-              headerName: data_.visualization_header,
-              getChildAction: data_.get_child_node_action,
-            },
-            ctx,
-          ),
-          ...dataHeader,
-        ]
-      : dataHeader
-
-    if (!data_.is_using_server_sort_and_filter) {
-      const shift = data_.type === 'EnsoTableOrColumn' ? 1 : 0
-      rowData = data_.data ? createRowsForTable(columnDefs, data_.data, shift, false) : []
-    }
-  }
-  const rows = rowData ?? ctx.previousRowData
-  const headerGroupingMap = new Map()
-
-  const determineGrouping = (header: string) =>
-    rows.some((row) => {
-      const value = row[header] && typeof row[header] === 'object' ? row[header].value : row[header]
-      return value > 999999 || value < -999999
-    })
-
-  if ('header' in data_) {
-    const headers = data_.header || []
-
-    if (data_.requires_number_format) {
-      columnDefs.forEach((col) => {
-        const colHeader = col.headerName
-        if (colHeader === INDEX_FIELD_NAME) {
-          headerGroupingMap.set(INDEX_FIELD_NAME, false)
-        }
-
-        if (typeof data === 'object' && 'header' in data) {
-          const dataHeaderIndex = data.header?.indexOf(colHeader ?? '')
-          const needsGrouping =
-            dataHeaderIndex !== -1 ? data_.requires_number_format[dataHeaderIndex!] : false
-          headerGroupingMap.set(colHeader, needsGrouping)
-        }
-      })
-    } else {
-      headers.forEach((header) => headerGroupingMap.set(header, determineGrouping(header)))
-    }
-  } else {
-    const headers = rows[0] ? Object.keys(rows[0]) : []
-    Object.keys(headers).forEach((header) =>
-      headerGroupingMap.set(header, determineGrouping(header)),
     )
   }
-
-  const rowCount = data_.all_rows_count == null ? 1 : data_.all_rows_count
+  for (const column of message.columns) {
+    columnDefs.push(
+      column.link ?
+        toLinkField(
+          column.name,
+          { tooltipValue: column.link.label, getChildAction: column.link.action },
+          ctx,
+        )
+      : toField(
+          column.name,
+          {
+            valueType: column.value_type,
+            metrics: column.metrics,
+            multiFilter: column.multi_filter,
+            total,
+          },
+          ctx,
+        ),
+    )
+  }
+  const rowData = message.data == null ? undefined : createRows(columnDefs, message.data)
+  const rowsSent = message.data?.[0]?.length ?? 0
+  const dataGrouping = new Map<string, boolean>()
+  if (message.index) dataGrouping.set(INDEX_FIELD_NAME, false)
+  for (const column of message.columns) {
+    dataGrouping.set(column.name, column.number_format ?? needsGrouping(rowData ?? [], column.name))
+  }
   return {
     columnDefs,
     rowData,
-    isTruncated,
-    dataGrouping: headerGroupingMap,
-    rowCount,
-    showRowCount: !(data_.all_rows_count == null),
+    isTruncated:
+      message.options?.disable_sort_when_partial === true && total != null && total !== rowsSent,
+    dataGrouping,
+    rowCount: total ?? 1,
+    showRowCount: total != null,
   }
 }
 
-function columnTypes(data: Data): Map<string, string> {
-  const colMap: Map<string, string> = new Map()
-  if (typeof data === 'object' && !('error' in data)) {
-    const valueTypes = 'value_type' in data ? data.value_type : []
-    const headers = 'header' in data ? data.header : []
-    headers?.forEach((header, index) => {
-      if (valueTypes[index]) {
-        colMap.set(header, valueTypes[index].constructor)
+/** The view of `data`, the message `prepare_visualization` sent. */
+export function buildTableView(data: unknown, ctx: TableViewContext): TableView {
+  const message = parseViewMessage(data)
+  if (message === undefined) {
+    return {
+      columnDefs: [],
+      rowData: [],
+      isTruncated: false,
+      dataGrouping: new Map(),
+      rowCount: 1,
+      showRowCount: false,
+    }
+  }
+  switch (message.kind) {
+    case 'error':
+      return {
+        columnDefs: [{ field: 'Error', cellStyle: { 'white-space': 'normal' } }],
+        rowData: [{ Error: message.error }],
+        isTruncated: false,
+        dataGrouping: new Map([['Error', false]]),
+        rowCount: 1,
+        showRowCount: false,
       }
-    })
+    case 'value':
+      return {
+        columnDefs: [toField('Value', { total: undefined }, ctx)],
+        rowData: [{ Value: message.value }],
+        isTruncated: false,
+        dataGrouping: new Map([['Value', false]]),
+        rowCount: 1,
+        showRowCount: false,
+      }
+    case 'grid':
+      return buildGrid(message, ctx)
   }
-  return colMap
 }
 
-/** What the component reads from `value` outside a refresh. */
-export function tableViewFlags(value: unknown): TableViewFlags {
-  const data = value as Data
-  const isObject = typeof data === 'object'
+/** What the component reads from `data` outside a refresh. */
+export function tableViewFlags(data: unknown): TableViewFlags {
+  const message = parseViewMessage(data)
+  if (message?.kind !== 'grid') {
+    return {
+      allRowCount: 0,
+      versionHash: null,
+      isSSRM: false,
+      bottomStatusBarRequested: false,
+      createNodeEnabled: false,
+      columnNames: [],
+      columnTypes: new Map(),
+    }
+  }
   return {
-    allRowCount: isObject && 'all_rows_count' in data ? data.all_rows_count : 0,
-    versionHash: isObject && 'table_version_hash' in data ? data.table_version_hash : null,
-    isSSRM: Boolean(
-      isObject && 'is_using_server_sort_and_filter' in data && data.is_using_server_sort_and_filter,
+    allRowCount: message.row_count ?? 0,
+    versionHash: message.version_hash ?? null,
+    isSSRM: message.server === true,
+    bottomStatusBarRequested: message.options?.status_bar === true,
+    createNodeEnabled: message.options?.create_node === true,
+    columnNames: message.columns.map((column) => column.name),
+    columnTypes: new Map<string, string>(
+      message.columns.flatMap((column) =>
+        column.value_type ? [[column.name, column.value_type.constructor] as const] : [],
+      ),
     ),
-    bottomStatusBarRequested:
-      isObject && 'use_bottom_status_bar' in data && Boolean(data.use_bottom_status_bar),
-    createNodeEnabled: Boolean(isObject && 'enable_create_node' in data && data.enable_create_node),
-    columnNames: isObject && 'header' in data ? (data.header ?? []) : [],
-    columnTypes: columnTypes(data),
   }
 }
 
-/** The rows of a server-side page (`get_rows_for_table`), for the view's `columnDefs`. */
+/** The rows of a server-side page, for the view's `columnDefs`. Throws when it is malformed. */
 export function rowsFromPage(
   columnDefs: ColDef[],
   page: unknown,
 ): { rows: Record<string, any>[]; rowCount: number } {
-  const value = page as { rows: unknown[][]; row_count: number }
+  const parsed = rowsPageSchema.parse(page)
   return {
-    rows: createRowsForTable(columnDefs, value.rows, 0, true),
-    rowCount: value.row_count,
+    rows: createRows(columnDefs, parsed.data, parsed.index),
+    rowCount: parsed.row_count,
   }
 }
 
-/** A column's distinct values (`get_distinct_values_for_column`), for its set filter. */
+/** A column's distinct values, for its set filter; `null` when there are too many to list. */
 export function distinctValuesFromResponse(response: unknown): any {
-  return (response as { distinct_vals: unknown }).distinct_vals
+  return distinctValuesSchema.parse(response).values
 }
