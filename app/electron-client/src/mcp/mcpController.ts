@@ -18,6 +18,10 @@ export const MCP_TOKEN_ACCOUNT = 'mcp-token'
 const MIN_PORT = 1024
 const MAX_PORT = 65535
 
+/** Why `setEnabled` and `setPort` are refused while an environment variable fixes the setting. */
+export const MCP_LOCKED_BY_ENVIRONMENT_ERROR =
+  'This setting is fixed by an environment variable (ENSO_MCP_ENABLED or ENSO_MCP_PORT).'
+
 export interface McpControllerOptions {
   /** `<userData>/mcp-settings.json`. */
   readonly settingsPath: string
@@ -56,6 +60,8 @@ export class McpController {
   private server: Server | null = null
   private error: string | null = null
   private queue: Promise<unknown> = Promise.resolve()
+  /** Set by {@link shutdown}: from then on nothing starts a server. */
+  private closed = false
 
   /** Nothing runs until {@link init}. */
   constructor(private readonly options: McpControllerOptions) {}
@@ -65,13 +71,26 @@ export class McpController {
     return token != null && token !== '' ? token : null
   }
 
+  private get envEnabled(): boolean {
+    return this.options.env.ENSO_MCP_ENABLED === '1'
+  }
+
+  private get envPort(): number | null {
+    const port = Number(this.options.env.ENSO_MCP_PORT)
+    return this.options.env.ENSO_MCP_PORT != null && isValidPort(port) ? port : null
+  }
+
   private get enabled(): boolean {
-    return this.options.env.ENSO_MCP_ENABLED === '1' || this.fileEnabled
+    return this.envEnabled || this.fileEnabled
   }
 
   private get port(): number {
-    const port = Number(this.options.env.ENSO_MCP_PORT)
-    return this.options.env.ENSO_MCP_PORT != null && isValidPort(port) ? port : this.filePort
+    return this.envPort ?? this.filePort
+  }
+
+  /** Whether `ENSO_MCP_ENABLED` or `ENSO_MCP_PORT` is in effect. */
+  private get lockedByEnvironment(): boolean {
+    return this.envEnabled || this.envPort != null
   }
 
   /** Run `task` after every earlier call has finished. */
@@ -105,33 +124,48 @@ export class McpController {
       port: this.port,
       running: this.server != null,
       error: this.error,
+      lockedByEnvironment: this.lockedByEnvironment,
     }
   }
 
-  /** Turn the server on or off, and remember the choice. */
+  /**
+   * Turn the server on or off, and remember the choice. Refused while an environment variable fixes
+   * the setting; after {@link shutdown}, the status without any change.
+   */
   setEnabled(enabled: boolean): Promise<McpStatus> {
     return this.serialised(async () => {
+      if (this.closed) return this.status()
+      if (this.lockedByEnvironment) throw new Error(MCP_LOCKED_BY_ENVIRONMENT_ERROR)
+      await this.save({ enabled, port: this.filePort })
       this.fileEnabled = enabled
-      await this.save()
       return this.apply()
     })
   }
 
-  /** `port` is an integer from 1024 to 65535; a running server restarts on it. */
+  /**
+   * `port` is an integer from 1024 to 65535; a running server restarts on it. Refused while an
+   * environment variable fixes the setting; after {@link shutdown}, the status without any change.
+   */
   setPort(port: number): Promise<McpStatus> {
     return this.serialised(async () => {
+      if (this.closed) return this.status()
+      if (this.lockedByEnvironment) throw new Error(MCP_LOCKED_BY_ENVIRONMENT_ERROR)
       if (!isValidPort(port)) {
         throw new Error(`The port must be a whole number from ${MIN_PORT} to ${MAX_PORT}.`)
       }
+      await this.save({ enabled: this.fileEnabled, port })
       this.filePort = port
-      await this.save()
       return this.apply()
     })
   }
 
-  /** Store a new token; a running server restarts with it. */
+  /**
+   * Store a new token; a running server restarts with it. After {@link shutdown}, the status
+   * without any change.
+   */
   replaceToken(): Promise<McpStatus> {
     return this.serialised(async () => {
+      if (this.closed) return this.status()
       if (this.envToken != null) throw new Error('The token is set by ENSO_MCP_TOKEN.')
       try {
         const entry = await this.options.entry(MCP_TOKEN_ACCOUNT)
@@ -151,8 +185,12 @@ export class McpController {
     })
   }
 
-  /** Stop the server. Settings are untouched. */
+  /**
+   * Stop the server, for good: no later call starts one. Settings are untouched. A start already
+   * queued before this call runs first, and is then stopped.
+   */
   async shutdown(): Promise<void> {
+    this.closed = true
     await this.serialised(async () => {
       await this.stopServer()
     })
@@ -183,7 +221,7 @@ export class McpController {
   private async apply(): Promise<McpStatus> {
     await this.stopServer()
     this.error = null
-    if (this.enabled) {
+    if (this.enabled && !this.closed) {
       const port = this.port
       try {
         const server = this.options.createServer(port, await this.token())
@@ -203,14 +241,18 @@ export class McpController {
       }
     }
     const status = this.status()
-    this.options.onStatusChanged(status)
+    try {
+      this.options.onStatusChanged(status)
+    } catch (e) {
+      console.warn('[MCP] the status listener failed:', e)
+    }
     return status
   }
 
-  /** Write the settings atomically (the temporary file, then a rename). */
-  private async save(): Promise<void> {
+  /** Write the settings atomically; the caller updates its state only once this succeeds (the temporary file, then a rename). */
+  private async save(settings: { enabled: boolean; port: number }): Promise<void> {
     const temporary = `${this.options.settingsPath}.tmp`
-    const text = JSON.stringify({ enabled: this.fileEnabled, port: this.filePort })
+    const text = JSON.stringify(settings)
     await fs.writeFile(temporary, text, 'utf8')
     await fs.rename(temporary, this.options.settingsPath)
   }

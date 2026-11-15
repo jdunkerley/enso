@@ -4,7 +4,8 @@
  * agent apps read the open project, with a warning about what a connected agent can do. While it is
  * on, the section shows the server's address, a port field, a button per client that copies that
  * client's setup text, and a button to replace the token. If the server could not start, the
- * reason shows under the switch.
+ * reason shows under the switch. While `ENSO_MCP_ENABLED` or `ENSO_MCP_PORT` fixes the setting
+ * (`lockedByEnvironment`), the switch and the port field are disabled, with a note saying why.
  *
  * The token never reaches this component: "Copy setup" goes through Electron main, which writes the
  * text to the clipboard.
@@ -52,7 +53,9 @@ const status = ref<McpStatus>({
   port: MCP_DEFAULT_PORT,
   running: false,
   error: null,
+  lockedByEnvironment: false,
 })
+const locked = computed(() => status.value.lockedByEnvironment)
 const address = computed(() => `http://127.0.0.1:${status.value.port}/mcp`)
 
 /** Show a failure as a toast. */
@@ -72,26 +75,33 @@ onMounted(() => {
   }, showError)
 })
 
-/** Bumped when a change fails, so that the switch goes back to the server's state. */
-const switchResets = ref(0)
+/**
+ * Bumped when a change fails, or resolves with a status other than the one asked for, so that the
+ * switch and the port field go back to the server's state.
+ */
+const formResets = ref(0)
 
 const setEnabled = useMutation({
   mutationFn: async (enabled: boolean) => {
     const next = await window.api?.mcp?.setEnabled(enabled)
-    if (next != null) status.value = next
+    if (next == null) return
+    status.value = next
+    if (next.enabled !== enabled) formResets.value += 1
   },
   onError: (error) => {
-    switchResets.value += 1
+    formResets.value += 1
     showError(error)
   },
 })
 
+/** A failure rejects into the port form, which shows it (`FormError`); there is no toast. */
 const setPort = useMutation({
   mutationFn: async (port: number) => {
     const next = await window.api?.mcp?.setPort(port)
-    if (next != null) status.value = next
+    if (next == null) return
+    status.value = next
+    if (next.port !== port) formResets.value += 1
   },
-  onError: showError,
 })
 
 const copyConfig = useMutation({
@@ -124,13 +134,14 @@ async function askReplaceToken() {
 <template>
   <div class="flex flex-col gap-2" data-testid="mcp-settings-section">
     <Form
-      :key="`${status.enabled}-${switchResets}`"
+      :key="`${status.enabled}-${formResets}`"
       :schema="(z) => z.object({ enabled: z.boolean() })"
       :defaultValues="{ enabled: status.enabled }"
       @change="(name, value) => name === 'enabled' && setEnabled.mutate(value === true)"
     >
-      <Switch name="enabled" :label="getText('mcpEnabledSetting')" />
+      <Switch name="enabled" :label="getText('mcpEnabledSetting')" :isDisabled="locked" />
     </Form>
+    <Text v-if="locked" testId="mcp-locked">{{ getText('mcpLockedByEnvironment') }}</Text>
     <Alert v-if="status.error != null" variant="error">
       <Text testId="mcp-error">{{ status.error }}</Text>
     </Alert>
@@ -141,7 +152,7 @@ async function askReplaceToken() {
         <Text textSelection="all" monospace testId="mcp-address">{{ address }}</Text>
       </div>
       <Form
-        :key="status.port"
+        :key="`${status.port}-${formResets}`"
         :schema="
           (z) =>
             z.object({
@@ -155,9 +166,9 @@ async function askReplaceToken() {
         :defaultValues="{ port: status.port }"
         @submit="({ port }) => setPort.mutateAsync(port)"
       >
-        <Input name="port" type="number" :label="getText('mcpPortLabel')" />
+        <Input name="port" type="number" :label="getText('mcpPortLabel')" :isDisabled="locked" />
         <ButtonGroup class="grow-0">
-          <Submit size="small" variant="outline">{{ getText('save') }}</Submit>
+          <Submit size="small" variant="outline" :isDisabled="locked">{{ getText('save') }}</Submit>
         </ButtonGroup>
         <FormError />
       </Form>

@@ -27,7 +27,10 @@ class FakeKeyring {
 class FakeServer {
   started = false
   startError: unknown = null
+  /** When set, `start` waits for it. */
+  startGate: Promise<void> | null = null
   readonly start = vi.fn(async () => {
+    if (this.startGate != null) await this.startGate
     if (this.startError != null) throw this.startError
     this.started = true
   })
@@ -50,6 +53,8 @@ describe('McpController', () => {
   let servers: FakeServer[]
   let statuses: McpStatus[]
   let startError: unknown
+  let startGate: Promise<void> | null
+  let onStatusChanged: (status: McpStatus) => void
 
   beforeEach(async () => {
     dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcp-controller-'))
@@ -58,6 +63,8 @@ describe('McpController', () => {
     servers = []
     statuses = []
     startError = null
+    startGate = null
+    onStatusChanged = (status) => statuses.push(status)
   })
 
   afterEach(async () => {
@@ -74,16 +81,23 @@ describe('McpController', () => {
       createServer: (port, token) => {
         const server = new FakeServer(port, token)
         server.startError = startError
+        server.startGate = startGate
         servers.push(server)
         return server
       },
-      onStatusChanged: (status) => statuses.push(status),
+      onStatusChanged: (status) => onStatusChanged(status),
     })
   }
 
   test('with no settings file it is off and touches nothing', async () => {
     const c = controller()
-    expect(await c.init()).toEqual({ enabled: false, port: 39417, running: false, error: null })
+    expect(await c.init()).toEqual({
+      enabled: false,
+      port: 39417,
+      running: false,
+      error: null,
+      lockedByEnvironment: false,
+    })
     expect(servers).toEqual([])
     expect(keyring.accounts).toEqual([])
   })
@@ -93,7 +107,13 @@ describe('McpController', () => {
     await c.init()
     statuses.length = 0
     const status = await c.setEnabled(true)
-    expect(status).toEqual({ enabled: true, port: 39417, running: true, error: null })
+    expect(status).toEqual({
+      enabled: true,
+      port: 39417,
+      running: true,
+      error: null,
+      lockedByEnvironment: false,
+    })
     expect(statuses).toEqual([status])
     expect(servers).toHaveLength(1)
     expect(servers[0]!.port).toBe(39417)
@@ -118,7 +138,13 @@ describe('McpController', () => {
     await c.setEnabled(true)
     const token = keyring.items.get(MCP_TOKEN_ACCOUNT)
     const status = await c.setEnabled(false)
-    expect(status).toEqual({ enabled: false, port: 39417, running: false, error: null })
+    expect(status).toEqual({
+      enabled: false,
+      port: 39417,
+      running: false,
+      error: null,
+      lockedByEnvironment: false,
+    })
     expect(servers[0]!.stop).toHaveBeenCalled()
     expect(keyring.items.get(MCP_TOKEN_ACCOUNT)).toBe(token)
   })
@@ -127,7 +153,13 @@ describe('McpController', () => {
     const c = controller()
     await c.setEnabled(true)
     const status = await c.setPort(40000)
-    expect(status).toEqual({ enabled: true, port: 40000, running: true, error: null })
+    expect(status).toEqual({
+      enabled: true,
+      port: 40000,
+      running: true,
+      error: null,
+      lockedByEnvironment: false,
+    })
     expect(servers[0]!.stop).toHaveBeenCalled()
     expect(servers[1]!.port).toBe(40000)
     await expect(c.setPort(80)).rejects.toThrow()
@@ -172,9 +204,35 @@ describe('McpController', () => {
       ENSO_MCP_ENABLED: '1',
       ENSO_MCP_PORT: '41000',
     })
-    expect(await c.init()).toEqual({ enabled: true, port: 41000, running: true, error: null })
+    expect(await c.init()).toEqual({
+      enabled: true,
+      port: 41000,
+      running: true,
+      error: null,
+      lockedByEnvironment: true,
+    })
     expect(servers[0]!.port).toBe(41000)
     await expect(fs.access(settingsPath)).rejects.toThrow()
+  })
+
+  test.each([
+    ['ENSO_MCP_ENABLED', { ENSO_MCP_ENABLED: '1' }],
+    ['ENSO_MCP_PORT', { ENSO_MCP_PORT: '41000' }],
+  ])('while %s is in effect the switch and the port are locked', async (_name, env) => {
+    const c = controller({ ENSO_MCP_TOKEN: 't', ...env })
+    const before = await c.init()
+    expect(before.lockedByEnvironment).toBe(true)
+    const locked =
+      'This setting is fixed by an environment variable (ENSO_MCP_ENABLED or ENSO_MCP_PORT).'
+    await expect(c.setEnabled(!before.enabled)).rejects.toThrow(locked)
+    await expect(c.setPort(40000)).rejects.toThrow(locked)
+    expect(c.status()).toEqual(before)
+    await expect(fs.access(settingsPath)).rejects.toThrow()
+  })
+
+  test('an ENSO_MCP_PORT that is not a valid port, or ENSO_MCP_ENABLED=0, locks nothing', async () => {
+    const c = controller({ ENSO_MCP_PORT: '80', ENSO_MCP_ENABLED: '0' })
+    expect((await c.init()).lockedByEnvironment).toBe(false)
   })
 
   test('replaceToken stores a new token and restarts a running server', async () => {
@@ -204,5 +262,57 @@ describe('McpController', () => {
     await c.setEnabled(true)
     await c.shutdown()
     expect(servers[0]!.stop).toHaveBeenCalled()
+  })
+
+  test('a throwing status listener does not reject init, and is logged', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      onStatusChanged = () => {
+        throw new Error('window gone')
+      }
+      await fs.writeFile(settingsPath, JSON.stringify({ enabled: true, port: 39417 }))
+      const status = await controller({ ENSO_MCP_TOKEN: 't' }).init()
+      expect(status.running).toBe(true)
+      expect(warn).toHaveBeenCalledOnce()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  test('after shutdown, setEnabled, setPort and replaceToken start no server', async () => {
+    const c = controller()
+    await c.init()
+    await c.shutdown()
+    expect((await c.setEnabled(true)).running).toBe(false)
+    expect((await c.setPort(40000)).running).toBe(false)
+    expect((await c.replaceToken()).running).toBe(false)
+    expect(servers).toEqual([])
+  })
+
+  test('shutdown while a start is pending leaves no server running', async () => {
+    let open!: () => void
+    startGate = new Promise((resolve) => (open = resolve))
+    const c = controller({ ENSO_MCP_TOKEN: 't' })
+    const enabling = c.setEnabled(true)
+    const shuttingDown = c.shutdown()
+    const changingPort = c.setPort(40000)
+    open()
+    await enabling
+    await shuttingDown
+    await changingPort
+    expect(servers.filter((server) => server.started)).toEqual([])
+    expect(c.status().running).toBe(false)
+  })
+
+  test('a settings file that cannot be written rejects and changes nothing', async () => {
+    const c = controller({ ENSO_MCP_TOKEN: 't' })
+    await c.init()
+    const before = c.status()
+    // A directory where the settings file should be: the rename fails.
+    await fs.mkdir(settingsPath)
+    await expect(c.setEnabled(true)).rejects.toThrow()
+    await expect(c.setPort(40000)).rejects.toThrow()
+    expect(c.status()).toEqual(before)
+    expect(servers).toEqual([])
   })
 })

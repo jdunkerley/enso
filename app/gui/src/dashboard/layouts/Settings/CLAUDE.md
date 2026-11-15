@@ -79,7 +79,12 @@ the address (`http://127.0.0.1:<port>/mcp`), a port field (1024 to 65535,
 text to the clipboard (`copyConfig`), and a New token button behind a confirm
 dialog (`replaceToken`). The token never reaches the renderer: no call returns
 it. An `error` in the status (port taken, no keychain) shows under the switch.
-Tests: `__tests__/McpSettingsSection.test.ts` and
+While `lockedByEnvironment` is true (`ENSO_MCP_ENABLED` or `ENSO_MCP_PORT` in
+effect), the switch, the port field and its Save are disabled, with a note
+(`mcpLockedByEnvironment`); main refuses both changes then anyway. A change that
+resolves with a status other than the one asked for, or fails, re-keys the forms
+so they show the server's state. A failed `setPort` shows in the port form only,
+not as a toast. Tests: `__tests__/McpSettingsSection.test.ts` and
 `integration-test/dashboard/mcpSettings.spec.ts`.
 
 ## Engine logs

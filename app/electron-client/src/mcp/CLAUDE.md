@@ -60,9 +60,12 @@ Caller]):
    this server's port — against DNS rebinding: `403` otherwise;
 3. `Authorization: Bearer <token>`, compared in constant time: `401` otherwise.
 
-Then any path but `/mcp` is `404`. Refusals are logged at the 1st, 10th, 100th,
-… only, so a looping process cannot fill the log. The server binds `127.0.0.1`
-only; do not bind another address or add a route before the checks.
+Then a request target that does not parse is `400` and any path but `/mcp` is
+`404`; everything after the checks runs inside one `try` (the request handler
+runs as `void`, so a throw would be an unhandled rejection in main). Refusals
+are logged at the 1st, 10th, 100th, … only, so a looping process cannot fill the
+log. The server binds `127.0.0.1` only; do not bind another address or add a
+route before the checks.
 
 ## Stateless, and the caller's name
 
@@ -90,12 +93,20 @@ authorise anything by it. The token is the only credential.
   `ENSO_MCP_ENABLED=1` turns the server on (without changing the file),
   `ENSO_MCP_PORT=<port>` sets the port (1024 to 65535; another value is
   ignored), and `ENSO_MCP_TOKEN=<token>` is the token (the keychain is not read,
-  and New token is refused). The packaged-app spec (`tests/mcp.spec.ts`) uses
-  all three, so tests never touch the real keychain item. Unit tests use a fake
-  keyring only.
+  and New token is refused). While `ENSO_MCP_ENABLED=1` or a valid
+  `ENSO_MCP_PORT` is in effect, the status's `lockedByEnvironment` is true,
+  `setEnabled` and `setPort` reject (`MCP_LOCKED_BY_ENVIRONMENT_ERROR`) and
+  change nothing, and Settings shows both controls disabled. The packaged-app
+  spec (`tests/mcp.spec.ts`) uses all three, so tests never touch the real
+  keychain item. Unit tests use a fake keyring only.
 - A start that fails is reported in the status's `error` (port in use, no
   keychain), which the Settings section shows; it never stops the IDE starting.
   `init` does not wait for the server: start-up must not wait on the keychain.
+- `setEnabled` and `setPort` update the in-memory setting only after the file is
+  written; a failed write rejects and changes nothing. A throwing
+  `onStatusChanged` is logged and ignored. After `shutdown()` nothing starts a
+  server again: `setEnabled`, `setPort` and `replaceToken` resolve with the
+  current status and change nothing.
 
 ## Output bounds
 

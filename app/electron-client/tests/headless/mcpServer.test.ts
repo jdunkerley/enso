@@ -3,6 +3,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import type { McpCaller } from 'enso-common/src/mcp'
 import * as fs from 'node:fs'
+import { request } from 'node:http'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -152,6 +153,29 @@ describe('McpHttpServer', () => {
     })
 
     test('answers another path with 404', async () => {
+      expect((await post('/other', { Authorization: `Bearer ${TOKEN}` })).status).toBe(404)
+    })
+
+    test('answers a request target that does not parse with 400, and goes on serving', async () => {
+      const url = new URL(server.url)
+      const status = await new Promise<number | undefined>((resolve, reject) => {
+        const req = request(
+          {
+            host: url.hostname,
+            port: url.port,
+            path: '//',
+            method: 'POST',
+            headers: { Authorization: `Bearer ${TOKEN}`, Host: url.host },
+          },
+          (res) => {
+            res.resume()
+            resolve(res.statusCode)
+          },
+        )
+        req.on('error', reject)
+        req.end()
+      })
+      expect(status).toBe(400)
       expect((await post('/other', { Authorization: `Bearer ${TOKEN}` })).status).toBe(404)
     })
   })

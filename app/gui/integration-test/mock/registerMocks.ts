@@ -218,17 +218,30 @@ async function mockElectronApi(
                 port: number
                 running: boolean
                 error: string | null
+                lockedByEnvironment: boolean
               }
               const w = window as unknown as { __mcpMockStatus?: Status; __mcpCopied?: string }
               const current = (): Status =>
-                w.__mcpMockStatus ?? { enabled: false, port: 39417, running: false, error: null }
+                w.__mcpMockStatus ?? {
+                  enabled: false,
+                  port: 39417,
+                  running: false,
+                  error: null,
+                  lockedByEnvironment: false,
+                }
               return {
                 onToolCall: (): (() => void) => () => {},
                 replyToolCall: (): void => {},
                 status: async (): Promise<Status> => current(),
                 onStatusChanged: (): (() => void) => () => {},
                 setEnabled: async (enabled: boolean): Promise<Status> => {
-                  w.__mcpMockStatus = { enabled, port: 39417, running: enabled, error: null }
+                  w.__mcpMockStatus = {
+                    enabled,
+                    port: 39417,
+                    running: enabled,
+                    error: null,
+                    lockedByEnvironment: false,
+                  }
                   return w.__mcpMockStatus
                 },
                 setPort: async (port: number): Promise<Status> => {

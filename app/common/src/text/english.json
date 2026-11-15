@@ -517,6 +517,7 @@
   "mcpAddressLabel": "Address",
   "mcpPortLabel": "Port",
   "mcpPortInvalid": "Enter a port from 1024 to 65535.",
+  "mcpLockedByEnvironment": "This setting is fixed by an environment variable (ENSO_MCP_ENABLED or ENSO_MCP_PORT).",
   "mcpCopySetupFor": "Copy setup for",
   "mcpClientClaudeCode": "Claude Code",
   "mcpClientCodex": "Codex",

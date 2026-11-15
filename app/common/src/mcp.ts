@@ -30,6 +30,11 @@ export interface McpStatus {
   readonly running: boolean
   /** Why an enabled server is not running (port taken, no keychain). */
   readonly error: string | null
+  /**
+   * True while `ENSO_MCP_ENABLED` or `ENSO_MCP_PORT` is in effect: the switch and the port are then
+   * fixed, and changing either is refused.
+   */
+  readonly lockedByEnvironment: boolean
 }
 
 export const MCP_CLIENT_KINDS = [

@@ -29,8 +29,20 @@ vi.mock('$/providers/toasts', () => ({ useToasts: () => ({ show: fake.show }) })
 
 const { getText } = useText()
 
-const OFF: McpStatus = { enabled: false, port: MCP_DEFAULT_PORT, running: false, error: null }
-const ON: McpStatus = { enabled: true, port: MCP_DEFAULT_PORT, running: true, error: null }
+const OFF: McpStatus = {
+  enabled: false,
+  port: MCP_DEFAULT_PORT,
+  running: false,
+  error: null,
+  lockedByEnvironment: false,
+}
+const ON: McpStatus = {
+  enabled: true,
+  port: MCP_DEFAULT_PORT,
+  running: true,
+  error: null,
+  lockedByEnvironment: false,
+}
 const ADDRESS = `http://127.0.0.1:${MCP_DEFAULT_PORT}/mcp`
 
 beforeEach(() => {
@@ -206,6 +218,58 @@ describe('McpSettingsSection', () => {
     await user.click(button(getText('cancel'), dialog()))
     await flushPromises()
     expect(fake.replaceToken).not.toHaveBeenCalled()
+  })
+
+  test('while the environment fixes the setting, the switch and port are disabled, with a note', async () => {
+    fake.status.mockResolvedValue({ ...ON, lockedByEnvironment: true })
+    await mountSection()
+    expect(switchInput().disabled).toBe(true)
+    expect(portInput().disabled).toBe(true)
+    expect(document.body.textContent).toContain(getText('mcpLockedByEnvironment'))
+  })
+
+  test('shows no lock note while nothing fixes the setting', async () => {
+    fake.status.mockResolvedValue(ON)
+    await mountSection()
+    expect(switchInput().disabled).toBe(false)
+    expect(portInput().disabled).toBe(false)
+    expect(document.body.textContent).not.toContain(getText('mcpLockedByEnvironment'))
+  })
+
+  test('a setEnabled(false) that resolves still on leaves the switch on', async () => {
+    fake.status.mockResolvedValue(ON)
+    fake.setEnabled.mockResolvedValue(ON)
+    await mountSection()
+    const user = userEvent.setup()
+    await user.click(switchInput())
+    await flushPromises()
+    expect(fake.setEnabled).toHaveBeenCalledExactlyOnceWith(false)
+    expect(switchInput().checked).toBe(true)
+  })
+
+  test('a setPort that resolves with another port shows the port it resolved with', async () => {
+    fake.status.mockResolvedValue(ON)
+    fake.setPort.mockResolvedValue(ON)
+    await mountSection()
+    const user = userEvent.setup()
+    await user.clear(portInput())
+    await user.type(portInput(), '40000')
+    await user.click(button(getText('save')))
+    await flushPromises()
+    expect(portInput().value).toBe(String(MCP_DEFAULT_PORT))
+  })
+
+  test('a failed setPort is shown once, in the form', async () => {
+    fake.status.mockResolvedValue(ON)
+    fake.setPort.mockRejectedValue(new Error('Port refused'))
+    await mountSection()
+    const user = userEvent.setup()
+    await user.clear(portInput())
+    await user.type(portInput(), '40000')
+    await user.click(button(getText('save')))
+    await flushPromises()
+    expect(document.body.textContent?.split('Port refused')).toHaveLength(2)
+    expect(fake.show).not.toHaveBeenCalled()
   })
 
   test('a failed setEnabled is shown as a toast', async () => {

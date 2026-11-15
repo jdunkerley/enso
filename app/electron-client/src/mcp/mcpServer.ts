@@ -182,22 +182,32 @@ export class McpHttpServer {
       res.end(refused.reason)
       return
     }
-    if (new URL(req.url ?? '/', 'http://localhost').pathname !== MCP_PATH) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' })
-      res.end('not found')
-      return
-    }
-    const server = this.createMcpServer(req.headers['user-agent'])
-    // The cast works around the SDK typing `sessionIdGenerator` as a non-optional
-    // `() => string` even though `undefined` (stateless) is accepted at runtime.
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-    } as unknown as ConstructorParameters<typeof StreamableHTTPServerTransport>[0])
-    res.on('close', () => {
-      void transport.close()
-      void server.close()
-    })
+    // Everything from here on is in the `try`: `handleHttp` runs as `void`, so a throw outside it
+    // would be an unhandled rejection in main.
     try {
+      let pathname: string
+      try {
+        pathname = new URL(req.url ?? '/', 'http://localhost').pathname
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'text/plain' })
+        res.end('bad request target')
+        return
+      }
+      if (pathname !== MCP_PATH) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' })
+        res.end('not found')
+        return
+      }
+      const server = this.createMcpServer(req.headers['user-agent'])
+      // The cast works around the SDK typing `sessionIdGenerator` as a non-optional
+      // `() => string` even though `undefined` (stateless) is accepted at runtime.
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+      } as unknown as ConstructorParameters<typeof StreamableHTTPServerTransport>[0])
+      res.on('close', () => {
+        void transport.close()
+        void server.close()
+      })
       await this.registerGuides(server)
       // SDK's `Transport.onclose` is `() => void` under exactOptionalPropertyTypes; the
       // concrete class actually exposes it as optional.
