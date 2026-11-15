@@ -213,7 +213,7 @@ public abstract class DataQualityMetrics {
                   + distinct.stream()
                       .filter(JsonOperation::nativeSupport)
                       .filter(Objects::nonNull)
-                      .map(o -> JsonOperation.INSTANCE.objectToJson(o))
+                      .map(o -> JsonOperation.WITH_DISPLAY_TEXT.objectToJson(o))
                       .sorted()
                       .collect(Collectors.joining(","))
                   + "]";

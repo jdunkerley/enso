@@ -1,0 +1,28 @@
+## Enso Signatures 1.0
+## module Standard.Visualization.Internal.View_Json
+- type Record_Row
+    - Value names:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) values:(Standard.Base.Data.Dictionary.Dictionary Standard.Base.Data.Text.Text Standard.Base.Any.Any)
+    - from_pairs pairs:Standard.Base.Data.Vector.Vector -> Standard.Visualization.Internal.View_Json.Record_Row
+- type Table_View
+    - Value index_action:Standard.Base.Data.Text.Text row_count:Standard.Base.Data.Numbers.Integer version_hash:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing) options:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) allow_server:Standard.Base.Data.Boolean.Boolean
+- type View_Column
+    - Value name:Standard.Base.Data.Text.Text link:(Standard.Visualization.Internal.View_Json.View_Link|Standard.Base.Nothing.Nothing)= number_format:(Standard.Base.Data.Boolean.Boolean|Standard.Base.Nothing.Nothing)=
+    - to_json_text self -> Standard.Base.Data.Text.Text
+- type View_Link
+    - Value action:Standard.Base.Data.Text.Text label:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)=
+    - to_json_text self -> Standard.Base.Data.Text.Text
+- cells_json values:Standard.Base.Data.Vector.Vector -> Standard.Base.Data.Text.Text
+- dictionary_view dict:Standard.Base.Data.Dictionary.Dictionary max_items:Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text
+- distinct_json values:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing) -> Standard.Base.Data.Text.Text
+- error_json message:Standard.Base.Data.Text.Text -> Standard.Base.Data.Text.Text
+- grid_json columns:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) data:((Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)|Standard.Base.Nothing.Nothing) row_count:(Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)= index:(Standard.Visualization.Internal.View_Json.View_Link|Standard.Base.Nothing.Nothing)= version_hash:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)= server:Standard.Base.Data.Boolean.Boolean= options:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)= -> Standard.Base.Data.Text.Text
+- hashset_view hashset:Standard.Base.Data.Hashset.Hashset max_items:Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text
+- js_object_view js_object:Standard.Base.Data.Json.JS_Object max_items:Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text
+- max_columns -> Standard.Base.Any.Any
+- max_inline_cells -> Standard.Base.Any.Any
+- missing_cell -> Standard.Base.Any.Any
+- rows_page_json row_count:Standard.Base.Data.Numbers.Integer index:Standard.Base.Data.Text.Text data:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) -> Standard.Base.Data.Text.Text
+- table_view viz:Standard.Visualization.Viz_Table.Viz_Table view:Standard.Visualization.Internal.View_Json.Table_View -> Standard.Base.Data.Text.Text
+- value_json value:Standard.Base.Any.Any -> Standard.Base.Data.Text.Text
+- value_view x:Standard.Base.Any.Any -> Standard.Base.Data.Text.Text
+- vector_view vector:Standard.Base.Data.Vector.Vector max_rows:Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text

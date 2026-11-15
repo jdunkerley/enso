@@ -12,16 +12,15 @@ add_specs suite_builder =
 
         group_builder.specify "An XML_Document shows its root element's attributes and children" <|
             json = Visualization.prepare_visualization doc . parse_json
-            json.get "type" . should_equal "XML_Document"
-            json.get "get_child_node_action" . should_equal "get_child_element {{#key}}"
-            json.get "all_rows_count" . should_equal 3
+            json.get "columns" . at 0 . get "link" . get "action" . should_equal "get_child_element {{#key}}"
+            json.get "row_count" . should_equal 3
             json.get "data" . should_equal [["@id", "0", "1"], ["Attribute", "Element", "Text"], ["10", "<bar>hello</bar>", "text"]]
 
         group_builder.specify "The row limit the visualisation asks for is honoured" <|
             children = (0.up_to 1500).map (i-> "<c n='" + i.to_text + "'/>")
             big = XML_Document.parse ("<root>" + children.join "" + "</root>")
             default_json = Visualization.prepare_visualization big . parse_json
-            default_json.get "all_rows_count" . should_equal 1500
+            default_json.get "row_count" . should_equal 1500
             default_json.get "data" . at 0 . length . should_equal 1000
             larger_json = Visualization.prepare_visualization big 2500 . parse_json
             larger_json.get "data" . at 0 . length . should_equal 1500
@@ -30,9 +29,37 @@ add_specs suite_builder =
 
         group_builder.specify "An XML_Element shows its attributes and children" <|
             json = Visualization.prepare_visualization doc.root_element . parse_json
-            json.get "type" . should_equal "XML_Element"
-            json.get "get_child_node_action" . should_equal "get {{#key}}"
+            json.get "columns" . at 0 . get "link" . get "action" . should_equal "get {{#key}}"
             json.get "data" . at 0 . should_equal ["@id", "0", "1"]
+
+        group_builder.specify "Attributes count towards the row limit and are read in document order" <|
+            attrs = (0.up_to 6).map i-> "a" + i.to_text + "='v" + i.to_text + "'"
+            many = XML_Document.parse ("<root " + (attrs.join " ") + "><c/><d/></root>")
+            json = Visualization.prepare_visualization many 4 . parse_json
+            json.get "row_count" . should_equal 8
+            json.get "data" . should_equal [["@a0", "@a1", "@a2", "@a3"], ["Attribute", "Attribute", "Attribute", "Attribute"], ["v0", "v1", "v2", "v3"]]
+            all = Visualization.prepare_visualization many 8 . parse_json
+            all.get "data" . at 0 . should_equal ["@a0", "@a1", "@a2", "@a3", "@a4", "@a5", "0", "1"]
+            all.get "data" . at 2 . should_equal ["v0", "v1", "v2", "v3", "v4", "v5", "<c/>", "<d/>"]
+
+        group_builder.specify "A child shows at most five of its attributes" <|
+            attrs = (0.up_to 7).map i-> "a" + i.to_text + "='v" + i.to_text + "'"
+            doc = XML_Document.parse ("<root><c " + (attrs.join " ") + "/><d x='1'/></root>")
+            json = Visualization.prepare_visualization doc . parse_json
+            json.get "data" . at 2 . should_equal ['<c a0="v0" a1="v1" a2="v2" a3="v3" a4="v4" .../>', '<d x="1"/>']
+
+        group_builder.specify "A row limit of zero or less shows no rows but counts them" <|
+            json = Visualization.prepare_visualization doc 0 . parse_json
+            json.get "row_count" . should_equal 3
+            json.get "data" . should_equal [[], [], []]
+            negative = Visualization.prepare_visualization doc -2 . parse_json
+            negative.get "row_count" . should_equal 3
+            negative.get "data" . should_equal [[], [], []]
+
+        group_builder.specify "An element without attributes or children has no rows" <|
+            json = Visualization.prepare_visualization (XML_Document.parse "<empty/>") . parse_json
+            json.get "row_count" . should_equal 0
+            json.get "data" . should_equal [[], [], []]
 
 main filter=Nothing =
     suite = Test.build suite_builder->

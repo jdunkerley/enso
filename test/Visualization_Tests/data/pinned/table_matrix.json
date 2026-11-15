@@ -1,1 +1,1 @@
-{"type":"Matrix","all_rows_count":2,"json":[[1,2],[3,4]],"column_count":2,"get_child_node_action":"at"}
+{"kind":"grid","row_count":2,"columns":[{"name":"0"},{"name":"1"}],"index":{"action":"at {{#index}}"},"data":[[1,3],[2,4]],"options":{"disable_sort_when_partial":true}}

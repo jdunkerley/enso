@@ -187,7 +187,7 @@ type Google_Sheets_Workbook
    private: true
    ---
 Viz_Table.from (that:Google_Sheets_Workbook) = 
-    Viz_Table.from_columns [Viz_Header.Link "worksheets" "worksheet" "read"] [that.sheet_names.to_vector]
+    Viz_Table.from_columns [Viz_Header.Link "worksheets" "worksheet" "read {{@worksheets}}"] [that.sheet_names.to_vector]
 
 ## Error occurred when calling the Google Sheets API
 type Google_API_Error

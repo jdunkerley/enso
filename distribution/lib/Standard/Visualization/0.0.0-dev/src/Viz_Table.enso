@@ -31,7 +31,7 @@ type Viz_Table
     ## ---
        private: true
        ---
-       In-memory columns, shown as a `Generic_Grid`.
+       In-memory columns, shown as a grid of those columns.
     from_columns (headers : Vector Viz_Header) (columns : Vector Vector) -> Viz_Table =
         Viz_Table.Value (Columns_Source.Value headers columns)
 
@@ -89,7 +89,7 @@ type Viz_Table
        private: true
        ---
        The optional capabilities the source supports: any of `"rows"`,
-       `"server_rows"`, `"spatial"`.
+       `"server_rows"`, `"spatial"`, `"view_pieces"`.
     supported_operations self -> Vector Text = self.source.supported_operations
 
     ## ---
@@ -143,6 +143,22 @@ type Viz_Table
     ## ---
        private: true
        ---
+       The cells of column number `index` (from 0, in `column_names` order) from
+       `start`, at most `count`, as a JSON array.
+    column_cells_json self (index : Integer) (start : Integer) (count : Integer) -> Text =
+        self.require "view_pieces" <| self.source.column_cells_json index start count
+
+    ## ---
+       private: true
+       ---
+       Each column's view details as JSON object fields: its `value_type`,
+       `metrics`, `multi_filter` and `number_format`.
+    column_metrics_json self -> Vector Text =
+        self.require "view_pieces" <| self.source.column_metrics_json
+
+    ## ---
+       private: true
+       ---
        The geo map's layers for a spatial table.
     spatial_layers_json self -> Text = self.require "spatial" <| self.source.spatial_layers_json
 
@@ -157,7 +173,11 @@ type Viz_Header
     ## ---
        private: true
        ---
-       Column whose cells create child nodes with `action`.
+       Column whose cells create child nodes with `action`, a full link
+       template: `{{#field}}` is the row's value of `field` (a number when it
+       reads as one), `{{@field}}` the value as it is, `{{#index}}` the row
+       number (for example `query {{@Table}}`). The IDE sends it as it is, and
+       does not complete a bare action.
     Link name tooltip action
 
     ## ---
@@ -185,12 +205,12 @@ type Viz_Unsupported
 ## ---
    private: true
    ---
-Viz_Table.from (that:Any) = Viz_Table.from_view (_-> View_Json.make_json_for_other that . to_json)
+Viz_Table.from (that:Any) = Viz_Table.from_view (_-> View_Json.value_view that)
 
 ## ---
    private: true
    ---
-Viz_Table.from (that:Vector) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_vector that max_rows . to_json)
+Viz_Table.from (that:Vector) = Viz_Table.from_view (max_rows-> View_Json.vector_view that max_rows)
 
 ## ---
    private: true
@@ -200,22 +220,22 @@ Viz_Table.from (that:Array) = Viz_Table.from that.to_vector
 ## ---
    private: true
    ---
-Viz_Table.from (that:Dictionary) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_dictionary that max_rows)
+Viz_Table.from (that:Dictionary) = Viz_Table.from_view (max_rows-> View_Json.dictionary_view that max_rows)
 
 ## ---
    private: true
    ---
-Viz_Table.from (that:Hashset) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_hashset that max_rows)
+Viz_Table.from (that:Hashset) = Viz_Table.from_view (max_rows-> View_Json.hashset_view that max_rows)
 
 ## ---
    private: true
    ---
-Viz_Table.from (that:JS_Object) = Viz_Table.from_view (max_rows-> View_Json.make_json_for_js_object that max_rows)
+Viz_Table.from (that:JS_Object) = Viz_Table.from_view (max_rows-> View_Json.js_object_view that max_rows)
 
 ## ---
    private: true
    ---
-Viz_Table.from (that:Number) = Viz_Table.from_view (_-> JS_Object.from_pairs [["json", Viz_Cell.render_value that]] . to_json)
+Viz_Table.from (that:Number) = Viz_Table.from_view (_-> View_Json.value_json (Viz_Cell.render_value that))
 
 ## ---
    private: true

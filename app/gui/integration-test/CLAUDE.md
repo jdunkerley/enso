@@ -32,6 +32,10 @@ Single projects:
 `corepack pnpm exec cross-env NODE_ENV=production playwright test --project="Integration Tests"`.
 `PROD=true` builds and previews instead of running the dev server.
 
+To run only some spec files: `pnpm test:integration -- <files>` does **not**
+filter, it runs the whole suite; use
+`corepack pnpm exec playwright test <files>` instead.
+
 ### On native Windows
 
 The same commands work from PowerShell, Git Bash or `cmd.exe` (#21). Linux — WSL

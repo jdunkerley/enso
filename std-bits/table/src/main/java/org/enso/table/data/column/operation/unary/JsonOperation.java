@@ -32,6 +32,10 @@ public class JsonOperation implements UnaryOperation {
   public static JsonOperation INSTANCE =
       new JsonOperation("Standard.Base.Data.Json", "Json", "stringify", false);
 
+  /** Writes native values as a table view cell: an object cell starts with its display text. */
+  public static JsonOperation WITH_DISPLAY_TEXT =
+      new JsonOperation("Standard.Base.Data.Json", "Json", "stringify", true);
+
   private final String ensoCallbackModule;
   private final String ensoCallbackType;
   private final String ensoCallbackMethod;
@@ -99,15 +103,15 @@ public class JsonOperation implements UnaryOperation {
     return switch (value) {
       case null -> "null";
       case Boolean b -> toJson(b);
-      case Long l -> toJson(l);
+      case Long l -> toJson(l, includeDisplayText);
       case Integer i -> toJson(i);
       case Short s -> toJson(s);
       case Byte b -> toJson(b & 0xFF);
       case Double d -> toJson(d, includeDisplayText);
       case Float f -> toJson(f, includeDisplayText);
       case String s -> toJson(s);
-      case BigInteger bi -> toJson(bi);
-      case BigDecimal bd -> toJson(bd);
+      case BigInteger bi -> toJson(bi, includeDisplayText);
+      case BigDecimal bd -> toJson(bd, includeDisplayText);
       case LocalDate date -> toJson(date, includeDisplayText);
       case LocalTime time -> toJson(time, includeDisplayText);
       case ZonedDateTime zdt -> toJson(zdt, includeDisplayText);
@@ -158,10 +162,23 @@ public class JsonOperation implements UnaryOperation {
   private static final BigInteger MAX_JSON_LONG_BIGINT = BigInteger.valueOf(MAX_JSON_LONG);
 
   public static String toJson(long value) {
+    return toJson(value, false);
+  }
+
+  /**
+   * A long as JSON: a number, or beyond JavaScript's safe integers an object (with its display text
+   * first when asked).
+   */
+  public static String toJson(long value, boolean includeDisplayText) {
     if (value < -MAX_JSON_LONG || value > MAX_JSON_LONG) {
-      return "{\"type\":\"Integer\",\"value\":\"" + value + "\"}";
+      return bigIntegerJson(String.valueOf(value), includeDisplayText);
     }
     return String.valueOf(value);
+  }
+
+  private static String bigIntegerJson(String digits, boolean includeDisplayText) {
+    var displayText = includeDisplayText ? "\"_display_text_\":\"" + digits + "\"," : "";
+    return "{" + displayText + "\"type\":\"Integer\",\"value\":\"" + digits + "\"}";
   }
 
   public static String toJson(double value, boolean includeDisplayText) {
@@ -178,15 +195,18 @@ public class JsonOperation implements UnaryOperation {
     return String.valueOf(value);
   }
 
-  private static String toJson(BigInteger value) {
+  private static String toJson(BigInteger value, boolean includeDisplayText) {
     if (value.abs().compareTo(MAX_JSON_LONG_BIGINT) > 0) {
-      return "{\"type\":\"Integer\",\"value\":\"" + value + "\"}";
+      return bigIntegerJson(value.toString(), includeDisplayText);
     }
     return value.toString();
   }
 
-  private static String toJson(BigDecimal value) {
-    return "{\"type\":\"Decimal\",\"value\":\""
+  private static String toJson(BigDecimal value, boolean includeDisplayText) {
+    var displayText = includeDisplayText ? "\"_display_text_\":\"" + value + "\"," : "";
+    return "{"
+        + displayText
+        + "\"type\":\"Decimal\",\"value\":\""
         + value
         + "\",\"scale\":"
         + value.scale()
@@ -206,9 +226,9 @@ public class JsonOperation implements UnaryOperation {
   private static String toJson(LocalDate date, boolean includeDisplayText) {
     String displayText =
         includeDisplayText ? "\"_display_text_\":\"" + date.toString() + "\"," : "";
-    return "{\"type\":\"Date\",\"constructor\":\"new\","
+    return "{"
         + displayText
-        + "\"day\":"
+        + "\"type\":\"Date\",\"constructor\":\"new\",\"day\":"
         + date.getDayOfMonth()
         + ",\"month\":"
         + date.getMonthValue()
@@ -228,9 +248,9 @@ public class JsonOperation implements UnaryOperation {
             ? time.format(time.getNano() == 0 ? TIME_SHORT_FORMAT : TIME_LONG_FORMAT)
             : "";
     String displayText = includeDisplayText ? "\"_display_text_\":\"" + timeString + "\"," : "";
-    return "{\"type\":\"Time_Of_Day\",\"constructor\":\"new\","
+    return "{"
         + displayText
-        + "\"hour\":"
+        + "\"type\":\"Time_Of_Day\",\"constructor\":\"new\",\"hour\":"
         + time.getHour()
         + ",\"minute\":"
         + time.getMinute()
@@ -263,9 +283,9 @@ public class JsonOperation implements UnaryOperation {
         "{\"type\":\"Time_Zone\",\"constructor\":\"parse\",\"id\":\""
             + datetime.getZone().getId()
             + "\"}";
-    return "{\"type\":\"Date_Time\",\"constructor\":\"new\","
+    return "{"
         + displayText
-        + "\"year\":"
+        + "\"type\":\"Date_Time\",\"constructor\":\"new\",\"year\":"
         + datetime.getYear()
         + ",\"month\":"
         + datetime.getMonthValue()

@@ -6,6 +6,7 @@ import Standard.Table.In_Memory_Column.In_Memory_Column
 import Standard.Table.In_Memory_Table.In_Memory_Table
 import Standard.Table.Internal.Viz_Helpers
 import Standard.Visualization.Geo_Map
+import Standard.Visualization.Internal.View_Json
 import Standard.Visualization.Viz_Table.Viz_Table
 
 ## The `Viz_Table` source of a database table or column. Only a bounded
@@ -46,6 +47,6 @@ private _db_table_view_json t max_rows is_column =
         False ->
             all_rows_count = t.row_count
             in_memory = if is_column then (dataframe.at 0):In_Memory_Column else dataframe:In_Memory_Table
-            in_memory.to_table_viz_json all_rows_count False
+            in_memory.to_table_viz_json db_row_count=all_rows_count
         True ->
-            JS_Object.from_pairs [["error", 'Error querying the database:\n' + dataframe.catch.to_display_text]] . to_json
+            View_Json.error_json ('Error querying the database:\n' + dataframe.catch.to_display_text)

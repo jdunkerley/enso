@@ -13,6 +13,14 @@ type Data
         clothes = enso_project.data/'clothes.csv' . read
         Data.Value clothes
 
+## The JSON of a column of integers as `to_json_data` writes it: a number, or
+   beyond JavaScript's safe integers an object that starts with its display text.
+integers_json values:Vector -> Text =
+    safe = 9007199254740991
+    cell (n : Integer) = if n.abs <= safe then n.to_text else
+        '{"_display_text_":"' + n.to_text + '","type":"Integer","value":"' + n.to_text + '"}'
+    '[' + (values.map cell . join ',') + ']'
+
 add_specs suite_builder =
     suite_builder.group 'JSON conversion' group_builder->
         data = Data.setup
@@ -53,11 +61,11 @@ add_specs suite_builder =
 
             big_ints = [0, 1, -1, 1000, -1000, 1234567890123456789, -1234567890123456789]
             big_ints_column = Table.new [['Big Ints', big_ints]] . at 'Big Ints'
-            big_ints_column.to_json_data . should_equal big_ints.to_json
+            big_ints_column.to_json_data . should_equal (integers_json big_ints)
 
             really_big_ints = [9223372036854775807, -9223372036854775808, 2^65, -2^65, 2^100, -2^100]
             really_big_ints_column = Table.new [['Really Big Ints', really_big_ints]] . at 'Really Big Ints'
-            really_big_ints_column.to_json_data . should_equal really_big_ints.to_json
+            really_big_ints_column.to_json_data . should_equal (integers_json really_big_ints)
 
         group_builder.specify 'should convert columns to JSON using to_json_data (Double)' <|
             name_column = data.clothes.at 'Price'
@@ -66,7 +74,8 @@ add_specs suite_builder =
         group_builder.specify 'should convert columns to JSON using to_json_data (Decimal)' <|
             decimals = [dec "0.0", dec "1.0", dec "-1.0", dec "1000.0", dec "-1000.0", dec "1234567890123456789.1234567890123456789", dec "-1234567890123456789.1234567890123456789"]
             decimals_column = Table.new [['Decimals', decimals]] . at 'Decimals'
-            decimals_column.to_json_data . should_equal decimals.to_json
+            decimals_json = '[{"_display_text_":"0.0","type":"Decimal","value":"0.0","scale":1,"precision":1},{"_display_text_":"1.0","type":"Decimal","value":"1.0","scale":1,"precision":2},{"_display_text_":"-1.0","type":"Decimal","value":"-1.0","scale":1,"precision":2},{"_display_text_":"1000.0","type":"Decimal","value":"1000.0","scale":1,"precision":5},{"_display_text_":"-1000.0","type":"Decimal","value":"-1000.0","scale":1,"precision":5},{"_display_text_":"1234567890123456789.1234567890123456789","type":"Decimal","value":"1234567890123456789.1234567890123456789","scale":19,"precision":38},{"_display_text_":"-1234567890123456789.1234567890123456789","type":"Decimal","value":"-1234567890123456789.1234567890123456789","scale":19,"precision":38}]'
+            decimals_column.to_json_data . should_equal decimals_json
 
         group_builder.specify 'should convert columns to JSON using to_json_data (Boolean)' <|
             bools = [True, False, True, False, True, False]
@@ -76,21 +85,21 @@ add_specs suite_builder =
         group_builder.specify 'should convert columns to JSON using to_json_data (Date)' <|
             date txt = txt.parse_date
             dates = [date "2020-01-01", date "2021-02-02", date "2022-03-03"]
-            dates_json = '[{"type":"Date","constructor":"new","_display_text_":"2020-01-01","day":1,"month":1,"year":2020},{"type":"Date","constructor":"new","_display_text_":"2021-02-02","day":2,"month":2,"year":2021},{"type":"Date","constructor":"new","_display_text_":"2022-03-03","day":3,"month":3,"year":2022}]'
+            dates_json = '[{"_display_text_":"2020-01-01","type":"Date","constructor":"new","day":1,"month":1,"year":2020},{"_display_text_":"2021-02-02","type":"Date","constructor":"new","day":2,"month":2,"year":2021},{"_display_text_":"2022-03-03","type":"Date","constructor":"new","day":3,"month":3,"year":2022}]'
             dates_column = Table.new [['Dates', dates]] . at 'Dates'
             dates_column.to_json_data . should_equal dates_json
 
         group_builder.specify 'should convert columns to JSON using to_json_data (Time_Of_Day)' <|
             time_of_day txt = txt.parse_time_of_day
             times_of_day = [time_of_day "00:00:00", time_of_day "12:34:56", time_of_day "23:59:59"]
-            times_of_day_json = '[{"type":"Time_Of_Day","constructor":"new","_display_text_":"00:00:00","hour":0,"minute":0,"second":0,"nanosecond":0},{"type":"Time_Of_Day","constructor":"new","_display_text_":"12:34:56","hour":12,"minute":34,"second":56,"nanosecond":0},{"type":"Time_Of_Day","constructor":"new","_display_text_":"23:59:59","hour":23,"minute":59,"second":59,"nanosecond":0}]'
+            times_of_day_json = '[{"_display_text_":"00:00:00","type":"Time_Of_Day","constructor":"new","hour":0,"minute":0,"second":0,"nanosecond":0},{"_display_text_":"12:34:56","type":"Time_Of_Day","constructor":"new","hour":12,"minute":34,"second":56,"nanosecond":0},{"_display_text_":"23:59:59","type":"Time_Of_Day","constructor":"new","hour":23,"minute":59,"second":59,"nanosecond":0}]'
             times_of_day_column = Table.new [['TimesOfDay', times_of_day]] . at 'TimesOfDay'
             times_of_day_column.to_json_data . should_equal times_of_day_json
 
         group_builder.specify 'should convert columns to JSON using to_json_data (Date_Time)' <|
             date_time txt = txt.parse_date_time
             date_times = [date_time "2020-01-01T00:00:00Z", date_time "2021-02-02T12:34:56Z", date_time "2022-03-03T23:59:59Z"]
-            date_times_json = '[{"type":"Date_Time","constructor":"new","_display_text_":"2020-01-01 00:00:00[Z]","year":2020,"month":1,"day":1,"hour":0,"minute":0,"second":0,"nanosecond":0,"zone":{"type":"Time_Zone","constructor":"parse","id":"Z"}},{"type":"Date_Time","constructor":"new","_display_text_":"2021-02-02 12:34:56[Z]","year":2021,"month":2,"day":2,"hour":12,"minute":34,"second":56,"nanosecond":0,"zone":{"type":"Time_Zone","constructor":"parse","id":"Z"}},{"type":"Date_Time","constructor":"new","_display_text_":"2022-03-03 23:59:59[Z]","year":2022,"month":3,"day":3,"hour":23,"minute":59,"second":59,"nanosecond":0,"zone":{"type":"Time_Zone","constructor":"parse","id":"Z"}}]'
+            date_times_json = '[{"_display_text_":"2020-01-01 00:00:00[Z]","type":"Date_Time","constructor":"new","year":2020,"month":1,"day":1,"hour":0,"minute":0,"second":0,"nanosecond":0,"zone":{"type":"Time_Zone","constructor":"parse","id":"Z"}},{"_display_text_":"2021-02-02 12:34:56[Z]","type":"Date_Time","constructor":"new","year":2021,"month":2,"day":2,"hour":12,"minute":34,"second":56,"nanosecond":0,"zone":{"type":"Time_Zone","constructor":"parse","id":"Z"}},{"_display_text_":"2022-03-03 23:59:59[Z]","type":"Date_Time","constructor":"new","year":2022,"month":3,"day":3,"hour":23,"minute":59,"second":59,"nanosecond":0,"zone":{"type":"Time_Zone","constructor":"parse","id":"Z"}}]'
             date_times_column = Table.new [['DateTimes', date_times]] . at 'DateTimes'
             date_times_column.to_json_data . should_equal date_times_json
 

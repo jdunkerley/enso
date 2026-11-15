@@ -1,5 +1,7 @@
 from Standard.Base import all
 
+import Standard.Visualization.Internal.View_Json
+from Standard.Visualization.Internal.View_Json import View_Column, View_Link
 import Standard.Visualization.Viz_Cell.Viz_Cell
 from Standard.Visualization.Viz_Column_Kind import Viz_Column_Kind, Viz_Kind
 
@@ -55,13 +57,9 @@ row_cell row (level : Integer) -> Text =
 ## ---
    private: true
    ---
-   The table view of a single row.
+   The table view of a single row: a `column` column that links to the value,
+   and a `value` column.
 row_table_view_json row -> Text =
-    header = ["header", ["column", "value"]]
-    all_rows = ["all_rows_count", row.length]
-    column_names = row.column_names
-    values = ((0.up_to row.length).map idx-> Viz_Cell.render_value (row.get idx))
-    data = ["data", [column_names, values]]
-    links = ["get_child_node_action", "at"]
-    get_child_node_action_link_name = ["get_child_node_link_name", "column"]
-    JS_Object.from_pairs [header, all_rows, data, links, get_child_node_action_link_name, ["type", "Map"]] . to_json
+    values = (0.up_to row.length).map idx-> Viz_Cell.render_value (row.get idx)
+    columns = [View_Column.Value "column" (View_Link.Value "at {{@column}}"), View_Column.Value "value"]
+    View_Json.grid_json (columns.map .to_json_text) [row.column_names.to_json, values.to_json] row.length

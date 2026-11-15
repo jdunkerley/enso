@@ -1,9 +1,8 @@
-private
-
 from Standard.Base import all
 import Standard.Base.Data.Vector.Builder
 
 import project.Viz_Cell.Viz_Cell
+import project.Viz_Table.Viz_Table
 
 ## ---
    private: true
@@ -15,50 +14,72 @@ max_columns = 250
 ## ---
    private: true
    ---
-   Render Error to JSON
-make_json_for_error : Any -> Text
-make_json_for_error error =
-    JS_Object.from_pairs [["type", "Error"], ["error", error.to_display_text]] . to_json
+   The view of a vector: a grid with a row-number column. A vector of vectors
+   has one column per item (at most `max_columns`), a vector of records one
+   per field, any other vector one `Value` column. Shows at most `max_rows`
+   rows.
+vector_view (vector : Vector) (max_rows : Integer) -> Text = Warning.clear <|
+    shown = vector.length.min max_rows . max 0
+    some_values = (0.up_to shown).any (i-> Nothing != vector.at i)
+    if some_values.not then _values_view vector shown else
+        if (0.up_to shown).all (i-> _is_matrix_row (vector.at i)) then _matrix_view vector shown else
+            records = _record_rows (Builder.new shown) vector shown
+            if records.is_nothing.not then _record_view records vector.length else
+                _values_view vector shown
+
+## The JSON array of the first `count` values, each rendered.
+private _rendered_json (count : Integer) (value_at : Integer -> Any) -> Text =
+    (0.up_to count . map i-> Viz_Cell.render_value (value_at i)) . to_json
+
+private _values_view (vector : Vector) (shown : Integer) -> Text =
+    column = View_Column.Value "Value" number_format=False
+    grid_json [column.to_json_text] [_rendered_json shown (i-> vector.at i)] vector.length (View_Link.Value "at {{#index}}") options=["disable_sort_when_partial"]
+
+private _is_matrix_row row -> Boolean = case row of
+    Nothing -> True
+    _ : Vector -> True
+    _ : Array -> True
+    _ -> False
+
+## The cell of a matrix row, or `missing_cell` for a `Nothing` row or a row
+   too short to have it.
+private _matrix_cell row (column : Integer) = if row.is_nothing || (column >= row.length) then missing_cell else
+    Viz_Cell.render_value (row.at column)
+
+private _matrix_view (vector : Vector) (shown : Integer) -> Text =
+    column_count = (0.up_to shown).fold 0 count-> r->
+        row = vector.at r
+        if row.is_nothing then count else count.max (row.length.min max_columns)
+    columns = (0.up_to column_count).map c-> (View_Column.Value c.to_text).to_json_text
+    data = (0.up_to column_count).map c->
+        (0.up_to shown . map r-> _matrix_cell (vector.at r) c) . to_json
+    grid_json columns data vector.length (View_Link.Value "at {{#index}}") options=["disable_sort_when_partial"]
 
 ## ---
    private: true
    ---
-   Render Vector to JSON
-make_json_for_vector : Vector -> Integer -> JS_Object
-make_json_for_vector vector max_rows =
-    all_rows = ["all_rows_count", vector.length]
-    get_child_node_action = ["get_child_node_action", "at"]
-    truncated = vector.take max_rows
-    some_values = truncated.any (v-> Nothing!=v)
-    if some_values.not then JS_Object.from_pairs [["type", "Vector"], all_rows, ["json", truncated.map Viz_Cell.render_value], get_child_node_action] else
-        matrix = make_json_for_matrix (Builder.new truncated.length) truncated
-        if matrix.is_nothing.not then JS_Object.from_pairs [["type", "Matrix"], all_rows, ["json", matrix], ["column_count", matrix.fold 0 c->v-> if v.is_nothing then c else c.max v.length], get_child_node_action] else
-            object_matrix = make_json_for_object_matrix (Builder.new truncated.length) truncated
-            if object_matrix.is_nothing.not then JS_Object.from_pairs [["type", "Object_Matrix"], all_rows, ["json", object_matrix], get_child_node_action] else
-                JS_Object.from_pairs [["type", "Vector"], all_rows, ["json", truncated.map Viz_Cell.render_value], get_child_node_action, ["child_label", "value"]]
+   One row of a vector of records: its field names in order, and its rendered
+   values by name. (A `JS_Object` would hand a field back through
+   `make_enso`, which turns a date's JSON into a `Date` and loses the display
+   text.)
+type Record_Row
+    ## ---
+       private: true
+       ---
+    Value (names : Vector Text) (values : Dictionary Text Any)
 
-## ---
-   private: true
-   ---
-   Render Vector of Vector / Array to JSON
-make_json_for_matrix : Builder -> Vector -> Integer -> Vector | Nothing
-make_json_for_matrix current vector idx=0 = if idx == vector.length then current.to_vector else
-    row = vector.at idx
-    to_append = case row of
-        Nothing -> Nothing
-        _ : Vector -> row.take max_columns . map Viz_Cell.render_value
-        _ : Array -> row.to_vector.take max_columns . map Viz_Cell.render_value
-        _ -> False
-    if to_append == False then Nothing else
-        current.append to_append
-        @Tail_Call make_json_for_matrix current vector idx+1
+    ## ---
+       private: true
+       ---
+       The row of rendered `[name, value]` pairs.
+    from_pairs (pairs : Vector) -> Record_Row =
+        Record_Row.Value (pairs.map .first) (Dictionary.from_vector pairs error_on_duplicates=False)
 
-## ---
-   private: true
-   ---
-   Render Vector of Objects to JSON
-make_json_for_object_matrix : Builder -> Vector -> Integer -> Vector | Nothing
-make_json_for_object_matrix current vector idx=0 = if idx == vector.length then current.to_vector else
+## Each of the first `shown` items as a `Record_Row` of rendered fields
+   (`Nothing` for a `Nothing` item): a Dictionary's entries, a record's
+   `Viz_Cell` pairs, or an atom's `to_js_object`; `Nothing` when some item is
+   none of these (dates and times included).
+private _record_rows (current : Builder) (vector : Vector) (shown : Integer) (idx : Integer = 0) -> Vector | Nothing = if idx == shown then current.to_vector else
     row = vector.at idx
     to_append = case row of
         Nothing -> Nothing
@@ -68,85 +89,227 @@ make_json_for_object_matrix current vector idx=0 = if idx == vector.length then 
         _ : Duration -> False
         _ : Period -> False
         _ : Dictionary ->
-            pairs = row.keys.map k-> [k.to_text, Viz_Cell.render_value (row.get k)]
-            JS_Object.from_pairs pairs
+            Record_Row.from_pairs (row.keys.map k-> [k.to_text, Viz_Cell.render_value (row.get k)])
         _ ->
             record = (Viz_Cell.from row).pairs
-            if record.is_nothing.not then JS_Object.from_pairs (record.map p-> [p.first, Viz_Cell.render_value p.second]) else
+            if record.is_nothing.not then Record_Row.from_pairs (record.map p-> [p.first, Viz_Cell.render_value p.second]) else
                 js_object = row.to_js_object
                 if js_object.is_a JS_Object . not then False else
                     if js_object.field_names.sort == ["constructor", "type"] then False else
-                        pairs = js_object.field_names.map f-> [f, Viz_Cell.render_value (js_object.get f)]
-                        JS_Object.from_pairs pairs
+                        Record_Row.from_pairs (js_object.field_names.map f-> [f, Viz_Cell.render_value (js_object.get f)])
     if to_append == False then Nothing else
         current.append to_append
-        @Tail_Call make_json_for_object_matrix current vector idx+1
+        @Tail_Call _record_rows current vector shown idx+1
+
+private _record_view (rows : Vector) (row_count : Integer) -> Text =
+    names = _record_columns rows
+    columns = names.map n-> (View_Column.Value n number_format=False).to_json_text
+    data = names.map n->
+        (rows.map r-> if r.is_nothing then missing_cell else (r.values.get n missing_cell)) . to_json
+    grid_json columns data row_count (View_Link.Value "at {{#index}}") options=["disable_sort_when_partial"]
+
+## The columns of a vector of records: each record's fields in the order the
+   IDE has always shown them (`JSON.parse` puts integer-like names first, in
+   ascending order), a name not seen before appended.
+private _record_columns (rows : Vector) -> Vector Text =
+    names = Vector.build builder->
+        rows.each r-> if r.is_nothing.not then
+            (_browser_order r.names).each n-> builder.append n
+    names.distinct
+
+private _browser_order (names : Vector Text) -> Vector Text =
+    is_index n = n.match "0|[1-9][0-9]{0,8}"
+    if names.any is_index . not then names else
+        indices = names.filter is_index . sort on=(n-> Integer.parse n)
+        indices + (names.filter (n-> (is_index n).not))
 
 ## ---
    private: true
    ---
-   Render Dictionary to JSON
-make_json_for_dictionary : Dictionary -> Integer -> Text
-make_json_for_dictionary dict max_items =
-    header = ["header", ["key", "value"]]
-    all_rows = ["all_rows_count", dict.size]
-    as_vector = Warning.clear (dict.to_vector.take max_items)
-    mapped = as_vector . map p-> [p.first.to_text, Viz_Cell.render_value p.second]
-    data = ["data", [mapped.map .first, mapped.map .second]]
-    links = ["get_child_node_action", "at {{#key}}"]
-    get_child_node_action_link_name = ["get_child_node_link_name", "key"]
-    JS_Object.from_pairs [header, data, all_rows, links, get_child_node_action_link_name, ["type", "Map"], ["child_label", "value"]] . to_json
+   The view of a Dictionary: a `key` column that links to the entry, and a
+   `value` column. Shows at most `max_items` entries.
+dictionary_view (dict : Dictionary) (max_items : Integer) -> Text =
+    pairs = dict.to_vector
+    shown = pairs.length.min max_items . max 0
+    columns = [View_Column.Value "key" (View_Link.Value "at {{#key}}" "value"), View_Column.Value "value"]
+    keys = (0.up_to shown . map i-> (pairs.at i . first).to_text) . to_json
+    Warning.clear <| grid_json (columns.map .to_json_text) [keys, _rendered_json shown (i-> pairs.at i . second)] dict.size
 
 ## ---
    private: true
    ---
-   Render Hashset to JSON
-make_json_for_hashset hashset:Hashset max_items:Integer -> Text =
-    header = ["header", ["key"]]
-    all_rows = ["all_rows_count", hashset.size]
-    as_vector = Warning.clear (hashset.to_vector.take max_items)
-    mapped = as_vector . map Viz_Cell.render_value
-    data = ["data", [mapped]]
-    JS_Object.from_pairs [header, data, all_rows, ["type", "Map"]] . to_json
+   The view of a Hashset: one `key` column. Shows at most `max_items` items.
+hashset_view (hashset : Hashset) (max_items : Integer) -> Text =
+    items = hashset.to_vector
+    shown = items.length.min max_items . max 0
+    Warning.clear <| grid_json [(View_Column.Value "key").to_json_text] [_rendered_json shown (i-> items.at i)] hashset.size
 
 ## ---
    private: true
    ---
-   Render JS_Object to JSON
-make_json_for_js_object : JS_Object -> Integer -> Text
-make_json_for_js_object js_object max_items =
+   The view of a JS_Object: `key` and `value` columns. Shows at most
+   `max_items` fields.
+js_object_view (js_object : JS_Object) (max_items : Integer) -> Text =
     fields = js_object.field_names
-    header = ["header", ["key", "value"]]
-    all_rows = ["all_rows_count", fields.length]
-    map_vector = Warning.clear (fields.take max_items)
-    mapped = map_vector . map p-> [p, Viz_Cell.render_value (js_object.get p)]
-    data = ["data", [mapped.map .first, mapped.map .second]]
-    JS_Object.from_pairs [header, data, all_rows, ["type", "Map"]] . to_json
+    shown = fields.length.min max_items . max 0
+    columns = [View_Column.Value "key", View_Column.Value "value"]
+    keys = (0.up_to shown . map i-> fields.at i) . to_json
+    Warning.clear <| grid_json (columns.map .to_json_text) [keys, _rendered_json shown (i-> js_object.get (fields.at i))] fields.length
 
 ## ---
    private: true
    ---
-   Create JSON serialization of values.
-make_json_for_other : Any -> JS_Object
-make_json_for_other x =
+   The view of any other value: its `to_js_object` with its display text
+   first and its fields rendered, or its display text and the error when
+   `to_js_object` fails.
+value_view (x : Any) -> Text =
     js_value = Panic.recover Any x.to_js_object
-    supports_js_object = js_value.is_error.not
-    case supports_js_object of
-        True ->
-            value = if js_value.is_a JS_Object . not then js_value else
-                pairs = [['_display_text_', x.to_display_text]] + js_value.field_names.map f-> [f, Viz_Cell.render_value (js_value.get f)]
-                JS_Object.from_pairs pairs
-            link_fields = if js_value.is_a JS_Object . not then [] else
-                if js_value.contains_key 'links' then [["links", js_value.get 'links']] else []
-            additional_fields = if js_value.is_a JS_Object . not then [] else
-                if js_value.contains_key 'get_child_node_action' then [["get_child_node_action", js_value.get 'get_child_node_action']] else []
-            label = if js_value.is_a JS_Object . not then [] else
-                if js_value.contains_key 'child_label' then [["child_label", js_value.get 'child_label']] else []
-            header = if js_value.is_a JS_Object . not then [] else
-                if js_value.contains_key 'visualization_header' then [["visualization_header", js_value.get 'visualization_header']] else []
-            JS_Object.from_pairs <| [["json", value]] + additional_fields + link_fields + label + header
+    value = case js_value.is_error of
+        False -> if js_value.is_a JS_Object . not then js_value else
+            pairs = [['_display_text_', x.to_display_text]] + js_value.field_names.map f-> [f, Viz_Cell.render_value (js_value.get f)]
+            JS_Object.from_pairs pairs
+        True -> JS_Object.from_pairs [["_display_text_", x.to_display_text], ["_to_js_object_error_", js_value.catch.to_display_text]]
+    value_json value
 
-        # Fallback for objects that fail to be serialized through `to_js_object`.
-        False ->
-            json = JS_Object.from_pairs [["_display_text_", x.to_display_text], ["_to_js_object_error_", js_value.catch.to_display_text]]
-            JS_Object.from_pairs [["json", json]]
+## ---
+   private: true
+   ---
+   The most cells a table view sends inline; above it the server sorts,
+   filters and pages the rows.
+max_inline_cells = 2500
+
+## ---
+   private: true
+   ---
+   A cell its row does not have (a short row of a vector of vectors, a
+   `Nothing` row, a record without that field). The IDE shows it empty, unlike
+   `Nothing`.
+missing_cell = JS_Object.from_pairs [["_missing_", True]]
+
+## ---
+   private: true
+   ---
+   A link: double-clicking a cell creates a node from `action`, a template in
+   which `{{#field}}` is the row's value of `field` (a number when it reads as
+   one), `{{@field}}` the value as it is, and `{{#index}}` the row number.
+   `label` names what the new node holds in the tooltip ("value" when
+   `Nothing`).
+type View_Link
+    ## ---
+       private: true
+       ---
+    Value (action : Text) (label : Text | Nothing = Nothing)
+
+    ## ---
+       private: true
+       ---
+    to_json_text self -> Text =
+        label = if self.label.is_nothing then "" else ',"label":' + self.label.to_json
+        '{"action":' + self.action.to_json + label + '}'
+
+## ---
+   private: true
+   ---
+   A column of a grid view. `number_format` says whether the IDE groups the
+   column's digits; `Nothing` lets it decide from the values.
+type View_Column
+    ## ---
+       private: true
+       ---
+    Value (name : Text) (link : View_Link | Nothing = Nothing) (number_format : Boolean | Nothing = Nothing)
+
+    ## ---
+       private: true
+       ---
+    to_json_text self -> Text =
+        link = if self.link.is_nothing then "" else ',"link":' + self.link.to_json_text
+        format = if self.number_format.is_nothing then "" else ',"number_format":' + self.number_format.to_json
+        '{"name":' + self.name.to_json + link + format + '}'
+
+## ---
+   private: true
+   ---
+   How a source with the `"view_pieces"` capability is shown.
+   - `index_action`: the row-number column's link template.
+   - `row_count`: the rows the value has (a database table's, which can be
+     more than the rows read).
+   - `version_hash`: the table's version, or `Nothing` (a database table).
+   - `options`: as in `grid_json`.
+   - `allow_server`: whether the server may sort, filter and page the rows
+     (above `max_inline_cells` cells).
+type Table_View
+    ## ---
+       private: true
+       ---
+    Value (index_action : Text) (row_count : Integer) (version_hash : Text | Nothing) (options : Vector Text) (allow_server : Boolean)
+
+## ---
+   private: true
+   ---
+   The view message of a grid.
+   - `columns`: one JSON object per column (`View_Column.to_json_text`, or a
+     source's fragments).
+   - `data`: one JSON array per column, or `Nothing` when the server pages.
+   - `row_count`: the rows the value has; `Nothing` shows no row count.
+   - `index`: the row-number column's link, or `Nothing` for none.
+   - `version_hash`: the table's version, or `Nothing`.
+   - `server`: whether the server sorts, filters and pages the rows.
+   - `options`: the options that are on, among `"status_bar"` (the row counts
+     below the grid), `"create_node"` (the toolbar's create-node button) and
+     `"disable_sort_when_partial"` (no sorting or filtering when fewer rows are
+     sent than the value has).
+grid_json (columns : Vector Text) (data : Vector Text | Nothing) (row_count : Integer | Nothing = Nothing) (index : View_Link | Nothing = Nothing) (version_hash : Text | Nothing = Nothing) (server : Boolean = False) (options : Vector Text = []) -> Text =
+    count_part = if row_count.is_nothing then "" else ',"row_count":' + row_count.to_text
+    index_part = if index.is_nothing then "" else ',"index":' + index.to_json_text
+    data_part = if data.is_nothing then ',"data":null' else ',"data":[' + (data.join ",") + ']'
+    version_part = if version_hash.is_nothing then "" else ',"version_hash":' + version_hash.to_json
+    server_part = if server then ',"server":true' else ""
+    options_part = if options.is_empty then "" else ',"options":{' + (options.map (o-> o.to_json + ':true') . join ",") + '}'
+    '{"kind":"grid"' + count_part + ',"columns":[' + (columns.join ",") + ']' + index_part + data_part + version_part + server_part + options_part + '}'
+
+## ---
+   private: true
+   ---
+   One column's cells as a JSON array, each rendered by `Viz_Cell.render_value`.
+cells_json (values : Vector) -> Text = (values.map Viz_Cell.render_value) . to_json
+
+## ---
+   private: true
+   ---
+   The view of a source with the `"view_pieces"` capability: one loop over
+   the columns, the cells and per-column details from the source.
+table_view (viz : Viz_Table) (view : Table_View) -> Text =
+    names = viz.column_names
+    details = viz.column_metrics_json
+    columns = names.zip details (name-> fields-> '{"name":' + name.to_json + ',' + fields + '}')
+    server = view.allow_server && (view.row_count * names.length > max_inline_cells)
+    rows = viz.row_count
+    data = if server then Nothing else (0.up_to names.length).map index-> viz.column_cells_json index 0 rows
+    grid_json columns data view.row_count (View_Link.Value view.index_action "row") view.version_hash server view.options
+
+## ---
+   private: true
+   ---
+   The view of one value: its JSON in one cell.
+value_json value -> Text = '{"kind":"value","value":' + value.to_json + '}'
+
+## ---
+   private: true
+   ---
+   The view of an error.
+error_json (message : Text) -> Text = '{"kind":"error","error":' + message.to_json + '}'
+
+## ---
+   private: true
+   ---
+   A page of the server-side rows: `index` holds each row's number (in the
+   table before sorting and filtering), `data` one JSON array per column.
+rows_page_json (row_count : Integer) (index : Text) (data : Vector Text) -> Text =
+    '{"row_count":' + row_count.to_text + ',"index":' + index + ',"data":[' + (data.join ",") + ']}'
+
+## ---
+   private: true
+   ---
+   A column's distinct values, a JSON array, or `Nothing` when there are too
+   many to list.
+distinct_json (values : Text | Nothing) -> Text = '{"values":' + (values.if_nothing "null") + '}'
