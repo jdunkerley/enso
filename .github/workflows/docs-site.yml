@@ -27,6 +27,7 @@ on:
       - "docs-site/**"
       - "app/gui/src/providers/openedProjects/suggestionDatabase/**"
       - "app/gui/src/project-view/components/ComponentHelp/**"
+      - "app/gui/src/project-view/components/GraphEditor/copiedNode.ts"
       - "app/gui/src/project-view/util/**"
       - "app/gui/src/project-view/assets/icons.svg"
       - "app/gui/src/project-view/assets/base.css"

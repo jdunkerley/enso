@@ -10,6 +10,7 @@ import { FIXTURES_LIB, readLibraries } from './catalogue'
 import { buildModel, isFunctionPage } from './model'
 import { writeSite } from './output'
 import { formatReport } from './report'
+import { styleViolations } from './style'
 
 /**
  * The fewest function pages a run with `--lib` may write, unless `--min-function-pages` says
@@ -17,6 +18,14 @@ import { formatReport } from './report'
  * hundred. Fewer means a catalogue came out empty or truncated. `--fixtures` runs have no floor.
  */
 export const MIN_FUNCTION_PAGES = 2500
+
+/**
+ * Whether documentation style violations (`style.ts`) fail the run. Off until Date's docs are
+ * rewritten to the house style (the Date documentation pilot's task 5, which flips this to `true`):
+ * they break the rules today, so this would fail the Docs Site CI job on `develop`'s catalogues.
+ * The violations are printed either way; `--style-gate` enforces them for one run.
+ */
+export const STYLE_GATE = false
 
 const SITE_DIR = fileURLToPath(new URL('../..', import.meta.url))
 
@@ -26,6 +35,7 @@ const { values } = parseArgs({
     lib: { type: 'string', multiple: true },
     fixtures: { type: 'boolean' },
     'min-function-pages': { type: 'string' },
+    'style-gate': { type: 'boolean' },
   },
 })
 
@@ -44,4 +54,13 @@ if (functionPages < floor) {
     `Only ${functionPages} function pages, below the floor of ${floor}: is a catalogue empty?`,
   )
   process.exit(1)
+}
+
+const violations = styleViolations(model)
+if (violations.length) {
+  const gated = values['style-gate'] ?? STYLE_GATE
+  const print = gated ? console.error : console.warn
+  for (const v of violations) print(`${v.page}: ${v.rule}`)
+  print(`${violations.length} documentation style violations (STYLE_CHECKED_MODULES).`)
+  if (gated) process.exit(1)
 }

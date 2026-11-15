@@ -21,8 +21,11 @@ design is its section 6); plan:
   into MDX (their `##` sections are split by the GUI's
   `ComponentHelp/sections.ts`, imported through `gui.ts`); `componentNode.ts`
   computes the node's props; `pages.ts` writes each page; `sidebarData.ts`,
-  `output.ts`, `report.ts` and `main.ts` write the rest and print the report. A
-  `*.test.ts` sits beside each.
+  `output.ts`, `report.ts` and `main.ts` write the rest and print the report;
+  `style.ts` checks the documentation style of the opted-in modules
+  (`STYLE_CHECKED_MODULES`), and `main.ts` prints its violations, failing the
+  run only when `STYLE_GATE` (or `--style-gate`) is on. A `*.test.ts` sits
+  beside each.
 - `generator/fixtures/` — `lib/` (two small fixture libraries covering every
   case) and `golden/` (`Table.filter`'s real catalogue entry and its reviewed
   page, `Table.filter.mdx`).
@@ -125,7 +128,9 @@ redirect another way.
   (`suggestionDatabase/argument.ts`), `groupColorVar`/`groupColorStyle`/
   `groupColor` (`project-view/util/groupColors.ts`), the icon rule
   (`project-view/util/entryIcon.ts`) and `ProjectPath.key()`'s rule
-  (`project-view/util/projectPathKey.ts`).
+  (`project-view/util/projectPathKey.ts`) and `CopiedNode`
+  (`GraphEditor/copiedNode.ts`, for `exampleToNodes`, which parses with the WASM
+  parser: `vitest.config.ts` loads it with `vite-plugin-wasm`, told it is SSR).
 - `tsconfig.json` is not composite (the GUI files reached through the aliases
   are not in its `include`) and uses the `source` export condition;
   `vitest.config.ts` restates the GUI's three aliases rather than importing the

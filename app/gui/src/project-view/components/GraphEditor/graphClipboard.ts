@@ -1,4 +1,5 @@
 import type { Node } from '$/providers/openedProjects/graph'
+import type { CopiedNode } from '@/components/GraphEditor/copiedNode'
 import {
   parseTsvData,
   tableToEnsoExpression,
@@ -8,7 +9,6 @@ import { nodeDocumentationText } from '@/util/ast/node'
 import { Vec2 } from '@/util/data/vec2'
 import { useToast } from '@/util/toast'
 import * as iter from 'enso-common/src/utilities/data/iter'
-import type { NodeMetadataFields } from 'ydoc-shared/ast'
 
 // MIME type in *vendor tree*; see https://www.rfc-editor.org/rfc/rfc6838#section-3.2
 // The `web ` prefix is required by Chromium:
@@ -20,13 +20,7 @@ interface ClipboardData {
   nodes: CopiedNode[]
 }
 
-/** Node data that is copied to the clipboard. Used for serializing and deserializing the node information. */
-export interface CopiedNode {
-  expression: string
-  binding?: string
-  documentation?: string | undefined
-  metadata?: NodeMetadataFields
-}
+export type { CopiedNode }
 
 /** @internal */
 export async function nodesFromClipboardContent(
