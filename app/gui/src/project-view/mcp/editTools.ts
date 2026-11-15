@@ -23,7 +23,7 @@ import {
   type NodeSummary,
 } from './graphTools'
 import { hasSyntaxError, parseImportLines, quote } from './importLines'
-import { enablesOutput, WRITE_REFUSED_ERROR } from './writeGuard'
+import { writeRefusal } from './writeGuard'
 
 /** Added to a result whose edit was not followed by a finished execution in time. */
 export const UNSETTLED_NOTE =
@@ -101,7 +101,7 @@ export function parseNodeExpression(expression: string): Result<string> {
 /**
  * `text` parsed as one statement of a method body. Err (`notOne` when it is not one statement)
  * for an import line, for anything the parser marks invalid, and for code that turns the output
- * context on ({@link enablesOutput}).
+ * context on ({@link writeRefusal}).
  */
 function parseMethodStatement(text: string, notOne: string): Result<Ast.Statement> {
   const quoted = quote(text)
@@ -112,7 +112,8 @@ function parseMethodStatement(text: string, notOne: string): Result<Ast.Statemen
     return Err(`\`${quoted}\` is an import. Pass import lines in \`imports\` of add_nodes.`)
   }
   if (hasSyntaxError(ast)) return Err(`\`${quoted}\` has a syntax error.`)
-  if (enablesOutput(ast)) return Err(WRITE_REFUSED_ERROR)
+  const refusal = writeRefusal(ast)
+  if (refusal != null) return Err(refusal)
   return Ok(ast)
 }
 

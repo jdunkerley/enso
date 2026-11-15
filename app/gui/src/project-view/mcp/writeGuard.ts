@@ -7,8 +7,10 @@
  * (`add_function`), an import line (`add_nodes`) and an evaluated expression
  * (`evaluate_expression`).
  *
- * This keeps the output context off; it is not a sandbox: Enso code can call Java, which can do
- * anything the IDE's process can.
+ * The check is a list of names matched over the parsed code. It stops an agent turning Write on by
+ * accident or by following an instruction naively; it is not a security boundary. Deliberately
+ * obfuscated code (dynamic dispatch, Java interop) can still reach the output context, and only
+ * engine-side enforcement could guarantee otherwise.
  */
 import { Ast } from '@/util/ast'
 
@@ -29,29 +31,69 @@ export const OUTPUT_ENABLING_IDENTIFIERS: ReadonlySet<string> = new Set([
   'with_enabled',
 ])
 
+/**
+ * The identifiers through which Enso code can build a method name from text, so that the enabling
+ * names never appear in it: `(Meta.meta .x).rename ("with_" + "enabled") . value Context.Output …`
+ * calls `Context.Output.with_enabled` (`src/Meta.enso`).
+ * - `meta`: `Meta.meta`. Of an unresolved symbol (`.x`) it gives a `Meta.Unresolved`, whose
+ *   `rename` makes a symbol with any Text as its name; its `Symbol` constructor is private, so
+ *   `Meta.meta` is the only way to get one. Refusing `meta` closes that route.
+ *
+ * `rename` itself is not refused: `Column.rename` and others share the name, and without
+ * `Meta.meta` there is no `Unresolved` to rename. The rest of `Meta` (`Meta.type_of`, `Meta.is_a`,
+ * …) only inspects values and stays allowed.
+ */
+export const REFLECTION_IDENTIFIERS: ReadonlySet<string> = new Set(['meta'])
+
+/** The annotation that binds a function to one of the runtime's builtins. */
+const BUILTIN_ANNOTATION = 'Builtin_Method'
+
 /** The answer to every tool given code that would turn the output context on. */
 export const WRITE_REFUSED_ERROR =
   'Only the user can turn Write on. Remove with_enabled_context / with_enabled from the code; the user clicks Write on the node if they want it to run with output.'
 
+/** The answer to every tool given code that looks a method up by reflection. */
+export const REFLECTION_REFUSED_ERROR =
+  'Code that looks a method up by reflection (Meta.meta) is refused. Only the user can turn Write on, by clicking it on a node.'
+
 /**
- * Whether `ast` contains, anywhere in its tree, an identifier token naming one of
- * {@link OUTPUT_ENABLING_IDENTIFIERS}: plain or qualified, called or not, as a method name after a
- * dot, inside a nested expression, a function body or a text interpolation. Text and comments are
- * not identifiers and do not count.
+ * The answer to every tool given code that binds a runtime builtin: `f c e ~a = @Builtin_Method
+ * "Runtime.with_context_builtin"` would enable a context without any of the names above.
  */
-export function enablesOutput(ast: Ast.Ast): boolean {
-  let found = false
+export const BUILTIN_REFUSED_ERROR =
+  'Code that binds a runtime builtin (@Builtin_Method) is refused.'
+
+/**
+ * Why `ast` is refused, or `undefined` when it is not. Anywhere in its tree (plain or qualified,
+ * called or not, as a method name after a dot, inside a nested expression, a function body or a
+ * text interpolation):
+ * - an identifier token in {@link OUTPUT_ENABLING_IDENTIFIERS} ({@link WRITE_REFUSED_ERROR});
+ * - an identifier token in {@link REFLECTION_IDENTIFIERS} ({@link REFLECTION_REFUSED_ERROR});
+ * - an `@Builtin_Method` annotation: the parser's annotation operator token followed by that
+ *   identifier ({@link BUILTIN_REFUSED_ERROR}).
+ *
+ * Text and comments are not identifiers and do not count.
+ */
+export function writeRefusal(ast: Ast.Ast): string | undefined {
+  let refusal: string | undefined
   Ast.visitRecursive(ast, (node) => {
+    let previous: Ast.Token | undefined
     for (const child of node.children()) {
-      if (
-        Ast.isToken(child) &&
-        child.typeName === 'Ident' &&
-        OUTPUT_ENABLING_IDENTIFIERS.has(child.code())
-      ) {
-        found = true
+      if (!Ast.isToken(child)) {
+        previous = undefined
+        continue
       }
+      if (child.typeName === 'Ident') {
+        const name = child.code()
+        if (OUTPUT_ENABLING_IDENTIFIERS.has(name)) refusal ??= WRITE_REFUSED_ERROR
+        else if (REFLECTION_IDENTIFIERS.has(name)) refusal ??= REFLECTION_REFUSED_ERROR
+        else if (name === BUILTIN_ANNOTATION && previous?.typeName === 'AnnotationOperator') {
+          refusal ??= BUILTIN_REFUSED_ERROR
+        }
+      }
+      previous = child
     }
-    return !found
+    return refusal == null
   })
-  return found
+  return refusal
 }

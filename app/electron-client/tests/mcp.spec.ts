@@ -195,6 +195,10 @@ const WRITE_PREFIX =
   'Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output "design" <| '
 /** The start of the refusal of code that turns the output context on. */
 const WRITE_REFUSED = 'Only the user can turn Write on.'
+/** The start of the refusal of code that looks a method up by reflection. */
+const REFLECTION_REFUSED = 'Code that looks a method up by reflection (Meta.meta) is refused.'
+/** The refusal of code that binds a runtime builtin. */
+const BUILTIN_REFUSED = 'Code that binds a runtime builtin (@Builtin_Method) is refused.'
 
 /** The states of a node that is neither an error nor a panic. */
 const NOT_FAILED = ['value', 'pending', 'unknown']
@@ -306,9 +310,9 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     note('get_node total preview', totalPreview)
     expect(totalPreview).toContain('6')
 
-    // An agent can never turn Write on: code wrapped in the Write prefix (or calling
-    // `with_enabled_context` / `with_enabled` anywhere) is refused by every tool that takes code,
-    // and the file it names is never written.
+    // Code that turns Write on by the routes the guard knows (the Write prefix, `with_enabled_context`
+    // / `with_enabled` anywhere, reflection, a runtime builtin) is refused by every tool that takes
+    // code, and the file it names is not written.
     const writeTarget = path.join(os.tmpdir(), `enso-mcp-write-prefix-${Date.now()}.txt`)
     const writeTargetEnso = writeTarget.replace(/\\/g, '/')
     await fs.rm(writeTarget, { force: true })
@@ -333,10 +337,30 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
       })
       note('evaluate_expression with Context.Output.with_enabled', methodRefused)
       expect(methodRefused).toContain(WRITE_REFUSED)
+      // The two routes past the names that review found, both of which wrote the file before they
+      // were refused: a method name built by reflection, and a function bound to the runtime's
+      // builtin.
+      const reflection = `(Meta.meta .x).rename ("with_" + "enabled") . value Standard.Base.Runtime.Context.Output ("x".write "${writeTargetEnso}")`
+      const reflectionEvaluated = await callError('evaluate_expression', {
+        expression: `(${reflection}).to_text`,
+      })
+      note('evaluate_expression with a method name built by reflection', reflectionEvaluated)
+      expect(reflectionEvaluated).toContain(REFLECTION_REFUSED)
+      const reflectionAdded = await callError('add_nodes', { statements: [`r = ${reflection}`] })
+      note('add_nodes with a method name built by reflection', reflectionAdded)
+      expect(reflectionAdded).toContain(REFLECTION_REFUSED)
+      const builtinAdded = await callError('add_function', {
+        source: 'go c e ~a = @Builtin_Method "Runtime.with_context_builtin"',
+      })
+      note('add_function bound to a runtime builtin', builtinAdded)
+      expect(builtinAdded).toBe(BUILTIN_REFUSED)
       // Give a write that the engine might finish late a moment to land.
       await page.waitForTimeout(2_000)
       expect(existsSync(writeTarget), `${writeTarget} must not exist`).toBe(false)
-      expect(names(await getGraph())).not.toContain('w')
+      const afterRefusals = await getGraph()
+      expect(names(afterRefusals)).not.toContain('w')
+      expect(names(afterRefusals)).not.toContain('r')
+      expect(afterRefusals.source).not.toContain('Builtin_Method')
     } finally {
       await fs.rm(writeTarget, { force: true })
     }

@@ -27,11 +27,15 @@ import {
   type EditToolDeps,
 } from '../editTools'
 import type { AffectedExpressions } from '../projectEvents'
-import { WRITE_REFUSED_ERROR } from '../writeGuard'
+import { BUILTIN_REFUSED_ERROR, REFLECTION_REFUSED_ERROR, WRITE_REFUSED_ERROR } from '../writeGuard'
 import {
+  BUILTIN_STATEMENTS,
   ENABLING_EXPRESSIONS,
   ENABLING_IMPORTS,
   HARMLESS_EXPRESSIONS,
+  REFLECTION_EXPRESSIONS,
+  REFLECTION_IMPORT,
+  REFLECTION_TWO_STATEMENTS,
   WRITE_PREFIX,
 } from './outputEnablingCode'
 
@@ -506,6 +510,35 @@ test.each(ENABLING_IMPORTS)(
     expect(createNodes).not.toHaveBeenCalled()
   },
 )
+
+test('parseNodeStatement and parseNodeExpression refuse a method name built by reflection', () => {
+  for (const expression of REFLECTION_EXPRESSIONS) {
+    expect(errorOf(parseNodeStatement(`x = ${expression}`)), expression).toBe(
+      REFLECTION_REFUSED_ERROR,
+    )
+    expect(errorOf(parseNodeExpression(expression)), expression).toBe(REFLECTION_REFUSED_ERROR)
+  }
+})
+
+test('parseNodeStatement refuses a @Builtin_Method annotation', () => {
+  for (const statement of BUILTIN_STATEMENTS) {
+    expect(errorOf(parseNodeStatement(statement)), statement).toBe(BUILTIN_REFUSED_ERROR)
+  }
+})
+
+test('add_nodes refuses a renamed symbol bound in one statement and applied in the next', async () => {
+  const { deps, createNodes } = makeDeps()
+  const result = await addNodes(deps, { statements: [...REFLECTION_TWO_STATEMENTS] })
+  expect(toolError(result)).toBe(`Statement 1: ${REFLECTION_REFUSED_ERROR}`)
+  expect(createNodes).not.toHaveBeenCalled()
+})
+
+test('add_nodes refuses an import of Meta.meta under a plain name', async () => {
+  const { deps, createNodes } = makeDeps()
+  const result = await addNodes(deps, { statements: ['c = 1'], imports: [REFLECTION_IMPORT] })
+  expect(toolError(result)).toBe(REFLECTION_REFUSED_ERROR)
+  expect(createNodes).not.toHaveBeenCalled()
+})
 
 test('edit_node refuses an expression that turns the output context on', async () => {
   const { deps, db } = makeDeps()

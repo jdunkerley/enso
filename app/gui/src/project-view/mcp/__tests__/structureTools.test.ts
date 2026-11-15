@@ -19,8 +19,14 @@ import {
   parseFunctionDefinition,
   type StructureToolDeps,
 } from '../structureTools'
-import { WRITE_REFUSED_ERROR } from '../writeGuard'
-import { ENABLING_EXPRESSIONS, ENABLING_FUNCTION, HARMLESS_EXPRESSIONS } from './outputEnablingCode'
+import { BUILTIN_REFUSED_ERROR, REFLECTION_REFUSED_ERROR, WRITE_REFUSED_ERROR } from '../writeGuard'
+import {
+  BUILTIN_FUNCTION,
+  ENABLING_EXPRESSIONS,
+  ENABLING_FUNCTION,
+  HARMLESS_EXPRESSIONS,
+  REFLECTION_EXPRESSIONS,
+} from './outputEnablingCode'
 
 const CODE = `## A helper.
 helper x = x
@@ -309,6 +315,25 @@ test('add_function refuses a body that turns the output context on, before the s
   )
   expect(session.run).not.toHaveBeenCalled()
   expect(topLevel.code()).toBe(before)
+})
+
+test('add_function refuses a function bound to a runtime builtin, before the session', async () => {
+  const { deps, topLevel, session } = makeDeps()
+  const before = topLevel.code()
+  expect(errorOf(parseFunctionDefinition(BUILTIN_FUNCTION))).toBe(BUILTIN_REFUSED_ERROR)
+  expect(toolError(await addFunction(deps, { source: BUILTIN_FUNCTION }))).toBe(
+    BUILTIN_REFUSED_ERROR,
+  )
+  expect(session.run).not.toHaveBeenCalled()
+  expect(topLevel.code()).toBe(before)
+})
+
+test('parseFunctionDefinition refuses a body that builds a method name by reflection', () => {
+  for (const expression of REFLECTION_EXPRESSIONS) {
+    expect(errorOf(parseFunctionDefinition(`f x = ${expression}`)), expression).toBe(
+      REFLECTION_REFUSED_ERROR,
+    )
+  }
 })
 
 test("collapse_nodes and add_function pass the call's deadline to the session", async () => {

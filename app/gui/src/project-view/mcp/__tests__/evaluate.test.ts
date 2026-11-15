@@ -10,8 +10,14 @@ import { describe, expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { EVALUATE_RESULT_CHARS, LIVE_MODE_ERROR, evaluateExpression } from '../evaluate'
-import { WRITE_REFUSED_ERROR } from '../writeGuard'
-import { ENABLING_EXPRESSIONS, HARMLESS_EXPRESSIONS } from './outputEnablingCode'
+import { BUILTIN_REFUSED_ERROR, REFLECTION_REFUSED_ERROR, WRITE_REFUSED_ERROR } from '../writeGuard'
+import {
+  BUILTIN_STATEMENTS,
+  ENABLING_EXPRESSIONS,
+  HARMLESS_EXPRESSIONS,
+  REFLECTION_EXPRESSIONS,
+  REFLECTION_TWO_STATEMENTS,
+} from './outputEnablingCode'
 
 const CODE = `main =
     a = 1 + 2
@@ -164,6 +170,30 @@ describe('code that turns the output context on', () => {
     })
     expect(evaluateRaw).not.toHaveBeenCalled()
   })
+
+  test.each([...REFLECTION_EXPRESSIONS, REFLECTION_TWO_STATEMENTS.join('\n')])(
+    'a method name built by reflection is refused before anything is evaluated: %s',
+    async (code) => {
+      const { deps, evaluateRaw } = makeDeps()
+      expect(await evaluateExpression(deps, { expression: code })).toEqual({
+        ok: false,
+        error: REFLECTION_REFUSED_ERROR,
+      })
+      expect(evaluateRaw).not.toHaveBeenCalled()
+    },
+  )
+
+  test.each([...BUILTIN_STATEMENTS, `(${BUILTIN_STATEMENTS[1]}).to_text`])(
+    'a @Builtin_Method annotation is refused before anything is evaluated: %s',
+    async (code) => {
+      const { deps, evaluateRaw } = makeDeps()
+      expect(await evaluateExpression(deps, { expression: code })).toEqual({
+        ok: false,
+        error: BUILTIN_REFUSED_ERROR,
+      })
+      expect(evaluateRaw).not.toHaveBeenCalled()
+    },
+  )
 
   test.each(HARMLESS_EXPRESSIONS)('similar names are evaluated: %s', async (code) => {
     const { deps, evaluateRaw } = makeDeps()
