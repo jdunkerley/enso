@@ -7,6 +7,9 @@ import org.enso.common.{LanguageInfo, MethodNames}
 import scala.ref.WeakReference
 import org.graalvm.polyglot.Context
 import org.enso.common.RuntimeOptions
+import org.enso.runtime.utils.ThreadUtils
+
+import java.util.concurrent.TimeUnit
 
 class RuntimeManagementTest extends InterpreterTest {
   private def parallelism = 5
@@ -18,6 +21,48 @@ class RuntimeManagementTest extends InterpreterTest {
       b.allowCreateThread(true)
         .option(RuntimeOptions.GUEST_PARALLELISM, "" + parallelism)
     })
+
+  /** How long any single wait in these tests may take. A passing run takes
+    * about two seconds per test, even on Windows CI.
+    */
+  private val waitTimeoutSeconds = 120L
+
+  private def failWithThreadDump(message: String): Nothing =
+    fail(ThreadUtils.dumpAllStacktraces(message))
+
+  private def awaitFuture[T](f: java.util.concurrent.Future[T]): T =
+    try {
+      f.get(waitTimeoutSeconds, TimeUnit.SECONDS)
+    } catch {
+      case _: java.util.concurrent.TimeoutException =>
+        failWithThreadDump(
+          s"A guest thread did not finish within $waitTimeoutSeconds seconds."
+        )
+    }
+
+  /** Waits until `marker` occurs `count` times in the output so far. It never
+    * resets the output, so it cannot lose a write; see Note [Waiting For The
+    * Guest Threads To Start].
+    */
+  private def awaitOutput(marker: String, count: Int)(implicit
+    interpreterContext: InterpreterContext
+  ): Unit = {
+    val deadline =
+      System.nanoTime() + TimeUnit.SECONDS.toNanos(waitTimeoutSeconds)
+    def seen = java.util.regex.Pattern
+      .compile(java.util.regex.Pattern.quote(marker))
+      .matcher(interpreterContext.output().toString)
+      .results()
+      .count()
+    while (seen < count) {
+      if (System.nanoTime() > deadline) {
+        failWithThreadDump(
+          s"Saw $seen of $count '$marker' within $waitTimeoutSeconds seconds."
+        )
+      }
+      Thread.sleep(10)
+    }
+  }
 
   override def specify(implicit
     interpreterContext: InterpreterContext
@@ -51,26 +96,44 @@ class RuntimeManagementTest extends InterpreterTest {
           main.execute()
         })
 
+      // Note [Waiting For The Guest Threads To Start]
+      // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      // The threads must all be running `foo` before `interruptThreads` is
+      // called: a thread that has not started yet is not flagged, so it is
+      // never interrupted and loops forever, and `f.get()` waits for it
+      // forever. This used to be decided by counting the lines that
+      // `consumeOut` returned, which races with the guest threads (#741):
+      // - `consumeOut` is `toString` followed by `reset`, two separate calls,
+      //   so a "Start." written between them is thrown away. The count then
+      //   never reaches `parallelism` and the loop spins forever. This is the
+      //   hang seen on Windows CI: a stress run of the old loop lost a line
+      //   in about 1 in 600 rounds with the JVM pinned to 4 CPUs, as on the
+      //   CI runners, and never with 32.
+      // - `println` writes the text and the line separator as two writes, so
+      //   a `toString` between them sees "Start." and, on the next round, a
+      //   bare separator, which `linesIterator` counts as a second (empty)
+      //   line. The count can then reach `parallelism` while a thread has not
+      //   started, and that thread is never interrupted. Not observed, but
+      //   nothing prevents it.
+      // Counting complete "Start." markers in the whole output, without
+      // resetting it, is immune to both. Every wait is bounded and fails with
+      // a thread dump.
       def runTest(): Unit = {
-        val futures       = 0.until(parallelism).map(_ => runMain())
-        var reportedCount = 0
-        while (reportedCount < parallelism) {
-          Thread.sleep(100)
-          reportedCount += consumeOut.length
-        }
-        val expectedOut = List.fill(parallelism)("Interrupted.")
+        val futures = 0.until(parallelism).map(_ => runMain())
+        awaitOutput("Start.", parallelism)
         langCtx.getThreadManager.interruptThreads()
         futures.foreach(f => {
-          try {
-            val v = f.get()
+          val ex = intercept[java.util.concurrent.ExecutionException] {
+            val v = awaitFuture(f)
             fail("Unexpected value: " + v)
-          } catch {
-            case ex1: java.util.concurrent.ExecutionException => {
-              ex1.getMessage() shouldEqual "org.enso.interpreter.test.InterpreterException: org.enso.interpreter.runtime.control.ThreadInterruptedException"
-            }
           }
+          ex.getMessage() shouldEqual "org.enso.interpreter.test.InterpreterException: org.enso.interpreter.runtime.control.ThreadInterruptedException"
         })
-        consumeOut shouldEqual expectedOut
+        val out = consumeOut
+        out.filter(_ == "Start.") shouldEqual List.fill(parallelism)("Start.")
+        out.filter(
+          _ != "Start."
+        ) shouldEqual List.fill(parallelism)("Interrupted.")
         futures.forall(_.isDone) shouldBe true
       }
 
