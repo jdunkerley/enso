@@ -40,13 +40,16 @@ test('Load Table Visualisation', async ({ editorPage, page }) => {
 
 const GET_ROWS = 'Standard.Visualization.Table.Visualization.get_rows_for_table'
 
+/** Longer than the 5 s default `executeExpression` timeout that row pages once had. */
+const PAST_OLD_ROW_TIMEOUT_MS = 6000
+
 /**
  Scenario (#777): a table large enough to be paged from the engine is opened while the engine is busy,
     so its first rows come after more than 5 s. The table must show them when they come, not settle to
     AG Grid's "No Rows To Show" before.
  */
 test('Paged table shows rows the engine sends late', async ({ editorPage, page, localApi }) => {
-  // It waits out the 5 s the row request used to be given.
+  // It waits past the old 5 s limit on a row request.
   test.slow()
   await initGraph(editorPage)
   await localApi.updateVisualization(
@@ -70,7 +73,7 @@ test('Paged table shows rows the engine sends late', async ({ editorPage, page, 
 
   // The engine is busy: the request for the rows waits past the 5 s it was once given.
   await expect.poll(() => localApi.pendingVisualizationRequests(GET_ROWS)).toBe(1)
-  await page.waitForTimeout(6000)
+  await page.waitForTimeout(PAST_OLD_ROW_TIMEOUT_MS)
   await expect(tableVisualization).not.toContainText('No Rows To Show')
 
   await localApi.updateVisualization(GET_ROWS, {
