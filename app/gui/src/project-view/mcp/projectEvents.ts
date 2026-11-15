@@ -155,42 +155,76 @@ export interface ExecutionEvents {
   ): unknown
 }
 
+/**
+ * The expressions an edit makes the engine compute, by whether they existed before it: the rule for
+ * when each has been reported differs (see {@link watchExecution}).
+ */
+export interface AffectedExpressions {
+  /** Expressions the edit created (new nodes, the call node of a collapse). */
+  readonly added?: readonly string[]
+  /** Expressions that existed before the edit (an edited node, the users of a removed node). */
+  readonly changed?: readonly string[]
+}
+
 /** A watch on the engine's reports, started before an edit is applied. */
 export interface ExecutionWatch {
-  /** The edit has returned: from now on an `executionFailed` settles the watch. */
+  /** The edit has returned: only the reports received from now on count. */
   editApplied(): void
   /**
    * Resolves true once the engine has reported results for the `affected` expressions since the
-   * watch started (at once if it already has, or if there are none), false after `timeoutMs`
+   * edit was applied (at once if it already has, or if there are none), false after `timeoutMs`
    * (from this call). Removes the listeners either way. See {@link watchExecution}.
    */
-  settled(affected: readonly string[], timeoutMs: number): Promise<boolean>
+  settled(affected: AffectedExpressions, timeoutMs: number): Promise<boolean>
   /** Removes the listeners; a later or pending `settled` resolves false. Idempotent. */
   cancel(): void
 }
 
+/** What a watch knows of one expression from the reports received since the edit was applied. */
+interface Reported {
+  /** The latest payload type. */
+  latest: string
+  /** Whether a `Pending` came: the engine took the edit up for this expression. */
+  pendingSeen: boolean
+}
+
 /**
- * Starts recording the context's `expressionUpdates` and `executionFailed` at once, so that a report
- * which comes before {@link ExecutionWatch.settled} is called is not missed.
+ * Starts listening to the context's `expressionUpdates` and `executionFailed` at once, before the
+ * edit, and records what arrives once {@link ExecutionWatch.editApplied} has been called, so that a
+ * report which comes before {@link ExecutionWatch.settled} is called is not missed. Reports
+ * received before the edit was applied never count: they belong to an earlier run.
  *
  * An edit has settled when:
  * - it affects no expression; or
- * - every affected expression's latest update since the watch started has a payload that is not
- *   `Pending` (the engine has computed it: a value, an error or a panic); or
+ * - every expression it added has, as its latest report since the edit, a payload that is not
+ *   `Pending` (the engine has computed it: a value, an error or a panic); and every expression that
+ *   existed before it has had a `Pending` since the edit, followed by a payload that is not
+ *   `Pending`. The `Pending` shows that the engine took this edit up: a run started for an earlier
+ *   edit can report its value for the node after this edit was applied, and that value is stale;
+ *   or
  * - an `executionFailed` came after the edit was applied (the whole execution failed).
  *
  * `executionComplete` plays no part: one follows each evaluation (a `get_graph` preview), so a
  * stray one arrives while the engine is still computing the edit (see `CLAUDE.md`).
  */
 export function watchExecution(context: ExecutionEvents): ExecutionWatch {
-  const latest = new Map<string, string>()
+  const reported = new Map<string, Reported>()
   let applied = false
   let failedAfterEdit = false
   let done = false
   let check: (() => void) | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
   const onUpdates = (updates: readonly ExpressionUpdateLike[]) => {
-    for (const update of updates) latest.set(update.expressionId, update.payload.type)
+    if (!applied) return
+    for (const { expressionId, payload } of updates) {
+      const entry = reported.get(expressionId)
+      const pending = payload.type === 'Pending'
+      if (entry == null) reported.set(expressionId, { latest: payload.type, pendingSeen: pending })
+      else {
+        entry.latest = payload.type
+        entry.pendingSeen ||= pending
+      }
+    }
     check?.()
   }
   const onFailed = () => {
@@ -211,16 +245,18 @@ export function watchExecution(context: ExecutionEvents): ExecutionWatch {
     editApplied() {
       applied = true
     },
-    settled(affected, timeoutMs) {
+    settled({ added = [], changed = [] }, timeoutMs) {
       if (done) return Promise.resolve(false)
-      const reported = () =>
-        affected.length === 0 ||
+      const computed = (id: string) => {
+        const entry = reported.get(id)
+        return entry != null && entry.latest !== 'Pending'
+      }
+      const settledNow = () =>
+        (added.length === 0 && changed.length === 0) ||
         failedAfterEdit ||
-        affected.every((id) => {
-          const type = latest.get(id)
-          return type != null && type !== 'Pending'
-        })
-      if (reported()) {
+        (added.every(computed) &&
+          changed.every((id) => computed(id) && reported.get(id)!.pendingSeen))
+      if (settledNow()) {
         stop()
         return Promise.resolve(true)
       }
@@ -231,7 +267,7 @@ export function watchExecution(context: ExecutionEvents): ExecutionWatch {
           resolve(settled)
         }
         check = () => {
-          if (reported()) finish?.(true)
+          if (settledNow()) finish?.(true)
         }
         timer = setTimeout(() => finish?.(false), timeoutMs)
       })

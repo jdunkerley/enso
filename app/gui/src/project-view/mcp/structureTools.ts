@@ -82,7 +82,7 @@ export async function collapseNodesTool(
     },
     {
       // The engine reports a value for the new node that calls the function.
-      affected: ({ callNode }) => (callNode != null ? [callNode] : []),
+      affected: ({ callNode }) => ({ added: callNode != null ? [callNode] : [] }),
       deadline: deps.deadline,
     },
   )

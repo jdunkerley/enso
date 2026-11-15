@@ -26,6 +26,7 @@ import {
   writeOnNodeError,
   type EditToolDeps,
 } from '../editTools'
+import type { AffectedExpressions } from '../projectEvents'
 import { WRITE_REFUSED_ERROR } from '../writeGuard'
 import {
   ENABLING_EXPRESSIONS,
@@ -105,10 +106,11 @@ const DEADLINE = 123_456
  * A session that runs each edit at once and reports `settled`. `affected` lists, per successful
  * run, the expression ids the tool said its edit affects.
  */
-function fakeSession(
-  settled = true,
-): Pick<EditSession, 'run'> & { affected: string[][]; deadlines: (number | undefined)[] } {
-  const affected: string[][] = []
+function fakeSession(settled = true): Pick<EditSession, 'run'> & {
+  affected: AffectedExpressions[]
+  deadlines: (number | undefined)[]
+} {
+  const affected: AffectedExpressions[] = []
   const deadlines: (number | undefined)[] = []
   return {
     affected,
@@ -121,7 +123,7 @@ function fakeSession(
       deadlines.push(options?.deadline)
       const result = await edit()
       if (!result.ok) return result
-      affected.push([...(options?.affected?.(result.value) ?? [])])
+      affected.push(options?.affected?.(result.value) ?? {})
       return Ok<EditOutcome<T>>({ value: result.value, settled })
     },
   }
@@ -419,18 +421,20 @@ test('set_node_comment and set_visualization affect no expression, so they do no
   const a = nodeNamed(db, 'a')
   await setNodeComment(deps, { node_id: a, text: 'Hello' })
   await setVisualization(deps, { node_id: a, visible: true })
-  expect(session.affected).toEqual([[], []])
+  expect(session.affected).toEqual([{}, {}])
 })
 
 test('add_nodes waits for the new nodes; edit_node for the edited node', async () => {
   const session = fakeSession()
   const { deps, db } = makeDeps({ session })
   const added = valueOf(await addNodes(deps, { statements: ['c = 1', 'd = c + 1'] }))
-  expect(session.affected[0]).toEqual(added.nodes.map((n: { id: string }) => n.id))
-  expect(session.affected[0]).toHaveLength(2)
+  // New nodes: any report after the edit counts.
+  expect(session.affected[0]).toEqual({ added: added.nodes.map((n: { id: string }) => n.id) })
+  expect(session.affected[0]!.added).toHaveLength(2)
   const a = nodeNamed(db, 'a')
   await editNode(deps, { node_id: a, expression: '7' })
-  expect(session.affected[1]).toEqual([a])
+  // An existing node: its result counts once the engine has taken the edit up.
+  expect(session.affected[1]).toEqual({ changed: [a] })
 })
 
 test('remove_nodes waits for the nodes that used a removed one, read before the deletion', async () => {
@@ -444,7 +448,7 @@ test('remove_nodes waits for the nodes that used a removed one, read before the 
     return Ok()
   })
   await removeNodes(deps, { node_ids: [a] })
-  expect(session.affected[0]).toEqual([b])
+  expect(session.affected[0]).toEqual({ changed: [b] })
 })
 
 test("remove_nodes of a node and its only user waits for the method's output node, which used it", async () => {
@@ -454,7 +458,7 @@ test("remove_nodes of a node and its only user waits for the method's output nod
   const b = nodeNamed(db, 'b')
   await removeNodes(deps, { node_ids: [a, b] })
   // `b` is used only by the method's output, which is not removed: it is the one user.
-  expect(session.affected[0]).toEqual([outputNode(db)])
+  expect(session.affected[0]).toEqual({ changed: [outputNode(db)] })
 })
 
 // === Code that turns the output context on ===

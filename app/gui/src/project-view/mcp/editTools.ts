@@ -225,7 +225,7 @@ export async function addNodes(
       return deps.createNodes(nodes, after, imports)
     },
     // The engine reports a value for each new node.
-    { affected: (ids) => ids, deadline: deps.deadline },
+    { affected: (ids) => ({ added: ids }), deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
   const summaries: NodeSummary[] = []
@@ -285,7 +285,8 @@ export async function editNode(
       }
       return deps.setNodeContent(id, expression.value)
     },
-    { affected: () => [id], deadline: deps.deadline },
+    // The node existed before: its result counts once the engine has taken this edit up.
+    { affected: () => ({ changed: [id] }), deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult({ nodes: [currentSummary(deps, found.value)] }, outcome.value)
@@ -323,7 +324,7 @@ export async function removeNodes(
       users = dependentsOf(deps, ids)
       return deps.deleteNodes(ids)
     },
-    { affected: () => users, deadline: deps.deadline },
+    { affected: () => ({ changed: users }), deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult({ removed: ids }, outcome.value)

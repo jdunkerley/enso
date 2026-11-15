@@ -5,7 +5,7 @@
  */
 import type { McpCaller } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
-import type { ExecutionWatch, GraphUpdateWatch } from './projectEvents'
+import type { AffectedExpressions, ExecutionWatch, GraphUpdateWatch } from './projectEvents'
 
 /** How long a caller's undo step stays open without a further edit by that caller. */
 export const EDIT_STEP_IDLE_MS = 10_000
@@ -64,12 +64,12 @@ export interface EditSessionDeps {
 
 export interface EditRunOptions<T> {
   /**
-   * The external ids of the expressions the edit makes the engine compute again (new nodes, an
-   * edited node, the users of a removed node), from the edit's value. None by default: an edit
-   * that affects nothing the engine runs (a comment, a visualization, a function definition on its
-   * own) settles at once.
+   * The external ids of the expressions the edit makes the engine compute (`added`: new nodes, the
+   * call node of a collapse; `changed`: an edited node, the users of a removed node), from the
+   * edit's value. None by default: an edit that affects nothing the engine runs (a comment, a
+   * visualization, a function definition on its own) settles at once.
    */
-  readonly affected?: (value: T) => readonly string[]
+  readonly affected?: (value: T) => AffectedExpressions
   /**
    * When the caller stops waiting (`Date.now()` milliseconds; the tool dispatcher's deadline). The
    * run is refused unless {@link EDIT_MIN_REMAINING_MS} are left at its turn and after the version
@@ -132,7 +132,7 @@ export class EditSession {
   ): Promise<Result<EditOutcome<T>>> {
     // `execute` never rejects, so the queue cannot stall.
     const task = this.tail.then(() =>
-      this.execute(caller, edit, options.affected ?? (() => []), options.deadline ?? Infinity),
+      this.execute(caller, edit, options.affected ?? (() => ({})), options.deadline ?? Infinity),
     )
     this.tail = task
     return task
@@ -194,7 +194,7 @@ export class EditSession {
   private async execute<T>(
     caller: McpCaller,
     edit: () => Result<T> | Promise<Result<T>>,
-    affected: (value: T) => readonly string[],
+    affected: (value: T) => AffectedExpressions,
     deadline: number,
   ): Promise<Result<EditOutcome<T>>> {
     let watch: ExecutionWatch | undefined

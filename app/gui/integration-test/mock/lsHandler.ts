@@ -524,21 +524,28 @@ export function mockExecutionComplete() {
 }
 
 /**
- * Sends one `expressionUpdates` batch to every execution context, reporting a computed value (no
- * type) for each of the expressions, as the engine does when it has evaluated them. The mock never
- * evaluates by itself: a spec that waits for an edit's results calls this.
+ * Sends two `expressionUpdates` batches to every execution context, as the engine does when it
+ * computes the expressions again: `Pending` for each, then a computed value (no type). The mock
+ * never evaluates by itself: a spec that waits for an edit's results calls this. (An edit to a node
+ * that existed before it settles only on a `Pending` after the edit followed by a value.)
  */
 export function mockExpressionValues(expressionIds: readonly string[]) {
-  const updates = expressionIds.map((expressionId) => ({
-    expressionId,
-    type: [],
-    profilingInfo: [],
-    fromCache: false,
-    payload: { type: 'Value' },
-  }))
+  const updatesOf = (type: 'Pending' | 'Value') =>
+    expressionIds.map((expressionId) => ({
+      expressionId,
+      type: [],
+      profilingInfo: [],
+      fromCache: false,
+      payload: { type },
+    }))
   for (const [contextId, sendMessage] of executionContexts) {
     try {
-      sendMessage({ method: 'executionContext/expressionUpdates', params: { contextId, updates } })
+      for (const updates of [updatesOf('Pending'), updatesOf('Value')]) {
+        sendMessage({
+          method: 'executionContext/expressionUpdates',
+          params: { contextId, updates },
+        })
+      }
     } catch {
       executionContexts.delete(contextId)
     }

@@ -16,6 +16,7 @@ import {
 import {
   watchExecution,
   watchGraphUpdate,
+  type AffectedExpressions,
   type ExecutionWatch,
   type ExpressionUpdateLike,
   type GraphUpdateWatch,
@@ -50,7 +51,7 @@ function setup({
   graphUpdated: graphUpdatedImpl = async () => true,
   ...overrides
 }: Partial<EditSessionDeps> & {
-  settle?: (affected: readonly string[], timeoutMs: number) => Promise<boolean>
+  settle?: (affected: AffectedExpressions, timeoutMs: number) => Promise<boolean>
   graphUpdated?: (timeoutMs: number) => Promise<boolean>
 } = {}) {
   const log: string[] = []
@@ -373,15 +374,15 @@ describe('EditSession', () => {
     const t2 = setup({ settle: async () => false })
     const result = await t2.session.run(claude, () => Ok('x'))
     expect(result).toEqual(Ok({ value: 'x', settled: false }))
-    expect(t2.settle).toHaveBeenCalledWith([], EDIT_SETTLE_MS)
+    expect(t2.settle).toHaveBeenCalledWith({}, EDIT_SETTLE_MS)
   })
 
   test("the affected ids come from the edit's value, after the edit is applied", async () => {
     const result = await t.session.run(claude, () => Ok(['n1', 'n2']), {
-      affected: (ids) => ids,
+      affected: (ids) => ({ added: ids, changed: ['old'] }),
     })
     expect(result).toEqual(Ok({ value: ['n1', 'n2'], settled: true }))
-    expect(t.settle).toHaveBeenCalledWith(['n1', 'n2'], EDIT_SETTLE_MS)
+    expect(t.settle).toHaveBeenCalledWith({ added: ['n1', 'n2'], changed: ['old'] }, EDIT_SETTLE_MS)
     expect(t.watches[0]!.editApplied).toHaveBeenCalledTimes(1)
   })
 
@@ -586,14 +587,17 @@ describe('the deadline', () => {
         return true
       },
     })
-    await t.session.run(claude, () => Ok(['n']), { deadline: 50_000, affected: (ids) => ids })
-    expect(t.settle).toHaveBeenCalledWith(['n'], 50_000 - 30_000 - EDIT_ANSWER_MARGIN_MS)
+    await t.session.run(claude, () => Ok(['n']), {
+      deadline: 50_000,
+      affected: (ids) => ({ added: ids }),
+    })
+    expect(t.settle).toHaveBeenCalledWith({ added: ['n'] }, 50_000 - 30_000 - EDIT_ANSWER_MARGIN_MS)
   })
 
   test('with time to spare the settle wait is EDIT_SETTLE_MS', async () => {
     const t = setup({ now: () => 0 })
     await t.session.run(claude, () => Ok(1), { deadline: 120_000 })
-    expect(t.settle).toHaveBeenCalledWith([], EDIT_SETTLE_MS)
+    expect(t.settle).toHaveBeenCalledWith({}, EDIT_SETTLE_MS)
   })
 })
 
@@ -661,7 +665,7 @@ describe('watching the execution', () => {
       return { ...t, context }
     }
 
-    /** A run of an edit whose value is the ids it affects. */
+    /** A run of an edit whose value is the ids it adds. */
     function runAffecting(t: ReturnType<typeof realSetup>, ids: string[], during?: () => void) {
       const done = vi.fn()
       void t.session
@@ -671,7 +675,7 @@ describe('watching the execution', () => {
             during?.()
             return Ok(ids)
           },
-          { affected: (value) => value },
+          { affected: (value) => ({ added: value }) },
         )
         .then(done)
       return done
@@ -747,12 +751,32 @@ describe('watching the execution', () => {
       expect(t.context.count()).toBe(0)
     })
 
-    test('updates that arrive during the edit, for ids it returns, are remembered', async () => {
+    test('updates that arrive during the edit, before it is applied, do not count', async () => {
       const t = realSetup()
       const done = runAffecting(t, ['new'], () => t.context.report('Value', 'new'))
       await vi.advanceTimersByTimeAsync(0)
+      expect(done).not.toHaveBeenCalled()
+      t.context.report('Value', 'new')
+      await vi.advanceTimersByTimeAsync(0)
       expect(done).toHaveBeenCalledWith(Ok({ value: ['new'], settled: true }))
       expect(t.context.count()).toBe(0)
+    })
+
+    test('an edited node settles on a Pending and then a value after the edit, not on a stale value', async () => {
+      const t = realSetup()
+      const done = vi.fn()
+      void t.session
+        .run(claude, () => Ok('y'), { affected: (id) => ({ changed: [id] }) })
+        .then(done)
+      await vi.advanceTimersByTimeAsync(0)
+      // The run started for the previous edit reports `y`.
+      t.context.report('Value', 'y')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).not.toHaveBeenCalled()
+      t.context.report('Pending', 'y')
+      t.context.report('Value', 'y')
+      await vi.advanceTimersByTimeAsync(0)
+      expect(done).toHaveBeenCalledWith(Ok({ value: 'y', settled: true }))
     })
 
     test('the values may come before the graph update is awaited', async () => {
@@ -765,7 +789,9 @@ describe('watching the execution', () => {
         },
       })
       const done = vi.fn()
-      void t.session.run(claude, () => Ok(['n']), { affected: (ids) => ids }).then(done)
+      void t.session
+        .run(claude, () => Ok(['n']), { affected: (ids) => ({ added: ids }) })
+        .then(done)
       await vi.advanceTimersByTimeAsync(0)
       expect(done).toHaveBeenCalledWith(Ok({ value: ['n'], settled: true }))
       expect(context.count()).toBe(0)

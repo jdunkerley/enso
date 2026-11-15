@@ -375,3 +375,14 @@ test('collapse_nodes refuses a node removed before its turn, as an unknown id', 
   )
   expect(deps.collapseNodes).not.toHaveBeenCalled()
 })
+
+test("collapse_nodes waits for the new call node's value; add_function for nothing", async () => {
+  const { deps, db, session } = makeDeps()
+  const collapsed = valueOf(await collapseNodesTool(deps, { node_ids: [nodeNamed(db, 'a')] }))
+  await addFunction(deps, { source: 'double x = x * 2' })
+  const affected = session.run.mock.calls.map((call) => call[2]?.affected)
+  expect(affected[0]!({ name: 'f' as Identifier, callNode: collapsed.node.id })).toEqual({
+    added: [collapsed.node.id],
+  })
+  expect(affected[1]).toBeUndefined()
+})
