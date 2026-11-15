@@ -290,8 +290,7 @@ type Date
        first day of the week is Monday, and week 1 is the week containing the
        first Thursday of the year. Therefore it is important to properly specify
        the `locale` argument.
-    week_of_year : (Locale | Nothing) -> Integer
-    week_of_year self locale=Nothing =
+    week_of_year self (locale : Locale | Nothing = Nothing) -> Integer =
         ensure_in_epoch self <|
             if locale.is_nothing then Time_Utils.get_field_as_localdate self IsoFields.WEEK_OF_WEEK_BASED_YEAR else
                 Time_Utils.week_of_year_localdate self locale.java_locale
@@ -349,8 +348,7 @@ type Date
        ---
        Returns the date that is the first day of the month containing the
        specified date.
-    first_of_month : Integer
-    first_of_month self =
+    first_of_month self -> Date =
         Time_Utils.first_of_month self
 
     ## ---
@@ -359,8 +357,7 @@ type Date
        ---
        Returns the date that is the last day of the month containing the
        specified date.
-    end_of_month : Integer
-    end_of_month self =
+    end_of_month self -> Date =
         Time_Utils.end_of_month self
 
     ## ---
@@ -433,8 +430,7 @@ type Date
 
        ## Arguments
         - `end`: the end date of the interval to count workdays in.
-    until : Date -> Period
-    until self end =
+    until self (end : Date) -> Period =
         ensure_in_epoch self <| ensure_in_epoch end <|
             Period.between self end
 
@@ -451,8 +447,7 @@ type Date
         - `end`: the end date of the interval to count workdays in.
         - `include_end_date`: whether to include the end date in the count. By
           default the end date is not included in the interval.
-    days_until : Date -> Boolean -> Integer
-    days_until self end include_end_date=False =
+    days_until self (end : Date) (include_end_date : Boolean = False) -> Integer =
         if end < self then -(end.days_until self include_end_date) else
             ensure_in_epoch self <| ensure_in_epoch end <|
                 (Time_Utils.days_between self end) + if include_end_date then 1 else 0
@@ -544,8 +539,7 @@ type Date
        provide the `include_end_date` argument for that purpose. Setting it to
        `True` should make the result consistent with the `NETWORKDAYS` function
        in Excel and similar products.
-    work_days_until : Date -> Vector Date -> Boolean -> Integer
-    work_days_until self end holidays=[] include_end_date=False =
+    work_days_until self (end : Date) (holidays : Vector Date = []) (include_end_date : Boolean = False) -> Integer =
         ensure_in_epoch self <|
             if include_end_date then self.work_days_until (end + (Period.new days=1)) holidays include_end_date=False else
                 weekdays = week_days_between self end
@@ -715,8 +709,7 @@ type Date
        ```
              example_shift = Date.new 2020 2 3 . add_work_days 5
        ```
-    add_work_days : Integer -> Vector Date -> Date
-    add_work_days self days=1 holidays=[] =
+    add_work_days self (days : Integer = 1) (holidays : Vector Date = []) -> Date =
         ensure_in_epoch self <|
             self.internal_add_work_days days holidays
 
@@ -725,8 +718,7 @@ type Date
        ---
        ensure_in_epoch breaks tail call annotation and causes stack overflow.
        That is why `add_work_days` method is split into two methods.
-    internal_add_work_days : Integer -> Vector Date -> Date
-    internal_add_work_days self days=1 holidays=[] =
+    internal_add_work_days self (days : Integer = 1) (holidays : Vector Date = []) -> Date =
         case days >= 0 of
             True ->
                 full_weeks = days.div 5

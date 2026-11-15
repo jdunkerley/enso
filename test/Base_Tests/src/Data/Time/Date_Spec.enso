@@ -299,6 +299,22 @@ spec_with suite_builder name create_new_date parse_date pending=Nothing =
             create_new_date 2000 3 1 . days_until (create_new_date 2001 3 1) include_end_date=True . should_equal 366
             create_new_date 2001 3 1 . days_until (create_new_date 2000 3 1) include_end_date=True . should_equal -366
 
+        group_builder.specify "first_of_month and end_of_month are Dates" <|
+            d = Date.new 2020 2 15
+            d.first_of_month . should_equal (Date.new 2020 2 1)
+            d.end_of_month . should_equal (Date.new 2020 2 29)
+            Meta.type_of d.first_of_month . should_equal_type Date
+            Meta.type_of d.end_of_month . should_equal_type Date
+
+        group_builder.specify "date methods reject arguments of the wrong type" <|
+            d = Date.new 2020 1 1
+            Test.expect_panic_with (d.work_days_until 5) Type_Error
+            Test.expect_panic_with (d.until 5) Type_Error
+            Test.expect_panic_with (d.days_until 5) Type_Error
+            Test.expect_panic_with (d.add_work_days "a") Type_Error
+            Test.expect_panic_with (d.work_days_until (Date.new 2020 1 5) holidays=5) Type_Error
+            Test.expect_panic_with (d.week_of_year 5) Type_Error
+
         group_builder.specify "should allow to compute the number of working days until a later date" <|
             # 2000-2-1 is a Tuesday
             create_new_date 2000 2 1 . work_days_until (create_new_date 2000 2 1) . should_equal 0
