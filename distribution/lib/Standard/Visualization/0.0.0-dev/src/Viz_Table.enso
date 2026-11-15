@@ -143,9 +143,10 @@ type Viz_Table
     ## ---
        private: true
        ---
-       One column's cells from `start`, at most `count`, as a JSON array.
-    column_cells_json self (name : Text) (start : Integer) (count : Integer) -> Text =
-        self.require "view_pieces" <| self.source.column_cells_json name start count
+       The cells of column number `index` (from 0, in `column_names` order) from
+       `start`, at most `count`, as a JSON array.
+    column_cells_json self (index : Integer) (start : Integer) (count : Integer) -> Text =
+        self.require "view_pieces" <| self.source.column_cells_json index start count
 
     ## ---
        private: true

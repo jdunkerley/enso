@@ -57,9 +57,12 @@ type In_Memory_Viz_Source
         # `to_vector` wraps the Java array, it does not copy it.
         (TableVizOperation.viewColumnsJson self.java_columns display (Nothing == self.db_row_count)).to_vector
 
-    column_cells_json self (name : Text) (start : Integer) (count : Integer) -> Text =
-        column = self.table.at name
-        (column:In_Memory_Column).to_json_data start count
+    # The Java column, by position: `table.at name` builds an Enso column for
+    # each name and a lookup by name scans the columns, which together cost
+    # more than the cells of a one-row table (2500 columns: ~150 ms of a
+    # ~280 ms first view).
+    column_cells_json self (index : Integer) (start : Integer) (count : Integer) -> Text =
+        TableVizOperation.makeJSONForColumn (self.java_columns.at index) start count
 
     column_names self -> Vector Text = self.table.column_names
     column_kinds self -> Vector = Viz_Helpers.column_kinds self.table

@@ -17,7 +17,7 @@ type Pieces_Source
     row_count self = self.rows
     supported_operations self = ["view_pieces"]
     column_metrics_json self = ['"value_type":{"constructor":"Integer","display_text":"Integer (64 bits)"},"metrics":[],"multi_filter":false,"number_format":false', '"metrics":[]']
-    column_cells_json self name start count = '["' + name + '",' + start.to_text + ',' + count.to_text + ']'
+    column_cells_json self index start count = '["' + (self.column_names.at index) + '",' + start.to_text + ',' + count.to_text + ']'
 
 add_specs suite_builder =
     suite_builder.group "The table view writer" group_builder->

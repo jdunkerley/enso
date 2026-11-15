@@ -284,7 +284,7 @@ table_view (viz : Viz_Table) (view : Table_View) -> Text =
     columns = names.zip details (name-> fields-> '{"name":' + name.to_json + ',' + fields + '}')
     server = view.allow_server && (view.row_count * names.length > max_inline_cells)
     rows = viz.row_count
-    data = if server then Nothing else names.map (name-> viz.column_cells_json name 0 rows)
+    data = if server then Nothing else (0.up_to names.length).map index-> viz.column_cells_json index 0 rows
     grid_json columns data view.row_count (View_Link.Value view.index_action "row") view.version_hash server view.options
 
 ## ---
