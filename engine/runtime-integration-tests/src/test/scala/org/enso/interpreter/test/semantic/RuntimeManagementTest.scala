@@ -30,10 +30,18 @@ class RuntimeManagementTest extends InterpreterTest {
   private def failWithThreadDump(message: String): Nothing =
     fail(ThreadUtils.dumpAllStacktraces(message))
 
-  private def awaitFuture[T](f: java.util.concurrent.Future[T]): T =
+  /** Waits for `f` and returns how it ended: `Left` with the exception it
+    * failed with, or `Right` with its value. A timeout fails the test with a
+    * thread dump. It must not run inside `intercept`, which would replace the
+    * dump with its own message.
+    */
+  private def awaitOutcome[T](
+    f: java.util.concurrent.Future[T]
+  ): Either[java.util.concurrent.ExecutionException, T] =
     try {
-      f.get(waitTimeoutSeconds, TimeUnit.SECONDS)
+      Right(f.get(waitTimeoutSeconds, TimeUnit.SECONDS))
     } catch {
+      case ex: java.util.concurrent.ExecutionException => Left(ex)
       case _: java.util.concurrent.TimeoutException =>
         failWithThreadDump(
           s"A guest thread did not finish within $waitTimeoutSeconds seconds."
@@ -123,9 +131,9 @@ class RuntimeManagementTest extends InterpreterTest {
         awaitOutput("Start.", parallelism)
         langCtx.getThreadManager.interruptThreads()
         futures.foreach(f => {
-          val ex = intercept[java.util.concurrent.ExecutionException] {
-            val v = awaitFuture(f)
-            fail("Unexpected value: " + v)
+          val ex = awaitOutcome(f) match {
+            case Left(ex) => ex
+            case Right(v) => fail("Unexpected value: " + v)
           }
           ex.getMessage() shouldEqual "org.enso.interpreter.test.InterpreterException: org.enso.interpreter.runtime.control.ThreadInterruptedException"
         })
@@ -139,6 +147,70 @@ class RuntimeManagementTest extends InterpreterTest {
 
       runTest()
       runTest()
+    }
+
+    "Interrupt a thread that is running a finalizer" in {
+      // See Note [A Finalizer Delays Thread Interrupts] in ResourceManager.
+      val langCtx = interpreterContext
+        .ctx()
+        .getBindings(LanguageInfo.ID)
+        .invokeMember(MethodNames.TopScope.LEAK_CONTEXT)
+        .asHostObject[EnsoContext]()
+
+      val code =
+        """import Standard.Base.Runtime.Thread
+          |import Standard.Base.IO
+          |import Standard.Base.Nothing
+          |import Standard.Base.Data.Numbers.Number
+          |from Standard.Base.Runtime.Managed_Resource import Managed_Resource
+          |
+          |type Mock_File
+          |    Value i
+          |
+          |wait_for flag = if flag.get then Nothing else @Tail_Call wait_for flag
+          |
+          |finalizer flag _ =
+          |    IO.println "Finalizing."
+          |    wait_for flag
+          |    IO.println "Finalized."
+          |
+          |foo flag x =
+          |    if x == 0 then Managed_Resource.register (Mock_File.Value x) (finalizer flag) else Nothing
+          |    @Tail_Call foo flag x+1
+          |
+          |main flag =
+          |    Thread.with_interrupt_handler (foo flag 0) (IO.println "Interrupted.")
+          |""".stripMargin
+
+      consumeOut
+      val main = getMain(code)
+      // The finalizer runs on the guest thread and does not return until the
+      // interrupt has been requested, so the interrupt arrives while it runs.
+      val flag   = new java.util.concurrent.atomic.AtomicBoolean(false)
+      val future = langCtx.getThreadManager.submit(() => main.execute(flag))
+      val deadline =
+        System.nanoTime() + TimeUnit.SECONDS.toNanos(waitTimeoutSeconds)
+      while (!interpreterContext.output().toString.contains("Finalizing.")) {
+        if (System.nanoTime() > deadline) {
+          failWithThreadDump(
+            s"The finalizer did not start within $waitTimeoutSeconds seconds."
+          )
+        }
+        System.gc()
+        Thread.sleep(10)
+      }
+      langCtx.getThreadManager.interruptThreads()
+      flag.set(true)
+
+      val ex = awaitOutcome(future) match {
+        case Left(ex) => ex
+        case Right(v) => fail("Unexpected value: " + v)
+      }
+      ex.getMessage() shouldEqual "org.enso.interpreter.test.InterpreterException: org.enso.interpreter.runtime.control.ThreadInterruptedException"
+      consumeOut shouldEqual List("Finalizing.", "Finalized.", "Interrupted.")
+      interpreterContext
+        .err()
+        .toString should not include "Exception in finalizer"
     }
 
     /** Don't use this in production code, ever.

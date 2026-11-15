@@ -2,6 +2,7 @@ package org.enso.interpreter.runtime;
 
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.ThreadLocalAction;
+import com.oracle.truffle.api.TruffleSafepoint;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
 import java.lang.ref.PhantomReference;
@@ -470,13 +471,38 @@ public final class ResourceManager {
      */
     @CompilerDirectives.TruffleBoundary
     private void finalizeNow(EnsoContext context) {
+      // See Note [A Finalizer Delays Thread Interrupts]
+      var safepoint = TruffleSafepoint.getCurrent();
+      var sideEffectsWereAllowed = safepoint.setAllowSideEffects(false);
       try {
         clear();
         InteropLibrary.getUncached(finalizer).execute(finalizer, underlying);
       } catch (Exception e) {
         context.getErr().println("Exception in finalizer: " + e.getMessage());
+      } finally {
+        safepoint.setAllowSideEffects(sideEffectsWereAllowed);
       }
     }
+
+    /* Note [A Finalizer Delays Thread Interrupts]
+     * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     * A finalizer is guest code, so it polls safepoints, and Truffle performs any
+     * pending thread-local action at those polls, including inside another action
+     * such as the one `ProcessItems` uses to run finalizers on a guest thread.
+     * `ThreadManager.interruptThreads` interrupts a thread by throwing
+     * `ThreadInterruptedException` from such an action. Thrown inside a finalizer,
+     * it unwound the finalizer and was caught by the `catch (Exception e)` above:
+     * the finalizer was abandoned half way, the interrupt was printed as
+     * "Exception in finalizer: null" and lost, and the interrupted thread carried on
+     * as if nothing had happened, so an endless computation was never stopped
+     * (#741, `RuntimeManagementTest`'s finalizer case).
+     *
+     * The interrupt action is side-effecting, so delaying side-effecting actions
+     * for the duration of the finalizer makes Truffle keep it pending: the
+     * finalizer runs to completion and the thread is interrupted at its next poll
+     * after it. Cancelling the context does not use a side-effecting action, so a
+     * finalizer that never ends can still be cancelled.
+     */
 
     private void park() {
       parkedCount.incrementAndGet();
