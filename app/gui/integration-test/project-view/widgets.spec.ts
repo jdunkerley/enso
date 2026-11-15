@@ -1200,3 +1200,117 @@ test.describe('Date widget', () => {
     await expect(node.locator('.WidgetDate .chip')).toHaveText('Pick a date')
   })
 })
+
+test.describe('Time_Of_Day widget', () => {
+  const TIME_TYPE = 'Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day'
+  test.afterEach(restoreMockMainFile)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile(
+          'from Standard.Base import Data\n\nmain =\n    since = Data.seconds_since\n',
+        ),
+    },
+  })
+
+  /** A `Data.seconds_since` call whose only argument, `time`, is a `Time_Of_Day` with no `@` annotation. */
+  async function timeNode(editorPage: EditorPageActions, page: Page) {
+    await editorPage
+      .mockSuggestion({
+        type: 'type',
+        module: 'Standard.Base.Data.Time.Time_Of_Day',
+        name: 'Time_Of_Day',
+        params: [],
+        reexport: 'Standard.Base.Main',
+      })
+      .mockSuggestion({
+        type: 'method',
+        module: 'Standard.Base.Data',
+        name: 'seconds_since',
+        arguments: [
+          {
+            name: 'time',
+            reprType: TIME_TYPE,
+            isSuspended: false,
+            hasDefault: false,
+          },
+        ],
+        selfType: 'Standard.Base.Data',
+        returnType: 'Standard.Base.Data.Numbers.Integer',
+        isStatic: true,
+        annotations: [],
+      })
+    await mockMethodCallInfo(page, 'since', {
+      methodPointer: {
+        module: 'Standard.Base.Data',
+        definedOnType: 'Standard.Base.Data',
+        name: 'seconds_since',
+      },
+      notAppliedArguments: [0],
+    })
+    const node = locate.graphNodeByBinding(page, 'since')
+    const chip = node.locator('.WidgetTimeOfDay .chip')
+    await expect(chip).toHaveCount(1)
+    return { node, chip }
+  }
+
+  async function moduleCode(page: Page): Promise<string> {
+    await page.keyboard.press('ControlOrMeta+`')
+    await expect(page.locator('.CodeEditor')).toBeVisible()
+    return page.evaluate(() => (window as any).__codeEditorApi.textContent())
+  }
+
+  test('a Time_Of_Day-typed argument shows the chip, and Now writes the short method', async ({
+    editorPage,
+    page,
+  }) => {
+    const { node, chip } = await timeNode(editorPage, page)
+    await expect(chip).toHaveText('Pick a time')
+    await expect(node.locator('.WidgetNumber, .WidgetText')).toHaveCount(0)
+    await chip.click()
+    const menu = page.locator('.TimeOfDayMenu')
+    await expect(menu).toBeVisible()
+    await expect(menu.locator('.item')).toHaveText(['Now'])
+    await menu.getByRole('button', { name: 'Now' }).click()
+    await expect(menu).toBeHidden()
+    await expect(chip).toHaveText('Now')
+    const code = await moduleCode(page)
+    expect(code).toContain('since = Data.seconds_since Time_Of_Day.now')
+    expect(code).toContain('from Standard.Base import Time_Of_Day')
+  })
+
+  test('typing a time into the field and pressing Enter writes Time_Of_Day.new', async ({
+    editorPage,
+    page,
+  }) => {
+    const { chip } = await timeNode(editorPage, page)
+    await chip.click()
+    const menu = page.locator('.TimeOfDayMenu')
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('spinbutton').first()).toBeFocused()
+    await page.keyboard.type('1430')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    await expect(chip).toHaveText('14:30')
+    expect(await moduleCode(page)).toMatch(
+      /since = Data\.seconds_since \(Time_Of_Day\.new 14 30\)\n/,
+    )
+    await page.keyboard.press('ControlOrMeta+`')
+    // Reopened, the field shows the written time; Escape closes without a change.
+    await chip.click()
+    await expect(menu.getByRole('spinbutton').first()).toHaveText('14')
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    await expect(chip).toHaveText('14:30')
+  })
+
+  test('one choice is one undo step', async ({ editorPage, page }) => {
+    const { node, chip } = await timeNode(editorPage, page)
+    await chip.click()
+    await page.locator('.TimeOfDayMenu').getByRole('button', { name: 'Now' }).click()
+    await expect(chip).toHaveText('Now')
+    await page.keyboard.press('ControlOrMeta+Z')
+    await expect(node.locator('.WidgetTimeOfDay .chip')).toHaveText('Pick a time')
+  })
+})
