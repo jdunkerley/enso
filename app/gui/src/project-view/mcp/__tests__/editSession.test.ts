@@ -20,6 +20,7 @@ function setup(overrides: Partial<EditSessionDeps> = {}) {
   const log: string[] = []
   let live = false
   let foreign: (() => void) | undefined
+  let failNextSetTimeout = false
   const timers: { f: () => void; ms: number; handle: number; cleared: boolean }[] = []
   const unsubscribe = vi.fn()
   const release = vi.fn(() => {
@@ -41,6 +42,10 @@ function setup(overrides: Partial<EditSessionDeps> = {}) {
     afterGraphUpdate: vi.fn(async () => {}),
     executionSettled: vi.fn(async () => true),
     setTimeout: (f, ms) => {
+      if (failNextSetTimeout) {
+        failNextSetTimeout = false
+        throw new Error('no timers today')
+      }
       const handle = timers.length + 1
       timers.push({ f, ms, handle, cleared: false })
       return handle
@@ -64,6 +69,9 @@ function setup(overrides: Partial<EditSessionDeps> = {}) {
       live = v
     },
     foreign: () => foreign?.(),
+    failNextSetTimeout: () => {
+      failNextSetTimeout = true
+    },
     /** Fires the single armed timer. */
     fire: () => {
       const armed = pending()
@@ -125,33 +133,88 @@ describe('EditSession', () => {
     expect(t.deps.holdUndoStep).toHaveBeenCalledTimes(2)
   })
 
-  test('a long settle wait does not let the step expire mid-run', async () => {
+  test('no idle timer runs during a run; the idle period starts when it ends', async () => {
     let finishSettle: (settled: boolean) => void = () => {}
     const t2 = setup({
       executionSettled: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
     })
     const running = t2.session.run(claude, () => Ok(1))
     await vi.waitFor(() => expect(t2.deps.afterGraphUpdate).toHaveBeenCalled())
-    // The timer armed when the edit started is live, and has not fired.
-    expect(t2.pending()).toHaveLength(1)
+    expect(t2.pending()).toHaveLength(0)
     expect(t2.release).not.toHaveBeenCalled()
     finishSettle(true)
     await running
-    // Re-armed when the run finished: the old one was cleared, a fresh one is live.
     expect(t2.pending()).toHaveLength(1)
+    expect(t2.pending()[0]!.ms).toBe(EDIT_STEP_IDLE_MS)
+    // A second run by the same caller before the timer fires joins the step.
+    const second = t2.session.run(claude, () => Ok(2))
+    await vi.waitFor(() => expect(t2.pending()).toHaveLength(0))
+    await vi.waitFor(() => expect(t2.deps.afterGraphUpdate).toHaveBeenCalledTimes(2))
+    await Promise.resolve()
+    finishSettle(true)
+    await second
+    expect(t2.deps.saveVersion).toHaveBeenCalledTimes(1)
+    expect(t2.deps.holdUndoStep).toHaveBeenCalledTimes(1)
   })
 
-  test('the idle timer is re-armed when an edit starts', async () => {
+  test('a starting run cancels the pending timer of the previous one', async () => {
     await t.session.run(claude, okEdit(t.log))
     const firstTimer = t.pending()[0]!
-    let duringEdit: unknown[] = []
+    let duringEdit = -1
     await t.session.run(claude, () => {
-      duringEdit = t.pending()
+      duringEdit = t.pending().length
       return Ok(1)
     })
     expect(firstTimer.cleared).toBe(true)
-    expect(duringEdit).toHaveLength(1)
-    expect(duringEdit[0]).not.toBe(firstTimer)
+    expect(duringEdit).toBe(0)
+    expect(t.pending()).toHaveLength(1)
+  })
+
+  test('a foreign edit during the settle wait releases the step; the run still succeeds', async () => {
+    let finishSettle: (settled: boolean) => void = () => {}
+    const t2 = setup({
+      executionSettled: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
+    })
+    const running = t2.session.run(claude, () => Ok(1))
+    await vi.waitFor(() => expect(t2.deps.afterGraphUpdate).toHaveBeenCalled())
+    t2.foreign()
+    expect(t2.release).toHaveBeenCalledTimes(1)
+    finishSettle(true)
+    expect((await running).ok).toBe(true)
+    expect(t2.pending()).toHaveLength(0)
+    const next = t2.session.run(claude, () => Ok(2))
+    await vi.waitFor(() => expect(t2.deps.holdUndoStep).toHaveBeenCalledTimes(2))
+    finishSettle(true)
+    await next
+    expect(t2.deps.saveVersion).toHaveBeenCalledTimes(2)
+  })
+
+  test('dispose with one run in progress and one queued', async () => {
+    let finishSettle: (settled: boolean) => void = () => {}
+    const t2 = setup({
+      executionSettled: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
+    })
+    const first = t2.session.run(claude, () => Ok(1))
+    const secondEdit = vi.fn(() => Ok(2))
+    const second = t2.session.run(claude, secondEdit)
+    await vi.waitFor(() => expect(t2.deps.afterGraphUpdate).toHaveBeenCalled())
+    t2.session.dispose()
+    finishSettle(true)
+    expect((await first).ok).toBe(true)
+    expect(errorOf(await second)).toBe('The project is no longer open.')
+    expect(secondEdit).not.toHaveBeenCalled()
+    expect(t2.release).toHaveBeenCalledTimes(1)
+    expect(t2.pending()).toHaveLength(0)
+  })
+
+  test('a throwing setTimeout does not stop a following run', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    t.failNextSetTimeout()
+    expect((await t.session.run(claude, okEdit(t.log))).ok).toBe(true)
+    expect(error).toHaveBeenCalledTimes(1)
+    error.mockRestore()
+    expect((await t.session.run(claude, okEdit(t.log))).ok).toBe(true)
+    expect(t.pending()).toHaveLength(1)
   })
 
   test('a different caller releases the open step and starts its own', async () => {

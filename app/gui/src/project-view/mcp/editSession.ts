@@ -71,6 +71,10 @@ export class EditSession {
    * step (saving a version before the first edit of a step); runs `edit` marked as the session's
    * own; waits for the graph update and for execution to settle.
    * `edit` returns Err to refuse without changing anything.
+   *
+   * `edit` should apply its module changes synchronously: a user edit that lands while an async
+   * `edit` is awaiting is treated as the session's own. The step's idle period is measured from
+   * the end of a run; no timer is pending while a run is in progress.
    */
   run<T>(
     caller: McpCaller,
@@ -120,6 +124,8 @@ export class EditSession {
   ): Promise<Result<EditOutcome<T>>> {
     try {
       if (this.disposed) return Err(PROJECT_CLOSED_ERROR)
+      // The idle period is measured from the end of a run, so none is pending while one runs.
+      this.clearIdleTimer()
       if (this.deps.isLive()) return Err(LIVE_EDIT_ERROR)
       const key = callerKey(caller)
       if (this.release == null || this.stepCaller !== key) {
@@ -133,7 +139,6 @@ export class EditSession {
         this.release = this.deps.holdUndoStep()
         this.stepCaller = key
       }
-      this.armIdleTimer()
       let result: Result<T>
       this.inEdit = true
       try {
@@ -148,7 +153,12 @@ export class EditSession {
     } catch (error) {
       return Err(errorText(error))
     } finally {
-      this.armIdleTimer()
+      try {
+        this.armIdleTimer()
+      } catch (error) {
+        // A failing timer must not reject the queue's tail.
+        console.error('Cannot arm the edit step idle timer', error)
+      }
     }
   }
 }
