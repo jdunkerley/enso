@@ -6,6 +6,8 @@ import nodeVitestConfig from '../vitest.node.base'
 export default mergeConfig(
   nodeVitestConfig,
   defineConfig({
+    // Inlining the MCP SDK (below) makes Vite warn that its sourcemaps point at missing sources.
+    logLevel: 'error',
     // Load `.md` imports as their text, as the esbuild config's `'.md': 'text'` loader does.
     plugins: [
       {
@@ -22,6 +24,10 @@ export default mergeConfig(
     test: {
       // Increase the default test timeout to accommodate longer-running tests.
       testTimeout: 120_000,
+      // The MCP SDK's client reaches `eventsource-parser`, whose `source` export is a `.ts` file
+      // that the shared `source` condition selects; Node cannot run it from `node_modules`, so
+      // Vite transforms both.
+      server: { deps: { inline: [/eventsource-parser/, /@modelcontextprotocol\/sdk/] } },
       include: ['tests/headless/**/*.test.ts'],
       silent: 'passed-only',
     },
