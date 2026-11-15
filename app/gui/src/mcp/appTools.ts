@@ -326,8 +326,13 @@ export async function openProject(
   const resolved = resolveAllowedPath(path, allowedRoots)
   if (resolved == null) return outsideError(deps)
   const root = deps.rootDirectory()
+  // A root is a folder of the Drive, not a project in it; and the parent is listed only when it is
+  // itself in the Drive, so that nothing outside the Drive is ever listed.
+  const isRoot = allowedRoots.some((allowedRoot) => samePath(allowedRoot, resolved, root))
   const parent = parentPath(resolved, root)
-  if (parent == null) return { ok: false, error: NO_PROJECT_AT_PATH_ERROR }
+  if (isRoot || parent == null || resolveAllowedPath(parent, allowedRoots) == null) {
+    return { ok: false, error: NO_PROJECT_AT_PATH_ERROR }
+  }
   let siblings: readonly DirectoryEntry[]
   try {
     siblings = await deps.listDirectory(parent)

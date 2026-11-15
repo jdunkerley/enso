@@ -90,9 +90,11 @@ export function appTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
       name: 'close_project',
       title: 'Close the project on screen',
       description:
-        'Close the project on screen, as when the user closes its tab, without asking the ' +
-        'user about version history; the project saves a version on close when its history ' +
-        'is on. It does not delete the project. Returns `{ closed, page, project }`: the ' +
+        'Close the project on screen, as when the user closes its tab. Edits already made ' +
+        'are kept: the project is saved to disk as it is edited, and a save still pending is ' +
+        'written as it closes. When the project keeps versions, closing also saves a version ' +
+        '("Saved on close"); otherwise none is saved, and the user is not asked whether to ' +
+        'start keeping them. It does not delete the project. Returns `{ closed, page, project }`: the ' +
         'project closed and what is on screen now (another tab, or the dashboard). An error ' +
         'when no project is on screen.',
       inputSchema: {},

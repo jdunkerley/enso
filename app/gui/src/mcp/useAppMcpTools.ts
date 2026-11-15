@@ -21,11 +21,7 @@ import type { FileSystemEntry } from 'enso-common/src/services/ProjectManager/ty
 import { getDirectoryAndName, getFileName } from 'enso-common/src/utilities/file'
 import { onScopeDispose } from 'vue'
 import { appToolHandlers, type AppState, type AppToolDeps, type DirectoryEntry } from './appTools'
-import {
-  hasProjectTools,
-  registerMcpAppToolHandlers,
-  whenProjectToolsActivated,
-} from './toolDispatcher'
+import { registerMcpAppToolHandlers, whenProjectToolsActive } from './toolDispatcher'
 
 /**
  * How long `open_project` and `create_project` wait for the project's tools to answer: inside
@@ -96,10 +92,13 @@ export function useAppMcpTools(): void {
 
   async function openProject(path: string, name: string): Promise<boolean> {
     const id = newProjectId(Path(path))
-    const tab = container.currentTab
-    if (tab?.type === 'project' && tab.id === id && hasProjectTools()) return true
-    // Waiting starts before the tab opens, so that the editor's registration cannot come first.
-    const ready = whenProjectToolsActivated(OPEN_WAIT_MS)
+    if (!container.canOpenProjectLocally(BackendType.local)) {
+      throw new Error('The project could not be opened: the local Drive is not available.')
+    }
+    // Waiting starts before the tab opens, so that the editor's registration cannot come first. It
+    // resolves only when this project's own tools answer: at once when they already do, never on
+    // another project's editor coming on screen.
+    const ready = whenProjectToolsActive(id, OPEN_WAIT_MS)
     container.openProjectLocally(
       {
         id,
@@ -109,6 +108,9 @@ export function useAppMcpTools(): void {
       },
       BackendType.local,
     )
+    // Set synchronously: `openProjectLocally` (with a local backend, checked above) calls
+    // `openProjectTab`, whose `openedProjects.openProject` adds the project before its first await.
+    // So an open failure reaches the caller through `waitForProcess`, not as the wait's timeout.
     const project = openedProjects.get(id)
     if (project == null) return ready
     const failed = openedProjects.waitForProcess(project).then(() => {

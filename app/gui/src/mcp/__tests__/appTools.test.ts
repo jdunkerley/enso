@@ -328,6 +328,18 @@ describe('open_project', () => {
     expect(deps.openProject).not.toHaveBeenCalled()
   })
 
+  test('refuses a root itself without listing anything outside the Drive', async () => {
+    const deps = makeDeps()
+    for (const path of [ROOT, `${ROOT}/`, '/mnt/saved', '/mnt/saved/./']) {
+      expect(await run(deps, 'open_project', { path })).toEqual({
+        ok: false,
+        error: NO_PROJECT_AT_PATH_ERROR,
+      })
+    }
+    expect(deps.listDirectory).not.toHaveBeenCalled()
+    expect(deps.openProject).not.toHaveBeenCalled()
+  })
+
   test('a project still opening at the timeout says to look again', async () => {
     const deps = makeDeps({ openProject: async () => false })
     expect(await run(deps, 'open_project', { path: `${ROOT}/Beta` })).toEqual({

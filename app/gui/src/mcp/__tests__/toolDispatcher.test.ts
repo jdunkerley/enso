@@ -2,12 +2,13 @@
 import type { McpToolCallReply, McpToolCallRequest } from 'enso-common/src/mcp'
 import { afterEach, expect, test, vi } from 'vitest'
 import {
-  hasProjectTools,
+  activeProjectToolsId,
   NO_PROJECT_ERROR,
+  pendingProjectToolsWaits,
   registerMcpAppToolHandlers,
   registerMcpToolHandlers,
   startMcpToolDispatcher,
-  whenProjectToolsActivated,
+  whenProjectToolsActive,
   type McpToolHandler,
 } from '../toolDispatcher'
 
@@ -48,15 +49,15 @@ function start() {
   return fake
 }
 
-function register(handlers: Record<string, McpToolHandler>) {
-  const registration = registerMcpToolHandlers(handlers)
+function register(handlers: Record<string, McpToolHandler>, projectId = 'P') {
+  const registration = registerMcpToolHandlers(handlers, () => projectId)
   cleanups.push(registration.remove)
   return registration
 }
 
 /** A registration whose `get_graph` answers `name`. */
 function project(name: string) {
-  return register({ get_graph: async () => ({ ok: true, value: name }) })
+  return register({ get_graph: async () => ({ ok: true, value: name }) }, name)
 }
 
 let nextId = 0
@@ -171,13 +172,13 @@ test('App tools answer whichever project is on screen or hidden', async () => {
   expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR })
 })
 
-test('App tools do not count as project tools being shown', () => {
+test('App tools do not count as a project being shown', () => {
   app({ get_app_state: async () => ({ ok: true, value: 'app' }) })
-  expect(hasProjectTools()).toBe(false)
+  expect(activeProjectToolsId()).toBeUndefined()
   const a = project('A')
-  expect(hasProjectTools()).toBe(true)
+  expect(activeProjectToolsId()).toBe('A')
   a.remove()
-  expect(hasProjectTools()).toBe(false)
+  expect(activeProjectToolsId()).toBeUndefined()
 })
 
 test('Unregistering the app tools stops them answering', async () => {
@@ -189,43 +190,117 @@ test('Unregistering the app tools stops them answering', async () => {
   )
 })
 
-test('whenProjectToolsActivated resolves true at the next project registration', async () => {
-  const activated = whenProjectToolsActivated(10_000)
-  project('A')
-  await expect(activated).resolves.toBe(true)
-})
+// === Waiting for a project's tools ===
 
-test('whenProjectToolsActivated resolves true when a removed project is activated again', async () => {
+test('activeProjectToolsId is the project whose handlers answer', () => {
   const a = project('A')
-  a.remove()
-  const activated = whenProjectToolsActivated(10_000)
+  const b = project('B')
+  expect(activeProjectToolsId()).toBe('B')
   a.activate()
-  await expect(activated).resolves.toBe(true)
+  expect(activeProjectToolsId()).toBe('A')
+  a.remove()
+  expect(activeProjectToolsId()).toBe('B')
+  b.remove()
+  expect(activeProjectToolsId()).toBeUndefined()
 })
 
-test('whenProjectToolsActivated waits for an activation after the call, not one before it', async () => {
+test('Waiting for B does not resolve when A activates, and resolves when B does', async () => {
+  let settled: boolean | undefined
+  void whenProjectToolsActive('B', 10_000).then((value) => (settled = value))
+  project('A')
+  await Promise.resolve()
+  expect(settled).toBeUndefined()
+  const b = project('B')
+  await vi.waitFor(() => expect(settled).toBe(true))
+  b.remove()
+})
+
+test('Waiting resolves when a removed project is activated again', async () => {
+  project('A')
+  const b = project('B')
+  b.remove()
+  const active = whenProjectToolsActive('B', 10_000)
+  b.activate()
+  await expect(active).resolves.toBe(true)
+})
+
+test('Waiting resolves when removing another project leaves this one answering', async () => {
+  project('B')
+  const a = project('A')
+  const active = whenProjectToolsActive('B', 10_000)
+  a.remove()
+  await expect(active).resolves.toBe(true)
+})
+
+test('Concurrent waits for different projects each resolve on their own project', async () => {
+  const settled: Record<string, boolean> = {}
+  void whenProjectToolsActive('A', 10_000).then((value) => (settled.A = value))
+  void whenProjectToolsActive('B', 10_000).then((value) => (settled.B = value))
+  project('A')
+  await vi.waitFor(() => expect(settled).toEqual({ A: true }))
+  project('B')
+  await vi.waitFor(() => expect(settled).toEqual({ A: true, B: true }))
+  expect(pendingProjectToolsWaits()).toBe(0)
+})
+
+test('The fast path: a wait for the project already answering resolves at once', async () => {
+  project('B')
+  await expect(whenProjectToolsActive('B', 10_000)).resolves.toBe(true)
+  expect(pendingProjectToolsWaits()).toBe(0)
+})
+
+test('The fast path is false when A answers and B is asked for', async () => {
   vi.useFakeTimers()
   try {
     project('A')
-    const activated = whenProjectToolsActivated(1_000)
+    expect(activeProjectToolsId()).not.toBe('B')
+    const active = whenProjectToolsActive('B', 1_000)
     let settled: boolean | undefined
-    void activated.then((value) => (settled = value))
-    await vi.advanceTimersByTimeAsync(999)
+    void active.then((value) => (settled = value))
+    await vi.advanceTimersByTimeAsync(0)
     expect(settled).toBeUndefined()
-    await vi.advanceTimersByTimeAsync(1)
+    await vi.advanceTimersByTimeAsync(1_000)
     expect(settled).toBe(false)
   } finally {
     vi.useRealTimers()
   }
 })
 
-test('whenProjectToolsActivated is not resolved by the app tools registering', async () => {
+test('A wait times out to false and leaves no listener behind', async () => {
   vi.useFakeTimers()
   try {
-    const activated = whenProjectToolsActivated(1_000)
+    const active = whenProjectToolsActive('B', 1_000)
+    expect(pendingProjectToolsWaits()).toBe(1)
+    let settled: boolean | undefined
+    void active.then((value) => (settled = value))
+    await vi.advanceTimersByTimeAsync(999)
+    expect(settled).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(settled).toBe(false)
+    expect(pendingProjectToolsWaits()).toBe(0)
+    // A later activation of B finds nothing waiting.
+    project('B')
+    expect(settled).toBe(false)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('A deactivated project never answers, and is not waited into answering', async () => {
+  const { call } = start()
+  const b = project('B')
+  b.remove()
+  expect(activeProjectToolsId()).toBeUndefined()
+  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR })
+})
+
+test('Waiting is not resolved by the app tools registering', async () => {
+  vi.useFakeTimers()
+  try {
+    const active = whenProjectToolsActive('B', 1_000)
     app({ get_app_state: async () => ({ ok: true, value: 'app' }) })
     await vi.advanceTimersByTimeAsync(1_000)
-    await expect(activated).resolves.toBe(false)
+    await expect(active).resolves.toBe(false)
   } finally {
     vi.useRealTimers()
   }

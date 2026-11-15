@@ -373,7 +373,9 @@ export function useProjectMcpTools(
       return openMethod(viewDeps(), node_id != null ? { node_id } : {})
     },
   }
-  const registration = registerMcpToolHandlers(handlers)
+  // The project id is read when asked for, not kept: an editor stays with one project (its tab is
+  // keyed by the project's id), so this is only belt and braces.
+  const registration = registerMcpToolHandlers(handlers, () => currentProject.id.value)
   onActivated(() => {
     active = true
     registration.activate()

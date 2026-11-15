@@ -28,35 +28,45 @@ export interface McpToolRegistration {
   readonly remove: () => void
 }
 
+/** One project's handlers, and the id of the project they are for. */
+interface ProjectRegistration {
+  readonly handlers: Readonly<Record<string, McpToolHandler>>
+  readonly projectId: () => string
+}
+
 /** Registrations, least recent first: the last one with a handler for a tool answers it. */
-const registrations: Readonly<Record<string, McpToolHandler>>[] = []
+const registrations: ProjectRegistration[] = []
 /**
  * The app tools' handlers, by tool name. Kept apart from {@link registrations}, so that they never
- * count as a project being shown ({@link hasProjectTools}, {@link whenProjectToolsActivated}).
+ * count as a project being shown ({@link activeProjectToolsId}).
  */
 const appHandlers = new Map<string, McpToolHandler>()
-/** Called, then forgotten, at the next activation of a project's handlers. */
-const activationListeners = new Set<() => void>()
+/** The waits of {@link whenProjectToolsActive}, each for one project's handlers to answer. */
+const projectWaits = new Set<{ readonly projectId: string; readonly resolve: () => void }>()
 
 /**
- * Registers handlers by tool name and makes them the ones that answer. Each open project registers
- * its own set; the most recently registered or activated set answers, so the project on screen
- * answers when it activates its set and removes it on deactivation.
+ * Registers one project's handlers by tool name and makes them the ones that answer. Each open
+ * project registers its own set; the most recently registered or activated set answers, so the
+ * project on screen answers when it activates its set and removes it on deactivation.
+ * `projectId` is read whenever it is asked for ({@link activeProjectToolsId}).
  */
 export function registerMcpToolHandlers(
   toRegister: Readonly<Record<string, McpToolHandler>>,
+  projectId: () => string,
 ): McpToolRegistration {
-  const entry = { ...toRegister }
+  const entry: ProjectRegistration = { handlers: { ...toRegister }, projectId }
   const remove = () => {
     const index = registrations.indexOf(entry)
-    if (index >= 0) registrations.splice(index, 1)
+    if (index >= 0) {
+      registrations.splice(index, 1)
+      settleProjectWaits()
+    }
   }
   const activate = () => {
-    remove()
+    const index = registrations.indexOf(entry)
+    if (index >= 0) registrations.splice(index, 1)
     registrations.push(entry)
-    const listeners = [...activationListeners]
-    activationListeners.clear()
-    for (const listener of listeners) listener()
+    settleProjectWaits()
   }
   activate()
   return { activate, remove }
@@ -80,33 +90,55 @@ export function registerMcpAppToolHandlers(
   }
 }
 
-/** Whether a project's handlers are registered: a project is on screen. */
-export function hasProjectTools(): boolean {
-  return registrations.length > 0
+/**
+ * The id of the project whose handlers answer the project tools: the project on screen. `undefined`
+ * when none does (the dashboard, settings, or a project still opening).
+ */
+export function activeProjectToolsId(): string | undefined {
+  return registrations.at(-1)?.projectId()
+}
+
+/** Resolves the waits for the project that now answers. */
+function settleProjectWaits() {
+  const active = activeProjectToolsId()
+  if (active == null) return
+  for (const wait of [...projectWaits]) {
+    if (wait.projectId === active) wait.resolve()
+  }
 }
 
 /**
- * Resolves `true` at the next registration or activation of a project's handlers after this call
- * (a project's graph editor coming on screen), or `false` after `timeoutMs` without one.
+ * Resolves `true` once the project tools answer for `projectId` (at once if they do already), or
+ * `false` after `timeoutMs`. Another project's handlers activating does not resolve it.
  */
-export function whenProjectToolsActivated(timeoutMs: number): Promise<boolean> {
+export function whenProjectToolsActive(projectId: string, timeoutMs: number): Promise<boolean> {
+  if (activeProjectToolsId() === projectId) return Promise.resolve(true)
   return new Promise((resolve) => {
-    const listener = () => {
-      clearTimeout(timer)
-      resolve(true)
+    const wait = {
+      projectId,
+      resolve: () => {
+        projectWaits.delete(wait)
+        clearTimeout(timer)
+        resolve(true)
+      },
     }
     const timer = setTimeout(() => {
-      activationListeners.delete(listener)
+      projectWaits.delete(wait)
       resolve(false)
     }, timeoutMs)
-    activationListeners.add(listener)
+    projectWaits.add(wait)
   })
+}
+
+/** How many {@link whenProjectToolsActive} waits are pending. For tests. */
+export function pendingProjectToolsWaits(): number {
+  return projectWaits.size
 }
 
 function handlerFor(tool: string): McpToolHandler | undefined {
   for (let i = registrations.length - 1; i >= 0; i--) {
-    const registration = registrations[i]!
-    if (Object.hasOwn(registration, tool)) return registration[tool]
+    const handlers = registrations[i]!.handlers
+    if (Object.hasOwn(handlers, tool)) return handlers[tool]
   }
   return appHandlers.get(tool)
 }

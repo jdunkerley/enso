@@ -17,11 +17,14 @@ what its handler returns and refuses.
     consulted only when no project set has the tool. Their names are not project
     tool names, so they cannot answer in a project's stead, and they do not
     count as a project being shown.
-  - `hasProjectTools()` (a project set is registered) and
-    `whenProjectToolsActivated(timeoutMs)` (resolves `true` at the next project
-    registration or activation after the call, `false` at the timeout) are how
-    `open_project` and `create_project` know the project's graph is ready: the
-    agent's next `get_graph` answers from then on.
+  - Each project registration carries its project's id (a getter;
+    `useProjectMcpTools` passes `currentProject.id`). `activeProjectToolsId()`
+    is the id whose handlers answer. `whenProjectToolsActive(id, timeoutMs)`
+    resolves `true` once that project's handlers answer (at once if they do),
+    never on another project's activation, and `false` at the timeout, leaving
+    no wait behind. `open_project` and `create_project` wait on it with the
+    opened project's id: from then on the agent's next `get_graph` reads that
+    project, not another tab that happened to activate meanwhile.
 - `appTools.ts` — `get_app_state`, `list_projects`, `list_files`,
   `create_project`, `open_project`, `close_project`: pure functions over
   `AppToolDeps`, tested with fakes. Names are cut at `NAME_CHARS` (300), lists
@@ -37,6 +40,9 @@ what its handler returns and refuses.
   case-insensitively (a fuller folding equates names NTFS keeps apart), and
   device paths, `:` in a segment and segments ending in a dot or space are
   refused. Symbolic links are out of scope.
+- `open_project` refuses a path equal to a root, or whose parent is not itself
+  in the Drive, without listing anything: only folders inside the Drive are ever
+  listed.
 - `useAppMcpTools.ts` — builds `AppToolDeps` at each call from the local backend
   (`listDirectoryEntries`, which keeps file sizes; the `createProject`
   mutation), the tabs (`useContainerData`) and `useOpenedProjects`. Opening

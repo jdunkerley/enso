@@ -14,7 +14,8 @@ too).
 
 - **The project on screen answers.** Every open project's `GraphEditor.vue`
   stays mounted (the tabs in `MiddlePanel.vue` are under `<KeepAlive>`), so each
-  registers its own handlers. `useProjectMcpTools.ts` registers them on setup,
+  registers its own handlers, with its project's id (which the app tools'
+  `open_project` waits on). `useProjectMcpTools.ts` registers them on setup,
   puts them first on `onActivated`, and removes them on `onDeactivated` and on
   scope dispose. The dispatcher answers with the most recently registered or
   activated set, falling back to the next most recent when one is removed. While
