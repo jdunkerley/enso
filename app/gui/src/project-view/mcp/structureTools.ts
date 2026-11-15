@@ -20,6 +20,7 @@ import {
   settledResult,
   toolError,
   UNSETTLED_NOTE,
+  writeOnNodeError,
   type EditToolDeps,
 } from './editTools'
 import { findNode, jsonResult, type GraphToolDeps } from './graphTools'
@@ -45,10 +46,12 @@ export interface StructureToolDeps
 
 /**
  * Collapses the nodes into a new function, replaced in the graph by one node calling it. Refused,
- * before anything changes, when `name` is not a lowercase identifier, or an id is unknown or names
- * the method's argument or output; and, at the call's turn, when the nodes cannot be collapsed
- * (more than one of them is used by other nodes). Answers with the function's name and the new
- * node.
+ * before anything changes, when `name` is not a lowercase identifier, or an id is unknown, names
+ * the method's argument or output, or is a node the user turned Write on for ({@link
+ * writeOnNodeError}: its whole statement, prefix included, would move into the function, and the
+ * call node left in its place would run it again with no Write shown); and, at the call's turn,
+ * when a node gained Write while the call waited, or the nodes cannot be collapsed (more than one
+ * of them is used by other nodes). Answers with the function's name and the new node.
  */
 export async function collapseNodesTool(
   deps: StructureToolDeps,
@@ -70,6 +73,7 @@ export async function collapseNodesTool(
       const role = node.type === 'input' ? 'an argument' : 'the output'
       return toolError(`Node ${nodeId} is ${role} of the method and cannot be collapsed.`)
     }
+    if (node.prefixes.enableRecording != null) return toolError(writeOnNodeError(nodeId))
     if (!ids.includes(id)) ids.push(id)
   }
   const method = methodOnScreen(deps)
@@ -78,6 +82,11 @@ export async function collapseNodesTool(
     () => {
       const unchanged = checkAtTurn(deps, method, ids)
       if (!unchanged.ok) return unchanged
+      // The user may have turned Write on for one of them while the edit waited.
+      const writeOn = ids.find(
+        (id) => deps.db.nodeIdToNode.get(id)?.prefixes.enableRecording != null,
+      )
+      if (writeOn != null) return Err(writeOnNodeError(writeOn))
       return deps.collapseNodes(ids, name)
     },
     {

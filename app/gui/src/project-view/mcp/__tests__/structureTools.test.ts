@@ -12,7 +12,12 @@ import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { EditSession, LIVE_EDIT_ERROR, type EditOutcome, type EditRunOptions } from '../editSession'
-import { METHOD_CHANGED_ERROR, MISSING_NODES_NOTE, UNSETTLED_NOTE } from '../editTools'
+import {
+  METHOD_CHANGED_ERROR,
+  MISSING_NODES_NOTE,
+  UNSETTLED_NOTE,
+  writeOnNodeError,
+} from '../editTools'
 import {
   addFunction,
   collapseNodesTool,
@@ -26,6 +31,7 @@ import {
   ENABLING_FUNCTION,
   HARMLESS_EXPRESSIONS,
   REFLECTION_EXPRESSIONS,
+  WRITE_PREFIX,
 } from './outputEnablingCode'
 
 const CODE = `## A helper.
@@ -61,18 +67,18 @@ function fakeSession(settled = true) {
   }
 }
 
-function makeDeps(overrides: Partial<StructureToolDeps> = {}) {
+function makeDeps(overrides: Partial<StructureToolDeps> = {}, code = CODE) {
   const projectNames = mockProjectNameStore()
   const db = GraphDb.Mock(undefined, undefined, projectNames)
-  const { root, getSpan } = Ast.parseUpdatingIdMap(CODE)
+  const { root, getSpan } = Ast.parseUpdatingIdMap(code)
   const func = Ast.findModuleMethod(root, 'main')?.statement
   assert(func instanceof Ast.MutableFunctionDef)
   db.updateExternalIds(root)
   db.updateNodes(func, { watchEffect })
-  db.updateBindings(func, { text: CODE, getSpan })
+  db.updateBindings(func, { text: code, getSpan })
   // `add_function` edits a transient copy of the module, committed when the edit succeeds.
   const edit = Ast.MutableModule.Transient()
-  const topLevel = Ast.parseModule(CODE, edit)
+  const topLevel = Ast.parseModule(code, edit)
   edit.setRoot(topLevel)
   const session = fakeSession()
   const deps: StructureToolDeps = {
@@ -163,6 +169,36 @@ test('collapse_nodes refuses an unknown node and the output node before the sess
     'cannot be collapsed',
   )
   expect(session.run).not.toHaveBeenCalled()
+})
+
+const WRITE_ON_CODE = `main =
+    a = 1 + 2
+    w = ${WRITE_PREFIX}a.to_text.write "x.txt"
+    w`
+
+test('collapse_nodes refuses a node the user turned Write on for, before the session', async () => {
+  const { deps, db, session } = makeDeps({}, WRITE_ON_CODE)
+  const a = nodeNamed(db, 'a')
+  const w = nodeNamed(db, 'w')
+  expect(db.nodeIdToNode.get(w)!.prefixes.enableRecording).toBeDefined()
+  expect(toolError(await collapseNodesTool(deps, { node_ids: [a, w] }))).toBe(writeOnNodeError(w))
+  expect(session.run).not.toHaveBeenCalled()
+  expect(deps.collapseNodes).not.toHaveBeenCalled()
+})
+
+test('collapse_nodes refuses a node the user turned Write on for while the edit waited', async () => {
+  const fixture: { db?: GraphDb; id?: NodeId } = {}
+  const { deps, db } = makeDeps({
+    session: sessionWith(() => {
+      const node = fixture.db!.nodeIdToNode.get(fixture.id!)!
+      fixture.db!.nodeIdToNode.set(fixture.id!, { ...node, prefixes: { enableRecording: [] } })
+    }),
+  })
+  fixture.db = db
+  const a = nodeNamed(db, 'a')
+  fixture.id = a
+  expect(toolError(await collapseNodesTool(deps, { node_ids: [a] }))).toBe(writeOnNodeError(a))
+  expect(deps.collapseNodes).not.toHaveBeenCalled()
 })
 
 test('collapse_nodes reports why the nodes cannot be collapsed', async () => {
