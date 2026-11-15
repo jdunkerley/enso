@@ -88,10 +88,12 @@ not as a toast. Under the copy buttons a Claude Desktop block shows the
 `ClaudeDesktopSetup` state read with `claudeDesktopStatus()` on mount and after
 each server status change: not installed (one line), not set up (a Set up
 button), set up, out of date (an Update button), or unreadable (the reason, and
-the manual route through the Claude Desktop copy button). The button asks first,
-then `setUpClaudeDesktop()` has main edit Claude Desktop's configuration file.
-The block always says Claude Desktop needs Node.js and that its Add custom
-connector screen cannot work. Tests: `__tests__/McpSettingsSection.test.ts` and
+the manual route through the Claude Desktop copy button). The button asks first
+(`McpClaudeDesktopConfirmModal.vue`: a non-destructive `AlertDialog` titled like
+the button; `ConfirmDeleteModal` is styled as destructive), then
+`setUpClaudeDesktop()` has main edit Claude Desktop's configuration file. The
+block always says Claude Desktop needs Node.js and that its Add custom connector
+screen cannot work. Tests: `__tests__/McpSettingsSection.test.ts` and
 `integration-test/dashboard/mcpSettings.spec.ts`.
 
 ## Engine logs

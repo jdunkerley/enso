@@ -57,10 +57,18 @@ function isMissing(error: unknown): boolean {
 }
 
 type Parsed =
-  | { readonly ok: true; readonly text: string | null; readonly config: Record<string, unknown> }
+  | {
+      readonly ok: true
+      /** The file's text, or null when it is absent or empty (nothing to back up). */
+      readonly text: string | null
+      readonly config: Record<string, unknown>
+    }
   | { readonly ok: false; readonly reason: string }
 
-/** The file's text and parsed content; an absent file is an empty configuration. */
+/**
+ * The file's text and parsed content. An absent, zero-byte or whitespace-only file is an empty
+ * configuration; a UTF-8 byte order mark is ignored.
+ */
 async function parseConfig(file: string): Promise<Parsed> {
   let text: string
   try {
@@ -69,6 +77,8 @@ async function parseConfig(file: string): Promise<Parsed> {
     if (isMissing(e)) return { ok: true, text: null, config: {} }
     return { ok: false, reason: `The configuration file could not be read: ${messageOf(e)}` }
   }
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1)
+  if (text.trim() === '') return { ok: true, text: null, config: {} }
   let config: unknown
   try {
     config = JSON.parse(text)
@@ -96,25 +106,32 @@ async function directoryExists(directory: string): Promise<boolean> {
   }
 }
 
-/** Where Claude Desktop's configuration stands against this address and token. */
+/**
+ * Where Claude Desktop's configuration stands against this address and token. With no `token`
+ * (none stored yet), an existing `enso` entry is out of date.
+ */
 export async function readClaudeDesktopSetup(
   directory: string | undefined,
   url: string,
-  token: string,
+  token: string | null,
 ): Promise<ClaudeDesktopSetup> {
   if (directory == null || !(await directoryExists(directory))) return { state: 'notInstalled' }
   const parsed = await parseConfig(path.join(directory, CONFIG_FILE))
   if (!parsed.ok) return { state: 'unreadable', reason: parsed.reason }
   const servers = parsed.config.mcpServers
   if (!isRecord(servers) || !(CLAUDE_DESKTOP_SERVER_NAME in servers)) return { state: 'notSetUp' }
-  return isDeepStrictEqual(servers[CLAUDE_DESKTOP_SERVER_NAME], claudeDesktopEntry(url, token)) ?
+  return (
+      token != null &&
+        isDeepStrictEqual(servers[CLAUDE_DESKTOP_SERVER_NAME], claudeDesktopEntry(url, token))
+    ) ?
       { state: 'setUp' }
     : { state: 'outOfDate' }
 }
 
 /**
- * Adds or replaces only `mcpServers.enso`, keeping every other key and server. Saves the old file
- * beside it first. Refuses (`unreadable`) a file it cannot parse. If the final rename fails the
+ * Adds or replaces only `mcpServers.enso`, keeping every other key and server. When it adds the
+ * entry to a file that has content, it saves that file beside it first (an older backup is
+ * overwritten); replacing an existing entry leaves any backup alone. Refuses (`unreadable`) a file it cannot parse. If the final rename fails the
  * original is untouched, the temporary file is removed and the error is thrown.
  */
 export async function writeClaudeDesktopSetup(
@@ -130,7 +147,10 @@ export async function writeClaudeDesktopSetup(
     ...parsed.config,
     mcpServers: { ...servers, [CLAUDE_DESKTOP_SERVER_NAME]: claudeDesktopEntry(url, token) },
   }
-  if (parsed.text != null) await fs.writeFile(`${file}${BACKUP_SUFFIX}`, parsed.text, 'utf8')
+  // The backup is the user's file from before Enso first touched it: made only when adding the
+  // entry, never when replacing one.
+  if (parsed.text != null && !(CLAUDE_DESKTOP_SERVER_NAME in servers))
+    await fs.writeFile(`${file}${BACKUP_SUFFIX}`, parsed.text, 'utf8')
   const temporary = `${file}.tmp`
   try {
     await fs.writeFile(temporary, `${JSON.stringify(updated, null, 2)}\n`, 'utf8')

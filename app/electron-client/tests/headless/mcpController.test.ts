@@ -367,6 +367,70 @@ describe('McpController', () => {
       expect(await c.claudeDesktopStatus()).toEqual({ state: 'setUp' })
     })
 
+    test('status with no directory does not touch the keychain', async () => {
+      claudeDir = undefined
+      const c = controller()
+      expect(await c.claudeDesktopStatus()).toEqual({ state: 'notInstalled' })
+      expect(keyring.accounts).toEqual([])
+    })
+
+    test('status with a missing folder does not touch the keychain', async () => {
+      await fs.rm(claudeDir!, { recursive: true })
+      const c = controller()
+      expect(await c.claudeDesktopStatus()).toEqual({ state: 'notInstalled' })
+      expect(keyring.accounts).toEqual([])
+    })
+
+    test('status with no stored token creates none: notSetUp, or outOfDate for an entry', async () => {
+      const c = controller()
+      expect(await c.claudeDesktopStatus()).toEqual({ state: 'notSetUp' })
+      await fs.writeFile(
+        path.join(claudeDir!, 'claude_desktop_config.json'),
+        JSON.stringify({ mcpServers: { enso: { command: 'x' } } }),
+      )
+      expect(await c.claudeDesktopStatus()).toEqual({ state: 'outOfDate' })
+      expect(keyring.items.size).toBe(0)
+    })
+
+    test('a keychain that throws gives unreadable, not a rejection', async () => {
+      keyring.getPassword = () => {
+        throw new Error('no keychain')
+      }
+      const c = controller()
+      expect(await c.claudeDesktopStatus()).toEqual({
+        state: 'unreadable',
+        reason: 'The system keychain is not available.',
+      })
+    })
+
+    test('the first set-up backs the file up; an update leaves that backup alone', async () => {
+      const file = path.join(claudeDir!, 'claude_desktop_config.json')
+      await fs.writeFile(file, '{"theme":"dark"}')
+      const c = controller()
+      await c.setUpClaudeDesktop()
+      expect(await fs.readFile(`${file}.enso-backup`, 'utf8')).toBe('{"theme":"dark"}')
+      await c.setPort(40000)
+      await c.replaceToken()
+      await c.setUpClaudeDesktop()
+      expect(await fs.readFile(`${file}.enso-backup`, 'utf8')).toBe('{"theme":"dark"}')
+    })
+
+    test.each(['replaceToken', 'setPort'] as const)(
+      '%s leaves a hand-edited entry byte-identical and creates no entry',
+      async (operation) => {
+        const file = path.join(claudeDir!, 'claude_desktop_config.json')
+        const c = controller()
+        await c.setUpClaudeDesktop()
+        const edited = `{ "mcpServers": { "enso": { "command": "mine" } } }\n`
+        await fs.writeFile(file, edited)
+        await (operation === 'setPort' ? c.setPort(40000) : c.replaceToken())
+        expect(await fs.readFile(file, 'utf8')).toBe(edited)
+        await fs.rm(file)
+        await (operation === 'setPort' ? c.setPort(40001) : c.replaceToken())
+        expect(await fs.readdir(claudeDir!)).toEqual([])
+      },
+    )
+
     test('replaceToken with no entry writes nothing', async () => {
       const c = controller()
       await c.replaceToken()

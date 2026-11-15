@@ -38,17 +38,27 @@ default. No tool changes the execution environment, settings or secrets.
   start and stop, the status, and the setup text each client pastes.
 - `claudeDesktop.ts` — setting up Claude Desktop: reads and edits its
   `claude_desktop_config.json` (folder from `claudeDesktopConfigDirectory`:
-  `%APPDATA%Claude`, or `~/Library/Application Support/Claude` on macOS; none
+  `%APPDATA%\Claude`, or `~/Library/Application Support/Claude` on macOS; none
   elsewhere). It adds only `mcpServers.enso`, the `mcp-remote` bridge with the
   token in `env` (Claude Desktop on Windows mishandles arguments with spaces).
   It never writes a file it cannot parse or whose top level or `mcpServers` is
-  not an object; it saves `claude_desktop_config.json.enso-backup` first, writes
-  a temporary file beside it and renames, and removes the temporary file if the
-  rename fails. The controller (`claudeDesktopStatus`, `setUpClaudeDesktop`)
-  runs these on its queue, rewrites an outdated entry after `replaceToken` and
-  `setPort`, and writes nothing on `setEnabled`. The token never reaches the
-  renderer: the IPC calls return only a `ClaudeDesktopSetup`. Tests inject a
-  temporary folder; never point one at the real Claude folder.
+  not an object. A zero-byte or whitespace-only file counts as empty and a UTF-8
+  BOM is ignored; comments or a trailing comma stay unreadable. It saves
+  `claude_desktop_config.json.enso-backup` only on first set-up (the file has
+  content and no `enso` entry), so the backup stays the user's file from before
+  Enso touched it; replacing an entry never writes or changes a backup. It
+  writes a temporary file beside the file and renames, removing the temporary
+  file if the rename fails. The controller (`claudeDesktopStatus`,
+  `setUpClaudeDesktop`) runs these on its queue. Status checks the folder first
+  and never creates a token: with none stored an `enso` entry is `outOfDate`; a
+  keychain read failure gives `unreadable`. Only `setUpClaudeDesktop` (a click)
+  creates the token. `replaceToken` and `setPort` read the status with the OLD
+  address and token first and rewrite the entry afterwards only if it was
+  `setUp` (Enso's own): a hand-edited entry is left alone and a missing one is
+  never created; a rewrite failure is logged. Nothing is written on
+  `setEnabled`. The token never reaches the renderer: the IPC calls return only
+  a `ClaudeDesktopSetup`. Tests inject a temporary folder; never point one at
+  the real Claude folder.
 - `clientConfigs.ts` — that setup text per client (`claude mcp add` command,
   Claude Desktop `mcp-remote` JSON, Codex TOML, Copilot JSON for VS Code and the
   CLI, a generic `mcpServers` block), each checked against the vendor's

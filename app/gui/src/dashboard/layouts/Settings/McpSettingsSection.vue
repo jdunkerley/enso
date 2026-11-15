@@ -35,6 +35,7 @@ import {
 } from 'enso-common/src/mcp'
 import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { computed, onMounted, onScopeDispose, ref } from 'vue'
+import McpClaudeDesktopConfirmModal from './McpClaudeDesktopConfirmModal.vue'
 
 const MIN_PORT = 1024
 const MAX_PORT = 65535
@@ -147,14 +148,12 @@ const setUpClaudeDesktop = useMutation({
 })
 
 async function askSetUpClaudeDesktop() {
-  const answer = await modals.ask(ConfirmDeleteModal, {
-    alert: getText('mcpClaudeDesktopConfirm'),
-    actionText: getText('mcpClaudeDesktopActionText'),
-    actionButtonLabel: getText(
-      claudeDesktop.value?.state === 'outOfDate' ?
-        'mcpClaudeDesktopUpdateButton'
-      : 'mcpClaudeDesktopSetUpButton',
-    ),
+  const updating = claudeDesktop.value?.state === 'outOfDate'
+  const label = getText(updating ? 'mcpClaudeDesktopUpdateButton' : 'mcpClaudeDesktopSetUpButton')
+  const answer = await modals.ask(McpClaudeDesktopConfirmModal, {
+    title: label,
+    message: getText(updating ? 'mcpClaudeDesktopUpdateConfirm' : 'mcpClaudeDesktopConfirm'),
+    confirm: label,
   })
   if (answer === 'confirm') setUpClaudeDesktop.mutate()
 }

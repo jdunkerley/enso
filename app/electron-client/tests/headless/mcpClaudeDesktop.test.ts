@@ -164,6 +164,40 @@ describe('Claude Desktop config file', () => {
         expect(await fs.readdir(dir)).toEqual([FILE])
       },
     )
+    test('an update leaves the first backup alone, and a file with content but no entry gets one', async () => {
+      await fs.writeFile(file, '{"a":1}')
+      await writeClaudeDesktopSetup(dir, URL, TOKEN)
+      await writeClaudeDesktopSetup(dir, URL, 'other-token')
+      expect(await fs.readFile(`${file}.enso-backup`, 'utf8')).toBe('{"a":1}')
+    })
+    test('a replaced entry creates no backup', async () => {
+      await fs.writeFile(file, JSON.stringify({ mcpServers: { enso: { command: 'old' } } }))
+      await writeClaudeDesktopSetup(dir, URL, TOKEN)
+      expect(await fs.readdir(dir)).toEqual([FILE])
+    })
+    test.each(['', '  \n\t', '﻿'])(
+      'a %j file is an empty configuration: no backup',
+      async (bytes) => {
+        await fs.writeFile(file, bytes)
+        expect(await writeClaudeDesktopSetup(dir, URL, TOKEN)).toEqual({ state: 'setUp' })
+        const text = await fs.readFile(file, 'utf8')
+        expect(JSON.parse(text)).toEqual({ mcpServers: { enso: claudeDesktopEntry(URL, TOKEN) } })
+        expect(await fs.readdir(dir)).toEqual([FILE])
+      },
+    )
+    test('a BOM before the JSON is read and not written back', async () => {
+      await fs.writeFile(file, '﻿{"a":1}')
+      expect(await writeClaudeDesktopSetup(dir, URL, TOKEN)).toEqual({ state: 'setUp' })
+      const text = await fs.readFile(file, 'utf8')
+      expect(text.startsWith('{')).toBe(true)
+      expect(JSON.parse(text)).toMatchObject({ a: 1 })
+    })
+    test('comments or a trailing comma stay unreadable', async () => {
+      await fs.writeFile(file, '{ "a": 1, }')
+      expect((await writeClaudeDesktopSetup(dir, URL, TOKEN)).state).toBe('unreadable')
+      await fs.writeFile(file, '{ // c\n "a": 1 }')
+      expect((await writeClaudeDesktopSetup(dir, URL, TOKEN)).state).toBe('unreadable')
+    })
     test('a failed rename leaves the original and removes the temporary file', async () => {
       await fs.writeFile(file, '{"a":1}')
       vi.spyOn(fs, 'rename').mockRejectedValue(new Error('rename refused'))

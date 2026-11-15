@@ -371,6 +371,19 @@ describe('McpSettingsSection', () => {
       expect(fake.show).toHaveBeenCalledWith(getText('mcpClaudeDesktopDone'), { type: 'success' })
     })
 
+    test('the Update dialog says it replaces the entry, and is titled Update', async () => {
+      await withState({ state: 'outOfDate' })
+      const user = userEvent.setup()
+      await user.click(button(getText('mcpClaudeDesktopUpdateButton')))
+      await vi.waitFor(dialog)
+      expect(dialog().textContent).toContain(getText('mcpClaudeDesktopUpdateConfirm'))
+      expect(dialog().textContent).not.toContain(getText('mcpClaudeDesktopConfirm'))
+      expect(dialog().textContent).not.toContain(getText('areYouSure'))
+      await user.click(button(getText('mcpClaudeDesktopUpdateButton'), dialog()))
+      await flushPromises()
+      expect(fake.setUpClaudeDesktop).toHaveBeenCalledOnce()
+    })
+
     test('cancelling the dialog calls nothing', async () => {
       await withState({ state: 'notSetUp' })
       const user = userEvent.setup()
