@@ -418,7 +418,8 @@ function createServer() {
       )
 
       try {
-        const response = await config.executeExpression(expressionFunction)
+        // No deadline (Note [Row Pages Wait For The Engine]).
+        const response = await config.executeExpression(expressionFunction, null)
         // See the note on the `getFilterValues` call above: `null` means "subdoc not synced yet"
         // and `Err` means the evaluation failed. Neither has a `value`, and reading one produced
         // the misleading "Cannot read properties of undefined (reading 'row_count')" that masked
@@ -442,6 +443,18 @@ function createServer() {
     },
   }
 }
+
+/*
+ * Note [Row Pages Wait For The Engine]
+ * ====================================
+ * A row page is requested with no timeout. The engine answers requests in turn, so right after a
+ * project opens, or while a node evaluates, the first page can take far longer than the usual 5 s
+ * (#777). A page that timed out was settled as an empty one, and AG Grid showed "No Rows To Show"
+ * over a table with rows until the table changed. Asking again would not help either: the engine
+ * still evaluates a request whose slot the GUI removed (a one-shot `inFrame` request is never
+ * detached), so each retry would add work to an engine that is already behind. Until the page
+ * comes, AG Grid shows its rows as loading.
+ */
 
 interface Response {
   rows: Record<string, any>[]

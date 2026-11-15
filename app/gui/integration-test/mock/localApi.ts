@@ -44,6 +44,7 @@ import {
   mockDataHandler,
   mockLSHandler,
   mockYdocProvider,
+  pendingVisualizationRequests,
   replaceMockServerSession,
   resetMockYdocServer,
   updateVisualizationData,
@@ -1251,6 +1252,7 @@ data: ${JSON.stringify(data)}
     addEngineLogEvent,
     addEngineLogLine,
     updateVisualization,
+    pendingVisualizationRequests,
     /**
      * Start a new ydoc server session: the GUI makes its project stores again, and its module docs
      * come back from the mocked sources, without the edits the old session received.

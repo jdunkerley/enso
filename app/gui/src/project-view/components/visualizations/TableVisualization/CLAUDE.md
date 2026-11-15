@@ -16,7 +16,10 @@ The table visualisation (`../TableVisualization.vue`) and its helpers.
   link's tooltip and the node it creates. A change to the wire format must leave
   the snapshot unchanged (regenerate the goldens, not the snapshot); a change to
   the snapshot is a visible change.
-- `TableVizDataSourceUtils.ts`: the server-side requests (sort, filter, page).
+- `TableVizDataSourceUtils.ts`: the server-side requests (sort, filter, page). A
+  row page is requested with no timeout (`executeExpression(…, null)`): a busy
+  engine answers late, and a page settled empty showed "No Rows To Show" (#777,
+  Note [Row Pages Wait For The Engine] in `../TableVisualization.vue`).
 - `tableVizFilterSetUpUtils.ts`, `tableVizFilterUtils.ts`,
   `CommunitySetFilter.ts`: the filters. `TableVisualisationTooltip.ts`: the
   header tooltip with the data quality metrics. `tableVizToolbar.ts`: the
