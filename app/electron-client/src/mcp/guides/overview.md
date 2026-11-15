@@ -46,10 +46,12 @@ No tool changes the execution environment, settings or secrets;
    before building on a node.
 5. Group a run of nodes that does one job with `collapse_nodes`, and explain a
    node with `set_node_comment`.
-6. `select_nodes` and `open_method` move what the user sees; the other edits do
-   not. `set_visualization` shows or hides a node's visualization.
-7. Edits are refused while the project is in Live mode: ask the user to switch
-   it back to Design.
+6. `select_nodes` and `open_method` are the only project tools that change the
+   selection or move the view; the other edits do not. `set_visualization` shows
+   or hides a node's visualization.
+7. Every tool that changes the project is refused while it is in Live mode: ask
+   the user to switch it back to Design. Reading, selecting and navigating
+   (`select_nodes`, `open_method`) still work there.
 8. Never assume a change reached disk. The edits are in the IDE; the user clicks
    Write to save them.
 

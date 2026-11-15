@@ -37,8 +37,9 @@ export function appTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
       name: 'list_projects',
       title: 'List projects',
       description:
-        'List the Enso projects on disk, in `directory` (the IDE project directory without ' +
-        'it), each with its name and path. Pass a `path` from the result to `open_project`.',
+        "List the Enso projects on disk in `directory` (it defaults to the Drive's root " +
+        'folder). Each result has `name`, `path` and `open`. Pass a `path` from the result ' +
+        'to `open_project`.',
       inputSchema: { directory: z.string().max(PATH_CHARS).optional() },
       run: forward('list_projects'),
     },
@@ -46,7 +47,7 @@ export function appTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
       name: 'list_files',
       title: 'List files',
       description:
-        'List the files and folders in `directory` (the IDE project directory without it), ' +
+        "List the files and folders in `directory` (it defaults to the Drive's root folder), " +
         'to find a project or a data file to name in a node.',
       inputSchema: { directory: z.string().max(PATH_CHARS).optional() },
       run: forward('list_files'),
@@ -55,8 +56,8 @@ export function appTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
       name: 'create_project',
       title: 'Create a project',
       description:
-        'Create a new empty project called `name` (in `directory`, the IDE project ' +
-        'directory without it) and open it. Returns when its graph is ready, so the ' +
+        'Create a new empty project called `name` in `directory` (it defaults to the ' +
+        "Drive's root folder) and open it. Returns when its graph is ready, so the " +
         'project tools work on it at once.',
       inputSchema: {
         name: z.string().min(1).max(NAME_CHARS),
@@ -68,7 +69,7 @@ export function appTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
       name: 'open_project',
       title: 'Open a project',
       description:
-        'Open the project at `path` (from `list_projects`). Returns when its graph is ' +
+        "Open the project at `path`, a project's `path` from `list_projects`. Returns when its graph is " +
         'ready, so the project tools work on it at once.',
       inputSchema: { path: z.string().max(PATH_CHARS) },
       run: forward('open_project', OPEN_TOOL_TIMEOUT_MS),

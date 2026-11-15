@@ -144,7 +144,9 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'lines (`from Standard.Table import Table`) added to the module if missing. Returns ' +
         'each new node with its id, name, expression and type and any error or panic, and ' +
         '`settled`, whether the engine finished evaluating them: check the types and errors, ' +
-        'and fix a wrong node with `edit_node`. Add a few nodes at a time.' +
+        'and fix a wrong node with `edit_node`. Add a few nodes at a time. The call is ' +
+        'all-or-nothing: if any statement or import does not parse, a name is already ' +
+        'taken, or `after_node` is unknown, nothing is added and the error says which.' +
         EDIT_RULES,
       inputSchema: {
         statements: z.array(z.string().min(1).max(STATEMENT_CHARS)).min(1).max(50),
@@ -200,10 +202,11 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       title: 'Add a function',
       description:
         '`source` is the source of one top-level function definition (a name, its ' +
-        'arguments, `=`, and an indented body), added to the module. Call it from a node ' +
+        'arguments, `=`, and an indented body, for example `double x =\n    x * 2`), added ' +
+        'to the module. A name already defined in the module is refused. Call it from a node ' +
         'as `Main.<name> args` (the form the IDE uses for the functions it generates), ' +
-        'for example with `add_nodes`. Returns the function added, and any error in its ' +
-        'definition.' +
+        "for example with `add_nodes`. The result gives the function's name, and any error " +
+        'in its definition.' +
         EDIT_RULES,
       inputSchema: { source: z.string().min(1).max(100_000) },
       run: forward('add_function', EDIT_TOOL_TIMEOUT_MS),
@@ -234,8 +237,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       description:
         'Select the nodes in `node_ids` (from `get_graph`) in the graph editor, to point ' +
         'the user at them; an empty list clears the selection. This and `open_method` are ' +
-        'the only tools that move what the user sees: the edit tools leave the selection ' +
-        'and the viewport alone. Returns the selection.',
+        'the only project tools that change the selection or move the view: the edit tools ' +
+        'leave both alone. Returns the selection. Works in Live mode too.',
       inputSchema: { node_ids: z.array(nodeId()).max(200) },
       run: forward('select_nodes'),
     },
@@ -245,7 +248,7 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       description:
         'Open the function that the node `node_id` (from `get_graph`) calls, in the graph ' +
         'editor, so the next `get_graph` reads its graph. Without `node_id` go back to the ' +
-        'method you came from. Returns the method now open.',
+        'method you came from. Returns the method now open. Works in Live mode too.',
       inputSchema: { node_id: nodeId().optional() },
       run: forward('open_method'),
     },
