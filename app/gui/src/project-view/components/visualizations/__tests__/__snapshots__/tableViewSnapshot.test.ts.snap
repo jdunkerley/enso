@@ -1,0 +1,3273 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Distinct values of each pinned response > ssrm_distinct 1`] = `
+[
+  "a",
+  "b",
+  "c",
+]
+`;
+
+exports[`Distinct values of each pinned response > ssrm_distinct_nothing 1`] = `null`;
+
+exports[`Link cells and created nodes of each pinned server page > ssrm_rows 1`] = `
+[
+  {
+    "colDef": {
+      "cellRenderer": "[function]",
+      "cellStyle": {
+        "border-right": "1px solid #C0C0C0",
+        "padding-left": "13px",
+      },
+      "field": "#",
+      "filter": false,
+      "headerClass": "indexColumnHeader",
+      "headerName": "#",
+      "onCellDoubleClicked": "[function]",
+      "tooltipValueGetter": "[function]",
+    },
+    "createdNodes": [
+      "operator1.get_row 0",
+      "operator1.get_row 1",
+      "operator1.get_row 2",
+    ],
+    "linkCells": [
+      "<div class='link'> 0 </div>",
+      "<div class='link'> 1 </div>",
+      "<div class='link'> 2 </div>",
+    ],
+    "linkTooltip": "Double click to view this row in a separate component",
+  },
+]
+`;
+
+exports[`Link cells and created nodes of each pinned server page > ssrm_rows_column 1`] = `
+[
+  {
+    "colDef": {
+      "cellRenderer": "[function]",
+      "cellStyle": {
+        "border-right": "1px solid #C0C0C0",
+        "padding-left": "13px",
+      },
+      "field": "#",
+      "filter": false,
+      "headerClass": "indexColumnHeader",
+      "headerName": "#",
+      "onCellDoubleClicked": "[function]",
+      "tooltipValueGetter": "[function]",
+    },
+    "createdNodes": [
+      "operator1.at 1",
+      "operator1.at 2",
+    ],
+    "linkCells": [
+      "<div class='link'> 1 </div>",
+      "<div class='link'> 2 </div>",
+    ],
+    "linkTooltip": "Double click to view this row in a separate component",
+  },
+]
+`;
+
+exports[`Link cells and created nodes of each pinned server page > ssrm_rows_filtered 1`] = `
+[
+  {
+    "colDef": {
+      "cellRenderer": "[function]",
+      "cellStyle": {
+        "border-right": "1px solid #C0C0C0",
+        "padding-left": "13px",
+      },
+      "field": "#",
+      "filter": false,
+      "headerClass": "indexColumnHeader",
+      "headerName": "#",
+      "onCellDoubleClicked": "[function]",
+      "tooltipValueGetter": "[function]",
+    },
+    "createdNodes": [
+      "operator1.get_row 1",
+      "operator1.get_row 2",
+    ],
+    "linkCells": [
+      "<div class='link'> 1 </div>",
+      "<div class='link'> 2 </div>",
+    ],
+    "linkTooltip": "Double click to view this row in a separate component",
+  },
+]
+`;
+
+exports[`Link cells and created nodes of each pinned server page > ssrm_rows_sorted 1`] = `
+[
+  {
+    "colDef": {
+      "cellRenderer": "[function]",
+      "cellStyle": {
+        "border-right": "1px solid #C0C0C0",
+        "padding-left": "13px",
+      },
+      "field": "#",
+      "filter": false,
+      "headerClass": "indexColumnHeader",
+      "headerName": "#",
+      "onCellDoubleClicked": "[function]",
+      "tooltipValueGetter": "[function]",
+    },
+    "createdNodes": [
+      "operator1.get_row 2",
+      "operator1.get_row 1",
+      "operator1.get_row 0",
+    ],
+    "linkCells": [
+      "<div class='link'> 2 </div>",
+      "<div class='link'> 1 </div>",
+      "<div class='link'> 0 </div>",
+    ],
+    "linkTooltip": "Double click to view this row in a separate component",
+  },
+]
+`;
+
+exports[`Rows of each pinned server page > ssrm_rows 1`] = `
+{
+  "rowCount": 3,
+  "rows": [
+    {
+      "#": 0,
+      "label": "a",
+      "when": {
+        "_display_text_": "2020-01-01",
+        "constructor": "new",
+        "day": 1,
+        "month": 1,
+        "type": "Date",
+        "year": 2020,
+      },
+      "x": 1,
+      "y": 4.5,
+    },
+    {
+      "#": 1,
+      "label": "b",
+      "when": {
+        "_display_text_": "2021-02-02",
+        "constructor": "new",
+        "day": 2,
+        "month": 2,
+        "type": "Date",
+        "year": 2021,
+      },
+      "x": 2,
+      "y": 5.5,
+    },
+    {
+      "#": 2,
+      "label": "c",
+      "when": {
+        "_display_text_": "2022-03-03",
+        "constructor": "new",
+        "day": 3,
+        "month": 3,
+        "type": "Date",
+        "year": 2022,
+      },
+      "x": 3,
+      "y": 6.5,
+    },
+  ],
+}
+`;
+
+exports[`Rows of each pinned server page > ssrm_rows_column 1`] = `
+{
+  "rowCount": 3,
+  "rows": [
+    {
+      "#": 1,
+      "y": 5.5,
+    },
+    {
+      "#": 2,
+      "y": 6.5,
+    },
+  ],
+}
+`;
+
+exports[`Rows of each pinned server page > ssrm_rows_filtered 1`] = `
+{
+  "rowCount": 2,
+  "rows": [
+    {
+      "#": 1,
+      "label": "b",
+      "when": {
+        "_display_text_": "2021-02-02",
+        "constructor": "new",
+        "day": 2,
+        "month": 2,
+        "type": "Date",
+        "year": 2021,
+      },
+      "x": 2,
+      "y": 5.5,
+    },
+    {
+      "#": 2,
+      "label": "c",
+      "when": {
+        "_display_text_": "2022-03-03",
+        "constructor": "new",
+        "day": 3,
+        "month": 3,
+        "type": "Date",
+        "year": 2022,
+      },
+      "x": 3,
+      "y": 6.5,
+    },
+  ],
+}
+`;
+
+exports[`Rows of each pinned server page > ssrm_rows_sorted 1`] = `
+{
+  "rowCount": 3,
+  "rows": [
+    {
+      "#": 2,
+      "label": "c",
+      "when": {
+        "_display_text_": "2022-03-03",
+        "constructor": "new",
+        "day": 3,
+        "month": 3,
+        "type": "Date",
+        "year": 2022,
+      },
+      "x": 3,
+      "y": 6.5,
+    },
+    {
+      "#": 1,
+      "label": "b",
+      "when": {
+        "_display_text_": "2021-02-02",
+        "constructor": "new",
+        "day": 2,
+        "month": 2,
+        "type": "Date",
+        "year": 2021,
+      },
+      "x": 2,
+      "y": 5.5,
+    },
+    {
+      "#": 0,
+      "label": "a",
+      "when": {
+        "_display_text_": "2020-01-01",
+        "constructor": "new",
+        "day": 1,
+        "month": 1,
+        "type": "Date",
+        "year": 2020,
+      },
+      "x": 1,
+      "y": 4.5,
+    },
+  ],
+}
+`;
+
+exports[`Table view of each pinned golden > table_array 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.at 0",
+        "operator1.at 1",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+      ],
+      "linkTooltip": "Double click to view this value in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "Value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "Value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 3,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": true,
+  "numberGrouping": {
+    "#": false,
+    "Value": false,
+  },
+  "rowCount": 3,
+  "rowData": [
+    {
+      "#": 0,
+      "Value": 1,
+    },
+    {
+      "#": 1,
+      "Value": 2,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_atom 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "Value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "Value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": undefined,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 0,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "Value": false,
+  },
+  "rowCount": 1,
+  "rowData": [
+    {
+      "Value": {
+        "_display_text_": "Atom.Value",
+        "constructor": "Value",
+        "type": "Atom",
+        "x": 1,
+        "y": "[2, 3]",
+      },
+    },
+  ],
+  "showRowCount": false,
+}
+`;
+
+exports[`Table view of each pinned golden > table_cells 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.get_row 0",
+        "operator1.get_row 1",
+        "operator1.get_row 2",
+        "operator1.get_row 3",
+        "operator1.get_row 4",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+        "<div class='link'> 2 </div>",
+        "<div class='link'> 3 </div>",
+        "<div class='link'> 4 </div>",
+      ],
+      "linkTooltip": "Double click to view this row in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "v",
+        "filter": null,
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#mixed"/></svg> </span>",
+        },
+        "headerName": "v",
+        "headerTooltip": "Mixed",
+        "sortable": false,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [
+            {
+              "displayType": "Count",
+              "name": "Number of distinct",
+              "value": 5,
+            },
+            {
+              "displayType": "Text",
+              "name": "",
+              "value": "Other: 5",
+            },
+          ],
+          "showDataQuality": true,
+          "total": 5,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 5,
+    "bottomStatusBarRequested": true,
+    "columnNames": [
+      "v",
+    ],
+    "columnTypes": {
+      "v": "Mixed",
+    },
+    "createNodeEnabled": true,
+    "isSSRM": false,
+    "versionHash": "<hash>",
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "v": false,
+  },
+  "rowCount": 5,
+  "rowData": [
+    {
+      "#": 0,
+      "v": "Table{3 rows x [x, y, label, when]}",
+    },
+    {
+      "#": 1,
+      "v": "Column{y: [4.5, 5.5, 6.5]}",
+    },
+    {
+      "#": 2,
+      "v": "Row{x, y, label, when}",
+    },
+    {
+      "#": 3,
+      "v": "[1, 2]",
+    },
+    {
+      "#": 4,
+      "v": "{k: 1}",
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_cells_vector 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.at 0",
+        "operator1.at 1",
+        "operator1.at 2",
+        "operator1.at 3",
+        "operator1.at 4",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+        "<div class='link'> 2 </div>",
+        "<div class='link'> 3 </div>",
+        "<div class='link'> 4 </div>",
+      ],
+      "linkTooltip": "Double click to view this value in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "Value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "Value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 5,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 5,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "Value": false,
+  },
+  "rowCount": 5,
+  "rowData": [
+    {
+      "#": 0,
+      "Value": "Table{3 rows x [x, y, label, when]}",
+    },
+    {
+      "#": 1,
+      "Value": "Column{y: [4.5, 5.5, 6.5]}",
+    },
+    {
+      "#": 2,
+      "Value": "Row{x, y, label, when}",
+    },
+    {
+      "#": 3,
+      "Value": "Table{3 rows x [x, y, label]}",
+    },
+    {
+      "#": 4,
+      "Value": "Column{y: [4.5, 5.5, 6.5]}",
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_connection 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "Table",
+        "filter": true,
+        "headerClass": "indexColumnHeader",
+        "headerName": "Table",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.query 'pinned'",
+        "operator1.query 'pinned_geo'",
+      ],
+      "linkCells": [
+        "<div class='link'> pinned </div>",
+        "<div class='link'> pinned_geo </div>",
+      ],
+      "linkTooltip": "Double click to view this table in a separate component",
+    },
+  ],
+  "flags": {
+    "allRowCount": 0,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "Table": false,
+  },
+  "rowCount": 1,
+  "rowData": [
+    {
+      "Table": "pinned",
+    },
+    {
+      "Table": "pinned_geo",
+    },
+  ],
+  "showRowCount": false,
+}
+`;
+
+exports[`Table view of each pinned golden > table_db_column 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.at 0",
+        "operator1.at 1",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+      ],
+      "linkTooltip": "Double click to view this row in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": "number",
+        "field": "y",
+        "filter": "agNumberColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "greaterThanOrEqual",
+            "lessThan",
+            "lessThanOrEqual",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#math"/></svg> </span>",
+        },
+        "headerName": "y",
+        "headerTooltip": "Float (64 bits)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 3,
+    "bottomStatusBarRequested": false,
+    "columnNames": [
+      "y",
+    ],
+    "columnTypes": {
+      "y": "Float",
+    },
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "y": false,
+  },
+  "rowCount": 3,
+  "rowData": [
+    {
+      "#": 0,
+      "y": 4.5,
+    },
+    {
+      "#": 1,
+      "y": 5.5,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_db_read_error 1`] = `
+{
+  "columns": [],
+  "flags": {
+    "allRowCount": 0,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {},
+  "rowCount": 1,
+  "rowData": [],
+  "showRowCount": false,
+}
+`;
+
+exports[`Table view of each pinned golden > table_db_table 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.get_row 0",
+        "operator1.get_row 1",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+      ],
+      "linkTooltip": "Double click to view this row in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": "number",
+        "field": "x",
+        "filter": "agNumberColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "greaterThanOrEqual",
+            "lessThan",
+            "lessThanOrEqual",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#math"/></svg> </span>",
+        },
+        "headerName": "x",
+        "headerTooltip": "Integer (64 bits)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": "number",
+        "field": "y",
+        "filter": "agNumberColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "greaterThanOrEqual",
+            "lessThan",
+            "lessThanOrEqual",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#math"/></svg> </span>",
+        },
+        "headerName": "y",
+        "headerTooltip": "Float (64 bits)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": "text",
+        "field": "label",
+        "filter": "agTextColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "contains",
+            "startsWith",
+            "endsWith",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#text_char"/></svg> </span>",
+        },
+        "headerName": "label",
+        "headerTooltip": "Char (variable length, max_size=unlimited)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 3,
+    "bottomStatusBarRequested": false,
+    "columnNames": [
+      "x",
+      "y",
+      "label",
+    ],
+    "columnTypes": {
+      "label": "Char",
+      "x": "Integer",
+      "y": "Float",
+    },
+    "createNodeEnabled": true,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "label": false,
+    "x": false,
+    "y": false,
+  },
+  "rowCount": 3,
+  "rowData": [
+    {
+      "#": 0,
+      "label": "a",
+      "x": 1,
+      "y": 4.5,
+    },
+    {
+      "#": 1,
+      "label": "b",
+      "x": 2,
+      "y": 5.5,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_dictionary 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "key",
+        "filter": true,
+        "headerClass": "indexColumnHeader",
+        "headerName": "key",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.at 'a'",
+        "operator1.at 'b'",
+      ],
+      "linkCells": [
+        "<div class='link'> a </div>",
+        "<div class='link'> b </div>",
+      ],
+      "linkTooltip": "Double click to view this value in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 2,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 2,
+    "bottomStatusBarRequested": false,
+    "columnNames": [
+      "key",
+      "value",
+    ],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "key": false,
+    "value": false,
+  },
+  "rowCount": 2,
+  "rowData": [
+    {
+      "key": "a",
+      "value": 1,
+    },
+    {
+      "key": "b",
+      "value": "[1, 2]",
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_error 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellStyle": {
+          "white-space": "normal",
+        },
+        "field": "Error",
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 0,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "Error": false,
+  },
+  "rowCount": 1,
+  "rowData": [
+    {
+      "Error": "Illegal Argument: boom",
+    },
+  ],
+  "showRowCount": false,
+}
+`;
+
+exports[`Table view of each pinned golden > table_function 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "Value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "Value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": undefined,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 0,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "Value": false,
+  },
+  "rowCount": 1,
+  "rowData": [
+    {
+      "Value": {
+        "_display_text_": "[Function Pinned_Fixtures.increment[Pinned_Fixtures.enso:3-7] self=Pinned_Fixtures x=_]",
+      },
+    },
+  ],
+  "showRowCount": false,
+}
+`;
+
+exports[`Table view of each pinned golden > table_hashset 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "key",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "key",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 3,
+    "bottomStatusBarRequested": false,
+    "columnNames": [
+      "key",
+    ],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "key": false,
+  },
+  "rowCount": 3,
+  "rowData": [
+    {
+      "key": 1,
+    },
+    {
+      "key": 2,
+    },
+    {
+      "key": 3,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_js_object 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "key",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "key",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 2,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 2,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 2,
+    "bottomStatusBarRequested": false,
+    "columnNames": [
+      "key",
+      "value",
+    ],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "key": false,
+    "value": false,
+  },
+  "rowCount": 2,
+  "rowData": [
+    {
+      "key": "a",
+      "value": 1,
+    },
+    {
+      "key": "b",
+      "value": "two",
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_matrix 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.at 0",
+        "operator1.at 1",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+      ],
+      "linkTooltip": "Double click to view this value in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "0",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "0",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 2,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "1",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "1",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 2,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 2,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "0": false,
+    "1": false,
+  },
+  "rowCount": 2,
+  "rowData": [
+    {
+      "#": 0,
+      "0": 1,
+      "1": 2,
+    },
+    {
+      "#": 1,
+      "0": 3,
+      "1": 4,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_mem_1col_table 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.get_row 0",
+        "operator1.get_row 1",
+        "operator1.get_row 2",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+        "<div class='link'> 2 </div>",
+      ],
+      "linkTooltip": "Double click to view this row in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": "number",
+        "field": "y",
+        "filter": "agNumberColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "greaterThanOrEqual",
+            "lessThan",
+            "lessThanOrEqual",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#math"/></svg> </span>",
+        },
+        "headerName": "y",
+        "headerTooltip": "Float (64 bits)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [
+            {
+              "displayType": "Text",
+              "name": "Range",
+              "value": "4.5 - 6.5",
+            },
+            {
+              "displayType": "Count",
+              "name": "Number of distinct",
+              "value": 3,
+            },
+          ],
+          "showDataQuality": true,
+          "total": 3,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 3,
+    "bottomStatusBarRequested": true,
+    "columnNames": [
+      "y",
+    ],
+    "columnTypes": {
+      "y": "Float",
+    },
+    "createNodeEnabled": true,
+    "isSSRM": false,
+    "versionHash": "<hash>",
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "y": false,
+  },
+  "rowCount": 3,
+  "rowData": [
+    {
+      "#": 0,
+      "y": 4.5,
+    },
+    {
+      "#": 1,
+      "y": 5.5,
+    },
+    {
+      "#": 2,
+      "y": 6.5,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_mem_1x1_table 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.get_row 0",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+      ],
+      "linkTooltip": "Double click to view this row in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": "number",
+        "field": "n",
+        "filter": "agNumberColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "greaterThanOrEqual",
+            "lessThan",
+            "lessThanOrEqual",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#math"/></svg> </span>",
+        },
+        "headerName": "n",
+        "headerTooltip": "Integer (64 bits)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [
+            {
+              "displayType": "Text",
+              "name": "Range",
+              "value": "7",
+            },
+            {
+              "displayType": "Count",
+              "name": "Number of distinct",
+              "value": 1,
+            },
+          ],
+          "showDataQuality": true,
+          "total": 1,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 1,
+    "bottomStatusBarRequested": true,
+    "columnNames": [
+      "n",
+    ],
+    "columnTypes": {
+      "n": "Integer",
+    },
+    "createNodeEnabled": true,
+    "isSSRM": false,
+    "versionHash": "<hash>",
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "n": false,
+  },
+  "rowCount": 1,
+  "rowData": [
+    {
+      "#": 0,
+      "n": 7,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_mem_column 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.at 0",
+        "operator1.at 1",
+        "operator1.at 2",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+        "<div class='link'> 2 </div>",
+      ],
+      "linkTooltip": "Double click to view this row in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": "number",
+        "field": "y",
+        "filter": "agNumberColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "greaterThanOrEqual",
+            "lessThan",
+            "lessThanOrEqual",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#math"/></svg> </span>",
+        },
+        "headerName": "y",
+        "headerTooltip": "Float (64 bits)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [
+            {
+              "displayType": "Text",
+              "name": "Range",
+              "value": "4.5 - 6.5",
+            },
+            {
+              "displayType": "Count",
+              "name": "Number of distinct",
+              "value": 3,
+            },
+          ],
+          "showDataQuality": true,
+          "total": 3,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 3,
+    "bottomStatusBarRequested": true,
+    "columnNames": [
+      "y",
+    ],
+    "columnTypes": {
+      "y": "Float",
+    },
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": "<hash>",
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "y": false,
+  },
+  "rowCount": 3,
+  "rowData": [
+    {
+      "#": 0,
+      "y": 4.5,
+    },
+    {
+      "#": 1,
+      "y": 5.5,
+    },
+    {
+      "#": 2,
+      "y": 6.5,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_mem_server_table 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [],
+      "linkCells": [],
+      "linkTooltip": "Double click to view this row in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": "number",
+        "field": "x",
+        "filter": "agNumberColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "greaterThanOrEqual",
+            "lessThan",
+            "lessThanOrEqual",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": "[function]",
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#math"/></svg> </span>",
+        },
+        "headerName": "x",
+        "headerTooltip": "Integer (64 bits)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [
+            {
+              "displayType": "Text",
+              "name": "Range",
+              "value": "0 - 19999",
+            },
+            {
+              "displayType": "Count",
+              "name": "Number of distinct",
+              "value": 20000,
+            },
+          ],
+          "showDataQuality": true,
+          "total": 20000,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": "number",
+        "field": "y",
+        "filter": "agNumberColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "greaterThanOrEqual",
+            "lessThan",
+            "lessThanOrEqual",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": "[function]",
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#math"/></svg> </span>",
+        },
+        "headerName": "y",
+        "headerTooltip": "Integer (64 bits)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [
+            {
+              "displayType": "Text",
+              "name": "Range",
+              "value": "0 - 39998",
+            },
+            {
+              "displayType": "Count",
+              "name": "Number of distinct",
+              "value": 20000,
+            },
+          ],
+          "showDataQuality": true,
+          "total": 20000,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 20000,
+    "bottomStatusBarRequested": true,
+    "columnNames": [
+      "x",
+      "y",
+    ],
+    "columnTypes": {
+      "x": "Integer",
+      "y": "Integer",
+    },
+    "createNodeEnabled": true,
+    "isSSRM": true,
+    "versionHash": "<hash>",
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "x": false,
+    "y": false,
+  },
+  "rowCount": 20000,
+  "rowData": "unchanged (server-side rows)",
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_mem_table 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.get_row 0",
+        "operator1.get_row 1",
+        "operator1.get_row 2",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+        "<div class='link'> 2 </div>",
+      ],
+      "linkTooltip": "Double click to view this row in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": "number",
+        "field": "x",
+        "filter": "agNumberColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "greaterThanOrEqual",
+            "lessThan",
+            "lessThanOrEqual",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#math"/></svg> </span>",
+        },
+        "headerName": "x",
+        "headerTooltip": "Integer (64 bits)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [
+            {
+              "displayType": "Text",
+              "name": "Range",
+              "value": "1 - 3",
+            },
+            {
+              "displayType": "Count",
+              "name": "Number of distinct",
+              "value": 3,
+            },
+          ],
+          "showDataQuality": true,
+          "total": 3,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": "number",
+        "field": "y",
+        "filter": "agNumberColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "greaterThanOrEqual",
+            "lessThan",
+            "lessThanOrEqual",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#math"/></svg> </span>",
+        },
+        "headerName": "y",
+        "headerTooltip": "Float (64 bits)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [
+            {
+              "displayType": "Text",
+              "name": "Range",
+              "value": "4.5 - 6.5",
+            },
+            {
+              "displayType": "Count",
+              "name": "Number of distinct",
+              "value": 3,
+            },
+          ],
+          "showDataQuality": true,
+          "total": 3,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": "text",
+        "field": "label",
+        "filter": "[class CommunitySetFilter]",
+        "filterParams": {
+          "buttons": [
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "contains",
+            "startsWith",
+            "endsWith",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#text_char"/></svg> </span>",
+        },
+        "headerName": "label",
+        "headerTooltip": "Char (variable length, max_size=unlimited)",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [
+            {
+              "displayType": "Text",
+              "name": "Range",
+              "value": "a - c",
+            },
+            {
+              "displayType": "Count",
+              "name": "Number of distinct",
+              "value": 3,
+            },
+          ],
+          "showDataQuality": true,
+          "total": 3,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": "date",
+        "comparator": "[function]",
+        "field": "when",
+        "filter": "agDateColumnFilter",
+        "filterParams": {
+          "buttons": [
+            "apply",
+            "clear",
+          ],
+          "filterOptions": [
+            "equals",
+            "notEqual",
+            "greaterThan",
+            "lessThan",
+            "inRange",
+            "blank",
+            "notBlank",
+          ],
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eLabel" class="ag-header-cell-label" role="presentation" style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;'><span data-ref="eText" class="ag-header-cell-text"></span></span><span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     <svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#calendar"/></svg> </span>",
+        },
+        "headerName": "when",
+        "headerTooltip": "Date",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [
+            {
+              "displayType": "Text",
+              "name": "Range",
+              "value": "2020-01-01 - 2022-03-03",
+            },
+            {
+              "displayType": "Count",
+              "name": "Number of distinct",
+              "value": 3,
+            },
+          ],
+          "showDataQuality": true,
+          "total": 3,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 3,
+    "bottomStatusBarRequested": true,
+    "columnNames": [
+      "x",
+      "y",
+      "label",
+      "when",
+    ],
+    "columnTypes": {
+      "label": "Char",
+      "when": "Date",
+      "x": "Integer",
+      "y": "Float",
+    },
+    "createNodeEnabled": true,
+    "isSSRM": false,
+    "versionHash": "<hash>",
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "label": false,
+    "when": false,
+    "x": false,
+    "y": false,
+  },
+  "rowCount": 3,
+  "rowData": [
+    {
+      "#": 0,
+      "label": "a",
+      "when": {
+        "_display_text_": "2020-01-01",
+        "constructor": "new",
+        "day": 1,
+        "month": 1,
+        "type": "Date",
+        "year": 2020,
+      },
+      "x": 1,
+      "y": 4.5,
+    },
+    {
+      "#": 1,
+      "label": "b",
+      "when": {
+        "_display_text_": "2021-02-02",
+        "constructor": "new",
+        "day": 2,
+        "month": 2,
+        "type": "Date",
+        "year": 2021,
+      },
+      "x": 2,
+      "y": 5.5,
+    },
+    {
+      "#": 2,
+      "label": "c",
+      "when": {
+        "_display_text_": "2022-03-03",
+        "constructor": "new",
+        "day": 3,
+        "month": 3,
+        "type": "Date",
+        "year": 2022,
+      },
+      "x": 3,
+      "y": 6.5,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_number 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "Value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "Value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": undefined,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 0,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "Value": false,
+  },
+  "rowCount": 1,
+  "rowData": [
+    {
+      "Value": 42,
+    },
+  ],
+  "showRowCount": false,
+}
+`;
+
+exports[`Table view of each pinned golden > table_object_matrix 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.at 0",
+        "operator1.at 1",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+      ],
+      "linkTooltip": "Double click to view this value in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "type",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "type",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 2,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "constructor",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "constructor",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 2,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "x",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "x",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 2,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "y",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "y",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 2,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 2,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "constructor": false,
+    "type": false,
+    "x": false,
+    "y": false,
+  },
+  "rowCount": 2,
+  "rowData": [
+    {
+      "#": 0,
+      "constructor": "Value",
+      "type": "Atom",
+      "x": 1,
+      "y": "a",
+    },
+    {
+      "#": 1,
+      "constructor": "Value",
+      "type": "Atom",
+      "x": 2,
+      "y": "b",
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_row 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "column",
+        "filter": true,
+        "headerClass": "indexColumnHeader",
+        "headerName": "column",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.at 'x'",
+        "operator1.at 'y'",
+        "operator1.at 'label'",
+        "operator1.at 'when'",
+      ],
+      "linkCells": [
+        "<div class='link'> x </div>",
+        "<div class='link'> y </div>",
+        "<div class='link'> label </div>",
+        "<div class='link'> when </div>",
+      ],
+      "linkTooltip": "Double click to view this value in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 4,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 4,
+    "bottomStatusBarRequested": false,
+    "columnNames": [
+      "column",
+      "value",
+    ],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "column": false,
+    "value": false,
+  },
+  "rowCount": 4,
+  "rowData": [
+    {
+      "column": "x",
+      "value": 2,
+    },
+    {
+      "column": "y",
+      "value": 5.5,
+    },
+    {
+      "column": "label",
+      "value": "b",
+    },
+    {
+      "column": "when",
+      "value": {
+        "_display_text_": "2021-02-02",
+        "constructor": "new",
+        "day": 2,
+        "month": 2,
+        "type": "Date",
+        "year": 2021,
+      },
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_rows_matrix 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.at 0",
+        "operator1.at 1",
+        "operator1.at 2",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+        "<div class='link'> 2 </div>",
+      ],
+      "linkTooltip": "Double click to view this value in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "x",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "x",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "y",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "y",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "label",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "label",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "when",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "when",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 3,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "#": false,
+    "label": false,
+    "when": false,
+    "x": false,
+    "y": false,
+  },
+  "rowCount": 3,
+  "rowData": [
+    {
+      "#": 0,
+      "label": "a",
+      "when": {
+        "_display_text_": "2020-01-01",
+        "constructor": "new",
+        "day": 1,
+        "month": 1,
+        "type": "Date",
+        "year": 2020,
+      },
+      "x": 1,
+      "y": 4.5,
+    },
+    {
+      "#": 1,
+      "label": "b",
+      "when": {
+        "_display_text_": "2021-02-02",
+        "constructor": "new",
+        "day": 2,
+        "month": 2,
+        "type": "Date",
+        "year": 2021,
+      },
+      "x": 2,
+      "y": 5.5,
+    },
+    {
+      "#": 2,
+      "label": "c",
+      "when": {
+        "_display_text_": "2022-03-03",
+        "constructor": "new",
+        "day": 3,
+        "month": 3,
+        "type": "Date",
+        "year": 2022,
+      },
+      "x": 3,
+      "y": 6.5,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_text 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "Value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "Value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": undefined,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 0,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "Value": false,
+  },
+  "rowCount": 1,
+  "rowData": [
+    {
+      "Value": "hello",
+    },
+  ],
+  "showRowCount": false,
+}
+`;
+
+exports[`Table view of each pinned golden > table_vector 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "#",
+        "filter": false,
+        "headerClass": "indexColumnHeader",
+        "headerName": "#",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.at 0",
+        "operator1.at 1",
+      ],
+      "linkCells": [
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+      ],
+      "linkTooltip": "Double click to view this value in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "Value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "Value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 3,
+    "bottomStatusBarRequested": false,
+    "columnNames": [],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": true,
+  "numberGrouping": {
+    "#": false,
+    "Value": false,
+  },
+  "rowCount": 3,
+  "rowData": [
+    {
+      "#": 0,
+      "Value": 1,
+    },
+    {
+      "#": 1,
+      "Value": 2,
+    },
+  ],
+  "showRowCount": true,
+}
+`;
+
+exports[`Table view of each pinned golden > table_xml_document 1`] = `
+{
+  "columns": [
+    {
+      "colDef": {
+        "cellRenderer": "[function]",
+        "cellStyle": {
+          "border-right": "1px solid #C0C0C0",
+          "padding-left": "13px",
+        },
+        "field": "key",
+        "filter": true,
+        "headerClass": "indexColumnHeader",
+        "headerName": "key",
+        "onCellDoubleClicked": "[function]",
+        "tooltipValueGetter": "[function]",
+      },
+      "createdNodes": [
+        "operator1.get_child_element '@id'",
+        "operator1.get_child_element 0",
+        "operator1.get_child_element 1",
+      ],
+      "linkCells": [
+        "<div class='link'> @id </div>",
+        "<div class='link'> 0 </div>",
+        "<div class='link'> 1 </div>",
+      ],
+      "linkTooltip": "Double click to view this value in a separate component",
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "type",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "type",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+    {
+      "colDef": {
+        "cellDataType": false,
+        "field": "value",
+        "filter": null,
+        "filterParams": {
+          "buttons": null,
+          "filterOptions": null,
+          "maxNumConditions": 1,
+          "refreshValuesOnOpen": true,
+          "values": null,
+        },
+        "headerComponentParams": {
+          "setAriaSort": "[function]",
+          "template": "<span style='display:flex; flex-direction:row; justify-content:space-between; width:inherit;' data-ref="eLabel"><span data-ref="eText" class="ag-header-cell-label"></span> <span data-ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"> </span> <span data-ref="eFilterButton" class="ag-header-icon ag-header-cell-filter-button" aria-hidden="true"></span> 
+      <span data-ref="eFilter" class="ag-header-icon ag-header-label-icon ag-filter-icon" aria-hidden="true"></span>
+      <span data-ref="eSortOrder" class="ag-header-icon ag-sort-order" aria-hidden="true"></span>
+      <span data-ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon" aria-hidden="true"></span>
+      <span data-ref="eSortNone" class="ag-header-icon ag-sort-none-icon" aria-hidden="true"></span>
+     </span>",
+        },
+        "headerName": "value",
+        "headerTooltip": "",
+        "sortable": true,
+        "tooltipComponent": "[class TableVisualisationTooltip]",
+        "tooltipComponentParams": {
+          "dataQualityMetrics": [],
+          "showDataQuality": false,
+          "total": 3,
+        },
+      },
+    },
+  ],
+  "flags": {
+    "allRowCount": 3,
+    "bottomStatusBarRequested": false,
+    "columnNames": [
+      "key",
+      "type",
+      "value",
+    ],
+    "columnTypes": {},
+    "createNodeEnabled": false,
+    "isSSRM": false,
+    "versionHash": null,
+  },
+  "isTruncated": false,
+  "numberGrouping": {
+    "key": false,
+    "type": false,
+    "value": false,
+  },
+  "rowCount": 3,
+  "rowData": [
+    {
+      "key": "@id",
+      "type": "Attribute",
+      "value": "10",
+    },
+    {
+      "key": "0",
+      "type": "Element",
+      "value": "<bar>hello</bar>",
+    },
+    {
+      "key": "1",
+      "type": "Text",
+      "value": "text",
+    },
+  ],
+  "showRowCount": true,
+}
+`;

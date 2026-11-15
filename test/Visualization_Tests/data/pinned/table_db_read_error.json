@@ -1,0 +1,1 @@
+{"error":"Error querying the database:\nThere was an SQL error: [SQLITE_ERROR] SQL error or missing database (no such table: pinned_gone). [Query was: SELECT \"pinned_gone\".\"a\" AS \"a\" FROM \"pinned_gone\" AS \"pinned_gone\" LIMIT 1000]"}

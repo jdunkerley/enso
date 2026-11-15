@@ -37,6 +37,7 @@ type Data
     big_table self = self.data.at 7
     db_geo_table self = self.data.at 8
     cells_table self = self.data.at 9
+    db_gone_table self = self.data.at 10
 
     setup = Data.Value <|
         mem_table = warm <| Table.new [["x", [1, 2, 3]], ["y", [4.5, 5.5, 6.5]], ["label", ["a", "b", "c"]], ["when", [Date.new 2020 1 1, Date.new 2021 2 2, Date.new 2022 3 3]]]
@@ -50,7 +51,11 @@ type Data
         big_table = Table.new [["x", 0.up_to 20000 . to_vector], ["y", 0.up_to 20000 . map (i-> i * 2)]]
         db_geo_table = geo_table.select_into_database_table connection "pinned_geo" temporary=True
         cells_table = warm <| Table.new [["v", [mem_table, mem_column, row, [1, 2], Dictionary.from_vector [["k", 1]]]]]
-        [mem_table, mem_column, db_table, db_column, row, connection, geo_table, big_table, db_geo_table, cells_table]
+        ## A database table whose table is dropped after the reference is made:
+           reading it fails, which the table view has to show.
+        db_gone_table = (Table.new [["a", [1]]]).select_into_database_table connection "pinned_gone" temporary=True
+        connection.drop_table "pinned_gone"
+        [mem_table, mem_column, db_table, db_column, row, connection, geo_table, big_table, db_geo_table, cells_table, db_gone_table]
 
 ## The table view JSON of an in-memory table embeds data-quality metrics that
    are computed asynchronously. Asking for `column_info` waits for them (as
@@ -92,6 +97,8 @@ add_specs suite_builder =
         table_view "xml_document" (XML_Document.parse '<foo id="10"><bar>hello</bar>text</foo>')
         table_view "cells" data.cells_table
         table_view "cells_vector" [data.mem_table, data.mem_column, data.row, data.db_table, data.db_column]
+        table_view "mem_server_table" (warm data.big_table)
+        table_view "db_read_error" data.db_gone_table
 
     suite_builder.group "Pinned default visualisation" group_builder->
         default name ~value =
