@@ -187,6 +187,9 @@ interface Graph {
   selection: string[]
 }
 
+/** How quickly an edit that runs code must answer, against its 20 s settle timeout. */
+const EDIT_ANSWER_MS = 10_000
+
 /** The states of a node that is neither an error nor a panic. */
 const NOT_FAILED = ['value', 'pending', 'unknown']
 
@@ -231,11 +234,14 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     return node!
   }
   /**
-   * Soft: the edit waited for the engine to finish executing (`settled`). Every step goes on, so
-   * that one run shows each edit's answer, and the test still fails.
+   * The edit that was just called saw the engine finish executing it (`settled`), and answered well
+   * inside the 20 s settle timeout: it took 0.8-2.1 s on a desktop (an edit with no node-database
+   * update waits out the 2 s graph wait), against 20-22 s when the execution was missed.
    */
-  const expectSettled = (step: string, result: { settled?: boolean }) =>
-    expect.soft(result.settled, `${step}: settled`).toBe(true)
+  const expectSettled = (step: string, result: { settled?: boolean }) => {
+    expect(result.settled, `${step}: settled`).toBe(true)
+    expect(lastCallMs, `${step}: answered in time`).toBeLessThan(EDIT_ANSWER_MS)
+  }
   const previewOf = async (nodeId: string) =>
     (await callJson<NodeSummary>('get_node', { node_id: nodeId })).preview ?? ''
 
