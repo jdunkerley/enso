@@ -1,0 +1,55 @@
+from Standard.Base import all
+import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+
+import project.Helpers
+from project.Helpers import time_visualization, short_display
+from project.Viz_Tree import page_size, Viz_Tree, Viz_Tree_Child
+
+## ---
+   private: true
+   ---
+   IDE entry of the JSON visualization: the root of the value's tree and the
+   first page of its children, as JSON text (the format is in this library's
+   CLAUDE.md). A dataflow error shows its payload.
+prepare value = time_visualization Tree ("Tree.prepare: " + (short_display value)) <|
+    tree = Viz_Tree.from (if value.is_error then value.catch else value)
+    json = case tree of
+        Viz_Tree.Leaf json_text -> '{"root":' + (leaf_json json_text) + '}'
+        Viz_Tree.Branch _ _ _ _ _ -> '{"root":' + (branch_json tree) + ',"children":' + (page_json tree 0 page_size) + '}'
+    if json.is_error.not then json else
+        '{"root":' + (leaf_json (Helpers.truncate value.to_display_text . to_json)) + '}'
+
+## ---
+   private: true
+   ---
+   IDE entry of the JSON visualization: one page of the children of the
+   branch that `path` (keys and indices from the root) leads to, as JSON
+   text. A missing key, a leaf or a failed page gives `{"error": message}`.
+children value (path : Vector) (start : Integer) (count : Integer) = time_visualization Tree ("Tree.children: " + (short_display value)) <|
+    root = Viz_Tree.from (if value.is_error then value.catch else value)
+    tree = path.fold root (t-> key-> (t.child key).tree)
+    page_json tree start count . catch Any err->
+        JS_Object.from_pairs [["error", err.to_display_text]] . to_json
+
+## A page: `{"start":…,"size":…,"entries":[…]}`.
+private page_json (tree : Viz_Tree) (start : Integer) (count : Integer) -> Text = case tree of
+    Viz_Tree.Leaf _ -> Error.throw (Illegal_Argument.Error "A leaf has no children.")
+    Viz_Tree.Branch _ size _ children _ ->
+        ## The page and its entries' texts are the only vectors, both at most
+           one page long; `join` needs the texts together.
+        entries = children start count . map entry_json
+        '{"start":' + start.to_text + ',"size":' + size.to_text + ',"entries":[' + (entries.join ",") + ']}'
+
+## A child: its key, its node's fields and its node expression.
+private entry_json (child : Viz_Tree_Child) -> Text =
+    node = case child.tree of
+        Viz_Tree.Leaf json_text -> '"kind":"leaf","value":' + json_text
+        Viz_Tree.Branch kind size label _ _ -> '"kind":' + kind.to_json + ',"size":' + size.to_text + ',"label":' + label.to_json
+    '{"key":' + child.key.to_json + ',' + node + ',"expr":' + child.node_expression.to_json + '}'
+
+## A leaf node.
+private leaf_json (json_text : Text) -> Text = '{"kind":"leaf","value":' + json_text + '}'
+
+## A branch node.
+private branch_json (tree : Viz_Tree) -> Text =
+    '{"kind":' + tree.kind.to_json + ',"size":' + tree.size.to_text + ',"label":' + tree.label.to_json + '}'

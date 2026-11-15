@@ -106,4 +106,5 @@
 - Standard.Visualization.SQL_Viz.SQL_Viz.from that:Standard.Table.Table.Table -> Standard.Visualization.SQL_Viz.SQL_Viz
 - Standard.Visualization.Viz_Cell.Viz_Cell.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Cell.Viz_Cell
 - Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Json.Viz_Json
+- Standard.Visualization.Viz_Tree.Viz_Tree.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Tree.Viz_Tree
 - Standard.Visualization.Id.Id.from that:Standard.Table.Table.Table -> Standard.Visualization.Id.Id

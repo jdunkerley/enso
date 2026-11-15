@@ -1,0 +1,1 @@
+{"root":{"kind":"object","size":3,"label":"{3 keys}"},"children":{"start":0,"size":3,"entries":[{"key":"name","kind":"leaf","value":"John","expr":".get 'name'"},{"key":"tags","kind":"array","size":2,"label":"[2 items]","expr":".get 'tags'"},{"key":"address","kind":"object","size":1,"label":"{1 key}","expr":".get 'address'"}]}}

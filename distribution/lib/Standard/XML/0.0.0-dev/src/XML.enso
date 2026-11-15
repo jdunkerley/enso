@@ -8,6 +8,7 @@ import Standard.Base.System.File.Generic.Writable_File.Writable_File
 import Standard.Base.System.Input_Stream.Input_Stream
 from Standard.Visualization.Viz_Json import Viz_Json
 from Standard.Visualization.Viz_Table import Viz_Table
+from Standard.Visualization.Viz_Tree import Viz_Tree, Viz_Tree_Child
 from Standard.Base.Metadata import Display, make_single_choice, Widget
 
 import Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns
@@ -997,6 +998,40 @@ Viz_Json.from (that:XML_Document) =
    private: true
    ---
 Viz_Json.from (that:XML_Element) = Viz_Json.Value (_element_js that False . to_json)
+
+## ---
+   private: true
+   ---
+   A document is an object of its root element, reached with `.root_element`.
+Viz_Tree.from (that:XML_Document) =
+    root = that.root_element
+    entry = Viz_Tree_Child.Value root.name (Viz_Tree.from root) ".root_element"
+    ## `paged` only asks for a page of the one child.
+    Viz_Tree.paged "object" 1 ("XML_Document (<" + root.name + ">)") (_-> _-> [entry])
+
+## ---
+   private: true
+   ---
+   An element is an object of its attributes (`@name`) and then its children
+   (by index), each reached with `.at`.
+Viz_Tree.from (that:XML_Element) =
+    names = that.attribute_names
+    nodes = that.children
+    attribute_count = names.length
+    size = attribute_count + nodes.length
+    label = "<" + that.name + "> (" + (Viz_Tree.count_text attribute_count "attribute" "attributes") + ", " + (Viz_Tree.count_text nodes.length "child" "children") + ")"
+    attribute_child name = Viz_Tree_Child.Value ("@" + name) (Viz_Tree.from (that.attribute name)) (".at " + ("@" + name).pretty)
+    node_child index = Viz_Tree_Child.Value index (Viz_Tree.from (nodes.at index)) (".at " + index.to_text)
+    ## Positions run over the attributes, then the child nodes.
+    page_of start end = start.up_to end . map position->
+        if position < attribute_count then attribute_child (names.at position) else node_child (position - attribute_count)
+    child_of key = case key of
+        _ : Text ->
+            name = key.drop 1
+            if key.starts_with "@" && (names.contains name) then attribute_child name else Nothing
+        _ : Integer -> if key >= 0 && key < nodes.length then node_child key else Nothing
+        _ -> Nothing
+    Viz_Tree.lookup_paged "object" size label page_of child_of
 
 ## The JSON of an element: its tag, attributes and at most 50 children. A
    nested element's children are shown by their display text.

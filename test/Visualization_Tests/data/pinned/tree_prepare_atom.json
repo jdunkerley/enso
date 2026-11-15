@@ -1,0 +1,1 @@
+{"root":{"kind":"object","size":4,"label":"{4 keys}"},"children":{"start":0,"size":4,"entries":[{"key":"type","kind":"leaf","value":"Atom","expr":null},{"key":"constructor","kind":"leaf","value":"Value","expr":null},{"key":"x","kind":"leaf","value":1,"expr":null},{"key":"y","kind":"array","size":2,"label":"[2 items]","expr":null}]}}

@@ -60,3 +60,5 @@
 - Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.XML.XML.XML_Document -> Standard.Visualization.Viz_Table.Viz_Table
 - Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.XML.XML.XML_Document -> Standard.Visualization.Viz_Json.Viz_Json
 - Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.XML.XML.XML_Element -> Standard.Visualization.Viz_Json.Viz_Json
+- Standard.Visualization.Viz_Tree.Viz_Tree.from that:Standard.XML.XML.XML_Document -> Standard.Visualization.Viz_Tree.Viz_Tree
+- Standard.Visualization.Viz_Tree.Viz_Tree.from that:Standard.XML.XML.XML_Element -> Standard.Visualization.Viz_Tree.Viz_Tree

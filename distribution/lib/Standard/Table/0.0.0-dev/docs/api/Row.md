@@ -18,3 +18,4 @@
 - Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Table.Viz_Table
 - Standard.Visualization.Viz_Cell.Viz_Cell.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Cell.Viz_Cell
 - Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Json.Viz_Json
+- Standard.Visualization.Viz_Tree.Viz_Tree.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Tree.Viz_Tree

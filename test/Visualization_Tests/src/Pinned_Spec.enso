@@ -14,6 +14,7 @@ import Standard.Visualization.Preprocessor
 import Standard.Visualization.Scatter_Plot
 import Standard.Visualization.SQL.Visualization as SQL_Visualization
 import Standard.Visualization.Table.Visualization
+import Standard.Visualization.Tree
 
 from Standard.Test import all
 
@@ -126,6 +127,29 @@ add_specs suite_builder =
         default_data "vector_deep" [[[[[[[1]]]]]], (0.up_to 150 . to_vector)]
         default_data "array" [1, [2, 3]].to_array
         default_data "long_text" (0.up_to 2500 . map (_-> "a") . join "")
+
+    suite_builder.group "Pinned tree JSON" group_builder->
+        tree_prepare name ~value =
+            group_builder.specify ("prepare " + name) <|
+                expect_pinned ("tree_prepare_" + name) (Tree.prepare value)
+        tree_children name ~value path start count =
+            group_builder.specify ("children " + name) <|
+                expect_pinned ("tree_children_" + name) (Tree.children value path start count)
+        js = Json.parse '{"name":"John","tags":["a","b"],"address":{"city":"Leeds"}}'
+        ## Eight levels of nesting, then 150 items.
+        deep = [[[[[[[[[1]]]]]]]], (0.up_to 150 . to_vector)]
+        tree_prepare "js_object" js
+        tree_children "js_object_address" js ["address"] 0 100
+        tree_prepare "vector_deep" deep
+        ## Eight steps in: the innermost `[1]`.
+        tree_children "vector_deep_bottom" deep [0, 0, 0, 0, 0, 0, 0, 0] 0 100
+        tree_children "vector_page" deep [1] 100 100
+        tree_prepare "atom" (Atom.Value 1 [2, 3])
+        tree_children "atom" (Atom.Value 1 [2, 3]) ["y"] 0 100
+        tree_prepare "error" (Error.throw (Illegal_Argument.Error "boom"))
+        tree_children "missing" js ["nope"] 0 100
+        tree_prepare "mem_table" data.mem_table
+        tree_children "mem_table_rows" data.mem_table ["rows"] 0 100
 
     suite_builder.group "Pinned server-side row model" group_builder->
         group_builder.specify "rows" <|

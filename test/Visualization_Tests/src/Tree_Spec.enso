@@ -1,0 +1,366 @@
+from Standard.Base import all
+import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+import Standard.Base.Runtime.Ref.Ref
+
+from Standard.Table import Table
+import Standard.Database.Connection.Database
+import Standard.Database.Extensions.Upload_Table
+from Standard.SQLite import SQLite
+from Standard.XML import XML_Document
+
+import Standard.Visualization.Tree
+import Standard.Visualization.Viz_Tree.Viz_Tree
+import Standard.Visualization.Viz_Tree.Viz_Tree_Child
+
+from Standard.Test import all
+
+type Atom
+    Value x y
+
+type Bad
+    Value
+
+    to_js_object self = Panic.throw "no JSON"
+
+type Person
+    Value name age
+
+## A user type describes its own tree in its own module.
+Viz_Tree.from (that:Person) =
+    fields = [Viz_Tree_Child.Value "name" (Viz_Tree.from that.name) ".name", Viz_Tree_Child.Value "age" (Viz_Tree.from that.age) ".age"]
+    Viz_Tree.paged "object" fields.length ("Person " + that.name) start-> end-> fields.slice start end
+
+## The keys of one page of `tree`.
+keys_of tree start=0 count=100 = tree.children start count . map .key
+
+## The node expressions of one page of `tree`.
+exprs_of tree start=0 count=100 = tree.children start count . map .node_expression
+
+## The tree of the child of `tree` with `key`.
+child_tree tree key = (tree.child key).tree
+
+add_specs suite_builder =
+    suite_builder.group "Viz_Tree of Base values" group_builder->
+        group_builder.specify "scalars are leaves holding their JSON" <|
+            (Viz_Tree.from 42).json_text . should_equal "42"
+            (Viz_Tree.from 1.5).json_text . should_equal "1.5"
+            (Viz_Tree.from True).json_text . should_equal "true"
+            (Viz_Tree.from Nothing).json_text . should_equal "null"
+            (Viz_Tree.from "hi").json_text . should_equal '"hi"'
+
+        group_builder.specify "dates and times are leaves holding their display text" <|
+            (Viz_Tree.from (Date.new 2020 1 2)).json_text . should_equal '"2020-01-02"'
+            (Viz_Tree.from (Time_Of_Day.new 10 30)).json_text . should_equal (Time_Of_Day.new 10 30).to_display_text.to_json
+
+        group_builder.specify "text over 2000 characters is cut, as Viz_Json cuts it" <|
+            long = 0.up_to 2500 . map (_-> "a") . join ""
+            expected = (0.up_to 2000 . map (_-> "a") . join "") + "…"
+            (Viz_Tree.from long).json_text . should_equal expected.to_json
+
+        group_builder.specify "a JS_Object is an object of its keys, reached with .get" <|
+            tree = Viz_Tree.from (Json.parse '{"a":1,"b":[1,2]}')
+            tree.kind . should_equal "object"
+            tree.size . should_equal 2
+            tree.label . should_equal "{2 keys}"
+            keys_of tree . should_equal ["a", "b"]
+            exprs_of tree . should_equal [".get " + "a".pretty, ".get " + "b".pretty]
+            (child_tree tree "b").label . should_equal "[2 items]"
+            exprs_of (child_tree tree "b") . should_equal [".at 0", ".at 1"]
+
+        group_builder.specify "a Vector and an Array are arrays of their indices, reached with .at" <|
+            tree = Viz_Tree.from [10, 20, 30]
+            tree.kind . should_equal "array"
+            tree.label . should_equal "[3 items]"
+            keys_of tree . should_equal [0, 1, 2]
+            exprs_of tree . should_equal [".at 0", ".at 1", ".at 2"]
+            (child_tree tree 1).json_text . should_equal "20"
+            keys_of (Viz_Tree.from [10, 20].to_array) . should_equal [0, 1]
+
+        group_builder.specify "a Dictionary is an object of its keys, reached with .at" <|
+            by_text = Viz_Tree.from (Dictionary.from_vector [["k", 1]])
+            by_text.kind . should_equal "object"
+            keys_of by_text . should_equal ["k"]
+            exprs_of by_text . should_equal [".at " + "k".pretty]
+            by_number = Viz_Tree.from (Dictionary.from_vector [[2, "two"]])
+            keys_of by_number . should_equal [2]
+            exprs_of by_number . should_equal [".at 2"]
+            by_date = Viz_Tree.from (Dictionary.from_vector [[Date.new 2020 1 2, 1]])
+            keys_of by_date . should_equal ["2020-01-02"]
+            exprs_of by_date . should_equal [".at (" + (Date.new 2020 1 2).pretty + ")"]
+
+        group_builder.specify "labels count with a thousands separator and a singular" <|
+            (Viz_Tree.from [1]).label . should_equal "[1 item]"
+            (Viz_Tree.from (Vector.fill 1234 0)).label . should_equal "[1,234 items]"
+            (Viz_Tree.from (Json.parse '{"a":1}')).label . should_equal "{1 key}"
+
+        group_builder.specify "any other value is its to_js_object, with no node expressions at any depth" <|
+            tree = Viz_Tree.from (Atom.Value 1 [2, 3])
+            tree.kind . should_equal "object"
+            keys_of tree . should_equal ["type", "constructor", "x", "y"]
+            exprs_of tree . should_equal [Nothing, Nothing, Nothing, Nothing]
+            exprs_of (child_tree tree "y") . should_equal [Nothing, Nothing]
+
+        group_builder.specify "a value whose to_js_object panics shows its text and the error" <|
+            keys_of (Viz_Tree.from Bad.Value) . should_equal ["value", "_to_js_object_error_"]
+
+        group_builder.specify "an error inside a vector is the error's JSON, with no node expressions" <|
+            tree = Viz_Tree.from [1, Error.throw (Illegal_Argument.Error "boom")]
+            item = child_tree tree 1
+            keys_of item . should_equal ["type", "content", "message"]
+            exprs_of item . should_equal [Nothing, Nothing, Nothing]
+
+    suite_builder.group "Viz_Tree paging and keys" group_builder->
+        tree = Viz_Tree.from (0.up_to 250 . to_vector)
+        group_builder.specify "the first page" <|
+            keys_of tree 0 100 . should_equal (0.up_to 100 . to_vector)
+
+        group_builder.specify "the last page is short" <|
+            keys_of tree 200 100 . should_equal (200.up_to 250 . to_vector)
+
+        group_builder.specify "a start at or past the end gives no children" <|
+            keys_of tree 250 100 . should_equal []
+            keys_of tree 300 100 . should_equal []
+
+        group_builder.specify "a negative start or count is an Illegal_Argument" <|
+            (tree.children (-1) 10) . should_fail_with Illegal_Argument
+            (tree.children 0 (-1)) . should_fail_with Illegal_Argument
+
+        group_builder.specify "child finds an array's child by index and an object's by key" <|
+            (child_tree tree 249).json_text . should_equal "249"
+            object = Viz_Tree.from (JS_Object.from_pairs (0.up_to 150 . map i-> ["k" + i.to_text, i]))
+            (child_tree object "k140").json_text . should_equal "140"
+
+        group_builder.specify "a large Vector's page at a high start has the right indices and values" <|
+            big = Viz_Tree.from (0.up_to 100000 . map i-> i * 2)
+            page = big.children 99950 100
+            page.map .key . should_equal (99950.up_to 100000 . to_vector)
+            page.map (c-> c.tree.json_text) . should_equal (99950.up_to 100000 . map i-> (i * 2).to_text)
+            page.map .node_expression . should_equal (99950.up_to 100000 . map i-> ".at " + i.to_text)
+            (child_tree big 99999).json_text . should_equal "199998"
+
+        group_builder.specify "child finds a key directly in each kind of object" <|
+            js = Viz_Tree.from (Json.parse '{"a":1,"b":{"c":2}}')
+            (child_tree js "a").json_text . should_equal "1"
+            (js.child "b").node_expression . should_equal (".get " + "b".pretty)
+            (js.child "z") . should_fail_with Illegal_Argument
+            (js.child 0) . should_fail_with Illegal_Argument
+            by_text = Viz_Tree.from (Dictionary.from_vector [["k", 1], [2, "two"], [2.5, "float"], [Date.new 2020 1 2, "date"]])
+            (child_tree by_text "k").json_text . should_equal "1"
+            (child_tree by_text 2).json_text . should_equal '"two"'
+            (by_text.child "2.5").node_expression . should_equal ".at 2.5"
+            (child_tree by_text "2.5").json_text . should_equal '"float"'
+            (by_text.child "2020-01-02").node_expression . should_equal (".at (" + (Date.new 2020 1 2).pretty + ")")
+            (by_text.child "nope") . should_fail_with Illegal_Argument
+            (by_text.child 7) . should_fail_with Illegal_Argument
+            ((Viz_Tree.from [10, 20]).child (-1)) . should_fail_with Illegal_Argument
+            ((Viz_Tree.from [10, 20]).child 2) . should_fail_with Illegal_Argument
+
+        group_builder.specify "a Dictionary's Float key is found by an equal Integer and by its display text" <|
+            floaty = Viz_Tree.from (Dictionary.from_vector [[2.0, "f"]])
+            keys_of floaty . should_equal ["2.0"]
+            ## An Integer key is a direct lookup, and Enso treats `2` and `2.0`
+               as the same key, so it finds the entry; the child is shown under
+               the key that was asked for.
+            by_integer = floaty.child 2
+            by_integer.key . should_equal 2
+            by_integer.node_expression . should_equal ".at 2"
+            by_integer.tree.json_text . should_equal '"f"'
+            ## The display text finds it through the search and keeps the
+               stored key's expression.
+            by_text = floaty.child "2.0"
+            by_text.key . should_equal "2.0"
+            by_text.node_expression . should_equal ".at 2.0"
+            by_text.tree.json_text . should_equal '"f"'
+
+        group_builder.specify "child of a missing key or of a leaf is an Illegal_Argument" <|
+            (tree.child 250) . should_fail_with Illegal_Argument
+            (tree.child "x") . should_fail_with Illegal_Argument
+            ((Viz_Tree.from 1).child 0) . should_fail_with Illegal_Argument
+
+        group_builder.specify "a Text key on a paged array misses without reading any page" <|
+            calls = Ref.new 0
+            page start end =
+                calls.put (calls.get + 1)
+                start.up_to end . map i-> Viz_Tree_Child.Value i (Viz_Tree.from i) (".at " + i.to_text)
+            big = Viz_Tree.paged "array" 1000000 "[1,000,000 items]" page
+            (big.child "x") . should_fail_with Illegal_Argument
+            (big.child "x").catch.message . should_equal "No child has the key 'x'."
+            calls.get . should_equal 0
+            (big.child 3).key . should_equal 3
+            calls.get . should_equal 1
+
+    suite_builder.group "Tree.prepare and Tree.children" group_builder->
+        value = Json.parse '{"name":"John","tags":["a","b"],"address":{"city":"Leeds"}}'
+        keys_in json = json.get "entries" . map (e-> e.get "key")
+        values_in json = json.get "entries" . map (e-> e.get "value")
+
+        group_builder.specify "prepare sends the root and its first page" <|
+            json = Json.parse (Tree.prepare value)
+            json.get "root" . get "kind" . should_equal "object"
+            json.get "root" . get "label" . should_equal "{3 keys}"
+            keys_in (json.get "children") . should_equal ["name", "tags", "address"]
+
+        group_builder.specify "prepare of a scalar is a leaf with no children" <|
+            json = Json.parse (Tree.prepare 42)
+            json.get "root" . get "value" . should_equal 42
+            json.contains_key "children" . should_be_false
+
+        group_builder.specify "prepare sends at most one page" <|
+            json = Json.parse (Tree.prepare (0.up_to 1000 . to_vector))
+            json.get "root" . get "size" . should_equal 1000
+            (json.get "children" . get "entries").length . should_equal 100
+
+        group_builder.specify "children walks a path of keys and indices" <|
+            page = Json.parse (Tree.children value ["tags"] 1 100)
+            page.get "start" . should_equal 1
+            page.get "size" . should_equal 2
+            values_in page . should_equal ["b"]
+            values_in (Json.parse (Tree.children [[1, [2, 3]]] [0, 1] 0 100)) . should_equal [2, 3]
+
+        group_builder.specify "children walks through a Dictionary" <|
+            values_in (Json.parse (Tree.children (Dictionary.from_vector [["k", [7, 8]]]) ["k"] 0 100)) . should_equal [7, 8]
+
+        group_builder.specify "a start past the end is an empty page" <|
+            page = Json.parse (Tree.children value ["tags"] 5 100)
+            page.get "entries" . should_equal []
+
+        group_builder.specify "a missing key, a leaf, or a negative start is an error message" <|
+            (Json.parse (Tree.children value ["nope"] 0 100)).get "error" . should_contain "nope"
+            (Json.parse (Tree.children value ["name"] 0 100)).get "error" . should_contain "leaf"
+            (Json.parse (Tree.children value ["name", 0] 0 100)).get "error" . should_contain "0"
+            (Json.parse (Tree.children value ["tags"] (-1) 100)).get "error" . should_contain "negative"
+
+        group_builder.specify "a dataflow error shows its payload" <|
+            json = Json.parse (Tree.prepare (Error.throw (Illegal_Argument.Error "boom")))
+            keys_in (json.get "children") . should_contain "message"
+
+        group_builder.specify "a user type's own conversion picks its children, label and node expressions" <|
+            tree = Viz_Tree.from (Person.Value "Ann" 41)
+            tree.label . should_equal "Person Ann"
+            keys_of tree . should_equal ["name", "age"]
+            exprs_of tree . should_equal [".name", ".age"]
+            page = Json.parse (Tree.children [Person.Value "Ann" 41] [0] 0 100)
+            page.get "entries" . map (e-> e.get "expr") . should_equal [".name", ".age"]
+
+    suite_builder.group "Viz_Tree of Table, Column, Row and XML" group_builder->
+        table = Table.new [["x", [1, 2, 3]], ["label", ["a", "b", "c"]]]
+
+        group_builder.specify "a Table is a summary of its row count, columns and rows" <|
+            tree = Viz_Tree.from table
+            tree.label . should_equal "Table (3 rows, 2 columns)"
+            keys_of tree . should_equal ["row_count", "columns", "rows"]
+            exprs_of tree . should_equal [".row_count", ".columns", ".rows"]
+            (child_tree tree "row_count").json_text . should_equal "3"
+            (child_tree tree "columns").label . should_equal "[2 columns]"
+            exprs_of (child_tree tree "columns") . should_equal [".at 0", ".at 1"]
+
+        group_builder.specify "a Table's rows are read a page at a time" <|
+            rows = child_tree (Viz_Tree.from table) "rows"
+            rows.label . should_equal "[3 rows]"
+            page = rows.children 1 100
+            page.map .key . should_equal [1, 2]
+            page.map .node_expression . should_equal [".at 1", ".at 2"]
+            row = page.first.tree
+            row.label . should_equal "Row (2 values)"
+            keys_of row . should_equal ["x", "label"]
+            exprs_of row . should_equal [".at " + "x".pretty, ".at " + "label".pretty]
+            (child_tree row "x").json_text . should_equal "2"
+
+        group_builder.specify "a Row's child finds a column holding Nothing, and a missing name or index is an error" <|
+            sparse = Table.new [["x", [1, Nothing]], ["y", ["a", "b"]]]
+            row = child_tree (child_tree (Viz_Tree.from sparse) "rows") 1
+            (child_tree row "x").json_text . should_equal "null"
+            (row.child "x").node_expression . should_equal (".at " + "x".pretty)
+            (row.child "z") . should_fail_with Illegal_Argument
+            (row.child 0) . should_fail_with Illegal_Argument
+
+        group_builder.specify "an in-memory Table's rows and columns pages at a high start have the right indices and values" <|
+            big = Table.new [["x", 0.up_to 1000 . to_vector], ["y", 0.up_to 1000 . map i-> "v" + i.to_text]]
+            rows = child_tree (Viz_Tree.from big) "rows"
+            page = rows.children 950 100
+            page.map .key . should_equal (950.up_to 1000 . to_vector)
+            page.map .node_expression . should_equal (950.up_to 1000 . map i-> ".at " + i.to_text)
+            (page.map c-> (c.tree.child "x").tree.json_text) . should_equal (950.up_to 1000 . map .to_text)
+            (page.map c-> (c.tree.child "y").tree.json_text) . should_equal (950.up_to 1000 . map i-> ("v" + i.to_text).to_json)
+            (rows.children 1000 100) . should_equal []
+            (child_tree rows 999 . child "y").tree.json_text . should_equal '"v999"'
+            (rows.child 1000) . should_fail_with Illegal_Argument
+            columns = child_tree (Viz_Tree.from big) "columns"
+            (child_tree columns 1).label . should_equal 'Column "y" (1,000 rows)'
+            (columns.child 2) . should_fail_with Illegal_Argument
+            row = child_tree rows 5
+            (child_tree row "y").json_text . should_equal '"v5"'
+            (row.child "z") . should_fail_with Illegal_Argument
+
+        group_builder.specify "an in-memory Column's page at a high start has the right indices and values" <|
+            column = Table.new [["c", 0.up_to 1000 . map i-> i * 3]] . at "c"
+            tree = Viz_Tree.from column
+            page = tree.children 920 100
+            page.map .key . should_equal (920.up_to 1000 . to_vector)
+            page.map (c-> c.tree.json_text) . should_equal (920.up_to 1000 . map i-> (i * 3).to_text)
+            page.map .node_expression . should_equal (920.up_to 1000 . map i-> ".at " + i.to_text)
+            (child_tree tree 999).json_text . should_equal "2997"
+            (tree.child 1000) . should_fail_with Illegal_Argument
+
+        group_builder.specify "a Column is an array of its values" <|
+            tree = Viz_Tree.from (table.at "label")
+            tree.label . should_equal 'Column "label" (3 rows)'
+            keys_of tree 1 100 . should_equal [1, 2]
+            exprs_of tree 1 100 . should_equal [".at 1", ".at 2"]
+            (child_tree tree 2).json_text . should_equal '"c"'
+
+        group_builder.specify "a database table reads only the page of rows asked for, and has no .rows expression" <|
+            connection = Database.connect SQLite.In_Memory
+            db_table = table.select_into_database_table connection "tree_rows" temporary=True
+            tree = Viz_Tree.from db_table
+            tree.label . should_equal "Table (3 rows, 2 columns)"
+            exprs_of tree . should_equal [".row_count", ".columns", Nothing]
+            keys_of (child_tree tree "rows") 2 100 . should_equal [2]
+            keys_of (child_tree (child_tree tree "columns") 0) . should_equal [0, 1, 2]
+            connection.close
+
+        group_builder.specify "a Text key on a database table's rows misses at once, without reading the table" <|
+            connection = Database.connect SQLite.In_Memory
+            big = Table.new [["x", 0.up_to 3000 . to_vector]]
+            db_table = big.select_into_database_table connection "tree_big_rows" temporary=True
+            rows = child_tree (Viz_Tree.from db_table) "rows"
+            (rows.child "x") . should_fail_with Illegal_Argument
+            (rows.child "x").catch.message . should_equal "No child has the key 'x'."
+            (Json.parse (Tree.children db_table ["rows", "x"] 0 100)).get "error" . should_contain "x"
+            (rows.child 2999).key . should_equal 2999
+            connection.close
+
+        group_builder.specify "children walks into a Table's rows" <|
+            page = Json.parse (Tree.children table ["rows", 0] 0 100)
+            page.get "entries" . map (e-> e.get "value") . should_equal [1, "a"]
+
+        group_builder.specify "an XML document is its root element; an element is its attributes and children" <|
+            doc = XML_Document.parse '<foo id="10"><bar>hello</bar>text</foo>'
+            tree = Viz_Tree.from doc
+            tree.label . should_equal "XML_Document (<foo>)"
+            keys_of tree . should_equal ["foo"]
+            exprs_of tree . should_equal [".root_element"]
+            root = child_tree tree "foo"
+            root.label . should_equal "<foo> (1 attribute, 2 children)"
+            keys_of root . should_equal ["@id", 0, 1]
+            exprs_of root . should_equal [".at " + "@id".pretty, ".at 0", ".at 1"]
+            (child_tree root "@id").json_text . should_equal '"10"'
+            (child_tree root 1).json_text . should_equal '"text"'
+            keys_of root 1 100 . should_equal [0, 1]
+            keys_of root 2 1 . should_equal [1]
+            (child_tree root 0).label . should_equal "<bar> (0 attributes, 1 child)"
+
+        group_builder.specify "child of an XML element misses with the same error as a page scan" <|
+            root = child_tree (Viz_Tree.from (XML_Document.parse '<foo id="10"><bar>hello</bar>text</foo>')) "foo"
+            (root.child "@nope") . should_fail_with Illegal_Argument
+            (root.child "id") . should_fail_with Illegal_Argument
+            (root.child 2) . should_fail_with Illegal_Argument
+            (root.child (-1)) . should_fail_with Illegal_Argument
+            (root.child "@nope").catch.message . should_equal "No child has the key '@nope'."
+            (root.child "id").catch.message . should_equal "No child has the key 'id'."
+            (root.child 2).catch.message . should_equal "No child has the key 2."
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter
