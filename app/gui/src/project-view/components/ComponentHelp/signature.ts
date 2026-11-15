@@ -1,13 +1,8 @@
 import { isRequiredArgument } from '$/providers/openedProjects/suggestionDatabase/argument'
 import type { CallableSuggestionEntry } from '$/providers/openedProjects/suggestionDatabase/entry'
+import { unqualifiedType } from '@/components/ComponentHelp/arguments'
 
-/** A qualified name inside a type expression (`Standard.Base.Data.Text.Text`). */
-const QUALIFIED_NAME = /\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b/g
-
-/** A type expression with each qualified name shortened to its last segment. */
-export function unqualifiedType(type: string): string {
-  return type.replace(QUALIFIED_NAME, (name) => name.slice(name.lastIndexOf('.') + 1))
-}
+export { unqualifiedType } from '@/components/ComponentHelp/arguments'
 
 /** One argument of a {@link Signature}. */
 export interface SignatureParam {
