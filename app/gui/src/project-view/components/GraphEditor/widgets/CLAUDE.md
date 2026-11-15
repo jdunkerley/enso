@@ -55,6 +55,17 @@ is already on the row, drawn by `WidgetIcon` at the root.
 - `WidgetIcon.vue` — owns the `DisplayIcon` symbol. Other widgets attach to it
   via `input[DisplayIcon] = { icon, showContents?, noGap? }` to request an
   inline icon in front of a child widget.
+- `WidgetDate.vue` — a chip (`Today`, `Yesterday`, `Tomorrow`, `2020-01-15`, or
+  `Pick a date`) for a `Date`-typed argument or item and for the four shapes
+  `Date.today`, `Date.today.previous`, `Date.today.next` and
+  `Date.new <y> <m> <d>`, with a menu (`WidgetDate/DateMenu.vue`: the three
+  relative days, then a Reka calendar). Priority 140: after
+  `WidgetArgumentName`, before `WidgetFunction`; its comment explains it.
+  `WidgetDate/dateExpression.ts` is the framework-free expression <-> label
+  mapping. A specific date is written parenthesised (`(Date.new 2020 1 15)`)
+  wherever it becomes an argument: an unparenthesised application written as a
+  string splits into one group per argument. Design:
+  `docs/superpowers/specs/2026-11-15-date-widget-design.md`.
 - `WidgetFileBrowser.vue` — a file, folder or `Enso_Secret` argument's dropdown:
   `WidgetFileBrowser/localBrowser.ts` (the native file dialog),
   `localSecrets.ts` (the local secrets and **New secret…**, which set
