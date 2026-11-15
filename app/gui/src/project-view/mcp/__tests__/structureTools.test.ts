@@ -160,6 +160,7 @@ test('collapse_nodes reports why the nodes cannot be collapsed', async () => {
 test('collapse_nodes in Live mode is refused by the session', async () => {
   const session = new EditSession({
     isLive: () => true,
+    isActive: () => true,
     holdUndoStep: () => () => {},
     onForeignEdit: () => () => {},
     saveVersion: async () => {},

@@ -254,6 +254,7 @@ test('add_nodes reports an error from creating the nodes', async () => {
 test('add_nodes in Live mode is refused by the session, and nothing is created', async () => {
   const session = new EditSession({
     isLive: () => true,
+    isActive: () => true,
     holdUndoStep: () => () => {},
     onForeignEdit: () => () => {},
     saveVersion: async () => {},

@@ -10,6 +10,10 @@ import { expect, test, type Page } from 'integration-test/base'
 import { mockExecutionComplete } from 'integration-test/mock/lsHandler'
 import * as locate from './locate'
 
+// Each test opens the project and makes several edits, each waiting for the graph and an
+// execution: the first test of a worker took ~20 s of the default 25 s on a cold dev server.
+test.setTimeout(60_000)
+
 interface ToolResult {
   ok: boolean
   value?: string

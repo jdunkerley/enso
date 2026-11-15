@@ -20,9 +20,13 @@ export const LIVE_EDIT_ERROR =
   'The project is in Live mode. Edits by an agent are refused there. Ask the user to switch the project back to Design.'
 /** The answer to an edit after the session was disposed. */
 export const PROJECT_CLOSED_ERROR = 'The project is no longer open.'
+/** The answer to an edit whose turn comes while the project's editor is not on screen. */
+export const NOT_ON_SCREEN_ERROR = 'The project is no longer on screen.'
 
 export interface EditSessionDeps {
   readonly isLive: () => boolean
+  /** Whether the project's editor is on screen; a hidden project is never edited. */
+  readonly isActive: () => boolean
   /** Starts holding one undo step; returns the release function (idempotent). */
   readonly holdUndoStep: () => () => void
   /** Calls `listener` before any module edit that the session did not make; returns unsubscribe. */
@@ -77,7 +81,8 @@ export class EditSession {
   }
 
   /**
-   * Runs one edit: queued behind earlier ones; refused in Live; joins or starts the caller's undo
+   * Runs one edit: queued behind earlier ones; refused in Live and while the editor is not on
+   * screen (checked at its turn and again after the version save; a run past both finishes); joins or starts the caller's undo
    * step (saving a version before the first edit of a step); runs `edit` marked as the session's
    * own; waits for the graph update and for execution to settle.
    * `edit` returns Err to refuse without changing anything.
@@ -138,6 +143,7 @@ export class EditSession {
   ): Promise<Result<EditOutcome<T>>> {
     try {
       if (this.disposed) return Err(PROJECT_CLOSED_ERROR)
+      if (!this.deps.isActive()) return Err(NOT_ON_SCREEN_ERROR)
       // The idle period is measured from the end of a run, so none is pending while one runs.
       this.clearIdleTimer()
       if (this.deps.isLive()) return Err(LIVE_EDIT_ERROR)
@@ -150,6 +156,8 @@ export class EditSession {
           return Err(errorText(error))
         }
         if (this.disposed) return Err(PROJECT_CLOSED_ERROR)
+        // The tab may have been switched while the version was saving.
+        if (!this.deps.isActive()) return Err(NOT_ON_SCREEN_ERROR)
         this.release = this.deps.holdUndoStep()
         this.stepCaller = key
       }

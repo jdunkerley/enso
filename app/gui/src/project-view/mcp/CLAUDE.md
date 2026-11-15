@@ -128,6 +128,17 @@ Live (`LIVE_EDIT_ERROR`, read at the call's turn). Before a caller's first edit
 of a step it saves a version (`Before changes by <caller>`; the edit is refused
 when that fails) and holds an undo step, which the same caller's further edits
 join. After each edit it waits for the graph update, then for the execution.
+
+**A hidden editor never edits.** Removing the handlers on `onDeactivated` stops
+new calls, but not the ones already in the session: one queued behind a running
+edit (which can take 20 s), or one awaiting the version save. So the session
+checks `isActive` (true from setup and each `onActivated` until `onDeactivated`)
+at a run's turn and again after the version save, beside the `disposed` checks.
+An inactive session answers `NOT_ON_SCREEN_ERROR` ("The project is no longer on
+screen."), takes no hold and does not call `edit`. A run already past both
+checks, which is editing or waiting to settle, finishes normally; deactivation
+then releases its step.
+
 Constants:
 
 - `EDIT_STEP_IDLE_MS` (10 s): a step ends after that long without an edit by its

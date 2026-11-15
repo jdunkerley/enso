@@ -6,6 +6,7 @@ import {
   EDIT_STEP_IDLE_MS,
   EditSession,
   LIVE_EDIT_ERROR,
+  NOT_ON_SCREEN_ERROR,
   type EditSessionDeps,
 } from '../editSession'
 
@@ -20,6 +21,7 @@ function errorOf(result: Result<unknown>): string {
 function setup(overrides: Partial<EditSessionDeps> = {}) {
   const log: string[] = []
   let live = false
+  let active = true
   let foreign: (() => void) | undefined
   let failNextSetTimeout = false
   const timers: { f: () => void; ms: number; handle: number; cleared: boolean }[] = []
@@ -29,6 +31,7 @@ function setup(overrides: Partial<EditSessionDeps> = {}) {
   })
   const deps: EditSessionDeps = {
     isLive: () => live,
+    isActive: () => active,
     holdUndoStep: vi.fn(() => {
       log.push('hold')
       return release
@@ -68,6 +71,9 @@ function setup(overrides: Partial<EditSessionDeps> = {}) {
     pending,
     setLive: (v: boolean) => {
       live = v
+    },
+    setActive: (v: boolean) => {
+      active = v
     },
     foreign: () => foreign?.(),
     failNextSetTimeout: () => {
@@ -351,5 +357,54 @@ describe('EditSession', () => {
     const edit = vi.fn(() => Ok(1))
     expect(errorOf(await t.session.run(claude, edit))).toBe('The project is no longer open.')
     expect(edit).not.toHaveBeenCalled()
+  })
+
+  test('an inactive session refuses without saving, holding or editing', async () => {
+    t.setActive(false)
+    const edit = vi.fn(() => Ok(1))
+    expect(errorOf(await t.session.run(claude, edit))).toBe(NOT_ON_SCREEN_ERROR)
+    expect(NOT_ON_SCREEN_ERROR).toBe('The project is no longer on screen.')
+    expect(t.deps.saveVersion).not.toHaveBeenCalled()
+    expect(t.deps.holdUndoStep).not.toHaveBeenCalled()
+    expect(edit).not.toHaveBeenCalled()
+  })
+
+  test('deactivated while the version is saving: refused, no hold, no edit', async () => {
+    let finishSave: () => void = () => {}
+    const t2 = setup({
+      saveVersion: vi.fn(() => new Promise<void>((resolve) => (finishSave = resolve))),
+    })
+    const edit = vi.fn(() => Ok(1))
+    const result = t2.session.run(claude, edit)
+    await vi.waitFor(() => expect(t2.deps.saveVersion).toHaveBeenCalled())
+    t2.setActive(false)
+    finishSave()
+    expect(errorOf(await result)).toBe(NOT_ON_SCREEN_ERROR)
+    expect(t2.deps.holdUndoStep).not.toHaveBeenCalled()
+    expect(edit).not.toHaveBeenCalled()
+  })
+
+  test('a run queued behind one in progress is refused when its turn comes after deactivation', async () => {
+    let finishSettle: ((settled: boolean) => void) | undefined
+    const t2 = setup({
+      executionSettled: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
+    })
+    const first = t2.session.run(claude, () => Ok(1))
+    const secondEdit = vi.fn(() => Ok(2))
+    const second = t2.session.run(claude, secondEdit)
+    await vi.waitFor(() => expect(finishSettle).toBeDefined())
+    t2.setActive(false)
+    finishSettle!(true)
+    // The run already past its checks finishes normally.
+    expect(await first).toEqual(Ok({ value: 1, settled: true }))
+    expect(errorOf(await second)).toBe(NOT_ON_SCREEN_ERROR)
+    expect(secondEdit).not.toHaveBeenCalled()
+  })
+
+  test('after reactivation runs work again', async () => {
+    t.setActive(false)
+    expect((await t.session.run(claude, () => Ok(1))).ok).toBe(false)
+    t.setActive(true)
+    expect(await t.session.run(claude, () => Ok(2))).toEqual(Ok({ value: 2, settled: true }))
   })
 })

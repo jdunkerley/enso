@@ -107,6 +107,16 @@ class FakeContext extends ObservableV2<{
   }
 }
 
+test('after the timeout, the left-behind update callback does nothing', async () => {
+  let callback: (() => void) | undefined
+  void afterGraphUpdate({ doAfterUpdate: (f: () => void) => (callback = f) }, 1_000)
+  await vi.advanceTimersByTimeAsync(1_000)
+  const clear = vi.spyOn(globalThis, 'clearTimeout')
+  callback!()
+  expect(clear).not.toHaveBeenCalled()
+  clear.mockRestore()
+})
+
 test('executionSettled resolves true on completion or failure and removes both listeners', async () => {
   const context = new FakeContext()
   const complete = executionSettled(context, 1_000)

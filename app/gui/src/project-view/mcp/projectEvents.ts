@@ -51,14 +51,24 @@ export function onUserModuleTransaction(
   }
 }
 
-/** Resolves once `doAfterUpdate` runs its callback, or after `timeoutMs`, whichever is first. */
+/**
+ * Resolves once `doAfterUpdate` runs its callback, or after `timeoutMs`, whichever is first. The
+ * store's list has no removal, so after the timeout the callback stays there until the next update,
+ * and does nothing then.
+ */
 export function afterGraphUpdate(
   graph: { doAfterUpdate: (f: () => void) => void },
   timeoutMs: number,
 ): Promise<void> {
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, timeoutMs)
+    let done = false
+    const timer = setTimeout(() => {
+      done = true
+      resolve()
+    }, timeoutMs)
     graph.doAfterUpdate(() => {
+      if (done) return
+      done = true
       clearTimeout(timer)
       resolve()
     })

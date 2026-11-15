@@ -82,9 +82,15 @@ export function useProjectMcpTools(
   currentProject: CurrentProjectStore = useCurrentProject(),
 ): void {
   const localVersioning = useLocalVersioning()
+  /**
+   * Whether this editor is on screen: from setup (an editor mounts on screen) and each
+   * `onActivated` until `onDeactivated`. An edit whose turn comes while it is hidden is refused.
+   */
+  let active = true
 
   const session = new EditSession({
     isLive: () => isLive(currentProject.store.value),
+    isActive: () => active,
     holdUndoStep: () => {
       const undoManager = currentProject.module.value.undoManager
       // A step held by something else (a node drag) does not end when ours starts or ends: end
@@ -368,8 +374,12 @@ export function useProjectMcpTools(
     },
   }
   const registration = registerMcpToolHandlers(handlers)
-  onActivated(registration.activate)
+  onActivated(() => {
+    active = true
+    registration.activate()
+  })
   onDeactivated(() => {
+    active = false
     registration.remove()
     // The user left this project: an agent's next edit here is a step of its own.
     session.releaseStep()
