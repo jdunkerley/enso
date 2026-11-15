@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [External agent apps (Claude Code, Codex, GitHub Copilot) can connect to the
+  IDE over MCP and read the open project][776]
 - [A component whose value is an image opens in the Image visualization.][758]
 - [Charts are offered for every value whose library can draw them, not a fixed
   list of types.][751]
@@ -495,6 +497,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[776]: https://github.com/jdunkerley/enso/pull/776
 [735]: https://github.com/jdunkerley/enso/pull/735
 [758]: https://github.com/jdunkerley/enso/pull/758
 [751]: https://github.com/jdunkerley/enso/pull/751
