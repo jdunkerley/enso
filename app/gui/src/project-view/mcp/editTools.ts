@@ -7,7 +7,7 @@
 import type { Node, NodeId } from '$/providers/openedProjects/graph/graphDatabase'
 import { Ast } from '@/util/ast'
 import { nodeMutableDocumentation } from '@/util/ast/node'
-import { isIdentifier } from '@/util/qualifiedName'
+import { isIdentifier, type Identifier } from '@/util/qualifiedName'
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import type { EditOutcome, EditSession } from './editSession'
@@ -114,8 +114,8 @@ function functionDefError(ast: Ast.FunctionDef, quoted: string): Result<never> {
     : Err(`\`${quoted}\` is a function definition. Add functions with add_function.`)
 }
 
-/** A lexical identifier starting with a lowercase letter: what a node can be named. */
-function isPlainName(name: string): boolean {
+/** A lexical identifier starting with a lowercase letter: what a node or a function can be named. */
+export function isPlainName(name: string): name is Identifier {
   return isIdentifier(name) && /^[a-z]/.test(name)
 }
 
@@ -188,7 +188,7 @@ export async function addNodes(
   const summaries: NodeSummary[] = []
   for (const id of outcome.value.value) {
     const node = deps.db.nodeIdToNode.get(id)
-    if (node != null) summaries.push(summary(deps, id, node))
+    if (node != null) summaries.push(cappedSummary(deps, id, node))
   }
   const notes = [
     ...(outcome.value.settled ? [] : [UNSETTLED_NOTE]),
@@ -276,17 +276,18 @@ export async function setVisualization(
   return jsonResult({ node: currentSummary(deps, found.value) })
 }
 
-function summary(deps: GraphToolDeps, id: NodeId, node: Node): NodeSummary {
+/** The node's summary, its texts capped as `get_graph` caps them. */
+export function cappedSummary(deps: GraphToolDeps, id: NodeId, node: Node): NodeSummary {
   return capNodeTexts(summarizeNode(deps, id, node))
 }
 
 /** The node's summary as the graph has it after the edit; as found before, if it is gone. */
 function currentSummary(deps: GraphToolDeps, { id, node }: FoundNode): NodeSummary {
-  return summary(deps, id, deps.db.nodeIdToNode.get(id) ?? node)
+  return cappedSummary(deps, id, deps.db.nodeIdToNode.get(id) ?? node)
 }
 
 /** `value` with `settled`, and the note when execution has not finished. */
-function settledResult(value: object, outcome: EditOutcome<unknown>): McpToolResult {
+export function settledResult(value: object, outcome: EditOutcome<unknown>): McpToolResult {
   return jsonResult({
     ...value,
     settled: outcome.settled,
@@ -294,11 +295,13 @@ function settledResult(value: object, outcome: EditOutcome<unknown>): McpToolRes
   })
 }
 
-function toolError(error: string): McpToolResult {
+/** A refusal with this text. */
+export function toolError(error: string): McpToolResult {
   return { ok: false, error }
 }
 
-function errorResult(
+/** A refusal with the error's text (after `preamble`), capped at {@link EDIT_ERROR_CHARS}. */
+export function errorResult(
   result: { ok: false; error: { message(preamble: string): string } },
   preamble = '',
 ) {

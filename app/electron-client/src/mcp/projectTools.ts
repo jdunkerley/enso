@@ -187,8 +187,11 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       title: 'Collapse nodes into a function',
       description:
         'Group the nodes in `node_ids` (from `get_graph`) into one new function, replaced ' +
-        'in the graph by a single node that calls it. `name` names the function (a name is ' +
-        'generated without it). Use it to keep a long graph readable. Returns the new node ' +
+        'in the graph by a single node that calls it. `name` names the function: a lowercase ' +
+        'name such as `clean_names` (a name is generated without it; a number is added when ' +
+        'the name is taken). Use it to keep a long graph readable. Refused when more than ' +
+        'one of the nodes is used by nodes outside the group: the function returns one value. ' +
+        'Returns `name`, the name the function got, `node`, the new node ' +
         'with its type and any error, and `settled`.' +
         EDIT_RULES,
       inputSchema: {
@@ -205,8 +208,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'arguments, `=`, and an indented body, for example `double x =\n    x * 2`), added ' +
         'to the module. A name already defined in the module is refused. Call it from a node ' +
         'as `Main.<name> args` (the form the IDE uses for the functions it generates), ' +
-        "for example with `add_nodes`. The result gives the function's name, and any error " +
-        'in its definition.' +
+        "for example with `add_nodes`. Returns the function's `name` and `settled`; an error in " +
+        'its definition shows on the nodes that call it.' +
         EDIT_RULES,
       inputSchema: { source: z.string().min(1).max(100_000) },
       run: forward('add_function', EDIT_TOOL_TIMEOUT_MS),
