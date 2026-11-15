@@ -17,6 +17,10 @@ The table visualisation (`../TableVisualization.vue`) and its helpers.
   the snapshot unchanged (regenerate the goldens, not the snapshot); a change to
   the snapshot is a visible change.
 - `TableVizDataSourceUtils.ts`: the server-side requests (sort, filter, page).
+  The component (`../TableVisualization.vue`, `getData`) requests a row page
+  with no timeout (`executeExpression(…, null)`): a busy engine answers late,
+  and a page settled empty showed "No Rows To Show" (#777, Note [Row Pages Wait
+  For The Engine]).
 - `tableVizFilterSetUpUtils.ts`, `tableVizFilterUtils.ts`,
   `CommunitySetFilter.ts`: the filters. `TableVisualisationTooltip.ts`: the
   header tooltip with the data quality metrics. `tableVizToolbar.ts`: the
