@@ -2,9 +2,12 @@
 import type { McpToolCallReply, McpToolCallRequest } from 'enso-common/src/mcp'
 import { afterEach, expect, test, vi } from 'vitest'
 import {
+  hasProjectTools,
   NO_PROJECT_ERROR,
+  registerMcpAppToolHandlers,
   registerMcpToolHandlers,
   startMcpToolDispatcher,
+  whenProjectToolsActivated,
   type McpToolHandler,
 } from '../toolDispatcher'
 
@@ -135,4 +138,95 @@ test('Stopping the dispatcher unsubscribes from the api', () => {
   expect(fake.unsubscribe).not.toHaveBeenCalled()
   stop()
   expect(fake.unsubscribe).toHaveBeenCalledOnce()
+})
+
+// === App tools ===
+
+/** App handlers registered as the app shell registers them: once, whatever page shows. */
+function app(handlers: Record<string, McpToolHandler>) {
+  const unregister = registerMcpAppToolHandlers(handlers)
+  cleanups.push(unregister)
+  return unregister
+}
+
+test('App tools answer on the dashboard, while project tools there still say no project is open', async () => {
+  const { call } = start()
+  app({ get_app_state: async () => ({ ok: true, value: 'dashboard' }) })
+  expect((await call({ requestId: 'a1', tool: 'get_app_state', args: {}, caller })).result).toEqual(
+    { ok: true, value: 'dashboard' },
+  )
+  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR })
+})
+
+test('App tools answer whichever project is on screen or hidden', async () => {
+  const { call } = start()
+  app({ get_app_state: async () => ({ ok: true, value: 'app' }) })
+  const a = project('A')
+  const appState = async () =>
+    (await call({ requestId: `s${nextId++}`, tool: 'get_app_state', args: {}, caller })).result
+  expect(await appState()).toEqual({ ok: true, value: 'app' })
+  expect(await graphFrom(call)).toEqual({ ok: true, value: 'A' })
+  a.remove()
+  expect(await appState()).toEqual({ ok: true, value: 'app' })
+  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR })
+})
+
+test('App tools do not count as project tools being shown', () => {
+  app({ get_app_state: async () => ({ ok: true, value: 'app' }) })
+  expect(hasProjectTools()).toBe(false)
+  const a = project('A')
+  expect(hasProjectTools()).toBe(true)
+  a.remove()
+  expect(hasProjectTools()).toBe(false)
+})
+
+test('Unregistering the app tools stops them answering', async () => {
+  const { call } = start()
+  const unregister = app({ list_projects: async () => ({ ok: true, value: '[]' }) })
+  unregister()
+  expect((await call({ requestId: 'a2', tool: 'list_projects', args: {}, caller })).result).toEqual(
+    { ok: false, error: NO_PROJECT_ERROR },
+  )
+})
+
+test('whenProjectToolsActivated resolves true at the next project registration', async () => {
+  const activated = whenProjectToolsActivated(10_000)
+  project('A')
+  await expect(activated).resolves.toBe(true)
+})
+
+test('whenProjectToolsActivated resolves true when a removed project is activated again', async () => {
+  const a = project('A')
+  a.remove()
+  const activated = whenProjectToolsActivated(10_000)
+  a.activate()
+  await expect(activated).resolves.toBe(true)
+})
+
+test('whenProjectToolsActivated waits for an activation after the call, not one before it', async () => {
+  vi.useFakeTimers()
+  try {
+    project('A')
+    const activated = whenProjectToolsActivated(1_000)
+    let settled: boolean | undefined
+    void activated.then((value) => (settled = value))
+    await vi.advanceTimersByTimeAsync(999)
+    expect(settled).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(settled).toBe(false)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('whenProjectToolsActivated is not resolved by the app tools registering', async () => {
+  vi.useFakeTimers()
+  try {
+    const activated = whenProjectToolsActivated(1_000)
+    app({ get_app_state: async () => ({ ok: true, value: 'app' }) })
+    await vi.advanceTimersByTimeAsync(1_000)
+    await expect(activated).resolves.toBe(false)
+  } finally {
+    vi.useRealTimers()
+  }
 })

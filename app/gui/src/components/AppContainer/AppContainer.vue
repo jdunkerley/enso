@@ -1,6 +1,7 @@
 <script lang="ts">
 import CommandPalette from '$/components/CommandPalette.vue'
 import ModalHost from '$/components/ModalHost/ModalHost.vue'
+import { useAppMcpTools } from '$/mcp/useAppMcpTools'
 import { useContainerData } from '$/providers/container'
 import { provideDriveLocation } from '$/providers/drive'
 import { useOpenedProjects } from '$/providers/openedProjects'
@@ -37,6 +38,8 @@ provideAsyncResources(openedProjects)
 provideRightPanelData(focusedPanel)
 provideFullscreenRoot(fullscreenRoot)
 provideDriveLocation()
+// The MCP app tools answer whatever page is showing, so the app shell registers them, once.
+useAppMcpTools()
 
 const actionHandlers = registerHandlers({
   'app.closeTab': {
