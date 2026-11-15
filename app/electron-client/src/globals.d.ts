@@ -79,6 +79,15 @@ declare global {
 
       // @ts-expect-error The index signature is intentional to disallow unknown env vars.
       readonly ENSO_SECRETS_KEY?: string
+
+      // === MCP server ===
+
+      // @ts-expect-error The index signature is intentional to disallow unknown env vars.
+      readonly ENSO_MCP_TOKEN?: string
+      // @ts-expect-error The index signature is intentional to disallow unknown env vars.
+      readonly ENSO_MCP_PORT?: string
+      // @ts-expect-error The index signature is intentional to disallow unknown env vars.
+      readonly ENSO_MCP_ENABLED?: string
     }
   }
 }

@@ -2,22 +2,30 @@ import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
 import { initJvmAotIpc } from '@/jvmAotIpc'
 import { resolveLogFileToReveal } from '@/logFileReveal'
+import { Guides, guideTool } from '@/mcp/guides'
+import { McpController } from '@/mcp/mcpController'
+import { McpHttpServer } from '@/mcp/mcpServer'
+import { projectTools } from '@/mcp/projectTools'
+import { ToolRegistry } from '@/mcp/toolRegistry'
+import { WindowBridge } from '@/mcp/windowBridge'
 import * as paths from '@/paths'
 import {
   getLocalSecrets,
   getSecretsKeySource,
   hasRunningProjects,
+  keyringEntries,
   refreshSpareEngine,
   stopSpareEngine,
 } from '@/projectService'
 import { resetSecrets, rotateSecretsKey } from '@/secretsKey'
 import { initUpdaterIpc } from '@/updaterIpc'
-import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import { download } from 'electron-dl'
 import electronUpdater from 'electron-updater'
 import type { DownloadUrlOptions } from 'enso-common/src/download'
+import { MCP_CLIENT_KINDS, type McpClientKind } from 'enso-common/src/mcp'
 import { unlinkSync } from 'node:fs'
-import { basename, dirname, extname } from 'node:path'
+import { basename, dirname, extname, join } from 'node:path'
 import {
   getEngineLogDirectory,
   importProjectFromPath,
@@ -69,6 +77,63 @@ export function registerShortcuts(electron: Electron) {
       }
     })
   })
+}
+
+let mcpController: McpController | null = null
+let mcpBridge: WindowBridge | null = null
+
+/** Stop the MCP server and drop the window bridge. A no-op before `initMcp` has run. */
+export async function shutdownMcp(): Promise<void> {
+  mcpBridge?.dispose()
+  mcpBridge = null
+  await mcpController?.shutdown()
+}
+
+/**
+ * Build the MCP server's pieces, register their IPC and start the server if the user turned it
+ * on. The token is written to the clipboard from here: no handler returns it to the renderer.
+ */
+function initMcp(electron: Electron | undefined, electronIsDev: boolean) {
+  const bridge = new WindowBridge(() => {
+    const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    return window?.webContents ?? null
+  }, ipcMain)
+  const guides = new Guides(paths.stdlibRoot(electron, electronIsDev))
+  const registry = new ToolRegistry()
+  for (const tool of projectTools(bridge)) registry.register(tool)
+  registry.register(guideTool(guides))
+  const controller = new McpController({
+    settingsPath: join(app.getPath('userData'), 'mcp-settings.json'),
+    entry: keyringEntries,
+    env: process.env,
+    createServer: (port, token) =>
+      new McpHttpServer({ registry, guides, port, token, version: BUILD_INFO.version }),
+    onStatusChanged: (status) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(Channel.mcpStatusChanged, status)
+      }
+    },
+  })
+  mcpBridge = bridge
+  mcpController = controller
+  ipcMain.handle(Channel.mcpStatus, () => controller.status())
+  ipcMain.handle(Channel.mcpSetEnabled, (_event, enabled: unknown) => {
+    if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean')
+    return controller.setEnabled(enabled)
+  })
+  ipcMain.handle(Channel.mcpSetPort, (_event, port: unknown) => {
+    if (typeof port !== 'number' || !Number.isInteger(port) || port < 1024 || port > 65535) {
+      throw new Error('The port must be a whole number from 1024 to 65535.')
+    }
+    return controller.setPort(port)
+  })
+  ipcMain.handle(Channel.mcpReplaceToken, () => controller.replaceToken())
+  ipcMain.handle(Channel.mcpCopyConfig, async (_event, client: unknown) => {
+    if (!MCP_CLIENT_KINDS.includes(client as McpClientKind)) throw new Error('Unknown MCP client')
+    clipboard.writeText(await controller.config(client as McpClientKind))
+  })
+  // Start-up must not wait for the server: it may be waiting on the keychain.
+  void controller.init()
 }
 
 /**
@@ -218,6 +283,8 @@ export function initIpc(
     const mcpConfigPath = await initAiMcpServer()
     initClaudeAgentIpc({ stdlibRoot, mcpConfigPath })
   })()
+
+  initMcp(electron, electronIsDev)
 
   // Handling navigation events from renderer process
   ipcMain.on(Channel.goBack, () => {
