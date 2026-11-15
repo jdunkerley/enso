@@ -1,0 +1,154 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Scatter plot > brush, one series 1`] = `"operator1.filter 'x' (..Between 0 10) . filter 'y' (..Between -1.5 3)"`;
+
+exports[`Scatter plot > brush, two series 1`] = `"operator1.filter 'x' (..Between 1 2) . filter 'y' (..Between 3 4) . filter 'z' (..Between 3 4)"`;
+
+exports[`Scatter plot > point of a table 1`] = `"operator1.get_row 3"`;
+
+exports[`Scatter plot > point of a vector 1`] = `"operator1.at 3"`;
+
+exports[`Table right-click menu, on a table > Get Column 1`] = `"operator1.at 'b'"`;
+
+exports[`Table right-click menu, on a table > Get Column on the row-number column 1`] = `undefined`;
+
+exports[`Table right-click menu, on a table > Get Row 1`] = `"operator1.get_row 2"`;
+
+exports[`Table right-click menu, on a table > Get Value 1`] = `"operator1.get_value 'b' 2"`;
+
+exports[`Table right-click menu, on a table > Get Value on the row-number column 1`] = `undefined`;
+
+exports[`Table toolbar: create components > blank 1`] = `
+[
+  "operator1 . filter 'b' ..Is_Nothing",
+]
+`;
+
+exports[`Table toolbar: create components > date equals 1`] = `
+[
+  "operator1 . filter 'd' (..Equal (Date.new 2024 1 2))",
+]
+`;
+
+exports[`Table toolbar: create components > everything at once 1`] = `
+[
+  "operator1 . filter 'a' (..Less 10) . filter 'b' (..Is_In ['x', 'y'])",
+  "operator1.sort [(..Name 'a' ..Descending )]",
+  "operator1.remove_columns ['d']",
+  "operator1.reorder_columns ['b', 'a']",
+]
+`;
+
+exports[`Table toolbar: create components > float greater than 1`] = `
+[
+  "operator1 . filter 'f' (..Greater 2.5)",
+]
+`;
+
+exports[`Table toolbar: create components > hidden columns 1`] = `
+[
+  "operator1.remove_columns ['b', 'd']",
+]
+`;
+
+exports[`Table toolbar: create components > not blank 1`] = `
+[
+  "operator1 . filter 'b' ..Not_Nothing",
+]
+`;
+
+exports[`Table toolbar: create components > number equals 1`] = `
+[
+  "operator1 . filter 'a' (..Equal 3)",
+]
+`;
+
+exports[`Table toolbar: create components > number in range 1`] = `
+[
+  "operator1 . filter 'a' (..Between 1 5)",
+]
+`;
+
+exports[`Table toolbar: create components > reordered columns 1`] = `
+[
+  "operator1.reorder_columns ['b', 'a', 'd']",
+]
+`;
+
+exports[`Table toolbar: create components > set of a boolean 1`] = `
+[
+  "operator1 . filter 'bo' (..Equal False)",
+]
+`;
+
+exports[`Table toolbar: create components > set of a date-time 1`] = `
+[
+  "operator1 . filter 'dt' (..Is_In [Date_Time.parse ('2024-01-02 10:30:00'), Date_Time.parse ('2024-01-03 11:00:00')])",
+]
+`;
+
+exports[`Table toolbar: create components > set of a mixed value 1`] = `
+[
+  "operator1 . filter 'm' (..Equal 12)",
+]
+`;
+
+exports[`Table toolbar: create components > set of a time 1`] = `
+[
+  "operator1 . filter 't' (..Equal Time_Of_Day.parse ('10:30:00'))",
+]
+`;
+
+exports[`Table toolbar: create components > set of dates 1`] = `
+[
+  "operator1 . filter 'd' (..Is_In [(Date.new 2024 1 2), (Date.new 2024 2 3)])",
+]
+`;
+
+exports[`Table toolbar: create components > set of one 1`] = `
+[
+  "operator1 . filter 'b' (..Equal 'x')",
+]
+`;
+
+exports[`Table toolbar: create components > set of two 1`] = `
+[
+  "operator1 . filter 'b' (..Is_In ['x', 'y'])",
+]
+`;
+
+exports[`Table toolbar: create components > sort by one column 1`] = `
+[
+  "operator1.sort [(..Name 'a' ..Ascending )]",
+]
+`;
+
+exports[`Table toolbar: create components > sort by two columns 1`] = `
+[
+  "operator1.sort [(..Name 'a' ..Ascending ), (..Name 'b' ..Descending )]",
+]
+`;
+
+exports[`Table toolbar: create components > text contains 1`] = `
+[
+  "operator1 . filter 'b' (..Contains 'ab')",
+]
+`;
+
+exports[`Table toolbar: create components > two filters in one node 1`] = `
+[
+  "operator1 . filter 'a' (..Greater 1) . filter 'b' (..Contains 'x')",
+]
+`;
+
+exports[`Tree > a key 1`] = `"operator1.get 'tags'"`;
+
+exports[`Tree > a key then an index 1`] = `"operator1.get 'tags' . at 1"`;
+
+exports[`Tree > a table row value 1`] = `"operator1.rows . at 0 . at 'x'"`;
+
+exports[`Tree > a table summary entry 1`] = `"operator1.row_count"`;
+
+exports[`Tree > an XML attribute 1`] = `"operator1.at '@id'"`;
+
+exports[`Warnings > remove warnings 1`] = `"operator1.remove_warnings"`;
