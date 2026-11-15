@@ -11,7 +11,7 @@
 import ChipMenuFrame from '@/components/GraphEditor/widgets/WidgetChip/ChipMenuFrame.vue'
 import { Time } from '@internationalized/date'
 import { TimeFieldInput, TimeFieldRoot } from 'reka-ui'
-import { computed, nextTick, onMounted, shallowRef, useTemplateRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue'
 import { localNow, type HourMinuteSecond, type TimeChoice } from './timeExpression'
 
 const props = defineProps<{
@@ -86,6 +86,10 @@ function close() {
   settled = true
   emit('close')
 }
+
+// A menu closed from outside (Escape is the app's cancel, a click elsewhere ends the interaction)
+// unmounts with the field focused, and the browser reports that as a blur: it is not a choice.
+onBeforeUnmount(() => (settled = true))
 
 onMounted(() =>
   nextTick(() => field.value?.querySelector<HTMLElement>('[role="spinbutton"]')?.focus()),

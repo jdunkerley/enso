@@ -66,6 +66,17 @@ is already on the row, drawn by `WidgetIcon` at the root.
   wherever it becomes an argument: an unparenthesised application written as a
   string splits into one group per argument. Design:
   `docs/superpowers/specs/2026-11-15-date-widget-design.md`.
+- `WidgetTimeOfDay.vue` — the same chip for a `Time_Of_Day`-typed argument or
+  item and for `Time_Of_Day.now` (`Now`) and `Time_Of_Day.new` with 0 to 3
+  integer literals (`14:30`, `14:30:15`, or `Pick a time`). Its menu
+  (`WidgetTimeOfDay/TimeOfDayMenu.vue`) is `Now` and a Reka `TimeField` (hours
+  and minutes, seconds on request, written only when not zero): Enter or leaving
+  the field writes it, Escape does not. `timeExpression.ts` is the mapping. The
+  chip, its floating menu and the interaction are
+  `WidgetChip/ChipMenuShell.vue`, the menu frame is
+  `WidgetChip/ChipMenuFrame.vue` and the "is this a value to pick" and
+  parenthesising rules are `WidgetChip/shape.ts`, all shared with `WidgetDate`.
+  Same priority (140) and rules.
 - `WidgetFileBrowser.vue` — a file, folder or `Enso_Secret` argument's dropdown:
   `WidgetFileBrowser/localBrowser.ts` (the native file dialog),
   `localSecrets.ts` (the local secrets and **New secret…**, which set

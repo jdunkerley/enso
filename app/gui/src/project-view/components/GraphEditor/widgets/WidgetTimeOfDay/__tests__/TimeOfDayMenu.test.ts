@@ -102,4 +102,12 @@ describe('the time-of-day menu', () => {
     await userEvent.click(document.body)
     expect(wrapper.emitted('choose')).toBeUndefined()
   })
+
+  test('the menu being removed after an edit is not a choice', async () => {
+    const wrapper = await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    await userEvent.keyboard('{ArrowUp}')
+    wrapper.unmount()
+    mounted = undefined
+    expect(wrapper.emitted('choose')).toBeUndefined()
+  })
 })

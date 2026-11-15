@@ -6,7 +6,9 @@
   date such as `2020-01-15`, instead of a text box or three number fields.
   Clicking it opens a menu of those three days and a calendar; it writes
   `Date.today`, `Date.today.previous`, `Date.today.next` or `Date.new`. Items of
-  a list of dates get the chip too.][NNN]
+  a list of dates get the chip too. A time-of-day argument likewise shows a
+  chip, `Now` or a time such as `14:30`, whose menu has `Now` and a time field
+  you can type into; it writes `Time_Of_Day.now` or `Time_Of_Day.new`.][NNN]
 - [The help panel shows each argument's type, default, widget and description in
   a tooltip on the component's node, and can expand the node to list them.
   Examples have a Copy button that pastes them into the graph as
