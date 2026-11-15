@@ -669,3 +669,15 @@ test('edit_node refuses a node the user turned Write on for while the edit waite
   expect(toolError(await editNode(deps, { node_id: a, expression: '7' }))).toBe(writeOnNodeError(a))
   expect(deps.setNodeContent).not.toHaveBeenCalled()
 })
+
+test('edit_node to the code the node already has waits for nothing: the engine computes nothing', async () => {
+  const session = fakeSession()
+  const { deps, db } = makeDeps({ session })
+  const a = nodeNamed(db, 'a')
+  const result = valueOf(await editNode(deps, { node_id: a, expression: '1 + 2' }))
+  expect(result.settled).toBe(true)
+  expect(session.affected[0]).toEqual({})
+  // A different text waits for the node.
+  await editNode(deps, { node_id: a, expression: '1 + 3' })
+  expect(session.affected[1]).toEqual({ changed: [a] })
+})

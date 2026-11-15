@@ -274,19 +274,24 @@ export async function editNode(
   const expression = parseNodeExpression(args.expression)
   if (!expression.ok) return errorResult(expression)
   const method = methodOnScreen(deps)
+  let codeChanged = true
   const outcome = await deps.session.run(
     deps.caller,
     () => {
       const unchanged = checkAtTurn(deps, method, [id])
       if (!unchanged.ok) return unchanged
+      const current = deps.db.nodeIdToNode.get(id)
       // The user may have turned Write on for it while the edit waited.
-      if (deps.db.nodeIdToNode.get(id)?.prefixes.enableRecording != null) {
-        return Err(writeOnNodeError(args.node_id))
-      }
+      if (current?.prefixes.enableRecording != null) return Err(writeOnNodeError(args.node_id))
+      codeChanged = current?.innerExpr.code() !== expression.value
       return deps.setNodeContent(id, expression.value)
     },
-    // The node existed before: its result counts once the engine has taken this edit up.
-    { affected: () => ({ changed: [id] }), deadline: deps.deadline },
+    {
+      // The node existed before: its result counts once the engine has taken this edit up. The
+      // code it already has changes nothing, and the engine then reports nothing (packaged app).
+      affected: () => (codeChanged ? { changed: [id] } : {}),
+      deadline: deps.deadline,
+    },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult({ nodes: [currentSummary(deps, found.value)] }, outcome.value)
