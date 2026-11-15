@@ -5,7 +5,8 @@ import * as locate from './locate'
 test('Navigating with arrows', async ({ editorPage, page }) => {
   await editorPage
   // Make sure nothing else is focused right now.
-  await locate.graphEditor(page).click({ position: { x: 400, y: 400 } })
+  // Left of the graph, which is shown centred.
+  await locate.graphEditor(page).click({ position: { x: 100, y: 500 } })
   const allNodes = await locate.graphNode(page).all()
   const receiveBBoxes = () =>
     Promise.all(
