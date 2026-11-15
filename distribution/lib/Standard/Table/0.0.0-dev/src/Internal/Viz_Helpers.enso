@@ -2,6 +2,8 @@ from Standard.Base import all
 
 import Standard.Visualization.Internal.View_Json
 from Standard.Visualization.Internal.View_Json import View_Column, View_Link
+import Standard.Visualization.Viz_Action.Viz_Action
+import Standard.Visualization.Viz_Actions.Viz_Actions
 import Standard.Visualization.Viz_Cell.Viz_Cell
 from Standard.Visualization.Viz_Column_Kind import Viz_Column_Kind, Viz_Kind
 
@@ -63,3 +65,28 @@ row_table_view_json row -> Text =
     values = (0.up_to row.length).map idx-> Viz_Cell.render_value (row.get idx)
     columns = [View_Column.Value "column" (View_Link.Value "at {{@column}}"), View_Column.Value "value"]
     View_Json.grid_json (columns.map .to_json_text) [row.column_names.to_json, values.to_json] row.length
+
+## ---
+   private: true
+   ---
+   The node actions of a table, in memory or in a database: a row, a column,
+   a cell, the table toolbar's sort, filter and column changes, and the
+   scatter plot's brush. A small fixed vector.
+table_actions -> Viz_Actions = Viz_Actions.Value <|
+    open_row = Viz_Action.chain "open_row" "Get Row" "select_row" "get_row {{#index}}"
+    open_column = Viz_Action.chain "open_column" "Get Column" "select_column" "at {{@column}}"
+    open_cell = Viz_Action.chain "open_cell" "Get Value" "select_cell" "get_value {{@column}} {{#index}}"
+    sort = Viz_Action.chain "sort" "Sort" "" "sort {{columns*}}"
+    filter = Viz_Action.chain "filter" "Filter" "" "filter {{@column}} {{condition}}"
+    remove_columns = Viz_Action.chain "remove_columns" "Remove Columns" "" "remove_columns {{@columns*}}"
+    reorder_columns = Viz_Action.chain "reorder_columns" "Reorder Columns" "" "reorder_columns {{@columns*}}"
+    brush_filter = Viz_Action.chain "brush_filter" "Filter To Selection" "" "filter {{@column}} (..Between {{#min}} {{#max}})"
+    [open_row, open_column, open_cell, sort, filter, remove_columns, reorder_columns, brush_filter]
+
+## ---
+   private: true
+   ---
+   The node actions of a column, in memory or in a database: a value by
+   number.
+column_actions -> Viz_Actions =
+    Viz_Actions.Value [Viz_Action.chain "open_row" "Get Value" "select_cell" "at {{#index}}"]

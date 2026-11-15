@@ -4,6 +4,11 @@ import Standard.Visualization.Viz_Action.Viz_Action
 import Standard.Visualization.Viz_Actions.Viz_Actions
 from Standard.Visualization.Viz_Actions import remove_warnings_action
 
+from Standard.Table import Table
+import Standard.Database.Connection.Database
+import Standard.Database.Extensions.Upload_Table
+from Standard.SQLite import SQLite
+
 from Standard.Test import all
 
 type Thing
@@ -14,6 +19,8 @@ type Thing
 Viz_Actions.from (that:Thing) =
     _ = that
     Viz_Actions.Value [Viz_Action.new_node "describe" "Describe" "" "Thing.describe {{node}}"]
+
+ids_of value = (Viz_Actions.from value).actions.map .id
 
 add_specs suite_builder =
     suite_builder.group "Viz_Actions" group_builder->
@@ -55,6 +62,23 @@ add_specs suite_builder =
 
         group_builder.specify "remove warnings is a plain chain" <|
             remove_warnings_action.to_json_text . should_equal '{"id":"remove_warnings","label":"Remove Warnings","icon":"not_exclamation","kind":"chain","template":"remove_warnings"}'
+
+    suite_builder.group "Table actions" group_builder->
+        mem_table = Table.new [["x", [1, 2]], ["y", ["a", "b"]]]
+        connection = Database.connect SQLite.In_Memory
+        db_table = mem_table.select_into_database_table connection "actions" temporary=True
+
+        group_builder.specify "a table offers its rows, columns and cells, and the toolbar's and brush's actions" <|
+            ids_of mem_table . should_equal ["open_row", "open_column", "open_cell", "sort", "filter", "remove_columns", "reorder_columns", "brush_filter"]
+            templates = (Viz_Actions.from mem_table).actions.map .template
+            templates . should_equal ["get_row {{#index}}", "at {{@column}}", "get_value {{@column}} {{#index}}", "sort {{columns*}}", "filter {{@column}} {{condition}}", "remove_columns {{@columns*}}", "reorder_columns {{@columns*}}", "filter {{@column}} (..Between {{#min}} {{#max}})"]
+
+        group_builder.specify "a database table offers the same templates" <|
+            (Viz_Actions.from db_table).to_json_text . should_equal (Viz_Actions.from mem_table).to_json_text
+
+        group_builder.specify "a column offers its values by number, in memory and in a database" <|
+            (Viz_Actions.from (mem_table.at "x")).to_json_text . should_equal '[{"id":"open_row","label":"Get Value","icon":"select_cell","kind":"chain","template":"at {{#index}}"}]'
+            (Viz_Actions.from (db_table.at "x")).to_json_text . should_equal (Viz_Actions.from (mem_table.at "x")).to_json_text
 
 main filter=Nothing =
     suite = Test.build suite_builder->

@@ -15,6 +15,7 @@ import project.Constants.Previous_Value
 import Standard.Visualization.SQL_Viz.SQL_Viz
 import Standard.Visualization.Viz_Cell.Viz_Cell
 import Standard.Visualization.Viz_Json.Viz_Json
+import Standard.Visualization.Viz_Actions.Viz_Actions
 import Standard.Visualization.Viz_Table.Viz_Table
 import Standard.Visualization.Viz_Tree.Viz_Tree
 import Standard.Visualization.Viz_Tree.Viz_Tree_Child
@@ -2727,3 +2728,11 @@ Viz_Tree.from (that:Column) =
             value_child (start + i) value
     in_memory_value key = if key.is_a Integer && key >= 0 && key < size then value_child key (that.at key) else Nothing
     if in_memory then Viz_Tree.lookup_paged "array" size label in_memory_page in_memory_value else Viz_Tree.paged "array" size label database_page
+
+## ---
+   private: true
+   ---
+   The same actions for an in-memory and a database column.
+Viz_Actions.from (that:Column) =
+    _ = that
+    Viz_Helpers.column_actions
