@@ -10,7 +10,7 @@ import { nodeMutableDocumentation } from '@/util/ast/node'
 import { isIdentifier, type Identifier } from '@/util/qualifiedName'
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
-import type { EditOutcome, EditSession } from './editSession'
+import { EDIT_SHORT_SETTLE_MS, type EditOutcome, type EditSession } from './editSession'
 import {
   capNodeTexts,
   findNode,
@@ -255,8 +255,11 @@ export async function setNodeComment(
   if (nodeMutableDocumentation(found.value.node) == null) {
     return toolError(`Node ${args.node_id} cannot have a comment.`)
   }
-  const outcome = await deps.session.run(deps.caller, () =>
-    deps.setNodeComment(found.value.id, args.text),
+  const outcome = await deps.session.run(
+    deps.caller,
+    () => deps.setNodeComment(found.value.id, args.text),
+    // A comment changes nothing the engine runs: an execution may never come.
+    { settleMs: EDIT_SHORT_SETTLE_MS },
   )
   if (!outcome.ok) return errorResult(outcome)
   return jsonResult({ node: currentSummary(deps, found.value) })
@@ -269,8 +272,10 @@ export async function setVisualization(
 ): Promise<McpToolResult> {
   const found = findNode(deps.db, args.node_id)
   if (!found.ok) return found
-  const outcome = await deps.session.run(deps.caller, () =>
-    deps.setVisualization(found.value.id, args.visible),
+  const outcome = await deps.session.run(
+    deps.caller,
+    () => deps.setVisualization(found.value.id, args.visible),
+    { settleMs: EDIT_SHORT_SETTLE_MS },
   )
   if (!outcome.ok) return errorResult(outcome)
   return jsonResult({ node: currentSummary(deps, found.value) })

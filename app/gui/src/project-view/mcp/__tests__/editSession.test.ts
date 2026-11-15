@@ -2,6 +2,7 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   EDIT_SETTLE_MS,
+  EDIT_SHORT_SETTLE_MS,
   EDIT_STEP_IDLE_MS,
   EditSession,
   LIVE_EDIT_ERROR,
@@ -296,6 +297,13 @@ describe('EditSession', () => {
     const result = await t2.session.run(claude, () => Ok('x'))
     expect(result).toEqual(Ok({ value: 'x', settled: false }))
     expect(t2.deps.executionSettled).toHaveBeenCalledWith(EDIT_SETTLE_MS)
+  })
+
+  test('a run may wait a shorter time for the execution to settle', async () => {
+    const result = await t.session.run(claude, () => Ok('x'), { settleMs: EDIT_SHORT_SETTLE_MS })
+    expect(result).toEqual(Ok({ value: 'x', settled: true }))
+    expect(t.deps.executionSettled).toHaveBeenCalledWith(EDIT_SHORT_SETTLE_MS)
+    expect(EDIT_SHORT_SETTLE_MS).toBeLessThan(EDIT_SETTLE_MS)
   })
 
   test('an Err from edit is returned, leaves the step open, and skips the settle wait', async () => {

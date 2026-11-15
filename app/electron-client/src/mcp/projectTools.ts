@@ -63,7 +63,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'There is no separate edge list: a node uses another by its name, so read the ' +
         'connections from each node `code` and from `source`. When previews run out of ' +
         'time or space, `previews_skipped` counts the nodes left without one: a long graph ' +
-        'returns fewer previews and cut texts, and `get_node` gives one node in full. Call this first to ' +
+        'returns fewer previews and cut texts, and `get_node` gives one node in full. ' +
+        '`selection` lists the ids of the nodes the user has selected. Call this first to ' +
         'see what the project does. Each `node_id` is stable across edits, so you can pass ' +
         'it to `get_node` and `evaluate_expression` later.',
       inputSchema: { previews: z.boolean().optional() },
@@ -159,10 +160,12 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       name: 'edit_node',
       title: 'Edit a node',
       description:
-        'Replace the expression of the node `node_id` (from `get_graph`) with `expression`; ' +
-        'the node keeps its name, so the nodes that use it stay connected. Returns the node ' +
-        'with its new type and any error or panic, the nodes that use it with theirs, and ' +
-        '`settled`, whether the engine finished evaluating them.' +
+        'Replace the expression of the node `node_id` (from `get_graph`) with `expression`. ' +
+        '`expression` is the new right-hand side only, not `name = expression`: the node ' +
+        'keeps its name, so the nodes that use it stay connected. An argument node of the ' +
+        'method is refused. Returns `nodes`, a list holding the node with its new type and ' +
+        'any error or panic, and `settled`, whether the engine finished evaluating it; call ' +
+        '`get_graph` for the nodes that use it.' +
         EDIT_RULES,
       inputSchema: {
         node_id: nodeId(),
@@ -174,10 +177,11 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       name: 'remove_nodes',
       title: 'Remove nodes',
       description:
-        'Remove the nodes in `node_ids` (from `get_graph`) from the graph. A node that ' +
-        'another node uses is not repaired: the nodes using it show an error. Returns the nodes ' +
-        'removed and the nodes left using them, with their types and any error, and ' +
-        '`settled`.' +
+        'Remove the nodes in `node_ids` (from `get_graph`) from the graph. The nodes that used ' +
+        'a removed node lose that input, as when the user deletes a node. The argument and ' +
+        'output nodes of the method are refused, and then nothing is removed. Returns ' +
+        '`removed`, the ids removed, and `settled`; call `get_graph` for the nodes that used ' +
+        'them.' +
         EDIT_RULES,
       inputSchema: { node_ids: z.array(nodeId()).min(1).max(200) },
       run: forward('remove_nodes', EDIT_TOOL_TIMEOUT_MS),
@@ -219,7 +223,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       title: 'Set a node comment',
       description:
         'Set the documentation comment of the node `node_id` (from `get_graph`) to `text`. ' +
-        'An empty `text` removes the comment. Returns the node.' +
+        'An empty `text` removes the comment. A node that cannot have a comment (an argument ' +
+        'of the method) is refused. Returns `node`, the node with its comment.' +
         EDIT_RULES,
       inputSchema: { node_id: nodeId(), text: z.string().max(5_000) },
       run: forward('set_node_comment', EDIT_TOOL_TIMEOUT_MS),
@@ -229,7 +234,7 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       title: 'Show or hide a visualization',
       description:
         'Show (`visible` true) or hide the visualization of the node `node_id` (from ' +
-        '`get_graph`) in the graph editor, for the user to look at. Returns the node.' +
+        '`get_graph`) in the graph editor, for the user to look at. Returns `node`, the node.' +
         EDIT_RULES,
       inputSchema: { node_id: nodeId(), visible: z.boolean() },
       run: forward('set_visualization', EDIT_TOOL_TIMEOUT_MS),
@@ -241,7 +246,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'Select the nodes in `node_ids` (from `get_graph`) in the graph editor, to point ' +
         'the user at them; an empty list clears the selection. This and `open_method` are ' +
         'the only project tools that change the selection or move the view: the edit tools ' +
-        'leave both alone. Returns the selection. Works in Live mode too.',
+        'leave both alone. Returns `selected`, the ids of the selected nodes. Works in Live ' +
+        'mode too.',
       inputSchema: { node_ids: z.array(nodeId()).max(200) },
       run: forward('select_nodes'),
     },
@@ -251,7 +257,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       description:
         'Open the function that the node `node_id` (from `get_graph`) calls, in the graph ' +
         'editor, so the next `get_graph` reads its graph. Without `node_id` go back to the ' +
-        'method you came from. Returns the method now open. Works in Live mode too.',
+        'method you came from. Returns `method`, the name of the method now open. Works in ' +
+        'Live mode too.',
       inputSchema: { node_id: nodeId().optional() },
       run: forward('open_method'),
     },

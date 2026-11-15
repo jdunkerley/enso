@@ -10,6 +10,11 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 export const EDIT_STEP_IDLE_MS = 10_000
 /** How long an edit waits for the execution to complete or fail. */
 export const EDIT_SETTLE_MS = 20_000
+/**
+ * How long an edit that changes no code the engine runs (a comment, a visualization) waits for an
+ * execution, which may never come.
+ */
+export const EDIT_SHORT_SETTLE_MS = 2_000
 /** The answer to every edit tool while the project is in Live mode. */
 export const LIVE_EDIT_ERROR =
   'The project is in Live mode. Edits by an agent are refused there. Ask the user to switch the project back to Design.'
@@ -30,6 +35,11 @@ export interface EditSessionDeps {
   readonly executionSettled: (timeoutMs: number) => Promise<boolean>
   readonly setTimeout: (f: () => void, ms: number) => unknown
   readonly clearTimeout: (handle: unknown) => void
+}
+
+export interface EditRunOptions {
+  /** How long to wait for the execution to settle; {@link EDIT_SETTLE_MS} by default. */
+  readonly settleMs?: number
 }
 
 export interface EditOutcome<T> {
@@ -79,9 +89,12 @@ export class EditSession {
   run<T>(
     caller: McpCaller,
     edit: () => Result<T> | Promise<Result<T>>,
+    options: EditRunOptions = {},
   ): Promise<Result<EditOutcome<T>>> {
     // `execute` never rejects, so the queue cannot stall.
-    const task = this.tail.then(() => this.execute(caller, edit))
+    const task = this.tail.then(() =>
+      this.execute(caller, edit, options.settleMs ?? EDIT_SETTLE_MS),
+    )
     this.tail = task
     return task
   }
@@ -121,6 +134,7 @@ export class EditSession {
   private async execute<T>(
     caller: McpCaller,
     edit: () => Result<T> | Promise<Result<T>>,
+    settleMs: number,
   ): Promise<Result<EditOutcome<T>>> {
     try {
       if (this.disposed) return Err(PROJECT_CLOSED_ERROR)
@@ -148,7 +162,7 @@ export class EditSession {
       }
       if (!result.ok) return result
       await this.deps.afterGraphUpdate()
-      const settled = await this.deps.executionSettled(EDIT_SETTLE_MS)
+      const settled = await this.deps.executionSettled(settleMs)
       return Ok({ value: result.value, settled })
     } catch (error) {
       return Err(errorText(error))

@@ -11,7 +11,12 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
-import { EditSession, LIVE_EDIT_ERROR, type EditOutcome } from '../editSession'
+import {
+  EDIT_SHORT_SETTLE_MS,
+  EditSession,
+  LIVE_EDIT_ERROR,
+  type EditOutcome,
+} from '../editSession'
 import {
   MISSING_NODES_NOTE,
   UNSETTLED_NOTE,
@@ -380,4 +385,15 @@ test('set_visualization shows the visualization and answers with the node', asyn
   expect(toolError(await setVisualization(deps, { node_id: 'nope', visible: false }))).toContain(
     'No node with id nope',
   )
+})
+
+test('set_node_comment and set_visualization wait only briefly for an execution', async () => {
+  const session = fakeSession()
+  const run = vi.spyOn(session, 'run')
+  const { deps, db } = makeDeps({ session })
+  const a = nodeNamed(db, 'a')
+  await setNodeComment(deps, { node_id: a, text: 'Hello' })
+  await setVisualization(deps, { node_id: a, visible: true })
+  expect(run).toHaveBeenCalledTimes(2)
+  for (const call of run.mock.calls) expect(call[2]).toEqual({ settleMs: EDIT_SHORT_SETTLE_MS })
 })

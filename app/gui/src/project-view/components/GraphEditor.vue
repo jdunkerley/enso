@@ -34,7 +34,10 @@ import { usePlacement } from '@/components/ComponentBrowser/placement'
 import ContextMenuTrigger from '@/components/ContextMenuTrigger.vue'
 import GraphEdges from '@/components/GraphEditor/GraphEdges.vue'
 import GraphNodes from '@/components/GraphEditor/GraphNodes.vue'
-import { collapseNodes as collapseNodesIntoFunction } from '@/components/GraphEditor/collapseNodes'
+import {
+  collapseNodes as collapseNodesIntoFunction,
+  type CollapseDeps,
+} from '@/components/GraphEditor/collapseNodes'
 import { helpActionHandlers } from '@/components/GraphEditor/helpActions'
 import { useGraphEditorClipboard } from '@/components/GraphEditor/graphClipboard'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
@@ -126,7 +129,6 @@ provideLanguageSupportExtensions({
 const nodeExecution = provideNodeExecution(projectStore)
 const aiPrompts = provideOngoingAiPrompts()
 useAiToolHandler(aiPrompts)
-useProjectMcpTools()
 ;(window as any)._mockSuggestion = suggestionDb.mockSuggestion
 
 onMounted(() => {
@@ -273,6 +275,27 @@ const { scheduleCreateNode, createNodes, placeNode } = provideNodeCreation(
     }
   },
 )
+
+// === MCP tools ===
+
+// Below the navigator, the selection, the stack navigator and the placement, which it uses.
+useProjectMcpTools({
+  selectedNodes: () => nodeSelection.selected,
+  selectNodes: (ids) => {
+    if (ids.length === 0) {
+      nodeSelection.deselectAll()
+      return
+    }
+    nodeSelection.setSelection(new Set(ids))
+    panToSelected()
+  },
+  enterNode: (id) => stackNavigator.enterNode(id),
+  canLeaveMethod: () => stackNavigator.allowNavigationLeft.value,
+  leaveMethod: () => stackNavigator.exitNode(),
+  viewport: () => graphNavigator.viewport,
+  collapseNodes: (ids, name) =>
+    collapseNodesIntoFunction(collapseDeps(), ids, name ? { name } : {}),
+})
 
 // === Clipboard Copy/Paste ===
 
@@ -789,22 +812,23 @@ function handleEdgeDrop(source: Ast.AstId, position: Vec2) {
 // === Node Collapsing ===
 const renameSchedule = provideRenameSchedule()
 
+function collapseDeps(): CollapseDeps {
+  return {
+    module: module.value,
+    graphStore,
+    placeCollapsedNode: collapsedNodePlacement,
+    // Below the moved nodes, with no other obstacles: what the action has always done (it
+    // passed one generator as both, and the obstacles' copy came out empty).
+    placeOutputNode: (movedNodeRects) =>
+      usePlacement([], graphNavigator.viewport).place(movedNodeRects),
+  }
+}
+
 function collapseNodes(nodes: Node[]) {
   const selected = nodes.filter(({ type }) => type === 'component').map(nodeId)
   if (selected.length == 0) return
   try {
-    const collapsed = collapseNodesIntoFunction(
-      {
-        module: module.value,
-        graphStore,
-        placeCollapsedNode: collapsedNodePlacement,
-        // Below the moved nodes, with no other obstacles: what the action has always done (it
-        // passed one generator as both, and the obstacles' copy came out empty).
-        placeOutputNode: (movedNodeRects) =>
-          usePlacement([], graphNavigator.viewport).place(movedNodeRects),
-      },
-      selected,
-    )
+    const collapsed = collapseNodesIntoFunction(collapseDeps(), selected)
     if (!collapsed.ok) {
       toasts.userActionFailed.show(
         `Unable to create User Defined Component: ${collapsed.error.payload}.`,
