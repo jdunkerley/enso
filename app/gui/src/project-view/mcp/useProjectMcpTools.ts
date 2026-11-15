@@ -32,7 +32,7 @@ import {
 import { evaluateExpression } from './evaluate'
 import { getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
 import { createMcpNodes } from './nodeCreation'
-import { afterGraphUpdate, executionSettled, onUserModuleTransaction } from './projectEvents'
+import { afterGraphUpdate, onUserModuleTransaction, watchExecution } from './projectEvents'
 import { addFunction, collapseNodesTool, type StructureToolDeps } from './structureTools'
 import { openMethod, selectNodes, type ViewToolDeps } from './viewTools'
 
@@ -111,8 +111,7 @@ export function useProjectMcpTools(
     saveVersion: (comment) =>
       localVersioning.saveIfEnabled(currentProject.store.value.assetId, comment),
     afterGraphUpdate: () => afterGraphUpdate(currentProject.graph.value, GRAPH_UPDATE_WAIT_MS),
-    executionSettled: (timeoutMs) =>
-      executionSettled(currentProject.store.value.executionContext, timeoutMs),
+    watchExecution: () => watchExecution(currentProject.store.value.executionContext),
     setTimeout: (f, ms) => setTimeout(f, ms),
     clearTimeout: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
   })

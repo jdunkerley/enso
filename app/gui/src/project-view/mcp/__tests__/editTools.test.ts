@@ -259,7 +259,7 @@ test('add_nodes in Live mode is refused by the session, and nothing is created',
     onForeignEdit: () => () => {},
     saveVersion: async () => {},
     afterGraphUpdate: async () => {},
-    executionSettled: async () => true,
+    watchExecution: () => ({ settled: async () => true, cancel: () => {} }),
     setTimeout: () => undefined,
     clearTimeout: () => {},
   })

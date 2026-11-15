@@ -75,27 +75,69 @@ export function afterGraphUpdate(
   })
 }
 
-/** The part of an execution context {@link executionSettled} listens to. */
+/** The part of an execution context {@link watchExecution} listens to. */
 export interface ExecutionEvents {
   on(event: 'executionComplete' | 'executionFailed', listener: () => void): unknown
   off(event: 'executionComplete' | 'executionFailed', listener: () => void): unknown
 }
 
+/** A watch on the execution context, started before an edit is applied. */
+export interface ExecutionWatch {
+  /**
+   * Resolves true once an execution has completed or failed since the watch started (at once if
+   * one already has), false after `timeoutMs` (from this call). Removes the listeners either way.
+   */
+  settled(timeoutMs: number): Promise<boolean>
+  /** Removes the listeners; a later or pending `settled` resolves false. Idempotent. */
+  cancel(): void
+}
+
 /**
- * Resolves true on the context's next `executionComplete` or `executionFailed`, false after
- * `timeoutMs`; both listeners are removed whichever comes first.
+ * Starts listening to the context's `executionComplete` and `executionFailed` at once, so that an
+ * execution which finishes before {@link ExecutionWatch.settled} is called is not missed: the
+ * engine often finishes a small edit's execution before the node database has been updated.
+ *
+ * Any execution that ends after the watch starts counts, including one that was already running
+ * when the edit was made, or the evaluation of a preview: the context reports no more than that an
+ * execution ended (see "The edit session" in `CLAUDE.md`).
  */
-export function executionSettled(context: ExecutionEvents, timeoutMs: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const finish = (settled: boolean) => {
-      clearTimeout(timer)
-      context.off('executionComplete', settle)
-      context.off('executionFailed', settle)
-      resolve(settled)
-    }
-    const settle = () => finish(true)
-    context.on('executionComplete', settle)
-    context.on('executionFailed', settle)
-    const timer = setTimeout(() => finish(false), timeoutMs)
-  })
+export function watchExecution(context: ExecutionEvents): ExecutionWatch {
+  let ended = false
+  let done = false
+  let finish: ((settled: boolean) => void) | undefined
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const onEvent = () => {
+    ended = true
+    finish?.(true)
+  }
+  const stop = () => {
+    done = true
+    if (timer !== undefined) clearTimeout(timer)
+    context.off('executionComplete', onEvent)
+    context.off('executionFailed', onEvent)
+  }
+  context.on('executionComplete', onEvent)
+  context.on('executionFailed', onEvent)
+  return {
+    settled(timeoutMs) {
+      if (done) return Promise.resolve(false)
+      if (ended) {
+        stop()
+        return Promise.resolve(true)
+      }
+      return new Promise((resolve) => {
+        finish = (settled) => {
+          finish = undefined
+          stop()
+          resolve(settled)
+        }
+        timer = setTimeout(() => finish?.(false), timeoutMs)
+      })
+    },
+    cancel() {
+      if (done) return
+      stop()
+      finish?.(false)
+    },
+  }
 }

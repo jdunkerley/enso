@@ -5,6 +5,7 @@
  */
 import type { McpCaller } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
+import type { ExecutionWatch } from './projectEvents'
 
 /** How long a caller's undo step stays open without a further edit by that caller. */
 export const EDIT_STEP_IDLE_MS = 10_000
@@ -35,8 +36,11 @@ export interface EditSessionDeps {
   readonly saveVersion: (comment: string) => Promise<void>
   /** Resolves when the node database reflects the last edit. */
   readonly afterGraphUpdate: () => Promise<void>
-  /** Resolves true when the next execution completes or fails, false after `timeoutMs`. */
-  readonly executionSettled: (timeoutMs: number) => Promise<boolean>
+  /**
+   * Starts watching the execution context, before the edit is applied, so that an execution that
+   * ends before the graph update is not missed. The session settles or cancels every watch.
+   */
+  readonly watchExecution: () => ExecutionWatch
   readonly setTimeout: (f: () => void, ms: number) => unknown
   readonly clearTimeout: (handle: unknown) => void
 }
@@ -84,7 +88,8 @@ export class EditSession {
    * Runs one edit: queued behind earlier ones; refused in Live and while the editor is not on
    * screen (checked at its turn and again after the version save; a run past both finishes); joins or starts the caller's undo
    * step (saving a version before the first edit of a step); runs `edit` marked as the session's
-   * own; waits for the graph update and for execution to settle.
+   * own, watching the execution from just before it; waits for the graph update and for
+   * execution to settle.
    * `edit` returns Err to refuse without changing anything.
    *
    * `edit` should apply its module changes synchronously: a user edit that lands while an async
@@ -141,6 +146,7 @@ export class EditSession {
     edit: () => Result<T> | Promise<Result<T>>,
     settleMs: number,
   ): Promise<Result<EditOutcome<T>>> {
+    let watch: ExecutionWatch | undefined
     try {
       if (this.disposed) return Err(PROJECT_CLOSED_ERROR)
       if (!this.deps.isActive()) return Err(NOT_ON_SCREEN_ERROR)
@@ -162,6 +168,9 @@ export class EditSession {
         this.stepCaller = key
       }
       let result: Result<T>
+      // Watching starts before the edit: the engine may finish executing it before the graph
+      // update below resolves.
+      watch = this.deps.watchExecution()
       this.inEdit = true
       try {
         result = await edit()
@@ -170,11 +179,13 @@ export class EditSession {
       }
       if (!result.ok) return result
       await this.deps.afterGraphUpdate()
-      const settled = await this.deps.executionSettled(settleMs)
+      const settled = await watch.settled(settleMs)
       return Ok({ value: result.value, settled })
     } catch (error) {
       return Err(errorText(error))
     } finally {
+      // A refused, failed or thrown edit leaves no listener behind; after `settled`, a no-op.
+      watch?.cancel()
       try {
         this.armIdleTimer()
       } catch (error) {

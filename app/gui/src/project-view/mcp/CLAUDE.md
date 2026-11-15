@@ -128,7 +128,9 @@ One per mounted graph editor, built in `useProjectMcpTools`: `releaseStep()` on
 Live (`LIVE_EDIT_ERROR`, read at the call's turn). Before a caller's first edit
 of a step it saves a version (`Before changes by <caller>`; the edit is refused
 when that fails) and holds an undo step, which the same caller's further edits
-join. After each edit it waits for the graph update, then for the execution.
+join. It starts watching the execution just before the edit is applied, then
+waits for the graph update, then for the execution; a refused or failed edit
+cancels the watch.
 
 **A hidden editor never edits.** Removing the handlers on `onDeactivated` stops
 new calls, but not the ones already in the session: one queued behind a running
@@ -185,9 +187,25 @@ from `useCurrentProject()`):
     (`graph.deleteNodes` awaits the port updates) counts as the session's own.
 - `saveVersion` → `localVersioning.saveIfEnabled(projectStore.assetId, …)`.
 - `afterGraphUpdate` → `graph.doAfterUpdate`, raced with `GRAPH_UPDATE_WAIT_MS`.
-- `executionSettled` → the context's next `executionComplete` or
-  `executionFailed`, false at the timeout; both listeners are removed on every
-  exit. An execution already running when the edit lands may end the wait early.
+- `watchExecution` → `watchExecution(executionContext)` (`projectEvents.ts`): it
+  listens to `executionComplete` and `executionFailed` from the moment it is
+  made, so an execution that ends before `settled` is called still counts.
+  `settled(ms)` is then true at once, otherwise on the next event, and false at
+  the timeout; settling, the timeout and `cancel()` all remove both listeners.
+  **Why before the edit**: against the real engine, a small edit's execution
+  ended 0.2–0.5 s after the edit, often before the graph update resolved (which
+  can take its full 2 s: `setNodeContent` causes no node-database update).
+  Listening only after the graph update missed it, and nearly every edit waited
+  the full 20 s and answered `settled: false` (the packaged spec,
+  `tests/mcp.spec.ts`, measured it).
+- **Limitation**: the context only says that _an_ execution ended. Any one that
+  ends after the watch starts settles the edit: one already running when the
+  edit was made, or a preview evaluation still running from an earlier
+  `get_graph` (in the packaged app, `executionComplete` events followed each
+  `get_node` and `get_graph` preview, with no edit). The result may then show
+  types from before the edit. No cheaper signal was found: in the packaged app
+  no node of the method was ever in the `Pending` state, at the watch's start,
+  at each event or at the settle, so "no node pending" adds nothing.
 
 `useProjectMcpTools(editor)` takes what only `GraphEditor.vue` has
 (`McpEditorDeps`: the selection, `panToSelected`, the stack navigator, the

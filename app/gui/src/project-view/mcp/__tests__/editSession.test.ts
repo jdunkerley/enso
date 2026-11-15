@@ -1,5 +1,6 @@
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { ObservableV2 } from 'lib0/observable'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   EDIT_SETTLE_MS,
   EDIT_SHORT_SETTLE_MS,
@@ -9,6 +10,7 @@ import {
   NOT_ON_SCREEN_ERROR,
   type EditSessionDeps,
 } from '../editSession'
+import { watchExecution, type ExecutionWatch } from '../projectEvents'
 
 const claude = { kind: 'external', name: 'claude-code' } as const
 const codex = { kind: 'external', name: 'codex' } as const
@@ -18,8 +20,22 @@ function errorOf(result: Result<unknown>): string {
   return result.error.message('')
 }
 
-function setup(overrides: Partial<EditSessionDeps> = {}) {
+interface FakeWatch extends ExecutionWatch {
+  readonly cancel: ReturnType<typeof vi.fn>
+  done: boolean
+}
+
+/**
+ * The session over fakes. `settle` answers each watch's `settled` (true by default); `watches` are
+ * the watches the session started, `openWatches()` those neither settled nor cancelled.
+ */
+function setup({
+  settle: settleImpl = async () => true,
+  ...overrides
+}: Partial<EditSessionDeps> & { settle?: (timeoutMs: number) => Promise<boolean> } = {}) {
   const log: string[] = []
+  const settle = vi.fn(settleImpl)
+  const watches: FakeWatch[] = []
   let live = false
   let active = true
   let foreign: (() => void) | undefined
@@ -44,7 +60,20 @@ function setup(overrides: Partial<EditSessionDeps> = {}) {
       log.push(`save:${comment}`)
     }),
     afterGraphUpdate: vi.fn(async () => {}),
-    executionSettled: vi.fn(async () => true),
+    watchExecution: vi.fn(() => {
+      const watch: FakeWatch = {
+        done: false,
+        settled: (timeoutMs) =>
+          settle(timeoutMs).finally(() => {
+            watch.done = true
+          }),
+        cancel: vi.fn(() => {
+          watch.done = true
+        }),
+      }
+      watches.push(watch)
+      return watch
+    }),
     setTimeout: (f, ms) => {
       if (failNextSetTimeout) {
         failNextSetTimeout = false
@@ -66,6 +95,9 @@ function setup(overrides: Partial<EditSessionDeps> = {}) {
     session,
     deps,
     log,
+    settle,
+    watches,
+    openWatches: () => watches.filter((watch) => !watch.done),
     release,
     unsubscribe,
     pending,
@@ -143,7 +175,7 @@ describe('EditSession', () => {
   test('no idle timer runs during a run; the idle period starts when it ends', async () => {
     let finishSettle: (settled: boolean) => void = () => {}
     const t2 = setup({
-      executionSettled: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
+      settle: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
     })
     const running = t2.session.run(claude, () => Ok(1))
     await vi.waitFor(() => expect(t2.deps.afterGraphUpdate).toHaveBeenCalled())
@@ -180,7 +212,7 @@ describe('EditSession', () => {
   test('a foreign edit during the settle wait releases the step; the run still succeeds', async () => {
     let finishSettle: (settled: boolean) => void = () => {}
     const t2 = setup({
-      executionSettled: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
+      settle: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
     })
     const running = t2.session.run(claude, () => Ok(1))
     await vi.waitFor(() => expect(t2.deps.afterGraphUpdate).toHaveBeenCalled())
@@ -199,7 +231,7 @@ describe('EditSession', () => {
   test('dispose with one run in progress and one queued', async () => {
     let finishSettle: (settled: boolean) => void = () => {}
     const t2 = setup({
-      executionSettled: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
+      settle: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
     })
     const first = t2.session.run(claude, () => Ok(1))
     const secondEdit = vi.fn(() => Ok(2))
@@ -270,7 +302,7 @@ describe('EditSession', () => {
     const order: string[] = []
     const finishers: ((settled: boolean) => void)[] = []
     const t2 = setup({
-      executionSettled: () => {
+      settle: () => {
         order.push('settle-start')
         return new Promise<boolean>((resolve) => {
           finishers.push((v) => {
@@ -299,16 +331,16 @@ describe('EditSession', () => {
   })
 
   test('the settle wait uses EDIT_SETTLE_MS; false gives settled: false', async () => {
-    const t2 = setup({ executionSettled: vi.fn(async () => false) })
+    const t2 = setup({ settle: async () => false })
     const result = await t2.session.run(claude, () => Ok('x'))
     expect(result).toEqual(Ok({ value: 'x', settled: false }))
-    expect(t2.deps.executionSettled).toHaveBeenCalledWith(EDIT_SETTLE_MS)
+    expect(t2.settle).toHaveBeenCalledWith(EDIT_SETTLE_MS)
   })
 
   test('a run may wait a shorter time for the execution to settle', async () => {
     const result = await t.session.run(claude, () => Ok('x'), { settleMs: EDIT_SHORT_SETTLE_MS })
     expect(result).toEqual(Ok({ value: 'x', settled: true }))
-    expect(t.deps.executionSettled).toHaveBeenCalledWith(EDIT_SHORT_SETTLE_MS)
+    expect(t.settle).toHaveBeenCalledWith(EDIT_SHORT_SETTLE_MS)
     expect(EDIT_SHORT_SETTLE_MS).toBeLessThan(EDIT_SETTLE_MS)
   })
 
@@ -317,7 +349,7 @@ describe('EditSession', () => {
     const result = await t.session.run(claude, () => Err('nope'))
     expect(errorOf(result)).toBe('nope')
     expect(t.release).not.toHaveBeenCalled()
-    expect(t.deps.executionSettled).toHaveBeenCalledTimes(1)
+    expect(t.settle).toHaveBeenCalledTimes(1)
     await t.session.run(claude, okEdit(t.log))
     expect(t.deps.holdUndoStep).toHaveBeenCalledTimes(1)
   })
@@ -387,7 +419,7 @@ describe('EditSession', () => {
   test('a run queued behind one in progress is refused when its turn comes after deactivation', async () => {
     let finishSettle: ((settled: boolean) => void) | undefined
     const t2 = setup({
-      executionSettled: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
+      settle: () => new Promise<boolean>((resolve) => (finishSettle = resolve)),
     })
     const first = t2.session.run(claude, () => Ok(1))
     const secondEdit = vi.fn(() => Ok(2))
@@ -406,5 +438,143 @@ describe('EditSession', () => {
     expect((await t.session.run(claude, () => Ok(1))).ok).toBe(false)
     t.setActive(true)
     expect(await t.session.run(claude, () => Ok(2))).toEqual(Ok({ value: 2, settled: true }))
+  })
+})
+
+class FakeContext extends ObservableV2<{
+  executionComplete(): void
+  executionFailed(message: string): void
+}> {
+  /** The listeners on the two events the session watches. */
+  count() {
+    return (
+      (this._observers.get('executionComplete')?.size ?? 0) +
+      (this._observers.get('executionFailed')?.size ?? 0)
+    )
+  }
+}
+
+describe('watching the execution', () => {
+  test('the watch starts before the edit is applied, and is settled after the graph update', async () => {
+    const order: string[] = []
+    const t = setup({
+      afterGraphUpdate: vi.fn(async () => {
+        order.push('graph')
+      }),
+      settle: async () => {
+        order.push('settled')
+        return true
+      },
+    })
+    vi.mocked(t.deps.watchExecution).mockImplementationOnce(() => {
+      order.push('watch')
+      return { settled: t.settle, cancel: () => order.push('cancel') }
+    })
+    await t.session.run(claude, () => {
+      order.push('edit')
+      return Ok(1)
+    })
+    expect(order[0]).toBe('watch')
+    expect(order.slice(1, 4)).toEqual(['edit', 'graph', 'settled'])
+  })
+
+  describe('against the real watch', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    function realSetup(overrides: Partial<EditSessionDeps> = {}) {
+      const context = new FakeContext()
+      const t = setup({ watchExecution: () => watchExecution(context), ...overrides })
+      return { ...t, context }
+    }
+
+    test('an execution that completes before the graph update settles the edit without waiting', async () => {
+      const context = new FakeContext()
+      const t = setup({
+        watchExecution: () => watchExecution(context),
+        afterGraphUpdate: async () => {
+          // The engine finished the edit's execution before the node database was updated.
+          context.emit('executionComplete', [])
+        },
+      })
+      const settled = vi.fn()
+      void t.session.run(claude, () => Ok(1)).then(settled)
+      // No timer is advanced: the result does not wait for the settle timeout.
+      await vi.advanceTimersByTimeAsync(0)
+      expect(settled).toHaveBeenCalledWith(Ok({ value: 1, settled: true }))
+      expect(context.count()).toBe(0)
+    })
+
+    test('an execution after the graph update settles it; the listeners are removed', async () => {
+      const t = realSetup()
+      const result = t.session.run(claude, () => Ok(1))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(t.context.count()).toBe(2)
+      t.context.emit('executionComplete', [])
+      expect(await result).toEqual(Ok({ value: 1, settled: true }))
+      expect(t.context.count()).toBe(0)
+    })
+
+    test('no execution: settled false at EDIT_SETTLE_MS; the listeners are removed', async () => {
+      const t = realSetup()
+      const result = t.session.run(claude, () => Ok(1))
+      await vi.advanceTimersByTimeAsync(EDIT_SETTLE_MS)
+      expect(await result).toEqual(Ok({ value: 1, settled: false }))
+      expect(t.context.count()).toBe(0)
+    })
+
+    test('an edit that returns Err or throws leaves no listener', async () => {
+      const t = realSetup()
+      expect((await t.session.run(claude, () => Err('nope'))).ok).toBe(false)
+      expect(t.context.count()).toBe(0)
+      const thrown = await t.session.run(claude, () => {
+        throw new Error('boom')
+      })
+      expect(errorOf(thrown)).toBe('boom')
+      expect(t.context.count()).toBe(0)
+    })
+
+    test('an async edit that rejects leaves no listener', async () => {
+      const t = realSetup()
+      const result = await t.session.run(claude, async () => {
+        throw new Error('later')
+      })
+      expect(errorOf(result)).toBe('later')
+      expect(t.context.count()).toBe(0)
+    })
+
+    test('a refused run leaves no listener: Live, not on screen, a failed version save', async () => {
+      const t = realSetup({
+        saveVersion: vi.fn(async () => {
+          throw new Error('The repository is blocked')
+        }),
+      })
+      expect(errorOf(await t.session.run(claude, () => Ok(1)))).toBe('The repository is blocked')
+      expect(t.context.count()).toBe(0)
+      t.setLive(true)
+      expect(errorOf(await t.session.run(claude, () => Ok(1)))).toBe(LIVE_EDIT_ERROR)
+      expect(t.context.count()).toBe(0)
+      t.setLive(false)
+      t.setActive(false)
+      expect(errorOf(await t.session.run(claude, () => Ok(1)))).toBe(NOT_ON_SCREEN_ERROR)
+      expect(t.context.count()).toBe(0)
+    })
+  })
+
+  test('a fake watch is cancelled when the edit returns Err or throws, and none is left open', async () => {
+    const t = setup()
+    await t.session.run(claude, () => Err('nope'))
+    expect(t.watches).toHaveLength(1)
+    expect(t.watches[0]!.cancel).toHaveBeenCalled()
+    await t.session.run(claude, () => {
+      throw new Error('boom')
+    })
+    expect(t.watches[1]!.cancel).toHaveBeenCalled()
+    expect(t.openWatches()).toHaveLength(0)
+    expect(t.settle).not.toHaveBeenCalled()
   })
 })

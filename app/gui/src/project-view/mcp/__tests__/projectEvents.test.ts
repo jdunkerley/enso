@@ -4,9 +4,9 @@ import { ref, watch } from 'vue'
 import * as Y from 'yjs'
 import {
   afterGraphUpdate,
-  executionSettled,
   isUserTransaction,
   onUserModuleTransaction,
+  watchExecution,
 } from '../projectEvents'
 
 beforeEach(() => {
@@ -117,25 +117,59 @@ test('after the timeout, the left-behind update callback does nothing', async ()
   clear.mockRestore()
 })
 
-test('executionSettled resolves true on completion or failure and removes both listeners', async () => {
+test('a watch resolves true on a completion or a failure after settled is called, and removes both listeners', async () => {
   const context = new FakeContext()
-  const complete = executionSettled(context, 1_000)
+  const watch = watchExecution(context)
   expect(context.count()).toBe(2)
+  const complete = watch.settled(1_000)
   context.emit('executionComplete', [])
   expect(await complete).toBe(true)
   expect(context.count()).toBe(0)
 
-  const failed = executionSettled(context, 1_000)
+  const failing = watchExecution(context)
+  const failed = failing.settled(1_000)
   context.emit('executionFailed', ['boom'])
   expect(await failed).toBe(true)
   expect(context.count()).toBe(0)
 })
 
-test('executionSettled resolves false at the timeout and removes both listeners', async () => {
+test('a completion before settled is called is not missed: settled resolves true at once', async () => {
   const context = new FakeContext()
-  const settled = executionSettled(context, 1_000)
-  await vi.advanceTimersByTimeAsync(1_000)
+  const watch = watchExecution(context)
+  context.emit('executionComplete', [])
+  const settled = vi.fn()
+  void watch.settled(1_000).then(settled)
+  // No timer is advanced.
+  await vi.advanceTimersByTimeAsync(0)
+  expect(settled).toHaveBeenCalledWith(true)
+  expect(context.count()).toBe(0)
+})
+
+test('a watch resolves false at the timeout and removes both listeners', async () => {
+  const context = new FakeContext()
+  const watch = watchExecution(context)
+  const settled = watch.settled(1_000)
+  await vi.advanceTimersByTimeAsync(999)
+  expect(context.count()).toBe(2)
+  await vi.advanceTimersByTimeAsync(1)
   expect(await settled).toBe(false)
   expect(context.count()).toBe(0)
   context.emit('executionComplete', [])
+})
+
+test('cancel removes both listeners, before or during settled, and is idempotent', async () => {
+  const context = new FakeContext()
+  const early = watchExecution(context)
+  early.cancel()
+  expect(context.count()).toBe(0)
+  expect(await early.settled(1_000)).toBe(false)
+  early.cancel()
+
+  const waiting = watchExecution(context)
+  const settled = waiting.settled(1_000)
+  waiting.cancel()
+  expect(await settled).toBe(false)
+  expect(context.count()).toBe(0)
+  // The cancelled watch's timer is gone too.
+  expect(vi.getTimerCount()).toBe(0)
 })
