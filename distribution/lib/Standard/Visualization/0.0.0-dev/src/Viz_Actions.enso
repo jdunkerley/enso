@@ -59,20 +59,22 @@ type Viz_Actions
        ---
        `json_text`, the JSON object a visualisation receives, with an
        `"actions"` field first. Unchanged when there are no actions, and for
-       an error message (`{"kind":"error",…}`). An empty object `{}` becomes
+       an error message (`{"kind":"error",…}`), and for a text that is not a
+       JSON object (empty, an array, a scalar). An empty object `{}` becomes
        `{"actions":[…]}`.
 
-       The message can be a megabyte, and a `Text` operation on one that is
-       still a rope (a concatenation) flattens it again each time. So it is
-       flattened and copied once, without its `{`, and everything else reads
-       that flat string by code unit, never walking it.
+       The message can be a megabyte. Handing it to Java flattens a rope (a
+       concatenation) once and keeps the flat string, so the checks read it by
+       code unit, and it is copied once, without its `{`; Enso's `Text`
+       operations would walk it by grapheme.
     add_to_json self (json_text : Text) -> Text =
-        if self.is_empty then json_text else
-            rest = Text_Utils.drop_first json_text 1
-            length = Text_Utils.char_length rest
-            if (Text_Utils.substring rest 0 (length.min 14)) == '"kind":"error"' then json_text else
-                if length == 1 then '{"actions":' + self.to_json_text + '}' else
-                    '{"actions":' + self.to_json_text + ',' + rest
+        if self.is_empty || (Text_Utils.char_length json_text < 2) then json_text else
+            if (Text_Utils.substring json_text 0 1) != '{' then json_text else
+                rest = Text_Utils.drop_first json_text 1
+                length = Text_Utils.char_length rest
+                if (Text_Utils.substring rest 0 (length.min 14)) == '"kind":"error"' then json_text else
+                    if length == 1 then '{"actions":' + self.to_json_text + '}' else
+                        '{"actions":' + self.to_json_text + ',' + rest
 
 ## ---
    private: true
