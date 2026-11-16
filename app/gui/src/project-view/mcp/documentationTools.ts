@@ -62,7 +62,9 @@ export async function getDocumentation(deps: DocumentationToolDeps): Promise<Mcp
  * `text` (`""` clears it) in one module edit through the edit session, so it is refused in Live
  * mode and when the method on screen changed before the edit's turn, and joins the caller's undo
  * step. Answers `{ method, characters, settled: true }`: documentation changes nothing the engine
- * runs. A text equal to the current one makes no edit and adds `unchanged: true`.
+ * runs. A text equal to the documentation as it is at the edit's turn (after any edit queued
+ * before it) makes no module edit and adds `unchanged: true`; in Live mode it is refused all the
+ * same.
  */
 export async function setDocumentation(
   deps: SetDocumentationDeps,
@@ -70,34 +72,36 @@ export async function setDocumentation(
 ): Promise<McpToolResult> {
   const shown = methodShown(deps)
   if (shown == null) return toolError(NO_METHOD_ERROR)
-  if (markdownOf(shown.ast) === text) {
-    return jsonResult({
-      method: shown.name,
-      characters: text.length,
-      settled: true,
-      unchanged: true,
-    })
-  }
   const method = methodOnScreen(deps)
   const outcome = await deps.session.run(
     deps.caller,
     // Documentation changes nothing the engine runs: no expression is affected, so it settles at
     // once.
-    () => {
-      const unchanged = checkAtTurn(deps, method)
-      if (!unchanged.ok) return unchanged
-      // Read again at the turn: the method's definition may be a newer version by now.
+    (): Result<{ unchanged: boolean }> => {
+      const sameMethod = checkAtTurn(deps, method)
+      if (!sameMethod.ok) return sameMethod
+      // Read again at the turn: the method's definition may be a newer version by now, and an
+      // edit queued before this one may have changed the text.
       const ast = deps.currentMethod.ast
       if (!ast.ok) return Err(NO_METHOD_ERROR)
-      return deps.editModule((edit) => {
+      if (markdownOf(ast.value) === text) return Ok({ unchanged: true })
+      const edited = deps.editModule((edit) => {
         const markdown = edit.getVersion(ast.value).mutableDocumentationMarkdown()
         markdown.delete(0, markdown.length)
         if (text !== '') markdown.insert(0, text)
         return Ok()
       })
+      return edited.ok ? Ok({ unchanged: false }) : edited
     },
     { deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
-  return settledResult({ method: shown.name, characters: text.length }, outcome.value)
+  return settledResult(
+    {
+      method: shown.name,
+      characters: text.length,
+      ...(outcome.value.value.unchanged ? { unchanged: true } : {}),
+    },
+    outcome.value,
+  )
 }

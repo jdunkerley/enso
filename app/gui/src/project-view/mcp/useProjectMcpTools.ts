@@ -97,9 +97,8 @@ export interface McpEditorDeps {
  * search_components, get_component_docs, evaluate_expression, list_visualizations,
  * get_documentation), the eight that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
  * set_documentation, set_visualization, collapse_nodes, add_function) and the two that navigate
- * (select_nodes, open_method); and the
- * two that main's `get_visualization` calls (get_visualization_data, prepare_visualization),
- * which are not MCP tools themselves.
+ * (select_nodes, open_method); and the two that main's `get_visualization` calls
+ * (get_visualization_data, prepare_visualization), which are not MCP tools themselves.
  *
  * Every open project's graph editor stays mounted (the tabs are under `<KeepAlive>`), so the tools
  * must answer for the one on screen: this project's handlers are put first on activation and

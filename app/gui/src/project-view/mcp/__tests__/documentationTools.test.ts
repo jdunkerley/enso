@@ -137,7 +137,7 @@ test('set_documentation with an empty text clears it', async () => {
   expect(func.mutableDocumentationMarkdown().toJSON()).toBe('')
 })
 
-test('set_documentation with the current text makes no edit', async () => {
+test('set_documentation with the text as it is at its turn makes no module edit', async () => {
   const session = fakeSession()
   const { deps, editModule } = makeDeps({ session })
   const text = 'Adds two numbers.'
@@ -147,24 +147,49 @@ test('set_documentation with the current text makes no edit', async () => {
     settled: true,
     unchanged: true,
   })
-  expect(session.runs).toBe(0)
+  // Compared at the edit's turn, inside the session's run.
+  expect(session.runs).toBe(1)
   expect(editModule).not.toHaveBeenCalled()
 })
 
-test("set_documentation passes on the session's refusal, and changes nothing", async () => {
-  const session = new EditSession({
-    isLive: () => true,
+/** A real session, in Design or Live mode, whose watches resolve at once. */
+function realSession(live: boolean) {
+  return new EditSession({
+    isLive: () => live,
     isActive: () => true,
     holdUndoStep: () => () => {},
     onForeignEdit: () => () => {},
     saveVersion: async () => {},
     watchGraphUpdate: () => ({ updated: async () => true, cancel: () => {} }),
-    watchExecution: () => ({ settled: async () => true, cancel: () => {} }),
+    watchExecution: () => ({ editApplied: () => {}, settled: async () => true, cancel: () => {} }),
     now: () => 0,
     setTimeout: () => undefined,
     clearTimeout: () => {},
   })
-  const { deps, func, editModule } = makeDeps({ session })
+}
+
+test('two calls at once: the second compares with the text the first left, and writes', async () => {
+  const { deps, func } = makeDeps({ session: realSession(false) })
+  const original = 'Adds two numbers.'
+  const first = setDocumentation(deps, { text: 'X' })
+  const second = setDocumentation(deps, { text: original })
+  expect(valueOf(await first)).toEqual({ method: 'main', characters: 1, settled: true })
+  expect(valueOf(await second)).toEqual({
+    method: 'main',
+    characters: original.length,
+    settled: true,
+  })
+  expect(func.mutableDocumentationMarkdown().toJSON()).toBe(original)
+})
+
+test('in Live mode the current text is refused like any other', async () => {
+  const { deps, editModule } = makeDeps({ session: realSession(true) })
+  expect(errorOf(await setDocumentation(deps, { text: 'Adds two numbers.' }))).toBe(LIVE_EDIT_ERROR)
+  expect(editModule).not.toHaveBeenCalled()
+})
+
+test("set_documentation passes on the session's refusal, and changes nothing", async () => {
+  const { deps, func, editModule } = makeDeps({ session: realSession(true) })
   expect(errorOf(await setDocumentation(deps, { text: 'New' }))).toBe(LIVE_EDIT_ERROR)
   expect(editModule).not.toHaveBeenCalled()
   expect(func.mutableDocumentationMarkdown().toJSON()).toBe('Adds two numbers.')

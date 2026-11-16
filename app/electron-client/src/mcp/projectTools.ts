@@ -301,8 +301,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'add it with `add_image`, whose result gives the Markdown to include. The user sees ' +
         'the documentation in the documentation panel. Returns `{ method, characters, ' +
         'settled }` (`characters`: the length of the text; `settled` is always true: nothing ' +
-        'is computed again); a `text` equal to the current one changes nothing and adds ' +
-        '`unchanged: true`.' +
+        'is computed again); a `text` equal to the documentation when the edit runs changes ' +
+        'nothing and adds `unchanged: true` (it is still refused in Live mode).' +
         EDIT_RULES,
       inputSchema: { text: z.string().max(DOCUMENTATION_CHARS) },
       run: forward('set_documentation', EDIT_TOOL_TIMEOUT_MS),
