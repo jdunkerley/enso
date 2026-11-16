@@ -39,8 +39,9 @@ type Viz_Actions
        ---
        The action of a value read item by item, `at {{#index}}`: a vector, an
        array, or a value a visualisation charts through its `to_vector` and
-       that has an `at` taking a number. The same for each of them, so it is a
-       constant and its JSON is written once.
+       that has an `at` taking a number. The same for each of them. Its JSON is
+       one short action, written per message (as before); unlike the table's,
+       it is not cached.
     items -> Viz_Actions = Viz_Actions.Json _item_json [_item_action]
 
     ## ---
