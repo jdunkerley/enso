@@ -1,16 +1,23 @@
 /* eslint-disable camelcase -- tool argument names are snake_case on the wire */
 /**
- * @file The MCP documentation tools, `get_documentation` and `set_documentation`, driving the real
- * editor: a call is delivered as Electron main would (`window.__mcpCall`,
- * `mock/registerMocks.ts`), and the spec checks the documentation panel and the undo stack.
+ * @file The MCP documentation tools, `get_documentation` and `set_documentation`, and the window
+ * handler `store_image` behind `add_image`, driving the real editor: a call is delivered as
+ * Electron main would (`window.__mcpCall`, `mock/registerMocks.ts`), and the spec checks the
+ * documentation panel, the undo stack and the mock project's `images` folder.
  */
 import assert from 'assert'
 import { expect, test, type Page } from 'integration-test/base'
-import { mockExecutionEnvironment, setMockExecutionMode } from 'integration-test/mock/lsHandler'
+import {
+  mockExecutionEnvironment,
+  mockImageNames,
+  restoreMockImages,
+  setMockExecutionMode,
+} from 'integration-test/mock/lsHandler'
 import * as locate from './locate'
 
 // Each test opens the project; the first of a worker can take ~20 s on a cold dev server.
 test.setTimeout(60_000)
+test.afterEach(restoreMockImages)
 
 interface ToolResult {
   ok: boolean
@@ -125,4 +132,52 @@ test('in Live mode the documentation is read but not replaced', async ({ editorP
   expect(refused.ok).toBe(false)
   expect(refused.error).toContain('Live mode')
   expect(await callOk(page, 'get_documentation')).toEqual(before)
+})
+
+/** A PNG of one pixel, as main sends an image to `store_image`: base64. */
+const PIXEL_PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+
+test('store_image keeps every image, and the documentation shows the Markdown it answers', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage.toggleDocsAssetPanel()
+  const docs = page.getByTestId('documentation-editor-content')
+  await expect(docs).toContainText(MAIN_DOCS_START)
+  const bytes = Buffer.from(PIXEL_PNG, 'base64').length
+
+  // Main sends the name it settled on (`add_image` forces the extension).
+  const first = await callOk(page, 'store_image', { data: PIXEL_PNG, name: 'agent chart.png' })
+  expect(first).toEqual({
+    path: '/images/agent%20chart.png',
+    markdown: '![agent chart](/images/agent%20chart.png)',
+    bytes,
+  })
+  // The same name again is never written over: it gets a name of its own.
+  const second = await callOk(page, 'store_image', { data: PIXEL_PNG, name: 'agent chart.png' })
+  expect(second).toEqual({
+    path: '/images/agent%20chart_1.png',
+    markdown: '![agent chart_1](/images/agent%20chart_1.png)',
+    bytes,
+  })
+  expect(mockImageNames()).toEqual(
+    expect.arrayContaining(['image.png', 'agent chart.png', 'agent chart_1.png']),
+  )
+
+  // Storing is not an edit: the documentation is unchanged until the agent sends the Markdown.
+  expect((await callOk(page, 'get_documentation')).text.startsWith(MAIN_DOCS_START)).toBe(true)
+  await callOk(page, 'set_documentation', {
+    text: `# Chart\n\n${first.markdown}\n\n${second.markdown}\n`,
+  })
+  for (const alt of ['agent chart', 'agent chart_1']) {
+    const image = docs.getByAltText(alt, { exact: true })
+    await expect(image).toHaveCount(1)
+    // Loaded from the stored bytes: an image that failed has no natural size.
+    await expect(image).toHaveJSProperty('naturalWidth', 1)
+  }
+
+  const refused = await call(page, 'store_image', { data: 'not base64!', name: 'x.png' })
+  expect(refused.ok).toBe(false)
+  expect(refused.error).toContain('not base64')
 })

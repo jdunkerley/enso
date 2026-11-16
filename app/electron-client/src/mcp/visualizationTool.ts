@@ -5,7 +5,7 @@
  * rectangle of the window. It does not import `electron`: the caller supplies the capture.
  */
 /* eslint-disable camelcase -- tool argument names are snake_case on the wire */
-import type { McpToolResult } from 'enso-common/src/mcp'
+import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { z } from 'zod'
 import type { ToolDefinition } from './toolRegistry'
 import { EDIT_TOOL_TIMEOUT_MS, type WindowBridge } from './windowBridge'
@@ -122,6 +122,58 @@ async function stableCapture(
   return image
 }
 
+/** Resolves after `ms` milliseconds: the wait between captures outside tests. */
+export function sleepFor(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** What `prepare_visualization` said about the visualization, without its rectangle. */
+export type PreparedVisualization = Omit<z.infer<typeof preparedSchema>, 'rect'>
+
+/** A picture of a node's visualization, and what the window said about it. */
+export interface VisualizationPicture {
+  readonly about: PreparedVisualization
+  /** At most {@link IMAGE_MAX_SIDE} pixels on its longer side. */
+  readonly png: Buffer
+  readonly width: number
+  readonly height: number
+}
+
+/**
+ * Takes the picture `get_visualization` answers with: the window handler `prepare_visualization`
+ * readies the visualization of `node` and says where it is, then that rectangle is captured until
+ * two captures in a row are the same, and the PNG capped at {@link IMAGE_MAX_SIDE} pixels.
+ * The window's refusal is passed on as it is.
+ */
+export async function pictureVisualization(
+  bridge: Pick<WindowBridge, 'call'>,
+  capture: Capture,
+  sleep: (ms: number) => Promise<void>,
+  node: { readonly node_id: unknown; readonly visualization?: unknown },
+  caller: McpCaller,
+): Promise<{ ok: true; value: VisualizationPicture } | { ok: false; error: string }> {
+  const prepared = await bridge.call('prepare_visualization', node, caller, EDIT_TOOL_TIMEOUT_MS)
+  if (!prepared.ok) return prepared
+  let parsed
+  try {
+    parsed = preparedSchema.safeParse(JSON.parse(prepared.value))
+  } catch {
+    parsed = undefined
+  }
+  if (parsed == null || !parsed.success) {
+    return {
+      ok: false,
+      error: 'The Enso window did not say where the visualization is.',
+    }
+  }
+  const { rect, ...about } = parsed.data
+  const image = await stableCapture(capture, rect, sleep)
+  if (image == null) return { ok: false, error: NO_CAPTURE_ERROR }
+  const capped = cappedPng(image)
+  if (capped == null) return { ok: false, error: NO_CAPTURE_ERROR }
+  return { ok: true, value: { about, ...capped } }
+}
+
 /**
  * The `get_visualization` tool over the window (`bridge`) and a way to photograph it. `sleep` is
  * the wait between captures (instant in tests).
@@ -129,7 +181,7 @@ async function stableCapture(
 export function visualizationTool(
   bridge: Pick<WindowBridge, 'call'>,
   capture: Capture,
-  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  sleep: (ms: number) => Promise<void> = sleepFor,
 ): ToolDefinition {
   return {
     name: VISUALIZATION_TOOL_NAME,
@@ -171,34 +223,13 @@ export function visualizationTool(
       if (args.format === 'data') {
         return bridge.call('get_visualization_data', node, caller, EDIT_TOOL_TIMEOUT_MS)
       }
-      const prepared = await bridge.call(
-        'prepare_visualization',
-        node,
-        caller,
-        EDIT_TOOL_TIMEOUT_MS,
-      )
-      if (!prepared.ok) return prepared
-      let parsed
-      try {
-        parsed = preparedSchema.safeParse(JSON.parse(prepared.value))
-      } catch {
-        parsed = undefined
-      }
-      if (parsed == null || !parsed.success) {
-        return {
-          ok: false,
-          error: 'The Enso window did not say where the visualization is.',
-        }
-      }
-      const { rect, ...about } = parsed.data
-      const image = await stableCapture(capture, rect, sleep)
-      if (image == null) return { ok: false, error: NO_CAPTURE_ERROR }
-      const capped = cappedPng(image)
-      if (capped == null) return { ok: false, error: NO_CAPTURE_ERROR }
+      const picture = await pictureVisualization(bridge, capture, sleep, node, caller)
+      if (!picture.ok) return picture
+      const { about, png, width, height } = picture.value
       return {
         ok: true,
-        value: JSON.stringify({ ...about, width: capped.width, height: capped.height }, null, 1),
-        image: { data: capped.png.toString('base64'), mimeType: 'image/png' },
+        value: JSON.stringify({ ...about, width, height }, null, 1),
+        image: { data: png.toString('base64'), mimeType: 'image/png' },
       }
     },
   }

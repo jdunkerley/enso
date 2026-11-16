@@ -12,6 +12,7 @@ import { nodeIdFromOuterAst, type NodeId } from '$/providers/openedProjects/grap
 import { importedLibraries } from '$/providers/openedProjects/module/imports'
 import type { ProjectStore } from '$/providers/openedProjects/project'
 import type { CollapseOutcome } from '@/components/GraphEditor/collapseNodes'
+import { useProjectFiles } from '@/stores/projectFiles'
 import { Ast } from '@/util/ast'
 import { Rect } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
@@ -34,6 +35,7 @@ import {
 } from './editTools'
 import { evaluateExpression } from './evaluate'
 import { findNode, getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
+import { serialized, storeImage, type ImageToolDeps } from './imageTools'
 import { createMcpNodes } from './nodeCreation'
 import { panelQuiet } from './panelQuiet'
 import {
@@ -97,8 +99,9 @@ export interface McpEditorDeps {
  * search_components, get_component_docs, evaluate_expression, list_visualizations,
  * get_documentation), the eight that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
  * set_documentation, set_visualization, collapse_nodes, add_function) and the two that navigate
- * (select_nodes, open_method); and the two that main's `get_visualization` calls
- * (get_visualization_data, prepare_visualization), which are not MCP tools themselves.
+ * (select_nodes, open_method); the two that main's `get_visualization` calls
+ * (get_visualization_data, prepare_visualization) and the one main's `add_image` calls
+ * (store_image), which are not MCP tools themselves.
  *
  * Every open project's graph editor stays mounted (the tabs are under `<KeepAlive>`), so the tools
  * must answer for the one on screen: this project's handlers are put first on activation and
@@ -355,6 +358,25 @@ export function useProjectMcpTools(
     }
   }
 
+  /**
+   * `store_image`'s dependencies: the project's file functions, as the documentation editor's
+   * upload uses them, and the node names for a picture's default name.
+   */
+  function imageDeps(deadline: number): ImageToolDeps {
+    const graph = currentProject.graph.value
+    return {
+      files: useProjectFiles(currentProject.store.value),
+      nodeName: (nodeId) => {
+        const found = findNode(graph.db, nodeId)
+        return found.ok ? found.value.node.pattern?.code() : undefined
+      },
+      now: () => Date.now(),
+      deadline,
+    }
+  }
+  // One store at a time: two images of the same name must not pick the same free name.
+  const storeImageInTurn = serialized(storeImage)
+
   const handlers: Record<string, McpToolHandler> = {
     get_graph: async (args) => {
       const previews = args.previews
@@ -496,6 +518,19 @@ export function useProjectMcpTools(
       return getVisualizationData(visualizationDeps(caller, deadline), {
         node_id,
         ...(visualization != null ? { visualization } : {}),
+      })
+    },
+    store_image: async (args, _caller, deadline) => {
+      const { data, name, node_id } = args
+      if (typeof data !== 'string') return invalidArgument('data', 'a string')
+      if (name != null && typeof name !== 'string') return invalidArgument('name', 'a string')
+      if (node_id != null && typeof node_id !== 'string') {
+        return invalidArgument('node_id', 'a string')
+      }
+      return storeImageInTurn(imageDeps(deadline), {
+        data,
+        ...(name != null ? { name } : {}),
+        ...(node_id != null ? { node_id } : {}),
       })
     },
     prepare_visualization: async (args, caller, deadline) => {
