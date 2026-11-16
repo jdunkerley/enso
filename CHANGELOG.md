@@ -2,7 +2,7 @@
 
 #### Enso IDE
 
-- [Libraries can provide their own visualizations][NNN]: a `.vue` file in a
+- [Libraries can provide their own visualizations][817]: a `.vue` file in a
   library's `visualizations/` folder appears in the view picker once the library
   is imported, and `Standard.Image` now ships the Image view this way.
 - [Right-clicking a table cell offers the components that the value's library
@@ -526,7 +526,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[817]: https://github.com/jdunkerley/enso/pull/817
 [800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795
 [790]: https://github.com/jdunkerley/enso/pull/790
