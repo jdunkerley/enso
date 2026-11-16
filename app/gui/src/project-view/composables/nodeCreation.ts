@@ -50,6 +50,8 @@ export interface NodeCreationOptions<Placement extends PlacementStrategy = Place
   placement: Placement
   expression: string
   binding?: string | undefined
+  /** The prefix of the new node's name when `binding` is absent. Unlike `binding`, it is never a rename. */
+  namePrefix?: string | undefined
   type?: Typename | undefined
   documentation?: string | undefined
   metadata?: Ast.NodeMetadataFields | undefined
@@ -232,6 +234,7 @@ export function useNodeCreation(
   ): Ast.Identifier {
     const namePrefix =
       options.binding ? existingNameToPrefix(options.binding)
+      : options.namePrefix ? options.namePrefix
       : options.type ? typeToPrefix(options.type)
       : inferPrefixFromAst(expr)
     const ident = toValue(graphStore).generateLocallyUniqueIdent(namePrefix, alreadyCreated)

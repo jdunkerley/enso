@@ -88,3 +88,40 @@ test('createNodes runs inSameEdit inside the same edit, with the new identifiers
   expect(edits).toBe(1)
   expect(seen).toEqual([['end1']])
 })
+
+test('createNodes: namePrefix names the node but is not a rename', () => {
+  const module = Ast.MutableModule.Transient()
+  const func = Ast.FunctionDef.new(identifier('main')!, [], Ast.BodyBlock.new([], module), {
+    edit: module,
+  })
+  const root = Ast.BodyBlock.new([], module)
+  root.push(func)
+  const moduleStore = {
+    edit: (f: (edit: Ast.MutableModule) => ReturnType<typeof Ok>) => void f(module),
+    addMissingImports: () => [],
+    addDetectedImports: () => {},
+  }
+  const graphStore = {
+    currentMethod: { ast: Ok(func) },
+    nodeRects: new Map(),
+    visibleNodeAreas: [],
+    generateLocallyUniqueIdent: (prefix: string) => `${prefix}1`,
+    doAfterUpdate: () => {},
+  }
+  const { createNodes } = useNodeCreation(
+    moduleStore as never,
+    graphStore as unknown as GraphStore,
+    {} as never,
+    undefined,
+    () => {},
+  )
+  createNodes([
+    {
+      placement: { type: 'fixed', position: Vec2.Zero },
+      expression: 'end.add_days 1',
+      namePrefix: 'end',
+    },
+  ])
+  // The reference to the existing `end` is left alone.
+  expect(root.code()).toContain('end1 = end.add_days 1')
+})

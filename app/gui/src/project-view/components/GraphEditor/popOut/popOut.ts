@@ -1,6 +1,7 @@
 import type { GraphStore } from '$/providers/openedProjects/graph'
 import type { MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
 import type { ModuleStore } from '$/providers/openedProjects/module'
+import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import { SuggestionKind } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
@@ -9,7 +10,6 @@ import type { NodeCreation } from '@/composables/nodeCreation'
 import { Ast } from '@/util/ast'
 import { ArgumentInfoKey } from '@/util/callTree'
 import type { Vec2 } from '@/util/data/vec2'
-import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
 import { useToast } from '@/util/toast'
 import type { Result } from 'enso-common/src/utilities/data/result'
 import { toValue } from 'vue'
@@ -42,12 +42,13 @@ export function usePopOut(deps: {
   module: ToValue<Pick<ModuleStore, 'ast'>>
   graph: ToValue<Pick<GraphStore, 'db'>>
   suggestionDb: ToValue<SuggestionDb>
+  projectNames: Pick<ProjectNameStore, 'parseProjectPathRaw'>
   createNodes: NodeCreation['createNodes']
 }) {
   const toast = useToast.error()
 
   const hasConstructor: HasConstructor = (typeQn, name) => {
-    const path = parseAbsoluteProjectPathRaw(`${typeQn}.${name}`)
+    const path = deps.projectNames.parseProjectPathRaw(`${typeQn}.${name}`)
     if (!path.ok) return false
     return (
       toValue(deps.suggestionDb).getEntryByProjectPath(path.value)?.kind ===
@@ -73,11 +74,14 @@ export function usePopOut(deps: {
         {
           placement: { type: 'fixed', position },
           expression: code.value,
-          binding: argName,
+          namePrefix: argName,
         },
       ],
       (edit, [ident]) => {
-        if (ident == null) return
+        if (ident == null) {
+          toast.show("Can't pop out: the value could not be made into a node.")
+          return
+        }
         edit.getVersion(arg).replace(Ast.Ident.new(edit, ident))
       },
     )
