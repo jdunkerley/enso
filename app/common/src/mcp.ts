@@ -13,6 +13,11 @@ export interface McpToolCallRequest {
   readonly tool: string
   readonly args: Readonly<Record<string, unknown>>
   readonly caller: McpCaller
+  /**
+   * How long main waits for the reply before it answers the caller that the call timed out. The
+   * window must not apply an edit after that: it refuses a run whose turn comes too late.
+   */
+  readonly timeoutMs: number
 }
 
 /** Window → main. */
@@ -39,9 +44,30 @@ export interface McpStatus {
 
 export const MCP_CLIENT_KINDS = [
   'claudeCode',
+  'claudeDesktop',
   'codex',
   'copilotVsCode',
   'copilotCli',
   'json',
 ] as const
 export type McpClientKind = (typeof MCP_CLIENT_KINDS)[number]
+
+/** Where Claude Desktop's configuration file stands, for the Settings "Claude Desktop" block. */
+export type ClaudeDesktopSetup =
+  /** Claude Desktop's configuration folder does not exist. */
+  | { readonly state: 'notInstalled' }
+  /** The folder exists; the file has no `enso` entry. */
+  | { readonly state: 'notSetUp' }
+  /** An `enso` entry with the current address and token. */
+  | { readonly state: 'setUp' }
+  /** An `enso` entry with another address or token. */
+  | { readonly state: 'outOfDate' }
+  /** The file cannot be used (not valid JSON, not the expected shape). */
+  | { readonly state: 'unreadable'; readonly reason: string }
+
+/**
+ * What the Settings block is given: the state, and the full path of Claude Desktop's configuration
+ * file for the instructions (null on a platform without Claude Desktop). The path is shown whether
+ * or not the file or its folder exists yet.
+ */
+export type ClaudeDesktopStatus = ClaudeDesktopSetup & { readonly configFile: string | null }

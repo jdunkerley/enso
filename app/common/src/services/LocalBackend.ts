@@ -29,6 +29,7 @@ import {
   MissingComponentAction,
   Path,
   ProjectName,
+  type FileSystemEntry,
   type IpWithSocket,
   type VersioningStatus,
 } from './ProjectManager/types.js'
@@ -293,6 +294,15 @@ export class LocalBackend extends backend.Backend {
       assets,
       paginationToken: last ? backend.PaginationToken(String(last.id)) : null,
     }
+  }
+
+  /**
+   * The entries of the folder as the shim lists them: unlike {@link listDirectory}'s assets, they
+   * carry each file's size (`attributes.byteSize`). The MCP app tools list folders with it.
+   * @throws {Error} An error if the folder cannot be listed.
+   */
+  listDirectoryEntries(path: Path): Promise<readonly FileSystemEntry[]> {
+    return this.projectManager.listDirectory(path)
   }
 
   /**

@@ -4,7 +4,9 @@
  * agent apps read the open project, with a warning about what a connected agent can do. While it is
  * on, the section shows the server's address, a port field, a button per client that copies that
  * client's setup text, and a button to replace the token. If the server could not start, the
- * reason shows under the switch. While `ENSO_MCP_ENABLED` or `ENSO_MCP_PORT` fixes the setting
+ * reason shows under the switch. Under the copy buttons, a Claude Desktop block shows whether its
+ * configuration file has the IDE's entry and offers to add or update it (Electron main edits the
+ * file), and, for doing it by hand, a Copy JSON button with the file's path and what to do with it. While `ENSO_MCP_ENABLED` or `ENSO_MCP_PORT` fixes the setting
  * (`lockedByEnvironment`), the switch and the port field are disabled, with a note saying why.
  *
  * The token never reaches this component: "Copy setup" goes through Electron main, which writes the
@@ -27,17 +29,20 @@ import { useMutation } from '@tanstack/vue-query'
 import {
   MCP_CLIENT_KINDS,
   MCP_DEFAULT_PORT,
+  type ClaudeDesktopStatus,
   type McpClientKind,
   type McpStatus,
 } from 'enso-common/src/mcp'
 import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { computed, onMounted, onScopeDispose, ref } from 'vue'
+import McpClaudeDesktopConfirmModal from './McpClaudeDesktopConfirmModal.vue'
 
 const MIN_PORT = 1024
 const MAX_PORT = 65535
 
 const CLIENT_LABEL_IDS = {
   claudeCode: 'mcpClientClaudeCode',
+  claudeDesktop: 'mcpClientClaudeDesktop',
   codex: 'mcpClientCodex',
   copilotVsCode: 'mcpClientCopilotVsCode',
   copilotCli: 'mcpClientCopilotCli',
@@ -55,12 +60,23 @@ const status = ref<McpStatus>({
   error: null,
   lockedByEnvironment: false,
 })
+/** `null` until main has answered. */
+const claudeDesktop = ref<ClaudeDesktopStatus | null>(null)
 const locked = computed(() => status.value.lockedByEnvironment)
 const address = computed(() => `http://127.0.0.1:${status.value.port}/mcp`)
+/** Claude Desktop's JSON is offered in its own block, beside where the file is. */
+const COPY_ROW_CLIENTS = MCP_CLIENT_KINDS.filter((client) => client !== 'claudeDesktop')
 
 /** Show a failure as a toast. */
 function showError(error: unknown) {
   toasts.show(getMessageOrToString(error), { type: 'error' })
+}
+
+/** Read where Claude Desktop's configuration stands: its entry holds the address and token. */
+function refreshClaudeDesktop() {
+  window.api?.mcp?.claudeDesktopStatus().then((next) => {
+    claudeDesktop.value = next
+  }, showError)
 }
 
 onMounted(() => {
@@ -68,7 +84,9 @@ onMounted(() => {
   if (mcp == null) return
   const stopListening = mcp.onStatusChanged((next) => {
     status.value = next
+    refreshClaudeDesktop()
   })
+  refreshClaudeDesktop()
   onScopeDispose(stopListening)
   mcp.status().then((next) => {
     status.value = next
@@ -120,6 +138,29 @@ const replaceToken = useMutation({
   },
   onError: showError,
 })
+
+const setUpClaudeDesktop = useMutation({
+  mutationFn: async () => {
+    const next = await window.api?.mcp?.setUpClaudeDesktop()
+    if (next == null) return
+    claudeDesktop.value = next
+    // Only an entry now in place is done; otherwise the block shows the state the file is in (for
+    // `unreadable`, why), as it does on mount.
+    if (next.state === 'setUp') toasts.show(getText('mcpClaudeDesktopDone'), { type: 'success' })
+  },
+  onError: showError,
+})
+
+async function askSetUpClaudeDesktop() {
+  const updating = claudeDesktop.value?.state === 'outOfDate'
+  const label = getText(updating ? 'mcpClaudeDesktopUpdateButton' : 'mcpClaudeDesktopSetUpButton')
+  const answer = await modals.ask(McpClaudeDesktopConfirmModal, {
+    title: label,
+    message: getText(updating ? 'mcpClaudeDesktopUpdateConfirm' : 'mcpClaudeDesktopConfirm'),
+    confirm: label,
+  })
+  if (answer === 'confirm') setUpClaudeDesktop.mutate()
+}
 
 async function askReplaceToken() {
   const answer = await modals.ask(ConfirmDeleteModal, {
@@ -179,7 +220,7 @@ async function askReplaceToken() {
         <Text weight="bold">{{ getText('mcpCopySetupFor') }}</Text>
         <ButtonGroup class="grow-0 flex-wrap">
           <Button
-            v-for="client in MCP_CLIENT_KINDS"
+            v-for="client in COPY_ROW_CLIENTS"
             :key="client"
             size="small"
             variant="outline"
@@ -188,6 +229,53 @@ async function askReplaceToken() {
             {{ getText(CLIENT_LABEL_IDS[client]) }}
           </Button>
         </ButtonGroup>
+      </div>
+      <div
+        v-if="claudeDesktop != null"
+        class="flex flex-col gap-1"
+        data-testid="mcp-claude-desktop"
+      >
+        <Text weight="bold">{{ getText('mcpClaudeDesktopHeading') }}</Text>
+        <Text v-if="claudeDesktop.state === 'notInstalled'">
+          {{ getText('mcpClaudeDesktopNotInstalled') }}
+        </Text>
+        <Text v-else-if="claudeDesktop.state === 'setUp'">
+          {{ getText('mcpClaudeDesktopIsSetUp') }}
+        </Text>
+        <Text v-else-if="claudeDesktop.state === 'outOfDate'">
+          {{ getText('mcpClaudeDesktopOutOfDate') }}
+        </Text>
+        <template v-else-if="claudeDesktop.state === 'unreadable'">
+          <Text>{{ claudeDesktop.reason }}</Text>
+          <Text>{{ getText('mcpClaudeDesktopUnreadableHint') }}</Text>
+        </template>
+        <ButtonGroup
+          v-if="claudeDesktop.state === 'notSetUp' || claudeDesktop.state === 'outOfDate'"
+          class="grow-0"
+        >
+          <Button size="small" variant="outline" @press="askSetUpClaudeDesktop">
+            {{
+              getText(
+                claudeDesktop.state === 'outOfDate' ?
+                  'mcpClaudeDesktopUpdateButton'
+                : 'mcpClaudeDesktopSetUpButton',
+              )
+            }}
+          </Button>
+        </ButtonGroup>
+        <template v-if="claudeDesktop.configFile != null">
+          <Text>{{ getText('mcpClaudeDesktopManualIntro') }}</Text>
+          <Text textSelection="all" monospace testId="mcp-claude-desktop-config-file">
+            {{ claudeDesktop.configFile }}
+          </Text>
+          <Text>{{ getText('mcpClaudeDesktopManualSteps') }}</Text>
+          <ButtonGroup class="grow-0">
+            <Button size="small" variant="outline" @press="copyConfig.mutate('claudeDesktop')">
+              {{ getText('mcpClaudeDesktopCopyJson') }}
+            </Button>
+          </ButtonGroup>
+        </template>
+        <Text>{{ getText('mcpClaudeDesktopNeeds') }}</Text>
       </div>
       <ButtonGroup class="grow-0">
         <Button size="small" variant="outline" @press="askReplaceToken">

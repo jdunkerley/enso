@@ -2,6 +2,8 @@ import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
 import { initJvmAotIpc } from '@/jvmAotIpc'
 import { resolveLogFileToReveal } from '@/logFileReveal'
+import { appTools } from '@/mcp/appTools'
+import { claudeDesktopConfigDirectory } from '@/mcp/claudeDesktop'
 import { Guides, guideTool } from '@/mcp/guides'
 import { McpController } from '@/mcp/mcpController'
 import { McpHttpServer } from '@/mcp/mcpServer'
@@ -25,6 +27,7 @@ import electronUpdater from 'electron-updater'
 import type { DownloadUrlOptions } from 'enso-common/src/download'
 import { MCP_CLIENT_KINDS, type McpClientKind } from 'enso-common/src/mcp'
 import { unlinkSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { basename, dirname, extname, join } from 'node:path'
 import {
   getEngineLogDirectory,
@@ -101,9 +104,11 @@ function initMcp(electron: Electron | undefined, electronIsDev: boolean) {
   const guides = new Guides(paths.stdlibRoot(electron, electronIsDev))
   const registry = new ToolRegistry()
   for (const tool of projectTools(bridge)) registry.register(tool)
+  for (const tool of appTools(bridge)) registry.register(tool)
   registry.register(guideTool(guides))
   const controller = new McpController({
     settingsPath: join(app.getPath('userData'), 'mcp-settings.json'),
+    claudeDesktopDirectory: claudeDesktopConfigDirectory(process.platform, process.env, homedir()),
     entry: keyringEntries,
     env: process.env,
     createServer: (port, token) =>
@@ -132,6 +137,9 @@ function initMcp(electron: Electron | undefined, electronIsDev: boolean) {
     if (!MCP_CLIENT_KINDS.includes(client as McpClientKind)) throw new Error('Unknown MCP client')
     clipboard.writeText(await controller.config(client as McpClientKind))
   })
+  // Neither takes arguments, and neither returns the token: only the status.
+  ipcMain.handle(Channel.mcpClaudeDesktopStatus, () => controller.claudeDesktopStatus())
+  ipcMain.handle(Channel.mcpClaudeDesktopSetUp, () => controller.setUpClaudeDesktop())
   // Start-up must not wait for the server: it may be waiting on the keychain.
   void controller.init()
 }

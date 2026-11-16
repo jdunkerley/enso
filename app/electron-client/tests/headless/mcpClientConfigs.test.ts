@@ -27,6 +27,10 @@ describe('clientConfig', () => {
     expect(text).toContain(`http_headers = { "Authorization" = "Bearer ${TOKEN}" }`)
   })
 
+  test('codex waits 120 s for a tool, longer than the IDE gives an edit or an open', () => {
+    expect(clientConfig('codex', URL, TOKEN).split('\n')).toContain('tool_timeout_sec = 120')
+  })
+
   test('copilotVsCode is JSON under "servers"', () => {
     const parsed: unknown = JSON.parse(clientConfig('copilotVsCode', URL, TOKEN))
     expect(parsed).toEqual({
@@ -60,5 +64,21 @@ describe('clientConfig', () => {
       },
     })
     expect(parsed.mcpServers.enso).not.toHaveProperty('tools')
+  })
+})
+
+describe('clientConfig claudeDesktop', () => {
+  test('is the mcp-remote bridge, with the token only in env', () => {
+    const text = clientConfig('claudeDesktop', URL, TOKEN)
+    const parsed = JSON.parse(text) as {
+      mcpServers: { enso: { command: string; args: string[]; env: Record<string, string> } }
+    }
+    const { enso } = parsed.mcpServers
+    expect(enso.command).toBe('npx')
+    expect(enso.args).toContain(URL)
+    expect(enso.args).toContain('Authorization:${ENSO_AUTH}')
+    expect(enso.env).toEqual({ ENSO_AUTH: `Bearer ${TOKEN}` })
+    expect(JSON.stringify(enso.args)).not.toContain(TOKEN)
+    expect(text).toBe(JSON.stringify(parsed, null, 2))
   })
 })

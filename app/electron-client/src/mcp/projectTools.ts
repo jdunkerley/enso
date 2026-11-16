@@ -1,8 +1,11 @@
-/** @file Definitions of the tools that read the open project. They run in the window; main forwards. */
+/**
+ * @file Definitions of the project tools: those that read the open project and those that edit or
+ * navigate it. They run in the window; main forwards.
+ */
 /* eslint-disable camelcase -- tool argument names are snake_case on the wire */
 import { z } from 'zod'
 import type { ToolDefinition } from './toolRegistry'
-import type { WindowBridge } from './windowBridge'
+import { EDIT_TOOL_TIMEOUT_MS, WINDOW_TOOL_TIMEOUT_MS, type WindowBridge } from './windowBridge'
 
 /** Most characters of a node id, a component name or a type name. */
 const NAME_CHARS = 200
@@ -11,7 +14,10 @@ const QUERY_CHARS = 500
 /** Most characters of an expression to evaluate. */
 const EXPRESSION_CHARS = 100_000
 
-export const PROJECT_TOOL_NAMES = [
+/** Most characters of one statement or expression an agent adds to a node. */
+const STATEMENT_CHARS = 20_000
+
+export const VIEW_TOOL_NAMES = [
   'get_graph',
   'get_node',
   'search_components',
@@ -19,12 +25,56 @@ export const PROJECT_TOOL_NAMES = [
   'evaluate_expression',
 ] as const
 
-/** The five project tools, each forwarding its arguments to the window through `bridge`. */
+export const EDIT_TOOL_NAMES = [
+  'add_nodes',
+  'edit_node',
+  'remove_nodes',
+  'collapse_nodes',
+  'add_function',
+  'set_node_comment',
+  'set_visualization',
+  'select_nodes',
+  'open_method',
+] as const
+
+export const PROJECT_TOOL_NAMES = [...VIEW_TOOL_NAMES, ...EDIT_TOOL_NAMES] as const
+
+const nodeId = () => z.string().max(NAME_CHARS)
+
+/**
+ * The Write rule, in the tool descriptions that take code. It says what the Write guard
+ * (`app/gui/src/project-view/mcp/writeGuard.ts`) refuses and the two ways an edit can still cause
+ * a write, which the guard does not stop.
+ */
+const WRITE_RULE =
+  'Do not turn Write on. Code that enables the output context (`with_enabled_context`, ' +
+  '`with_enabled`, binding a runtime builtin, building a method name by reflection, looking a ' +
+  'method up by a name in text, or evaluating text as code) is refused. Only the user turns Write on, by clicking it on a node. Your edits can still cause ' +
+  "a write in two ways you should avoid: calling a function in the user's project that itself " +
+  'enables output, and changing a node upstream of one the user has switched Write on for (it ' +
+  're-runs with your change). Ask the user before doing either.'
+
+/** The refusal and undo rules every edit tool shares, appended to its description. */
+const EDIT_RULES =
+  ' Refused while the project is in Live mode, and, with nothing changed, when the method on ' +
+  'screen changed before the edit ran (call `get_graph` and try again). Your run of changes is ' +
+  'one undo step for the user, until you pause for 10 seconds, the user edits or leaves the ' +
+  "project's tab, or `open_method` changes the method; there is no undo tool. The project is " +
+  'saved as it is edited. ' +
+  WRITE_RULE +
+  ' `settled: true`: the engine has reported results for the changed nodes, so the types ' +
+  'and errors in this result are current. `settled: false`: it had not within 20 seconds; call ' +
+  '`get_node` later.'
+
+/**
+ * The project tools (the five that read, the nine that edit or navigate), each forwarding its
+ * arguments to the window through `bridge`.
+ */
 export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
   const forward =
-    (name: string): ToolDefinition['run'] =>
+    (name: string, timeoutMs: number = WINDOW_TOOL_TIMEOUT_MS): ToolDefinition['run'] =>
     (args, caller) =>
-      bridge.call(name, args, caller)
+      bridge.call(name, args, caller, timeoutMs)
   return [
     {
       name: 'get_graph',
@@ -36,7 +86,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'There is no separate edge list: a node uses another by its name, so read the ' +
         'connections from each node `code` and from `source`. When previews run out of ' +
         'time or space, `previews_skipped` counts the nodes left without one: a long graph ' +
-        'returns fewer previews and cut texts, and `get_node` gives one node in full. Call this first to ' +
+        'returns fewer previews and cut texts, and `get_node` gives one node in full. ' +
+        '`selection` lists the ids of the nodes the user has selected. Call this first to ' +
         'see what the project does. Each `node_id` is stable across edits, so you can pass ' +
         'it to `get_node` and `evaluate_expression` later.',
       inputSchema: { previews: z.boolean().optional() },
@@ -96,14 +147,152 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         '`.catch_primitive (e -> e.to_display_text)` so the result is still Text. ' +
         'Returns the text the expression produced, or an error string if the scope is ' +
         'unavailable or evaluation fails. Runs only in the Design environment, where output is ' +
-        'off: nothing is written to the file, database or service an expression names. A write ' +
-        'that supports a dry run writes to a temporary file instead and returns that ' +
-        "file's path; other writes fail. When the project is in Live mode the tool is refused.",
+        'off: a write does not reach the file, database or service the expression names. A ' +
+        'write that supports a dry run writes to a temporary file instead and returns that ' +
+        "file's path; other writes fail. When the project is in Live mode the tool is " +
+        'refused. ' +
+        WRITE_RULE,
       inputSchema: {
         expression: z.string().max(EXPRESSION_CHARS),
         node_id: z.string().max(NAME_CHARS).optional(),
       },
       run: forward('evaluate_expression'),
+    },
+    {
+      name: 'add_nodes',
+      title: 'Add nodes',
+      description:
+        'Add nodes to the graph of the open project. Each of `statements` is one Enso ' +
+        'statement: `name = expression` (the name becomes the node name) or a bare ' +
+        'expression (a name is generated). Later statements may use the names of earlier ' +
+        'ones and of existing nodes. In the code the new nodes are always added at the end of ' +
+        'the method; `after_node` (an id from `get_graph`) only sets where they are drawn, below ' +
+        'that node (without it, below the last node). `imports` are whole import ' +
+        'lines (`from Standard.Table import Table`) added to the module if missing. Returns ' +
+        'each new node with its id, name, expression and type and any error or panic, and ' +
+        '`settled` (see below): check the types and errors, ' +
+        'and fix a wrong node with `edit_node`. Add a few nodes at a time. The call is ' +
+        'all-or-nothing: if any statement or import does not parse, a name is already ' +
+        'taken, or `after_node` is unknown, nothing is added and the error says which.' +
+        EDIT_RULES,
+      inputSchema: {
+        statements: z.array(z.string().min(1).max(STATEMENT_CHARS)).min(1).max(50),
+        after_node: nodeId().optional(),
+        imports: z.array(z.string().max(500)).max(20).optional(),
+      },
+      run: forward('add_nodes', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'edit_node',
+      title: 'Edit a node',
+      description:
+        'Replace the expression of the node `node_id` (from `get_graph`) with `expression`. ' +
+        '`expression` is the new right-hand side only, not `name = expression`: the node ' +
+        'keeps its name, so the nodes that use it stay connected. An argument node of the ' +
+        'method is refused, and so is a node the user turned Write on for. Returns `nodes`, a ' +
+        'list holding the node with its new type and ' +
+        'any error or panic, and `settled` (see below); call ' +
+        '`get_graph` for the nodes that use it.' +
+        EDIT_RULES,
+      inputSchema: {
+        node_id: nodeId(),
+        expression: z.string().min(1).max(STATEMENT_CHARS),
+      },
+      run: forward('edit_node', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'remove_nodes',
+      title: 'Remove nodes',
+      description:
+        'Remove the nodes in `node_ids` (from `get_graph`) from the graph. The nodes that used ' +
+        'a removed node lose that input, as when the user deletes a node. Removing a node ' +
+        'rewrites the nodes that used it, and if the user switched Write on for one of those, it ' +
+        're-runs with output: ask the user first. The argument and ' +
+        'output nodes of the method are refused, and then nothing is removed. Returns ' +
+        '`removed`, the ids removed, and `settled`; call `get_graph` for the nodes that used ' +
+        'them.' +
+        EDIT_RULES,
+      inputSchema: { node_ids: z.array(nodeId()).min(1).max(200) },
+      run: forward('remove_nodes', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'collapse_nodes',
+      title: 'Collapse nodes into a function',
+      description:
+        'Group the nodes in `node_ids` (from `get_graph`) into one new function, replaced ' +
+        'in the graph by a single node that calls it. `name` names the function: a lowercase ' +
+        'name such as `clean_names` (a name is generated without it; a number is added when ' +
+        'the name is taken). Use it to keep a long graph readable. Refused when more than ' +
+        'one of the nodes is used by nodes outside the group: the function returns one value. ' +
+        'A node the user turned Write on for is refused, and then nothing is collapsed. ' +
+        'Returns `name`, the name the function got, `node`, the new node ' +
+        'with its type and any error, and `settled`.' +
+        EDIT_RULES,
+      inputSchema: {
+        node_ids: z.array(nodeId()).min(1).max(200),
+        name: z.string().max(100).optional(),
+      },
+      run: forward('collapse_nodes', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'add_function',
+      title: 'Add a function',
+      description:
+        '`source` is the source of one top-level function definition (a name, its ' +
+        'arguments, `=`, and an indented body, for example `double x =\n    x * 2`), added ' +
+        'to the module. A name already defined in the module is refused. Call it from a node ' +
+        'as `Main.<name> args` (the form the IDE uses for the functions it generates), ' +
+        "for example with `add_nodes`. Returns the function's `name` and `settled`; an error in " +
+        'its definition shows on the nodes that call it.' +
+        EDIT_RULES,
+      inputSchema: { source: z.string().min(1).max(100_000) },
+      run: forward('add_function', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'set_node_comment',
+      title: 'Set a node comment',
+      description:
+        'Set the documentation comment of the node `node_id` (from `get_graph`) to `text`. ' +
+        'An empty `text` removes the comment. A node that cannot have a comment (an argument ' +
+        'of the method) is refused. Returns `node`, the node with its comment, and `settled` ' +
+        '(always true: nothing is computed again).' +
+        EDIT_RULES,
+      inputSchema: { node_id: nodeId(), text: z.string().max(5_000) },
+      run: forward('set_node_comment', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'set_visualization',
+      title: 'Show or hide a visualization',
+      description:
+        'Show (`visible` true) or hide the visualization of the node `node_id` (from ' +
+        '`get_graph`) in the graph editor, for the user to look at. Returns `node`, the node, ' +
+        'and `settled` (always true: nothing is computed again).' +
+        EDIT_RULES,
+      inputSchema: { node_id: nodeId(), visible: z.boolean() },
+      run: forward('set_visualization', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'select_nodes',
+      title: 'Select nodes',
+      description:
+        'Select the nodes in `node_ids` (from `get_graph`) in the graph editor, to point ' +
+        'the user at them; an empty list clears the selection. This and `open_method` are ' +
+        'the only project tools that change the selection or move the view: the edit tools ' +
+        'leave both alone. Returns `selected`, the ids of the selected nodes. Works in Live ' +
+        'mode too.',
+      inputSchema: { node_ids: z.array(nodeId()).max(200) },
+      run: forward('select_nodes'),
+    },
+    {
+      name: 'open_method',
+      title: 'Open a method or go back',
+      description:
+        'Open the function that the node `node_id` (from `get_graph`) calls, in the graph ' +
+        'editor, so the next `get_graph` reads its graph. Without `node_id` go back to the ' +
+        'method you came from. Returns `method`, the name of the method now open. Works in ' +
+        'Live mode too.',
+      inputSchema: { node_id: nodeId().optional() },
+      run: forward('open_method'),
     },
   ]
 }

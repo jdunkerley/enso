@@ -98,12 +98,16 @@ export function attachProvider(
   return { provider, dispose }
 }
 
-/** @returns a reactive view of the given Yjs text object's content. */
-export function useYText(text: ToValue<Y.Text>) {
+/** @returns a reactive view of the given Yjs text object's content; undefined without one. */
+export function useYText(text: ToValue<Y.Text | undefined>) {
   const content = ref<string>()
 
   watchEffect((onCleanup) => {
     const textValue = toValue(text)
+    if (textValue == null) {
+      content.value = undefined
+      return
+    }
     const update = () => (content.value = textValue.toJSON())
     update()
     textValue.observe(update)

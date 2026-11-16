@@ -51,6 +51,19 @@ test('Add new comment via menu', async ({ editorPage, page }) => {
   await expect(locate.nodeCommentContent(page)).toHaveCount(INITIAL_NODE_COMMENTS + 1)
 })
 
+test('Typing a comment that starts like an AI prompt keeps the editor', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const nodeComment = locate.nodeCommentContent(locate.graphNodeByBinding(page, 'final'))
+  await nodeComment.click()
+  await page.keyboard.press(`ControlOrMeta+A`)
+  await page.keyboard.type('AI: x')
+  await expect(nodeComment).toBeFocused()
+  await expect(nodeComment).toHaveText('AI: x')
+})
+
 test('Delete comment by clearing text', async ({ editorPage, page }) => {
   await editorPage
   const nodeComment = locate.nodeCommentContent(locate.graphNodeByBinding(page, 'final'))
