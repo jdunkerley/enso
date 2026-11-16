@@ -42,6 +42,11 @@ add_specs suite_builder =
             (Viz_Actions.from [1, 2, 3]).to_json_text . should_equal json
             (Viz_Actions.from [1, 2, 3].to_array).to_json_text . should_equal json
 
+        group_builder.specify "the items' JSON, written out once as a literal, is the action's own JSON" <|
+            ## The text is a literal, not built per message, so it could drift from the action: it cannot.
+            (Viz_Actions.from [1, 2, 3]).to_json_text . should_equal ('[' + Viz_Actions.items.actions.first.to_json_text + ']')
+            (Viz_Actions.from [4].to_array).to_json_text . should_equal ('[' + Viz_Actions.items.actions.first.to_json_text + ']')
+
         group_builder.specify "a user type offers its own, a standalone node among them" <|
             (Viz_Actions.from (Thing.Value "a")).to_json_text . should_equal '[{"id":"describe","label":"Describe","icon":"","kind":"new_node","template":"Thing.describe {{node}}"}]'
             (Viz_Actions.for (Thing.Value "a")).actions.map .id . should_equal ["describe"]
