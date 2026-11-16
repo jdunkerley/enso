@@ -106,14 +106,12 @@ const TOOLBAR_CASES: Record<string, ToolbarCase> = {
       }),
     ],
   },
-  // KNOWN DEFECT, issue #785: the recorded text `..Equal Time_Of_Day.parse ('10:30:00')` is not
-  // parenthesised, so Enso reads it as `Equal` with two arguments. This entry (and the single
-  // date-time one below) pins today's text on purpose; do not "correct" the snapshot. It changes
-  // when #785 is fixed, after PR 3.2.
+  // A single value is grouped, so `..Equal (Time_Of_Day.parse '10:30:00')` gives `Equal` one
+  // argument (#785).
   'set of a time': {
     filters: [filter({ columnName: 't', filterType: 'set', values: ['10:30:00'] })],
   },
-  'set of one date-time (known defect, #785)': {
+  'set of one date-time': {
     filters: [filter({ columnName: 'dt', filterType: 'set', values: ['2024-01-02 10:30:00'] })],
   },
   'set of a date-time': {
