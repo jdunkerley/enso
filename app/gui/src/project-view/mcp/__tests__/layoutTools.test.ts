@@ -391,6 +391,27 @@ test('arrange_nodes counts the nodes whose position changed', async () => {
   expect(result).toEqual({ action: 'tidy', arranged: 2, settled: true })
 })
 
+test('arrange_nodes does not count a move made after its edit, while the session waits', async () => {
+  const fixture: { db?: GraphDb } = {}
+  const inner = fakeSession()
+  const { deps, db } = makeDeps({
+    tidy: () => {
+      fixture.db!.nodeIdToNode.get(nodeNamed(fixture.db!, 'a'))!.position = new Vec2(-5, -5)
+    },
+    session: {
+      // The edit runs, then someone else moves another node before the session answers.
+      async run(caller, edit, options) {
+        const outcome = await inner.run(caller, edit, options)
+        fixture.db!.nodeIdToNode.get(nodeNamed(fixture.db!, 'b'))!.position = new Vec2(-9, -9)
+        return outcome
+      },
+    },
+  })
+  fixture.db = db
+  const result = valueOf(await arrangeNodes(deps, { action: 'tidy' }))
+  expect(result).toEqual({ action: 'tidy', arranged: 1, settled: true })
+})
+
 test('arrange_nodes tells the session whether the module changed', async () => {
   const fixture: { db?: GraphDb } = {}
   const { deps, db, session } = makeDeps({

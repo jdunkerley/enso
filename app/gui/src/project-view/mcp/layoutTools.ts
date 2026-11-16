@@ -66,7 +66,7 @@ export async function moveNodes(
   for (const { node_id, x, y } of args.moves) {
     if (!isCoordinate(x) || !isCoordinate(y)) {
       return toolError(
-        `The position of node ${node_id} is out of range: x and y must be numbers within ±1,000,000.`,
+        `The position of node ${node_id} is out of range: x and y must be numbers within ±${MOVE_COORDINATE_LIMIT.toLocaleString('en-US')}.`,
       )
     }
     const found = findNode(deps.db, node_id)
@@ -169,7 +169,8 @@ function isArrangeAction(action: string): action is ArrangeAction {
  * action, more than {@link ARRANGE_NODES_MAX} ids, an unknown or repeated node, or too few nodes;
  * and at its turn when the method on screen changed or a node is gone ({@link checkAtTurn}).
  * Neither the view nor the selection changes. Answers `{ action, arranged, settled: true }`,
- * `arranged` counting the nodes of the method whose position changed (0 when already laid out).
+ * `arranged` counting the nodes of the method whose position this edit changed (0 when already
+ * laid out).
  */
 export async function arrangeNodes(
   deps: ArrangeToolDeps,
@@ -196,14 +197,13 @@ export async function arrangeNodes(
     return toolError(`\`${action}\` needs at least two nodes in \`node_ids\`.`)
   }
   const method = methodOnScreen(deps)
-  let before = new Map<NodeId, Vec2>()
   const outcome = await deps.session.run(
     deps.caller,
     // Positions change nothing the engine runs: no expression is affected, so it settles at once.
     () => {
       const sameMethod = checkAtTurn(deps, method, ids)
       if (!sameMethod.ok) return sameMethod
-      before = positions(deps)
+      const before = positions(deps)
       const changed = deps.moduleChanged(() => {
         if (action === 'tidy') {
           deps.tidy(ids.length >= 2 ? ids : undefined)
@@ -212,18 +212,24 @@ export async function arrangeNodes(
           deps.alignment[ALIGNMENT_HANDLER[action]](nodes)
         }
       })
-      return Ok({ unchanged: !changed })
+      // Counted here, when the edit has committed (the node database follows the module at once):
+      // a move someone else makes while the session waits is not this call's.
+      return Ok({ unchanged: !changed, arranged: changedCount(before, positions(deps)) })
     },
     { deadline: deps.deadline, unchanged: ({ unchanged }) => unchanged },
   )
   if (!outcome.ok) return errorResult(outcome)
-  const after = positions(deps)
-  let arranged = 0
+  return settledResult({ action, arranged: outcome.value.value.arranged }, outcome.value)
+}
+
+/** How many of the nodes in `before` are at another position in `after`. */
+function changedCount(before: Map<NodeId, Vec2>, after: Map<NodeId, Vec2>): number {
+  let count = 0
   for (const [id, position] of before) {
     const now = after.get(id)
-    if (now != null && !now.equals(position)) arranged += 1
+    if (now != null && !now.equals(position)) count += 1
   }
-  return settledResult({ action, arranged }, outcome.value)
+  return count
 }
 
 /** The position of every node of the method on screen. */

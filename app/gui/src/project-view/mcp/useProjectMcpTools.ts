@@ -84,6 +84,11 @@ export interface McpEditorDeps {
   readonly leaveMethod: () => void
   /** The visible part of the scene. */
   readonly viewport: () => Rect
+  /**
+   * The zoom `viewport` is drawn at now (1 is 100%). During a zoom animation it is on its way to
+   * {@link scale}, the zoom the view is going to.
+   */
+  readonly viewportScale: () => number
   /** The graph editor's "Group components", without its follow-up (the rename it schedules). */
   readonly collapseNodes: (
     ids: readonly NodeId[],
@@ -192,7 +197,8 @@ export function useProjectMcpTools(
       ...graphDeps(),
       selection: editor.selectedNodes,
       area: (id) => graph.visibleArea(id),
-      view: () => ({ rect: editor.viewport(), scale: editor.scale() }),
+      // The rectangle and the zoom of the same moment, even during a zoom animation.
+      view: () => ({ rect: editor.viewport(), scale: editor.viewportScale() }),
     }
   }
 

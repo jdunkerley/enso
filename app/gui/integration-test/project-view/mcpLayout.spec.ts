@@ -126,6 +126,8 @@ test('move_nodes moves a node on screen, and one undo moves it back', async ({
   page,
 }) => {
   await editorPage
+  // Ends the initial view's following of the graph first, so the other node's box can stay still.
+  await selectFive(page)
   const graph = await layoutGraph(page)
   const five = nodeNamed(graph, 'five')
   const ten = nodeNamed(graph, 'ten')

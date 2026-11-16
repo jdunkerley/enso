@@ -293,6 +293,7 @@ useProjectMcpTools({
   canLeaveMethod: () => stackNavigator.allowNavigationLeft.value,
   leaveMethod: () => stackNavigator.exitNode(),
   viewport: () => graphNavigator.viewport,
+  viewportScale: () => graphNavigator.scale,
   collapseNodes: (ids, name) =>
     collapseNodesIntoFunction(collapseDeps(), ids, name ? { name } : {}),
   viewRect: () => viewportElem.value?.getBoundingClientRect() ?? new DOMRect(),

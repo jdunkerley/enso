@@ -75,7 +75,7 @@ export interface GetGraphDeps extends GraphToolDeps {
    * units; undefined for a node not yet drawn.
    */
   readonly area: (id: NodeId) => Rect | undefined
-  /** The part of the scene on screen, and the zoom (1 is 100%). */
+  /** The part of the scene on screen, and the zoom it is drawn at now (1 is 100%). */
   readonly view: () => { rect: Rect; scale: number }
 }
 
