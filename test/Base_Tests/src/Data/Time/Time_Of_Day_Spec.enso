@@ -17,6 +17,33 @@ add_specs suite_builder =
     if Polyglot.is_language_installed "python" then
         specWith suite_builder "PythonLocalTime" python_time python_parse nanoseconds_loss_in_precision=True
 
+    suite_builder.group "Time_Of_Day signatures" group_builder->
+        group_builder.specify "start_of and end_of default to the hour, and take ..Minute" <|
+            t = Time_Of_Day.new 15 37 58
+            t.start_of . should_equal (Time_Of_Day.new 15 0 0)
+            t.end_of . should_equal (Time_Of_Day.new 15 59 59 nanosecond=999999999)
+            t.start_of ..Minute . should_equal (Time_Of_Day.new 15 37 0)
+
+        group_builder.specify "to_date_time takes a Date, and a zone" <|
+            dt = (Time_Of_Day.new 12 30).to_date_time (Date.new 2020 1 1) Time_Zone.utc
+            dt . should_equal (Date_Time.new 2020 1 1 12 30 zone=Time_Zone.utc)
+
+        group_builder.specify "+ and - take each Time_Period and a Duration" <|
+            t = Time_Of_Day.new 12 30
+            (t + Time_Period.Hour) . should_equal (Time_Of_Day.new 13 30)
+            (t - Time_Period.Minute) . should_equal (Time_Of_Day.new 12 29)
+            (t + (Duration.new seconds=15)) . should_equal (Time_Of_Day.new 12 30 15)
+            (t - (Duration.new minutes=45)) . should_equal (Time_Of_Day.new 11 45)
+
+        group_builder.specify "methods reject arguments of the wrong type" <|
+            t = Time_Of_Day.new 12 30
+            Test.expect_panic_with (t.to_date_time 5) Type_Error
+            Test.expect_panic_with (t.start_of 5) Type_Error
+            Test.expect_panic_with (t.end_of "Hour") Type_Error
+            Test.expect_panic_with (t.nanosecond 5) Type_Error
+            Test.expect_panic_with (Time_Of_Day.new "a") Type_Error
+            Test.expect_panic_with (t.to_date_time (Date.new 2020 1 1) 5) Type_Error
+
 specWith suite_builder name create_new_time parse_time nanoseconds_loss_in_precision=False =
     suite_builder.group name group_builder->
 
