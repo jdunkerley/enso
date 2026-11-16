@@ -15,11 +15,8 @@ import type {
   RegisterBuiltinModulesRequest,
 } from '@/stores/visualization/compiler'
 import Compiler from '@/stores/visualization/compiler?worker'
-import {
-  parseRootAddress,
-  rootAddressProtocol,
-  stylePathAttribute,
-} from '@/stores/visualization/rootAddress'
+import { attachStyles, StyleCollector } from '@/stores/visualization/moduleStyles'
+import { parseRootAddress, rootAddressProtocol } from '@/stores/visualization/rootAddress'
 import {
   InvalidVisualizationModuleError,
   VisualizationModule,
@@ -57,6 +54,13 @@ const workerCallbacks = new Map<
  * This is used to prevent duplicated modules, at the cost of increased memory usage.
  */
 const moduleCode = new Map<string, string>()
+
+/**
+ * The style blocks of each file, from the worker's notification of the block to the one of its
+ * module. They go onto the module's component, which is where a custom element looks for the CSS
+ * to put in its shadow root.
+ */
+const moduleStyles = new StyleCollector()
 
 /** The reader for each content root a visualization has been compiled from. */
 const rootReaders = new Map<Uuid, DataServer>()
@@ -201,10 +205,7 @@ export async function compile(address: string, data: DataServer) {
           }
           // === Notifications ===
           case 'add-style-notification': {
-            const styleNode = document.createElement('style')
-            styleNode.setAttribute(stylePathAttribute, event.data.path)
-            styleNode.innerHTML = event.data.code
-            document.head.appendChild(styleNode)
+            moduleStyles.add(event.data.path, event.data.code)
             break
           }
           case 'add-raw-import-notification': {
@@ -221,12 +222,17 @@ export async function compile(address: string, data: DataServer) {
           }
           case 'add-import-notification': {
             try {
+              const styles = moduleStyles.take(event.data.path)
+              // The worker puts a hash of the whole file into the code, so unchanged code means
+              // unchanged styles, and the module already has them.
               if (moduleCode.get(event.data.path) === event.data.code) break
               moduleCode.set(event.data.path, event.data.code)
+              // The styles are attached before the module is published, so that nothing mounts
+              // the component without them.
               const module = import(
                 /* @vite-ignore */
                 URL.createObjectURL(new Blob([event.data.code], { type: 'text/javascript' }))
-              )
+              ).then((module) => attachStyles(module, styles))
               // Required for 'compilation-result-response' handler above.
               moduleCache[event.data.path] = module
               moduleCache[event.data.path] = await module
