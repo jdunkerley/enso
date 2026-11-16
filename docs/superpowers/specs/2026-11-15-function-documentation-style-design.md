@@ -376,3 +376,22 @@ follows the source's front matter:
    `previous` are) so the dropdown writes `..Month`.
 6. Broken: `week_of_year`'s locale selector.
 7. Separate ticket: the numeric widget's barely visible slider.
+
+### After
+
+Taken on: 2026-11-16, IDE Packaging run 43899118024 (#800 at 021e1e51b0), by the
+owner in the installed IDE: "looks really good".
+
+Every **missing** and **broken** row above is fixed, except the comparators'
+`that`, which is deferred to #797 with a `## Remarks` in each comparator's doc:
+
+- `end` on `until`, `days_until`, `date_diff`, `work_days_until`, `up_to`,
+  `down_to`: the date picker (#789), now that `end` is typed.
+- `holidays` on `work_days_until`, `add_work_days`: a list of date pickers (the
+  IDE gives a `Vector Date` argument's items the `Date` type; a new item starts
+  as `Date.today`).
+- `to_date_time`'s `time_of_day`: the time picker.
+- `+`, `-` `amount` and `up_to`/`down_to` `step`: each `Date_Period` and
+  `Period.new`.
+- `start_of`, `end_of`: a typed `period`, so the dropdown writes `..Month`.
+- `week_of_year`'s `locale`: `Locale.default_widget`.
