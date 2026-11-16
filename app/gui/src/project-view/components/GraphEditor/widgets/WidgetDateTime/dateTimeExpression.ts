@@ -1,0 +1,133 @@
+/**
+ * @file The date-time widget's expression <-> choice mapping: which code a value holds as a date
+ * and time, the code a choice writes, and the arguments an edit keeps. The arguments are read from
+ * the AST, so a kept one (`zone=(Time_Zone.parse "Europe/London")`) is carried over verbatim
+ * (`docs/superpowers/specs/2026-11-16-argument-access-and-time-widgets-design.md`, part D).
+ */
+import {
+  isValidDate,
+  type YearMonthDay,
+} from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
+import { Ast } from '@/util/ast'
+
+/** The qualified name of the `Date_Time` type. */
+export const DATE_TIME_TYPE = 'Standard.Base.Data.Time.Date_Time.Date_Time'
+
+/** A date and a time to the minute: what the picker writes. */
+export interface DateTimeParts extends YearMonthDay {
+  readonly hour: number
+  readonly minute: number
+}
+
+/** What the value stands for: the current instant, or a specific one. */
+export type DateTimeChoice =
+  | { readonly kind: 'now' }
+  | ({ readonly kind: 'dateTime' } & DateTimeParts & {
+        /** The arguments after the minute, as written (`45`, `second=45`, `zone=Time_Zone.utc`); absent when none. */
+        readonly kept?: readonly string[]
+      })
+
+/** The parameters the picker writes, in `Date_Time.new`'s order. */
+const PICKED = ['year', 'month', 'day', 'hour', 'minute'] as const
+type Picked = (typeof PICKED)[number]
+/** The parameters an edit keeps, in `Date_Time.new`'s order after the minute. */
+const KEPT = ['second', 'millisecond', 'microsecond', 'nanosecond', 'zone'] as const
+const INTEGER = /^\d+$/
+
+/** The arguments of an application chain, first to last, and its callee. */
+function callArguments(expr: Ast.Ast): {
+  callee: Ast.Ast
+  args: { name: string | undefined; code: string }[]
+} {
+  const args: { name: string | undefined; code: string }[] = []
+  let node = expr
+  while (node instanceof Ast.App) {
+    args.unshift({
+      name: node.argumentName?.code(),
+      code: node.argument.code(),
+    })
+    node = node.function
+  }
+  return { callee: node, args }
+}
+
+/**
+ * The choice that the code stands for, or `undefined` when it is not `Date_Time.now` or a
+ * `Date_Time.new` whose year (required) and month, day, hour and minute (each optional) are integer
+ * literals, positional or named, followed by any of `Date_Time.new`'s other arguments, which are
+ * kept as written. A positional argument after a named one, an argument given twice, an unknown
+ * name, a computed year … minute, or an impossible date or time is not ours.
+ */
+export function parseDateTimeExpression(code: string | undefined): DateTimeChoice | undefined {
+  const text = code?.trim()
+  if (!text) return undefined
+  if (text === 'Date_Time.now') return { kind: 'now' }
+  const expr = Ast.parseExpression(text)
+  if (expr == null) return undefined
+  const { callee, args } = callArguments(expr)
+  if (callee.code() !== 'Date_Time.new' || args.length === 0) return undefined
+  const parts: Partial<Record<Picked, number>> = {}
+  const seen = new Set<string>()
+  const kept: string[] = []
+  let named = false
+  let position = 0
+  for (const { name: given, code: argCode } of args) {
+    let name: string
+    if (given == null) {
+      if (named || position >= PICKED.length + KEPT.length) return undefined
+      name = position < PICKED.length ? PICKED[position]! : KEPT[position - PICKED.length]!
+      position += 1
+    } else {
+      named = true
+      name = given
+    }
+    if (seen.has(name)) return undefined
+    seen.add(name)
+    if ((PICKED as readonly string[]).includes(name)) {
+      if (!INTEGER.test(argCode)) return undefined
+      parts[name as Picked] = Number(argCode)
+    } else if ((KEPT as readonly string[]).includes(name)) {
+      kept.push(given == null ? argCode : `${given}=${argCode}`)
+    } else return undefined
+  }
+  if (parts.year == null) return undefined
+  const value = {
+    year: parts.year,
+    month: parts.month ?? 1,
+    day: parts.day ?? 1,
+    hour: parts.hour ?? 0,
+    minute: parts.minute ?? 0,
+  }
+  if (!isValidDate(value) || value.hour > 23 || value.minute > 59) return undefined
+  return kept.length > 0 ? { kind: 'dateTime', ...value, kept } : { kind: 'dateTime', ...value }
+}
+
+/** The code that a choice writes: year to minute positionally (each a port), then the kept arguments. */
+export function dateTimeExpressionCode(choice: DateTimeChoice): string {
+  if (choice.kind === 'now') return 'Date_Time.now'
+  const { year, month, day, hour, minute } = choice
+  return [`Date_Time.new ${year} ${month} ${day} ${hour} ${minute}`, ...(choice.kept ?? [])].join(
+    ' ',
+  )
+}
+
+/** `picked`, with the kept arguments of `current` when both are specific: an edit keeps them. */
+export function withKeptArguments(
+  picked: DateTimeChoice,
+  current: DateTimeChoice | undefined,
+): DateTimeChoice {
+  if (picked.kind !== 'dateTime' || current?.kind !== 'dateTime' || current.kept == null)
+    return picked
+  return { ...picked, kept: current.kept }
+}
+
+/** The local date and time of `now`, to the minute. */
+export function localDateTimeNow(now: Date = new Date()): DateTimeParts {
+  return {
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+    day: now.getDate(),
+    hour: now.getHours(),
+    minute: now.getMinutes(),
+  }
+}
