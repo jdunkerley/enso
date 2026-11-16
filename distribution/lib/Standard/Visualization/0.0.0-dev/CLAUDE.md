@@ -131,9 +131,9 @@ Visualization and not on each data library.
   `brush_filter`; Column: `open_row`; Row: `open_row` (`at {{#index}}`, its
   values by number; the scatter plot and tree send it, but the Row's table view
   does not: `Viz_Table.from_view … has_actions=False`, as it has no `#` column
-  and the action would hide its `at {{@column}}` link). A user type offers its own with
-  `Viz_Actions.from (that:My_Type)`. The table view, scatter plot and tree
-  preprocessors send them as an `"actions"` array first in their JSON
+  and the action would hide its `at {{@column}}` link). A user type offers its
+  own with `Viz_Actions.from (that:My_Type)`. The table view, scatter plot and
+  tree preprocessors send them as an `"actions"` array first in their JSON
   (`Viz_Actions.add_to_json`; absent when there are none, never on an error);
   the Warnings preprocessor sends
   `{"warnings":[…],"actions":[remove_warnings]}`. The links of the table view
