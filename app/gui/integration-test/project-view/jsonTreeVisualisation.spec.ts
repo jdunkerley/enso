@@ -11,6 +11,18 @@ async function openTree(page: Page) {
   return vis
 }
 
+/**
+ * Scroll an entry into view and let the scroll event it causes arrive. The tree closes its menu on
+ * scroll, and the event comes a frame after the scroll, so a right-click straight after
+ * Playwright's own scroll into view would lose its menu.
+ */
+async function scrollIntoViewSettled(content: Locator) {
+  await content.scrollIntoViewIfNeeded()
+  await content.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  )
+}
+
 function entry(vis: Locator, text: string) {
   return vis.locator('.TreeRow.entry').filter({ hasText: text })
 }
@@ -165,4 +177,47 @@ test('Right-click on an entry with no expression opens no menu at all', async ({
     .click({ button: 'right' })
   await expect(page.getByTestId('gridPopupMenu')).toHaveCount(0)
   await expect(page.getByTestId('contextMenu')).toHaveCount(0)
+})
+
+test('Right-click on an entry offers Get Value, which makes the double-click node', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  await entry(vis, 'items: [150 items]').getByRole('button', { name: 'Expand' }).click()
+  const nodeCount = await locate.graphNode(page).count()
+  const content = vis.locator('.TreeRow.entry .content').filter({ hasText: /^3: 3$/ })
+  await scrollIntoViewSettled(content)
+  await content.click({ button: 'right' })
+  await page.getByTestId('gridPopupMenu').getByText('Get Value', { exact: true }).click()
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
+  await page.keyboard.press('ControlOrMeta+`')
+  await expect(page.locator('.CodeEditor')).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__codeEditorApi.textContent()))
+    .toContain("aggregated.get 'items' . at 3")
+})
+
+test('Get All Loaded Values Here makes a node for each entry beside the clicked one', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  const content = entry(vis, 'nested: {1 key}').locator('.content')
+  await scrollIntoViewSettled(content)
+  await content.click({ button: 'right' })
+  await page
+    .getByTestId('gridPopupMenu')
+    .getByText('Get All Loaded Values Here', { exact: true })
+    .click()
+  // `visualizedExpr` has no expression; `items`, `nested` and `broken` each make a node.
+  await page.keyboard.press('ControlOrMeta+`')
+  await expect(page.locator('.CodeEditor')).toBeVisible()
+  for (const key of ['items', 'nested', 'broken']) {
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__codeEditorApi.textContent()))
+      .toContain(`aggregated.get '${key}'`)
+  }
 })
