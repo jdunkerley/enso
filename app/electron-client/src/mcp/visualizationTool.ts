@@ -86,9 +86,12 @@ const preparedSchema = z.object({
 
 /**
  * The PNG of the capture, at most {@link IMAGE_MAX_SIDE} pixels on its longer side. The size is
- * read from the PNG: `getSize` is in logical units, which are not pixels on a HiDPI screen.
+ * read from the PNG: `getSize` is in logical units, which are not pixels on a HiDPI screen. Null
+ * when the bytes are not a PNG. `get_graph_image` uses it too.
  */
-function cappedPng(image: CapturedImage): { png: Buffer; width: number; height: number } | null {
+export function cappedPng(
+  image: CapturedImage,
+): { png: Buffer; width: number; height: number } | null {
   let png = image.toPNG()
   let size = pngSize(png)
   if (size == null) return null
@@ -112,9 +115,9 @@ function cappedPng(image: CapturedImage): { png: Buffer; width: number; height: 
 /**
  * Captures the rectangle until two captures in a row have the same PNG bytes, at most
  * {@link CAPTURE_MAX_TRIES} times, {@link CAPTURE_INTERVAL_MS} apart. Null when a capture is
- * missing or empty.
+ * missing or empty. `get_graph_image` uses it too.
  */
-async function stableCapture(
+export async function stableCapture(
   capture: Capture,
   rect: CaptureRect,
   sleep: (ms: number) => Promise<void>,

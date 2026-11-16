@@ -4,6 +4,7 @@ import { initJvmAotIpc } from '@/jvmAotIpc'
 import { resolveLogFileToReveal } from '@/logFileReveal'
 import { appTools } from '@/mcp/appTools'
 import { claudeDesktopConfigDirectory } from '@/mcp/claudeDesktop'
+import { graphImageTool } from '@/mcp/graphImageTool'
 import { Guides, guideTool } from '@/mcp/guides'
 import { fsImageFiles, imageTool } from '@/mcp/imageTool'
 import { McpController } from '@/mcp/mcpController'
@@ -119,6 +120,7 @@ function initMcp(electron: Electron | undefined, electronIsDev: boolean) {
   }
   registry.register(visualizationTool(bridge, capture))
   registry.register(imageTool(bridge, capture, fsImageFiles()))
+  registry.register(graphImageTool(bridge, capture))
   registry.register(guideTool(guides))
   const controller = new McpController({
     settingsPath: join(app.getPath('userData'), 'mcp-settings.json'),

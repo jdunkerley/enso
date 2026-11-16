@@ -332,3 +332,72 @@ test('in Live mode arrange_nodes is refused and nothing moves', async ({ editorP
   expect(refused.error).toContain('Live mode')
   expect(await positions(page)).toEqual(before)
 })
+
+interface PreparedGraphImage {
+  rect: { x: number; y: number; width: number; height: number }
+  scale: number
+  nodes: number
+}
+
+test('prepare_graph_image frames every node in the viewport and answers where the viewport is', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const graph = await layoutGraph(page)
+  // Spread the graph wider than the viewport, so that it must zoom out.
+  const five = nodeNamed(graph, 'five')
+  assert(five.position != null)
+  await callOk(page, 'move_nodes', {
+    moves: [{ node_id: five.id, x: five.position.x + 3000, y: five.position.y + 1500 }],
+  })
+
+  const prepared: PreparedGraphImage = await callOk(page, 'prepare_graph_image', {})
+  expect(prepared.nodes).toBe(graph.nodes.length)
+  expect(prepared.scale).toBeGreaterThanOrEqual(0.1)
+  expect(prepared.scale).toBeLessThan(1)
+  const viewport = await locate.graphEditor(page).locator('.viewport').boundingBox()
+  assert(viewport != null)
+  expect(Math.abs(prepared.rect.x - viewport.x)).toBeLessThanOrEqual(1)
+  expect(Math.abs(prepared.rect.y - viewport.y)).toBeLessThanOrEqual(1)
+  expect(Math.abs(prepared.rect.width - viewport.width)).toBeLessThanOrEqual(1)
+  expect(Math.abs(prepared.rect.height - viewport.height)).toBeLessThanOrEqual(1)
+  for (const node of graph.nodes) {
+    const box = await boxOf(page, node.id)
+    expect(box.x, node.name ?? node.id).toBeGreaterThanOrEqual(viewport.x)
+    expect(box.y, node.name ?? node.id).toBeGreaterThanOrEqual(viewport.y)
+    expect(box.x + box.width, node.name ?? node.id).toBeLessThanOrEqual(viewport.x + viewport.width)
+    expect(box.y + box.height, node.name ?? node.id).toBeLessThanOrEqual(
+      viewport.y + viewport.height,
+    )
+  }
+  // The view stays where the picture left it.
+  expect((await layoutGraph(page)).view.scale).toBeCloseTo(prepared.scale, 2)
+})
+
+test('prepare_graph_image of one node frames it at 100%', async ({ editorPage, page }) => {
+  await editorPage
+  const five = nodeNamed(await layoutGraph(page), 'five')
+  const prepared: PreparedGraphImage = await callOk(page, 'prepare_graph_image', {
+    node_ids: [five.id],
+  })
+  expect(prepared).toEqual(expect.objectContaining({ scale: 1, nodes: 1 }))
+  const viewport = await locate.graphEditor(page).locator('.viewport').boundingBox()
+  assert(viewport != null)
+  const box = await boxOf(page, five.id)
+  expect(box.x).toBeGreaterThanOrEqual(viewport.x)
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.x + viewport.width)
+})
+
+test('prepare_graph_image works in Live mode, and refuses an unknown node', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  await goLive()
+  const prepared: PreparedGraphImage = await callOk(page, 'prepare_graph_image', {})
+  expect(prepared.nodes).toBeGreaterThan(0)
+  const refused = await deliver(page, 'prepare_graph_image', { node_ids: ['nope'] })
+  expect(refused.ok).toBe(false)
+  expect(refused.error).toContain('nope')
+})

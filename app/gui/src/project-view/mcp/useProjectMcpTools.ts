@@ -53,7 +53,7 @@ import {
   watchGraphUpdate,
 } from './projectEvents'
 import { addFunction, collapseNodesTool, type StructureToolDeps } from './structureTools'
-import { openMethod, selectNodes, type ViewToolDeps } from './viewTools'
+import { openMethod, prepareGraphImage, selectNodes, type ViewToolDeps } from './viewTools'
 import { lookupVisualization } from './visualizationRegistry'
 import {
   drawnVisualizationSize,
@@ -95,6 +95,8 @@ export interface McpEditorDeps {
   readonly scale: () => number
   /** Moves the view, without animation, to show this client rectangle at 100% where it fits. */
   readonly revealClientRect: (rect: Edges) => void
+  /** Moves the view, without animation, to show this scene rectangle centred at `scale`. */
+  readonly frameScene: (rect: Rect, scale: number) => void
   /** Whether the view is still moving. */
   readonly viewMoving: () => boolean
   /**
@@ -114,8 +116,9 @@ export interface McpEditorDeps {
  * get_documentation), the ten that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
  * set_documentation, set_visualization, move_nodes, arrange_nodes, collapse_nodes, add_function)
  * and the two that navigate (select_nodes, open_method); the two that main's `get_visualization`
- * calls (get_visualization_data, prepare_visualization) and the one main's `add_image` calls
- * (store_image), which are not MCP tools themselves.
+ * calls (get_visualization_data, prepare_visualization), the one main's `add_image` calls
+ * (store_image) and the one main's `get_graph_image` calls (prepare_graph_image), which are not
+ * MCP tools themselves.
  *
  * Every open project's graph editor stays mounted (the tabs are under `<KeepAlive>`), so the tools
  * must answer for the one on screen: this project's handlers are put first on activation and
@@ -607,6 +610,27 @@ export function useProjectMcpTools(
         ...(node_id != null ? { node_id } : {}),
         ...(project_id != null ? { project_id } : {}),
       })
+    },
+    prepare_graph_image: async (args, _caller, deadline) => {
+      const node_ids = args.node_ids
+      if (node_ids != null && !isStringArray(node_ids)) {
+        return invalidArgument('node_ids', 'a list of strings')
+      }
+      const graph = currentProject.graph.value
+      return prepareGraphImage(
+        {
+          db: graph.db,
+          area: (id) => graph.visibleArea(id),
+          viewRect: editor.viewRect,
+          scale: editor.scale,
+          frame: editor.frameScene,
+          viewMoving: editor.viewMoving,
+          nextFrame,
+          now: () => Date.now(),
+          deadline,
+        },
+        node_ids != null ? { node_ids } : {},
+      )
     },
     prepare_visualization: async (args, caller, deadline) => {
       const { node_id, visualization } = args

@@ -307,6 +307,8 @@ useProjectMcpTools({
       1,
       true,
     ),
+  // The scale is chosen by the caller (`graphImageFrame`): the range is that one scale.
+  frameScene: (rect, scale) => graphNavigator.panAndZoomTo(rect, scale, scale, true),
   viewMoving: () => graphNavigator.transformChanging,
   // As `GraphNode.vue` passes the type info to its visualization's dropdown.
   visualizationsFor: (id) => {
