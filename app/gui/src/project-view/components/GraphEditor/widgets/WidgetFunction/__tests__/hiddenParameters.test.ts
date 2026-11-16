@@ -1,6 +1,9 @@
 import { makeMethod } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
 import * as widgetCfg from '$/providers/openedProjects/widgetRegistry/configuration'
-import { hiddenParameters } from '@/components/GraphEditor/widgets/WidgetFunction/hiddenParameters'
+import {
+  hiddenParameters,
+  insertPrefixArgument,
+} from '@/components/GraphEditor/widgets/WidgetFunction/hiddenParameters'
 import { Ast } from '@/util/ast'
 import { ArgumentApplication, ArgumentPlaceholder, interpretCall } from '@/util/callTree'
 import { assert, expect, test } from 'vitest'
@@ -34,8 +37,8 @@ const dateTimeNew = makeMethod('Standard.Base.Data.Time.Date_Time.Date_Time.new'
   ],
 })
 
-function applicationOf(code: string, configuration?: widgetCfg.FunctionCall) {
-  const ast = Ast.parseExpression(code)
+function applicationOf(code: string | Ast.Expression, configuration?: widgetCfg.FunctionCall) {
+  const ast = typeof code === 'string' ? Ast.parseExpression(code) : code
   assertDefined(ast)
   return ArgumentApplication.FromInterpretedWithInfo(interpretCall(ast), {
     suggestion: dateTimeNew,
@@ -79,9 +82,8 @@ test('a parameter configured to always show is not hidden', () => {
   expect(hidden.map((p) => p.name)).toEqual(['hour', 'minute', 'second'])
 })
 
-test('only the first unset parameter is inserted positionally; later ones are named', () => {
-  // `applyArgUpdate` names an inserted parameter when `insertAsNamed`, so `second` after an unset
-  // `minute` comes out as `second=0`, and the first (`hour`) as a plain `0`.
+test('the placeholder flags: only later unset parameters ask to be named (the menu names every pick)', () => {
+  // The `…` menu passes `forceNamed`, so the first one is named too (see the insertion tests).
   const app = applicationOf('Date_Time.new 2020 1 15')
   assert(app instanceof ArgumentApplication)
   const named = new Map(
@@ -100,3 +102,32 @@ test('only the first unset parameter is inserted positionally; later ones are na
     ]),
   )
 })
+
+test.each`
+  code                              | picked      | forceNamed | expected
+  ${'Date_Time.new 2020 1 15'}      | ${'hour'}   | ${true}    | ${'Date_Time.new 2020 1 15 hour=0'}
+  ${'Date_Time.new 2020 1 15'}      | ${'hour'}   | ${false}   | ${'Date_Time.new 2020 1 15 0'}
+  ${'Date_Time.new 2020 1 15 9 30'} | ${'second'} | ${true}    | ${'Date_Time.new 2020 1 15 9 30 second=0'}
+  ${'Date_Time.new 2020 1 15'}      | ${'zone'}   | ${true}    | ${'Date_Time.new 2020 1 15 zone=Time_Zone.system'}
+`(
+  'inserting $picked into $code (forceNamed $forceNamed) gives $expected',
+  ({ code, picked, forceNamed, expected }) => {
+    const block = Ast.parseBlock(`x = ${code}`)
+    const assignment = [...block.statements()][0]
+    assert(assignment instanceof Ast.Assignment)
+    const app = applicationOf(assignment.expression)
+    assert(app instanceof ArgumentApplication)
+    const target = [...app.iterApplications()].find(
+      ({ argument }) => argument instanceof ArgumentPlaceholder && argument.argInfo.name === picked,
+    )
+    assertDefined(target)
+    assert(target.argument instanceof ArgumentPlaceholder)
+    const hidden = hiddenParameters(app).find((p) => p.name === picked)
+    assertDefined(hidden)
+    const edit = block.module.edit()
+    const value = Ast.parseExpression(hidden.defaultCode, edit)
+    assertDefined(value)
+    insertPrefixArgument(edit, target.appTree, target.argument, value, forceNamed)
+    expect(edit.getVersion(block).code()).toBe(`x = ${expected}`)
+  },
+)

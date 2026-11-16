@@ -5,6 +5,7 @@
 import type { PortId } from '@/providers/portInfo'
 import { Ast } from '@/util/ast'
 import { ArgumentApplication, ArgumentPlaceholder } from '@/util/callTree'
+import { isIdentifier } from '@/util/qualifiedName'
 
 export interface HiddenParameter {
   /** The placeholder's port, the `origin` of the update that inserts it. */
@@ -47,4 +48,22 @@ export function hiddenParameters(
   }
   // Iteration runs from the outermost application inwards.
   return result.reverse()
+}
+
+/**
+ * Apply an argument to a call's prefix application: the placeholder's value, named when the
+ * placeholder asks for it (it follows an unset parameter) or when `forceNamed` is set.
+ */
+export function insertPrefixArgument(
+  edit: Ast.MutableModule,
+  appTree: Ast.Expression,
+  placeholder: ArgumentPlaceholder,
+  newArg: Ast.Owned<Ast.MutableExpression>,
+  forceNamed: boolean,
+) {
+  const name =
+    (forceNamed || placeholder.insertAsNamed) && isIdentifier(placeholder.argInfo.name) ?
+      placeholder.argInfo.name
+    : undefined
+  edit.getVersion(appTree).updateValue((oldAppTree) => Ast.App.new(edit, oldAppTree, name, newArg))
 }

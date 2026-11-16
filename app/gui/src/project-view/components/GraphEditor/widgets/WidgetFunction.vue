@@ -18,6 +18,7 @@ import {
 } from '@/components/GraphEditor/widgets/WidgetFunction/formatForPath'
 import {
   hiddenParameters,
+  insertPrefixArgument,
   type HiddenParameter,
 } from '@/components/GraphEditor/widgets/WidgetFunction/hiddenParameters'
 import ParameterMenu from '@/components/GraphEditor/widgets/WidgetFunction/ParameterMenu.vue'
@@ -121,17 +122,21 @@ const innerInput = computed(() => {
   return input
 })
 
-/** The parameters the `…` menu offers: those not shown, unless the node shows its details. */
-const hidden = computed(() =>
-  tree.showDetails || !application.value ? [] : hiddenParameters(application.value),
-)
+/**
+ * The parameters the `…` menu offers. Opening the menu selects the node, which shows its details,
+ * so the list does not depend on them: the menu hides its button instead (`collapsed`).
+ */
+const hidden = computed(() => (application.value ? hiddenParameters(application.value) : []))
 
-/** Insert a hidden parameter, with its default value's code (named when it follows unset ones). */
+/** Insert a hidden parameter with its default value's code. It is always written as a named argument. */
 function insertParameter(parameter: HiddenParameter) {
-  applyArgUpdate({
-    portUpdate: { origin: parameter.portId, value: parameter.defaultCode },
-    directInteraction: true,
-  })
+  applyArgUpdate(
+    {
+      portUpdate: { origin: parameter.portId, value: parameter.defaultCode },
+      directInteraction: true,
+    },
+    true,
+  )
 }
 
 /**
@@ -162,9 +167,10 @@ function handleArgUpdate(update: WidgetUpdate): HandledUpdate {
 
 /**
  * Process an argument value update. Takes care of inserting assigned placeholder values, as well as
- * handling deletions of arguments and rewriting the applications to named as appropriate.
+ * handling deletions of arguments and rewriting the applications to named as appropriate. With
+ * `forceNamed`, an inserted placeholder value is always written as a named argument.
  */
-function applyArgUpdate(update: WidgetUpdate): HandledUpdate {
+function applyArgUpdate(update: WidgetUpdate, forceNamed: boolean = false): HandledUpdate {
   const app = application.value
   if (update.portUpdate && app instanceof ArgumentApplication) {
     if (!('value' in update.portUpdate)) {
@@ -194,13 +200,7 @@ function applyArgUpdate(update: WidgetUpdate): HandledUpdate {
         if (argApp.appTree instanceof Ast.OprApp) {
           edit.getVersion(argApp.appTree)[argApp.argument.index === 0 ? 'setLhs' : 'setRhs'](newArg)
         } else {
-          const name =
-            argApp.argument.insertAsNamed && isIdentifier(argApp.argument.argInfo.name) ?
-              argApp.argument.argInfo.name
-            : undefined
-          edit
-            .getVersion(argApp.appTree)
-            .updateValue((oldAppTree) => Ast.App.new(edit, oldAppTree, name, newArg))
+          insertPrefixArgument(edit, argApp.appTree, argApp.argument, newArg, forceNamed)
         }
         return props.updateCallback({ edit, directInteraction })
       } else if (value == null && argApp?.argument instanceof ArgumentAst) {
@@ -375,5 +375,11 @@ export const widgetDefinition = defineWidget(
 
 <template>
   <NodeWidget :input="innerInput" :updateCallback="handleArgUpdate" />
-  <ParameterMenu v-if="hidden.length" :parameters="hidden" @pick="insertParameter" />
+  <ParameterMenu
+    v-if="hidden.length"
+    :port="props.input.value.id"
+    :collapsed="tree.showDetails"
+    :parameters="hidden"
+    @pick="insertParameter"
+  />
 </template>
