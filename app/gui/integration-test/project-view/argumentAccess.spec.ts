@@ -172,6 +172,9 @@ test.describe('Pop out', () => {
     const code = await moduleCode(page)
     expect(code).toContain(`end1 = ${NEW_DATE}`)
     expect(code).toContain('days = date1.days_until end1')
+    // Bindings are sequential: the new node must be defined before its user.
+    expect(code.indexOf('end1 =')).toBeGreaterThanOrEqual(0)
+    expect(code.indexOf('end1 =')).toBeLessThan(code.indexOf('days ='))
     await expect(await locate.edgesFromNode(page, popped)).toHaveCount(1)
     await expect(node).toBeVisible()
     await page.keyboard.press('ControlOrMeta+Z')

@@ -126,7 +126,7 @@ is already on the row, drawn by `WidgetIcon` at the root.
 - The `…` after a call's arguments (`WidgetFunction/ParameterMenu.vue`; which
   parameters it offers: `WidgetFunction/hiddenParameters.ts`) adds a parameter
   the call is not showing, always written as a named argument. The button hides
-  while the node shows details, unless its menu is open.
+  while it is the only selected node, unless its menu is open.
 - `WidgetPort` marks an argument that can be popped out with `data-pop-out-port`
   (plus `data-pop-out-name` and `data-pop-out-type`); dragging it off the node
   makes it a node of its own. The drag and the edit are in `../popOut/` - see

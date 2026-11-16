@@ -130,13 +130,19 @@ const hidden = computed(() => (application.value ? hiddenParameters(application.
 
 /** Insert a hidden parameter with its default value's code. It is always written as a named argument. */
 function insertParameter(parameter: HiddenParameter) {
-  applyArgUpdate(
-    {
-      portUpdate: { origin: parameter.portId, value: parameter.defaultCode },
-      directInteraction: true,
-    },
-    true,
-  )
+  // A written default like `Auto_Detect` needs its import, in the same edit.
+  module.value.edit((edit) => {
+    const written = Ast.parseExpression(parameter.defaultCode, edit)
+    if (written) module.value.addDetectedImports(edit, written)
+    return applyArgUpdate(
+      {
+        edit,
+        portUpdate: { origin: parameter.portId, value: parameter.defaultCode },
+        directInteraction: true,
+      },
+      true,
+    )
+  })
 }
 
 /**

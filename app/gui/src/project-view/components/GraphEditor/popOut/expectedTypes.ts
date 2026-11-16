@@ -19,7 +19,9 @@ export function expectedTypesIn(
   graphDb: { getMethodCallInfo(id: Ast.AstId): MethodCallInfo | undefined },
 ): Map<Ast.AstId, string> {
   const types = new Map<Ast.AstId, string>()
-  if (rootType != null) types.set(root.id, rootType)
+  // `Any` says nothing: leave the position unknown rather than qualify with `Any`.
+  if (rootType != null && rootType !== 'Any' && rootType !== ANY_TYPE_QN)
+    types.set(root.id, rootType)
   Ast.visitRecursive(root, (ast) => {
     if (!(ast instanceof Ast.App || ast instanceof Ast.OprApp)) return true
     // Only the top of an application chain: inner links are covered through it.

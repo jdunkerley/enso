@@ -5,7 +5,11 @@ import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import { SuggestionKind } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
-import type { NodeCreation, NodeCreationOptions } from '@/composables/nodeCreation'
+import {
+  insertNodeStatements,
+  type NodeCreation,
+  type NodeCreationOptions,
+} from '@/composables/nodeCreation'
 import { Ast } from '@/util/ast'
 import { ArgumentInfoKey } from '@/util/callTree'
 import { Vec2 } from '@/util/data/vec2'
@@ -56,6 +60,10 @@ describe('popOutCode', () => {
     const e = Ast.parseExpression('..Month')!
     expect(popOutCode(e, undefined, noInfo, has)).toEqual(Err('..Month'))
   })
+  test.each(['Any', 'Standard.Base.Any.Any'])('an untyped root (%s) is not qualified', (t) => {
+    const e = Ast.parseExpression('..Month')!
+    expect(popOutCode(e, t, noInfo, has)).toEqual(Err('..Month'))
+  })
   test('plain code is unchanged', () => {
     const e = Ast.parseExpression('Date.new 2020 1 15')!
     expect(popOutCode(e, undefined, noInfo, has)).toEqual(Ok('Date.new 2020 1 15'))
@@ -69,6 +77,7 @@ describe('usePopOut', () => {
       parseProjectPathRaw: (p) => parseAbsoluteProjectPathRaw(p),
     },
     suggestionDb: unknown = { getEntryByProjectPath: () => undefined },
+    insertReal = false,
   ) {
     const block = Ast.parseBlock(code)
     const module = block.module
@@ -79,6 +88,13 @@ describe('usePopOut', () => {
       hook?: (edit: Ast.MutableModule, ids: readonly Ast.Identifier[]) => void,
     ) => {
       created.push(...options)
+      // Like the real `createNodes`: the new assignment goes at the end of the body.
+      if (insertReal) {
+        const statements = [...options].map((o) =>
+          Ast.parseBlockStatement(`${ident} = ${o.expression}`, module)!,
+        )
+        insertNodeStatements(block as Ast.MutableBodyBlock, statements)
+      }
       hook?.(module, ident === '' ? [] : [ident as Ast.Identifier])
       return new Set()
     }) as NodeCreation['createNodes']
@@ -111,6 +127,17 @@ describe('usePopOut', () => {
     expect(s.created[0]).toMatchObject({ expression: 'Date.new 2020 1 15', namePrefix: 'end' })
     expect(s.created[0]!.binding).toBeUndefined()
     expect(s.block.code().trim()).toBe('x = Date.up_to end1')
+  })
+
+  test('the new node is defined before the statement that uses it', () => {
+    const s = setup('y = 1\nx = Date.up_to (Date.new 2020 1 15)\nz = 2', undefined, undefined, true)
+    s.popOut()
+    expect(s.block.code().trim().split('\n')).toEqual([
+      'y = 1',
+      'end1 = Date.new 2020 1 15',
+      'x = Date.up_to end1',
+      'z = 2',
+    ])
   })
 
   test('the group as the port gives the same result', () => {

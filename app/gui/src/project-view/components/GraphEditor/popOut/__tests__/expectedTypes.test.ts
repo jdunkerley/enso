@@ -5,6 +5,7 @@ import {
 } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
 import { Ast } from '@/util/ast'
 import { interpretCall } from '@/util/callTree'
+import { ANY_TYPE_QN } from '@/util/ensoTypes'
 import { parseAbsoluteProjectPath } from '@/util/projectPath'
 import { tryQualifiedName, type Identifier } from '@/util/qualifiedName'
 import { unwrap } from 'enso-common/src/utilities/data/result'
@@ -97,12 +98,20 @@ test('Type.method called with self as the first argument', () => {
 
 test('an argument of type Any is left unknown', () => {
   const e = Ast.parseExpression('foo ..Month')!
-  const anyEntry = makeMethod('Standard.Base.Data.Foo.foo', { args: [makeArgument('x')] })
+  const anyEntry = makeMethod('Standard.Base.Data.Foo.foo', {
+    args: [makeArgument('x', ANY_TYPE_QN)],
+  })
   const db = {
     getMethodCallInfo: (id: Ast.AstId) =>
       id === e.id ? { ...infoFor(e.id, []), suggestion: anyEntry } : undefined,
   }
   expect(expectedTypesIn(e, undefined, db).size).toBe(0)
+})
+
+test.each(['Any', ANY_TYPE_QN])('a root type of %s is left unknown', (rootType) => {
+  const e = Ast.parseExpression('..Month')!
+  const types = expectedTypesIn(e, rootType, { getMethodCallInfo: () => undefined })
+  expect(types.size).toBe(0)
 })
 
 test('calls without info contribute nothing', () => {

@@ -21,5 +21,15 @@ part A).
   `GraphNodes.vue` forwards the `popOut` event and `GraphEditor.vue` calls
   `usePopOut`.
 
-Number, text and slider inputs stop `pointerdown`, so they can't start a pop-out
+Number, text and slider inputs, the vector editor (`DraggableList`) and the
+table editor handle `pointerdown` themselves, so they can't start a pop-out
 drag; drag a non-input part of the argument (such as the `Date.new` text).
+
+`canPopOut` refuses every plain identifier, not only references to other nodes:
+constructors such as `True` and `Nothing` parse as identifiers too, and so are
+not popped out.
+
+The new node's assignment is appended at the end of the method body, which would
+leave it after the statement that now uses it (Enso bindings are sequential), so
+`usePopOut` moves that line to just above the statement using it, inside the
+same edit (the line moves whole, keeping its metadata).

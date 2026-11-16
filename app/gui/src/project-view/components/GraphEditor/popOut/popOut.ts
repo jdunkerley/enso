@@ -37,6 +37,41 @@ export function popOutCode(
   return qualifyAutoscoped(arg, expectedTypesIn(arg, argType, graphDb), hasConstructor)
 }
 
+/** The ids of `ast` and all its ancestors, innermost first. */
+function ancestorsOf(ast: Ast.Ast): Ast.AstId[] {
+  const ids = [ast.id]
+  for (let p = ast.parent(); p != null; p = p.parent()) ids.push(p.id)
+  return ids
+}
+
+/**
+ * Move the new node's assignment to just above the body statement that now uses it: Enso
+ * bindings are sequential, and new nodes are appended at the end of the body. `ancestors` are
+ * the ids from the replaced argument up to the root.
+ */
+function defineBefore(edit: Ast.MutableModule, ident: Ast.Identifier, ancestors: Ast.AstId[]) {
+  for (const id of ancestors) {
+    const body = edit.tryGet(id)?.parent()
+    if (!(body instanceof Ast.MutableBodyBlock)) continue
+    const lines = body.lines
+    const newIndex = lines.findIndex((line) => {
+      const statement = line.statement?.node
+      return statement instanceof Ast.Assignment && statement.pattern.code() === ident
+    })
+    const userIndex = lines.findIndex((line) => line.statement?.node.id === id)
+    if (newIndex < 0 || userIndex < 0) continue
+    if (newIndex > userIndex) {
+      // The line moves whole, so the node keeps its metadata (the drop position).
+      body.updateLines((owned) => {
+        const [moved] = owned.splice(newIndex, 1)
+        owned.splice(userIndex, 0, moved!)
+        return owned
+      })
+    }
+    return
+  }
+}
+
 /** The pop-out action: `popOut(portId, argName, argType, position)`; shows a toast on failure. */
 export function usePopOut(deps: {
   module: ToValue<Pick<ModuleStore, 'ast'>>
@@ -87,7 +122,10 @@ export function usePopOut(deps: {
           toast.show("Can't pop out: the value could not be made into a node.")
           return
         }
-        edit.getVersion(target).replace(Ast.Ident.new(edit, ident))
+        const mutableTarget = edit.getVersion(target)
+        const ancestors = ancestorsOf(mutableTarget)
+        mutableTarget.replace(Ast.Ident.new(edit, ident))
+        defineBefore(edit, ident, ancestors)
       },
     )
   }
