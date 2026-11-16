@@ -11,6 +11,18 @@ async function openTree(page: Page) {
   return vis
 }
 
+/**
+ * Scroll an entry into view and let the scroll event it causes arrive. The tree closes its menu on
+ * scroll, and the event comes a frame after the scroll, so a right-click straight after
+ * Playwright's own scroll into view would lose its menu.
+ */
+async function scrollIntoViewSettled(content: Locator) {
+  await content.scrollIntoViewIfNeeded()
+  await content.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  )
+}
+
 function entry(vis: Locator, text: string) {
   return vis.locator('.TreeRow.entry').filter({ hasText: text })
 }
@@ -127,4 +139,85 @@ test('Retry on a failed page loads it when the next request succeeds', async ({
   await expect(vis).toContainText('recovered: true')
   await expect(vis).not.toContainText("couldn't load")
   await expect(vis.getByRole('button', { name: 'Retry' })).toHaveCount(0)
+})
+
+test('Right-click on an entry opens only the tree menu, and leaves the selection alone', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  // With two nodes selected, a right-click that selected the visualized one alone would shrink it.
+  await locate.graphNodeIcon(locate.graphNodeByBinding(page, 'sum')).click({ modifiers: ['Shift'] })
+  await expect(locate.selectedNodes(page)).toHaveCount(2)
+  await entry(vis, 'nested: {1 key}').locator('.content').click({ button: 'right' })
+  const menu = page.getByTestId('gridPopupMenu')
+  await expect(menu).toBeVisible()
+  await expect(menu.getByText('Get Value', { exact: true })).toBeVisible()
+  await expect(menu.getByText('Get All Loaded Values Here')).toBeVisible()
+  // Not the node's or the graph's own menu.
+  await expect(page.getByTestId('contextMenu')).toHaveCount(0)
+  await expect(locate.selectedNodes(page)).toHaveCount(2)
+  const nodeCount = await locate.graphNode(page).count()
+  await menu.getByText('Get All Loaded Values Here').click()
+  // Of the four root entries, `visualizedExpr` has no expression: `items`, `nested` and `broken` do.
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 3)
+  await expect(menu).toHaveCount(0)
+})
+
+test('Right-click on an entry with no expression opens no menu at all', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  await vis
+    .locator('.TreeRow.entry .content')
+    .filter({ hasText: /^visualizedExpr:/ })
+    .click({ button: 'right' })
+  await expect(page.getByTestId('gridPopupMenu')).toHaveCount(0)
+  await expect(page.getByTestId('contextMenu')).toHaveCount(0)
+})
+
+test('Right-click on an entry offers Get Value, which makes the double-click node', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  await entry(vis, 'items: [150 items]').getByRole('button', { name: 'Expand' }).click()
+  const nodeCount = await locate.graphNode(page).count()
+  const content = vis.locator('.TreeRow.entry .content').filter({ hasText: /^3: 3$/ })
+  await scrollIntoViewSettled(content)
+  await content.click({ button: 'right' })
+  await page.getByTestId('gridPopupMenu').getByText('Get Value', { exact: true }).click()
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
+  await page.keyboard.press('ControlOrMeta+`')
+  await expect(page.locator('.CodeEditor')).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__codeEditorApi.textContent()))
+    .toContain("aggregated.get 'items' . at 3")
+})
+
+test('Get All Loaded Values Here makes a node for each entry beside the clicked one', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  const content = entry(vis, 'nested: {1 key}').locator('.content')
+  await scrollIntoViewSettled(content)
+  await content.click({ button: 'right' })
+  await page
+    .getByTestId('gridPopupMenu')
+    .getByText('Get All Loaded Values Here', { exact: true })
+    .click()
+  // `visualizedExpr` has no expression; `items`, `nested` and `broken` each make a node.
+  await page.keyboard.press('ControlOrMeta+`')
+  await expect(page.locator('.CodeEditor')).toBeVisible()
+  for (const key of ['items', 'nested', 'broken']) {
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__codeEditorApi.textContent()))
+      .toContain(`aggregated.get '${key}'`)
+  }
 })

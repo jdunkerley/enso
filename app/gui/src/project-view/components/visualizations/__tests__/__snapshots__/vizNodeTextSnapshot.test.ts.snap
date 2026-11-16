@@ -10,7 +10,7 @@ exports[`Scatter plot > point of a vector 1`] = `"operator1.at 3"`;
 
 exports[`Table right-click menu, on a table > Get Column 1`] = `"operator1.at 'b'"`;
 
-exports[`Table right-click menu, on a table > Get Column on the row-number column 1`] = `"operator1.at '#'"`;
+exports[`Table right-click menu, on a table > Get Column on the row-number column 1`] = `undefined`;
 
 exports[`Table right-click menu, on a table > Get Column with no column under the click 1`] = `undefined`;
 
@@ -22,7 +22,7 @@ exports[`Table right-click menu, on a table > Get Value 1`] = `"operator1.get_va
 
 exports[`Table right-click menu, on a table > Get Value at row 0 1`] = `"operator1.get_value 'b' 0"`;
 
-exports[`Table right-click menu, on a table > Get Value on the row-number column 1`] = `"operator1.get_value '#' 2"`;
+exports[`Table right-click menu, on a table > Get Value on the row-number column 1`] = `undefined`;
 
 exports[`Table right-click menu, on a table > Get Value with no column under the click 1`] = `undefined`;
 
