@@ -1367,7 +1367,7 @@ test.describe('Time_Of_Day widget', () => {
     setupApi: {
       local: () =>
         setMockMainFile(
-          'from Standard.Base import Data\n\nmain =\n    since = Data.seconds_since\n    time1 = Time_Of_Day.new 14 30\n    time2 = Time_Of_Day.now\n',
+          'from Standard.Base import Data\n\nmain =\n    since = Data.seconds_since\n    time1 = Time_Of_Day.new 14 30\n    time2 = Time_Of_Day.now\n    time3 = Time_Of_Day.new 14 30 second=15\n    time4 = Time_Of_Day.new 14 30 15 500\n',
         ),
     },
   })
@@ -1578,6 +1578,35 @@ test.describe('Time_Of_Day widget', () => {
     expect(await moduleCode(page)).toMatch(/time2 = Time_Of_Day.now$/m)
   })
 
+  test('editing a time with a named second keeps the second', async ({ editorPage, page }) => {
+    await timeNode(editorPage, page)
+    const node = locate.graphNodeByBinding(page, 'time3')
+    const widget = node.locator('.WidgetTimeOfDay')
+    const menu = page.locator('.TimeOfDayMenu')
+    await widget.click({ position: { x: 4, y: 4 } })
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('spinbutton')).toHaveText(['14', '30', '15'])
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain('time3 = Time_Of_Day.new 15 30 15\n')
+  })
+
+  test('editing a time with milliseconds keeps them', async ({ editorPage, page }) => {
+    await timeNode(editorPage, page)
+    const node = locate.graphNodeByBinding(page, 'time4')
+    const widget = node.locator('.WidgetTimeOfDay')
+    const menu = page.locator('.TimeOfDayMenu')
+    await widget.click({ position: { x: 4, y: 4 } })
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain('time4 = Time_Of_Day.new 15 30 15 500\n')
+  })
+
   test('one choice is one undo step, and the import is undone with it', async ({
     editorPage,
     page,
@@ -1591,7 +1620,7 @@ test.describe('Time_Of_Day widget', () => {
     await expect(widget).not.toContainText(/now/)
     const code = await moduleCode(page)
     expect(code).not.toContain('import Time_Of_Day')
-    expect(code).not.toContain('Time_Of_Day.now\n    time')
+    expect(code).not.toContain('seconds_since Time_Of_Day.now')
   })
 
   test('a parenthesised time is one undo step too', async ({ editorPage, page }) => {
