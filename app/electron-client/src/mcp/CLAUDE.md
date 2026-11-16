@@ -60,15 +60,16 @@ default. No tool changes the execution environment, settings or secrets.
   permission bits, and renames, removing the temporary file if the rename fails.
   The controller (`claudeDesktopStatus`, `setUpClaudeDesktop`) runs these on its
   queue. Status checks the folder first and never creates a token: with none
-  stored an `enso` entry is `outOfDate`; a keychain read failure gives
-  `unreadable`. Only `setUpClaudeDesktop` (a click) creates the token.
-  `replaceToken` and `setPort` read the status with the OLD address and token
-  first and rewrite the entry afterwards only if it was `setUp` (Enso's own): a
-  hand-edited entry is left alone and a missing one is never created; a rewrite
-  failure is logged. Nothing is written on `setEnabled`. The token never reaches
-  the renderer: the IPC calls return only a `ClaudeDesktopStatus` (the state and
-  the configuration file's path, which Settings shows beside Copy JSON).
-  Settings → AI offers the set-up only while the server is on
+  stored an `enso` entry is `outOfDate`. (An existing keychain token is migrated
+  on a status read, see "Settings, token"; that creates nothing.) Only
+  `setUpClaudeDesktop` (a click) creates the token. `replaceToken` and `setPort`
+  read the status with the OLD address and token first and rewrite the entry
+  afterwards only if it was `setUp` (Enso's own): a hand-edited entry is left
+  alone and a missing one is never created; a rewrite failure is logged. Nothing
+  is written on `setEnabled`. The token never reaches the renderer: the IPC
+  calls return only a `ClaudeDesktopStatus` (the state and the configuration
+  file's path, which Settings shows beside Copy JSON). Settings → AI offers the
+  set-up only while the server is on
   (`app/gui/src/dashboard/layouts/Settings/CLAUDE.md`, "AI"). Tests inject a
   temporary folder; never point one at the real Claude folder.
 - `clientConfigs.ts` — that setup text per client (`claude mcp add` command,
@@ -321,29 +322,53 @@ authorise anything by it. The token is the only credential.
 
 ## Settings, token and environment overrides
 
-- **The setting** is `<userData>/mcp-settings.json`, `{ enabled, port }`
-  (default off, port 39417), written atomically (a temporary file, then a
-  rename). A missing or unreadable file means the defaults.
-- **The token** is in the system keychain, service `Enso`, account `mcp-token`
-  (`MCP_TOKEN_ACCOUNT`), through the same `@napi-rs/keyring` entries as the
-  secrets key (`keyringEntries` in `projectService.ts`). It is created on first
-  use (turning the server on, or copying a setup); New token in Settings
-  replaces it, and a running server restarts with it. It never enters the
-  renderer: the only way out is `copyConfig`, which writes the setup text to the
+- **The setting** is `<userData>/mcp-settings.json`, `{ enabled, port, token }`
+  (default off, port 39417, no token), written atomically (a temporary file,
+  then a rename) with mode `0o600`, so only the user can read it where the
+  platform enforces modes (Windows does not; no ACL code). Unknown fields are
+  ignored. A missing file (`ENOENT`) or malformed JSON means the defaults. Any
+  other read failure (busy, no permission) is an error, not a reset: no
+  migration, no new token, nothing written, and no server starts. The status
+  error "The MCP settings file could not be read: …" is reported whether or not
+  the server is switched on, so Settings shows it; it lasts until the app
+  restarts. The temporary file is removed first and created fresh, and synced
+  before the rename.
+- **The token** is the settings file's `token` field. It used to be in the
+  system keychain; the owner chose the file because the server is loopback only
+  and the token already sits in plain text in each agent app's own configuration
+  (Claude Desktop's `env`, the `claude mcp add` header), so the keychain added
+  prompts and a failure mode, not secrecy. The `Origin` and `Host` checks ("The
+  caller checks") are unchanged and still do the work against web pages. It is
+  created on first use (turning the server on, or copying a setup); New token in
+  Settings replaces it (written to the file), and a running server restarts with
+  it. **Migration:** with no token in the file and no `ENSO_MCP_TOKEN`, the
+  keychain (service `Enso`, account `mcp-token`, `MCP_TOKEN_ACCOUNT`, through
+  `options.entry`) is read once per session; a token found there is copied into
+  the file and used, so agent apps already configured keep working. A keychain
+  that throws, is unavailable or is empty counts as holding nothing. The
+  keychain is never written for the MCP token; the old entry is deleted once the
+  file save succeeded (best effort, a failure is ignored; not deleted if the
+  save failed), so a revoked token cannot come back; once the file has a token
+  the keychain is not consulted. When the keychain read failed and a new token
+  is created, one line is logged (never the token). A status read may migrate
+  but never creates a token. The token never enters the renderer: the status is
+  built from separate fields (`enabled`, `port`, ...), not the file's contents,
+  and the only way out is `copyConfig`, which writes the setup text to the
   clipboard from main.
-- **Environment overrides**, which win over the file and keychain:
-  `ENSO_MCP_ENABLED=1` turns the server on (without changing the file),
-  `ENSO_MCP_PORT=<port>` sets the port (1024 to 65535; another value is
-  ignored), and `ENSO_MCP_TOKEN=<token>` is the token (the keychain is not read,
-  and New token is refused). While `ENSO_MCP_ENABLED=1` or a valid
-  `ENSO_MCP_PORT` is in effect, the status's `lockedByEnvironment` is true,
-  `setEnabled` and `setPort` reject (`MCP_LOCKED_BY_ENVIRONMENT_ERROR`) and
-  change nothing, and Settings shows both controls disabled. The packaged-app
-  spec (`tests/mcp.spec.ts`) uses all three, so tests never touch the real
-  keychain item. Unit tests use a fake keyring only.
-- A start that fails is reported in the status's `error` (port in use, no
-  keychain), which the Settings section shows; it never stops the IDE starting.
-  `init` does not wait for the server: start-up must not wait on the keychain.
+- **Environment overrides**, which win over the file: `ENSO_MCP_ENABLED=1` turns
+  the server on (without changing the file), `ENSO_MCP_PORT=<port>` sets the
+  port (1024 to 65535; another value is ignored), and `ENSO_MCP_TOKEN=<token>`
+  is the token (it is never written to the file, the keychain is not read, and
+  New token is refused). While `ENSO_MCP_ENABLED=1` or a valid `ENSO_MCP_PORT`
+  is in effect, the status's `lockedByEnvironment` is true, `setEnabled` and
+  `setPort` reject (`MCP_LOCKED_BY_ENVIRONMENT_ERROR`) and change nothing, and
+  Settings shows both controls disabled. The packaged-app spec
+  (`tests/mcp.spec.ts`) uses all three, so tests never touch the real keychain
+  item or settings file. Unit tests use a fake keyring only.
+- A start that fails is reported in the status's `error` (port in use, the token
+  could not be saved), which the Settings section shows; it never stops the IDE
+  starting, and an unavailable keychain no longer fails a start. `init` does not
+  wait for the server.
 - `setEnabled` and `setPort` update the in-memory setting only after the file is
   written; a failed write rejects and changes nothing. A throwing
   `onStatusChanged` is logged and ignored. After `shutdown()` nothing starts a

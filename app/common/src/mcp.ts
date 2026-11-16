@@ -42,7 +42,7 @@ export interface McpStatus {
   readonly port: number
   /** True while the server is listening. */
   readonly running: boolean
-  /** Why an enabled server is not running (port taken, no keychain). */
+  /** Why an enabled server is not running (port taken, the token or settings file could not be written). */
   readonly error: string | null
   /**
    * True while `ENSO_MCP_ENABLED` or `ENSO_MCP_PORT` is in effect: the switch and the port are then
