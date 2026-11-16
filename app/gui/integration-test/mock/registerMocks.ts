@@ -210,6 +210,50 @@ async function mockElectronApi(
                 replyToolCall: () => {},
               }
             })(),
+            // The MCP server: status lives on `window.__mcpMockStatus`, the last copied client on
+            // `window.__mcpCopied`, so tests can read and seed them.
+            mcp: ((): unknown => {
+              interface Status {
+                enabled: boolean
+                port: number
+                running: boolean
+                error: string | null
+                lockedByEnvironment: boolean
+              }
+              const w = window as unknown as { __mcpMockStatus?: Status; __mcpCopied?: string }
+              const current = (): Status =>
+                w.__mcpMockStatus ?? {
+                  enabled: false,
+                  port: 39417,
+                  running: false,
+                  error: null,
+                  lockedByEnvironment: false,
+                }
+              return {
+                onToolCall: (): (() => void) => () => {},
+                replyToolCall: (): void => {},
+                status: async (): Promise<Status> => current(),
+                onStatusChanged: (): (() => void) => () => {},
+                setEnabled: async (enabled: boolean): Promise<Status> => {
+                  w.__mcpMockStatus = {
+                    enabled,
+                    port: 39417,
+                    running: enabled,
+                    error: null,
+                    lockedByEnvironment: false,
+                  }
+                  return w.__mcpMockStatus
+                },
+                setPort: async (port: number): Promise<Status> => {
+                  w.__mcpMockStatus = { ...current(), port }
+                  return w.__mcpMockStatus
+                },
+                replaceToken: async (): Promise<Status> => current(),
+                copyConfig: async (client: string): Promise<void> => {
+                  w.__mcpCopied = client
+                },
+              }
+            })(),
             // The JDK AOT cache training: `trainingStatus` answers the status given to
             // `registerMocks`; `setJvmAotTrainingStatus` broadcasts a new one through `__jvmAotMock`.
             jvmAot: ((): unknown => {

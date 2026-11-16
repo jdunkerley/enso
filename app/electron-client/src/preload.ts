@@ -15,6 +15,12 @@ import type {
   AiToolCallRequest,
 } from 'enso-common/src/ai'
 import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
+import type {
+  McpClientKind,
+  McpStatus,
+  McpToolCallReply,
+  McpToolCallRequest,
+} from 'enso-common/src/mcp'
 import type { UpdateStatus } from 'enso-common/src/updater'
 import type { $Config } from 'enso-gui/src/config'
 import type { ElectronApi } from 'enso-gui/src/electronApi'
@@ -200,6 +206,33 @@ const secrets: ElectronApi['secrets'] = {
   rotate: () => electron.ipcRenderer.invoke(ipc.Channel.secretsRotate),
 }
 
+const mcp: ElectronApi['mcp'] = {
+  onToolCall: (handler: (request: McpToolCallRequest) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, request: McpToolCallRequest) =>
+      handler(request)
+    electron.ipcRenderer.on(ipc.Channel.mcpToolCall, listener)
+    return () => {
+      electron.ipcRenderer.removeListener(ipc.Channel.mcpToolCall, listener)
+    }
+  },
+  replyToolCall: (reply: McpToolCallReply): void => {
+    electron.ipcRenderer.send(ipc.Channel.mcpToolReply, reply)
+  },
+  status: () => electron.ipcRenderer.invoke(ipc.Channel.mcpStatus),
+  onStatusChanged: (handler: (status: McpStatus) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: McpStatus) => handler(status)
+    electron.ipcRenderer.on(ipc.Channel.mcpStatusChanged, listener)
+    return () => {
+      electron.ipcRenderer.removeListener(ipc.Channel.mcpStatusChanged, listener)
+    }
+  },
+  setEnabled: (enabled: boolean) => electron.ipcRenderer.invoke(ipc.Channel.mcpSetEnabled, enabled),
+  setPort: (port: number) => electron.ipcRenderer.invoke(ipc.Channel.mcpSetPort, port),
+  replaceToken: () => electron.ipcRenderer.invoke(ipc.Channel.mcpReplaceToken),
+  copyConfig: (client: McpClientKind) =>
+    electron.ipcRenderer.invoke(ipc.Channel.mcpCopyConfig, client),
+}
+
 const jvmAot: ElectronApi['jvmAot'] = {
   trainingStatus: () => electron.ipcRenderer.invoke(ipc.Channel.jvmAotTrainingStatus),
   onTrainingStatus: (handler) => {
@@ -236,6 +269,7 @@ const api: ElectronApi = {
   ai,
   updater,
   secrets,
+  mcp,
   jvmAot,
 }
 
