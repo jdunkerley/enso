@@ -451,7 +451,7 @@
 
 - [`Time_Of_Day`'s functions have typed arguments with working widgets: a period
   dropdown for `start_of`, `end_of`, `+` and `-`, a date picker and time zone
-  dropdown for `to_date_time`, and a checkbox for `nanosecond`.][NNN]
+  dropdown for `to_date_time`, and a checkbox for `nanosecond`.][829]
 - [`Date`'s functions are documented with examples you can copy into the graph,
   and every argument has a widget][800]
 - [`Date.yesterday` and `Date.tomorrow` give the day before and after
@@ -528,7 +528,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[829]: https://github.com/jdunkerley/enso/pull/829
 [809]: https://github.com/jdunkerley/enso/pull/809
 [800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795
