@@ -231,6 +231,8 @@ const mcp: ElectronApi['mcp'] = {
   replaceToken: () => electron.ipcRenderer.invoke(ipc.Channel.mcpReplaceToken),
   copyConfig: (client: McpClientKind) =>
     electron.ipcRenderer.invoke(ipc.Channel.mcpCopyConfig, client),
+  claudeDesktopStatus: () => electron.ipcRenderer.invoke(ipc.Channel.mcpClaudeDesktopStatus),
+  setUpClaudeDesktop: () => electron.ipcRenderer.invoke(ipc.Channel.mcpClaudeDesktopSetUp),
 }
 
 const jvmAot: ElectronApi['jvmAot'] = {

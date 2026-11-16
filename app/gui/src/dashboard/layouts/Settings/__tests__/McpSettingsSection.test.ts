@@ -8,7 +8,13 @@ import { useText } from '$/providers/text'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
-import { MCP_CLIENT_KINDS, MCP_DEFAULT_PORT, type McpStatus } from 'enso-common/src/mcp'
+import {
+  MCP_CLIENT_KINDS,
+  MCP_DEFAULT_PORT,
+  type ClaudeDesktopSetup,
+  type ClaudeDesktopStatus,
+  type McpStatus,
+} from 'enso-common/src/mcp'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { h } from 'vue'
 import McpSettingsSection from '../McpSettingsSection.vue'
@@ -21,6 +27,8 @@ const fake = vi.hoisted(() => ({
   setPort: vi.fn(),
   replaceToken: vi.fn(),
   copyConfig: vi.fn(),
+  claudeDesktopStatus: vi.fn(),
+  setUpClaudeDesktop: vi.fn(),
   show: vi.fn(),
   emit: undefined as ((status: McpStatus) => void) | undefined,
 }))
@@ -51,6 +59,8 @@ beforeEach(() => {
   fake.setPort.mockImplementation((port: number) => Promise.resolve({ ...ON, port }))
   fake.replaceToken.mockResolvedValue(ON)
   fake.copyConfig.mockResolvedValue(undefined)
+  fake.claudeDesktopStatus.mockResolvedValue({ state: 'notSetUp', configFile: null })
+  fake.setUpClaudeDesktop.mockResolvedValue({ state: 'setUp', configFile: null })
   fake.onStatusChanged.mockImplementation((handler: (status: McpStatus) => void) => {
     fake.emit = handler
     return () => {
@@ -66,6 +76,8 @@ beforeEach(() => {
       setPort: fake.setPort,
       replaceToken: fake.replaceToken,
       copyConfig: fake.copyConfig,
+      claudeDesktopStatus: fake.claudeDesktopStatus,
+      setUpClaudeDesktop: fake.setUpClaudeDesktop,
     },
   })
   useModals().closeAll()
@@ -129,7 +141,7 @@ describe('McpSettingsSection', () => {
     ] as const) {
       button(getText(label))
     }
-    expect(MCP_CLIENT_KINDS).toHaveLength(5)
+    expect(MCP_CLIENT_KINDS).toHaveLength(6)
   })
 
   test('follows a status change from Electron main', async () => {
@@ -281,5 +293,170 @@ describe('McpSettingsSection', () => {
     await flushPromises()
     expect(fake.show).toHaveBeenCalledWith('no keychain', { type: 'error' })
     expect(switchInput().checked).toBe(false)
+  })
+  describe('Claude Desktop', () => {
+    const NOTE = () => getText('mcpClaudeDesktopNeeds')
+    const CONFIG_FILE = '/home/me/Claude/claude_desktop_config.json'
+    const withState = async (
+      state: ClaudeDesktopSetup,
+      configFile: ClaudeDesktopStatus['configFile'] = CONFIG_FILE,
+    ) => {
+      fake.status.mockResolvedValue(ON)
+      fake.claudeDesktopStatus.mockResolvedValue({ ...state, configFile })
+      await mountSection()
+    }
+    const buttonNamed = (name: string) =>
+      [...document.querySelectorAll<HTMLElement>('button')].find(
+        (element) => element.textContent.trim() === name,
+      )
+
+    test('offers the JSON with where the file is and what to do, in every state', async () => {
+      await withState({ state: 'setUp' })
+      expect(document.body.textContent).toContain(getText('mcpClaudeDesktopManualIntro'))
+      expect(document.body.textContent).toContain(CONFIG_FILE)
+      expect(document.body.textContent).toContain(getText('mcpClaudeDesktopManualSteps'))
+      button(getText('mcpClaudeDesktopCopyJson')).click()
+      await flushPromises()
+      expect(fake.copyConfig).toHaveBeenCalledWith('claudeDesktop')
+    })
+
+    test('the copy row has no Claude Desktop button: its JSON is in the block', async () => {
+      await withState({ state: 'notSetUp' })
+      expect(buttonNamed(getText('mcpClientClaudeDesktop'))).toBeUndefined()
+    })
+
+    test('no file path (no Claude Desktop on this platform): no manual route', async () => {
+      await withState({ state: 'notInstalled' }, null)
+      expect(document.body.textContent).not.toContain(getText('mcpClaudeDesktopManualIntro'))
+      expect(buttonNamed(getText('mcpClaudeDesktopCopyJson'))).toBeUndefined()
+    })
+
+    test('notInstalled: one line and no button', async () => {
+      await withState({ state: 'notInstalled' })
+      expect(document.body.textContent).toContain(getText('mcpClaudeDesktopNotInstalled'))
+      expect(buttonNamed(getText('mcpClaudeDesktopSetUpButton'))).toBeUndefined()
+      expect(buttonNamed(getText('mcpClaudeDesktopUpdateButton'))).toBeUndefined()
+    })
+
+    test('notSetUp: the Set up button', async () => {
+      await withState({ state: 'notSetUp' })
+      button(getText('mcpClaudeDesktopSetUpButton'))
+    })
+
+    test('setUp: says so and has no button', async () => {
+      await withState({ state: 'setUp' })
+      expect(document.body.textContent).toContain(getText('mcpClaudeDesktopIsSetUp'))
+      expect(buttonNamed(getText('mcpClaudeDesktopSetUpButton'))).toBeUndefined()
+      expect(buttonNamed(getText('mcpClaudeDesktopUpdateButton'))).toBeUndefined()
+    })
+
+    test('outOfDate: says so and has the Update button', async () => {
+      await withState({ state: 'outOfDate' })
+      expect(document.body.textContent).toContain(getText('mcpClaudeDesktopOutOfDate'))
+      button(getText('mcpClaudeDesktopUpdateButton'))
+    })
+
+    test('unreadable: the reason and the manual route, no button', async () => {
+      await withState({ state: 'unreadable', reason: 'The file is not valid JSON.' })
+      expect(document.body.textContent).toContain('The file is not valid JSON.')
+      expect(document.body.textContent).toContain(getText('mcpClaudeDesktopUnreadableHint'))
+      expect(buttonNamed(getText('mcpClaudeDesktopSetUpButton'))).toBeUndefined()
+    })
+
+    test.each(['notInstalled', 'notSetUp', 'setUp', 'outOfDate'] as const)(
+      'the Node.js note shows in %s',
+      async (state) => {
+        await withState({ state })
+        expect(document.body.textContent).toContain(NOTE())
+      },
+    )
+
+    test('it is read on mount and again when the server status changes', async () => {
+      await withState({ state: 'notSetUp' })
+      expect(fake.claudeDesktopStatus).toHaveBeenCalledTimes(1)
+      fake.claudeDesktopStatus.mockResolvedValue({ state: 'outOfDate' })
+      fake.emit?.({ ...ON, port: 40000 })
+      await flushPromises()
+      expect(fake.claudeDesktopStatus).toHaveBeenCalledTimes(2)
+      button(getText('mcpClaudeDesktopUpdateButton'))
+    })
+
+    test('the button asks first, then sets up, shows the new state and says what to do', async () => {
+      await withState({ state: 'notSetUp' })
+      const user = userEvent.setup()
+      await user.click(button(getText('mcpClaudeDesktopSetUpButton')))
+      await vi.waitFor(dialog)
+      expect(dialog().textContent).toContain(getText('mcpClaudeDesktopConfirm'))
+      expect(fake.setUpClaudeDesktop).not.toHaveBeenCalled()
+      await user.click(button(getText('mcpClaudeDesktopSetUpButton'), dialog()))
+      await flushPromises()
+      expect(fake.setUpClaudeDesktop).toHaveBeenCalledOnce()
+      expect(document.body.textContent).toContain(getText('mcpClaudeDesktopIsSetUp'))
+      expect(fake.show).toHaveBeenCalledWith(getText('mcpClaudeDesktopDone'), { type: 'success' })
+    })
+
+    test.each([
+      [{ state: 'notInstalled' }, () => getText('mcpClaudeDesktopNotInstalled')],
+      [{ state: 'outOfDate' }, () => getText('mcpClaudeDesktopOutOfDate')],
+      [
+        { state: 'unreadable', reason: 'The file changed: not valid JSON.' },
+        () => 'The file changed: not valid JSON.',
+      ],
+    ] as const)(
+      'a set-up that did not end set up (%o) shows that state, not Done',
+      async (returned, text) => {
+        fake.setUpClaudeDesktop.mockResolvedValue(returned)
+        await withState({ state: 'notSetUp' })
+        const user = userEvent.setup()
+        await user.click(button(getText('mcpClaudeDesktopSetUpButton')))
+        await vi.waitFor(dialog)
+        await user.click(button(getText('mcpClaudeDesktopSetUpButton'), dialog()))
+        await flushPromises()
+        expect(fake.setUpClaudeDesktop).toHaveBeenCalledOnce()
+        expect(fake.show).not.toHaveBeenCalled()
+        expect(document.body.textContent).toContain(text())
+        expect(document.body.textContent).not.toContain(getText('mcpClaudeDesktopIsSetUp'))
+      },
+    )
+
+    test('the Done text says to quit Claude Desktop completely and open it again', () => {
+      expect(getText('mcpClaudeDesktopDone')).toBe(
+        'Done. Quit Claude Desktop completely and open it again.',
+      )
+    })
+
+    test('the Update dialog says it replaces the entry, and is titled Update', async () => {
+      await withState({ state: 'outOfDate' })
+      const user = userEvent.setup()
+      await user.click(button(getText('mcpClaudeDesktopUpdateButton')))
+      await vi.waitFor(dialog)
+      expect(dialog().textContent).toContain(getText('mcpClaudeDesktopUpdateConfirm'))
+      expect(dialog().textContent).not.toContain(getText('mcpClaudeDesktopConfirm'))
+      expect(dialog().textContent).not.toContain(getText('areYouSure'))
+      await user.click(button(getText('mcpClaudeDesktopUpdateButton'), dialog()))
+      await flushPromises()
+      expect(fake.setUpClaudeDesktop).toHaveBeenCalledOnce()
+    })
+
+    test('cancelling the dialog calls nothing', async () => {
+      await withState({ state: 'notSetUp' })
+      const user = userEvent.setup()
+      await user.click(button(getText('mcpClaudeDesktopSetUpButton')))
+      await vi.waitFor(dialog)
+      await user.click(button(getText('cancel'), dialog()))
+      await flushPromises()
+      expect(fake.setUpClaudeDesktop).not.toHaveBeenCalled()
+    })
+
+    test('a failed set-up is shown as a toast', async () => {
+      fake.setUpClaudeDesktop.mockRejectedValue(new Error('disk full'))
+      await withState({ state: 'notSetUp' })
+      const user = userEvent.setup()
+      await user.click(button(getText('mcpClaudeDesktopSetUpButton')))
+      await vi.waitFor(dialog)
+      await user.click(button(getText('mcpClaudeDesktopSetUpButton'), dialog()))
+      await flushPromises()
+      expect(fake.show).toHaveBeenCalledWith('disk full', { type: 'error' })
+    })
   })
 })

@@ -80,7 +80,12 @@ describe('Guides', () => {
 
   test('built-in guides mention the tools they teach', async () => {
     const guides = new Guides(undefined)
-    expect(await guides.read('overview')).toContain('get_graph')
+    const overview = (await guides.read('overview')) ?? ''
+    expect(overview).toContain('get_graph')
+    expect(overview).toContain('add_nodes')
+    expect(overview).not.toContain('None of these tools edits')
+    expect(guides.instructions).not.toContain('none of these tools edits')
+    expect(guides.instructions.split(/\s+/).length).toBeLessThan(120)
     expect(guides.instructions).toContain('get_guide')
   })
 

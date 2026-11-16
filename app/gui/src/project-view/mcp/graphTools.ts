@@ -62,6 +62,11 @@ export interface GraphToolDeps {
   readonly now?: () => number
 }
 
+/** What `get_graph` reads besides the graph: the nodes selected in the editor. */
+export interface GetGraphDeps extends GraphToolDeps {
+  readonly selection: () => Iterable<NodeId>
+}
+
 export interface NodeSummary {
   id: string
   name: string | null
@@ -114,11 +119,11 @@ export function summarizeNode(deps: GraphToolDeps, id: NodeId, node: Node): Node
  * The method on screen: its name and source, the module's imports, and a summary of each node,
  * with a short preview of each value unless `previews` is false. `previews_skipped` counts the
  * value nodes left without a preview because the previews' deadline passed or their total budget
- * was spent (only when non-zero). The source and each node's texts are capped; `get_node` gives one
- * node in full.
+ * was spent (only when non-zero). `selection` lists the ids of the nodes selected in the editor. The
+ * source and each node's texts are capped; `get_node` gives one node in full.
  */
 export async function getGraph(
-  deps: GraphToolDeps,
+  deps: GetGraphDeps,
   args: { previews?: boolean },
 ): Promise<McpToolResult> {
   const { ast, pointer } = deps.currentMethod
@@ -128,18 +133,21 @@ export async function getGraph(
     node,
     summary: capNodeTexts(summarizeNode(deps, id, node)),
   }))
+  // Read with the nodes, before the previews' wait, so that both describe the same moment.
+  const selection = [...deps.selection()]
   const previewsSkipped = args.previews !== false ? await addGraphPreviews(deps, nodes) : 0
   return jsonResult({
     method: pointer.value.name,
     source: truncate(ast.value.code(), GRAPH_SOURCE_CHARS),
     imports: moduleImports(deps.moduleRoot()),
     nodes: nodes.map(({ summary }) => summary),
+    selection,
     ...(previewsSkipped > 0 ? { previews_skipped: previewsSkipped } : {}),
   })
 }
 
 /** The summary with its `code`, `comment` and `message` cut to {@link GRAPH_NODE_TEXT_CHARS}. */
-function capNodeTexts(summary: NodeSummary): NodeSummary {
+export function capNodeTexts(summary: NodeSummary): NodeSummary {
   summary.code = truncate(summary.code, GRAPH_NODE_TEXT_CHARS)
   if (summary.comment != null) summary.comment = truncate(summary.comment, GRAPH_NODE_TEXT_CHARS)
   if (summary.message != null) summary.message = truncate(summary.message, GRAPH_NODE_TEXT_CHARS)
@@ -225,9 +233,12 @@ export async function getNode(
   return jsonResult(summary)
 }
 
+/** Most characters of a `node_id` quoted back in {@link unknownNodeError}. */
+const NODE_ID_QUOTE_CHARS = 200
+
 /** The error a tool returns for a `node_id` that is not a node of the method on screen. */
 export function unknownNodeError(nodeId: string): string {
-  return `No node with id ${nodeId} in the method on screen. Call get_graph for the current ids.`
+  return `No node with id ${truncate(nodeId, NODE_ID_QUOTE_CHARS)} in the method on screen. Call get_graph for the current ids.`
 }
 
 /** The node of the method on screen with the given id, or the tool's error for an unknown id. */

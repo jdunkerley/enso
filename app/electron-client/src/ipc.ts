@@ -75,6 +75,10 @@ export enum Channel {
   mcpReplaceToken = 'mcp-replace-token',
   /** Renderer → main: write an MCP client's config, token included, to the clipboard. */
   mcpCopyConfig = 'mcp-copy-config',
+  /** Renderer → main: where Claude Desktop's configuration stands (a `ClaudeDesktopSetup`). */
+  mcpClaudeDesktopStatus = 'mcp-claude-desktop-status',
+  /** Renderer → main: add the IDE's entry to Claude Desktop's configuration; resolves with the new `ClaudeDesktopSetup`. */
+  mcpClaudeDesktopSetUp = 'mcp-claude-desktop-set-up',
   /** Renderer → main: query the update mode (`auto` or `manual`). */
   updaterMode = 'updater-mode',
   /** Renderer → main: check for an update; resolves with the resulting `UpdateStatus`. */

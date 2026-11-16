@@ -294,8 +294,11 @@ function createContainerStore() {
     }
   }
 
-  /** Close given tab. The project will be closed in backend too. */
-  function closeTab(tab: Tab) {
+  /**
+   * Close given tab. The project will be closed in backend too; a local one is first offered a
+   * repository unless `offer` is false (an agent's `close_project` does not ask).
+   */
+  function closeTab(tab: Tab, { offer = true }: { offer?: boolean } = {}) {
     const key = panelKey(tab)
     const removed = tabs.delete(key)
     if (!removed) return Err(`Tab to close not found: ${key}`)
@@ -305,7 +308,7 @@ function createContainerStore() {
     }
     if (tab.type === 'project') {
       analytics.workflowClosed()
-      openedProjects.closeProject(tab.id)
+      openedProjects.closeProject(tab.id, undefined, { offer })
     }
   }
 

@@ -291,3 +291,37 @@ test('Perform collapse', () => {
     after[`target = Main.${COLLAPSED_FUNCTION_NAME} keep1`]!.expression.id,
   )
 })
+
+function collapseLastNode(code: string, baseName?: Identifier) {
+  const root = Ast.parseModule(code)
+  const main = Ast.findModuleMethod(root, 'main')
+  assert(main != null)
+  const statements = [...main.statement.bodyAsBlock().statements()]
+  const target = statements[statements.length - 1]!
+  const result = performCollapseImpl(
+    root,
+    { args: [], statementsToExtract: new Set([target.id]), statementToReplace: target.id },
+    'main',
+    baseName,
+  )
+  return { root, result }
+}
+
+test('Perform collapse with a base name', () => {
+  const { root, result } = collapseLastNode(
+    ['main =', '    target = 1'].join('\n'),
+    'my_group' as Identifier,
+  )
+  expect(result.collapsedName).toBe('my_group')
+  expect(root.code()).toContain('my_group =\n    target = 1\n    target')
+  expect(root.code()).toContain('    target = Main.my_group')
+})
+
+test('Perform collapse with a base name already taken', () => {
+  const { root, result } = collapseLastNode(
+    ['my_group = 0', '', 'main =', '    target = 1'].join('\n'),
+    'my_group' as Identifier,
+  )
+  expect(result.collapsedName).toBe('my_group_1')
+  expect(root.code()).toContain('    target = Main.my_group_1')
+})

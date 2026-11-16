@@ -8,7 +8,12 @@ import type {
 import { randomUUID } from 'node:crypto'
 import { Channel } from '../ipc'
 
+/** How long a read, selection or navigation tool may take. */
 export const WINDOW_TOOL_TIMEOUT_MS = 30_000
+/** How long an edit tool may take: it waits for the engine to settle the new code. */
+export const EDIT_TOOL_TIMEOUT_MS = 60_000
+/** How long `create_project` and `open_project` may take: they return when the graph is ready. */
+export const OPEN_TOOL_TIMEOUT_MS = 120_000
 
 /** The part of a `WebContents` the bridge needs. */
 export interface WindowTarget {
@@ -52,9 +57,15 @@ export class WindowBridge {
 
   /**
    * Send {@link Channel.mcpToolCall} and resolve with the window's reply, or `{ ok: false }` when
-   * there is no window, it is destroyed, it fails to receive the call, or 30 s pass.
+   * there is no window, it is destroyed, it fails to receive the call, or `timeoutMs` pass
+   * ({@link WINDOW_TOOL_TIMEOUT_MS} by default).
    */
-  call(tool: string, args: Record<string, unknown>, caller: McpCaller): Promise<McpToolResult> {
+  call(
+    tool: string,
+    args: Record<string, unknown>,
+    caller: McpCaller,
+    timeoutMs: number = WINDOW_TOOL_TIMEOUT_MS,
+  ): Promise<McpToolResult> {
     const win = this.resolveWindow()
     if (win == null || win.isDestroyed()) {
       return Promise.resolve({ ok: false, error: 'No Enso window is open to run this tool' })
@@ -65,12 +76,12 @@ export class WindowBridge {
         if (this.pending.delete(requestId)) {
           resolve({
             ok: false,
-            error: `The Enso window timed out after ${WINDOW_TOOL_TIMEOUT_MS}ms`,
+            error: `The Enso window timed out after ${timeoutMs}ms`,
           })
         }
-      }, WINDOW_TOOL_TIMEOUT_MS)
+      }, timeoutMs)
       this.pending.set(requestId, { resolve, timer })
-      const request: McpToolCallRequest = { requestId, tool, args, caller }
+      const request: McpToolCallRequest = { requestId, tool, args, caller, timeoutMs }
       try {
         win.send(Channel.mcpToolCall, request)
       } catch (error) {

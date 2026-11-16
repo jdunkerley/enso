@@ -2,8 +2,8 @@
 
 The IDE's MCP server for external agent apps (Claude Code, Codex, GitHub
 Copilot): with it turned on, an agent the user has pointed at it can read the
-project open in the IDE. It is off by default. No tool edits the project or
-changes the execution environment, settings or secrets.
+project open in the IDE and edit it, and open or create projects. It is off by
+default. No tool changes the execution environment, settings or secrets.
 
 ## The parts
 
@@ -15,13 +15,19 @@ changes the execution environment, settings or secrets.
   are stripped before the registry sees them (`McpServer.validateToolInput` in
   `@modelcontextprotocol/sdk` 1.30; `mcpServer.test.ts` checks it). The
   registry's strict check binds callers that do not go through the SDK.
-- `projectTools.ts` — the definitions of the five project tools (`get_graph`,
-  `get_node`, `search_components`, `get_component_docs`, `evaluate_expression`).
+- `projectTools.ts` — the definitions of the project tools: the five that read
+  (`VIEW_TOOL_NAMES`) and the nine that edit or navigate (`EDIT_TOOL_NAMES`).
   Each only forwards its arguments to the window.
+- `appTools.ts` — the six app tools (`get_app_state`, `list_projects`,
+  `list_files`, `create_project`, `open_project`, `close_project`), forwarded
+  the same way.
 - `windowBridge.ts` — `WindowBridge` forwards a call to the focused window (or
   the first one) over `Channel.mcpToolCall` and resolves with the reply
   (`Channel.mcpToolReply`, matched by `requestId`), or with an error when there
-  is no window or 30 s pass (`WINDOW_TOOL_TIMEOUT_MS`).
+  is no window or the call's timeout passes (`WINDOW_TOOL_TIMEOUT_MS` 30 s by
+  default, `EDIT_TOOL_TIMEOUT_MS` 60 s, `OPEN_TOOL_TIMEOUT_MS` 120 s). The
+  request carries that timeout (`McpToolCallRequest.timeoutMs`), so that the
+  window never applies an edit after main has answered that it timed out.
 - `guides.ts` and `guides/*.md` — the `get_guide` tool, the guides as MCP
   resources (`enso://guide/<topic>`) and the server `instructions`
   (`guides/instructions.md`). Built-in topics (`overview`, `language`,
@@ -32,9 +38,40 @@ changes the execution environment, settings or secrets.
 - `mcpServer.ts` — `McpHttpServer`, the HTTP server on `127.0.0.1:<port>/mcp`.
 - `mcpController.ts` — `McpController`: the on/off setting and port, the token,
   start and stop, the status, and the setup text each client pastes.
+- `claudeDesktop.ts` — setting up Claude Desktop: reads and edits its
+  `claude_desktop_config.json` (folder from `claudeDesktopConfigDirectory`:
+  `%APPDATA%\Claude`, or `~/Library/Application Support/Claude` on macOS; none
+  elsewhere). It adds only `mcpServers.enso`, the `mcp-remote` bridge with the
+  token in `env` (Claude Desktop on Windows mishandles arguments with spaces).
+  It never writes a file it cannot parse or whose top level or `mcpServers` is
+  not an object. A zero-byte or whitespace-only file counts as empty and a UTF-8
+  BOM is ignored; comments or a trailing comma stay unreadable. It saves
+  `claude_desktop_config.json.enso-backup` only on first set-up (the file has
+  content and no `enso` entry), as the file's exact bytes, so the backup stays
+  the user's file from before Enso touched it; replacing an entry never writes
+  or changes a backup, so an older backup is overwritten only when the entry was
+  removed and is set up again. It writes through a symbolic link to its target
+  (`fs.realpath`), writes a temporary file beside the target with the target's
+  permission bits, and renames, removing the temporary file if the rename fails.
+  The controller (`claudeDesktopStatus`, `setUpClaudeDesktop`) runs these on its
+  queue. Status checks the folder first and never creates a token: with none
+  stored an `enso` entry is `outOfDate`; a keychain read failure gives
+  `unreadable`. Only `setUpClaudeDesktop` (a click) creates the token.
+  `replaceToken` and `setPort` read the status with the OLD address and token
+  first and rewrite the entry afterwards only if it was `setUp` (Enso's own): a
+  hand-edited entry is left alone and a missing one is never created; a rewrite
+  failure is logged. Nothing is written on `setEnabled`. The token never reaches
+  the renderer: the IPC calls return only a `ClaudeDesktopStatus` (the state and
+  the configuration file's path, which Settings shows beside Copy JSON).
+  Settings → AI offers the set-up only while the server is on
+  (`app/gui/src/dashboard/layouts/Settings/CLAUDE.md`, "AI"). Tests inject a
+  temporary folder; never point one at the real Claude folder.
 - `clientConfigs.ts` — that setup text per client (`claude mcp add` command,
-  Codex TOML, Copilot JSON for VS Code and the CLI, a generic `mcpServers`
-  block), each checked against the vendor's documentation (dates in the code).
+  Claude Desktop `mcp-remote` JSON, Codex TOML, Copilot JSON for VS Code and the
+  CLI, a generic `mcpServers` block), each checked against the vendor's
+  documentation (dates in the code). The Codex block sets
+  `tool_timeout_sec = 120` (Codex's default is 60 s, which an edit or an open
+  can take).
 
 `electron.ts`'s `initMcp` wires them together at start-up and registers the IPC
 the Settings → AI tab uses (`Channel.mcp*`); `index.ts` calls `shutdownMcp` on
@@ -53,6 +90,74 @@ removes it when hidden). With no project showing (the dashboard, or none open)
 the dispatcher answers that no project is open. Add, rename or change a tool on
 both sides, and keep its description and `guides/overview.md` in step with what
 the handler returns. Only `get_guide` runs entirely in main.
+
+The app tools run in the window too (`app/gui/src/mcp/appTools.ts`, registered
+once by the app shell), so they answer on any page. Every path an agent passes
+them must be the Drive's root folder, a local folder the user added to the
+Drive, or inside one (`resolveAllowedPath`): anything else is refused with "That
+folder is outside the Drive", before anything is listed or opened.
+`create_project` and `open_project` answer once the opened project's own tools
+answer, waited for by its project id (`whenProjectToolsActive`), so the agent's
+next call reads that project and not another tab; main gives them 120 s, the
+window 100 s.
+
+## Edits
+
+The edit tools run through one edit session per open graph editor
+(`app/gui/src/project-view/mcp/editSession.ts`; its `CLAUDE.md` has the
+details). Its rules, which the tool descriptions and `guides/overview.md` state:
+
+- **One writer at a time**: the session queues edits and runs one at a time,
+  whoever calls.
+- **Refused in Live** (`LIVE_EDIT_ERROR`: "The project is in Live mode. Edits by
+  an agent are refused there. …"), read at the edit's turn and after the version
+  save, and **refused when the project is not on screen** (its tab was hidden
+  while the call waited).
+- **Refused too late**: an edit with less than 25 s of its call's timeout left
+  at its turn, or after the version save, is refused ("The call timed out before
+  it ran. Nothing was changed; try again."), so it is never applied after main
+  has answered that the call timed out.
+- **Refused in another method**: an edit whose turn comes after the method on
+  screen changed, or after one of its nodes was removed, changes nothing and
+  says so.
+- **One undo step per caller**: a caller's edits join one undo step until it has
+  made no edit for 10 s, measured from the end of its last run, or until the
+  user edits the project, the user leaves the project's tab, or the agent opens
+  a method, which ends the step.
+- **A version first**: before a step's first edit the session saves a version
+  (`Before changes by <caller>`) when the project keeps versions; the edit is
+  refused if that save fails.
+- `add_nodes` creates all its nodes and import lines in one module edit, or none
+  of them: a statement that does not parse, a name already used or an unknown
+  `after_node` refuses the whole call.
+- An edit never moves the view or changes the selection; only `select_nodes` and
+  `open_method` do.
+
+An edit answers once the engine has reported results for the nodes it changed
+(`settled: true`, the types and errors in the result are current) or after 20 s
+(`settled: false`); `app/gui/src/project-view/mcp/CLAUDE.md` ("When an edit has
+settled") says exactly what counts and what does not.
+
+Edits are saved with the project as they are made, as the user's are: in the
+packaged spec the edit's text was in `src/Main.enso` on disk about 4–7 s after
+the call answered, with the project still open. Every tool that takes code
+refuses code that enables the output context by the routes that are known: the
+two enabling functions (`with_enabled_context`, `with_enabled`), an
+`@Builtin_Method` binding, reflection by `Meta.meta`, evaluating text with
+`Debug.eval`, and looking a method up by a name in text (`Polyglot.get_member`,
+`Polyglot.invoke`). `edit_node` and `collapse_nodes` refuse a node the user
+turned Write on for. Three of those routes were found only by review after the
+first version, and a fourth while fixing the third; each really wrote a file in
+the packaged app. The guard is a list of names over the AST, so others may
+exist, and it is **not a security boundary**: Java and other polyglot code
+(`foreign python`, `foreign js`) are not covered at all and can write a file
+directly, the user's own Write-enabled functions and nodes can be driven by an
+agent's edits, and a real guarantee needs engine-side enforcement (an
+execution-level lock on the output context), which is not built. The list, its
+history and the routes review found (all now refused) are in
+`app/gui/src/project-view/mcp/CLAUDE.md`, "Write stays the user's". The tool
+descriptions (`WRITE_RULE` in `projectTools.ts`) and the guides tell the agent
+the same, and name the two ways its edits can still cause a write.
 
 ## The caller checks
 
@@ -125,17 +230,22 @@ none started after 15 s or once 40,000 characters of previews are collected,
 with the rest counted in `previews_skipped`; it also caps the `source` (50,000)
 and each node's `code`, `comment` and panic `message` (2,000). A preview
 evaluation does not interrupt the execution context on timeout;
-`evaluate_expression` does (25 s). The window bridge gives up after 30 s.
-Details in `app/gui/src/project-view/mcp/CLAUDE.md`.
+`evaluate_expression` does (25 s). The window bridge gives up after 30 s for a
+reading tool, 60 s for an edit (which waits up to 20 s for the execution) and
+120 s for opening or creating a project. Details in
+`app/gui/src/project-view/mcp/CLAUDE.md`.
 
 `evaluate_expression` runs only in the Design environment: the window refuses it
 while the project is in Live mode, because an evaluation runs in the execution
-context's environment. In Design the output context is off, so an expression
-cannot write to the path it names (`tests/mcp.spec.ts` checks this against the
-packaged app). Writes that support a dry run still write their data to a
+context's environment. In Design the output context is off, so a plain write
+does not reach the path it names (`tests/mcp.spec.ts` checks this against the
+packaged app), and code that enables the output context is refused by the same
+guard as the edits. Writes that support a dry run still write their data to a
 temporary file (`<name>_ensodryrun<digits>.<ext>` in the system temporary
 directory) and return its path; the tool description and `guides/overview.md`
-say so. This prevents accidental writes; it is not a sandbox.
+say so. This prevents accidental writes; it is not a security boundary (see
+"Edits" above): an expression can still call a function of the user's project
+that enables output.
 
 ## Not the AI mode's server
 
@@ -149,12 +259,25 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
 - `tests/headless/mcpToolRegistry.test.ts`, `mcpWindowBridge.test.ts`,
   `mcpGuides.test.ts`, `mcpServer.test.ts` (a real SDK client against the
   server), `mcpController.test.ts` (fake keyring and server),
-  `mcpClientConfigs.test.ts`.
-- `tests/mcp.spec.ts` — the packaged app: an SDK client lists the six tools,
-  reads the guide and the graph of a new project, searches components,
-  evaluates, checks that an evaluation does not write the file it names (the
-  answer names the dry-run file, which the test deletes), and that a request
-  without the token is `401`. It cannot check the Live-mode refusal: nothing in
-  the UI switches a project to Live (the project's `executionMode` setting is
-  only read from its settings), so `app/gui/src/project-view/mcp/__tests__/`
-  covers that.
+  `mcpClientConfigs.test.ts`, `mcpClaudeDesktop.test.ts` (a temporary folder,
+  never the real Claude folder).
+- `tests/mcp.spec.ts` — the packaged app, two tests. The first: an SDK client
+  lists the 21 tools, reads the guide and the graph of a new project, searches
+  components, evaluates, checks that an evaluation does not write the file it
+  names (the answer names the dry-run file, which the test deletes), and that a
+  request without the token is `401`. The second builds a project from the
+  dashboard against the real engine: `create_project`, `add_nodes` (with an
+  import line, and with a node in error that `edit_node` fixes), code in the
+  Write prefix refused by `add_nodes`, `edit_node` and `evaluate_expression`
+  with the file it names never written, `edit_node` back to back on a node and
+  its user (the second result current) and to the same text, a `remove_nodes` of
+  a node with a user, `set_node_comment`, `set_visualization`, `select_nodes`,
+  `collapse_nodes`, `open_method` in and out, `add_function`, one `Mod+Z` in the
+  window taking back a whole `add_nodes` call, `remove_nodes`, `list_files`, the
+  path rule, `close_project` (the edits are in `Main.enso` on disk) and
+  `open_project`; it deletes the project it made. Neither can check the
+  Live-mode refusals: nothing in the UI switches a project to Live (the
+  project's `executionMode` setting is only read from its settings), so
+  `app/gui/src/project-view/mcp/__tests__/` covers them. The GUI side has its
+  own Playwright specs: `app/gui/integration-test/project-view/mcpEdit.spec.ts`
+  and `integration-test/dashboard/mcpApp.spec.ts`.

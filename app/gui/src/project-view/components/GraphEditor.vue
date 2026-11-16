@@ -34,7 +34,10 @@ import { usePlacement } from '@/components/ComponentBrowser/placement'
 import ContextMenuTrigger from '@/components/ContextMenuTrigger.vue'
 import GraphEdges from '@/components/GraphEditor/GraphEdges.vue'
 import GraphNodes from '@/components/GraphEditor/GraphNodes.vue'
-import { performCollapse, prepareCollapsedInfo } from '@/components/GraphEditor/collapsing'
+import {
+  collapseNodes as collapseNodesIntoFunction,
+  type CollapseDeps,
+} from '@/components/GraphEditor/collapseNodes'
 import { helpActionHandlers } from '@/components/GraphEditor/helpActions'
 import { useGraphEditorClipboard } from '@/components/GraphEditor/graphClipboard'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
@@ -80,7 +83,7 @@ import { provideLanguageSupportExtensions } from '@/providers/languageSupportExt
 import { provideOngoingAiPrompts } from '@/stores/ongoingAiPrompts'
 import { providePersisted } from '@/stores/persisted'
 import { provideVisualizationStore } from '@/stores/visualization'
-import { assert, bail } from '@/util/assert'
+import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import { partition } from '@/util/data/array'
 import { Rect } from '@/util/data/rect'
@@ -126,7 +129,6 @@ provideLanguageSupportExtensions({
 const nodeExecution = provideNodeExecution(projectStore)
 const aiPrompts = provideOngoingAiPrompts()
 useAiToolHandler(aiPrompts)
-useProjectMcpTools()
 ;(window as any)._mockSuggestion = suggestionDb.mockSuggestion
 
 onMounted(() => {
@@ -273,6 +275,27 @@ const { scheduleCreateNode, createNodes, placeNode } = provideNodeCreation(
     }
   },
 )
+
+// === MCP tools ===
+
+// Below the navigator, the selection, the stack navigator and the placement, which it uses.
+useProjectMcpTools({
+  selectedNodes: () => nodeSelection.selected,
+  selectNodes: (ids) => {
+    if (ids.length === 0) {
+      nodeSelection.deselectAll()
+      return
+    }
+    nodeSelection.setSelection(new Set(ids))
+    panToSelected()
+  },
+  enterNode: (id) => stackNavigator.enterNode(id),
+  canLeaveMethod: () => stackNavigator.allowNavigationLeft.value,
+  leaveMethod: () => stackNavigator.exitNode(),
+  viewport: () => graphNavigator.viewport,
+  collapseNodes: (ids, name) =>
+    collapseNodesIntoFunction(collapseDeps(), ids, name ? { name } : {}),
+})
 
 // === Clipboard Copy/Paste ===
 
@@ -789,57 +812,33 @@ function handleEdgeDrop(source: Ast.AstId, position: Vec2) {
 // === Node Collapsing ===
 const renameSchedule = provideRenameSchedule()
 
+function collapseDeps(): CollapseDeps {
+  return {
+    module: module.value,
+    graphStore,
+    placeCollapsedNode: collapsedNodePlacement,
+    // Below the moved nodes, with no other obstacles: what the action has always done (it
+    // passed one generator as both, and the obstacles' copy came out empty).
+    placeOutputNode: (movedNodeRects) =>
+      usePlacement([], graphNavigator.viewport).place(movedNodeRects),
+  }
+}
+
 function collapseNodes(nodes: Node[]) {
-  const selected = new Set(
-    iter.map(
-      iter.filter(nodes, ({ type }) => type === 'component'),
-      nodeId,
-    ),
-  )
-  if (selected.size == 0) return
+  const selected = nodes.filter(({ type }) => type === 'component').map(nodeId)
+  if (selected.length == 0) return
   try {
-    const info = prepareCollapsedInfo(selected, graphStore.db)
-    if (!info.ok) {
+    const collapsed = collapseNodesIntoFunction(collapseDeps(), selected)
+    if (!collapsed.ok) {
       toasts.userActionFailed.show(
-        `Unable to create User Defined Component: ${info.error.payload}.`,
+        `Unable to create User Defined Component: ${collapsed.error.payload}.`,
       )
       return
     }
-    const currentMethodName = unwrapOr(graphStore.currentMethod.pointer, undefined)?.name
-    if (currentMethodName == null) {
-      bail(`Cannot get the method name for the current execution stack item.`)
+    if (graphStore.currentMethod.pointer.ok) {
+      const currentPointer = graphStore.currentMethod.pointer.value
+      renameSchedule?.scheduleFunctionRename({ ...currentPointer, name: collapsed.value.name })
     }
-    const topLevel = module.value.root
-    if (!topLevel) {
-      bail('BUG: no top level, creating User Defined Component not possible.')
-    }
-    const selectedNodeRects = iter.filterDefined(iter.map(selected, graphStore.visibleArea))
-    module.value.edit((edit) => {
-      const { collapsedCallRoot, collapsedNodeIds, outputAstId, collapsedName } = performCollapse(
-        info.value,
-        edit.getVersion(topLevel),
-        graphStore.db,
-        currentMethodName,
-      )
-      const position = collapsedNodePlacement(selectedNodeRects)
-      edit.get(collapsedCallRoot).mutableNodeMetadata().set('position', position.xy())
-
-      const collapsedNodeRects = iter.filterDefined(
-        iter.map(collapsedNodeIds, graphStore.visibleArea),
-      )
-      const { place } = usePlacement(collapsedNodeRects, graphNavigator.viewport)
-      const outputPosition = place(collapsedNodeRects)
-      edit.get(outputAstId).mutableNodeMetadata().set('position', outputPosition.xy())
-
-      if (graphStore.currentMethod.pointer.ok) {
-        const currentPointer = graphStore.currentMethod.pointer.value
-        renameSchedule?.scheduleFunctionRename({ ...currentPointer, name: collapsedName })
-      }
-
-      // The collapsed nodes leave this graph: what they were pushing returns.
-      graphStore.releasePushedBy(selected, edit)
-      return Ok()
-    })
   } catch (err) {
     console.error('Error while creating User Defined Component, this is not normal.', err)
   }

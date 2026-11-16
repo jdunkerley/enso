@@ -6,10 +6,21 @@
  * The token never leaves this module except inside {@link McpController.config}'s text, which the
  * caller writes to the clipboard from main.
  */
-import { MCP_DEFAULT_PORT, type McpClientKind, type McpStatus } from 'enso-common/src/mcp'
+import {
+  MCP_DEFAULT_PORT,
+  type ClaudeDesktopSetup,
+  type ClaudeDesktopStatus,
+  type McpClientKind,
+  type McpStatus,
+} from 'enso-common/src/mcp'
 import { randomBytes } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import type { KeyringEntryLike } from '../secretsKey'
+import {
+  claudeDesktopConfigFile,
+  readClaudeDesktopSetup,
+  writeClaudeDesktopSetup,
+} from './claudeDesktop'
 import { clientConfig } from './clientConfigs'
 
 /** The keychain account of the MCP token. The service is always `Enso`. */
@@ -25,6 +36,8 @@ export const MCP_LOCKED_BY_ENVIRONMENT_ERROR =
 export interface McpControllerOptions {
   /** `<userData>/mcp-settings.json`. */
   readonly settingsPath: string
+  /** The folder holding Claude Desktop's `claude_desktop_config.json`; undefined where there is none. */
+  readonly claudeDesktopDirectory: string | undefined
   readonly entry: (account: string) => Promise<KeyringEntryLike>
   /**
    * The app environment (`process.env`). Narrower than `NodeJS.ProcessEnv`, whose index signature
@@ -153,9 +166,12 @@ export class McpController {
       if (!isValidPort(port)) {
         throw new Error(`The port must be a whole number from ${MIN_PORT} to ${MAX_PORT}.`)
       }
+      const hadOwnEntry = await this.hasOwnClaudeDesktopEntry()
       await this.save({ enabled: this.fileEnabled, port })
       this.filePort = port
-      return this.apply()
+      const status = await this.apply()
+      if (hadOwnEntry) await this.rewriteClaudeDesktop()
+      return status
     })
   }
 
@@ -167,13 +183,16 @@ export class McpController {
     return this.serialised(async () => {
       if (this.closed) return this.status()
       if (this.envToken != null) throw new Error('The token is set by ENSO_MCP_TOKEN.')
+      const hadOwnEntry = await this.hasOwnClaudeDesktopEntry()
       try {
         const entry = await this.options.entry(MCP_TOKEN_ACCOUNT)
         entry.setPassword(randomBytes(32).toString('base64url'))
       } catch (e) {
         throw new Error(`The system keychain is not available: ${messageOf(e)}`, { cause: e })
       }
-      return this.apply()
+      const status = await this.apply()
+      if (hadOwnEntry) await this.rewriteClaudeDesktop()
+      return status
     })
   }
 
@@ -181,7 +200,33 @@ export class McpController {
   config(client: McpClientKind): Promise<string> {
     return this.serialised(async () => {
       const token = await this.token()
-      return clientConfig(client, `http://127.0.0.1:${this.port}/mcp`, token)
+      return clientConfig(client, this.url, token)
+    })
+  }
+
+  /**
+   * Where Claude Desktop's configuration stands against the current address and token. Reading it
+   * never creates a token: with none stored, an existing entry is out of date. The result
+   * also carries the file's path, for the instructions in Settings.
+   */
+  claudeDesktopStatus(): Promise<ClaudeDesktopStatus> {
+    return this.serialised(async () => this.withConfigFile(await this.currentClaudeDesktopStatus()))
+  }
+
+  /**
+   * Add or replace the `enso` entry in Claude Desktop's configuration file, with the current
+   * address and token, whether or not the server is enabled. Resolves with the status read back.
+   */
+  setUpClaudeDesktop(): Promise<ClaudeDesktopStatus> {
+    return this.serialised(async () => {
+      const directory = this.options.claudeDesktopDirectory
+      const found = await readClaudeDesktopSetup(directory, this.url, null)
+      if (directory == null || found.state === 'notInstalled') {
+        return this.withConfigFile({ state: 'notInstalled' })
+      }
+      return this.withConfigFile(
+        await writeClaudeDesktopSetup(directory, this.url, await this.token()),
+      )
     })
   }
 
@@ -194,6 +239,56 @@ export class McpController {
     await this.serialised(async () => {
       await this.stopServer()
     })
+  }
+
+  /** The address the server listens on, or would. */
+  private get url(): string {
+    return `http://127.0.0.1:${this.port}/mcp`
+  }
+
+  /** The stored token (the environment's, or the keychain's), without creating one. */
+  private async storedToken(): Promise<string | null> {
+    if (this.envToken != null) return this.envToken
+    const existing = (await this.options.entry(MCP_TOKEN_ACCOUNT)).getPassword()
+    return existing != null && existing !== '' ? existing : null
+  }
+
+  private withConfigFile(setup: ClaudeDesktopSetup): ClaudeDesktopStatus {
+    return { ...setup, configFile: claudeDesktopConfigFile(this.options.claudeDesktopDirectory) }
+  }
+
+  /** Claude Desktop's status. Touches the keychain only once the folder exists; never throws. */
+  private async currentClaudeDesktopStatus(): Promise<ClaudeDesktopSetup> {
+    const directory = this.options.claudeDesktopDirectory
+    const withoutToken = await readClaudeDesktopSetup(directory, this.url, null)
+    if (withoutToken.state === 'notInstalled' || withoutToken.state === 'unreadable') {
+      return withoutToken
+    }
+    try {
+      const token = await this.storedToken()
+      return token == null ? withoutToken : await readClaudeDesktopSetup(directory, this.url, token)
+    } catch {
+      return { state: 'unreadable', reason: 'The system keychain is not available.' }
+    }
+  }
+
+  /** Whether Claude Desktop's `enso` entry is exactly the one Enso wrote for the current settings. */
+  private async hasOwnClaudeDesktopEntry(): Promise<boolean> {
+    return (await this.currentClaudeDesktopStatus()).state === 'setUp'
+  }
+
+  /**
+   * After the address or token changed, for an entry that was Enso's own: write it again so it
+   * keeps working. A failure is logged, never thrown.
+   */
+  private async rewriteClaudeDesktop(): Promise<void> {
+    const directory = this.options.claudeDesktopDirectory
+    if (directory == null) return
+    try {
+      await writeClaudeDesktopSetup(directory, this.url, await this.token())
+    } catch (e) {
+      console.warn('[MCP] could not update the Claude Desktop entry:', e)
+    }
   }
 
   /** The token from the environment or the keychain, created when there is neither. */

@@ -364,10 +364,15 @@ export function createGraphStore(
     })
   }
 
-  function setNodeContent(id: NodeId, content: string, withImports?: RequiredImport[] | undefined) {
+  /** Replace a node's expression, adding the imports it needs, in one edit; Err when nothing changed. */
+  function setNodeContent(
+    id: NodeId,
+    content: string,
+    withImports?: RequiredImport[] | undefined,
+  ): Result {
     const node = db.nodeIdToNode.get(id)
-    if (!node) return
-    module.edit((edit) => {
+    if (!node) return Err(`No node ${id}`)
+    return module.edit((edit) => {
       const editExpr = edit.getVersion(node.innerExpr)
       editExpr.syncToCode(content)
       if (withImports) {

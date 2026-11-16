@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [Agents connected over MCP can create and open projects and add, edit, remove
+  and group nodes; each run of changes is one undo step. Settings → AI can also
+  set up Claude Desktop.][790]
 - [A date argument has a dropdown arrow under it that opens a menu of
   `Date.today`, `Date.yesterday`, `Date.tomorrow` and a calendar; the argument
   shows the code it holds, and a `Date.new` shows its year, month and day as
@@ -517,6 +520,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [800]: https://github.com/jdunkerley/enso/pull/800
+[790]: https://github.com/jdunkerley/enso/pull/790
 [789]: https://github.com/jdunkerley/enso/pull/789
 [782]: https://github.com/jdunkerley/enso/pull/782
 [788]: https://github.com/jdunkerley/enso/pull/788

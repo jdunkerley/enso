@@ -25,6 +25,7 @@ import {
   getGraph,
   getNode,
   summarizeNode,
+  type GetGraphDeps,
   type GraphToolDeps,
 } from '../graphTools'
 
@@ -43,7 +44,7 @@ const pointer: MethodPointer = {
   name: 'main' as Identifier,
 }
 
-function makeDeps(overrides: Partial<GraphToolDeps> = {}, code = CODE) {
+function makeDeps(overrides: Partial<GetGraphDeps> = {}, code = CODE) {
   const registry = ComputedValueRegistry.Mock()
   const projectNames = mockProjectNameStore()
   const db = GraphDb.Mock(registry, undefined, projectNames)
@@ -54,12 +55,13 @@ function makeDeps(overrides: Partial<GraphToolDeps> = {}, code = CODE) {
   db.updateNodes(func, { watchEffect })
   db.updateBindings(func, { text: code, getSpan })
   const evaluate = vi.fn<GraphToolDeps['evaluate']>(async () => Ok('text'))
-  const deps: GraphToolDeps = {
+  const deps: GetGraphDeps = {
     db,
     currentMethod: { ast: Ok(func), pointer: Ok(pointer) },
     moduleRoot: () => root,
     printType: projectNames.printProjectPath,
     evaluate,
+    selection: () => [],
     ...overrides,
   }
   return { deps, db, registry, evaluate, func }
@@ -146,6 +148,15 @@ test('get_graph without previews never evaluates', async () => {
   expect(graph.nodes.every((n: object) => !('preview' in n))).toBe(true)
 })
 
+test('get_graph lists the selected nodes', async () => {
+  const selected: NodeId[] = []
+  const { deps, db } = makeDeps({ selection: () => selected })
+  expect(parseValue(await getGraph(deps, { previews: false })).selection).toEqual([])
+  selected.push(nodeNamed(db, 'b'), nodeNamed(db, 'a'))
+  const graph = parseValue(await getGraph(deps, { previews: false }))
+  expect(graph.selection).toEqual([nodeNamed(db, 'b'), nodeNamed(db, 'a')])
+})
+
 test('get_graph previews each value node, cut to the limit, and leaves out failures', async () => {
   const { deps, db, registry, evaluate } = makeDeps()
   const a = nodeNamed(db, 'a')
@@ -186,6 +197,14 @@ test('get_node with an unknown id says so', async () => {
   expect(result.ok).toBe(false)
   expect(result.ok ? '' : result.error).toBe(
     'No node with id not-a-node in the method on screen. Call get_graph for the current ids.',
+  )
+})
+
+test('An unknown id is quoted back cut to 200 characters', async () => {
+  const { deps } = makeDeps()
+  const result = await getNode(deps, { node_id: 'x'.repeat(500) })
+  expect(result.ok ? '' : result.error).toBe(
+    `No node with id ${'x'.repeat(200)}… in the method on screen. Call get_graph for the current ids.`,
   )
 })
 

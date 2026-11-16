@@ -2,8 +2,9 @@
 
 An Enso project is a graph. Each node is an Enso expression bound to a name, and
 the connections between nodes are the names one expression uses from another.
-The tools here read the project that is open in the IDE. None of these tools
-edits the project or changes its execution environment, settings or secrets;
+The tools here read and edit the project that is open in the IDE, and open or
+create projects. Edits are made as ordinary nodes, and the user can undo them.
+No tool changes the execution environment, settings or secrets;
 `evaluate_expression` runs code, but only in the Design environment.
 
 ## How to work
@@ -27,6 +28,53 @@ edits the project or changes its execution environment, settings or secrets;
    what you need and do not fan out. The expression must evaluate to Text:
    choose the encoding with `.to_text`, `.to_display_text` or `.to_json`.
 
+## Building
+
+1. Read the graph with `get_graph` first, so you build on what is there. With no
+   project open, `get_app_state` tells you, `list_projects` finds one and
+   `open_project` or `create_project` opens it.
+2. Look components up (`search_components`, then `get_component_docs`) before
+   using them.
+3. Add a few nodes at a time with `add_nodes`: each statement is
+   `name = expression`, and later statements may use the names of earlier ones.
+   Pass whole import lines in `imports`. Use `add_function` for a top-level
+   function and call it from a node as `Main.<name> args`.
+4. Read the result of every edit. `add_nodes` and `edit_node` return the nodes
+   they made or changed, with their types and errors; `collapse_nodes` returns
+   the function's name and the node that calls it; `set_node_comment` and
+   `set_visualization` return the node; `remove_nodes` returns only the ids it
+   removed and `add_function` only the function's name, so after either call
+   `get_graph` to see the nodes they affected. `settled: true`: the engine has
+   reported results for the changed nodes, so the types and errors in this
+   result are current. `settled: false`: it had not within 20 seconds; call
+   `get_node` later. When a node has an error or the wrong type, fix it with
+   `edit_node`; use `remove_nodes` to drop a node. Check with `get_node` or
+   `evaluate_expression` before building on a node.
+5. Group a run of nodes that does one job with `collapse_nodes`, and explain a
+   node with `set_node_comment`.
+6. `select_nodes` and `open_method` are the only project tools that change the
+   selection or move the view; the other edits do not. `set_visualization` shows
+   or hides a node's visualization.
+7. Every tool that changes the project is refused while it is in Live mode: ask
+   the user to switch it back to Design. Reading, selecting and navigating
+   (`select_nodes`, `open_method`) still work there.
+8. Your edits are saved with the project as you make them. Do not turn Write on
+   (writing a node's output: a file, a database table). Code that enables the
+   output context (`with_enabled_context`, `with_enabled`, binding a runtime
+   builtin, building a method name by reflection, looking a method up by a name
+   in text, or evaluating text as code) is refused. Only the user turns Write
+   on, by clicking it on a node; `edit_node` and `collapse_nodes` refuse a node
+   they did. Your edits can still cause a write in two ways you should avoid:
+   calling a function in the user's project that itself enables output, and
+   changing a node upstream of one the user has switched Write on for (it
+   re-runs with your change). Ask the user before doing either.
+9. Your edits form one undo step for the user until you pause for 10 seconds,
+   the user edits the project or leaves its tab, or `open_method` changes the
+   method; then the next edit starts a new step. Edits from several agents run
+   one at a time. An edit whose turn comes after the method on screen changed is
+   refused with nothing changed: call `get_graph` and try again. There is no
+   undo tool: to take a change back, edit or remove the nodes.
+
 ## Evaluating expressions
 
 Examples, with `table` standing for a binding in scope:
@@ -38,19 +86,23 @@ Examples, with `table` standing for a binding in scope:
   expression may produce a DataflowError; otherwise the call returns the error
   wrapped in a hint rather than the value.
 
-Evaluation runs only in the Design environment, where output is off: an
-expression never writes to the file, database or service it names. A write that
-supports a dry run (such as `.write` on Text or a Table) writes to a temporary
-file instead and returns that file's path; other writes fail. While the user has
-the project in Live mode, `evaluate_expression` is refused. Do not use it to
-save data.
+Evaluation runs only in the Design environment, where output is off: a write in
+the expression does not reach the file, database or service it names. A write
+that supports a dry run (such as `.write` on Text or a Table) writes to a
+temporary file instead and returns that file's path; other writes fail. While
+the user has the project in Live mode, `evaluate_expression` is refused. Do not
+use it to save data, and do not turn Write on in it: the code that enables the
+output context is refused here as in the edits (item 8 above), and an expression
+that calls a function of the user's project which enables output can still
+write. Ask the user before doing that.
 
 ## Cap reads at the lowest layer
 
-The tool-call timeout (about 25 seconds) fires during I/O (an HTTPS fetch,
-parsing, a SQL round-trip), not during slicing after the parse. Wrapping a full
-`Data.read` in `.take 100` does not save parse cost. Push the cap into the
-reader or the SQL itself when you only want to look at the data.
+`evaluate_expression` waits 25 seconds for an expression's result, then answers
+with an error. The limit fires during I/O (an HTTPS fetch, parsing, a SQL
+round-trip), not during slicing after the parse. Wrapping a full `Data.read` in
+`.take 100` does not save parse cost. Push the cap into the reader or the SQL
+itself when you only want to look at the data.
 
 - CSV / TSV: `Data.read "<path>" (..Delimited row_limit=(..First 100))`. The
   parser stops at row 100.
