@@ -22,6 +22,10 @@ type Viz_Actions
        Actions whose JSON is already written: `json_text` is
        `to_json_text` of `actions`. For a value whose actions are the same every
        time, so that the text is not built again for each message.
+
+       Never empty: `is_empty` is `False` for a `Json` without looking at its
+       actions, so a value with no actions must use `Viz_Actions.none`, never
+       `Viz_Actions.Json "[]" []`.
     Json (json_text : Text) (~actions : Vector Viz_Action)
 
     ## ---
