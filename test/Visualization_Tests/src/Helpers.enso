@@ -10,3 +10,8 @@ import Standard.Test.Spec_Result.Spec_Result
 Column.expect self name:Text contents:Vector -> Spec_Result =
     self.name.should_equal name
     self.to_vector.should_equal contents
+
+## The message `json` without its `"actions"` field (checked by
+   `Viz_Actions_Spec`), for specs that compare the rest of a message.
+without_actions (json : JS_Object) -> JS_Object =
+    JS_Object.from_pairs (json.field_names.filter (n-> n != "actions") . map n-> [n, json.get n])

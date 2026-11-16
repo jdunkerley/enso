@@ -2,6 +2,7 @@ from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 
 import project.Helpers
+import project.Viz_Actions.Viz_Actions
 from project.Helpers import time_visualization, short_display
 from project.Viz_Tree import page_size, Viz_Tree, Viz_Tree_Child
 
@@ -16,8 +17,9 @@ prepare value = time_visualization Tree ("Tree.prepare: " + (short_display value
     json = case tree of
         Viz_Tree.Leaf json_text -> '{"root":' + (leaf_json json_text) + '}'
         Viz_Tree.Branch _ _ _ _ _ -> '{"root":' + (branch_json tree) + ',"children":' + (page_json tree 0 page_size) + '}'
-    if json.is_error.not then json else
+    result = if json.is_error.not then json else
         '{"root":' + (leaf_json (Helpers.truncate value.to_display_text . to_json)) + '}'
+    (Viz_Actions.for value).add_to_json result
 
 ## ---
    private: true

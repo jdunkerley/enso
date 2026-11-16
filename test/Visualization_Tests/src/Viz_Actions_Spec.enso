@@ -1,0 +1,115 @@
+from Standard.Base import all
+
+import Standard.Visualization.Scatter_Plot
+import Standard.Visualization.Table.Visualization
+import Standard.Visualization.Tree
+import Standard.Visualization.Viz_Action.Viz_Action
+import Standard.Visualization.Viz_Actions.Viz_Actions
+from Standard.Visualization.Viz_Actions import remove_warnings_action
+
+from Standard.Table import Table
+import Standard.Database.Connection.Database
+import Standard.Database.Extensions.Upload_Table
+from Standard.SQLite import SQLite
+
+from Standard.Test import all
+
+type Thing
+    Value name
+
+## A user type offers its own actions in its own module: here one that
+   creates a standalone node from a static call taking the node.
+Viz_Actions.from (that:Thing) =
+    _ = that
+    Viz_Actions.Value [Viz_Action.new_node "describe" "Describe" "" "Thing.describe {{node}}"]
+
+ids_of value = (Viz_Actions.from value).actions.map .id
+
+add_specs suite_builder =
+    suite_builder.group "Viz_Actions" group_builder->
+        group_builder.specify "an action is written as one JSON object" <|
+            action = Viz_Action.chain "open_row" "Get Item" "select_row" "at {{#index}}"
+            action.to_json_text . should_equal '{"id":"open_row","label":"Get Item","icon":"select_row","kind":"chain","template":"at {{#index}}"}'
+
+        group_builder.specify "a value no conversion describes offers none" <|
+            (Viz_Actions.from 42).actions . should_equal []
+            (Viz_Actions.from "text").to_json_text . should_equal "[]"
+            (Viz_Actions.from Nothing).actions . should_equal []
+
+        group_builder.specify "a vector or an array offers its items by number" <|
+            json = '[{"id":"open_row","label":"Get Item","icon":"select_row","kind":"chain","template":"at {{#index}}"}]'
+            (Viz_Actions.from [1, 2, 3]).to_json_text . should_equal json
+            (Viz_Actions.from [1, 2, 3].to_array).to_json_text . should_equal json
+
+        group_builder.specify "a user type offers its own, a standalone node among them" <|
+            (Viz_Actions.from (Thing.Value "a")).to_json_text . should_equal '[{"id":"describe","label":"Describe","icon":"","kind":"new_node","template":"Thing.describe {{node}}"}]'
+            (Viz_Actions.for (Thing.Value "a")).actions.map .id . should_equal ["describe"]
+
+        group_builder.specify "a dataflow error offers none" <|
+            (Viz_Actions.for (Error.throw "boom")).actions . should_equal []
+            (Viz_Actions.for [1]).actions.length . should_equal 1
+
+        group_builder.specify "the field goes first in a message, and only when there are actions" <|
+            actions = Viz_Actions.from [1]
+            actions.add_to_json '{"kind":"grid","columns":[]}' . should_equal ('{"actions":' + actions.to_json_text + ',"kind":"grid","columns":[]}')
+            Viz_Actions.none.add_to_json '{"kind":"grid"}' . should_equal '{"kind":"grid"}'
+
+        group_builder.specify "an empty object stays valid JSON" <|
+            actions = Viz_Actions.from [1]
+            text = actions.add_to_json '{}'
+            text . should_equal ('{"actions":' + actions.to_json_text + '}')
+            text.parse_json.get "actions" . length . should_equal 1
+
+        group_builder.specify "an error message never carries it" <|
+            (Viz_Actions.from [1]).add_to_json '{"kind":"error","error":"x"}' . should_equal '{"kind":"error","error":"x"}'
+
+        group_builder.specify "a text that is not a JSON object is returned unchanged" <|
+            actions = Viz_Actions.from [1]
+            actions.add_to_json '' . should_equal ''
+            actions.add_to_json '[1,2]' . should_equal '[1,2]'
+            actions.add_to_json '"x"' . should_equal '"x"'
+            actions.add_to_json 'null' . should_equal 'null'
+
+        group_builder.specify "remove warnings is a plain chain" <|
+            remove_warnings_action.to_json_text . should_equal '{"id":"remove_warnings","label":"Remove Warnings","icon":"not_exclamation","kind":"chain","template":"remove_warnings"}'
+
+    suite_builder.group "Table actions" group_builder->
+        mem_table = Table.new [["x", [1, 2]], ["y", ["a", "b"]]]
+        connection = Database.connect SQLite.In_Memory
+        db_table = mem_table.select_into_database_table connection "actions" temporary=True
+
+        group_builder.specify "a table offers its rows, columns and cells, and the toolbar's and brush's actions" <|
+            ids_of mem_table . should_equal ["open_row", "open_column", "open_cell", "sort", "filter", "remove_columns", "reorder_columns", "brush_filter"]
+            templates = (Viz_Actions.from mem_table).actions.map .template
+            templates . should_equal ["get_row {{#index}}", "at {{@column}}", "get_value {{@column}} {{#index}}", "sort {{columns*}}", "filter {{@column}} {{condition}}", "remove_columns {{@columns*}}", "reorder_columns {{@columns*}}", "filter {{@column}} (..Between {{#min}} {{#max}})"]
+
+        group_builder.specify "a database table offers the same templates" <|
+            (Viz_Actions.from db_table).to_json_text . should_equal (Viz_Actions.from mem_table).to_json_text
+
+        group_builder.specify "a column offers its values by number, in memory and in a database" <|
+            (Viz_Actions.from (mem_table.at "x")).to_json_text . should_equal '[{"id":"open_row","label":"Get Value","icon":"select_cell","kind":"chain","template":"at {{#index}}"}]'
+            (Viz_Actions.from (db_table.at "x")).to_json_text . should_equal (Viz_Actions.from (mem_table.at "x")).to_json_text
+
+    suite_builder.group "The actions field" group_builder->
+        table = Table.new [["x", [1, 2]], ["y", [3, 4]]]
+        table_actions = (Viz_Actions.from table).to_json_text
+
+        group_builder.specify "the table view of a table starts with its actions" <|
+            Visualization.prepare_visualization table . should_start_with ('{"actions":' + table_actions + ',"kind":"grid"')
+
+        group_builder.specify "a value without actions is unchanged" <|
+            Visualization.prepare_visualization 42 . should_start_with '{"kind":"value"'
+
+        group_builder.specify "an error has no actions" <|
+            Visualization.prepare_visualization (Error.throw "boom") . should_start_with '{"kind":"error"'
+
+        group_builder.specify "the scatter plot of a table carries them" <|
+            Scatter_Plot.process_to_json_text table . should_start_with ('{"actions":' + table_actions + ',"data":')
+
+        group_builder.specify "the tree of a vector carries them" <|
+            Tree.prepare [1, 2] . should_start_with '{"actions":[{"id":"open_row"'
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

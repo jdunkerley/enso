@@ -2,6 +2,7 @@ from Standard.Base import all
 
 import project.Helpers
 import project.Internal.View_Json
+import project.Viz_Actions.Viz_Actions
 import project.Viz_Cell.Viz_Cell
 import project.Viz_Table.Viz_Table
 from project.Helpers import time_visualization, short_display
@@ -32,7 +33,7 @@ prepare_visualization y max_rows=1000 = time_visualization Visualization ("prepa
         x = Warning.set y []
         case x of
             f : Function -> View_Json.value_json (JS_Object.from_pairs [['_display_text_', '[Function '+f.to_text+']']])
-            _ -> (Viz_Table.from x).table_view_json max_rows
+            _ -> (Viz_Actions.for x).add_to_json ((Viz_Table.from x).table_view_json max_rows)
 
 ## ---
    private: true

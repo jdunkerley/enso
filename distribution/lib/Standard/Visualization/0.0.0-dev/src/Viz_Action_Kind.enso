@@ -1,0 +1,28 @@
+from Standard.Base import all
+
+## ---
+   private: true
+   ---
+   How a visualisation action makes its node.
+type Viz_Action_Kind
+    ## ---
+       private: true
+       ---
+       The node is the visualised node, a dot and the template: `sort {{columns*}}`
+       on node `data` makes `data.sort [...]`.
+    Chain
+
+    ## ---
+       private: true
+       ---
+       The template is the whole expression, and `{{node}}` names the
+       visualised node: a static call can take it as an argument.
+    New_Node
+
+    ## ---
+       private: true
+       ---
+       The kind's name in the IDE's JSON.
+    wire_name self -> Text = case self of
+        Viz_Action_Kind.Chain -> "chain"
+        Viz_Action_Kind.New_Node -> "new_node"

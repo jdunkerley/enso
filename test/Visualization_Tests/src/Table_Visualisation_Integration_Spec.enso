@@ -7,6 +7,8 @@ from Standard.Test import all
 
 import Standard.Visualization.Table.Visualization
 
+from project.Helpers import without_actions
+
 ## These tests pair with the Playwright tests found at app/gui/integration-test/project-view/tableVisualisation.spec.ts
    These tests check the json produced by prepare_visualization matches a baseline
    The Playwright tests check that json data then renders correctly in an AG Grid in the GUI
@@ -61,7 +63,7 @@ add_specs suite_builder =
 
 _get_vis_data table =
     table.columns.each c-> (c:In_Memory_Column).await_metrics
-    Visualization.prepare_visualization table . parse_json
+    without_actions (Visualization.prepare_visualization table . parse_json)
 
 main filter=Nothing =
     suite = Test.build suite_builder->

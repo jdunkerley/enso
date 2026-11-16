@@ -1,1 +1,1 @@
-{"kind":"grid","row_count":3,"columns":[{"name":"Value","number_format":false}],"index":{"action":"at {{#index}}"},"data":[[1,2]],"options":{"disable_sort_when_partial":true}}
+{"actions":[{"id":"open_row","label":"Get Item","icon":"select_row","kind":"chain","template":"at {{#index}}"}],"kind":"grid","row_count":3,"columns":[{"name":"Value","number_format":false}],"index":{"action":"at {{#index}}"},"data":[[1,2]],"options":{"disable_sort_when_partial":true}}
