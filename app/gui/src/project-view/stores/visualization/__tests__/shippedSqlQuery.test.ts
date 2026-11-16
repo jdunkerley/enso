@@ -63,3 +63,22 @@ test('Ctrl+C copies the selected SQL instead of reaching the graph editor', asyn
   wrapper.unmount()
   document.body.removeEventListener('keydown', graph)
 })
+
+test('markup in a value or in the code is shown as text', () => {
+  const wrapper = mount(SqlQuery.default, {
+    props: sql(`SELECT '<i>y</i>' AS "x" WHERE "b" = ?`, '<b>bold</b>'),
+  })
+  const pre = wrapper.get('pre.sql')
+  expect(pre.find('i').exists()).toBe(false)
+  expect(pre.find('b').exists()).toBe(false)
+  expect(pre.text()).toContain(`'<i>y</i>'`)
+  expect(pre.get('.interpolation').text()).toBe(`'<b>bold</b>'`)
+})
+
+test('a Text value gets the colour its type name hashes to', () => {
+  const wrapper = mount(SqlQuery.default, { props: sql('SELECT ?', 'a') })
+  // What the GUI's former DEFAULT_THEME computed for 'Standard.Base.Data.Text.Text'.
+  const style = wrapper.get('.interpolation').attributes('style')
+  expect(style).toContain('color:rgba(52.4609375,106.25,37.1875,1);')
+  expect(style).toContain('background-color:rgba(52.4609375,106.25,37.1875,0.2);')
+})

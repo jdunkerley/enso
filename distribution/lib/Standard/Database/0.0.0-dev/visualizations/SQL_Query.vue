@@ -49,12 +49,28 @@ const language = computed(() =>
     props.data.dialect
   : 'sql',
 )
+
+/** Escape text for an HTML context. */
+function escapeHtml(text: string) {
+  return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+}
+
+/** A parameter sql-formatter copies through unchanged, swapped for the value after escaping. */
+const placeholder = (index: number) => `__enso_param_${index}__`
+const PLACEHOLDER = /__enso_param_(\d+)__/g
+
 const formatted = computed(() => {
   if (props.data.error != null || props.data.code == null) {
     return undefined
   }
-  const params = (props.data.interpolations ?? []).map(renderInterpolationParameter)
-  return format(props.data.code, { params, language: language.value })
+  const interpolations = props.data.interpolations ?? []
+  const text = format(props.data.code, {
+    params: interpolations.map((_, index) => placeholder(index)),
+    language: language.value,
+  })
+  return escapeHtml(text).replace(PLACEHOLDER, (_, index) =>
+    renderInterpolationParameter(interpolations[Number(index)]!),
+  )
 })
 
 interface RGBA {
@@ -159,7 +175,7 @@ function renderRegularInterpolation(value: unknown, fgColor: RGBA, bgColor: RGBA
   let html = `<div class="interpolation" style="color:${convertColorToRgba(
     fgColor,
   )};background-color:${convertColorToRgba(bgColor)};">`
-  html += value
+  html += escapeHtml(String(value))
   html += '</div>'
   return html
 }
@@ -168,7 +184,7 @@ function renderRegularInterpolation(value: unknown, fgColor: RGBA, bgColor: RGBA
 <template>
   <div class="SQLVisualization scrollable" tabindex="-1" @wheel.stop.passive @keydown="stopCopy">
     <pre v-if="data.error" class="sql" v-text="data.error"></pre>
-    <!-- eslint-disable-next-line vue/no-v-html This is SAFE, beause it is not user input. -->
+    <!-- eslint-disable-next-line vue/no-v-html The code and every value are escaped (escapeHtml); only our own spans are markup. -->
     <pre v-else class="sql" v-html="formatted"></pre>
   </div>
 </template>
