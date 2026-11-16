@@ -9,6 +9,7 @@ import {
 } from '$/providers/openedProjects/widgetRegistry'
 import { cachedGetter, proxyRefs } from '$/utils/reactivity'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
+import { canPopOut } from '@/components/GraphEditor/popOut/popOut'
 import { useRaf } from '@/composables/animation'
 import { useResizeObserver } from '@/composables/events'
 import type { NavigatorComposable } from '@/composables/navigator'
@@ -81,6 +82,17 @@ const portId = cachedGetter<PortId>(
   },
   { flush: 'sync' },
 )
+
+// An argument that can be popped out: `GraphNode` routes a drag that starts here to pop out. The
+// new node is named after the argument, so an argument the suggestion database does not describe
+// is not marked.
+const popOut = computed(() => {
+  if (!canPopOut(props.input)) return undefined
+  const name = props.input[ArgumentInfoKey]?.info?.name
+  return name != null ?
+      { port: props.input.portId, name, type: props.input.expectedType }
+    : undefined
+})
 
 const innerWidget = computed(() => {
   return { ...props.input, forcePort: false }
@@ -196,6 +208,9 @@ export const widgetDefinition = defineWidget(
     ref="portRoot"
     class="WidgetPort widgetParent"
     :data-port="props.input.portId"
+    :data-pop-out-port="popOut?.port"
+    :data-pop-out-name="popOut?.name"
+    :data-pop-out-type="popOut?.type"
     :class="{
       enabled,
       connected: showConnectedStyle,

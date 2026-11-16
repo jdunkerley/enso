@@ -14,4 +14,9 @@ part A).
   check, the code of the new node, and the edit (one undo step, through
   `createNodes`'s `inSameEdit`).
 
-The drag is routed in `GraphNode.vue` from ports marked `data-pop-out-port`.
+- `usePopOutDrag.ts` - the drag's state (source, ghost, Escape, drop outside the
+  node). `GraphNode.vue` feeds it from its own `useClickableDraggable`: a drag
+  that starts inside a port `WidgetPort` marks with `data-pop-out-port` (and
+  `data-pop-out-name`, `data-pop-out-type`) pops out instead of moving the node.
+  `GraphNodes.vue` forwards the `popOut` event and `GraphEditor.vue` calls
+  `usePopOut`.
