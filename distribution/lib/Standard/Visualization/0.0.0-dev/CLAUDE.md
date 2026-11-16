@@ -142,7 +142,11 @@ Visualization and not on each data library.
   Query for a database table; Image: `Id.Library "Standard.Image" "Image"`).
   `Id.Builtin name` is a visualization the GUI implements;
   `Id.Library library name` one a library ships in its `visualizations/` folder
-  (`to_js_object`: `{"library": {"name": library}, "name": name}`).
+  (`to_js_object`: `{"library": {"name": library}, "name": name}`; `library` is
+  `<namespace>.<name>`, as `Standard.Image`). The GUI watches that folder of
+  every loaded library and registers each `.vue` file it finds as
+  `{ kind: 'Library', name: library }`, waiting up to 10 s for a library that is
+  still loading; see `app/gui/src/project-view/stores/visualization/CLAUDE.md`.
 
 Layering rule: Visualization imports only `Standard.Base`; Base knows nothing
 about visualisation. Libraries (`Table`, `Database`, ...) import Visualization

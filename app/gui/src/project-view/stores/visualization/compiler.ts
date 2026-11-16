@@ -13,7 +13,9 @@
  *
  * # Typical Request Lifetime
  * See the "Protocol" section below for details on specific messages.
- * - A `CompileRequest` is sent with id `1` and path `/Viz.vue`.
+ * Paths are root addresses (`enso-root:<rootId>/visualizations/Viz.vue`, see `rootAddress.ts`), for
+ * a file in the project or in a library; an import stays in the root of the file that makes it.
+ * - A `CompileRequest` is sent with id `1` and path `enso-root:<rootId>/visualizations/Viz.vue`.
  * - (begin `importVue`) The Worker `fetch`es the path.
  * - The CSS styles are compiled using `vue/compiler-sfc`, then sent as `AddStyleNotification`s.
  * - The Vue script is compiled using `vue/compiler-sfc` into TypeScript.
@@ -23,9 +25,9 @@
  *   - (`importVue`) Vue imports are recursively compiled as described in this process.
  *   - (`importTS`) TypeScript imports are recursively compiled as described in this process,
  *     excluding the style and script compilation steps.
- * - (end `importVue`) An `AddUrlNotification` with path `/Viz.vue` is sent to the main
+ * - (end `importVue`) An `AddUrlNotification` with that same path is sent to the main
  *   thread.
- * - A `CompilationResultResponse` with id `1` and path `/Viz.vue` is sent to the main thread.
+ * - A `CompilationResultResponse` with id `1` and that path is sent to the main thread.
  */
 
 import { compileSfc, compileTs } from '@/stores/visualization/compileSfc'
@@ -43,8 +45,9 @@ import MagicString from 'magic-string'
  * A request to compile a visualization module. The Worker MUST reply with a
  * {@link CompilationResultResponse} when compilation is done, or a {@link CompilationErrorResponse}
  * when compilation fails. The `id` is an arbitrary number that uniquely identifies the request.
- * The `path` is either an absolute URL (`http://doma.in/path/to/TheScript.vue`), or a root-relative
- * URL (`/visualizations/TheScript.vue`). Relative URLs (`./TheScript.vue`) are NOT valid.
+ * The `path` is either an absolute URL (`http://doma.in/path/to/TheScript.vue`), or a root address
+ * (`enso-root:<rootId>/visualizations/TheScript.vue`). Relative URLs (`./TheScript.vue`) are NOT
+ * valid.
  *
  * Note that compiling files other than Vue files (TypeScript, SVG etc.) is currently NOT
  * supported.

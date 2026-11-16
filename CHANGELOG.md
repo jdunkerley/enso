@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [Libraries can provide their own visualizations][NNN]: a `.vue` file in a
+  library's `visualizations/` folder appears in the view picker once the library
+  is imported, and `Standard.Image` now ships the Image view this way.
 - [Agents connected over MCP can create and open projects and add, edit, remove
   and group nodes; each run of changes is one undo step. Settings → AI can also
   set up Claude Desktop.][790]
@@ -517,6 +520,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[NNN]: https://github.com/jdunkerley/enso/pull/NNN
 [790]: https://github.com/jdunkerley/enso/pull/790
 [789]: https://github.com/jdunkerley/enso/pull/789
 [782]: https://github.com/jdunkerley/enso/pull/782
