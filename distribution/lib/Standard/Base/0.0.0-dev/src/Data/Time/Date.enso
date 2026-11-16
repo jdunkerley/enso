@@ -290,6 +290,7 @@ type Date
        first day of the week is Monday, and week 1 is the week containing the
        first Thursday of the year. Therefore it is important to properly specify
        the `locale` argument.
+    @locale Locale.default_widget
     week_of_year self (locale : Locale | Nothing = Nothing) -> Integer =
         ensure_in_epoch self <|
             if locale.is_nothing then Time_Utils.get_field_as_localdate self IsoFields.WEEK_OF_WEEK_BASED_YEAR else
@@ -383,16 +384,14 @@ type Date
        icon: time
        ---
        Returns the first date within the `Date_Period` containing self.
-    start_of : Date_Period -> Date
-    start_of self period=Date_Period.Month = period.adjust_start self
+    start_of self (period : Date_Period = ..Month) -> Date = period.adjust_start self
 
     ## ---
        group: DateTime
        icon: time
        ---
        Returns the last date within the `Date_Period` containing self.
-    end_of : Date_Period -> Date
-    end_of self period=Date_Period.Month = period.adjust_end self
+    end_of self (period : Date_Period = ..Month) -> Date = period.adjust_end self
 
     ## ---
        group: DateTime
@@ -571,8 +570,7 @@ type Date
              example_to_time = Date.new 2020 2 3 . to_date_time Time_Of_Day.new Time_Zone.utc
        ```
     @zone Time_Zone.default_widget
-    to_date_time : Time_Of_Day -> Time_Zone -> Date_Time
-    to_date_time self (time_of_day=Time_Of_Day.new) (zone=Time_Zone.system) =
+    to_date_time self (time_of_day : Time_Of_Day = Time_Of_Day.new) (zone : Time_Zone = Time_Zone.system) -> Date_Time =
         Time_Utils.make_zoned_date_time self time_of_day zone
 
     ## ---
@@ -602,6 +600,7 @@ type Date
 
              example_add = Date.new 2020 + Date_Period.Month
        ```
+    @amount make_period_selector
     + : Period | Date_Period -> Date ! (Time_Error | Illegal_Argument)
     + self (amount : Period | Date_Period) =
         case amount of
@@ -636,6 +635,7 @@ type Date
        ```
              (Date.new 2021 12 05).up_to (Date.new 2021 12 06) include_end=True
        ```
+    @step make_period_selector
     up_to : Date -> Boolean -> Date_Period|Period -> Date_Range
     up_to self end:Date include_end:Boolean=False step:Date_Period|Period=Date_Period.Day =
         effective_end = if include_end then end.next else end
@@ -666,6 +666,7 @@ type Date
        ```
              (Date.new 2021 12 06).down_to (Date.new 2021 12 05) include_end=True
        ```
+    @step make_period_selector
     down_to : Date -> Boolean -> Date_Period|Period -> Date_Range
     down_to self end:Date include_end:Boolean=False step:Date_Period|Period=Date_Period.Day =
         effective_end = if include_end then end.previous else end
@@ -824,6 +825,7 @@ type Date
 
              example_add = Date.new 2020 - Date_Period.Month
        ```
+    @amount make_period_selector
     - : Period | Date_Period -> Date ! (Time_Error | Illegal_Argument)
     - self amount:(Period | Date_Period) =
         case amount of
@@ -999,6 +1001,18 @@ type Date
        ---
        Checks if `self` is less than or equal to `that`.
     <= self that = Comparable.<= self=self that
+
+## ---
+   private: true
+   ---
+   The choices for an amount of time added to, or stepped from, a Date: each
+   `Date_Period`, and `Period.new` for a custom number of years, months and
+   days. The whole names are written, as the argument takes either type.
+make_period_selector display:Display=..When_Modified -> Widget =
+    periods = ["Year", "Quarter", "Month", "Week", "Day"].map name->
+        code = "Date_Period." + name
+        Option code code
+    Widget.Single_Choice values=(periods + [Option "Period.new" "(Period.new)"]) display=display
 
 ## ---
    private: true
