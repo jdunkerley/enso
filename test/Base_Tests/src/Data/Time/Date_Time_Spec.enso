@@ -2,6 +2,7 @@ from Standard.Base import all
 import Standard.Base.Errors.Common.Incomparable_Values
 import Standard.Base.Errors.Common.Type_Error
 import Standard.Base.Errors.Time_Error.Time_Error
+from Standard.Base.Data.Time.Date_Time import make_date_time_period_selector
 import Standard.Base.Runtime.Debug
 
 from Standard.Test import all
@@ -52,6 +53,13 @@ add_specs suite_builder =
             (Date_Time.new 2022 12 12).should_not_equal (Date_Time.new 1996)
 
     suite_builder.group "Date_Time signatures" group_builder->
+        group_builder.specify "the period selectors list both kinds, and the custom amounts when asked" <|
+            periods = ["Date_Period.Year", "Date_Period.Quarter", "Date_Period.Month", "Date_Period.Week", "Date_Period.Day", "Time_Period.Hour", "Time_Period.Minute", "Time_Period.Second", "Time_Period.Millisecond", "Time_Period.Microsecond", "Time_Period.Nanosecond"]
+            make_date_time_period_selector.values.map .label . should_equal periods
+            amounts = make_date_time_period_selector include_custom=True
+            amounts.values.map .label . should_equal (periods + ["Period.new", "Duration.new"])
+            amounts.values.last.value . should_equal "(Duration.new)"
+
         group_builder.specify "first_of_month and end_of_month are Dates" <|
             dt = Date_Time.new 2020 2 15 10 30
             dt.first_of_month . should_equal (Date.new 2020 2 1)

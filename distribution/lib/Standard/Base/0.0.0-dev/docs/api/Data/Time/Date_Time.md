@@ -1,55 +1,56 @@
 ## Enso Signatures 1.0
 ## module Standard.Base.Data.Time.Date_Time
 - type Date_Time
-    - + self amount:(Standard.Base.Data.Time.Duration.Duration|Standard.Base.Data.Time.Period.Period|Standard.Base.Data.Time.Time_Period.Time_Period|Standard.Base.Data.Time.Date_Period.Date_Period) -> Standard.Base.Any.Any
-    - - self amount:(Standard.Base.Data.Time.Duration.Duration|Standard.Base.Data.Time.Period.Period|Standard.Base.Data.Time.Time_Period.Time_Period|Standard.Base.Data.Time.Date_Period.Date_Period) -> Standard.Base.Any.Any
+    - + self amount:(Standard.Base.Data.Time.Duration.Duration|Standard.Base.Data.Time.Period.Period|Standard.Base.Data.Time.Time_Period.Time_Period|Standard.Base.Data.Time.Date_Period.Date_Period) -> Standard.Base.Data.Time.Date_Time.Date_Time!Standard.Base.Errors.Time_Error.Time_Error
+    - - self amount:(Standard.Base.Data.Time.Duration.Duration|Standard.Base.Data.Time.Period.Period|Standard.Base.Data.Time.Time_Period.Time_Period|Standard.Base.Data.Time.Date_Period.Date_Period) -> Standard.Base.Data.Time.Date_Time.Date_Time!Standard.Base.Errors.Time_Error.Time_Error
     - < self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - <= self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - > self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - >= self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - add_work_days self days:Standard.Base.Any.Any= holidays:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - at_time_zone self zone:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - century self -> Standard.Base.Any.Any
+    - add_work_days self days:Standard.Base.Data.Numbers.Integer= holidays:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Time.Date.Date)= -> Standard.Base.Data.Time.Date_Time.Date_Time
+    - at_time_zone self zone:Standard.Base.Data.Time.Time_Zone.Time_Zone -> Standard.Base.Data.Time.Date_Time.Date_Time
+    - century self -> Standard.Base.Data.Numbers.Integer
     - date self -> Standard.Base.Data.Time.Date.Date
-    - date_add self amount:Standard.Base.Data.Numbers.Integer period:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Time_Period.Time_Period) -> Standard.Base.Any.Any
-    - date_diff self end:Standard.Base.Data.Time.Date_Time.Date_Time period:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Time_Period.Time_Period) -> Standard.Base.Any.Any
-    - date_part self period:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Time_Period.Time_Period) -> Standard.Base.Any.Any
+    - date_add self amount:Standard.Base.Data.Numbers.Integer period:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Time_Period.Time_Period) -> Standard.Base.Data.Time.Date_Time.Date_Time
+    - date_diff self end:Standard.Base.Data.Time.Date_Time.Date_Time period:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Time_Period.Time_Period) -> Standard.Base.Data.Numbers.Integer
+    - date_part self period:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Time_Period.Time_Period) -> Standard.Base.Data.Numbers.Integer
     - day self -> Standard.Base.Data.Numbers.Integer
-    - day_of_week self -> Standard.Base.Any.Any
-    - day_of_year self -> Standard.Base.Any.Any
-    - end_of self period:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - end_of_month self -> Standard.Base.Any.Any
+    - day_of_week self -> Standard.Base.Data.Time.Day_Of_Week.Day_Of_Week
+    - day_of_year self -> Standard.Base.Data.Numbers.Integer
+    - end_of self period:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Time_Period.Time_Period)= -> Standard.Base.Data.Time.Date_Time.Date_Time
+    - end_of_month self -> Standard.Base.Data.Time.Date.Date
     - enso_epoch_start -> Standard.Base.Data.Time.Date_Time.Date_Time
-    - first_of_month self -> Standard.Base.Any.Any
-    - format self format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter -> Standard.Base.Any.Any
-    - from_unix_epoch_milliseconds milliseconds:Standard.Base.Data.Numbers.Integer -> Standard.Base.Any.Any
-    - from_unix_epoch_seconds seconds:Standard.Base.Data.Numbers.Integer nanoseconds:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Any.Any
+    - first_of_month self -> Standard.Base.Data.Time.Date.Date
+    - format self format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter -> Standard.Base.Data.Text.Text
+    - from_unix_epoch_milliseconds milliseconds:Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Time.Date_Time.Date_Time
+    - from_unix_epoch_seconds seconds:Standard.Base.Data.Numbers.Integer nanoseconds:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Data.Time.Date_Time.Date_Time
     - hour self -> Standard.Base.Data.Numbers.Integer
-    - is_leap_year self -> Standard.Base.Any.Any
-    - length_of_month self -> Standard.Base.Any.Any
-    - length_of_year self -> Standard.Base.Any.Any
+    - is_leap_year self -> Standard.Base.Data.Boolean.Boolean
+    - length_of_month self -> Standard.Base.Data.Numbers.Integer
+    - length_of_year self -> Standard.Base.Data.Numbers.Integer
     - microsecond self -> Standard.Base.Data.Numbers.Integer
     - millisecond self -> Standard.Base.Data.Numbers.Integer
     - minute self -> Standard.Base.Data.Numbers.Integer
     - month self -> Standard.Base.Data.Numbers.Integer
     - nanosecond self include_milliseconds:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Numbers.Integer
-    - new year:Standard.Base.Data.Numbers.Integer= month:Standard.Base.Data.Numbers.Integer= day:Standard.Base.Data.Numbers.Integer= hour:Standard.Base.Data.Numbers.Integer= minute:Standard.Base.Data.Numbers.Integer= second:Standard.Base.Data.Numbers.Integer= millisecond:Standard.Base.Data.Numbers.Integer= microsecond:Standard.Base.Data.Numbers.Integer= nanosecond:Standard.Base.Any.Any= zone:Standard.Base.Data.Time.Time_Zone.Time_Zone= -> Standard.Base.Any.Any
+    - new year:Standard.Base.Data.Numbers.Integer= month:Standard.Base.Data.Numbers.Integer= day:Standard.Base.Data.Numbers.Integer= hour:Standard.Base.Data.Numbers.Integer= minute:Standard.Base.Data.Numbers.Integer= second:Standard.Base.Data.Numbers.Integer= millisecond:Standard.Base.Data.Numbers.Integer= microsecond:Standard.Base.Data.Numbers.Integer= nanosecond:Standard.Base.Data.Numbers.Integer= zone:Standard.Base.Data.Time.Time_Zone.Time_Zone= -> Standard.Base.Data.Time.Date_Time.Date_Time!Standard.Base.Errors.Time_Error.Time_Error
     - now -> Standard.Base.Data.Time.Date_Time.Date_Time
-    - parse text:Standard.Base.Data.Text.Text format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter= -> Standard.Base.Any.Any
-    - pretty self -> Standard.Base.Any.Any
-    - quarter self -> Standard.Base.Any.Any
+    - parse text:Standard.Base.Data.Text.Text format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter= -> Standard.Base.Data.Time.Date_Time.Date_Time!Standard.Base.Errors.Time_Error.Time_Error
+    - pretty self -> Standard.Base.Data.Text.Text
+    - quarter self -> Standard.Base.Data.Numbers.Integer
     - second self -> Standard.Base.Data.Numbers.Integer
-    - set_time_zone self zone:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - start_of self period:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - set_time_zone self zone:Standard.Base.Data.Time.Time_Zone.Time_Zone -> Standard.Base.Data.Time.Date_Time.Date_Time
+    - start_of self period:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Time_Period.Time_Period)= -> Standard.Base.Data.Time.Date_Time.Date_Time
     - time_of_day self -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day
-    - to_display_text self -> Standard.Base.Any.Any
-    - to_enso_epoch_milliseconds self -> Standard.Base.Any.Any
-    - to_enso_epoch_seconds self -> Standard.Base.Any.Any
-    - to_js_object self -> Standard.Base.Any.Any
-    - to_unix_epoch_milliseconds self -> Standard.Base.Any.Any
-    - to_unix_epoch_seconds self -> Standard.Base.Any.Any
-    - to_utc self -> Standard.Base.Any.Any
-    - week_of_year self locale:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - to_display_text self -> Standard.Base.Data.Text.Text
+    - to_enso_epoch_milliseconds self -> Standard.Base.Data.Numbers.Integer
+    - to_enso_epoch_seconds self -> Standard.Base.Data.Numbers.Integer
+    - to_js_object self -> Standard.Base.Data.Json.JS_Object
+    - to_unix_epoch_milliseconds self -> Standard.Base.Data.Numbers.Integer
+    - to_unix_epoch_seconds self -> Standard.Base.Data.Numbers.Integer
+    - to_utc self -> Standard.Base.Data.Time.Date_Time.Date_Time
+    - week_of_year self locale:(Standard.Base.Data.Locale.Locale|Standard.Base.Nothing.Nothing)= -> Standard.Base.Data.Numbers.Integer
     - year self -> Standard.Base.Data.Numbers.Integer
     - zone self -> Standard.Base.Data.Time.Time_Zone.Time_Zone
+- make_date_time_period_selector include_custom:Standard.Base.Data.Boolean.Boolean= display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
 - Standard.Base.Data.Time.Date_Time.Date_Time.from that:Standard.Base.Data.Json.JS_Object -> Standard.Base.Data.Time.Date_Time.Date_Time

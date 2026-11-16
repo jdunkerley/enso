@@ -195,3 +195,26 @@ running IDE).
 Hidden (`private: true`): `to_js_object`, `to_display_text`, `pretty`,
 `Date_Time.from`. (`enso_epoch_start` is not hidden. The type's own doc block is
 also `private: true`.)
+
+#### After
+
+Taken from the code, the stdlib tests and the IDE's widget rules
+(`app/gui/src/project-view/components/GraphEditor/widgets/CLAUDE.md`), with
+`Date_Time.enso` and its API snapshot as of the Task 3 commit. The running IDE
+was not used: that check is left to the installer hand test.
+
+| Function                      | Argument        | Type (declared)                                  | Widget                                                                               | Result | Note                                                                                     |
+| ----------------------------- | --------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------- |
+| week_of_year                  | locale          | Locale \| Nothing                                | locale dropdown (`@locale Locale.default_widget`)                                    | works  | Typed now, as Date.                                                                      |
+| first_of_month · end_of_month | —               | —                                                | —                                                                                    | n/a    | Return `Date` in the snapshot.                                                           |
+| start_of · end_of             | period          | Date_Period \| Time_Period                       | dropdown of both kinds (`@period make_date_time_period_selector`)                    | works  | Whole names (`Date_Period.Week`), so each entry resolves.                                |
+| at_time_zone · set_time_zone  | zone            | Time_Zone                                        | zone dropdown                                                                        | works  | Typed now; the catalogue says `Time_Zone`, not `Any`.                                    |
+| date_part                     | period          | Date_Period \| Time_Period                       | dropdown of both kinds                                                               | works  |                                                                                          |
+| date_diff                     | end             | Date_Time                                        | date-time picker (`WidgetDateTime`, from this branch)                                | works  | Checked again by the picker's own tasks.                                                 |
+| date_diff · date_add          | period          | Date_Period \| Time_Period                       | dropdown of both kinds                                                               | works  |                                                                                          |
+| date_add                      | amount          | Integer                                          | number                                                                               | works  | Unchanged.                                                                               |
+| + · -                         | amount          | Duration \| Period \| Time_Period \| Date_Period | dropdown of both kinds, plus `Period.new` and `Duration.new` (`include_custom=True`) | works  | The two custom entries are written `(Period.new)` and `(Duration.new)` for an amount.    |
+| add_work_days                 | days · holidays | Integer · Vector Date                            | number · list of date pickers                                                        | works  | The typed `Vector Date` gives its items the date picker (#800); no annotation is needed. |
+| > · >= · < · <=               | that            | (untyped)                                        | —                                                                                    | n/a    | Still untyped (#797).                                                                    |
+
+Every other row of the table above is unchanged.

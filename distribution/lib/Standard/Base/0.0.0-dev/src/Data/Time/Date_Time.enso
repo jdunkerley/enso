@@ -26,6 +26,7 @@ from project.Data.Text.Extensions import all
 from project.Data.Time.Date import make_day_picker
 from project.Internal.Time.Date_Helpers import ensure_in_epoch, unix_epoch_start
 from project.Metadata import Display, Widget
+from project.Metadata.Choice import Option
 from project.Nothing import all
 from project.Widget_Helpers import make_date_time_format_selector
 
@@ -656,6 +657,7 @@ type Date_Time
        ---
        Returns the first date within the `Time_Period` or `Date_Period`
        containing self.
+    @period make_date_time_period_selector
     start_of self (period : Date_Period | Time_Period = Date_Period.Month) -> Date_Time =
         adjusted = period.adjust_start self
         case period of
@@ -668,6 +670,7 @@ type Date_Time
        ---
        Returns the last date within the `Time_Period` or `Date_Period` containing
        self.
+    @period make_date_time_period_selector
     end_of self (period : Date_Period | Time_Period = Date_Period.Month) -> Date_Time =
         adjusted = period.adjust_end self
         case period of
@@ -763,6 +766,7 @@ type Date_Time
        Returns a requested date-time part as integer.
        Produces a warning for a Date_Time that is before epoch start.
        See `Date_Time.enso_epoch_start`.
+    @period make_date_time_period_selector
     date_part self (period : Date_Period | Time_Period) -> Integer =
         case period of
             Date_Period.Year        -> self.year
@@ -791,6 +795,7 @@ type Date_Time
        ## Arguments
         - `end`: A date-time to compute the difference from.
         - `period`: The period to compute the difference in.
+    @period make_date_time_period_selector
     date_diff self (end : Date_Time) (period : Date_Period | Time_Period) -> Integer = ensure_in_epoch self <|
         Time_Utils.unit_datetime_difference period.to_java_unit self end
 
@@ -806,6 +811,7 @@ type Date_Time
         - `amount`: An integer specifying by how many periods to shift the
           date-time.
         - `period`: The period by which to shift.
+    @period make_date_time_period_selector
     date_add self (amount : Integer) (period : Date_Period | Time_Period) -> Date_Time = ensure_in_epoch self <|
         Time_Utils.unit_datetime_add period.to_java_unit self amount
 
@@ -837,6 +843,7 @@ type Date_Time
 
              example_plus = Date_Time.new 2020 + Date_Period.Quarter
        ```
+    @amount (make_date_time_period_selector include_custom=True)
     + self (amount : Duration | Period | Time_Period | Date_Period) -> Date_Time ! Time_Error =
         case amount of
             duration : Duration ->
@@ -920,6 +927,7 @@ type Date_Time
 
              example_plus = Date_Time.new 2020 - Date_Period.Quarter
        ```
+    @amount (make_date_time_period_selector include_custom=True)
     - self (amount : Duration | Period | Time_Period | Date_Period) -> Date_Time ! Time_Error =
         result = case amount of
             duration : Duration ->
@@ -1118,6 +1126,23 @@ type Date_Time
        ---
        Checks if `self` is less than or equal to `that`.
     <= self that = Comparable.<= self=self that
+
+## ---
+   private: true
+   ---
+   The choices for a period of a Date_Time: each `Date_Period`, then each
+   `Time_Period`, by their whole names (the arguments take either type, so an
+   auto-scoped name would not resolve). With `include_custom`, also
+   `Period.new` and `Duration.new`, for an amount added to or taken from it.
+make_date_time_period_selector (include_custom:Boolean=False) display:Display=..When_Modified -> Widget =
+    date_periods = ["Year", "Quarter", "Month", "Week", "Day"].map name->
+        code = "Date_Period." + name
+        Option code code
+    time_periods = ["Hour", "Minute", "Second", "Millisecond", "Microsecond", "Nanosecond"].map name->
+        code = "Time_Period." + name
+        Option code code
+    custom = if include_custom then [Option "Period.new" "(Period.new)", Option "Duration.new" "(Duration.new)"] else []
+    Widget.Single_Choice values=(date_periods + time_periods + custom) display=display
 
 ## ---
    private: true
