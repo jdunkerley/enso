@@ -14,20 +14,20 @@ The Date picker showed two general gaps in the graph editor:
   appear only while the node is focused for editing, and there is no direct way
   to add one.
 
-The owner also wants the same picker work for `Time_Of_Day` and `Date_Time`,
-and a Boolean widget that shows `True`/`False` instead of a bare checkbox.
+The owner also wants the same picker work for `Time_Of_Day` and `Date_Time`, and
+a Boolean widget that shows `True`/`False` instead of a bare checkbox.
 
 ## Parts and order
 
 Four PRs, in this order. Pop out is a drag on any argument, so the pickers need
 nothing from A; B and C can be built alongside it.
 
-| Part | What                                          | Depends on      |
-| ---- | --------------------------------------------- | --------------- |
-| A    | The `…` parameter menu and Pop out to node    | —               |
-| B    | Boolean: checkbox + code + ▾                  | —               |
-| C    | Time_Of_Day: function pass and picker fixes   | —               |
-| D    | Date_Time: new picker and function pass       | A (…), C (time field) |
+| Part | What                                        | Depends on            |
+| ---- | ------------------------------------------- | --------------------- |
+| A    | The `…` parameter menu and Pop out to node  | —                     |
+| B    | Boolean: checkbox + code + ▾                | —                     |
+| C    | Time_Of_Day: function pass and picker fixes | —                     |
+| D    | Date_Time: new picker and function pass     | A (…), C (time field) |
 
 ## A. Reaching parameters and popping out values (every node)
 
@@ -46,8 +46,8 @@ nothing from A; B and C can be built alongside it.
 - Picking an argument whose default is not a literal writes the default's code
   as the catalogue gives it (`zone=Time_Zone.system`).
 - Nothing changes about today's behaviour: focusing the node for editing
-  (`tree.showDetails`) still shows every argument. The `…` is shown only when
-  at least one parameter is hidden.
+  (`tree.showDetails`) still shows every argument. The `…` is shown only when at
+  least one parameter is hidden.
 
 ### Pop out to node
 
@@ -55,8 +55,8 @@ nothing from A; B and C can be built alongside it.
   is placed where it is dropped. There is no menu entry (owner's decision): the
   drag is the one way to pop out.
 - **Which arguments:** every argument that has a value (an `ArgumentAst`, not a
-  placeholder, and not already a plain reference to another node). Dropping
-  back on the node, or pressing Escape during the drag, cancels it.
+  placeholder, and not already a plain reference to another node). Dropping back
+  on the node, or pressing Escape during the drag, cancels it.
 - **Dragging an argument does nothing else.** If a drag that starts on an
   argument does anything today (such as starting an edge from its port), that
   behaviour is replaced by Pop out; the plan checks what the drag does now
@@ -67,8 +67,8 @@ nothing from A; B and C can be built alongside it.
      from the argument's name (`end1`), as new nodes are named today.
   2. The argument replaced by a reference to `<name>`, so an edge connects them.
 - **Auto-scoped values are made explicit.** An argument's `..Month` is resolved
-  against the argument's expected type, and a node has none, so each
-  auto-scoped constructor in the expression is rewritten to its qualified form
+  against the argument's expected type, and a node has none, so each auto-scoped
+  constructor in the expression is rewritten to its qualified form
   (`Date_Period.Month`), anywhere in the expression, using the expected types
   the call tree already holds for nested arguments. If a constructor's type
   cannot be determined, the drop does nothing and a toast says why, rather than
@@ -81,13 +81,13 @@ nothing from A; B and C can be built alongside it.
 ## B. Boolean
 
 - A `Boolean`-typed argument (what `isHandledByCheckboxWidget` matches today)
-  shows `[☑] True ▾`: a checkbox, then the value as code, then the ▾ arrow
-  under it, like any dropdown argument.
+  shows `[☑] True ▾`: a checkbox, then the value as code, then the ▾ arrow under
+  it, like any dropdown argument.
 - Clicking the checkbox flips the value (as now). ▾ opens `True` and `False`.
-- An unset argument shows its default greyed, as other placeholders do;
-  clicking either control writes the value.
-- A connected argument shows the edge as today; the checkbox is hidden while
-  the value is not a `True`/`False` literal.
+- An unset argument shows its default greyed, as other placeholders do; clicking
+  either control writes the value.
+- A connected argument shows the edge as today; the checkbox is hidden while the
+  value is not a `True`/`False` literal.
 - Replaces `WidgetCheckbox` everywhere it is used.
 
 ## C. Time_Of_Day
@@ -108,8 +108,8 @@ nothing from A; B and C can be built alongside it.
 ### Picker
 
 - The ▾ menu stays: `Time_Of_Day.now`, then the time field.
-- The time field shows and keeps seconds when the value has them (today it
-  edits hours and minutes only, so seconds are lost on edit).
+- The time field shows and keeps seconds when the value has them (today it edits
+  hours and minutes only, so seconds are lost on edit).
 
 ## D. Date_Time
 
@@ -121,8 +121,8 @@ nothing from A; B and C can be built alongside it.
 - The ▾ menu: `Date_Time.now`, the calendar (DateMenu's), the time field
   (TimeOfDayMenu's).
 - Picking a day or a time writes
-  `Date_Time.new <year> <month> <day> <hour> <minute>`, keeping year … minute
-  as ports.
+  `Date_Time.new <year> <month> <day> <hour> <minute>`, keeping year … minute as
+  ports.
 - Editing an existing `Date_Time.new …` changes only the parts picked: its
   `second` and finer parts and its `zone=` are kept. The picker never sets a
   zone; `zone` is reached through A's `…` menu, and has its own dropdown.
@@ -149,8 +149,8 @@ nothing from A; B and C can be built alongside it.
   through `…`; drag a `Date.new` out of `end` and check the edge and code; flip
   a Boolean both ways; pick a Date_Time day and time.
 - Stdlib tests for each signature change; the API snapshots regenerated.
-- An installer for the owner's hand test before each part merges (features
-  wait for the owner's OK).
+- An installer for the owner's hand test before each part merges (features wait
+  for the owner's OK).
 
 ## Appendix: assessments
 
