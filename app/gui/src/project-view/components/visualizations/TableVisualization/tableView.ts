@@ -7,18 +7,19 @@
 /* eslint-disable camelcase */
 // The schema spells the wire format's snake_case field names (`row_count`, `value_type`, …).
 import { Ast } from '@/util/ast'
-import { Pattern } from '@/util/ast/match'
+import type { Pattern } from '@/util/ast/match'
 import { svgUseHref } from '@/util/icons'
 import type {
-  CellDoubleClickedEvent,
   ColDef,
   ICellRendererParams,
   ITooltipParams,
   SetFilterValuesFuncParams,
 } from 'ag-grid-community'
 import { z } from 'zod'
+import { actionPattern, findAction, parseVizActions, placeholderNames } from '../vizActions'
 import { TableVisualisationTooltip } from './TableVisualisationTooltip'
 import { getCellDataType, getFilterParams, getFilterType } from './tableVizFilterSetUpUtils'
+import { TABLE_TOOLBAR_ACTIONS } from './tableVizToolbar'
 import type { ValueType } from './tableVizUtils'
 
 export const INDEX_FIELD_NAME = '#'
@@ -70,7 +71,6 @@ const gridSchema = z.object({
   options: z
     .object({
       status_bar: z.boolean().optional(),
-      create_node: z.boolean().optional(),
       disable_sort_when_partial: z.boolean().optional(),
     })
     .optional(),
@@ -290,46 +290,18 @@ function toField(name: string, options: FieldOptions, ctx: TableViewContext): Co
   return colDef
 }
 
-type ParsedActionTemplate = {
-  pattern: string
-  selectors: { name: string; numeric: boolean }[]
-}
-
-function parseActionTemplate(input: string): ParsedActionTemplate {
-  const selectors: { name: string; numeric: boolean }[] = []
-  const pattern =
-    '__.' +
-    input.replace(/{{([#@]?)(\w+)}}/g, (_, flag, key) => {
-      selectors.push({ name: key, numeric: flag === '#' })
-      return '__'
-    })
-  return { pattern, selectors }
-}
-
-function isNumber(value: unknown): value is number {
-  return typeof value === 'number' && !isNaN(value)
-}
-
 /**
- * The node a link creates from a row: `action` with `{{#field}}` replaced by the row's value of
- * `field` (a number when it reads as one), `{{\@field}}` by the value as it is, and `{{#index}}`
- * by the row number.
+ * The node a link creates from a row: its template filled from the row, `{{#index}}` from the row
+ * number. A link is the view's own `chain` action (Enso writes it beside the columns it reads).
  */
-function getAstPattern(params: CellDoubleClickedEvent, action: string) {
-  const parsedAction = parseActionTemplate(action)
-
-  return Pattern.new<Ast.Expression>((ast) => {
-    const mappedExpressions = parsedAction.selectors.map(({ name, numeric }) => {
-      const value = name === 'index' ? params.data[INDEX_FIELD_NAME] : params.data[name]
-      const castedValue = numeric && !isNaN(Number(value)) ? Number(value) : value
-      return isNumber(castedValue) ?
-          Ast.tryNumberToEnso(castedValue, ast.module)!
-        : Ast.TextLiteral.new(castedValue, ast.module)
-    })
-
-    const templatePattern = Pattern.parseExpression(parsedAction.pattern)
-    return templatePattern.instantiateCopied([ast, ...mappedExpressions])
-  })
+function linkPattern(row: Record<string, unknown>, template: string) {
+  const values = Object.fromEntries(
+    placeholderNames(template).map((name) => [
+      name,
+      (name === 'index' ? row[INDEX_FIELD_NAME] : row[name]) as string | number | null | undefined,
+    ]),
+  )
+  return actionPattern({ kind: 'chain', template }, values)
 }
 
 interface LinkFieldOptions {
@@ -343,7 +315,10 @@ function toLinkField(fieldName: string, options: LinkFieldOptions, ctx: TableVie
   return {
     headerName: headerName ? headerName : fieldName,
     field: fieldName,
-    onCellDoubleClicked: (params) => ctx.createNode(getAstPattern(params, getChildAction)),
+    onCellDoubleClicked: (params) => {
+      const pattern = linkPattern(params.data, getChildAction)
+      if (pattern) ctx.createNode(pattern)
+    },
     tooltipValueGetter: (params: ITooltipParams) =>
       params.node?.rowPinned === 'top' ?
         null
@@ -502,7 +477,7 @@ export function tableViewFlags(data: unknown): TableViewFlags {
     versionHash: message.version_hash ?? null,
     isSSRM: message.server === true,
     bottomStatusBarRequested: message.options?.status_bar === true,
-    createNodeEnabled: message.options?.create_node === true,
+    createNodeEnabled: TABLE_TOOLBAR_ACTIONS.some((id) => findAction(parseVizActions(data), id)),
     columnNames: message.columns.map((column) => column.name),
     columnTypes: new Map<string, string>(
       message.columns.flatMap((column) =>

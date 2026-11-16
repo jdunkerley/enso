@@ -54,6 +54,7 @@ import {
 } from './TableVisualization/tableView'
 
 import { formatText, isNumericType } from './TableVisualization/tableVizUtils'
+import { parseVizActions, plainActionToolbar } from './vizActions'
 
 export type { DataQualityMetricValue } from './TableVisualization/tableView'
 
@@ -171,7 +172,7 @@ const bottomStatusBar = computed(() =>
   ),
 )
 
-const isCreateNewNodeEnabled = computed(() => viewFlags.value.createNodeEnabled)
+const vizActions = computed(() => parseVizActions(props.data))
 
 const ssrmServer = computed(() => {
   return isSSRM.value && createServer()
@@ -592,19 +593,23 @@ onMounted(() => {
 // === Toolbar ===
 // ===============
 
+const tableToolbar = useTableVizToolbar({
+  textFormatterSelected,
+  filterModel,
+  sortModel,
+  tableFilteredOrSorted: isTableFilteredOrSorted,
+  actions: vizActions,
+  createNodes: config.createNodes,
+  getColumnValueToEnso,
+  hiddenColumns,
+  vizColumnOrder,
+  refreshGrid,
+})
 config.setToolbar(
-  useTableVizToolbar({
-    textFormatterSelected,
-    filterModel,
-    sortModel,
-    tableFilteredOrSorted: isTableFilteredOrSorted,
-    isCreateNewNodeEnabled,
-    createNodes: config.createNodes,
-    getColumnValueToEnso,
-    hiddenColumns,
-    vizColumnOrder,
-    refreshGrid,
-  }),
+  computed(() => [
+    ...tableToolbar.value,
+    ...plainActionToolbar(vizActions.value, config.createNodes),
+  ]),
 )
 </script>
 
