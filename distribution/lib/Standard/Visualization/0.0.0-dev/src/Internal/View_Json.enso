@@ -255,9 +255,8 @@ type Table_View
    - `version_hash`: the table's version, or `Nothing`.
    - `server`: whether the server sorts, filters and pages the rows.
    - `options`: the options that are on, among `"status_bar"` (the row counts
-     below the grid), `"create_node"` (the toolbar's create-node button) and
-     `"disable_sort_when_partial"` (no sorting or filtering when fewer rows are
-     sent than the value has).
+     below the grid) and `"disable_sort_when_partial"` (no sorting or filtering
+     when fewer rows are sent than the value has).
 grid_json (columns : Vector Text) (data : Vector Text | Nothing) (row_count : Integer | Nothing = Nothing) (index : View_Link | Nothing = Nothing) (version_hash : Text | Nothing = Nothing) (server : Boolean = False) (options : Vector Text = []) -> Text =
     count_part = if row_count.is_nothing then "" else ',"row_count":' + row_count.to_text
     index_part = if index.is_nothing then "" else ',"index":' + index.to_json_text

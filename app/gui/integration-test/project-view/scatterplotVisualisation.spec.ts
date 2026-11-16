@@ -34,7 +34,6 @@ const SCATTER_DATA = {
   ],
   axis: { x: { label: 'x' }, y: { label: 'y' } },
   is_multi_series: false,
-  get_row_method: 'get_row',
   x_value_type: 'Integer',
   error_message: null,
   actions: [TABLE_ROW_ACTION, BRUSH_ACTION],
@@ -44,7 +43,6 @@ const SCATTER_DATA = {
 const VECTOR_DATA = {
   ...SCATTER_DATA,
   axis: null,
-  get_row_method: 'at',
   actions: [
     {
       id: 'open_row',

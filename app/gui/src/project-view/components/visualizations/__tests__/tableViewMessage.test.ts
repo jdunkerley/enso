@@ -141,55 +141,14 @@ describe('The table view message', () => {
       data: [[1, 2, 3]],
       version_hash: 'v',
       options: { status_bar: true },
-      actions: [
-        { id: 'sort', label: 'Sort', icon: '', kind: 'chain', template: 'sort {{columns*}}' },
-      ],
     })
     expect(flags).toEqual({
       allRowCount: 3,
       versionHash: 'v',
       isSSRM: false,
       bottomStatusBarRequested: true,
-      createNodeEnabled: true,
       columnNames: ['x'],
       columnTypes: new Map([['x', 'Integer']]),
     })
-  })
-
-  const gridWith = (extra: Record<string, unknown>) => ({
-    kind: 'grid',
-    row_count: 1,
-    columns: [{ name: 'x' }],
-    data: [[1]],
-    ...extra,
-  })
-  const action = (id: string, template: string) => ({
-    id,
-    label: id,
-    icon: '',
-    kind: 'chain',
-    template,
-  })
-
-  test.each(['sort', 'filter', 'remove_columns', 'reorder_columns'])(
-    'creating nodes is enabled by the %s action',
-    (id) => {
-      const flags = tableViewFlags(gridWith({ actions: [action(id, `${id} {{columns*}}`)] }))
-      expect(flags.createNodeEnabled).toBe(true)
-    },
-  )
-
-  test('creating nodes is not enabled by the links alone, nor by the old option', () => {
-    expect(
-      tableViewFlags(
-        gridWith({
-          actions: [action('open_row', 'get_row {{#index}}')],
-          options: { create_node: true },
-        }),
-      ).createNodeEnabled,
-    ).toBe(false)
-    expect(tableViewFlags(gridWith({ options: { create_node: true } })).createNodeEnabled).toBe(
-      false,
-    )
   })
 })

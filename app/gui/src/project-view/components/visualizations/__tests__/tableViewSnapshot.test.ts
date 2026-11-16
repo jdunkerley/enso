@@ -112,7 +112,6 @@ function viewSnapshot(name: string) {
       versionHash: flags.versionHash,
       isSSRM: flags.isSSRM,
       bottomStatusBarRequested: flags.bottomStatusBarRequested,
-      createNodeEnabled: flags.createNodeEnabled,
       columnNames: flags.columnNames,
       columnTypes: flags.columnTypes,
     }),

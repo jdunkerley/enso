@@ -162,8 +162,8 @@ and `value` possibly `null`, `multi_filter`, `number_format`), column-major
 `data`, optional `row_count`, `index` (the row-number column's link),
 `version_hash`, `server` (`true` when the GUI pages rows from the engine; `data`
 is then `null` and rows come as row pages) and `options` (`status_bar`,
-`create_node`, `disable_sort_when_partial`). A link action is an explicit
-template: `{{#field}}` (a number when it reads as one), `{{@field}}` (as it is),
+`disable_sort_when_partial`). A link action is an explicit template:
+`{{#field}}` (a number when it reads as one), `{{@field}}` (as it is),
 `{{#index}}` (the row number). A cell is `null`, a boolean, a finite number,
 text, or an object starting with `_display_text_`; `{"_missing_":true}` is a
 cell its row lacks. A row page is `{"row_count","index","data"}`; distinct
