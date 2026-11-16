@@ -78,7 +78,8 @@ describe('GridPopupMenu', () => {
     ['without an interaction handler (table visualization)', false],
     ['with an interaction handler (table editor header)', true],
   ])('dismissal %s', (_name, withHandler) => {
-    async function mountPopup() {
+    /** `settled`: wait for the frame after which the popup treats a scroll as the user's. */
+    async function mountPopup({ settled = true } = {}) {
       ensureFloatingLayer()
       const onClose = vi.fn()
       const items: GridMenuItem[] = [{ type: 'item', name: 'Cut', action: vi.fn() }]
@@ -89,6 +90,7 @@ describe('GridPopupMenu', () => {
         global: withHandler ? { provide: { [HANDLER_KEY]: new InteractionHandler() } } : {},
       })
       await flushPromises()
+      if (settled) await new Promise((resolve) => requestAnimationFrame(resolve))
       return { wrapper, onClose }
     }
 
@@ -118,6 +120,22 @@ describe('GridPopupMenu', () => {
       const scroller = document.createElement('div')
       document.body.appendChild(scroller)
       // `scroll` does not bubble, so only a capturing listener sees it.
+      scroller.dispatchEvent(new Event('scroll'))
+      expect(onClose).toHaveBeenCalledTimes(1)
+      scroller.remove()
+      wrapper.unmount()
+    })
+
+    // A scroll event is delivered at the next frame, so the scroll that the right-click that opened
+    // the popup caused (the browser scrolls a focused element into view) arrives after the popup
+    // has mounted. It is not the user scrolling away from the popup (#814, found on Linux CI).
+    test('a scroll delivered before the first frame leaves the popup open', async () => {
+      const { wrapper, onClose } = await mountPopup({ settled: false })
+      const scroller = document.createElement('div')
+      document.body.appendChild(scroller)
+      scroller.dispatchEvent(new Event('scroll'))
+      expect(onClose).not.toHaveBeenCalled()
+      await new Promise((resolve) => requestAnimationFrame(resolve))
       scroller.dispatchEvent(new Event('scroll'))
       expect(onClose).toHaveBeenCalledTimes(1)
       scroller.remove()

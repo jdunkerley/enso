@@ -74,6 +74,23 @@ function activate(item: Extract<GridMenuItem, { type: 'item' }>) {
 // Escape is listened for in the capture phase too: the grid stops a prevented key event from
 // bubbling (`AgGridTableView`'s `stopIfPrevented`), and AG Grid prevents Escape on a focused cell,
 // so a bubbling listener on `window` never saw it (found by the Playwright spec for #814).
+//
+// A scroll event is delivered at the next frame, after the scroll itself. The right-click that
+// opened the popup may have scrolled something (the browser scrolls a focused element into view),
+// and that event arrives after the popup has mounted — a user does not scroll in that first frame,
+// so scrolls are only taken as the user's once it has passed. (A `requestAnimationFrame` callback
+// runs after the frame's scroll events.) Without this, such a menu was closed ~30 ms after it
+// opened, which failed the sorted-table Playwright spec on Linux CI.
+const settled = ref(false)
+let settleFrame: number | undefined
+onMounted(() => {
+  settleFrame = requestAnimationFrame(() => {
+    settled.value = true
+  })
+})
+onUnmounted(() => {
+  if (settleFrame != null) cancelAnimationFrame(settleFrame)
+})
 useEventListener(
   window,
   'keydown',
@@ -86,7 +103,7 @@ useEventListener(
   window,
   'scroll',
   (event: Event) => {
-    if (targetIsOutside(event, menu.value)) emit('close')
+    if (settled.value && targetIsOutside(event, menu.value)) emit('close')
   },
   { capture: true, passive: true },
 )
