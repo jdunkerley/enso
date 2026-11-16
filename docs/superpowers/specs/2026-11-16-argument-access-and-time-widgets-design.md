@@ -184,6 +184,26 @@ running IDE).
 Hidden (`private: true`): `to_js_object`, `to_display_text`, `pretty`,
 `default_widget`, `Time_Of_Day.from`.
 
+#### After
+
+Taken on: 2026-11-16, commit 1f0467354e, from the code (`Time_Of_Day.enso`, the
+regenerated API snapshot and the IDE's widget rules); the running IDE is checked
+in the PR's screenshots and the installer test. Only the rows that changed.
+
+| Function              | Argument                                        | Type (declared)            | Expected widget                         | Widget from the code                                | Result | Note                                                                  |
+| --------------------- | ----------------------------------------------- | -------------------------- | --------------------------------------- | --------------------------------------------------- | ------ | --------------------------------------------------------------------- |
+| new                   | hour · minute                                   | Integer                    | number, 0–23 / 0–59                     | number (`@hour`, `@minute` Numeric_Input)           | works  | The catalogue now sees `Integer`; returns `Time_Of_Day ! Time_Error`. |
+| new                   | second · millisecond · microsecond · nanosecond | Integer                    | number, shown when modified             | number (annotations)                                | works  | Typed `Integer`.                                                      |
+| parse                 | text · format                                   | Text · Date_Time_Formatter | text · format dropdown                  | text · `make_time_format_selector`                  | works  | Returns `Time_Of_Day ! Time_Error` instead of `Any`.                  |
+| nanosecond            | include_milliseconds                            | Boolean                    | checkbox                                | checkbox                                            | works  | The type moved onto the argument, so the catalogue sees `Boolean`.    |
+| start_of · end_of     | period                                          | Time_Period                | Time_Period dropdown, writing `..Hour`  | Time_Period dropdown (`make_time_period_selector`)  | works  | New `make_time_period_selector`; returns `Time_Of_Day`.               |
+| to_date_time          | date                                            | Date                       | date picker                             | date picker                                         | works  | Typed `Date`; returns `Date_Time`.                                    |
+| to_date_time          | zone                                            | Time_Zone                  | time zone dropdown                      | time zone dropdown (`@zone`)                        | works  | `@zone` added, as `Date.to_date_time`.                                |
+| + · -                 | amount                                          | Duration \| Time_Period    | Time_Period dropdown and `Duration.new` | Time_Period dropdown and `Duration.new` (`@amount`) | works  | `@amount` added; returns `Time_Of_Day ! Time_Error`.                  |
+| date_part · date_diff | period · end                                    | Time_Period · Time_Of_Day  | unchanged                               | unchanged                                           | works  | Returns now `Integer` (was `Any`).                                    |
+| date_add · format     | —                                               | —                          | unchanged                               | unchanged                                           | works  | Returns now `Time_Of_Day` and `Text`.                                 |
+| > · >= · < · <=       | that                                            | (untyped)                  | —                                       | text box                                            | n/a    | Still untyped (#797).                                                 |
+
 ### Date_Time — before
 
 (Filled in by part D's first task.)
