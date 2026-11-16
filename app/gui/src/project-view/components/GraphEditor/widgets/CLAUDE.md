@@ -100,6 +100,15 @@ is already on the row, drawn by `WidgetIcon` at the root.
   when the node is already selected (`.GraphNode.selected`) and no modifier is
   held; otherwise the click bubbles so the node selects (or, with Ctrl/Cmd,
   edits). `WidgetTimeOfDay` likewise takes `Time_Of_Day.now`/`new` whole nodes.
+- `WidgetBoolean.vue` — a Boolean: a checkbox that flips it, then its code (an
+  unset argument's default greyed), drawn after the argument name (priority
+  101). The ▾ is `WidgetSelection`'s: it lists `True` and `False`, with their
+  imports, for every Boolean argument (`WidgetBoolean/booleanValue.ts`'s
+  `isBooleanArgument`: `True`/`False` tag values, a `Boolean` type, or a literal
+  value) that has no `@` dropdown of its own. A value that is not a literal is
+  left to the other widgets, so it has no checkbox; a literal that is not an
+  argument (a whole node, an operand) has the checkbox and no ▾. It replaced
+  `WidgetCheckbox`.
 - `WidgetFileBrowser.vue` — a file, folder or `Enso_Secret` argument's dropdown:
   `WidgetFileBrowser/localBrowser.ts` (the native file dialog),
   `localSecrets.ts` (the local secrets and **New secret…**, which set
