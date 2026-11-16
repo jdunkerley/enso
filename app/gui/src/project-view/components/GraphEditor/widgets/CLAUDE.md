@@ -84,7 +84,11 @@ is already on the row, drawn by `WidgetIcon` at the root.
   `Time_Of_Day.now`, or `Time_Of_Day.new` with `hour`, `minute` and `second`
   ports). Its menu (`WidgetTimeOfDay/TimeOfDayMenu.vue`) is `Time_Of_Day.now`
   and a Reka `TimeField` (hours and minutes, seconds on request, written only
-  when not zero): Enter in the field, leaving it or a click outside the menu
+  when not zero). It reads a second written by name (`second=15`, as the `…`
+  menu and `pretty` write it) and the millisecond, microsecond and nanosecond
+  arguments, positional or named; an edit writes hour, minute and second
+  positionally and keeps the finer arguments as they were written
+  (`withKeptParts`). Enter in the field, leaving it or a click outside the menu
   writes it (the shell calls the handler the menu registers with `setAccept`
   before it ends the interaction), Escape and the arrow's toggle do not. A
   cleared segment blocks the write until it is filled in. `timeExpression.ts` is

@@ -15,10 +15,30 @@ export interface HourMinuteSecond {
 }
 
 /** What the value stands for: the current time, or a specific one. */
-export type TimeChoice = { readonly kind: 'now' } | ({ readonly kind: 'time' } & HourMinuteSecond)
+export type TimeChoice =
+  | { readonly kind: 'now' }
+  | ({ readonly kind: 'time' } & HourMinuteSecond & {
+        /**
+         * The millisecond, microsecond and nanosecond arguments as they were written (`500`,
+         * `millisecond=500`), kept by an edit. Absent when there are none.
+         */
+        readonly finer?: readonly string[]
+      })
 
-/** `Time_Of_Day.new` and two or three integer literals: hour, minute, second. */
-const TIME_NEW = /^Time_Of_Day\.new((?:\s+\d+){2,3})$/
+/** `Time_Of_Day.new`, hour and minute as integer literals, then the rest of the arguments. */
+const TIME_NEW = /^Time_Of_Day\.new\s+(\d+)\s+(\d+)((?:\s+\S+)*)$/
+const INTEGER = /^\d+$/
+const NAMED = /^(second|millisecond|microsecond|nanosecond)=(\d+)$/
+/** The arguments after the minute, in `Time_Of_Day.new`'s order. */
+const AFTER_MINUTE = ['second', 'millisecond', 'microsecond', 'nanosecond'] as const
+type AfterMinute = (typeof AFTER_MINUTE)[number]
+/** Each part's largest value, as `Time_Of_Day.new` documents them. */
+const MAX: Readonly<Record<AfterMinute, number>> = {
+  second: 59,
+  millisecond: 999,
+  microsecond: 999_999,
+  nanosecond: 999_999_999,
+}
 
 function isValidTime({ hour, minute, second }: HourMinuteSecond): boolean {
   return (
@@ -34,9 +54,10 @@ function isValidTime({ hour, minute, second }: HourMinuteSecond): boolean {
 
 /**
  * The choice that the code stands for, or `undefined` when the code is not one of the shapes:
- * `Time_Of_Day.now` and `Time_Of_Day.new` with two or three integer literals (hour, minute,
- * second; the ones left out are zero). Anything else (a variable, a computed argument, a named
- * argument such as `hour=14`, an hour of 24) is not ours.
+ * `Time_Of_Day.now`, and `Time_Of_Day.new` with an hour and a minute as integer literals followed
+ * by a second and the finer parts, positional or named, as integer literals. Anything else (a
+ * variable, a computed argument, a named hour or minute, an argument given twice, a positional
+ * argument after a named one, an hour of 24) is not ours.
  */
 export function parseTimeExpression(code: string | undefined): TimeChoice | undefined {
   const text = code?.trim()
@@ -44,17 +65,58 @@ export function parseTimeExpression(code: string | undefined): TimeChoice | unde
   if (text === 'Time_Of_Day.now') return { kind: 'now' }
   const match = TIME_NEW.exec(text)
   if (match == null) return undefined
-  const numbers = (match[1] ?? '').split(/\s+/).filter(Boolean).map(Number)
-  const [hour = 0, minute = 0, second = 0] = numbers
-  const time = { hour, minute, second }
-  return isValidTime(time) ? { kind: 'time', ...time } : undefined
+  const values: Partial<Record<AfterMinute, number>> = {}
+  const finer: string[] = []
+  let named = false
+  let next = 0
+  for (const arg of (match[3] ?? '').split(/\s+/).filter(Boolean)) {
+    let name: AfterMinute
+    let value: number
+    if (INTEGER.test(arg)) {
+      const positional = AFTER_MINUTE[next++]
+      if (named || positional == null) return undefined
+      name = positional
+      value = Number(arg)
+    } else {
+      const byName = NAMED.exec(arg)
+      if (byName == null) return undefined
+      named = true
+      name = byName[1] as AfterMinute
+      value = Number(byName[2])
+    }
+    if (name in values || value > MAX[name]) return undefined
+    values[name] = value
+    if (name !== 'second') finer.push(arg)
+  }
+  const time = {
+    hour: Number(match[1]),
+    minute: Number(match[2]),
+    second: values.second ?? 0,
+  }
+  if (!isValidTime(time)) return undefined
+  return finer.length > 0 ? { kind: 'time', ...time, finer } : { kind: 'time', ...time }
 }
 
-/** The code that a choice writes: seconds only when they are not zero. */
+/**
+ * The code that a choice writes: the second when it is not zero or a finer part follows it
+ * positionally (which needs it), then the finer parts as they were written.
+ */
 export function timeExpressionCode(choice: TimeChoice): string {
   if (choice.kind === 'now') return 'Time_Of_Day.now'
   const { hour, minute, second } = choice
-  return `Time_Of_Day.new ${hour} ${minute}${second !== 0 ? ` ${second}` : ''}`
+  const finer = choice.finer ?? []
+  const withSecond = second !== 0 || finer.some((arg) => INTEGER.test(arg))
+  return [
+    `Time_Of_Day.new ${hour} ${minute}`,
+    ...(withSecond ? [String(second)] : []),
+    ...finer,
+  ].join(' ')
+}
+
+/** `picked`, with the finer parts of `current` when both are specific times: an edit keeps them. */
+export function withKeptParts(picked: TimeChoice, current: TimeChoice | undefined): TimeChoice {
+  if (picked.kind !== 'time' || current?.kind !== 'time' || current.finer == null) return picked
+  return { ...picked, finer: current.finer }
 }
 
 /** The local time of `now`, with seconds. */
