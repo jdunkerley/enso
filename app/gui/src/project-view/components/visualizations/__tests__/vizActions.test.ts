@@ -1,7 +1,9 @@
 /** @file Tests for the node action builder. */
+import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import { Ast } from '@/util/ast'
 import type { Pattern } from '@/util/ast/match'
 import { describe, expect, test } from 'vitest'
+import { isActionButton } from '../toolbar'
 import {
   actionPattern,
   chainPattern,
@@ -9,6 +11,7 @@ import {
   isPlainAction,
   parseVizActions,
   placeholderNames,
+  plainActionToolbar,
   type VizAction,
 } from '../vizActions'
 
@@ -324,5 +327,59 @@ describe('more plain actions, chains and parsing', () => {
     const good = { id: 'a', label: 'A', icon: '', kind: 'chain', template: 't' }
     const data = { actions: [{ ...good, kind: 'other' }, { ...good, extra: 1 }, 7] }
     expect(parseVizActions(data)).toEqual([good])
+  })
+})
+
+describe('plainActionToolbar', () => {
+  test('a button per plain action, creating its node', () => {
+    const actions: VizAction[] = [
+      {
+        id: 'remove_warnings',
+        label: 'Remove Warnings',
+        icon: 'not_exclamation',
+        kind: 'chain',
+        template: 'remove_warnings',
+      },
+      {
+        id: 'open_row',
+        label: 'Get Row',
+        icon: 'select_row',
+        kind: 'chain',
+        template: 'get_row {{#index}}',
+      },
+    ]
+    const created: string[] = []
+    const items = plainActionToolbar(actions, (...options: NodeCreationOptions[]) =>
+      options.forEach((option) => created.push(text(option.content)!)),
+    )
+    expect(items).toHaveLength(1)
+    const [button] = items
+    if (button == null || !isActionButton(button)) throw new Error('not a button')
+    expect(button.title).toBe('Remove Warnings')
+    expect(button.dataTestid).toBe('remove-warnings-button')
+    button.onClick()
+    expect(created).toEqual(['operator1.remove_warnings'])
+  })
+
+  test('an icon the IDE does not know is left out, and a disabled rule is passed on', () => {
+    const action = (icon: string): VizAction => ({
+      id: 'a_b',
+      label: 'A',
+      icon,
+      kind: 'chain',
+      template: 'a_b',
+    })
+    const [known, unknown] = plainActionToolbar(
+      [action('not_exclamation'), action('no such icon')],
+      () => {},
+      (a) => a.icon === 'no such icon',
+    )
+    if (known == null || unknown == null || !isActionButton(known) || !isActionButton(unknown))
+      throw new Error('not buttons')
+    expect(known.icon).toBe('not_exclamation')
+    expect(unknown.icon).toBeUndefined()
+    expect(known.disabled).toBe(false)
+    expect(unknown.disabled).toBe(true)
+    expect(known.dataTestid).toBe('a-b-button')
   })
 })

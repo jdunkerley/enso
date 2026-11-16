@@ -2,8 +2,14 @@
  * @file The node actions Enso describes for a visualised value, and the builder that turns an
  * action's template and a gesture's values into a node pattern.
  */
+import type { ToValue } from '$/utils/reactivity'
+import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
+import type { ActionButton, ToolbarItem } from '@/components/visualizations/toolbar'
 import { Ast } from '@/util/ast'
 import { Pattern } from '@/util/ast/match'
+import { isUrlString } from '@/util/data/urlString'
+import { isIconName } from '@/util/iconMetadata/iconName'
+import type { AnyIcon } from '@/util/icons'
 import { assertDefined } from 'ydoc-shared/util/assert'
 import { z } from 'zod'
 
@@ -228,4 +234,28 @@ export function actionPattern(
 export function isPlainAction(action: VizAction): boolean {
   const { slots } = parseTemplate(action.template)
   return action.kind === 'chain' ? slots.length === 0 : slots.length > 0 && slots.every(isNodeSlot)
+}
+
+function iconOf(action: VizAction): AnyIcon | undefined {
+  return isIconName(action.icon) || isUrlString(action.icon) ? action.icon : undefined
+}
+
+/** A toolbar button for each plain action the value offers; the icon is left out when unknown. */
+export function plainActionToolbar(
+  actions: readonly VizAction[],
+  createNodes: (...options: NodeCreationOptions[]) => void,
+  disabled: (action: VizAction) => ToValue<boolean> = () => false,
+): ToolbarItem[] {
+  return actions.filter(isPlainAction).flatMap((action) => {
+    const content = actionPattern(action)
+    if (content == null) return []
+    const button: ActionButton = {
+      icon: iconOf(action),
+      title: action.label,
+      disabled: disabled(action),
+      onClick: () => createNodes({ content, commit: true }),
+      dataTestid: `${action.id.replaceAll('_', '-')}-button`,
+    }
+    return [button]
+  })
 }

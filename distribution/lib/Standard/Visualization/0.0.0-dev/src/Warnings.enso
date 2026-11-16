@@ -1,6 +1,7 @@
 from Standard.Base import all
 
 from project.Helpers import time_visualization, short_display
+from project.Viz_Actions import remove_warnings_action
 
 ## ---
    private: true
@@ -17,4 +18,4 @@ process_to_json_text value = time_visualization Warnings ("process_to_json_text:
     vec = case Warning.limit_reached value of
         True -> texts + ["Warnings limit reached."]
         False -> texts
-    vec.to_json
+    '{"warnings":' + vec.to_json + ',"actions":[' + remove_warnings_action.to_json_text + ']}'

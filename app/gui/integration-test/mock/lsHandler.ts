@@ -270,10 +270,18 @@ const mockVizPreprocessors: Record<string, Uint8Array | ((params: string[]) => U
         Array.from({ length: 10 }, (_, i) => Array.from({ length: 5 }, (_, j) => `${i},${j}`)),
       ),
     ),
-    'Standard.Visualization.Warnings.process_to_json_text': encodeJSON([
-      'warning 1',
-      "warning 2!!&<>;'\x22",
-    ]),
+    'Standard.Visualization.Warnings.process_to_json_text': encodeJSON({
+      warnings: ['warning 1', "warning 2!!&<>;'\x22"],
+      actions: [
+        {
+          id: 'remove_warnings',
+          label: 'Remove Warnings',
+          icon: 'not_exclamation',
+          kind: 'chain',
+          template: 'remove_warnings',
+        },
+      ],
+    }),
     'Standard.Visualization.Widgets.get_widget_json': (params) =>
       mockWidgetConfiguration(params[0]),
 
