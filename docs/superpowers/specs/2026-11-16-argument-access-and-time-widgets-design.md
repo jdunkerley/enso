@@ -19,15 +19,15 @@ and a Boolean widget that shows `True`/`False` instead of a bare checkbox.
 
 ## Parts and order
 
-Four PRs, in this order. B and C do not depend on A except for the Pop out
-entry in their menus, which each adds once A is in.
+Four PRs, in this order. Pop out is a drag on any argument, so the pickers need
+nothing from A; B and C can be built alongside it.
 
 | Part | What                                          | Depends on      |
 | ---- | --------------------------------------------- | --------------- |
 | A    | The `…` parameter menu and Pop out to node    | —               |
-| B    | Boolean: checkbox + code + ▾                  | A (Pop out)     |
-| C    | Time_Of_Day: function pass and picker fixes   | A (Pop out)     |
-| D    | Date_Time: new picker and function pass       | A, C (time field) |
+| B    | Boolean: checkbox + code + ▾                  | —               |
+| C    | Time_Of_Day: function pass and picker fixes   | —               |
+| D    | Date_Time: new picker and function pass       | A (…), C (time field) |
 
 ## A. Reaching parameters and popping out values (every node)
 
@@ -45,19 +45,22 @@ entry in their menus, which each adds once A is in.
   shown, with its widget (number, dropdown, picker) and its port.
 - Picking an argument whose default is not a literal writes the default's code
   as the catalogue gives it (`zone=Time_Zone.system`).
-- The menu's last entry is **⤴ Pop out to node** (below) for the argument the
-  `…` follows, when that argument has a value and no ▾ menu of its own.
 - Nothing changes about today's behaviour: focusing the node for editing
   (`tree.showDetails`) still shows every argument. The `…` is shown only when
   at least one parameter is hidden.
 
 ### Pop out to node
 
-- **Where:** every argument that has a value (an `ArgumentAst`, not a
-  placeholder, and not already a plain reference to another node) offers it:
-  as the last entry of its ▾ menu (WidgetSelection and the pickers), or in the
-  `…` menu when it has none. Dragging the value off the node does the same,
-  with the new node placed where it is dropped.
+- **How:** drag an argument off the node and drop it on the graph; the new node
+  is placed where it is dropped. There is no menu entry (owner's decision): the
+  drag is the one way to pop out.
+- **Which arguments:** every argument that has a value (an `ArgumentAst`, not a
+  placeholder, and not already a plain reference to another node). Dropping
+  back on the node, or pressing Escape during the drag, cancels it.
+- **Dragging an argument does nothing else.** If a drag that starts on an
+  argument does anything today (such as starting an edge from its port), that
+  behaviour is replaced by Pop out; the plan checks what the drag does now
+  first. Dragging an edge's end is not dragging an argument and is unchanged.
 - **What it writes,** as one undoable edit:
   1. A new node `<name> = <expression>` placed above the target node
      (`nodeCreation`'s placement), where `<name>` is a fresh identifier derived
@@ -68,14 +71,11 @@ entry in their menus, which each adds once A is in.
   auto-scoped constructor in the expression is rewritten to its qualified form
   (`Date_Period.Month`), anywhere in the expression, using the expected types
   the call tree already holds for nested arguments. If a constructor's type
-  cannot be determined, the Pop out entry is disabled with a tooltip saying why
-  rather than producing broken code.
+  cannot be determined, the drop does nothing and a toast says why, rather than
+  producing broken code.
 - **Imports:** any type or module the new node's expression names that the
   module does not yet import is added (`requiredImportsByProjectPath`, as the
   pickers do).
-- **The drag:** dragging from an argument today may already start an edge from
-  its port. The plan checks this first; if so, Pop out starts only from a drag
-  on the value's text (not the port), and the edge drag is unchanged.
 - Not in scope: the reverse (inlining a node back into an argument).
 
 ## B. Boolean
@@ -83,8 +83,7 @@ entry in their menus, which each adds once A is in.
 - A `Boolean`-typed argument (what `isHandledByCheckboxWidget` matches today)
   shows `[☑] True ▾`: a checkbox, then the value as code, then the ▾ arrow
   under it, like any dropdown argument.
-- Clicking the checkbox flips the value (as now). ▾ opens `True`, `False`, and
-  Pop out.
+- Clicking the checkbox flips the value (as now). ▾ opens `True` and `False`.
 - An unset argument shows its default greyed, as other placeholders do;
   clicking either control writes the value.
 - A connected argument shows the edge as today; the checkbox is hidden while
@@ -111,7 +110,6 @@ entry in their menus, which each adds once A is in.
 - The ▾ menu stays: `Time_Of_Day.now`, then the time field.
 - The time field shows and keeps seconds when the value has them (today it
   edits hours and minutes only, so seconds are lost on edit).
-- Pop out is the menu's last entry.
 
 ## D. Date_Time
 
@@ -121,7 +119,7 @@ entry in their menus, which each adds once A is in.
   for a `Date_Time`-typed argument or item, or a whole node that is
   `Date_Time.now` or `Date_Time.new …`; Mismatch under another dropdown.
 - The ▾ menu: `Date_Time.now`, the calendar (DateMenu's), the time field
-  (TimeOfDayMenu's), then Pop out.
+  (TimeOfDayMenu's).
 - Picking a day or a time writes
   `Date_Time.new <year> <month> <day> <hour> <minute>`, keeping year … minute
   as ports.
@@ -148,7 +146,7 @@ entry in their menus, which each adds once A is in.
   imports), the Boolean widget's edits, the time field's seconds, and the
   Date_Time picker's edits (zone and seconds kept).
 - Playwright for each part's main flow on a real graph: add a hidden parameter
-  through `…`; pop out a `Date.new` from `end` and check the edge and code; flip
+  through `…`; drag a `Date.new` out of `end` and check the edge and code; flip
   a Boolean both ways; pick a Date_Time day and time.
 - Stdlib tests for each signature change; the API snapshots regenerated.
 - An installer for the owner's hand test before each part merges (features
