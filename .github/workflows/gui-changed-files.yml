@@ -45,6 +45,7 @@ jobs:
         with:
           files: |
             test/Visualization_Tests/data/pinned/tree_*.json
+            distribution/lib/Standard/*/0.0.0-dev/visualizations/**
             app/**
             docs-site/**
             lib/rust/**
@@ -74,9 +75,13 @@ jobs:
       # and minus `docs-site/`: the user documentation site is checked by the GUI checks' typecheck,
       # lint and unit tests (the root `ci:*` scripts run every workspace package's), but it is not
       # part of the IDE, so a change to it alone does not package the IDE. Keep the two lists in sync.
-      # The one exception is `test/Visualization_Tests/data/pinned/tree_*.json`, which only the first
-      # list has: the GUI's `treeWire.test.ts` reads those Enso goldens to pin the lazy tree's wire format,
-      # so a change to them must run the GUI checks, but they are test data the IDE package never contains.
+      # The exceptions are `test/Visualization_Tests/data/pinned/tree_*.json` and
+      # `distribution/lib/Standard/*/0.0.0-dev/visualizations/**`, which only the first list has: the
+      # GUI's `treeWire.test.ts` reads those Enso goldens to pin the lazy tree's wire format, and its
+      # `shippedVisualizations.test.ts` compiles and mounts the visualizations the standard libraries
+      # ship (Image.vue), so a change to either must run the GUI checks. The IDE package needs neither
+      # list for them: the goldens are test data it never contains, and the shipped visualizations are
+      # packaged by the engine gate, which owns everything under `distribution/`.
       - name: Get changed files, excluding GUI tests
         id: gui-changed-files-excluding-tests
         uses: step-security/changed-files@v45

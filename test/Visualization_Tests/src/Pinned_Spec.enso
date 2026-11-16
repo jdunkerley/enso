@@ -195,6 +195,7 @@ add_specs suite_builder =
         scatter "vector" [3, 1, 2]
         scatter "vector_bounds" [3, 1, 2, 5] [0, 2, 0, 10]
         scatter "range" (2.up_to 5)
+        scatter "row" data.row
 
     suite_builder.group "Pinned geo map JSON" group_builder->
         geo name ~value =

@@ -13,7 +13,9 @@
  *
  * # Typical Request Lifetime
  * See the "Protocol" section below for details on specific messages.
- * - A `CompileRequest` is sent with id `1` and path `/Viz.vue`.
+ * Paths are root addresses (`enso-root:<rootId>/visualizations/Viz.vue`, see `rootAddress.ts`), for
+ * a file in the project or in a library; an import stays in the root of the file that makes it.
+ * - A `CompileRequest` is sent with id `1` and path `enso-root:<rootId>/visualizations/Viz.vue`.
  * - (begin `importVue`) The Worker `fetch`es the path.
  * - The CSS styles are compiled using `vue/compiler-sfc`, then sent as `AddStyleNotification`s.
  * - The Vue script is compiled using `vue/compiler-sfc` into TypeScript.
@@ -23,18 +25,17 @@
  *   - (`importVue`) Vue imports are recursively compiled as described in this process.
  *   - (`importTS`) TypeScript imports are recursively compiled as described in this process,
  *     excluding the style and script compilation steps.
- * - (end `importVue`) An `AddUrlNotification` with path `/Viz.vue` is sent to the main
+ * - (end `importVue`) An `AddUrlNotification` with that same path is sent to the main
  *   thread.
- * - A `CompilationResultResponse` with id `1` and path `/Viz.vue` is sent to the main thread.
+ * - A `CompilationResultResponse` with id `1` and that path is sent to the main thread.
  */
 
+import { compileSfc, compileTs } from '@/stores/visualization/compileSfc'
+import { resolveRelativeImport } from '@/stores/visualization/rootAddress'
 import { assertNever } from '@/util/assert'
 import { parse as babelParse } from '@babel/parser'
-import hash from 'hash-sum'
 import * as map from 'lib0/map'
 import MagicString from 'magic-string'
-import { transform } from 'sucrase'
-import { compileScript, compileStyle, parse } from 'vue/compiler-sfc'
 
 // ========================================
 // === Requests (Main Thread to Worker) ===
@@ -44,8 +45,9 @@ import { compileScript, compileStyle, parse } from 'vue/compiler-sfc'
  * A request to compile a visualization module. The Worker MUST reply with a
  * {@link CompilationResultResponse} when compilation is done, or a {@link CompilationErrorResponse}
  * when compilation fails. The `id` is an arbitrary number that uniquely identifies the request.
- * The `path` is either an absolute URL (`http://doma.in/path/to/TheScript.vue`), or a root-relative
- * URL (`/visualizations/TheScript.vue`). Relative URLs (`./TheScript.vue`) are NOT valid.
+ * The `path` is either an absolute URL (`http://doma.in/path/to/TheScript.vue`), or a root address
+ * (`enso-root:<rootId>/visualizations/TheScript.vue`). Relative URLs (`./TheScript.vue`) are NOT
+ * valid.
  *
  * Note that compiling files other than Vue files (TypeScript, SVG etc.) is currently NOT
  * supported.
@@ -356,10 +358,7 @@ async function importTS(path: string) {
   const scriptTs = decoder.decode((await tryFetch(path)).contents)
   let text: string | undefined
   try {
-    text = transform(scriptTs, {
-      disableESTransforms: true,
-      transforms: ['typescript'],
-    }).code
+    text = compileTs(scriptTs)
   } catch (error) {
     compileError(path, toError(error))
   }
@@ -372,30 +371,15 @@ async function importVue(path: string) {
   const dir = path.replace(/[^/\\]+$/, '')
   const raw = decoder.decode((await tryFetch(path)).contents)
   const filename = path.match(/[^/\\]+$/)![0]!
-  const parsed = parse(raw, { filename })
-  const id = hash(raw)
-  for (const style of parsed.descriptor.styles) {
-    addStyle(
-      path,
-      compileStyle({ filename, source: style.content, id, scoped: style.scoped ?? false }).code,
-    )
-  }
-  let text: string | undefined
+  let compiled: ReturnType<typeof compileSfc> | undefined
   try {
-    const scriptTs = compileScript(parsed.descriptor, {
-      id,
-      inlineTemplate: true,
-      sourceMap: false,
-    }).content
-    text = transform(scriptTs, {
-      disableESTransforms: true,
-      transforms: ['typescript'],
-    }).code
+    compiled = compileSfc(raw, filename)
   } catch (error) {
     compileError(path, toError(error))
   }
-  if (text != null) {
-    addImport(path, await rewriteImports(text, dir, id))
+  if (compiled != null) {
+    for (const style of compiled.styles) addStyle(path, style)
+    addImport(path, await rewriteImports(compiled.code, dir, compiled.id))
   }
 }
 
@@ -409,12 +393,7 @@ async function rewriteImports(code: string, dir: string, id: string | undefined)
         const isBuiltin = builtinModules.has(path)
         const isRelative = /^[./]/.test(path)
         if (isRelative) {
-          const url = new URL(dir + path, location.href)
-          if (!/^(?:data|https?|ftps?|wss?):$/.test(url.protocol)) {
-            path = url.protocol + new URL('http://example.com/' + url.pathname).pathname.slice(1)
-          } else {
-            path = url.href
-          }
+          path = resolveRelativeImport(dir, path, location.href)
         }
         const extension = isRelative ? extractExtension(path).toLowerCase() : ''
         if (

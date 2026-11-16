@@ -16,11 +16,21 @@ type Id
     ## ---
        private: true
        ---
+       A visualization shipped by a library in its `visualizations/` folder.
+       `library` is the library's qualified name (`Standard.Image`); `name` is
+       the visualization's `name` export.
+    Library library name
+
+    ## ---
+       private: true
+       ---
        Serializes this ID to a JSON format understandable by the graphical
-       interface. `library` is always `null`: only builtin visualisations exist.
+       interface: `library` is `null` for a builtin, else `{"name": library}`.
     to_js_object : JS_Object
-    to_js_object self =
-        JS_Object.from_pairs [["library", Nothing], ["name", self.name]]
+    to_js_object self = case self of
+        Id.Builtin name -> JS_Object.from_pairs [["library", Nothing], ["name", name]]
+        Id.Library library name ->
+            JS_Object.from_pairs [["library", JS_Object.from_pairs [["name", library]]], ["name", name]]
 
     ## ---
        private: true
@@ -56,13 +66,6 @@ type Id
        An identifier for the builtin Geo Map visualization
     geo_map : Id
     geo_map = Id.Builtin "Geo Map"
-
-    ## ---
-       private: true
-       ---
-       An identifier for the builtin Image visualization
-    image : Id
-    image = Id.Builtin "Image"
 
 ## ---
    private: true

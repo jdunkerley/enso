@@ -16,6 +16,7 @@
 - Standard.Base.Data.Vector.Vector.from that:Standard.Table.Row.Row -> Standard.Base.Data.Vector.Vector
 - Standard.Base.Data.Ordering.Comparable.from that:Standard.Table.Row.Row -> Standard.Base.Data.Ordering.Comparable
 - Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Table.Viz_Table
+- Standard.Visualization.Viz_Actions.Viz_Actions.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Actions.Viz_Actions
 - Standard.Visualization.Viz_Cell.Viz_Cell.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Cell.Viz_Cell
 - Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Json.Viz_Json
 - Standard.Visualization.Viz_Tree.Viz_Tree.from that:Standard.Table.Row.Row -> Standard.Visualization.Viz_Tree.Viz_Tree
