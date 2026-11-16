@@ -11,7 +11,9 @@
 # `ide-packaging.yml`), falling back to that run's Linux distribution artifact while no develop run
 # has the small one, and re-uploads them into this run, so `docs-site-build.yml` downloads only from
 # its own run and the engine workflows' permissions stay as they are. A pull request that changes
-# both kinds of file runs both; this one is a few minutes and harmless.
+# both kinds of file runs both; this one is a few minutes and harmless: develop's catalogues lack the
+# pull request's doc comments, so it reports their style violations without failing
+# (`--no-style-gate`), and the engine checks apply the gate.
 #
 # These pull requests do not run the GUI checks (`gui-changed-files.yml` leaves `docs-site/**` out of
 # the gate that starts them), so the build also typechecks, lints and unit-tests the site

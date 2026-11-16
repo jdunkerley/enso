@@ -30,6 +30,9 @@ const SITE_DIR = fileURLToPath(new URL('../..', import.meta.url))
 
 const { values } = parseArgs({
   args: process.argv.slice(2).filter((arg) => arg !== '--'),
+  // `--no-style-gate`: report violations without failing, for catalogues that are not this
+  // checkout's (`docs-site.yml` builds with develop's).
+  allowNegative: true,
   options: {
     lib: { type: 'string', multiple: true },
     fixtures: { type: 'boolean' },
