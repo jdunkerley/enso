@@ -117,6 +117,15 @@ export function getLocalSecrets(): LocalSecrets {
 }
 
 /**
+ * The keychain entries under service `Enso`, shared by the secrets key and the MCP token. See
+ * {@link getSecretsKeySource} for why it is a plain `new Entry` and why the module loads late.
+ */
+export const keyringEntries = lazyKeyringEntries(async () => {
+  const { Entry } = await import('@napi-rs/keyring')
+  return (account) => new Entry('Enso', account, { linux: { store: 'secret-service' } })
+})
+
+/**
  * The master key: `ENSO_SECRETS_KEY`, or the keychain item service `Enso`, account `secrets-key`.
  *
  * Use the plain `new Entry(service, account)`, never `Entry.withTarget`: in `@napi-rs/keyring` 2.1.2
@@ -131,10 +140,7 @@ export function getLocalSecrets(): LocalSecrets {
 export function getSecretsKeySource(): SecretsKeySource {
   secretsKeySource ??= new SecretsKeySource({
     env: process.env,
-    entry: lazyKeyringEntries(async () => {
-      const { Entry } = await import('@napi-rs/keyring')
-      return (account) => new Entry('Enso', account, { linux: { store: 'secret-service' } })
-    }),
+    entry: keyringEntries,
     fileKeyId: () => getLocalSecrets().fileKeyId(),
     fileHasSecrets: async () => (await getLocalSecrets().list()).length > 0,
   })

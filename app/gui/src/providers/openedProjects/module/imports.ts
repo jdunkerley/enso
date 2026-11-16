@@ -168,7 +168,7 @@ export function printRequiredImport(i: RequiredImport): string {
  *  The location chosen will be before the first non-import line, and after all preexisting imports.
  *  If there are any blank lines in that range, it will be before them.
  */
-function newImportsLocation(scope: Ast.BodyBlock): number {
+export function newImportsLocation(scope: Ast.BodyBlock): number {
   let lastImport
   const lines = scope.lines
   for (let i = 0; i < lines.length; i++) {

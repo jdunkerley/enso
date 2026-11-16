@@ -185,6 +185,24 @@ opens WebSockets only to the ydoc server (Node, hosted by the IDE;
 of Enso source on the client side uses the Rust parser compiled to WASM
 (`rust-ffi` package → `ydoc-shared/src/ast/`).
 
+## MCP tools (external agent apps)
+
+Electron main runs an MCP server that external agent apps (Claude Code, Codex,
+GitHub Copilot) connect to (`app/electron-client/src/mcp/CLAUDE.md`). Main holds
+each tool's definition; the window runs the tools. `src/mcp/toolDispatcher.ts`,
+started by `App.vue`, receives the calls main forwards over `window.api.mcp`,
+runs the handler registered for the tool and replies; with no handler it answers
+`NO_PROJECT_ERROR`. The project tools (read, edit, navigate) are in
+`project-view/mcp/` (see its `CLAUDE.md`, which has the edit session's rules),
+registered by `GraphEditor.vue` while a project is on screen. The app tools
+(`get_app_state`, `list_projects`, `list_files`, `create_project`,
+`open_project`, `close_project`) are in `src/mcp/` (see its `CLAUDE.md`: every
+path must be in the Drive), registered once by `AppContainer.vue`. A new tool
+needs both halves. The Settings → AI tab turns the server on
+(`dashboard/layouts/Settings/CLAUDE.md`, "AI"). None of this is the in-app AI
+mode (`ComponentBrowser/aiToolHandler.ts`), which talks to the separate agent
+under `app/electron-client/src/ai/`.
+
 ## Dashboard ↔ backend
 
 The Dashboard talks to the local Project Manager shim, the only backend. The

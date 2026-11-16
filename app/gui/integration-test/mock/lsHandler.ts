@@ -527,6 +527,61 @@ function mockWidgetConfiguration(method: string | undefined) {
   return mockWidgetConfigurations.get(method) ?? null
 }
 
+/** The execution contexts created on the open pages, each with the channel that notifies it. */
+const executionContexts = new Map<
+  ContextId,
+  (message: { method: string; params: object }) => void
+>()
+
+/**
+ * Sends `executionComplete` for every execution context, as the engine does when an execution
+ * ends. The mock never executes on its own after an edit: a spec that waits for an execution calls
+ * this.
+ */
+export function mockExecutionComplete() {
+  for (const [contextId, sendMessage] of executionContexts) {
+    try {
+      sendMessage({ method: 'executionContext/executionComplete', params: { contextId } })
+    } catch {
+      executionContexts.delete(contextId)
+    }
+  }
+}
+
+/**
+ * Sends two `expressionUpdates` batches to every execution context, as the engine does when it
+ * computes the expressions again: `Pending` for each, then a computed value (no type). The mock
+ * never evaluates by itself: a spec that waits for an edit's results calls this. (An edit to a node
+ * that existed before it settles only on a `Pending` after the edit followed by a value.)
+ */
+export function mockExpressionValues(expressionIds: readonly string[]) {
+  const updatesOf = (type: 'Pending' | 'Value') =>
+    expressionIds.map((expressionId) => ({
+      expressionId,
+      type: [],
+      profilingInfo: [],
+      fromCache: false,
+      payload: { type },
+    }))
+  for (const [contextId, sendMessage] of executionContexts) {
+    try {
+      for (const updates of [updatesOf('Pending'), updatesOf('Value')]) {
+        sendMessage({
+          method: 'executionContext/expressionUpdates',
+          params: { contextId, updates },
+        })
+      }
+    } catch {
+      executionContexts.delete(contextId)
+    }
+  }
+}
+
+/** Forgets the execution contexts of an earlier test's page. */
+export function clearMockExecutionContexts() {
+  executionContexts.clear()
+}
+
 export const mockLSHandler = async (
   method: string,
   params: object,
@@ -542,6 +597,7 @@ export const mockLSHandler = async (
       const data_ = params as {
         contextId: ContextId
       }
+      executionContexts.set(data_.contextId, sendMessage)
       setTimeout(
         () =>
           sendMessage({

@@ -210,6 +210,99 @@ async function mockElectronApi(
                 replyToolCall: () => {},
               }
             })(),
+            // The MCP server: status lives on `window.__mcpMockStatus`, the last copied client on
+            // `window.__mcpCopied`, so tests can read and seed them.
+            mcp: ((): unknown => {
+              interface Status {
+                enabled: boolean
+                port: number
+                running: boolean
+                error: string | null
+                lockedByEnvironment: boolean
+              }
+              const w = window as unknown as {
+                __mcpMockStatus?: Status
+                __mcpCopied?: string
+                __mcpClaudeDesktopSetUp?: boolean
+              }
+              const current = (): Status =>
+                w.__mcpMockStatus ?? {
+                  enabled: false,
+                  port: 39417,
+                  running: false,
+                  error: null,
+                  lockedByEnvironment: false,
+                }
+              // A spec delivers a tool call as main would, and awaits the window's reply:
+              // `window.__mcpCall(tool, args, caller?)` resolves with the `McpToolResult`.
+              type Reply = { requestId: string; result: unknown }
+              type Request = {
+                requestId: string
+                tool: string
+                args: unknown
+                caller: unknown
+                timeoutMs: number
+              }
+              let toolCallHandler: ((request: Request) => void) | undefined
+              const pendingReplies = new Map<string, (result: unknown) => void>()
+              let nextRequest = 0
+              ;(window as unknown as { __mcpCall: unknown }).__mcpCall = (
+                tool: string,
+                args: unknown,
+                caller: unknown = { kind: 'external', name: 'claude-code' },
+              ): Promise<unknown> => {
+                const handler = toolCallHandler
+                if (handler == null) return Promise.reject(new Error('No MCP tool dispatcher'))
+                const requestId = `mock-${++nextRequest}`
+                return new Promise((resolve) => {
+                  pendingReplies.set(requestId, resolve)
+                  // Main's longest per-call timeout (`OPEN_TOOL_TIMEOUT_MS`): the window refuses
+                  // an edit with less than 25 s of it left.
+                  handler({ requestId, tool, args, caller, timeoutMs: 120_000 })
+                })
+              }
+              return {
+                onToolCall: (handler: (request: Request) => void): (() => void) => {
+                  toolCallHandler = handler
+                  return () => {
+                    if (toolCallHandler === handler) toolCallHandler = undefined
+                  }
+                },
+                replyToolCall: (reply: Reply): void => {
+                  pendingReplies.get(reply.requestId)?.(reply.result)
+                  pendingReplies.delete(reply.requestId)
+                },
+                status: async (): Promise<Status> => current(),
+                onStatusChanged: (): (() => void) => () => {},
+                setEnabled: async (enabled: boolean): Promise<Status> => {
+                  w.__mcpMockStatus = {
+                    enabled,
+                    port: 39417,
+                    running: enabled,
+                    error: null,
+                    lockedByEnvironment: false,
+                  }
+                  return w.__mcpMockStatus
+                },
+                setPort: async (port: number): Promise<Status> => {
+                  w.__mcpMockStatus = { ...current(), port }
+                  return w.__mcpMockStatus
+                },
+                replaceToken: async (): Promise<Status> => current(),
+                copyConfig: async (client: string): Promise<void> => {
+                  w.__mcpCopied = client
+                },
+                // Not set up until the spec presses the button; then `__mcpClaudeDesktopSetUp` is true.
+                claudeDesktopStatus: async (): Promise<{ state: string; configFile: string }> => ({
+                  state: w.__mcpClaudeDesktopSetUp === true ? 'setUp' : 'notSetUp',
+                  configFile: '/mock/Claude/claude_desktop_config.json',
+                }),
+                setUpClaudeDesktop: async (): Promise<{ state: string; configFile: string }> => {
+                  w.__mcpClaudeDesktopSetUp = true
+                  return { state: 'setUp', configFile: '/mock/Claude/claude_desktop_config.json' }
+                },
+              }
+            })(),
             // The JDK AOT cache training: `trainingStatus` answers the status given to
             // `registerMocks`; `setJvmAotTrainingStatus` broadcasts a new one through `__jvmAotMock`.
             jvmAot: ((): unknown => {

@@ -9,6 +9,13 @@ import type {
 } from 'enso-common/src/ai'
 import type { DownloadUrlOptions } from 'enso-common/src/download'
 import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
+import type {
+  ClaudeDesktopStatus,
+  McpClientKind,
+  McpStatus,
+  McpToolCallReply,
+  McpToolCallRequest,
+} from 'enso-common/src/mcp'
 import type { Path } from 'enso-common/src/services/Backend'
 import type { UpdateMode, UpdateStatus } from 'enso-common/src/updater'
 import type { FileFilter } from './project-view/util/fileFilter'
@@ -154,6 +161,23 @@ export function isSecretsBlockedByProjects(
   return error instanceof Error && error.message.endsWith(SECRETS_BLOCKED_BY_PROJECTS[action])
 }
 
+/** The IDE's MCP server, which Electron main runs; see `app/electron-client/src/mcp/`. */
+export interface McpApi {
+  readonly onToolCall: (handler: (request: McpToolCallRequest) => void) => () => void
+  readonly replyToolCall: (reply: McpToolCallReply) => void
+  readonly status: () => Promise<McpStatus>
+  readonly onStatusChanged: (handler: (status: McpStatus) => void) => () => void
+  readonly setEnabled: (enabled: boolean) => Promise<McpStatus>
+  readonly setPort: (port: number) => Promise<McpStatus>
+  readonly replaceToken: () => Promise<McpStatus>
+  /** Main writes the client's config, token included, to the clipboard. */
+  readonly copyConfig: (client: McpClientKind) => Promise<void>
+  /** Where Claude Desktop's configuration file stands. Main reads it; the token never comes here. */
+  readonly claudeDesktopStatus: () => Promise<ClaudeDesktopStatus>
+  /** Main adds the `enso` entry to Claude Desktop's configuration file, and returns the new status. */
+  readonly setUpClaudeDesktop: () => Promise<ClaudeDesktopStatus>
+}
+
 export interface ElectronApi {
   readonly navigation: NavigationApi
   readonly menu: MenuApi
@@ -165,6 +189,7 @@ export interface ElectronApi {
   readonly ai: AiApi
   readonly updater: UpdaterApi
   readonly secrets: SecretsApi
+  readonly mcp?: McpApi
   /** Absent outside Electron: in the browser build, nothing trains. */
   readonly jvmAot?: JvmAotApi
 }

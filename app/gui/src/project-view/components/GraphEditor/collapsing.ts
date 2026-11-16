@@ -153,12 +153,16 @@ interface PreparedCollapseInfo {
   statementToReplace: Ast.AstId
 }
 
-/** Perform the actual AST refactoring for collapsing nodes. */
+/**
+ * Perform the actual AST refactoring for collapsing nodes. The new function is named `baseName`
+ * ({@link COLLAPSED_FUNCTION_NAME} by default), with a number added when the name is taken.
+ */
 export function performCollapse(
   info: CollapsedInfo,
   topLevel: Ast.MutableBodyBlock,
   graphDb: GraphDb,
   currentMethodName: string,
+  baseName?: Identifier,
 ): CollapsingResult {
   const nodeIdToStatementId = (nodeId: NodeId) => graphDb.nodeIdToNode.get(nodeId)!.outerAst.id
   const preparedInfo = {
@@ -167,7 +171,7 @@ export function performCollapse(
     statementToReplace: nodeIdToStatementId(info.refactored.id),
     outputIdentifier: info.extracted.output.identifier,
   }
-  return performCollapseImpl(topLevel, preparedInfo, currentMethodName)
+  return performCollapseImpl(topLevel, preparedInfo, currentMethodName, baseName)
 }
 
 /** @internal */
@@ -175,9 +179,10 @@ export function performCollapseImpl(
   topLevel: Ast.MutableBodyBlock,
   info: PreparedCollapseInfo,
   currentMethodName: string,
+  baseName?: Identifier,
 ) {
   const edit = topLevel.module
-  const collapsedName = generateUniqueName(COLLAPSED_FUNCTION_NAME, topLevel)
+  const collapsedName = generateUniqueName(baseName ?? COLLAPSED_FUNCTION_NAME, topLevel)
   const { statement: currentMethod, index: currentMethodLine } = Ast.findModuleMethod(
     topLevel,
     currentMethodName,

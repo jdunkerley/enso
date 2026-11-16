@@ -12,17 +12,17 @@ context entries receive, and the search over tabs, sections and entries are in
 `$/configurations/settings.ts`, framework-free, so that one search spans every
 tab.
 
-- **The tabs** (`tabs.ts`), all Vue since #88: Local, Appearance and Keyboard
-  shortcuts. The page opens on Local (`DEFAULT_TAB`), or on the first tab shown
-  when there is no local backend. There is no Account tab: the local user has no
-  account settings (it showed only the stand-in name and a note), so it went
-  with the settings cog (the left rail's Settings button opens the page). The
-  cloud's tabs (Organization, Billing & Plans, Members, User groups, Activity
-  log, API keys, Usage) were deleted with the cloud UI, and so were their
-  `SettingsTabType` values. `SettingsTab.vue` lays out a tab's sections; a form
-  entry is `SettingsFormEntry.vue`, a component entry reads the page's context
-  with `useSettingsContext` (`$/providers/settingsContext`). A tab with no
-  sections is not listed.
+- **The tabs** (`tabs.ts`), all Vue since #88: Local, AI, Appearance and
+  Keyboard shortcuts. The page opens on Local (`DEFAULT_TAB`), or on the first
+  tab shown when there is no local backend. There is no Account tab: the local
+  user has no account settings (it showed only the stand-in name and a note), so
+  it went with the settings cog (the left rail's Settings button opens the
+  page). The cloud's tabs (Organization, Billing & Plans, Members, User groups,
+  Activity log, API keys, Usage) were deleted with the cloud UI, and so were
+  their `SettingsTabType` values. `SettingsTab.vue` lays out a tab's sections; a
+  form entry is `SettingsFormEntry.vue`, a component entry reads the page's
+  context with `useSettingsContext` (`$/providers/settingsContext`). A tab with
+  no sections is not listed.
 - **Further sections could come through `$/providers/settingsContributions`**
   (see "Contribution registries" in `app/gui/CLAUDE.md`), which nothing uses
   now; the settings route waits for them to load. There is no sign-in (the
@@ -64,6 +64,43 @@ it to the project service (`engine/setSpare`) on load and on every change. The
 section is always shown (it was hidden under the native engine, which has no
 spare, until that engine was removed). Tests: `__tests__/localTab.test.ts` and
 `integration-test/dashboard/spareEngineSettings.spec.ts`.
+
+## AI
+
+The AI tab (`AI_TAB`, after Local) has one section, External agents
+(`McpSettingsSection.vue`), for the MCP server that Electron main runs so
+external agent apps (Claude Code, Codex, GitHub Copilot) can read the open
+project. The section, and so the tab, is shown only when `window.api.mcp` exists
+(the desktop app). It reads `status()` on mount and follows `onStatusChanged`. A
+switch turns the server on (off by default) under a standing warning that a
+connected agent can read the project and run Enso code as you. While it is on:
+the address (`http://127.0.0.1:<port>/mcp`), a port field (1024 to 65535,
+`setPort` on submit), a button per client that has main copy that client's setup
+text to the clipboard (`copyConfig`), and a New token button behind a confirm
+dialog (`replaceToken`). The token never reaches the renderer: no call returns
+it. An `error` in the status (port taken, no keychain) shows under the switch.
+While `lockedByEnvironment` is true (`ENSO_MCP_ENABLED` or `ENSO_MCP_PORT` in
+effect), the switch, the port field and its Save are disabled, with a note
+(`mcpLockedByEnvironment`); main refuses both changes then anyway. A change that
+resolves with a status other than the one asked for, or fails, re-keys the forms
+so they show the server's state. A failed `setPort` shows in the port form only,
+not as a toast. Under the copy buttons a Claude Desktop block shows the
+`ClaudeDesktopStatus` read with `claudeDesktopStatus()` on mount and after each
+server status change: not installed (one line), not set up (a Set up button),
+set up, out of date (an Update button), or unreadable (the reason, and a pointer
+to Copy JSON). In every state with a `configFile` (the file's full path, from
+main; null on a platform without Claude Desktop) the block also has the manual
+route: the path, what to do with the JSON, and a Copy JSON button
+(`copyConfig('claudeDesktop')`). The "Copy setup for" row therefore has no
+Claude Desktop button. The button asks first
+(`McpClaudeDesktopConfirmModal.vue`: a non-destructive `AlertDialog` titled like
+the button; `ConfirmDeleteModal` is styled as destructive), then
+`setUpClaudeDesktop()` has main edit Claude Desktop's configuration file. The
+block then shows the state main returns; only `setUp` also gets the "Done" toast
+(any other state means nothing was written, and the block says why). The block
+always says Claude Desktop needs Node.js and that its Add custom connector
+screen cannot work. Tests: `__tests__/McpSettingsSection.test.ts` and
+`integration-test/dashboard/mcpSettings.spec.ts`.
 
 ## Engine logs
 

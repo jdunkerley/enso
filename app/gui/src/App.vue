@@ -24,6 +24,7 @@ import { useJvmAotTrainingToast } from '$/composables/jvmAotTrainingToast'
 import { useOfflineNotification } from '$/composables/offlineNotification'
 import { useSecretsKeyReminder } from '$/composables/secretsKeyReminder'
 import { useSpareEngineSync } from '$/composables/spareEngineSync'
+import { startMcpToolDispatcher } from '$/mcp/toolDispatcher'
 import { useCodeFontRootClasses } from '$/providers/codeFont'
 import { appOpenCloseCallback } from '$/utils/analytics'
 import '@/assets/base.css'
@@ -39,7 +40,7 @@ import { provideTooltipRegistry } from '@/providers/tooltipRegistry'
 import { registerAutoBlurHandler, registerGlobalBlurHandler } from '@/util/autoBlur'
 import * as objects from 'enso-common/src/utilities/data/object'
 import { Platform, platform } from 'enso-common/src/utilities/detect'
-import { defineAsyncComponent, ref, watch } from 'vue'
+import { defineAsyncComponent, onScopeDispose, ref, watch } from 'vue'
 import LoadingScreen from './components/LoadingScreen.vue'
 
 const classSet = provideAppClassSet()
@@ -92,6 +93,10 @@ useOfflineNotification()
 useSecretsKeyReminder()
 useSpareEngineSync()
 useJvmAotTrainingToast()
+
+// Answers the MCP tool calls Electron main forwards; the open project's graph editor registers
+// the handlers that read it (`project-view/mcp/`).
+if (window.api?.mcp) onScopeDispose(startMcpToolDispatcher(window.api.mcp))
 
 // The "About Enso" dialog, opened by the app menu here, and by the user and info menus. Loaded on
 // first use, so that it keeps the dialog (and Reka) out of the initial chunk, and kept mounted

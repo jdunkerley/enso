@@ -238,7 +238,7 @@ const operatorCodeToName: Record<string, string> = {
 }
 
 /** Try to infer binding name from AST. This is used when type information from the engine is not available yet. */
-function inferPrefixFromAst(expr: Ast.Ast): string | undefined {
+export function inferPrefixFromAst(expr: Ast.Ast): string | undefined {
   if (expr instanceof Ast.Vector) return 'vector'
   if (expr instanceof Ast.NumericLiteral) return expr.code().includes('.') ? 'float' : 'integer'
   if (expr instanceof Ast.TextLiteral) return 'text'

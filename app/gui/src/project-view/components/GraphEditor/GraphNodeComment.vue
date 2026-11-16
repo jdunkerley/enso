@@ -5,6 +5,7 @@ import PlainTextEditor from '@/components/PlainTextEditor.vue'
 import { useFocusDelayed } from '@/composables/focus'
 import { nodeMutableDocumentation } from '@/util/ast/node'
 import { useYTextSync } from '@/util/codemirror'
+import { useYText } from '@/util/crdt'
 import { syncRef } from '@vueuse/core'
 import { computed, ref, type ComponentInstance } from 'vue'
 
@@ -15,10 +16,15 @@ const textEditor = ref<ComponentInstance<typeof PlainTextEditor>>()
 const textEditorContent = computed(() => textEditor.value?.contentElement)
 
 const documentation = computed(() => nodeMutableDocumentation(props.node))
+// The text, kept up to date: a comment written to the node's `Y.Text` from elsewhere (an undo, an
+// MCP tool) must show on a node that had none, and go when it is cleared.
+const documentationText = useYText(documentation)
 
-// AI-prompt docs are rendered inline by WidgetAiPrompt, not as a comment above the node.
+// AI-prompt docs are rendered inline by WidgetAiPrompt, not as a comment above the node. While the
+// comment is being edited it stays, whatever the text becomes: typing `AI: ` must not unmount the
+// editor under the user's cursor.
 const isAiPrompt = computed(() => {
-  const text = documentation.value?.toJSON()
+  const text = documentationText.value
   return text != null && readAiPrompt(text) !== null
 })
 
@@ -28,7 +34,7 @@ syncRef(editing, useFocusDelayed(textEditorContent).focused)
 </script>
 <template>
   <div
-    v-if="documentation && !isAiPrompt && (editing || documentation.toJSON().trimStart())"
+    v-if="documentation && (editing || (!isAiPrompt && documentationText?.trimStart()))"
     class="GraphNodeComment"
     @keydown.enter.capture.stop="editing = false"
   >

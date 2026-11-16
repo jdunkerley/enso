@@ -38,11 +38,13 @@
     - to_display_text self -> Standard.Base.Any.Any
     - to_js_object self -> Standard.Base.Any.Any
     - today -> Standard.Base.Data.Time.Date.Date
+    - tomorrow -> Standard.Base.Data.Time.Date.Date
     - until self end:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - up_to self end:Standard.Base.Data.Time.Date.Date include_end:Standard.Base.Data.Boolean.Boolean= step:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Period.Period)= -> Standard.Base.Any.Any
     - week_of_year self locale:Standard.Base.Any.Any= -> Standard.Base.Any.Any
     - work_days_until self end:Standard.Base.Any.Any holidays:Standard.Base.Any.Any= include_end_date:Standard.Base.Any.Any= -> Standard.Base.Any.Any
     - year self -> Standard.Base.Data.Numbers.Integer
+    - yesterday -> Standard.Base.Data.Time.Date.Date
 - fits_in_range start:Standard.Base.Any.Any end:Standard.Base.Any.Any date:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - is_weekend date:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - week_days_between start:Standard.Base.Any.Any end:Standard.Base.Any.Any -> Standard.Base.Any.Any

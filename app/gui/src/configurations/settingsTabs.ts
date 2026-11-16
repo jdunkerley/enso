@@ -4,6 +4,7 @@ import type { Icon } from '@/util/iconMetadata/iconName'
 /** A sub-page of the settings page. */
 enum SettingsTabType {
   local = 'local',
+  ai = 'ai',
   appearance = 'appearance',
   keyboardShortcuts = 'keyboard-shortcuts',
 }
@@ -16,6 +17,7 @@ export default SettingsTabType
  */
 export const SETTINGS_TAB_ICONS: Readonly<Record<SettingsTabType, Icon>> = {
   [SettingsTabType.local]: 'system',
+  [SettingsTabType.ai]: 'robot',
   [SettingsTabType.appearance]: 'paint_palette',
   [SettingsTabType.keyboardShortcuts]: 'keyboard_shortcuts',
 }

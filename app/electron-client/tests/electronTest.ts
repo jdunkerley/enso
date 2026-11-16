@@ -62,6 +62,12 @@ export const test = base.extend<{
    * never finished, and its toast covered the controls the specs click.
    */
   spareEngine: boolean
+  /**
+   * More environment variables for the launched app, applied last. Default none. The MCP spec
+   * uses it to turn the server on with a port and token of its own (`ENSO_MCP_*`), so that it never
+   * reads the settings file or the keychain.
+   */
+  extraEnv: Readonly<Record<string, string>>
   app: ElectronApplication
   page: Page
 }>({
@@ -76,10 +82,11 @@ export const test = base.extend<{
   aiEnabled: [false, { option: true }],
   welcomeProject: [false, { option: true }],
   spareEngine: [false, { option: true }],
+  extraEnv: [{}, { option: true }],
 
   /** Setup for all tests: Create an electron-based app instance. */
   app: async function (
-    { projectsDir, testRunId, aiEnabled, welcomeProject, spareEngine },
+    { projectsDir, testRunId, aiEnabled, welcomeProject, spareEngine, extraEnv },
     use,
     testInfo,
   ) {
@@ -98,6 +105,7 @@ export const test = base.extend<{
       ...(spareEngine ?
         { ENSO_SPARE_ENGINE: '1', ENSO_JVM_AOT_DIR: jvmAotDir }
       : { ENSO_SPARE_ENGINE: '0', ENSO_JVM_AOT: '0' }),
+      ...extraEnv,
     }
     const app = await _electron.launch({ executablePath: electronExecutablePath, args, env })
     try {

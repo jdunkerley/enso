@@ -22,6 +22,7 @@ test('settings open on the Local tab', async ({ drivePage, page }) => {
   // The personal tabs, and none of the cloud's, and no Account.
   await expect(settingsPanel(page).locator('aside').getByRole('button')).toHaveText([
     TEXT.localSettingsTab,
+    TEXT.aiSettingsTab,
     TEXT.appearanceSettingsTab,
     TEXT.keyboardShortcutsSettingsTab,
   ])

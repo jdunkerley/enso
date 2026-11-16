@@ -310,6 +310,27 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.
+- `ENSO_MCP_ENABLED=1`, `ENSO_MCP_PORT`, `ENSO_MCP_TOKEN` — turn the MCP server
+  for external agents on, and set its port and token, over the settings file and
+  the keychain (see below).
+
+## MCP server for external agents
+
+`src/mcp/` runs an MCP server on `http://127.0.0.1:<port>/mcp` (off by default;
+Settings → AI → External agents) through which agent apps (Claude Code, Codex,
+GitHub Copilot) read the open project (its graph, components and documentation,
+and the result of evaluating an expression), edit it (add, edit, remove and
+group nodes, each caller's run of edits one undo step, refused in Live), and
+create, open and close projects in the Drive. Main holds the tool definitions
+and checks every caller (no `Origin`, a loopback `Host`, the bearer token); the
+IDE window runs the tools (`app/gui/src/project-view/mcp/` for the project
+tools, `app/gui/src/mcp/` for the app tools). The setting is
+`<userData>/mcp-settings.json`, the token is in the keychain (service `Enso`,
+account `mcp-token`) and never reaches the renderer. Settings can also set up
+Claude Desktop, by editing its `claude_desktop_config.json`
+(`src/mcp/claudeDesktop.ts`). See `src/mcp/CLAUDE.md`. It is separate from the
+AI mode's own MCP server (`src/ai/aiMcpServer.ts`, below). Tests:
+`tests/headless/mcp*.test.ts` and `tests/mcp.spec.ts`.
 
 ## Local Claude agent
 
