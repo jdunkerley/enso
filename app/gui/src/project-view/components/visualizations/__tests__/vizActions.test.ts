@@ -2,6 +2,7 @@
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import { Ast } from '@/util/ast'
 import type { Pattern } from '@/util/ast/match'
+import { svgUseHref } from '@/util/icons'
 import { describe, expect, test } from 'vitest'
 import { isActionButton } from '../toolbar'
 import {
@@ -361,7 +362,7 @@ describe('plainActionToolbar', () => {
     expect(created).toEqual(['operator1.remove_warnings'])
   })
 
-  test('an icon the IDE does not know is left out, and a disabled rule is passed on', () => {
+  test('an icon the IDE does not know shows the missing-icon placeholder, and a disabled rule is passed on', () => {
     const action = (icon: string): VizAction => ({
       id: 'a_b',
       label: 'A',
@@ -369,15 +370,24 @@ describe('plainActionToolbar', () => {
       kind: 'chain',
       template: 'a_b',
     })
-    const [known, unknown] = plainActionToolbar(
-      [action('not_exclamation'), action('no such icon')],
+    const [known, unknown, empty] = plainActionToolbar(
+      [action('not_exclamation'), action('no such icon'), action('')],
       () => {},
       (a) => a.icon === 'no such icon',
     )
-    if (known == null || unknown == null || !isActionButton(known) || !isActionButton(unknown))
+    if (
+      known == null ||
+      unknown == null ||
+      empty == null ||
+      !isActionButton(known) ||
+      !isActionButton(unknown) ||
+      !isActionButton(empty)
+    )
       throw new Error('not buttons')
     expect(known.icon).toBe('not_exclamation')
-    expect(unknown.icon).toBeUndefined()
+    expect(unknown.icon).toBeDefined()
+    expect(unknown.icon && svgUseHref(unknown.icon)).toBe(svgUseHref('no such icon'))
+    expect(empty.icon && svgUseHref(empty.icon)).toBe(svgUseHref('no such icon'))
     expect(known.disabled).toBe(false)
     expect(unknown.disabled).toBe(true)
     expect(known.dataTestid).toBe('a-b-button')

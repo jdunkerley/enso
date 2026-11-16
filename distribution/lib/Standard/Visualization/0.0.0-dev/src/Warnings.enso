@@ -7,7 +7,10 @@ from project.Viz_Actions import remove_warnings_action
    private: true
    ---
    Default preprocessor for the warnings visualization.
-   Generates JSON text describing the warnings visualization.
+   Generates JSON text describing the warnings visualization: an object with
+   the `warnings` (a vector of their display texts) and the `actions` the
+   visualization offers, the single action `remove_warnings`. The visualization
+   draws its button from that action.
 
    ## Arguments
     - `value`: the value to be visualized.

@@ -1,6 +1,7 @@
 /**
- * @file The node actions Enso describes for a visualised value, and the builder that turns an
- * action's template and a gesture's values into a node pattern.
+ * @file The node actions Enso describes for a visualised value, the builder that turns an
+ * action's template and a gesture's values into a node pattern, and the toolbar buttons for the
+ * actions that need no gesture.
  */
 import type { ToValue } from '$/utils/reactivity'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
@@ -236,11 +237,24 @@ export function isPlainAction(action: VizAction): boolean {
   return action.kind === 'chain' ? slots.length === 0 : slots.length > 0 && slots.every(isNodeSlot)
 }
 
-function iconOf(action: VizAction): AnyIcon | undefined {
-  return isIconName(action.icon) || isUrlString(action.icon) ? action.icon : undefined
+/**
+ * A URL that is not an SVG, so {@link svgUseHref} draws the "missing icon" placeholder for it. It
+ * stands in for an icon Enso names that the IDE does not have.
+ */
+const MISSING_ICON: AnyIcon = (() => {
+  const url = 'missing:icon'
+  if (!isUrlString(url)) throw new Error('The missing icon is not a URL string')
+  return url
+})()
+
+function iconOf(action: VizAction): AnyIcon {
+  return isIconName(action.icon) || isUrlString(action.icon) ? action.icon : MISSING_ICON
 }
 
-/** A toolbar button for each plain action the value offers; the icon is left out when unknown. */
+/**
+ * A toolbar button for each plain action the value offers; an icon the IDE does not know shows the
+ * missing-icon placeholder.
+ */
 export function plainActionToolbar(
   actions: readonly VizAction[],
   createNodes: (...options: NodeCreationOptions[]) => void,

@@ -42,11 +42,7 @@ const messages = computed(() => {
   return []
 })
 
-const isRemoveWarningsDisabled = computed(
-  () =>
-    messages.value.length === 0 ||
-    (typeof props.data === 'object' && props.data !== null && 'message' in props.data),
-)
+const isRemoveWarningsDisabled = computed(() => messages.value.length === 0)
 
 config.setToolbar(
   computed(() =>
