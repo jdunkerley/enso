@@ -4,6 +4,10 @@
 
 - [Agents connected over MCP can list the visualizations a node offers and look
   at any of them, as a picture or as its data.][809]
+- [Right-clicking a table cell offers the components that the value's library
+  describes for it (its row, column or value, or the table or sheet it links
+  to), and right-clicking an entry of the JSON tree adds a component for it or
+  for every entry beside it.][795]
 - [Agents connected over MCP can create and open projects and add, edit, remove
   and group nodes; each run of changes is one undo step. Settings → AI can also
   set up Claude Desktop.][790]
@@ -520,6 +524,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [809]: https://github.com/jdunkerley/enso/pull/809
+[795]: https://github.com/jdunkerley/enso/pull/795
 [790]: https://github.com/jdunkerley/enso/pull/790
 [789]: https://github.com/jdunkerley/enso/pull/789
 [782]: https://github.com/jdunkerley/enso/pull/782
