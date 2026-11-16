@@ -45,34 +45,30 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-node
-      # No Rust: the generator loads no WASM; only the Markdown parser fork and the icon list need
-      # building, which `--ignore-scripts` skipped.
+      # `--ignore-scripts` skips the Markdown parser fork, the icon list and the WASM parser; each is
+      # built below.
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
       - name: Build the Markdown parser and the icon list
         run: |
           corepack pnpm --filter @lezer/markdown run prepare
           corepack pnpm --filter enso-gui run generate-icons
-      # The typecheck follows the imports of the IDE's code into `ydoc-shared/src/ast`, which needs
-      # the generated `ast.ts` and the WASM parser's bindings (`rust-ffi`), as the GUI checks do. The
-      # generator itself loads neither, so the build below runs without. Shares the GUI checks' Rust
-      # cache (`wasm-parser`) and never saves it.
+      # The generator's style check turns each example into nodes with the IDE's code
+      # (`exampleToNodes`), which imports `ydoc-shared/src/ast`: that needs the generated `ast.ts`
+      # and the WASM parser's bindings (`rust-ffi`), as the GUI checks do, and so does the typecheck.
+      # Shares the GUI checks' Rust cache (`wasm-parser`) and never saves it.
       - name: Cache the Rust build
-        if: inputs.static-checks
         uses: ./.github/actions/setup-rust
         with:
           shared-key: wasm-parser
           save: "false"
       - name: Add the wasm target
-        if: inputs.static-checks
         run: rustup target add wasm32-unknown-unknown
       - name: Install wasm-bindgen-cli
-        if: inputs.static-checks
         uses: taiki-e/install-action@v2
         with:
           tool: wasm-bindgen-cli@0.2.128
       - name: Build the WASM parser and generate the AST types
-        if: inputs.static-checks
         run: |
           corepack pnpm --filter rust-ffi run build-wasm
           corepack pnpm --filter ydoc-shared run generate-ast
@@ -108,8 +104,13 @@ jobs:
         with:
           name: docs-site-catalogues
           path: docs-site-input
+      # Catalogues from develop (`source: catalogues`) do not have this pull request's doc comments,
+      # so their style violations are reported but do not fail the run; the engine checks build the
+      # site from this pull request's own distribution, with the gate.
       - name: Generate the Components reference
-        run: corepack pnpm --filter docs-site run generate -- --lib "$GITHUB_WORKSPACE/docs-site-input/lib"
+        run: >-
+          corepack pnpm --filter docs-site run generate -- --lib "$GITHUB_WORKSPACE/docs-site-input/lib"
+          ${{ inputs.source == 'catalogues' && '--no-style-gate' || '' }}
       - name: Build the site
         run: |
           start=$(date +%s)

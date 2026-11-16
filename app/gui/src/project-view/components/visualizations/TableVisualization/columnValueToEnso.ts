@@ -25,10 +25,10 @@ const getFormattedValueForCell = (item: string, module: Ast.MutableModule, cellT
     return createDateValue(item, module)
   }
   if (cellType === 'Time') {
-    return createDateTimeValue('Time_Of_Day.parse (__)', item, module)
+    return createDateTimeValue('(Time_Of_Day.parse __)', item, module)
   }
   if (cellType === 'Date_Time') {
-    return createDateTimeValue('Date_Time.parse (__)', item, module)
+    return createDateTimeValue('(Date_Time.parse __)', item, module)
   }
   return Ast.TextLiteral.new(item)
 }
@@ -48,11 +48,11 @@ export function columnValueToEnso(columnTypes: ReadonlyMap<string, string>) {
     }
     if (columnType === 'Time') {
       return (item: string, module: Ast.MutableModule) =>
-        createDateTimeValue('Time_Of_Day.parse (__)', item, module)
+        createDateTimeValue('(Time_Of_Day.parse __)', item, module)
     }
     if (columnType === 'Date_Time') {
       return (item: string, module: Ast.MutableModule) =>
-        createDateTimeValue('Date_Time.parse (__)', item, module)
+        createDateTimeValue('(Date_Time.parse __)', item, module)
     }
     if (columnType === 'Mixed') {
       return (item: string, module: Ast.MutableModule) => {

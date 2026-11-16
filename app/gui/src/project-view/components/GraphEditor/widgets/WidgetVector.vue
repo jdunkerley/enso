@@ -7,6 +7,10 @@ import {
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
+import {
+  defaultItemCode,
+  vectorElementType,
+} from '@/components/GraphEditor/widgets/WidgetVector/elementType'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import DraggableList from '@/components/widgets/DraggableList.vue'
 import { injectGraphNavigator } from '@/providers/graphNavigator'
@@ -43,11 +47,16 @@ const itemConfig = computed(() =>
   : undefined,
 )
 
-const defaultItem = computed(() =>
-  props.input.dynamicConfig?.kind === 'Vector_Editor' ?
-    (Ast.parseExpression(props.input.dynamicConfig.item_default) ?? DEFAULT_ITEM.value)
-  : DEFAULT_ITEM.value,
-)
+// A `Vector Date` argument's items are Dates, so each gets the date picker (and likewise for any type
+// whose widget is keyed on it).
+const itemType = computed(() => vectorElementType(props.input.expectedType))
+
+const defaultItem = computed(() => {
+  if (props.input.dynamicConfig?.kind === 'Vector_Editor')
+    return Ast.parseExpression(props.input.dynamicConfig.item_default) ?? DEFAULT_ITEM.value
+  const typed = defaultItemCode(itemType.value)
+  return (typed != null ? Ast.parseExpression(typed) : undefined) ?? DEFAULT_ITEM.value
+})
 
 function handleAddItem() {
   if (props.input.editHandler?.addItem()) return
@@ -135,6 +144,7 @@ const editHandler = WidgetEditHandler.New(props, {
 function itemInput(ast: Ast.Expression): WidgetInput {
   return {
     ...WidgetInput.FromAst(ast),
+    ...(itemType.value != null ? { expectedType: itemType.value } : {}),
     dynamicConfig: itemConfig.value,
     forcePort: true,
     editHandler: editHandler.value,

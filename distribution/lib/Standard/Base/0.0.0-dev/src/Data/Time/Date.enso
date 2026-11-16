@@ -50,10 +50,9 @@ type Date
        Obtains the current date from the system clock in the system timezone.
 
        ## Examples
-       ### Get the current date.
-
+       ### The date today
        ```
-             example_today = Date.today
+       date = Date.today
        ```
     today -> Date = Date_Helpers.today
 
@@ -65,10 +64,9 @@ type Date
        The day before today, from the system clock in the system timezone.
 
        ## Examples
-       ### The day before today.
-
+       ### The day before today
        ```
-       day = Date.yesterday
+       date = Date.yesterday
        ```
     yesterday -> Date = Date.today.previous
 
@@ -80,10 +78,9 @@ type Date
        The day after today, from the system clock in the system timezone.
 
        ## Examples
-       ### The day after today.
-
+       ### The day after today
        ```
-       day = Date.tomorrow
+       date = Date.tomorrow
        ```
     tomorrow -> Date = Date.today.next
 
@@ -96,25 +93,22 @@ type Date
        Returns a `Time_Error` if the provided time is not valid.
 
        ## Arguments
-        - `year`: The year to represent.
-        - `month`: The month-of-year to represent, from 1 (January) to 12
-          (December).
-        - `day`: The day-of-month to represent, from 1 to 31. It must be valid
-          for the year and month.
+       - `year`: The year to represent.
+       - `month`: The month-of-year to represent, from 1 (January) to 12 (December).
+       - `day`: The day-of-month to represent, from 1 to 31. It must be valid for the
+         year and month.
 
        ## Examples
-       ### Create a new local date at Unix epoch.
-
+       ### A date from its year, month and day
        ```
-             from Standard.Base import Date
-
-             example_new = Date.new 1970
+       date = Date.new 2020 12 23
+       # → 2020-12-23
        ```
 
-       ### Get the local date of 5th August 1986.
-
+       ### The first day of a year
        ```
-             example_new = Date.new 1986 8 5
+       date = Date.new 1970
+       # → 1970-01-01
        ```
     @year (Widget.Numeric_Input display=Display.Always)
     @month (Widget.Numeric_Input minimum=1 maximum=12 display=Display.Always)
@@ -135,46 +129,28 @@ type Date
        provided `format`.
 
        ## Arguments
-        - `text`: The text to try and parse as a date.
-        - `format`: A pattern describing how to parse the text, or a
-          `Date_Time_Formatter`.
+       - `text`: The text to try and parse as a date.
+       - `format`: A pattern describing how to parse the text, or a
+         `Date_Time_Formatter`. By default the text is read as an ISO-8601 date.
 
        ## Examples
-       ### Parse the date of 23rd December 2020.
-
+       ### Parse an ISO date
        ```
-             from Standard.Base import Date
-
-             example_parse = Date.parse "2020-12-23"
+       date = Date.parse "2020-12-23"
+       # → 2020-12-23
        ```
 
-       ### Recover from an error due to a wrong format.
-
+       ### Parse a date with a custom format
        ```
-             from Standard.Base import Date
-             from Standard.Base.Errors.Common import Time_Error
-
-             example_parse_err = Date.parse "my birthday" . catch Time_Error _->
-                 Date.new 2000 1 1
+       date = Date.parse "23/12/2020" "dd/MM/yyyy"
+       # → 2020-12-23
        ```
 
-       ### Parse "1999-1-1" as Date using a custom format.
-
+       ### Fall back to a default date when the text is not a date
        ```
-             from Standard.Base import Date
-
-             example_parse = Date.parse "1999-1-1" "yyyy-M-d"
-       ```
-
-       ### Recover from the parse error.
-
-       ```
-             from Standard.Base import Date
-             from Standard.Base.Errors.Common import Time_Error
-
-             example_parse_err =
-                 date = Date.parse "1999-1-1" "yyyy-MM-dd"
-                 date.catch Time_Error (_->Date.new 2000 1 1)
+       parsed = Date.parse "my birthday"
+       date = parsed.catch Any _-> Date.new 2000 1 1
+       # → 2000-01-01
        ```
 
        ## Remarks
@@ -227,15 +203,14 @@ type Date
        group: Metadata
        icon: metadata
        ---
-       Get the year field.
+       The year of this date.
 
        ## Examples
-       ### Get the current year.
-
+       ### The year of a date
        ```
-             from Standard.Base import Date
-
-             example_year = Date.today.year
+       date = Date.new 2020 12 23
+       year = date.year
+       # → 2020
        ```
     year : Integer
     year self -> Integer = Date_Helpers.year self
@@ -244,13 +219,14 @@ type Date
        group: Metadata
        icon: metadata
        ---
-       Get the month of year field, as a number from 1 to 12.
+       The month of this date, as a number from 1 (January) to 12 (December).
 
        ## Examples
-       ### Get the current month.
-
+       ### The month of a date
        ```
-             example_month = Date.today.month
+       date = Date.new 2020 12 23
+       month = date.month
+       # → 12
        ```
     month self -> Integer = Date_Helpers.month self 
 
@@ -258,27 +234,41 @@ type Date
        group: Metadata
        icon: metadata
        ---
-       Get the day of month field.
+       The day of the month of this date, from 1 to 31.
 
        ## Examples
-       ### Get the current day.
-
+       ### The day of the month of a date
        ```
-             from Standard.Base import Date
-
-             example_day = Date.today.day
+       date = Date.new 2020 12 23
+       day = date.day
+       # → 23
        ```
     day self -> Integer = Date_Helpers.day self
 
     ## ---
        icon: metadata
        ---
-       Returns the number of week of year this date falls into.
+       The number of the week of the year this date falls into.
        Produces a warning for a Date that is before epoch start.
 
        ## Arguments
-        - `locale`: the locale used to define the notion of weeks of year. If no
-          locale is provided, then the ISO 8601 week of year is used.
+       - `locale`: The locale that defines the notion of weeks of year. If no locale
+         is given, the ISO 8601 week of year is used.
+
+       ## Examples
+       ### The ISO week of a date at the start of a year
+       ```
+       date = Date.new 2021 1 1
+       week = date.week_of_year
+       # → 53
+       ```
+
+       ### The week of the same date in the US
+       ```
+       date = Date.new 2021 1 1
+       week = date.week_of_year Locale.us
+       # → 1
+       ```
 
        ## Remarks
 
@@ -290,8 +280,8 @@ type Date
        first day of the week is Monday, and week 1 is the week containing the
        first Thursday of the year. Therefore it is important to properly specify
        the `locale` argument.
-    week_of_year : (Locale | Nothing) -> Integer
-    week_of_year self locale=Nothing =
+    @locale Locale.default_widget
+    week_of_year self (locale : Locale | Nothing = Nothing) -> Integer =
         ensure_in_epoch self <|
             if locale.is_nothing then Time_Utils.get_field_as_localdate self IsoFields.WEEK_OF_WEEK_BASED_YEAR else
                 Time_Utils.week_of_year_localdate self locale.java_locale
@@ -300,8 +290,23 @@ type Date
        group: DateTime
        icon: metadata
        ---
-       Returns if the date is in a leap year.
+       Whether this date is in a leap year.
        Produces a warning for a Date that is before epoch start.
+
+       ## Examples
+       ### A leap year
+       ```
+       date = Date.new 2000 3 1
+       is_leap = date.is_leap_year
+       # → True
+       ```
+
+       ### A century that is not a leap year
+       ```
+       date = Date.new 1900 3 1
+       is_leap = date.is_leap_year
+       # → False
+       ```
     is_leap_year : Boolean
     is_leap_year self =
         ensure_in_epoch self <|
@@ -311,15 +316,32 @@ type Date
        group: DateTime
        icon: metadata
        ---
-       Returns the number of days in the year represented by this date.
+       The number of days in the year of this date, 365 or 366.
        Produces a warning for a Date that is before epoch start.
+
+       ## Examples
+       ### The length of a leap year
+       ```
+       date = Date.new 2020 3 1
+       days = date.length_of_year
+       # → 366
+       ```
     length_of_year : Integer
     length_of_year self = if self.is_leap_year then 366 else 365
 
     ## ---
        icon: metadata
        ---
-       Returns the century of the date.
+       The century of this date, counting 2000 as the last year of the 20th century.
+       Returns an `Illegal_Argument` error for a year before the common era.
+
+       ## Examples
+       ### The century of the year 2000
+       ```
+       date = Date.new 2000 1 1
+       century = date.century
+       # → 20
+       ```
     century : Integer
     century self = if self.year > 0 then (self.year - 1).div 100 + 1 else
         Error.throw (Illegal_Argument.Error "Century can only be given for AD years.")
@@ -328,7 +350,15 @@ type Date
        group: Metadata
        icon: metadata
        ---
-       Returns the quarter of the year the date falls into.
+       The quarter of the year this date falls into, from 1 to 4.
+
+       ## Examples
+       ### The first day of the second quarter
+       ```
+       date = Date.new 2020 4 1
+       quarter = date.quarter
+       # → 2
+       ```
     quarter : Integer
     quarter self = Time_Utils.get_field_as_localdate self IsoFields.QUARTER_OF_YEAR
 
@@ -336,8 +366,16 @@ type Date
        group: DateTime
        icon: metadata
        ---
-       Returns the number of days in the month represented by this date.
+       The number of days in the month of this date.
        Produces a warning for a Date that is before epoch start.
+
+       ## Examples
+       ### The length of February in a leap year
+       ```
+       date = Date.new 2020 2 10
+       days = date.length_of_month
+       # → 29
+       ```
     length_of_month : Integer
     length_of_month self =
         ensure_in_epoch self <|
@@ -347,26 +385,46 @@ type Date
        group: DateTime
        icon: metadata
        ---
-       Returns the date that is the first day of the month containing the
-       specified date.
-    first_of_month : Integer
-    first_of_month self =
+       The first day of the month of this date.
+
+       ## Examples
+       ### The first day of December
+       ```
+       date = Date.new 2020 12 23
+       first = date.first_of_month
+       # → 2020-12-01
+       ```
+    first_of_month self -> Date =
         Time_Utils.first_of_month self
 
     ## ---
        group: DateTime
        icon: metadata
        ---
-       Returns the date that is the last day of the month containing the
-       specified date.
-    end_of_month : Integer
-    end_of_month self =
+       The last day of the month of this date.
+
+       ## Examples
+       ### The last day of a leap-year February
+       ```
+       date = Date.new 2020 2 10
+       last = date.end_of_month
+       # → 2020-02-29
+       ```
+    end_of_month self -> Date =
         Time_Utils.end_of_month self
 
     ## ---
        icon: metadata
        ---
-       Returns the day of the year.
+       The day of the year of this date, counting 1 January as day 1.
+
+       ## Examples
+       ### The last day of a leap year
+       ```
+       date = Date.new 2020 12 31
+       day = date.day_of_year
+       # → 366
+       ```
     day_of_year : Integer
     day_of_year self = Time_Utils.get_field_as_localdate self ChronoField.DAY_OF_YEAR
 
@@ -374,8 +432,16 @@ type Date
        group: Metadata
        icon: metadata
        ---
-       Returns the day of the week.
+       The day of the week of this date.
        Produces a warning for a Date that is before epoch start.
+
+       ## Examples
+       ### The day of the week of a date
+       ```
+       date = Date.new 2020 12 23
+       day = date.day_of_week
+       # → Wednesday
+       ```
     day_of_week : Day_Of_Week
     day_of_week self =
         ensure_in_epoch self <|
@@ -385,28 +451,65 @@ type Date
        group: DateTime
        icon: time
        ---
-       Returns the first date within the `Date_Period` containing self.
-    start_of : Date_Period -> Date
-    start_of self period=Date_Period.Month = period.adjust_start self
+       The first date of the period of the given kind that contains this date.
+
+       ## Arguments
+       - `period`: The kind of period to find the start of: year, quarter, month, week
+         or day.
+
+       ## Examples
+       ### The start of the quarter
+       ```
+       date = Date.new 2020 12 23
+       start = date.start_of Date_Period.Quarter
+       # → 2020-10-01
+       ```
+    start_of self (period : Date_Period = ..Month) -> Date = period.adjust_start self
 
     ## ---
        group: DateTime
        icon: time
        ---
-       Returns the last date within the `Date_Period` containing self.
-    end_of : Date_Period -> Date
-    end_of self period=Date_Period.Month = period.adjust_end self
+       The last date of the period of the given kind that contains this date.
+
+       ## Arguments
+       - `period`: The kind of period to find the end of: year, quarter, month, week or
+         day.
+
+       ## Examples
+       ### The end of the week
+       ```
+       date = Date.new 2020 12 23
+       last = date.end_of Date_Period.Week
+       # → 2020-12-27
+       ```
+    end_of self (period : Date_Period = ..Month) -> Date = period.adjust_end self
 
     ## ---
        group: DateTime
        icon: time
        ---
-       Returns the next date adding the `Date_Period` to self.
+       The date after this one: a day later, or one of the given period.
        Produces a warning for a Date that is before epoch start.
        See `Date_Time.enso_epoch_start`.
 
        ## Arguments
-        - `period`: the period to add to self.
+       - `period`: The period to add to this date.
+
+       ## Examples
+       ### The day after the last day of a year
+       ```
+       date = Date.new 2020 12 31
+       next = date.next
+       # → 2021-01-01
+       ```
+
+       ### A month later, clamped to the end of a shorter month
+       ```
+       date = Date.new 2020 1 31
+       next = date.next Date_Period.Month
+       # → 2020-02-29
+       ```
     next : Date_Period -> Date
     next self period:Date_Period=..Day = self + period.to_period
 
@@ -414,12 +517,27 @@ type Date
        group: DateTime
        icon: time
        ---
-       Returns the previous date subtracting the `Date_Period` from self.
+       The date before this one: a day earlier, or one of the given period.
        Produces a warning for a Date that is before epoch start.
        See `Date_Time.enso_epoch_start`.
 
        ## Arguments
-        - `period`: the period to add to self.
+       - `period`: The period to subtract from this date.
+
+       ## Examples
+       ### The day before the first day of a year
+       ```
+       date = Date.new 2021 1 1
+       previous = date.previous
+       # → 2020-12-31
+       ```
+
+       ### A month earlier, clamped to the end of a shorter month
+       ```
+       date = Date.new 2020 3 31
+       previous = date.previous Date_Period.Month
+       # → 2020-02-29
+       ```
     previous : Date_Period -> Date
     previous self period:Date_Period=..Day = self - period.to_period
 
@@ -427,14 +545,21 @@ type Date
        group: DateTime
        icon: time
        ---
-       Creates a `Period` between self and the provided end date.
+       Creates a `Period` between this date and the provided end date.
        Produces a warning for a Date that is before epoch start.
        See `Date_Time.enso_epoch_start`.
 
        ## Arguments
-        - `end`: the end date of the interval to count workdays in.
-    until : Date -> Period
-    until self end =
+       - `end`: The date the period runs up to.
+
+       ## Examples
+       ### The period between two dates
+       ```
+       date = Date.new 2020 1 15
+       period = date.until (Date.new 2020 12 23)
+       # → Period.Value P11M8D
+       ```
+    until self (end : Date) -> Period =
         ensure_in_epoch self <| ensure_in_epoch end <|
             Period.between self end
 
@@ -442,17 +567,30 @@ type Date
        group: DateTime
        icon: time
        ---
-       Counts the days between self (inclusive) and the provided end date
-       (exclusive, or inclusive if include_end_date=True).
+       Counts the days between this date (inclusive) and the provided end date
+       (exclusive, or inclusive if `include_end_date` is on).
        Produces a warning for a Date that is before epoch start.
        See `Date_Time.enso_epoch_start`.
 
        ## Arguments
-        - `end`: the end date of the interval to count workdays in.
-        - `include_end_date`: whether to include the end date in the count. By
-          default the end date is not included in the interval.
-    days_until : Date -> Boolean -> Integer
-    days_until self end include_end_date=False =
+       - `end`: The date to count the days up to.
+       - `include_end_date`: Whether to count the end date too.
+
+       ## Examples
+       ### The days to the start of the next year
+       ```
+       date = Date.new 2020 12 20
+       days = date.days_until (Date.new 2021 1 1)
+       # → 12
+       ```
+
+       ### Counting the end date too
+       ```
+       date = Date.new 2020 12 20
+       days = date.days_until (Date.new 2021 1 1) include_end_date=True
+       # → 13
+       ```
+    days_until self (end : Date) (include_end_date : Boolean = False) -> Integer =
         if end < self then -(end.days_until self include_end_date) else
             ensure_in_epoch self <| ensure_in_epoch end <|
                 (Time_Utils.days_between self end) + if include_end_date then 1 else 0
@@ -461,9 +599,21 @@ type Date
        group: DateTime
        icon: time
        ---
-       Returns a requested date part as integer.
+       A part of this date, as a number: the year, quarter, month, week of the year or
+       day of the month.
        Produces a warning for a Date that is before epoch start.
        See `Date_Time.enso_epoch_start`.
+
+       ## Arguments
+       - `period`: Which part of the date to return.
+
+       ## Examples
+       ### The quarter of a date
+       ```
+       date = Date.new 2020 12 23
+       quarter = date.date_part Date_Period.Quarter
+       # → 4
+       ```
     date_part : Date_Period -> Integer
     date_part self (period : Date_Period) =
         case period of
@@ -477,16 +627,22 @@ type Date
        group: DateTime
        icon: time
        ---
-       Computes a time difference between the two dates.
-       It returns an integer expressing how many periods fit between the two
-       dates.
-       The difference will be positive if `end` is greater than `self`.
+       Computes the difference between two dates as a whole number of periods.
+       The difference is positive if `end` is after this date.
        Produces a warning for a Date that is before epoch start.
        See `Date_Time.enso_epoch_start`.
 
        ## Arguments
-        - `end`: A date to compute the difference from.
-        - `period`: The period to compute the difference in.
+       - `end`: The date to compute the difference to.
+       - `period`: The kind of period to count.
+
+       ## Examples
+       ### The whole months between two dates
+       ```
+       date = Date.new 2020 1 1
+       months = date.date_diff (Date.new 2020 12 23) Date_Period.Month
+       # → 11
+       ```
     date_diff : Date -> Date_Period -> Integer
     date_diff self (end : Date) (period : Date_Period) = ensure_in_epoch self <|
         Time_Utils.unit_date_difference period.to_java_unit self end
@@ -495,13 +651,22 @@ type Date
        group: DateTime
        icon: time
        ---
-       Shifts the date by a specified period.
+       Shifts this date by a number of periods.
        Produces a warning for a Date that is before epoch start.
        See `Date_Time.enso_epoch_start`.
 
        ## Arguments
-        - `amount`: An integer specifying by how many periods to shift the date.
-        - `period`: The period by which to shift.
+       - `amount`: How many periods to shift the date by. A negative number shifts it
+         back.
+       - `period`: The kind of period to shift by.
+
+       ## Examples
+       ### A month after the end of January
+       ```
+       date = Date.new 2020 1 31
+       shifted = date.date_add 1 Date_Period.Month
+       # → 2020-02-29
+       ```
     date_add : Integer -> Date_Period -> Date
     date_add self (amount : Integer) (period : Date_Period) = ensure_in_epoch self <|
         Time_Utils.unit_date_add period.to_java_unit self amount
@@ -510,24 +675,39 @@ type Date
        group: DateTime
        icon: time
        ---
-       Counts workdays between self (inclusive) and the provided end date
-       (exclusive).
+       Counts the working days from this date (inclusive) up to the provided end date
+       (exclusive, or inclusive if `include_end_date` is on). Weekends are not
+       counted.
        Produces a warning for a Date that is before epoch start.
        See `Date_Time.enso_epoch_start`.
 
        ## Arguments
-        - `end`: the end date of the interval to count workdays in.
-        - `holidays`: dates of holidays to skip when counting workdays.
-        - `include_end_date`: whether to include the end date in the count. By
-          default the end date is not included in the interval.
+       - `end`: The date to count the working days up to.
+       - `holidays`: Dates to skip as well. Weekends are already skipped.
+       - `include_end_date`: Whether to count the end date too, as Excel's `NETWORKDAYS`
+         does.
 
        ## Examples
-       ### Count the number of workdays between two dates.
-
+       ### The working days of January 2020
        ```
-             from Standard.Base import Date
+       date = Date.new 2020 1 1
+       days = date.work_days_until (Date.new 2020 2 1)
+       # → 23
+       ```
 
-             example_workdays = Date.new 2020 1 1 . work_days_until (Date.new 2020 1 5)
+       ### Skipping a holiday
+       ```
+       date = Date.new 2020 1 1
+       holidays = [Date.new 2020 1 1]
+       days = date.work_days_until (Date.new 2020 2 1) holidays
+       # → 22
+       ```
+
+       ### Counting the end date too
+       ```
+       date = Date.new 2020 1 6
+       days = date.work_days_until (Date.new 2020 1 10) include_end_date=True
+       # → 5
        ```
 
        ## Remarks
@@ -544,8 +724,7 @@ type Date
        provide the `include_end_date` argument for that purpose. Setting it to
        `True` should make the result consistent with the `NETWORKDAYS` function
        in Excel and similar products.
-    work_days_until : Date -> Vector Date -> Boolean -> Integer
-    work_days_until self end holidays=[] include_end_date=False =
+    work_days_until self (end : Date) (holidays : Vector Date = []) (include_end_date : Boolean = False) -> Integer =
         ensure_in_epoch self <|
             if include_end_date then self.work_days_until (end + (Period.new days=1)) holidays include_end_date=False else
                 weekdays = week_days_between self end
@@ -562,23 +741,23 @@ type Date
        group: Conversions
        icon: convert
        ---
-       Combine this date with time of day to create a point in time.
+       Combines this date with a time of day to create a point in time.
 
        ## Arguments
-        - `time_of_day`: The time to combine with the date to create a time.
-        - `zone`: The time-zone in which to create the time.
+       - `time_of_day`: The time of day to combine with the date. By default it is
+         midnight.
+       - `zone`: The time zone in which to create the time. By default it is the
+         system time zone.
 
        ## Examples
-       ### Convert this date to midnight UTC time.
-
+       ### A date at half past noon, UTC
        ```
-             from Standard.Base import Date, Time_Of_Day, Time_Zone
-
-             example_to_time = Date.new 2020 2 3 . to_date_time Time_Of_Day.new Time_Zone.utc
+       date = Date.new 2020 2 3
+       time = date.to_date_time (Time_Of_Day.new 12 30) Time_Zone.utc
+       # → 2020-02-03 12:30:00Z[UTC]
        ```
     @zone Time_Zone.default_widget
-    to_date_time : Time_Of_Day -> Time_Zone -> Date_Time
-    to_date_time self (time_of_day=Time_Of_Day.new) (zone=Time_Zone.system) =
+    to_date_time self (time_of_day : Time_Of_Day = Time_Of_Day.new) (zone : Time_Zone = Time_Zone.system) -> Date_Time =
         Time_Utils.make_zoned_date_time self time_of_day zone
 
     ## ---
@@ -586,28 +765,27 @@ type Date
        group: Operators
        icon: time
        ---
-       Add the specified amount of time to this instant to get another date.
+       Adds an amount of time to this date to get another date.
 
        ## Arguments
-        - `amount`: The amount of time to add to this instant. It can be a
-          `Period` or `Date_Period`.
+       - `amount`: The amount of time to add: a `Date_Period`, or a `Period` for a
+         custom number of years, months and days.
 
        ## Examples
-       ### Add 6 months to a local date.
-
+       ### Add six months to the end of August
        ```
-             import Standard.Base.Data.Time.Duration
-
-             example_add = Date.new 2020 + (Period.new months=6)
+       date = Date.new 2020 8 31
+       later = date + (Period.new months=6)
+       # → 2021-02-28
        ```
 
-       ### Add a month to a local date.
-
+       ### Add a month to a date
        ```
-             import Standard.Base.Data.Time.Date_Period
-
-             example_add = Date.new 2020 + Date_Period.Month
+       date = Date.new 2020 12 23
+       later = date + Date_Period.Month
+       # → 2021-01-23
        ```
+    @amount make_period_selector
     + : Period | Date_Period -> Date ! (Time_Error | Illegal_Argument)
     + self (amount : Period | Date_Period) =
         case amount of
@@ -621,27 +799,40 @@ type Date
        group: Input
        icon: time
        ---
-       Creates an increasing range of dates from `self` to `end`.
+       Creates an increasing range of dates from this date to `end`.
 
        ## Arguments
-        - `end`: The end of the range.
-        - `include_end`: Specifies if the right end of the range should be
-          included. By default, the range is right-exclusive.
-        - `step`: The step of the range. It can be a `Date_Period` or `Period`.
-          By default, the step is one day.
+       - `end`: The end of the range.
+       - `include_end`: Whether the range includes `end`. By default the range is
+         right-exclusive.
+       - `step`: The step of the range, a `Date_Period` or a `Period`. By default the
+         step is one day.
 
        ## Examples
-       ### Create a range of dates.
+       ### The days from 5 to 10 December
+       ```
+       start = Date.new 2021 12 5
+       range = start.up_to (Date.new 2021 12 10)
+       days = range.to_vector
+       # → [2021-12-05, 2021-12-06, 2021-12-07, 2021-12-08, 2021-12-09]
+       ```
 
+       ### Include the end date
        ```
-             (Date.new 2021 12 05).up_to (Date.new 2021 12 10)
+       start = Date.new 2021 12 5
+       range = start.up_to (Date.new 2021 12 6) include_end=True
+       days = range.to_vector
+       # → [2021-12-05, 2021-12-06]
        ```
 
-       ### Create a range containing dates [2021-12-05, 2021-12-06].
-
+       ### Step a week at a time
        ```
-             (Date.new 2021 12 05).up_to (Date.new 2021 12 06) include_end=True
+       start = Date.new 2021 12 5
+       range = start.up_to (Date.new 2022 1 1) step=Date_Period.Week
+       days = range.to_vector
+       # → [2021-12-05, 2021-12-12, 2021-12-19, 2021-12-26]
        ```
+    @step make_period_selector
     up_to : Date -> Boolean -> Date_Period|Period -> Date_Range
     up_to self end:Date include_end:Boolean=False step:Date_Period|Period=Date_Period.Day =
         effective_end = if include_end then end.next else end
@@ -653,25 +844,32 @@ type Date
        group: Input
        icon: time
        ---
-       Creates a decreasing range of dates from `self` to `end`.
+       Creates a decreasing range of dates from this date to `end`.
 
        ## Arguments
-        - `end`: The end of the range.
-        - `include_end`: Specifies if the right end of the range should be
-          included. By default, the range is right-exclusive.
+       - `end`: The end of the range.
+       - `include_end`: Whether the range includes `end`. By default the range is
+         right-exclusive.
+       - `step`: The step of the range, a `Date_Period` or a `Period`. By default the
+         step is one day.
 
        ## Examples
-       ### Create a reverse range of dates.
+       ### The days from 10 down to 5 December
+       ```
+       start = Date.new 2021 12 10
+       range = start.down_to (Date.new 2021 12 5)
+       days = range.to_vector
+       # → [2021-12-10, 2021-12-09, 2021-12-08, 2021-12-07, 2021-12-06]
+       ```
 
+       ### Include the end date
        ```
-             (Date.new 2021 12 10).down_to (Date.new 2021 12 05)
+       start = Date.new 2021 12 6
+       range = start.down_to (Date.new 2021 12 5) include_end=True
+       days = range.to_vector
+       # → [2021-12-06, 2021-12-05]
        ```
-
-       ### Create a range containing dates [2021-12-06, 2021-12-05].
-
-       ```
-             (Date.new 2021 12 06).down_to (Date.new 2021 12 05) include_end=True
-       ```
+    @step make_period_selector
     down_to : Date -> Boolean -> Date_Period|Period -> Date_Range
     down_to self end:Date include_end:Boolean=False step:Date_Period|Period=Date_Period.Day =
         effective_end = if include_end then end.previous else end
@@ -682,41 +880,43 @@ type Date
        group: DateTime
        icon: time
        ---
-       Shift the date by the specified amount of business days.
-       For the purpose of this method, the business days are defined to be Monday
-       through Friday.
-       Produces a warning for a Date that is before epoch start. See
-       `Date_Time.enso_epoch_start`.
-       This method always returns a day which is a business day - if the shift
-       amount is zero, the closest following business day is returned. For the
-       purpose of calculating the shift, the holidays are treated as if we were
-       starting at the next business day after them, for example counting the
-       shift starting on Saturday or Sunday works as if we were counting the
-       shift from Monday (for positive shifts). So shifting Sunday by zero days
-       will return Monday, but shifting it by one day will return a Tuesday (so
-       that there is the full work day - Monday) within the interval. For
-       negative shifts, shifting either Saturday or Sunday one day backwards will
-       return Friday, but shifting Monday one day backwards will return a Friday.
-       The whole logic is made consistent with `work_days_until`, so that the
-       following properties hold:
-       date.work_days_until (date.add_work_days N) == N for any N >= 0
-       (date.add_work_days N).work_days_until date == -N for any N < 0
+       Shifts this date by a number of working days, Monday to Friday.
+       Produces a warning for a Date that is before epoch start.
+       See `Date_Time.enso_epoch_start`.
 
        ## Arguments
-        - `amount`: The number of business days to shift the date by. If `amount`
-          is zero, the current date is returned, unless it is a weekend or a
-          holiday, in which case the next business day is returned.
-        - `holidays`: An optional list of dates of custom holidays that should
-          also be skipped. If it is not provided, only weekends are skipped.
+       - `days`: The number of working days to shift the date by. A negative number
+         shifts it back.
+       - `holidays`: Dates to skip as well. Weekends are already skipped.
 
        ## Examples
-       ### Shift the date by 5 business days.
+       ### The next working day after a Friday
+       ```
+       date = Date.new 2020 2 7
+       next = date.add_work_days 1
+       # → 2020-02-10
+       ```
 
+       ### Skipping a holiday
        ```
-             example_shift = Date.new 2020 2 3 . add_work_days 5
+       date = Date.new 2020 12 24
+       holidays = [Date.new 2020 12 25]
+       next = date.add_work_days 1 holidays
+       # → 2020-12-28
        ```
-    add_work_days : Integer -> Vector Date -> Date
-    add_work_days self days=1 holidays=[] =
+
+       ## Remarks
+
+       ### Which day you land on
+       The result is always a working day: with a shift of zero, the closest following
+       working day is returned. For the shift, a weekend or holiday counts as if the
+       count started on the next working day, so shifting a Sunday by zero days gives
+       Monday, and shifting it by one day gives Tuesday. For a negative shift, shifting
+       a Saturday or Sunday back one day gives Friday, and so does shifting a Monday.
+       The logic is consistent with `work_days_until`, so that
+       `date.work_days_until (date.add_work_days N) == N` for any `N >= 0` and
+       `(date.add_work_days N).work_days_until date == -N` for any `N < 0`.
+    add_work_days self (days : Integer = 1) (holidays : Vector Date = []) -> Date =
         ensure_in_epoch self <|
             self.internal_add_work_days days holidays
 
@@ -725,8 +925,7 @@ type Date
        ---
        ensure_in_epoch breaks tail call annotation and causes stack overflow.
        That is why `add_work_days` method is split into two methods.
-    internal_add_work_days : Integer -> Vector Date -> Date
-    internal_add_work_days self days=1 holidays=[] =
+    internal_add_work_days self (days : Integer = 1) (holidays : Vector Date = []) -> Date =
         case days >= 0 of
             True ->
                 full_weeks = days.div 5
@@ -808,30 +1007,27 @@ type Date
        group: Operators
        icon: time
        ---
-       Subtract the specified amount of time from this instant to get another
-       date.
+       Subtracts an amount of time from this date to get another date.
 
        ## Arguments
-        - `amount`: The amount of time to add to this instant. It can be a
-          `Period` or `Date_Period`.
+       - `amount`: The amount of time to subtract: a `Date_Period`, or a `Period` for a
+         custom number of years, months and days.
 
        ## Examples
-       ### Subtract 7 days from a local date.
-
+       ### The day before 1 March
        ```
-             from Standard.Base import Date
-             import Standard.Base.Data.Time.Duration
-
-             example_subtract = Date.new 2020 - (Period.new days=7)
+       date = Date.new 2020 3 1
+       earlier = date - (Period.new days=1)
+       # → 2020-02-29
        ```
 
-       ### Subtract a month from a local date.
-
+       ### Subtract a month from a date
        ```
-             import Standard.Base.Data.Time.Date_Period
-
-             example_add = Date.new 2020 - Date_Period.Month
+       date = Date.new 2020 3 31
+       earlier = date - Date_Period.Month
+       # → 2020-02-29
        ```
+    @amount make_period_selector
     - : Period | Date_Period -> Date ! (Time_Error | Illegal_Argument)
     - self amount:(Period | Date_Period) =
         case amount of
@@ -870,49 +1066,40 @@ type Date
        group: Conversions
        icon: convert
        ---
-       Format this date using the provided format specifier.
+       Formats this date as text using the provided format specifier.
 
        ## Arguments
-        - `format`: A pattern describing how to format the text, or a
-          `Date_Time_Formatter`.
+       - `format`: A pattern describing how to format the text, or a
+         `Date_Time_Formatter`. By default the date is written as an ISO-8601 date.
 
        ## Examples
-       ### Format "2020-06-02" as "2 Jun 2020"
-
+       ### Format a date with the month's name
        ```
-             from Standard.Base import Date
-
-             example_format = Date.new 2020 6 2 . format "d MMMM yyyy"
-       ```
-
-       ### Format "2020-06-02" as "2 Jun 20"
-
-       ```
-             example_format = Date.new 2020 6 2 . format "d MMMM yy"
+       date = Date.new 2020 6 2
+       text = date.format "d MMMM yyyy"
+       # → "2 June 2020"
        ```
 
-       ### Format "2020-06-02" as "Tuesday, 02 Jun 2020"
-
+       ### Format a date with a short weekday and month
        ```
-             example_format = Date.new 2020 6 2 . format "EEEE, dd MMMM yyyy"
-       ```
-
-       ### Format "2020-06-02" as "Tue Jun 2"
-
-       ```
-             example_format = Date.new 2020 6 2 . format "EEE MMM d"
+       date = Date.new 2020 6 2
+       text = date.format "ddd MMM d"
+       # → "Tue Jun 2"
        ```
 
-       ### Format "2020-06-02" as "2020AD"
-
+       ### Format a date with the weekday's full name
        ```
-             example_format = Date.new 2020 6 2 . format "yyyyGG"
+       date = Date.new 2020 6 2
+       text = date.format "dddd, dd MMMM yyyy"
+       # → "Tuesday, 02 June 2020"
        ```
 
-       ### Format "2020-06-21" with French locale as "21. juin 2020"
-
+       ### Format a date in a particular locale
        ```
-             example_format = Date.new 2020 6 21 . format (Date_Time_Formatter.from "d. MMMM yyyy" (Locale.new "fr"))
+       date = Date.new 2020 6 21
+       formatter = Date_Time_Formatter.from "d. MMMM yyyy" (Locale.new "fr")
+       text = date.format formatter
+       # → "21. juin 2020"
        ```
 
        ## Remarks
@@ -981,7 +1168,25 @@ type Date
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than `that`.
+       Checks if this date is after `that` date.
+
+       ## Arguments
+       - `that`: The date to compare with.
+
+       ## Examples
+       ### A date after another
+       ```
+       date = Date.new 2020 12 23
+       other = Date.new 2020 1 1
+       result = date > other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date picker. Connect a date, or type one such as
+       `Date.new 2020 1 1`.
     > self that = Comparable.> self=self that
 
     ## ---
@@ -989,7 +1194,25 @@ type Date
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than or equal to `that`.
+       Checks if this date is the same as, or after, `that` date.
+
+       ## Arguments
+       - `that`: The date to compare with.
+
+       ## Examples
+       ### A date compared with itself
+       ```
+       date = Date.new 2020 12 23
+       other = Date.new 2020 12 23
+       result = date >= other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date picker. Connect a date, or type one such as
+       `Date.new 2020 1 1`.
     >= self that = Comparable.>= self=self that
 
     ## ---
@@ -997,7 +1220,25 @@ type Date
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than `that`.
+       Checks if this date is before `that` date.
+
+       ## Arguments
+       - `that`: The date to compare with.
+
+       ## Examples
+       ### A date before another
+       ```
+       date = Date.new 2020 1 1
+       other = Date.new 2020 12 23
+       result = date < other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date picker. Connect a date, or type one such as
+       `Date.new 2020 1 1`.
     < self that = Comparable.< self=self that
 
     ## ---
@@ -1005,8 +1246,38 @@ type Date
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than or equal to `that`.
+       Checks if this date is the same as, or before, `that` date.
+
+       ## Arguments
+       - `that`: The date to compare with.
+
+       ## Examples
+       ### A date after another
+       ```
+       date = Date.new 2020 12 23
+       other = Date.new 2020 1 1
+       result = date <= other
+       # → False
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date picker. Connect a date, or type one such as
+       `Date.new 2020 1 1`.
     <= self that = Comparable.<= self=self that
+
+## ---
+   private: true
+   ---
+   The choices for an amount of time added to, or stepped from, a Date: each
+   `Date_Period`, and `Period.new` for a custom number of years, months and
+   days. The whole names are written, as the argument takes either type.
+make_period_selector display:Display=..When_Modified -> Widget =
+    periods = ["Year", "Quarter", "Month", "Week", "Day"].map name->
+        code = "Date_Period." + name
+        Option code code
+    Widget.Single_Choice values=(periods + [Option "Period.new" "(Period.new)"]) display=display
 
 ## ---
    private: true

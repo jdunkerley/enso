@@ -449,6 +449,8 @@
 
 #### Enso Standard Library
 
+- [`Date`'s functions are documented with examples you can copy into the graph,
+  and every argument has a widget][800]
 - [`Date.yesterday` and `Date.tomorrow` give the day before and after
   today.][789]
 - [EDI files are read by the new Standard.EDI library; add
@@ -524,6 +526,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [809]: https://github.com/jdunkerley/enso/pull/809
+[800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795
 [790]: https://github.com/jdunkerley/enso/pull/790
 [789]: https://github.com/jdunkerley/enso/pull/789

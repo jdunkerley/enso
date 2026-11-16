@@ -1,4 +1,4 @@
-import type { CopiedNode } from '@/components/GraphEditor/graphClipboard'
+import type { CopiedNode } from '@/components/GraphEditor/copiedNode'
 import * as Ast from 'ydoc-shared/ast'
 
 /** A `# → value` line: an example's stated result, shown but never pasted. */
