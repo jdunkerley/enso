@@ -223,6 +223,43 @@ The user's switch is never changed by a tool.
   written to the `Y.Text` from elsewhere (this tool, an undo) shows on a node
   that had none. Before, only a node already showing one updated.
 
+## Looking at a visualization (`visualizationTools.ts`)
+
+The MCP tool `get_visualization` (`visualizationTool.ts` in
+`app/electron-client/src/mcp/`; its `CLAUDE.md`, "Looking at a visualization")
+is served by two window handlers that are **not MCP tools** (they are in no tool
+list, and an agent cannot call them): `get_visualization_data` for
+`format: 'data'` and `prepare_visualization` for `format: 'image'`. **Only
+Electron main produces images**: `prepare_visualization` readies the
+visualization and answers where it is; main captures that rectangle with
+`webContents.capturePage`.
+
+- **The registry** (`visualizationRegistry.ts`): the mounted visualizations by
+  project id, then node id. `GraphVisualization.vue` writes itself in while it
+  shows a node's visualization (not a Ctrl-hover preview, nor the Component
+  Browser's) and removes itself when that ends; an entry only reads its
+  component's state when asked (`panel`, `status`, `name`, `data`,
+  `fullscreen`), so nothing is a snapshot. A replaced component removes only its
+  own entry.
+- **Both handlers** find the node in the method on screen and, when its
+  visualization is hidden, show it as `set_visualization` does: through the edit
+  session, so refused in Live mode and part of the caller's undo step
+  (`shown: true`). They then wait for the entry to stop loading, at most
+  `VISUALIZATION_WAIT_MS` (15 s, and no later than 2 s before the call's
+  `deadline`), else answer "The visualization is still loading …". A view
+  showing an error answers "The visualization failed: …".
+- `get_visualization_data` answers the data the view was given, text that is
+  JSON as its value, at most `VISUALIZATION_DATA_CHARS` (20,000) characters,
+  then `truncated: true` and the start of the text.
+- `prepare_visualization` moves the view (`moved: true`, without animation) when
+  the panel is not wholly in the graph viewport or the zoom is below 100%, waits
+  for two frames with the view still, and answers the panel's rectangle in CSS
+  pixels, cut to the graph viewport (a full-screen visualization is not cut). A
+  docked panel drawn over the graph viewport is not detected. It is the one
+  handler besides `select_nodes` and `open_method` that moves the view; in Live
+  it works only for a visualization already shown.
+- Main caps the picture at 1,200 pixels on its longer side.
+
 ## The edit session (`editSession.ts`)
 
 One per mounted graph editor, built in `useProjectMcpTools`: `releaseStep()` on

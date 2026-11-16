@@ -49,6 +49,25 @@ function textOf(result: Awaited<ReturnType<Client['callTool']>>): string {
   return content[0]?.text ?? ''
 }
 
+/** The image and the text of a tool result that is one image item and one text item. */
+function imageOf(result: Awaited<ReturnType<Client['callTool']>>): {
+  png: Buffer
+  text: string
+} {
+  const content = result.content as {
+    type: string
+    text?: string
+    data?: string
+    mimeType?: string
+  }[]
+  expect(content.map((item) => item.type)).toEqual(['image', 'text'])
+  expect(content[0]?.mimeType).toBe('image/png')
+  return {
+    png: Buffer.from(content[0]?.data ?? '', 'base64'),
+    text: content[1]?.text ?? '',
+  }
+}
+
 /** An SDK client connected to the app's MCP server with the test's token. */
 async function connectClient(): Promise<Client> {
   const client = new Client({ name: 'enso-packaged-test', version: '1' })
@@ -81,6 +100,7 @@ test('an MCP client reads the open project and cannot write a file', async ({
         'get_component_docs',
         'get_graph',
         'get_node',
+        'get_visualization',
         'search_components',
         // The project tools that edit or navigate.
         'add_function',
@@ -208,7 +228,7 @@ const NAME_LOOKUP_REFUSED =
 /** The states of a node that is neither an error nor a panic. */
 const NOT_FAILED = ['value', 'pending', 'unknown']
 
-test('an MCP client builds a project from the dashboard', async ({ page, testRunId }) => {
+test('an MCP client builds a project from the dashboard', async ({ page, testRunId }, testInfo) => {
   // A cold engine's first execution of a new project, about twenty edits each waiting for its
   // execution, an 11 s pause, and a close and reopen.
   test.setTimeout(600_000)
@@ -314,6 +334,28 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     const totalPreview = await previewOf(totalId)
     note('get_node total preview', totalPreview)
     expect(totalPreview).toContain('6')
+
+    // The vector's visualization, hidden until now: the picture shows it, then its data.
+    const picture = await callTool('get_visualization', { node_id: numbersId })
+    expect(picture.isError, JSON.stringify(picture.content)).toBeFalsy()
+    const { png, text } = imageOf(picture)
+    note('get_visualization numbers (image)', text)
+    const about = JSON.parse(text) as { shown: boolean; width: number; height: number }
+    expect(about.shown).toBe(true)
+    // A PNG: the signature, then the size the text states, within the cap.
+    expect(png.subarray(1, 4).toString('ascii')).toBe('PNG')
+    expect(png.readUInt32BE(16)).toBe(about.width)
+    expect(png.readUInt32BE(20)).toBe(about.height)
+    expect(about.width).toBeGreaterThan(100)
+    expect(Math.max(about.width, about.height)).toBeLessThanOrEqual(1200)
+    // Not one flat colour: a blank capture has no more than a handful of distinct bytes.
+    expect(new Set(png.subarray(33)).size).toBeGreaterThan(32)
+    await testInfo.attach('visualization.png', { body: png, contentType: 'image/png' })
+
+    const data = await callTool('get_visualization', { node_id: numbersId, format: 'data' })
+    expect(data.isError, textOf(data)).toBeFalsy()
+    note('get_visualization numbers (data)', textOf(data))
+    expect(JSON.parse(textOf(data))).toMatchObject({ shown: false, truncated: false })
 
     // Code that turns Write on by the routes the guard knows (the Write prefix, `with_enabled_context`
     // / `with_enabled` anywhere, reflection, a runtime builtin, text evaluated as code, a method
