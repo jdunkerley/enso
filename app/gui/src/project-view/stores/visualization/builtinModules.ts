@@ -4,7 +4,7 @@
  * any of them to read that module. Widening this list widens what every library can rely on: it is
  * the owner's decision (see `CLAUDE.md`, "What a library visualization can use").
  */
-export const BUILTIN_MODULE_NAMES = ['vue', 'builtins', 'd3'] as const
+export const BUILTIN_MODULE_NAMES = ['vue', 'builtins', 'd3', 'sql-formatter'] as const
 
 /** One of {@link BUILTIN_MODULE_NAMES}. */
 export type BuiltinModuleName = (typeof BUILTIN_MODULE_NAMES)[number]

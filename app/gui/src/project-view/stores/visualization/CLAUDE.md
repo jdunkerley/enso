@@ -105,19 +105,20 @@ library, `movedVisualizations.ts` maps the old id to the new one, and
 before the move keep their view. The saved metadata is rewritten only when the
 user changes the visualization.
 
-| Old id            | Now                                      |
-| ----------------- | ---------------------------------------- |
-| `Builtin` `Image` | `Library` `Standard.Image`, name `Image` |
+| Old id                | Now                                             |
+| --------------------- | ----------------------------------------------- |
+| `Builtin` `Image`     | `Library` `Standard.Image`, name `Image`        |
+| `Builtin` `SQL Query` | `Library` `Standard.Database`, name `SQL Query` |
 
-Add a row when another built-in moves (Geo map → `Standard.Geo`, SQL Query →
-`Standard.Database` are planned).
+Add a row when another built-in moves (Geo map → `Standard.Geo` is planned).
 
 ## What a library visualization can use
 
-The same as a project visualization: `vue`, `d3`, the GUI's `builtins` module
-(`useVisualizationConfig`, `defineKeybinds`), and scripts listed in `scripts`.
-Nothing wider; it runs in the IDE window with the trust of the library's own
-Enso and Java code.
+The same as a project visualization: `vue`, `d3`, `sql-formatter` (a lazy chunk
+like `d3`; Standard.Database's SQL Query view formats with it), the GUI's
+`builtins` module (`useVisualizationConfig`, `defineKeybinds`), and scripts
+listed in `scripts`. Nothing wider; it runs in the IDE window with the trust of
+the library's own Enso and Java code.
 
 ## Tests
 

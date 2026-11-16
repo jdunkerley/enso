@@ -11,6 +11,9 @@ export const defaultPreprocessor = [
 /**
  * A visualization that pretty-prints generated SQL code and displays type hints related to
  * interpolated query parameters.
+ *
+ * Shipped by Standard.Database and compiled by the IDE at run time, so it imports only `vue` and the
+ * IDE's lazy `sql-formatter` module.
  */
 
 type Data = SQLData | Error
@@ -36,17 +39,13 @@ interface Error {
 </script>
 
 <script setup lang="ts">
-import { DEFAULT_THEME, type RGBA, type Theme } from '@/components/visualizations/builtins'
-import { stopCopy } from '@/util/shortcuts'
+import { format, supportedDialects } from 'sql-formatter'
 import { computed } from 'vue'
-const sqlFormatter = await import('sql-formatter')
 
 const props = defineProps<{ data: Data }>()
 
-const theme: Theme = DEFAULT_THEME
-
 const language = computed(() =>
-  props.data.dialect != null && sqlFormatter.supportedDialects.includes(props.data.dialect) ?
+  props.data.dialect != null && supportedDialects.includes(props.data.dialect) ?
     props.data.dialect
   : 'sql',
 )
@@ -54,15 +53,43 @@ const formatted = computed(() => {
   if (props.data.error != null || props.data.code == null) {
     return undefined
   }
-  const params = (props.data.interpolations ?? []).map((param) =>
-    renderInterpolationParameter(theme, param),
-  )
-
-  return sqlFormatter.format(props.data.code, {
-    params: params,
-    language: language.value,
-  })
+  const params = (props.data.interpolations ?? []).map(renderInterpolationParameter)
+  return format(props.data.code, { params, language: language.value })
 })
+
+interface RGBA {
+  red: number
+  green: number
+  blue: number
+  alpha: number
+}
+
+/** A colour for an Enso type: a hash of its qualified name (the GUI's former `DEFAULT_THEME`). */
+function colorForType(type: string): RGBA {
+  let hash = 0
+  for (const c of type) {
+    hash = 0 | (hash * 31 + c.charCodeAt(0))
+  }
+  if (hash < 0) {
+    hash += 0x80000000
+  }
+  const red = (hash >> 24) / 0x180
+  const green = ((hash >> 16) & 0xff) / 0x180
+  const blue = ((hash >> 8) & 0xff) / 0x180
+  return { red, green, blue, alpha: 1 }
+}
+
+/**
+ * Let Mod+C (Ctrl, or Cmd on macOS) copy the selected SQL rather than reach the graph editor's
+ * copy (the GUI's `stopCopy`).
+ */
+function stopCopy(event: KeyboardEvent) {
+  const isMac = /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)
+  const mod = isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
+  if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c') {
+    event.stopPropagation()
+  }
+}
 
 /** The qualified name of the Text type. */
 const TEXT_TYPE = 'Standard.Base.Data.Text.Text'
@@ -96,12 +123,9 @@ function replaceAlpha(color: RGBA, newAlpha: number) {
 }
 
 /** Renders HTML for displaying an Enso parameter that is interpolated into the SQL code. */
-function renderInterpolationParameter(theme: Theme, param: { enso_type: string; value: unknown }) {
-  const actualType = param.enso_type
+function renderInterpolationParameter(param: SQLInterpolation) {
   const value = formatInterpolationParameter(param)
-
-  const actualTypeColor = theme.getColorForType(actualType)
-  const fgColor = actualTypeColor
+  const fgColor = colorForType(param.enso_type)
   const bgColor = replaceAlpha(fgColor, INTERPOLATION_BACKGROUND_OPACITY)
 
   return renderRegularInterpolation(value, fgColor, bgColor)

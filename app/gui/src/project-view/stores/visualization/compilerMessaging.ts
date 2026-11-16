@@ -41,6 +41,10 @@ const builtinModules = {
   get d3() {
     return import('d3')
   },
+  // The SQL Query view of Standard.Database formats with it; a lazy chunk, as when it was built in.
+  get 'sql-formatter'() {
+    return import('sql-formatter')
+  },
 } satisfies Record<BuiltinModuleName, unknown>
 
 // Keeps the getters: a lazy module is imported only when a visualization asks for it.
