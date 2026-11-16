@@ -390,7 +390,7 @@ describe('Table right-click menu, on a table', () => {
     ['Get Row at row 0', 'Get Row', 'b', 0],
     ['Get Value at row 0', 'Get Value', 'b', 0],
     // The row-number column has the id `#` (`INDEX_FIELD_NAME`) but is no column of the table, so
-    // it offers only the row. (Before 3.3.1 these made `at '#'` and `get_value '#' 2`.)
+    // it offers only the row.
     ['Get Column on the row-number column', 'Get Column', '#', 2],
     ['Get Value on the row-number column', 'Get Value', '#', 2],
     ['Get Column with no column under the click', 'Get Column', null, 2],

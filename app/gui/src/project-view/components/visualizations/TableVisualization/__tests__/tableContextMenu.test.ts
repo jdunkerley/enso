@@ -42,6 +42,19 @@ describe('tableMenuEntries', () => {
     ])
   })
 
+  test('column names are written as Enso text', () => {
+    expect(texts(tableMenuEntries(TABLE, undefined, "it's", { '#': 1 }))).toEqual([
+      "Get Column: operator1.at 'it\\'s'",
+      'Get Row: operator1.get_row 1',
+      "Get Value: operator1.get_value 'it\\'s' 1",
+    ])
+    expect(texts(tableMenuEntries(TABLE, undefined, '1', { '#': 1 }))).toEqual([
+      "Get Column: operator1.at '1'",
+      'Get Row: operator1.get_row 1',
+      "Get Value: operator1.get_value '1' 1",
+    ])
+  })
+
   test('the row-number column offers only the row', () => {
     expect(texts(tableMenuEntries(TABLE, undefined, '#', { '#': 2 }))).toEqual([
       'Get Row: operator1.get_row 2',
