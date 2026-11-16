@@ -57,6 +57,8 @@ export interface VisualizationToolDeps {
   readonly viewMoving: () => boolean
   /** Resolves on the next animation frame, or shortly after when the window draws none. */
   readonly nextFrame: () => Promise<void>
+  /** Resolves when the panel's DOM has not changed for a while, or after a cap. */
+  readonly panelQuiet: (nodeId: string) => Promise<void>
   /** The clock, in milliseconds. */
   readonly now: () => number
   /** When main stops waiting for the reply, in `now()` milliseconds. */
@@ -158,8 +160,15 @@ export async function prepareVisualization(
       moved = true
     }
   }
-  // Also when nothing moved: a visualization that has just become ready has yet to paint.
   const until = deps.deadline - REPLY_MARGIN_MS
+  while (deps.viewMoving()) {
+    if (deps.now() >= until) return toolError(STILL_LOADING_ERROR)
+    await deps.nextFrame()
+  }
+  // Also when nothing moved: a visualization that has just become ready is still rendering (a
+  // table's cells come after its data), and then has yet to paint.
+  if (deps.now() >= until) return toolError(STILL_LOADING_ERROR)
+  await deps.panelQuiet(nodeId)
   for (let still = 0; still < SETTLE_FRAMES;) {
     if (deps.now() >= until) return toolError(STILL_LOADING_ERROR)
     await deps.nextFrame()

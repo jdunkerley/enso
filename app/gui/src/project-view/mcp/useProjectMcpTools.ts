@@ -55,6 +55,10 @@ import {
 const EVALUATE_TIMEOUT_MS = 25_000
 /** How long to wait for a frame before going on without one: a hidden window draws none. */
 const FRAME_FALLBACK_MS = 100
+/** How long a visualization panel's DOM must stay unchanged to count as drawn. */
+export const PANEL_QUIET_MS = 250
+/** The longest wait for a visualization panel's DOM to be quiet: an animated view never is. */
+export const PANEL_QUIET_CAP_MS = 3_000
 
 /** What only the graph editor has: its selection, its view and its navigation. */
 export interface McpEditorDeps {
@@ -300,6 +304,8 @@ export function useProjectMcpTools(
       },
       viewMoving: editor.viewMoving,
       nextFrame,
+      panelQuiet: (nodeId) =>
+        domQuiet(lookupVisualization(currentProject.id.value, nodeId)?.panel()),
       now: () => Date.now(),
       deadline,
     }
@@ -493,6 +499,43 @@ function nextFrame(): Promise<void> {
       resolve()
     })
   })
+}
+
+/**
+ * Resolves once nothing in `element` has changed for {@link PANEL_QUIET_MS}, or after
+ * {@link PANEL_QUIET_CAP_MS}; at once when it is not in the DOM. The open shadow roots inside it
+ * (the visualization host's) are watched too: a `MutationObserver` does not cross into one.
+ */
+function domQuiet(element: HTMLElement | undefined): Promise<void> {
+  if (element == null || !element.isConnected) return Promise.resolve()
+  return new Promise((resolve) => {
+    let quietTimer: ReturnType<typeof setTimeout> | undefined
+    const finish = () => {
+      observer.disconnect()
+      clearTimeout(quietTimer)
+      clearTimeout(capTimer)
+      resolve()
+    }
+    const restart = () => {
+      clearTimeout(quietTimer)
+      quietTimer = setTimeout(finish, PANEL_QUIET_MS)
+    }
+    const observer = new MutationObserver(restart)
+    const options = { childList: true, subtree: true, attributes: true, characterData: true }
+    for (const root of [element, ...openShadowRoots(element)]) observer.observe(root, options)
+    const capTimer = setTimeout(finish, PANEL_QUIET_CAP_MS)
+    restart()
+  })
+}
+
+/** The open shadow roots of the elements under `root`, and of those inside them. */
+function openShadowRoots(root: Element | ShadowRoot): ShadowRoot[] {
+  const found: ShadowRoot[] = []
+  for (const element of root.querySelectorAll('*')) {
+    if (element.shadowRoot != null)
+      found.push(element.shadowRoot, ...openShadowRoots(element.shadowRoot))
+  }
+  return found
 }
 
 function isStringArray(value: unknown): value is string[] {

@@ -351,6 +351,14 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     // Not one flat colour: a blank capture has no more than a handful of distinct bytes.
     expect(new Set(png.subarray(33)).size).toBeGreaterThan(32)
     await testInfo.attach('visualization.png', { body: png, contentType: 'image/png' })
+    // The stale-frame check: a picture taken once everything has long been drawn is the same.
+    await page.waitForTimeout(3_000)
+    const again = await callTool('get_visualization', { node_id: numbersId })
+    expect(again.isError, JSON.stringify(again.content)).toBeFalsy()
+    const second = imageOf(again)
+    await testInfo.attach('visualization-again.png', { body: second.png, contentType: 'image/png' })
+    expect((JSON.parse(second.text) as { shown: boolean }).shown).toBe(false)
+    expect(second.png.equals(png), 'the first picture is the settled one').toBe(true)
 
     const data = await callTool('get_visualization', { node_id: numbersId, format: 'data' })
     expect(data.isError, textOf(data)).toBeFalsy()

@@ -105,13 +105,23 @@ given, at most 20,000 characters (`VISUALIZATION_DATA_CHARS`). `format: 'image'`
 1. **The window readies it**: the window handler `prepare_visualization` shows a
    hidden visualization (through the edit session, as `set_visualization` does:
    refused in Live, part of the caller's undo step), waits at most 15 s
-   (`VISUALIZATION_WAIT_MS`) for it to draw its data, moves the view when the
-   panel is not wholly in the viewport at 100% zoom, waits two still frames, and
-   answers the panel's rectangle in CSS pixels, cut to the graph viewport.
+   (`VISUALIZATION_WAIT_MS`) for it to get its data, moves the view when the
+   panel is not wholly in the viewport at 100% zoom, waits for the view to stop
+   moving, then for the panel's DOM to be quiet (no mutation for 250 ms, at most
+   3 s: `PANEL_QUIET_MS`, `PANEL_QUIET_CAP_MS` in `useProjectMcpTools.ts`), then
+   two still frames, and answers the panel's rectangle in CSS pixels, cut to the
+   graph viewport.
 2. **Main captures it**: `electron.ts` passes the tool a `Capture` that calls
    `webContents.capturePage` on that rectangle (scaled by the page's zoom
-   factor), and the tool answers a PNG image item of at most 1,200 pixels on its
-   longer side (`IMAGE_MAX_SIDE`; resized when larger) and a text item
+   factor). The tool captures until a capture's PNG bytes equal the one before,
+   150 ms apart, at most 10 captures (`CAPTURE_INTERVAL_MS`,
+   `CAPTURE_MAX_TRIES`), and keeps the last. **Why both**: with the GPU off (as
+   the packaged tests run), status `ready` plus two animation frames gave a
+   stale picture, the graph without the just-shown panel or a table without its
+   cells, because the window's composited frame lags the page and AG Grid draws
+   its cells after the data arrives. The tool then answers a PNG image item of
+   at most 1,200 pixels on its longer side (`IMAGE_MAX_SIDE`; only the final
+   capture is resized) and a text item
    `{ node_id, visualization, shown, moved, width, height }`, the size read from
    the PNG. A minimised or missing window, or an empty capture, gives "The Enso
    window could not be captured …".
@@ -303,11 +313,12 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   dashboard against the real engine: `create_project`, `add_nodes` (with an
   import line, and with a node in error that `edit_node` fixes),
   `get_visualization` of the vector node's hidden visualization (a PNG of the
-  size its text states, not one flat colour, attached as `visualization.png`;
-  then its data), code in the Write prefix refused by `add_nodes`, `edit_node`
-  and `evaluate_expression` with the file it names never written, `edit_node`
-  back to back on a node and its user (the second result current) and to the
-  same text, a `remove_nodes` of a node with a user, `set_node_comment`,
+  size its text states, not one flat colour, attached as `visualization.png`; 3
+  s later a second picture, byte for byte the same, the stale-frame check; then
+  its data), code in the Write prefix refused by `add_nodes`, `edit_node` and
+  `evaluate_expression` with the file it names never written, `edit_node` back
+  to back on a node and its user (the second result current) and to the same
+  text, a `remove_nodes` of a node with a user, `set_node_comment`,
   `set_visualization`, `select_nodes`, `collapse_nodes`, `open_method` in and
   out, `add_function`, one `Mod+Z` in the window taking back a whole `add_nodes`
   call, `remove_nodes`, `list_files`, the path rule, `close_project` (the edits

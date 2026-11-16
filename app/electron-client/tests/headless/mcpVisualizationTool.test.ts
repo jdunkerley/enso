@@ -3,6 +3,8 @@
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { expect, test } from 'vitest'
 import {
+  CAPTURE_INTERVAL_MS,
+  CAPTURE_MAX_TRIES,
   IMAGE_MAX_SIDE,
   pngSize,
   visualizationTool,
@@ -12,33 +14,37 @@ import {
 
 const CALLER: McpCaller = { kind: 'external', name: 'test' }
 
-/** A PNG header for an image of that size: the signature, then IHDR. */
-function png(width: number, height: number): Buffer {
-  const buffer = Buffer.alloc(24)
+/** A PNG header for an image of that size: the signature, then IHDR; then `tag`, to tell frames apart. */
+function png(width: number, height: number, tag = 0): Buffer {
+  const buffer = Buffer.alloc(25)
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer, 0)
   buffer.writeUInt32BE(13, 8)
   buffer.write('IHDR', 12, 'ascii')
   buffer.writeUInt32BE(width, 16)
   buffer.writeUInt32BE(height, 20)
+  buffer.writeUInt8(tag, 24)
   return buffer
 }
 
 /** An image of `pixels` whose `getSize` is in units `factor` times coarser, as on a HiDPI screen. */
-function image(width: number, height: number, factor = 1): CapturedImage {
+function image(width: number, height: number, factor = 1, tag = 0): CapturedImage {
   return {
     isEmpty: () => width === 0,
     getSize: () => ({ width: width / factor, height: height / factor }),
-    resize: (options) => image(options.width * factor, options.height * factor, factor),
-    toPNG: () => png(width, height),
+    resize: (options) => image(options.width * factor, options.height * factor, factor, tag),
+    toPNG: () => png(width, height, tag),
   }
 }
 
 function tool(
   window: (tool: string, args: Record<string, unknown>) => McpToolResult,
-  captured: CapturedImage | null = image(200, 150),
+  captured: CapturedImage | null | (CapturedImage | null)[] = image(200, 150),
 ) {
   const calls: { tool: string; args: Record<string, unknown> }[] = []
   const rects: CaptureRect[] = []
+  const sleeps: number[] = []
+  // A list is the frames in turn; its last one repeats.
+  const frames = Array.isArray(captured) ? captured : [captured]
   const definition = visualizationTool(
     {
       call: async (name, args) => {
@@ -48,10 +54,13 @@ function tool(
     },
     async (rect) => {
       rects.push(rect)
-      return captured
+      return frames[Math.min(rects.length, frames.length) - 1]!
+    },
+    async (ms) => {
+      sleeps.push(ms)
     },
   )
-  return { definition, calls, rects }
+  return { definition, calls, rects, sleeps }
 }
 
 const PREPARED: McpToolResult = {
@@ -82,7 +91,9 @@ test('image is the default: the prepared rectangle is captured', async () => {
   const { definition, calls, rects } = tool(() => PREPARED)
   const result = await definition.run({ node_id: 'n' }, CALLER)
   expect(calls).toEqual([{ tool: 'prepare_visualization', args: { node_id: 'n' } }])
-  expect(rects).toEqual([{ x: 10, y: 20, width: 200, height: 150 }])
+  // A frame that does not change is captured twice: the second capture confirms the first.
+  const rect = { x: 10, y: 20, width: 200, height: 150 }
+  expect(rects).toEqual([rect, rect])
   expect(result).toEqual({
     ok: true,
     value: JSON.stringify(
@@ -145,4 +156,42 @@ test('a reply without a rectangle is an error', async () => {
   }))
   expect((await definition.run({ node_id: 'n' }, CALLER)).ok).toBe(false)
   expect(rects).toEqual([])
+})
+
+test('the capture is repeated until a frame equals the one before, and that frame is the image', async () => {
+  const a = image(200, 150, 1, 1)
+  const b = image(200, 150, 1, 2)
+  const { definition, rects, sleeps } = tool(() => PREPARED, [a, b, b])
+  const result = await definition.run({ node_id: 'n' }, CALLER)
+  if (!result.ok) throw new Error(result.error)
+  expect(rects).toHaveLength(3)
+  expect(sleeps).toEqual([CAPTURE_INTERVAL_MS, CAPTURE_INTERVAL_MS])
+  expect(result.image!.data).toBe(png(200, 150, 2).toString('base64'))
+})
+
+test('a capture that never settles stops at the most tries and gives the last frame', async () => {
+  const frames = Array.from({ length: CAPTURE_MAX_TRIES + 5 }, (_, i) => image(200, 150, 1, i))
+  const { definition, rects } = tool(() => PREPARED, frames)
+  const result = await definition.run({ node_id: 'n' }, CALLER)
+  if (!result.ok) throw new Error(result.error)
+  expect(rects).toHaveLength(CAPTURE_MAX_TRIES)
+  expect(result.image!.data).toBe(png(200, 150, CAPTURE_MAX_TRIES - 1).toString('base64'))
+})
+
+test('a capture lost after the first is an error that names the other format', async () => {
+  const { definition, rects } = tool(() => PREPARED, [image(200, 150, 1, 1), null])
+  const result = await definition.run({ node_id: 'n' }, CALLER)
+  expect(rects).toHaveLength(2)
+  expect(result.ok).toBe(false)
+  if (!result.ok) expect(result.error).toContain('format `data`')
+})
+
+test('only the final capture is scaled to the cap', async () => {
+  const big = image(2400, 1200, 1, 1)
+  const { definition } = tool(() => PREPARED, [image(2400, 1200, 1, 0), big, big])
+  const result = await definition.run({ node_id: 'n' }, CALLER)
+  if (!result.ok) throw new Error(result.error)
+  const bytes = Buffer.from(result.image!.data, 'base64')
+  expect(pngSize(bytes)).toEqual({ width: IMAGE_MAX_SIDE, height: 600 })
+  expect(bytes[24]).toBe(1)
 })

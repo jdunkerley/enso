@@ -277,8 +277,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       description:
         'Select the nodes in `node_ids` (from `get_graph`) in the graph editor, to point ' +
         'the user at them; an empty list clears the selection. This and `open_method` are ' +
-        'the only project tools that change the selection or move the view: the edit tools ' +
-        'leave both alone. Returns `selected`, the ids of the selected nodes. Works in Live ' +
+        'the only project tools that change the selection, and with `get_visualization` the ' +
+        'only ones that move the view: the edit tools leave both alone. Returns `selected`, the ids of the selected nodes. Works in Live ' +
         'mode too.',
       inputSchema: { node_ids: z.array(nodeId()).max(200) },
       run: forward('select_nodes'),

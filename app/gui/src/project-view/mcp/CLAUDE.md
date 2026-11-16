@@ -253,12 +253,20 @@ visualization and answers where it is; main captures that rectangle with
   then `truncated: true` and the start of the text.
 - `prepare_visualization` moves the view (`moved: true`, without animation) when
   the panel is not wholly in the graph viewport or the zoom is below 100%, waits
+  for the view to stop moving, then for the panel to be **quiet** (`panelQuiet`:
+  a `MutationObserver` on the panel and on the open shadow roots inside it, the
+  visualization host's included, since an observer does not cross a shadow
+  boundary; resolved after `PANEL_QUIET_MS` (250 ms) without a mutation, at most
+  `PANEL_QUIET_CAP_MS` (3 s), at once when the panel is not in the DOM), then
   for two frames with the view still, and answers the panel's rectangle in CSS
   pixels, cut to the graph viewport (a full-screen visualization is not cut). A
   docked panel drawn over the graph viewport is not detected. It is the one
   handler besides `select_nodes` and `open_method` that moves the view; in Live
   it works only for a visualization already shown.
-- Main caps the picture at 1,200 pixels on its longer side.
+- Main captures until two captures in a row are the same (150 ms apart, at
+  most 10) and caps the picture at 1,200 pixels on its longer side. Status
+  `ready` plus two frames alone gave stale pictures with the GPU off: see
+  "Looking at a visualization" in `app/electron-client/src/mcp/CLAUDE.md`.
 
 ## The edit session (`editSession.ts`)
 

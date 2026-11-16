@@ -21,6 +21,12 @@ interface Fake {
   revealed: number
   fullscreen: boolean
   showResult: { ok: true; value: string } | { ok: false; error: string }
+  /** Frames for which the view is still moving. */
+  movingFrames: number
+  /** Each `panelQuiet` call: the time, how many reveals had happened, whether the view moved. */
+  quietCalls: { time: number; revealed: number; viewMoving: boolean }[]
+  /** What `panelQuiet` does, e.g. change the rectangle as a late render would. */
+  onQuiet: (state: Fake) => void
 }
 
 function fake(overrides: Partial<Fake> = {}): {
@@ -37,6 +43,9 @@ function fake(overrides: Partial<Fake> = {}): {
     revealed: 0,
     fullscreen: false,
     showResult: { ok: true, value: '{}' },
+    movingFrames: 0,
+    quietCalls: [],
+    onQuiet: () => {},
     ...overrides,
   }
   const entry: VisualizationEntry = {
@@ -63,9 +72,18 @@ function fake(overrides: Partial<Fake> = {}): {
       state.scale = 1
       state.rect = { left: 400, top: 325, right: 600, bottom: 475 }
     },
-    viewMoving: () => false,
+    viewMoving: () => state.movingFrames > 0,
     nextFrame: async () => {
       state.time += 16
+      if (state.movingFrames > 0) state.movingFrames--
+    },
+    panelQuiet: async () => {
+      state.quietCalls.push({
+        time: state.time,
+        revealed: state.revealed,
+        viewMoving: state.movingFrames > 0,
+      })
+      state.onQuiet(state)
     },
     now: () => state.time,
     deadline: 60_000,
@@ -168,6 +186,32 @@ test('image: a zoomed-out graph is brought to 100%', async () => {
   const { deps, state } = fake({ scale: 0.4 })
   await prepareVisualization(deps, { node_id: NODE })
   expect(state.revealed).toBe(1)
+})
+
+test('image: the panel is quiet after the reveal, and the rectangle is read after that', async () => {
+  const { deps, state } = fake({
+    rect: { left: 900, top: 100, right: 1100, bottom: 250 },
+    // A late render: the panel grows once its content is drawn.
+    onQuiet: (s) => (s.rect = { ...s.rect, bottom: s.rect.bottom + 50 }),
+  })
+  const value = parsed(await prepareVisualization(deps, { node_id: NODE }))
+  expect(state.quietCalls).toHaveLength(1)
+  expect(state.quietCalls[0]!.revealed).toBe(1)
+  expect(value.rect).toEqual({ x: 400, y: 325, width: 200, height: 200 })
+})
+
+test('image: the panel is awaited only once the view has stopped moving', async () => {
+  const { deps, state } = fake({ movingFrames: 5 })
+  await prepareVisualization(deps, { node_id: NODE })
+  expect(state.quietCalls).toEqual([{ time: 5 * 16, revealed: 0, viewMoving: false }])
+})
+
+test('image: a view that never stops moving ends in an error before the deadline', async () => {
+  const { deps, state } = fake({ movingFrames: Number.MAX_SAFE_INTEGER })
+  const result = await prepareVisualization(deps, { node_id: NODE })
+  expect(result.ok).toBe(false)
+  expect(state.quietCalls).toHaveLength(0)
+  expect(state.time).toBeLessThan(deps.deadline)
 })
 
 test('image: a fullscreen visualization is not moved', async () => {

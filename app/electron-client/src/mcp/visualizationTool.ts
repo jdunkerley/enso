@@ -13,6 +13,14 @@ import { EDIT_TOOL_TIMEOUT_MS, type WindowBridge } from './windowBridge'
 export const VISUALIZATION_TOOL_NAME = 'get_visualization'
 /** Most pixels of the image's longer side. */
 export const IMAGE_MAX_SIDE = 1200
+/** How long to wait between two captures of the same rectangle. */
+export const CAPTURE_INTERVAL_MS = 150
+/**
+ * Most captures of one rectangle, the first included. The window can be composited a frame or more
+ * behind the page (seen under software compositing), so a capture counts only once the next one
+ * is the same; a view that never stops changing gives the last.
+ */
+export const CAPTURE_MAX_TRIES = 10
 /** Most characters of a node id. */
 const NAME_CHARS = 200
 
@@ -85,10 +93,39 @@ function cappedPng(image: CapturedImage): { png: Buffer; width: number; height: 
   return { png, ...size }
 }
 
-/** The `get_visualization` tool over the window (`bridge`) and a way to photograph it. */
+/**
+ * Captures the rectangle until two captures in a row have the same PNG bytes, at most
+ * {@link CAPTURE_MAX_TRIES} times, {@link CAPTURE_INTERVAL_MS} apart. Null when a capture is
+ * missing or empty.
+ */
+async function stableCapture(
+  capture: Capture,
+  rect: CaptureRect,
+  sleep: (ms: number) => Promise<void>,
+): Promise<CapturedImage | null> {
+  let image = await capture(rect)
+  if (image == null || image.isEmpty()) return null
+  let png = image.toPNG()
+  for (let tries = 1; tries < CAPTURE_MAX_TRIES; tries++) {
+    await sleep(CAPTURE_INTERVAL_MS)
+    const next = await capture(rect)
+    if (next == null || next.isEmpty()) return null
+    const nextPng = next.toPNG()
+    image = next
+    if (nextPng.equals(png)) break
+    png = nextPng
+  }
+  return image
+}
+
+/**
+ * The `get_visualization` tool over the window (`bridge`) and a way to photograph it. `sleep` is
+ * the wait between captures (instant in tests).
+ */
 export function visualizationTool(
   bridge: Pick<WindowBridge, 'call'>,
   capture: Capture,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 ): ToolDefinition {
   return {
     name: VISUALIZATION_TOOL_NAME,
@@ -137,8 +174,8 @@ export function visualizationTool(
         }
       }
       const { rect, ...about } = parsed.data
-      const image = await capture(rect)
-      if (image == null || image.isEmpty()) return { ok: false, error: NO_CAPTURE_ERROR }
+      const image = await stableCapture(capture, rect, sleep)
+      if (image == null) return { ok: false, error: NO_CAPTURE_ERROR }
       const capped = cappedPng(image)
       if (capped == null) return { ok: false, error: NO_CAPTURE_ERROR }
       return {
