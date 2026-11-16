@@ -2,9 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   addDays,
   dateExpressionCode,
-  dateLabel,
   daysInMonth,
-  isoDate,
   parseDateExpression,
   resolveChoice,
   type DateChoice,
@@ -64,22 +62,6 @@ describe('dateExpressionCode', () => {
     expect(dateExpressionCode(choice)).toBe(code)
     // What a choice writes is what it reads back as.
     expect(parseDateExpression(code)).toEqual(choice)
-  })
-})
-
-describe('dateLabel', () => {
-  test.each([
-    [{ kind: 'today' }, 'Today'],
-    [{ kind: 'yesterday' }, 'Yesterday'],
-    [{ kind: 'tomorrow' }, 'Tomorrow'],
-    [{ kind: 'date', year: 2020, month: 1, day: 15 }, '2020-01-15'],
-    [{ kind: 'date', year: 1000, month: 12, day: 3 }, '1000-12-03'],
-  ] satisfies [DateChoice, string][])('%j is labelled %s', (choice, label) => {
-    expect(dateLabel(choice)).toBe(label)
-  })
-
-  test('isoDate pads', () => {
-    expect(isoDate({ year: 2020, month: 3, day: 4 })).toBe('2020-03-04')
   })
 })
 

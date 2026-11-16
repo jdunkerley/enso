@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
- * @file The date widget's menu: Today, Yesterday and Tomorrow, a divider, then a month calendar. It
- * knows nothing of the graph: it takes the chip's current choice and emits the one that is made.
+ * @file The date widget's menu: `Date.today`, `Date.yesterday` and `Date.tomorrow`, a divider, then a month calendar. It
+ * knows nothing of the graph: it takes the value's current choice and emits the one that is made.
  * Choosing writes nothing here; `WidgetDate.vue` does that.
  *
  * The calendar is Reka's `Calendar` (as the dashboard's `DatePicker` uses for its popover): arrows
  * move between days, Enter chooses one, PageUp and PageDown change the month. Escape asks to close.
  */
-import ChipMenuFrame from '@/components/GraphEditor/widgets/WidgetChip/ChipMenuFrame.vue'
+import PickerMenuFrame from '@/components/GraphEditor/widgets/WidgetPicker/PickerMenuFrame.vue'
 import { CalendarDate, type DateValue } from '@internationalized/date'
 import {
   CalendarCell,
@@ -26,7 +26,7 @@ import {
 import { computed, nextTick, onMounted, shallowRef, useTemplateRef } from 'vue'
 import {
   RELATIVE_CHOICES,
-  dateLabel,
+  dateExpressionCode,
   localToday,
   resolveChoice,
   type DateChoice,
@@ -34,7 +34,7 @@ import {
 } from './dateExpression'
 
 const props = defineProps<{
-  /** What the chip holds now; `undefined` for an unset argument. */
+  /** What the value holds now; `undefined` for an unset argument. */
   choice: DateChoice | undefined
   /** Today's date; the browser's by default. A test sets it. */
   today?: YearMonthDay | undefined
@@ -54,7 +54,7 @@ const selected = computed(() =>
   props.choice?.kind === 'date' ? toCalendarDate(props.choice) : null,
 )
 const placeholder = shallowRef<DateValue>(toCalendarDate(shownDay.value))
-/** The dates `Date.new` takes and the chip recognises (`isValidDate`): years 100 to 9999. */
+/** The dates `Date.new` takes and the widget recognises (`isValidDate`): years 100 to 9999. */
 const minValue = new CalendarDate(100, 1, 1)
 const maxValue = new CalendarDate(9999, 12, 31)
 
@@ -83,7 +83,7 @@ onMounted(() =>
 </script>
 
 <template>
-  <ChipMenuFrame ref="root" class="DateMenu" ariaLabel="Pick a date" @close="emit('close')">
+  <PickerMenuFrame ref="root" class="DateMenu" ariaLabel="Pick a date" @close="emit('close')">
     <ul class="relative">
       <li v-for="relative in RELATIVE_CHOICES" :key="relative.kind">
         <button
@@ -93,7 +93,7 @@ onMounted(() =>
           :data-choice="relative.kind"
           @click="emit('choose', relative)"
         >
-          {{ dateLabel(relative) }}
+          {{ dateExpressionCode(relative) }}
         </button>
       </li>
     </ul>
@@ -131,7 +131,7 @@ onMounted(() =>
         </CalendarGridBody>
       </CalendarGrid>
     </CalendarRoot>
-  </ChipMenuFrame>
+  </PickerMenuFrame>
 </template>
 
 <style scoped>

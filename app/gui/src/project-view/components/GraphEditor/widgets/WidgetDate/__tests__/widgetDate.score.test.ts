@@ -1,11 +1,10 @@
-/** @file Which inputs the date widget takes, and that it ranks between its neighbours. */
+/** @file Which inputs the date widget takes, and where it ranks. */
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import { Score, WidgetInput, type WidgetProps } from '$/providers/openedProjects/widgetRegistry'
 import { widgetDefinition as argumentNameWidget } from '@/components/GraphEditor/widgets/WidgetArgumentName.vue'
 import { widgetDefinition as dateWidget } from '@/components/GraphEditor/widgets/WidgetDate.vue'
 import { widgetDefinition as functionWidget } from '@/components/GraphEditor/widgets/WidgetFunction.vue'
-import { widgetDefinition as numberWidget } from '@/components/GraphEditor/widgets/WidgetNumber.vue'
-import { widgetDefinition as textWidget } from '@/components/GraphEditor/widgets/WidgetText.vue'
+import { widgetDefinition as selectionWidget } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import { Ast } from '@/util/ast'
 import { ArgumentInfoKey } from '@/util/callTree'
 import { describe, expect, test } from 'vitest'
@@ -36,58 +35,30 @@ const typedArgument = (reprType: string | undefined) =>
   }) as Partial<WidgetInput>
 
 describe('the date widget scores', () => {
-  test.each(['Date.today', 'Date.yesterday', 'Date.tomorrow', 'Date.new 2020 1 15'])(
-    '%s Perfect',
-    (code) => {
-      expect(score(inputFor(code))).toBe(Score.Perfect)
-    },
-  )
-
-  test('a Date-typed placeholder Perfect, by reprType or expected type', () => {
+  test('a Date-typed argument Perfect, by reprType or expected type', () => {
     expect(score(placeholder(typedArgument(DATE_TYPE)))).toBe(Score.Perfect)
     expect(score(placeholder({ expectedType: DATE_TYPE as never }))).toBe(Score.Perfect)
+    expect(score({ ...inputFor('Date.today'), ...typedArgument(DATE_TYPE) })).toBe(Score.Perfect)
   })
 
-  test('a placeholder holding a date default Perfect', () => {
-    expect(score(placeholder({ value: 'Date.today' }))).toBe(Score.Perfect)
-  })
-
-  test.each([
-    'date1',
-    'Date.new 2020 1',
-    'Date.new 2020 2 30',
-    'Date.new y 1 15',
-    'Date.today.add_days 3',
-    '5',
-    "'text'",
-  ])('%s Mismatch', (code) => {
-    expect(score(inputFor(code))).toBe(Score.Mismatch)
-  })
-
-  test('a Date-typed argument holding a variable or another expression Mismatch', () => {
-    const typed = typedArgument(DATE_TYPE)
-    expect(score({ ...inputFor('date1'), ...typed })).toBe(Score.Mismatch)
-    expect(score({ ...inputFor('Date.today.add_days 3'), ...typed })).toBe(Score.Mismatch)
-  })
-
-  test('other placeholders Mismatch', () => {
+  test('an untyped expression Mismatch, whatever its shape', () => {
+    expect(score(inputFor('Date.today'))).toBe(Score.Mismatch)
+    expect(score(placeholder({ value: 'Date.today' }))).toBe(Score.Mismatch)
     expect(score(placeholder())).toBe(Score.Mismatch)
-    expect(score(placeholder(typedArgument('Standard.Base.Data.Text.Text')))).toBe(Score.Mismatch)
-    expect(score(placeholder({ value: 'Missing_Argument.throw' }))).toBe(Score.Mismatch)
   })
 
-  test('the target of a call is not a date to pick', () => {
-    // `Date.today` here is the call's target; only the whole expression would be a value.
-    expect(score(inputFor('Date.today.add_days 3', 'Date.today'))).toBe(Score.Mismatch)
-    expect(score(inputFor('Date.today + x', 'Date.today'))).toBe(Score.Mismatch)
+  test('other types Mismatch', () => {
+    expect(score(placeholder(typedArgument('Standard.Base.Data.Text.Text')))).toBe(Score.Mismatch)
+    expect(
+      score(placeholder(typedArgument('Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day'))),
+    ).toBe(Score.Mismatch)
   })
 })
 
 describe('the date widget ranks', () => {
-  test('after the argument name, before the function and the text and number widgets', () => {
-    expect(dateWidget.priority).toBeGreaterThan(argumentNameWidget.priority)
+  test('after the dropdown widgets, before the argument name and the function', () => {
+    expect(dateWidget.priority).toBeGreaterThan(selectionWidget.priority)
+    expect(dateWidget.priority).toBeLessThan(argumentNameWidget.priority)
     expect(dateWidget.priority).toBeLessThan(functionWidget.priority)
-    expect(dateWidget.priority).toBeLessThan(textWidget.priority)
-    expect(dateWidget.priority).toBeLessThan(numberWidget.priority)
   })
 })

@@ -7,20 +7,18 @@ import {
   defineWidget,
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
-import ChipMenuShell from '@/components/GraphEditor/widgets/WidgetChip/ChipMenuShell.vue'
 import {
-  isPickableShape,
   parenthesisedApplication,
-} from '@/components/GraphEditor/widgets/WidgetChip/shape'
+  unparenthesisedCode,
+} from '@/components/GraphEditor/widgets/WidgetPicker/parentheses'
+import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
 import TimeOfDayMenu from '@/components/GraphEditor/widgets/WidgetTimeOfDay/TimeOfDayMenu.vue'
 import {
   TIME_OF_DAY_TYPE,
   parseTimeExpression,
   timeExpressionCode,
-  timeLabel,
   type TimeChoice,
 } from '@/components/GraphEditor/widgets/WidgetTimeOfDay/timeExpression'
-import { Ast } from '@/util/ast'
 import { ArgumentInfoKey } from '@/util/callTree'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
@@ -39,16 +37,7 @@ const timeImport = computed(() =>
   ),
 )
 
-const choice = computed(() => parseTimeExpression(WidgetInput.valueRepr(props.input)))
-const label = computed(() => (choice.value ? timeLabel(choice.value) : 'Pick a time'))
-/** An unset argument is drawn dimmed, as other widgets draw a default; its label is the default's. */
-const dimmed = computed(() => choice.value == null || WidgetInput.isPlaceholder(props.input))
-/** A default that is not one of the shapes (`Nothing`) is shown beside `Pick a time`, as code. */
-const hint = computed(() =>
-  choice.value == null && WidgetInput.isPlaceholder(props.input) ?
-    WidgetInput.valueRepr(props.input)
-  : undefined,
-)
+const choice = computed(() => parseTimeExpression(unparenthesisedCode(props.input)))
 
 /** One choice is one edit, so one undo step: the import and the new code go in together. */
 function choose(picked: TimeChoice, done: () => void) {
@@ -78,39 +67,22 @@ function isTimeTyped(input: WidgetInput): boolean {
 }
 
 /**
- * Priority 140, for the reasons the date widget's has: after `WidgetArgumentName` (100), which draws
- * the name and the missing-value style around the chip, and before `WidgetFunction` (200), which
- * would otherwise take `Time_Of_Day.new 14 30` as a call with number fields, and before the text and
- * number widgets (1001). `WidgetSelection` (50) and `WidgetFileBrowser` (49) come first.
- *
- * The score is `Perfect` for the shapes (`Time_Of_Day.now`, `Time_Of_Day.new` with two or three
- * integer literals) and for an unset Time_Of_Day-typed argument, and `Mismatch` for everything else.
+ * The date widget's counterpart for a `Time_Of_Day`-typed argument or item: its own widgets show
+ * the code (`Time_Of_Day.now`, or `Time_Of_Day.new` with `hour`, `minute` ports), and an arrow
+ * under it opens a menu that replaces the whole value. Priority 52, after the date widget (51).
  */
 export const widgetDefinition = defineWidget(
   WidgetInput.isAstOrPlaceholder,
   {
-    priority: 140,
-    score: (props) => {
-      const value = props.input.value
-      if (value instanceof Ast.Ast)
-        return isPickableShape(value, parseTimeExpression) ? Score.Perfect : Score.Mismatch
-      return isTimeTyped(props.input) || parseTimeExpression(value) != null ?
-          Score.Perfect
-        : Score.Mismatch
-    },
+    priority: 52,
+    score: (props) => (isTimeTyped(props.input) ? Score.Perfect : Score.Mismatch),
   },
   import.meta.hot,
 )
 </script>
 
 <template>
-  <ChipMenuShell
-    class="WidgetTimeOfDay"
-    :widget="props"
-    :label="label"
-    :placeholder="dimmed"
-    :hint="hint"
-  >
+  <PickerShell class="WidgetTimeOfDay" :widget="props">
     <template #menu="{ close, done, setAccept }">
       <TimeOfDayMenu
         :choice="choice"
@@ -119,5 +91,5 @@ export const widgetDefinition = defineWidget(
         @close="close"
       />
     </template>
-  </ChipMenuShell>
+  </PickerShell>
 </template>

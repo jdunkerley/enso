@@ -1,9 +1,8 @@
-/** @file Which expressions the chips take (never a whole node) and when what they write is parenthesised. */
+/** @file When what the date and time widgets write is parenthesised. */
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import { Ast } from '@/util/ast'
 import { describe, expect, test } from 'vitest'
-import { parseDateExpression } from '../../WidgetDate/dateExpression'
-import { isPickableShape, parenthesisedApplication } from '../shape'
+import { parenthesisedApplication, unparenthesisedCode } from '../parentheses'
 
 /** The node of the parsed block `code` whose code is `subject`; the outermost one. */
 function find(code: string, subject: string): Ast.Ast {
@@ -17,28 +16,6 @@ function find(code: string, subject: string): Ast.Ast {
 }
 
 const NEW = 'Date.new 2020 1 15'
-
-describe('isPickableShape', () => {
-  test.each([
-    [`date1 = ${NEW}`, NEW],
-    [NEW, NEW],
-    [`date1 = (${NEW})`, NEW],
-    ['date1 = Date.today', 'Date.today'],
-    ['t = Time_Of_Day.now', 'Time_Of_Day.now'],
-  ])('a whole node is not a chip: %s', (code, subject) => {
-    const parse = subject.startsWith('Date') ? parseDateExpression : () => ({})
-    expect(isPickableShape(find(code, subject), parse)).toBe(false)
-  })
-
-  test.each([
-    [`x = foo (${NEW})`, NEW],
-    [`x = foo Date.today`, 'Date.today'],
-    [`x = [${NEW}, ${NEW}]`, NEW],
-    [`x = a + Date.today`, 'Date.today'],
-  ])('an argument, an operand or an item is: %s', (code, subject) => {
-    expect(isPickableShape(find(code, subject), parseDateExpression)).toBe(true)
-  })
-})
 
 describe('parenthesisedApplication', () => {
   const portOf = (ast: Ast.Ast) => ast.id as WidgetInput['portId']
@@ -69,5 +46,20 @@ describe('parenthesisedApplication', () => {
     expect(parenthesisedApplication(NEW, item, portOf(item))).toBe(NEW)
     const root = find(`x = ${NEW}`, NEW)
     expect(parenthesisedApplication(NEW, root, portOf(root))).toBe(NEW)
+  })
+})
+
+describe('unparenthesisedCode', () => {
+  test.each([
+    [`x = foo (${NEW})`, `(${NEW})`, NEW],
+    [`x = foo ((${NEW}))`, `((${NEW}))`, NEW],
+    ['x = foo Date.today', 'Date.today', 'Date.today'],
+  ])('%s', (code, subject, expected) => {
+    expect(unparenthesisedCode(WidgetInput.FromAst(find(code, subject)))).toBe(expected)
+  })
+
+  test('an unset argument has its default, as code', () => {
+    const input = { portId: 'p' as WidgetInput['portId'], value: 'Date.today' }
+    expect(unparenthesisedCode(input)).toBe('Date.today')
   })
 })

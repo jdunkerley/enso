@@ -1,11 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import {
-  isoTime,
-  parseTimeExpression,
-  timeExpressionCode,
-  timeLabel,
-  type TimeChoice,
-} from '../timeExpression'
+import { parseTimeExpression, timeExpressionCode, type TimeChoice } from '../timeExpression'
 
 describe('parseTimeExpression', () => {
   test.each([
@@ -56,23 +50,5 @@ describe('timeExpressionCode', () => {
     expect(timeExpressionCode(choice)).toBe(code)
     // What a choice writes is what it reads back as.
     expect(parseTimeExpression(code)).toEqual(choice)
-  })
-})
-
-describe('timeLabel', () => {
-  test.each([
-    [{ kind: 'now' }, 'Now'],
-    [{ kind: 'time', hour: 0, minute: 0, second: 0 }, '00:00'],
-    [{ kind: 'time', hour: 14, minute: 0, second: 0 }, '14:00'],
-    [{ kind: 'time', hour: 14, minute: 30, second: 0 }, '14:30'],
-    [{ kind: 'time', hour: 9, minute: 5, second: 7 }, '09:05:07'],
-    [{ kind: 'time', hour: 14, minute: 30, second: 15 }, '14:30:15'],
-  ] satisfies [TimeChoice, string][])('%j is labelled %s', (choice, label) => {
-    expect(timeLabel(choice)).toBe(label)
-  })
-
-  test('isoTime pads, and shows seconds on request', () => {
-    expect(isoTime({ hour: 3, minute: 4, second: 5 }, false)).toBe('03:04')
-    expect(isoTime({ hour: 3, minute: 4, second: 5 }, true)).toBe('03:04:05')
   })
 })

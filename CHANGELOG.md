@@ -2,13 +2,12 @@
 
 #### Enso IDE
 
-- [A date argument shows a single chip, `Today`, `Yesterday`, `Tomorrow` or a
-  date such as `2020-01-15`, instead of a text box or three number fields.
-  Clicking it opens a menu of those three days and a calendar; it writes
-  `Date.today`, `Date.yesterday`, `Date.tomorrow` or `Date.new`. Items of a list
-  of dates get the chip too. A time-of-day argument likewise shows a chip, `Now`
-  or a time such as `14:30`, whose menu has `Now` and a time field you can type
-  into; it writes `Time_Of_Day.now` or `Time_Of_Day.new`.][789]
+- [A date argument has a dropdown arrow under it that opens a menu of
+  `Date.today`, `Date.yesterday`, `Date.tomorrow` and a calendar; the argument
+  shows the code it holds, and a `Date.new` shows its year, month and day as
+  fields. Items of a list of dates get the arrow too. A time-of-day argument
+  likewise has a menu of `Time_Of_Day.now` and a time field you can type
+  into.][789]
 - [The help panel shows each argument's type, default, widget and description in
   a tooltip on the component's node, and can expand the node to list them.
   Examples have a Copy button that pastes them into the graph as

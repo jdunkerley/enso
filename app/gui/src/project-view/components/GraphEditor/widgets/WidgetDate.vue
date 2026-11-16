@@ -7,20 +7,18 @@ import {
   defineWidget,
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
-import ChipMenuShell from '@/components/GraphEditor/widgets/WidgetChip/ChipMenuShell.vue'
 import {
-  isPickableShape,
   parenthesisedApplication,
-} from '@/components/GraphEditor/widgets/WidgetChip/shape'
+  unparenthesisedCode,
+} from '@/components/GraphEditor/widgets/WidgetPicker/parentheses'
+import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
 import DateMenu from '@/components/GraphEditor/widgets/WidgetDate/DateMenu.vue'
 import {
   DATE_TYPE,
   dateExpressionCode,
-  dateLabel,
   parseDateExpression,
   type DateChoice,
 } from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
-import { Ast } from '@/util/ast'
 import { ArgumentInfoKey } from '@/util/callTree'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
@@ -36,16 +34,7 @@ const dateImport = computed(() =>
   ),
 )
 
-const choice = computed(() => parseDateExpression(WidgetInput.valueRepr(props.input)))
-const label = computed(() => (choice.value ? dateLabel(choice.value) : 'Pick a date'))
-/** An unset argument is drawn dimmed, as other widgets draw a default; its label is the default's. */
-const dimmed = computed(() => choice.value == null || WidgetInput.isPlaceholder(props.input))
-/** A default that is not one of the shapes (`Nothing`) is shown beside `Pick a date`, as code. */
-const hint = computed(() =>
-  choice.value == null && WidgetInput.isPlaceholder(props.input) ?
-    WidgetInput.valueRepr(props.input)
-  : undefined,
-)
+const choice = computed(() => parseDateExpression(unparenthesisedCode(props.input)))
 
 /** One choice is one edit, so one undo step: the import and the new code go in together. */
 function choose(picked: DateChoice, done: () => void) {
@@ -78,44 +67,29 @@ function isDateTyped(input: WidgetInput): boolean {
 }
 
 /**
- * Priority 140: after `WidgetArgumentName` (100), which then draws the name, the required-argument
- * arrow and the missing-value style around the chip as it does for any placeholder, and before
- * `WidgetFunction` (200), which would otherwise take `Date.today` and `Date.new 2020 1 15` as calls
- * and draw `Date.new` with three number fields. It is also before the text and number widgets
- * (1001) that a Date-typed placeholder would otherwise get. `WidgetSelection` (50) and
- * `WidgetFileBrowser` (49) come first, so an argument with its own dropdown keeps it.
+ * A dropdown around a `Date`-typed argument or item: its own widgets show the code (`Date.today`,
+ * or `Date.new` with `year`, `month` and `day` ports), and an arrow under it opens a menu that
+ * replaces the whole value. Only a typed input takes it, so a whole node (which has no expected
+ * type) and an untyped `Date.new ...` are drawn as any other expression.
  *
- * The score is `Perfect` for the four shapes and for an unset Date-typed argument, and `Mismatch`
- * for everything else: a variable, a connected port or another expression is left to the widgets
- * that show it today.
+ * Priority 51, just after `WidgetSelection` (50) and `WidgetFileBrowser` (49): an argument with its
+ * own dropdown keeps it, and the widgets that follow (argument name, function) draw the argument as
+ * they do under any dropdown.
  */
 export const widgetDefinition = defineWidget(
   WidgetInput.isAstOrPlaceholder,
   {
-    priority: 140,
-    score: (props) => {
-      const value = props.input.value
-      if (value instanceof Ast.Ast)
-        return isPickableShape(value, parseDateExpression) ? Score.Perfect : Score.Mismatch
-      return isDateTyped(props.input) || parseDateExpression(value) != null ?
-          Score.Perfect
-        : Score.Mismatch
-    },
+    priority: 51,
+    score: (props) => (isDateTyped(props.input) ? Score.Perfect : Score.Mismatch),
   },
   import.meta.hot,
 )
 </script>
 
 <template>
-  <ChipMenuShell
-    class="WidgetDate"
-    :widget="props"
-    :label="label"
-    :placeholder="dimmed"
-    :hint="hint"
-  >
+  <PickerShell class="WidgetDate" :widget="props">
     <template #menu="{ close, done }">
       <DateMenu :choice="choice" @choose="choose($event, done)" @close="close" />
     </template>
-  </ChipMenuShell>
+  </PickerShell>
 </template>

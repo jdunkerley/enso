@@ -1,7 +1,6 @@
 /**
- * @file The date widget's expression <-> choice mapping: which code an argument holds as a date
- * chip, the chip's label, and the code a choice writes. Framework-free, so it is unit-tested alone
- * (`docs/superpowers/specs/2026-11-15-date-widget-design.md`).
+ * @file The date widget's expression <-> choice mapping: which code a value holds as a date, and the code a choice writes. Framework-free, so it is
+ * unit-tested alone (`docs/superpowers/specs/2026-11-15-date-widget-design.md`).
  */
 
 /** The qualified name of the `Date` type, which a typed argument's `reprType` or `expectedType` has. */
@@ -14,7 +13,7 @@ export interface YearMonthDay {
   readonly day: number
 }
 
-/** What the chip stands for: a relative day, or a specific date. */
+/** What the value stands for: a relative day, or a specific date. */
 export type DateChoice =
   | { readonly kind: 'today' }
   | { readonly kind: 'yesterday' }
@@ -87,26 +86,6 @@ export function dateExpressionCode(choice: DateChoice): string {
       return 'Date.tomorrow'
     case 'date':
       return `Date.new ${choice.year} ${choice.month} ${choice.day}`
-  }
-}
-
-/** A specific date as `2020-01-15`. */
-export function isoDate({ year, month, day }: YearMonthDay): string {
-  const pad = (n: number, width: number) => String(n).padStart(width, '0')
-  return `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)}`
-}
-
-/** The chip's label for a choice: `Today`, `Yesterday`, `Tomorrow` or `2020-01-15`. */
-export function dateLabel(choice: DateChoice): string {
-  switch (choice.kind) {
-    case 'today':
-      return 'Today'
-    case 'yesterday':
-      return 'Yesterday'
-    case 'tomorrow':
-      return 'Tomorrow'
-    case 'date':
-      return isoDate(choice)
   }
 }
 

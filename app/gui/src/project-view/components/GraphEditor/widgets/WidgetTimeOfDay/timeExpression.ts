@@ -1,6 +1,6 @@
 /**
- * @file The time-of-day widget's expression <-> choice mapping: which code an argument holds as a
- * time chip, the chip's label, and the code a choice writes. Framework-free, so it is unit-tested
+ * @file The time-of-day widget's expression <-> choice mapping: which code a value holds as a
+ * time, and the code a choice writes. Framework-free, so it is unit-tested
  * alone (`docs/superpowers/specs/2026-11-15-date-widget-design.md`, "Time_Of_Day").
  */
 
@@ -14,7 +14,7 @@ export interface HourMinuteSecond {
   readonly second: number
 }
 
-/** What the chip stands for: the current time, or a specific one. */
+/** What the value stands for: the current time, or a specific one. */
 export type TimeChoice = { readonly kind: 'now' } | ({ readonly kind: 'time' } & HourMinuteSecond)
 
 /** `Time_Of_Day.new` and two or three integer literals: hour, minute, second. */
@@ -55,17 +55,6 @@ export function timeExpressionCode(choice: TimeChoice): string {
   if (choice.kind === 'now') return 'Time_Of_Day.now'
   const { hour, minute, second } = choice
   return `Time_Of_Day.new ${hour} ${minute}${second !== 0 ? ` ${second}` : ''}`
-}
-
-/** A time as `14:30`, or `14:30:15` when `withSeconds`. */
-export function isoTime({ hour, minute, second }: HourMinuteSecond, withSeconds: boolean): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(hour)}:${pad(minute)}${withSeconds ? `:${pad(second)}` : ''}`
-}
-
-/** The chip's label for a choice: `Now`, `14:30` or `14:30:15` (seconds only when they are set). */
-export function timeLabel(choice: TimeChoice): string {
-  return choice.kind === 'now' ? 'Now' : isoTime(choice, choice.second !== 0)
 }
 
 /** The local time of `now`, with seconds. */

@@ -55,41 +55,42 @@ is already on the row, drawn by `WidgetIcon` at the root.
 - `WidgetIcon.vue` — owns the `DisplayIcon` symbol. Other widgets attach to it
   via `input[DisplayIcon] = { icon, showContents?, noGap? }` to request an
   inline icon in front of a child widget.
-- `WidgetDate.vue` — a chip (`Today`, `Yesterday`, `Tomorrow`, `2020-01-15`, or
-  `Pick a date`) for a `Date`-typed argument or item and for the four shapes
-  `Date.today`, `Date.yesterday`, `Date.tomorrow` and `Date.new <y> <m> <d>`,
-  with a menu (`WidgetDate/DateMenu.vue`: the three relative days, then a Reka
-  calendar). Priority 140: after `WidgetArgumentName`, before `WidgetFunction`;
-  its comment explains it. `WidgetDate/dateExpression.ts` is the framework-free
-  expression <-> label mapping. **A whole node is never a chip**
-  (`date1 = Date.new 2020 1 15` keeps `WidgetFunction`'s fields, whose ports an
-  edge can reach): `isPickableShape` scores `Mismatch` for a shape that is a
-  node's expression. A specific date is written parenthesised
-  (`(Date.new 2020 1 15)`) wherever it becomes an argument: an unparenthesised
-  application written as a string splits into one group per argument. The
-  decision is made on the AST the _port_ names
-  (`parenthesisedApplication(code, value, portId)`), not on the value's parent:
-  `WidgetGroup` hands the chip its inner expression with the Group's port, so
-  the write replaces the parentheses too. Only a node's expression and a vector
-  item are written bare. An unset argument whose default is a shape shows the
-  chip dimmed with the default's label; any other default shows after
-  `Pick a date`, dimmed. The chip's accessible name is `name: label`. Design:
+- `WidgetDate.vue` — a dropdown wrapper for a `Date`-typed input (the argument's
+  `reprType` or the input's `expectedType`, vector items included; nothing
+  untyped, and so never a whole node). It renders `<NodeWidget>` over its own
+  input, so the argument shows its real code (`Date.today`, or `Date.new` with
+  `year`, `month` and `day` ports), plus a `SelectionArrow` under it; the arrow
+  opens a menu (`WidgetDate/DateMenu.vue`: `Date.today`, `Date.yesterday`,
+  `Date.tomorrow`, then a Reka calendar) that **replaces the whole value** in
+  one `module.edit` (the import goes in the same edit). Priority 51, after
+  `WidgetSelection` (50), so an argument with its own `@` dropdown keeps it, and
+  before `WidgetArgumentName`, which draws the name inside it.
+  `WidgetDate/dateExpression.ts` is the framework-free expression <-> choice
+  mapping. A specific date is written parenthesised (`(Date.new 2020 1 15)`)
+  wherever it becomes an argument: an unparenthesised application written as a
+  string splits into one group per argument. The decision is made on the AST the
+  _port_ names (`parenthesisedApplication(code, value, portId)`), not on the
+  value's parent: `WidgetGroup` hands its inner expression on with the Group's
+  port, so the write replaces the parentheses too. Only a node's expression and
+  a vector item are written bare. The menu opens on the current value through
+  `unparenthesisedCode`. Design:
   `docs/superpowers/specs/2026-11-15-date-widget-design.md`.
-- `WidgetTimeOfDay.vue` — the same chip for a `Time_Of_Day`-typed argument or
-  item and for `Time_Of_Day.now` (`Now`) and `Time_Of_Day.new` with 2 or 3
-  integer literals (`14:30`, `14:30:15`, or `Pick a time`); `Time_Of_Day.new`
-  and `Time_Of_Day.new 14` stay `WidgetFunction`'s, as a chip would hide the
-  placeholders of the arguments left out. Its menu
-  (`WidgetTimeOfDay/TimeOfDayMenu.vue`) is `Now` and a Reka `TimeField` (hours
-  and minutes, seconds on request, written only when not zero): Enter in the
-  field, leaving it or a click outside the menu writes it (the shell calls the
-  handler the menu registers with `setAccept` before it ends the interaction),
-  Escape and the chip's toggle do not. A cleared segment blocks the write until
-  it is filled in. `timeExpression.ts` is the mapping. The chip, its floating
-  menu and the interaction are `WidgetChip/ChipMenuShell.vue`, the menu frame is
-  `WidgetChip/ChipMenuFrame.vue` and the "is this a value to pick" and
-  parenthesising rules are `WidgetChip/shape.ts`, all shared with `WidgetDate`.
-  Same priority (140) and rules.
+- `WidgetTimeOfDay.vue` — the same for a `Time_Of_Day`-typed input (priority 52;
+  `Time_Of_Day.now`, or `Time_Of_Day.new` with `hour`, `minute` and `second`
+  ports). Its menu (`WidgetTimeOfDay/TimeOfDayMenu.vue`) is `Time_Of_Day.now`
+  and a Reka `TimeField` (hours and minutes, seconds on request, written only
+  when not zero): Enter in the field, leaving it or a click outside the menu
+  writes it (the shell calls the handler the menu registers with `setAccept`
+  before it ends the interaction), Escape and the arrow's toggle do not. A
+  cleared segment blocks the write until it is filled in. `timeExpression.ts` is
+  the mapping. The wrapper, its floating menu and the interaction are
+  `WidgetPicker/PickerShell.vue`, the menu frame is
+  `WidgetPicker/PickerMenuFrame.vue` and the parenthesising rule is
+  `WidgetPicker/parentheses.ts`, all shared with `WidgetDate`. **The menu is
+  open only when the widget asked for it** (`menuOpen`): editing a nested number
+  makes the widget's interaction active too (as it does for `WidgetSelection`,
+  which then opens its list), and must not show the menu. A nested number's
+  `@click.stop` keeps its clicks from toggling it.
 - `WidgetFileBrowser.vue` — a file, folder or `Enso_Secret` argument's dropdown:
   `WidgetFileBrowser/localBrowser.ts` (the native file dialog),
   `localSecrets.ts` (the local secrets and **New secret…**, which set

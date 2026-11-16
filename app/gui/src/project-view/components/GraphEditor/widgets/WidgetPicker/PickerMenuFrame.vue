@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * @file The frame of a chip's menu, shared by the date and time-of-day menus: a rounded dropdown
+ * @file The frame of a widget's menu, shared by the date and time-of-day menus: a rounded dropdown
  * dialog that keeps its keys, clicks and wheel to itself, and asks to close on Escape. The slot
  * holds `.item` buttons (full-width rows) and `.divider` rules, which the frame styles.
  */
@@ -10,7 +10,7 @@ const emit = defineEmits<{ close: [] }>()
 
 <template>
   <div
-    class="ChipMenuFrame"
+    class="PickerMenuFrame"
     role="dialog"
     :aria-label="ariaLabel"
     @keydown.escape.stop.prevent="emit('close')"
@@ -23,7 +23,7 @@ const emit = defineEmits<{ close: [] }>()
 </template>
 
 <style scoped>
-.ChipMenuFrame {
+.PickerMenuFrame {
   --item-height: 23px;
   --dropdown-padding: 6px;
   min-width: 200px;
@@ -35,7 +35,7 @@ const emit = defineEmits<{ close: [] }>()
   border-radius: calc(var(--item-height) / 2 + var(--dropdown-padding));
 }
 
-.ChipMenuFrame :deep(.item) {
+.PickerMenuFrame :deep(.item) {
   display: flex;
   align-items: center;
   width: 100%;
@@ -54,7 +54,7 @@ const emit = defineEmits<{ close: [] }>()
   }
 }
 
-.ChipMenuFrame :deep(.divider) {
+.PickerMenuFrame :deep(.divider) {
   margin: 4px 0;
   border: none;
   border-top: 1px solid color-mix(in oklab, var(--dropdown-bg), black 12%);

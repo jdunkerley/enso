@@ -1,5 +1,5 @@
 /**
- * @file The time-of-day menu: Now and the time field write the expected code, and the keyboard
+ * @file The time-of-day menu: Time_Of_Day.now and the time field write the expected code, and the keyboard
  * edits the field, commits with Enter or blur, and cancels with Escape.
  */
 import userEvent from '@testing-library/user-event'
@@ -36,9 +36,9 @@ describe('the time-of-day menu', () => {
     expect(chosenCodes(wrapper)).toEqual(['Time_Of_Day.now'])
   })
 
-  test('lists Now, then a field of hours and minutes', async () => {
+  test('lists Time_Of_Day.now, then a field of hours and minutes', async () => {
     const wrapper = await mountMenu(undefined)
-    expect(wrapper.findAll('.item').map((item) => item.text())).toEqual(['Now'])
+    expect(wrapper.findAll('.item').map((item) => item.text())).toEqual(['Time_Of_Day.now'])
     expect(wrapper.find('.divider').exists()).toBe(true)
     expect(segments()).toHaveLength(2)
   })

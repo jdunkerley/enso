@@ -1143,69 +1143,95 @@ test.describe('Date widget', () => {
       notAppliedArguments: [0],
     })
     const node = locate.graphNodeByBinding(page, 'since')
-    const chip = node.locator('.WidgetDate .chip')
-    await expect(chip).toHaveCount(1)
-    return { node, chip }
+    const widget = node.locator('.WidgetDate')
+    await expect(widget).toHaveCount(1)
+    const menu = page.locator('.DateMenu')
+    /** Opens the menu: the arrow under the argument appears on hover. */
+    const open = async () => {
+      await widget.hover()
+      await expect(widget.locator('svg.arrow')).toBeVisible()
+      // The corner, not the middle: the middle of a written `Date.new` is a number field.
+      await widget.click({ position: { x: 4, y: 4 } })
+      await expect(menu).toBeVisible()
+    }
+    return { node, widget, menu, open }
   }
 
+  /** The module's code; the code editor is closed again afterwards. */
   async function moduleCode(page: Page): Promise<string> {
     await page.keyboard.press('ControlOrMeta+`')
     await expect(page.locator('.CodeEditor')).toBeVisible()
-    return page.evaluate(() => (window as any).__codeEditorApi.textContent())
+    const code = await page.evaluate(() => (window as any).__codeEditorApi.textContent())
+    await page.keyboard.press('ControlOrMeta+`')
+    await expect(page.locator('.CodeEditor')).toBeHidden()
+    return code
   }
 
-  test('a Date-typed argument shows the chip, and a relative choice writes the short method', async ({
+  const days = '[data-reka-calendar-cell-trigger]:not([data-outside-view])'
+
+  test('a Date-typed argument has the arrow, and a relative choice writes the code it names', async ({
     editorPage,
     page,
   }) => {
-    const { node, chip } = await dateNode(editorPage, page)
-    await expect(chip).toHaveText('Pick a date')
-    await expect(chip).toHaveAttribute('aria-label', 'date: Pick a date')
-    await expect(node.locator('.WidgetNumber, .WidgetText')).toHaveCount(0)
-    await chip.click()
-    const menu = page.locator('.DateMenu')
-    await expect(menu).toBeVisible()
-    await expect(menu.locator('.item')).toHaveText(['Today', 'Yesterday', 'Tomorrow'])
-    await menu.getByRole('button', { name: 'Yesterday' }).click()
+    const { widget, menu, open } = await dateNode(editorPage, page)
+    await open()
+    await expect(menu.locator('.item')).toHaveText([
+      'Date.today',
+      'Date.yesterday',
+      'Date.tomorrow',
+    ])
+    await menu.getByRole('button', { name: 'Date.yesterday' }).click()
     await expect(menu).toBeHidden()
-    await expect(chip).toHaveText('Yesterday')
+    await expect(widget).toContainText(/Date\W*yesterday/)
     const code = await moduleCode(page)
     expect(code).toContain('since = Data.days_since Date.yesterday')
     expect(code).toContain('from Standard.Base import Date')
   })
 
-  test('a calendar choice writes Date.new, which the chip shows as an ISO date', async ({
+  test('a calendar choice writes Date.new, whose year, month and day are fields', async ({
     editorPage,
     page,
   }) => {
-    const { chip } = await dateNode(editorPage, page)
-    await chip.click()
-    const menu = page.locator('.DateMenu')
-    await expect(menu).toBeVisible()
-    await menu.locator('[data-reka-calendar-cell-trigger]:not([data-outside-view])').nth(14).click()
+    const { widget, menu, open } = await dateNode(editorPage, page)
+    await open()
+    await menu.locator(days).nth(14).click()
     await expect(menu).toBeHidden()
-    await expect(chip).toHaveText(/^\d{4}-\d{2}-15$/)
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
     expect(await moduleCode(page)).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 15\)\n/)
-    await page.keyboard.press('ControlOrMeta+`')
     // Reopened, the calendar marks the chosen day, and the keyboard closes it.
-    await chip.click()
+    await open()
     await expect(menu.locator('[aria-selected="true"]')).toHaveText('15')
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
   })
 
+  test('editing a field of the written date edits the number and does not open the menu', async ({
+    editorPage,
+    page,
+  }) => {
+    const { widget, menu, open } = await dateNode(editorPage, page)
+    await open()
+    await menu.locator(days).nth(14).click()
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
+    const day = widget.locator('.WidgetNumber').nth(2)
+    await day.click()
+    await expect(day).toBeFocused()
+    await expect(menu).toBeHidden()
+    await day.fill('20')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 20\)\n/)
+  })
+
   test('picking a specific date twice keeps the parentheses', async ({ editorPage, page }) => {
-    const { chip } = await dateNode(editorPage, page)
-    const menu = page.locator('.DateMenu')
-    const days = '[data-reka-calendar-cell-trigger]:not([data-outside-view])'
-    await chip.click()
+    const { widget, menu, open } = await dateNode(editorPage, page)
+    await open()
     await menu.locator(days).nth(14).click()
     await expect(menu).toBeHidden()
-    await expect(chip).toHaveText(/^\d{4}-\d{2}-15$/)
-    await chip.click()
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
+    await open()
     await menu.locator(days).nth(15).click()
     await expect(menu).toBeHidden()
-    await expect(chip).toHaveText(/^\d{4}-\d{2}-16$/)
     const code = await moduleCode(page)
     expect(code).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 16\)\n/)
     expect(code).not.toMatch(/since = Data\.days_since Date\.new/)
@@ -1215,21 +1241,22 @@ test.describe('Date widget', () => {
     editorPage,
     page,
   }) => {
-    const { chip } = await dateNode(editorPage, page)
-    const menu = page.locator('.DateMenu')
-    const days = '[data-reka-calendar-cell-trigger]:not([data-outside-view])'
-    await chip.click()
+    const { widget, menu, open } = await dateNode(editorPage, page)
+    await open()
     await menu.locator(days).nth(14).click()
     await expect(menu).toBeHidden()
-    await chip.click()
+    await open()
     await menu.locator(days).nth(14).click()
     await expect(menu).toBeHidden()
     // One undo step takes the date back out: the second click wrote nothing.
     await page.keyboard.press('ControlOrMeta+Z')
-    await expect(chip).toHaveText('Pick a date')
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(0)
   })
 
-  test('a whole node is not a chip: its fields keep their ports', async ({ editorPage, page }) => {
+  test('an untyped Date.new, and a whole node, are drawn as any other expression', async ({
+    editorPage,
+    page,
+  }) => {
     await dateNode(editorPage, page)
     const node = locate.graphNodeByBinding(page, 'date1')
     await expect(node).toBeVisible()
@@ -1240,37 +1267,32 @@ test.describe('Date widget', () => {
     editorPage,
     page,
   }) => {
-    const { node, chip } = await dateNode(editorPage, page)
-    await chip.click()
-    await page.locator('.DateMenu').getByRole('button', { name: 'Tomorrow' }).click()
-    await expect(chip).toHaveText('Tomorrow')
+    const { widget, menu, open } = await dateNode(editorPage, page)
+    await open()
+    await menu.getByRole('button', { name: 'Date.tomorrow' }).click()
+    await expect(widget).toContainText(/Date\W*tomorrow/)
     expect(await moduleCode(page)).toContain('from Standard.Base import Date')
-    await page.keyboard.press('ControlOrMeta+`')
     await page.keyboard.press('ControlOrMeta+Z')
-    await expect(node.locator('.WidgetDate .chip')).toHaveText('Pick a date')
+    await expect(widget).not.toContainText(/tomorrow/)
     const code = await moduleCode(page)
     expect(code).not.toContain('import Date')
     expect(code).not.toContain('Date.tomorrow')
   })
 
   test('a parenthesised date is one undo step too', async ({ editorPage, page }) => {
-    const { node, chip } = await dateNode(editorPage, page)
-    const menu = page.locator('.DateMenu')
-    const days = '[data-reka-calendar-cell-trigger]:not([data-outside-view])'
-    await chip.click()
+    const { widget, menu, open } = await dateNode(editorPage, page)
+    await open()
     await menu.locator(days).nth(14).click()
-    await expect(chip).toHaveText(/-15$/)
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
     // Edits within the undo manager's capture timeout (500 ms) merge into one step.
     await page.waitForTimeout(600)
-    await chip.click()
+    await open()
     await menu.locator(days).nth(15).click()
-    await expect(chip).toHaveText(/-16$/)
+    await expect(menu).toBeHidden()
     await page.keyboard.press('ControlOrMeta+Z')
-    await expect(chip).toHaveText(/-15$/)
     expect(await moduleCode(page)).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 15\)\n/)
-    await page.keyboard.press('ControlOrMeta+`')
     await page.keyboard.press('ControlOrMeta+Z')
-    await expect(node.locator('.WidgetDate .chip')).toHaveText('Pick a date')
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(0)
     expect(await moduleCode(page)).not.toContain('import Date')
   })
 })
@@ -1323,32 +1345,40 @@ test.describe('Time_Of_Day widget', () => {
       notAppliedArguments: [0],
     })
     const node = locate.graphNodeByBinding(page, 'since')
-    const chip = node.locator('.WidgetTimeOfDay .chip')
-    await expect(chip).toHaveCount(1)
-    return { node, chip }
+    const widget = node.locator('.WidgetTimeOfDay')
+    await expect(widget).toHaveCount(1)
+    const menu = page.locator('.TimeOfDayMenu')
+    /** Opens the menu: the arrow under the argument appears on hover. */
+    const open = async () => {
+      await widget.hover()
+      await expect(widget.locator('svg.arrow')).toBeVisible()
+      // The corner, not the middle: the middle of a written `Date.new` is a number field.
+      await widget.click({ position: { x: 4, y: 4 } })
+      await expect(menu).toBeVisible()
+    }
+    return { node, widget, menu, open }
   }
 
+  /** The module's code; the code editor is closed again afterwards. */
   async function moduleCode(page: Page): Promise<string> {
     await page.keyboard.press('ControlOrMeta+`')
     await expect(page.locator('.CodeEditor')).toBeVisible()
-    return page.evaluate(() => (window as any).__codeEditorApi.textContent())
+    const code = await page.evaluate(() => (window as any).__codeEditorApi.textContent())
+    await page.keyboard.press('ControlOrMeta+`')
+    await expect(page.locator('.CodeEditor')).toBeHidden()
+    return code
   }
 
-  test('a Time_Of_Day-typed argument shows the chip, and Now writes the short method', async ({
+  test('a Time_Of_Day-typed argument has the arrow, and Time_Of_Day.now writes the code it names', async ({
     editorPage,
     page,
   }) => {
-    const { node, chip } = await timeNode(editorPage, page)
-    await expect(chip).toHaveText('Pick a time')
-    await expect(chip).toHaveAttribute('aria-label', 'time: Pick a time')
-    await expect(node.locator('.WidgetNumber, .WidgetText')).toHaveCount(0)
-    await chip.click()
-    const menu = page.locator('.TimeOfDayMenu')
-    await expect(menu).toBeVisible()
-    await expect(menu.locator('.item')).toHaveText(['Now'])
-    await menu.getByRole('button', { name: 'Now' }).click()
+    const { widget, menu, open } = await timeNode(editorPage, page)
+    await open()
+    await expect(menu.locator('.item')).toHaveText(['Time_Of_Day.now'])
+    await menu.getByRole('button', { name: 'Time_Of_Day.now' }).click()
     await expect(menu).toBeHidden()
-    await expect(chip).toHaveText('Now')
+    await expect(widget).toContainText(/Time_Of_Day\W*now/)
     const code = await moduleCode(page)
     expect(code).toContain('since = Data.seconds_since Time_Of_Day.now')
     expect(code).toContain('from Standard.Base import Time_Of_Day')
@@ -1358,37 +1388,55 @@ test.describe('Time_Of_Day widget', () => {
     editorPage,
     page,
   }) => {
-    const { chip } = await timeNode(editorPage, page)
-    await chip.click()
-    const menu = page.locator('.TimeOfDayMenu')
-    await expect(menu).toBeVisible()
+    const { widget, menu, open } = await timeNode(editorPage, page)
+    await open()
     await expect(menu.getByRole('spinbutton').first()).toBeFocused()
     await page.keyboard.type('1430')
     await page.keyboard.press('Enter')
     await expect(menu).toBeHidden()
-    await expect(chip).toHaveText('14:30')
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(2)
     expect(await moduleCode(page)).toMatch(
       /since = Data\.seconds_since \(Time_Of_Day\.new 14 30\)\n/,
     )
-    await page.keyboard.press('ControlOrMeta+`')
     // Reopened, the field shows the written time; Escape closes without a change.
-    await chip.click()
+    await open()
     await expect(menu.getByRole('spinbutton').first()).toHaveText('14')
     await page.keyboard.press('ArrowUp')
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
-    await expect(chip).toHaveText('14:30')
+    expect(await moduleCode(page)).toMatch(
+      /since = Data\.seconds_since \(Time_Of_Day\.new 14 30\)\n/,
+    )
+  })
+
+  test('editing a field of the written time edits the number and does not open the menu', async ({
+    editorPage,
+    page,
+  }) => {
+    const { widget, menu, open } = await timeNode(editorPage, page)
+    await open()
+    await page.keyboard.type('1430')
+    await page.keyboard.press('Enter')
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(2)
+    const minute = widget.locator('.WidgetNumber').nth(1)
+    await minute.click()
+    await expect(minute).toBeFocused()
+    await expect(menu).toBeHidden()
+    await minute.fill('45')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toMatch(
+      /since = Data\.seconds_since \(Time_Of_Day\.new 14 45\)\n/,
+    )
   })
 
   test('typing a time and clicking outside the menu writes it', async ({ editorPage, page }) => {
-    const { chip } = await timeNode(editorPage, page)
-    await chip.click()
-    const menu = page.locator('.TimeOfDayMenu')
+    const { menu, open } = await timeNode(editorPage, page)
+    await open()
     await expect(menu.getByRole('spinbutton').first()).toBeFocused()
     await page.keyboard.type('0915')
     await page.mouse.click(0, 0)
     await expect(menu).toBeHidden()
-    await expect(chip).toHaveText('09:15')
     expect(await moduleCode(page)).toMatch(
       /since = Data\.seconds_since \(Time_Of_Day\.new 9 15\)\n/,
     )
@@ -1398,33 +1446,29 @@ test.describe('Time_Of_Day widget', () => {
     editorPage,
     page,
   }) => {
-    const { chip } = await timeNode(editorPage, page)
-    const menu = page.locator('.TimeOfDayMenu')
-    await chip.click()
-    await expect(menu).toBeVisible()
+    const { menu, open } = await timeNode(editorPage, page)
+    await open()
     await page.mouse.click(0, 0)
     await expect(menu).toBeHidden()
-    await expect(chip).toHaveText('Pick a time')
-    await chip.click()
+    await open()
     await expect(menu.getByRole('spinbutton').first()).toBeFocused()
     await page.keyboard.type('0915')
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
-    await expect(chip).toHaveText('Pick a time')
+    expect(await moduleCode(page)).not.toContain('Time_Of_Day.new 9 15')
   })
 
   test('a time picked twice keeps the parentheses', async ({ editorPage, page }) => {
-    const { chip } = await timeNode(editorPage, page)
-    const menu = page.locator('.TimeOfDayMenu')
-    await chip.click()
+    const { widget, menu, open } = await timeNode(editorPage, page)
+    await open()
     await page.keyboard.type('1430')
     await page.keyboard.press('Enter')
-    await expect(chip).toHaveText('14:30')
-    await chip.click()
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(2)
+    await open()
     await expect(menu.getByRole('spinbutton').first()).toBeFocused()
     await page.keyboard.type('0815')
     await page.keyboard.press('Enter')
-    await expect(chip).toHaveText('08:15')
+    await expect(menu).toBeHidden()
     const code = await moduleCode(page)
     expect(code).toMatch(/since = Data\.seconds_since \(Time_Of_Day\.new 8 15\)\n/)
     expect(code).not.toMatch(/since = Data\.seconds_since Time_Of_Day\.new/)
@@ -1434,19 +1478,19 @@ test.describe('Time_Of_Day widget', () => {
     editorPage,
     page,
   }) => {
-    const { chip } = await timeNode(editorPage, page)
-    const menu = page.locator('.TimeOfDayMenu')
-    await chip.click()
+    const { menu, open } = await timeNode(editorPage, page)
+    await open()
     await expect(menu.getByRole('spinbutton').first()).toBeFocused()
     await page.keyboard.type('1430')
     await menu.getByRole('button', { name: 'Add seconds' }).focus()
     await page.keyboard.press('Enter')
     await expect(menu.getByRole('spinbutton')).toHaveCount(3)
     await expect(menu).toBeVisible()
-    await expect(chip).toHaveText('Pick a time')
+    await page.keyboard.press('Escape')
+    expect(await moduleCode(page)).toContain('since = Data.seconds_since\n')
   })
 
-  test('a whole node is not a chip: its fields keep their ports', async ({ editorPage, page }) => {
+  test('a whole node is drawn as any other expression', async ({ editorPage, page }) => {
     await timeNode(editorPage, page)
     for (const binding of ['time1', 'time2']) {
       const node = locate.graphNodeByBinding(page, binding)
@@ -1459,39 +1503,35 @@ test.describe('Time_Of_Day widget', () => {
     editorPage,
     page,
   }) => {
-    const { node, chip } = await timeNode(editorPage, page)
-    await chip.click()
-    await page.locator('.TimeOfDayMenu').getByRole('button', { name: 'Now' }).click()
-    await expect(chip).toHaveText('Now')
+    const { widget, menu, open } = await timeNode(editorPage, page)
+    await open()
+    await menu.getByRole('button', { name: 'Time_Of_Day.now' }).click()
+    await expect(widget).toContainText(/Time_Of_Day\W*now/)
     expect(await moduleCode(page)).toContain('from Standard.Base import Time_Of_Day')
-    await page.keyboard.press('ControlOrMeta+`')
     await page.keyboard.press('ControlOrMeta+Z')
-    await expect(node.locator('.WidgetTimeOfDay .chip')).toHaveText('Pick a time')
+    await expect(widget).not.toContainText(/now/)
     const code = await moduleCode(page)
     expect(code).not.toContain('import Time_Of_Day')
     expect(code).not.toContain('Time_Of_Day.now\n    time')
   })
 
   test('a parenthesised time is one undo step too', async ({ editorPage, page }) => {
-    const { node, chip } = await timeNode(editorPage, page)
-    await chip.click()
+    const { widget, open } = await timeNode(editorPage, page)
+    await open()
     await page.keyboard.type('1430')
     await page.keyboard.press('Enter')
-    await expect(chip).toHaveText('14:30')
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(2)
     // Edits within the undo manager's capture timeout (500 ms) merge into one step.
     await page.waitForTimeout(600)
-    await chip.click()
+    await open()
     await page.keyboard.type('0815')
     await page.keyboard.press('Enter')
-    await expect(chip).toHaveText('08:15')
     await page.keyboard.press('ControlOrMeta+Z')
-    await expect(chip).toHaveText('14:30')
     expect(await moduleCode(page)).toMatch(
       /since = Data\.seconds_since \(Time_Of_Day\.new 14 30\)\n/,
     )
-    await page.keyboard.press('ControlOrMeta+`')
     await page.keyboard.press('ControlOrMeta+Z')
-    await expect(node.locator('.WidgetTimeOfDay .chip')).toHaveText('Pick a time')
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(0)
     expect(await moduleCode(page)).not.toContain('import Time_Of_Day')
   })
 })

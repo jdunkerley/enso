@@ -4,7 +4,7 @@
  */
 import userEvent from '@testing-library/user-event'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import DateMenu from '../DateMenu.vue'
 import { dateExpressionCode, type DateChoice, type YearMonthDay } from '../dateExpression'
 
@@ -14,8 +14,15 @@ let mounted: VueWrapper | undefined
 afterEach(() => mounted?.unmount())
 
 async function mountMenu(choice: DateChoice | undefined) {
-  mounted = mount(DateMenu, { props: { choice, today: TODAY }, attachTo: document.body })
-  await flushPromises()
+  // The calendar marks "today" by the system clock when it renders, so the clock is `TODAY`'s then.
+  // A fake clock would also stop the keyboard events of `userEvent`, so it is only held while mounting.
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date(TODAY.year, TODAY.month - 1, TODAY.day, 12) })
+  try {
+    mounted = mount(DateMenu, { props: { choice, today: TODAY }, attachTo: document.body })
+    await flushPromises()
+  } finally {
+    vi.useRealTimers()
+  }
   return mounted
 }
 
@@ -42,12 +49,12 @@ describe('the date menu', () => {
     expect(chosenCodes(wrapper)).toEqual([code])
   })
 
-  test('lists Today, Yesterday and Tomorrow, then the calendar', async () => {
+  test('lists Date.today, Date.yesterday and Date.tomorrow, then the calendar', async () => {
     const wrapper = await mountMenu(undefined)
     expect(wrapper.findAll('.item').map((item) => item.text())).toEqual([
-      'Today',
-      'Yesterday',
-      'Tomorrow',
+      'Date.today',
+      'Date.yesterday',
+      'Date.tomorrow',
     ])
     expect(wrapper.find('.divider').exists()).toBe(true)
     expect(wrapper.find('[data-reka-calendar-cell-trigger]').exists()).toBe(true)

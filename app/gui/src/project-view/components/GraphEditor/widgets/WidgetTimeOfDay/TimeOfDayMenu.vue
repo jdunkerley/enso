@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The time-of-day widget's menu: `Now`, a divider, then a time field of hours and minutes,
- * with seconds when asked for. It knows nothing of the graph: it takes the chip's current choice and
+ * with seconds when asked for. It knows nothing of the graph: it takes the value's current choice and
  * emits the one that is made. Choosing writes nothing here; `WidgetTimeOfDay.vue` does that.
  *
  * The field is Reka's `TimeField` (as the dashboard's time inputs are): digits fill a segment,
@@ -11,14 +11,14 @@
  * close without it. A segment that was cleared makes the time incomplete: nothing is written until
  * it is filled in again.
  */
-import ChipMenuFrame from '@/components/GraphEditor/widgets/WidgetChip/ChipMenuFrame.vue'
+import PickerMenuFrame from '@/components/GraphEditor/widgets/WidgetPicker/PickerMenuFrame.vue'
 import { Time } from '@internationalized/date'
 import { TimeFieldInput, TimeFieldRoot } from 'reka-ui'
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue'
 import { localNow, type HourMinuteSecond, type TimeChoice } from './timeExpression'
 
 const props = defineProps<{
-  /** What the chip holds now; `undefined` for an unset argument. */
+  /** What the value holds now; `undefined` for an unset argument. */
   choice: TimeChoice | undefined
   /** The time the field shows for `Now` or an unset argument; the browser's by default. A test sets it. */
   now?: HourMinuteSecond | undefined
@@ -113,7 +113,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <ChipMenuFrame ref="root" class="TimeOfDayMenu" ariaLabel="Pick a time" @close="close">
+  <PickerMenuFrame ref="root" class="TimeOfDayMenu" ariaLabel="Pick a time" @close="close">
     <ul class="relative">
       <li>
         <button
@@ -123,7 +123,7 @@ onMounted(() => {
           data-choice="now"
           @click="chooseNow"
         >
-          Now
+          Time_Of_Day.now
         </button>
       </li>
     </ul>
@@ -149,7 +149,7 @@ onMounted(() => {
         {{ showSeconds ? 'Hide seconds' : 'Add seconds' }}
       </button>
     </div>
-  </ChipMenuFrame>
+  </PickerMenuFrame>
 </template>
 
 <style scoped>
