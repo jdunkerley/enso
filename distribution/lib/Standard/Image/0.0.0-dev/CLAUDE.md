@@ -51,7 +51,7 @@ diff = img - mat
 - `src/Image_File_Format.enso` — file format SPI for `Data.read` / `Data.write`.
 - `src/Image_Services.enso` — internal SPI implementation.
 - Image imports `Standard.Visualization` only for
-  `Id.from (that:Image) = Id.image`.
+  `Id.from (that:Image) = Id.Library "Standard.Image" "Image"`.
 
 ## Things to avoid in generated code
 

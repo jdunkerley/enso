@@ -139,7 +139,10 @@ Visualization and not on each data library.
 - `Id` (`src/Id.enso`) - which visualisation a node opens with. `Id.from`
   answers it: any value gives `Id.table`, a `JS_Object` `Id.json`; a library
   picks another for its type with `Id.from (that:Its_Public_Type)` (Table: SQL
-  Query for a database table; Image: Image).
+  Query for a database table; Image: `Id.Library "Standard.Image" "Image"`).
+  `Id.Builtin name` is a visualization the GUI implements;
+  `Id.Library library name` one a library ships in its `visualizations/` folder
+  (`to_js_object`: `{"library": {"name": library}, "name": name}`).
 
 Layering rule: Visualization imports only `Standard.Base`; Base knows nothing
 about visualisation. Libraries (`Table`, `Database`, ...) import Visualization
