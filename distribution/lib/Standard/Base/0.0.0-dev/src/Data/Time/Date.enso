@@ -741,19 +741,20 @@ type Date
        group: Conversions
        icon: convert
        ---
-       Combine this date with time of day to create a point in time.
+       Combines this date with a time of day to create a point in time.
 
        ## Arguments
-        - `time_of_day`: The time to combine with the date to create a time.
-        - `zone`: The time-zone in which to create the time.
+       - `time_of_day`: The time of day to combine with the date. By default it is
+         midnight.
+       - `zone`: The time zone in which to create the time. By default it is the
+         system time zone.
 
        ## Examples
-       ### Convert this date to midnight UTC time.
-
+       ### A date at half past noon, UTC
        ```
-             from Standard.Base import Date, Time_Of_Day, Time_Zone
-
-             example_to_time = Date.new 2020 2 3 . to_date_time Time_Of_Day.new Time_Zone.utc
+       date = Date.new 2020 2 3
+       time = date.to_date_time (Time_Of_Day.new 12 30) Time_Zone.utc
+       # → 2020-02-03 12:30:00Z[UTC]
        ```
     @zone Time_Zone.default_widget
     to_date_time self (time_of_day : Time_Of_Day = Time_Of_Day.new) (zone : Time_Zone = Time_Zone.system) -> Date_Time =
@@ -798,26 +799,38 @@ type Date
        group: Input
        icon: time
        ---
-       Creates an increasing range of dates from `self` to `end`.
+       Creates an increasing range of dates from this date to `end`.
 
        ## Arguments
-        - `end`: The end of the range.
-        - `include_end`: Specifies if the right end of the range should be
-          included. By default, the range is right-exclusive.
-        - `step`: The step of the range. It can be a `Date_Period` or `Period`.
-          By default, the step is one day.
+       - `end`: The end of the range.
+       - `include_end`: Whether the range includes `end`. By default the range is
+         right-exclusive.
+       - `step`: The step of the range, a `Date_Period` or a `Period`. By default the
+         step is one day.
 
        ## Examples
-       ### Create a range of dates.
-
+       ### The days from 5 to 10 December
        ```
-             (Date.new 2021 12 05).up_to (Date.new 2021 12 10)
+       start = Date.new 2021 12 5
+       range = start.up_to (Date.new 2021 12 10)
+       days = range.to_vector
+       # → [2021-12-05, 2021-12-06, 2021-12-07, 2021-12-08, 2021-12-09]
        ```
 
-       ### Create a range containing dates [2021-12-05, 2021-12-06].
-
+       ### Include the end date
        ```
-             (Date.new 2021 12 05).up_to (Date.new 2021 12 06) include_end=True
+       start = Date.new 2021 12 5
+       range = start.up_to (Date.new 2021 12 6) include_end=True
+       days = range.to_vector
+       # → [2021-12-05, 2021-12-06]
+       ```
+
+       ### Step a week at a time
+       ```
+       start = Date.new 2021 12 5
+       range = start.up_to (Date.new 2022 1 1) step=Date_Period.Week
+       days = range.to_vector
+       # → [2021-12-05, 2021-12-12, 2021-12-19, 2021-12-26]
        ```
     @step make_period_selector
     up_to : Date -> Boolean -> Date_Period|Period -> Date_Range
@@ -831,24 +844,30 @@ type Date
        group: Input
        icon: time
        ---
-       Creates a decreasing range of dates from `self` to `end`.
+       Creates a decreasing range of dates from this date to `end`.
 
        ## Arguments
-        - `end`: The end of the range.
-        - `include_end`: Specifies if the right end of the range should be
-          included. By default, the range is right-exclusive.
+       - `end`: The end of the range.
+       - `include_end`: Whether the range includes `end`. By default the range is
+         right-exclusive.
+       - `step`: The step of the range, a `Date_Period` or a `Period`. By default the
+         step is one day.
 
        ## Examples
-       ### Create a reverse range of dates.
-
+       ### The days from 10 down to 5 December
        ```
-             (Date.new 2021 12 10).down_to (Date.new 2021 12 05)
+       start = Date.new 2021 12 10
+       range = start.down_to (Date.new 2021 12 5)
+       days = range.to_vector
+       # → [2021-12-10, 2021-12-09, 2021-12-08, 2021-12-07, 2021-12-06]
        ```
 
-       ### Create a range containing dates [2021-12-06, 2021-12-05].
-
+       ### Include the end date
        ```
-             (Date.new 2021 12 06).down_to (Date.new 2021 12 05) include_end=True
+       start = Date.new 2021 12 6
+       range = start.down_to (Date.new 2021 12 5) include_end=True
+       days = range.to_vector
+       # → [2021-12-06, 2021-12-05]
        ```
     @step make_period_selector
     down_to : Date -> Boolean -> Date_Period|Period -> Date_Range
@@ -1047,49 +1066,40 @@ type Date
        group: Conversions
        icon: convert
        ---
-       Format this date using the provided format specifier.
+       Formats this date as text using the provided format specifier.
 
        ## Arguments
-        - `format`: A pattern describing how to format the text, or a
-          `Date_Time_Formatter`.
+       - `format`: A pattern describing how to format the text, or a
+         `Date_Time_Formatter`. By default the date is written as an ISO-8601 date.
 
        ## Examples
-       ### Format "2020-06-02" as "2 Jun 2020"
-
+       ### Format a date with the month's name
        ```
-             from Standard.Base import Date
-
-             example_format = Date.new 2020 6 2 . format "d MMMM yyyy"
-       ```
-
-       ### Format "2020-06-02" as "2 Jun 20"
-
-       ```
-             example_format = Date.new 2020 6 2 . format "d MMMM yy"
+       date = Date.new 2020 6 2
+       text = date.format "d MMMM yyyy"
+       # → "2 June 2020"
        ```
 
-       ### Format "2020-06-02" as "Tuesday, 02 Jun 2020"
-
+       ### Format a date with a short weekday and month
        ```
-             example_format = Date.new 2020 6 2 . format "EEEE, dd MMMM yyyy"
-       ```
-
-       ### Format "2020-06-02" as "Tue Jun 2"
-
-       ```
-             example_format = Date.new 2020 6 2 . format "EEE MMM d"
+       date = Date.new 2020 6 2
+       text = date.format "ddd MMM d"
+       # → "Tue Jun 2"
        ```
 
-       ### Format "2020-06-02" as "2020AD"
-
+       ### Format a date with the weekday's full name
        ```
-             example_format = Date.new 2020 6 2 . format "yyyyGG"
+       date = Date.new 2020 6 2
+       text = date.format "dddd, dd MMMM yyyy"
+       # → "Tuesday, 02 June 2020"
        ```
 
-       ### Format "2020-06-21" with French locale as "21. juin 2020"
-
+       ### Format a date in a particular locale
        ```
-             example_format = Date.new 2020 6 21 . format (Date_Time_Formatter.from "d. MMMM yyyy" (Locale.new "fr"))
+       date = Date.new 2020 6 21
+       formatter = Date_Time_Formatter.from "d. MMMM yyyy" (Locale.new "fr")
+       text = date.format formatter
+       # → "21. juin 2020"
        ```
 
        ## Remarks
@@ -1158,7 +1168,25 @@ type Date
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than `that`.
+       Checks if this date is after `that` date.
+
+       ## Arguments
+       - `that`: The date to compare with.
+
+       ## Examples
+       ### A date after another
+       ```
+       date = Date.new 2020 12 23
+       other = Date.new 2020 1 1
+       result = date > other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date picker. Connect a date, or type one such as
+       `Date.new 2020 1 1`.
     > self that = Comparable.> self=self that
 
     ## ---
@@ -1166,7 +1194,25 @@ type Date
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than or equal to `that`.
+       Checks if this date is the same as, or after, `that` date.
+
+       ## Arguments
+       - `that`: The date to compare with.
+
+       ## Examples
+       ### A date compared with itself
+       ```
+       date = Date.new 2020 12 23
+       other = Date.new 2020 12 23
+       result = date >= other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date picker. Connect a date, or type one such as
+       `Date.new 2020 1 1`.
     >= self that = Comparable.>= self=self that
 
     ## ---
@@ -1174,7 +1220,25 @@ type Date
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than `that`.
+       Checks if this date is before `that` date.
+
+       ## Arguments
+       - `that`: The date to compare with.
+
+       ## Examples
+       ### A date before another
+       ```
+       date = Date.new 2020 1 1
+       other = Date.new 2020 12 23
+       result = date < other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date picker. Connect a date, or type one such as
+       `Date.new 2020 1 1`.
     < self that = Comparable.< self=self that
 
     ## ---
@@ -1182,7 +1246,25 @@ type Date
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than or equal to `that`.
+       Checks if this date is the same as, or before, `that` date.
+
+       ## Arguments
+       - `that`: The date to compare with.
+
+       ## Examples
+       ### A date after another
+       ```
+       date = Date.new 2020 12 23
+       other = Date.new 2020 1 1
+       result = date <= other
+       # → False
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date picker. Connect a date, or type one such as
+       `Date.new 2020 1 1`.
     <= self that = Comparable.<= self=self that
 
 ## ---
