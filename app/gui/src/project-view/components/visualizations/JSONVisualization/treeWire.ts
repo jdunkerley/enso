@@ -35,11 +35,13 @@ const TreePage = z.object({
 /** The children of a branch from `start`; `size` is the branch's whole size. */
 export type TreePage = z.infer<typeof TreePage>
 
+/** The root value's node actions, as Enso wrote them: `vizActions.ts` reads them. */
+const actions = z.array(z.unknown()).optional()
 const Prepared = z.union([
-  z.object({ root: BranchNode, children: TreePage }),
-  z.object({ root: LeafNode }),
+  z.object({ actions, root: BranchNode, children: TreePage }),
+  z.object({ actions, root: LeafNode }),
 ])
-/** What `Tree.prepare` sends: the root, and the first page when it is a branch. */
+/** What `Tree.prepare` sends: the root, and the first page when it is a branch; the root's actions. */
 export type Prepared = z.infer<typeof Prepared>
 
 /** A page, or why it could not be loaded. */
