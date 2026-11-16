@@ -114,9 +114,16 @@ function numberAst(value: number, module: Ast.MutableModule) {
 }
 
 /**
- * One value as an Enso expression. A `''` flag reads text as code. `#` writes text that reads as
- * a number as that number, and `@` leaves it text; either writes a number as a number.
- * `undefined` when the value cannot be written.
+ * A decimal numeral: an optional sign, digits, an optional fraction and an optional exponent. Not
+ * what JS's `Number()` accepts, which also reads `''` as 0, and hex, binary and `Infinity`.
+ */
+const DECIMAL_NUMERAL = /^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/
+
+/**
+ * One value as an Enso expression. A `''` flag reads text as code. `#` writes text that is a
+ * decimal numeral as that number and any other text as text, and cannot write an empty value; `@`
+ * leaves text as text; either writes a number as a number. `undefined` when the value cannot be
+ * written.
  */
 function scalarAst(value: ActionScalar, flag: Slot['flag'], module: Ast.MutableModule) {
   if (typeof value === 'function') return value(module)
@@ -124,10 +131,11 @@ function scalarAst(value: ActionScalar, flag: Slot['flag'], module: Ast.MutableM
     return typeof value === 'number' ? numberAst(value, module) : parseCode(value, module)
   }
   if (typeof value === 'number') return numberAst(value, module)
-  const number = Number(value)
-  return flag === '#' && !Number.isNaN(number) ?
-      numberAst(number, module)
-    : Ast.TextLiteral.new(value, module)
+  if (flag === '#') {
+    if (value === '') return undefined
+    if (DECIMAL_NUMERAL.test(value)) return numberAst(Number(value), module)
+  }
+  return Ast.TextLiteral.new(value, module)
 }
 
 /** `code` as an expression; `undefined` when it is empty or not valid Enso. */
@@ -214,7 +222,8 @@ export function chainPattern(
  * from them, never a throw: a value is missing, empty or not writable as Enso, or the template is
  * not a valid one.
  *
- * Placeholders: `{{#x}}` is the value of `x`, a number when it reads as one and else text;
+ * Placeholders: `{{#x}}` is the value of `x`, a number when it is a decimal numeral (`-12`, `3.5`,
+ * `1e-7`), else text, and an empty one leaves the template unfilled;
  * `{{\@x}}` the value as it is (a number stays a number, anything else is text); `{{x}}` an Enso
  * expression (a string of code, or a builder); a `*` after the name, a non-empty vector of such
  * values. A `new_node` template has to hold `{{node}}` once, the visualised node; a `chain` one
