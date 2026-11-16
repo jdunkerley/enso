@@ -28,13 +28,12 @@
  * - A `CompilationResultResponse` with id `1` and path `/Viz.vue` is sent to the main thread.
  */
 
+import { compileSfc, compileTs } from '@/stores/visualization/compileSfc'
+import { resolveRelativeImport } from '@/stores/visualization/rootAddress'
 import { assertNever } from '@/util/assert'
 import { parse as babelParse } from '@babel/parser'
-import hash from 'hash-sum'
 import * as map from 'lib0/map'
 import MagicString from 'magic-string'
-import { transform } from 'sucrase'
-import { compileScript, compileStyle, parse } from 'vue/compiler-sfc'
 
 // ========================================
 // === Requests (Main Thread to Worker) ===
@@ -356,10 +355,7 @@ async function importTS(path: string) {
   const scriptTs = decoder.decode((await tryFetch(path)).contents)
   let text: string | undefined
   try {
-    text = transform(scriptTs, {
-      disableESTransforms: true,
-      transforms: ['typescript'],
-    }).code
+    text = compileTs(scriptTs)
   } catch (error) {
     compileError(path, toError(error))
   }
@@ -372,30 +368,15 @@ async function importVue(path: string) {
   const dir = path.replace(/[^/\\]+$/, '')
   const raw = decoder.decode((await tryFetch(path)).contents)
   const filename = path.match(/[^/\\]+$/)![0]!
-  const parsed = parse(raw, { filename })
-  const id = hash(raw)
-  for (const style of parsed.descriptor.styles) {
-    addStyle(
-      path,
-      compileStyle({ filename, source: style.content, id, scoped: style.scoped ?? false }).code,
-    )
-  }
-  let text: string | undefined
+  let compiled: ReturnType<typeof compileSfc> | undefined
   try {
-    const scriptTs = compileScript(parsed.descriptor, {
-      id,
-      inlineTemplate: true,
-      sourceMap: false,
-    }).content
-    text = transform(scriptTs, {
-      disableESTransforms: true,
-      transforms: ['typescript'],
-    }).code
+    compiled = compileSfc(raw, filename)
   } catch (error) {
     compileError(path, toError(error))
   }
-  if (text != null) {
-    addImport(path, await rewriteImports(text, dir, id))
+  if (compiled != null) {
+    for (const style of compiled.styles) addStyle(path, style)
+    addImport(path, await rewriteImports(compiled.code, dir, compiled.id))
   }
 }
 
@@ -409,12 +390,7 @@ async function rewriteImports(code: string, dir: string, id: string | undefined)
         const isBuiltin = builtinModules.has(path)
         const isRelative = /^[./]/.test(path)
         if (isRelative) {
-          const url = new URL(dir + path, location.href)
-          if (!/^(?:data|https?|ftps?|wss?):$/.test(url.protocol)) {
-            path = url.protocol + new URL('http://example.com/' + url.pathname).pathname.slice(1)
-          } else {
-            path = url.href
-          }
+          path = resolveRelativeImport(dir, path, location.href)
         }
         const extension = isRelative ? extractExtension(path).toLowerCase() : ''
         if (

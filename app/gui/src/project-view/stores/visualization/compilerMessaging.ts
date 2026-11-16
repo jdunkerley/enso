@@ -15,10 +15,10 @@ import type {
   RegisterBuiltinModulesRequest,
 } from '@/stores/visualization/compiler'
 import Compiler from '@/stores/visualization/compiler?worker'
+import { parseRootAddress, rootAddressProtocol } from '@/stores/visualization/rootAddress'
 import { VisualizationModule } from '@/stores/visualization/runtimeTypes'
 import { assertNever } from '@/util/assert'
 import { toError } from '@/util/data/error'
-import type { Opt } from '@/util/data/opt'
 import type { DataServer } from '@/util/net/dataServer'
 import * as builtins from '@/util/visualizationBuiltins'
 // eslint-disable-next-line no-restricted-imports
@@ -26,8 +26,6 @@ import * as vue from 'vue'
 import { Error as DataError } from 'ydoc-shared/binaryProtocol'
 import type { Uuid } from 'ydoc-shared/languageServerTypes'
 
-/** The custom URL protocol used internally for project-local assets. */
-export const currentProjectProtocol = 'enso-current-project:'
 export const stylePathAttribute = 'data-style-path'
 
 const moduleCache: Record<string, unknown> = {
@@ -63,12 +61,19 @@ const workerCallbacks = new Map<
  */
 const moduleCode = new Map<string, string>()
 
+/** The reader for each content root a visualization has been compiled from. */
+const rootReaders = new Map<Uuid, DataServer>()
+
 function postMessage<T>(worker: Worker, message: T) {
   worker.postMessage(message)
 }
 
 /** TODO: Add docs */
-export async function compile(path: string, projectRoot: Opt<Uuid>, data: DataServer) {
+export async function compile(address: string, data: DataServer) {
+  const parsedAddress = parseRootAddress(address)
+  if (!parsedAddress) throw new Error(`'${address}' is not a content root address.`)
+  // The latest reader wins: a reconnected project must not read through a dead connection.
+  rootReaders.set(parsedAddress.rootId, data)
   if (worker == null) {
     const worker_ = (worker = new Compiler())
     postMessage<RegisterBuiltinModulesRequest>(worker, {
@@ -148,19 +153,18 @@ export async function compile(path: string, projectRoot: Opt<Uuid>, data: DataSe
                   }
                   break
                 }
-                case currentProjectProtocol: {
-                  const rootId = projectRoot
-                  if (!rootId) {
+                case rootAddressProtocol: {
+                  const address = parseRootAddress(event.data.path)
+                  const reader = address && rootReaders.get(address.rootId)
+                  if (!address || !reader) {
                     postMessage<FetchWorkerError>(worker_, {
                       type: 'fetch-worker-error',
                       path: event.data.path,
-                      error: new Error(
-                        'Could not find a file system content root for the current project.',
-                      ),
+                      error: new Error(`Could not find the content root of '${event.data.path}'.`),
                     })
                     break
                   }
-                  const payload = await data.readFile({ rootId, segments: url.pathname.split('/') })
+                  const payload = await reader.readFile(address)
                   if (payload instanceof DataError) {
                     postMessage<FetchWorkerError>(worker_, {
                       type: 'fetch-worker-error',
@@ -175,7 +179,7 @@ export async function compile(path: string, projectRoot: Opt<Uuid>, data: DataSe
                       type: 'fetch-worker-error',
                       path: event.data.path,
                       error: new Error(
-                        `An invalid response was recieved when fetching '${url.pathname}' from the current project.`,
+                        `An invalid response was recieved when fetching '${event.data.path}'.`,
                       ),
                     })
                     break
@@ -264,6 +268,11 @@ export async function compile(path: string, projectRoot: Opt<Uuid>, data: DataSe
   const promise = new Promise<VisualizationModule>((resolve, reject) => {
     workerCallbacks.set(id, { resolve, reject })
   })
-  postMessage<CompileRequest>(worker, { type: 'compile-request', id, path, recompile: true })
+  postMessage<CompileRequest>(worker, {
+    type: 'compile-request',
+    id,
+    path: address,
+    recompile: true,
+  })
   return await promise
 }

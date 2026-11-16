@@ -11,7 +11,6 @@ import * as warningsVisualization from '@/components/visualizations/WarningsVisu
 import { createContextStore } from '@/providers'
 import {
   compile,
-  currentProjectProtocol,
   InvalidVisualizationModuleError,
   stylePathAttribute,
 } from '@/stores/visualization/compilerMessaging'
@@ -22,6 +21,7 @@ import {
   visualizationsForTypes,
   type VisualizationId,
 } from '@/stores/visualization/metadata'
+import { rootAddress } from '@/stores/visualization/rootAddress'
 import type { VisualizationModule } from '@/stores/visualization/runtimeTypes'
 import type { Opt } from '@/util/data/opt'
 import { isUrlString } from '@/util/data/urlString'
@@ -147,6 +147,7 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
     async function onFileEvent({ kind, path }: LSEvent<'file/event'>) {
       if (path.rootId !== (await projectRoot) || !/[.]vue$/.test(path.segments.at(-1) ?? '')) return
       const pathString = customVisualizationsDirectory + '/' + path.segments.join('/')
+      const address = rootAddress(path.rootId, [customVisualizationsDirectory, ...path.segments])
       const name = currentProjectVisualizationsByPath.get(pathString)
       let id: VisualizationIdentifier | undefined =
         name != null ? { module: { kind: 'CurrentProject' }, name } : undefined
@@ -155,7 +156,7 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
       compilationAbortControllers.delete(pathString)
       // FIXME [sb]: Ideally these should be deleted as late as possible, instead of immediately.
       for (const el of document.querySelectorAll(
-        `[${stylePathAttribute}="${CSS.escape(currentProjectProtocol + pathString)}"]`,
+        `[${stylePathAttribute}="${CSS.escape(address)}"]`,
       )) {
         el.remove()
       }
@@ -165,11 +166,7 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
           try {
             const abortController = new AbortController()
             compilationAbortControllers.set(pathString, abortController)
-            const vizPromise = compile(
-              currentProjectProtocol + pathString,
-              await projectRoot,
-              await proj.dataConnection,
-            ).then(async (viz) => {
+            const vizPromise = compile(address, await proj.dataConnection).then(async (viz) => {
               await loadScripts(viz)
               return viz
             })
