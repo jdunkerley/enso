@@ -1,4 +1,5 @@
 import { provideInteractionHandler } from '@/providers/interactionHandler'
+import userEvent from '@testing-library/user-event'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
@@ -158,13 +159,60 @@ describe('GridPopupMenu', () => {
       wrapper.unmount()
     })
 
-    test('Enter runs the focused item and closes the menu', async () => {
+    test.each([
+      ['Enter', '{Enter}'],
+      ['Space', ' '],
+    ])(
+      '%s runs the focused item, closes the menu and does not reach the window',
+      async (_name, keys) => {
+        vi.mocked((items[2] as { action: () => void }).action).mockClear()
+        const wrapper = await mountMenu(true)
+        await press('ArrowDown')
+        const reached = vi.fn()
+        window.addEventListener('keydown', reached)
+        await userEvent.setup().keyboard(keys)
+        await flushPromises()
+        window.removeEventListener('keydown', reached)
+        expect(items[2]?.type === 'item' && vi.mocked(items[2].action)).toHaveBeenCalledOnce()
+        expect(wrapper.emitted('close')).toHaveLength(1)
+        expect(reached).not.toHaveBeenCalled()
+        wrapper.unmount()
+      },
+    )
+
+    function contextmenu() {
+      document.activeElement?.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+      )
+    }
+
+    // Windows fires the Menu key's `contextmenu` on key up, at the item the key down focused.
+    test('a keyboard-opened menu ignores a contextmenu that comes with no pointer press', async () => {
       const wrapper = await mountMenu(true)
-      await press('ArrowDown')
-      document.activeElement?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      contextmenu()
       await flushPromises()
-      expect(items[2]?.type === 'item' && vi.mocked(items[2].action)).toHaveBeenCalledOnce()
-      expect(wrapper.emitted('close')).toHaveLength(1)
+      expect(wrapper.emitted('close')).toBeUndefined()
+      wrapper.unmount()
+    })
+
+    test('a keyboard-opened menu closes on a right-click, which presses first', async () => {
+      const wrapper = await mountMenu(true)
+      document.activeElement?.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 2 }),
+      )
+      contextmenu()
+      await flushPromises()
+      expect(wrapper.emitted('close')).toEqual([['pointer']])
+      wrapper.unmount()
+    })
+
+    test('a mouse-opened menu closes on any contextmenu', async () => {
+      const wrapper = await mountMenu(undefined)
+      panel()
+        .querySelector('button')
+        ?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
+      await flushPromises()
+      expect(wrapper.emitted('close')).toEqual([['pointer']])
       wrapper.unmount()
     })
   })

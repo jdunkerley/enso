@@ -221,3 +221,124 @@ test('Get All Loaded Values Here makes a node for each entry beside the clicked 
       .toContain(`aggregated.get '${key}'`)
   }
 })
+
+// === The keyboard ===
+
+/** Focus the visualization itself, so that the next Tab goes to the tree's one tab stop. */
+async function focusBeforeTree(vis: Locator) {
+  await vis.evaluate((el) => (el as HTMLElement).focus())
+}
+
+const focusedRow = (vis: Locator) => vis.locator('.TreeRow:focus')
+
+test('Tab enters the tree on its first entry, and the arrows move between entries', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  await focusBeforeTree(vis)
+  await page.keyboard.press('Tab')
+  const entries = vis.locator('.TreeRow.entry')
+  await expect(entries.nth(0)).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(entries.nth(1)).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(entries.nth(2)).toBeFocused()
+  await page.keyboard.press('ArrowUp')
+  await expect(entries.nth(1)).toBeFocused()
+  // The tree is one tab stop: Tab leaves it rather than stepping to the next entry.
+  await page.keyboard.press('Tab')
+  await expect(focusedRow(vis)).toHaveCount(0)
+})
+
+test('Right opens a branch and steps into it, and Enter makes a node for the entry', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  const items = entry(vis, 'items: [150 items]')
+  await items.focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(vis).toContainText('0: 0')
+  await expect(items).toBeFocused()
+  await page.keyboard.press('ArrowRight')
+  await expect(entry(vis, '0: 0')).toBeFocused()
+  const nodeCount = await locate.graphNode(page).count()
+  await page.keyboard.press('Enter')
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
+  // Enter belongs to the tree: the graph's own Enter (the component browser) did not also act.
+  await expect(page.locator('.ComponentBrowser')).toHaveCount(0)
+  await page.keyboard.press('ControlOrMeta+`')
+  await expect(page.locator('.CodeEditor')).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__codeEditorApi.textContent()))
+    .toContain("aggregated.get 'items' . at 0")
+})
+
+test('Shift+F10 opens the entry menu, Escape closes it and returns the focus to the entry', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  const nested = entry(vis, 'nested: {1 key}')
+  await nested.focus()
+  await page.keyboard.press('Shift+F10')
+  const menu = page.getByTestId('gridPopupMenu')
+  await expect(menu).toBeVisible()
+  await expect(menu.getByRole('button', { name: /Get Value/ })).toBeFocused()
+  await page.keyboard.press('ArrowDown')
+  await expect(menu.getByRole('button', { name: /Get All Loaded Values Here/ })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(menu).toHaveCount(0)
+  await expect(nested).toBeFocused()
+})
+
+test('Enter on a menu item runs it, and the Enter goes no further', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  const nested = entry(vis, 'nested: {1 key}')
+  await nested.focus()
+  await page.keyboard.press('Shift+F10')
+  const menu = page.getByTestId('gridPopupMenu')
+  await expect(menu).toBeVisible()
+  const nodeCount = await locate.graphNode(page).count()
+  await page.keyboard.press('Enter')
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
+  await expect(menu).toHaveCount(0)
+  // The graph clears the focus itself once it has made a node (`clearFocus` in `GraphEditor.vue`),
+  // so there is no focus to check; the Enter must not also have opened the component browser.
+  await expect(page.locator('.ComponentBrowser')).toHaveCount(0)
+})
+
+test('The menu key opens the entry menu and leaves it open', async ({ editorPage, page }) => {
+  await editorPage
+  const vis = await openTree(page)
+  await entry(vis, 'nested: {1 key}').focus()
+  await page.keyboard.press('ContextMenu')
+  const menu = page.getByTestId('gridPopupMenu')
+  await expect(menu).toBeVisible()
+  await expect(menu.getByRole('button', { name: /Get Value/ })).toBeFocused()
+  // Windows fires the key's `contextmenu` on key up; give it, and anything else late, time.
+  await page.waitForTimeout(500)
+  await expect(menu).toBeVisible()
+  await expect(menu.getByRole('button', { name: /Get Value/ })).toBeFocused()
+})
+
+test('Show more from the keyboard keeps the focus in the tree', async ({ editorPage, page }) => {
+  await editorPage
+  const vis = await openTree(page)
+  await entry(vis, 'items: [150 items]').getByRole('button', { name: 'Expand' }).click()
+  await expect(vis).toContainText('0: 0')
+  await scrollToBottom(vis)
+  const more = vis.locator('.TreeRow.more')
+  await more.focus()
+  await page.keyboard.press('Enter')
+  await expect(vis).toContainText('100: 100')
+  await expect(vis.locator('.TreeRow:focus')).toContainText('100: 100')
+})

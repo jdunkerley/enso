@@ -37,8 +37,17 @@ The JSON visualization: a lazy tree over any value (spec
   more" and error rows: load more / retry), and the context-menu key or
   Shift+F10 opens the entry menu under the entry's text with the focus on its
   first item (`GridPopupMenu`'s `focusFirst`; its arrows, Home/End, Escape and
-  Tab). Escape or a chosen item closes a keyboard-opened menu and gives the
-  focus back to the entry. A key the tree handles is stopped
+  Tab; Enter and Space stop at the menu). Escape, a chosen item, a scroll and a
+  new payload close a keyboard-opened menu through `closeMenu`, which gives the
+  focus back to the entry; a click away (`close` with `'pointer'`) does not. A
+  chosen item that makes a node loses the focus anyway: the graph's `clearFocus`
+  runs once the node exists. The menu key's `contextmenu`, which Windows fires
+  on key up at the menu's first item, is ignored by a keyboard-opened
+  `GridPopupMenu` unless a pointer press on it came first. "Show more" and Retry
+  (`loadFrom`) keep the focus on the entry above while the page loads, then move
+  it to the first entry it brought (or the row, if it failed again); a
+  visualization is in a shadow root, so the check reads the root's
+  `activeElement`, not the document's. A key the tree handles is stopped
   (`stopPropagation`), so the graph editor's window handlers (Enter opens the
   component browser, the arrows, Escape deselects) never see it; Tab, typing and
   anything with Ctrl/Alt/Meta pass. The focus ring is the engine-log list's

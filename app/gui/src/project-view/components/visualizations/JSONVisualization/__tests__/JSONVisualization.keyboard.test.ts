@@ -48,12 +48,16 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
+/** Replaces the tree's payload (the host the harness mounts it in owns its props). */
+let setTreeData: (data: unknown) => Promise<void>
+
 async function mountTree() {
-  const { wrapper } = await mountWithProviders(JSONVisualization, {
+  const { wrapper, setProps } = await mountWithProviders(JSONVisualization, {
     props: { data: TREE },
     global: { stubs: { GridPopupMenu: true } },
     attachTo: document.body,
   })
+  setTreeData = (data) => setProps({ data })
   return wrapper
 }
 type Tree = Awaited<ReturnType<typeof mountTree>>
@@ -61,7 +65,7 @@ type Tree = Awaited<ReturnType<typeof mountTree>>
 /** The row element of an entry (or `more`) by its key text. */
 function row(wrapper: Tree, key: string): HTMLElement {
   const found = wrapper.findAll('.TreeRow').find((candidate) =>
-    key === 'more' ? candidate.classes('more')
+    key === 'more' || key === 'error' ? candidate.classes(key)
     : candidate.find('.key').exists() ? candidate.find('.key').text() === key
     : false,
   )
@@ -83,9 +87,11 @@ async function press(
 function focused(): string {
   const active = document.activeElement
   if (!(active instanceof HTMLElement) || !active.classList.contains('TreeRow')) return '(none)'
-  return active.classList.contains('more') ?
-      'more'
+  return (
+    active.classList.contains('more') ? 'more'
+    : active.classList.contains('error') ? 'error'
     : (active.querySelector('.key')?.textContent ?? '')
+  )
 }
 
 function popup(wrapper: Tree) {
@@ -256,6 +262,94 @@ describe('Enter', () => {
   })
 })
 
+describe('the focus while a page loads', () => {
+  const MORE_PAGE = {
+    start: 3,
+    size: 4,
+    entries: [{ key: 'extra', kind: 'leaf', value: 1, expr: ".get 'extra'" }],
+  }
+
+  /** A request that is answered when the test says so. */
+  function deferred<T>() {
+    let resolve!: (value: T) => void
+    const promise = new Promise<T>((r) => (resolve = r))
+    return { promise, resolve }
+  }
+
+  test('Show more keeps the focus on the entry above, then moves it to the first new entry', async () => {
+    const answer = deferred<unknown>()
+    executeExpression.mockReturnValue(answer.promise)
+    const wrapper = await mountTree()
+    row(wrapper, 'more').focus()
+    await press(row(wrapper, 'more'), 'Enter')
+    expect(wrapper.find('.TreeRow.loading').exists()).toBe(true)
+    expect(focused()).toBe('raw')
+    answer.resolve({ ok: true, value: MORE_PAGE })
+    await flushPromises()
+    expect(focused()).toBe('extra')
+  })
+
+  test('Show more leaves a focus that moved on while it loaded alone', async () => {
+    const answer = deferred<unknown>()
+    executeExpression.mockReturnValue(answer.promise)
+    const wrapper = await mountTree()
+    row(wrapper, 'more').focus()
+    await press(row(wrapper, 'more'), 'Enter')
+    await press(row(wrapper, 'raw'), 'ArrowUp')
+    expect(focused()).toBe('address')
+    answer.resolve({ ok: true, value: MORE_PAGE })
+    await flushPromises()
+    expect(focused()).toBe('address')
+  })
+
+  describe('Retry', () => {
+    async function failedAddress() {
+      executeExpression.mockResolvedValueOnce({ ok: false, error: { payload: 'boom' } })
+      const wrapper = await mountTree()
+      row(wrapper, 'address').focus()
+      await press(row(wrapper, 'address'), 'ArrowRight')
+      expect(wrapper.find('.TreeRow.error').exists()).toBe(true)
+      return wrapper
+    }
+
+    test('keeps the focus on the entry above, then moves it to the first entry it loads', async () => {
+      const wrapper = await failedAddress()
+      const answer = deferred<unknown>()
+      executeExpression.mockReturnValue(answer.promise)
+      row(wrapper, 'error').focus()
+      await press(row(wrapper, 'error'), 'Enter')
+      expect(wrapper.find('.TreeRow.loading').exists()).toBe(true)
+      expect(focused()).toBe('address')
+      answer.resolve({ ok: true, value: ADDRESS_PAGE })
+      await flushPromises()
+      expect(focused()).toBe('city')
+    })
+
+    test('puts the focus back on the failed row when it fails again', async () => {
+      const wrapper = await failedAddress()
+      executeExpression.mockResolvedValue({ ok: false, error: { payload: 'still' } })
+      row(wrapper, 'error').focus()
+      await press(row(wrapper, 'error'), 'Enter')
+      expect(wrapper.find('.TreeRow.error').text()).toContain('still')
+      expect(focused()).toBe('error')
+    })
+  })
+
+  test('a mouse click on Show more keeps the focus too', async () => {
+    const answer = deferred<unknown>()
+    executeExpression.mockReturnValue(answer.promise)
+    const wrapper = await mountTree()
+    const button = wrapper.find('.TreeRow.more button').element as HTMLElement
+    button.focus()
+    button.click()
+    await flushPromises()
+    expect(focused()).toBe('raw')
+    answer.resolve({ ok: true, value: MORE_PAGE })
+    await flushPromises()
+    expect(focused()).toBe('extra')
+  })
+})
+
 describe('the entry menu from the keyboard', () => {
   function placeAt(element: HTMLElement) {
     const content = element.querySelector('.content')!
@@ -318,6 +412,52 @@ describe('the entry menu from the keyboard', () => {
     await flushPromises()
     expect(popup(wrapper).exists()).toBe(false)
     expect(focused()).toBe('name')
+  })
+
+  /** Opens the menu on `name`, then drops the focus as the real menu's removal would. */
+  async function openKeyboardMenu(wrapper: Tree) {
+    row(wrapper, 'name').focus()
+    await press(row(wrapper, 'name'), 'ContextMenu')
+    ;(document.activeElement as HTMLElement).blur()
+  }
+
+  test('a click outside closes the menu and leaves the focus to the click', async () => {
+    const wrapper = await mountTree()
+    await openKeyboardMenu(wrapper)
+    popup(wrapper).vm.$emit('close', 'pointer')
+    await flushPromises()
+    expect(popup(wrapper).exists()).toBe(false)
+    expect(focused()).toBe('(none)')
+  })
+
+  test('scrolling closes the menu and returns the focus to its entry', async () => {
+    const wrapper = await mountTree()
+    await openKeyboardMenu(wrapper)
+    wrapper.find('[data-testid="tree-scroller"]').element.dispatchEvent(new Event('scroll'))
+    await flushPromises()
+    expect(popup(wrapper).exists()).toBe(false)
+    expect(focused()).toBe('name')
+  })
+
+  test('a new payload closes the menu and returns the focus to its entry', async () => {
+    const wrapper = await mountTree()
+    await openKeyboardMenu(wrapper)
+    await setTreeData({ ...TREE })
+    await flushPromises()
+    expect(popup(wrapper).exists()).toBe(false)
+    expect(focused()).toBe('name')
+  })
+
+  test('a new payload without the entry sends the focus to the first row', async () => {
+    const wrapper = await mountTree()
+    await openKeyboardMenu(wrapper)
+    await setTreeData({
+      ...TREE,
+      children: { ...TREE.children, entries: TREE.children.entries.slice(1) },
+    })
+    await flushPromises()
+    expect(popup(wrapper).exists()).toBe(false)
+    expect(focused()).toBe('address')
   })
 
   test('Escape on the entry closes the menu, returns the focus and goes no further', async () => {

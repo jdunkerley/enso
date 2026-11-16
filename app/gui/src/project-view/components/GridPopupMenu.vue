@@ -28,7 +28,10 @@ const {
    */
   focusFirst?: boolean
 }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{
+  /** `pointer` when the pointer closed it (a click outside, a right-click on it), not a key or an item. */
+  close: [reason?: 'pointer']
+}>()
 
 const menu = ref<HTMLElement>()
 // `true` here means "don't throw if no ancestor provided this" — required because `GridPopupMenu`
@@ -110,6 +113,11 @@ function onKeydown(event: KeyboardEvent) {
       event.stopPropagation()
       emit('close')
       return
+    case 'Enter':
+    case ' ':
+      // The button does the activating (a click); the graph's own Enter bindings must not also act.
+      event.stopPropagation()
+      return
     default:
       return
   }
@@ -122,8 +130,8 @@ onMounted(() => {
   if (focusFirst) void nextTick(() => enabledButtons()[0]?.focus())
   if (interaction) {
     const menuInteraction = endOnClickOutside(menu, {
-      cancel: () => emit('close'),
-      end: () => emit('close'),
+      cancel: () => emit('close', 'pointer'),
+      end: () => emit('close', 'pointer'),
     })
     interaction.setCurrent(menuInteraction)
   } else {
@@ -140,7 +148,23 @@ onUnmounted(() => {
 })
 
 function onWindowPointerDown(event: PointerEvent) {
-  if (targetIsOutside(event, menu.value)) emit('close')
+  if (targetIsOutside(event, menu.value)) emit('close', 'pointer')
+}
+
+/**
+ * A `contextmenu` event on the menu closes it (a right-click on it, as `ContextMenu.vue` does). The
+ * context-menu key is different: on Windows the browser fires its `contextmenu` on key *up*, at
+ * the focused element, which by then is the first item of the menu that the key *down* opened, and
+ * would close it at once. So a keyboard-opened menu ignores a `contextmenu` that no pointer press
+ * on the menu came before.
+ */
+let pointerPressed = false
+function onPointerDown() {
+  pointerPressed = true
+}
+function onContextMenu() {
+  if (focusFirst && !pointerPressed) return
+  emit('close', 'pointer')
 }
 </script>
 
@@ -152,7 +176,8 @@ function onWindowPointerDown(event: PointerEvent) {
       :style="floatingStyles"
       data-testid="gridPopupMenu"
       @keydown="onKeydown"
-      @contextmenu.stop.prevent="emit('close')"
+      @pointerdown.capture="onPointerDown"
+      @contextmenu.stop.prevent="onContextMenu"
     >
       <template v-for="(item, index) in items" :key="index">
         <div v-if="item.type === 'separator'" class="separator" />

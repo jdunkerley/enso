@@ -176,15 +176,17 @@ export function useLazyTree(fetchPage: FetchPage) {
       void load(path, 0, PAGE_SIZE)
   }
 
-  function showMore(path: readonly TreeKey[]) {
+  /** Asks for the next page of a branch. Settles when it has arrived (or failed). */
+  async function showMore(path: readonly TreeKey[]) {
     const page = pages.get(pathKey(path))
     if (page == null || page.loading) return
-    void load(path, page.entries.length, PAGE_SIZE)
+    await load(path, page.entries.length, PAGE_SIZE)
   }
 
-  function retry(path: readonly TreeKey[]) {
+  /** Asks again for the page that failed. Settles when it has arrived (or failed again). */
+  async function retry(path: readonly TreeKey[]) {
     const failed = pages.get(pathKey(path))?.failed
-    if (failed != null) void load(path, failed.start, failed.count)
+    if (failed != null) await load(path, failed.start, failed.count)
   }
 
   function pushPage(

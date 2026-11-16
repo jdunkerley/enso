@@ -14,6 +14,7 @@ import {
 } from '@/components/shared/AgGridTableView/gridPopupMenuItems'
 import {
   entryMenu,
+  pathKey,
   siblingChains,
   useLazyTree,
   type TreeRow,
@@ -78,9 +79,10 @@ const activeKey = shallowRef<string>()
 watch(
   prepared,
   (value) => {
-    // The menu holds chains made for the old payload.
-    menu.value = undefined
     tree.setRoot(value)
+    // The menu holds chains made for the old payload. Closed after the tree has the new rows, so
+    // the focus it held goes to the entry if the new payload has it, and to the first row if not.
+    closeMenu()
   },
   { immediate: true },
 )
@@ -147,11 +149,18 @@ function openMenuFromKey(row: TreeRow) {
   if (element != null) openMenu(row, entryPoint(element), true)
 }
 
-/** Closes the menu; one the keyboard opened gives the focus back to its entry. */
-function closeMenu() {
+/**
+ * Closes the menu. One the keyboard opened gives the focus back to its entry (the first row if a
+ * new payload has no such entry), unless the pointer closed it: a click outside then keeps the
+ * focus it moves itself.
+ */
+function closeMenu(reason?: 'pointer') {
   const closing = menu.value
   menu.value = undefined
-  if (closing?.keyboard) void focusRow(closing.row)
+  if (closing == null || !closing.keyboard || reason === 'pointer') return
+  const rows = tree.rows.value
+  const target = rows.find((row) => rowKey(row) === closing.row) ?? rows.find(isNavigable)
+  if (target != null) void focusRow(rowKey(target))
 }
 
 /** The popup is placed from the click point and the keyboard is not its own: close it on Escape. */
@@ -177,6 +186,50 @@ async function focusRow(key: string) {
     await nextTick()
   }
   rowElement(key)?.focus()
+}
+
+/**
+ * The focused element in the tree's own DOM root. A visualization lives in a shadow root, where
+ * `document.activeElement` is only the host.
+ */
+function focusedElement(): Element | null {
+  const root = scroller.value?.getRootNode()
+  return root instanceof ShadowRoot || root instanceof Document ?
+      root.activeElement
+    : document.activeElement
+}
+
+/**
+ * Loads more of a branch (`Show more`) or loads a failed page again (`Retry`) from `row`. The row
+ * gives way to a "Loading…" row, which cannot hold the focus, so the focus the row had goes to the
+ * entry above while the page comes, then to the first entry it brings (or to the row, if it failed
+ * again). A focus that has moved elsewhere meanwhile is left where it is.
+ */
+async function loadFrom(row: TreeRow, load: () => Promise<void>) {
+  const key = rowKey(row)
+  const hadFocus = rowElement(key)?.contains(focusedElement()) === true
+  // By key: the list the template iterates may hand over a copy of the row, not the one in `rows`.
+  const index = tree.rows.value.findIndex((candidate) => rowKey(candidate) === key)
+  const above = tree.rows.value.slice(0, Math.max(index, 0)).reverse().find(isNavigable)
+  const loaded = load()
+  if (!hadFocus || above == null) return await loaded
+  const aboveKey = rowKey(above)
+  await focusRow(aboveKey)
+  await loaded
+  await nextTick()
+  const active = focusedElement()
+  if (active != null && active !== document.body && active !== rowElement(aboveKey)) return
+  const rows = tree.rows.value
+  const first = rows[index]
+  const brought =
+    (
+      first?.kind === 'entry' &&
+      first.path.length === row.path.length + 1 &&
+      pathKey(first.path.slice(0, -1)) === pathKey(row.path)
+    ) ?
+      first
+    : rows.find((candidate) => rowKey(candidate) === key)
+  if (brought != null) await focusRow(rowKey(brought))
 }
 
 function onFocusin(event: FocusEvent) {
@@ -215,10 +268,10 @@ function onKeydown(event: KeyboardEvent) {
       activate(action.row, action.all)
       break
     case 'more':
-      tree.showMore(action.path)
+      void loadFrom(row, () => tree.showMore(action.path))
       break
     case 'retry':
-      tree.retry(action.path)
+      void loadFrom(row, () => tree.retry(action.path))
       break
     case 'menu':
       openMenu(action.row, entryPoint(element), true)
@@ -239,7 +292,7 @@ function onKeydown(event: KeyboardEvent) {
       role="tree"
       aria-label="Values"
       data-testid="tree-scroller"
-      @scroll="menu = undefined"
+      @scroll="closeMenu()"
       @focusin="onFocusin"
     >
       <div v-bind="wrapperProps">
@@ -250,8 +303,8 @@ function onKeydown(event: KeyboardEvent) {
           :tabStop="rowKey(row) === tabStopKey"
           :style="{ height: `${ROW_HEIGHT_PX}px` }"
           @toggle="tree.toggle(row.path)"
-          @more="tree.showMore(row.path)"
-          @retry="tree.retry(row.path)"
+          @more="loadFrom(row, () => tree.showMore(row.path))"
+          @retry="loadFrom(row, () => tree.retry(row.path))"
           @activate="activate(row, $event)"
           @menu="openMenu(row, { x: $event.clientX, y: $event.clientY }, false)"
           @menuKey="openMenuFromKey(row)"
@@ -263,7 +316,7 @@ function onKeydown(event: KeyboardEvent) {
       :items="menu.items"
       :point="menu.point"
       :focusFirst="menu.keyboard"
-      @close="closeMenu"
+      @close="closeMenu($event)"
     />
   </div>
 </template>

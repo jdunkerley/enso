@@ -89,7 +89,6 @@ const moreText = computed(() =>
         class="arrow"
         :class="{ open: row.expanded }"
         :aria-label="row.expanded ? 'Collapse' : 'Expand'"
-        aria-hidden="true"
         tabindex="-1"
         @click.stop="emit('toggle')"
       >
