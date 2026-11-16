@@ -143,7 +143,7 @@ Comparable.from (that:Row) = Comparable.new that Row_Comparator
 ## ---
    private: true
    ---
-Viz_Table.from (that:Row) = Viz_Table.from_view (_-> Viz_Helpers.row_table_view_json that)
+Viz_Table.from (that:Row) = Viz_Table.from_view (_-> Viz_Helpers.row_table_view_json that) has_actions=False
 
 ## ---
    private: true
