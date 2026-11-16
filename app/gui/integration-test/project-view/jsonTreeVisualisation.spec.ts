@@ -128,3 +128,39 @@ test('Retry on a failed page loads it when the next request succeeds', async ({
   await expect(vis).not.toContainText("couldn't load")
   await expect(vis.getByRole('button', { name: 'Retry' })).toHaveCount(0)
 })
+
+test('Right-click on an entry opens only the tree menu, and leaves the selection alone', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  const selected = await locate.selectedNodes(page).count()
+  await entry(vis, 'nested: {1 key}').locator('.content').click({ button: 'right' })
+  const menu = page.getByTestId('gridPopupMenu')
+  await expect(menu).toBeVisible()
+  await expect(menu.getByText('Get Value', { exact: true })).toBeVisible()
+  await expect(menu.getByText('Get All Loaded Values Here')).toBeVisible()
+  // Not the node's or the graph's own menu.
+  await expect(page.getByTestId('contextMenu')).toHaveCount(0)
+  await expect(locate.selectedNodes(page)).toHaveCount(selected)
+  const nodeCount = await locate.graphNode(page).count()
+  await menu.getByText('Get All Loaded Values Here').click()
+  // Of the four root entries, `visualizedExpr` has no expression: `items`, `nested` and `broken` do.
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 3)
+  await expect(menu).toHaveCount(0)
+})
+
+test('Right-click on an entry with no expression opens no menu at all', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const vis = await openTree(page)
+  await vis
+    .locator('.TreeRow.entry .content')
+    .filter({ hasText: /^visualizedExpr:/ })
+    .click({ button: 'right' })
+  await expect(page.getByTestId('gridPopupMenu')).toHaveCount(0)
+  await expect(page.getByTestId('contextMenu')).toHaveCount(0)
+})

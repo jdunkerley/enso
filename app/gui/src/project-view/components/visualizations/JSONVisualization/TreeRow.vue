@@ -9,6 +9,7 @@ const emit = defineEmits<{
   more: []
   retry: []
   activate: [all: boolean]
+  menu: [event: MouseEvent]
 }>()
 
 /** Indentation per level, in pixels. */
@@ -69,6 +70,7 @@ const moreText = computed(() =>
         :title="title"
         @mousedown="preventWordSelection"
         @dblclick.stop="emit('activate', $event.shiftKey)"
+        @contextmenu.prevent.stop="emit('menu', $event)"
       >
         <!-- Vue drops the whitespace between these spans (it holds a newline), so the text reads
              `key: value` exactly; the Playwright spec matches it. -->

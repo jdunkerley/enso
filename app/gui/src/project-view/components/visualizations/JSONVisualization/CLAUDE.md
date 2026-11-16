@@ -19,3 +19,8 @@ The JSON visualization: a lazy tree over any value (spec
   Shift adds one node per loaded sibling. An entry under one with no expression
   has none. The root value's plain actions (`"actions"` in `Tree.prepare`'s
   JSON) are toolbar buttons.
+- Right-click on an entry opens a menu of the same two actions, **Get Value**
+  and **Get All Loaded Values Here** (`entryMenu` in `lazyTree.ts`, shown with
+  the grids' `GridPopupMenu`). An item is offered only if a node comes of it, so
+  an entry no expression reaches gets no menu. The row stops the `contextmenu`
+  event (prevent and stop), so the browser's and the graph's menus stay away.
