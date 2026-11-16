@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
+import { pinnedDir } from '../../__tests__/pinnedGoldens'
 import { parsePageResult, parsePrepared } from '../treeWire'
 
 describe('parsePrepared', () => {
@@ -55,10 +56,7 @@ describe('parsePageResult', () => {
 })
 
 describe('the pinned Enso goldens', () => {
-  const pinned = path.resolve(
-    __dirname,
-    '../../../../../../../../test/Visualization_Tests/data/pinned',
-  )
+  const pinned = pinnedDir
   const golden = (name: string): unknown =>
     JSON.parse(readFileSync(path.join(pinned, name), 'utf8'))
   const names = readdirSync(pinned).filter((name) => /^tree_.*\.json$/.test(name))
@@ -70,9 +68,7 @@ describe('the pinned Enso goldens', () => {
   test.each(names.filter((name) => name.startsWith('tree_prepare_')))(
     '%s is read by parsePrepared',
     (name) => {
-      // The GUI does not read the `actions` field yet (PR 3.2), so the parser drops it.
-      const { actions: _actions, ...prepared } = golden(name) as Record<string, unknown>
-      expect(parsePrepared(golden(name))).toEqual(prepared)
+      expect(parsePrepared(golden(name))).toEqual(golden(name))
     },
   )
 

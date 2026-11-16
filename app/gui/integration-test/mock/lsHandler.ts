@@ -178,6 +178,23 @@ const scatterplotJson = (params: string[]) =>
       { x: 0.1, y: 0.7, label: 'foo', color: '#FF0000', shape: 'circle', size: 0.2 },
       { x: 0.4, y: 0.2, label: 'baz', color: '#0000FF', shape: 'square', size: 0.3 },
     ],
+    // What `Scatter_Plot` sends for a table: a point's row and the brush's filter.
+    actions: [
+      {
+        id: 'open_row',
+        label: 'Get Row',
+        icon: 'select_row',
+        kind: 'chain',
+        template: 'get_row {{#index}}',
+      },
+      {
+        id: 'brush_filter',
+        label: 'Filter To Selection',
+        icon: '',
+        kind: 'chain',
+        template: 'filter {{@column}} (..Between {{#min}} {{#max}})',
+      },
+    ],
   })
 
 /** The 150 items of the mocked tree's `items` branch. */
@@ -270,10 +287,18 @@ const mockVizPreprocessors: Record<string, Uint8Array | ((params: string[]) => U
         Array.from({ length: 10 }, (_, i) => Array.from({ length: 5 }, (_, j) => `${i},${j}`)),
       ),
     ),
-    'Standard.Visualization.Warnings.process_to_json_text': encodeJSON([
-      'warning 1',
-      "warning 2!!&<>;'\x22",
-    ]),
+    'Standard.Visualization.Warnings.process_to_json_text': encodeJSON({
+      warnings: ['warning 1', "warning 2!!&<>;'\x22"],
+      actions: [
+        {
+          id: 'remove_warnings',
+          label: 'Remove Warnings',
+          icon: 'not_exclamation',
+          kind: 'chain',
+          template: 'remove_warnings',
+        },
+      ],
+    }),
     'Standard.Visualization.Widgets.get_widget_json': (params) =>
       mockWidgetConfiguration(params[0]),
 

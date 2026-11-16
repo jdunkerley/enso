@@ -6,6 +6,7 @@ import { Pattern } from '@/util/ast/match'
 import { computed, type ComputedRef, type Ref, toValue } from 'vue'
 import type { Expression, MutableExpression } from 'ydoc-shared/ast'
 import type { TextFormatOptions } from '../TableVisualization.vue'
+import { actionPattern, chainPattern, findAction, type VizAction } from '../vizActions'
 import {
   actionMap,
   type FilterAction,
@@ -25,7 +26,7 @@ export type SortModel = {
 export interface SortFilterNodesButtonOptions {
   filterModel: ToValue<GridFilterModel[]>
   sortModel: ToValue<SortModel[]>
-  isCreateNewNodeEnabled: ToValue<boolean>
+  actions: ToValue<readonly VizAction[]>
   createNodes: (...options: NodeCreationOptions[]) => void
   getColumnValueToEnso: (
     columnName: string,
@@ -37,7 +38,7 @@ export interface FormatMenuOptions {
 }
 
 export interface ColumnNodeButton {
-  isCreateNewNodeEnabled: ToValue<boolean>
+  actions: ToValue<readonly VizAction[]>
   createNodes: (...options: NodeCreationOptions[]) => void
   hiddenColumns: ToValue<string[]>
   vizColumnOrder: ToValue<string[] | null>
@@ -54,227 +55,144 @@ export interface RefreshButtonOptions {
 
 export interface Options extends NewNodeOptions, FormatMenuOptions, RefreshButtonOptions {}
 
-type ConstructivePattern = (
-  placeholder: Ast.Owned<Ast.MutableExpression>,
-) => Ast.Owned<Ast.MutableExpression>
+/** The actions the toolbar's "create components" button understands. */
+export const TABLE_TOOLBAR_ACTIONS = [
+  'sort',
+  'filter',
+  'remove_columns',
+  'reorder_columns',
+] as const
 
-/***
- * function that returns a toolbar button item used to apply new nodes to the graph reflecting the sort filter and column changes applied to the current table visualization
- *
- * @param {FilterModel} options.filterModel - The current filter model applied to the table.
- * @param {SortModel} options.sortModel - The current sort model applied to the table.
- * @param {boolean} options.tableFilteredOrSorted - Are there changes to the table viz sorting or filtering. Used to enable/disable buttons
- * @param {boolean} options.isCreateNewNodeEnabled - Whether the functionality to create new nodes is enabled, only enabled for tables (i.e not rows, vectors).
- * @param options.createNodes - Function to trigger creation of new nodes.
- * @param {(columnId: string, value: unknown) => EnsoValue} options.getColumnValueToEnso - Function to convert column values to a format compatible with Enso.
- * @param {string[]} options.hiddenColumns - A list of column Ids that are currently hidden.
- * @param {string[] | null} options.vizColumnOrder - A list of all column Ids in their new order; if the order is unchanged, this will be null.
- *
- * @returns {ComputedRef<ToolbarItem | undefined>} A computed reference to a toolbar item,
- * or undefined if the button should not be rendered.
+/**
+ * The toolbar's "create components" button: it makes a node of the grid's filters, one of its
+ * sort, and one each of the hidden and the reordered columns, each from the action Enso offers for
+ * it (an action the value does not offer makes no node). The button is there when the value offers
+ * any of {@link TABLE_TOOLBAR_ACTIONS}, and `undefined` otherwise.
  */
 function useSortFilterNodesButton({
   filterModel,
   sortModel,
   tableFilteredOrSorted,
-  isCreateNewNodeEnabled,
+  actions,
   createNodes,
   getColumnValueToEnso,
   hiddenColumns,
   vizColumnOrder,
 }: NewNodeOptions): ComputedRef<ToolbarItem | undefined> {
-  const sortPattern = computed(() => Pattern.parseExpression('(..Name __ __ )')!)
-  const filterPattern = computed(() => Pattern.parseExpression('__ (__ __)')!)
-  const filterBetweenPattern = computed(() => Pattern.parseExpression('__ (..Between __ __)')!)
-  const filterNothingPattern = computed(() => Pattern.parseExpression('__ __')!)
+  const sortSpecPattern = Pattern.parseExpression('(..Name __ __ )')!
+  const conditionPattern = Pattern.parseExpression('(__ __)')!
+  const betweenPattern = Pattern.parseExpression('(..Between __ __)')!
 
-  function createSimpleAstCall(
-    name: string,
-    arg: Ast.Owned<MutableExpression>,
-    ast: Ast.Owned<Ast.MutableExpression>,
-  ) {
-    return Ast.App.positional(Ast.PropertyAccess.new(ast.module, ast, Ast.identifier(name)!), arg)
-  }
+  const sortDirection = { asc: '..Ascending', desc: '..Descending' }
 
-  function createFilterCall(
-    ast: Ast.Owned<Ast.MutableExpression>,
-    expr: Ast.Owned<MutableExpression>,
-    parentPattern: Ast.Owned<Ast.MutableExpression>,
-  ) {
-    const style = {
-      spaced: parentPattern !== undefined,
-    }
-    return Ast.App.positional(
-      Ast.PropertyAccess.new(ast.module, parentPattern, Ast.identifier('filter')!, style),
-      expr,
-    )
-  }
-
-  function buildFilterExpression(
-    ast: Ast.Owned<Ast.MutableExpression>,
+  /** The condition of one grid filter, as the filter action's `{{condition}}`: `(..Equal 3)`. */
+  function conditionBuilder(
     columnName: string,
     filterType: FilterType,
-    filterAction: FilterAction,
+    filterAction: FilterAction | undefined,
     value?: string[] | string | FilterValueRange,
   ) {
-    const column = Ast.TextLiteral.new(columnName)
     const valueFormatter = getColumnValueToEnso(columnName)
-
-    if (filterAction === 'blank' || filterAction === 'notBlank') {
-      return filterNothingPattern.value.instantiateCopied([
-        column,
-        Ast.parseExpression(actionMap[filterAction])!,
-      ])
-    }
-
-    if (filterType === 'set') {
-      if (Array.isArray(value) && value.length === 1) {
-        return filterPattern.value.instantiateCopied([
-          column,
-          Ast.parseExpression('..Equal')!,
-          valueFormatter(value[0]!, ast.module) as Expression | MutableExpression,
+    return (module: Ast.MutableModule): Ast.Owned<Ast.MutableExpression> => {
+      if (filterAction === 'blank' || filterAction === 'notBlank') {
+        return Ast.parseExpression(actionMap[filterAction], module)!
+      }
+      if (filterType === 'set') {
+        if (Array.isArray(value) && value.length === 1) {
+          return conditionPattern.instantiateCopied([
+            Ast.parseExpression('..Equal')!,
+            valueFormatter(value[0]!, module) as Expression | MutableExpression,
+          ])
+        }
+        return conditionPattern.instantiateCopied([
+          Ast.parseExpression('..Is_In')!,
+          Ast.Vector.build(
+            value as string[],
+            (element, tempModule) => valueFormatter(element, tempModule),
+            module,
+          ),
         ])
       }
-      return filterPattern.value.instantiateCopied([
-        column,
-        Ast.parseExpression('..Is_In')!,
-        Ast.Vector.build(
-          value as string[],
-          (element, tempModule) => valueFormatter(element, tempModule),
-          ast.module,
-        ),
-      ])
-    }
-
-    if (filterType === 'number') {
-      if (filterAction === 'inRange' && typeof value === 'object') {
+      if (filterType === 'number' && filterAction === 'inRange' && typeof value === 'object') {
         const { fromValue, toValue } = value as FilterValueRange
-        return filterBetweenPattern.value.instantiateCopied([
-          column,
-          valueFormatter(fromValue, ast.module) as Expression | MutableExpression,
-          valueFormatter(toValue, ast.module) as Expression | MutableExpression,
+        return betweenPattern.instantiateCopied([
+          valueFormatter(fromValue, module) as Expression | MutableExpression,
+          valueFormatter(toValue, module) as Expression | MutableExpression,
         ])
       }
-
-      return filterPattern.value.instantiateCopied([
-        column,
-        Ast.parseExpression(actionMap[filterAction])!,
-        valueFormatter(value as string, ast.module) as Expression | MutableExpression,
+      return conditionPattern.instantiateCopied([
+        Ast.parseExpression(actionMap[filterAction!])!,
+        valueFormatter(value as string, module) as Expression | MutableExpression,
       ])
     }
-
-    return filterPattern.value.instantiateCopied([
-      column,
-      Ast.parseExpression(actionMap[filterAction])!,
-      valueFormatter(value as string, ast.module) as Expression | MutableExpression,
-    ])
-  }
-
-  function buildPattern(
-    ast: Ast.Owned<Ast.MutableExpression>,
-    parentPattern: Ast.Owned<Ast.MutableExpression>,
-    columnName: string,
-    filterType: FilterType,
-    filterAction: FilterAction,
-    value?: string[] | string | FilterValueRange,
-  ) {
-    const filterExpr = buildFilterExpression(ast, columnName, filterType, filterAction, value)
-    return createFilterCall(ast, filterExpr, parentPattern)
-  }
-
-  const sortDirection = computed(() => ({
-    asc: '..Ascending',
-    desc: '..Descending',
-  }))
-
-  function makeSortPattern(ast: Ast.Owned<Ast.MutableExpression>) {
-    const sorts = toValue(sortModel)
-      .filter((s) => s?.columnName)
-      .sort((a, b) => a.sortIndex - b.sortIndex)
-      .map((sort) =>
-        sortPattern.value.instantiateCopied([
-          Ast.TextLiteral.new(sort.columnName),
-          Ast.parseExpression(sortDirection.value[sort.sortDirection as SortDirection])!,
-        ]),
-      )
-    return Ast.Vector.new(ast.module, sorts)
-  }
-
-  function getAstPatternSort(): Pattern {
-    return Pattern.new<Ast.Expression>((ast) =>
-      Ast.App.positional(
-        Ast.PropertyAccess.new(ast.module, ast, Ast.identifier('sort')!),
-        makeSortPattern(ast),
-      ),
-    )
   }
 
   function createNewNodes() {
-    const patterns: Pattern[] = []
+    const offered = toValue(actions)
     const filters = toValue(filterModel)
     const sorts = toValue(sortModel)
+    const patterns: Pattern[] = []
 
-    if (sorts.length > 0) {
-      patterns.push(getAstPatternSort())
+    const filterAction = findAction(offered, 'filter')
+    const filterNode =
+      filterAction && filters.length ?
+        chainPattern(
+          filters.map((filter) => ({
+            template: filterAction.template,
+            values: {
+              column: filter.columnName,
+              condition: conditionBuilder(
+                filter.columnName,
+                filter.filterType,
+                filter.filterAction,
+                getFilterValue(filter),
+              ),
+            },
+          })),
+          { firstSpaced: true },
+        )
+      : undefined
+
+    const sortAction = findAction(offered, 'sort')
+    if (sortAction && sorts.length > 0) {
+      const columns = sorts
+        .filter((s) => s?.columnName)
+        .sort((a, b) => a.sortIndex - b.sortIndex)
+        .map(
+          (sort) => (module: Ast.MutableModule) =>
+            sortSpecPattern.instantiateCopied(
+              [
+                Ast.TextLiteral.new(sort.columnName),
+                Ast.parseExpression(sortDirection[sort.sortDirection as SortDirection])!,
+              ],
+              module,
+            ),
+        )
+      const pattern = actionPattern(sortAction, { columns })
+      if (pattern) patterns.push(pattern)
     }
 
+    const removeAction = findAction(offered, 'remove_columns')
     const columnsToRemove = toValue(hiddenColumns)
-    if (columnsToRemove.length) {
-      patterns.push(
-        Pattern.new((ast) =>
-          createSimpleAstCall(
-            'remove_columns',
-            Ast.Vector.build(columnsToRemove, Ast.TextLiteral.new, ast.module),
-            ast,
-          ),
-        ),
-      )
+    if (removeAction && columnsToRemove.length) {
+      const pattern = actionPattern(removeAction, { columns: columnsToRemove })
+      if (pattern) patterns.push(pattern)
     }
 
+    const reorderAction = findAction(offered, 'reorder_columns')
     const columnOrder = toValue(vizColumnOrder)
-    if (columnOrder?.length) {
-      patterns.push(
-        Pattern.new((ast) =>
-          createSimpleAstCall(
-            'reorder_columns',
-            Ast.Vector.build(columnOrder, Ast.TextLiteral.new, ast.module),
-            ast,
-          ),
-        ),
-      )
-    }
-
-    function projector(parentPattern: ConstructivePattern | undefined) {
-      return (columnName: any, filterAction: any, filterType: any, value: any) =>
-        (ast: Ast.Owned<Ast.MutableExpression>) => {
-          const parentPat = parentPattern ? parentPattern(ast) : ast
-          return buildPattern(ast, parentPat, columnName, filterAction, filterType, value)
-        }
-    }
-
-    let filterPatterns = new Array<ConstructivePattern>()
-    for (const filter of filters) {
-      const { columnName, filterAction, filterType } = filter
-      const value = getFilterValue(filter)
-
-      filterPatterns = (filterPatterns.length ? filterPatterns : [undefined]).flatMap((parent) => {
-        const projectionFunction = projector(parent)
-        const pattern = projectionFunction(columnName, filterType, filterAction, value)
-        return [pattern]
-      })
+    if (reorderAction && columnOrder?.length) {
+      const pattern = actionPattern(reorderAction, { columns: columnOrder })
+      if (pattern) patterns.push(pattern)
     }
 
     createNodes(
-      ...filterPatterns.map(
-        (pattern) =>
-          ({ content: Pattern.new(pattern), commit: true }) satisfies NodeCreationOptions,
+      ...(filterNode ? [filterNode] : []).map(
+        (content) => ({ content, commit: true }) satisfies NodeCreationOptions,
       ),
     )
-
     createNodes(
-      ...patterns.map(
-        (pattern) => ({ content: pattern, commit: true }) satisfies NodeCreationOptions,
-      ),
+      ...patterns.map((content) => ({ content, commit: true }) satisfies NodeCreationOptions),
     )
   }
 
@@ -285,8 +203,13 @@ function useSortFilterNodesButton({
     onClick: createNewNodes,
   }
 
-  return computed(() => (toValue(isCreateNewNodeEnabled) ? createNodesButton : undefined))
+  return computed(() =>
+    TABLE_TOOLBAR_ACTIONS.some((id) => findAction(toValue(actions), id)) ? createNodesButton : (
+      undefined
+    ),
+  )
 }
+
 function createFormatMenu({ textFormatterSelected }: FormatMenuOptions): ToolbarItem {
   return {
     selected: textFormatterSelected,

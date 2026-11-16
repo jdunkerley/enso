@@ -6,6 +6,7 @@ import Standard.Visualization.Tree
 import Standard.Visualization.Viz_Action.Viz_Action
 import Standard.Visualization.Viz_Actions.Viz_Actions
 from Standard.Visualization.Viz_Actions import remove_warnings_action
+import Standard.Visualization.Warnings
 
 from Standard.Table import Table
 import Standard.Database.Connection.Database
@@ -108,6 +109,11 @@ add_specs suite_builder =
 
         group_builder.specify "the tree of a vector carries them" <|
             Tree.prepare [1, 2] . should_start_with '{"actions":[{"id":"open_row"'
+
+        group_builder.specify "the warnings message lists the warnings and offers to remove them" <|
+            value = Warning.attach "Uh oh" 42
+            Warnings.process_to_json_text value . should_equal ('{"warnings":["Uh oh"],"actions":[' + remove_warnings_action.to_json_text + ']}')
+            Warnings.process_to_json_text 42 . should_equal ('{"warnings":[],"actions":[' + remove_warnings_action.to_json_text + ']}')
 
 main filter=Nothing =
     suite = Test.build suite_builder->

@@ -140,14 +140,13 @@ describe('The table view message', () => {
       ],
       data: [[1, 2, 3]],
       version_hash: 'v',
-      options: { status_bar: true, create_node: true },
+      options: { status_bar: true },
     })
     expect(flags).toEqual({
       allRowCount: 3,
       versionHash: 'v',
       isSSRM: false,
       bottomStatusBarRequested: true,
-      createNodeEnabled: true,
       columnNames: ['x'],
       columnTypes: new Map([['x', 'Integer']]),
     })
