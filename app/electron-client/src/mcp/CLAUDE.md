@@ -198,9 +198,11 @@ authorise anything by it. The token is the only credential.
   platform enforces modes (Windows does not; no ACL code). Unknown fields are
   ignored. A missing file (`ENOENT`) or malformed JSON means the defaults. Any
   other read failure (busy, no permission) is an error, not a reset: no
-  migration, no new token, nothing written, and an enabled server does not start
-  (status error "The MCP settings file could not be read: …"). The temporary
-  file is removed first and created fresh, and synced before the rename.
+  migration, no new token, nothing written, and no server starts. The status
+  error "The MCP settings file could not be read: …" is reported whether or not
+  the server is switched on, so Settings shows it; it lasts until the app
+  restarts. The temporary file is removed first and created fresh, and synced
+  before the rename.
 - **The token** is the settings file's `token` field. It used to be in the
   system keychain; the owner chose the file because the server is loopback only
   and the token already sits in plain text in each agent app's own configuration

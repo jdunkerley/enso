@@ -220,7 +220,9 @@ describe('McpController', () => {
     await fs.mkdir(settingsPath)
     const c = controller()
     const status = await c.init()
-    expect(status.error).toBeNull()
+    // Reported even though the server is off: the switch reads as off because of it.
+    expect(status.error).toMatch(/^The MCP settings file could not be read: /)
+    expect(status.running).toBe(false)
     const enabled = await c.setEnabled(true).catch((e: unknown) => e)
     expect(enabled).toBeInstanceOf(Error)
     await expect(c.setUpClaudeDesktop()).rejects.toThrow('The MCP settings file could not be read')

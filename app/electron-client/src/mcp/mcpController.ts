@@ -375,7 +375,9 @@ export class McpController {
   private async apply(): Promise<McpStatus> {
     await this.stopServer()
     this.error = null
-    if (this.enabled && !this.closed && this.fileUnreadable != null) {
+    if (this.fileUnreadable != null) {
+      // Shown whether or not the server is switched on: with the file unreadable the switch reads
+      // as off, and the user must be told why and that nothing can be changed.
       this.error = this.fileUnreadable
     } else if (this.enabled && !this.closed) {
       const port = this.port
