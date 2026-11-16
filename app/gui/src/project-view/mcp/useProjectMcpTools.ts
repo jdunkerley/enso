@@ -36,7 +36,13 @@ import {
 import { evaluateExpression } from './evaluate'
 import { findNode, getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
 import { serialized, storeImage, withProjectId, type ImageToolDeps } from './imageTools'
-import { moveNodes, type LayoutToolDeps, type NodeMove } from './layoutTools'
+import {
+  arrangeNodes,
+  moveNodes,
+  type AlignmentHandlers,
+  type ArrangeToolDeps,
+  type NodeMove,
+} from './layoutTools'
 import { createMcpNodes } from './nodeCreation'
 import { panelQuiet } from './panelQuiet'
 import {
@@ -93,15 +99,19 @@ export interface McpEditorDeps {
    * dropdown (the visualization store's `byType` for the node's type info).
    */
   readonly visualizationsFor: (nodeId: NodeId) => VisualizationIdentifier[]
+  /** Tidy up (`useGraphTidy`): the given nodes when two or more, else the whole graph. */
+  readonly tidy: (ids: readonly NodeId[] | undefined) => void
+  /** The Align and Spacing handlers, without the menu's check of the panel's focus. */
+  readonly alignment: AlignmentHandlers
 }
 
 /**
  * Registers the project tools for the open project: the seven that read (get_graph, get_node,
  * search_components, get_component_docs, evaluate_expression, list_visualizations,
- * get_documentation), the nine that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
- * set_documentation, set_visualization, move_nodes, collapse_nodes, add_function) and the two that
- * navigate (select_nodes, open_method); the two that main's `get_visualization` calls
- * (get_visualization_data, prepare_visualization) and the one main's `add_image` calls
+ * get_documentation), the ten that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
+ * set_documentation, set_visualization, move_nodes, arrange_nodes, collapse_nodes, add_function)
+ * and the two that navigate (select_nodes, open_method); the two that main's `get_visualization`
+ * calls (get_visualization_data, prepare_visualization) and the one main's `add_image` calls
  * (store_image), which are not MCP tools themselves.
  *
  * Every open project's graph editor stays mounted (the tabs are under `<KeepAlive>`), so the tools
@@ -279,7 +289,7 @@ export function useProjectMcpTools(
   }
 
   /** The layout tools' dependencies: positions are module metadata, edited through the session. */
-  function layoutDeps(caller: McpCaller, deadline: number): LayoutToolDeps {
+  function layoutDeps(caller: McpCaller, deadline: number): ArrangeToolDeps {
     const graph = currentProject.graph.value
     return {
       db: graph.db,
@@ -288,6 +298,8 @@ export function useProjectMcpTools(
       caller,
       deadline,
       setNodePositions: (moves) => currentProject.graph.value.setNodePositions(moves),
+      tidy: editor.tidy,
+      alignment: editor.alignment,
     }
   }
 
@@ -511,6 +523,17 @@ export function useProjectMcpTools(
         return invalidArgument('moves', 'a list of `{ node_id, x, y }`')
       }
       return moveNodes(layoutDeps(caller, deadline), { moves })
+    },
+    arrange_nodes: async (args, caller, deadline) => {
+      const { action, node_ids } = args
+      if (typeof action !== 'string') return invalidArgument('action', 'a string')
+      if (node_ids != null && !isStringArray(node_ids)) {
+        return invalidArgument('node_ids', 'a list of strings')
+      }
+      return arrangeNodes(layoutDeps(caller, deadline), {
+        action,
+        ...(node_ids != null ? { node_ids } : {}),
+      })
     },
     collapse_nodes: async (args, caller, deadline) => {
       const { node_ids, name } = args

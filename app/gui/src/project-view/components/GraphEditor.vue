@@ -314,6 +314,10 @@ useProjectMcpTools({
     const typeInfo = node && graphStore.db.getExpressionInfo(node.innerExpr.externalId)?.typeInfo
     return [...visualizationStore.byType(typeInfo)]
   },
+  // Called only when a tool runs, after setup: `graphTidy` is defined below.
+  tidy: (ids) => graphTidy.tidy(ids),
+  // The handlers themselves, not the menu's actions, which check the panel's focus.
+  alignment: createSelectionAlignmentHandlers(graphStore),
 })
 
 // === Clipboard Copy/Paste ===

@@ -14,9 +14,14 @@ import { watchEffect } from 'vue'
 import { EditSession, LIVE_EDIT_ERROR, type EditOutcome, type EditRunOptions } from '../editSession'
 import { METHOD_CHANGED_ERROR } from '../editTools'
 import {
+  ARRANGE_ACTIONS,
+  ARRANGE_NODES_MAX,
   MOVE_COORDINATE_LIMIT,
   MOVE_NODES_MAX,
+  arrangeNodes,
   moveNodes,
+  type AlignmentHandlers,
+  type ArrangeToolDeps,
   type LayoutToolDeps,
 } from '../layoutTools'
 import type { AffectedExpressions } from '../projectEvents'
@@ -62,7 +67,22 @@ function fakeSession(before: () => void = () => {}) {
   }
 }
 
-function makeDeps(overrides: Partial<LayoutToolDeps> = {}) {
+/** Fake Align and Spacing handlers, each recording the nodes it was given and moving nothing. */
+function fakeAlignment(): AlignmentHandlers {
+  return {
+    alignLeftNodes: vi.fn(),
+    alignCenterNodes: vi.fn(),
+    alignRightNodes: vi.fn(),
+    alignTopNodes: vi.fn(),
+    alignBottomNodes: vi.fn(),
+    spaceVerticalNodes: vi.fn(),
+    spaceVerticalNodesTight: vi.fn(),
+    spaceVerticalNodesZero: vi.fn(),
+    spaceVerticalNodesWide: vi.fn(),
+  }
+}
+
+function makeDeps(overrides: Partial<ArrangeToolDeps> = {}) {
   const projectNames = mockProjectNameStore()
   const db = GraphDb.Mock(undefined, undefined, projectNames)
   const { root, getSpan } = Ast.parseUpdatingIdMap(CODE)
@@ -78,16 +98,20 @@ function makeDeps(overrides: Partial<LayoutToolDeps> = {}) {
   const setNodePositions = vi.fn<LayoutToolDeps['setNodePositions']>((moves) => {
     for (const [id, position] of moves) db.nodeIdToNode.get(id)!.position = position
   })
-  const deps: LayoutToolDeps = {
+  const tidy = vi.fn<ArrangeToolDeps['tidy']>()
+  const alignment = fakeAlignment()
+  const deps: ArrangeToolDeps = {
     db,
     currentMethod: { ast: Ok(func), pointer: Ok(pointer) },
     session,
     caller,
     deadline: DEADLINE,
     setNodePositions,
+    tidy,
+    alignment,
     ...overrides,
   }
-  return { deps, db, session, setNodePositions }
+  return { deps, db, session, setNodePositions, tidy, alignment }
 }
 
 function nodeNamed(db: GraphDb, name: string): NodeId {
@@ -252,4 +276,166 @@ test('move_nodes refuses, at its turn, a changed method or a removed node', asyn
   })
   expect(errorOf(removed)).toContain(`No node with id ${b}`)
   expect(setNodePositions).not.toHaveBeenCalled()
+})
+
+// === arrange_nodes ===
+
+test('arrange_nodes offers the menu commands', () => {
+  expect(ARRANGE_ACTIONS).toEqual([
+    'tidy',
+    'align_left',
+    'align_right',
+    'align_center',
+    'align_top',
+    'align_bottom',
+    'space',
+    'space_tight',
+    'space_wide',
+    'space_none',
+  ])
+  expect(ARRANGE_NODES_MAX).toBe(500)
+})
+
+test('tidy lays out the whole graph without node_ids or with fewer than two', async () => {
+  const { deps, db, tidy } = makeDeps()
+  const a = nodeNamed(db, 'a')
+  for (const args of [{}, { node_ids: [a] }]) {
+    tidy.mockClear()
+    const result = valueOf(await arrangeNodes(deps, { action: 'tidy', ...args }))
+    expect(tidy).toHaveBeenCalledExactlyOnceWith(undefined)
+    expect(result).toEqual({ action: 'tidy', arranged: 0, settled: true })
+  }
+})
+
+test('tidy with two or more node_ids lays out only those', async () => {
+  const { deps, db, tidy } = makeDeps()
+  const ids = [nodeNamed(db, 'b'), nodeNamed(db, 'a')]
+  await arrangeNodes(deps, { action: 'tidy', node_ids: ids })
+  expect(tidy).toHaveBeenCalledExactlyOnceWith(ids)
+})
+
+test.each([
+  ['align_left', 'alignLeftNodes'],
+  ['align_right', 'alignRightNodes'],
+  ['align_center', 'alignCenterNodes'],
+  ['align_top', 'alignTopNodes'],
+  ['align_bottom', 'alignBottomNodes'],
+  ['space', 'spaceVerticalNodes'],
+  ['space_tight', 'spaceVerticalNodesTight'],
+  ['space_wide', 'spaceVerticalNodesWide'],
+  ['space_none', 'spaceVerticalNodesZero'],
+] as const)('%s runs %s with the nodes of node_ids, and nothing else', async (action, handler) => {
+  const { deps, db, alignment, tidy } = makeDeps()
+  const ids = [nodeNamed(db, 'c'), nodeNamed(db, 'a')]
+  const result = valueOf(await arrangeNodes(deps, { action, node_ids: ids }))
+  expect(result).toEqual({ action, arranged: 0, settled: true })
+  expect(alignment[handler]).toHaveBeenCalledExactlyOnceWith(
+    ids.map((id) => db.nodeIdToNode.get(id)),
+  )
+  for (const [name, other] of Object.entries(alignment)) {
+    if (name !== handler) expect(other, name).not.toHaveBeenCalled()
+  }
+  expect(tidy).not.toHaveBeenCalled()
+})
+
+test('align and space need at least two node_ids', async () => {
+  const { deps, db, alignment } = makeDeps()
+  const a = nodeNamed(db, 'a')
+  for (const action of ARRANGE_ACTIONS.filter((action) => action !== 'tidy')) {
+    for (const args of [{}, { node_ids: [a] }]) {
+      expect(errorOf(await arrangeNodes(deps, { action, ...args })), action).toContain(
+        'at least two',
+      )
+    }
+  }
+  for (const handler of Object.values(alignment)) expect(handler).not.toHaveBeenCalled()
+})
+
+test('arrange_nodes counts the nodes whose position changed', async () => {
+  const fixture: { db?: GraphDb } = {}
+  const { deps, db } = makeDeps({
+    // As the store does: the handler moves the nodes it lays out, in one call.
+    tidy: () => {
+      const nodes = [...fixture.db!.nodeIdToNode.values()]
+      nodes[0]!.position = new Vec2(-5, -5)
+      nodes[1]!.position = new Vec2(-6, -6)
+      // The same position again is not a change.
+      nodes[2]!.position = new Vec2(nodes[2]!.position.x, nodes[2]!.position.y)
+    },
+  })
+  fixture.db = db
+  const result = valueOf(await arrangeNodes(deps, { action: 'tidy' }))
+  expect(result).toEqual({ action: 'tidy', arranged: 2, settled: true })
+})
+
+test('arrange_nodes refuses an unknown or repeated node, and arranges nothing', async () => {
+  const { deps, db, tidy, alignment } = makeDeps()
+  const a = nodeNamed(db, 'a')
+  const b = nodeNamed(db, 'b')
+  expect(
+    errorOf(await arrangeNodes(deps, { action: 'align_left', node_ids: [a, 'nope'] })),
+  ).toContain('No node with id nope')
+  const twice = errorOf(await arrangeNodes(deps, { action: 'tidy', node_ids: [a, b, a] }))
+  expect(twice).toContain(a)
+  expect(twice).toContain('twice')
+  expect(tidy).not.toHaveBeenCalled()
+  expect(alignment.alignLeftNodes).not.toHaveBeenCalled()
+})
+
+test('arrange_nodes takes at most 500 node_ids', async () => {
+  const { deps, tidy } = makeDeps()
+  const many = Array.from({ length: 501 }, (_, i) => `node-${i}`)
+  expect(errorOf(await arrangeNodes(deps, { action: 'tidy', node_ids: many }))).toContain('500')
+  expect(tidy).not.toHaveBeenCalled()
+})
+
+test('arrange_nodes refuses an action it does not know', async () => {
+  const { deps } = makeDeps()
+  expect(errorOf(await arrangeNodes(deps, { action: 'shuffle' }))).toContain('tidy')
+})
+
+test('arrange_nodes affects no expression, and passes the call deadline to the session', async () => {
+  const { deps, session } = makeDeps()
+  await arrangeNodes(deps, { action: 'tidy' })
+  expect(session.affected).toEqual([{}])
+  expect(session.deadlines).toEqual([DEADLINE])
+})
+
+test('arrange_nodes in Live mode is refused by the session, and nothing is arranged', async () => {
+  const session = new EditSession({
+    isLive: () => true,
+    isActive: () => true,
+    holdUndoStep: () => () => {},
+    onForeignEdit: () => () => {},
+    saveVersion: async () => {},
+    watchGraphUpdate: () => ({ updated: async () => true, cancel: () => {} }),
+    watchExecution: () => ({ settled: async () => true, cancel: () => {} }),
+    now: () => 0,
+    setTimeout: () => undefined,
+    clearTimeout: () => {},
+  })
+  const { deps, tidy } = makeDeps({ session })
+  expect(errorOf(await arrangeNodes(deps, { action: 'tidy' }))).toBe(LIVE_EDIT_ERROR)
+  expect(tidy).not.toHaveBeenCalled()
+})
+
+test('arrange_nodes refuses, at its turn, a changed method or a removed node', async () => {
+  const before = vi.fn(() => {})
+  const { deps, db, tidy, alignment } = makeDeps({ session: fakeSession(() => before()) })
+  const a = nodeNamed(db, 'a')
+  const b = nodeNamed(db, 'b')
+
+  before.mockImplementationOnce(() => {
+    deps.currentMethod.pointer = Ok(otherPointer)
+  })
+  expect(errorOf(await arrangeNodes(deps, { action: 'tidy' }))).toBe(METHOD_CHANGED_ERROR)
+  deps.currentMethod.pointer = Ok(pointer)
+
+  before.mockImplementationOnce(() => {
+    db.nodeIdToNode.delete(b)
+  })
+  const removed = await arrangeNodes(deps, { action: 'align_left', node_ids: [a, b] })
+  expect(errorOf(removed)).toContain(`No node with id ${b}`)
+  expect(tidy).not.toHaveBeenCalled()
+  expect(alignment.alignLeftNodes).not.toHaveBeenCalled()
 })

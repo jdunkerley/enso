@@ -187,6 +187,7 @@ describe('projectTools', () => {
       'set_documentation',
       'set_visualization',
       'move_nodes',
+      'arrange_nodes',
       'select_nodes',
       'open_method',
     ])
@@ -302,6 +303,16 @@ describe('edit tool arguments', () => {
     expect(await ok('move_nodes', { moves: [{ node_id: 'x'.repeat(201), x: 1, y: 1 }] })).toBe(
       false,
     )
+  })
+
+  test('arrange_nodes takes a known action and up to 500 node ids', async () => {
+    expect(await ok('arrange_nodes', { action: 'tidy' })).toBe(true)
+    expect(await ok('arrange_nodes', { action: 'space_none', node_ids: ['a', 'b'] })).toBe(true)
+    expect(await ok('arrange_nodes', { action: 'shuffle' })).toBe(false)
+    expect(await ok('arrange_nodes', {})).toBe(false)
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => `n${i}`)
+    expect(await ok('arrange_nodes', { action: 'tidy', node_ids: ids(500) })).toBe(true)
+    expect(await ok('arrange_nodes', { action: 'tidy', node_ids: ids(501) })).toBe(false)
   })
 
   test('set_visualization needs a boolean', async () => {

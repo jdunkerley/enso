@@ -1,13 +1,15 @@
 /* eslint-disable camelcase -- tool argument names are snake_case on the wire */
 /**
- * @file The MCP layout tools driving the real graph editor: `get_graph { layout: true }` and
- * `move_nodes`. A call is delivered as Electron main would (`window.__mcpCall`,
- * `mock/registerMocks.ts`); the spec checks the nodes on screen and the undo stack. A move changes
- * nothing the engine computes, so no call waits for the mock engine's results.
+ * @file The MCP layout tools driving the real graph editor: `get_graph { layout: true }`,
+ * `move_nodes` and `arrange_nodes`. A call is delivered as Electron main would
+ * (`window.__mcpCall`, `mock/registerMocks.ts`); the spec checks the nodes on screen, the view, the
+ * selection and the undo stack. A move changes nothing the engine computes, so no call waits for
+ * the mock engine's results.
  */
 import assert from 'assert'
 import { expect, test, type Page } from 'integration-test/base'
 import { mockExecutionEnvironment, setMockExecutionMode } from 'integration-test/mock/lsHandler'
+import * as locate from './locate'
 
 // Each test opens the project and edits it through the edit session.
 test.setTimeout(60_000)
@@ -201,4 +203,95 @@ test('in Live mode move_nodes is refused and nothing moves', async ({ editorPage
   expect(refused.ok).toBe(false)
   expect(refused.error).toContain('Live mode')
   expect(nodeNamed(await layoutGraph(page), 'five').position).toEqual(five.position)
+})
+
+/** The positions of every node, by id. */
+async function positions(page: Page): Promise<Map<string, Point | undefined>> {
+  return new Map((await layoutGraph(page)).nodes.map((n) => [n.id, n.position]))
+}
+
+/**
+ * Selects `five` by clicking it: a press ends the initial view's following of the graph, so the
+ * view moves only when something moves it.
+ */
+async function selectFive(page: Page) {
+  await locate.graphNodeByBinding(page, 'five').locator('.grab-handle').click()
+  await expect(locate.selectedNodes(page)).toHaveCount(1)
+}
+
+test('arrange_nodes align_left gives scattered nodes one x, without moving the view or the selection', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  await selectFive(page)
+  const graph = await layoutGraph(page)
+  const nodes = ['five', 'ten', 'sum'].map((name) => nodeNamed(graph, name))
+  const ids = nodes.map((n) => n.id)
+  await callOk(page, 'move_nodes', {
+    moves: nodes.map((n, i) => ({ node_id: n.id, x: -2000 + i * 150, y: -2000 + i * 200 })),
+  })
+  const before = await layoutGraph(page)
+  const fiveBox = await boxOf(page, nodeNamed(before, 'five').id)
+
+  const result = await callOk(page, 'arrange_nodes', { action: 'align_left', node_ids: ids })
+  expect(result).toEqual({ action: 'align_left', arranged: 2, settled: true })
+  const after = await layoutGraph(page)
+  expect(ids.map((id) => after.nodes.find((n) => n.id === id)?.position?.x)).toEqual([
+    -2000, -2000, -2000,
+  ])
+  expect(ids.map((id) => after.nodes.find((n) => n.id === id)?.position?.y)).toEqual([
+    -2000, -1800, -1600,
+  ])
+  // Neither the view nor the selection changed.
+  expect(after.view).toEqual(before.view)
+  expect(after.selection).toEqual(before.selection)
+  expect(after.selection).toEqual([nodeNamed(before, 'five').id])
+  expect(await boxOf(page, nodeNamed(before, 'five').id)).toEqual(fiveBox)
+})
+
+test('arrange_nodes align refuses fewer than two nodes', async ({ editorPage, page }) => {
+  await editorPage
+  const five = nodeNamed(await layoutGraph(page), 'five')
+  const refused = await deliver(page, 'arrange_nodes', {
+    action: 'align_top',
+    node_ids: [five.id],
+  })
+  expect(refused.ok).toBe(false)
+  expect(refused.error).toContain('at least two')
+})
+
+test('arrange_nodes tidy lays the graph out, and one undo restores it', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  await selectFive(page)
+  const before = await positions(page)
+  const selection = (await layoutGraph(page)).selection
+
+  const result = await callOk(page, 'arrange_nodes', { action: 'tidy' })
+  expect(result.action).toBe('tidy')
+  expect(result.arranged).toBeGreaterThan(0)
+  const tidied = await positions(page)
+  const changed = [...tidied].filter(
+    ([id, p]) => JSON.stringify(p) !== JSON.stringify(before.get(id)),
+  )
+  expect(changed.length).toBe(result.arranged)
+  expect((await layoutGraph(page)).selection).toEqual(selection)
+
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect
+    .poll(async () => Object.fromEntries(await positions(page)))
+    .toEqual(Object.fromEntries(before))
+})
+
+test('in Live mode arrange_nodes is refused and nothing moves', async ({ editorPage, page }) => {
+  await editorPage
+  const before = await positions(page)
+  await goLive()
+  const refused = await deliver(page, 'arrange_nodes', { action: 'tidy' })
+  expect(refused.ok).toBe(false)
+  expect(refused.error).toContain('Live mode')
+  expect(await positions(page)).toEqual(before)
 })

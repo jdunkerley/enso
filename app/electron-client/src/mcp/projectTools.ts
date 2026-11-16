@@ -24,6 +24,8 @@ const STATEMENT_CHARS = 20_000
 const MOVE_NODES_MAX = 200
 /** The farthest from the origin, in scene units, a node may be moved to on either axis. */
 const COORDINATE_LIMIT = 1_000_000
+/** Most nodes one `arrange_nodes` call lays out. */
+const ARRANGE_NODES_MAX = 500
 
 export const VIEW_TOOL_NAMES = [
   'get_graph',
@@ -45,6 +47,7 @@ export const EDIT_TOOL_NAMES = [
   'set_documentation',
   'set_visualization',
   'move_nodes',
+  'arrange_nodes',
   'select_nodes',
   'open_method',
 ] as const
@@ -79,7 +82,7 @@ const EDIT_RULES =
   '`get_node` later.'
 
 /**
- * The project tools (the seven that read, the eleven that edit or navigate), each forwarding its
+ * The project tools (the seven that read, the twelve that edit or navigate), each forwarding its
  * arguments to the window through `bridge`.
  */
 export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
@@ -356,6 +359,40 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
           .max(MOVE_NODES_MAX),
       },
       run: forward('move_nodes', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'arrange_nodes',
+      title: 'Arrange nodes',
+      description:
+        "Lay nodes out with the graph editor's own commands, as the user would. `action`: " +
+        '`tidy` (Tidy up: lays out the nodes of `node_ids`, or the whole graph without ' +
+        '`node_ids` or with fewer than two); `align_left`, `align_right`, `align_center`, ' +
+        '`align_top`, `align_bottom` (Align: line the nodes up on that edge or centre); ' +
+        '`space`, `space_tight`, `space_wide`, `space_none` (Spacing: stack the nodes ' +
+        'vertically with the default, tight, wide or no gap). The Align and Spacing actions ' +
+        'need at least two nodes in `node_ids` (ids from `get_graph`). An unknown or repeated ' +
+        'node refuses the call and nothing moves. All of it is one edit; the view and the ' +
+        'selection do not change. Returns `{ action, arranged, settled }`: `arranged`, the ' +
+        'number of nodes whose position changed (0 when they were already laid out), and ' +
+        '`settled` (always true: nothing is computed again). Read the new positions with ' +
+        '`get_graph { layout: true }`.' +
+        EDIT_RULES,
+      inputSchema: {
+        action: z.enum([
+          'tidy',
+          'align_left',
+          'align_right',
+          'align_center',
+          'align_top',
+          'align_bottom',
+          'space',
+          'space_tight',
+          'space_wide',
+          'space_none',
+        ]),
+        node_ids: z.array(nodeId()).max(ARRANGE_NODES_MAX).optional(),
+      },
+      run: forward('arrange_nodes', EDIT_TOOL_TIMEOUT_MS),
     },
     {
       name: 'select_nodes',
