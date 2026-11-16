@@ -175,7 +175,7 @@ type Viz_Header
        ---
        Column whose cells create child nodes with `action`, a full link
        template: `{{#field}}` is the row's value of `field` (a number when it
-       reads as one), `{{@field}}` the value as it is, `{{#index}}` the row
+       is a decimal numeral), `{{@field}}` the value as it is, `{{#index}}` the row
        number (for example `query {{@Table}}`). The IDE sends it as it is, and
        does not complete a bare action.
     Link name tooltip action
