@@ -47,11 +47,11 @@ const parseFilterValues = (
       return datePattern.instantiateCopied(dateParts)
     }
     case 'Time': {
-      const pattern = Pattern.parseExpression('Time_Of_Day.parse (__)')!
+      const pattern = Pattern.parseExpression('(Time_Of_Day.parse __)')!
       return pattern.instantiateCopied([Ast.TextLiteral.new(value.value, tempModule)])
     }
     case 'Date_Time': {
-      const pattern = Pattern.parseExpression('Date_Time.parse (__)')!
+      const pattern = Pattern.parseExpression('(Date_Time.parse __)')!
       return pattern.instantiateCopied([Ast.TextLiteral.new(value.value, tempModule)])
     }
     case 'Integer':
