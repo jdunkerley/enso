@@ -6,6 +6,7 @@
     - add_to_json self json_text:Standard.Base.Data.Text.Text -> Standard.Base.Data.Text.Text
     - for value:Standard.Base.Any.Any -> Standard.Visualization.Viz_Actions.Viz_Actions
     - is_empty self -> Standard.Base.Data.Boolean.Boolean
+    - items -> Standard.Visualization.Viz_Actions.Viz_Actions
     - none -> Standard.Visualization.Viz_Actions.Viz_Actions
     - to_json_text self -> Standard.Base.Data.Text.Text
 - remove_warnings_action -> Standard.Visualization.Viz_Action.Viz_Action
