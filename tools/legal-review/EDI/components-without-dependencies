@@ -1,0 +1,2 @@
+# See `componentsWithoutDependenciesFileName` in project/GatherLicenses.scala.
+std-edi: depends only on the GraalVM polyglot API, which the runtime provides, and on Standard.Base and Standard.Table; it ships nothing but its own std-edi.jar.

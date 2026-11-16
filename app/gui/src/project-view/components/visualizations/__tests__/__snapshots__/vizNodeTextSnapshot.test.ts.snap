@@ -133,7 +133,7 @@ exports[`Table toolbar: create components > set of a boolean, true 1`] = `
 
 exports[`Table toolbar: create components > set of a date-time 1`] = `
 [
-  "operator1 . filter 'dt' (..Is_In [Date_Time.parse ('2024-01-02 10:30:00'), Date_Time.parse ('2024-01-03 11:00:00')])",
+  "operator1 . filter 'dt' (..Is_In [(Date_Time.parse '2024-01-02 10:30:00'), (Date_Time.parse '2024-01-03 11:00:00')])",
 ]
 `;
 
@@ -145,7 +145,7 @@ exports[`Table toolbar: create components > set of a mixed value 1`] = `
 
 exports[`Table toolbar: create components > set of a time 1`] = `
 [
-  "operator1 . filter 't' (..Equal Time_Of_Day.parse ('10:30:00'))",
+  "operator1 . filter 't' (..Equal (Time_Of_Day.parse '10:30:00'))",
 ]
 `;
 
@@ -161,9 +161,9 @@ exports[`Table toolbar: create components > set of one 1`] = `
 ]
 `;
 
-exports[`Table toolbar: create components > set of one date-time (known defect, #785) 1`] = `
+exports[`Table toolbar: create components > set of one date-time 1`] = `
 [
-  "operator1 . filter 'dt' (..Equal Date_Time.parse ('2024-01-02 10:30:00'))",
+  "operator1 . filter 'dt' (..Equal (Date_Time.parse '2024-01-02 10:30:00'))",
 ]
 `;
 

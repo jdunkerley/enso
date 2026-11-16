@@ -69,6 +69,16 @@ result = "not a number".parse_integer.catch _-> 0
 - Direct `polyglot java import` of internal classes — only the stdlib should
   reach across the polyglot boundary.
 
+## Doc comments
+
+Doc comments follow the house style in the wiki's
+[Style-Guide-Enso-Docs](https://github.com/jdunkerley/enso/wiki/Style-Guide-Enso-Docs):
+a one-sentence summary, `## Arguments` bullets, and `## Examples` that paste
+into the graph as nodes. The docs-site generator checks it for the modules in
+`STYLE_CHECKED_MODULES` in `docs-site/generator/src/style.ts`; today that is
+`Standard.Base.Data.Time.Date` only (`src/Data/Time/Date.enso` is the worked
+example). When you convert another module, add it to that list in the same PR.
+
 ## Where to read more
 
 - `src/Main.enso` — full public API list.

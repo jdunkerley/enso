@@ -11,6 +11,7 @@ export {
   type DocumentationData,
 } from '$/providers/openedProjects/suggestionDatabase/documentation'
 export type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase/groupInfo'
+export { RESULT_LINE, exampleToNodes } from '@/components/ComponentHelp/examples'
 export { extractMetadata, type DocumentationMetadata } from '@/components/ComponentHelp/metadata'
 export {
   KNOWN_SECTIONS,
