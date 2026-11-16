@@ -328,7 +328,7 @@ type Time_Of_Day
        ```
              from Standard.Base import Time_Of_Day
 
-             example_to_time = Time_Of_Day.new 12 30 . to_time (Date.new 2020)
+             example_to_time = Time_Of_Day.new 12 30 . to_date_time (Date.new 2020)
        ```
     @zone Time_Zone.default_widget
     to_date_time self (date : Date) (zone : Time_Zone = Time_Zone.system) -> Date_Time =

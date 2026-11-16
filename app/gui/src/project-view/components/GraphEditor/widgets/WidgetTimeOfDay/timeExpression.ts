@@ -32,7 +32,12 @@ const NAMED = /^(second|millisecond|microsecond|nanosecond)=(\d+)$/
 /** The arguments after the minute, in `Time_Of_Day.new`'s order. */
 const AFTER_MINUTE = ['second', 'millisecond', 'microsecond', 'nanosecond'] as const
 type AfterMinute = (typeof AFTER_MINUTE)[number]
-/** Each part's largest value, as `Time_Of_Day.new` documents them. */
+/**
+ * Each part's largest value, as `Time_Of_Day.new` documents them. These are the
+ * largest values it accepts for each part on its own (it sums the sub-second
+ * parts into one nanosecond count), which are wider than the 0–999 ranges its
+ * number widgets offer.
+ */
 const MAX: Readonly<Record<AfterMinute, number>> = {
   second: 59,
   millisecond: 999,
