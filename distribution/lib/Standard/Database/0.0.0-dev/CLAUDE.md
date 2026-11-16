@@ -53,6 +53,18 @@ raw = conn.query (..Raw_SQL "SELECT id, name FROM users WHERE active = true")
   from `Main.enso`; other libraries import the modules directly.
 - `src/Internal/DB_Viz_Source.enso` — the conversion of `DB_Table` to
   `Viz_Table` and `SQL_Viz`.
+- `visualizations/SQL_Query.vue` — the SQL Query view of a `DB_Table` or
+  `DB_Column`: the generated SQL pretty-printed with `sql-formatter`, each
+  interpolated value coloured by its Enso type, text selectable and Ctrl+C
+  copying it. It is not built with the IDE: the GUI compiles it at run time once
+  the library is loaded (it may import only `vue`, `sql-formatter` and the IDE's
+  `builtins`; see `app/gui/src/project-view/stores/visualization/CLAUDE.md`).
+  Its preprocessor, `Standard.Visualization.SQL.Visualization`, and the
+  `SQL_Viz` data type stay in Standard.Visualization, because Table converts to
+  `SQL_Viz` and Visualization cannot import Database. `DB_Table`'s
+  `default_viz_id` (`DB_Table_Implementation`) answers
+  `Id.Library "Standard.Database" "SQL Query"` to open it. A node saved with the
+  old built-in id `SQL Query` still opens it (`movedVisualizations.ts`).
 
 ## Things to avoid in generated code
 

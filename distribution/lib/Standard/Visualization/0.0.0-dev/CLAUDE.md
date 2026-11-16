@@ -60,8 +60,11 @@ components and workflows should not.
 - `src/Table/Visualization.enso` — IDE entry points of the table view
   (`prepare_visualization`, `get_rows_for_table`,
   `get_distinct_values_for_column`), written against `Viz_Table`.
-- `src/SQL/Visualization.enso` — IDE entry point of the SQL view, written
-  against `SQL_Viz`.
+- `src/SQL/Visualization.enso` — the preprocessor of the SQL Query view, written
+  against `SQL_Viz`. The view itself is no longer in the GUI: Standard.Database
+  ships it as `visualizations/SQL_Query.vue`
+  (`Id.Library "Standard.Database" "SQL Query"`), whose `defaultPreprocessor`
+  names this module.
 - `src/Internal/Chart_Limits.enso` — the row bounds and `local_rows`, which the
   charts use to read a bounded number of rows from any `Viz_Table`.
 - `src/Widgets.enso`, `src/Id.enso`, `src/Warnings.enso`, `src/File_Upload.enso`
@@ -142,10 +145,11 @@ Visualization and not on each data library.
 - `Id` (`src/Id.enso`) - which visualisation a node opens with. `Id.from`
   answers it: any value gives `Id.table`, a `JS_Object` `Id.json`; a library
   picks another for its type with `Id.from (that:Its_Public_Type)` (Table: SQL
-  Query for a database table; Image: `Id.Library "Standard.Image" "Image"`).
-  `Id.Builtin name` is a visualization the GUI implements;
-  `Id.Library library name` one a library ships in its `visualizations/` folder
-  (`to_js_object`: `{"library": {"name": library}, "name": name}`; `library` is
+  Query, `Id.Library "Standard.Database" "SQL Query"`, for a database table;
+  Image: `Id.Library "Standard.Image" "Image"`). `Id.Builtin name` is a
+  visualization the GUI implements; `Id.Library library name` one a library
+  ships in its `visualizations/` folder (`to_js_object`:
+  `{"library": {"name": library}, "name": name}`; `library` is
   `<namespace>.<name>`, as `Standard.Image`). The GUI watches that folder of
   every loaded library and registers each `.vue` file it finds as
   `{ kind: 'Library', name: library }`, waiting up to 10 s for a library that is
