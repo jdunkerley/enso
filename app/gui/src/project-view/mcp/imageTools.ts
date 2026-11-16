@@ -16,6 +16,11 @@ import { jsonResult } from './graphTools'
 export const IMAGES_FOLDER = 'images'
 /** Most bytes of a stored image (main's `IMAGE_MAX_BYTES`). */
 export const STORED_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+/**
+ * Nothing is created or written with less than this left before the call's deadline: the write
+ * itself takes time, and it must not land after main has told the agent the call timed out.
+ */
+export const STORE_DEADLINE_MARGIN_MS = 5_000
 
 /** The extensions `add_image` stores under: the documentation editor's list. */
 const IMAGE_EXTENSIONS = ['png', 'apng', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'svg']
@@ -39,7 +44,10 @@ export interface ImageToolDeps {
   /** The name of the node's binding; undefined when it has none or there is no such node. */
   readonly nodeName: (nodeId: string) => string | undefined
   readonly now: () => number
-  /** When main stops waiting for the answer: nothing is written after it. */
+  /**
+   * When main stops waiting for the answer: nothing is created or written later than
+   * {@link STORE_DEADLINE_MARGIN_MS} before it.
+   */
   readonly deadline: number
 }
 
@@ -109,12 +117,15 @@ export async function storeImage(
   if (bytes === 'too large') return toolError('The image is larger than 10 MB.')
   const rootId = await deps.files.projectRootId
   if (rootId == null) return toolError('The project has no file tree to store the image in.')
+  const tooLate = () => deps.now() >= deps.deadline - STORE_DEADLINE_MARGIN_MS
+  // Checked before the folder too, so that no empty `images` folder appears after a timeout.
+  if (tooLate()) return toolError(TIMED_OUT_ERROR)
   const folder = { rootId, segments: [IMAGES_FOLDER] }
   const exists = await deps.files.ensureDirExists(folder)
   if (!exists.ok) return toolError(exists.error.message('Could not create the images folder'))
   const unique = await deps.files.pickUniqueName(folder, name)
   if (!unique.ok) return toolError(unique.error.message('Could not list the images folder'))
-  if (deps.now() >= deps.deadline) return toolError(TIMED_OUT_ERROR)
+  if (tooLate()) return toolError(TIMED_OUT_ERROR)
   const segments = [IMAGES_FOLDER, unique.value]
   const written = await deps.files.writeFileBinary({ rootId, segments }, new Blob([bytes]))
   if (!written.ok) return toolError(written.error.message('Could not write the image'))

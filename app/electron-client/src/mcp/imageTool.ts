@@ -11,13 +11,20 @@
  * leading bytes are that kind (an extension that does not match the content, such as a PNG named
  * `.jpg`, is refused too). It must be a regular file (after following symbolic links) of at most
  * {@link IMAGE_MAX_BYTES}, which is checked from its size before anything is read; no error ever
- * quotes the file's content.
+ * quotes the file's content. On Windows the path must be a drive path (`C:\...`): a network path
+ * (`\\host\share`) would make `stat` connect, and authenticate, to that host, and a device path
+ * (`\\.\`, `\\?\`) reaches pipes and devices.
+ *
+ * For SVG only the start of the file is checked (an `<svg` element after the prologue), so a text
+ * file that begins with `<svg` is copied whole. That is acceptable: such a file is one the agent
+ * already controls the content of (nothing of the user's is revealed by copying it), and the
+ * documentation panel shows it in an `<img>`, which runs no script and loads nothing external.
  */
 /* eslint-disable camelcase -- tool argument names are snake_case on the wire */
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { constants as fsConstants } from 'node:fs'
 import { open, realpath, stat } from 'node:fs/promises'
-import { basename, extname, isAbsolute } from 'node:path'
+import { posix, win32 } from 'node:path'
 import { z } from 'zod'
 import type { ToolDefinition } from './toolRegistry'
 import { pictureVisualization, sleepFor, type Capture } from './visualizationTool'
@@ -32,6 +39,8 @@ const PATH_CHARS = 1_000
 const IMAGE_NAME_CHARS = 100
 /** Most characters of a node id, as `get_visualization` takes it. */
 const NODE_ID_CHARS = 200
+/** Most bytes of an AVIF file's `ftyp` box that are searched for its brand. */
+const FTYP_SCAN_BYTES = 256
 
 /** The characters a stored name may have. */
 const NAME_PATTERN = /^[A-Za-z0-9._ -]+$/
@@ -57,7 +66,7 @@ function ascii(bytes: Buffer, start: number, end: number): string {
 /** An ISO BMFF `ftyp` box whose major or a compatible brand is AVIF's (`avif`, `avis`). */
 function isAvif(bytes: Buffer): boolean {
   if (ascii(bytes, 4, 8) !== 'ftyp') return false
-  const boxEnd = Math.min(bytes.readUInt32BE(0), bytes.length)
+  const boxEnd = Math.min(bytes.readUInt32BE(0), bytes.length, FTYP_SCAN_BYTES)
   const brands = [ascii(bytes, 8, 12)]
   for (let at = 16; at + 4 <= boxEnd; at += 4) brands.push(ascii(bytes, at, at + 4))
   return brands.some((brand) => brand === 'avif' || brand === 'avis')
@@ -69,7 +78,7 @@ function isAvif(bytes: Buffer): boolean {
  */
 function isSvg(bytes: Buffer): boolean {
   const text = bytes.toString('utf8')
-  let at = text.startsWith('﻿') ? 1 : 0
+  let at = text.charCodeAt(0) === 0xfeff ? 1 : 0
   const skipSpace = () => {
     while (at < text.length && /\s/.test(text[at]!)) at += 1
   }
@@ -209,7 +218,7 @@ function readError(error: unknown): string {
     case 'ELOOP':
       return NOT_REGULAR_ERROR
     default:
-      return `The file could not be read${typeof code === 'string' ? ` (${code})` : ''}.`
+      return 'The file could not be read.'
   }
 }
 
@@ -257,17 +266,35 @@ function nameFromSource(fileName: string, extension: string): string {
 
 type Loaded = { ok: true; bytes: Buffer; name: string } | { ok: false; error: string }
 
+const NOT_LOCAL_ERROR =
+  'Give the full path of a file on this computer, such as C:\\charts\\sales.png; network and ' +
+  'device paths are not accepted.'
+const RELATIVE_ERROR = 'The `path` must be absolute: the full path of an image file.'
+
+/**
+ * Why `path` is not taken, or null. On Windows only a drive path (`C:\` or `C:/`), which by its
+ * first characters refuses network (`\\host\share`, `//host/share`), device (`\\.\`, `\\?\`),
+ * drive-relative (`C:x`) and driveless (`\charts`) paths. Elsewhere any absolute path.
+ */
+function pathError(path: string, platform: NodeJS.Platform): string | null {
+  if (platform === 'win32') {
+    return /^[A-Za-z]:[\\/]/.test(path) ? null : NOT_LOCAL_ERROR
+  }
+  return posix.isAbsolute(path) ? null : RELATIVE_ERROR
+}
+
 /** Reads the image at `path`, refusing anything Note [add_image Reads Only Images] rules out. */
 async function loadImageFile(
   files: ImageFiles,
   path: string,
   name: string | undefined,
+  platform: NodeJS.Platform,
 ): Promise<Loaded> {
-  if (!isAbsolute(path)) {
-    return { ok: false, error: 'The `path` must be absolute: the full path of an image file.' }
-  }
-  const fileName = basename(path)
-  const extension = extname(fileName).slice(1).toLowerCase()
+  const refusal = pathError(path, platform)
+  if (refusal != null) return { ok: false, error: refusal }
+  const paths = platform === 'win32' ? win32 : posix
+  const fileName = paths.basename(path)
+  const extension = paths.extname(fileName).slice(1).toLowerCase()
   const kind = kindOfExtension(extension)
   if (kind == null) {
     return {
@@ -296,7 +323,7 @@ async function loadImageFile(
         : ': its content is not an image of that kind, so it was not copied.'),
     }
   }
-  const ownExtension = extname(fileName).slice(1)
+  const ownExtension = paths.extname(fileName).slice(1)
   return {
     ok: true,
     bytes,
@@ -314,13 +341,14 @@ const SHOWN_NOTE =
 /**
  * The `add_image` tool over the window (`bridge`), a way to photograph it (as for
  * `get_visualization`) and a way to read files. `sleep` is the wait between captures (instant in
- * tests).
+ * tests); `platform` decides which paths are taken (injected in tests, to cover both rules).
  */
 export function imageTool(
   bridge: Pick<WindowBridge, 'call'>,
   capture: Capture,
   files: ImageFiles,
   sleep: (ms: number) => Promise<void> = sleepFor,
+  platform: NodeJS.Platform = process.platform,
 ): ToolDefinition {
   return {
     name: IMAGE_TOOL_NAME,
@@ -365,7 +393,7 @@ export function imageTool(
         if (error != null) return { ok: false, error }
       }
       if (path != null) {
-        const loaded = await loadImageFile(files, path, name)
+        const loaded = await loadImageFile(files, path, name, platform)
         if (!loaded.ok) return loaded
         return bridge.call(
           'store_image',

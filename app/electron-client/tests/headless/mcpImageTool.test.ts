@@ -92,6 +92,7 @@ const STORED: McpToolResult = {
 function tool(
   files: Record<string, FakeFile> = {},
   window: (tool: string, args: Record<string, unknown>) => McpToolResult = () => STORED,
+  platform: NodeJS.Platform = process.platform,
 ) {
   const calls: { tool: string; args: Record<string, unknown>; timeoutMs: number | undefined }[] = []
   const fake = fakeFiles(files)
@@ -105,6 +106,7 @@ function tool(
     async () => capturedImage(300, 200),
     fake,
     async () => {},
+    platform,
   )
   return { definition, calls, reads: fake.reads }
 }
@@ -212,7 +214,7 @@ test('a directory, a missing file and a relative path are refused', async () => 
   expect(reads).toEqual([])
   expect(errorOf(await definition.run({ path: ROOT + 'missing.png' }, CALLER))).toContain('no file')
   for (const relative of ['chart.png', 'charts/chart.png', './chart.png', '../chart.png']) {
-    expect(errorOf(await definition.run({ path: relative }, CALLER))).toContain('absolute')
+    expect(errorOf(await definition.run({ path: relative }, CALLER))).toMatch(/absolute|full path/)
   }
 })
 
@@ -356,4 +358,64 @@ test('the real file reader reads a regular file and refuses a directory', async 
     'not a regular file',
   )
   expect((await definition.run({ path: file }, CALLER)).ok).toBe(true)
+})
+
+const NOT_LOCAL_ERROR =
+  'Give the full path of a file on this computer, such as C:\\charts\\sales.png; ' +
+  'network and device paths are not accepted.'
+
+test('on Windows only a drive path is taken: network, device and drive-relative paths are refused', async () => {
+  const refused = [
+    String.raw`\\host\share\x.png`,
+    String.raw`\\.\pipe\x.png`,
+    String.raw`\\?\C:\charts\x.png`,
+    '//host/share/x.png',
+    String.raw`\charts\x.png`,
+    '/charts/x.png',
+    'C:x.png',
+    'x.png',
+  ]
+  for (const path of refused) {
+    const { definition, reads } = tool({ [path]: { bytes: PNG } }, () => STORED, 'win32')
+    expect(errorOf(await definition.run({ path }, CALLER)), path).toBe(NOT_LOCAL_ERROR)
+    expect(reads, path).toEqual([])
+  }
+  for (const path of [String.raw`C:\charts\x.png`, 'd:/charts/x.png']) {
+    const { definition, calls } = tool({ [path]: { bytes: PNG } }, () => STORED, 'win32')
+    expect((await definition.run({ path }, CALLER)).ok, path).toBe(true)
+    expect(calls[0]?.args.name, path).toBe('x.png')
+  }
+})
+
+test('elsewhere an absolute path is taken, and a relative one refused', async () => {
+  const path = '/home/user/charts/x.png'
+  const { definition } = tool({ [path]: { bytes: PNG } }, () => STORED, 'linux')
+  expect((await definition.run({ path }, CALLER)).ok).toBe(true)
+  expect(errorOf(await definition.run({ path: 'charts/x.png' }, CALLER))).toContain('absolute')
+})
+
+test('an AVIF brand past the first 256 bytes of the ftyp box is not looked for', async () => {
+  const box = Buffer.alloc(400)
+  box.writeUInt32BE(400, 0)
+  box.write('ftypmif1', 4, 'ascii')
+  box.write('avif', 300, 'ascii')
+  const path = ROOT + 'late.avif'
+  const { definition } = tool({ [path]: { bytes: box } })
+  expect(errorOf(await definition.run({ path }, CALLER))).toContain('not an AVIF image')
+})
+
+test('an unknown read error gives one fixed sentence, without its code', async () => {
+  const definition = imageTool(
+    { call: async () => STORED },
+    async () => null,
+    {
+      stat: async () => {
+        throw Object.assign(new Error('weird'), { code: 'EWEIRD_SECRET' })
+      },
+      read: async () => PNG,
+    },
+    async () => {},
+  )
+  const result = await definition.run({ path: ROOT + 'odd.png' }, CALLER)
+  expect(errorOf(result)).toBe('The file could not be read.')
 })

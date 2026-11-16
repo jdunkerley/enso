@@ -7,6 +7,7 @@ import {
   altText,
   IMAGES_FOLDER,
   serialized,
+  STORE_DEADLINE_MARGIN_MS,
   STORED_IMAGE_MAX_BYTES,
   storeImage,
   type ImageToolDeps,
@@ -42,7 +43,7 @@ function deps(overrides: Partial<ImageToolDeps> = {}): ImageToolDeps {
     files: fakeFiles().files,
     nodeName: () => 'sales',
     now: () => 0,
-    deadline: 1_000,
+    deadline: 60_000,
     ...overrides,
   }
 }
@@ -141,13 +142,40 @@ test('a failure of the file functions is passed on, and nothing is written after
   const late = fakeFiles()
   expect(
     error(
-      await storeImage(deps({ files: late.files, now: () => 1_000 }), {
+      await storeImage(deps({ files: late.files, now: () => 60_000 }), {
         data: DATA,
         name: 'a.png',
       }),
     ),
   ).toContain('timed out')
   expect(late.written).toEqual([])
+})
+
+test('within the safety margin of the deadline nothing is created or written', async () => {
+  // Too near before anything: not even the folder is created.
+  const early = fakeFiles()
+  const nearDeadline = 60_000 - STORE_DEADLINE_MARGIN_MS + 1
+  const refused = await storeImage(deps({ files: early.files, now: () => nearDeadline }), {
+    data: DATA,
+    name: 'a.png',
+  })
+  expect(error(refused)).toContain('timed out')
+  expect(early.files.ensureDirExists).not.toHaveBeenCalled()
+
+  // The margin reached while the name was picked: the write is skipped.
+  const slow = fakeFiles()
+  let clock = 0
+  slow.files.pickUniqueName.mockImplementation(async (_path, name) => {
+    clock = 60_000 - STORE_DEADLINE_MARGIN_MS
+    return Ok(name)
+  })
+  const late = await storeImage(deps({ files: slow.files, now: () => clock }), {
+    data: DATA,
+    name: 'a.png',
+  })
+  expect(error(late)).toContain('timed out')
+  expect(slow.files.ensureDirExists).toHaveBeenCalled()
+  expect(slow.written).toEqual([])
 })
 
 test('serialized stores run one at a time, so two of the same name get different names', async () => {
