@@ -1612,7 +1612,7 @@ test.describe('Boolean widget', () => {
     setupApi: {
       local: () =>
         setMockMainFile(
-          'from Standard.Base import Data\n\nmain =\n    kept = Data.keep_rows True\n    unset = Data.keep_rows\n    computed = Data.keep_rows (1 > 2)\n    flag = True\n',
+          'from Standard.Base import Data\n\nmain =\n    kept = Data.keep_rows True\n    unset = Data.keep_rows\n    computed = Data.keep_rows (1 > 2)\n    flag = True\n    both = flag && True\n',
         ),
     },
   })
@@ -1681,7 +1681,8 @@ test.describe('Boolean widget', () => {
     const selection = node.locator('.WidgetSelection').first()
     await selection.hover()
     await expect(selection.locator('svg.arrow')).toBeVisible()
-    // The corner, not the middle: the middle of the widget is the checkbox.
+    // The corner: the argument name and checkbox fill the rest of the widget, and the checkbox
+    // does not open the list.
     await selection.click({ position: { x: 4, y: 4 } })
     await dropDown.expectVisibleWithOptions(['True', 'False'])
     await dropDown.clickOption('False')
@@ -1707,6 +1708,24 @@ test.describe('Boolean widget', () => {
     const { node } = await booleanNode(editorPage, page, 'computed')
     await expect(node.locator('.WidgetBoolean')).toHaveCount(0)
     await expect(node.locator('.WidgetSelection')).toHaveCount(1)
+    const selection = node.locator('.WidgetSelection').first()
+    await selection.hover()
+    await expect(selection.locator('svg.arrow')).toBeVisible()
+  })
+
+  test('an unset argument has its arrow under the greyed default', async ({ editorPage, page }) => {
+    const { node, widget } = await booleanNode(editorPage, page, 'unset')
+    await node.click()
+    await expect(widget.locator('.defaultValue')).toHaveText('False')
+    await node.locator('.WidgetSelection').first().hover()
+    await expect(widget.locator('.defaultValue svg.arrow')).toBeVisible()
+  })
+
+  test('an infix operand keeps its checkbox and has no arrow', async ({ editorPage, page }) => {
+    await editorPage
+    const node = locate.graphNodeByBinding(page, 'both')
+    await expect(node.locator('.WidgetBoolean')).not.toHaveCount(0)
+    await expect(node.locator('.WidgetSelection')).toHaveCount(0)
   })
 
   test('a whole True node has the checkbox and no arrow', async ({ editorPage, page }) => {

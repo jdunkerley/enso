@@ -2,7 +2,7 @@
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import { Ast } from '@/util/ast'
-import { ArgumentInfoKey } from '@/util/callTree'
+import { ApplicationKind, ArgumentInfoKey } from '@/util/callTree'
 import { describe, expect, test } from 'vitest'
 
 const BOOLEAN = 'Standard.Base.Data.Boolean.Boolean'
@@ -44,6 +44,12 @@ describe('a Boolean argument has a dropdown', () => {
     expect(
       hasDropdown(argument({ reprType: BOOLEAN }, { dynamicConfig: { kind: 'Pending' } as never })),
     ).toBe(false)
+  })
+
+  test('an infix operand has none', () => {
+    const operand = argument({ reprType: BOOLEAN }, { value: Ast.parseExpression('True')! })
+    operand[ArgumentInfoKey]!.appKind = ApplicationKind.Infix
+    expect(hasDropdown(operand)).toBe(false)
   })
 
   test('a literal that is not an argument has none', () => {

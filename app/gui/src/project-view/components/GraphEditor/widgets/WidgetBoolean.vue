@@ -23,10 +23,23 @@ import CheckboxWidget from '@/components/widgets/CheckboxWidget.vue'
 import { Ast } from '@/util/ast'
 import { ProjectPath } from '@/util/projectPath'
 import type { Identifier, QualifiedName } from '@/util/qualifiedName'
-import { computed } from 'vue'
+import { useMounted } from '@/composables/events'
+import { injectSelectionArrow } from '@/providers/selectionArrow'
+import { computed, ref } from 'vue'
 
 const props = defineProps(widgetProps(widgetDefinition))
 const { suggestionDb, module } = useCurrentProject()
+
+/** An unset argument draws no inner widget, so its ▾ goes under the greyed default. */
+const arrowInfo = injectSelectionArrow(true)
+const defaultElement = ref<HTMLElement | null>()
+useMounted(() => {
+  if (defaultElement.value != null && arrowInfo && !arrowInfo.handled) {
+    arrowInfo.requestArrow(defaultElement.value)
+    arrowInfo.handled = true
+    return () => (arrowInfo.handled = false)
+  }
+})
 
 const isUnset = computed(() => WidgetInput.isPlaceholder(props.input))
 /** The default's code, shown greyed while the argument is unset. */
@@ -95,7 +108,12 @@ export const widgetDefinition = defineWidget(
       contenteditable="false"
       @pointerdown.stop
     />
-    <span v-if="isUnset" class="defaultValue widgetApplyPadding" v-text="defaultCode" />
+    <span
+      v-if="isUnset"
+      ref="defaultElement"
+      class="defaultValue widgetApplyPadding"
+      v-text="defaultCode"
+    />
     <NodeWidget v-else :input="props.input" />
   </div>
 </template>
@@ -106,7 +124,9 @@ export const widgetDefinition = defineWidget(
   align-items: center;
 }
 
+/* The ▾ is positioned against this element. */
 .defaultValue {
+  position: relative;
   opacity: 0.5;
 }
 </style>

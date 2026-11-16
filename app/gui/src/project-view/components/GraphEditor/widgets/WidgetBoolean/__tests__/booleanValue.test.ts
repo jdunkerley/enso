@@ -1,7 +1,7 @@
 /** @file Which inputs are Booleans, and the dropdown's entries. */
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import { Ast } from '@/util/ast'
-import { ArgumentInfoKey } from '@/util/callTree'
+import { ApplicationKind, ArgumentInfoKey } from '@/util/callTree'
 import { describe, expect, test } from 'vitest'
 import {
   BOOLEAN_TYPE,
@@ -31,6 +31,17 @@ const argument = (
     },
     ...extra,
   }) as WidgetInput
+
+describe('isBooleanArgument and infix operands', () => {
+  test('an infix operand is not a Boolean argument, however it is typed', () => {
+    const value = Ast.parseExpression('True')!
+    const prefix = argument({ reprType: BOOLEAN_TYPE, tagValues: ['True', 'False'] }, { value })
+    expect(isBooleanArgument(prefix)).toBe(true)
+    const infix = argument({ reprType: BOOLEAN_TYPE, tagValues: ['True', 'False'] }, { value })
+    infix[ArgumentInfoKey]!.appKind = ApplicationKind.Infix
+    expect(isBooleanArgument(infix)).toBe(false)
+  })
+})
 
 describe('booleanFromCode', () => {
   test.each([

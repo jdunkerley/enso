@@ -8,7 +8,7 @@ import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import { ExpressionTag } from '@/components/GraphEditor/widgets/WidgetSelection/tags'
 import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
-import { ArgumentInfoKey } from '@/util/callTree'
+import { ApplicationKind, ArgumentInfoKey } from '@/util/callTree'
 import { ProjectPath } from '@/util/projectPath'
 import type { Identifier, QualifiedName } from '@/util/qualifiedName'
 
@@ -48,10 +48,14 @@ function hasBooleanTags(tagValues: readonly string[] | null | undefined) {
  * `False`, or its `reprType` or expected type is `Boolean`, or - only for an argument with no
  * tag values of its own and no dynamic configuration - its value is a `True`/`False` literal. An
  * `Any`-typed argument with its own dropdown (tags `A`, `B`) whose value happens to be `True`
- * therefore keeps its own options.
+ * therefore keeps its own options. The operands of an infix operator are not arguments in this
+ * sense (`x && True`, `a == True`) though the call tree describes them with the operator's
+ * argument info: they stay a plain literal with a checkbox and no dropdown.
  */
 export function isBooleanArgument(input: WidgetInput): boolean {
-  const info = input[ArgumentInfoKey]?.info
+  const argument = input[ArgumentInfoKey]
+  if (argument == null || argument.appKind === ApplicationKind.Infix) return false
+  const info = argument.info
   if (info == null) return false
   if (hasBooleanTags(info.tagValues)) return true
   if (info.reprType === BOOLEAN_TYPE || input.expectedType === BOOLEAN_TYPE) return true
