@@ -62,8 +62,13 @@ export function usePopOut(deps: {
     argType: string | undefined,
     position: Vec2,
   ): void {
-    const arg = toValue(deps.module).ast?.tryGet(portId)
-    if (!arg?.isExpression()) return
+    const port = toValue(deps.module).ast?.tryGet(portId)
+    if (!port?.isExpression()) return
+    // The value is the expression inside any parentheses; the parentheses go with it.
+    let arg: Ast.Expression = port
+    while (arg instanceof Ast.Group && arg.expression) arg = arg.expression
+    let target: Ast.Expression = arg
+    for (let p = target.parent(); p instanceof Ast.Group; p = target.parent()) target = p
     const code = popOutCode(arg, argType, toValue(deps.graph).db, hasConstructor)
     if (!code.ok) {
       toast.show(`Can't pop out: the type of \`${code.error}\` is not known.`)
@@ -82,7 +87,7 @@ export function usePopOut(deps: {
           toast.show("Can't pop out: the value could not be made into a node.")
           return
         }
-        edit.getVersion(arg).replace(Ast.Ident.new(edit, ident))
+        edit.getVersion(target).replace(Ast.Ident.new(edit, ident))
       },
     )
   }

@@ -89,15 +89,17 @@ describe('usePopOut', () => {
       projectNames,
       createNodes,
     })
-    let target: Ast.Expression | undefined
+    let group: Ast.Group | undefined
     Ast.visitRecursive(block, (ast) => {
-      if (ast instanceof Ast.Group) target = ast.expression ?? undefined
+      if (ast instanceof Ast.Group) group = ast
       return true
     })
+    const target = group!.expression!
     return {
       block,
       created,
-      popOut: (type?: string) => popOut(target!.id, 'end', type, Vec2.Zero),
+      popOut: (type?: string, port: 'inner' | 'group' = 'inner') =>
+        popOut(port === 'group' ? group!.id : target.id, 'end', type, Vec2.Zero),
       noIdent: () => (ident = ''),
     }
   }
@@ -108,7 +110,14 @@ describe('usePopOut', () => {
     expect(s.created).toHaveLength(1)
     expect(s.created[0]).toMatchObject({ expression: 'Date.new 2020 1 15', namePrefix: 'end' })
     expect(s.created[0]!.binding).toBeUndefined()
-    expect(s.block.code().trim()).toBe('x = Date.up_to (end1)')
+    expect(s.block.code().trim()).toBe('x = Date.up_to end1')
+  })
+
+  test('the group as the port gives the same result', () => {
+    const s = setup('x = Date.up_to (Date.new 2020 1 15)')
+    s.popOut(undefined, 'group')
+    expect(s.created[0]).toMatchObject({ expression: 'Date.new 2020 1 15' })
+    expect(s.block.code().trim()).toBe('x = Date.up_to end1')
   })
 
   test('a value that refers to a binding of the same name is not renamed', () => {
