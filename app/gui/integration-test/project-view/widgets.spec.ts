@@ -418,7 +418,8 @@ test.describe('Dynamic configuration updates', () => {
    */
   test('File browser widget', async ({ page, localApi, editorPage }) => {
     const node = await dataReadNodeWithMethodCallInfo(editorPage)
-    await node.click()
+    // Click the node's left edge: its middle may be on the `…` of the hidden parameters, which keeps the click.
+    await node.click({ position: { x: 8, y: 8 } })
     await expect(node.locator('.WidgetTopLevelArgument')).toHaveCount(3)
     const pathArg = node.locator('.WidgetTopLevelArgument').filter({ has: page.getByText('path') })
     await pathArg.click()

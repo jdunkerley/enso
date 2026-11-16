@@ -17,10 +17,16 @@ import {
   trackFormatConfig,
 } from '@/components/GraphEditor/widgets/WidgetFunction/formatForPath'
 import {
+  hiddenParameters,
+  type HiddenParameter,
+} from '@/components/GraphEditor/widgets/WidgetFunction/hiddenParameters'
+import ParameterMenu from '@/components/GraphEditor/widgets/WidgetFunction/ParameterMenu.vue'
+import {
   getPotentialModuleFunctionPointer,
   useWidgetFunctionCallInfo,
 } from '@/components/GraphEditor/widgets/WidgetFunction/widgetFunctionCallInfo'
 import { injectFunctionInfo, provideFunctionInfo } from '@/providers/functionInfo'
+import { injectWidgetTree } from '@/providers/widgetTree'
 import { assert, assertUnreachable } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import type { AstId } from '@/util/ast/abstract'
@@ -46,6 +52,8 @@ const {
   graph,
   suggestionDb,
 } = useCurrentProject()
+
+const tree = injectWidgetTree()
 
 const exprInfo = computed(() => graph.value.db.getExpressionInfo(props.input.value.externalId))
 const outputType = computed(() => exprInfo.value?.typeInfo?.primaryType)
@@ -112,6 +120,19 @@ const innerInput = computed(() => {
   }
   return input
 })
+
+/** The parameters the `…` menu offers: those not shown, unless the node shows its details. */
+const hidden = computed(() =>
+  tree.showDetails || !application.value ? [] : hiddenParameters(application.value),
+)
+
+/** Insert a hidden parameter, with its default value's code (named when it follows unset ones). */
+function insertParameter(parameter: HiddenParameter) {
+  applyArgUpdate({
+    portUpdate: { origin: parameter.portId, value: parameter.defaultCode },
+    directInteraction: true,
+  })
+}
 
 /**
  * With `format` on `Auto_Detect`, a change of the `path` argument also adds the import of the
@@ -354,4 +375,5 @@ export const widgetDefinition = defineWidget(
 
 <template>
   <NodeWidget :input="innerInput" :updateCallback="handleArgUpdate" />
+  <ParameterMenu v-if="hidden.length" :parameters="hidden" @pick="insertParameter" />
 </template>
