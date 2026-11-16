@@ -3,6 +3,7 @@ from Standard.Base import all
 import project.Helpers
 import project.Internal.Chart_Limits
 import project.Internal.Names
+import project.Viz_Actions.Viz_Actions
 import project.Viz_Table.Viz_Table
 from project.Helpers import time_visualization, short_display
 
@@ -118,7 +119,7 @@ json_from_vector vec bounds limit =
     - `value`: the value to be visualized.
 process_to_json_text : Any -> Integer | Nothing -> Integer | Nothing -> Text
 process_to_json_text value bounds=Nothing limit=Nothing = time_visualization Scatter_Plot ("process_to_json_text: " + (short_display value)) <|
-    case value of
+    json = case value of
         _ : Vector -> json_from_vector value bounds limit
         _ : Array -> json_from_vector value bounds limit
         _ ->
@@ -132,3 +133,4 @@ process_to_json_text value bounds=Nothing limit=Nothing = time_visualization Sca
                 rows = Chart_Limits.local_rows vt (limit.if_nothing Chart_Limits.chart_row_bound)
                 ## A source made of columns only (a connection, a workbook) cannot work on rows: show the chart's empty state.
                 if rows.supports "rows" then json_from_viz_table rows bounds limit else no_numeric_json
+    (Viz_Actions.for value).add_to_json json

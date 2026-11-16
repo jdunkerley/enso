@@ -17,9 +17,9 @@ it either.
     `{"kind":"object"|"array","size":…,"label":…}`; an entry is
     `{"key":…,<node fields>,"expr":<node expression or null>}`;
   - a page is `{"start":…,"size":…,"entries":[…]}`; `prepare` returns
-    `{"root":…}` or `{"root":…,"children":<page>}`; `children` returns a page or
-    `{"error":…}`. The goldens `test/Visualization_Tests/data/pinned/tree_*` pin
-    it;
+    `{"root":…}` or `{"root":…,"children":<page>}` (both with `"actions"` first
+    when the value offers any); `children` returns a page or `{"error":…}`. The
+    goldens `test/Visualization_Tests/data/pinned/tree_*` pin it;
   - a value that is a dataflow error shows its payload's tree as the root;
   - `prepare` falls back to a leaf of the value's display text when building the
     tree fails;
@@ -119,6 +119,21 @@ Visualization and not on each data library.
   library or a user type describes its own with
   `Viz_Tree.from (that:Its_Public_Type)` (Table: row count, columns and rows
   read a page at a time; Column, Row; XML: attributes and children).
+- `Viz_Actions` (`src/Viz_Actions.enso`, with `Viz_Action` and
+  `Viz_Action_Kind`) - the nodes a value's visualisations can create. Each
+  `Viz_Action` has an `id` a visualisation looks for, a label, an icon, a kind
+  (`Chain` on the node, or `New_Node`, whose template names the node with
+  `{{node}}`) and a template: `{{#x}}` a value (a number when it reads as one),
+  `{{@x}}` a value as it is, `{{x}}` an expression the visualisation builds, `*`
+  for a vector of them. Base: a vector or array offers `open_row`
+  (`at {{#index}}`); any other value none. Table: `open_row`, `open_column`,
+  `open_cell`, `sort`, `filter`, `remove_columns`, `reorder_columns`,
+  `brush_filter`; Column: `open_row`. A user type offers its own with
+  `Viz_Actions.from (that:My_Type)`. The table view, scatter plot and tree
+  preprocessors send them as an `"actions"` array first in their JSON
+  (`Viz_Actions.add_to_json`; absent when there are none, never on an error).
+  The links of the table view stay in the view (its `link` and `index`): they
+  are the view's own `Chain` actions.
 - `Id` (`src/Id.enso`) - which visualisation a node opens with. `Id.from`
   answers it: any value gives `Id.table`, a `JS_Object` `Id.json`; a library
   picks another for its type with `Id.from (that:Its_Public_Type)` (Table: SQL
