@@ -440,6 +440,8 @@
 
 #### Enso Standard Library
 
+- [`Date`'s functions are documented with examples you can copy into the graph,
+  and every argument has a widget][NNN]
 - [`Date.yesterday` and `Date.tomorrow` give the day before and after
   today.][789]
 - [EDI files are read by the new Standard.EDI library; add
@@ -514,6 +516,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[NNN]: https://github.com/jdunkerley/enso/pull/NNN
 [789]: https://github.com/jdunkerley/enso/pull/789
 [782]: https://github.com/jdunkerley/enso/pull/782
 [788]: https://github.com/jdunkerley/enso/pull/788
