@@ -48,10 +48,21 @@ A visualization is a `.vue` file in a `visualizations/` folder beside `src/`:
   it with the rest of the library.
 
 The store watches the project root, every content root of type `Library` the
-session already has (`ls.contentRoots`), and every later `file/rootAdded`. A
-library therefore contributes its visualizations once the language server has
-loaded it (when something imports it), and editing a `.vue` file under a local
-library (`~/enso/libraries`) reloads the open view, as for a project.
+connection has recorded (`ls.contentRoots`), and every later `file/rootAdded`.
+`LanguageServer` records the roots itself, from its construction: those of each
+initialization reply and each `file/rootAdded`, deduplicated by root id. The
+store is created only when the graph editor mounts, which can be after the first
+execution has already loaded a library (e.g. `Standard.Image`), so a root
+announced in that gap must not depend on anyone listening at the time. A library
+therefore contributes its visualizations once the language server has loaded it
+(when something imports it), and editing a `.vue` file under a local library
+(`~/enso/libraries`) reloads the open view, as for a project.
+
+**Limitation:** the language server's `PathWatcher` stays in its initialized
+stage when the watched path does not exist, so a `visualizations/` folder
+created _after_ the watch started (for a project or a library) is not noticed
+until the project is reopened. Editing files in a folder that already existed
+reloads as usual.
 
 A visualization's name is the `name` it exports, not its file name. A file that
 exports no `name`/`inputType` is not a visualization (it may be a dependency of
@@ -82,9 +93,9 @@ the limit it rejects with
 
 > `The library 'Standard.Image' has no visualization 'Image'.`
 
-which `visualizationData.ts` shows as the existing "was not found in the
-library" error. A rejected wait is dropped from the cache, so a later request
-tries again.
+which `visualizationData.ts` catches and shows with the rejection's own text (it
+is not the "was not found in the library" error). A rejected wait is dropped
+from the cache, so a later request tries again.
 
 ## Moved ids
 

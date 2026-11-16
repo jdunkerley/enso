@@ -27,8 +27,8 @@ export function rootAddress(rootId: Uuid, segments: readonly string[]): string {
 
 /**
  * Split an address made by {@link rootAddress}; `undefined` if it is not one. A segment that is `.`
- * or `..`, or that holds a `/` or `\` once decoded, is not a name inside the root, so such an address is
- * refused rather than handed on to a reader that might treat it as a path.
+ * or `..`, or that holds a `/` or `\` once decoded, is not a name inside the root, so such an
+ * address is refused rather than handed on to a reader that might treat it as a path.
  */
 export function parseRootAddress(
   address: string,
@@ -56,8 +56,8 @@ export function parseRootAddress(
  * in `/`). Addresses that are not `http(s)` etc. come back as `protocol + normalised path`.
  *
  * An import from a file in a content root must stay in that root: the resolver clamps `..` at the
- * top, which would otherwise turn `../../<other root id>/x.vue` into a file of another root. Such an
- * import throws, which the compiler reports as an error compiling the importing file.
+ * top, which would otherwise turn `../../<other root id>/x.vue` into a file of another root. Such
+ * an import throws, which the compiler reports as an error compiling the importing file.
  */
 export function resolveRelativeImport(dir: string, path: string, baseHref: string): string {
   const url = new URL(dir + path, baseHref)

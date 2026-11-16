@@ -10,7 +10,7 @@ const shipped = readdirSync(STANDARD).flatMap((lib) => {
   return existsSync(dir) ?
       readdirSync(dir)
         .filter((f) => f.endsWith('.vue'))
-        .map((f) => ({ lib, file: path.join(dir, f) }))
+        .map((f) => ({ lib, name: f, file: path.join(dir, f) }))
     : []
 })
 
@@ -19,7 +19,7 @@ describe('visualizations shipped by the standard libraries', () => {
     expect(shipped.map((s) => `${s.lib}/${path.basename(s.file)}`)).toContain('Image/Image.vue')
   })
 
-  test.each(shipped)('$lib/$file compiles with the run-time compiler', ({ file }) => {
+  test.each(shipped)('$lib/$name compiles with the run-time compiler', ({ file }) => {
     expect(() => compileSfc(readFileSync(file, 'utf8'), path.basename(file))).not.toThrow()
   })
 })

@@ -47,10 +47,17 @@ class FakeLanguageServer extends ObservableV2<{
     this.unsubscribes.push(unsubscribe)
     return { promise: Promise.resolve(Ok()), unsubscribe }
   })
-  constructor(readonly contentRoots: Promise<ContentRoot[]>) {
+  /** Every root announced so far, as the real connection records them from its start. */
+  private readonly roots: ContentRoot[]
+  constructor(initialRoots: ContentRoot[]) {
     super()
+    this.roots = [...initialRoots]
+  }
+  get contentRoots(): Promise<ContentRoot[]> {
+    return Promise.resolve([...this.roots])
   }
   addRoot(root: ContentRoot) {
+    if (!this.roots.some((known) => known.id === root.id)) this.roots.push(root)
     this.emit('file/rootAdded', [{ root }])
   }
   fileEvent(rootId: Uuid, kind: LSEvent<'file/event'>['kind'], segments: string[]) {
@@ -60,10 +67,12 @@ class FakeLanguageServer extends ObservableV2<{
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-function createStore(initialRoots: ContentRoot[] = []) {
-  const ls = new FakeLanguageServer(
-    Promise.resolve([{ type: 'Project', id: PROJECT_ROOT }, ...initialRoots]),
-  )
+function createStore(
+  initialRoots: ContentRoot[] = [],
+  beforeStore?: (ls: FakeLanguageServer) => void,
+) {
+  const ls = new FakeLanguageServer([{ type: 'Project', id: PROJECT_ROOT }, ...initialRoots])
+  beforeStore?.(ls)
   const project = {
     projectRootId: Promise.resolve(PROJECT_ROOT),
     lsRpcConnection: Object.assign(ls, {}),
@@ -102,6 +111,14 @@ test('a library root added later starts a watch, once', async () => {
   ls.addRoot(libraryRoot)
   await settle()
   expect(ls.watchFiles.mock.calls.filter(([root]) => root === LIBRARY_ROOT)).toHaveLength(1)
+})
+
+test('a library root announced after the session started but before the store exists is watched', async () => {
+  // The first execution loads a library while the project is still opening, before the graph
+  // editor creates the store; nothing was listening to `file/rootAdded` then.
+  const { ls } = createStore([], (ls) => ls.addRoot(libraryRoot))
+  await settle()
+  expect(ls.watched.has(LIBRARY_ROOT)).toBe(true)
 })
 
 test('a library visualization requested before its root arrives resolves once it registers', async () => {

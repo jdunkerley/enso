@@ -67,7 +67,9 @@ export function watchVisualizationFolder({
   unregister,
   quietIfMissing,
 }: WatchVisualizationFolderOptions): { unsubscribe(): void } {
-  /** A map from file to {@link AbortController}, so that a newer event for a file stops the older. */
+  /**
+   * A map from file to {@link AbortController}, so that a newer event for a file stops the older.
+   */
   const abortControllers = new Map<string, AbortController>()
   /** A map from file to visualization name, so that a removal can unregister the visualization. */
   const namesByFile = new Map<string, string>()
@@ -128,7 +130,8 @@ export function watchVisualizationFolder({
       if (id) unregister(id)
       if (error instanceof InvalidVisualizationModuleError) {
         console.info(
-          `Imported local file '${visualizationsDirectory}/${file}' which is not a visualization. ` +
+          `Imported local file '${visualizationsDirectory}/${file}' ` +
+            `which is not a visualization. ` +
             `If it is not a dependency, are you perhaps missing \`name\` or \`inputType\`?`,
         )
       } else {

@@ -175,6 +175,8 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
       stopWatching?.()
       for (const watcher of folderWatchers.values()) watcher.unsubscribe()
       folderWatchers.clear()
+      for (const waiter of libraryWaiters.values()) clearTimeout(waiter.timer)
+      libraryWaiters.clear()
     })
 
     /** Watch the `visualizations/` folder of a content root; once per root. */

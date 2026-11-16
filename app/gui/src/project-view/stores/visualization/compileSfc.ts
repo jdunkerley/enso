@@ -1,6 +1,7 @@
 /**
  * The pure compile steps of the visualization compiler: Vue single-file components and TypeScript
- * to JavaScript. They do no fetching and no import rewriting, so they run (and are tested) anywhere.
+ * to JavaScript. They do no fetching and no import rewriting, so they run (and are tested)
+ * anywhere.
  */
 
 import hash from 'hash-sum'

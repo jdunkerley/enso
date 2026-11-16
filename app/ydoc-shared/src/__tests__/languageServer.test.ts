@@ -41,15 +41,22 @@ const INIT = 'session/initProtocolConnection'
 function fakeLanguageServer(doc: Y.Doc) {
   const channel = new YjsChannel<string>(doc, CHANNEL)
   const requests: string[] = []
+  const initReply = { contentRoots: [] as object[] }
   channel.subscribe((raw) => {
     const message = JSON.parse(raw)
     if (typeof message.method !== 'string') return
     requests.push(message.method)
     if (message.id == null) return
-    const result = message.method === INIT ? { contentRoots: [] } : null
+    const result = message.method === INIT ? initReply : null
     queueMicrotask(() => channel.send(JSON.stringify({ jsonrpc: '2.0', id: message.id, result })))
   })
-  return { requests, initRequests: () => requests.filter((method) => method === INIT).length }
+  return {
+    requests,
+    initReply,
+    initRequests: () => requests.filter((method) => method === INIT).length,
+    notify: (method: string, params: object) =>
+      channel.send(JSON.stringify({ jsonrpc: '2.0', method, params })),
+  }
 }
 
 /** A transport whose `open` is only emitted when the test calls {@link open}. */
@@ -171,6 +178,44 @@ describe('LanguageServer initialization', () => {
     expect(server.requests.at(-1)).toBe('file/list')
     expect(warn).not.toHaveBeenCalled()
     expect(error).not.toHaveBeenCalled()
+  })
+
+  test('a content root announced before anyone asks is kept, once', async () => {
+    ls = new LanguageServer(CLIENT_ID, new YjsTransport(doc, CHANNEL))
+    expect((await ls.initialized).ok).toBe(true)
+    const library = {
+      type: 'Library',
+      id: '00000000-0000-0000-0000-0000000000b1',
+      namespace: 'Standard',
+      name: 'Image',
+      version: '0.0.0-dev',
+    }
+    // Nothing is listening to `file/rootAdded` but the connection itself.
+    server.notify('file/rootAdded', { root: library })
+    server.notify('file/rootAdded', { root: library })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(await ls.contentRoots).toEqual([library])
+  })
+
+  test('the content roots of a re-initialization are recorded, without duplicates', async () => {
+    ls = new LanguageServer(CLIENT_ID, new YjsTransport(doc, CHANNEL))
+    expect((await ls.initialized).ok).toBe(true)
+    const library = {
+      type: 'Library',
+      id: '00000000-0000-0000-0000-0000000000b1',
+      namespace: 'Standard',
+      name: 'Image',
+      version: '0.0.0-dev',
+    }
+    server.notify('file/rootAdded', { root: library })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    server.initReply.contentRoots = [{ type: 'Project', id: CLIENT_ID }, library]
+    ls.reconnect()
+    expect((await ls.initialized).ok).toBe(true)
+    expect(await ls.contentRoots).toHaveLength(2)
+    expect(await ls.contentRoots).toEqual(
+      expect.arrayContaining([{ type: 'Project', id: CLIENT_ID }, library]),
+    )
   })
 
   test('a request waiting for initialization ends with an error when the server is disposed', async () => {
