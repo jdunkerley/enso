@@ -6,6 +6,9 @@
   and take a picture of the graph.][NNN]
 - [Agents connected over MCP can switch between open projects, read and rewrite
   a workflow's or a function's documentation, and add images to it.][825]
+- [Libraries can provide their own visualizations][817]: a `.vue` file in a
+  library's `visualizations/` folder appears in the view picker once the library
+  is imported, and `Standard.Image` now ships the Image view this way.
 - [Agents connected over MCP can list the visualizations a node offers and look
   at any of them, as a picture or as its data.][809]
 - [Right-clicking a table cell offers the components that the value's library
@@ -531,6 +534,7 @@
 
 [NNN]: https://github.com/jdunkerley/enso/pull/NNN
 [825]: https://github.com/jdunkerley/enso/pull/825
+[817]: https://github.com/jdunkerley/enso/pull/817
 [809]: https://github.com/jdunkerley/enso/pull/809
 [800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795

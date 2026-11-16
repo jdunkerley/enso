@@ -27,7 +27,6 @@ add_specs suite_builder = suite_builder.group "Serializable Visualization Identi
         Visualization.Id.table.to_json . should_equal (json_for_name "Table")
         Visualization.Id.sql_query.to_json . should_equal (json_for_name "SQL Query")
         Visualization.Id.geo_map.to_json . should_equal (json_for_name "Geo Map")
-        Visualization.Id.image.to_json . should_equal (json_for_name "Image")
 
     group_builder.specify "converts any value to the Table visualization" <|
         Id.from (My_Type.Value 30) . should_equal Id.table
@@ -49,8 +48,12 @@ add_specs suite_builder = suite_builder.group "Serializable Visualization Identi
         Id.from (t.at "Y") . should_equal Id.table
         Id.from (t.rows.at 0) . should_equal Id.table
 
-    group_builder.specify "converts an Image to the Image visualization" <|
-        Id.from (Image.from_vector [0, 0, 0, 0] rows=2 channels=1) . should_equal Id.image
+    group_builder.specify "serializes a library visualization with its library" <|
+        expected = JS_Object.from_pairs [["library", JS_Object.from_pairs [["name", "Standard.Image"]]], ["name", "Image"]]
+        (Id.Library "Standard.Image" "Image").to_json . should_equal expected.to_text
+
+    group_builder.specify "converts an Image to the Image visualization of Standard.Image" <|
+        Id.from (Image.from_vector [0, 0, 0, 0] rows=2 channels=1) . should_equal (Id.Library "Standard.Image" "Image")
 
     group_builder.specify "lets a user type pick its visualization by a conversion" <|
         Id.from (My_Json_Type.Value 1) . should_equal Id.json

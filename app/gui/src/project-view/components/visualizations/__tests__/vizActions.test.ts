@@ -71,6 +71,44 @@ describe('templates', () => {
     expect(text(actionPattern(chain('at {{#index}}'), { index: '3' }))).toBe('operator1.at 3')
     expect(text(actionPattern(chain('at {{#key}}'), { key: 'a' }))).toBe("operator1.at 'a'")
   })
+  test.each([
+    ['-12', '-12'],
+    ['+4', '4'],
+    ['3.5', '3.5'],
+    ['0', '0'],
+    ['007', '7'],
+    ['1e-7', '0.0000001'],
+    ['2.5E+3', '2500'],
+    ['-1.5e2', '-150'],
+  ])('# reads the decimal numeral %j as a number', (value, code) => {
+    expect(text(actionPattern(chain('at {{#index}}'), { index: value }))).toBe(
+      `operator1.at ${code}`,
+    )
+  })
+  test.each([
+    ['0x10'],
+    ['0b11'],
+    ['0o7'],
+    [' 3'],
+    ['3 '],
+    ['1_000'],
+    ['.5'],
+    ['5.'],
+    ['1e'],
+    ['NaN'],
+    ['-Infinity'],
+    ['--1'],
+    ['1,5'],
+  ])('# keeps %j as text: it is not a decimal numeral', (value) => {
+    expect(text(actionPattern(chain('at {{#key}}'), { key: value }))).toBe(
+      `operator1.at '${value}'`,
+    )
+  })
+  test('# leaves an empty value unfilled, and writes a blank one as text', () => {
+    expect(actionPattern(chain('at {{#index}}'), { index: '' })).toBeUndefined()
+    expect(actionPattern(chain('f {{#xs*}}'), { xs: ['1', ''] })).toBeUndefined()
+    expect(text(actionPattern(chain('at {{#index}}'), { index: '  ' }))).toBe("operator1.at '  '")
+  })
   test('@ keeps a number a number and text text', () => {
     expect(text(actionPattern(chain('read {{@t}}'), { t: '2' }))).toBe("operator1.read '2'")
     expect(text(actionPattern(chain('read {{@t}}'), { t: 2 }))).toBe('operator1.read 2')
@@ -251,8 +289,10 @@ describe('values Enso cannot write', () => {
     expect(actionPattern(chain('read {{@t}}'), { t: value })).toBeUndefined()
     expect(actionPattern(between, { column: 'x', min: value, max: 1 })).toBeUndefined()
   })
-  test("the text 'Infinity' read as a number gives no pattern, as text it is text", () => {
-    expect(actionPattern(chain('at {{#index}}'), { index: 'Infinity' })).toBeUndefined()
+  test("the text 'Infinity' is not a numeral, so it is text under # and @", () => {
+    expect(text(actionPattern(chain('at {{#index}}'), { index: 'Infinity' }))).toBe(
+      "operator1.at 'Infinity'",
+    )
     expect(text(actionPattern(chain('read {{@t}}'), { t: 'Infinity' }))).toBe(
       "operator1.read 'Infinity'",
     )
