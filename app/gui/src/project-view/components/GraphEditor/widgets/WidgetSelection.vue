@@ -239,24 +239,30 @@ function isHandledByCheckboxWidget(parameter: SuggestionEntryArgument | undefine
   )
 }
 
+function selectionScore(input: WidgetInput): Score {
+  return (
+    // We don’t want to show the dropdown until the dynamic config is received
+    // to avoid showing stale dropdown items. Custom dropdown items should be displayed without delay, though.
+    input[CustomDropdownItemsKey] != null ? Score.Perfect
+    : input.dynamicConfig?.kind === 'Pending' ? Score.Mismatch
+    : input.dynamicConfig?.kind === 'Single_Choice' ? Score.Perfect
+    : isHandledByCheckboxWidget(input[ArgumentInfoKey]?.info) ? Score.Mismatch
+      // TODO[ao] here, instead of checking for existing dynamic config, we should rather return
+      // Score.Good. But this does not work with WidgetArgument which would then take precedence
+      // over selection (and we want to have name always under it)
+    : input[ArgumentInfoKey]?.info?.tagValues != null && input.dynamicConfig == null ? Score.Perfect
+    : Score.Mismatch
+  )
+}
+
+/** Whether this widget draws a dropdown for the input: the widgets with their own menu then stay out. */
+export function hasDropdown(input: WidgetInput): boolean {
+  return selectionScore(input) !== Score.Mismatch
+}
+
 export const widgetDefinition = defineWidget(
   WidgetInput.isAstOrPlaceholder,
-  {
-    priority: 50,
-    score: (props) =>
-      // We don’t want to show the dropdown until the dynamic config is received
-      // to avoid showing stale dropdown items. Custom dropdown items should be displayed without delay, though.
-      props.input[CustomDropdownItemsKey] != null ? Score.Perfect
-      : props.input.dynamicConfig?.kind === 'Pending' ? Score.Mismatch
-      : props.input.dynamicConfig?.kind === 'Single_Choice' ? Score.Perfect
-      : isHandledByCheckboxWidget(props.input[ArgumentInfoKey]?.info) ? Score.Mismatch
-        // TODO[ao] here, instead of checking for existing dynamic config, we should rather return
-        // Score.Good. But this does not work with WidgetArgument which would then take precedence
-        // over selection (and we want to have name always under it)
-      : props.input[ArgumentInfoKey]?.info?.tagValues != null && props.input.dynamicConfig == null ?
-        Score.Perfect
-      : Score.Mismatch,
-  },
+  { priority: 50, score: (props) => selectionScore(props.input) },
   import.meta.hot,
 )
 

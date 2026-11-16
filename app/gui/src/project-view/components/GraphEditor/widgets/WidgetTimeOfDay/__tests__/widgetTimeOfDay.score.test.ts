@@ -24,6 +24,21 @@ function inputFor(code: string, subject: string = code): WidgetInput {
   })
   return WidgetInput.FromAst(found!)
 }
+/** The input for the node of the parsed block `code` that has the code `subject`. */
+function inBlock(code: string, subject: string): WidgetInput {
+  const root = Ast.parseBlock(code)
+  let found: Ast.Ast | undefined
+  Ast.visitRecursive(root, (ast) => {
+    if (
+      found == null &&
+      !(ast instanceof Ast.ExpressionStatement || ast instanceof Ast.BodyBlock) &&
+      ast.code() === subject
+    )
+      found = ast
+    return found == null
+  })
+  return WidgetInput.FromAst(found!)
+}
 const placeholder = (extra: Partial<WidgetInput> = {}): WidgetInput => ({
   portId: 'port' as WidgetInput['portId'],
   value: undefined,
@@ -40,6 +55,25 @@ describe('the time-of-day widget scores', () => {
     expect(score(placeholder({ expectedType: TIME_OF_DAY_TYPE as never }))).toBe(Score.Perfect)
     expect(score({ ...inputFor('Time_Of_Day.now'), ...typedArgument(TIME_OF_DAY_TYPE) })).toBe(
       Score.Perfect,
+    )
+  })
+
+  test('a node that is only a time Perfect, whatever its arguments', () => {
+    expect(score(inBlock('x = Time_Of_Day.now', 'Time_Of_Day.now'))).toBe(Score.Perfect)
+    expect(score(inBlock('x = Time_Of_Day.new 14 30', 'Time_Of_Day.new 14 30'))).toBe(Score.Perfect)
+    expect(score(inBlock('x = Time_Of_Day.new h 30', 'Time_Of_Day.new h 30'))).toBe(Score.Perfect)
+  })
+
+  test('what is not a whole time node Mismatch', () => {
+    expect(score(inBlock('x = Time_Of_Day.now.hour', 'Time_Of_Day.now'))).toBe(Score.Mismatch)
+    expect(score(inBlock('x = foo Time_Of_Day.now', 'Time_Of_Day.now'))).toBe(Score.Mismatch)
+    expect(score(inBlock('x = Date.today', 'Date.today'))).toBe(Score.Mismatch)
+  })
+
+  test('an argument that has its own dropdown Mismatch, so it gets no second one', () => {
+    const singleChoice = { dynamicConfig: { kind: 'Single_Choice', values: [] } } as never
+    expect(score(placeholder({ ...typedArgument(TIME_OF_DAY_TYPE), ...singleChoice }))).toBe(
+      Score.Mismatch,
     )
   })
 

@@ -24,6 +24,21 @@ function inputFor(code: string, subject: string = code): WidgetInput {
   })
   return WidgetInput.FromAst(found!)
 }
+/** The input for the node of the parsed block `code` that has the code `subject`. */
+function inBlock(code: string, subject: string): WidgetInput {
+  const root = Ast.parseBlock(code)
+  let found: Ast.Ast | undefined
+  Ast.visitRecursive(root, (ast) => {
+    if (
+      found == null &&
+      !(ast instanceof Ast.ExpressionStatement || ast instanceof Ast.BodyBlock) &&
+      ast.code() === subject
+    )
+      found = ast
+    return found == null
+  })
+  return WidgetInput.FromAst(found!)
+}
 const placeholder = (extra: Partial<WidgetInput> = {}): WidgetInput => ({
   portId: 'port' as WidgetInput['portId'],
   value: undefined,
@@ -39,6 +54,48 @@ describe('the date widget scores', () => {
     expect(score(placeholder(typedArgument(DATE_TYPE)))).toBe(Score.Perfect)
     expect(score(placeholder({ expectedType: DATE_TYPE as never }))).toBe(Score.Perfect)
     expect(score({ ...inputFor('Date.today'), ...typedArgument(DATE_TYPE) })).toBe(Score.Perfect)
+  })
+
+  test('a node that is only a date Perfect, whatever its arguments', () => {
+    expect(score(inBlock('x = Date.today', 'Date.today'))).toBe(Score.Perfect)
+    expect(score(inBlock('Date.tomorrow', 'Date.tomorrow'))).toBe(Score.Perfect)
+    expect(score(inBlock('x = Date.new 2020 1 15', 'Date.new 2020 1 15'))).toBe(Score.Perfect)
+    expect(score(inBlock('x = (Date.new 2020 1 15)', 'Date.new 2020 1 15'))).toBe(Score.Perfect)
+    // A connected argument, or any other count of them, still is a date node.
+    expect(score(inBlock('x = Date.new yr 1 15', 'Date.new yr 1 15'))).toBe(Score.Perfect)
+    expect(score(inBlock('x = Date.new yr', 'Date.new yr'))).toBe(Score.Perfect)
+  })
+
+  test('what is not a whole date node Mismatch', () => {
+    // The target of a call, an argument, a part of an application, and other calls.
+    expect(score(inBlock('x = Date.today.add_days 3', 'Date.today'))).toBe(Score.Mismatch)
+    expect(score(inBlock('x = Date.today.add_days 3', 'Date.today.add_days 3'))).toBe(
+      Score.Mismatch,
+    )
+    expect(score(inBlock('x = foo Date.today', 'Date.today'))).toBe(Score.Mismatch)
+    expect(score(inBlock('x = Date.new yr 1 15', 'Date.new yr 1'))).toBe(Score.Mismatch)
+    expect(score(inBlock('x = Date.new', 'Date.new'))).toBe(Score.Mismatch)
+    expect(score(inBlock('x = Date.parse "2020-01-15"', 'Date.parse "2020-01-15"'))).toBe(
+      Score.Mismatch,
+    )
+    expect(score(inBlock('x = Time_Of_Day.now', 'Time_Of_Day.now'))).toBe(Score.Mismatch)
+  })
+
+  test('an argument that has its own dropdown Mismatch, so it gets no second one', () => {
+    const singleChoice = { dynamicConfig: { kind: 'Single_Choice', values: [] } } as never
+    expect(score(placeholder({ ...typedArgument(DATE_TYPE), ...singleChoice }))).toBe(
+      Score.Mismatch,
+    )
+    expect(
+      score({ ...inBlock('x = Date.today', 'Date.today'), ...singleChoice } as WidgetInput),
+    ).toBe(Score.Mismatch)
+    const tags = {
+      [ArgumentInfoKey]: {
+        appKind: 0,
+        info: { name: 'end', reprType: DATE_TYPE, tagValues: ['Date.today'] },
+      },
+    } as Partial<WidgetInput>
+    expect(score(placeholder(tags))).toBe(Score.Mismatch)
   })
 
   test('an untyped expression Mismatch, whatever its shape', () => {

@@ -9,6 +9,31 @@ We can then use that more widely."
 
 ## Decisions (the owner's, 2026-11-15; revised 2026-11-16)
 
+**Second revision, 2026-11-16, after testing: whole nodes offer it, and an
+argument with its own dropdown does not get a second one.**
+
+- A node that is only a date (its whole expression, parentheses not counted: the
+  parent is an `Assignment` or `ExpressionStatement`) is wrapped too when it is
+  `Date.today`, `Date.yesterday`, `Date.tomorrow` or `Date.new` with any
+  arguments and any number of them (`Date.new yr 1 15` with a connected year
+  still offers it); for time, `Time_Of_Day.now` and `Time_Of_Day.new <any>`. The
+  callee is recognised by its code. The target of a call
+  (`Date.today.add_days 3`'s `Date.today`) and an argument that is not typed are
+  not whole nodes. The menu opens on the current value when its arguments are
+  literals, else on today or now; a pick is written bare (no parentheses) as the
+  node's expression.
+- **At a node root, the first click is the node's.** The wrapper's click handler
+  would otherwise stop the click that selects the node (and the modified click
+  that edits it). On a whole node the widget takes the click only when the node
+  is already selected: the first click selects, the next opens the menu; Shift,
+  Ctrl or Cmd clicks always go to the node. Dragging is unaffected (pointer
+  events are not stopped).
+- An input that `WidgetSelection` already draws a dropdown for (a
+  `Single_Choice` dynamic config, tag values, custom items) scores `Mismatch` in
+  both widgets, so it keeps its own dropdown alone. For this the library lost
+  `@time_of_day` on `Date.to_date_time` and `@end_date` on
+  `Google_Analytics.read`; `start_date`'s custom `Single_Choice` stays.
+
 **Revised 2026-11-16, after testing: the widget is a dropdown wrapper, not a
 chip.** Where the text below says "chip", read the design in this paragraph. The
 argument shows its real code through the ordinary widgets: `Date.today` and

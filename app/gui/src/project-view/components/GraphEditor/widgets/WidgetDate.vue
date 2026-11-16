@@ -12,6 +12,8 @@ import {
   unparenthesisedCode,
 } from '@/components/GraphEditor/widgets/WidgetPicker/parentheses'
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
+import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
+import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import DateMenu from '@/components/GraphEditor/widgets/WidgetDate/DateMenu.vue'
 import {
   DATE_TYPE,
@@ -66,21 +68,32 @@ function isDateTyped(input: WidgetInput): boolean {
   return input.expectedType === DATE_TYPE || input[ArgumentInfoKey]?.info?.reprType === DATE_TYPE
 }
 
+/** A node that is only a date: `Date.today`, `Date.new` with whatever arguments, and so on. */
+function isWholeDateNode(input: WidgetInput): boolean {
+  return isWholeNodeCall(input, {
+    bare: ['Date.today', 'Date.yesterday', 'Date.tomorrow'],
+    applied: ['Date.new'],
+  })
+}
+
 /**
- * A dropdown around a `Date`-typed argument or item: its own widgets show the code (`Date.today`,
+ * A dropdown around a `Date`-typed argument or item, or a whole node that is a date (`Date.today`,
+ * `Date.new 2020 1 15`, even with a connected argument): its own widgets show the code (`Date.today`,
  * or `Date.new` with `year`, `month` and `day` ports), and an arrow under it opens a menu that
- * replaces the whole value. Only a typed input takes it, so a whole node (which has no expected
- * type) and an untyped `Date.new ...` are drawn as any other expression.
+ * replaces the whole value. Any other untyped `Date.new ...` is drawn as any other expression.
  *
  * Priority 51, just after `WidgetSelection` (50) and `WidgetFileBrowser` (49): an argument with its
- * own dropdown keeps it, and the widgets that follow (argument name, function) draw the argument as
- * they do under any dropdown.
+ * own dropdown keeps it (and does not get a second one: it scores `Mismatch`), and the widgets that
+ * follow (argument name, function) draw the argument as they do under any dropdown.
  */
 export const widgetDefinition = defineWidget(
   WidgetInput.isAstOrPlaceholder,
   {
     priority: 51,
-    score: (props) => (isDateTyped(props.input) ? Score.Perfect : Score.Mismatch),
+    score: (props) =>
+      !hasDropdown(props.input) && (isDateTyped(props.input) || isWholeDateNode(props.input)) ?
+        Score.Perfect
+      : Score.Mismatch,
   },
   import.meta.hot,
 )

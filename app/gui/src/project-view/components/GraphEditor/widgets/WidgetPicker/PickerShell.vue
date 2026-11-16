@@ -8,6 +8,10 @@
  * the interaction ends, so a click away keeps what was typed). The widget keeps the edit: what a
  * choice writes is its business.
  *
+ * When the widget is a whole node, a click is the node's too (it selects it, and with a modifier
+ * edits it): the widget takes it only on a node that is already selected. A first click on the node
+ * selects it, the next opens the menu.
+ *
  * The menu is open only when the widget asked for it (a click on it, or on the arrow): a field
  * inside the argument (the year of `Date.new 2020 1 15`) being edited makes the interaction active,
  * too, but is not a reason to show the menu.
@@ -23,7 +27,9 @@ import { usePopoverRoot } from '@/providers/popoverRoot'
 import { provideSelectionArrow } from '@/providers/selectionArrow'
 import { useTopLevelArgument } from '@/providers/topLevelArgument'
 import { injectWidgetTree } from '@/providers/widgetTree'
+import { Ast } from '@/util/ast'
 import { targetIsOutside } from '@/util/autoBlur'
+import { isNodeRoot } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { computed, ref, toRef, useTemplateRef } from 'vue'
 
 const props = defineProps<{
@@ -87,6 +93,21 @@ function toggleMenu() {
   }
 }
 
+const isWholeNode = computed(() => {
+  const value = props.widget.input.value
+  return value instanceof Ast.Ast && isNodeRoot(value)
+})
+
+function onClick(event: MouseEvent) {
+  if (isWholeNode.value) {
+    const modified = event.ctrlKey || event.metaKey || event.shiftKey
+    const node = widgetRoot.value?.closest('.GraphNode')
+    if (modified || !node?.classList.contains('selected')) return
+  }
+  event.stopPropagation()
+  toggleMenu()
+}
+
 const close = () => interaction.value.cancel()
 const done = () => interaction.value.end()
 </script>
@@ -96,7 +117,7 @@ const done = () => interaction.value.end()
     ref="widgetRoot"
     class="PickerShell widgetParent clickable"
     @pointerdown.prevent
-    @click.stop="toggleMenu"
+    @click="onClick"
     @keydown.enter.stop
     @pointerover="isHovered = true"
     @pointerout="isHovered = false"

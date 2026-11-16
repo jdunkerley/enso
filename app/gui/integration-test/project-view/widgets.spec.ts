@@ -1253,14 +1253,77 @@ test.describe('Date widget', () => {
     await expect(widget.locator('.WidgetNumber')).toHaveCount(0)
   })
 
-  test('an untyped Date.new, and a whole node, are drawn as any other expression', async ({
+  test('an untyped Date.new argument is drawn as any other expression', async ({
     editorPage,
     page,
   }) => {
+    const { widget } = await dateNode(editorPage, page)
+    await expect(widget).toHaveCount(1)
+    await expect(widget.locator('.WidgetDate')).toHaveCount(0)
+  })
+
+  /** The node `date1 = Date.new 2020 1 15`, which is only a date. */
+  async function wholeDateNode(editorPage: EditorPageActions, page: Page) {
     await dateNode(editorPage, page)
     const node = locate.graphNodeByBinding(page, 'date1')
-    await expect(node).toBeVisible()
-    await expect(node.locator('.WidgetDate')).toHaveCount(0)
+    const widget = node.locator('.WidgetDate')
+    await expect(widget).toHaveCount(1)
+    return { node, widget, menu: page.locator('.DateMenu') }
+  }
+
+  test('a whole Date.new node offers the menu once selected, and a pick replaces its code', async ({
+    editorPage,
+    page,
+  }) => {
+    const { node, widget, menu } = await wholeDateNode(editorPage, page)
+    // The first click is the node's: it selects it.
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(node).toHaveClass(/selected/)
+    await expect(menu).toBeHidden()
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    await menu.getByRole('button', { name: 'Date.yesterday' }).click()
+    await expect(menu).toBeHidden()
+    const code = await moduleCode(page)
+    expect(code).toContain('date1 = Date.yesterday\n')
+    expect(code).not.toContain('(Date.yesterday)')
+  })
+
+  test('a calendar pick on a whole node is written without parentheses', async ({
+    editorPage,
+    page,
+  }) => {
+    const { widget, menu } = await wholeDateNode(editorPage, page)
+    await widget.click({ position: { x: 4, y: 4 } })
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    await menu.locator(days).nth(19).click()
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toMatch(/date1 = Date\.new \d+ \d+ 20\n/)
+  })
+
+  test('a whole date node still selects and drags, and its first click does not open the menu', async ({
+    editorPage,
+    page,
+  }) => {
+    const { node, widget, menu } = await wholeDateNode(editorPage, page)
+    await editorPage.clearSelection()
+    await expect(node).not.toHaveClass(/selected/)
+    const before = await node.boundingBox()
+    const grab = await widget.boundingBox()
+    const x = grab!.x + 4
+    const y = grab!.y + grab!.height / 2
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x + 60, y + 40, { steps: 6 })
+    await page.mouse.up()
+    const after = await node.boundingBox()
+    expect(after!.x).toBeGreaterThan(before!.x + 30)
+    expect(after!.y).toBeGreaterThan(before!.y + 20)
+    await expect(menu).toBeHidden()
+    // A drag leaves the node selected, and a modified click is the node's, not the menu's.
+    await widget.click({ position: { x: 4, y: 4 }, modifiers: ['Shift'] })
+    await expect(menu).toBeHidden()
   })
 
   test('one choice is one undo step, and the import is undone with it', async ({
@@ -1490,13 +1553,29 @@ test.describe('Time_Of_Day widget', () => {
     expect(await moduleCode(page)).toContain('since = Data.seconds_since\n')
   })
 
-  test('a whole node is drawn as any other expression', async ({ editorPage, page }) => {
+  test('a whole node (now, or new with any arguments) offers the menu once selected', async ({
+    editorPage,
+    page,
+  }) => {
     await timeNode(editorPage, page)
+    const menu = page.locator('.TimeOfDayMenu')
     for (const binding of ['time1', 'time2']) {
       const node = locate.graphNodeByBinding(page, binding)
-      await expect(node).toBeVisible()
-      await expect(node.locator('.WidgetTimeOfDay')).toHaveCount(0)
+      const widget = node.locator('.WidgetTimeOfDay')
+      await expect(widget).toHaveCount(1)
+      // The first click is the node's: it selects it.
+      await widget.click({ position: { x: 4, y: 4 } })
+      await expect(node).toHaveClass(/selected/)
+      await expect(menu).toBeHidden()
+      await widget.click({ position: { x: 4, y: 4 } })
+      await expect(menu).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(menu).toBeHidden()
     }
+    const node = locate.graphNodeByBinding(page, 'time2')
+    await node.locator('.WidgetTimeOfDay').click({ position: { x: 4, y: 4 } })
+    await page.locator('.TimeOfDayMenu').getByRole('button', { name: 'Time_Of_Day.now' }).click()
+    expect(await moduleCode(page)).toMatch(/time2 = Time_Of_Day.now$/m)
   })
 
   test('one choice is one undo step, and the import is undone with it', async ({

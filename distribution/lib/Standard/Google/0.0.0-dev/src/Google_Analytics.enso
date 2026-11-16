@@ -41,7 +41,6 @@ type Google_Analytics
     @dimensions _make_dimensions_vector_selector
     @metrics _make_metrics_vector_selector
     @start_date _make_start_date_widget
-    @end_date (Date.default_widget include_today=True)
     read : Google_Credential -> Google_Analytics_Property -> (Vector Text) -> (Vector Text) -> Date -> Date -> Table
     read credentials:Google_Credential=(Missing_Argument.throw "credentials") property:Google_Analytics_Property=(Missing_Argument.throw "property") dimensions:Vector=['country'] metrics:Vector=['activeUsers'] start_date:Date=(Date.today.previous ..Year) end_date:Date=Date.today -> Table =
         case credentials of
