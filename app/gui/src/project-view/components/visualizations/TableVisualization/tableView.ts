@@ -16,7 +16,13 @@ import type {
   SetFilterValuesFuncParams,
 } from 'ag-grid-community'
 import { z } from 'zod'
-import { actionPattern, findAction, parseVizActions, placeholderNames } from '../vizActions'
+import {
+  actionPattern,
+  findAction,
+  parseVizActions,
+  placeholderNames,
+  type VizAction,
+} from '../vizActions'
 import { TableVisualisationTooltip } from './TableVisualisationTooltip'
 import { getCellDataType, getFilterParams, getFilterType } from './tableVizFilterSetUpUtils'
 import { TABLE_TOOLBAR_ACTIONS } from './tableVizToolbar'
@@ -458,6 +464,11 @@ export function buildTableView(data: unknown, ctx: TableViewContext): TableView 
   }
 }
 
+/** Whether `actions` has any of the actions `ids` names. */
+function offersAny(actions: readonly VizAction[], ids: readonly string[]): boolean {
+  return ids.some((id) => findAction(actions, id))
+}
+
 /** What the component reads from `data` outside a refresh. */
 export function tableViewFlags(data: unknown): TableViewFlags {
   const message = parseViewMessage(data)
@@ -477,7 +488,7 @@ export function tableViewFlags(data: unknown): TableViewFlags {
     versionHash: message.version_hash ?? null,
     isSSRM: message.server === true,
     bottomStatusBarRequested: message.options?.status_bar === true,
-    createNodeEnabled: TABLE_TOOLBAR_ACTIONS.some((id) => findAction(parseVizActions(data), id)),
+    createNodeEnabled: offersAny(parseVizActions(data), TABLE_TOOLBAR_ACTIONS),
     columnNames: message.columns.map((column) => column.name),
     columnTypes: new Map<string, string>(
       message.columns.flatMap((column) =>

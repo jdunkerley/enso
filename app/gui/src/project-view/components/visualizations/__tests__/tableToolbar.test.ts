@@ -12,7 +12,7 @@ import {
 import { isActionButton } from '../toolbar'
 import type { VizAction } from '../vizActions'
 
-// The toolbar's node text is pinned by `vizNodeTextSnapshot.test.ts`, which is the full gate; these
+// The toolbar's node text is pinned by `vizNodeTextSnapshot.test.ts` (once 3.2.7 rewires it); these
 // cases check that the toolbar follows the actions the value offers, with the text of a few of them.
 
 const chain = (id: string, template: string): VizAction => ({
@@ -55,7 +55,8 @@ function created(actions: VizAction[], state: State): string[] | undefined {
     actions,
     createNodes: (...options: NodeCreationOptions[]) => {
       for (const option of options) {
-        nodes.push(option.content.instantiateCopied([Ast.parseExpression('operator1')!]).code())
+        expect(option.content).toBeDefined()
+        nodes.push(option.content!.instantiateCopied([Ast.parseExpression('operator1')!]).code())
       }
     },
     getColumnValueToEnso: columnValueToEnso(COLUMN_TYPES),
