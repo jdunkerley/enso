@@ -88,4 +88,84 @@ describe('GridPopupMenu', () => {
     expect(getComputedStyle(separator as Element).height).toBe('1px')
     wrapper.unmount()
   })
+
+  describe('from the keyboard', () => {
+    const items: GridMenuItem[] = [
+      { type: 'item', name: 'First', action: vi.fn() },
+      { type: 'item', name: 'Off', action: vi.fn(), disabled: true },
+      { type: 'item', name: 'Last', action: vi.fn() },
+    ]
+
+    async function mountMenu(focusFirst: boolean | undefined) {
+      ensureFloatingLayer()
+      const wrapper = mount(GridPopupMenu, {
+        props: { items, point, ...(focusFirst != null ? { focusFirst } : {}) },
+        attachTo: document.body,
+      })
+      await flushPromises()
+      return wrapper
+    }
+    const panel = () => document.querySelector('[data-testid="gridPopupMenu"]')!
+    const active = () => document.activeElement?.textContent?.trim()
+    async function press(key: string) {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      document.activeElement?.dispatchEvent(event)
+      await flushPromises()
+      return event
+    }
+
+    test('focusFirst puts the focus on the first item', async () => {
+      const wrapper = await mountMenu(true)
+      expect(active()).toBe('First')
+      wrapper.unmount()
+    })
+
+    test('without focusFirst the focus is not taken', async () => {
+      const wrapper = await mountMenu(undefined)
+      expect(panel().contains(document.activeElement)).toBe(false)
+      wrapper.unmount()
+    })
+
+    test('ArrowDown and ArrowUp move between the enabled items and wrap', async () => {
+      const wrapper = await mountMenu(true)
+      await press('ArrowDown')
+      expect(active()).toBe('Last')
+      await press('ArrowDown')
+      expect(active()).toBe('First')
+      await press('ArrowUp')
+      expect(active()).toBe('Last')
+      wrapper.unmount()
+    })
+
+    test('Home and End go to the first and the last item', async () => {
+      const wrapper = await mountMenu(true)
+      await press('End')
+      expect(active()).toBe('Last')
+      await press('Home')
+      expect(active()).toBe('First')
+      wrapper.unmount()
+    })
+
+    test('Escape asks to close, and neither it nor the arrows reach the window', async () => {
+      const wrapper = await mountMenu(true)
+      const reached = vi.fn()
+      window.addEventListener('keydown', reached)
+      expect((await press('ArrowDown')).defaultPrevented).toBe(true)
+      expect((await press('Escape')).defaultPrevented).toBe(true)
+      window.removeEventListener('keydown', reached)
+      expect(reached).not.toHaveBeenCalled()
+      expect(wrapper.emitted('close')).toHaveLength(1)
+      wrapper.unmount()
+    })
+
+    test('Enter runs the focused item and closes the menu', async () => {
+      const wrapper = await mountMenu(true)
+      await press('ArrowDown')
+      document.activeElement?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await flushPromises()
+      expect(items[2]?.type === 'item' && vi.mocked(items[2].action)).toHaveBeenCalledOnce()
+      expect(wrapper.emitted('close')).toHaveLength(1)
+      wrapper.unmount()
+    })
+  })
 })

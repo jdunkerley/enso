@@ -10,13 +10,23 @@ import { useResizeObserver } from '@/composables/events'
 import { injectInteractionHandler } from '@/providers/interactionHandler'
 import { endOnClickOutside, targetIsOutside } from '@/util/autoBlur'
 import { autoUpdate, flip, shift, useFloating } from '@floating-ui/vue'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { unrefElement } from '@vueuse/core'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { GridMenuItem } from './shared/AgGridTableView/gridPopupMenuItems'
 
-const { items, point } = defineProps<{
+const {
+  items,
+  point,
+  focusFirst = false,
+} = defineProps<{
   items: GridMenuItem[]
   /** Location to display the menu near, in client coordinates. */
   point: { x: number; y: number }
+  /**
+   * Put the focus on the first item when the menu opens, for a menu asked for from the keyboard.
+   * The arrow keys, Home and End then move between the items, and Escape asks to close.
+   */
+  focusFirst?: boolean
 }>()
 const emit = defineEmits<{ close: [] }>()
 
@@ -64,7 +74,52 @@ function activate(item: Extract<GridMenuItem, { type: 'item' }>) {
   emit('close')
 }
 
+/** The items that can take the focus. */
+function enabledButtons(): HTMLElement[] {
+  const panel = unrefElement(menu)
+  return panel == null ?
+      []
+    : Array.from(panel.querySelectorAll<HTMLElement>('button:not(:disabled)'))
+}
+
+/**
+ * The keys of a menu: the arrows (wrapping), Home and End move the focus, Escape and Tab close. A
+ * key the menu uses goes no further, so the graph beneath does not also move or deselect.
+ */
+function onKeydown(event: KeyboardEvent) {
+  if (event.ctrlKey || event.altKey || event.metaKey) return
+  const buttons = enabledButtons()
+  const current = buttons.indexOf(document.activeElement as HTMLElement)
+  let target: HTMLElement | undefined
+  switch (event.key) {
+    case 'ArrowDown':
+      target = buttons[(current + 1) % buttons.length]
+      break
+    case 'ArrowUp':
+      target = buttons[(current <= 0 ? buttons.length : current) - 1]
+      break
+    case 'Home':
+      target = buttons[0]
+      break
+    case 'End':
+      target = buttons[buttons.length - 1]
+      break
+    case 'Escape':
+    case 'Tab':
+      event.preventDefault()
+      event.stopPropagation()
+      emit('close')
+      return
+    default:
+      return
+  }
+  event.preventDefault()
+  event.stopPropagation()
+  target?.focus()
+}
+
 onMounted(() => {
+  if (focusFirst) void nextTick(() => enabledButtons()[0]?.focus())
   if (interaction) {
     const menuInteraction = endOnClickOutside(menu, {
       cancel: () => emit('close'),
@@ -96,6 +151,7 @@ function onWindowPointerDown(event: PointerEvent) {
       class="GridPopupMenu"
       :style="floatingStyles"
       data-testid="gridPopupMenu"
+      @keydown="onKeydown"
       @contextmenu.stop.prevent="emit('close')"
     >
       <template v-for="(item, index) in items" :key="index">

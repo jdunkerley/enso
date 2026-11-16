@@ -1,0 +1,396 @@
+/** @file The JSON tree used from the keyboard: roving focus, expanding, Enter and the entry menu. */
+import { mountWithProviders } from '$/utils/testing/mountWithProviders'
+import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
+import { Ast } from '@/util/ast'
+import { Pattern } from '@/util/ast/match'
+import { flushPromises } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import JSONVisualization from '../JSONVisualization.vue'
+
+const createNodes = vi.hoisted(() => vi.fn())
+const executeExpression = vi.hoisted(() => vi.fn())
+vi.mock('@/util/visualizationBuiltins', () => ({
+  useVisualizationConfig: () => ({
+    createNodes,
+    executeExpression,
+    setToolbar: vi.fn(),
+  }),
+}))
+
+/** `name`, `address` (a branch of two entries), `raw` (no expression), and a "Show more" row. */
+const TREE = {
+  root: { kind: 'object', size: 4, label: '{4 keys}' },
+  children: {
+    start: 0,
+    size: 4,
+    entries: [
+      { key: 'name', kind: 'leaf', value: 'John', expr: ".get 'name'" },
+      { key: 'address', kind: 'object', size: 2, label: '{2 keys}', expr: ".get 'address'" },
+      { key: 'raw', kind: 'leaf', value: 1, expr: null },
+    ],
+  },
+}
+const ADDRESS_PAGE = {
+  start: 0,
+  size: 2,
+  entries: [
+    { key: 'city', kind: 'leaf', value: 'Rome', expr: ".get 'city'" },
+    { key: 'zip', kind: 'leaf', value: '00100', expr: ".get 'zip'" },
+  ],
+}
+
+beforeEach(() => {
+  createNodes.mockClear()
+  executeExpression.mockReset()
+  executeExpression.mockResolvedValue({ ok: true, value: ADDRESS_PAGE })
+})
+afterEach(() => {
+  document.body.innerHTML = ''
+})
+
+async function mountTree() {
+  const { wrapper } = await mountWithProviders(JSONVisualization, {
+    props: { data: TREE },
+    global: { stubs: { GridPopupMenu: true } },
+    attachTo: document.body,
+  })
+  return wrapper
+}
+type Tree = Awaited<ReturnType<typeof mountTree>>
+
+/** The row element of an entry (or `more`) by its key text. */
+function row(wrapper: Tree, key: string): HTMLElement {
+  const found = wrapper.findAll('.TreeRow').find((candidate) =>
+    key === 'more' ? candidate.classes('more')
+    : candidate.find('.key').exists() ? candidate.find('.key').text() === key
+    : false,
+  )
+  if (found == null) throw new Error(`no row ${key}`)
+  return found.element
+}
+
+async function press(
+  element: Element,
+  key: string,
+  init: KeyboardEventInit = {},
+): Promise<KeyboardEvent> {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
+  element.dispatchEvent(event)
+  await flushPromises()
+  return event
+}
+
+function focused(): string {
+  const active = document.activeElement
+  if (!(active instanceof HTMLElement) || !active.classList.contains('TreeRow')) return '(none)'
+  return active.classList.contains('more') ?
+      'more'
+    : (active.querySelector('.key')?.textContent ?? '')
+}
+
+function popup(wrapper: Tree) {
+  return wrapper.findComponent({ name: 'GridPopupMenu' })
+}
+
+function nodeTexts(options: readonly NodeCreationOptions[]) {
+  return options.map(({ content }) => {
+    if (!(content instanceof Pattern)) throw new Error('not a pattern')
+    return content.instantiateCopied([Ast.parseExpression('data')!]).code()
+  })
+}
+
+describe('the tree as an ARIA tree', () => {
+  test('the scroller is a tree, and its entries are tree items with a level', async () => {
+    const wrapper = await mountTree()
+    expect(wrapper.find('[data-testid="tree-scroller"]').attributes('role')).toBe('tree')
+    expect(row(wrapper, 'name').getAttribute('role')).toBe('treeitem')
+    expect(row(wrapper, 'name').getAttribute('aria-level')).toBe('1')
+  })
+
+  test('a branch says whether it is expanded, a leaf says nothing', async () => {
+    const wrapper = await mountTree()
+    expect(row(wrapper, 'address').getAttribute('aria-expanded')).toBe('false')
+    expect(row(wrapper, 'name').hasAttribute('aria-expanded')).toBe(false)
+    await press(row(wrapper, 'address'), 'ArrowRight')
+    expect(row(wrapper, 'address').getAttribute('aria-expanded')).toBe('true')
+    expect(row(wrapper, 'city').getAttribute('aria-level')).toBe('2')
+  })
+})
+
+describe('one tab stop', () => {
+  test('only the first entry is tabbable at first; the buttons inside rows are not', async () => {
+    const wrapper = await mountTree()
+    const stops = wrapper
+      .findAll('.TreeRow, .TreeRow button')
+      .filter((element) => element.attributes('tabindex') === '0')
+    expect(stops.map((element) => element.element)).toEqual([row(wrapper, 'name')])
+    expect(wrapper.find('button.arrow').attributes('tabindex')).toBe('-1')
+    expect(wrapper.find('.TreeRow.more button').attributes('tabindex')).toBe('-1')
+  })
+
+  test('the tab stop follows the focused entry', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'address').focus()
+    await flushPromises()
+    expect(row(wrapper, 'address').getAttribute('tabindex')).toBe('0')
+    expect(row(wrapper, 'name').getAttribute('tabindex')).toBe('-1')
+  })
+})
+
+describe('moving between entries', () => {
+  test('ArrowDown and ArrowUp move focus through the visible entries', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    expect((await press(row(wrapper, 'name'), 'ArrowDown')).defaultPrevented).toBe(true)
+    expect(focused()).toBe('address')
+    await press(row(wrapper, 'address'), 'ArrowDown')
+    expect(focused()).toBe('raw')
+    await press(row(wrapper, 'raw'), 'ArrowDown')
+    expect(focused()).toBe('more')
+    await press(row(wrapper, 'more'), 'ArrowUp')
+    expect(focused()).toBe('raw')
+  })
+
+  test('ArrowUp on the first entry and ArrowDown on the last stay where they are', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    await press(row(wrapper, 'name'), 'ArrowUp')
+    expect(focused()).toBe('name')
+    row(wrapper, 'more').focus()
+    await press(row(wrapper, 'more'), 'ArrowDown')
+    expect(focused()).toBe('more')
+  })
+
+  test('ArrowDown from an open branch goes into its entries', async () => {
+    const wrapper = await mountTree()
+    await press(row(wrapper, 'address'), 'ArrowRight')
+    row(wrapper, 'address').focus()
+    await press(row(wrapper, 'address'), 'ArrowDown')
+    expect(focused()).toBe('city')
+  })
+})
+
+describe('expanding and collapsing', () => {
+  test('ArrowRight opens a closed branch, then moves into it', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'address').focus()
+    await press(row(wrapper, 'address'), 'ArrowRight')
+    expect(executeExpression).toHaveBeenCalledOnce()
+    expect(row(wrapper, 'address').getAttribute('aria-expanded')).toBe('true')
+    expect(focused()).toBe('address')
+    await press(row(wrapper, 'address'), 'ArrowRight')
+    expect(focused()).toBe('city')
+  })
+
+  test('ArrowRight on a leaf does nothing', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    await press(row(wrapper, 'name'), 'ArrowRight')
+    expect(focused()).toBe('name')
+    expect(executeExpression).not.toHaveBeenCalled()
+  })
+
+  test('ArrowLeft closes an open branch', async () => {
+    const wrapper = await mountTree()
+    await press(row(wrapper, 'address'), 'ArrowRight')
+    row(wrapper, 'address').focus()
+    await press(row(wrapper, 'address'), 'ArrowLeft')
+    expect(row(wrapper, 'address').getAttribute('aria-expanded')).toBe('false')
+    expect(wrapper.findAll('.TreeRow.entry')).toHaveLength(3)
+    expect(focused()).toBe('address')
+  })
+
+  test('ArrowLeft on an entry of a branch goes to the branch', async () => {
+    const wrapper = await mountTree()
+    await press(row(wrapper, 'address'), 'ArrowRight')
+    row(wrapper, 'zip').focus()
+    await press(row(wrapper, 'zip'), 'ArrowLeft')
+    expect(focused()).toBe('address')
+  })
+
+  test('ArrowLeft on a closed top-level entry does nothing', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'address').focus()
+    await press(row(wrapper, 'address'), 'ArrowLeft')
+    expect(focused()).toBe('address')
+    expect(row(wrapper, 'address').getAttribute('aria-expanded')).toBe('false')
+  })
+})
+
+describe('Enter', () => {
+  test('makes the entry node, as a double-click does', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    expect((await press(row(wrapper, 'name'), 'Enter')).defaultPrevented).toBe(true)
+    expect(nodeTexts(createNodes.mock.calls[0]!)).toEqual(["data.get 'name'"])
+  })
+
+  test('with Shift makes a node for each loaded entry beside it', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    await press(row(wrapper, 'name'), 'Enter', { shiftKey: true })
+    expect(nodeTexts(createNodes.mock.calls[0]!)).toEqual(["data.get 'name'", "data.get 'address'"])
+  })
+
+  test('makes nothing on an entry no expression reaches', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'raw').focus()
+    await press(row(wrapper, 'raw'), 'Enter')
+    expect(createNodes).not.toHaveBeenCalled()
+  })
+
+  test('on "Show more" asks for the next entries', async () => {
+    executeExpression.mockResolvedValue({
+      ok: true,
+      value: {
+        start: 3,
+        size: 4,
+        entries: [{ key: 'extra', kind: 'leaf', value: 1, expr: ".get 'extra'" }],
+      },
+    })
+    const wrapper = await mountTree()
+    row(wrapper, 'more').focus()
+    await press(row(wrapper, 'more'), 'Enter')
+    expect(executeExpression).toHaveBeenCalledOnce()
+    expect(wrapper.find('.TreeRow.more').exists()).toBe(false)
+  })
+})
+
+describe('the entry menu from the keyboard', () => {
+  function placeAt(element: HTMLElement) {
+    const content = element.querySelector('.content')!
+    vi.spyOn(content, 'getBoundingClientRect').mockReturnValue({
+      x: 40,
+      y: 100,
+      left: 40,
+      right: 140,
+      top: 100,
+      bottom: 120,
+      width: 100,
+      height: 20,
+      toJSON: () => ({}),
+    })
+  }
+
+  test.each([
+    ['the context-menu key', 'ContextMenu', {}],
+    ['Shift+F10', 'F10', { shiftKey: true }],
+  ])('%s opens the menu at the entry, with focus in it', async (_name, key, init) => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    placeAt(row(wrapper, 'name'))
+    const event = await press(row(wrapper, 'name'), key, init)
+    expect(event.defaultPrevented).toBe(true)
+    expect(popup(wrapper).exists()).toBe(true)
+    expect(popup(wrapper).props('point')).toEqual({ x: 40, y: 120 })
+    expect(popup(wrapper).props('focusFirst')).toBe(true)
+    expect(
+      popup(wrapper)
+        .props('items')
+        .map((item: { name?: string }) => item.name),
+    ).toEqual(['Get Value', 'Get All Loaded Values Here'])
+  })
+
+  test('is not opened on an entry no expression reaches', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'raw').focus()
+    await press(row(wrapper, 'raw'), 'ContextMenu')
+    expect(popup(wrapper).exists()).toBe(false)
+  })
+
+  test('a right-click opens the menu without taking the focus for it', async () => {
+    const wrapper = await mountTree()
+    wrapper
+      .find('.TreeRow.entry .content')
+      .element.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 1, clientY: 2 }),
+      )
+    await flushPromises()
+    expect(popup(wrapper).props('focusFirst')).toBe(false)
+  })
+
+  test('closing the menu returns the focus to its entry', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    await press(row(wrapper, 'name'), 'ContextMenu')
+    ;(document.activeElement as HTMLElement).blur()
+    popup(wrapper).vm.$emit('close')
+    await flushPromises()
+    expect(popup(wrapper).exists()).toBe(false)
+    expect(focused()).toBe('name')
+  })
+
+  test('Escape on the entry closes the menu, returns the focus and goes no further', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    await press(row(wrapper, 'name'), 'ContextMenu')
+    const reached = vi.fn()
+    window.addEventListener('keydown', reached)
+    const event = await press(row(wrapper, 'name'), 'Escape')
+    window.removeEventListener('keydown', reached)
+    expect(popup(wrapper).exists()).toBe(false)
+    expect(focused()).toBe('name')
+    expect(event.defaultPrevented).toBe(true)
+    expect(reached).not.toHaveBeenCalled()
+  })
+
+  test('Escape with no menu open is left to the graph', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    const reached = vi.fn()
+    window.addEventListener('keydown', reached)
+    await press(row(wrapper, 'name'), 'Escape')
+    window.removeEventListener('keydown', reached)
+    expect(reached).toHaveBeenCalledOnce()
+  })
+})
+
+describe('keys stay in the tree', () => {
+  test.each([
+    ['ArrowDown', {}],
+    ['ArrowUp', {}],
+    ['ArrowRight', {}],
+    ['ArrowLeft', {}],
+    ['Enter', {}],
+    ['ContextMenu', {}],
+    ['F10', { shiftKey: true }],
+  ])('%s does not reach the graph editor on the window', async (key, init) => {
+    const wrapper = await mountTree()
+    row(wrapper, 'address').focus()
+    const reached = vi.fn()
+    window.addEventListener('keydown', reached)
+    await press(row(wrapper, 'address'), key, init)
+    window.removeEventListener('keydown', reached)
+    expect(reached).not.toHaveBeenCalled()
+  })
+
+  test('Tab and other keys are left alone', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    const reached = vi.fn()
+    window.addEventListener('keydown', reached)
+    const tab = await press(row(wrapper, 'name'), 'Tab')
+    await press(row(wrapper, 'name'), 'a')
+    window.removeEventListener('keydown', reached)
+    expect(tab.defaultPrevented).toBe(false)
+    expect(reached).toHaveBeenCalledTimes(2)
+  })
+
+  test('F10 without Shift is left alone, and opens no menu', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    const reached = vi.fn()
+    window.addEventListener('keydown', reached)
+    await press(row(wrapper, 'name'), 'F10')
+    window.removeEventListener('keydown', reached)
+    expect(reached).toHaveBeenCalledOnce()
+    expect(popup(wrapper).exists()).toBe(false)
+  })
+
+  test('a modified arrow key is left alone', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    await press(row(wrapper, 'name'), 'ArrowDown', { ctrlKey: true })
+    expect(focused()).toBe('name')
+  })
+})
