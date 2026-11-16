@@ -3,6 +3,7 @@ import Standard.Base.Data.Array_Proxy.Array_Proxy
 import Standard.Base.Errors.Common.Index_Out_Of_Bounds
 
 import project.Errors.No_Such_Column
+import Standard.Visualization.Viz_Actions.Viz_Actions
 import Standard.Visualization.Viz_Cell.Viz_Cell
 import Standard.Visualization.Viz_Json.Viz_Json
 import Standard.Visualization.Viz_Table.Viz_Table
@@ -143,6 +144,15 @@ Comparable.from (that:Row) = Comparable.new that Row_Comparator
    private: true
    ---
 Viz_Table.from (that:Row) = Viz_Table.from_view (_-> Viz_Helpers.row_table_view_json that)
+
+## ---
+   private: true
+   ---
+   A row's values, by number: `row.at index`, as for the vector the scatter
+   plot and the JSON visualisation draw it as (`to_vector`).
+Viz_Actions.from (that:Row) =
+    _ = that
+    Viz_Actions.items
 
 ## ---
    private: true

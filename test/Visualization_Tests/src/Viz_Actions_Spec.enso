@@ -91,6 +91,11 @@ add_specs suite_builder =
             (Viz_Actions.from (mem_table.at "x")).to_json_text . should_equal '[{"id":"open_row","label":"Get Value","icon":"select_cell","kind":"chain","template":"at {{#index}}"}]'
             (Viz_Actions.from (db_table.at "x")).to_json_text . should_equal (Viz_Actions.from (mem_table.at "x")).to_json_text
 
+        group_builder.specify "a row offers its values by number" <|
+            row = mem_table.first_row
+            (Viz_Actions.from row).to_json_text . should_equal '[{"id":"open_row","label":"Get Item","icon":"select_row","kind":"chain","template":"at {{#index}}"}]'
+            row.at 1 . should_equal "a"
+
     suite_builder.group "The actions field" group_builder->
         table = Table.new [["x", [1, 2]], ["y", [3, 4]]]
         table_actions = (Viz_Actions.from table).to_json_text

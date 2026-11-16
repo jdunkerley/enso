@@ -128,7 +128,8 @@ Visualization and not on each data library.
   for a vector of them. Base: a vector or array offers `open_row`
   (`at {{#index}}`); any other value none. Table: `open_row`, `open_column`,
   `open_cell`, `sort`, `filter`, `remove_columns`, `reorder_columns`,
-  `brush_filter`; Column: `open_row`. A user type offers its own with
+  `brush_filter`; Column: `open_row`; Row: `open_row` (`at {{#index}}`, its
+  values by number). A user type offers its own with
   `Viz_Actions.from (that:My_Type)`. The table view, scatter plot and tree
   preprocessors send them as an `"actions"` array first in their JSON
   (`Viz_Actions.add_to_json`; absent when there are none, never on an error);
