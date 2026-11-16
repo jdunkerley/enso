@@ -3,6 +3,7 @@ import { expect, test } from 'vitest'
 import type { VisualizationEntry, VisualizationStatus } from '../visualizationRegistry'
 import {
   getVisualizationData,
+  listVisualizations,
   prepareVisualization,
   VISUALIZATION_DATA_CHARS,
   VISUALIZATION_WAIT_MS,
@@ -10,6 +11,7 @@ import {
 } from '../visualizationTools'
 
 const NODE = '00000000-0000-0000-0000-000000000001'
+const AVAILABLE = ['Table', 'JSON', 'Scatter Plot']
 
 interface Fake {
   shown: boolean
@@ -27,6 +29,14 @@ interface Fake {
   quietCalls: { time: number; revealed: number; viewMoving: boolean }[]
   /** What `panelQuiet` does, e.g. change the rectangle as a late render would. */
   onQuiet: (state: Fake) => void
+  /** The name of the visualization on screen. */
+  name: string
+  /** Each `show` call's visualization name (undefined when none was named). */
+  showCalls: (string | undefined)[]
+  /** Frames for which the old view stays on screen after `show` switched it. */
+  switchFrames: number
+  /** The budget of each `panelQuiet` call. */
+  quietBudgets: number[]
 }
 
 function fake(overrides: Partial<Fake> = {}): {
@@ -46,12 +56,17 @@ function fake(overrides: Partial<Fake> = {}): {
     movingFrames: 0,
     quietCalls: [],
     onQuiet: () => {},
+    name: 'Table',
+    showCalls: [],
+    switchFrames: 0,
+    quietBudgets: [],
     ...overrides,
   }
+  let pendingName: string | undefined
   const entry: VisualizationEntry = {
     panel: () => undefined,
     status: () => state.status,
-    name: () => 'Table',
+    name: () => state.name,
     data: () => state.data,
     fullscreen: () => state.fullscreen,
   }
@@ -60,8 +75,15 @@ function fake(overrides: Partial<Fake> = {}): {
       id === NODE ? { ok: true, value: id } : { ok: false, error: `No node ${id}` },
     lookup: () => (state.shown ? entry : undefined),
     isShown: () => state.shown,
-    show: async () => {
-      if (state.showResult.ok) state.shown = true
+    availableNames: () => AVAILABLE,
+    show: async (_nodeId, visualization) => {
+      state.showCalls.push(visualization)
+      if (!state.showResult.ok) return state.showResult
+      state.shown = true
+      if (visualization != null) {
+        if (state.switchFrames > 0) pendingName = visualization
+        else state.name = visualization
+      }
       return state.showResult
     },
     panelRect: () => state.rect,
@@ -76,8 +98,13 @@ function fake(overrides: Partial<Fake> = {}): {
     nextFrame: async () => {
       state.time += 16
       if (state.movingFrames > 0) state.movingFrames--
+      if (pendingName != null && --state.switchFrames <= 0) {
+        state.name = pendingName
+        pendingName = undefined
+      }
     },
-    panelQuiet: async () => {
+    panelQuiet: async (_nodeId, budgetMs) => {
+      state.quietBudgets.push(budgetMs)
       state.quietCalls.push({
         time: state.time,
         revealed: state.revealed,
@@ -102,7 +129,9 @@ test('data: the view data of a shown visualization', async () => {
     node_id: NODE,
     visualization: 'Table',
     shown: false,
+    changed: false,
     truncated: false,
+    available: AVAILABLE,
     data: { rows: [1, 2] },
   })
 })
@@ -166,7 +195,9 @@ test('image: a visualization in view at 100% is not moved', async () => {
     node_id: NODE,
     visualization: 'Table',
     shown: false,
+    changed: false,
     moved: false,
+    available: AVAILABLE,
     rect: { x: 100, y: 100, width: 200, height: 150 },
   })
   expect(state.revealed).toBe(0)
@@ -222,4 +253,84 @@ test('image: a fullscreen visualization is not moved', async () => {
   const value = parsed(await prepareVisualization(deps, { node_id: NODE }))
   expect(state.revealed).toBe(0)
   expect(value.rect).toEqual({ x: 0, y: 0, width: 1400, height: 900 })
+})
+
+test('image: the quiet wait is bounded by the time left before the deadline', async () => {
+  const { deps, state } = fake()
+  await prepareVisualization(deps, { node_id: NODE })
+  expect(state.quietBudgets).toEqual([deps.deadline - 2_000])
+})
+
+test('list: a hidden node lists what it offers and is not shown', async () => {
+  const { deps, state } = fake({ shown: false })
+  expect(parsed(await listVisualizations(deps, { node_id: NODE }))).toEqual({
+    node_id: NODE,
+    shown: false,
+    visualization: null,
+    available: AVAILABLE,
+  })
+  expect(state.showCalls).toEqual([])
+})
+
+test('list: a shown node names the visualization on screen', async () => {
+  const { deps } = fake({ name: 'JSON' })
+  expect(parsed(await listVisualizations(deps, { node_id: NODE }))).toEqual({
+    node_id: NODE,
+    shown: true,
+    visualization: 'JSON',
+    available: AVAILABLE,
+  })
+})
+
+test('list: an unknown node is refused', async () => {
+  const { deps } = fake()
+  expect((await listVisualizations(deps, { node_id: 'nope' })).ok).toBe(false)
+})
+
+test('a name the node does not offer is refused with the list, and nothing is shown', async () => {
+  const { deps, state } = fake({ shown: false })
+  for (const run of [getVisualizationData, prepareVisualization]) {
+    expect(await run(deps, { node_id: NODE, visualization: 'Heatmap' })).toEqual({
+      ok: false,
+      error: 'The node has no visualization `Heatmap`. Available: Table, JSON, Scatter Plot.',
+    })
+  }
+  expect(state.showCalls).toEqual([])
+  expect(state.shown).toBe(false)
+})
+
+test('another name switches the node to it in one call, and the result says so', async () => {
+  const { deps, state } = fake()
+  const value = parsed(await prepareVisualization(deps, { node_id: NODE, visualization: 'JSON' }))
+  expect(state.showCalls).toEqual(['JSON'])
+  expect(value).toMatchObject({ visualization: 'JSON', changed: true, available: AVAILABLE })
+})
+
+test('a hidden node is shown with the named visualization in one call', async () => {
+  const { deps, state } = fake({ shown: false })
+  const value = parsed(await getVisualizationData(deps, { node_id: NODE, visualization: 'JSON' }))
+  expect(state.showCalls).toEqual(['JSON'])
+  expect(value).toMatchObject({ visualization: 'JSON', shown: true, changed: true })
+})
+
+test('the wait does not accept the old view after a switch', async () => {
+  const { deps, state } = fake({ switchFrames: 4 })
+  const value = parsed(await getVisualizationData(deps, { node_id: NODE, visualization: 'JSON' }))
+  expect(value.visualization).toBe('JSON')
+  expect(state.time).toBeGreaterThanOrEqual(4 * 16)
+})
+
+test('the name already on screen changes nothing', async () => {
+  const { deps, state } = fake()
+  const value = parsed(await getVisualizationData(deps, { node_id: NODE, visualization: 'Table' }))
+  expect(state.showCalls).toEqual([])
+  expect(value).toMatchObject({ visualization: 'Table', shown: false, changed: false })
+})
+
+test('a refused switch is the result', async () => {
+  const { deps } = fake({ showResult: { ok: false, error: 'Live mode' } })
+  expect(await getVisualizationData(deps, { node_id: NODE, visualization: 'JSON' })).toEqual({
+    ok: false,
+    error: 'Live mode',
+  })
 })

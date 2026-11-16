@@ -101,6 +101,7 @@ test('an MCP client reads the open project and cannot write a file', async ({
         'get_graph',
         'get_node',
         'get_visualization',
+        'list_visualizations',
         'search_components',
         // The project tools that edit or navigate.
         'add_function',
@@ -340,8 +341,16 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     expect(picture.isError, JSON.stringify(picture.content)).toBeFalsy()
     const { png, text } = imageOf(picture)
     note('get_visualization numbers (image)', text)
-    const about = JSON.parse(text) as { shown: boolean; width: number; height: number }
+    const about = JSON.parse(text) as {
+      visualization: string
+      shown: boolean
+      changed: boolean
+      available: string[]
+      width: number
+      height: number
+    }
     expect(about.shown).toBe(true)
+    expect(about.changed).toBe(false)
     // A PNG: the signature, then the size the text states, within the cap.
     expect(png.subarray(1, 4).toString('ascii')).toBe('PNG')
     expect(png.readUInt32BE(16)).toBe(about.width)
@@ -364,6 +373,53 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     expect(data.isError, textOf(data)).toBeFalsy()
     note('get_visualization numbers (data)', textOf(data))
     expect(JSON.parse(textOf(data))).toMatchObject({ shown: false, truncated: false })
+
+    // The node's other visualizations: offered, then one of them looked at by name.
+    const offered = await callJson<{ shown: boolean; visualization: string; available: string[] }>(
+      'list_visualizations',
+      { node_id: numbersId },
+    )
+    note('list_visualizations numbers', offered)
+    expect(offered.shown).toBe(true)
+    expect(offered.visualization).toBe(about.visualization)
+    expect(offered.available).toContain(about.visualization)
+    expect(about.available).toEqual(offered.available)
+    const otherName =
+      offered.available.includes('JSON') && about.visualization !== 'JSON' ?
+        'JSON'
+      : offered.available.find((name) => name !== about.visualization)!
+    expect(otherName).toBeDefined()
+    const other = await callTool('get_visualization', {
+      node_id: numbersId,
+      visualization: otherName,
+    })
+    expect(other.isError, JSON.stringify(other.content)).toBeFalsy()
+    const otherImage = imageOf(other)
+    note('get_visualization numbers by name (image)', otherImage.text)
+    const otherAbout = JSON.parse(otherImage.text) as { visualization: string; changed: boolean }
+    expect(otherAbout).toMatchObject({ visualization: otherName, changed: true })
+    expect(new Set(otherImage.png.subarray(33)).size).toBeGreaterThan(32)
+    expect(otherImage.png.equals(png), 'the other picture is not the first one').toBe(false)
+    await testInfo.attach('other-visualization.png', {
+      body: otherImage.png,
+      contentType: 'image/png',
+    })
+    // It stays switched, and is drawn: the same picture 3 s later.
+    await page.waitForTimeout(3_000)
+    const otherAgain = await callTool('get_visualization', {
+      node_id: numbersId,
+      visualization: otherName,
+    })
+    expect(otherAgain.isError, JSON.stringify(otherAgain.content)).toBeFalsy()
+    const otherSecond = imageOf(otherAgain)
+    await testInfo.attach('other-visualization-again.png', {
+      body: otherSecond.png,
+      contentType: 'image/png',
+    })
+    expect((JSON.parse(otherSecond.text) as { changed: boolean }).changed).toBe(false)
+    expect(otherSecond.png.equals(otherImage.png), 'the other picture is the settled one').toBe(
+      true,
+    )
 
     // Code that turns Write on by the routes the guard knows (the Write prefix, `with_enabled_context`
     // / `with_enabled` anywhere, reflection, a runtime builtin, text evaluated as code, a method

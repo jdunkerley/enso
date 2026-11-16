@@ -62,11 +62,16 @@ No tool changes the execution environment, settings or secrets;
    again if the user did not ask to see it. For a picture it may also move the
    view (`moved: true`) to bring the visualization on screen. To read values,
    `get_node` and `evaluate_expression` are better; use `get_visualization` to
-   see a chart or what the user is looking at.
+   see a chart or what the user is looking at. `list_visualizations` names the
+   visualizations a node offers (`available`, in the order of its toolbar's
+   dropdown) and the one on screen, and changes nothing; every
+   `get_visualization` result has `available` too. Pass one of those names as
+   `visualization` to look at it: a name not on screen switches the node to it
+   (`changed: true`), and it stays switched, as part of your undo step.
 7. Every tool that changes the project is refused while it is in Live mode: ask
    the user to switch it back to Design. Reading, selecting and navigating
-   (`select_nodes`, `open_method`) still work there; `get_visualization` works
-   there only for a visualization already shown.
+   (`select_nodes`, `open_method`, `list_visualizations`) still work there;
+   `get_visualization` works there only for the visualization already on screen.
 8. Your edits are saved with the project as you make them. Do not turn Write on
    (writing a node's output: a file, a database table). Code that enables the
    output context (`with_enabled_context`, `with_enabled`, binding a runtime

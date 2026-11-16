@@ -2,8 +2,8 @@
 
 #### Enso IDE
 
-- [Agents connected over MCP can look at a node's visualization, as a picture or
-  as its data.][NNN]
+- [Agents connected over MCP can list the visualizations a node offers and look
+  at any of them, as a picture or as its data.][NNN]
 - [Agents connected over MCP can create and open projects and add, edit, remove
   and group nodes; each run of changes is one undo step. Settings → AI can also
   set up Claude Desktop.][790]

@@ -1,8 +1,8 @@
 /* eslint-disable camelcase -- tool argument names are snake_case on the wire */
 /**
- * @file The window's two `get_visualization` handlers driving the real graph editor: a call is
- * delivered as Electron main would (`window.__mcpCall`, `mock/registerMocks.ts`), and the spec
- * checks the visualization, the view and the undo stack. The mock answers a visualization's
+ * @file The window's two `get_visualization` handlers, and `list_visualizations`, driving the
+ * real graph editor: a call is delivered as Electron main would (`window.__mcpCall`,
+ * `mock/registerMocks.ts`), and the spec checks the visualization, the view and the undo stack. The mock answers a visualization's
  * preprocessor by itself (`mockVizPreprocessors` in `mock/lsHandler.ts`), so a shown
  * visualization gets data without help.
  */
@@ -153,4 +153,126 @@ test('in Live mode a hidden visualization is refused; a shown one answers', asyn
   const shown = await callOk(page, 'get_visualization_data', { node_id: final })
   expect(shown.shown).toBe(false)
   expect((await callOk(page, 'prepare_visualization', { node_id: final })).shown).toBe(false)
+})
+
+test('list_visualizations names what a hidden node offers and leaves it hidden', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const final = await nodeId(page, 'final')
+
+  const listed = await callOk(page, 'list_visualizations', { node_id: final })
+  expect(listed).toEqual({
+    node_id: final,
+    shown: false,
+    visualization: null,
+    available: expect.arrayContaining(['JSON', 'Table']),
+  })
+  await expect(visualizationOf(page, final)).toHaveCount(0)
+})
+
+test('a named visualization is shown on a hidden node, as one undo step', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const final = await nodeId(page, 'final')
+
+  const result = await callOk(page, 'get_visualization_data', {
+    node_id: final,
+    visualization: 'JSON',
+  })
+  expect(result).toEqual(
+    expect.objectContaining({ visualization: 'JSON', shown: true, changed: true }),
+  )
+  expect(result.available).toContain('JSON')
+  await expect(locate.jsonVisualization(page)).toExist()
+
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect(visualizationOf(page, final)).toHaveCount(0)
+})
+
+test('another named visualization switches the panel, and one undo switches it back', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const final = await nodeId(page, 'final')
+  // The user shows it: an edit of their own, so the agent's switch is a step of its own.
+  await locate.graphNodeByBinding(page, 'final').click({ position: { x: 8, y: 8 } })
+  await locate.toggleVisualizationButton(page).click()
+  await expect(locate.loadingVisualization(page)).toHaveCount(0)
+  await expect(locate.jsonVisualization(page)).toExist()
+  const before = await callOk(page, 'list_visualizations', { node_id: final })
+  expect(before).toEqual(
+    expect.objectContaining({ shown: true, visualization: 'JSON', available: expect.anything() }),
+  )
+  expect(before.available).toContain('Table')
+
+  const result = await callOk(page, 'get_visualization_data', {
+    node_id: final,
+    visualization: 'Table',
+  })
+  expect(result).toEqual(
+    expect.objectContaining({ visualization: 'Table', shown: false, changed: true }),
+  )
+  await expect(locate.tableVisualization(page)).toExist()
+  await expect(locate.jsonVisualization(page)).toHaveCount(0)
+  // The same name again changes nothing.
+  const again = await callOk(page, 'get_visualization_data', {
+    node_id: final,
+    visualization: 'Table',
+  })
+  expect(again.changed).toBe(false)
+
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect(locate.jsonVisualization(page)).toExist()
+  await expect(locate.tableVisualization(page)).toHaveCount(0)
+  expect((await callOk(page, 'list_visualizations', { node_id: final })).visualization).toBe('JSON')
+})
+
+test('a name the node does not offer is refused, and nothing changes', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const final = await nodeId(page, 'final')
+
+  for (const tool of ['get_visualization_data', 'prepare_visualization']) {
+    const refused = await deliver(page, tool, { node_id: final, visualization: 'No Such View' })
+    expect(refused.ok).toBe(false)
+    expect(refused.error).toContain('The node has no visualization `No Such View`. Available: ')
+  }
+  await expect(visualizationOf(page, final)).toHaveCount(0)
+  expect((await callOk(page, 'list_visualizations', { node_id: final })).shown).toBe(false)
+})
+
+test('in Live mode the visualization on screen answers by name; another is refused', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const final = await nodeId(page, 'final')
+  await callOk(page, 'get_visualization_data', { node_id: final })
+  await expect(visualizationOf(page, final)).toBeVisible()
+  const onScreen = (await callOk(page, 'list_visualizations', { node_id: final })).visualization
+  assert(typeof onScreen === 'string')
+
+  await goLive()
+
+  const listed = await callOk(page, 'list_visualizations', { node_id: final })
+  expect(listed.visualization).toBe(onScreen)
+  const same = await callOk(page, 'get_visualization_data', {
+    node_id: final,
+    visualization: onScreen,
+  })
+  expect(same.changed).toBe(false)
+  const other = onScreen === 'JSON' ? 'Table' : 'JSON'
+  const refused = await deliver(page, 'get_visualization_data', {
+    node_id: final,
+    visualization: other,
+  })
+  expect(refused.ok).toBe(false)
+  expect(refused.error).toContain('Live mode')
 })

@@ -225,14 +225,15 @@ The user's switch is never changed by a tool.
 
 ## Looking at a visualization (`visualizationTools.ts`)
 
-The MCP tool `get_visualization` (`visualizationTool.ts` in
-`app/electron-client/src/mcp/`; its `CLAUDE.md`, "Looking at a visualization")
-is served by two window handlers that are **not MCP tools** (they are in no tool
-list, and an agent cannot call them): `get_visualization_data` for
-`format: 'data'` and `prepare_visualization` for `format: 'image'`. **Only
-Electron main produces images**: `prepare_visualization` readies the
-visualization and answers where it is; main captures that rectangle with
-`webContents.capturePage`.
+The MCP tool `list_visualizations` names the visualizations a node offers; its
+handler is `listVisualizations` here. The MCP tool `get_visualization`
+(`visualizationTool.ts` in `app/electron-client/src/mcp/`; its `CLAUDE.md`,
+"Looking at a visualization") is served by two window handlers that are **not
+MCP tools** (they are in no tool list, and an agent cannot call them):
+`get_visualization_data` for `format: 'data'` and `prepare_visualization` for
+`format: 'image'`. **Only Electron main produces images**:
+`prepare_visualization` readies the visualization and answers where it is; main
+captures that rectangle with `webContents.capturePage`.
 
 - **The registry** (`visualizationRegistry.ts`): the mounted visualizations by
   project id, then node id. `GraphVisualization.vue` writes itself in while it
@@ -241,28 +242,51 @@ visualization and answers where it is; main captures that rectangle with
   component's state when asked (`panel`, `status`, `name`, `data`,
   `fullscreen`), so nothing is a snapshot. A replaced component removes only its
   own entry.
-- **Both handlers** find the node in the method on screen and, when its
-  visualization is hidden, show it as `set_visualization` does: through the edit
-  session, so refused in Live mode and part of the caller's undo step
-  (`shown: true`). They then wait for the entry to stop loading, at most
+- **`list_visualizations`** (an MCP tool, unlike the two handlers) answers
+  `{ node_id, shown, visualization, available }`: whether the node's
+  visualization is switched on, the name of the one mounted (null when none is),
+  and `available`, the names the node's type offers in the toolbar dropdown's
+  order. `available` comes from `McpEditorDeps.visualizationsFor`, which
+  `GraphEditor.vue` supplies from the store it provides
+  (`provideVisualizationStore`) and the node's type info
+  (`db.getExpressionInfo(node.innerExpr.externalId)?.typeInfo`, as
+  `GraphNode.vue` reads it): the store's `byType`, the same source as
+  `allVisualizations` in `GraphVisualization/visualizationData.ts`. It shows,
+  moves and edits nothing, so it works in Live.
+- **Both handlers** find the node in the method on screen. A `visualization`
+  name the node does not offer is refused before anything changes ("The node has
+  no visualization `X`. Available: …"). When the visualization is hidden, or a
+  name other than the one on screen is given, they show it as
+  `set_visualization` does: through the edit session, so refused in Live mode
+  and part of the caller's undo step (`shown: true` when it was hidden,
+  `changed: true` when it switched to the name). Visible and identifier go in
+  **one** `setNodeVisualization` call, as choosing it in the toolbar writes the
+  node's metadata, and it stays switched. `useProjectMcpTools.ts` turns the name
+  into an identifier: of two visualizations of the same name from different
+  modules, the first in the dropdown's order. They then wait for the entry to
+  stop loading **and**, when a name was given, to have that name (the old view
+  can stay mounted and `ready` for a few frames after a switch), at most
   `VISUALIZATION_WAIT_MS` (15 s, and no later than 2 s before the call's
   `deadline`), else answer "The visualization is still loading …". A view
-  showing an error answers "The visualization failed: …".
+  showing an error answers "The visualization failed: …". Every result carries
+  `changed` and `available`.
 - `get_visualization_data` answers the data the view was given, text that is
   JSON as its value, at most `VISUALIZATION_DATA_CHARS` (20,000) characters,
   then `truncated: true` and the start of the text.
 - `prepare_visualization` moves the view (`moved: true`, without animation) when
   the panel is not wholly in the graph viewport or the zoom is below 100%, waits
-  for the view to stop moving, then for the panel to be **quiet** (`panelQuiet`:
-  a `MutationObserver` on the panel and on the open shadow roots inside it, the
-  visualization host's included, since an observer does not cross a shadow
-  boundary; resolved after `PANEL_QUIET_MS` (250 ms) without a mutation, at most
-  `PANEL_QUIET_CAP_MS` (3 s), at once when the panel is not in the DOM), then
-  for two frames with the view still, and answers the panel's rectangle in CSS
-  pixels, cut to the graph viewport (a full-screen visualization is not cut). A
-  docked panel drawn over the graph viewport is not detected. It is the one
-  handler besides `select_nodes` and `open_method` that moves the view; in Live
-  it works only for a visualization already shown.
+  for the view to stop moving, then for the panel to be **quiet**
+  (`panelQuiet.ts`: a `MutationObserver` on the panel and on the open shadow
+  roots inside it, the visualization host's included, since an observer does not
+  cross a shadow boundary, and those of nodes added while it waits; resolved
+  after `PANEL_QUIET_MS` (250 ms) without a mutation, at most
+  `PANEL_QUIET_CAP_MS` (3 s) or the time left before the call's deadline, at
+  once when the panel is not in the DOM), then for two frames with the view
+  still, and answers the panel's rectangle in CSS pixels, cut to the graph
+  viewport (a full-screen visualization is not cut). A docked panel drawn over
+  the graph viewport is not detected. It is the one handler besides
+  `select_nodes` and `open_method` that moves the view; in Live it works only
+  for the visualization already on screen.
 - Main captures until two captures in a row are the same (150 ms apart, at
   most 10) and caps the picture at 1,200 pixels on its longer side. Status
   `ready` plus two frames alone gave stale pictures with the GPU off: see

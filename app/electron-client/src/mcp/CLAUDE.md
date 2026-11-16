@@ -15,9 +15,10 @@ default. No tool changes the execution environment, settings or secrets.
   are stripped before the registry sees them (`McpServer.validateToolInput` in
   `@modelcontextprotocol/sdk` 1.30; `mcpServer.test.ts` checks it). The
   registry's strict check binds callers that do not go through the SDK.
-- `projectTools.ts` — the definitions of the project tools: the five that read
-  (`VIEW_TOOL_NAMES`) and the nine that edit or navigate (`EDIT_TOOL_NAMES`).
-  Each only forwards its arguments to the window.
+- `projectTools.ts` — the definitions of the project tools: the six that read
+  (`VIEW_TOOL_NAMES`, `list_visualizations` among them) and the nine that edit
+  or navigate (`EDIT_TOOL_NAMES`). Each only forwards its arguments to the
+  window.
 - `visualizationTool.ts` — `get_visualization`, the one project tool whose `run`
   does part of its work in main (see "Looking at a visualization").
 - `appTools.ts` — the six app tools (`get_app_state`, `list_projects`,
@@ -95,12 +96,26 @@ the handler returns. Only `get_guide` runs entirely in main.
 
 ## Looking at a visualization
 
-`get_visualization { node_id, format? }` answers with what a node's
-visualization shows. `format: 'data'` forwards to the window handler
+`list_visualizations { node_id }` is a plain forward to the window (30 s): it
+answers `{ node_id, shown, visualization, available }`, the names of the
+visualizations the node's type offers in the order of its toolbar's dropdown and
+the name of the one on screen (null when none is), and changes nothing, so it
+works in Live.
+
+`get_visualization { node_id, format?, visualization? }` answers with what a
+node's visualization shows. `visualization` (at most 100 characters) is a name
+from `available`: a name the node does not offer is refused before anything
+changes, and a name not on screen switches the node to it in one edit through
+the edit session (visible and identifier together, as the toolbar writes them;
+refused in Live, part of the caller's undo step), where it stays. The window
+then waits for **that** visualization: one whose registry entry has the name and
+is no longer loading, since the old view stays `ready` for a few frames after
+the switch. Every result has `changed` (this call switched it) and `available`.
+`format: 'data'` forwards both arguments to the window handler
 `get_visualization_data`, which answers
-`{ node_id, visualization, shown, truncated, data }` with the data the view was
-given, at most 20,000 characters (`VISUALIZATION_DATA_CHARS`). `format: 'image'`
-(the default) is two steps:
+`{ node_id, visualization, shown, changed, truncated, available, data }` with
+the data the view was given, at most 20,000 characters
+(`VISUALIZATION_DATA_CHARS`). `format: 'image'` (the default) is two steps:
 
 1. **The window readies it**: the window handler `prepare_visualization` shows a
    hidden visualization (through the edit session, as `set_visualization` does:
@@ -108,7 +123,8 @@ given, at most 20,000 characters (`VISUALIZATION_DATA_CHARS`). `format: 'image'`
    (`VISUALIZATION_WAIT_MS`) for it to get its data, moves the view when the
    panel is not wholly in the viewport at 100% zoom, waits for the view to stop
    moving, then for the panel's DOM to be quiet (no mutation for 250 ms, at most
-   3 s: `PANEL_QUIET_MS`, `PANEL_QUIET_CAP_MS` in `useProjectMcpTools.ts`), then
+   3 s or the time left before the call's deadline: `PANEL_QUIET_MS`,
+   `PANEL_QUIET_CAP_MS` in `app/gui/src/project-view/mcp/panelQuiet.ts`), then
    two still frames, and answers the panel's rectangle in CSS pixels, cut to the
    graph viewport.
 2. **Main captures it**: `electron.ts` passes the tool a `Capture` that calls
@@ -122,9 +138,10 @@ given, at most 20,000 characters (`VISUALIZATION_DATA_CHARS`). `format: 'image'`
    its cells after the data arrives. The tool then answers a PNG image item of
    at most 1,200 pixels on its longer side (`IMAGE_MAX_SIDE`; only the final
    capture is resized) and a text item
-   `{ node_id, visualization, shown, moved, width, height }`, the size read from
-   the PNG. A minimised or missing window, or an empty capture, gives "The Enso
-   window could not be captured …".
+   `{ node_id, visualization, shown, changed, moved, available, width, height }`,
+   the size read from the PNG (`preparedSchema` accepts and passes on `changed`
+   and `available`). A minimised or missing window, or an empty capture, gives
+   "The Enso window could not be captured …".
 
 **Only main produces images**: the window never sends one, only where to look.
 `get_visualization_data` and `prepare_visualization` are window handlers, not
@@ -306,7 +323,7 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   never the real Claude folder), `mcpVisualizationTool.test.ts` (a fake bridge
   and capture).
 - `tests/mcp.spec.ts` — the packaged app, two tests. The first: an SDK client
-  lists the 22 tools, reads the guide and the graph of a new project, searches
+  lists the 23 tools, reads the guide and the graph of a new project, searches
   components, evaluates, checks that an evaluation does not write the file it
   names (the answer names the dry-run file, which the test deletes), and that a
   request without the token is `401`. The second builds a project from the
@@ -315,17 +332,20 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   `get_visualization` of the vector node's hidden visualization (a PNG of the
   size its text states, not one flat colour, attached as `visualization.png`; 3
   s later a second picture, byte for byte the same, the stale-frame check; then
-  its data), code in the Write prefix refused by `add_nodes`, `edit_node` and
-  `evaluate_expression` with the file it names never written, `edit_node` back
-  to back on a node and its user (the second result current) and to the same
-  text, a `remove_nodes` of a node with a user, `set_node_comment`,
-  `set_visualization`, `select_nodes`, `collapse_nodes`, `open_method` in and
-  out, `add_function`, one `Mod+Z` in the window taking back a whole `add_nodes`
-  call, `remove_nodes`, `list_files`, the path rule, `close_project` (the edits
-  are in `Main.enso` on disk) and `open_project`; it deletes the project it
-  made. Neither can check the Live-mode refusals: nothing in the UI switches a
-  project to Live (the project's `executionMode` setting is only read from its
-  settings), so `app/gui/src/project-view/mcp/__tests__/` covers them. The GUI
-  side has its own Playwright specs:
+  its data; then `list_visualizations`, whose `available` holds the name the
+  picture reported, and a picture of another name from it, `changed` and not the
+  first picture's bytes, again the same 3 s later, attached as
+  `other-visualization.png`), code in the Write prefix refused by `add_nodes`,
+  `edit_node` and `evaluate_expression` with the file it names never written,
+  `edit_node` back to back on a node and its user (the second result current)
+  and to the same text, a `remove_nodes` of a node with a user,
+  `set_node_comment`, `set_visualization`, `select_nodes`, `collapse_nodes`,
+  `open_method` in and out, `add_function`, one `Mod+Z` in the window taking
+  back a whole `add_nodes` call, `remove_nodes`, `list_files`, the path rule,
+  `close_project` (the edits are in `Main.enso` on disk) and `open_project`; it
+  deletes the project it made. Neither can check the Live-mode refusals: nothing
+  in the UI switches a project to Live (the project's `executionMode` setting is
+  only read from its settings), so `app/gui/src/project-view/mcp/__tests__/`
+  covers them. The GUI side has its own Playwright specs:
   `app/gui/integration-test/project-view/mcpEdit.spec.ts` and
   `integration-test/dashboard/mcpApp.spec.ts`.

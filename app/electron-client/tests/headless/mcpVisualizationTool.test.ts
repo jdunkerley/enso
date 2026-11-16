@@ -69,7 +69,9 @@ const PREPARED: McpToolResult = {
     node_id: 'n',
     visualization: 'Table',
     shown: false,
+    changed: true,
     moved: true,
+    available: ['Table', 'JSON'],
     rect: { x: 10, y: 20, width: 200, height: 150 },
   }),
 }
@@ -101,7 +103,9 @@ test('image is the default: the prepared rectangle is captured', async () => {
         node_id: 'n',
         visualization: 'Table',
         shown: false,
+        changed: true,
         moved: true,
+        available: ['Table', 'JSON'],
         width: 200,
         height: 150,
       },
@@ -110,6 +114,26 @@ test('image is the default: the prepared rectangle is captured', async () => {
     ),
     image: { data: png(200, 150).toString('base64'), mimeType: 'image/png' },
   })
+})
+
+test('a named visualization is forwarded to both window handlers', async () => {
+  const data: McpToolResult = { ok: true, value: '{"data":1}' }
+  const { definition, calls } = tool((name) =>
+    name === 'get_visualization_data' ? data : PREPARED,
+  )
+  await definition.run({ node_id: 'n', format: 'data', visualization: 'JSON' }, CALLER)
+  await definition.run({ node_id: 'n', visualization: 'JSON' }, CALLER)
+  expect(calls).toEqual([
+    { tool: 'get_visualization_data', args: { node_id: 'n', visualization: 'JSON' } },
+    { tool: 'prepare_visualization', args: { node_id: 'n', visualization: 'JSON' } },
+  ])
+})
+
+test('a visualization name is at most 100 characters', () => {
+  const { definition } = tool(() => PREPARED)
+  const schema = definition.inputSchema.visualization!
+  expect(schema.safeParse('x'.repeat(100)).success).toBe(true)
+  expect(schema.safeParse('x'.repeat(101)).success).toBe(false)
 })
 
 test("the window's refusal is the result, and nothing is captured", async () => {

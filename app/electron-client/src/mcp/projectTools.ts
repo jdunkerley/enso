@@ -23,6 +23,7 @@ export const VIEW_TOOL_NAMES = [
   'search_components',
   'get_component_docs',
   'evaluate_expression',
+  'list_visualizations',
 ] as const
 
 export const EDIT_TOOL_NAMES = [
@@ -67,7 +68,7 @@ const EDIT_RULES =
   '`get_node` later.'
 
 /**
- * The project tools (the five that read, the nine that edit or navigate), each forwarding its
+ * The project tools (the six that read, the nine that edit or navigate), each forwarding its
  * arguments to the window through `bridge`.
  */
 export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
@@ -157,6 +158,19 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         node_id: z.string().max(NAME_CHARS).optional(),
       },
       run: forward('evaluate_expression'),
+    },
+    {
+      name: 'list_visualizations',
+      title: 'List the visualizations of a node',
+      description:
+        'List the visualizations the node `node_id` (from `get_graph`) offers for its type, ' +
+        'in the order of the dropdown in its visualization toolbar. Returns `{ node_id, ' +
+        'shown, visualization, available }`: `shown`, whether its visualization is switched ' +
+        'on; `visualization`, the name of the one on screen (null when none is); `available`, ' +
+        'the names to pass to `get_visualization` as `visualization`. Shows, moves and changes ' +
+        'nothing, and works in Live mode too.',
+      inputSchema: { node_id: nodeId() },
+      run: forward('list_visualizations'),
     },
     {
       name: 'add_nodes',
@@ -278,8 +292,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'Select the nodes in `node_ids` (from `get_graph`) in the graph editor, to point ' +
         'the user at them; an empty list clears the selection. This and `open_method` are ' +
         'the only project tools that change the selection, and with `get_visualization` the ' +
-        'only ones that move the view: the edit tools leave both alone. Returns `selected`, the ids of the selected nodes. Works in Live ' +
-        'mode too.',
+        'only ones that move the view: the edit tools leave both alone. Returns `selected`, ' +
+        'the ids of the selected nodes. Works in Live mode too.',
       inputSchema: { node_ids: z.array(nodeId()).max(200) },
       run: forward('select_nodes'),
     },

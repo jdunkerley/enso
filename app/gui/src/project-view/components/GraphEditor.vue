@@ -119,7 +119,7 @@ const graphStore = useGraphStore()
 const { id: assetId, info: projectInfo, module } = useCurrentProject()
 const widgetRegistry = useWidgetRegistry()
 const suggestionDb = useSuggestionDbStore()
-provideVisualizationStore(projectStore, suggestionDb.entries)
+const visualizationStore = provideVisualizationStore(projectStore, suggestionDb.entries)
 provideLanguageSupportExtensions({
   project: projectStore,
   projectNames,
@@ -308,6 +308,12 @@ useProjectMcpTools({
       true,
     ),
   viewMoving: () => graphNavigator.transformChanging,
+  // As `GraphNode.vue` passes the type info to its visualization's dropdown.
+  visualizationsFor: (id) => {
+    const node = graphStore.db.nodeIdToNode.get(id)
+    const typeInfo = node && graphStore.db.getExpressionInfo(node.innerExpr.externalId)?.typeInfo
+    return [...visualizationStore.byType(typeInfo)]
+  },
 })
 
 // === Clipboard Copy/Paste ===

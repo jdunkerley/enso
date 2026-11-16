@@ -23,6 +23,8 @@ export const CAPTURE_INTERVAL_MS = 150
 export const CAPTURE_MAX_TRIES = 10
 /** Most characters of a node id. */
 const NAME_CHARS = 200
+/** Most characters of a visualization's name. */
+const VISUALIZATION_NAME_CHARS = 100
 
 const NO_CAPTURE_ERROR =
   'The Enso window could not be captured (it may be minimised or hidden). Use format `data`.'
@@ -59,7 +61,9 @@ const preparedSchema = z.object({
   node_id: z.string(),
   visualization: z.string(),
   shown: z.boolean(),
+  changed: z.boolean(),
   moved: z.boolean(),
+  available: z.array(z.string()),
   rect: z.object({
     x: z.number().int().nonnegative(),
     y: z.number().int().nonnegative(),
@@ -133,14 +137,19 @@ export function visualizationTool(
     description:
       'Look at the visualization of the node `node_id` (from `get_graph`): the table, chart ' +
       'or other view the user sees under the node. `format` is `image` (the default): a PNG ' +
-      'of the visualization as drawn, with `{ node_id, visualization, shown, moved, width, ' +
-      'height }`; or `data`: `{ node_id, visualization, shown, truncated, data }`, the data ' +
-      'the view was given (its shape belongs to the view and may change; at most 20,000 ' +
-      'characters, then `truncated` is true and `data` is the start of the text). A table ' +
-      'shows its first 1,000 rows by default, either way. A hidden visualization is shown ' +
-      'first (`shown` true), as `set_visualization` does: that is refused in Live mode and ' +
-      'is part of your undo step; hide it again with `set_visualization` if the user did ' +
-      'not ask to see it. For `image` the graph view moves when the visualization is not ' +
+      'of the visualization as drawn, with `{ node_id, visualization, shown, changed, moved, ' +
+      'available, width, height }`; or `data`: `{ node_id, visualization, shown, changed, ' +
+      'truncated, available, data }`, the data the view was given (its shape belongs to the ' +
+      'view and may change; at most 20,000 characters, then `truncated` is true and `data` is ' +
+      'the start of the text). A table shows its first 1,000 rows by default, either way. ' +
+      '`visualization` names the one to look at, from `available`: call ' +
+      '`list_visualizations` for the names, or read `available` from a result. Naming one ' +
+      'that is not on screen switches the node to it (`changed` true), and it stays switched; ' +
+      'that is part of your undo step and refused in Live mode. Without it you get the one on ' +
+      'screen. A hidden visualization is shown first (`shown` true), as `set_visualization` ' +
+      'does: that is refused in Live mode and is part of your undo step; hide it again with ' +
+      '`set_visualization` if the user did not ask to see it. For `image` the graph view ' +
+      'moves when the visualization is not ' +
       'wholly on screen at 100% zoom (`moved` true), and the Enso window must not be ' +
       'minimised. An error when the visualization is still loading after 15 seconds or ' +
       'failed to load. To read values, prefer `get_node` or `evaluate_expression`; use ' +
@@ -148,9 +157,13 @@ export function visualizationTool(
     inputSchema: {
       node_id: z.string().max(NAME_CHARS),
       format: z.enum(['image', 'data']).optional(),
+      visualization: z.string().max(VISUALIZATION_NAME_CHARS).optional(),
     },
     run: async (args, caller): Promise<McpToolResult> => {
-      const node = { node_id: args.node_id }
+      const node = {
+        node_id: args.node_id,
+        ...(args.visualization != null ? { visualization: args.visualization } : {}),
+      }
       if (args.format === 'data') {
         return bridge.call('get_visualization_data', node, caller, EDIT_TOOL_TIMEOUT_MS)
       }
