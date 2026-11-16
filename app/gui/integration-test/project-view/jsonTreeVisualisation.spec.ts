@@ -135,7 +135,9 @@ test('Right-click on an entry opens only the tree menu, and leaves the selection
 }) => {
   await editorPage
   const vis = await openTree(page)
-  const selected = await locate.selectedNodes(page).count()
+  // With two nodes selected, a right-click that selected the visualized one alone would shrink it.
+  await locate.graphNodeIcon(locate.graphNodeByBinding(page, 'sum')).click({ modifiers: ['Shift'] })
+  await expect(locate.selectedNodes(page)).toHaveCount(2)
   await entry(vis, 'nested: {1 key}').locator('.content').click({ button: 'right' })
   const menu = page.getByTestId('gridPopupMenu')
   await expect(menu).toBeVisible()
@@ -143,7 +145,7 @@ test('Right-click on an entry opens only the tree menu, and leaves the selection
   await expect(menu.getByText('Get All Loaded Values Here')).toBeVisible()
   // Not the node's or the graph's own menu.
   await expect(page.getByTestId('contextMenu')).toHaveCount(0)
-  await expect(locate.selectedNodes(page)).toHaveCount(selected)
+  await expect(locate.selectedNodes(page)).toHaveCount(2)
   const nodeCount = await locate.graphNode(page).count()
   await menu.getByText('Get All Loaded Values Here').click()
   // Of the four root entries, `visualizedExpr` has no expression: `items`, `nested` and `broken` do.

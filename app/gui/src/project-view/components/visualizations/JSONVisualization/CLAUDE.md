@@ -24,3 +24,5 @@ The JSON visualization: a lazy tree over any value (spec
   the grids' `GridPopupMenu`). An item is offered only if a node comes of it, so
   an entry no expression reaches gets no menu. The row stops the `contextmenu`
   event (prevent and stop), so the browser's and the graph's menus stay away.
+  The menu closes on a click away, on Escape, when the tree scrolls and when a
+  new payload arrives (the popup keeps its click point and its chains).

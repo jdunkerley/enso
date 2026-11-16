@@ -36,7 +36,7 @@ const title = computed(() => {
   if (row.kind !== 'entry') return leafText.value ?? ''
   const action =
     row.chain != null ?
-      'Double-click to add a component for this entry; Shift+double-click adds one for each entry beside it.'
+      'Double-click, or right-click for a menu, to add a component for this entry; Shift+double-click adds one for each entry beside it.'
     : 'No expression reaches this entry, so double-clicking it adds nothing.'
   return leafText.value != null ? `${leafText.value}\n\n${action}` : action
 })

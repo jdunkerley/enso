@@ -1,4 +1,4 @@
-/** @file The JSON tree's toolbar offers the plain actions of the root value, and only those. */
+/** @file The JSON tree's toolbar and its right-click menu on an entry. */
 import type { ToValue } from '$/utils/reactivity'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
@@ -94,15 +94,18 @@ describe('the right-click menu on a tree entry', () => {
   }
 
   /** Mounts the tree; `GridPopupMenu` is stubbed, as it teleports and needs an interaction handler. */
-  async function mountTree() {
-    const { wrapper } = await mountWithProviders(JSONVisualization, {
+  function mountTreeWithProps() {
+    return mountWithProviders(JSONVisualization, {
       props: { data: TREE },
       global: { stubs: { GridPopupMenu: true } },
     })
-    return wrapper
   }
+  async function mountTree() {
+    return (await mountTreeWithProps()).wrapper
+  }
+  type Tree = Awaited<ReturnType<typeof mountTree>>
 
-  function content(wrapper: Awaited<ReturnType<typeof mountTree>>, key: string) {
+  function content(wrapper: Tree, key: string) {
     const found = wrapper
       .findAll('.TreeRow.entry .content')
       .find((element) => element.find('.key').text() === key)
@@ -126,7 +129,7 @@ describe('the right-click menu on a tree entry', () => {
     return { event, reachedBody: reached.mock.calls.length > 0 }
   }
 
-  function menuItems(wrapper: Awaited<ReturnType<typeof mountTree>>): GridMenuItem[] {
+  function menuItems(wrapper: Tree): GridMenuItem[] {
     return wrapper.findComponent({ name: 'GridPopupMenu' }).props('items')
   }
 
@@ -184,6 +187,56 @@ describe('the right-click menu on a tree entry', () => {
     expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(true)
     await rightClick(content(wrapper, 'raw'))
     expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(false)
+  })
+
+  test('the tooltip of an entry with an expression names the right-click menu as well', async () => {
+    const wrapper = await mountTree()
+    const title = content(wrapper, 'name').attributes('title') ?? ''
+    expect(title).toContain('Double-click')
+    expect(title).toContain('right-click')
+    expect(title).toContain('Shift+double-click')
+  })
+
+  test('the tooltip of an entry with no expression promises no menu', async () => {
+    const wrapper = await mountTree()
+    expect(content(wrapper, 'raw').attributes('title') ?? '').not.toContain('right-click')
+  })
+
+  async function openOn(wrapper: Tree, key: string) {
+    await rightClick(content(wrapper, key))
+    expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(true)
+  }
+
+  function menuIsOpen(wrapper: Tree) {
+    return wrapper.findComponent({ name: 'GridPopupMenu' }).exists()
+  }
+
+  test('scrolling the tree closes the menu', async () => {
+    const wrapper = await mountTree()
+    await openOn(wrapper, 'name')
+    await wrapper.find('[data-testid="tree-scroller"]').trigger('scroll')
+    expect(menuIsOpen(wrapper)).toBe(false)
+  })
+
+  test('a new tree payload closes the menu', async () => {
+    const { wrapper, setProps } = await mountTreeWithProps()
+    await openOn(wrapper, 'name')
+    await setProps({ data: { ...TREE } })
+    expect(menuIsOpen(wrapper)).toBe(false)
+  })
+
+  test('Escape closes the menu, and only while it is open', async () => {
+    const wrapper = await mountTree()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    expect(menuIsOpen(wrapper)).toBe(false)
+    await openOn(wrapper, 'name')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+    await flushPromises()
+    expect(menuIsOpen(wrapper)).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    expect(menuIsOpen(wrapper)).toBe(false)
   })
 
   test.each(['name', 'raw'])(

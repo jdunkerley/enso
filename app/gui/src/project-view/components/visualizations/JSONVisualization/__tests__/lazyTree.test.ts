@@ -428,6 +428,37 @@ describe('entryMenu', () => {
     expect(entryMenu(rows, entry)).toEqual([])
   })
 
+  test('Get All Loaded Values Here is the loaded siblings in display order, and nothing under them', async () => {
+    const tree = useLazyTree(fakeFetch())
+    tree.setRoot({
+      root: prepared.root,
+      children: {
+        start: 0,
+        size: 6,
+        entries: [
+          leaf('a', 1, ".get 'a'"),
+          { key: 'items', kind: 'array', size: 250, label: '[250 items]', expr: ".get 'items'" },
+          leaf('b', 2, ".get 'b'"),
+          leaf('c', 3, ".get 'c'"),
+        ],
+      },
+    })
+    tree.toggle(['items'])
+    await flushPromises()
+    const rows = tree.rows.value
+    // The tree has the root's "Show more" row and 100 of the 250 `items`, with their own.
+    expect(rows.filter((r) => r.kind === 'more').map((r) => r.path)).toEqual([['items'], []])
+    expect(rows.filter((r) => r.kind === 'entry' && r.path[0] === 'items')).toHaveLength(101)
+    // Whichever sibling is clicked, the unloaded two of six and the children of `items` are left out.
+    for (const key of ['a', 'items', 'b', 'c'])
+      expect(entryMenu(rows, entryAt(rows, [key]))[1]!.chains).toEqual([
+        [".get 'a'"],
+        [".get 'items'"],
+        [".get 'b'"],
+        [".get 'c'"],
+      ])
+  })
+
   test('leaves a sibling with no pattern out of the loaded values', () => {
     const rows = useLazyTreeRows({
       ...prepared,

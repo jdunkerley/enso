@@ -32,7 +32,7 @@ import TreeRowView from '@/components/visualizations/JSONVisualization/TreeRow.v
 import { parseVizActions, plainActionToolbar } from '@/components/visualizations/vizActions'
 import { stopCopy } from '@/util/shortcuts'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
-import { useVirtualList } from '@vueuse/core'
+import { useEventListener, useVirtualList } from '@vueuse/core'
 import { computed, shallowRef, watch } from 'vue'
 
 const { data } = defineProps<{ data: unknown }>()
@@ -58,7 +58,17 @@ config.setToolbar(computed(() => plainActionToolbar(parseVizActions(data), confi
 
 const prepared = computed(() => parsePrepared(data))
 const tree = useLazyTree(fetchPage)
-watch(prepared, (value) => tree.setRoot(value), { immediate: true })
+/** The open right-click menu, where it was asked for. */
+const menu = shallowRef<{ point: { x: number; y: number }; items: GridMenuItem[] }>()
+watch(
+  prepared,
+  (value) => {
+    // The menu holds chains made for the old payload.
+    menu.value = undefined
+    tree.setRoot(value)
+  },
+  { immediate: true },
+)
 
 const { list, containerProps, wrapperProps } = useVirtualList(tree.rows, {
   itemHeight: ROW_HEIGHT_PX,
@@ -79,9 +89,6 @@ function activate(row: TreeRow, all: boolean) {
   createNodesFor(all ? siblingChains(tree.rows.value, row) : [row.chain])
 }
 
-/** The open right-click menu, where it was asked for. */
-const menu = shallowRef<{ point: { x: number; y: number }; items: GridMenuItem[] }>()
-
 function openMenu(row: TreeRow, event: MouseEvent) {
   const entries = entryMenu(tree.rows.value, row)
   menu.value =
@@ -98,6 +105,11 @@ function openMenu(row: TreeRow, event: MouseEvent) {
       }
 }
 
+/** The popup is placed from the click point and the keyboard is not its own: close it on Escape. */
+useEventListener(window, 'keydown', (event) => {
+  if (event.key === 'Escape') menu.value = undefined
+})
+
 function rowKey(row: TreeRow) {
   return `${row.kind}:${JSON.stringify(row.path)}`
 }
@@ -106,7 +118,13 @@ function rowKey(row: TreeRow) {
 <template>
   <div class="JSONVisualization" tabindex="-1" @wheel.stop.passive @keydown="stopCopy">
     <pre v-if="prepared == null" class="raw" v-text="JSON.stringify(data, null, 2)" />
-    <div v-else v-bind="containerProps" class="scroller" data-testid="tree-scroller">
+    <div
+      v-else
+      v-bind="containerProps"
+      class="scroller"
+      data-testid="tree-scroller"
+      @scroll="menu = undefined"
+    >
       <div v-bind="wrapperProps">
         <TreeRowView
           v-for="{ data: row } in list"
