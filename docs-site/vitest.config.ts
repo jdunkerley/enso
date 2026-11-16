@@ -5,14 +5,34 @@
  * (`resolve.alias`) rather than imported, since that config loads the GUI's Vue and WASM plugins.
  */
 import { fileURLToPath } from 'node:url'
-import { defineConfig, mergeConfig } from 'vitest/config'
+import wasm from 'vite-plugin-wasm'
+import { defineConfig, mergeConfig, type Plugin } from 'vitest/config'
 import nodeVitestConfig from '../app/vitest.node.base'
 
 const guiSrc = (path: string) => fileURLToPath(new URL(`../app/gui/src${path}`, import.meta.url))
 
+/**
+ * The parser behind `exampleToNodes` (the style check) is a WASM module. `vite-plugin-wasm` inlines
+ * it for Node only when it is told the load is SSR, which vitest is detected for and `vite-node`
+ * (the `generate` script) is not: it would try to `fetch` the module's `/@fs/` URL. Both run in
+ * Node here, so always say so.
+ */
+function wasmForNode(): Plugin {
+  const plugin = wasm()
+  const load = plugin.load
+  if (typeof load !== 'function') throw new Error('vite-plugin-wasm: load is not a function')
+  return {
+    ...plugin,
+    load(id) {
+      return load.call(this, id, { ssr: true })
+    },
+  }
+}
+
 export default mergeConfig(
   nodeVitestConfig,
   defineConfig({
+    plugins: [wasmForNode()],
     resolve: {
       conditions: ['source'],
       alias: {

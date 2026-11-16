@@ -7,7 +7,7 @@
     - <= self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - > self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - >= self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - add_work_days self days:Standard.Base.Any.Any= holidays:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - add_work_days self days:Standard.Base.Data.Numbers.Integer= holidays:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Time.Date.Date)= -> Standard.Base.Data.Time.Date.Date
     - century self -> Standard.Base.Any.Any
     - date_add self amount:Standard.Base.Data.Numbers.Integer period:Standard.Base.Data.Time.Date_Period.Date_Period -> Standard.Base.Any.Any
     - date_diff self end:Standard.Base.Data.Time.Date.Date period:Standard.Base.Data.Time.Date_Period.Date_Period -> Standard.Base.Any.Any
@@ -15,14 +15,14 @@
     - day self -> Standard.Base.Data.Numbers.Integer
     - day_of_week self -> Standard.Base.Any.Any
     - day_of_year self -> Standard.Base.Any.Any
-    - days_until self end:Standard.Base.Any.Any include_end_date:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - days_until self end:Standard.Base.Data.Time.Date.Date include_end_date:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Numbers.Integer
     - default_widget include_today:Standard.Base.Data.Boolean.Boolean= display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
     - down_to self end:Standard.Base.Data.Time.Date.Date include_end:Standard.Base.Data.Boolean.Boolean= step:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Period.Period)= -> Standard.Base.Any.Any
-    - end_of self period:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - end_of_month self -> Standard.Base.Any.Any
-    - first_of_month self -> Standard.Base.Any.Any
+    - end_of self period:Standard.Base.Data.Time.Date_Period.Date_Period= -> Standard.Base.Data.Time.Date.Date
+    - end_of_month self -> Standard.Base.Data.Time.Date.Date
+    - first_of_month self -> Standard.Base.Data.Time.Date.Date
     - format self format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter= -> Standard.Base.Any.Any
-    - internal_add_work_days self days:Standard.Base.Any.Any= holidays:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - internal_add_work_days self days:Standard.Base.Data.Numbers.Integer= holidays:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Time.Date.Date)= -> Standard.Base.Data.Time.Date.Date
     - is_leap_year self -> Standard.Base.Any.Any
     - length_of_month self -> Standard.Base.Any.Any
     - length_of_year self -> Standard.Base.Any.Any
@@ -33,19 +33,20 @@
     - pretty self -> Standard.Base.Any.Any
     - previous self period:Standard.Base.Data.Time.Date_Period.Date_Period= -> Standard.Base.Any.Any
     - quarter self -> Standard.Base.Any.Any
-    - start_of self period:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - to_date_time self time_of_day:Standard.Base.Any.Any= zone:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - start_of self period:Standard.Base.Data.Time.Date_Period.Date_Period= -> Standard.Base.Data.Time.Date.Date
+    - to_date_time self time_of_day:Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day= zone:Standard.Base.Data.Time.Time_Zone.Time_Zone= -> Standard.Base.Data.Time.Date_Time.Date_Time
     - to_display_text self -> Standard.Base.Any.Any
     - to_js_object self -> Standard.Base.Any.Any
     - today -> Standard.Base.Data.Time.Date.Date
     - tomorrow -> Standard.Base.Data.Time.Date.Date
-    - until self end:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - until self end:Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Time.Period.Period
     - up_to self end:Standard.Base.Data.Time.Date.Date include_end:Standard.Base.Data.Boolean.Boolean= step:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Period.Period)= -> Standard.Base.Any.Any
-    - week_of_year self locale:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - work_days_until self end:Standard.Base.Any.Any holidays:Standard.Base.Any.Any= include_end_date:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - week_of_year self locale:(Standard.Base.Data.Locale.Locale|Standard.Base.Nothing.Nothing)= -> Standard.Base.Data.Numbers.Integer
+    - work_days_until self end:Standard.Base.Data.Time.Date.Date holidays:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Time.Date.Date)= include_end_date:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Numbers.Integer
     - year self -> Standard.Base.Data.Numbers.Integer
     - yesterday -> Standard.Base.Data.Time.Date.Date
 - fits_in_range start:Standard.Base.Any.Any end:Standard.Base.Any.Any date:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - is_weekend date:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- make_period_selector display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
 - week_days_between start:Standard.Base.Any.Any end:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - Standard.Base.Data.Time.Date.Date.from that:Standard.Base.Data.Json.JS_Object -> Standard.Base.Data.Time.Date.Date

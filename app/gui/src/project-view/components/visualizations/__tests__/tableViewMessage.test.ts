@@ -9,6 +9,7 @@ import {
   distinctValuesFromResponse,
   rowsFromPage,
   tableViewFlags,
+  viewLink,
   type TableViewContext,
 } from '../TableVisualization/tableView'
 
@@ -150,5 +151,44 @@ describe('The table view message', () => {
       columnNames: ['x'],
       columnTypes: new Map([['x', 'Integer']]),
     })
+  })
+})
+
+describe('The view link', () => {
+  const column = (name: string, link?: { action: string; label?: string }) => ({
+    name,
+    ...(link ? { link } : {}),
+  })
+
+  test('the row-number column’s link comes first', () => {
+    expect(
+      viewLink({
+        kind: 'grid',
+        columns: [column('a', { action: 'at {{@a}}' })],
+        index: { action: 'get_row {{#index}}', label: 'row' },
+        data: [[1]],
+      }),
+    ).toEqual({ action: 'get_row {{#index}}', label: 'row' })
+  })
+
+  test('else the first column with a link', () => {
+    expect(
+      viewLink({
+        kind: 'grid',
+        columns: [
+          column('a'),
+          column('b', { action: 'query {{@b}}', label: 'table' }),
+          column('c', { action: 'other {{@c}}' }),
+        ],
+        data: [[1], [2], [3]],
+      }),
+    ).toEqual({ action: 'query {{@b}}', label: 'table' })
+  })
+
+  test('none when the grid has no link, or is not a grid', () => {
+    expect(viewLink({ kind: 'grid', columns: [column('a')], data: [[1]] })).toBeUndefined()
+    expect(viewLink({ kind: 'error', error: 'boom' })).toBeUndefined()
+    expect(viewLink(42)).toBeUndefined()
+    expect(viewLink({ other: 'visualisation' })).toBeUndefined()
   })
 })

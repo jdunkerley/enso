@@ -622,3 +622,132 @@ test('Sorting a table and creating components makes a sort node', async ({
   await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
   await expect(locate.graphNode(page).last()).toContainText(/sort.*Name.*Ascending/)
 })
+
+/** The right-click menu actions an in-memory table sends (`Viz_Helpers.enso`, `table_actions`). */
+const MENU_ACTIONS = [
+  {
+    id: 'open_row',
+    label: 'Get Row',
+    icon: 'select_row',
+    kind: 'chain',
+    template: 'get_row {{#index}}',
+  },
+  {
+    id: 'open_column',
+    label: 'Get Column',
+    icon: 'select_column',
+    kind: 'chain',
+    template: 'at {{@column}}',
+  },
+  {
+    id: 'open_cell',
+    label: 'Get Value',
+    icon: 'select_cell',
+    kind: 'chain',
+    template: 'get_value {{@column}} {{#index}}',
+  },
+]
+
+/** The code editor's text. The editor is opened to read it and closed again: it covers the grid. */
+async function codeText(page: Page) {
+  const editor = page.locator('.CodeEditor')
+  await page.keyboard.press('ControlOrMeta+`')
+  await expect(editor).toBeVisible()
+  const text: string = await page.evaluate(() => (window as any).__codeEditorApi.textContent())
+  await page.keyboard.press('ControlOrMeta+`')
+  await expect(editor).toBeHidden()
+  return text
+}
+
+/** Open the table visualization of `aggregated` showing `message`, sorted by column `a`. */
+async function openSortedTable(
+  editorPage: EditorPageActions,
+  page: Page,
+  localApi: MockLocalApi,
+  message: object,
+) {
+  await initGraph(editorPage)
+  await graphNodeByBinding(page, 'aggregated').click()
+  await editorPage.press('Space')
+  const tableVisualization = locate.tableVisualization(page)
+  await expect(tableVisualization).toExist()
+  await localApi.updateVisualization(
+    'Standard.Visualization.Table.Visualization.prepare_visualization',
+    message,
+  )
+  await expect(tableVisualization).toContainText('c')
+  await tableVisualization.locator('.ag-header-cell-text', { hasText: /^a$/ }).click()
+  // After the sort the first displayed row is the data's row 1 (`a` = 1, `b` = 'a').
+  await expect(getCellLocator(page, 'a', 0)).toHaveText('1')
+  return tableVisualization
+}
+
+/** Choose `item` from the grid's right-click menu on `cell`, and wait for the node it makes. */
+async function chooseFromMenu(page: Page, cell: Locator, item: string) {
+  const nodeCount = await locate.graphNode(page).count()
+  await cell.click({ button: 'right' })
+  await page.getByTestId('gridPopupMenu').getByText(item, { exact: true }).click()
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
+}
+
+/**
+ Scenario: a table sorted by `a` is right-clicked on its first displayed row. The menu's Get Row, Get
+    Column and Get Value name the clicked row by its place in the table (`1`), not by its place on
+    screen (`0`, which is `a` = 3).
+ */
+test('Right-click on a sorted table row gets that row, not the displayed position', async ({
+  editorPage,
+  page,
+  localApi,
+}) => {
+  await openSortedTable(editorPage, page, localApi, { ...SORTABLE_TABLE, actions: MENU_ACTIONS })
+  const cell = getCellLocator(page, 'b', 0)
+  await expect(cell).toHaveText('a')
+  await chooseFromMenu(page, cell, 'Get Row')
+  await expect.poll(() => codeText(page)).toMatch(/aggregated\.get_row 1$/m)
+  await chooseFromMenu(page, cell, 'Get Column')
+  await expect.poll(() => codeText(page)).toMatch(/aggregated\.at 'b'$/m)
+  await chooseFromMenu(page, cell, 'Get Value')
+  await expect.poll(() => codeText(page)).toMatch(/aggregated\.get_value 'b' 1$/m)
+  // The unsorted position was never used.
+  expect(await codeText(page)).not.toMatch(/get_row 0|get_value 'b' 0/)
+})
+
+/** Scenario: the row-number column is not a column of the table, so its menu offers only the row. */
+test('Right-click on the row-number column offers only Get Row', async ({
+  editorPage,
+  page,
+  localApi,
+}) => {
+  await openSortedTable(editorPage, page, localApi, { ...SORTABLE_TABLE, actions: MENU_ACTIONS })
+  const cell = getCellLocator(page, '#', 0)
+  await cell.click({ button: 'right' })
+  const menu = page.getByTestId('gridPopupMenu')
+  await expect(menu.getByText('Get Row', { exact: true })).toBeVisible()
+  await expect(menu.getByText('Get Column', { exact: true })).toHaveCount(0)
+  await expect(menu.getByText('Get Value', { exact: true })).toHaveCount(0)
+  const nodeCount = await locate.graphNode(page).count()
+  await menu.getByText('Get Row', { exact: true }).click()
+  await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
+  await expect.poll(() => codeText(page)).toMatch(/aggregated\.get_row 1$/m)
+})
+
+/** Scenario: a value that sends no row action, only a link, gets that link in the menu. */
+test('Right-click on a link offers the link', async ({ editorPage, page, localApi }) => {
+  await initGraph(editorPage)
+  await graphNodeByBinding(page, 'aggregated').click()
+  await editorPage.press('Space')
+  const tableVisualization = locate.tableVisualization(page)
+  await expect(tableVisualization).toExist()
+  await localApi.updateVisualization(
+    'Standard.Visualization.Table.Visualization.prepare_visualization',
+    {
+      kind: 'grid',
+      row_count: 1,
+      columns: [{ name: 'Table', link: { action: 'query {{@Table}}', label: 'table' } }],
+      data: [['pinned']],
+    },
+  )
+  await chooseFromMenu(page, tableVisualization.getByText('pinned'), 'Open This Table')
+  await expect.poll(() => codeText(page)).toMatch(/aggregated\.query 'pinned'$/m)
+})

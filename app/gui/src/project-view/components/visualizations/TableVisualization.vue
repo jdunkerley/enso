@@ -42,7 +42,7 @@ import {
   type ValueTypes,
 } from './TableVisualization/TableVizDataSourceUtils'
 import { columnValueToEnso } from './TableVisualization/columnValueToEnso'
-import { valueNodePattern, type ValueNodeAction } from './TableVisualization/tableContextMenu'
+import { tableMenuEntries } from './TableVisualization/tableContextMenu'
 import { makeFilterModelList, type GridFilterModel } from './TableVisualization/tableVizFilterUtils'
 import {
   buildTableView,
@@ -51,6 +51,7 @@ import {
   INDEX_FIELD_NAME,
   rowsFromPage,
   tableViewFlags,
+  viewLink,
 } from './TableVisualization/tableView'
 
 import { formatText, isNumericType } from './TableVisualization/tableVizUtils'
@@ -123,37 +124,23 @@ const grid = ref<
 const getContextMenuItems = (
   params: GetContextMenuItemsParams,
 ): (MenuItemDef | DefaultMenuItem)[] => {
-  const colId = params.column ? params.column.getColId() : null
-  const { rowIndex } = params.node ?? {}
-
-  const actions = [
-    { name: 'Get Column', action: 'at' as const, colId, icon: 'select_column' },
-    { name: 'Get Row', action: 'get_row' as const, rowIndex, icon: 'select_row' },
-    { name: 'Get Value', action: 'get_value' as const, colId, rowIndex, icon: 'select_cell' },
-  ]
-
-  const createMenuItem = ({ name, action, colId, rowIndex, icon }: (typeof actions)[number]) => ({
-    name,
-    action: () => createValueNode(colId, rowIndex, action),
-    icon: getSvgTemplate(icon),
-  })
-
+  const entries = tableMenuEntries(
+    vizActions.value,
+    viewLink(props.data),
+    params.column ? params.column.getColId() : null,
+    params.node?.data ?? null,
+  )
   return [
     commonContextMenuActions.copy,
     commonContextMenuActions.copyWithHeaders,
     'separator',
     'export',
-    ...actions.map(createMenuItem),
+    ...entries.map((entry) => ({
+      name: entry.name,
+      action: () => config.createNodes({ content: entry.pattern, commit: true }),
+      icon: getSvgTemplate(entry.icon),
+    })),
   ]
-}
-
-function createValueNode(
-  columnId: string | null | undefined,
-  rowIndex: number | null | undefined,
-  action: ValueNodeAction,
-) {
-  const pattern = valueNodePattern(columnId, rowIndex, action)
-  if (pattern) config.createNodes({ content: pattern, commit: true })
 }
 
 const viewFlags = computed(() => tableViewFlags(props.data))

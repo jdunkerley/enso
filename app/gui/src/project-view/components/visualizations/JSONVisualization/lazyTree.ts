@@ -1,6 +1,6 @@
 /** @file The lazy tree's state: the loaded pages, the open branches, and the rows they show. */
 import { computed, shallowReactive, shallowRef } from 'vue'
-import { isNodeExpression } from './treeExpression'
+import { isNodeExpression, nodeExpressionPattern } from './treeExpression'
 import type { PageResult, Prepared, TreeEntry, TreeKey, TreeNode } from './treeWire'
 
 /** How many entries one `children` call, and one "Show more", asks for. */
@@ -57,6 +57,32 @@ export function siblingChains(rows: readonly TreeRow[], row: TreeRow): (readonly
       [other.chain]
     : [],
   )
+}
+
+/** An entry of the tree's right-click menu: what it is called and the node chains it creates. */
+export interface EntryMenuItem {
+  name: string
+  /** The name of the icon in the sprite. */
+  icon: string
+  chains: (readonly string[])[]
+}
+
+/**
+ * The tree's right-click menu on `row`: the node of the entry (as a double-click) and one node for
+ * each loaded entry beside it (as Shift+double-click). An item is offered only if a node comes of
+ * it, so there are none for an entry that no expression reaches.
+ */
+export function entryMenu(rows: readonly TreeRow[], row: TreeRow): EntryMenuItem[] {
+  if (row.kind !== 'entry' || row.chain == null) return []
+  const makesNode = (chain: readonly string[]) => nodeExpressionPattern(chain) != null
+  const one = [row.chain].filter(makesNode)
+  const all = siblingChains(rows, row).filter(makesNode)
+  return [
+    ...(one.length > 0 ? [{ name: 'Get Value', icon: 'select_cell', chains: one }] : []),
+    ...(all.length > 0 ?
+      [{ name: 'Get All Loaded Values Here', icon: 'select_row', chains: all }]
+    : []),
+  ]
 }
 
 /**

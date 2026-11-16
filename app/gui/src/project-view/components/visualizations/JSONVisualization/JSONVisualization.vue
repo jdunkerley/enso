@@ -7,7 +7,13 @@ export const defaultPreprocessor = ['Standard.Visualization.Tree', 'prepare'] as
 
 <script setup lang="ts">
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
+import GridPopupMenu from '@/components/GridPopupMenu.vue'
 import {
+  menuIconHtml,
+  type GridMenuItem,
+} from '@/components/shared/AgGridTableView/gridPopupMenuItems'
+import {
+  entryMenu,
   siblingChains,
   useLazyTree,
   type TreeRow,
@@ -26,8 +32,8 @@ import TreeRowView from '@/components/visualizations/JSONVisualization/TreeRow.v
 import { parseVizActions, plainActionToolbar } from '@/components/visualizations/vizActions'
 import { stopCopy } from '@/util/shortcuts'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
-import { useVirtualList } from '@vueuse/core'
-import { computed, watch } from 'vue'
+import { useEventListener, useVirtualList } from '@vueuse/core'
+import { computed, shallowRef, watch } from 'vue'
 
 const { data } = defineProps<{ data: unknown }>()
 const config = useVisualizationConfig()
@@ -52,22 +58,57 @@ config.setToolbar(computed(() => plainActionToolbar(parseVizActions(data), confi
 
 const prepared = computed(() => parsePrepared(data))
 const tree = useLazyTree(fetchPage)
-watch(prepared, (value) => tree.setRoot(value), { immediate: true })
+/** The open right-click menu, where it was asked for. */
+const menu = shallowRef<{ point: { x: number; y: number }; items: GridMenuItem[] }>()
+watch(
+  prepared,
+  (value) => {
+    // The menu holds chains made for the old payload.
+    menu.value = undefined
+    tree.setRoot(value)
+  },
+  { immediate: true },
+)
 
 const { list, containerProps, wrapperProps } = useVirtualList(tree.rows, {
   itemHeight: ROW_HEIGHT_PX,
   overscan: 10,
 })
 
-function activate(row: TreeRow, all: boolean) {
-  if (row.kind !== 'entry' || row.chain == null) return
-  const chains = all ? siblingChains(tree.rows.value, row) : [row.chain]
+/** Creates a node for each chain that makes one. */
+function createNodesFor(chains: readonly (readonly string[])[]) {
   const patterns = chains.flatMap((chain) => nodeExpressionPattern(chain) ?? [])
   if (patterns.length === 0) return
   config.createNodes(
     ...patterns.map((content) => ({ content, commit: true }) satisfies NodeCreationOptions),
   )
 }
+
+function activate(row: TreeRow, all: boolean) {
+  if (row.kind !== 'entry' || row.chain == null) return
+  createNodesFor(all ? siblingChains(tree.rows.value, row) : [row.chain])
+}
+
+function openMenu(row: TreeRow, event: MouseEvent) {
+  const entries = entryMenu(tree.rows.value, row)
+  menu.value =
+    entries.length === 0 ?
+      undefined
+    : {
+        point: { x: event.clientX, y: event.clientY },
+        items: entries.map(({ name, icon, chains }) => ({
+          type: 'item',
+          name,
+          icon: menuIconHtml(icon),
+          action: () => createNodesFor(chains),
+        })),
+      }
+}
+
+/** The popup is placed from the click point and the keyboard is not its own: close it on Escape. */
+useEventListener(window, 'keydown', (event) => {
+  if (event.key === 'Escape') menu.value = undefined
+})
 
 function rowKey(row: TreeRow) {
   return `${row.kind}:${JSON.stringify(row.path)}`
@@ -77,7 +118,13 @@ function rowKey(row: TreeRow) {
 <template>
   <div class="JSONVisualization" tabindex="-1" @wheel.stop.passive @keydown="stopCopy">
     <pre v-if="prepared == null" class="raw" v-text="JSON.stringify(data, null, 2)" />
-    <div v-else v-bind="containerProps" class="scroller" data-testid="tree-scroller">
+    <div
+      v-else
+      v-bind="containerProps"
+      class="scroller"
+      data-testid="tree-scroller"
+      @scroll="menu = undefined"
+    >
       <div v-bind="wrapperProps">
         <TreeRowView
           v-for="{ data: row } in list"
@@ -88,9 +135,11 @@ function rowKey(row: TreeRow) {
           @more="tree.showMore(row.path)"
           @retry="tree.retry(row.path)"
           @activate="activate(row, $event)"
+          @menu="openMenu(row, $event)"
         />
       </div>
     </div>
+    <GridPopupMenu v-if="menu" :items="menu.items" :point="menu.point" @close="menu = undefined" />
   </div>
 </template>
 
