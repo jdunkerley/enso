@@ -2,6 +2,12 @@
 
 #### Enso IDE
 
+- [A date argument has a dropdown arrow under it that opens a menu of
+  `Date.today`, `Date.yesterday`, `Date.tomorrow` and a calendar; the argument
+  shows the code it holds, and a `Date.new` shows its year, month and day as
+  fields. Items of a list of dates get the arrow too. A time-of-day argument
+  likewise has a menu of `Time_Of_Day.now` and a time field you can type
+  into.][789]
 - [External agent apps (Claude Code, Codex, GitHub Copilot) can connect to the
   IDE over MCP and read the open project. Turn it on in Settings → AI.][782]
 - [The help panel shows each argument's type, default, widget and description in
@@ -434,6 +440,8 @@
 
 #### Enso Standard Library
 
+- [`Date.yesterday` and `Date.tomorrow` give the day before and after
+  today.][789]
 - [EDI files are read by the new Standard.EDI library; add
   `from Standard.EDI import all` to use `EDI_Format` by name.][733]
 - [Fixed-width text files are read by the new Standard.Fixed_Width library; add
@@ -506,6 +514,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[789]: https://github.com/jdunkerley/enso/pull/789
 [782]: https://github.com/jdunkerley/enso/pull/782
 [788]: https://github.com/jdunkerley/enso/pull/788
 [771]: https://github.com/jdunkerley/enso/pull/771
