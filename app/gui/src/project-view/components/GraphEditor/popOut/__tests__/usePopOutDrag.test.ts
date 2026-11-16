@@ -1,7 +1,10 @@
+import { useEvent } from '@/composables/events'
+import { provideGlobalEventRegistry } from '@/providers/globalEventRegistry'
 import { Rect } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
+import { appWithSetup } from '@/util/testing'
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { effectScope, type EffectScope } from 'vue'
+import type { App } from 'vue'
 import { popOutSourceOf, usePopOutDrag, type PopOutSource } from '../usePopOutDrag'
 
 function portElement(attrs: Record<string, string>): HTMLElement {
@@ -36,36 +39,71 @@ describe('popOutSourceOf', () => {
   })
 })
 
-let scope: EffectScope | undefined
-afterEach(() => scope?.stop())
+let app: App | undefined
+afterEach(() => app?.unmount())
 
-/** A pop-out drag over a node at (0,0)-(100,40), with client coordinates equal to scene ones. */
+/**
+ * A pop-out drag over a node at (0,0)-(100,40), with client coordinates equal to scene ones. It
+ * plays `useClickableDraggable`'s part: `move` reports the offset and marks the move significant
+ * as it does (squared length 50 or more), `release` commits.
+ *
+ * The app's Escape binding (`app.cancel` in `App.vue`) is stood in for by a capture-phase handler
+ * on the main registry, registered first, that stops the event as the shortcut dispatcher does.
+ */
 function setup() {
   const popOut = vi.fn<(source: PopOutSource, position: Vec2) => void>()
-  scope = effectScope()
-  const drag = scope.run(() =>
-    usePopOutDrag({
+  const appCancel = vi.fn((event: KeyboardEvent) => {
+    if (event.key !== 'Escape') return
+    event.stopImmediatePropagation()
+    event.preventDefault()
+  })
+  let pointerDown = false
+  let dragged = false
+  const [drag, mounted] = appWithSetup(() => {
+    const registry = provideGlobalEventRegistry()
+    // `useEvent`, so unmounting removes it: a stale one would stop the next test's Escape.
+    useEvent(registry.globalEventRegistry, 'keydown', appCancel, { capture: true })
+    return usePopOutDrag({
       clientToScenePos: (client) => client,
       nodeRect: () => Rect.XYWH(0, 0, 100, 40),
       popOut,
-    }),
-  )!
-  function down(target: EventTarget) {
-    // jsdom has no `PointerEvent`; the drag reads only the target and the client position.
-    const event = new MouseEvent('pointerdown', { clientX: 10, clientY: 10 }) as PointerEvent
+      isPointerDown: () => pointerDown,
+      isDragged: () => dragged,
+      keyEvents: registry.globalEventRegistryPre,
+    })
+  })
+  app = mounted
+  function down(target: EventTarget, { button = 0, at = new Vec2(10, 10) } = {}) {
+    // jsdom has no `PointerEvent`; the drag reads only the target, button and client position.
+    const event = new MouseEvent('pointerdown', { button, clientX: at.x, clientY: at.y })
     Object.defineProperty(event, 'target', { value: target })
-    drag.pointerdown(event)
+    drag.pointerdown(event as PointerEvent)
+    if (button === 0) pointerDown = true
   }
-  return { drag, popOut, down }
+  function move(offset: Vec2) {
+    dragged ||= offset.lengthSquared() >= 50
+    return drag.dragMove(offset)
+  }
+  function release() {
+    const handled = drag.dragCommit()
+    pointerDown = dragged = false
+    return handled
+  }
+  const escape = () => {
+    // From inside the page, so `window` sees it in the capture phase as it would a real key.
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    document.body.dispatchEvent(event)
+  }
+  return { drag, popOut, appCancel, down, move, release, escape }
 }
 
 describe('usePopOutDrag', () => {
   test('dropping outside the node pops the argument out at the drop', () => {
-    const { drag, popOut, down } = setup()
+    const { drag, popOut, down, move, release } = setup()
     down(portElement(MARKED))
-    expect(drag.dragMove(new Vec2(200, 100))).toBe(true)
+    expect(move(new Vec2(200, 100))).toBe(true)
     expect(drag.ghost.value?.position).toEqual(new Vec2(210, 110))
-    expect(drag.dragCommit()).toBe(true)
+    expect(release()).toBe(true)
     expect(popOut).toHaveBeenCalledWith(
       { port: 'port-1', name: 'end', type: 'Standard.Base.Data.Time.Date.Date' },
       new Vec2(210, 110),
@@ -74,58 +112,78 @@ describe('usePopOutDrag', () => {
   })
 
   test('dropping back on the node does nothing', () => {
-    const { drag, popOut, down } = setup()
+    const { popOut, down, move, release } = setup()
     down(portElement(MARKED))
-    drag.dragMove(new Vec2(20, 5))
-    expect(drag.dragCommit()).toBe(true)
+    move(new Vec2(20, 5))
+    expect(release()).toBe(true)
     expect(popOut).not.toHaveBeenCalled()
   })
 
   test('a click (no move) does nothing', () => {
-    const { drag, popOut, down } = setup()
+    const { popOut, down, move, release } = setup()
     down(portElement(MARKED))
-    drag.dragMove(Vec2.Zero)
-    expect(drag.dragCommit()).toBe(true)
+    move(Vec2.Zero)
+    expect(release()).toBe(true)
     expect(popOut).not.toHaveBeenCalled()
   })
 
-  test('Escape during the drag cancels it', () => {
-    const { drag, popOut, down } = setup()
-    down(portElement(MARKED))
-    drag.dragMove(new Vec2(200, 100))
-    const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
-    window.dispatchEvent(escape)
-    expect(escape.defaultPrevented).toBe(true)
-    expect(drag.ghost.value).toBeUndefined()
-    drag.dragMove(new Vec2(300, 100))
-    expect(drag.ghost.value).toBeUndefined()
-    expect(drag.dragCommit()).toBe(true)
+  test('a click near the edge that jitters out of the node does nothing', () => {
+    const { popOut, down, move, release } = setup()
+    down(portElement(MARKED), { at: new Vec2(10, 36) })
+    move(new Vec2(0, 6))
+    expect(release()).toBe(true)
     expect(popOut).not.toHaveBeenCalled()
   })
 
-  test('Escape with no drag under way is left alone', () => {
-    const { down } = setup()
+  test('Escape during the drag cancels it, ahead of the app shortcuts', () => {
+    const { drag, popOut, appCancel, down, move, release, escape } = setup()
     down(portElement(MARKED))
-    const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
-    window.dispatchEvent(escape)
-    expect(escape.defaultPrevented).toBe(false)
+    move(new Vec2(200, 100))
+    escape()
+    expect(appCancel).toHaveBeenCalled()
+    expect(drag.ghost.value).toBeUndefined()
+    move(new Vec2(300, 100))
+    expect(drag.ghost.value).toBeUndefined()
+    expect(release()).toBe(true)
+    expect(popOut).not.toHaveBeenCalled()
+  })
+
+  test('Escape before the drag moves does not cancel it', () => {
+    const { popOut, down, move, release, escape } = setup()
+    down(portElement(MARKED))
+    escape()
+    move(new Vec2(200, 100))
+    release()
+    expect(popOut).toHaveBeenCalledOnce()
+  })
+
+  test('a right-click or a second pointer does not reset a drag under way', () => {
+    const { drag, popOut, down, move, release } = setup()
+    down(portElement(MARKED))
+    move(new Vec2(200, 100))
+    down(portElement({ 'data-port': 'port-2' }), { button: 2 })
+    down(portElement({ 'data-port': 'port-2' }))
+    expect(move(new Vec2(210, 100))).toBe(true)
+    expect(drag.ghost.value).toBeDefined()
+    release()
+    expect(popOut).toHaveBeenCalledOnce()
   })
 
   test('a cancelled pointer does nothing', () => {
-    const { drag, popOut, down } = setup()
+    const { drag, popOut, down, move } = setup()
     down(portElement(MARKED))
-    drag.dragMove(new Vec2(200, 100))
+    move(new Vec2(200, 100))
     expect(drag.dragCancel()).toBe(true)
     expect(drag.dragCommit()).toBe(false)
     expect(popOut).not.toHaveBeenCalled()
   })
 
   test('a drag elsewhere on the node is not handled', () => {
-    const { drag, popOut, down } = setup()
+    const { drag, popOut, down, move, release } = setup()
     down(portElement({ 'data-port': 'port-2' }))
-    expect(drag.dragMove(new Vec2(200, 100))).toBe(false)
+    expect(move(new Vec2(200, 100))).toBe(false)
     expect(drag.ghost.value).toBeUndefined()
-    expect(drag.dragCommit()).toBe(false)
+    expect(release()).toBe(false)
     expect(drag.dragCancel()).toBe(false)
     expect(popOut).not.toHaveBeenCalled()
   })

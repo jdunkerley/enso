@@ -1,4 +1,4 @@
-import { useEvent } from '@/composables/events'
+import { useEvent, type WindowEventTarget } from '@/composables/events'
 import type { Ast } from '@/util/ast'
 import type { Rect } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
@@ -27,7 +27,8 @@ export function popOutSourceOf(target: EventTarget | null): PopOutSource | undef
  * drag is a pop out; then `dragMove`, `dragCommit` and `dragCancel` return `true` when they
  * handled the event, and the node must then not move.
  *
- * Dropping inside the node, or pressing Escape during the drag, does nothing.
+ * Only a significant move pops out (a click with some jitter does not), and dropping inside the
+ * node, or pressing Escape during the drag, does nothing.
  */
 export function usePopOutDrag(deps: {
   /** Client to scene coordinates; `undefined` when there is no navigator. */
@@ -35,6 +36,15 @@ export function usePopOutDrag(deps: {
   /** The node's rectangle, in scene coordinates. */
   nodeRect: () => Rect | undefined
   popOut: (source: PopOutSource, scenePosition: Vec2) => void
+  /** Whether the node's pointer is down: a second press then does not start another drag. */
+  isPointerDown: () => boolean
+  /** Whether the move so far is a drag rather than a click (`useClickableDraggable`'s `isDragged`). */
+  isDragged: () => boolean
+  /**
+   * Where Escape is listened for: the global registry's `globalEventRegistryPre`, so the drag sees
+   * the key before the app's shortcuts (`app.cancel` stops it from reaching anything later).
+   */
+  keyEvents: WindowEventTarget
 }) {
   const source = shallowRef<PopOutSource>()
   const startClientPos = shallowRef(Vec2.Zero)
@@ -49,6 +59,8 @@ export function usePopOutDrag(deps: {
 
   /** Call on the node's `pointerdown`, before its drag handling sees it. */
   function pointerdown(event: PointerEvent) {
+    // A right-click, or a second pointer, must not reset a drag under way.
+    if (event.button !== 0 || deps.isPointerDown()) return
     end()
     source.value = popOutSourceOf(event.target)
     startClientPos.value = new Vec2(event.clientX, event.clientY)
@@ -68,7 +80,7 @@ export function usePopOutDrag(deps: {
   function dragCommit(): boolean {
     const from = source.value
     if (from == null) return false
-    const position = cancelled ? undefined : scenePosition.value
+    const position = cancelled || !deps.isDragged() ? undefined : scenePosition.value
     end()
     if (position != null && !(deps.nodeRect()?.contains(position) ?? false))
       deps.popOut(from, position)
@@ -81,10 +93,10 @@ export function usePopOutDrag(deps: {
     return true
   }
 
-  // Escape cancels a drag under way; the pointer's release then commits nothing. Listen in the
-  // capture phase so the key does nothing else (such as clearing the selection) meanwhile.
+  // Escape cancels a drag under way; the pointer's release then commits nothing. Listen ahead of
+  // the app's shortcuts, in the capture phase.
   useEvent(
-    window,
+    deps.keyEvents,
     'keydown',
     (event) => {
       if (event.key !== 'Escape' || source.value == null || offset.value == null || cancelled)

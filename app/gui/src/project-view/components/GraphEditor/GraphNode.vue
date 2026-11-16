@@ -40,6 +40,7 @@ import { useEvent, useResizeObserver } from '@/composables/events'
 import { useProgressBackground } from '@/composables/progressBar'
 import type { ActionHandler, DisplayableActionName } from '@/providers/action'
 import { registerHandlers, toggledAction } from '@/providers/action'
+import { useGlobalEventRegistry } from '@/providers/globalEventRegistry'
 import { injectGraphNavigator } from '@/providers/graphNavigator'
 import { injectNodeColors } from '@/providers/graphNodeColors'
 import { useGraphSelection } from '@/providers/graphSelection'
@@ -258,6 +259,9 @@ const popOutDrag = usePopOutDrag({
   clientToScenePos: (client) => navigator?.clientToScenePos(client),
   nodeRect: () => graph.nodeRects.get(nodeId.value),
   popOut: ({ port, name, type }, position) => emit('popOut', port, name, type, position),
+  isPointerDown: () => isPointerDown.value,
+  isDragged: () => isDragged.value,
+  keyEvents: useGlobalEventRegistry().globalEventRegistryPre,
 })
 const { isDragged, isPointerDown, pointerEvents } = useClickableDraggable({
   dragMove: (fullOffset) => {

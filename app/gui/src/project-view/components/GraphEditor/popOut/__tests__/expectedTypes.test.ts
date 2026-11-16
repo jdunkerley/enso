@@ -45,7 +45,9 @@ function infoFor(id: Ast.AstId, notAppliedArguments: number[]): MethodCallInfo {
 
 /** A database that knows the call (nothing applied beyond `applied`) and the bare function. */
 function fakeDb(call: Ast.Expression, bareNotApplied: number[], callNotApplied: number[] = []) {
-  const func = interpretCall(call).func
+  const interpreted = interpretCall(call)
+  assert(interpreted.kind === 'prefix', 'the fake knows only prefix calls')
+  const func = interpreted.func
   const infos = new Map([
     [call.id, infoFor(call.id, callNotApplied)],
     [func.id, infoFor(func.id, bareNotApplied)],
