@@ -50,10 +50,9 @@ type Date
        Obtains the current date from the system clock in the system timezone.
 
        ## Examples
-       ### Get the current date.
-
+       ### The date today
        ```
-             example_today = Date.today
+       date = Date.today
        ```
     today -> Date = Date_Helpers.today
 
@@ -65,10 +64,9 @@ type Date
        The day before today, from the system clock in the system timezone.
 
        ## Examples
-       ### The day before today.
-
+       ### The day before today
        ```
-       day = Date.yesterday
+       date = Date.yesterday
        ```
     yesterday -> Date = Date.today.previous
 
@@ -80,10 +78,9 @@ type Date
        The day after today, from the system clock in the system timezone.
 
        ## Examples
-       ### The day after today.
-
+       ### The day after today
        ```
-       day = Date.tomorrow
+       date = Date.tomorrow
        ```
     tomorrow -> Date = Date.today.next
 
@@ -96,25 +93,22 @@ type Date
        Returns a `Time_Error` if the provided time is not valid.
 
        ## Arguments
-        - `year`: The year to represent.
-        - `month`: The month-of-year to represent, from 1 (January) to 12
-          (December).
-        - `day`: The day-of-month to represent, from 1 to 31. It must be valid
-          for the year and month.
+       - `year`: The year to represent.
+       - `month`: The month-of-year to represent, from 1 (January) to 12 (December).
+       - `day`: The day-of-month to represent, from 1 to 31. It must be valid for the
+         year and month.
 
        ## Examples
-       ### Create a new local date at Unix epoch.
-
+       ### A date from its year, month and day
        ```
-             from Standard.Base import Date
-
-             example_new = Date.new 1970
+       date = Date.new 2020 12 23
+       # → 2020-12-23
        ```
 
-       ### Get the local date of 5th August 1986.
-
+       ### The first day of a year
        ```
-             example_new = Date.new 1986 8 5
+       date = Date.new 1970
+       # → 1970-01-01
        ```
     @year (Widget.Numeric_Input display=Display.Always)
     @month (Widget.Numeric_Input minimum=1 maximum=12 display=Display.Always)
@@ -135,46 +129,28 @@ type Date
        provided `format`.
 
        ## Arguments
-        - `text`: The text to try and parse as a date.
-        - `format`: A pattern describing how to parse the text, or a
-          `Date_Time_Formatter`.
+       - `text`: The text to try and parse as a date.
+       - `format`: A pattern describing how to parse the text, or a
+         `Date_Time_Formatter`. By default the text is read as an ISO-8601 date.
 
        ## Examples
-       ### Parse the date of 23rd December 2020.
-
+       ### Parse an ISO date
        ```
-             from Standard.Base import Date
-
-             example_parse = Date.parse "2020-12-23"
+       date = Date.parse "2020-12-23"
+       # → 2020-12-23
        ```
 
-       ### Recover from an error due to a wrong format.
-
+       ### Parse a date with a custom format
        ```
-             from Standard.Base import Date
-             from Standard.Base.Errors.Common import Time_Error
-
-             example_parse_err = Date.parse "my birthday" . catch Time_Error _->
-                 Date.new 2000 1 1
+       date = Date.parse "23/12/2020" "dd/MM/yyyy"
+       # → 2020-12-23
        ```
 
-       ### Parse "1999-1-1" as Date using a custom format.
-
+       ### Fall back to a default date when the text is not a date
        ```
-             from Standard.Base import Date
-
-             example_parse = Date.parse "1999-1-1" "yyyy-M-d"
-       ```
-
-       ### Recover from the parse error.
-
-       ```
-             from Standard.Base import Date
-             from Standard.Base.Errors.Common import Time_Error
-
-             example_parse_err =
-                 date = Date.parse "1999-1-1" "yyyy-MM-dd"
-                 date.catch Time_Error (_->Date.new 2000 1 1)
+       parsed = Date.parse "my birthday"
+       date = parsed.catch Any _-> Date.new 2000 1 1
+       # → 2000-01-01
        ```
 
        ## Remarks
