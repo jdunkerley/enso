@@ -608,10 +608,12 @@ export const mockLSHandler = async (
       )
       return { contextId: data_.contextId }
     }
+    case 'executionContext/setExecutionEnvironment':
+      lastExecutionEnvironment = (params as { executionEnvironment?: string }).executionEnvironment
+      return {}
     case 'executionContext/push':
     case 'executionContext/pop':
-    case 'executionContext/recompute':
-    case 'executionContext/setExecutionEnvironment': {
+    case 'executionContext/recompute': {
       return {}
     }
     case 'search/getSuggestionsDatabase':
@@ -885,6 +887,24 @@ const mockIndexDocs = new Set<Doc>()
 export function replaceMockServerSession() {
   mockServerSession = `mock-server-session-${crypto.randomUUID()}`
   for (const doc of mockIndexDocs) new DistributedProject(doc).markServerSession(mockServerSession)
+}
+
+/** The environment the GUI last set on an execution context, since {@link setMockExecutionMode}. */
+let lastExecutionEnvironment: string | undefined
+
+/**
+ * Sets the execution mode of every project the mock ydoc server serves, as the user's switch
+ * between Design and Live does: it is the project's `executionMode` setting. The GUI has taken the
+ * change up once {@link mockExecutionEnvironment} answers the matching environment.
+ */
+export function setMockExecutionMode(mode: 'design' | 'live') {
+  lastExecutionEnvironment = undefined
+  for (const doc of mockIndexDocs) new DistributedProject(doc).settings.set('executionMode', mode)
+}
+
+/** The environment the GUI last set on an execution context since {@link setMockExecutionMode}. */
+export function mockExecutionEnvironment(): string | undefined {
+  return lastExecutionEnvironment
 }
 
 /** Forget the session replacements of an earlier test. */

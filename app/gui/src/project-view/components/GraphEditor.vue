@@ -119,7 +119,7 @@ const graphStore = useGraphStore()
 const { id: assetId, info: projectInfo, module } = useCurrentProject()
 const widgetRegistry = useWidgetRegistry()
 const suggestionDb = useSuggestionDbStore()
-provideVisualizationStore(projectStore, suggestionDb.entries)
+const visualizationStore = provideVisualizationStore(projectStore, suggestionDb.entries)
 provideLanguageSupportExtensions({
   project: projectStore,
   projectNames,
@@ -295,6 +295,25 @@ useProjectMcpTools({
   viewport: () => graphNavigator.viewport,
   collapseNodes: (ids, name) =>
     collapseNodesIntoFunction(collapseDeps(), ids, name ? { name } : {}),
+  viewRect: () => viewportElem.value?.getBoundingClientRect() ?? new DOMRect(),
+  scale: () => graphNavigator.targetScale,
+  // `panAndZoomTo` centres the rectangle at the largest scale in [0.1, 1] at which it fits.
+  revealClientRect: (rect) =>
+    graphNavigator.panAndZoomTo(
+      graphNavigator.clientToSceneRect(
+        Rect.FromBounds(rect.left, rect.top, rect.right, rect.bottom),
+      ),
+      0.1,
+      1,
+      true,
+    ),
+  viewMoving: () => graphNavigator.transformChanging,
+  // As `GraphNode.vue` passes the type info to its visualization's dropdown.
+  visualizationsFor: (id) => {
+    const node = graphStore.db.nodeIdToNode.get(id)
+    const typeInfo = node && graphStore.db.getExpressionInfo(node.innerExpr.externalId)?.typeInfo
+    return [...visualizationStore.byType(typeInfo)]
+  },
 })
 
 // === Clipboard Copy/Paste ===

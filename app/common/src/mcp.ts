@@ -4,8 +4,17 @@
 export type McpCaller =
   { readonly kind: 'chat' } | { readonly kind: 'external'; readonly name: string }
 
+/** An image a tool returns beside its text. Only Electron main produces one. */
+export interface McpImage {
+  /** The image's bytes, base64. */
+  readonly data: string
+  readonly mimeType: string
+}
+
+/** What a tool returns: text (and optionally an image), or an error sentence. */
 export type McpToolResult =
-  { readonly ok: true; readonly value: string } | { readonly ok: false; readonly error: string }
+  | { readonly ok: true; readonly value: string; readonly image?: McpImage }
+  | { readonly ok: false; readonly error: string }
 
 /** Main → window. `args` has passed the tool's schema. */
 export interface McpToolCallRequest {

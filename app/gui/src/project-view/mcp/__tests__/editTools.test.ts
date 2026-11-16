@@ -422,11 +422,21 @@ test('set_visualization shows the visualization and answers with the node', asyn
   const { deps, db } = makeDeps()
   const a = nodeNamed(db, 'a')
   const result = valueOf(await setVisualization(deps, { node_id: a, visible: true }))
-  expect(deps.setVisualization).toHaveBeenCalledWith(a, true)
+  expect(deps.setVisualization).toHaveBeenCalledWith(a, true, undefined)
   expect(result).toEqual({ node: expect.objectContaining({ id: a }), settled: true })
   expect(toolError(await setVisualization(deps, { node_id: 'nope', visible: false }))).toContain(
     'No node with id nope',
   )
+})
+
+test('set_visualization with an identifier passes it on in the same edit', async () => {
+  const session = fakeSession()
+  const { deps, db } = makeDeps({ session })
+  const a = nodeNamed(db, 'a')
+  const identifier = { module: { kind: 'Builtin' as const }, name: 'JSON' }
+  valueOf(await setVisualization(deps, { node_id: a, visible: true, identifier }))
+  expect(deps.setVisualization).toHaveBeenCalledExactlyOnceWith(a, true, identifier)
+  expect(session.affected).toHaveLength(1)
 })
 
 test('set_node_comment and set_visualization affect no expression, so they do not wait', async () => {

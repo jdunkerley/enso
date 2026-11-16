@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useCurrentProject } from '$/components/WithCurrentProject.vue'
 import { proxyRefs } from '$/utils/reactivity'
 import { visualizationBindings } from '@/bindings'
 import type { RawDataSource } from '@/components/GraphEditor/GraphVisualization/visualizationData'
@@ -14,6 +15,7 @@ import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
 import WithFullscreenMode from '@/components/WithFullscreenMode.vue'
 import { focusIsIn, useEvent, useResizeObserver } from '@/composables/events'
+import { registerVisualization } from '@/mcp/visualizationRegistry'
 import { registerHandlers } from '@/providers/action'
 import type { VisualizationDataSource } from '@/stores/visualization'
 import type { Opt } from '@/util/data/opt'
@@ -62,6 +64,7 @@ const emit = defineEmits<{
 const {
   effectiveVisualization,
   effectiveVisualizationData,
+  status,
   updatePreprocessor,
   allVisualizations,
   currentVisualization,
@@ -89,6 +92,31 @@ const contentElementSize = useResizeObserver(contentElement)
 // === Events ===
 
 const isFullscreen = ref(false)
+
+// === MCP ===
+
+const currentProject = useCurrentProject()
+// A node's visualization can be found by the MCP `get_visualization` tool while it is shown.
+// A Ctrl-hover preview and the Component Browser's preview are not registered.
+watch(
+  () =>
+    props.show && !props.isPreview && props.dataSource?.type === 'node' ?
+      props.dataSource.nodeId
+    : undefined,
+  (nodeId, _previous, onCleanup) => {
+    if (nodeId == null) return
+    onCleanup(
+      registerVisualization(currentProject.id.value, nodeId, {
+        panel: () => panelElement.value,
+        status: () => status.value,
+        name: () => currentVisualization.value.name,
+        data: () => effectiveVisualizationData.value,
+        fullscreen: () => isFullscreen.value,
+      }),
+    )
+  },
+  { immediate: true },
+)
 
 const actionHandlers = registerHandlers({
   'visualization.exitFullscreen': {
