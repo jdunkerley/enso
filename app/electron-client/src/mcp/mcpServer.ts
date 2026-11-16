@@ -139,9 +139,23 @@ export class McpHttpServer {
             kind: 'external',
             name: clientName,
           })
-          return result.ok ?
-              { content: [{ type: 'text' as const, text: result.value }] }
-            : { content: [{ type: 'text' as const, text: result.error }], isError: true }
+          if (!result.ok) {
+            return { content: [{ type: 'text' as const, text: result.error }], isError: true }
+          }
+          const text = { type: 'text' as const, text: result.value }
+          // The image first: clients show content in order, and the text describes the image.
+          return result.image == null ?
+              { content: [text] }
+            : {
+                content: [
+                  {
+                    type: 'image' as const,
+                    data: result.image.data,
+                    mimeType: result.image.mimeType,
+                  },
+                  text,
+                ],
+              }
         },
       )
     }
