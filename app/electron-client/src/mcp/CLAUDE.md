@@ -194,18 +194,24 @@ and `node_id`:
 
 - **`path`**: main reads the file with the user's rights, so it is checked first
   (Note [add_image Reads Only Images]). On Windows only a drive path (`C:\…` or
-  `C:/…`): network (`\\host\share`) and device (`\\.\`, `\\?\`) paths are
-  refused before anything touches them; elsewhere any absolute path. The
-  extension must be an accepted image kind (`.png`, `.apng`, `.jpg`, `.jpeg`,
-  `.gif`, `.webp`, `.avif`, `.svg`: the documentation editor's list) **and** the
-  leading bytes that same kind, so a text file named `.png`, or a PNG named
-  `.jpg`, is refused and nothing is copied. A regular file (after links) of at
-  most 10 MB (`IMAGE_MAX_BYTES`), checked from its size before it is read and
-  again while reading. No error quotes the file's content. A `path` works in
-  Live: storing a file is not an edit.
+  `C:/…`), with no other `:`: network (`\\host\share`), device (`\\.\`, `\\?\`)
+  and alternate-data-stream (`C:\notes.txt:x.png`) paths are refused before
+  anything touches them; elsewhere any absolute path. The extension must be an
+  accepted image kind (`.png`, `.apng`, `.jpg`, `.jpeg`, `.gif`, `.webp`,
+  `.avif`, `.svg`: the documentation editor's list) **and** the leading bytes
+  that same kind, so a text file named `.png`, or a PNG named `.jpg`, is refused
+  and nothing is copied. A regular file (after links) of at most 10 MB
+  (`IMAGE_MAX_BYTES`), checked from its size before it is read and again while
+  reading. No error quotes the file's content. A `path` works in Live: storing a
+  file is not an edit.
 - **`node_id`**: a picture of the node's visualization, taken exactly as
   `get_visualization` takes one (`pictureVisualization`, the same Live rules,
-  `shown` and `moved` in the result), stored as PNG.
+  `shown` and `moved` in the result), stored as PNG. The picture and the store
+  are two window calls, so `prepare_visualization`'s answer carries the id of
+  the project that answered (`project_id`, which `get_visualization` does not
+  pass on to the agent), main sends it to `store_image`, and a different project
+  on screen by then refuses ("The project on screen changed …"). A `path` image
+  has no first call, so no id is sent or checked.
 
 `name` (at most 100 characters; letters, digits, spaces, `.`, `_`, `-`; no
 folders, no device name) chooses the stored name; its extension is set to match

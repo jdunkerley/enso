@@ -73,7 +73,7 @@ const EDIT_RULES =
   '`get_node` later.'
 
 /**
- * The project tools (the six that read, the nine that edit or navigate), each forwarding its
+ * The project tools (the seven that read, the ten that edit or navigate), each forwarding its
  * arguments to the window through `bridge`.
  */
 export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {

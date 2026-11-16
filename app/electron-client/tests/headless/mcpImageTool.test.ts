@@ -419,3 +419,43 @@ test('an unknown read error gives one fixed sentence, without its code', async (
   const result = await definition.run({ path: ROOT + 'odd.png' }, CALLER)
   expect(errorOf(result)).toBe('The file could not be read.')
 })
+
+test('a capture is stored only by the project that took it: its id goes to store_image', async () => {
+  const prepared = {
+    node_id: 'n',
+    visualization: 'Table',
+    shown: false,
+    changed: false,
+    moved: false,
+    available: ['Table'],
+    rect: { x: 0, y: 0, width: 300, height: 200 },
+    project_id: 'p1',
+  }
+  const { definition, calls } = tool({}, (name) =>
+    name === 'prepare_visualization' ? { ok: true, value: JSON.stringify(prepared) } : STORED,
+  )
+  const result = await definition.run({ node_id: 'n' }, CALLER)
+  expect(calls[1]!.args).toEqual({
+    data: png(300, 200).toString('base64'),
+    node_id: 'n',
+    project_id: 'p1',
+  })
+  expect(JSON.parse(result.ok ? result.value : '')).not.toHaveProperty('project_id')
+
+  // A file has no first window call, so no project id is sent.
+  const path = ROOT + 'chart.png'
+  const file = tool({ [path]: { bytes: PNG } })
+  await file.definition.run({ path }, CALLER)
+  expect(file.calls[0]!.args).not.toHaveProperty('project_id')
+})
+
+test('on Windows a path naming an alternate data stream is refused before any file call', async () => {
+  for (const path of [String.raw`C:\a:stream.png`, String.raw`C:\secret.txt:x.png`]) {
+    const { definition, reads } = tool({ [path]: { bytes: PNG } }, () => STORED, 'win32')
+    expect(errorOf(await definition.run({ path }, CALLER)), path).toBe(NOT_LOCAL_ERROR)
+    expect(reads, path).toEqual([])
+  }
+  const path = String.raw`C:\charts\x.png`
+  const { definition } = tool({ [path]: { bytes: PNG } }, () => STORED, 'win32')
+  expect((await definition.run({ path }, CALLER)).ok).toBe(true)
+})

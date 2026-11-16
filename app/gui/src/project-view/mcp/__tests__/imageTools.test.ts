@@ -6,10 +6,12 @@ import type { Path, Uuid } from 'ydoc-shared/languageServerTypes'
 import {
   altText,
   IMAGES_FOLDER,
+  PROJECT_CHANGED_ERROR,
   serialized,
   STORE_DEADLINE_MARGIN_MS,
   STORED_IMAGE_MAX_BYTES,
   storeImage,
+  withProjectId,
   type ImageToolDeps,
 } from '../imageTools'
 
@@ -42,6 +44,7 @@ function deps(overrides: Partial<ImageToolDeps> = {}): ImageToolDeps {
   return {
     files: fakeFiles().files,
     nodeName: () => 'sales',
+    projectId: () => 'p1',
     now: () => 0,
     deadline: 60_000,
     ...overrides,
@@ -190,4 +193,35 @@ test('serialized stores run one at a time, so two of the same name get different
   expect(value(first).path).toBe('/images/a.png')
   expect(value(second).path).toBe('/images/a_1.png')
   expect(written.map((w) => w.path.segments.at(-1))).toEqual(['a.png', 'a_1.png'])
+})
+
+test('a picture is stored only by the project that took it', async () => {
+  const other = fakeFiles()
+  const refused = await storeImage(deps({ files: other.files, projectId: () => 'p2' }), {
+    data: DATA,
+    node_id: 'n',
+    project_id: 'p1',
+  })
+  expect(error(refused)).toBe(PROJECT_CHANGED_ERROR)
+  expect(other.files.ensureDirExists).not.toHaveBeenCalled()
+  expect(other.written).toEqual([])
+
+  const same = fakeFiles()
+  const stored = await storeImage(deps({ files: same.files }), {
+    data: DATA,
+    node_id: 'n',
+    project_id: 'p1',
+  })
+  expect(stored.ok).toBe(true)
+  // A file (no first call, so no id) is stored by whichever project is on screen.
+  expect(
+    (await storeImage(deps({ projectId: () => 'p2' }), { data: DATA, name: 'a.png' })).ok,
+  ).toBe(true)
+})
+
+test("withProjectId adds the project's id to a JSON answer and leaves a refusal alone", () => {
+  const answer = withProjectId({ ok: true, value: JSON.stringify({ node_id: 'n' }, null, 1) }, 'p1')
+  expect(JSON.parse(answer.ok ? answer.value : '')).toEqual({ node_id: 'n', project_id: 'p1' })
+  const refusal: McpToolResult = { ok: false, error: 'No node n.' }
+  expect(withProjectId(refusal, 'p1')).toBe(refusal)
 })

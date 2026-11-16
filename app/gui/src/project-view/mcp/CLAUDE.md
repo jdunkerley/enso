@@ -322,13 +322,18 @@ top level, and a function of the project's after `open_method`.
   reads the text and sends it all back.
 - **`store_image`** is a window handler, **not an MCP tool**: main's `add_image`
   (`app/electron-client/src/mcp/imageTool.ts`, which reads and checks the file
-  or captures the visualization) calls it with `{ data, name? | node_id? }`, the
-  bytes as base64. It is in no tool list and an agent cannot call it. It checks
-  again what main checked (one file name of letters, digits, spaces, `.`, `_`,
-  `-`, not a Windows device name, with an image extension; valid base64 of at
-  most `STORED_IMAGE_MAX_BYTES`, 10 MB) and writes through the documentation
-  editor's upload functions (`useProjectFiles`: `ensureDirExists` for the
-  `images` folder, `pickUniqueName`, which compares names case-insensitively, so
+  or captures the visualization) calls it with
+  `{ data, name? | node_id?, project_id? }`, the bytes as base64. `project_id`
+  comes with a picture: `prepare_visualization` adds the id of its project to
+  its answer (`withProjectId`), and `store_image` refuses with
+  `PROJECT_CHANGED_ERROR` when another project is on screen by then, so a
+  picture of one project's node never lands in another's `images` folder. It is
+  in no tool list and an agent cannot call it. It checks again what main checked
+  (one file name of letters, digits, spaces, `.`, `_`, `-`, not a Windows device
+  name, with an image extension; valid base64 of at most
+  `STORED_IMAGE_MAX_BYTES`, 10 MB) and writes through the documentation editor's
+  upload functions (`useProjectFiles`: `ensureDirExists` for the `images`
+  folder, `pickUniqueName`, which compares names case-insensitively, so
   `Chart.png` gets `Chart_1.png` beside `chart.png`, and `writeFileBinary`), so
   nothing is ever overwritten. Without a name, a picture is named after the
   node's binding (`<name>.png`, `visualization.png` when it has none). Calls run

@@ -3,7 +3,7 @@
 #### Enso IDE
 
 - [Agents connected over MCP can switch between open projects, read and rewrite
-  a workflow's or a function's documentation, and add images to it.][NNN]
+  a workflow's or a function's documentation, and add images to it.][825]
 - [Agents connected over MCP can list the visualizations a node offers and look
   at any of them, as a picture or as its data.][809]
 - [Right-clicking a table cell offers the components that the value's library
@@ -527,7 +527,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[825]: https://github.com/jdunkerley/enso/pull/825
 [809]: https://github.com/jdunkerley/enso/pull/809
 [800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795

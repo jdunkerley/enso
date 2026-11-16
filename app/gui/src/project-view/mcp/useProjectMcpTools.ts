@@ -35,7 +35,7 @@ import {
 } from './editTools'
 import { evaluateExpression } from './evaluate'
 import { findNode, getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
-import { serialized, storeImage, type ImageToolDeps } from './imageTools'
+import { serialized, storeImage, withProjectId, type ImageToolDeps } from './imageTools'
 import { createMcpNodes } from './nodeCreation'
 import { panelQuiet } from './panelQuiet'
 import {
@@ -370,6 +370,7 @@ export function useProjectMcpTools(
         const found = findNode(graph.db, nodeId)
         return found.ok ? found.value.node.pattern?.code() : undefined
       },
+      projectId: () => currentProject.id.value,
       now: () => Date.now(),
       deadline,
     }
@@ -521,16 +522,20 @@ export function useProjectMcpTools(
       })
     },
     store_image: async (args, _caller, deadline) => {
-      const { data, name, node_id } = args
+      const { data, name, node_id, project_id } = args
       if (typeof data !== 'string') return invalidArgument('data', 'a string')
       if (name != null && typeof name !== 'string') return invalidArgument('name', 'a string')
       if (node_id != null && typeof node_id !== 'string') {
         return invalidArgument('node_id', 'a string')
       }
+      if (project_id != null && typeof project_id !== 'string') {
+        return invalidArgument('project_id', 'a string')
+      }
       return storeImageInTurn(imageDeps(deadline), {
         data,
         ...(name != null ? { name } : {}),
         ...(node_id != null ? { node_id } : {}),
+        ...(project_id != null ? { project_id } : {}),
       })
     },
     prepare_visualization: async (args, caller, deadline) => {
@@ -539,10 +544,13 @@ export function useProjectMcpTools(
       if (visualization != null && typeof visualization !== 'string') {
         return invalidArgument('visualization', 'a string')
       }
-      return prepareVisualization(visualizationDeps(caller, deadline), {
+      const prepared = await prepareVisualization(visualizationDeps(caller, deadline), {
         node_id,
         ...(visualization != null ? { visualization } : {}),
       })
+      // Which project took the picture: `add_image` stores it there only. Main does not pass it
+      // on to the agent.
+      return withProjectId(prepared, currentProject.id.value)
     },
   }
   // The project id is read when asked for, not kept: an editor stays with one project (its tab is

@@ -7,6 +7,7 @@
  * and the Markdown that shows the image. Storing a file is not a module edit: nothing joins the
  * undo stack, and it works in Live mode.
  */
+/* eslint-disable camelcase -- tool argument names are snake_case on the wire */
 import type { ProjectFiles } from '@/stores/projectFiles'
 import type { McpToolResult } from 'enso-common/src/mcp'
 import { toolError } from './editTools'
@@ -31,6 +32,10 @@ const NAME_SUBSTANCE = /[A-Za-z0-9_-]/
 const RESERVED_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/
 
+/** The refusal when the picture was taken in one project and another is on screen now. */
+export const PROJECT_CHANGED_ERROR =
+  'The project on screen changed before the image was stored. Call `add_image` again.'
+
 const TIMED_OUT_ERROR =
   'The call timed out before the image was stored. Nothing was stored; try again.'
 
@@ -43,6 +48,8 @@ export interface ImageToolDeps {
   >
   /** The name of the node's binding; undefined when it has none or there is no such node. */
   readonly nodeName: (nodeId: string) => string | undefined
+  /** The id of the project these handlers belong to. */
+  readonly projectId: () => string
   readonly now: () => number
   /**
    * When main stops waiting for the answer: nothing is created or written later than
@@ -56,6 +63,11 @@ export interface StoreImageArgs {
   readonly data: string
   readonly name?: string
   readonly node_id?: string
+  /**
+   * The project that took the picture (from `prepare_visualization`'s answer); none for a file.
+   * Another project refuses to store it.
+   */
+  readonly project_id?: string
 }
 
 /** The name an image of the node's visualization is stored under when the agent gave none. */
@@ -107,6 +119,9 @@ export async function storeImage(
   deps: ImageToolDeps,
   args: StoreImageArgs,
 ): Promise<McpToolResult> {
+  if (args.project_id != null && args.project_id !== deps.projectId()) {
+    return toolError(PROJECT_CHANGED_ERROR)
+  }
   const name =
     args.name ?? nameForNode(args.node_id != null ? deps.nodeName(args.node_id) : undefined)
   if (!isSafeName(name)) {
@@ -147,4 +162,20 @@ export function serialized<A extends unknown[], R>(
     last = next.catch(() => {})
     return next
   }
+}
+
+/**
+ * `prepare_visualization`'s answer with the id of the project that gave it, which main passes to
+ * `store_image` for `add_image`. A refusal, or an answer that is not a JSON object, is unchanged.
+ */
+export function withProjectId(result: McpToolResult, projectId: string): McpToolResult {
+  if (!result.ok) return result
+  let value: unknown
+  try {
+    value = JSON.parse(result.value)
+  } catch {
+    return result
+  }
+  if (value == null || typeof value !== 'object' || Array.isArray(value)) return result
+  return jsonResult({ ...value, project_id: projectId })
 }

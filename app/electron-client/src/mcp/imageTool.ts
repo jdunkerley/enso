@@ -12,8 +12,9 @@
  * `.jpg`, is refused too). It must be a regular file (after following symbolic links) of at most
  * {@link IMAGE_MAX_BYTES}, which is checked from its size before anything is read; no error ever
  * quotes the file's content. On Windows the path must be a drive path (`C:\...`): a network path
- * (`\\host\share`) would make `stat` connect, and authenticate, to that host, and a device path
- * (`\\.\`, `\\?\`) reaches pipes and devices.
+ * (`\\host\share`) would make `stat` connect, and authenticate, to that host, a device path
+ * (`\\.\`, `\\?\`) reaches pipes and devices, and a further `:` names an alternate data stream
+ * (`C:\notes.txt:x.png`), another file's hidden content.
  *
  * For SVG only the start of the file is checked (an `<svg` element after the prologue), so a text
  * file that begins with `<svg` is copied whole. That is acceptable: such a file is one the agent
@@ -274,11 +275,14 @@ const RELATIVE_ERROR = 'The `path` must be absolute: the full path of an image f
 /**
  * Why `path` is not taken, or null. On Windows only a drive path (`C:\` or `C:/`), which by its
  * first characters refuses network (`\\host\share`, `//host/share`), device (`\\.\`, `\\?\`),
- * drive-relative (`C:x`) and driveless (`\charts`) paths. Elsewhere any absolute path.
+ * drive-relative (`C:x`) and driveless (`\charts`) paths, and with no other `:`, which refuses
+ * alternate data streams. Elsewhere any absolute path.
  */
 function pathError(path: string, platform: NodeJS.Platform): string | null {
   if (platform === 'win32') {
-    return /^[A-Za-z]:[\\/]/.test(path) ? null : NOT_LOCAL_ERROR
+    // A `:` after the drive names an alternate data stream (`C:\a.txt:x.png`), another file's
+    // hidden content.
+    return /^[A-Za-z]:[\\/]/.test(path) && !path.includes(':', 2) ? null : NOT_LOCAL_ERROR
   }
   return posix.isAbsolute(path) ? null : RELATIVE_ERROR
 }
@@ -419,6 +423,8 @@ export function imageTool(
           ...(name != null ?
             { name: withKindExtension(name, PNG_KIND, 'png') }
           : { node_id: nodeId }),
+          // The window refuses when another project is on screen by now.
+          ...(picture.value.projectId != null ? { project_id: picture.value.projectId } : {}),
         },
         caller,
         EDIT_TOOL_TIMEOUT_MS,

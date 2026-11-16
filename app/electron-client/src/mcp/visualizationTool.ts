@@ -70,6 +70,11 @@ const preparedSchema = z.object({
     width: z.number().int().positive(),
     height: z.number().int().positive(),
   }),
+  /**
+   * The id of the project that answered, for `add_image` to store the picture in that project
+   * only. Never passed on to the agent.
+   */
+  project_id: z.string().optional(),
 })
 
 /**
@@ -128,7 +133,7 @@ export function sleepFor(ms: number): Promise<void> {
 }
 
 /** What `prepare_visualization` said about the visualization, without its rectangle. */
-export type PreparedVisualization = Omit<z.infer<typeof preparedSchema>, 'rect'>
+export type PreparedVisualization = Omit<z.infer<typeof preparedSchema>, 'rect' | 'project_id'>
 
 /** A picture of a node's visualization, and what the window said about it. */
 export interface VisualizationPicture {
@@ -137,6 +142,8 @@ export interface VisualizationPicture {
   readonly png: Buffer
   readonly width: number
   readonly height: number
+  /** The id of the project whose window answered, when it said. */
+  readonly projectId: string | undefined
 }
 
 /**
@@ -166,12 +173,12 @@ export async function pictureVisualization(
       error: 'The Enso window did not say where the visualization is.',
     }
   }
-  const { rect, ...about } = parsed.data
+  const { rect, project_id: projectId, ...about } = parsed.data
   const image = await stableCapture(capture, rect, sleep)
   if (image == null) return { ok: false, error: NO_CAPTURE_ERROR }
   const capped = cappedPng(image)
   if (capped == null) return { ok: false, error: NO_CAPTURE_ERROR }
-  return { ok: true, value: { about, ...capped } }
+  return { ok: true, value: { about, ...capped, projectId } }
 }
 
 /**
