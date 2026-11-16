@@ -295,6 +295,19 @@ useProjectMcpTools({
   viewport: () => graphNavigator.viewport,
   collapseNodes: (ids, name) =>
     collapseNodesIntoFunction(collapseDeps(), ids, name ? { name } : {}),
+  viewRect: () => viewportElem.value?.getBoundingClientRect() ?? new DOMRect(),
+  scale: () => graphNavigator.targetScale,
+  // `panAndZoomTo` centres the rectangle at the largest scale in [0.1, 1] at which it fits.
+  revealClientRect: (rect) =>
+    graphNavigator.panAndZoomTo(
+      graphNavigator.clientToSceneRect(
+        Rect.FromBounds(rect.left, rect.top, rect.right, rect.bottom),
+      ),
+      0.1,
+      1,
+      true,
+    ),
+  viewMoving: () => graphNavigator.transformChanging,
 })
 
 // === Clipboard Copy/Paste ===

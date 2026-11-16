@@ -1,7 +1,9 @@
 /**
  * @file The MCP tools that change what the graph editor shows, not the project: `select_nodes` and
- * `open_method`. They are the only project tools that change the selection or move the view, and
- * they work in Live mode too. Pure functions over {@link ViewToolDeps}.
+ * `open_method`. They are the only project tools that change the selection, and with
+ * `prepare_visualization` (`visualizationTools.ts`, which brings a visualization into view to be
+ * captured) the only ones that move the view; they work in Live mode too. Pure functions over
+ * {@link ViewToolDeps}.
  */
 import type { GraphDb, NodeId } from '$/providers/openedProjects/graph/graphDatabase'
 import type { McpToolResult } from 'enso-common/src/mcp'
