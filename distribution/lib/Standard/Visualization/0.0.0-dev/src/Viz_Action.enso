@@ -8,7 +8,8 @@ import project.Viz_Action_Kind.Viz_Action_Kind
    A node a visualisation can create from the visualised value. A
    visualisation finds the actions it understands by `id` and fills in the
    values the template asks for:
-   - `{{#x}}`: the value of `x`, a number when it reads as one, else text;
+   - `{{#x}}`: the value of `x`, a number when it is a decimal numeral
+     (`-12`, `3.5`, `1e-7`), else text; an empty value makes no node;
    - `{{@x}}`: the value as it is (a number stays a number, else text);
    - `{{x}}`: an Enso expression the visualisation builds (a filter
      condition, a sort column);

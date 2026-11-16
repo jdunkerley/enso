@@ -581,7 +581,7 @@ Comparable.from (that:Image) = Comparable.new that Image_Comparator
 ## ---
    private: true
    ---
-   An image opens in the Image visualization.
+   An image opens in the Image visualization that Standard.Image ships.
 Id.from (that:Image) =
     _ = that
-    Id.image
+    Id.Library "Standard.Image" "Image"

@@ -370,7 +370,7 @@ export type Notifications = {
   }) => void
   'search/suggestionsDatabaseUpdates': (param: SuggestionDatabaseUpdates) => void
   'file/event': (param: { path: Path; kind: FileEventKind }) => void
-  'file/rootAdded': (param: object) => void
+  'file/rootAdded': (param: { root: ContentRoot }) => void
   'file/rootRemoved': (param: object) => void
   'library/loadFailed': (param: LibraryLoadFailure) => void
   'refactoring/projectRenamed': (param: {
