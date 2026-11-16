@@ -66,8 +66,12 @@ No tool changes the execution environment, settings or secrets;
    visualizations a node offers (`available`, in the order of its toolbar's
    dropdown) and the one on screen, and changes nothing; every
    `get_visualization` result has `available` too. Pass one of those names as
-   `visualization` to look at it: a name not on screen switches the node to it
-   (`changed: true`), and it stays switched, as part of your undo step.
+   `visualization` to look at it: a name that is not the node's choice switches
+   the node to it, and it stays switched, as part of your undo step; name the
+   previous one to switch back. `changed: true` means this call changed the
+   node's stored choice (the one on screen, or, for a hidden node, the one saved
+   with it). An error that comes after the call showed or switched the
+   visualization says so.
 7. Every tool that changes the project is refused while it is in Live mode: ask
    the user to switch it back to Design. Reading, selecting and navigating
    (`select_nodes`, `open_method`, `list_visualizations`) still work there;

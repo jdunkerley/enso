@@ -28,6 +28,7 @@ import {
   removeNodes,
   setNodeComment,
   setVisualization,
+  toolError,
   type EditToolDeps,
 } from './editTools'
 import { evaluateExpression } from './evaluate'
@@ -46,6 +47,7 @@ import { lookupVisualization } from './visualizationRegistry'
 import {
   getVisualizationData,
   listVisualizations,
+  noSuchVisualizationError,
   prepareVisualization,
   type Edges,
   type VisualizationToolDeps,
@@ -299,17 +301,24 @@ export function useProjectMcpTools(
       },
       lookup: (nodeId) => lookupVisualization(currentProject.id.value, nodeId),
       isShown: (nodeId) => graph.db.nodeIdToNode.get(nodeId as NodeId)?.vis?.visible ?? false,
+      storedName: (nodeId) => graph.db.nodeIdToNode.get(nodeId as NodeId)?.vis?.identifier?.name,
+      // As `GraphNodes.vue` passes `edited` to the node, which then unmounts its visualization.
+      isEdited: (nodeId) => graph.editedNodeInfo?.id === nodeId,
       availableNames: (nodeId) =>
         editor.visualizationsFor(nodeId as NodeId).map((identifier) => identifier.name),
       show: (nodeId, visualization) => {
         // Two visualizations of the same name from different modules: the first in the
         // dropdown's order, which is the one `availableNames` lists first.
+        const offered = editor.visualizationsFor(nodeId as NodeId)
         const identifier =
           visualization != null ?
-            editor
-              .visualizationsFor(nodeId as NodeId)
-              .find((candidate) => candidate.name === visualization)
+            offered.find((candidate) => candidate.name === visualization)
           : undefined
+        // The node's type may have changed since the name was checked: never show it unswitched.
+        if (visualization != null && identifier == null) {
+          const names = offered.map((candidate) => candidate.name)
+          return Promise.resolve(toolError(noSuchVisualizationError(visualization, names)))
+        }
         return setVisualization(editDeps(caller, deadline), {
           node_id: nodeId,
           visible: true,

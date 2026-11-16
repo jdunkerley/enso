@@ -4,8 +4,7 @@
  * `prepare_visualization` (`visualizationTools.ts`, which brings a visualization into view to be
  * captured) the only ones that move the view. `select_nodes` and `open_method` work in Live mode
  * too; `prepare_visualization` works there only for a visualization already shown, since showing
- * one is an edit. Pure functions over
- * {@link ViewToolDeps}.
+ * one is an edit. Pure functions over {@link ViewToolDeps}.
  */
 import type { GraphDb, NodeId } from '$/providers/openedProjects/graph/graphDatabase'
 import type { McpToolResult } from 'enso-common/src/mcp'

@@ -144,9 +144,13 @@ export function visualizationTool(
       'the start of the text). A table shows its first 1,000 rows by default, either way. ' +
       '`visualization` names the one to look at, from `available`: call ' +
       '`list_visualizations` for the names, or read `available` from a result. Naming one ' +
-      'that is not on screen switches the node to it (`changed` true), and it stays switched; ' +
-      'that is part of your undo step and refused in Live mode. Without it you get the one on ' +
-      'screen. A hidden visualization is shown first (`shown` true), as `set_visualization` ' +
+      "that is not the node's choice switches the node to it, and it stays switched; that is " +
+      'part of your undo step and refused in Live mode. `changed` is true when this call ' +
+      "changed the node's stored choice: the one on screen, or, for a hidden node, the one " +
+      'saved with it. To switch back, name the previous one (`visualization` from ' +
+      '`list_visualizations` or the earlier result). Without a name you get the one on ' +
+      'screen. When an error comes after the call showed or switched the visualization, the ' +
+      'error says so. A hidden visualization is shown first (`shown` true), as `set_visualization` ' +
       'does: that is refused in Live mode and is part of your undo step; hide it again with ' +
       '`set_visualization` if the user did not ask to see it. For `image` the graph view ' +
       'moves when the visualization is not ' +

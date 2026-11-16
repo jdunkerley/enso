@@ -258,18 +258,26 @@ captures that rectangle with `webContents.capturePage`.
   no visualization `X`. Available: …"). When the visualization is hidden, or a
   name other than the one on screen is given, they show it as
   `set_visualization` does: through the edit session, so refused in Live mode
-  and part of the caller's undo step (`shown: true` when it was hidden,
-  `changed: true` when it switched to the name). Visible and identifier go in
-  **one** `setNodeVisualization` call, as choosing it in the toolbar writes the
-  node's metadata, and it stays switched. `useProjectMcpTools.ts` turns the name
-  into an identifier: of two visualizations of the same name from different
-  modules, the first in the dropdown's order. They then wait for the entry to
-  stop loading **and**, when a name was given, to have that name (the old view
-  can stay mounted and `ready` for a few frames after a switch), at most
-  `VISUALIZATION_WAIT_MS` (15 s, and no later than 2 s before the call's
-  `deadline`), else answer "The visualization is still loading …". A view
-  showing an error answers "The visualization failed: …". Every result carries
-  `changed` and `available`.
+  and part of the caller's undo step (`shown: true` when it was hidden).
+  `changed` means this call changed the node's stored visualization choice: the
+  name is compared with the one mounted, or, when none is (a hidden node), with
+  the node's stored identifier (`storedName`, `vis.identifier.name`); no stored
+  identifier and a name given counts as changed. A node the user is editing
+  (`graph.editedNodeInfo`, whose panel is unmounted) is answered at once with
+  `EDITED_NODE_ERROR`, before any edit. An error that comes after the call
+  showed or switched it (failed view, still loading, not on screen, data not
+  JSON) ends with a sentence saying so (`afterEdit`). If the node's type no
+  longer offers the name when the edit runs, `show` refuses rather than showing
+  it unswitched. Visible and identifier go in **one** `setNodeVisualization`
+  call, as choosing it in the toolbar writes the node's metadata, and it stays
+  switched. `useProjectMcpTools.ts` turns the name into an identifier: of two
+  visualizations of the same name from different modules, the first in the
+  dropdown's order. They then wait for the entry to stop loading **and**, when a
+  name was given, to have that name (the old view can stay mounted and `ready`
+  for a few frames after a switch), at most `VISUALIZATION_WAIT_MS` (15 s, and
+  no later than 2 s before the call's `deadline`), else answer "The
+  visualization is still loading …". A view showing an error answers "The
+  visualization failed: …". Every result carries `changed` and `available`.
 - `get_visualization_data` answers the data the view was given, text that is
   JSON as its value, at most `VISUALIZATION_DATA_CHARS` (20,000) characters,
   then `truncated: true` and the start of the text.

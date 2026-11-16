@@ -2,9 +2,9 @@
 /**
  * @file The window's two `get_visualization` handlers, and `list_visualizations`, driving the
  * real graph editor: a call is delivered as Electron main would (`window.__mcpCall`,
- * `mock/registerMocks.ts`), and the spec checks the visualization, the view and the undo stack. The mock answers a visualization's
- * preprocessor by itself (`mockVizPreprocessors` in `mock/lsHandler.ts`), so a shown
- * visualization gets data without help.
+ * `mock/registerMocks.ts`), and the spec checks the visualization, the view and the undo stack.
+ * The mock answers a visualization's preprocessor by itself (`mockVizPreprocessors` in
+ * `mock/lsHandler.ts`), so a shown visualization gets data without help.
  */
 import assert from 'assert'
 import { expect, test, type Page } from 'integration-test/base'

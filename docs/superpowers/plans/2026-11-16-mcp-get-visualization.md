@@ -1555,7 +1555,7 @@ commands and `mcpVisualization.spec.ts` with `--repeat-each=3`.
 ## Not in this PR
 
 - Restoring the view after an `image` capture.
-- Choosing the visualization type or its size from MCP.
+- Choosing the visualization's size from MCP.
 - Detecting a docked panel drawn over the graph viewport.
 
 ---

@@ -27,6 +27,14 @@ export const STILL_LOADING_ERROR =
 /** The visualization's panel is not in the DOM, or no part of it is in the viewport. */
 export const NOT_ON_SCREEN_ERROR =
   'The visualization could not be brought on screen. Use format `data`.'
+/** The user is editing the node, which takes its visualization off screen. */
+export const EDITED_NODE_ERROR =
+  'The user is editing this node, so its visualization is not on screen. Try again when they ' +
+  'have finished.'
+/** Added to an error when this call showed the visualization before it failed. */
+const SHOWN_NOTE =
+  'The visualization was shown and stays shown (part of your undo step); hide it with ' +
+  '`set_visualization` if the user did not ask to see it.'
 
 /** Edges in CSS pixels of the window's client area. */
 export interface Edges {
@@ -44,6 +52,10 @@ export interface VisualizationToolDeps {
   readonly lookup: (nodeId: string) => VisualizationEntry | undefined
   /** Whether the node's visualization is switched on. */
   readonly isShown: (nodeId: string) => boolean
+  /** The name of the visualization stored in the node's metadata, if one is. */
+  readonly storedName: (nodeId: string) => string | undefined
+  /** Whether the user is editing the node: its visualization is then not mounted. */
+  readonly isEdited: (nodeId: string) => boolean
   /** The names of the visualizations the node's type offers, in the toolbar's order. */
   readonly availableNames: (nodeId: string) => string[]
   /**
@@ -74,6 +86,13 @@ export interface VisualizationToolDeps {
   readonly deadline: number
 }
 
+/** What this call edited: whether it showed the visualization, and what it switched it to. */
+interface Edited {
+  readonly shown: boolean
+  /** The name the node was switched to; undefined when it was not switched. */
+  readonly switchedTo: string | undefined
+}
+
 type Ready =
   | {
       ok: true
@@ -84,6 +103,31 @@ type Ready =
       available: string[]
     }
   | { ok: false; error: string }
+
+/** The refusal of a visualization name the node does not offer, with the names it does. */
+export function noSuchVisualizationError(name: string, available: readonly string[]): string {
+  return (
+    `The node has no visualization \`${name}\`. ` +
+    `Available: ${available.length > 0 ? available.join(', ') : 'none'}.`
+  )
+}
+
+/** The error, followed by what this call edited before it: an agent must not miss that. */
+function afterEdit(error: string, edited: Edited): string {
+  let text = error
+  if (edited.shown) text += ' ' + SHOWN_NOTE
+  if (edited.switchedTo != null) {
+    text +=
+      ` The node was switched to \`${edited.switchedTo}\` and stays so ` +
+      '(part of your undo step).'
+  }
+  return text
+}
+
+/** What a call that got its visualization ready had edited on the way. */
+function editedBy(ready: Extract<Ready, { ok: true }>): Edited {
+  return { shown: ready.shown, switchedTo: ready.changed ? ready.entry.name() : undefined }
+}
 
 /**
  * The visualizations the node offers, whether its visualization is switched on, and the name of
@@ -106,7 +150,9 @@ export async function listVisualizations(
 
 /**
  * Shows the node's visualization if it is hidden, switches it to `visualization` if that is named
- * and is not the one on screen, and waits until that one has drawn its data.
+ * and is not the node's choice, and waits until that one has drawn its data. The node's choice is
+ * the one on screen, or, when none is mounted, the one stored in its metadata: `changed` means
+ * this call changed the stored choice. An error after an edit says what was edited.
  */
 async function readyVisualization(
   deps: VisualizationToolDeps,
@@ -117,22 +163,21 @@ async function readyVisualization(
   if (!found.ok) return found
   const available = deps.availableNames(found.value)
   if (visualization != null && !available.includes(visualization)) {
-    return {
-      ok: false,
-      error:
-        `The node has no visualization \`${visualization}\`. ` +
-        `Available: ${available.length > 0 ? available.join(', ') : 'none'}.`,
-    }
+    return { ok: false, error: noSuchVisualizationError(visualization, available) }
   }
+  // Its panel is unmounted while the user edits it, and would stay so whatever we did.
+  if (deps.isEdited(found.value)) return { ok: false, error: EDITED_NODE_ERROR }
   const visible = deps.isShown(found.value)
-  const onScreen = visible ? deps.lookup(found.value)?.name() : undefined
-  const changed = visualization != null && visualization !== onScreen
+  const mounted = visible ? deps.lookup(found.value) : undefined
+  const current = mounted != null ? mounted.name() : deps.storedName(found.value)
+  const changed = visualization != null && visualization !== current
   let shown = false
   if (!visible || changed) {
     const result = await deps.show(found.value, changed ? visualization : undefined)
     if (!result.ok) return result
     shown = !visible
   }
+  const edited: Edited = { shown, switchedTo: changed ? visualization : undefined }
   const until = Math.min(deps.now() + VISUALIZATION_WAIT_MS, deps.deadline - REPLY_MARGIN_MS)
   for (;;) {
     const entry = deps.lookup(found.value)
@@ -143,10 +188,10 @@ async function readyVisualization(
     if (entry != null && wanted && status !== 'loading') {
       const failure = failureOf(entry, status === 'error')
       return failure != null ?
-          { ok: false, error: `The visualization failed: ${failure}` }
+          { ok: false, error: afterEdit(`The visualization failed: ${failure}`, edited) }
         : { ok: true, nodeId: found.value, entry, shown, changed, available }
     }
-    if (deps.now() >= until) return { ok: false, error: STILL_LOADING_ERROR }
+    if (deps.now() >= until) return { ok: false, error: afterEdit(STILL_LOADING_ERROR, edited) }
     await deps.nextFrame()
   }
 }
@@ -174,7 +219,10 @@ export async function getVisualizationData(
     text = typeof data === 'string' ? data : JSON.stringify(data)
   } catch {
     return toolError(
-      'The data of this visualization cannot be written as JSON. Use format `image`.',
+      afterEdit(
+        'The data of this visualization cannot be written as JSON. Use format `image`.',
+        editedBy(ready),
+      ),
     )
   }
   const truncated = text.length > VISUALIZATION_DATA_CHARS
@@ -210,10 +258,11 @@ export async function prepareVisualization(
   const ready = await readyVisualization(deps, args.node_id, args.visualization)
   if (!ready.ok) return toolError(ready.error)
   const { nodeId, entry } = ready
+  const fail = (error: string) => toolError(afterEdit(error, editedBy(ready)))
   let moved = false
   if (!entry.fullscreen()) {
     const before = deps.panelRect(nodeId)
-    if (before == null) return toolError(NOT_ON_SCREEN_ERROR)
+    if (before == null) return fail(NOT_ON_SCREEN_ERROR)
     if (deps.scale() < 1 || !contains(deps.viewRect(), before)) {
       deps.reveal(nodeId)
       moved = true
@@ -221,27 +270,27 @@ export async function prepareVisualization(
   }
   const until = deps.deadline - REPLY_MARGIN_MS
   while (deps.viewMoving()) {
-    if (deps.now() >= until) return toolError(STILL_LOADING_ERROR)
+    if (deps.now() >= until) return fail(STILL_LOADING_ERROR)
     await deps.nextFrame()
   }
   // Also when nothing moved: a visualization that has just become ready is still rendering (a
   // table's cells come after its data), and then has yet to paint.
-  if (deps.now() >= until) return toolError(STILL_LOADING_ERROR)
+  if (deps.now() >= until) return fail(STILL_LOADING_ERROR)
   await deps.panelQuiet(nodeId, Math.max(0, until - deps.now()))
   for (let still = 0; still < SETTLE_FRAMES;) {
-    if (deps.now() >= until) return toolError(STILL_LOADING_ERROR)
+    if (deps.now() >= until) return fail(STILL_LOADING_ERROR)
     await deps.nextFrame()
     still = deps.viewMoving() ? 0 : still + 1
   }
   const panel = deps.panelRect(nodeId)
-  if (panel == null) return toolError(NOT_ON_SCREEN_ERROR)
+  if (panel == null) return fail(NOT_ON_SCREEN_ERROR)
   // A panel larger than the viewport even zoomed out is cut to what shows.
   const visible = entry.fullscreen() ? panel : intersection(panel, deps.viewRect())
   const x = Math.round(visible.left)
   const y = Math.round(visible.top)
   const width = Math.round(visible.right) - x
   const height = Math.round(visible.bottom) - y
-  if (width <= 0 || height <= 0) return toolError(NOT_ON_SCREEN_ERROR)
+  if (width <= 0 || height <= 0) return fail(NOT_ON_SCREEN_ERROR)
   return jsonResult({
     node_id: nodeId,
     visualization: entry.name(),

@@ -110,7 +110,11 @@ the edit session (visible and identifier together, as the toolbar writes them;
 refused in Live, part of the caller's undo step), where it stays. The window
 then waits for **that** visualization: one whose registry entry has the name and
 is no longer loading, since the old view stays `ready` for a few frames after
-the switch. Every result has `changed` (this call switched it) and `available`.
+the switch. Every result has `available` and `changed`, which means this call
+changed the node's stored visualization choice (compared with the one on screen,
+or, for a hidden node, the identifier saved in its metadata). An error that
+comes after the call showed or switched the visualization says so, and a node
+the user is editing is answered at once (its panel is unmounted).
 `format: 'data'` forwards both arguments to the window handler
 `get_visualization_data`, which answers
 `{ node_id, visualization, shown, changed, truncated, available, data }` with

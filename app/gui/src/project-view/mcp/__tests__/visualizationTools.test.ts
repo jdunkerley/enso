@@ -2,9 +2,12 @@
 import { expect, test } from 'vitest'
 import type { VisualizationEntry, VisualizationStatus } from '../visualizationRegistry'
 import {
+  EDITED_NODE_ERROR,
   getVisualizationData,
   listVisualizations,
+  NOT_ON_SCREEN_ERROR,
   prepareVisualization,
+  STILL_LOADING_ERROR,
   VISUALIZATION_DATA_CHARS,
   VISUALIZATION_WAIT_MS,
   type VisualizationToolDeps,
@@ -12,6 +15,11 @@ import {
 
 const NODE = '00000000-0000-0000-0000-000000000001'
 const AVAILABLE = ['Table', 'JSON', 'Scatter Plot']
+const SHOWN_NOTE =
+  ' The visualization was shown and stays shown (part of your undo step); hide it with ' +
+  '`set_visualization` if the user did not ask to see it.'
+const switchedNote = (name: string) =>
+  ` The node was switched to \`${name}\` and stays so (part of your undo step).`
 
 interface Fake {
   shown: boolean
@@ -37,6 +45,12 @@ interface Fake {
   switchFrames: number
   /** The budget of each `panelQuiet` call. */
   quietBudgets: number[]
+  /** Whether a shown visualization's panel is mounted (it is not while the user edits the node). */
+  mounted: boolean
+  /** The name of the node's stored visualization identifier, if it has one. */
+  stored: string | undefined
+  /** Whether the user is editing the node. */
+  edited: boolean
 }
 
 function fake(overrides: Partial<Fake> = {}): {
@@ -60,6 +74,9 @@ function fake(overrides: Partial<Fake> = {}): {
     showCalls: [],
     switchFrames: 0,
     quietBudgets: [],
+    mounted: true,
+    stored: undefined,
+    edited: false,
     ...overrides,
   }
   let pendingName: string | undefined
@@ -73,14 +90,18 @@ function fake(overrides: Partial<Fake> = {}): {
   const deps: VisualizationToolDeps = {
     findNode: (id) =>
       id === NODE ? { ok: true, value: id } : { ok: false, error: `No node ${id}` },
-    lookup: () => (state.shown ? entry : undefined),
+    lookup: () => (state.shown && state.mounted ? entry : undefined),
     isShown: () => state.shown,
+    storedName: () => state.stored,
+    isEdited: () => state.edited,
     availableNames: () => AVAILABLE,
     show: async (_nodeId, visualization) => {
       state.showCalls.push(visualization)
       if (!state.showResult.ok) return state.showResult
       state.shown = true
+      state.mounted = true
       if (visualization != null) {
+        state.stored = visualization
         if (state.switchFrames > 0) pendingName = visualization
         else state.name = visualization
       }
@@ -332,5 +353,72 @@ test('a refused switch is the result', async () => {
   expect(await getVisualizationData(deps, { node_id: NODE, visualization: 'JSON' })).toEqual({
     ok: false,
     error: 'Live mode',
+  })
+})
+
+test('a hidden node whose stored choice is the name is shown, but not switched', async () => {
+  const { deps, state } = fake({ shown: false, stored: 'JSON', name: 'JSON' })
+  const value = parsed(await getVisualizationData(deps, { node_id: NODE, visualization: 'JSON' }))
+  expect(state.showCalls).toEqual([undefined])
+  expect(value).toMatchObject({ visualization: 'JSON', shown: true, changed: false })
+})
+
+test('a hidden node whose stored choice is another name is switched', async () => {
+  const { deps, state } = fake({ shown: false, stored: 'Table' })
+  const value = parsed(await getVisualizationData(deps, { node_id: NODE, visualization: 'JSON' }))
+  expect(state.showCalls).toEqual(['JSON'])
+  expect(value).toMatchObject({ shown: true, changed: true })
+})
+
+test('a node the user is editing answers at once, and nothing is edited', async () => {
+  const { deps, state } = fake({ mounted: false, edited: true })
+  for (const run of [getVisualizationData, prepareVisualization]) {
+    expect(await run(deps, { node_id: NODE, visualization: 'JSON' })).toEqual({
+      ok: false,
+      error: EDITED_NODE_ERROR,
+    })
+  }
+  expect(state.showCalls).toEqual([])
+  expect(state.time).toBe(0)
+})
+
+test('a view that fails after a switch says the node was switched', async () => {
+  const { deps } = fake({ status: 'error', data: { name: 'JSON', error: new Error('boom') } })
+  expect(await getVisualizationData(deps, { node_id: NODE, visualization: 'JSON' })).toEqual({
+    ok: false,
+    error: 'The visualization failed: boom' + switchedNote('JSON'),
+  })
+})
+
+test('a view still loading after it was shown says it was shown', async () => {
+  const { deps } = fake({ shown: false, status: 'loading' })
+  expect(await getVisualizationData(deps, { node_id: NODE })).toEqual({
+    ok: false,
+    error: STILL_LOADING_ERROR + SHOWN_NOTE,
+  })
+})
+
+test('shown and switched in one call: the error says both', async () => {
+  const { deps } = fake({ shown: false, status: 'loading' })
+  expect(await prepareVisualization(deps, { node_id: NODE, visualization: 'JSON' })).toEqual({
+    ok: false,
+    error: STILL_LOADING_ERROR + SHOWN_NOTE + switchedNote('JSON'),
+  })
+})
+
+test('a panel not on screen after it was shown says it was shown', async () => {
+  const { deps: base } = fake({ shown: false })
+  const deps = { ...base, panelRect: () => undefined }
+  expect(await prepareVisualization(deps, { node_id: NODE })).toEqual({
+    ok: false,
+    error: NOT_ON_SCREEN_ERROR + SHOWN_NOTE,
+  })
+})
+
+test('an error when nothing was edited is unchanged', async () => {
+  const { deps } = fake({ status: 'loading' })
+  expect(await getVisualizationData(deps, { node_id: NODE, visualization: 'Table' })).toEqual({
+    ok: false,
+    error: STILL_LOADING_ERROR,
   })
 })
