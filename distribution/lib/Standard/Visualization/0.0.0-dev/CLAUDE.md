@@ -128,9 +128,12 @@ Visualization and not on each data library.
   for a vector of them. Base: a vector or array offers `open_row`
   (`at {{#index}}`); any other value none. Table: `open_row`, `open_column`,
   `open_cell`, `sort`, `filter`, `remove_columns`, `reorder_columns`,
-  `brush_filter`; Column: `open_row`. A user type offers its own with
-  `Viz_Actions.from (that:My_Type)`. The table view, scatter plot and tree
-  preprocessors send them as an `"actions"` array first in their JSON
+  `brush_filter`; Column: `open_row`; Row: `open_row` (`at {{#index}}`, its
+  values by number; the scatter plot and tree send it, but the Row's table view
+  does not: `Viz_Table.from_view … has_actions=False`, as it has no `#` column
+  and the action would hide its `at {{@column}}` link). A user type offers its
+  own with `Viz_Actions.from (that:My_Type)`. The table view, scatter plot and
+  tree preprocessors send them as an `"actions"` array first in their JSON
   (`Viz_Actions.add_to_json`; absent when there are none, never on an error);
   the Warnings preprocessor sends
   `{"warnings":[…],"actions":[remove_warnings]}`. The links of the table view
@@ -139,7 +142,14 @@ Visualization and not on each data library.
 - `Id` (`src/Id.enso`) - which visualisation a node opens with. `Id.from`
   answers it: any value gives `Id.table`, a `JS_Object` `Id.json`; a library
   picks another for its type with `Id.from (that:Its_Public_Type)` (Table: SQL
-  Query for a database table; Image: Image).
+  Query for a database table; Image: `Id.Library "Standard.Image" "Image"`).
+  `Id.Builtin name` is a visualization the GUI implements;
+  `Id.Library library name` one a library ships in its `visualizations/` folder
+  (`to_js_object`: `{"library": {"name": library}, "name": name}`; `library` is
+  `<namespace>.<name>`, as `Standard.Image`). The GUI watches that folder of
+  every loaded library and registers each `.vue` file it finds as
+  `{ kind: 'Library', name: library }`, waiting up to 10 s for a library that is
+  still loading; see `app/gui/src/project-view/stores/visualization/CLAUDE.md`.
 
 Layering rule: Visualization imports only `Standard.Base`; Base knows nothing
 about visualisation. Libraries (`Table`, `Database`, ...) import Visualization

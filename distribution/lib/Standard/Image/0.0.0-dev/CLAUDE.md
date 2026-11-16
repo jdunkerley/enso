@@ -50,8 +50,21 @@ diff = img - mat
 - `src/Read_Flag.enso`, `src/Write_Flag.enso` — flag enums for read/write.
 - `src/Image_File_Format.enso` — file format SPI for `Data.read` / `Data.write`.
 - `src/Image_Services.enso` — internal SPI implementation.
+- `visualizations/Image.vue` — the Image view of the IDE (`name = 'Image'`,
+  `inputType = 'Standard.Image.Image.Image'`): it shows the
+  `{mediaType, base64}` that `Image.to_js_object` gives. It lives here, not in
+  the GUI, and the GUI loads it at run time: once this library is loaded, the
+  IDE watches its `visualizations/` folder, compiles each `.vue` file and
+  registers it as `{ kind: 'Library', name: 'Standard.Image' }`. Any library can
+  ship views this way. Editing the file updates an open view of a local library;
+  the folder is copied with the rest of the library (only `CLAUDE.md` is left
+  out of the distribution). No build step and no GUI type-check apply to it — a
+  GUI unit test compiles and mounts it. Details in
+  `app/gui/src/project-view/stores/visualization/CLAUDE.md`.
 - Image imports `Standard.Visualization` only for
-  `Id.from (that:Image) = Id.image`.
+  `Id.from (that:Image) = Id.Library "Standard.Image" "Image"`, which makes the
+  view above an image node's default. Do not change that id without changing the
+  file's `name` and the GUI's table of moved ids.
 
 ## Things to avoid in generated code
 

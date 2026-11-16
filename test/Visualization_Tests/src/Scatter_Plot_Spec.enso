@@ -138,6 +138,15 @@ add_specs suite_builder =
             (Json.parse (Scatter_Plot.process_to_json_text (2.up_to 5))).get "actions" . should_equal item_actions
             (Json.parse (Scatter_Plot.process_to_json_text [2, 3, 4])).get "actions" . should_equal item_actions
 
+        group_builder.specify "a row offers its values by number: each point is a value of the row" <|
+            item_actions = Json.parse '[{"id":"open_row","label":"Get Item","icon":"select_row","kind":"chain","template":"at {{#index}}"}]'
+            row = (Table.new [["a", [10]], ["b", [20]], ["c", [30]]]).first_row
+            json = Json.parse (Scatter_Plot.process_to_json_text row)
+            json.get "actions" . should_equal item_actions
+            ## The point's `row_number` is the value's position: what `row.at` takes.
+            json.get "data" . map (p-> p.get "row_number") . should_equal [0, 1, 2]
+            json.get "data" . map (p-> row.at (p.get "row_number")) . should_equal (json.get "data" . map (p-> p.get "y"))
+
         group_builder.specify "a value charted through its `to_vector` offers `at` only when it has one" <|
             item_actions = Json.parse '[{"id":"open_row","label":"Get Item","icon":"select_row","kind":"chain","template":"at {{#index}}"}]'
             actions_of value = (Json.parse (Scatter_Plot.process_to_json_text value)).get "actions"
