@@ -112,6 +112,14 @@ add_specs suite_builder =
         group_builder.specify "the scatter plot of a table carries them" <|
             Scatter_Plot.process_to_json_text table . should_start_with ('{"actions":' + table_actions + ',"data":')
 
+        group_builder.specify "the table view of a row has none: it has no # column to fill `at {{#index}}`" <|
+            row = table.first_row
+            Visualization.prepare_visualization row . should_start_with '{"kind":"grid"'
+            (Viz_Actions.for row).is_empty.should_be_false
+
+        group_builder.specify "the scatter plot of a row carries its actions" <|
+            Scatter_Plot.process_to_json_text table.first_row . should_start_with ('{"actions":' + (Viz_Actions.from table.first_row).to_json_text + ',"data":')
+
         group_builder.specify "the tree of a vector carries them" <|
             Tree.prepare [1, 2] . should_start_with '{"actions":[{"id":"open_row"'
 
