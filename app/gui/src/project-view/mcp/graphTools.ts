@@ -12,6 +12,8 @@ import {
 } from '$/providers/openedProjects/graph/graphDatabase'
 import { Ast } from '@/util/ast'
 import { nodeDocumentationText } from '@/util/ast/node'
+import type { Rect } from '@/util/data/rect'
+import type { Vec2 } from '@/util/data/vec2'
 import type { MethodPointer } from '@/util/methodPointer'
 import type { ProjectPath } from '@/util/projectPath'
 import { isIdentifier } from '@/util/qualifiedName'
@@ -62,9 +64,48 @@ export interface GraphToolDeps {
   readonly now?: () => number
 }
 
-/** What `get_graph` reads besides the graph: the nodes selected in the editor. */
+/**
+ * What `get_graph` reads besides the graph: the nodes selected in the editor, and, for `layout`,
+ * where the nodes are drawn and the part of the scene on screen.
+ */
 export interface GetGraphDeps extends GraphToolDeps {
   readonly selection: () => Iterable<NodeId>
+  /**
+   * `graph.visibleArea`: the room the node takes on screen, its visualization included, in scene
+   * units; undefined for a node not yet drawn.
+   */
+  readonly area: (id: NodeId) => Rect | undefined
+  /** The part of the scene on screen, and the zoom (1 is 100%). */
+  readonly view: () => { rect: Rect; scale: number }
+}
+
+/** A point in scene units (pixels at 100% zoom), x to the right, y down, rounded. */
+export interface ScenePoint {
+  x: number
+  y: number
+}
+
+/** A rectangle in scene units: its top-left corner and its size, rounded. */
+export interface SceneRect extends ScenePoint {
+  width: number
+  height: number
+}
+
+/** The point, rounded to whole scene units; undefined when it is not finite (not placed yet). */
+export function scenePoint(point: Vec2): ScenePoint | undefined {
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return undefined
+  return { x: Math.round(point.x), y: Math.round(point.y) }
+}
+
+/** The rectangle, rounded to whole scene units; undefined when it is not finite. */
+export function sceneRect(rect: Rect): SceneRect | undefined {
+  if (!rect.isFinite()) return undefined
+  return {
+    x: Math.round(rect.left),
+    y: Math.round(rect.top),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  }
 }
 
 export interface NodeSummary {
@@ -78,6 +119,10 @@ export interface NodeSummary {
   warnings?: number
   comment?: string
   preview?: string
+  /** With `layout`: the node's stored position, its top-left. */
+  position?: ScenePoint
+  /** With `layout`: the room the node takes with its visualization; absent before it is drawn. */
+  area?: SceneRect
 }
 
 /** A node's summary, without a value preview. */
@@ -120,21 +165,24 @@ export function summarizeNode(deps: GraphToolDeps, id: NodeId, node: Node): Node
  * with a short preview of each value unless `previews` is false. `previews_skipped` counts the
  * value nodes left without a preview because the previews' deadline passed or their total budget
  * was spent (only when non-zero). `selection` lists the ids of the nodes selected in the editor. The
- * source and each node's texts are capped; `get_node` gives one node in full.
+ * source and each node's texts are capped; `get_node` gives one node in full. With `layout`, each
+ * node has its `position` and `area` and the result the `view`, in scene units, rounded.
  */
 export async function getGraph(
   deps: GetGraphDeps,
-  args: { previews?: boolean },
+  args: { previews?: boolean; layout?: boolean },
 ): Promise<McpToolResult> {
   const { ast, pointer } = deps.currentMethod
   if (!ast.ok) return { ok: false, error: ast.error.message('') }
   if (!pointer.ok) return { ok: false, error: pointer.error.message('') }
   const nodes = Array.from(deps.db.nodeIdToNode.entries(), ([id, node]) => ({
+    id,
     node,
     summary: capNodeTexts(summarizeNode(deps, id, node)),
   }))
   // Read with the nodes, before the previews' wait, so that both describe the same moment.
   const selection = [...deps.selection()]
+  const view = args.layout === true ? addLayout(deps, nodes) : undefined
   const previewsSkipped = args.previews !== false ? await addGraphPreviews(deps, nodes) : 0
   return jsonResult({
     method: pointer.value.name,
@@ -142,8 +190,34 @@ export async function getGraph(
     imports: moduleImports(deps.moduleRoot()),
     nodes: nodes.map(({ summary }) => summary),
     selection,
+    ...(view != null ? { view } : {}),
     ...(previewsSkipped > 0 ? { previews_skipped: previewsSkipped } : {}),
   })
+}
+
+/**
+ * Adds each node's `position` (when it has one) and `area` (when it is drawn), and returns the
+ * view: the part of the scene on screen and the zoom.
+ */
+function addLayout(
+  deps: GetGraphDeps,
+  nodes: readonly { id: NodeId; node: Node; summary: NodeSummary }[],
+): SceneRect & { scale: number } {
+  for (const { id, node, summary } of nodes) {
+    const position = scenePoint(node.position)
+    if (position != null) summary.position = position
+    const area = deps.area(id)
+    const rounded = area != null ? sceneRect(area) : undefined
+    if (rounded != null) summary.area = rounded
+  }
+  const { rect, scale } = deps.view()
+  return {
+    x: Math.round(rect.left),
+    y: Math.round(rect.top),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+    scale,
+  }
 }
 
 /** The summary with its `code`, `comment` and `message` cut to {@link GRAPH_NODE_TEXT_CHARS}. */

@@ -36,6 +36,7 @@ import {
 import { evaluateExpression } from './evaluate'
 import { findNode, getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
 import { serialized, storeImage, withProjectId, type ImageToolDeps } from './imageTools'
+import { moveNodes, type LayoutToolDeps, type NodeMove } from './layoutTools'
 import { createMcpNodes } from './nodeCreation'
 import { panelQuiet } from './panelQuiet'
 import {
@@ -97,9 +98,9 @@ export interface McpEditorDeps {
 /**
  * Registers the project tools for the open project: the seven that read (get_graph, get_node,
  * search_components, get_component_docs, evaluate_expression, list_visualizations,
- * get_documentation), the eight that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
- * set_documentation, set_visualization, collapse_nodes, add_function) and the two that navigate
- * (select_nodes, open_method); the two that main's `get_visualization` calls
+ * get_documentation), the nine that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
+ * set_documentation, set_visualization, move_nodes, collapse_nodes, add_function) and the two that
+ * navigate (select_nodes, open_method); the two that main's `get_visualization` calls
  * (get_visualization_data, prepare_visualization) and the one main's `add_image` calls
  * (store_image), which are not MCP tools themselves.
  *
@@ -170,7 +171,13 @@ export function useProjectMcpTools(
   }
 
   function getGraphDeps(): GetGraphDeps {
-    return { ...graphDeps(), selection: editor.selectedNodes }
+    const graph = currentProject.graph.value
+    return {
+      ...graphDeps(),
+      selection: editor.selectedNodes,
+      area: (id) => graph.visibleArea(id),
+      view: () => ({ rect: editor.viewport(), scale: editor.scale() }),
+    }
   }
 
   function catalogueDeps(): CatalogueDeps {
@@ -268,6 +275,19 @@ export function useProjectMcpTools(
       addDetectedImports: (edit, scope) => {
         module().addDetectedImports(edit, scope)
       },
+    }
+  }
+
+  /** The layout tools' dependencies: positions are module metadata, edited through the session. */
+  function layoutDeps(caller: McpCaller, deadline: number): LayoutToolDeps {
+    const graph = currentProject.graph.value
+    return {
+      db: graph.db,
+      currentMethod: graph.currentMethod,
+      session,
+      caller,
+      deadline,
+      setNodePositions: (moves) => currentProject.graph.value.setNodePositions(moves),
     }
   }
 
@@ -380,11 +400,17 @@ export function useProjectMcpTools(
 
   const handlers: Record<string, McpToolHandler> = {
     get_graph: async (args) => {
-      const previews = args.previews
+      const { previews, layout } = args
       if (previews != null && typeof previews !== 'boolean') {
         return invalidArgument('previews', 'a boolean')
       }
-      return getGraph(getGraphDeps(), previews != null ? { previews } : {})
+      if (layout != null && typeof layout !== 'boolean') {
+        return invalidArgument('layout', 'a boolean')
+      }
+      return getGraph(getGraphDeps(), {
+        ...(previews != null ? { previews } : {}),
+        ...(layout != null ? { layout } : {}),
+      })
     },
     get_node: async (args) => {
       const node_id = args.node_id
@@ -478,6 +504,13 @@ export function useProjectMcpTools(
       if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
       if (typeof visible !== 'boolean') return invalidArgument('visible', 'a boolean')
       return setVisualization(editDeps(caller, deadline), { node_id, visible })
+    },
+    move_nodes: async (args, caller, deadline) => {
+      const moves = args.moves
+      if (!Array.isArray(moves) || !moves.every(isNodeMove)) {
+        return invalidArgument('moves', 'a list of `{ node_id, x, y }`')
+      }
+      return moveNodes(layoutDeps(caller, deadline), { moves })
     },
     collapse_nodes: async (args, caller, deadline) => {
       const { node_ids, name } = args
@@ -612,6 +645,12 @@ function nextFrame(): Promise<void> {
       resolve()
     })
   })
+}
+
+function isNodeMove(value: unknown): value is NodeMove {
+  if (typeof value !== 'object' || value == null) return false
+  const { node_id, x, y } = value as Record<string, unknown>
+  return typeof node_id === 'string' && typeof x === 'number' && typeof y === 'number'
 }
 
 function isStringArray(value: unknown): value is string[] {

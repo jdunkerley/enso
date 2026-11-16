@@ -20,6 +20,11 @@ const DOCUMENTATION_CHARS = 100_000
 /** Most characters of one statement or expression an agent adds to a node. */
 const STATEMENT_CHARS = 20_000
 
+/** Most nodes one `move_nodes` call moves. */
+const MOVE_NODES_MAX = 200
+/** The farthest from the origin, in scene units, a node may be moved to on either axis. */
+const COORDINATE_LIMIT = 1_000_000
+
 export const VIEW_TOOL_NAMES = [
   'get_graph',
   'get_node',
@@ -39,6 +44,7 @@ export const EDIT_TOOL_NAMES = [
   'set_node_comment',
   'set_documentation',
   'set_visualization',
+  'move_nodes',
   'select_nodes',
   'open_method',
 ] as const
@@ -73,7 +79,7 @@ const EDIT_RULES =
   '`get_node` later.'
 
 /**
- * The project tools (the seven that read, the ten that edit or navigate), each forwarding its
+ * The project tools (the seven that read, the eleven that edit or navigate), each forwarding its
  * arguments to the window through `bridge`.
  */
 export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
@@ -93,10 +99,15 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'connections from each node `code` and from `source`. When previews run out of ' +
         'time or space, `previews_skipped` counts the nodes left without one: a long graph ' +
         'returns fewer previews and cut texts, and `get_node` gives one node in full. ' +
-        '`selection` lists the ids of the nodes the user has selected. Call this first to ' +
+        '`selection` lists the ids of the nodes the user has selected. With `layout` true, ' +
+        'each node also has `position` `{ x, y }` (its top-left as stored) and `area` ' +
+        '`{ x, y, width, height }` (the room it takes on screen with its visualization; absent ' +
+        'for a node not drawn yet), and the result has `view` `{ x, y, width, height, scale }`, ' +
+        'the part of the graph on screen; all in scene units (pixels at 100% zoom, x to the ' +
+        'right, y down), rounded. Call this first to ' +
         'see what the project does. Each `node_id` is stable across edits, so you can pass ' +
         'it to `get_node` and `evaluate_expression` later.',
-      inputSchema: { previews: z.boolean().optional() },
+      inputSchema: { previews: z.boolean().optional(), layout: z.boolean().optional() },
       run: forward('get_graph'),
     },
     {
@@ -317,6 +328,34 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         EDIT_RULES,
       inputSchema: { node_id: nodeId(), visible: z.boolean() },
       run: forward('set_visualization', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'move_nodes',
+      title: 'Move nodes',
+      description:
+        'Move nodes in the graph editor. Each of `moves` is `{ node_id, x, y }`: the new ' +
+        "position of the node's top-left, in scene units (pixels at 100% zoom, x to the right, " +
+        "y down). Read the current positions with `get_graph { layout: true }`; a node's " +
+        '`area` shows the room it needs, its visualization included, so leave a gap between ' +
+        'areas. All the moves are one edit; nodes the moved ones were pushing aside return to ' +
+        'their places. An unknown node, or the same node twice, refuses the whole call and ' +
+        'nothing moves. For a tidy result prefer `arrange_nodes`. Returns `moved`, each ' +
+        'node `{ id, position }` as stored afterwards, and `settled` (always true: nothing is ' +
+        'computed again).' +
+        EDIT_RULES,
+      inputSchema: {
+        moves: z
+          .array(
+            z.object({
+              node_id: nodeId(),
+              x: z.number().finite().min(-COORDINATE_LIMIT).max(COORDINATE_LIMIT),
+              y: z.number().finite().min(-COORDINATE_LIMIT).max(COORDINATE_LIMIT),
+            }),
+          )
+          .min(1)
+          .max(MOVE_NODES_MAX),
+      },
+      run: forward('move_nodes', EDIT_TOOL_TIMEOUT_MS),
     },
     {
       name: 'select_nodes',
