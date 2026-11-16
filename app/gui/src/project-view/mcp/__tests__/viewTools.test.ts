@@ -4,15 +4,18 @@ import { mockProjectNameStore } from '$/providers/openedProjects/projectNames'
 import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import { Rect } from '@/util/data/rect'
+import { Vec2 } from '@/util/data/vec2'
 import type { McpToolResult } from 'enso-common/src/mcp'
 import { expect, test, vi } from 'vitest'
 import { watchEffect } from 'vue'
 import {
   ALREADY_AT_TOP_ERROR,
+  clearArea,
   EMPTY_METHOD_ERROR,
   GRAPH_IMAGE_MARGIN,
   GRAPH_IMAGE_NODES_MAX,
   graphImageFrame,
+  NO_NODE_IDS_ERROR,
   NOT_ENTERABLE_ERROR,
   OPEN_METHOD_WAIT_MS,
   openMethod,
@@ -162,41 +165,93 @@ test('open_method answers an error when the graph shows no method afterwards', a
 
 // === prepare_graph_image ===
 
-test('the frame is the bounding area of the nodes with a margin of 40, at a scale in [0.1, 1]', () => {
-  expect(GRAPH_IMAGE_MARGIN).toBe(40)
-  const areas = [Rect.XYWH(0, 0, 100, 50), Rect.XYWH(300, 200, 100, 50)]
-  // 400 x 250 with the margin is 480 x 330: fits a 960 x 990 viewport at 2, capped at 1.
-  expect(graphImageFrame(areas, { width: 960, height: 990 })).toEqual({
-    rect: Rect.XYWH(-40, -40, 480, 330),
-    scale: 1,
-  })
-  // A 240 x 330 viewport: the width decides, 240 / 480.
-  expect(graphImageFrame(areas, { width: 240, height: 330 })?.scale).toBe(0.5)
-  // A huge graph never goes below 10%.
-  expect(graphImageFrame([Rect.XYWH(0, 0, 100_000, 10)], { width: 1000, height: 800 })?.scale).toBe(
-    0.1,
-  )
-  expect(graphImageFrame([], { width: 1000, height: 800 })).toBeUndefined()
+test('the clear area is the viewport less the overlays along its edges', () => {
+  const view = { left: 0, top: 0, right: 1000, bottom: 800 }
+  expect(clearArea(view, {})).toEqual(view)
+  expect(
+    clearArea(view, {
+      // The top bar, inset from the sides.
+      top: [{ left: 13, top: 17, right: 987, bottom: 49 }],
+      // The dock's buttons at the bottom left, and the horizontal scroll bar.
+      bottom: [
+        { left: 12, top: 750, right: 80, bottom: 788 },
+        { left: 0, top: 793, right: 1000, bottom: 799 },
+      ],
+      right: [{ left: 992, top: 0, right: 998, bottom: 800 }],
+    }),
+  ).toEqual({ left: 0, top: 49, right: 992, bottom: 750 })
+  // An overlay outside the viewport, or not laid out (an empty box), takes nothing.
+  expect(
+    clearArea(view, {
+      top: [{ left: 0, top: 0, right: 0, bottom: 0 }],
+      bottom: [{ left: 0, top: 900, right: 100, bottom: 950 }],
+    }),
+  ).toEqual(view)
 })
 
-const VIEW = { left: 10, top: 20, right: 1010.4, bottom: 820 }
+test('the frame is the nodes with a margin of 40, centred in the clear area, at a scale in [0.1, 1]', () => {
+  expect(GRAPH_IMAGE_MARGIN).toBe(40)
+  const areas = [Rect.XYWH(0, 0, 100, 50), Rect.XYWH(300, 200, 100, 50)]
+  const nodes = Rect.XYWH(-40, -40, 480, 330)
+  // A top bar 100 high: the clear area is 1000 x 700, where 480 x 330 fits at 2, capped at 1.
+  // Its centre is 50 below the viewport's, so the view is framed 50 higher.
+  expect(
+    graphImageFrame(
+      areas,
+      { left: 0, top: 0, right: 1000, bottom: 800 },
+      { left: 0, top: 100, right: 1000, bottom: 800 },
+    ),
+  ).toEqual({ nodes, frame: nodes.offsetBy(new Vec2(0, -50)), scale: 1 })
+  // A 240 x 330 clear area: the width decides, 240 / 480; the 50-pixel offset is 100 units.
+  expect(
+    graphImageFrame(
+      areas,
+      { left: 0, top: 0, right: 240, bottom: 430 },
+      { left: 0, top: 100, right: 240, bottom: 430 },
+    ),
+  ).toEqual({ nodes, frame: nodes.offsetBy(new Vec2(0, -100)), scale: 0.5 })
+  // A huge graph never goes below 10%.
+  const view = { left: 0, top: 0, right: 1000, bottom: 800 }
+  expect(graphImageFrame([Rect.XYWH(0, 0, 100_000, 10)], view, view)?.scale).toBe(0.1)
+  expect(graphImageFrame([], view, view)).toBeUndefined()
+})
 
-function imageDeps(overrides: Partial<GraphImageDeps> = {}) {
+/** The graph viewport, in client pixels: 1000 x 800. */
+const VIEW = { left: 10, top: 20, right: 1010, bottom: 820 }
+/** The part of it clear of the top bar (to 70) and the dock's buttons (from 800). */
+const CLEAR = { left: 10, top: 70, right: 1010, bottom: 800 }
+
+/**
+ * Deps over a fake navigator: `frame` centres the rectangle in the viewport at the scale, as
+ * `panAndZoomTo` does, and the view then moves for three frames. Only `a` and `b` are drawn,
+ * unless `areas` is given.
+ */
+function imageDeps(
+  overrides: Partial<GraphImageDeps> = {},
+  drawn?: (db: GraphDb) => Map<NodeId, Rect>,
+) {
   const { db } = makeDeps()
   let scale = 0.7
+  let viewport = Rect.XYWH(0, 0, 1000 / scale, 800 / scale)
   let moving = 0
   const log: string[] = []
-  const areas = new Map<NodeId, Rect>()
-  let x = 0
-  for (const id of db.nodeIdToNode.keys()) areas.set(id, Rect.XYWH((x += 200), 0, 100, 40))
+  const areas =
+    drawn?.(db) ??
+    new Map([
+      [nodeNamed(db, 'a'), Rect.XYWH(200, 0, 100, 40)],
+      [nodeNamed(db, 'b'), Rect.XYWH(500, 0, 100, 40)],
+    ])
   const deps: GraphImageDeps = {
     db,
     area: (id) => areas.get(id),
     viewRect: () => VIEW,
+    clearRect: () => CLEAR,
+    viewport: () => viewport,
     scale: () => scale,
     frame: vi.fn((rect: Rect, to: number) => {
       log.push('frame')
       scale = to
+      viewport = Rect.FromCenterSize(rect.center(), new Vec2(1000 / to, 800 / to))
       moving = 3
     }),
     viewMoving: () => moving > 0,
@@ -211,30 +266,40 @@ function imageDeps(overrides: Partial<GraphImageDeps> = {}) {
   return { deps, db, areas, log }
 }
 
-test('prepare_graph_image frames every node, waits for the view to stop and two frames, then answers', async () => {
-  const { deps, db, areas, log } = imageDeps()
+test('prepare_graph_image frames the nodes in the clear area, waits, and answers their rectangle', async () => {
+  const { deps, log } = imageDeps()
   const result = valueOf(await prepareGraphImage(deps, {}))
-  const bounds = Rect.Bounding(...areas.values())!.expand(GRAPH_IMAGE_MARGIN)
-  expect(deps.frame).toHaveBeenCalledExactlyOnceWith(bounds, 1)
+  // 160..640 x -40..80 with the margin: 480 x 120 at 100%, centred in the clear area (y 435).
+  const nodes = Rect.XYWH(160, -40, 480, 120)
+  expect(deps.frame).toHaveBeenCalledExactlyOnceWith(nodes.offsetBy(new Vec2(0, -15)), 1)
   expect(log).toEqual(['frame', 'moving', 'moving', 'moving', 'frame-still', 'frame-still'])
-  expect(result).toEqual({
-    rect: { x: 10, y: 20, width: 1000, height: 800 },
-    scale: 1,
-    nodes: db.nodeIdToNode.size,
-  })
+  expect(result).toEqual({ rect: { x: 270, y: 375, width: 480, height: 120 }, scale: 1, nodes: 2 })
+})
+
+test('prepare_graph_image cuts nodes too wide for 10% to the clear area', async () => {
+  const { deps } = imageDeps(
+    {},
+    (db) => new Map([[nodeNamed(db, 'a'), Rect.XYWH(0, 0, 20_000, 40)]]),
+  )
+  const result = valueOf(await prepareGraphImage(deps, {}))
+  // 20,080 x 120 at 10%: 2,008 x 12 pixels, centred at y 435 and cut to the clear width.
+  expect(result).toEqual({ rect: { x: 10, y: 429, width: 1000, height: 12 }, scale: 0.1, nodes: 1 })
 })
 
 test('prepare_graph_image with node_ids frames only those', async () => {
   const { deps, db, areas } = imageDeps()
   const a = nodeNamed(db, 'a')
   const result = valueOf(await prepareGraphImage(deps, { node_ids: [a, a] }))
-  expect(deps.frame).toHaveBeenCalledExactlyOnceWith(areas.get(a)!.expand(GRAPH_IMAGE_MARGIN), 1)
+  const nodes = areas.get(a)!.expand(GRAPH_IMAGE_MARGIN)
+  expect(deps.frame).toHaveBeenCalledExactlyOnceWith(nodes.offsetBy(new Vec2(0, -15)), 1)
   expect(result.nodes).toBe(1)
+  expect(result.rect).toEqual({ x: 420, y: 375, width: 180, height: 120 })
 })
 
-test('prepare_graph_image refuses an unknown node, or too many, and moves nothing', async () => {
+test('prepare_graph_image refuses an empty node_ids, an unknown node, or too many, and moves nothing', async () => {
   expect(GRAPH_IMAGE_NODES_MAX).toBe(500)
   const { deps, db } = imageDeps()
+  expect(toolError(await prepareGraphImage(deps, { node_ids: [] }))).toBe(NO_NODE_IDS_ERROR)
   expect(
     toolError(await prepareGraphImage(deps, { node_ids: [nodeNamed(db, 'a'), 'nope'] })),
   ).toContain('No node with id nope')

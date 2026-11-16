@@ -1,7 +1,7 @@
 /**
- * @file The `get_graph_image` tool: a picture of the graph editor's viewport, framed on the nodes.
+ * @file The `get_graph_image` tool: a picture of the nodes as the graph editor draws them.
  * Like `get_visualization` its `run` does part of the work here in main: the window handler
- * `prepare_graph_image` (not an MCP tool) frames the nodes and says where the viewport is, and
+ * `prepare_graph_image` (not an MCP tool) frames the nodes and says where they are on screen, and
  * main captures that rectangle, as `get_visualization` captures a visualization. Nothing is passed
  * to the window after the capture, so no project check is needed. It does not import `electron`:
  * the caller supplies the capture.
@@ -49,16 +49,19 @@ export function graphImageTool(
     description:
       'Take a picture of the graph editor, to see the layout as the user sees it. The view is ' +
       'moved and zoomed, without animation, to frame all the nodes of the method on screen, or ' +
-      'only those of `node_ids` (ids from `get_graph`, at most 500; an unknown id refuses), ' +
-      'at a zoom between 10% and 100% (never larger). It moves the view and does not move it ' +
-      'back. Returns a PNG of the viewport (at most 1,200 pixels on its longer side) with ' +
+      'only those of `node_ids` (ids from `get_graph`, 1 to 500; an unknown id refuses), ' +
+      'at a zoom between 10% and 100% (never larger), clear of the top bar of the editor. Below 10% ' +
+      'not every node fits: the picture then shows the middle of them. It moves the view and ' +
+      'does not move it back. Returns a PNG of the framed nodes with a small margin, as drawn ' +
+      'on screen (at most 1,200 pixels on its longer side), with ' +
       '`{ scale, width, height, nodes }`: `scale`, the zoom (1 is 100%); `width` and `height`, ' +
-      'the picture in pixels; `nodes`, how many nodes were framed. At a low `scale` the text ' +
+      'the picture in pixels; `nodes`, how many nodes were framed (a node not drawn yet is ' +
+      'left out). At a low `scale` the text ' +
       'is not legible: frame fewer nodes with `node_ids` to read them. A method with no nodes ' +
       'is an error. It edits nothing and works in Live mode too; the Enso window must not be ' +
       'minimised.',
     inputSchema: {
-      node_ids: z.array(z.string().max(NAME_CHARS)).max(GRAPH_IMAGE_NODES_MAX).optional(),
+      node_ids: z.array(z.string().max(NAME_CHARS)).min(1).max(GRAPH_IMAGE_NODES_MAX).optional(),
     },
     run: async (args, caller: McpCaller): Promise<McpToolResult> => {
       const prepared = await bridge.call(

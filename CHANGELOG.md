@@ -3,7 +3,7 @@
 #### Enso IDE
 
 - [Agents connected over MCP can arrange and move nodes, resize a visualization,
-  and take a picture of the graph.][NNN]
+  and take a picture of the graph.][831]
 - [Agents connected over MCP can switch between open projects, read and rewrite
   a workflow's or a function's documentation, and add images to it.][825]
 - [Libraries can provide their own visualizations][817]: a `.vue` file in a
@@ -532,7 +532,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[831]: https://github.com/jdunkerley/enso/pull/831
 [825]: https://github.com/jdunkerley/enso/pull/825
 [817]: https://github.com/jdunkerley/enso/pull/817
 [809]: https://github.com/jdunkerley/enso/pull/809

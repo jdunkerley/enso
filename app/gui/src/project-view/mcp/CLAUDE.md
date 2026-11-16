@@ -360,18 +360,29 @@ reads is updated only when the transaction commits).
   version save and the step's hold still happen first: an empty step records
   nothing.
 - **`prepare_graph_image`** (the window half of main's `get_graph_image`; not an
-  MCP tool) frames every node of the method, or the nodes of `node_ids` (at most
-  `GRAPH_IMAGE_NODES_MAX`, 500; an unknown one refuses, a repeated one counts
-  once), with `graphImageFrame`: their drawn areas' bounding rectangle with
-  `GRAPH_IMAGE_MARGIN` (40) around it, at the largest zoom at which it fits,
-  clamped to 0.1–1. `McpEditorDeps.frameScene` is
-  `panAndZoomTo(rect, scale, scale, true)`, so the navigator only centres it,
-  without animation. It then waits while the view moves and for two still frames
-  (giving up 2 s before the call's deadline), and answers
-  `{ rect, scale, nodes }`: the viewport's client rectangle for main to capture,
-  the zoom, and the nodes framed (a node not drawn yet is skipped). An empty
-  method is `EMPTY_METHOD_ERROR`; none drawn, "The nodes are not drawn yet". It
-  edits nothing, so it works in Live, and leaves the view where it framed it.
+  MCP tool) frames every node of the method, or the nodes of `node_ids` (1 to
+  `GRAPH_IMAGE_NODES_MAX`, 500; `[]` is `NO_NODE_IDS_ERROR`, an unknown one
+  refuses, a repeated one counts once). **The clear area**:
+  `McpEditorDeps.clearViewRect` is the viewport less the overlays drawn over it
+  (`clearArea`): the `TopBar` (absolute, at the top, inside the viewport), the
+  `SceneScroller`'s scroll bar tracks (right and bottom edges; transparent until
+  the scene is scrollable, but always laid out) and, while the dock is closed,
+  `BottomPanel`'s buttons (`bottomDockButtons`, absolute at the bottom left of
+  the editor, so over the viewport). Each takes its whole edge. **Framing**
+  (`graphImageFrame`): the drawn areas' bounding rectangle with
+  `GRAPH_IMAGE_MARGIN` (40) around it, at the largest zoom at which it fits the
+  clear area, clamped to 0.1–1, and shifted by the offset between the clear
+  area's centre and the viewport's, because `McpEditorDeps.frameScene`
+  (`panAndZoomTo(rect, scale, scale, true)`) centres in the whole viewport. So
+  no framed node sits under the top bar at any scale that fits. It then waits
+  while the view moves and for two still frames (giving up 2 s before the call's
+  deadline), and answers `{ rect, scale, nodes }`: the client rectangle of the
+  nodes and their margin as now drawn (`viewport` and `viewRect` convert scene
+  to client), cut to the clear area (at 10% a graph too large to fit is cut),
+  for main to capture; the zoom; and the nodes framed (a node not drawn yet is
+  skipped). An empty method is `EMPTY_METHOD_ERROR`; none drawn, "The nodes are
+  not drawn yet". It edits nothing, so it works in Live, and leaves the view
+  where it framed it.
 
 ## Documentation and images (`documentationTools.ts`, `imageTools.ts`)
 

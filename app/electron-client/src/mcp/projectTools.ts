@@ -338,7 +338,8 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         '`get_graph`) in the graph editor, for the user to look at. `width` and `height` ' +
         '(optional) set its size in scene units (pixels at 100% zoom), 100 to 2,000 each, ' +
         'or `null` for the default (the width of the node or 200, and 150 high); one left out ' +
-        'stays as it is. All of it is one edit. A larger visualization pushes the nodes around ' +
+        'stays as it is, and a size given with `visible` false is stored while the ' +
+        'visualization stays hidden. All of it is one edit. A larger visualization pushes the nodes around ' +
         'it away, and they return when it shrinks. The size stays as set and is part of your ' +
         'undo step: when the user did not ask for a large one, pass `null` for both to put it ' +
         'back to the small default when you are done. The view never draws it narrower than ' +

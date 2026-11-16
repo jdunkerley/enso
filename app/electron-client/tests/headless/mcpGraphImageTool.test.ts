@@ -136,7 +136,7 @@ test('no capture is an error', async () => {
   expect(result.error).toContain('could not be captured')
 })
 
-test('node_ids takes at most 500 ids', async () => {
+test('node_ids takes 1 to 500 ids', async () => {
   expect(GRAPH_IMAGE_NODES_MAX).toBe(500)
   const registry = new ToolRegistry()
   registry.register(tool(() => PREPARED).definition)
@@ -145,6 +145,7 @@ test('node_ids takes at most 500 ids', async () => {
   expect((await registry.call(GRAPH_IMAGE_TOOL_NAME, { node_ids: ids(501) }, CALLER)).ok).toBe(
     false,
   )
+  expect((await registry.call(GRAPH_IMAGE_TOOL_NAME, { node_ids: [] }, CALLER)).ok).toBe(false)
   expect((await registry.call(GRAPH_IMAGE_TOOL_NAME, {}, CALLER)).ok).toBe(true)
 })
 

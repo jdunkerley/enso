@@ -341,7 +341,35 @@ interface PreparedGraphImage {
   nodes: number
 }
 
-test('prepare_graph_image frames every node in the viewport and answers where the viewport is', async ({
+/** A box that Playwright measured, as a client rectangle. */
+interface Box {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/**
+ * The rectangle main captures holds every one of the nodes' boxes, lies inside the graph
+ * viewport, and does not overlap the editor's top bar (each within a pixel, for rounding).
+ */
+async function expectFramed(page: Page, rect: Box, ids: readonly string[]) {
+  const viewport = await locate.graphEditor(page).locator('.viewport').boundingBox()
+  const topBar = await locate.graphEditor(page).locator('.TopBar').boundingBox()
+  assert(viewport != null && topBar != null)
+  const inside = (outer: Box, inner: Box, what: string) => {
+    expect(inner.x, what).toBeGreaterThanOrEqual(outer.x - 1)
+    expect(inner.y, what).toBeGreaterThanOrEqual(outer.y - 1)
+    expect(inner.x + inner.width, what).toBeLessThanOrEqual(outer.x + outer.width + 1)
+    expect(inner.y + inner.height, what).toBeLessThanOrEqual(outer.y + outer.height + 1)
+  }
+  inside(viewport, rect, 'the rectangle in the viewport')
+  for (const id of ids) inside(rect, await boxOf(page, id), `node ${id} in the rectangle`)
+  // Below the top bar, which spans the viewport's width.
+  expect(rect.y).toBeGreaterThanOrEqual(topBar.y + topBar.height - 1)
+}
+
+test('prepare_graph_image frames every node below the top bar and answers where they are', async ({
   editorPage,
   page,
 }) => {
@@ -358,40 +386,32 @@ test('prepare_graph_image frames every node in the viewport and answers where th
   expect(prepared.nodes).toBe(graph.nodes.length)
   expect(prepared.scale).toBeGreaterThanOrEqual(0.1)
   expect(prepared.scale).toBeLessThan(1)
-  const viewport = await locate.graphEditor(page).locator('.viewport').boundingBox()
-  assert(viewport != null)
-  expect(Math.abs(prepared.rect.x - viewport.x)).toBeLessThanOrEqual(1)
-  expect(Math.abs(prepared.rect.y - viewport.y)).toBeLessThanOrEqual(1)
-  expect(Math.abs(prepared.rect.width - viewport.width)).toBeLessThanOrEqual(1)
-  expect(Math.abs(prepared.rect.height - viewport.height)).toBeLessThanOrEqual(1)
-  for (const node of graph.nodes) {
-    const box = await boxOf(page, node.id)
-    expect(box.x, node.name ?? node.id).toBeGreaterThanOrEqual(viewport.x)
-    expect(box.y, node.name ?? node.id).toBeGreaterThanOrEqual(viewport.y)
-    expect(box.x + box.width, node.name ?? node.id).toBeLessThanOrEqual(viewport.x + viewport.width)
-    expect(box.y + box.height, node.name ?? node.id).toBeLessThanOrEqual(
-      viewport.y + viewport.height,
-    )
-  }
+  await expectFramed(
+    page,
+    prepared.rect,
+    graph.nodes.map((node) => node.id),
+  )
   // The view stays where the picture left it.
   expect((await layoutGraph(page)).view.scale).toBeCloseTo(prepared.scale, 2)
 })
 
-test('prepare_graph_image of one node frames it at 100%', async ({ editorPage, page }) => {
+test('prepare_graph_image of one node frames it at 100%, and only it', async ({
+  editorPage,
+  page,
+}) => {
   await editorPage
   const five = nodeNamed(await layoutGraph(page), 'five')
   const prepared: PreparedGraphImage = await callOk(page, 'prepare_graph_image', {
     node_ids: [five.id],
   })
   expect(prepared).toEqual(expect.objectContaining({ scale: 1, nodes: 1 }))
-  const viewport = await locate.graphEditor(page).locator('.viewport').boundingBox()
-  assert(viewport != null)
+  await expectFramed(page, prepared.rect, [five.id])
+  // The node and its margin of 40 on each side, not the viewport.
   const box = await boxOf(page, five.id)
-  expect(box.x).toBeGreaterThanOrEqual(viewport.x)
-  expect(box.x + box.width).toBeLessThanOrEqual(viewport.x + viewport.width)
+  expect(Math.abs(prepared.rect.width - (box.width + 80))).toBeLessThanOrEqual(2)
 })
 
-test('prepare_graph_image works in Live mode, and refuses an unknown node', async ({
+test('prepare_graph_image works in Live mode, and refuses an unknown node or no node_ids', async ({
   editorPage,
   page,
 }) => {
@@ -402,4 +422,7 @@ test('prepare_graph_image works in Live mode, and refuses an unknown node', asyn
   const refused = await deliver(page, 'prepare_graph_image', { node_ids: ['nope'] })
   expect(refused.ok).toBe(false)
   expect(refused.error).toContain('nope')
+  const empty = await deliver(page, 'prepare_graph_image', { node_ids: [] })
+  expect(empty.ok).toBe(false)
+  expect(empty.error).toContain('at least one node id')
 })

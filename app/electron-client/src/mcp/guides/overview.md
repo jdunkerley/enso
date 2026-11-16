@@ -85,8 +85,9 @@ No tool changes the execution environment, settings or secrets;
    away, and they return when it shrinks. The size stays as set, so when the
    user did not ask for a large one, pass `null` for both when you are done.
    `get_graph_image` is a picture of the graph: it frames every node of the
-   method, or those of `node_ids`, at up to 100% zoom, and leaves the view
-   there. With many nodes the zoom is low and the text not legible; frame fewer
+   method, or those of `node_ids`, at up to 100% zoom, pictures just those nodes
+   with a small margin, and leaves the view there. Below 10% zoom not every node
+   fits. With many nodes the zoom is low and the text not legible; frame fewer
    to read them. `get_visualization` lets you look at a node's visualization as
    the user sees it: `format: "image"` (the default) is a picture of it,
    `format: "data"` is the data the view was given (at most 20,000 characters).

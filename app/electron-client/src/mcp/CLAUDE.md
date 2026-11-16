@@ -25,8 +25,7 @@ default. No tool changes the execution environment, settings or secrets.
 - `imageTool.ts` — `add_image`, another: main reads the file or captures the
   picture, and the window stores it (see "Documentation and images").
 - `graphImageTool.ts` — `get_graph_image`, the third: the window frames the
-  nodes and main captures the viewport (see "Layout and a picture of the
-  graph").
+  nodes and main captures them (see "Layout and a picture of the graph").
 - `appTools.ts` — the seven app tools (`get_app_state`, `list_projects`,
   `list_files`, `create_project`, `open_project`, `switch_project`,
   `close_project`), forwarded the same way.
@@ -217,11 +216,16 @@ the selection. They answer `{ moved: [{ id, position }] }` and
 
 `get_graph_image { node_ids? }` (`graphImageTool.ts`) is two steps, as
 `get_visualization`'s picture: the window handler `prepare_graph_image` (not an
-MCP tool) frames every node of the method, or those of `node_ids` (at most 500;
-an unknown id refuses), with a 40-unit margin at the largest zoom in 10%–100% at
-which they fit, without animation; waits for the view to stop and two still
-frames; and answers the viewport's rectangle, the zoom and the number of nodes
-framed. Main captures that rectangle with the same `stableCapture` and
+MCP tool) frames every node of the method, or those of `node_ids` (1 to 500, in
+main's schema and again in the window; an unknown id refuses), with a 40-unit
+margin, in the part of the viewport no overlay covers (below the top bar, above
+the closed dock's buttons, inside the scroll bars), at the largest zoom in
+10%–100% at which they fit there, without animation; waits for the view to stop
+and two still frames; and answers the client rectangle of the framed nodes with
+their margin, cut to that clear part (below 10% not everything fits: the middle
+is shown), the zoom and the number of nodes framed (those drawn). The picture is
+the nodes, not the viewport: no top bar and no empty background around a small
+graph. Main captures that rectangle with the same `stableCapture` and
 `cappedPng` (at most 1,200 pixels on the longer side) and answers the PNG with
 `{ scale, width, height, nodes }`. It edits nothing, so it works in Live; it
 moves the view and does not move it back. A method with no nodes is an error.

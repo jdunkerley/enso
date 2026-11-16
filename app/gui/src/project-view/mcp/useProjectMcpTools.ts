@@ -96,6 +96,11 @@ export interface McpEditorDeps {
   ) => Result<CollapseOutcome>
   /** The graph editor's viewport, in CSS pixels of the window's client area. */
   readonly viewRect: () => Edges
+  /**
+   * The part of the viewport no overlay covers (the top bar, the dock's buttons, the scroll bars),
+   * in the same pixels (`clearArea` in `viewTools.ts`).
+   */
+  readonly clearViewRect: () => Edges
   /** The graph's zoom: 1 is 100%. */
   readonly scale: () => number
   /** Moves the view, without animation, to show this client rectangle at 100% where it fits. */
@@ -628,6 +633,8 @@ export function useProjectMcpTools(
           db: graph.db,
           area: (id) => graph.visibleArea(id),
           viewRect: editor.viewRect,
+          clearRect: editor.clearViewRect,
+          viewport: editor.viewport,
           scale: editor.scale,
           frame: editor.frameScene,
           viewMoving: editor.viewMoving,

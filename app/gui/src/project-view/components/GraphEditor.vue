@@ -68,6 +68,7 @@ import { unrefElement, useEventConditional } from '@/composables/events'
 import { useGraphPaletteActions } from '@/composables/graphPaletteActions'
 import { useNodeAppearanceCache } from '@/composables/nodeAppearanceCache'
 import { useProjectMcpTools } from '@/mcp/useProjectMcpTools'
+import { clearArea } from '@/mcp/viewTools'
 import type { PlacementStrategy } from '@/composables/nodeCreation'
 import { registerHandlers, toggledAction, type DisplayableActionName } from '@/providers/action'
 import { useGlobalEventRegistry } from '@/providers/globalEventRegistry'
@@ -297,6 +298,23 @@ useProjectMcpTools({
   collapseNodes: (ids, name) =>
     collapseNodesIntoFunction(collapseDeps(), ids, name ? { name } : {}),
   viewRect: () => viewportElem.value?.getBoundingClientRect() ?? new DOMRect(),
+  // The overlays drawn over the viewport: the top bar, the scroll bars and, while the dock is
+  // closed, its buttons at the bottom left (positioned in this editor, outside the viewport).
+  // Called only when a tool runs, after setup: `root` is defined below.
+  clearViewRect: () => {
+    const view = viewportElem.value
+    if (view == null) return new DOMRect()
+    const boxes = (within: ParentNode | null | undefined, selector: string) =>
+      Array.from(within?.querySelectorAll(selector) ?? [], (elem) => elem.getBoundingClientRect())
+    return clearArea(view.getBoundingClientRect(), {
+      top: boxes(view, '.TopBar'),
+      right: boxes(view, '.ScrollBar .track.vertical'),
+      bottom: [
+        ...boxes(view, '.ScrollBar .track.horizontal'),
+        ...boxes(root.value, '[data-testid="bottomDockButtons"]'),
+      ],
+    })
+  },
   scale: () => graphNavigator.targetScale,
   // `panAndZoomTo` centres the rectangle at the largest scale in [0.1, 1] at which it fits.
   revealClientRect: (rect) =>
