@@ -21,6 +21,7 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { onActivated, onDeactivated, onScopeDispose, watch } from 'vue'
 import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
 import { getComponentDocs, searchComponents, type CatalogueDeps } from './catalogueTools'
+import { getDocumentation, setDocumentation, type SetDocumentationDeps } from './documentationTools'
 import { EditSession } from './editSession'
 import {
   addNodes,
@@ -92,10 +93,11 @@ export interface McpEditorDeps {
 }
 
 /**
- * Registers the project tools for the open project: the six that read (get_graph, get_node,
- * search_components, get_component_docs, evaluate_expression, list_visualizations), the seven
- * that edit (add_nodes, edit_node, remove_nodes, set_node_comment, set_visualization,
- * collapse_nodes, add_function) and the two that navigate (select_nodes, open_method); and the
+ * Registers the project tools for the open project: the seven that read (get_graph, get_node,
+ * search_components, get_component_docs, evaluate_expression, list_visualizations,
+ * get_documentation), the eight that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
+ * set_documentation, set_visualization, collapse_nodes, add_function) and the two that navigate
+ * (select_nodes, open_method); and the
  * two that main's `get_visualization` calls (get_visualization_data, prepare_visualization),
  * which are not MCP tools themselves.
  *
@@ -267,6 +269,19 @@ export function useProjectMcpTools(
     }
   }
 
+  /** `set_documentation`'s dependencies: one module edit, through the edit session. */
+  function documentationDeps(caller: McpCaller, deadline: number): SetDocumentationDeps {
+    const graph = currentProject.graph.value
+    return {
+      db: graph.db,
+      currentMethod: graph.currentMethod,
+      session,
+      caller,
+      deadline,
+      editModule: (f) => currentProject.module.value.edit(f),
+    }
+  }
+
   function viewDeps(): ViewToolDeps {
     const graph = currentProject.graph.value
     return {
@@ -426,6 +441,15 @@ export function useProjectMcpTools(
       if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
       if (typeof text !== 'string') return invalidArgument('text', 'a string')
       return setNodeComment(editDeps(caller, deadline), { node_id, text })
+    },
+    get_documentation: async () => {
+      const graph = currentProject.graph.value
+      return getDocumentation({ db: graph.db, currentMethod: graph.currentMethod })
+    },
+    set_documentation: async (args, caller, deadline) => {
+      const text = args.text
+      if (typeof text !== 'string') return invalidArgument('text', 'a string')
+      return setDocumentation(documentationDeps(caller, deadline), { text })
     },
     set_visualization: async (args, caller, deadline) => {
       const { node_id, visible } = args

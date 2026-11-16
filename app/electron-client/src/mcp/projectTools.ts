@@ -14,6 +14,9 @@ const QUERY_CHARS = 500
 /** Most characters of an expression to evaluate. */
 const EXPRESSION_CHARS = 100_000
 
+/** Most characters of the documentation `set_documentation` writes. */
+const DOCUMENTATION_CHARS = 100_000
+
 /** Most characters of one statement or expression an agent adds to a node. */
 const STATEMENT_CHARS = 20_000
 
@@ -24,6 +27,7 @@ export const VIEW_TOOL_NAMES = [
   'get_component_docs',
   'evaluate_expression',
   'list_visualizations',
+  'get_documentation',
 ] as const
 
 export const EDIT_TOOL_NAMES = [
@@ -33,6 +37,7 @@ export const EDIT_TOOL_NAMES = [
   'collapse_nodes',
   'add_function',
   'set_node_comment',
+  'set_documentation',
   'set_visualization',
   'select_nodes',
   'open_method',
@@ -173,6 +178,18 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       run: forward('list_visualizations'),
     },
     {
+      name: 'get_documentation',
+      title: 'Read the documentation',
+      description:
+        'Read the documentation of the function on screen: the Markdown the documentation ' +
+        "panel shows, the workflow's at the top level and a function's of the project after " +
+        '`open_method`. Returns `{ method, text, truncated }`: `method`, the name of the ' +
+        'function; `text`, its Markdown, at most 50,000 characters (the start of it, with ' +
+        '`truncated: true`, when longer). Changes nothing, and works in Live mode too.',
+      inputSchema: {},
+      run: forward('get_documentation'),
+    },
+    {
       name: 'add_nodes',
       title: 'Add nodes',
       description:
@@ -273,6 +290,22 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         EDIT_RULES,
       inputSchema: { node_id: nodeId(), text: z.string().max(5_000) },
       run: forward('set_node_comment', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'set_documentation',
+      title: 'Replace the documentation',
+      description:
+        'Replace the documentation of the function on screen (the one `get_documentation` ' +
+        'reads) with `text`, which is Markdown; an empty `text` clears it. It replaces all of ' +
+        'it, so call `get_documentation` first and send the full new text. To show an image, ' +
+        'add it with `add_image`, whose result gives the Markdown to include. The user sees ' +
+        'the documentation in the documentation panel. Returns `{ method, characters, ' +
+        'settled }` (`characters`: the length of the text; `settled` is always true: nothing ' +
+        'is computed again); a `text` equal to the current one changes nothing and adds ' +
+        '`unchanged: true`.' +
+        EDIT_RULES,
+      inputSchema: { text: z.string().max(DOCUMENTATION_CHARS) },
+      run: forward('set_documentation', EDIT_TOOL_TIMEOUT_MS),
     },
     {
       name: 'set_visualization',
