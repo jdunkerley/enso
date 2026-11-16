@@ -101,6 +101,18 @@ describe('GridPopupMenu', () => {
       wrapper.unmount()
     })
 
+    test('Escape closes the popup although a handler below stops it bubbling', async () => {
+      // The grid does exactly this to the key events AG Grid prevents (`stopIfPrevented`).
+      const { wrapper, onClose } = await mountPopup()
+      const cell = document.createElement('div')
+      cell.addEventListener('keydown', (event) => event.stopPropagation())
+      document.body.appendChild(cell)
+      cell.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      expect(onClose).toHaveBeenCalledTimes(1)
+      cell.remove()
+      wrapper.unmount()
+    })
+
     test('scrolling anything outside the popup closes it', async () => {
       const { wrapper, onClose } = await mountPopup()
       const scroller = document.createElement('div')

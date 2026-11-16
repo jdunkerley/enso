@@ -71,9 +71,17 @@ function activate(item: Extract<GridMenuItem, { type: 'item' }>) {
 // only way to see every scroller; scrolling inside the popup itself is not a reason to close it.
 // A scroll inside a shadow root never reaches `window`: such a host (the grid) closes the popup
 // itself on its own scroll event.
-useEventListener(window, 'keydown', (event: KeyboardEvent) => {
-  if (event.key === 'Escape') emit('close')
-})
+// Escape is listened for in the capture phase too: the grid stops a prevented key event from
+// bubbling (`AgGridTableView`'s `stopIfPrevented`), and AG Grid prevents Escape on a focused cell,
+// so a bubbling listener on `window` never saw it (found by the Playwright spec for #814).
+useEventListener(
+  window,
+  'keydown',
+  (event: KeyboardEvent) => {
+    if (event.key === 'Escape') emit('close')
+  },
+  { capture: true },
+)
 useEventListener(
   window,
   'scroll',

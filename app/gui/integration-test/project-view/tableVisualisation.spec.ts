@@ -751,3 +751,119 @@ test('Right-click on a link offers the link', async ({ editorPage, page, localAp
   await chooseFromMenu(page, tableVisualization.getByText('pinned'), 'Open This Table')
   await expect.poll(() => codeText(page)).toMatch(/aggregated\.query 'pinned'$/m)
 })
+
+/**
+ Scenario (#814): the cell menu closes on Escape and when the grid scrolls, but not because of the scroll the
+    right-click itself may cause on a cell that is partly out of view (AG Grid scrolls it into view). The
+    grid scrolls inside a shadow root, so it is AG Grid's `bodyScroll` that closes the menu.
+ */
+test.describe('Cell menu dismissal', () => {
+  const GRID_ROWS = 60
+  const GRID_COLUMNS = 24
+
+  async function openWideTable(editorPage: EditorPageActions, page: Page, localApi: MockLocalApi) {
+    await initGraph(editorPage)
+    await graphNodeByBinding(page, 'aggregated').click()
+    await editorPage.press('Space')
+    const tableVisualization = locate.tableVisualization(page)
+    await expect(tableVisualization).toExist()
+    await localApi.updateVisualization(
+      'Standard.Visualization.Table.Visualization.prepare_visualization',
+      matrixView(
+        Array.from({ length: GRID_ROWS }, (_, i) =>
+          Array.from({ length: GRID_COLUMNS }, (_, j) => `r${i}c${j}`),
+        ),
+      ),
+    )
+    await expect(tableVisualization).toContainText('r0c0')
+    return tableVisualization
+  }
+
+  /**
+   * The cell cut off at the `edge` of what can be clicked, with the most of it showing, and a point
+   * on its visible part. What is visible is found by hit-testing, not by geometry: the node clips
+   * the table and AG Grid's scrollbars overlay its rows.
+   */
+  async function cellCutOffAt(table: Locator, edge: 'right' | 'bottom') {
+    const cells = await table.locator('.ag-cell').all()
+    let best: { x: number; y: number; area: number } | undefined
+    for (const cell of cells) {
+      const found = await cell.evaluate((el) => {
+        const box = el.getBoundingClientRect()
+        const root = el.getRootNode() as Document | ShadowRoot
+        const hits: { x: number; y: number }[] = []
+        for (let x = Math.max(box.left, 0) + 1; x < box.right; x += 3) {
+          for (let y = Math.max(box.top, 0) + 1; y < box.bottom; y += 3) {
+            if (root.elementFromPoint(x, y)?.closest('.ag-cell') === el) hits.push({ x, y })
+          }
+        }
+        if (!hits.length) return undefined
+        const xs = hits.map((p) => p.x)
+        const ys = hits.map((p) => p.y)
+        const centre = {
+          x: (Math.min(...xs) + Math.max(...xs)) / 2,
+          y: (Math.min(...ys) + Math.max(...ys)) / 2,
+        }
+        const nearest = hits.reduce((a, b) =>
+          Math.hypot(a.x - centre.x, a.y - centre.y) <= Math.hypot(b.x - centre.x, b.y - centre.y) ?
+            a
+          : b,
+        )
+        return { box, maxX: Math.max(...xs), maxY: Math.max(...ys), hits: hits.length, ...nearest }
+      })
+      if (found == null) continue
+      const cut = edge === 'right' ? found.box.right - found.maxX : found.box.bottom - found.maxY
+      // Partly visible: some pixels in, and some pixels out.
+      if (cut <= 4) continue
+      if (best == null || found.hits > best.area)
+        best = { x: found.x, y: found.y, area: found.hits }
+    }
+    expect(best, `a cell cut off at the ${edge} edge`).toBeDefined()
+    return best!
+  }
+
+  const bodyScroll = (table: Locator) =>
+    table.locator('.ag-grid-viewport').evaluate((el) => ({
+      top: el.scrollTop,
+      left: el.scrollLeft,
+    }))
+
+  for (const edge of ['right', 'bottom'] as const) {
+    test(`Menu on a cell cut off at the ${edge} edge stays open, then closes on scroll`, async ({
+      editorPage,
+      page,
+      localApi,
+    }) => {
+      const table = await openWideTable(editorPage, page, localApi)
+      if (edge === 'bottom') {
+        // Row height does not divide the viewport's, so scroll to leave a click-sized strip of the next row.
+        await table.locator('.ag-grid-viewport').evaluate((el) => (el.scrollTop = 10))
+        await page.waitForTimeout(300)
+      }
+      const target = await cellCutOffAt(table, edge)
+      const menu = page.getByTestId('gridPopupMenu')
+
+      await page.mouse.click(target.x, target.y, { button: 'right' })
+      await expect(menu).toBeVisible()
+      // Anything AG Grid does because of the click (focus, ensure visible) has happened by now.
+      await page.waitForTimeout(500)
+      await expect(menu).toBeVisible()
+
+      // Scrolling the grid closes it.
+      const before = await bodyScroll(table)
+      await table.locator('.ag-grid-viewport').hover()
+      await page.mouse.wheel(edge === 'right' ? 200 : 0, edge === 'bottom' ? 200 : 0)
+      await expect.poll(() => bodyScroll(table)).not.toEqual(before)
+      await expect(menu).toBeHidden()
+    })
+  }
+
+  test('Menu closes on Escape', async ({ editorPage, page, localApi }) => {
+    const table = await openWideTable(editorPage, page, localApi)
+    const menu = page.getByTestId('gridPopupMenu')
+    await table.getByText('r1c1', { exact: true }).click({ button: 'right' })
+    await expect(menu).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+  })
+})
