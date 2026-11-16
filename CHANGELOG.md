@@ -4,6 +4,9 @@
 
 - [Agents connected over MCP can list the visualizations a node offers and look
   at any of them, as a picture or as its data.][809]
+- [Drag an argument's value off a node to turn it into a node of its own,
+  connected back by an edge. A … after a component's arguments adds any of the
+  parameters it is not showing.][NNN]
 - [Right-clicking a table cell offers the components that the value's library
   describes for it (its row, column or value, or the table or sheet it links
   to), and right-clicking an entry of the JSON tree adds a component for it or
@@ -526,6 +529,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [809]: https://github.com/jdunkerley/enso/pull/809
+[NNN]: https://github.com/jdunkerley/enso/pull/NNN
 [800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795
 [790]: https://github.com/jdunkerley/enso/pull/790
