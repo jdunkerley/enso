@@ -13,13 +13,17 @@ import type { KeyringEntryLike } from '../../src/secretsKey'
 class FakeKeyring {
   readonly items = new Map<string, string>()
   readonly accounts: string[] = []
+  readonly writes: string[] = []
   getPassword: (account: string) => string | null = (account) => this.items.get(account) ?? null
 
   entry = async (account: string): Promise<KeyringEntryLike> => {
     this.accounts.push(account)
     return {
       getPassword: () => this.getPassword(account),
-      setPassword: (password) => void this.items.set(account, password),
+      setPassword: (password) => {
+        this.writes.push(account)
+        this.items.set(account, password)
+      },
       deletePassword: () => this.items.delete(account),
     }
   }
@@ -57,6 +61,9 @@ describe('McpController', () => {
   let startError: unknown
   let startGate: Promise<void> | null
   let onStatusChanged: (status: McpStatus) => void
+
+  const fileOf = async (): Promise<Record<string, unknown>> =>
+    JSON.parse(await fs.readFile(settingsPath, 'utf8')) as Record<string, unknown>
 
   beforeEach(async () => {
     dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mcp-controller-'))
@@ -122,12 +129,100 @@ describe('McpController', () => {
     expect(statuses).toEqual([status])
     expect(servers).toHaveLength(1)
     expect(servers[0]!.port).toBe(39417)
-    expect(servers[0]!.token).toBe(keyring.items.get(MCP_TOKEN_ACCOUNT))
     expect(servers[0]!.token.length).toBeGreaterThan(20)
-    expect(JSON.parse(await fs.readFile(settingsPath, 'utf8'))).toEqual({
+    expect(await fileOf()).toEqual({
       enabled: true,
       port: 39417,
+      token: servers[0]!.token,
     })
+    expect(keyring.accounts).toEqual([MCP_TOKEN_ACCOUNT])
+    expect(keyring.writes).toEqual([])
+  })
+
+  test.skipIf(process.platform === 'win32')(
+    'the settings file is readable by the user only',
+    async () => {
+      await fs.writeFile(settingsPath, JSON.stringify({ enabled: false, port: 39417 }), {
+        mode: 0o644,
+      })
+      await controller().init()
+      await controller().setEnabled(true)
+      expect((await fs.stat(settingsPath)).mode & 0o777).toBe(0o600)
+    },
+  )
+
+  test('a token in the file is used, and the keychain is never consulted', async () => {
+    await fs.writeFile(
+      settingsPath,
+      JSON.stringify({ enabled: true, port: 39417, token: 'from-file', extra: 1 }),
+    )
+    await controller().init()
+    expect(servers[0]!.token).toBe('from-file')
+    expect(keyring.accounts).toEqual([])
+  })
+
+  test('a keychain token is copied to the file once, used, and left in the keychain', async () => {
+    keyring.items.set(MCP_TOKEN_ACCOUNT, 'from-keychain')
+    await controller().setEnabled(true)
+    expect(servers[0]!.token).toBe('from-keychain')
+    expect((await fileOf()).token).toBe('from-keychain')
+    expect(keyring.items.get(MCP_TOKEN_ACCOUNT)).toBe('from-keychain')
+    expect(keyring.writes).toEqual([])
+    keyring.accounts.length = 0
+    const second = controller()
+    await second.init()
+    expect(servers[1]!.token).toBe('from-keychain')
+    expect(keyring.accounts).toEqual([])
+  })
+
+  test('an empty keychain gives a new token in the file', async () => {
+    keyring.items.set(MCP_TOKEN_ACCOUNT, '')
+    await controller().setEnabled(true)
+    expect((await fileOf()).token).toBe(servers[0]!.token)
+    expect(servers[0]!.token.length).toBeGreaterThan(20)
+    expect(keyring.writes).toEqual([])
+  })
+
+  test('a keychain that throws is not an error: a new token goes in the file', async () => {
+    keyring.getPassword = () => {
+      throw new Error('locked')
+    }
+    const status = await controller().setEnabled(true)
+    expect(status).toMatchObject({ enabled: true, running: true, error: null })
+    expect((await fileOf()).token).toBe(servers[0]!.token)
+    expect(keyring.writes).toEqual([])
+  })
+
+  test('an unavailable keychain (entry rejects) does not stop the server either', async () => {
+    const c = new McpController({
+      settingsPath,
+      claudeDesktopDirectory: claudeDir,
+      entry: () => Promise.reject(new Error('no keychain')),
+      env: {},
+      createServer: (port, token) => {
+        const server = new FakeServer(port, token)
+        servers.push(server)
+        return server
+      },
+      onStatusChanged: () => {},
+    })
+    expect(await c.setEnabled(true)).toMatchObject({ running: true, error: null })
+  })
+
+  test('the token reaches neither the status nor the window', async () => {
+    const c = controller()
+    const status = await c.setEnabled(true)
+    const token = servers[0]!.token
+    expect(JSON.stringify(status)).not.toContain(token)
+    expect(JSON.stringify(c.status())).not.toContain(token)
+    expect(JSON.stringify(statuses)).not.toContain(token)
+    expect(Object.keys(c.status()).sort()).toEqual([
+      'enabled',
+      'error',
+      'lockedByEnvironment',
+      'port',
+      'running',
+    ])
   })
 
   test('a second controller starts with the same token', async () => {
@@ -141,7 +236,8 @@ describe('McpController', () => {
   test('setEnabled(false) stops the server and keeps the token', async () => {
     const c = controller()
     await c.setEnabled(true)
-    const token = keyring.items.get(MCP_TOKEN_ACCOUNT)
+    const token = (await fileOf()).token
+    expect(token).toBeTruthy()
     const status = await c.setEnabled(false)
     expect(status).toEqual({
       enabled: false,
@@ -151,7 +247,7 @@ describe('McpController', () => {
       lockedByEnvironment: false,
     })
     expect(servers[0]!.stop).toHaveBeenCalled()
-    expect(keyring.items.get(MCP_TOKEN_ACCOUNT)).toBe(token)
+    expect((await fileOf()).token).toBe(token)
   })
 
   test('setPort restarts a running server; bad ports reject and change nothing', async () => {
@@ -183,24 +279,15 @@ describe('McpController', () => {
     expect(status.error).toBe('Port 39417 is in use by another program.')
   })
 
-  test('a keychain failure is reported and enabled stays', async () => {
-    keyring.getPassword = () => {
-      throw new Error('locked')
-    }
-    const c = controller()
-    const status = await c.setEnabled(true)
-    expect(status.enabled).toBe(true)
-    expect(status.running).toBe(false)
-    expect(status.error).toBe('The system keychain is not available: locked')
-    expect(servers).toEqual([])
-  })
-
   test('ENSO_MCP_TOKEN is used without touching the keychain, and cannot be replaced', async () => {
     const c = controller({ ENSO_MCP_TOKEN: 'from-env' })
     await c.setEnabled(true)
     expect(servers[0]!.token).toBe('from-env')
     expect(keyring.accounts).toEqual([])
     await expect(c.replaceToken()).rejects.toThrow('The token is set by ENSO_MCP_TOKEN.')
+    expect(JSON.stringify(await fileOf())).not.toContain('from-env')
+    await c.config('json')
+    expect(JSON.stringify(await fileOf())).not.toContain('from-env')
   })
 
   test('ENSO_MCP_ENABLED and ENSO_MCP_PORT override and are not written back', async () => {
@@ -243,11 +330,12 @@ describe('McpController', () => {
   test('replaceToken stores a new token and restarts a running server', async () => {
     const c = controller()
     await c.setEnabled(true)
-    const old = keyring.items.get(MCP_TOKEN_ACCOUNT)
+    const old = (await fileOf()).token
     statuses.length = 0
     const status = await c.replaceToken()
-    const fresh = keyring.items.get(MCP_TOKEN_ACCOUNT)
+    const fresh = (await fileOf()).token
     expect(fresh).not.toBe(old)
+    expect(keyring.writes).toEqual([])
     expect(status.running).toBe(true)
     expect(servers[0]!.stop).toHaveBeenCalled()
     expect(servers[1]!.token).toBe(fresh)
@@ -257,7 +345,7 @@ describe('McpController', () => {
   test('config gives the URL and the token, creating the token when there is none', async () => {
     const c = controller()
     const text = await c.config('json')
-    const token = keyring.items.get(MCP_TOKEN_ACCOUNT)!
+    const token = (await fileOf()).token as string
     expect(text).toContain('http://127.0.0.1:39417/mcp')
     expect(text).toContain(`Bearer ${token}`)
   })
@@ -335,7 +423,7 @@ describe('McpController', () => {
       const c = controller()
       expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'notSetUp' })
       expect(await c.setUpClaudeDesktop()).toMatchObject({ state: 'setUp' })
-      const token = keyring.items.get(MCP_TOKEN_ACCOUNT)!
+      const token = (await fileOf()).token as string
       expect(await entryOf()).toEqual(
         JSON.parse(clientConfig('claudeDesktop', 'http://127.0.0.1:39417/mcp', token)).mcpServers
           .enso,
@@ -368,7 +456,7 @@ describe('McpController', () => {
       const c = controller()
       await c.setUpClaudeDesktop()
       await c.replaceToken()
-      const fresh = keyring.items.get(MCP_TOKEN_ACCOUNT)!
+      const fresh = (await fileOf()).token as string
       expect(await entryOf()).toMatchObject({ env: { ENSO_AUTH: `Bearer ${fresh}` } })
       expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'setUp' })
     })
@@ -406,15 +494,25 @@ describe('McpController', () => {
       expect(keyring.items.size).toBe(0)
     })
 
-    test('a keychain that throws gives unreadable, not a rejection', async () => {
+    test('status migrates an existing keychain token but never creates one', async () => {
+      keyring.items.set(MCP_TOKEN_ACCOUNT, 'old')
+      const c = controller()
+      await c.setUpClaudeDesktop()
+      expect((await fileOf()).token).toBe('old')
+      expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'setUp' })
+    })
+
+    test('a keychain that throws does not make the status unreadable', async () => {
       keyring.getPassword = () => {
         throw new Error('no keychain')
       }
       const c = controller()
-      expect(await c.claudeDesktopStatus()).toMatchObject({
-        state: 'unreadable',
-        reason: 'The system keychain is not available.',
-      })
+      await fs.writeFile(
+        path.join(claudeDir!, 'claude_desktop_config.json'),
+        JSON.stringify({ mcpServers: { enso: { command: 'x' } } }),
+      )
+      expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'outOfDate' })
+      await expect(fs.access(settingsPath)).rejects.toThrow()
     })
 
     test('the first set-up backs the file up; an update leaves that backup alone', async () => {
@@ -457,9 +555,9 @@ describe('McpController', () => {
       // A directory where the temporary file goes makes the write fail.
       await fs.mkdir(path.join(claudeDir!, 'claude_desktop_config.json.tmp'))
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const old = keyring.items.get(MCP_TOKEN_ACCOUNT)
+      const old = (await fileOf()).token
       await expect(c.replaceToken()).resolves.toMatchObject({ enabled: false })
-      expect(keyring.items.get(MCP_TOKEN_ACCOUNT)).not.toBe(old)
+      expect((await fileOf()).token).not.toBe(old)
       expect(warn).toHaveBeenCalled()
       warn.mockRestore()
     })
