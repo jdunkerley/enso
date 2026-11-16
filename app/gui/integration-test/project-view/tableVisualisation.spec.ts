@@ -761,6 +761,12 @@ test.describe('Cell menu dismissal', () => {
   const GRID_ROWS = 60
   const GRID_COLUMNS = 24
 
+  // A 60 x 24 grid is slow to render and to hit-test cell by cell: with the default 25 s a test
+  // took 20-27 s on a loaded machine and timed out some runs, in the dismissal check and not for it.
+  test.beforeEach(() => {
+    test.slow()
+  })
+
   async function openWideTable(editorPage: EditorPageActions, page: Page, localApi: MockLocalApi) {
     await initGraph(editorPage)
     await graphNodeByBinding(page, 'aggregated').click()
