@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [A date-and-time picker for Date_Time values: Date_Time.now, a calendar and a
+  time field. Editing a value keeps its seconds and time zone.][NNN]
 - [Agents connected over MCP can list the visualizations a node offers and look
   at any of them, as a picture or as its data.][809]
 - [Right-clicking a table cell offers the components that the value's library
@@ -449,6 +451,8 @@
 
 #### Enso Standard Library
 
+- [Date_Time's functions have typed arguments with working widgets, including
+  period dropdowns for start_of, end_of, + and -.][NNN]
 - [`Date`'s functions are documented with examples you can copy into the graph,
   and every argument has a widget][800]
 - [`Date.yesterday` and `Date.tomorrow` give the day before and after
@@ -525,6 +529,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[NNN]: https://github.com/jdunkerley/enso/pull/NNN
 [809]: https://github.com/jdunkerley/enso/pull/809
 [800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795

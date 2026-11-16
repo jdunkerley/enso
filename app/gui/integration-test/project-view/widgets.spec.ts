@@ -1614,3 +1614,161 @@ test.describe('Time_Of_Day widget', () => {
     expect(await moduleCode(page)).not.toContain('import Time_Of_Day')
   })
 })
+
+test.describe('Date_Time widget', () => {
+  const DATE_TIME_TYPE = 'Standard.Base.Data.Time.Date_Time.Date_Time'
+  const days = '[data-reka-calendar-cell-trigger]:not([data-outside-view])'
+  test.afterEach(restoreMockMainFile)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile(
+          'from Standard.Base import Data\n\nmain =\n    since = Data.hours_since\n    dt1 = Date_Time.new 2020 1 15 9 30 second=45 zone=Time_Zone.utc\n    dt2 = Date_Time.now\n',
+        ),
+    },
+  })
+
+  /** A `Data.hours_since` call whose only argument, `moment`, is a `Date_Time` with no `@` annotation. */
+  async function dateTimeNode(editorPage: EditorPageActions, page: Page) {
+    await editorPage
+      .mockSuggestion({
+        type: 'type',
+        module: 'Standard.Base.Data.Time.Date_Time',
+        name: 'Date_Time',
+        params: [],
+        reexport: 'Standard.Base.Main',
+      })
+      .mockSuggestion({
+        type: 'method',
+        module: 'Standard.Base.Data',
+        name: 'hours_since',
+        arguments: [
+          {
+            name: 'moment',
+            reprType: DATE_TIME_TYPE,
+            isSuspended: false,
+            hasDefault: false,
+          },
+        ],
+        selfType: 'Standard.Base.Data',
+        returnType: 'Standard.Base.Data.Numbers.Integer',
+        isStatic: true,
+        annotations: [],
+      })
+    await mockMethodCallInfo(page, 'since', {
+      methodPointer: {
+        module: 'Standard.Base.Data',
+        definedOnType: 'Standard.Base.Data',
+        name: 'hours_since',
+      },
+      notAppliedArguments: [0],
+    })
+    const node = locate.graphNodeByBinding(page, 'since')
+    const widget = node.locator('.WidgetDateTime')
+    await expect(widget).toHaveCount(1)
+    const menu = page.locator('.DateTimeMenu')
+    /** Opens the menu: the arrow under the argument appears on hover. */
+    const open = async () => {
+      await widget.hover()
+      await expect(widget.locator('svg.arrow')).toBeVisible()
+      // The corner, not the middle: the middle of a written `Date_Time.new` is a number field.
+      await widget.click({ position: { x: 4, y: 4 } })
+      await expect(menu).toBeVisible()
+    }
+    return { node, widget, menu, open }
+  }
+
+  /** The module's code; the code editor is closed again afterwards. */
+  async function moduleCode(page: Page): Promise<string> {
+    await page.keyboard.press('ControlOrMeta+`')
+    await expect(page.locator('.CodeEditor')).toBeVisible()
+    const code = await page.evaluate(() => (window as any).__codeEditorApi.textContent())
+    await page.keyboard.press('ControlOrMeta+`')
+    await expect(page.locator('.CodeEditor')).toBeHidden()
+    return code
+  }
+
+  test('a Date_Time argument: now writes the code it names, with the import', async ({
+    editorPage,
+    page,
+  }) => {
+    const { widget, menu, open } = await dateTimeNode(editorPage, page)
+    await open()
+    await expect(menu.locator('.item')).toHaveText(['Date_Time.now'])
+    await expect(menu.getByRole('spinbutton')).toHaveCount(2)
+    await menu.getByRole('button', { name: 'Date_Time.now' }).click()
+    await expect(menu).toBeHidden()
+    await expect(widget).toContainText(/Date_Time\W*now/)
+    const code = await moduleCode(page)
+    expect(code).toContain('since = Data.hours_since Date_Time.now')
+    expect(code).toContain('from Standard.Base import Date_Time')
+  })
+
+  test('a day writes Date_Time.new, parenthesised, with five ports', async ({
+    editorPage,
+    page,
+  }) => {
+    const { widget, menu, open } = await dateTimeNode(editorPage, page)
+    await open()
+    await menu.locator(days).nth(19).click()
+    await expect(menu).toBeHidden()
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(5)
+    expect(await moduleCode(page)).toMatch(
+      /since = Data\.hours_since \(Date_Time\.new \d+ \d+ 20 \d+ \d+\)\n/,
+    )
+  })
+
+  test('a time typed and Enter writes it on today', async ({ editorPage, page }) => {
+    const { menu, open } = await dateTimeNode(editorPage, page)
+    await open()
+    await menu.getByRole('spinbutton').first().focus()
+    await page.keyboard.type('0930')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toMatch(
+      /since = Data\.hours_since \(Date_Time\.new \d+ \d+ \d+ 9 30\)\n/,
+    )
+  })
+
+  /** The whole node `dt1`, opened: one click selects it, the next opens the menu. */
+  async function openWholeNode(page: Page) {
+    const node = locate.graphNodeByBinding(page, 'dt1')
+    const widget = node.locator('.WidgetDateTime')
+    const menu = page.locator('.DateTimeMenu')
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(node).toHaveClass(/selected/)
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    return { node, widget, menu }
+  }
+
+  test('a day picked on a whole node keeps its second and zone', async ({ editorPage, page }) => {
+    await dateTimeNode(editorPage, page)
+    const { menu } = await openWholeNode(page)
+    await menu.locator(days).nth(19).click()
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain(
+      'dt1 = Date_Time.new 2020 1 20 9 30 second=45 zone=Time_Zone.utc\n',
+    )
+  })
+
+  test('a time edited on a whole node keeps its day, second and zone', async ({
+    editorPage,
+    page,
+  }) => {
+    await dateTimeNode(editorPage, page)
+    const { menu } = await openWholeNode(page)
+    await menu.getByRole('spinbutton').first().focus()
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain(
+      'dt1 = Date_Time.new 2020 1 15 10 30 second=45 zone=Time_Zone.utc\n',
+    )
+  })
+
+  test('Date_Time.now as a whole node has the picker', async ({ editorPage, page }) => {
+    await dateTimeNode(editorPage, page)
+    await expect(locate.graphNodeByBinding(page, 'dt2').locator('.WidgetDateTime')).toHaveCount(1)
+  })
+})
