@@ -70,7 +70,9 @@ describe('the pinned Enso goldens', () => {
   test.each(names.filter((name) => name.startsWith('tree_prepare_')))(
     '%s is read by parsePrepared',
     (name) => {
-      expect(parsePrepared(golden(name))).toEqual(golden(name))
+      // The GUI does not read the `actions` field yet (PR 3.2), so the parser drops it.
+      const { actions: _actions, ...prepared } = golden(name) as Record<string, unknown>
+      expect(parsePrepared(golden(name))).toEqual(prepared)
     },
   )
 
