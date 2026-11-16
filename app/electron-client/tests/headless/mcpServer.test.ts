@@ -92,6 +92,17 @@ describe('McpHttpServer', () => {
       inputSchema: {},
       run: async () => ({ ok: false, error: 'it failed' }),
     })
+    registry.register({
+      name: 'picture',
+      title: 'Picture',
+      description: 'Returns an image.',
+      inputSchema: {},
+      run: async () => ({
+        ok: true,
+        value: '{"width":1}',
+        image: { data: 'AAAA', mimeType: 'image/png' },
+      }),
+    })
     server = new McpHttpServer({ registry, guides, port: 0, token: TOKEN, version: '1.2.3' })
     await server.start()
   })
@@ -189,6 +200,7 @@ describe('McpHttpServer', () => {
     expect(tools.map((tool) => [tool.name, tool.description])).toEqual([
       ['echo', 'Echoes its text.'],
       ['fail', 'Always fails.'],
+      ['picture', 'Returns an image.'],
     ])
   })
 
@@ -214,6 +226,15 @@ describe('McpHttpServer', () => {
     const result = await (await connect()).callTool({ name: 'fail', arguments: {} })
     expect(result.isError).toBe(true)
     expect(result.content).toEqual([{ type: 'text', text: 'it failed' }])
+  })
+
+  test('a result with an image is an image item followed by its text', async () => {
+    const result = await (await connect()).callTool({ name: 'picture', arguments: {} })
+    expect(result.isError).toBeFalsy()
+    expect(result.content).toEqual([
+      { type: 'image', data: 'AAAA', mimeType: 'image/png' },
+      { type: 'text', text: '{"width":1}' },
+    ])
   })
 
   test('serves the guides as resources', async () => {
