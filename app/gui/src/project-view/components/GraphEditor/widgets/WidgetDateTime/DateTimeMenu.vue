@@ -126,3 +126,11 @@ onMounted(() => {
     />
   </PickerMenuFrame>
 </template>
+
+<style scoped>
+/* The shell stretches its floating box to the reference's width, which for a whole `Date_Time.new`
+ * node with `second=` and `zone=` is far wider than a calendar: keep the frame at its own width. */
+.DateTimeMenu {
+  width: max-content;
+}
+</style>
