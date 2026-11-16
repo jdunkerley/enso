@@ -33,7 +33,10 @@ prepare_visualization y max_rows=1000 = time_visualization Visualization ("prepa
         x = Warning.set y []
         case x of
             f : Function -> View_Json.value_json (JS_Object.from_pairs [['_display_text_', '[Function '+f.to_text+']']])
-            _ -> (Viz_Actions.for x).add_to_json ((Viz_Table.from x).table_view_json max_rows)
+            _ ->
+                vt = Viz_Table.from x
+                actions = if vt.has_actions then Viz_Actions.for x else Viz_Actions.none
+                actions.add_to_json (vt.table_view_json max_rows)
 
 ## ---
    private: true

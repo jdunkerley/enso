@@ -20,28 +20,33 @@ type Viz_Table
     ## ---
        private: true
        ---
-    private Value source
+    private Value source (has_actions : Boolean)
 
     ## ---
        private: true
        ---
        Wraps a library's implementation of the contract.
-    from_source source -> Viz_Table = Viz_Table.Value source
+    from_source source -> Viz_Table = Viz_Table.Value source True
 
     ## ---
        private: true
        ---
        In-memory columns, shown as a grid of those columns.
     from_columns (headers : Vector Viz_Header) (columns : Vector Vector) -> Viz_Table =
-        Viz_Table.Value (Columns_Source.Value headers columns)
+        Viz_Table.Value (Columns_Source.Value headers columns) True
 
     ## ---
        private: true
        ---
        A value with a table view and no columns; `make_json` takes the row
-       limit the view shows.
-    from_view (make_json : Integer -> Text) -> Viz_Table =
-        Viz_Table.Value (View_Source.Value make_json)
+       limit the view shows. `has_actions` says whether the table view offers
+       the value's own `Viz_Actions`: pass `False` for a view with no `#`
+       column, where an action reading a row by number (`at {{#index}}`)
+       could not be filled in, and would hide the view's own `link`. The
+       value's other visualisations (the scatter plot, the tree) still offer
+       them.
+    from_view (make_json : Integer -> Text) (has_actions : Boolean = True) -> Viz_Table =
+        Viz_Table.Value (View_Source.Value make_json) has_actions
 
     ## ---
        private: true
