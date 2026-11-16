@@ -218,6 +218,34 @@ describe('LanguageServer initialization', () => {
     )
   })
 
+  test('a re-initialization replaces the recorded content roots with those of its reply', async () => {
+    const oldProject = { type: 'Project', id: '00000000-0000-0000-0000-0000000000a1' }
+    const newProject = { type: 'Project', id: '00000000-0000-0000-0000-0000000000a2' }
+    const oldLibrary = {
+      type: 'Library',
+      id: '00000000-0000-0000-0000-0000000000b1',
+      namespace: 'Standard',
+      name: 'Image',
+      version: '0.0.0-dev',
+    }
+    const newLibrary = { ...oldLibrary, id: '00000000-0000-0000-0000-0000000000b2' }
+    server.initReply.contentRoots = [oldProject, oldLibrary]
+    ls = new LanguageServer(CLIENT_ID, new YjsTransport(doc, CHANNEL))
+    expect((await ls.initialized).ok).toBe(true)
+    expect(await ls.contentRoots).toEqual([oldProject, oldLibrary])
+
+    // A restarted server mints new root ids: none of the old ones is valid any more.
+    server.initReply.contentRoots = [newProject]
+    ls.reconnect()
+    expect((await ls.initialized).ok).toBe(true)
+    expect(await ls.contentRoots).toEqual([newProject])
+
+    // What is announced after the reply is still appended.
+    server.notify('file/rootAdded', { root: newLibrary })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(await ls.contentRoots).toEqual([newProject, newLibrary])
+  })
+
   test('a request waiting for initialization ends with an error when the server is disposed', async () => {
     const transport = new YjsTransport(doc, CHANNEL)
     ls = new LanguageServer(CLIENT_ID, transport)
