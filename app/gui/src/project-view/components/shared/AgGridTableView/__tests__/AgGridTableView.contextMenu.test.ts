@@ -58,8 +58,22 @@ async function mountGrid() {
   return { wrapper, stub: wrapper.findComponent({ name: 'StubAgGridVue' }) }
 }
 
+/** A stand-in for the grid API's scroll position, which the test moves to scroll the grid. */
+function fakeScrollingApi() {
+  const position = { left: 0, top: 0 }
+  return {
+    position,
+    autoSizeColumns: vi.fn(),
+    getHorizontalPixelRange: () => ({ left: position.left, right: position.left + 100 }),
+    getVerticalPixelRange: () => ({ top: position.top, bottom: position.top + 100 }),
+  }
+}
+
 /** Emits the `cellContextMenu` AG Grid raises for a right-click on the only cell. */
-async function rightClickCell(stub: Awaited<ReturnType<typeof mountGrid>>['stub']) {
+async function rightClickCell(
+  stub: Awaited<ReturnType<typeof mountGrid>>['stub'],
+  api: ReturnType<typeof fakeScrollingApi> = fakeScrollingApi(),
+) {
   stub.vm.$emit('cellContextMenu', {
     event: new MouseEvent('contextmenu', { clientX: 10, clientY: 20 }),
     column: {
@@ -68,7 +82,7 @@ async function rightClickCell(stub: Awaited<ReturnType<typeof mountGrid>>['stub'
     },
     node: { data: { value: 1 } },
     value: 1,
-    api: { autoSizeColumns: vi.fn() },
+    api,
     context: undefined,
   })
   await stub.vm.$nextTick()
@@ -91,11 +105,28 @@ describe('AgGridTableView context menu', () => {
   // the popup cannot see it: the grid has to close the menu on AG Grid's own `bodyScroll` event.
   test('scrolling the grid body closes the menu', async () => {
     const { wrapper, stub } = await mountGrid()
-    await rightClickCell(stub)
+    const api = fakeScrollingApi()
+    await rightClickCell(stub, api)
     expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(true)
 
-    stub.vm.$emit('bodyScroll', { direction: 'vertical' })
+    api.position.top = 40
+    stub.vm.$emit('bodyScroll', { direction: 'vertical', api })
     await stub.vm.$nextTick()
     expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(false)
+  })
+
+  // AG Grid raises `bodyScroll` asynchronously (behind a `setTimeout`), like `cellContextMenu`: the
+  // scroll that the right-click itself causes (AG Grid brings the focused cell into view) is
+  // reported after the menu has opened, and must not close it (#814, found on Linux CI).
+  test('a scroll that was already made when the menu opened leaves it open', async () => {
+    const { wrapper, stub } = await mountGrid()
+    const api = fakeScrollingApi()
+    api.position.left = 8
+    await rightClickCell(stub, api)
+
+    stub.vm.$emit('bodyScroll', { direction: 'horizontal', left: 8, top: -1, api })
+    stub.vm.$emit('bodyScroll', { direction: 'vertical', left: 8, top: 0, api })
+    await stub.vm.$nextTick()
+    expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(true)
   })
 })

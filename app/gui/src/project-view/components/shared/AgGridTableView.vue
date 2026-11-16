@@ -141,6 +141,7 @@ import { modKey } from '@/composables/events'
 import { registerHandlers } from '@/providers/action'
 import { useAutoBlur } from '@/util/autoBlur'
 import type {
+  BodyScrollEvent,
   CellContextMenuEvent,
   CellEditingStartedEvent,
   CellEditingStoppedEvent,
@@ -521,6 +522,7 @@ function onCellContextMenu(event: CellContextMenuEvent<TData>) {
   if (!rawItems.length) return
   // No `domEvent.preventDefault()` here: it would run too late to matter (see `stopIfPrevented`'s
   // comment above, on the synchronous `@contextmenu` handler that now does this instead).
+  menuScrollPosition = bodyScrollPosition(event.api)
   contextMenuState.value = {
     point: { x: domEvent.clientX, y: domEvent.clientY },
     // `resolveGridMenuItems`'s parameter type narrows each item's `action` signature to the
@@ -540,6 +542,31 @@ function onCellContextMenu(event: CellContextMenuEvent<TData>) {
 
 function closeContextMenu() {
   contextMenuState.value = null
+}
+
+/** Where the grid body is scrolled to, as AG Grid reports it now. */
+function bodyScrollPosition(api: GridApi<TData>) {
+  return { left: api.getHorizontalPixelRange().left, top: api.getVerticalPixelRange().top }
+}
+
+/** Where the grid body was scrolled to when the open menu was opened. */
+let menuScrollPosition: { left: number; top: number } | undefined
+
+/**
+ * Closes the menu when the user scrolls the grid. AG Grid raises `bodyScroll` asynchronously, like
+ * `cellContextMenu`, so the scroll that the right-click itself causes (AG Grid focuses the cell and
+ * brings it into view, as it does for the cell cut off at the table's edge) is reported *after* the
+ * menu opened, a millisecond later. It has already happened, so the position is unchanged since the
+ * menu opened: ignore it. (Closing on it made the menu flicker shut under the click that chose from
+ * it, which failed the sorted-table spec on Linux CI.)
+ */
+function onBodyScroll(event: BodyScrollEvent<TData>) {
+  const opened = menuScrollPosition
+  if (opened != null) {
+    const now = bodyScrollPosition(event.api)
+    if (now.left === opened.left && now.top === opened.top) return
+  }
+  closeContextMenu()
 }
 
 // === Cell-range selection ===
@@ -779,7 +806,7 @@ const customLocale = {
       @columnMoved="emit('columnMoved', $event)"
       @contextmenu="stopIfPrevented"
       @cellContextMenu="onCellContextMenu"
-      @bodyScroll="closeContextMenu"
+      @bodyScroll="onBodyScroll"
     />
     <VueComponentHost :host="vueHost" />
     <GridPopupMenu
