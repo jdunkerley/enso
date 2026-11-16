@@ -1,7 +1,8 @@
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
-import { removeWarningsPattern } from '@/components/visualizations/warningsNodes'
 import { Ast } from '@/util/ast'
 import type { Pattern } from '@/util/ast/match'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { ref } from 'vue'
 import { nodeExpressionPattern } from '../JSONVisualization/treeExpression'
@@ -11,6 +12,8 @@ import { valueNodePattern, type ValueNodeAction } from '../TableVisualization/ta
 import type { GridFilterModel } from '../TableVisualization/tableVizFilterUtils'
 import { useTableVizToolbar, type SortModel } from '../TableVisualization/tableVizToolbar'
 import { isActionButton } from '../toolbar'
+import { findAction, parseVizActions, plainActionToolbar, type VizAction } from '../vizActions'
+import { pinnedDir } from './pinnedGoldens'
 
 // The gate of piece 3 (docs/superpowers/specs/2026-11-14-viz-actions-design.md, "Verification"):
 // the exact text of the node each visualisation gesture creates. The table's links are pinned by
@@ -230,6 +233,24 @@ function capture(created: string[]) {
 
 // ---- DRIVERS: how the code makes each gesture's node. PRs 3.2 and 3.3 replace this block. ----
 
+/** The actions Enso sends for a value, read from its pinned golden. */
+function pinnedActions(golden: string): VizAction[] {
+  const message: unknown = JSON.parse(
+    fs.readFileSync(path.join(pinnedDir, `${golden}.json`), 'utf-8'),
+  )
+  return parseVizActions(message)
+}
+
+const TABLE_ACTIONS = pinnedActions('table_mem_table')
+const SCATTER_TABLE_ACTIONS = pinnedActions('scatter_mem_table')
+const SCATTER_VECTOR_ACTIONS = pinnedActions('scatter_vector')
+
+function action(actions: readonly VizAction[], id: string): VizAction {
+  const found = findAction(actions, id)
+  if (found == null) throw new Error(`no ${id} action`)
+  return found
+}
+
 /** The nodes the table toolbar's "create components" button makes. */
 function toolbarNodes(c: ToolbarCase): string[] {
   const created: string[] = []
@@ -238,7 +259,7 @@ function toolbarNodes(c: ToolbarCase): string[] {
     filterModel: c.filters ?? [],
     sortModel: c.sorts ?? [],
     tableFilteredOrSorted: true,
-    isCreateNewNodeEnabled: true,
+    actions: TABLE_ACTIONS,
     createNodes: capture(created),
     getColumnValueToEnso: columnValueToEnso(COLUMN_TYPES),
     hiddenColumns: c.hidden ?? [],
@@ -275,17 +296,47 @@ function brushNode(
   minY: number,
   maxY: number,
 ) {
-  return text(brushFilterPattern(series, x, minX, maxX, minY, maxY))
+  return text(
+    brushFilterPattern(
+      action(SCATTER_TABLE_ACTIONS, 'brush_filter'),
+      series,
+      x,
+      minX,
+      maxX,
+      minY,
+      maxY,
+    ),
+  )
 }
 
 /** A double-clicked scatter point's node, on a table (`table`) or a vector (`vector`). */
 function pointNode(row: number, value: 'table' | 'vector') {
-  return text(rowPattern(row, value === 'table' ? 'get_row' : 'at'))
+  return text(
+    rowPattern(
+      action(value === 'table' ? SCATTER_TABLE_ACTIONS : SCATTER_VECTOR_ACTIONS, 'open_row'),
+      row,
+    ),
+  )
 }
 
-/** The Warnings visualisation's "remove warnings" node. */
+/** The Warnings visualisation's "remove warnings" node, from the action its preprocessor sends. */
 function removeWarningsNode() {
-  return text(removeWarningsPattern())
+  const created: string[] = []
+  const actions = parseVizActions({
+    actions: [
+      {
+        id: 'remove_warnings',
+        label: 'Remove Warnings',
+        icon: 'not_exclamation',
+        kind: 'chain',
+        template: 'remove_warnings',
+      },
+    ],
+  })
+  const [button] = plainActionToolbar(actions, capture(created))
+  if (button == null || !isActionButton(button)) throw new Error('no remove-warnings button')
+  button.onClick()
+  return created[0]
 }
 
 /** A tree entry's node, from its chain of node expressions. */
@@ -307,10 +358,10 @@ describe('Table toolbar: create components', () => {
 })
 
 describe('Table toolbar: filters the toolbar cannot build', () => {
-  // A Date column offers `inRange`, but the range falls through to the single-value branch of
-  // `buildFilterExpression`, which formats an object as a date string: clicking the button throws.
-  // Pinned as a throw, not a snapshot. PR 3.2.3 may fix it on purpose; then this test changes.
-  test('date in range throws a TypeError', () => {
+  // A Date column offers `inRange`, but the grid sends a range object where the filter condition
+  // needs a single date, so the builder cannot write the condition: clicking the button makes no
+  // node.
+  test('date in range makes no node', () => {
     const c: ToolbarCase = {
       filters: [
         filter({
@@ -322,7 +373,7 @@ describe('Table toolbar: filters the toolbar cannot build', () => {
         }),
       ],
     }
-    expect(() => toolbarNodes(c)).toThrow(TypeError)
+    expect(toolbarNodes(c)).toEqual([])
   })
 })
 

@@ -23,6 +23,7 @@ import {
   type TreeKey,
 } from '@/components/visualizations/JSONVisualization/treeWire'
 import TreeRowView from '@/components/visualizations/JSONVisualization/TreeRow.vue'
+import { parseVizActions, plainActionToolbar } from '@/components/visualizations/vizActions'
 import { stopCopy } from '@/util/shortcuts'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
 import { useVirtualList } from '@vueuse/core'
@@ -46,6 +47,8 @@ async function fetchPage(
   if (!response.ok) return { ok: false, message: String(response.error.payload) }
   return parsePageResult(response.value)
 }
+
+config.setToolbar(computed(() => plainActionToolbar(parseVizActions(data), config.createNodes)))
 
 const prepared = computed(() => parsePrepared(data))
 const tree = useLazyTree(fetchPage)

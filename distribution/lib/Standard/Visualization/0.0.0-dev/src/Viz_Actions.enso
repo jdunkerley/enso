@@ -1,0 +1,126 @@
+from Standard.Base import all
+
+import project.Viz_Action.Viz_Action
+
+polyglot java import org.enso.base.Text_Utils
+
+## ---
+   private: true
+   ---
+   The node actions a value offers its visualisations. Base values are
+   converted here; a library or a user type offers its own with
+   `Viz_Actions.from (that:Its_Public_Type)` in its own module.
+type Viz_Actions
+    ## ---
+       private: true
+       ---
+    Value (actions : Vector Viz_Action)
+
+    ## ---
+       private: true
+       ---
+       Actions whose JSON is already written: `json_text` is
+       `to_json_text` of `actions`. For a value whose actions are the same every
+       time, so that the text is not built again for each message.
+
+       Never empty: `is_empty` is `False` for a `Json` without looking at its
+       actions, so a value with no actions must use `Viz_Actions.none`, never
+       `Viz_Actions.Json "[]" []`.
+    Json (json_text : Text) (~actions : Vector Viz_Action)
+
+    ## ---
+       private: true
+       ---
+       No actions.
+    none -> Viz_Actions = Viz_Actions.Value []
+
+    ## ---
+       private: true
+       ---
+       The action of a value read item by item, `at {{#index}}`: a vector, an
+       array, or a value a visualisation charts through its `to_vector` and
+       that has an `at` taking a number. The same for each of them. Its JSON is
+       one short action, written per message (as before); unlike the table's,
+       it is not cached.
+    items -> Viz_Actions = Viz_Actions.Json _item_json [_item_action]
+
+    ## ---
+       private: true
+       ---
+       The actions of `value`; none for a dataflow error.
+    for value -> Viz_Actions = if value.is_error then Viz_Actions.none else Viz_Actions.from value
+
+    ## ---
+       private: true
+       ---
+       Whether there are none; a `Json` has some, and its `actions` are not
+       built to say so.
+    is_empty self -> Boolean = case self of
+        Viz_Actions.Json _ _ -> False
+        _ -> self.actions.is_empty
+
+    ## ---
+       private: true
+       ---
+       The actions as the IDE reads them: a JSON array.
+    to_json_text self -> Text = case self of
+        Viz_Actions.Json json_text _ -> json_text
+        # A handful of actions: the texts are joined, so they are built once.
+        _ -> '[' + (self.actions.map .to_json_text . join ",") + ']'
+
+    ## ---
+       private: true
+       ---
+       `json_text`, the JSON object a visualisation receives, with an
+       `"actions"` field first. Unchanged when there are no actions, and for
+       an error message (`{"kind":"error",…}`), and for a text that is not a
+       JSON object (empty, an array, a scalar). An empty object `{}` becomes
+       `{"actions":[…]}`.
+
+       The message can be a megabyte. Handing it to Java flattens a rope (a
+       concatenation) once and keeps the flat string, so the checks read it by
+       code unit, and it is copied once, without its `{`; Enso's `Text`
+       operations would walk it by grapheme.
+    add_to_json self (json_text : Text) -> Text =
+        if self.is_empty || (Text_Utils.char_length json_text < 2) then json_text else
+            if (Text_Utils.substring json_text 0 1) != '{' then json_text else
+                rest = Text_Utils.drop_first json_text 1
+                length = Text_Utils.char_length rest
+                if (Text_Utils.substring rest 0 (length.min 14)) == '"kind":"error"' then json_text else
+                    if length == 1 then '{"actions":' + self.to_json_text + '}' else
+                        '{"actions":' + self.to_json_text + ',' + rest
+
+## ---
+   private: true
+   ---
+   Removes the visualised node's warnings. Sent by the Warnings visualisation's
+   preprocessor: a conversion cannot see a value's warnings.
+remove_warnings_action -> Viz_Action =
+    Viz_Action.chain "remove_warnings" "Remove Warnings" "not_exclamation" "remove_warnings"
+
+## ---
+   private: true
+   ---
+   Any other value offers no actions.
+Viz_Actions.from (that:Any) =
+    _ = that
+    Viz_Actions.none
+
+## ---
+   private: true
+   ---
+   A vector's items, by number.
+Viz_Actions.from (that:Vector) =
+    _ = that
+    Viz_Actions.items
+
+## ---
+   private: true
+   ---
+   An array's items, by number.
+Viz_Actions.from (that:Array) =
+    _ = that
+    Viz_Actions.items
+
+private _item_action = Viz_Action.chain "open_row" "Get Item" "select_row" "at {{#index}}"
+private _item_json = '[' + _item_action.to_json_text + ']'

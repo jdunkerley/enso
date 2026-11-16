@@ -1,7 +1,7 @@
 <script lang="ts">
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
 import { computed } from 'vue'
-import { removeWarningsPattern } from './warningsNodes'
+import { parseVizActions, plainActionToolbar } from './vizActions'
 
 export const name = 'Warnings'
 export const icon = 'exclamation'
@@ -10,8 +10,6 @@ export const defaultPreprocessor = [
   'Standard.Visualization.Warnings',
   'process_to_json_text',
 ] as const
-
-const removeWarnings = computed(() => removeWarningsPattern())
 </script>
 
 <script setup lang="ts">
@@ -29,37 +27,30 @@ type Error = {
 
 type Warning = string[]
 
-type Data = Error | Warning
+type Message = { warnings: Warning; actions?: unknown }
+
+type Data = Error | Warning | Message
 
 const props = defineProps<{ data: Data }>()
 const config = useVisualizationConfig()
 
 const messages = computed(() => {
   const data = props.data
-  if (Array.isArray(data)) {
-    return data
-  }
-  if (typeof data === 'object' && data !== null && 'message' in data) {
-    return [data.message]
-  }
+  if (Array.isArray(data)) return data
+  if (typeof data === 'object' && data !== null && 'warnings' in data) return data.warnings
+  if (typeof data === 'object' && data !== null && 'message' in data) return [data.message]
   return []
 })
 
-const isRemoveWarningsDisabled = computed(() =>
-  Array.isArray(props.data) ?
-    messages.value.length === 0
-  : typeof props.data === 'object' && props.data !== null && 'message' in props.data,
-)
+const isRemoveWarningsDisabled = computed(() => messages.value.length === 0)
 
-config.setToolbar([
-  {
-    icon: 'not_exclamation',
-    title: 'Remove Warnings',
-    disabled: isRemoveWarningsDisabled,
-    onClick: () => config.createNodes({ content: removeWarnings.value, commit: true }),
-    dataTestid: 'remove-warnings-button',
-  },
-])
+config.setToolbar(
+  computed(() =>
+    plainActionToolbar(parseVizActions(props.data), config.createNodes, (action) =>
+      action.id === 'remove_warnings' ? isRemoveWarningsDisabled : false,
+    ),
+  ),
+)
 </script>
 
 <template>

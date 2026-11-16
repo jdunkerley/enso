@@ -1,6 +1,7 @@
 # Hand-written. Builds the backend on each platform and the GUI once, packages the IDE for Linux
 # and Windows, and runs the package tests: called by `ide-pull-request.yml`, and can be started by
-# hand.
+# hand. A hand-started run can also build the macOS `.dmg` on the self-hosted Mac (`macos`; Note
+# [macOS Packaging On Request]).
 
 name: IDE Packaging
 on:
@@ -18,6 +19,13 @@ on:
         required: false
         type: boolean
         default: true
+      macos:
+        description: >-
+          Also build the macOS dmg on the self-hosted Mac and upload it as `ide-macos` (Note [macOS
+          Packaging On Request]).
+        required: false
+        type: boolean
+        default: false
       open_perf:
         description: Measure the open time (app/electron-client/perf/openTime.ts).
         required: false
@@ -119,6 +127,21 @@ env:
 # first 30 develop candidates among them. `package-ide` downloads from that run. `build_backend` is declared on
 # `workflow_dispatch` too, with a default: an undeclared input is null, and in an expression
 # `null == false` is true (both coerce to 0), which would skip the build on a hand-started run.
+
+# Note [macOS Packaging On Request]
+# =================================
+# Pull requests package for Linux and Windows only (the `CI: macOS …` labels add the macOS checks,
+# Note [macOS Checks On Request] in `macos-pull-request.yml`; the `.dmg` is otherwise built only by
+# `release.yml`). To test a branch on a Mac without a release, start this workflow by hand with
+# `macos` ticked: `check-the-mac-os-runner` waits 5 minutes for the self-hosted Mac and fails the
+# run if it is offline (the Mac was asked for, as in `macos-pull-request.yml`), then
+# `build-backend-macos` and `package-ide-macos` do what `release.yml` does (the backend is always
+# built: develop's runs have none for macOS), from the same `gui` artifact as the other platforms,
+# and upload the `.dmg` as `ide-macos`. `macos` is not an input of `workflow_call`, so a pull
+# request's run never has it. The build is unsigned: `release.yml` passes no certificate either
+# (Note [Signing The Installers]), and `ide-build` is called without `--sign`, so `isMacSigned` in
+# `electron-builder-config.ts` is false. The Mac keeps its working tree between runs, so each job
+# cleans it before and after, as in `release.yml`.
 
 permissions:
   actions: read
@@ -538,6 +561,116 @@ jobs:
           compression-level: 0
           name: test-traces-${{ matrix.os }}-amd64
           path: app/electron-client/test-traces
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  check-the-mac-os-runner:
+    name: Check the macOS runner
+    # See Note [macOS Packaging On Request]. `== true`: absent (a called run) is not true.
+    if: ${{ inputs.macos == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      online: ${{ steps.wait.outputs.online }}
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+      - id: wait
+        name: Wait for the macOS runner
+        run: ./tools/ci/wait-for-macos-runner.sh 5 fail
+        env:
+          RUNNER_STATUS_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
+
+  build-backend-macos:
+    name: Build Backend (macos, aarch64)
+    needs: [check-the-mac-os-runner]
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 45
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: engine
+          flatc: "true"
+          rust: "true"
+      - id: version
+        name: Compute the version
+        run: corepack pnpm --filter build-scripts run version
+      - name: Build the engine bundle
+        run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "clean; all buildEngineBundle"
+        env:
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
+      - name: Archive backend
+        run: tar -cvf backend.tar -C built-distribution/engine-bundle-${{ steps.version.outputs.ENSO_VERSION }}-macos-aarch64/enso .
+      - name: Upload backend
+        uses: actions/upload-artifact@v5
+        with:
+          name: backend-macos
+          path: backend.tar
+      - name: Cleanup
+        run: rm backend.tar
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  package-ide-macos:
+    name: Package New IDE (macos, aarch64)
+    needs: [check-the-mac-os-runner, build-backend-macos, gui-build]
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 30
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - name: Download backend
+        uses: actions/download-artifact@v5
+        with:
+          name: backend-macos
+          path: dist/backend
+      - run: |-
+          tar -xvf dist/backend/backend.tar -C dist/backend
+          rm dist/backend/backend.tar
+      - name: Download GUI
+        uses: actions/download-artifact@v5
+        with:
+          name: gui
+          path: dist/gui
+      - name: Download WASM parser artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: wasm-artifacts
+          path: app
+      - name: Package the IDE
+        run: corepack pnpm --filter build-scripts run ide-build
+        env:
+          ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
+          ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
+          ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload ide
+        uses: actions/upload-artifact@v5
+        with:
+          name: ide-macos
+          path: dist/ide/enso-*.dmg
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean

@@ -3,6 +3,7 @@ from Standard.Base import all
 import project.Helpers
 import project.Internal.Chart_Limits
 import project.Internal.Names
+import project.Viz_Actions.Viz_Actions
 import project.Viz_Table.Viz_Table
 from project.Helpers import time_visualization, short_display
 
@@ -26,7 +27,7 @@ x_column_name vt = if vt.column_names.length == 1 then Nothing else
    ---
    The JSON of a scatter plot with nothing to draw.
 no_numeric_json : Text
-no_numeric_json = '{"data":[],"axis":{},"is_multi_series":false,"get_row_method":"get_row","x_value_type":"Integer","error_message":"At least one numeric (other than X) must be provided for a scatter plot."}'
+no_numeric_json = '{"data":[],"axis":{},"is_multi_series":false,"x_value_type":"Integer","error_message":"At least one numeric (other than X) must be provided for a scatter plot."}'
 
 ## ---
    private: true
@@ -84,7 +85,7 @@ json_from_viz_table vt bounds limit =
                 filtered = name_map.take 1 + name_map.drop core_names.length
                 axes_json = '{' + ((filtered.map p-> p.second.to_json + ':{"label":' + p.first.to_json + '}') . join ',') + '}'
                 data_json = "[" + (rows_by_field limited field_sources field_names . join ',') + "]"
-                '{"data":' + data_json + ',"axis":' + axes_json + ',"is_multi_series":' + (data_names.length > 1).to_json + ',"get_row_method":"get_row","x_value_type":"' + x_kind.display_name + '","error_message":null}'
+                '{"data":' + data_json + ',"axis":' + axes_json + ',"is_multi_series":' + (data_names.length > 1).to_json + ',"x_value_type":"' + x_kind.display_name + '","error_message":null}'
 
 
 ## ---
@@ -106,7 +107,7 @@ json_from_vector vec bounds limit =
 
     ## Create JSON
     data_json = limited.map_with_index i-> elem-> '{"x":' + i.to_text + ',"y":' + elem.to_json + ',"row_number":' + i.to_text + '}'
-    '{"data": [' + (data_json.join ',') + '],"axis":null,"is_multi_series":false,"get_row_method":"at","x_value_type":"Integer","error_message":null}'
+    '{"data": [' + (data_json.join ',') + '],"axis":null,"is_multi_series":false,"x_value_type":"Integer","error_message":null}'
 
 ## ---
    private: true
@@ -119,16 +120,33 @@ json_from_vector vec bounds limit =
 process_to_json_text : Any -> Integer | Nothing -> Integer | Nothing -> Text
 process_to_json_text value bounds=Nothing limit=Nothing = time_visualization Scatter_Plot ("process_to_json_text: " + (short_display value)) <|
     case value of
-        _ : Vector -> json_from_vector value bounds limit
-        _ : Array -> json_from_vector value bounds limit
+        _ : Vector -> Viz_Actions.items.add_to_json (json_from_vector value bounds limit)
+        _ : Array -> Viz_Actions.items.add_to_json (json_from_vector value bounds limit)
         _ ->
             vt = Viz_Table.from value
             if vt.column_names.is_empty then
                 ## A value with no columns is charted through its `to_vector`; one without it, or with nothing in it, shows the empty state.
                 as_vector = Panic.catch Any (value.to_vector.catch Any _->Nothing) _->Nothing
-                if as_vector.is_nothing || as_vector.is_empty then no_numeric_json else json_from_vector as_vector bounds limit
+                if as_vector.is_nothing || as_vector.is_empty then (Viz_Actions.for value).add_to_json no_numeric_json else
+                    (to_vector_actions value).add_to_json (json_from_vector as_vector bounds limit)
             else
                 ## A database reads at most `limit` rows (15000 when there is no limit) before anything else, as before.
                 rows = Chart_Limits.local_rows vt (limit.if_nothing Chart_Limits.chart_row_bound)
                 ## A source made of columns only (a connection, a workbook) cannot work on rows: show the chart's empty state.
-                if rows.supports "rows" then json_from_viz_table rows bounds limit else no_numeric_json
+                json = if rows.supports "rows" then json_from_viz_table rows bounds limit else no_numeric_json
+                (Viz_Actions.for value).add_to_json json
+
+## ---
+   private: true
+   ---
+   The actions of a value charted through its `to_vector`: its own, else its
+   items by number for the types whose `at` takes a position (each point's row
+   is then `value.at index`). Any other type has no such `at`.
+private to_vector_actions value -> Viz_Actions =
+    own = Viz_Actions.for value
+    if own.is_empty.not then own else case value of
+        _ : Range -> Viz_Actions.items
+        _ : Pair -> Viz_Actions.items
+        _ : List -> Viz_Actions.items
+        _ : Date_Range -> Viz_Actions.items
+        _ -> own

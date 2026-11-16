@@ -24,7 +24,9 @@ settings. Every workflow is hand-written YAML (build simplification;
   the checks, callable (`workflow_call`) and mostly startable by hand
   (`workflow_dispatch`). `ide-packaging.yml` also measures the open time, with
   `app/electron-client/perf/openTime.ts`, after the package tests (Note [Open
-  Time In CI]).
+  Time In CI]). A hand-started run with `macos` also builds the unsigned macOS
+  `.dmg` on the self-hosted Mac and uploads it as `ide-macos` (Note [macOS
+  Packaging On Request]); pull requests never do.
 - `workflows/changelog.yml`, `std-libs-labels.yml` (called from
   `engine-pull-request.yml`), `formatting.yml`, `enso4igv.yml`,
   `workflow-lint.yml`, `build-scripts.yml` — single-purpose pull-request

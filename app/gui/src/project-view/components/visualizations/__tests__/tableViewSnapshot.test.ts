@@ -10,16 +10,13 @@ import {
   tableViewFlags,
   type TableViewContext,
 } from '../TableVisualization/tableView'
+import { pinnedDir } from './pinnedGoldens'
 
 // The gate of spec B (docs/superpowers/specs/2026-11-14-table-viz-one-format-design.md, "Proof
 // that views do not change"). Each pinned golden of `test/Visualization_Tests` is what the table
 // visualisation's preprocessors send for one kind of value; this records what the visualisation
 // makes of it. A wire-format change regenerates the goldens and must leave this snapshot as it is.
 // Resolve the goldens relative to this file: vitest may run from `app/gui`.
-const pinnedDir = path.resolve(
-  __dirname,
-  '../../../../../../../test/Visualization_Tests/data/pinned',
-)
 
 function readPinned(name: string): unknown {
   return JSON.parse(fs.readFileSync(path.join(pinnedDir, `${name}.json`), 'utf-8'))
@@ -115,7 +112,6 @@ function viewSnapshot(name: string) {
       versionHash: flags.versionHash,
       isSSRM: flags.isSSRM,
       bottomStatusBarRequested: flags.bottomStatusBarRequested,
-      createNodeEnabled: flags.createNodeEnabled,
       columnNames: flags.columnNames,
       columnTypes: flags.columnTypes,
     }),

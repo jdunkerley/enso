@@ -14,5 +14,8 @@ The JSON visualization: a lazy tree over any value (spec
 - The rows are a virtual list (`useVirtualList`, fixed 20px rows): a long text
   leaf is one line, cut with an ellipsis, with the whole text in its tooltip.
 - Double-click on an entry creates a node from the chain of node expressions
-  from the root (`treeExpression.ts`, joined with the spaced dot); Shift adds
-  one node per loaded sibling. An entry under one with no expression has none.
+  from the root (`treeExpression.ts`: the steps are literal steps of the shared
+  builder's `chainPattern`, `../vizActions.ts`, joined with the spaced dot);
+  Shift adds one node per loaded sibling. An entry under one with no expression
+  has none. The root value's plain actions (`"actions"` in `Tree.prepare`'s
+  JSON) are toolbar buttons.

@@ -1,12 +1,16 @@
 from Standard.Base import all
 
 from project.Helpers import time_visualization, short_display
+from project.Viz_Actions import remove_warnings_action
 
 ## ---
    private: true
    ---
    Default preprocessor for the warnings visualization.
-   Generates JSON text describing the warnings visualization.
+   Generates JSON text describing the warnings visualization: an object with
+   the `warnings` (a vector of their display texts) and the `actions` the
+   visualization offers, the single action `remove_warnings`. The visualization
+   draws its button from that action.
 
    ## Arguments
     - `value`: the value to be visualized.
@@ -17,4 +21,4 @@ process_to_json_text value = time_visualization Warnings ("process_to_json_text:
     vec = case Warning.limit_reached value of
         True -> texts + ["Warnings limit reached."]
         False -> texts
-    vec.to_json
+    '{"warnings":' + vec.to_json + ',"actions":[' + remove_warnings_action.to_json_text + ']}'

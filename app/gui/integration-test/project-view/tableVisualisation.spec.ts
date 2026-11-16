@@ -595,7 +595,9 @@ const SORTABLE_TABLE = {
     [3, 1, 2],
     ['c', 'a', 'b'],
   ],
-  options: { create_node: true },
+  actions: [
+    { id: 'sort', label: 'Sort', icon: 'sort', kind: 'chain', template: 'sort {{columns*}}' },
+  ],
 }
 
 /** Scenario: the grid is sorted by a header click, and the toolbar button makes a `sort` node of it. */

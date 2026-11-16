@@ -1,6 +1,7 @@
 /** @file The Enso expressions the tree visualization evaluates, and those it creates nodes from. */
 import { Ast } from '@/util/ast'
-import { Pattern } from '@/util/ast/match'
+import type { Pattern } from '@/util/ast/match'
+import { chainPattern } from '../vizActions'
 import type { TreeKey } from './treeWire'
 
 /** The module of the tree's Enso entry points. */
@@ -42,12 +43,6 @@ export function isNodeExpression(expr: string): boolean {
  * when a step is not a method call or the result does not parse.
  */
 export function nodeExpressionPattern(chain: readonly string[]): Pattern | undefined {
-  const [first, ...rest] = chain
-  if (first == null || !chain.every(isNodeExpression)) return undefined
-  const code = '__' + first + rest.map((step) => ' . ' + step.slice(1)).join('')
-  try {
-    return Pattern.parseExpression(code)
-  } catch {
-    return undefined
-  }
+  if (chain.length === 0 || !chain.every(isNodeExpression)) return undefined
+  return chainPattern(chain.map((step) => ({ code: step.slice(1) })))
 }
