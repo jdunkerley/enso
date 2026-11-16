@@ -1,5 +1,8 @@
-import { insertNodeStatements } from '@/composables/nodeCreation'
+import type { GraphStore } from '$/providers/openedProjects/graph'
+import { insertNodeStatements, useNodeCreation } from '@/composables/nodeCreation'
 import { Ast } from '@/util/ast'
+import { Vec2 } from '@/util/data/vec2'
+import { Ok } from 'enso-common/src/utilities/data/result'
 import { expect, test } from 'vitest'
 import { identifier } from 'ydoc-shared/ast'
 
@@ -39,4 +42,49 @@ test('Adding node to empty block', () => {
       .split('\n')
       .map((line) => line.trimEnd()),
   ).toEqual(['f =', '    newNode'])
+})
+
+test('createNodes runs inSameEdit inside the same edit, with the new identifiers', () => {
+  const module = Ast.MutableModule.Transient()
+  const func = Ast.FunctionDef.new(identifier('main')!, [], Ast.BodyBlock.new([], module), {
+    edit: module,
+  })
+  const root = Ast.BodyBlock.new([], module)
+  root.push(func)
+  let edits = 0
+  const moduleStore = {
+    edit: (f: (edit: Ast.MutableModule) => ReturnType<typeof Ok>) => {
+      edits++
+      f(module)
+    },
+    addMissingImports: () => [],
+    addDetectedImports: () => {},
+  }
+  const graphStore = {
+    currentMethod: { ast: Ok(func) },
+    nodeRects: new Map(),
+    visibleNodeAreas: [],
+    generateLocallyUniqueIdent: (prefix: string) => `${prefix}1`,
+    doAfterUpdate: () => {},
+  }
+  const { createNodes } = useNodeCreation(
+    moduleStore as never,
+    graphStore as unknown as GraphStore,
+    {} as never,
+    undefined,
+    () => {},
+  )
+  const seen: Ast.Identifier[][] = []
+  createNodes(
+    [
+      {
+        placement: { type: 'fixed', position: Vec2.Zero },
+        expression: 'Date.new 2020 1 15',
+        binding: 'end',
+      },
+    ],
+    (_edit, identifiers) => seen.push([...identifiers]),
+  )
+  expect(edits).toBe(1)
+  expect(seen).toEqual([['end1']])
 })
