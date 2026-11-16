@@ -1,6 +1,6 @@
 /**
  * @file Decides when the MCP server runs: owns the on/off setting and port (a JSON file), the
- * token (the environment, or the system keychain), start and stop, status, and the config text
+ * token (the environment, or the settings file), start and stop, status, and the config text
  * each client pastes. It does not import `electron`; `electron.ts` supplies the pieces.
  *
  * The token never leaves this module except inside {@link McpController.config}'s text, which the
@@ -23,7 +23,10 @@ import {
 } from './claudeDesktop'
 import { clientConfig } from './clientConfigs'
 
-/** The keychain account of the MCP token. The service is always `Enso`. */
+/**
+ * The keychain account the MCP token used to be kept in, read once to migrate it into the settings
+ * file. The service is always `Enso`. The keychain is never written for the MCP token.
+ */
 export const MCP_TOKEN_ACCOUNT = 'mcp-token'
 
 const MIN_PORT = 1024
@@ -70,6 +73,14 @@ export class McpController {
   /** What the settings file holds. */
   private fileEnabled = false
   private filePort = MCP_DEFAULT_PORT
+  /** The token the settings file holds (never sent to the window). */
+  private fileToken: string | null = null
+  /** Whether the keychain was already consulted for a token to migrate. */
+  private keychainChecked = false
+  /** Why the settings file could not be read (not merely missing); nothing is written then. */
+  private fileUnreadable: string | null = null
+  /** Whether reading the keychain for a token to migrate failed. */
+  private keychainFailed = false
   private server: Server | null = null
   private error: string | null = null
   private queue: Promise<unknown> = Promise.resolve()
@@ -116,15 +127,31 @@ export class McpController {
   /** Reads the settings file and starts the server when enabled. Never throws. */
   init(): Promise<McpStatus> {
     return this.serialised(async () => {
+      let text: string | null = null
       try {
-        const parsed: unknown = JSON.parse(await fs.readFile(this.options.settingsPath, 'utf8'))
+        text = await fs.readFile(this.options.settingsPath, 'utf8')
+      } catch (e) {
+        // A missing file is the defaults. Any other failure (busy, no permission) is not "no file":
+        // reading nothing here and then writing would lose the stored token.
+        if ((e as { code?: unknown }).code !== 'ENOENT') {
+          this.fileUnreadable = `The MCP settings file could not be read: ${messageOf(e)}`
+        }
+      }
+      try {
+        // Malformed JSON keeps the existing rule: the defaults.
+        const parsed: unknown = text == null ? null : JSON.parse(text)
         if (typeof parsed === 'object' && parsed != null) {
-          const { enabled, port } = parsed as { enabled?: unknown; port?: unknown }
+          const { enabled, port, token } = parsed as {
+            enabled?: unknown
+            port?: unknown
+            token?: unknown
+          }
           this.fileEnabled = enabled === true
           if (isValidPort(port)) this.filePort = port
+          if (typeof token === 'string' && token !== '') this.fileToken = token
         }
       } catch {
-        // Missing or unreadable: the defaults.
+        // Malformed: the defaults.
       }
       return this.apply()
     })
@@ -184,12 +211,9 @@ export class McpController {
       if (this.closed) return this.status()
       if (this.envToken != null) throw new Error('The token is set by ENSO_MCP_TOKEN.')
       const hadOwnEntry = await this.hasOwnClaudeDesktopEntry()
-      try {
-        const entry = await this.options.entry(MCP_TOKEN_ACCOUNT)
-        entry.setPassword(randomBytes(32).toString('base64url'))
-      } catch (e) {
-        throw new Error(`The system keychain is not available: ${messageOf(e)}`, { cause: e })
-      }
+      const fresh = randomBytes(32).toString('base64url')
+      await this.save({ enabled: this.fileEnabled, port: this.filePort }, fresh)
+      this.fileToken = fresh
       const status = await this.apply()
       if (hadOwnEntry) await this.rewriteClaudeDesktop()
       return status
@@ -246,18 +270,50 @@ export class McpController {
     return `http://127.0.0.1:${this.port}/mcp`
   }
 
-  /** The stored token (the environment's, or the keychain's), without creating one. */
+  /**
+   * The stored token (the environment's, or the settings file's), without creating one. With
+   * neither, the keychain of an earlier version is read once and a token found there is copied
+   * into the settings file. A keychain that fails or is empty counts as holding nothing.
+   */
   private async storedToken(): Promise<string | null> {
     if (this.envToken != null) return this.envToken
-    const existing = (await this.options.entry(MCP_TOKEN_ACCOUNT)).getPassword()
-    return existing != null && existing !== '' ? existing : null
+    if (this.fileToken != null) return this.fileToken
+    if (this.keychainChecked || this.fileUnreadable != null) return null
+    this.keychainChecked = true
+    let entry: KeyringEntryLike
+    let old: string | null
+    try {
+      entry = await this.options.entry(MCP_TOKEN_ACCOUNT)
+      old = entry.getPassword()
+    } catch {
+      this.keychainFailed = true
+      return null
+    }
+    if (old == null || old === '') return null
+    let saved = false
+    try {
+      await this.save({ enabled: this.fileEnabled, port: this.filePort }, old)
+      saved = true
+    } catch (e) {
+      console.warn('[MCP] could not copy the keychain token to the settings file:', e)
+    }
+    this.fileToken = old
+    if (saved) {
+      // So that a token revoked later cannot come back from here. Best effort.
+      try {
+        entry.deletePassword()
+      } catch {
+        // Ignored.
+      }
+    }
+    return old
   }
 
   private withConfigFile(setup: ClaudeDesktopSetup): ClaudeDesktopStatus {
     return { ...setup, configFile: claudeDesktopConfigFile(this.options.claudeDesktopDirectory) }
   }
 
-  /** Claude Desktop's status. Touches the keychain only once the folder exists; never throws. */
+  /** Claude Desktop's status. Reads the token only once the folder exists; never throws. */
   private async currentClaudeDesktopStatus(): Promise<ClaudeDesktopSetup> {
     const directory = this.options.claudeDesktopDirectory
     const withoutToken = await readClaudeDesktopSetup(directory, this.url, null)
@@ -268,7 +324,7 @@ export class McpController {
       const token = await this.storedToken()
       return token == null ? withoutToken : await readClaudeDesktopSetup(directory, this.url, token)
     } catch {
-      return { state: 'unreadable', reason: 'The system keychain is not available.' }
+      return { state: 'unreadable', reason: 'The token could not be read.' }
     }
   }
 
@@ -291,19 +347,22 @@ export class McpController {
     }
   }
 
-  /** The token from the environment or the keychain, created when there is neither. */
+  /** The token from the environment or the settings file, created when there is neither. */
   private async token(): Promise<string> {
-    if (this.envToken != null) return this.envToken
-    try {
-      const entry = await this.options.entry(MCP_TOKEN_ACCOUNT)
-      const existing = entry.getPassword()
-      if (existing != null && existing !== '') return existing
-      const created = randomBytes(32).toString('base64url')
-      entry.setPassword(created)
-      return created
-    } catch (e) {
-      throw new Error(`The system keychain is not available: ${messageOf(e)}`, { cause: e })
+    if (this.fileUnreadable != null) throw new Error(this.fileUnreadable)
+    const existing = await this.storedToken()
+    if (existing != null) return existing
+    if (this.keychainFailed) {
+      console.warn('[MCP] the keychain could not be read; a new token was created')
     }
+    const created = randomBytes(32).toString('base64url')
+    try {
+      await this.save({ enabled: this.fileEnabled, port: this.filePort }, created)
+    } catch (e) {
+      throw new Error(`The token could not be saved: ${messageOf(e)}`, { cause: e })
+    }
+    this.fileToken = created
+    return created
   }
 
   private async stopServer(): Promise<void> {
@@ -316,7 +375,11 @@ export class McpController {
   private async apply(): Promise<McpStatus> {
     await this.stopServer()
     this.error = null
-    if (this.enabled && !this.closed) {
+    if (this.fileUnreadable != null) {
+      // Shown whether or not the server is switched on: with the file unreadable the switch reads
+      // as off, and the user must be told why and that nothing can be changed.
+      this.error = this.fileUnreadable
+    } else if (this.enabled && !this.closed) {
       const port = this.port
       try {
         const server = this.options.createServer(port, await this.token())
@@ -344,11 +407,28 @@ export class McpController {
     return status
   }
 
-  /** Write the settings atomically; the caller updates its state only once this succeeds (the temporary file, then a rename). */
-  private async save(settings: { enabled: boolean; port: number }): Promise<void> {
+  /**
+   * Write the settings atomically (a temporary file, then a rename); the caller updates its state
+   * only once this succeeds. The file holds the token, so it is created readable by the user only
+   * (`0o600`; Windows ignores the mode). `ENSO_MCP_TOKEN` is never written.
+   */
+  private async save(
+    settings: { enabled: boolean; port: number },
+    token: string | null = this.fileToken,
+  ): Promise<void> {
+    if (this.fileUnreadable != null) throw new Error(this.fileUnreadable)
     const temporary = `${this.options.settingsPath}.tmp`
-    const text = JSON.stringify(settings)
-    await fs.writeFile(temporary, text, 'utf8')
+    const text = JSON.stringify(token == null ? settings : { ...settings, token })
+    // Never write into a leftover (it may have looser permissions): create it fresh.
+    await fs.rm(temporary, { force: true })
+    const file = await fs.open(temporary, 'wx', 0o600)
+    try {
+      await file.writeFile(text, 'utf8')
+      if (token != null) await file.chmod(0o600)
+      await file.sync()
+    } finally {
+      await file.close()
+    }
     await fs.rename(temporary, this.options.settingsPath)
   }
 }
