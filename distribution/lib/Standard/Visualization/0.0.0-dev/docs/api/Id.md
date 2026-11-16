@@ -6,7 +6,6 @@
     - geo_map -> Standard.Base.Any.Any
     - json -> Standard.Base.Any.Any
     - scatter_plot -> Standard.Base.Any.Any
-    - sql_query -> Standard.Base.Any.Any
     - table -> Standard.Base.Any.Any
     - to_js_object self -> Standard.Base.Any.Any
 - Standard.Visualization.Id.Id.from that:Standard.Base.Any.Any -> Standard.Visualization.Id.Id
