@@ -176,6 +176,43 @@ test('move_nodes moves several nodes as one undo step', async ({ editorPage, pag
   expect(nodeNamed(await layoutGraph(page), 'five').position).toEqual(five.position)
 })
 
+/** Delivers the call and answers how long it took, in milliseconds, measured in the window. */
+function timedDeliver(page: Page, tool: string, args: object) {
+  return page.evaluate(
+    async ([tool, args]) => {
+      const start = performance.now()
+      const result = await (
+        window as unknown as {
+          __mcpCall: (tool: string, args: unknown) => Promise<ToolResult>
+        }
+      ).__mcpCall(tool as string, args)
+      return { result, ms: performance.now() - start }
+    },
+    [tool, args] as const,
+  )
+}
+
+test('a move to where the nodes already are answers without waiting for a graph update', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const five = nodeNamed(await layoutGraph(page), 'five')
+  assert(five.position != null)
+  const target = { x: five.position.x + 300, y: five.position.y }
+  const moves = [{ node_id: five.id, ...target }]
+  await callOk(page, 'move_nodes', { moves })
+  // The same move again changes nothing: no node-database update comes, and the edit session's
+  // 2 s safety net (`GRAPH_UPDATE_WAIT_MS`) must not be waited out.
+  const again = await timedDeliver(page, 'move_nodes', { moves })
+  assert(again.result.ok, again.result.error)
+  expect(JSON.parse(again.result.value!)).toEqual({
+    moved: [{ id: five.id, position: target }],
+    settled: true,
+  })
+  expect(again.ms).toBeLessThan(1_000)
+})
+
 test('move_nodes with an unknown node moves nothing', async ({ editorPage, page }) => {
   await editorPage
   const graph = await layoutGraph(page)

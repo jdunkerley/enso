@@ -31,11 +31,12 @@ const pointer: MethodPointer = {
 const caller = { kind: 'external', name: 'claude-code' } as const
 const DEADLINE = 123_456
 
-/** A session that runs each edit at once, counting the runs. */
+/** A session that runs each edit at once, counting the runs and recording what `unchanged` said. */
 function fakeSession(onRun: () => void = () => {}) {
   const session = {
     runs: 0,
     deadlines: [] as (number | undefined)[],
+    unchanged: [] as (boolean | undefined)[],
     async run<T>(
       _caller: unknown,
       edit: () => Result<T> | Promise<Result<T>>,
@@ -46,6 +47,7 @@ function fakeSession(onRun: () => void = () => {}) {
       onRun()
       const result = await edit()
       if (!result.ok) return result
+      session.unchanged.push(options?.unchanged?.(result.value))
       return Ok<EditOutcome<T>>({ value: result.value, settled: true })
     },
   }
@@ -124,6 +126,8 @@ test('set_documentation replaces the whole text in one edit of one session run',
   expect(valueOf(await getDocumentation(deps)).text).toBe(text)
   expect(session.runs).toBe(1)
   expect(session.deadlines).toEqual([DEADLINE])
+  // A real edit: the session waits for the graph update.
+  expect(session.unchanged).toEqual([false])
   expect(editModule).toHaveBeenCalledTimes(1)
 })
 
@@ -147,8 +151,9 @@ test('set_documentation with the text as it is at its turn makes no module edit'
     settled: true,
     unchanged: true,
   })
-  // Compared at the edit's turn, inside the session's run.
+  // Compared at the edit's turn, inside the session's run, which answers without waiting.
   expect(session.runs).toBe(1)
+  expect(session.unchanged).toEqual([true])
   expect(editModule).not.toHaveBeenCalled()
 })
 

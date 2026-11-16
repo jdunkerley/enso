@@ -52,6 +52,25 @@ export function onUserModuleTransaction(
 }
 
 /**
+ * Runs `f` and answers whether it changed the module's document: whether any transaction that
+ * began on it while `f` ran inserted or deleted anything. A transaction that writes nothing (a
+ * position set to the one stored is skipped by `graph.ts`) does not count, so no node-database
+ * update will follow it. `f` must make its changes synchronously.
+ */
+export function moduleChangedBy(module: Pick<ModuleStore, 'onBeforeEdit'>, f: () => void): boolean {
+  const transactions: Y.Transaction[] = []
+  const { unregister } = module.onBeforeEdit((transaction) => transactions.push(transaction))
+  try {
+    f()
+  } finally {
+    unregister()
+  }
+  return transactions.some(
+    (transaction) => transaction.changed.size > 0 || transaction.deleteSet.clients.size > 0,
+  )
+}
+
+/**
  * Resolves once `doAfterUpdate` runs its callback, or after `timeoutMs`, whichever is first. The
  * store's list has no removal, so after the timeout the callback stays there until the next update,
  * and does nothing then.

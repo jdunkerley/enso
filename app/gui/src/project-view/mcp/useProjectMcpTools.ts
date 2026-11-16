@@ -47,6 +47,7 @@ import { createMcpNodes } from './nodeCreation'
 import { panelQuiet } from './panelQuiet'
 import {
   afterGraphUpdate,
+  moduleChangedBy,
   onUserModuleTransaction,
   watchExecution,
   watchGraphUpdate,
@@ -298,6 +299,7 @@ export function useProjectMcpTools(
       caller,
       deadline,
       setNodePositions: (moves) => currentProject.graph.value.setNodePositions(moves),
+      moduleChanged: (f) => moduleChangedBy(currentProject.module.value, f),
       tidy: editor.tidy,
       alignment: editor.alignment,
     }

@@ -44,14 +44,16 @@ const DEADLINE = 123_456
 
 /**
  * A session that runs each edit at once, after `before`, and records what the tool passed it:
- * the affected expressions and the deadline of each successful run.
+ * the affected expressions, the deadline and what `unchanged` said of each successful run.
  */
 function fakeSession(before: () => void = () => {}) {
   const affected: AffectedExpressions[] = []
   const deadlines: (number | undefined)[] = []
+  const unchanged: (boolean | undefined)[] = []
   return {
     affected,
     deadlines,
+    unchanged,
     async run<T>(
       _caller: unknown,
       edit: () => Result<T> | Promise<Result<T>>,
@@ -62,6 +64,7 @@ function fakeSession(before: () => void = () => {}) {
       const result = await edit()
       if (!result.ok) return result
       affected.push(options?.affected?.(result.value) ?? {})
+      unchanged.push(options?.unchanged?.(result.value))
       return Ok<EditOutcome<T>>({ value: result.value, settled: true })
     },
   }
@@ -100,6 +103,12 @@ function makeDeps(overrides: Partial<ArrangeToolDeps> = {}) {
   })
   const tidy = vi.fn<ArrangeToolDeps['tidy']>()
   const alignment = fakeAlignment()
+  // Stands for the module's document: a change of any node's position is a change of the module.
+  const moduleChanged = vi.fn<LayoutToolDeps['moduleChanged']>((f) => {
+    const before = new Map(Array.from(db.nodeIdToNode, ([id, node]) => [id, node.position]))
+    f()
+    return Array.from(db.nodeIdToNode).some(([id, node]) => !before.get(id)?.equals(node.position))
+  })
   const deps: ArrangeToolDeps = {
     db,
     currentMethod: { ast: Ok(func), pointer: Ok(pointer) },
@@ -107,11 +116,12 @@ function makeDeps(overrides: Partial<ArrangeToolDeps> = {}) {
     caller,
     deadline: DEADLINE,
     setNodePositions,
+    moduleChanged,
     tidy,
     alignment,
     ...overrides,
   }
-  return { deps, db, session, setNodePositions, tidy, alignment }
+  return { deps, db, session, setNodePositions, moduleChanged, tidy, alignment }
 }
 
 function nodeNamed(db: GraphDb, name: string): NodeId {
@@ -174,6 +184,19 @@ test('move_nodes affects no expression, and passes the call deadline to the sess
   await moveNodes(deps, { moves: [{ node_id: nodeNamed(db, 'a'), x: 1, y: 2 }] })
   expect(session.affected).toEqual([{}])
   expect(session.deadlines).toEqual([DEADLINE])
+})
+
+test('move_nodes tells the session whether the module changed', async () => {
+  const { deps, db, session, setNodePositions, moduleChanged } = makeDeps()
+  const a = nodeNamed(db, 'a')
+  const { x, y } = db.nodeIdToNode.get(a)!.position
+  const result = valueOf(await moveNodes(deps, { moves: [{ node_id: a, x, y }] }))
+  expect(result.moved).toEqual([{ id: a, position: { x, y } }])
+  // The store is still asked: it also releases the nodes this one was pushing.
+  expect(setNodePositions).toHaveBeenCalledOnce()
+  expect(moduleChanged).toHaveBeenCalledOnce()
+  await moveNodes(deps, { moves: [{ node_id: a, x: x + 1, y }] })
+  expect(session.unchanged).toEqual([true, false])
 })
 
 test('move_nodes refuses an unknown node, and moves nothing', async () => {
@@ -366,6 +389,21 @@ test('arrange_nodes counts the nodes whose position changed', async () => {
   fixture.db = db
   const result = valueOf(await arrangeNodes(deps, { action: 'tidy' }))
   expect(result).toEqual({ action: 'tidy', arranged: 2, settled: true })
+})
+
+test('arrange_nodes tells the session whether the module changed', async () => {
+  const fixture: { db?: GraphDb } = {}
+  const { deps, db, session } = makeDeps({
+    tidy: (ids) => {
+      if (ids == null) return
+      fixture.db!.nodeIdToNode.get(ids[0]!)!.position = new Vec2(-5, -5)
+    },
+  })
+  fixture.db = db
+  // Already tidy: the whole graph, which the fake leaves as it is.
+  expect(valueOf(await arrangeNodes(deps, { action: 'tidy' })).arranged).toBe(0)
+  await arrangeNodes(deps, { action: 'tidy', node_ids: [nodeNamed(db, 'a'), nodeNamed(db, 'b')] })
+  expect(session.unchanged).toEqual([true, false])
 })
 
 test('arrange_nodes refuses an unknown or repeated node, and arranges nothing', async () => {

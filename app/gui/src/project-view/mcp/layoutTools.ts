@@ -31,6 +31,13 @@ export interface LayoutToolDeps extends Pick<GraphToolDeps, 'db' | 'currentMetho
    * pushing return to their places).
    */
   readonly setNodePositions: (moves: readonly (readonly [NodeId, Vec2])[]) => void
+  /**
+   * Runs `f` and answers whether it changed the module (a transaction on the module's document
+   * changed something). A move to where a node already is, with nothing pushed to release, changes
+   * nothing; nor does Tidy up, Align or Spacing on nodes already laid out so. The session then
+   * answers without waiting for a graph update that never comes.
+   */
+  readonly moduleChanged: (f: () => void) => boolean
 }
 
 /** One entry of `move_nodes`' `moves`: where the node's top-left goes, in scene units. */
@@ -76,12 +83,13 @@ export async function moveNodes(
     deps.caller,
     // A position changes nothing the engine runs: no expression is affected, so it settles at once.
     () => {
-      const unchanged = checkAtTurn(deps, method, ids)
-      if (!unchanged.ok) return unchanged
-      deps.setNodePositions(moves)
-      return Ok()
+      const sameMethod = checkAtTurn(deps, method, ids)
+      if (!sameMethod.ok) return sameMethod
+      // Called even when every node is already there: it releases the nodes they were pushing.
+      const changed = deps.moduleChanged(() => deps.setNodePositions(moves))
+      return Ok({ unchanged: !changed })
     },
-    { deadline: deps.deadline },
+    { deadline: deps.deadline, unchanged: ({ unchanged }) => unchanged },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult(
@@ -193,18 +201,20 @@ export async function arrangeNodes(
     deps.caller,
     // Positions change nothing the engine runs: no expression is affected, so it settles at once.
     () => {
-      const unchanged = checkAtTurn(deps, method, ids)
-      if (!unchanged.ok) return unchanged
+      const sameMethod = checkAtTurn(deps, method, ids)
+      if (!sameMethod.ok) return sameMethod
       before = positions(deps)
-      if (action === 'tidy') {
-        deps.tidy(ids.length >= 2 ? ids : undefined)
-      } else {
-        const nodes = ids.map((id) => deps.db.nodeIdToNode.get(id)).filter((n) => n != null)
-        deps.alignment[ALIGNMENT_HANDLER[action]](nodes)
-      }
-      return Ok()
+      const changed = deps.moduleChanged(() => {
+        if (action === 'tidy') {
+          deps.tidy(ids.length >= 2 ? ids : undefined)
+        } else {
+          const nodes = ids.map((id) => deps.db.nodeIdToNode.get(id)).filter((n) => n != null)
+          deps.alignment[ALIGNMENT_HANDLER[action]](nodes)
+        }
+      })
+      return Ok({ unchanged: !changed })
     },
-    { deadline: deps.deadline },
+    { deadline: deps.deadline, unchanged: ({ unchanged }) => unchanged },
   )
   if (!outcome.ok) return errorResult(outcome)
   const after = positions(deps)

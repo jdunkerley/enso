@@ -93,7 +93,8 @@ export async function setDocumentation(
       })
       return edited.ok ? Ok({ unchanged: false }) : edited
     },
-    { deadline: deps.deadline },
+    // An equal text edits nothing, so no graph update follows: the session answers at once.
+    { deadline: deps.deadline, unchanged: ({ unchanged }) => unchanged },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult(
