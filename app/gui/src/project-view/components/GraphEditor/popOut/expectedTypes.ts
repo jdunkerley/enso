@@ -6,6 +6,7 @@ import {
   getMethodCallInfoRecursively,
   interpretCall,
 } from '@/util/callTree'
+import { ANY_TYPE_QN } from '@/util/ensoTypes'
 
 /**
  * The expected type at `root` (`rootType`, the dragged argument's own) and at every argument
@@ -26,18 +27,23 @@ export function expectedTypesIn(
     if (parent instanceof Ast.App && parent.function.id === ast.id) return true
     const info = getMethodCallInfoRecursively(ast, graphDb)
     if (!info) return true
-    const application = ArgumentApplication.FromInterpretedWithInfo(interpretCall(ast), {
+    const call = interpretCall(ast)
+    // As the function widget does: the bare function's info says whether `self` is already
+    // applied (by the access subject of `a.method`) or is still the first positional argument
+    // (`Type.method a ...`).
+    const noArgs = call.kind === 'prefix' ? graphDb.getMethodCallInfo(call.func.id) : undefined
+    const application = ArgumentApplication.FromInterpretedWithInfo(call, {
       suggestion: info.suggestion,
-      // The access subject of `a.method ...` is the `self` argument. All other arguments are
-      // matched by position or name, ignoring which the engine reports as not yet applied (we only
-      // read the arguments present in the code).
-      subjectAsSelf: true,
+      notAppliedArguments: noArgs?.methodCall.notAppliedArguments,
+      subjectAsSelf: noArgs ? !noArgs.methodCall.notAppliedArguments.includes(0) : true,
     })
     if (application instanceof ArgumentApplication) {
       for (const app of application.iterApplications()) {
         const arg = app.argument
-        if (arg instanceof ArgumentAst && arg.argInfo?.reprType != null)
-          types.set(arg.ast.id, arg.argInfo.reprType)
+        if (!(arg instanceof ArgumentAst)) continue
+        const type = arg.argInfo?.reprType
+        // `Any` says nothing: leave the position unknown rather than qualify with `Any`.
+        if (type != null && type !== 'Any' && type !== ANY_TYPE_QN) types.set(arg.ast.id, type)
       }
     }
     return true
