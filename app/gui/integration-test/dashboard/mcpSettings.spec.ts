@@ -22,9 +22,12 @@ test('turning the server on shows its address, and a setup button copies that cl
   await section.getByText(TEXT.mcpEnabledSetting, { exact: true }).click()
   await expect(section.getByLabel(TEXT.mcpEnabledSetting)).toBeChecked()
   await expect(section.getByTestId('mcp-address')).toHaveText('http://127.0.0.1:39417/mcp')
+  // The Claude Desktop block arrives with its own call; the screenshot waits for it.
+  await expect(section.getByTestId('mcp-claude-desktop-config-file')).toBeVisible()
   await expectScreenshot(section, 'mcp-settings-enabled.png')
 
-  await section.getByRole('button', { name: TEXT.mcpClientJson }).click()
+  // Exact: "Copy JSON" in the Claude Desktop block also contains the name.
+  await section.getByRole('button', { name: TEXT.mcpClientJson, exact: true }).click()
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { __mcpCopied?: string }).__mcpCopied))
     .toBe('json')
