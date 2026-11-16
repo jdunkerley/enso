@@ -190,8 +190,8 @@ missing_cell = JS_Object.from_pairs [["_missing_", True]]
    private: true
    ---
    A link: double-clicking a cell creates a node from `action`, a template in
-   which `{{#field}}` is the row's value of `field` (a number when it reads as
-   one), `{{@field}}` the value as it is, and `{{#index}}` the row number.
+   which `{{#field}}` is the row's value of `field` (a number when it is a
+   decimal numeral), `{{@field}}` the value as it is, and `{{#index}}` the row number.
    `label` names what the new node holds in the tooltip ("value" when
    `Nothing`).
 type View_Link

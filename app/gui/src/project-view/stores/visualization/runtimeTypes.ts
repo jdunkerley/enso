@@ -64,3 +64,11 @@ export const VisualizationModule = z.object({
   scripts: z.string().array().optional(),
 })
 export type VisualizationModule = z.infer<typeof VisualizationModule>
+
+/** Thrown when a compiled module is not a visualization (it lacks a `name`, for example). */
+export class InvalidVisualizationModuleError extends TypeError {
+  /** Create the error for the module at `path`. */
+  constructor(public path: string) {
+    super(`The module '${path}' is not a visualization.`)
+  }
+}

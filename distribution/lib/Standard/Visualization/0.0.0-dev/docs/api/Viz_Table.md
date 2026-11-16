@@ -14,7 +14,7 @@
     - filter_between self name:Standard.Base.Data.Text.Text low:Standard.Base.Any.Any high:Standard.Base.Any.Any -> Standard.Visualization.Viz_Table.Viz_Table
     - from_columns headers:(Standard.Base.Data.Vector.Vector Standard.Visualization.Viz_Table.Viz_Header) columns:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Vector.Vector) -> Standard.Visualization.Viz_Table.Viz_Table
     - from_source source:Standard.Base.Any.Any -> Standard.Visualization.Viz_Table.Viz_Table
-    - from_view make_json:(Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text) -> Standard.Visualization.Viz_Table.Viz_Table
+    - from_view make_json:(Standard.Base.Data.Numbers.Integer -> Standard.Base.Data.Text.Text) has_actions:Standard.Base.Data.Boolean.Boolean= -> Standard.Visualization.Viz_Table.Viz_Table
     - rename_columns self names:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) -> Standard.Visualization.Viz_Table.Viz_Table
     - row_count self -> (Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)
     - rows_json self -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)

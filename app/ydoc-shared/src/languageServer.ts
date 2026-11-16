@@ -145,6 +145,7 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     ((result: LsRpcResult<response.InitProtocolConnection>) => void) | undefined
   private shouldReconnect = true
   private retainCount = 1
+  private recordedContentRoots: ContentRoot[] = []
   debug = false
 
   /** Create a {@link LanguageServer}. */
@@ -153,6 +154,8 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     private transport: YjsTransport,
   ) {
     super()
+    // Recorded from the start, so a root announced before anyone listens is not lost.
+    this.on('file/rootAdded', ({ root }) => this.recordContentRoot(root))
     // The client must exist before initialization runs, because initialization sends requests
     // through it. `new RequestManager` connects the transport, and `YjsTransport.connect` emits
     // `open` synchronously, so the transport can already be open once the client exists;
@@ -214,7 +217,13 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
             )
           },
         }).then((result) => {
-          if (!result.ok) {
+          if (result.ok) {
+            // The reply replaces the list: root ids belong to one server process, so a restarted
+            // server's reply has none of the old ones. A `rootAdded` sent before this reply is
+            // already in it; one sent after arrives later and is appended.
+            this.recordedContentRoots = []
+            for (const root of result.value.contentRoots) this.recordContentRoot(root)
+          } else {
             result.error.log('Error initializing Language Server RPC')
           }
           resolve(result)
@@ -231,9 +240,19 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     return this.retainCount === 0
   }
 
-  /** The {@link ContentRoot}s of this {@link LanguageServer}. */
+  /**
+   * The {@link ContentRoot}s of this {@link LanguageServer}: those of the latest initialization
+   * reply (each initialization replaces the previous list) and every one announced by
+   * `file/rootAdded` since, without duplicates. Resolves once the protocol is initialized.
+   */
   get contentRoots(): Promise<ContentRoot[]> {
-    return this.initialized.then((result) => (result.ok ? result.value.contentRoots : []))
+    return this.initialized.then((result) => (result.ok ? [...this.recordedContentRoots] : []))
+  }
+
+  private recordContentRoot(root: ContentRoot) {
+    if (!this.recordedContentRoots.some((known) => known.id === root.id)) {
+      this.recordedContentRoots.push(root)
+    }
   }
 
   /** Reconnect the underlying network transport. */
