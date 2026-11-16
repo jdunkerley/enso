@@ -31,6 +31,9 @@ goldens); TypeScript/Vue 3 in `app/gui` (run-time compiler: `vue/compiler-sfc`,
 (addendum to `2026-11-16-library-visualizations-design.md`). Its owner questions
 decide what this plan builds:
 
+Answered 2026-11-16: the owner chose the recommendation on all three (Q1
+Standard.Visualization, Q2 yes, Q3 yes), and #817 is merged (848dd7f3f4).
+
 - **Q1** (Geo Map's library): this plan uses the recommendation,
   `Standard.Visualization`. If the owner picks another library, apply "If Q1
   picks another library" at the end of PR B.
@@ -756,7 +759,7 @@ the template comment:
       changed Markdown and the moved `.vue` file. Commit `SQL Query: docs`.
 - [ ] **Step 3: Open the PR** to `develop` with label `CI: No changelog needed`.
       Body: what moved and why the data stays in Standard.Visualization, the
-      allow-list, the `sql-formatter` widening (Q2, approved on <date>), the
+      allow-list, the `sql-formatter` widening (Q2, approved on 2026-11-16), the
       escaping fix, test evidence. Link it; wait for CI green (the PR touches
       `distribution/`, so CI packages an installer with its own engine).
 - [ ] **Step 4: Screenshots**: a database table node in SQL Query before
@@ -1286,7 +1289,7 @@ TypeScript does not follow, as in Task A3 step 4.
       Commit `Geo Map: docs`.
 - [ ] **Step 3: Open the PR** to `develop` with label `CI: No changelog needed`.
       Body: what moved, why Standard.Visualization (Q1), the `builtins` widening
-      (Q3, approved on <date>), the inlined bounding box and dropped
+      (Q3, approved on 2026-11-16), the inlined bounding box and dropped
       dependencies, test evidence. Link it; wait for CI green.
 - [ ] **Step 4: Screenshots**: a lat/lon table in Geo Map (with a token) and the
       token-missing empty state, before (develop) and after (PR), on

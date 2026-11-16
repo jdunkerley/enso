@@ -1,9 +1,10 @@
 # Library visualizations, addendum: SQL Query and Geo Map leave the GUI
 
-Status: proposed (2026-11-16). Addendum to
-`2026-11-16-library-visualizations-design.md` (#808, implemented by #817), whose
-"Not in scope" names these two moves as follow-ups once Image proves the path.
-To be built only after the owner approves the Image move (#817). Plan:
+Status: approved (2026-11-16; the owner chose the recommendation on Q1, Q2 and
+Q3). Addendum to `2026-11-16-library-visualizations-design.md` (#808,
+implemented by #817), whose "Not in scope" names these two moves as follow-ups
+once Image proves the path. To be built only after the owner approves the Image
+move (#817). Plan:
 `docs/superpowers/plans/2026-11-16-sql-geo-library-visualizations.md`.
 
 ## Goal
@@ -186,3 +187,10 @@ Two PRs, each after #817 is merged, SQL first (it brings the allow-list): no
 changelog entry (nothing changes for users; label `CI: No changelog needed`),
 before/after screenshots of each view, and merge on the owner's OK after an
 installer test, as for Image.
+
+## Owner answers (2026-11-16)
+
+- Q1: Geo Map goes to Standard.Visualization.
+- Q2: yes, `builtins` gains the lazy `sql-formatter` module.
+- Q3: yes, `builtins` exports `useMapboxToken`, `redactAccessToken` and the
+  `MapboxTokenMissing` component.
