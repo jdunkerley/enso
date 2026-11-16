@@ -82,3 +82,21 @@ test('a Text value gets the colour its type name hashes to', () => {
   expect(style).toContain('color:rgba(52.4609375,106.25,37.1875,1);')
   expect(style).toContain('background-color:rgba(52.4609375,106.25,37.1875,0.2);')
 })
+
+test('a placeholder-looking name in the SQL is shown as it is', () => {
+  const wrapper = mount(SqlQuery.default, {
+    props: sql('SELECT __enso_param_7__ FROM "t" WHERE "b" = ?', 'x'),
+  })
+  const pre = wrapper.get('pre.sql')
+  expect(pre.text()).toContain('__enso_param_7__')
+  expect(pre.get('.interpolation').text()).toBe("'x'")
+})
+
+test('a placeholder-looking name in the SQL that matches a value is still shown as it is', () => {
+  const wrapper = mount(SqlQuery.default, {
+    props: sql('SELECT __enso_param_0__ WHERE "b" = ?', 'x'),
+  })
+  const pre = wrapper.get('pre.sql')
+  expect(pre.text().replace(/\s+/g, ' ')).toContain('SELECT __enso_param_0__')
+  expect(pre.findAll('.interpolation')).toHaveLength(1)
+})

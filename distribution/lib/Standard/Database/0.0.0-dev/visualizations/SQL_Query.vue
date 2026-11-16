@@ -55,22 +55,33 @@ function escapeHtml(text: string) {
   return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 }
 
-/** A parameter sql-formatter copies through unchanged, swapped for the value after escaping. */
-const placeholder = (index: number) => `__enso_param_${index}__`
-const PLACEHOLDER = /__enso_param_(\d+)__/g
+/**
+ * A name for each parameter that sql-formatter copies through unchanged, swapped for the value
+ * after escaping. The prefix is lengthened until the SQL text itself cannot contain it, so a name
+ * in the SQL that looks like a placeholder is never taken for one.
+ */
+function placeholderPrefixFor(code: string) {
+  let prefix = '__enso_param_'
+  for (let nonce = 1; code.includes(prefix); nonce += 1) {
+    prefix = `__enso_param${nonce}_`
+  }
+  return prefix
+}
 
 const formatted = computed(() => {
   if (props.data.error != null || props.data.code == null) {
     return undefined
   }
   const interpolations = props.data.interpolations ?? []
+  const prefix = placeholderPrefixFor(props.data.code)
   const text = format(props.data.code, {
-    params: interpolations.map((_, index) => placeholder(index)),
+    params: interpolations.map((_, index) => `${prefix}${index}__`),
     language: language.value,
   })
-  return escapeHtml(text).replace(PLACEHOLDER, (_, index) =>
-    renderInterpolationParameter(interpolations[Number(index)]!),
-  )
+  return escapeHtml(text).replace(new RegExp(`${prefix}(\\d+)__`, 'g'), (match, index) => {
+    const interpolation = interpolations[Number(index)]
+    return interpolation != null ? renderInterpolationParameter(interpolation) : match
+  })
 })
 
 interface RGBA {
