@@ -55,10 +55,19 @@ async function mountGrid() {
     global: { stubs: { GridPopupMenu: true } },
   })
   await flushPromises()
-  return { wrapper, stub: wrapper.findComponent({ name: 'StubAgGridVue' }) }
+  const stub = wrapper.findComponent({ name: 'StubAgGridVue' })
+  // AG Grid 36 scrolls both axes in one element, `.ag-grid-viewport`, which the stub lacks.
+  const viewport = document.createElement('div')
+  viewport.className = 'ag-grid-viewport'
+  stub.element.appendChild(viewport)
+  return { wrapper, stub, viewport }
 }
 
-/** A stand-in for the grid API's scroll position, which the test moves to scroll the grid. */
+/**
+ * A stand-in for the grid API. Its scroll position is what AG Grid *reports*, which lags behind the
+ * viewport element's real one (`getVScrollPosition` returns a cached `lastScrollTop` until the
+ * viewport's own `scroll` event invalidates it), so the tests move it separately.
+ */
 function fakeScrollingApi() {
   const position = { left: 0, top: 0 }
   return {
@@ -104,13 +113,24 @@ describe('AgGridTableView context menu', () => {
   // The grid scrolls inside its own shadow root, where a `scroll` event never reaches `window`, so
   // the popup cannot see it: the grid has to close the menu on AG Grid's own `bodyScroll` event.
   test('scrolling the grid body closes the menu', async () => {
-    const { wrapper, stub } = await mountGrid()
+    const { wrapper, stub, viewport } = await mountGrid()
     const api = fakeScrollingApi()
     await rightClickCell(stub, api)
     expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(true)
 
+    viewport.scrollTop = 40
     api.position.top = 40
     stub.vm.$emit('bodyScroll', { direction: 'vertical', api })
+    await stub.vm.$nextTick()
+    expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(false)
+  })
+
+  test('scrolling the grid body sideways closes the menu', async () => {
+    const { wrapper, stub, viewport } = await mountGrid()
+    await rightClickCell(stub)
+
+    viewport.scrollLeft = 40
+    stub.vm.$emit('bodyScroll', { direction: 'horizontal', api: fakeScrollingApi() })
     await stub.vm.$nextTick()
     expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(false)
   })
@@ -119,13 +139,45 @@ describe('AgGridTableView context menu', () => {
   // scroll that the right-click itself causes (AG Grid brings the focused cell into view) is
   // reported after the menu has opened, and must not close it (#814, found on Linux CI).
   test('a scroll that was already made when the menu opened leaves it open', async () => {
-    const { wrapper, stub } = await mountGrid()
+    const { wrapper, stub, viewport } = await mountGrid()
     const api = fakeScrollingApi()
+    viewport.scrollLeft = 8
     api.position.left = 8
     await rightClickCell(stub, api)
 
     stub.vm.$emit('bodyScroll', { direction: 'horizontal', left: 8, top: -1, api })
     stub.vm.$emit('bodyScroll', { direction: 'vertical', left: 8, top: 0, api })
+    await stub.vm.$nextTick()
+    expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(true)
+  })
+
+  // The position AG Grid reports is cached: on Linux and macOS the `cellContextMenu` handler can run
+  // before the frame that delivers the focus-scroll's `scroll` event, so what it reports is stale
+  // while the viewport element has moved already. The menu must compare the element's real position.
+  test('a stale position reported by the grid API does not close the menu', async () => {
+    const { wrapper, stub, viewport } = await mountGrid()
+    const api = fakeScrollingApi()
+    viewport.scrollTop = 30 // the focus-scroll has happened ...
+    api.position.top = 0 // ... but the API still reports the cached position.
+    await rightClickCell(stub, api)
+
+    api.position.top = 30 // The `scroll` event arrives, and the cache catches up.
+    stub.vm.$emit('bodyScroll', { direction: 'vertical', left: 0, top: 30, api })
+    await stub.vm.$nextTick()
+    expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(true)
+  })
+
+  test('a menu opened again is compared with the position it was opened at', async () => {
+    const { wrapper, stub, viewport } = await mountGrid()
+    const api = fakeScrollingApi()
+    await rightClickCell(stub, api)
+    wrapper.findComponent({ name: 'GridPopupMenu' }).vm.$emit('close')
+    await stub.vm.$nextTick()
+    expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(false)
+
+    viewport.scrollTop = 25
+    await rightClickCell(stub, api)
+    stub.vm.$emit('bodyScroll', { direction: 'vertical', api })
     await stub.vm.$nextTick()
     expect(wrapper.findComponent({ name: 'GridPopupMenu' }).exists()).toBe(true)
   })

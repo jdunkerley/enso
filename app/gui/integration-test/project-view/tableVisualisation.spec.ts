@@ -849,9 +849,14 @@ test.describe('Cell menu dismissal', () => {
       const target = await cellCutOffAt(table, edge)
       const menu = page.getByTestId('gridPopupMenu')
 
+      const beforeClick = await bodyScroll(table)
       await page.mouse.click(target.x, target.y, { button: 'right' })
       await expect(menu).toBeVisible()
-      // Anything AG Grid does because of the click (focus, ensure visible) has happened by now.
+      // The premise of this test: the right-click itself scrolled the grid (AG Grid brings the cut-off
+      // cell into view) - without it the menu would stay open for nothing to do with the fix.
+      const axis = edge === 'right' ? 'left' : 'top'
+      await expect.poll(async () => (await bodyScroll(table))[axis]).not.toBe(beforeClick[axis])
+      // Anything AG Grid does because of the click (focus, ensure visible, `bodyScroll`) has happened by now.
       await page.waitForTimeout(500)
       await expect(menu).toBeVisible()
 
