@@ -58,6 +58,36 @@ type Date
     today -> Date = Date_Helpers.today
 
     ## ---
+       aliases: [previous day]
+       group: DateTime
+       icon: calendar
+       ---
+       The day before today, from the system clock in the system timezone.
+
+       ## Examples
+       ### The day before today.
+
+       ```
+       day = Date.yesterday
+       ```
+    yesterday -> Date = Date.today.previous
+
+    ## ---
+       aliases: [next day]
+       group: DateTime
+       icon: calendar
+       ---
+       The day after today, from the system clock in the system timezone.
+
+       ## Examples
+       ### The day after today.
+
+       ```
+       day = Date.tomorrow
+       ```
+    tomorrow -> Date = Date.today.next
+
+    ## ---
        group: Constants
        icon: calendar
        ---
@@ -546,7 +576,6 @@ type Date
 
              example_to_time = Date.new 2020 2 3 . to_date_time Time_Of_Day.new Time_Zone.utc
        ```
-    @time_of_day (Time_Of_Day.default_widget include_now=False)
     @zone Time_Zone.default_widget
     to_date_time : Time_Of_Day -> Time_Zone -> Date_Time
     to_date_time self (time_of_day=Time_Of_Day.new) (zone=Time_Zone.system) =
