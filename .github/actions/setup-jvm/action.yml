@@ -161,8 +161,9 @@ runs:
         fi
         rm "$dir/$name" "$dir/$name.sha256"
         # The archive holds one directory (`graalvm-community-<release>+<build>`).
+        # `tr` because macOS's BSD `wc` pads its count with spaces (`       1`).
         top=$(find "$dir/graalvm" -mindepth 1 -maxdepth 1 -type d)
-        if [ "$(wc -l <<< "$top")" != 1 ] || [ -z "$top" ]; then
+        if [ "$(wc -l <<< "$top" | tr -d ' ')" != 1 ] || [ -z "$top" ]; then
           echo "::error::setup-jvm: expected one directory in $name, found: ${top:-none}"
           exit 1
         fi
@@ -280,7 +281,7 @@ runs:
         fi
         rm "$dir/$asset" "$dir/$asset.sha256"
         top=$(find "$dir/graalpy" -mindepth 1 -maxdepth 1 -type d)
-        if [ -z "$top" ] || [ "$(wc -l <<< "$top")" != 1 ]; then
+        if [ -z "$top" ] || [ "$(wc -l <<< "$top" | tr -d ' ')" != 1 ]; then
           echo "::error::setup-jvm: expected one directory in $asset, found: ${top:-none}"
           exit 1
         fi
