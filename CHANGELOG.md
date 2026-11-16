@@ -3,7 +3,7 @@
 #### Enso IDE
 
 - [Agents connected over MCP can list the visualizations a node offers and look
-  at any of them, as a picture or as its data.][NNN]
+  at any of them, as a picture or as its data.][809]
 - [Agents connected over MCP can create and open projects and add, edit, remove
   and group nodes; each run of changes is one undo step. Settings → AI can also
   set up Claude Desktop.][790]
@@ -519,7 +519,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[809]: https://github.com/jdunkerley/enso/pull/809
 [790]: https://github.com/jdunkerley/enso/pull/790
 [789]: https://github.com/jdunkerley/enso/pull/789
 [782]: https://github.com/jdunkerley/enso/pull/782
