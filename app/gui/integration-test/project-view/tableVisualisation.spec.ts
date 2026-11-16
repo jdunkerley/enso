@@ -786,13 +786,13 @@ test.describe('Cell menu dismissal', () => {
   }
 
   /**
-   * The cell cut off at the `edge` of what can be clicked, with the most of it showing, and a point
-   * on its visible part. What is visible is found by hit-testing, not by geometry: the node clips
-   * the table and AG Grid's scrollbars overlay its rows.
+   * The cell cut off at the `edge` of what can be clicked, with the most of it showing. What is
+   * visible is found by hit-testing, not by geometry: the node clips the table and AG Grid's
+   * scrollbars overlay its rows.
    */
   async function cellCutOffAt(table: Locator, edge: 'right' | 'bottom') {
     const cells = await table.locator('.ag-cell').all()
-    let best: { x: number; y: number; area: number } | undefined
+    let best: { cell: Locator; area: number } | undefined
     for (const cell of cells) {
       const found = await cell.evaluate((el) => {
         const box = el.getBoundingClientRect()
@@ -821,8 +821,7 @@ test.describe('Cell menu dismissal', () => {
       const cut = edge === 'right' ? found.box.right - found.maxX : found.box.bottom - found.maxY
       // Partly visible: some pixels in, and some pixels out.
       if (cut <= 4) continue
-      if (best == null || found.hits > best.area)
-        best = { x: found.x, y: found.y, area: found.hits }
+      if (best == null || found.hits > best.area) best = { cell, area: found.hits }
     }
     expect(best, `a cell cut off at the ${edge} edge`).toBeDefined()
     return best!
@@ -850,13 +849,36 @@ test.describe('Cell menu dismissal', () => {
       const menu = page.getByTestId('gridPopupMenu')
 
       const beforeClick = await bodyScroll(table)
-      await page.mouse.click(target.x, target.y, { button: 'right' })
+      if (edge === 'right') {
+        // Playwright scrolls a cut-off cell into view before it clicks it, and AG Grid reports that
+        // scroll as `bodyScroll` asynchronously - around when the menu opens.
+        await target.cell.click({ button: 'right' })
+      } else {
+        // AG Grid scrolls no cell into view for a click, and what is cut off at the bottom is only
+        // overlaid by its scrollbar, which Playwright does not scroll for. So scroll in the same task
+        // as the right-click: the `scroll` event reaches AG Grid a frame later, after the menu opened
+        // and while its cached position still is the one from before.
+        await target.cell.evaluate((cell) => {
+          cell.closest('.ag-grid-viewport')!.scrollTop += 5
+          const box = cell.getBoundingClientRect()
+          cell.dispatchEvent(
+            new MouseEvent('contextmenu', {
+              bubbles: true,
+              cancelable: true,
+              composed: true,
+              button: 2,
+              clientX: box.left + box.width / 2,
+              clientY: box.top + box.height / 2,
+            }),
+          )
+        })
+      }
       await expect(menu).toBeVisible()
-      // The premise of this test: the right-click itself scrolled the grid (AG Grid brings the cut-off
-      // cell into view) - without it the menu would stay open for nothing to do with the fix.
+      // The premise of this test: the grid did scroll because of the click - without it the menu would
+      // stay open for nothing to do with the fix.
       const axis = edge === 'right' ? 'left' : 'top'
       await expect.poll(async () => (await bodyScroll(table))[axis]).not.toBe(beforeClick[axis])
-      // Anything AG Grid does because of the click (focus, ensure visible, `bodyScroll`) has happened by now.
+      // Anything AG Grid does because of the click (focus, `bodyScroll`) has happened by now.
       await page.waitForTimeout(500)
       await expect(menu).toBeVisible()
 
