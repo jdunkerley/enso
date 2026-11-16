@@ -6,7 +6,7 @@
  * client's setup text, and a button to replace the token. If the server could not start, the
  * reason shows under the switch. Under the copy buttons, a Claude Desktop block shows whether its
  * configuration file has the IDE's entry and offers to add or update it (Electron main edits the
- * file). While `ENSO_MCP_ENABLED` or `ENSO_MCP_PORT` fixes the setting
+ * file), and, for doing it by hand, a Copy JSON button with the file's path and what to do with it. While `ENSO_MCP_ENABLED` or `ENSO_MCP_PORT` fixes the setting
  * (`lockedByEnvironment`), the switch and the port field are disabled, with a note saying why.
  *
  * The token never reaches this component: "Copy setup" goes through Electron main, which writes the
@@ -29,7 +29,7 @@ import { useMutation } from '@tanstack/vue-query'
 import {
   MCP_CLIENT_KINDS,
   MCP_DEFAULT_PORT,
-  type ClaudeDesktopSetup,
+  type ClaudeDesktopStatus,
   type McpClientKind,
   type McpStatus,
 } from 'enso-common/src/mcp'
@@ -61,9 +61,11 @@ const status = ref<McpStatus>({
   lockedByEnvironment: false,
 })
 /** `null` until main has answered. */
-const claudeDesktop = ref<ClaudeDesktopSetup | null>(null)
+const claudeDesktop = ref<ClaudeDesktopStatus | null>(null)
 const locked = computed(() => status.value.lockedByEnvironment)
 const address = computed(() => `http://127.0.0.1:${status.value.port}/mcp`)
+/** Claude Desktop's JSON is offered in its own block, beside where the file is. */
+const COPY_ROW_CLIENTS = MCP_CLIENT_KINDS.filter((client) => client !== 'claudeDesktop')
 
 /** Show a failure as a toast. */
 function showError(error: unknown) {
@@ -218,7 +220,7 @@ async function askReplaceToken() {
         <Text weight="bold">{{ getText('mcpCopySetupFor') }}</Text>
         <ButtonGroup class="grow-0 flex-wrap">
           <Button
-            v-for="client in MCP_CLIENT_KINDS"
+            v-for="client in COPY_ROW_CLIENTS"
             :key="client"
             size="small"
             variant="outline"
@@ -261,6 +263,18 @@ async function askReplaceToken() {
             }}
           </Button>
         </ButtonGroup>
+        <template v-if="claudeDesktop.configFile != null">
+          <Text>{{ getText('mcpClaudeDesktopManualIntro') }}</Text>
+          <Text textSelection="all" monospace testId="mcp-claude-desktop-config-file">
+            {{ claudeDesktop.configFile }}
+          </Text>
+          <Text>{{ getText('mcpClaudeDesktopManualSteps') }}</Text>
+          <ButtonGroup class="grow-0">
+            <Button size="small" variant="outline" @press="copyConfig.mutate('claudeDesktop')">
+              {{ getText('mcpClaudeDesktopCopyJson') }}
+            </Button>
+          </ButtonGroup>
+        </template>
         <Text>{{ getText('mcpClaudeDesktopNeeds') }}</Text>
       </div>
       <ButtonGroup class="grow-0">

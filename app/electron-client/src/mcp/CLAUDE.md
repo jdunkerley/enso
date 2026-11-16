@@ -61,8 +61,9 @@ default. No tool changes the execution environment, settings or secrets.
   first and rewrite the entry afterwards only if it was `setUp` (Enso's own): a
   hand-edited entry is left alone and a missing one is never created; a rewrite
   failure is logged. Nothing is written on `setEnabled`. The token never reaches
-  the renderer: the IPC calls return only a `ClaudeDesktopSetup`. Settings → AI
-  offers the set-up only while the server is on
+  the renderer: the IPC calls return only a `ClaudeDesktopStatus` (the state and
+  the configuration file's path, which Settings shows beside Copy JSON).
+  Settings → AI offers the set-up only while the server is on
   (`app/gui/src/dashboard/layouts/Settings/CLAUDE.md`, "AI"). Tests inject a
   temporary folder; never point one at the real Claude folder.
 - `clientConfigs.ts` — that setup text per client (`claude mcp add` command,

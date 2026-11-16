@@ -333,8 +333,8 @@ describe('McpController', () => {
 
     test('status is notSetUp, then setUpClaudeDesktop writes the entry with the URL and token', async () => {
       const c = controller()
-      expect(await c.claudeDesktopStatus()).toEqual({ state: 'notSetUp' })
-      expect(await c.setUpClaudeDesktop()).toEqual({ state: 'setUp' })
+      expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'notSetUp' })
+      expect(await c.setUpClaudeDesktop()).toMatchObject({ state: 'setUp' })
       const token = keyring.items.get(MCP_TOKEN_ACCOUNT)!
       expect(await entryOf()).toEqual(
         JSON.parse(clientConfig('claudeDesktop', 'http://127.0.0.1:39417/mcp', token)).mcpServers
@@ -343,11 +343,25 @@ describe('McpController', () => {
       expect(servers).toEqual([])
     })
 
+    test('the status carries the path of the configuration file, or null without a folder', async () => {
+      expect((await controller().claudeDesktopStatus()).configFile).toBe(
+        path.join(claudeDir!, 'claude_desktop_config.json'),
+      )
+      expect((await controller().setUpClaudeDesktop()).configFile).toBe(
+        path.join(claudeDir!, 'claude_desktop_config.json'),
+      )
+      claudeDir = undefined
+      expect(await controller().claudeDesktopStatus()).toEqual({
+        state: 'notInstalled',
+        configFile: null,
+      })
+    })
+
     test('without a Claude Desktop folder it is notInstalled and writes nothing', async () => {
       claudeDir = undefined
       const c = controller()
-      expect(await c.claudeDesktopStatus()).toEqual({ state: 'notInstalled' })
-      expect(await c.setUpClaudeDesktop()).toEqual({ state: 'notInstalled' })
+      expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'notInstalled' })
+      expect(await c.setUpClaudeDesktop()).toMatchObject({ state: 'notInstalled' })
     })
 
     test('replaceToken rewrites an existing entry with the new token', async () => {
@@ -356,7 +370,7 @@ describe('McpController', () => {
       await c.replaceToken()
       const fresh = keyring.items.get(MCP_TOKEN_ACCOUNT)!
       expect(await entryOf()).toMatchObject({ env: { ENSO_AUTH: `Bearer ${fresh}` } })
-      expect(await c.claudeDesktopStatus()).toEqual({ state: 'setUp' })
+      expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'setUp' })
     })
 
     test('setPort rewrites an existing entry with the new address', async () => {
@@ -364,31 +378,31 @@ describe('McpController', () => {
       await c.setUpClaudeDesktop()
       await c.setPort(40000)
       expect(JSON.stringify(await entryOf())).toContain('http://127.0.0.1:40000/mcp')
-      expect(await c.claudeDesktopStatus()).toEqual({ state: 'setUp' })
+      expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'setUp' })
     })
 
     test('status with no directory does not touch the keychain', async () => {
       claudeDir = undefined
       const c = controller()
-      expect(await c.claudeDesktopStatus()).toEqual({ state: 'notInstalled' })
+      expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'notInstalled' })
       expect(keyring.accounts).toEqual([])
     })
 
     test('status with a missing folder does not touch the keychain', async () => {
       await fs.rm(claudeDir!, { recursive: true })
       const c = controller()
-      expect(await c.claudeDesktopStatus()).toEqual({ state: 'notInstalled' })
+      expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'notInstalled' })
       expect(keyring.accounts).toEqual([])
     })
 
     test('status with no stored token creates none: notSetUp, or outOfDate for an entry', async () => {
       const c = controller()
-      expect(await c.claudeDesktopStatus()).toEqual({ state: 'notSetUp' })
+      expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'notSetUp' })
       await fs.writeFile(
         path.join(claudeDir!, 'claude_desktop_config.json'),
         JSON.stringify({ mcpServers: { enso: { command: 'x' } } }),
       )
-      expect(await c.claudeDesktopStatus()).toEqual({ state: 'outOfDate' })
+      expect(await c.claudeDesktopStatus()).toMatchObject({ state: 'outOfDate' })
       expect(keyring.items.size).toBe(0)
     })
 
@@ -397,7 +411,7 @@ describe('McpController', () => {
         throw new Error('no keychain')
       }
       const c = controller()
-      expect(await c.claudeDesktopStatus()).toEqual({
+      expect(await c.claudeDesktopStatus()).toMatchObject({
         state: 'unreadable',
         reason: 'The system keychain is not available.',
       })

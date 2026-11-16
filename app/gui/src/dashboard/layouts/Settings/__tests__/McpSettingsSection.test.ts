@@ -12,6 +12,7 @@ import {
   MCP_CLIENT_KINDS,
   MCP_DEFAULT_PORT,
   type ClaudeDesktopSetup,
+  type ClaudeDesktopStatus,
   type McpStatus,
 } from 'enso-common/src/mcp'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -58,8 +59,8 @@ beforeEach(() => {
   fake.setPort.mockImplementation((port: number) => Promise.resolve({ ...ON, port }))
   fake.replaceToken.mockResolvedValue(ON)
   fake.copyConfig.mockResolvedValue(undefined)
-  fake.claudeDesktopStatus.mockResolvedValue({ state: 'notSetUp' })
-  fake.setUpClaudeDesktop.mockResolvedValue({ state: 'setUp' })
+  fake.claudeDesktopStatus.mockResolvedValue({ state: 'notSetUp', configFile: null })
+  fake.setUpClaudeDesktop.mockResolvedValue({ state: 'setUp', configFile: null })
   fake.onStatusChanged.mockImplementation((handler: (status: McpStatus) => void) => {
     fake.emit = handler
     return () => {
@@ -133,7 +134,6 @@ describe('McpSettingsSection', () => {
     expect(switchInput().checked).toBe(true)
     for (const label of [
       'mcpClientClaudeCode',
-      'mcpClientClaudeDesktop',
       'mcpClientCodex',
       'mcpClientCopilotVsCode',
       'mcpClientCopilotCli',
@@ -154,7 +154,6 @@ describe('McpSettingsSection', () => {
 
   test.each([
     ['mcpClientClaudeCode', 'claudeCode'],
-    ['mcpClientClaudeDesktop', 'claudeDesktop'],
     ['mcpClientCodex', 'codex'],
     ['mcpClientCopilotVsCode', 'copilotVsCode'],
     ['mcpClientCopilotCli', 'copilotCli'],
@@ -297,15 +296,40 @@ describe('McpSettingsSection', () => {
   })
   describe('Claude Desktop', () => {
     const NOTE = () => getText('mcpClaudeDesktopNeeds')
-    const withState = async (state: ClaudeDesktopSetup) => {
+    const CONFIG_FILE = '/home/me/Claude/claude_desktop_config.json'
+    const withState = async (
+      state: ClaudeDesktopSetup,
+      configFile: ClaudeDesktopStatus['configFile'] = CONFIG_FILE,
+    ) => {
       fake.status.mockResolvedValue(ON)
-      fake.claudeDesktopStatus.mockResolvedValue(state)
+      fake.claudeDesktopStatus.mockResolvedValue({ ...state, configFile })
       await mountSection()
     }
     const buttonNamed = (name: string) =>
       [...document.querySelectorAll<HTMLElement>('button')].find(
         (element) => element.textContent.trim() === name,
       )
+
+    test('offers the JSON with where the file is and what to do, in every state', async () => {
+      await withState({ state: 'setUp' })
+      expect(document.body.textContent).toContain(getText('mcpClaudeDesktopManualIntro'))
+      expect(document.body.textContent).toContain(CONFIG_FILE)
+      expect(document.body.textContent).toContain(getText('mcpClaudeDesktopManualSteps'))
+      button(getText('mcpClaudeDesktopCopyJson')).click()
+      await flushPromises()
+      expect(fake.copyConfig).toHaveBeenCalledWith('claudeDesktop')
+    })
+
+    test('the copy row has no Claude Desktop button: its JSON is in the block', async () => {
+      await withState({ state: 'notSetUp' })
+      expect(buttonNamed(getText('mcpClientClaudeDesktop'))).toBeUndefined()
+    })
+
+    test('no file path (no Claude Desktop on this platform): no manual route', async () => {
+      await withState({ state: 'notInstalled' }, null)
+      expect(document.body.textContent).not.toContain(getText('mcpClaudeDesktopManualIntro'))
+      expect(buttonNamed(getText('mcpClaudeDesktopCopyJson'))).toBeUndefined()
+    })
 
     test('notInstalled: one line and no button', async () => {
       await withState({ state: 'notInstalled' })

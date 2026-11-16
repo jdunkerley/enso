@@ -40,6 +40,15 @@ test('the Claude Desktop block offers set-up, asks first, and then says it is se
   await section.getByText(TEXT.mcpEnabledSetting, { exact: true }).click()
   const block = section.getByTestId('mcp-claude-desktop')
   await expect(block).toContainText(TEXT.mcpClaudeDesktopNeeds)
+  // The manual route: where the file is, and its JSON.
+  await expect(block.getByTestId('mcp-claude-desktop-config-file')).toHaveText(
+    '/mock/Claude/claude_desktop_config.json',
+  )
+  await expect(block).toContainText(TEXT.mcpClaudeDesktopManualSteps)
+  await block.getByRole('button', { name: TEXT.mcpClaudeDesktopCopyJson }).click()
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __mcpCopied?: string }).__mcpCopied))
+    .toBe('claudeDesktop')
   await block.getByRole('button', { name: TEXT.mcpClaudeDesktopSetUpButton }).click()
   const dialog = page.getByRole('alertdialog')
   await expect(dialog).toContainText(TEXT.mcpClaudeDesktopConfirm)

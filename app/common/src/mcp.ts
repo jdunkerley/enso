@@ -64,3 +64,10 @@ export type ClaudeDesktopSetup =
   | { readonly state: 'outOfDate' }
   /** The file cannot be used (not valid JSON, not the expected shape). */
   | { readonly state: 'unreadable'; readonly reason: string }
+
+/**
+ * What the Settings block is given: the state, and the full path of Claude Desktop's configuration
+ * file for the instructions (null on a platform without Claude Desktop). The path is shown whether
+ * or not the file or its folder exists yet.
+ */
+export type ClaudeDesktopStatus = ClaudeDesktopSetup & { readonly configFile: string | null }

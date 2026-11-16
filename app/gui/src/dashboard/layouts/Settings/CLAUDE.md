@@ -85,10 +85,14 @@ effect), the switch, the port field and its Save are disabled, with a note
 resolves with a status other than the one asked for, or fails, re-keys the forms
 so they show the server's state. A failed `setPort` shows in the port form only,
 not as a toast. Under the copy buttons a Claude Desktop block shows the
-`ClaudeDesktopSetup` state read with `claudeDesktopStatus()` on mount and after
-each server status change: not installed (one line), not set up (a Set up
-button), set up, out of date (an Update button), or unreadable (the reason, and
-the manual route through the Claude Desktop copy button). The button asks first
+`ClaudeDesktopStatus` read with `claudeDesktopStatus()` on mount and after each
+server status change: not installed (one line), not set up (a Set up button),
+set up, out of date (an Update button), or unreadable (the reason, and a pointer
+to Copy JSON). In every state with a `configFile` (the file's full path, from
+main; null on a platform without Claude Desktop) the block also has the manual
+route: the path, what to do with the JSON, and a Copy JSON button
+(`copyConfig('claudeDesktop')`). The "Copy setup for" row therefore has no
+Claude Desktop button. The button asks first
 (`McpClaudeDesktopConfirmModal.vue`: a non-destructive `AlertDialog` titled like
 the button; `ConfirmDeleteModal` is styled as destructive), then
 `setUpClaudeDesktop()` has main edit Claude Desktop's configuration file. The

@@ -293,12 +293,13 @@ async function mockElectronApi(
                   w.__mcpCopied = client
                 },
                 // Not set up until the spec presses the button; then `__mcpClaudeDesktopSetUp` is true.
-                claudeDesktopStatus: async (): Promise<{ state: string }> => ({
+                claudeDesktopStatus: async (): Promise<{ state: string; configFile: string }> => ({
                   state: w.__mcpClaudeDesktopSetUp === true ? 'setUp' : 'notSetUp',
+                  configFile: '/mock/Claude/claude_desktop_config.json',
                 }),
-                setUpClaudeDesktop: async (): Promise<{ state: string }> => {
+                setUpClaudeDesktop: async (): Promise<{ state: string; configFile: string }> => {
                   w.__mcpClaudeDesktopSetUp = true
-                  return { state: 'setUp' }
+                  return { state: 'setUp', configFile: '/mock/Claude/claude_desktop_config.json' }
                 },
               }
             })(),

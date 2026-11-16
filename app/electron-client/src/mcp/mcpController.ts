@@ -9,13 +9,18 @@
 import {
   MCP_DEFAULT_PORT,
   type ClaudeDesktopSetup,
+  type ClaudeDesktopStatus,
   type McpClientKind,
   type McpStatus,
 } from 'enso-common/src/mcp'
 import { randomBytes } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import type { KeyringEntryLike } from '../secretsKey'
-import { readClaudeDesktopSetup, writeClaudeDesktopSetup } from './claudeDesktop'
+import {
+  claudeDesktopConfigFile,
+  readClaudeDesktopSetup,
+  writeClaudeDesktopSetup,
+} from './claudeDesktop'
 import { clientConfig } from './clientConfigs'
 
 /** The keychain account of the MCP token. The service is always `Enso`. */
@@ -201,22 +206,27 @@ export class McpController {
 
   /**
    * Where Claude Desktop's configuration stands against the current address and token. Reading it
-   * never creates a token: with none stored, an existing entry is out of date.
+   * never creates a token: with none stored, an existing entry is out of date. The result
+   * also carries the file's path, for the instructions in Settings.
    */
-  claudeDesktopStatus(): Promise<ClaudeDesktopSetup> {
-    return this.serialised(() => this.currentClaudeDesktopStatus())
+  claudeDesktopStatus(): Promise<ClaudeDesktopStatus> {
+    return this.serialised(async () => this.withConfigFile(await this.currentClaudeDesktopStatus()))
   }
 
   /**
    * Add or replace the `enso` entry in Claude Desktop's configuration file, with the current
    * address and token, whether or not the server is enabled. Resolves with the status read back.
    */
-  setUpClaudeDesktop(): Promise<ClaudeDesktopSetup> {
+  setUpClaudeDesktop(): Promise<ClaudeDesktopStatus> {
     return this.serialised(async () => {
       const directory = this.options.claudeDesktopDirectory
       const found = await readClaudeDesktopSetup(directory, this.url, null)
-      if (directory == null || found.state === 'notInstalled') return { state: 'notInstalled' }
-      return writeClaudeDesktopSetup(directory, this.url, await this.token())
+      if (directory == null || found.state === 'notInstalled') {
+        return this.withConfigFile({ state: 'notInstalled' })
+      }
+      return this.withConfigFile(
+        await writeClaudeDesktopSetup(directory, this.url, await this.token()),
+      )
     })
   }
 
@@ -241,6 +251,10 @@ export class McpController {
     if (this.envToken != null) return this.envToken
     const existing = (await this.options.entry(MCP_TOKEN_ACCOUNT)).getPassword()
     return existing != null && existing !== '' ? existing : null
+  }
+
+  private withConfigFile(setup: ClaudeDesktopSetup): ClaudeDesktopStatus {
+    return { ...setup, configFile: claudeDesktopConfigFile(this.options.claudeDesktopDirectory) }
   }
 
   /** Claude Desktop's status. Touches the keychain only once the folder exists; never throws. */

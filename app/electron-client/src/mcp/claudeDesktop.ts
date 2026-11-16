@@ -36,6 +36,11 @@ export function claudeDesktopConfigDirectory(
   }
 }
 
+/** The full path of `claude_desktop_config.json` in `directory`, for the instructions shown to the user. */
+export function claudeDesktopConfigFile(directory: string | undefined): string | null {
+  return directory == null ? null : path.join(directory, CONFIG_FILE)
+}
+
 /** The `mcpServers.enso` value: the mcp-remote bridge, with the token in `env`, not in an argument. */
 export function claudeDesktopEntry(
   url: string,
