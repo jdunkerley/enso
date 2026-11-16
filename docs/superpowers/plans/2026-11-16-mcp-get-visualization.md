@@ -1557,3 +1557,128 @@ commands and `mcpVisualization.spec.ts` with `--repeat-each=3`.
 - Restoring the view after an `image` capture.
 - Choosing the visualization type or its size from MCP.
 - Detecting a docked panel drawn over the graph viewport.
+
+---
+
+### Task 6: List a node's visualizations and choose one
+
+Added on the owner's request (2026-11-16): "It would be nice if the agent could
+ask for a list of available vizzes and then get any specified one."
+
+**Files:**
+
+- Modify: `app/gui/src/project-view/mcp/visualizationTools.ts` and its test
+- Create: `app/gui/src/project-view/mcp/panelQuiet.ts` and
+  `__tests__/panelQuiet.test.ts` (move `domQuiet`/`openShadowRoots` out of
+  `useProjectMcpTools.ts`)
+- Modify: `app/gui/src/project-view/mcp/editTools.ts`
+  (`EditToolDeps.setVisualization`, `setVisualization`),
+  `useProjectMcpTools.ts`, `GraphEditor.vue`
+- Modify: `app/electron-client/src/mcp/visualizationTool.ts`, `projectTools.ts`,
+  and their headless tests
+- Modify: `app/gui/integration-test/project-view/mcpVisualization.spec.ts`,
+  `app/electron-client/tests/mcp.spec.ts`
+- Modify: `app/electron-client/src/mcp/guides/overview.md`, the two
+  `mcp/CLAUDE.md` files, `CHANGELOG.md`
+
+**Behaviour:**
+
+1. **`list_visualizations { node_id }`**, a new MCP tool (a plain forward to the
+   window, `WINDOW_TOOL_TIMEOUT_MS`, listed in `VIEW_TOOL_NAMES`). It shows
+   nothing, moves nothing and edits nothing, and works in Live mode. It returns
+   `{ node_id, shown, visualization, available }`:
+   - `available`: the names of the visualizations the node's type offers, in the
+     order of the toolbar's dropdown (the visualization store's `byType` for the
+     node's type info, the same source as `allVisualizations` in
+     `GraphVisualization/visualizationData.ts`).
+   - `shown`: whether the node's visualization is switched on.
+   - `visualization`: the name of the one on screen (from the registry entry),
+     or null when none is mounted.
+2. **`get_visualization` gains `visualization?: string`** (at most 100
+   characters), a name from `available`, for both formats.
+   - A name the node does not offer is refused before anything is shown or
+     changed, with the error:
+     ``The node has no visualization `X`. Available: A, B, C.``
+   - When the name is not the one on screen (or the visualization is hidden),
+     the node is switched to it in **one** edit through the `EditSession`
+     (visible and identifier together), exactly as choosing it in the toolbar
+     writes the node's metadata. It stays switched. Refused in Live mode with
+     the edit rules' usual error; in Live a request for the visualization
+     already on screen still answers.
+   - The wait for "drawn" must then be for **that** visualization: ready only
+     when the registry entry's `name()` equals the requested name and its status
+     is not `loading`. Without this the old view's `ready` would be answered.
+   - Two visualizations of the same name from different modules: take the first
+     in `available` order (the dropdown's), and say so in a code comment.
+3. **Every `get_visualization` result gains** `available` (as above) and
+   `changed` (true when this call switched the visualization type). Main's
+   `preparedSchema` accepts and passes them through; the image text becomes
+   `{ node_id, visualization, shown, changed, moved, available, width, height }`,
+   and the data result
+   `{ node_id, visualization, shown, changed, truncated, available, data }`.
+4. **Tool descriptions**: `get_visualization` says to call `list_visualizations`
+   (or read `available` from a result) for the names, and that naming one
+   switches the node to it and it stays switched (part of the undo step; refused
+   in Live). `set_visualization` is unchanged.
+
+**How:**
+
+- `VisualizationToolDeps` gains `availableNames(nodeId: string): string[]`, and
+  `show` becomes
+  `show(nodeId: string, visualization?: string): Promise<McpToolResult>`
+  (switches it on, and to that visualization when one is named). The
+  name-to-identifier lookup is done in `useProjectMcpTools.ts`.
+- `McpEditorDeps` gains
+  `visualizationsFor: (nodeId: NodeId) => VisualizationIdentifier[]`, supplied
+  by `GraphEditor.vue` from the store it provides (`provideVisualizationStore`)
+  and the node's type info (find how `GraphNode.vue` gets
+  `expressionInfo.typeInfo`).
+- `EditToolDeps.setVisualization(id, visible, identifier?)` passes
+  `{ visible, ...(identifier ? { identifier } : {}) }` to
+  `graph.setNodeVisualization`; `setVisualization(deps, args)` accepts an
+  optional `identifier`. The `set_visualization` MCP tool's behaviour and result
+  do not change.
+
+**Carried fixes from Task 5's review (do them here):**
+
+- Bound the quiet wait by the call's deadline: `panelQuiet(nodeId, budgetMs)`
+  with `budgetMs = Math.max(0, until - now())`; the cap is
+  `Math.min(PANEL_QUIET_CAP_MS, budgetMs)`.
+- In the moved `panelQuiet.ts`: also observe a shadow root that appears on a
+  node added after observation started.
+- Unit-test `panelQuiet.ts` with fake timers: a mutation inside a shadow root
+  restarts the quiet period; continuous mutation ends at the cap; a disconnected
+  or missing panel resolves at once; the budget caps the wait.
+- Re-wrap the over-long string in `projectTools.ts` (`select_nodes` description)
+  to the file's ~100 columns.
+
+**Tests (write the failing ones first):**
+
+- `visualizationTools.test.ts`: `listVisualizations` (hidden node: `shown`
+  false, `visualization` null, `available` listed, and `show` never called); an
+  unknown name is refused with the list and nothing is shown; a named
+  visualization that differs from the one on screen calls `show(nodeId, name)`
+  once and the result has `changed: true`; the wait does not accept the old view
+  (the fake keeps the old name for a few frames after `show`); the same name as
+  on screen gives `changed: false` and no `show`; every result carries
+  `available`.
+- `editTools.test.ts`: `setVisualization` with an identifier passes it on in the
+  same edit.
+- `mcpVisualizationTool.test.ts`: `visualization` is forwarded to both window
+  handlers; `changed` and `available` reach the image text.
+- `mcpVisualization.spec.ts` (mock): `list_visualizations` on a hidden node
+  lists names and leaves it hidden; `get_visualization_data` with another name
+  from that list switches the panel (assert the DOM shows that visualization),
+  and one Ctrl+Z restores the previous state; an unknown name is refused and
+  nothing changes. Run with `--repeat-each=3`.
+- `mcp.spec.ts` (packaged; rebuild with `ide-local`): `list_visualizations` in
+  the tool list; on the `[1, 2, 3]` node `available` contains the name the first
+  image call reported as `visualization`; pick another name from `available`,
+  get the image, and assert `changed` true and that its PNG bytes differ from
+  the table picture; a second call for the same name 3 s later returns identical
+  bytes. Keep that picture in the sdd folder as `task6-other-viz.png` and look
+  at it. Run the spec 3 times.
+
+**Verification:** the Windows commands you ran for Task 5 Step 6, plus the two
+Playwright runs above. Commit
+`MCP: list a node's visualizations and get a chosen one`.
