@@ -20,3 +20,6 @@ part A).
   `data-pop-out-name`, `data-pop-out-type`) pops out instead of moving the node.
   `GraphNodes.vue` forwards the `popOut` event and `GraphEditor.vue` calls
   `usePopOut`.
+
+Number, text and slider inputs stop `pointerdown`, so they can't start a pop-out
+drag; drag a non-input part of the argument (such as the `Date.new` text).

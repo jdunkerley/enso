@@ -64,10 +64,13 @@ test.describe('The … menu of hidden parameters', () => {
       .getByRole('button', { name: /^format/ })
       .click()
     await expect(page.getByRole('dialog', { name: 'More parameters' })).toBeHidden()
-    await page.keyboard.press('ControlOrMeta+`')
-    await expect(page.locator('.CodeEditor')).toBeVisible()
-    const code = await page.evaluate(() => (window as any).__codeEditorApi.textContent())
-    expect(code).toContain('data = Data.read format=Auto_Detect')
+    expect(await moduleCode(page)).toContain('data = Data.read format=Auto_Detect')
+    await actions.clickAtBackground(page)
+    // `on_problems` is still hidden, so the button stays, and the menu no longer lists `format`.
+    await data.locator('.parameterMenuButton').click()
+    const menu = page.getByRole('dialog', { name: 'More parameters' })
+    await expect(menu.getByRole('button', { name: /^on_problems/ })).toBeVisible()
+    await expect(menu.getByRole('button', { name: /^format/ })).toHaveCount(0)
   })
 
   test('Escape, and a click on a node, close the menu; one menu is open at a time', async ({
@@ -184,7 +187,9 @@ test.describe('Pop out', () => {
     const before = await moduleCode(page)
     const boxBefore = (await node.boundingBox())!
     await startDrag(page, handle)
+    await expect(page.getByTestId('popOutGhost')).toBeVisible()
     await page.keyboard.press('Escape')
+    await expect(page.getByTestId('popOutGhost')).toHaveCount(0)
     await page.mouse.up()
     await expect(locate.graphNodeByBinding(page, 'end1')).toHaveCount(0)
     expect(await moduleCode(page)).toBe(before)
