@@ -63,6 +63,9 @@ function tool(
   return { definition, calls, rects, sleeps }
 }
 
+/** The size the window reports with a visualization. */
+const SIZE = { width: 600, height: 150, default_width: false, default_height: true }
+
 const PREPARED: McpToolResult = {
   ok: true,
   value: JSON.stringify({
@@ -72,6 +75,7 @@ const PREPARED: McpToolResult = {
     changed: true,
     moved: true,
     available: ['Table', 'JSON'],
+    size: SIZE,
     rect: { x: 10, y: 20, width: 200, height: 150 },
   }),
 }
@@ -106,6 +110,7 @@ test('image is the default: the prepared rectangle is captured', async () => {
         changed: true,
         moved: true,
         available: ['Table', 'JSON'],
+        size: SIZE,
         width: 200,
         height: 150,
       },

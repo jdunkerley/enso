@@ -273,6 +273,7 @@ test('a capture is stored as PNG and its result carries shown and moved', async 
     changed: false,
     moved: true,
     available: ['Table'],
+    size: { width: 300, height: 150, default_width: false, default_height: true },
     rect: { x: 0, y: 0, width: 300, height: 200 },
   }
   const { definition, calls } = tool({}, (name) =>
@@ -322,6 +323,7 @@ test("the window's refusal is passed on; after a capture that showed the visuali
     changed: false,
     moved: false,
     available: ['Table'],
+    size: { width: 300, height: 150, default_width: false, default_height: true },
     rect: { x: 0, y: 0, width: 300, height: 200 },
   }
   const shown = tool({}, (name) =>
@@ -428,6 +430,7 @@ test('a capture is stored only by the project that took it: its id goes to store
     changed: false,
     moved: false,
     available: ['Table'],
+    size: { width: 300, height: 150, default_width: false, default_height: true },
     rect: { x: 0, y: 0, width: 300, height: 200 },
     project_id: 'p1',
   }

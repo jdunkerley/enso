@@ -319,6 +319,19 @@ describe('edit tool arguments', () => {
     expect(await ok('set_visualization', { node_id: 'a', visible: 'yes' })).toBe(false)
     expect(await ok('set_visualization', { node_id: 'a', visible: true })).toBe(true)
   })
+
+  test('set_visualization takes an optional width and height of 100 to 2,000, or null', async () => {
+    const set = (size: Record<string, unknown>) =>
+      ok('set_visualization', { node_id: 'a', visible: true, ...size })
+    expect(await set({ width: 600, height: 400 })).toBe(true)
+    expect(await set({ width: 100, height: 2_000 })).toBe(true)
+    expect(await set({ width: 450.5 })).toBe(true)
+    expect(await set({ width: null, height: null })).toBe(true)
+    expect(await set({ width: 99 })).toBe(false)
+    expect(await set({ height: 2_001 })).toBe(false)
+    expect(await set({ width: Infinity })).toBe(false)
+    expect(await set({ height: '400' })).toBe(false)
+  })
 })
 
 describe('appTools', () => {

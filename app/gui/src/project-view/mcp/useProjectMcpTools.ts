@@ -56,11 +56,13 @@ import { addFunction, collapseNodesTool, type StructureToolDeps } from './struct
 import { openMethod, selectNodes, type ViewToolDeps } from './viewTools'
 import { lookupVisualization } from './visualizationRegistry'
 import {
+  drawnVisualizationSize,
   getVisualizationData,
   listVisualizations,
   noSuchVisualizationError,
   prepareVisualization,
   type Edges,
+  type VisualizationSize,
   type VisualizationToolDeps,
 } from './visualizationTools'
 
@@ -257,13 +259,15 @@ export function useProjectMcpTools(
           return Ok()
         })
       },
-      setVisualization: (id, visible, identifier) => {
+      setVisualization: (id, update) => {
         const g = graph()
         if (!g.db.nodeIdToNode.has(id)) return Err(`No node ${id}`)
-        // As choosing one in the toolbar writes it: the identifier in the node's metadata.
-        g.setNodeVisualization(id, { visible, ...(identifier ? { identifier } : {}) })
+        // As choosing one in the toolbar writes it (the identifier in the node's metadata), and as
+        // a resize handle writes the size: one call, which also pushes or releases the neighbours.
+        g.setNodeVisualization(id, update)
         return Ok()
       },
+      visualizationSize: (id) => sizeOf(graph(), id),
     }
   }
 
@@ -357,6 +361,7 @@ export function useProjectMcpTools(
       isEdited: (nodeId) => graph.editedNodeInfo?.id === nodeId,
       availableNames: (nodeId) =>
         editor.visualizationsFor(nodeId as NodeId).map((identifier) => identifier.name),
+      size: (nodeId) => sizeOf(currentProject.graph.value, nodeId as NodeId),
       show: (nodeId, visualization) => {
         // Two visualizations of the same name from different modules: the first in the
         // dropdown's order, which is the one `availableNames` lists first.
@@ -514,10 +519,17 @@ export function useProjectMcpTools(
       return setDocumentation(documentationDeps(caller, deadline), { text })
     },
     set_visualization: async (args, caller, deadline) => {
-      const { node_id, visible } = args
+      const { node_id, visible, width, height } = args
       if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
       if (typeof visible !== 'boolean') return invalidArgument('visible', 'a boolean')
-      return setVisualization(editDeps(caller, deadline), { node_id, visible })
+      if (!isSizeArgument(width)) return invalidArgument('width', 'a number or null')
+      if (!isSizeArgument(height)) return invalidArgument('height', 'a number or null')
+      return setVisualization(editDeps(caller, deadline), {
+        node_id,
+        visible,
+        ...(width !== undefined ? { width } : {}),
+        ...(height !== undefined ? { height } : {}),
+      })
     },
     move_nodes: async (args, caller, deadline) => {
       const moves = args.moves
@@ -653,6 +665,17 @@ function lastNode(graph: GraphStore): NodeId | undefined {
   return last
 }
 
+/**
+ * The size of the node's visualization as drawn: its stored size under the node's measured width
+ * (0 before the node is measured, which leaves the 200 minimum).
+ */
+function sizeOf(graph: GraphStore, id: NodeId): VisualizationSize {
+  return drawnVisualizationSize(
+    graph.db.nodeIdToNode.get(id)?.vis,
+    graph.nodeBareSizes.get(id)?.x ?? 0,
+  )
+}
+
 /** The node's area on screen; its position alone before it has been rendered. */
 function nodeArea(graph: GraphStore, id: NodeId): Rect | undefined {
   const area = graph.visibleArea(id)
@@ -676,6 +699,11 @@ function isNodeMove(value: unknown): value is NodeMove {
   if (typeof value !== 'object' || value == null) return false
   const { node_id, x, y } = value as Record<string, unknown>
   return typeof node_id === 'string' && typeof x === 'number' && typeof y === 'number'
+}
+
+/** A visualization size argument: a number, null (the default) or absent. */
+function isSizeArgument(value: unknown): value is number | null | undefined {
+  return value === undefined || value === null || typeof value === 'number'
 }
 
 function isStringArray(value: unknown): value is string[] {

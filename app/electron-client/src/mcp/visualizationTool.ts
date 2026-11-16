@@ -64,6 +64,13 @@ const preparedSchema = z.object({
   changed: z.boolean(),
   moved: z.boolean(),
   available: z.array(z.string()),
+  /** The visualization's size as drawn, in scene units, and whether each is the default. */
+  size: z.object({
+    width: z.number(),
+    height: z.number(),
+    default_width: z.boolean(),
+    default_height: z.boolean(),
+  }),
   rect: z.object({
     x: z.number().int().nonnegative(),
     y: z.number().int().nonnegative(),
@@ -197,8 +204,9 @@ export function visualizationTool(
       'Look at the visualization of the node `node_id` (from `get_graph`): the table, chart ' +
       'or other view the user sees under the node. `format` is `image` (the default): a PNG ' +
       'of the visualization as drawn, with `{ node_id, visualization, shown, changed, moved, ' +
-      'available, width, height }`; or `data`: `{ node_id, visualization, shown, changed, ' +
-      'truncated, available, data }`, the data the view was given (its shape belongs to the ' +
+      'available, size, width, height }` (`width` and `height`: the picture in pixels); or ' +
+      '`data`: `{ node_id, visualization, shown, changed, truncated, available, size, data }`, ' +
+      'the data the view was given (its shape belongs to the ' +
       'view and may change; at most 20,000 characters, then `truncated` is true and `data` is ' +
       'the start of the text). A table shows its first 1,000 rows by default, either way. ' +
       '`visualization` names the one to look at, from `available`: call ' +
@@ -215,8 +223,11 @@ export function visualizationTool(
       'moves when the visualization is not ' +
       'wholly on screen at 100% zoom (`moved` true), and the Enso window must not be ' +
       'minimised. An error when the visualization is still loading after 15 seconds or ' +
-      'failed to load. To read values, prefer `get_node` or `evaluate_expression`; use ' +
-      'this to see what the user sees, such as a chart.',
+      'failed to load. `size` is `{ width, height, default_width, default_height }`, the ' +
+      'visualization as drawn in scene units and whether each is the default. The picture is ' +
+      'of the visualization at its current size: to see more of a table or chart, make it ' +
+      'larger first with `set_visualization`. To read values, prefer `get_node` or ' +
+      '`evaluate_expression`; use this to see what the user sees, such as a chart.',
     inputSchema: {
       node_id: z.string().max(NAME_CHARS),
       format: z.enum(['image', 'data']).optional(),

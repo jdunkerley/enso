@@ -26,6 +26,9 @@ const MOVE_NODES_MAX = 200
 const COORDINATE_LIMIT = 1_000_000
 /** Most nodes one `arrange_nodes` call lays out. */
 const ARRANGE_NODES_MAX = 500
+/** The smallest and largest width or height, in scene units, `set_visualization` sets. */
+const VISUALIZATION_SIZE_MIN = 100
+const VISUALIZATION_SIZE_MAX = 2_000
 
 export const VIEW_TOOL_NAMES = [
   'get_graph',
@@ -55,6 +58,9 @@ export const EDIT_TOOL_NAMES = [
 export const PROJECT_TOOL_NAMES = [...VIEW_TOOL_NAMES, ...EDIT_TOOL_NAMES] as const
 
 const nodeId = () => z.string().max(NAME_CHARS)
+/** A visualization's width or height: in scene units, `null` for the default, or left out. */
+const visualizationSize = () =>
+  z.number().finite().min(VISUALIZATION_SIZE_MIN).max(VISUALIZATION_SIZE_MAX).nullable().optional()
 
 /**
  * The Write rule, in the tool descriptions that take code. It says what the Write guard
@@ -186,8 +192,10 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'in the order of the dropdown in its visualization toolbar. Returns `{ node_id, ' +
         'shown, visualization, available }`: `shown`, whether its visualization is switched ' +
         'on; `visualization`, the name of the one on screen (null when none is); `available`, ' +
-        'the names to pass to `get_visualization` as `visualization`. Shows, moves and changes ' +
-        'nothing, and works in Live mode too.',
+        'the names to pass to `get_visualization` as `visualization`; `size`, `{ width, height, ' +
+        'default_width, default_height }`: its size as drawn in scene units (as it would be ' +
+        'when hidden) and whether each is the default. Shows, moves and changes nothing, and ' +
+        'works in Live mode too.',
       inputSchema: { node_id: nodeId() },
       run: forward('list_visualizations'),
     },
@@ -323,13 +331,26 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
     },
     {
       name: 'set_visualization',
-      title: 'Show or hide a visualization',
+      title: 'Show, hide or resize a visualization',
       description:
         'Show (`visible` true) or hide the visualization of the node `node_id` (from ' +
-        '`get_graph`) in the graph editor, for the user to look at. Returns `node`, the node, ' +
-        'and `settled` (always true: nothing is computed again).' +
+        '`get_graph`) in the graph editor, for the user to look at. `width` and `height` ' +
+        '(optional) set its size in scene units (pixels at 100% zoom), 100 to 2,000 each, ' +
+        'or `null` for the default (the width of the node or 200, and 150 high); one left out ' +
+        'stays as it is. All of it is one edit. A larger visualization pushes the nodes around ' +
+        'it away, and they return when it shrinks. The size stays as set and is part of your ' +
+        'undo step: when the user did not ask for a large one, pass `null` for both to put it ' +
+        'back to the small default when you are done. The view never draws it narrower than ' +
+        'the node or 200, nor lower than 32. Returns `node`, the node, `size`, `{ width, ' +
+        'height, default_width, default_height }` (as drawn, and whether each is the ' +
+        'default), and `settled` (always true: nothing is computed again).' +
         EDIT_RULES,
-      inputSchema: { node_id: nodeId(), visible: z.boolean() },
+      inputSchema: {
+        node_id: nodeId(),
+        visible: z.boolean(),
+        width: visualizationSize(),
+        height: visualizationSize(),
+      },
       run: forward('set_visualization', EDIT_TOOL_TIMEOUT_MS),
     },
     {
