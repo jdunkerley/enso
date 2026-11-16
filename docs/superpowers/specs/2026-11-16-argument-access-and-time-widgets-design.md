@@ -130,7 +130,8 @@ nothing from A; B and C can be built alongside it.
 
 ### Function pass
 
-- `first_of_month`/`end_of_month`: declared `Integer`, return a `Date_Time`.
+- `first_of_month`/`end_of_month`: declared `Integer`, return a `Date`; now
+  declared `-> Date` (the owner's decision, 2026-11-16: no behaviour change).
 - `week_of_year`: typed `locale` with `Locale.default_widget`, as for Date.
 - `start_of`/`end_of`: typed `Date_Period | Time_Period`, with a dropdown of
   both kinds.

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import {
   dateTimeExpressionCode,
+  keptDateTimeArguments,
   parseDateTimeExpression,
   withKeptArguments,
   type DateTimeChoice,
@@ -107,5 +108,36 @@ describe('withKeptArguments', () => {
     expect(withKeptArguments(picked, { kind: 'now' })).toEqual(picked)
     expect(withKeptArguments(picked, undefined)).toEqual(picked)
     expect(withKeptArguments(picked, at(2020, 1, 1, 0, 0))).toEqual(picked)
+  })
+})
+
+describe('keptDateTimeArguments', () => {
+  test.each([
+    ['Date_Time.new y 1 15 zone=Time_Zone.utc', ['zone=Time_Zone.utc']],
+    ['Date_Time.new (2000 + 20) 1 15 9 30 45', ['45']],
+    ['Date_Time.new 2020 1 15 9 30 second=45', ['second=45']],
+  ])('%s keeps %j', (code, kept) => {
+    expect(keptDateTimeArguments(code)).toEqual(kept)
+  })
+
+  test.each([
+    'Date_Time.new 2020 1 15',
+    'Date_Time.new 2020 hour=9 10',
+    'Date_Time.new 2020 2020',
+    'Date_Time.new 2020 foo=1',
+    'Date.new 2020 1 1',
+    'foo',
+    '',
+    undefined,
+  ])('%s keeps nothing', (code) => {
+    expect(keptDateTimeArguments(code)).toBeUndefined()
+  })
+
+  test('a pick over a computed value carries them', () => {
+    const kept = keptDateTimeArguments('Date_Time.new y 1 15 zone=Time_Zone.utc')
+    expect(withKeptArguments(at(2021, 3, 4, 10, 0), kept)).toEqual(
+      at(2021, 3, 4, 10, 0, ['zone=Time_Zone.utc']),
+    )
+    expect(withKeptArguments({ kind: 'now' }, kept)).toEqual({ kind: 'now' })
   })
 })

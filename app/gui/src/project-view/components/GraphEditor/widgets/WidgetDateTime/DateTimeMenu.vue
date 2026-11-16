@@ -51,6 +51,7 @@ function chooseNow() {
 /** A day keeps the time in the field, edited or not; the chosen day without a time edit only closes. */
 function chooseDay(day: YearMonthDay) {
   if (settled) return
+  // Deliberate: an incomplete field (a cleared segment) holds no time, so the day takes the opening time.
   const time = field.value?.currentTime() ?? initialTime
   const edited = field.value?.editedTime() != null
   const chosen = selectedDay.value

@@ -11,6 +11,7 @@ import DateTimeMenu from '@/components/GraphEditor/widgets/WidgetDateTime/DateTi
 import {
   DATE_TIME_TYPE,
   dateTimeExpressionCode,
+  keptDateTimeArguments,
   parseDateTimeExpression,
   withKeptArguments,
   type DateTimeChoice,
@@ -40,11 +41,14 @@ const dateTimeImport = computed(() =>
   ),
 )
 
-const choice = computed(() => parseDateTimeExpression(unparenthesisedCode(props.input)))
+const code = computed(() => unparenthesisedCode(props.input))
+const choice = computed(() => parseDateTimeExpression(code.value))
+/** What an edit keeps, also when year … minute are computed and `choice` is undefined. */
+const keptArguments = computed(() => keptDateTimeArguments(code.value))
 
 /** One choice is one edit, so one undo step; an edit keeps the value's second, finer parts and zone. */
 function choose(picked: DateTimeChoice, done: () => void) {
-  const kept = withKeptArguments(picked, choice.value)
+  const kept = withKeptArguments(picked, choice.value ?? keptArguments.value)
   module.value.edit((edit) => {
     module.value.addMissingImports(edit, dateTimeImport.value)
     const code = dateTimeExpressionCode(kept)

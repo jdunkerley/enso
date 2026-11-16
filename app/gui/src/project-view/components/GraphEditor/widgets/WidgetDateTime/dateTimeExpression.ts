@@ -52,21 +52,20 @@ function callArguments(expr: Ast.Ast): {
 }
 
 /**
- * The choice that the code stands for, or `undefined` when it is not `Date_Time.now` or a
- * `Date_Time.new` whose year (required) and month, day, hour and minute (each optional) are integer
- * literals, positional or named, followed by any of `Date_Time.new`'s other arguments, which are
- * kept as written. A positional argument after a named one, an argument given twice, an unknown
- * name, a computed year … minute, or an impossible date or time is not ours.
+ * The arguments of a well-formed `Date_Time.new` call: the code written for year to minute, by
+ * name, and the kept arguments as written. A positional argument after a named one, an argument
+ * given twice, an unknown name or too many positional arguments make a call malformed.
  */
-export function parseDateTimeExpression(code: string | undefined): DateTimeChoice | undefined {
+function dateTimeNewArguments(
+  code: string | undefined,
+): { picked: Partial<Record<Picked, string>>; kept: string[] } | undefined {
   const text = code?.trim()
   if (!text) return undefined
-  if (text === 'Date_Time.now') return { kind: 'now' }
   const expr = Ast.parseExpression(text)
   if (expr == null) return undefined
   const { callee, args } = callArguments(expr)
   if (callee.code() !== 'Date_Time.new' || args.length === 0) return undefined
-  const parts: Partial<Record<Picked, number>> = {}
+  const picked: Partial<Record<Picked, string>> = {}
   const seen = new Set<string>()
   const kept: string[] = []
   let named = false
@@ -83,13 +82,31 @@ export function parseDateTimeExpression(code: string | undefined): DateTimeChoic
     }
     if (seen.has(name)) return undefined
     seen.add(name)
-    if ((PICKED as readonly string[]).includes(name)) {
-      if (!INTEGER.test(argCode)) return undefined
-      parts[name as Picked] = Number(argCode)
-    } else if ((KEPT as readonly string[]).includes(name)) {
+    if ((PICKED as readonly string[]).includes(name)) picked[name as Picked] = argCode
+    else if ((KEPT as readonly string[]).includes(name))
       kept.push(given == null ? argCode : `${given}=${argCode}`)
-    } else return undefined
+    else return undefined
   }
+  return { picked, kept }
+}
+
+/**
+ * The choice that the code stands for, or `undefined` when it is not `Date_Time.now` or a
+ * `Date_Time.new` whose year (required) and month, day, hour and minute (each optional) are integer
+ * literals, positional or named, followed by any of `Date_Time.new`'s other arguments, which are
+ * kept as written. A positional argument after a named one, an argument given twice, an unknown
+ * name, a computed year … minute, or an impossible date or time is not ours.
+ */
+export function parseDateTimeExpression(code: string | undefined): DateTimeChoice | undefined {
+  if (code?.trim() === 'Date_Time.now') return { kind: 'now' }
+  const call = dateTimeNewArguments(code)
+  if (call == null) return undefined
+  const parts: Partial<Record<Picked, number>> = {}
+  for (const [name, argCode] of Object.entries(call.picked)) {
+    if (!INTEGER.test(argCode)) return undefined
+    parts[name as Picked] = Number(argCode)
+  }
+  const { kept } = call
   if (parts.year == null) return undefined
   const value = {
     year: parts.year,
@@ -102,6 +119,16 @@ export function parseDateTimeExpression(code: string | undefined): DateTimeChoic
   return kept.length > 0 ? { kind: 'dateTime', ...value, kept } : { kind: 'dateTime', ...value }
 }
 
+/**
+ * The arguments after the minute of a well-formed `Date_Time.new` call, as written, whether or not
+ * its year … minute are literals (`Date_Time.new y 1 15 zone=Time_Zone.utc` keeps `zone=…`);
+ * `undefined` for any other code or when there are none.
+ */
+export function keptDateTimeArguments(code: string | undefined): readonly string[] | undefined {
+  const kept = dateTimeNewArguments(code)?.kept
+  return kept != null && kept.length > 0 ? kept : undefined
+}
+
 /** The code that a choice writes: year to minute positionally (each a port), then the kept arguments. */
 export function dateTimeExpressionCode(choice: DateTimeChoice): string {
   if (choice.kind === 'now') return 'Date_Time.now'
@@ -111,14 +138,22 @@ export function dateTimeExpressionCode(choice: DateTimeChoice): string {
   )
 }
 
-/** `picked`, with the kept arguments of `current` when both are specific: an edit keeps them. */
+/**
+ * `picked`, with the kept arguments of `current` when `picked` is specific: an edit keeps them.
+ * `current` is a parsed choice or the kept list of a computed value (`keptDateTimeArguments`).
+ */
 export function withKeptArguments(
   picked: DateTimeChoice,
-  current: DateTimeChoice | undefined,
+  current: DateTimeChoice | readonly string[] | undefined,
 ): DateTimeChoice {
-  if (picked.kind !== 'dateTime' || current?.kind !== 'dateTime' || current.kept == null)
-    return picked
-  return { ...picked, kept: current.kept }
+  if (picked.kind !== 'dateTime' || current == null) return picked
+  const kept =
+    'kind' in current ?
+      current.kind === 'dateTime' ?
+        current.kept
+      : undefined
+    : current
+  return kept == null || kept.length === 0 ? picked : { ...picked, kept }
 }
 
 /** The local date and time of `now`, to the minute. */
