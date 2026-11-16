@@ -2,7 +2,6 @@ import type { ProjectStore } from '$/providers/openedProjects/project'
 import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegistry'
 import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import * as geoMapVisualization from '@/components/visualizations/GeoMapVisualization.vue'
-import * as imageBase64Visualization from '@/components/visualizations/ImageBase64Visualization.vue'
 import * as jsonVisualization from '@/components/visualizations/JSONVisualization'
 import * as scatterplotVisualization from '@/components/visualizations/ScatterplotVisualization.vue'
 import * as sqlVisualization from '@/components/visualizations/SQLVisualization.vue'
@@ -72,7 +71,6 @@ const builtinVisualizations: VisualizationModule[] = [
   scatterplotVisualization,
   sqlVisualization,
   geoMapVisualization,
-  imageBase64Visualization,
   warningsVisualization,
 ]
 

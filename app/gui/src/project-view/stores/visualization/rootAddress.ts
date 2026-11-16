@@ -27,7 +27,7 @@ export function rootAddress(rootId: Uuid, segments: readonly string[]): string {
 
 /**
  * Split an address made by {@link rootAddress}; `undefined` if it is not one. A segment that is `.`
- * or `..`, or that holds a `/` once decoded, is not a name inside the root, so such an address is
+ * or `..`, or that holds a `/` or `\` once decoded, is not a name inside the root, so such an address is
  * refused rather than handed on to a reader that might treat it as a path.
  */
 export function parseRootAddress(
@@ -38,7 +38,12 @@ export function parseRootAddress(
   if (rootId == null || !UUID_PATTERN.test(rootId)) return undefined
   try {
     const segments = encodedSegments.map(decodeURIComponent)
-    if (segments.some((segment) => segment === '.' || segment === '..' || segment.includes('/')))
+    if (
+      segments.some(
+        (segment) =>
+          segment === '.' || segment === '..' || segment.includes('/') || segment.includes('\\'),
+      )
+    )
       return undefined
     return { rootId: rootId as Uuid, segments }
   } catch {

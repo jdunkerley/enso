@@ -66,6 +66,11 @@ test('an address whose segment holds a slash is not a root address', () => {
   expect(parseRootAddress(`enso-root:${ROOT}/visualizations%2Fa.vue`)).toBeUndefined()
 })
 
+test('an address whose segment holds a backslash is not a root address', () => {
+  expect(parseRootAddress(`enso-root:${ROOT}/visualizations/%5C..%5Cx`)).toBeUndefined()
+  expect(parseRootAddress(`enso-root:${ROOT}/visualizations%5Ca.vue`)).toBeUndefined()
+})
+
 test('http imports are left as absolute URLs', () => {
   expect(resolveRelativeImport('https://example.com/viz/', './a.ts', BASE)).toBe(
     'https://example.com/viz/a.ts',
