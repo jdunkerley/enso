@@ -13,6 +13,7 @@ import {
   useVisualizationStore,
   type VisualizationDataSource,
 } from '@/stores/visualization'
+import { canonicalVisualizationId } from '@/stores/visualization/movedVisualizations'
 import type { Visualization } from '@/stores/visualization/runtimeTypes'
 import { Ast } from '@/util/ast'
 import { toError } from '@/util/data/error'
@@ -125,7 +126,8 @@ export function useVisualizationData({
 
   const currentVisualization = computed(() => {
     const selectedTypeValue = toValue(selectedVis)
-    if (selectedTypeValue) return selectedTypeValue
+    // A node saved before a visualization moved to a library still names the old id.
+    if (selectedTypeValue) return canonicalVisualizationId(selectedTypeValue)
     if (defaultVisualizationForCurrentNodeSource.value)
       return defaultVisualizationForCurrentNodeSource.value
     const [id] = visualizationStore.byType(toValue(typeinfo))

@@ -9,30 +9,33 @@ import * as sqlVisualization from '@/components/visualizations/SQLVisualization.
 import * as tableVisualization from '@/components/visualizations/TableVisualization.vue'
 import * as warningsVisualization from '@/components/visualizations/WarningsVisualization.vue'
 import { createContextStore } from '@/providers'
-import {
-  compile,
-  InvalidVisualizationModuleError,
-  stylePathAttribute,
-} from '@/stores/visualization/compilerMessaging'
+import { compile } from '@/stores/visualization/compilerMessaging'
+import { watchVisualizationFolder } from '@/stores/visualization/folderLoader'
 import {
   fromVisualizationId,
   toVisualizationId,
   VisualizationMetadataDb,
   visualizationsForTypes,
   type VisualizationId,
+  type VisualizationMetadata,
 } from '@/stores/visualization/metadata'
-import { rootAddress } from '@/stores/visualization/rootAddress'
+import { canonicalVisualizationId } from '@/stores/visualization/movedVisualizations'
 import type { VisualizationModule } from '@/stores/visualization/runtimeTypes'
 import type { Opt } from '@/util/data/opt'
 import { isUrlString } from '@/util/data/urlString'
 import { isIconName } from '@/util/iconMetadata/iconName'
-import { computed, reactive } from 'vue'
-import { ErrorCode, LsRpcError, RemoteRpcError } from 'ydoc-shared/languageServer'
-import type { Event as LSEvent, VisualizationConfiguration } from 'ydoc-shared/languageServerTypes'
+import { computed, onScopeDispose, reactive } from 'vue'
+import type { LanguageServer } from 'ydoc-shared/languageServer'
+import type {
+  ContentRoot,
+  Event as LSEvent,
+  Uuid,
+  VisualizationConfiguration,
+} from 'ydoc-shared/languageServerTypes'
 import type { ExternalId, VisualizationIdentifier } from 'ydoc-shared/yjsModel'
 
-/** The directory in the project under which custom visualizations can be found. */
-const customVisualizationsDirectory = 'visualizations'
+/** How long a request for a library's visualization waits for the library to provide it. */
+export const LIBRARY_WAIT_MS = 10_000
 
 /** A module containing the default visualization function. */
 const DEFAULT_VISUALIZATION_MODULE = 'Standard.Visualization.Preprocessor'
@@ -82,15 +85,13 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
   (proj: ProjectStore, suggestionDb?: SuggestionDb) => {
     const cache = reactive(new Map<VisualizationId, Promise<VisualizationModule>>())
     /**
-     * A map from file path to {@link AbortController}, so that a file change event can stop previous
-     * file change event handlers for the same path.
+     * The requests for a library's visualization that arrived before the library registered it;
+     * each is settled when the visualization registers, or rejected after {@link LIBRARY_WAIT_MS}.
      */
-    const compilationAbortControllers = reactive(new Map<string, AbortController>())
-    /**
-     * A map from file path in the current project, to visualization name. This is required so that
-     * file delete events can remove the cached visualization.
-     */
-    const currentProjectVisualizationsByPath = new Map<string, string>()
+    const libraryWaiters = new Map<
+      VisualizationId,
+      { resolve: (viz: Promise<VisualizationModule>) => void; timer: ReturnType<typeof setTimeout> }
+    >()
     const metadata = new VisualizationMetadataDb()
     const projectRoot = proj.projectRootId
 
@@ -144,98 +145,86 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
       return Promise.allSettled(promises)
     }
 
-    async function onFileEvent({ kind, path }: LSEvent<'file/event'>) {
-      if (path.rootId !== (await projectRoot) || !/[.]vue$/.test(path.segments.at(-1) ?? '')) return
-      const pathString = customVisualizationsDirectory + '/' + path.segments.join('/')
-      const address = rootAddress(path.rootId, [customVisualizationsDirectory, ...path.segments])
-      const name = currentProjectVisualizationsByPath.get(pathString)
-      let id: VisualizationIdentifier | undefined =
-        name != null ? { module: { kind: 'CurrentProject' }, name } : undefined
-      const key = id && toVisualizationId(id)
-      compilationAbortControllers.get(pathString)?.abort()
-      compilationAbortControllers.delete(pathString)
-      // FIXME [sb]: Ideally these should be deleted as late as possible, instead of immediately.
-      for (const el of document.querySelectorAll(
-        `[${stylePathAttribute}="${CSS.escape(address)}"]`,
-      )) {
-        el.remove()
-      }
-      switch (kind) {
-        case 'Added':
-        case 'Modified': {
-          try {
-            const abortController = new AbortController()
-            compilationAbortControllers.set(pathString, abortController)
-            const vizPromise = compile(address, await proj.dataConnection).then(async (viz) => {
-              await loadScripts(viz)
-              return viz
-            })
-            if (key) cache.set(key, vizPromise)
-            const viz = await vizPromise
-            if (abortController.signal.aborted) break
-            currentProjectVisualizationsByPath.set(pathString, viz.name)
-            if (!id || viz.name !== id.name) {
-              if (key && id && viz.name !== id.name) {
-                cache.delete(key)
-                metadata.delete(key)
-              }
-              id = { module: { kind: 'CurrentProject' }, name: viz.name }
-              cache.set(toVisualizationId(id), vizPromise)
-            }
-            metadata.set(toVisualizationId(id), {
-              name: viz.name,
-              inputType: viz.inputType,
-              dataType: viz.dataType,
-              icon: viz.icon,
-            })
-          } catch (error) {
-            if (key) cache.delete(key)
-            if (error instanceof InvalidVisualizationModuleError) {
-              console.info(
-                `Imported local file '${pathString}' which is not a visualization. ` +
-                  `If it is not a dependency, are you perhaps missing \`name\` or \`inputType\`?`,
-              )
-            } else {
-              console.error('Could not load visualization:', error)
-            }
-          }
-          break
-        }
-        case 'Removed': {
-          currentProjectVisualizationsByPath.delete(pathString)
-          if (key) {
-            cache.delete(key)
-            metadata.delete(key)
-          }
-        }
+    /** Make a visualization known to the store, and release anything waiting for it. */
+    function register(
+      id: VisualizationIdentifier,
+      viz: Promise<VisualizationModule>,
+      meta: VisualizationMetadata | undefined,
+    ) {
+      const key = toVisualizationId(id)
+      cache.set(key, viz)
+      if (meta) metadata.set(key, meta)
+      const waiter = libraryWaiters.get(key)
+      if (waiter) {
+        libraryWaiters.delete(key)
+        clearTimeout(waiter.timer)
+        waiter.resolve(viz)
       }
     }
 
+    /** Forget a visualization, whose file was removed, renamed or no longer compiles. */
+    function unregister(id: VisualizationIdentifier) {
+      const key = toVisualizationId(id)
+      cache.delete(key)
+      metadata.delete(key)
+    }
+
+    const folderWatchers = new Map<Uuid, { unsubscribe(): void }>()
+    let stopWatching: (() => void) | undefined
+    let disposed = false
+    onScopeDispose(() => {
+      disposed = true
+      stopWatching?.()
+      for (const watcher of folderWatchers.values()) watcher.unsubscribe()
+      folderWatchers.clear()
+    })
+
+    /** Watch the `visualizations/` folder of a content root; once per root. */
+    function watchFolder(
+      ls: LanguageServer,
+      rootId: Uuid,
+      module: VisualizationIdentifier['module'],
+      quietIfMissing: boolean,
+    ) {
+      if (disposed || folderWatchers.has(rootId)) return
+      folderWatchers.set(
+        rootId,
+        watchVisualizationFolder({
+          ls,
+          rootId,
+          module,
+          compile: async (address) => {
+            const viz = await compile(address, await proj.dataConnection)
+            await loadScripts(viz)
+            return viz
+          },
+          register,
+          unregister,
+          quietIfMissing,
+        }),
+      )
+    }
+
+    function watchLibrary(ls: LanguageServer, root: Extract<ContentRoot, { type: 'Library' }>) {
+      const module = { kind: 'Library', name: `${root.namespace}.${root.name}` } as const
+      watchFolder(ls, root.id, module, true)
+    }
+
     Promise.all([proj.lsRpcConnection, projectRoot]).then(async ([ls, projectRoot]) => {
-      if (!projectRoot) {
-        console.error('Could not load custom visualizations: Project directory not found.')
-        return
+      // Libraries are watched as they are announced, so a library loaded later is not missed.
+      const onRootAdded = ({ root }: LSEvent<'file/rootAdded'>) => {
+        if (root.type === 'Library') watchLibrary(ls, root)
       }
-      const watching = await ls.watchFiles(
-        projectRoot,
-        [customVisualizationsDirectory],
-        onFileEvent,
-      ).promise
-      if (!watching.ok) {
-        if (
-          watching.error.payload instanceof LsRpcError &&
-          watching.error.payload.cause instanceof RemoteRpcError &&
-          watching.error.payload.cause.code === ErrorCode.FILE_NOT_FOUND
-        ) {
-          console.info(
-            "'visualizations/' folder not found in project directory. " +
-              "If you have custom visualizations, please put them under 'visualizations/'.",
-          )
-        } else {
-          if (!proj.lsRpcConnection.isDisposed) {
-            watching.error.log('Could not load custom visualizations')
-          }
-        }
+      ls.on('file/rootAdded', onRootAdded)
+      stopWatching = () => ls.off('file/rootAdded', onRootAdded)
+      if (disposed) stopWatching()
+      if (projectRoot) {
+        watchFolder(ls, projectRoot, { kind: 'CurrentProject' }, false)
+      } else {
+        console.error('Could not load custom visualizations: Project directory not found.')
+      }
+      for (const root of await ls.contentRoots) {
+        if (root.type === 'Library') watchLibrary(ls, root)
       }
     })
 
@@ -256,11 +245,12 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
     }
 
     function icon(type: VisualizationIdentifier) {
-      const icon = metadata.get(toVisualizationId(type))?.icon
+      const icon = metadata.get(toVisualizationId(canonicalVisualizationId(type)))?.icon
       return icon && (isIconName(icon) || isUrlString(icon)) ? icon : undefined
     }
 
-    function get(meta: VisualizationIdentifier, ignoreCache = false) {
+    function get(requested: VisualizationIdentifier, ignoreCache = false) {
+      const meta = canonicalVisualizationId(requested)
       const key = toVisualizationId(meta)
       if (!cache.get(key) || ignoreCache) {
         switch (meta.module.kind) {
@@ -269,16 +259,34 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
             break
           }
           case 'CurrentProject': {
-            // No special handling needed; updates are handled in an external event handler above.
+            // No special handling needed; updates are handled by the folder watcher above.
             break
           }
           case 'Library': {
-            console.warn('Library visualization support is not yet implemented:', meta.module)
+            // A library's folder is watched like the project's, so the visualization is there once
+            // the library has loaded and its files have been read. Until then, wait for it.
+            if (!cache.get(key)) {
+              cache.set(key, waitForLibraryVisualization(key, meta.module.name, meta.name))
+            }
             break
           }
         }
       }
       return computed(() => cache.get(key))
+    }
+
+    function waitForLibraryVisualization(key: VisualizationId, library: string, name: string) {
+      const waiting = new Promise<VisualizationModule>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          libraryWaiters.delete(key)
+          if (cache.get(key) === waiting) cache.delete(key)
+          reject(new Error(`The library '${library}' has no visualization '${name}'.`))
+        }, LIBRARY_WAIT_MS)
+        libraryWaiters.set(key, { resolve, timer })
+      })
+      // The requester handles a rejection; this keeps a cached, unread one from being reported.
+      waiting.catch(() => {})
+      return waiting
     }
 
     async function resolveBuiltinVisualization(type: string) {

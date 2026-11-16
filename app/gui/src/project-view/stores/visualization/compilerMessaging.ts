@@ -15,8 +15,15 @@ import type {
   RegisterBuiltinModulesRequest,
 } from '@/stores/visualization/compiler'
 import Compiler from '@/stores/visualization/compiler?worker'
-import { parseRootAddress, rootAddressProtocol } from '@/stores/visualization/rootAddress'
-import { VisualizationModule } from '@/stores/visualization/runtimeTypes'
+import {
+  parseRootAddress,
+  rootAddressProtocol,
+  stylePathAttribute,
+} from '@/stores/visualization/rootAddress'
+import {
+  InvalidVisualizationModuleError,
+  VisualizationModule,
+} from '@/stores/visualization/runtimeTypes'
 import { assertNever } from '@/util/assert'
 import { toError } from '@/util/data/error'
 import type { DataServer } from '@/util/net/dataServer'
@@ -25,8 +32,6 @@ import * as builtins from '@/util/visualizationBuiltins'
 import * as vue from 'vue'
 import { Error as DataError } from 'ydoc-shared/binaryProtocol'
 import type { Uuid } from 'ydoc-shared/languageServerTypes'
-
-export const stylePathAttribute = 'data-style-path'
 
 const moduleCache: Record<string, unknown> = {
   __proto__: null,
@@ -39,14 +44,6 @@ const moduleCache: Record<string, unknown> = {
 // @ts-expect-error Intentionally not defined in `env.d.ts` as it is a mistake to access this
 // anywhere else.
 window.__visualizationModules = moduleCache
-
-/** TODO: Add docs */
-export class InvalidVisualizationModuleError extends TypeError {
-  /** TODO: Add docs */
-  constructor(public path: string) {
-    super(`The module '${path}' is not a visualization.`)
-  }
-}
 
 let worker: Worker | undefined
 let workerMessageId = 0
@@ -154,9 +151,9 @@ export async function compile(address: string, data: DataServer) {
                   break
                 }
                 case rootAddressProtocol: {
-                  const address = parseRootAddress(event.data.path)
-                  const reader = address && rootReaders.get(address.rootId)
-                  if (!address || !reader) {
+                  const fetched = parseRootAddress(event.data.path)
+                  const reader = fetched && rootReaders.get(fetched.rootId)
+                  if (!fetched || !reader) {
                     postMessage<FetchWorkerError>(worker_, {
                       type: 'fetch-worker-error',
                       path: event.data.path,
@@ -164,7 +161,7 @@ export async function compile(address: string, data: DataServer) {
                     })
                     break
                   }
-                  const payload = await reader.readFile(address)
+                  const payload = await reader.readFile(fetched)
                   if (payload instanceof DataError) {
                     postMessage<FetchWorkerError>(worker_, {
                       type: 'fetch-worker-error',

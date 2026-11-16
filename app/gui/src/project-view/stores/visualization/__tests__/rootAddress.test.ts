@@ -37,9 +37,33 @@ test('a parent-directory import resolves inside the same root', () => {
   })
 })
 
-test('an import that climbs out of the root no longer names a root', () => {
+test('an import that climbs out of the root is refused', () => {
   const dir = `enso-root:${ROOT}/visualizations/`
-  expect(parseRootAddress(resolveRelativeImport(dir, '../../a.ts', BASE))).toBeUndefined()
+  expect(() => resolveRelativeImport(dir, '../../a.ts', BASE)).toThrow(/outside its content root/)
+})
+
+test('an import that climbs into another root is refused', () => {
+  const dir = `enso-root:${ROOT}/visualizations/`
+  const other = '6f9d2c1e-0000-4000-8000-000000000009'
+  // Climbing above the root is clamped by the resolver, so this lands in `other`'s root.
+  expect(() => resolveRelativeImport(dir, `../../../${other}/a.ts`, BASE)).toThrow(
+    /outside its content root/,
+  )
+})
+
+test('an import between two directories of one root is allowed', () => {
+  const dir = `enso-root:${ROOT}/visualizations/`
+  expect(resolveRelativeImport(dir, '../lib/a.ts', BASE)).toBe(`enso-root:${ROOT}/lib/a.ts`)
+})
+
+test('an address with a dot segment is not a root address', () => {
+  expect(parseRootAddress(`enso-root:${ROOT}/visualizations/../a.vue`)).toBeUndefined()
+  expect(parseRootAddress(`enso-root:${ROOT}/visualizations/./a.vue`)).toBeUndefined()
+  expect(parseRootAddress(`enso-root:${ROOT}/visualizations/%2e%2e/a.vue`)).toBeUndefined()
+})
+
+test('an address whose segment holds a slash is not a root address', () => {
+  expect(parseRootAddress(`enso-root:${ROOT}/visualizations%2Fa.vue`)).toBeUndefined()
 })
 
 test('http imports are left as absolute URLs', () => {
