@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [Right-clicking a table cell offers the components that the value's library
+  describes for it (its row, column or value, or the table or sheet it links
+  to), and right-clicking an entry of the JSON tree adds a component for it or
+  for every entry beside it.][795]
 - [The help panel shows each argument's type, default, widget and description in
   a tooltip on the component's node, and can expand the node to list them.
   Examples have a Copy button that pastes them into the graph as
@@ -504,6 +508,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[795]: https://github.com/jdunkerley/enso/pull/795
 [788]: https://github.com/jdunkerley/enso/pull/788
 [771]: https://github.com/jdunkerley/enso/pull/771
 [735]: https://github.com/jdunkerley/enso/pull/735
