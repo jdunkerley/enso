@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [Agents connected over MCP can list the visualizations a node offers and look
+  at any of them, as a picture or as its data.][809]
 - [Right-clicking a table cell offers the components that the value's library
   describes for it (its row, column or value, or the table or sheet it links
   to), and right-clicking an entry of the JSON tree adds a component for it or
@@ -523,6 +525,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[809]: https://github.com/jdunkerley/enso/pull/809
 [800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795
 [790]: https://github.com/jdunkerley/enso/pull/790

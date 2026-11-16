@@ -11,6 +11,7 @@ import { methodPointerEquals, type MethodPointer } from '@/util/methodPointer'
 import { isIdentifier, type Identifier } from '@/util/qualifiedName'
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
+import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
 import type { EditOutcome, EditSession } from './editSession'
 import {
   capNodeTexts,
@@ -145,7 +146,12 @@ export interface EditToolDeps extends GraphToolDeps {
   readonly setNodeContent: (id: NodeId, expression: string) => Result<void>
   readonly deleteNodes: (ids: readonly NodeId[]) => Promise<Result<void>>
   readonly setNodeComment: (id: NodeId, text: string) => Result<void>
-  readonly setVisualization: (id: NodeId, visible: boolean) => Result<void>
+  /** Shows or hides the node's visualization, and switches it to `identifier` when given. */
+  readonly setVisualization: (
+    id: NodeId,
+    visible: boolean,
+    identifier?: VisualizationIdentifier,
+  ) => Result<void>
 }
 
 type FoundNode = { id: NodeId; node: Node }
@@ -365,12 +371,13 @@ export async function setNodeComment(
 }
 
 /**
- * Shows or hides a node's visualization. Answers with the node and `settled: true` (nothing is
- * computed again).
+ * Shows or hides a node's visualization, and switches it to `identifier` in the same edit when one
+ * is given (`get_visualization` does; the `set_visualization` tool never passes one). Answers with
+ * the node and `settled: true` (nothing is computed again).
  */
 export async function setVisualization(
   deps: EditToolDeps,
-  args: { node_id: string; visible: boolean },
+  args: { node_id: string; visible: boolean; identifier?: VisualizationIdentifier },
 ): Promise<McpToolResult> {
   const found = findNode(deps.db, args.node_id)
   if (!found.ok) return found
@@ -382,7 +389,7 @@ export async function setVisualization(
     () => {
       const unchanged = checkAtTurn(deps, method, [found.value.id])
       if (!unchanged.ok) return unchanged
-      return deps.setVisualization(found.value.id, args.visible)
+      return deps.setVisualization(found.value.id, args.visible, args.identifier)
     },
     { deadline: deps.deadline },
   )
