@@ -57,11 +57,14 @@ needs.
 
 ### GUI
 
-1. **Library roots.** The visualization store listens to `file/rootAdded` (and
-   reads the roots already in the session's `contentRoots`). For each root of
-   type `Library` it calls `ls.watchFiles(root.id, ['visualizations'], …)`. A
-   library without the folder is skipped quietly (the same `FILE_NOT_FOUND`
-   check as for the project, without the console message).
+1. **Library roots.** The language server connection records every content root
+   from its start: those of each initialization reply and each `file/rootAdded`
+   (deduplicated by root id), so a root announced before the graph editor
+   creates the store is not lost. The visualization store reads the recorded
+   `contentRoots` and listens to later `file/rootAdded`. For each root of type
+   `Library` it calls `ls.watchFiles(root.id, ['visualizations'], …)`. A library
+   without the folder is skipped quietly (the same `FILE_NOT_FOUND` check as for
+   the project, without the console message).
 2. **One code path for project and library folders.** The current `onFileEvent`
    is generalised to take the root and the module (`{ kind: 'CurrentProject' }`
    or `{ kind: 'Library', name: '<namespace>.<name>' }`). The per-path maps and
