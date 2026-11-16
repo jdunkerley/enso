@@ -77,6 +77,10 @@ export class McpController {
   private fileToken: string | null = null
   /** Whether the keychain was already consulted for a token to migrate. */
   private keychainChecked = false
+  /** Why the settings file could not be read (not merely missing); nothing is written then. */
+  private fileUnreadable: string | null = null
+  /** Whether reading the keychain for a token to migrate failed. */
+  private keychainFailed = false
   private server: Server | null = null
   private error: string | null = null
   private queue: Promise<unknown> = Promise.resolve()
@@ -123,8 +127,19 @@ export class McpController {
   /** Reads the settings file and starts the server when enabled. Never throws. */
   init(): Promise<McpStatus> {
     return this.serialised(async () => {
+      let text: string | null = null
       try {
-        const parsed: unknown = JSON.parse(await fs.readFile(this.options.settingsPath, 'utf8'))
+        text = await fs.readFile(this.options.settingsPath, 'utf8')
+      } catch (e) {
+        // A missing file is the defaults. Any other failure (busy, no permission) is not "no file":
+        // reading nothing here and then writing would lose the stored token.
+        if ((e as { code?: unknown }).code !== 'ENOENT') {
+          this.fileUnreadable = `The MCP settings file could not be read: ${messageOf(e)}`
+        }
+      }
+      try {
+        // Malformed JSON keeps the existing rule: the defaults.
+        const parsed: unknown = text == null ? null : JSON.parse(text)
         if (typeof parsed === 'object' && parsed != null) {
           const { enabled, port, token } = parsed as {
             enabled?: unknown
@@ -136,7 +151,7 @@ export class McpController {
           if (typeof token === 'string' && token !== '') this.fileToken = token
         }
       } catch {
-        // Missing or unreadable: the defaults.
+        // Malformed: the defaults.
       }
       return this.apply()
     })
@@ -263,21 +278,34 @@ export class McpController {
   private async storedToken(): Promise<string | null> {
     if (this.envToken != null) return this.envToken
     if (this.fileToken != null) return this.fileToken
-    if (this.keychainChecked) return null
+    if (this.keychainChecked || this.fileUnreadable != null) return null
     this.keychainChecked = true
+    let entry: KeyringEntryLike
     let old: string | null
     try {
-      old = (await this.options.entry(MCP_TOKEN_ACCOUNT)).getPassword()
+      entry = await this.options.entry(MCP_TOKEN_ACCOUNT)
+      old = entry.getPassword()
     } catch {
+      this.keychainFailed = true
       return null
     }
     if (old == null || old === '') return null
+    let saved = false
     try {
       await this.save({ enabled: this.fileEnabled, port: this.filePort }, old)
+      saved = true
     } catch (e) {
       console.warn('[MCP] could not copy the keychain token to the settings file:', e)
     }
     this.fileToken = old
+    if (saved) {
+      // So that a token revoked later cannot come back from here. Best effort.
+      try {
+        entry.deletePassword()
+      } catch {
+        // Ignored.
+      }
+    }
     return old
   }
 
@@ -321,8 +349,12 @@ export class McpController {
 
   /** The token from the environment or the settings file, created when there is neither. */
   private async token(): Promise<string> {
+    if (this.fileUnreadable != null) throw new Error(this.fileUnreadable)
     const existing = await this.storedToken()
     if (existing != null) return existing
+    if (this.keychainFailed) {
+      console.warn('[MCP] the keychain could not be read; a new token was created')
+    }
     const created = randomBytes(32).toString('base64url')
     try {
       await this.save({ enabled: this.fileEnabled, port: this.filePort }, created)
@@ -343,7 +375,9 @@ export class McpController {
   private async apply(): Promise<McpStatus> {
     await this.stopServer()
     this.error = null
-    if (this.enabled && !this.closed) {
+    if (this.enabled && !this.closed && this.fileUnreadable != null) {
+      this.error = this.fileUnreadable
+    } else if (this.enabled && !this.closed) {
       const port = this.port
       try {
         const server = this.options.createServer(port, await this.token())
@@ -380,10 +414,19 @@ export class McpController {
     settings: { enabled: boolean; port: number },
     token: string | null = this.fileToken,
   ): Promise<void> {
+    if (this.fileUnreadable != null) throw new Error(this.fileUnreadable)
     const temporary = `${this.options.settingsPath}.tmp`
     const text = JSON.stringify(token == null ? settings : { ...settings, token })
-    await fs.writeFile(temporary, text, { encoding: 'utf8', mode: 0o600 })
-    if (token != null) await fs.chmod(temporary, 0o600)
+    // Never write into a leftover (it may have looser permissions): create it fresh.
+    await fs.rm(temporary, { force: true })
+    const file = await fs.open(temporary, 'wx', 0o600)
+    try {
+      await file.writeFile(text, 'utf8')
+      if (token != null) await file.chmod(0o600)
+      await file.sync()
+    } finally {
+      await file.close()
+    }
     await fs.rename(temporary, this.options.settingsPath)
   }
 }

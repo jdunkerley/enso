@@ -196,7 +196,11 @@ authorise anything by it. The token is the only credential.
   (default off, port 39417, no token), written atomically (a temporary file,
   then a rename) with mode `0o600`, so only the user can read it where the
   platform enforces modes (Windows does not; no ACL code). Unknown fields are
-  ignored. A missing or unreadable file means the defaults.
+  ignored. A missing file (`ENOENT`) or malformed JSON means the defaults. Any
+  other read failure (busy, no permission) is an error, not a reset: no
+  migration, no new token, nothing written, and an enabled server does not start
+  (status error "The MCP settings file could not be read: …"). The temporary
+  file is removed first and created fresh, and synced before the rename.
 - **The token** is the settings file's `token` field. It used to be in the
   system keychain; the owner chose the file because the server is loopback only
   and the token already sits in plain text in each agent app's own configuration
@@ -210,12 +214,15 @@ authorise anything by it. The token is the only credential.
   `options.entry`) is read once per session; a token found there is copied into
   the file and used, so agent apps already configured keep working. A keychain
   that throws, is unavailable or is empty counts as holding nothing. The
-  keychain is never written for the MCP token and the old entry is left in place
-  (deleting it is one more prompt); once the file has a token the keychain is
-  not consulted. A status read may migrate but never creates a token. The token
-  never enters the renderer: the status is built from separate fields
-  (`enabled`, `port`, ...), not the file's contents, and the only way out is
-  `copyConfig`, which writes the setup text to the clipboard from main.
+  keychain is never written for the MCP token; the old entry is deleted once the
+  file save succeeded (best effort, a failure is ignored; not deleted if the
+  save failed), so a revoked token cannot come back; once the file has a token
+  the keychain is not consulted. When the keychain read failed and a new token
+  is created, one line is logged (never the token). A status read may migrate
+  but never creates a token. The token never enters the renderer: the status is
+  built from separate fields (`enabled`, `port`, ...), not the file's contents,
+  and the only way out is `copyConfig`, which writes the setup text to the
+  clipboard from main.
 - **Environment overrides**, which win over the file: `ENSO_MCP_ENABLED=1` turns
   the server on (without changing the file), `ENSO_MCP_PORT=<port>` sets the
   port (1024 to 65535; another value is ignored), and `ENSO_MCP_TOKEN=<token>`

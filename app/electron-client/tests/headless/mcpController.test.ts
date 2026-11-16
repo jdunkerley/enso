@@ -161,18 +161,118 @@ describe('McpController', () => {
     expect(keyring.accounts).toEqual([])
   })
 
-  test('a keychain token is copied to the file once, used, and left in the keychain', async () => {
+  test('a keychain token is copied to the file once and used', async () => {
     keyring.items.set(MCP_TOKEN_ACCOUNT, 'from-keychain')
     await controller().setEnabled(true)
     expect(servers[0]!.token).toBe('from-keychain')
     expect((await fileOf()).token).toBe('from-keychain')
-    expect(keyring.items.get(MCP_TOKEN_ACCOUNT)).toBe('from-keychain')
     expect(keyring.writes).toEqual([])
     keyring.accounts.length = 0
     const second = controller()
     await second.init()
     expect(servers[1]!.token).toBe('from-keychain')
     expect(keyring.accounts).toEqual([])
+  })
+
+  test('the keychain entry is deleted after a successful migration, never written', async () => {
+    keyring.items.set(MCP_TOKEN_ACCOUNT, 'from-keychain')
+    await controller().setEnabled(true)
+    expect(keyring.items.has(MCP_TOKEN_ACCOUNT)).toBe(false)
+    expect(keyring.writes).toEqual([])
+  })
+
+  test('the keychain entry stays when the file could not be saved', async () => {
+    keyring.items.set(MCP_TOKEN_ACCOUNT, 'from-keychain')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await fs.mkdir(`${settingsPath}.tmp`)
+    await controller().setUpClaudeDesktop()
+    expect(keyring.items.get(MCP_TOKEN_ACCOUNT)).toBe('from-keychain')
+    warn.mockRestore()
+  })
+
+  test('a keychain delete that throws is ignored', async () => {
+    keyring.items.set(MCP_TOKEN_ACCOUNT, 'from-keychain')
+    const c = new McpController({
+      settingsPath,
+      claudeDesktopDirectory: claudeDir,
+      entry: async () => ({
+        getPassword: () => 'from-keychain',
+        setPassword: () => {},
+        deletePassword: () => {
+          throw new Error('denied')
+        },
+      }),
+      env: {},
+      createServer: (port, token) => {
+        const server = new FakeServer(port, token)
+        servers.push(server)
+        return server
+      },
+      onStatusChanged: () => {},
+    })
+    expect(await c.setEnabled(true)).toMatchObject({ running: true, error: null })
+    expect((await fileOf()).token).toBe('from-keychain')
+  })
+
+  test('an unreadable (not missing) settings file is never written, migrated or replaced', async () => {
+    keyring.items.set(MCP_TOKEN_ACCOUNT, 'from-keychain')
+    // A directory where the file should be: reading fails with EISDIR, not ENOENT.
+    await fs.mkdir(settingsPath)
+    const c = controller()
+    const status = await c.init()
+    expect(status.error).toBeNull()
+    const enabled = await c.setEnabled(true).catch((e: unknown) => e)
+    expect(enabled).toBeInstanceOf(Error)
+    await expect(c.setUpClaudeDesktop()).rejects.toThrow('The MCP settings file could not be read')
+    expect(keyring.accounts).toEqual([])
+    expect(keyring.items.get(MCP_TOKEN_ACCOUNT)).toBe('from-keychain')
+    expect(servers).toEqual([])
+    expect((await fs.stat(settingsPath)).isDirectory()).toBe(true)
+  })
+
+  test('an enabled server does not start when the settings file cannot be read', async () => {
+    await fs.mkdir(settingsPath)
+    const c = controller({ ENSO_MCP_ENABLED: '1' })
+    const status = await c.init()
+    expect(status.running).toBe(false)
+    expect(status.error).toMatch(/^The MCP settings file could not be read: /)
+    expect(servers).toEqual([])
+  })
+
+  test('a malformed settings file is the defaults', async () => {
+    await fs.writeFile(settingsPath, '{ not json')
+    expect(await controller().init()).toMatchObject({ enabled: false, port: 39417, error: null })
+  })
+
+  test('a leftover temporary file is replaced, not written into', async () => {
+    await fs.writeFile(`${settingsPath}.tmp`, 'stale', { mode: 0o644 })
+    await controller().setEnabled(true)
+    expect((await fileOf()).token).toBe(servers[0]!.token)
+    await expect(fs.access(`${settingsPath}.tmp`)).rejects.toThrow()
+    if (process.platform !== 'win32') {
+      expect((await fs.stat(settingsPath)).mode & 0o777).toBe(0o600)
+    }
+  })
+
+  test('a keychain read failure then a new token logs one line without the token', async () => {
+    keyring.getPassword = () => {
+      throw new Error('locked')
+    }
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await controller().setEnabled(true)
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(String(warn.mock.calls[0]![0])).not.toContain(servers[0]!.token)
+    warn.mockRestore()
+  })
+
+  test('a file token survives init, setEnabled and setPort', async () => {
+    await fs.writeFile(settingsPath, JSON.stringify({ enabled: false, port: 39417, token: 'kept' }))
+    const c = controller()
+    await c.init()
+    await c.setEnabled(true)
+    await c.setPort(40000)
+    expect(await fileOf()).toEqual({ enabled: true, port: 40000, token: 'kept' })
+    expect(servers.at(-1)!.token).toBe('kept')
   })
 
   test('an empty keychain gives a new token in the file', async () => {
