@@ -779,6 +779,7 @@ const customLocale = {
       @columnMoved="emit('columnMoved', $event)"
       @contextmenu="stopIfPrevented"
       @cellContextMenu="onCellContextMenu"
+      @bodyScroll="closeContextMenu"
     />
     <VueComponentHost :host="vueHost" />
     <GridPopupMenu

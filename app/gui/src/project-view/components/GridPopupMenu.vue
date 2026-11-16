@@ -10,6 +10,7 @@ import { useResizeObserver } from '@/composables/events'
 import { injectInteractionHandler } from '@/providers/interactionHandler'
 import { endOnClickOutside, targetIsOutside } from '@/util/autoBlur'
 import { autoUpdate, flip, shift, useFloating } from '@floating-ui/vue'
+import { useEventListener } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { GridMenuItem } from './shared/AgGridTableView/gridPopupMenuItems'
 
@@ -63,6 +64,24 @@ function activate(item: Extract<GridMenuItem, { type: 'item' }>) {
   item.action()
   emit('close')
 }
+
+// The popup is placed from a click point and the keyboard is not its own: close it on Escape, and
+// when anything scrolls (it would otherwise float over content that moved away from the click) —
+// as the tree visualization's menu does. `scroll` does not bubble, so a capturing listener is the
+// only way to see every scroller; scrolling inside the popup itself is not a reason to close it.
+// A scroll inside a shadow root never reaches `window`: such a host (the grid) closes the popup
+// itself on its own scroll event.
+useEventListener(window, 'keydown', (event: KeyboardEvent) => {
+  if (event.key === 'Escape') emit('close')
+})
+useEventListener(
+  window,
+  'scroll',
+  (event: Event) => {
+    if (targetIsOutside(event, menu.value)) emit('close')
+  },
+  { capture: true, passive: true },
+)
 
 onMounted(() => {
   if (interaction) {
