@@ -109,6 +109,16 @@ test('Text widget: Convert to multiline', async ({ editorPage, page }) => {
   ])
 })
 
+/** The module's code; the code editor is closed again afterwards. */
+async function moduleCode(page: Page): Promise<string> {
+  await page.keyboard.press('ControlOrMeta+`')
+  await expect(page.locator('.CodeEditor')).toBeVisible()
+  const code = await page.evaluate(() => (window as any).__codeEditorApi.textContent())
+  await page.keyboard.press('ControlOrMeta+`')
+  await expect(page.locator('.CodeEditor')).toBeHidden()
+  return code
+}
+
 test.describe('Multi-selection widget', () => {
   test.beforeEach(async ({ editorPage, page }) => {
     await editorPage
@@ -1157,16 +1167,6 @@ test.describe('Date widget', () => {
     return { node, widget, menu, open }
   }
 
-  /** The module's code; the code editor is closed again afterwards. */
-  async function moduleCode(page: Page): Promise<string> {
-    await page.keyboard.press('ControlOrMeta+`')
-    await expect(page.locator('.CodeEditor')).toBeVisible()
-    const code = await page.evaluate(() => (window as any).__codeEditorApi.textContent())
-    await page.keyboard.press('ControlOrMeta+`')
-    await expect(page.locator('.CodeEditor')).toBeHidden()
-    return code
-  }
-
   const days = '[data-reka-calendar-cell-trigger]:not([data-outside-view])'
 
   test('a Date-typed argument has the arrow, and a relative choice writes the code it names', async ({
@@ -1422,16 +1422,6 @@ test.describe('Time_Of_Day widget', () => {
     return { node, widget, menu, open }
   }
 
-  /** The module's code; the code editor is closed again afterwards. */
-  async function moduleCode(page: Page): Promise<string> {
-    await page.keyboard.press('ControlOrMeta+`')
-    await expect(page.locator('.CodeEditor')).toBeVisible()
-    const code = await page.evaluate(() => (window as any).__codeEditorApi.textContent())
-    await page.keyboard.press('ControlOrMeta+`')
-    await expect(page.locator('.CodeEditor')).toBeHidden()
-    return code
-  }
-
   test('a Time_Of_Day-typed argument has the arrow, and Time_Of_Day.now writes the code it names', async ({
     editorPage,
     page,
@@ -1612,5 +1602,120 @@ test.describe('Time_Of_Day widget', () => {
     await page.keyboard.press('ControlOrMeta+Z')
     await expect(widget.locator('.WidgetNumber')).toHaveCount(0)
     expect(await moduleCode(page)).not.toContain('import Time_Of_Day')
+  })
+})
+
+test.describe('Boolean widget', () => {
+  const BOOLEAN_TYPE = 'Standard.Base.Data.Boolean.Boolean'
+  test.afterEach(restoreMockMainFile)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile(
+          'from Standard.Base import Data\n\nmain =\n    kept = Data.keep_rows True\n    unset = Data.keep_rows\n    computed = Data.keep_rows (1 > 2)\n    flag = True\n',
+        ),
+    },
+  })
+
+  /** `Data.keep_rows` takes one Boolean argument, `keep`, defaulting to `False`. */
+  async function booleanNode(
+    editorPage: EditorPageActions,
+    page: Page,
+    binding: 'kept' | 'unset' | 'computed',
+  ) {
+    await editorPage.mockSuggestion({
+      type: 'method',
+      module: 'Standard.Base.Data',
+      name: 'keep_rows',
+      arguments: [
+        {
+          name: 'keep',
+          reprType: BOOLEAN_TYPE,
+          isSuspended: false,
+          hasDefault: true,
+          defaultValue: 'False',
+          tagValues: ['True', 'False'],
+        },
+      ],
+      selfType: 'Standard.Base.Data',
+      returnType: 'Standard.Base.Data.Numbers.Integer',
+      isStatic: true,
+      annotations: [],
+    })
+    await mockMethodCallInfo(page, binding, {
+      methodPointer: {
+        module: 'Standard.Base.Data',
+        definedOnType: 'Standard.Base.Data',
+        name: 'keep_rows',
+      },
+      notAppliedArguments: binding === 'unset' ? [0] : [],
+    })
+    const node = locate.graphNodeByBinding(page, binding)
+    const widget = node.locator('.WidgetBoolean')
+    return { node, widget, checkbox: widget.locator('.Checkbox') }
+  }
+
+  test('a set argument shows the checkbox and its code, and the checkbox flips it both ways', async ({
+    editorPage,
+    page,
+  }) => {
+    const { widget, checkbox } = await booleanNode(editorPage, page, 'kept')
+    await expect(widget).toHaveCount(1)
+    await expect(widget).toContainText('True')
+    await checkbox.click()
+    await expect(widget).toContainText('False')
+    expect(await moduleCode(page)).toContain('kept = Data.keep_rows False\n')
+    await checkbox.click()
+    await expect(widget).toContainText('True')
+    expect(await moduleCode(page)).toContain('kept = Data.keep_rows True\n')
+    // The checkbox does not open the list.
+    await expect(page.locator('.DropdownWidget')).toBeHidden()
+  })
+
+  test('the arrow lists True and False only, and a pick writes it', async ({
+    editorPage,
+    page,
+  }) => {
+    const { node } = await booleanNode(editorPage, page, 'kept')
+    const dropDown = new DropDownLocator(node)
+    const selection = node.locator('.WidgetSelection').first()
+    await selection.hover()
+    await expect(selection.locator('svg.arrow')).toBeVisible()
+    // The corner, not the middle: the middle of the widget is the checkbox.
+    await selection.click({ position: { x: 4, y: 4 } })
+    await dropDown.expectVisibleWithOptions(['True', 'False'])
+    await dropDown.clickOption('False')
+    await dropDown.expectNotVisible()
+    expect(await moduleCode(page)).toContain('kept = Data.keep_rows False\n')
+  })
+
+  test('an unset argument shows its default greyed, and the checkbox writes the flipped value', async ({
+    editorPage,
+    page,
+  }) => {
+    const { node, widget, checkbox } = await booleanNode(editorPage, page, 'unset')
+    // Unset arguments show only while the node is selected.
+    await node.click()
+    await expect(widget).toHaveCount(1)
+    await expect(widget.locator('.defaultValue')).toHaveText('False')
+    await checkbox.click()
+    await expect(widget.locator('.defaultValue')).toHaveCount(0)
+    expect(await moduleCode(page)).toMatch(/unset = Data\.keep_rows (keep=)?True\n/)
+  })
+
+  test('an expression value has no checkbox, and keeps the arrow', async ({ editorPage, page }) => {
+    const { node } = await booleanNode(editorPage, page, 'computed')
+    await expect(node.locator('.WidgetBoolean')).toHaveCount(0)
+    await expect(node.locator('.WidgetSelection')).toHaveCount(1)
+  })
+
+  test('a whole True node has the checkbox and no arrow', async ({ editorPage, page }) => {
+    await editorPage
+    const node = locate.graphNodeByBinding(page, 'flag')
+    const widget = node.locator('.WidgetBoolean')
+    await expect(widget).toHaveCount(1)
+    await expect(node.locator('.WidgetSelection')).toHaveCount(0)
+    await widget.locator('.Checkbox').click()
+    expect(await moduleCode(page)).toContain('flag = False\n')
   })
 })
