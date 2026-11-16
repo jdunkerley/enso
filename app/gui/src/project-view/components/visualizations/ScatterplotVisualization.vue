@@ -9,6 +9,7 @@ import { defineKeybinds } from '@/util/visualizationBuiltins'
 import { computed, ref, watch, watchEffect, watchPostEffect } from 'vue'
 import { brushFilterPattern, rowPattern } from './ScatterplotVisualization/scatterNodes'
 import type { ToolbarItem } from './toolbar'
+import { findAction, parseVizActions, plainActionToolbar } from './vizActions'
 
 export const name = 'Scatter Plot'
 export const icon = 'points'
@@ -62,7 +63,6 @@ interface Data {
   isTimeSeries: boolean
   x_value_type: string
   is_multi_series: boolean
-  get_row_method: string
   error_message: string | null
 }
 
@@ -125,6 +125,10 @@ const d3 = await import('d3')
 const props = defineProps<{ data: Partial<Data> | number[] }>()
 
 const config = useVisualizationConfig()
+
+const vizActions = computed(() => parseVizActions(props.data))
+const brushAction = computed(() => findAction(vizActions.value, 'brush_filter'))
+const rowAction = computed(() => findAction(vizActions.value, 'open_row'))
 
 // Font size for the multi-series legend labels (distinct from the axis labels, which are
 // measured with their actual rendered font — see `labelFont` below).
@@ -205,8 +209,6 @@ const data = computed<Data>(() => {
   // eslint-disable-next-line camelcase
   const is_multi_series: boolean = !!rawData.is_multi_series
   // eslint-disable-next-line camelcase
-  const get_row_method: string = rawData.get_row_method || 'get_row'
-  // eslint-disable-next-line camelcase
   const error_message: string | null = rawData.error_message || null
   return {
     axis,
@@ -217,8 +219,6 @@ const data = computed<Data>(() => {
     is_multi_series,
     // eslint-disable-next-line camelcase
     x_value_type: rawData.x_value_type || '',
-    // eslint-disable-next-line camelcase
-    get_row_method,
     // eslint-disable-next-line camelcase
     error_message,
     isTimeSeries,
@@ -608,6 +608,8 @@ function getPlotData(data: Data): Point[] {
 const errorMessage = computed(() => data.value.error_message)
 
 const createNewFilterNode = () => {
+  const action = brushAction.value
+  if (action == null) return
   const seriesLabels = Object.keys(data.value.axis)
     .filter((s) => s != 'x')
     .map((s) => data.value.axis[s as keyof AxesConfiguration].label)
@@ -622,22 +624,14 @@ const createNewFilterNode = () => {
   const yItemsVal = yItems.map((k) => Object.values(k)).flat(1)
   const minY = Math.min(...yItemsVal)
   const maxY = Math.max(...yItemsVal)
-  const pattern = brushFilterPattern(seriesLabels, xColName, minX, maxX, minY, maxY)
-  config.createNodes({
-    content: pattern,
-    commit: true,
-  })
+  const pattern = brushFilterPattern(action, seriesLabels, xColName, minX, maxX, minY, maxY)
+  if (pattern) config.createNodes({ content: pattern, commit: true })
 }
 
 function createNode(rowNumber: number) {
-  const selector = data.value.get_row_method
-  const pattern = rowPattern(rowNumber, selector)
-  if (pattern) {
-    config.createNodes({
-      content: pattern,
-      commit: true,
-    })
-  }
+  const action = rowAction.value
+  const pattern = action && rowPattern(action, rowNumber)
+  if (pattern) config.createNodes({ content: pattern, commit: true })
 }
 
 function formatXPoint(x: Date | number | DateObj) {
@@ -881,13 +875,18 @@ function useScatterplotVizToolbar() {
       title: 'Reset scatterplot view',
       onClick: () => zoomToSelected(false),
     },
-    {
-      icon: 'add_to_graph_editor',
-      title: 'Create component of selected points',
-      disabled: () => !createNewFilterNodeEnabled.value,
-      onClick: createNewFilterNode,
-    },
+    ...(brushAction.value != null ?
+      [
+        {
+          icon: 'add_to_graph_editor',
+          title: 'Create component of selected points',
+          disabled: () => !createNewFilterNodeEnabled.value,
+          onClick: createNewFilterNode,
+        } satisfies ToolbarItem,
+      ]
+    : []),
     ...(data.value.is_multi_series ? [textSelectionButton] : []),
+    ...plainActionToolbar(vizActions.value, config.createNodes),
   ])
 }
 

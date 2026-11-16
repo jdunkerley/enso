@@ -45,10 +45,9 @@ type In_Memory_Viz_Source
     view_settings self -> Table_View =
         is_table = Nothing == self.column
         index_action = if is_table then "get_row {{#index}}" else "at {{#index}}"
-        create_node = if is_table then ["create_node"] else []
         case self.db_row_count of
-            Nothing -> Table_View.Value index_action self.table.row_count self.version_hash (["status_bar"] + create_node) True
-            n -> Table_View.Value index_action n Nothing create_node False
+            Nothing -> Table_View.Value index_action self.table.row_count self.version_hash ["status_bar"] True
+            n -> Table_View.Value index_action n Nothing [] False
 
     # The Java columns, the table's own array (no copy).
     java_columns self = (self.table:In_Memory_Table).java_table.getColumns

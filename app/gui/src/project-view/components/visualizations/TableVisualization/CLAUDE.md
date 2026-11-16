@@ -24,7 +24,10 @@ The table visualisation (`../TableVisualization.vue`) and its helpers.
 - `tableVizFilterSetUpUtils.ts`, `tableVizFilterUtils.ts`,
   `CommunitySetFilter.ts`: the filters. `TableVisualisationTooltip.ts`: the
   header tooltip with the data quality metrics. `tableVizToolbar.ts`: the
-  toolbar.
+  toolbar. Its "create components" button, and the links' nodes in
+  `tableView.ts`, are built by `../vizActions.ts` from the `actions` Enso sends
+  with the value; the button is there when the value offers `sort`, `filter`,
+  `remove_columns` or `reorder_columns` (`TABLE_TOOLBAR_ACTIONS`).
 - `columnValueToEnso.ts`: a cell's text as an Enso value of its column's type
   (the toolbar's filters). `tableContextMenu.ts`: the right-click menu's nodes.
   Both, the scatter plot's `scatterNodes.ts` and the Warnings visualisation's

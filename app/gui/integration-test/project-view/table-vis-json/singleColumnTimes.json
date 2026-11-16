@@ -1,4 +1,56 @@
 {
+  "actions": [
+    {
+      "id": "open_row",
+      "label": "Get Row",
+      "icon": "select_row",
+      "kind": "chain",
+      "template": "get_row {{#index}}"
+    },
+    {
+      "id": "open_column",
+      "label": "Get Column",
+      "icon": "select_column",
+      "kind": "chain",
+      "template": "at {{@column}}"
+    },
+    {
+      "id": "open_cell",
+      "label": "Get Value",
+      "icon": "select_cell",
+      "kind": "chain",
+      "template": "get_value {{@column}} {{#index}}"
+    },
+    { "id": "sort", "label": "Sort", "icon": "", "kind": "chain", "template": "sort {{columns*}}" },
+    {
+      "id": "filter",
+      "label": "Filter",
+      "icon": "",
+      "kind": "chain",
+      "template": "filter {{@column}} {{condition}}"
+    },
+    {
+      "id": "remove_columns",
+      "label": "Remove Columns",
+      "icon": "",
+      "kind": "chain",
+      "template": "remove_columns {{@columns*}}"
+    },
+    {
+      "id": "reorder_columns",
+      "label": "Reorder Columns",
+      "icon": "",
+      "kind": "chain",
+      "template": "reorder_columns {{@columns*}}"
+    },
+    {
+      "id": "brush_filter",
+      "label": "Filter To Selection",
+      "icon": "",
+      "kind": "chain",
+      "template": "filter {{@column}} (..Between {{#min}} {{#max}})"
+    }
+  ],
   "kind": "grid",
   "row_count": 3,
   "columns": [
@@ -47,5 +99,5 @@
     ]
   ],
   "version_hash": "0a31bbc5-99f5-4f0b-ba50-88042ac907ba",
-  "options": { "status_bar": true, "create_node": true }
+  "options": { "status_bar": true }
 }
