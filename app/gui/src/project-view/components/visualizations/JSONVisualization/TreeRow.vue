@@ -9,6 +9,7 @@ const emit = defineEmits<{
   more: []
   retry: []
   activate: [all: boolean]
+  menu: [event: MouseEvent]
 }>()
 
 /** Indentation per level, in pixels. */
@@ -35,7 +36,7 @@ const title = computed(() => {
   if (row.kind !== 'entry') return leafText.value ?? ''
   const action =
     row.chain != null ?
-      'Double-click to add a component for this entry; Shift+double-click adds one for each entry beside it.'
+      'Double-click, or right-click for a menu, to add a component for this entry; Shift+double-click adds one for each entry beside it.'
     : 'No expression reaches this entry, so double-clicking it adds nothing.'
   return leafText.value != null ? `${leafText.value}\n\n${action}` : action
 })
@@ -69,6 +70,7 @@ const moreText = computed(() =>
         :title="title"
         @mousedown="preventWordSelection"
         @dblclick.stop="emit('activate', $event.shiftKey)"
+        @contextmenu.prevent.stop="emit('menu', $event)"
       >
         <!-- Vue drops the whitespace between these spans (it holds a newline), so the text reads
              `key: value` exactly; the Playwright spec matches it. -->

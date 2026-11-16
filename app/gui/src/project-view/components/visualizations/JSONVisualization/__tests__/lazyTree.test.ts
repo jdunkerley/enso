@@ -1,6 +1,14 @@
 import { flushPromises } from '@vue/test-utils'
 import { describe, expect, test, vi } from 'vitest'
-import { PAGE_SIZE, siblingChains, useLazyTree, type FetchPage, type TreeRow } from '../lazyTree'
+import {
+  entryMenu,
+  PAGE_SIZE,
+  siblingChains,
+  useLazyTree,
+  type FetchPage,
+  type TreeRow,
+} from '../lazyTree'
+import { nodeExpressionPattern } from '../treeExpression'
 import type { PageResult, Prepared, TreeEntry } from '../treeWire'
 
 function leaf(key: string | number, value: unknown, expr: string | null = null): TreeEntry {
@@ -354,3 +362,119 @@ describe('useLazyTree', () => {
     expect(chains[0]).toEqual([".get 'items'", '.at 0'])
   })
 })
+
+describe('entryMenu', () => {
+  async function loaded() {
+    const tree = useLazyTree(fakeFetch())
+    tree.setRoot(prepared)
+    tree.toggle(['items'])
+    await flushPromises()
+    return tree.rows.value
+  }
+
+  function entryAt(rows: readonly TreeRow[], path: (string | number)[]) {
+    const row = rows.find(
+      (r) => r.kind === 'entry' && JSON.stringify(r.path) === JSON.stringify(path),
+    )
+    if (row?.kind !== 'entry') throw new Error(`no entry at ${JSON.stringify(path)}`)
+    return row
+  }
+
+  test('offers the entry and its loaded siblings', async () => {
+    const rows = await loaded()
+    const entry = entryAt(rows, ['items', 5])
+    const menu = entryMenu(rows, entry)
+    expect(menu.map((m) => m.name)).toEqual(['Get Value', 'Get All Loaded Values Here'])
+    expect(menu[0]!.chains).toEqual([[".get 'items'", '.at 5']])
+    expect(menu[1]!.chains).toEqual(siblingChains(rows, entry))
+    expect(menu[1]!.chains).toHaveLength(100)
+  })
+
+  test('has an icon for each entry', async () => {
+    const rows = await loaded()
+    expect(entryMenu(rows, entryAt(rows, ['name'])).map((m) => m.icon)).toEqual([
+      'select_cell',
+      'select_row',
+    ])
+  })
+
+  test('is empty for an entry no expression reaches', async () => {
+    const tree = useLazyTree(fakeFetch())
+    tree.setRoot(prepared)
+    tree.toggle(['raw'])
+    await flushPromises()
+    const rows = tree.rows.value
+    expect(entryMenu(rows, entryAt(rows, ['raw']))).toEqual([])
+    expect(entryMenu(rows, entryAt(rows, ['raw', 0]))).toEqual([])
+  })
+
+  test('is empty for a row that is not an entry', async () => {
+    const rows = await loaded()
+    expect(rows.some((r) => r.kind !== 'entry')).toBe(true)
+    for (const row of rows.filter((r) => r.kind !== 'entry'))
+      expect(entryMenu(rows, row)).toEqual([])
+  })
+
+  test('offers nothing that makes no node', () => {
+    // A bare `__` step is a second hole: the builder gives no pattern for it.
+    const stepWithHole = leaf('hole', 1, '.get __')
+    const rows = useLazyTreeRows({
+      ...prepared,
+      children: { ...prepared.children, entries: [stepWithHole] },
+    })
+    const entry = entryAt(rows, ['hole'])
+    expect(entry.chain).toEqual(['.get __'])
+    expect(nodeExpressionPattern(entry.chain!)).toBeUndefined()
+    expect(entryMenu(rows, entry)).toEqual([])
+  })
+
+  test('Get All Loaded Values Here is the loaded siblings in display order, and nothing under them', async () => {
+    const tree = useLazyTree(fakeFetch())
+    tree.setRoot({
+      root: prepared.root,
+      children: {
+        start: 0,
+        size: 6,
+        entries: [
+          leaf('a', 1, ".get 'a'"),
+          { key: 'items', kind: 'array', size: 250, label: '[250 items]', expr: ".get 'items'" },
+          leaf('b', 2, ".get 'b'"),
+          leaf('c', 3, ".get 'c'"),
+        ],
+      },
+    })
+    tree.toggle(['items'])
+    await flushPromises()
+    const rows = tree.rows.value
+    // The tree has the root's "Show more" row and 100 of the 250 `items`, with their own.
+    expect(rows.filter((r) => r.kind === 'more').map((r) => r.path)).toEqual([['items'], []])
+    expect(rows.filter((r) => r.kind === 'entry' && r.path[0] === 'items')).toHaveLength(101)
+    // Whichever sibling is clicked, the unloaded two of six and the children of `items` are left out.
+    for (const key of ['a', 'items', 'b', 'c'])
+      expect(entryMenu(rows, entryAt(rows, [key]))[1]!.chains).toEqual([
+        [".get 'a'"],
+        [".get 'items'"],
+        [".get 'b'"],
+        [".get 'c'"],
+      ])
+  })
+
+  test('leaves a sibling with no pattern out of the loaded values', () => {
+    const rows = useLazyTreeRows({
+      ...prepared,
+      children: {
+        ...prepared.children,
+        entries: [leaf('a', 1, ".get 'a'"), leaf('hole', 2, '.get __')],
+      },
+    })
+    const menu = entryMenu(rows, entryAt(rows, ['a']))
+    expect(menu.map((m) => m.name)).toEqual(['Get Value', 'Get All Loaded Values Here'])
+    expect(menu[1]!.chains).toEqual([[".get 'a'"]])
+  })
+})
+
+function useLazyTreeRows(payload: Prepared): readonly TreeRow[] {
+  const tree = useLazyTree(fakeFetch())
+  tree.setRoot(payload)
+  return tree.rows.value
+}
