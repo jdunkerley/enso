@@ -5,6 +5,8 @@ import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Time_Error.Time_Error
 import Standard.Base.Runtime.Debug
 
+from Standard.Base.Data.Time.Time_Of_Day import make_time_period_selector
+
 from Standard.Test import all
 
 polyglot java import java.util.Locale as Java_Locale
@@ -34,6 +36,12 @@ add_specs suite_builder =
             (t - Time_Period.Minute) . should_equal (Time_Of_Day.new 12 29)
             (t + (Duration.new seconds=15)) . should_equal (Time_Of_Day.new 12 30 15)
             (t - (Duration.new minutes=45)) . should_equal (Time_Of_Day.new 11 45)
+
+        group_builder.specify "+ and - offer each Time_Period and Duration.new" <|
+            widget = make_time_period_selector
+            labels = widget.values.map .label
+            labels . should_equal ["Time_Period.Hour", "Time_Period.Minute", "Time_Period.Second", "Time_Period.Millisecond", "Time_Period.Microsecond", "Time_Period.Nanosecond", "Duration.new"]
+            widget.values.last.value . should_equal "(Duration.new)"
 
         group_builder.specify "methods reject arguments of the wrong type" <|
             t = Time_Of_Day.new 12 30
