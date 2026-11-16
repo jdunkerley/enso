@@ -23,9 +23,8 @@ design is its section 6); plan:
   computes the node's props; `pages.ts` writes each page; `sidebarData.ts`,
   `output.ts`, `report.ts` and `main.ts` write the rest and print the report;
   `style.ts` checks the documentation style of the opted-in modules
-  (`STYLE_CHECKED_MODULES`), and `main.ts` prints its violations, failing the
-  run only when `STYLE_GATE` (or `--style-gate`) is on. A `*.test.ts` sits
-  beside each.
+  (`STYLE_CHECKED_MODULES`), and `main.ts` prints its violations and fails the
+  run while `STYLE_GATE` is on (it is). A `*.test.ts` sits beside each.
 - `generator/fixtures/` — `lib/` (two small fixture libraries covering every
   case) and `golden/` (`Table.filter`'s real catalogue entry and its reviewed
   page, `Table.filter.mdx`).

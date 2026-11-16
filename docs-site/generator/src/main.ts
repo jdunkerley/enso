@@ -20,12 +20,11 @@ import { styleViolations } from './style'
 export const MIN_FUNCTION_PAGES = 2500
 
 /**
- * Whether documentation style violations (`style.ts`) fail the run. Off until Date's docs are
- * rewritten to the house style (the Date documentation pilot's task 5, which flips this to `true`):
- * they break the rules today, so this would fail the Docs Site CI job on `develop`'s catalogues.
- * The violations are printed either way; `--style-gate` enforces them for one run.
+ * Whether documentation style violations (`style.ts`) fail the run. On since Date's docs were
+ * rewritten to the house style (the Date documentation pilot): a violation in an opted-in module
+ * fails the Docs Site CI job.
  */
-export const STYLE_GATE = false
+export const STYLE_GATE = true
 
 const SITE_DIR = fileURLToPath(new URL('../..', import.meta.url))
 
