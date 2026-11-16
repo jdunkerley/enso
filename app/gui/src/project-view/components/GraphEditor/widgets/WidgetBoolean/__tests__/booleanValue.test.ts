@@ -9,6 +9,7 @@ import {
   booleanFromCode,
   booleanLiteral,
   isBooleanArgument,
+  setBooleanLiteral,
 } from '../booleanValue'
 
 const argument = (
@@ -113,5 +114,29 @@ describe('booleanExpressionTags', () => {
     const tags = booleanExpressionTags(db)
     expect(tags.map((tag) => tag.expression)).toEqual(['True', 'False'])
     expect(tags.map((tag) => tag.label)).toEqual(['True', 'False'])
+  })
+})
+
+describe('setBooleanLiteral', () => {
+  function flip(code: string, value: boolean) {
+    const module = Ast.MutableModule.Transient()
+    const ast = Ast.parseExpression(code, module)!
+    const result = setBooleanLiteral(ast, value)
+    return { ...result, code: ast.code() }
+  }
+
+  test.each([
+    ['True', false, 'False', true],
+    ['False', true, 'True', true],
+    ['Boolean.True', false, 'Boolean.False', false],
+    ['Boolean.False', true, 'Boolean.True', false],
+    [
+      'Standard.Base.Data.Boolean.Boolean.False',
+      true,
+      'Standard.Base.Data.Boolean.Boolean.True',
+      false,
+    ],
+  ])('%s set to %s becomes %s (requiresImport %s)', (code, value, expected, requiresImport) => {
+    expect(flip(code, value)).toEqual({ code: expected, requiresImport })
   })
 })

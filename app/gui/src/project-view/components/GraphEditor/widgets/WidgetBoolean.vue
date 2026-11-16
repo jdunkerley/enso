@@ -17,9 +17,9 @@ import {
   booleanFromCode,
   booleanLiteral,
   isBooleanArgument,
+  setBooleanLiteral,
 } from '@/components/GraphEditor/widgets/WidgetBoolean/booleanValue'
 import CheckboxWidget from '@/components/widgets/CheckboxWidget.vue'
-import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import { ProjectPath } from '@/util/projectPath'
 import type { Identifier, QualifiedName } from '@/util/qualifiedName'
@@ -51,13 +51,8 @@ const checked = computed({
       const current = props.input.value
       if (current instanceof Ast.Ast) {
         // `Boolean.True` keeps its type prefix and needs no import; a bare `True` may.
-        const target = edit.getVersion(current)
-        if (target instanceof Ast.MutablePropertyAccess) target.setRhs(name)
-        else {
-          assert(target instanceof Ast.MutableIdent)
-          target.setToken(name)
-          module.value.addMissingImports(edit, constructorImport(value))
-        }
+        const { requiresImport } = setBooleanLiteral(edit.getVersion(current), value)
+        if (requiresImport) module.value.addMissingImports(edit, constructorImport(value))
         return props.updateCallback({ edit, directInteraction: true })
       }
       module.value.addMissingImports(edit, constructorImport(value))

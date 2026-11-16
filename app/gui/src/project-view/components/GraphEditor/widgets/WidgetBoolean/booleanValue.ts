@@ -6,10 +6,11 @@
 import { requiredImportsByProjectPath } from '$/providers/openedProjects/module/imports'
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import { ExpressionTag } from '@/components/GraphEditor/widgets/WidgetSelection/tags'
+import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import { ArgumentInfoKey } from '@/util/callTree'
 import { ProjectPath } from '@/util/projectPath'
-import type { QualifiedName } from '@/util/qualifiedName'
+import type { Identifier, QualifiedName } from '@/util/qualifiedName'
 
 /** The qualified name of the `Boolean` type, as a typed argument's `reprType` or `expectedType` has it. */
 export const BOOLEAN_TYPE = 'Standard.Base.Data.Boolean.Boolean'
@@ -79,4 +80,22 @@ export function booleanExpressionTags(
         ),
       ),
   )
+}
+
+/**
+ * Flips a `True`/`False` literal in place: `Boolean.True` (or fully qualified) keeps its type
+ * prefix and needs no import; a bare `True`/`False` identifier may, so `requiresImport` is set.
+ */
+export function setBooleanLiteral(
+  target: Ast.MutableAst,
+  value: boolean,
+): { requiresImport: boolean } {
+  const name = (value ? 'True' : 'False') as Identifier
+  if (target instanceof Ast.MutablePropertyAccess) {
+    target.setRhs(name)
+    return { requiresImport: false }
+  }
+  assert(target instanceof Ast.MutableIdent)
+  target.setToken(name)
+  return { requiresImport: true }
 }
