@@ -1,16 +1,10 @@
 /**
- * @file The node actions Enso describes for a visualised value (`Standard.Visualization.Viz_Actions`,
- * the `actions` field of a visualisation's message), and the one builder that turns an action's
- * template and a gesture's values into a node pattern. A visualisation owns its gestures and fills
- * in the values a template names; it never writes an Enso method name.
- *
- * Templates: `{{#x}}` the value of `x`, a number when it reads as one, else text; an `@` placeholder, the
- * value as it is (a number stays a number, anything else is text); `{{x}}` an Enso expression the
- * gesture builds; a `*` after the name, a vector of such values; `{{node}}` the visualised node, in
- * a `new_node` template only. A missing value gives no pattern, never a broken node.
+ * @file The node actions Enso describes for a visualised value, and the builder that turns an
+ * action's template and a gesture's values into a node pattern.
  */
 import { Ast } from '@/util/ast'
 import { Pattern } from '@/util/ast/match'
+import { assertDefined } from 'ydoc-shared/util/assert'
 import { z } from 'zod'
 
 export const vizActionSchema = z.object({
@@ -24,10 +18,9 @@ export type VizAction = z.infer<typeof vizActionSchema>
 
 /** The `actions` of a visualisation's message: none when it has none; a malformed entry is dropped. */
 export function parseVizActions(data: unknown): VizAction[] {
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) return []
-  const list = z.array(z.unknown()).safeParse((data as { actions?: unknown }).actions)
-  if (!list.success) return []
-  return list.data.flatMap((item) => {
+  const message = z.object({ actions: z.array(z.unknown()) }).safeParse(data)
+  if (!message.success) return []
+  return message.data.actions.flatMap((item) => {
     const action = vizActionSchema.safeParse(item)
     return action.success ? [action.data] : []
   })
@@ -55,7 +48,7 @@ const NODE = 'node'
 function parseTemplate(template: string): { code: string; slots: Slot[] } {
   const slots: Slot[] = []
   const code = template.replace(PLACEHOLDER, (_match, flag: string, name: string, star: string) => {
-    slots.push({ name, flag: flag as Slot['flag'], many: star === '*' })
+    slots.push({ name, flag: flag === '#' || flag === '@' ? flag : '', many: star === '*' })
     return '__'
   })
   return { code, slots }
@@ -68,62 +61,112 @@ export function placeholderNames(template: string): string[] {
   return parseTemplate(template).slots.map((slot) => slot.name)
 }
 
-/** Whether a template's values are all there, each a vector exactly where `*` asks for one. */
-function filled(slots: readonly Slot[], values: ActionValues): boolean {
-  return slots.every((slot) => {
-    if (isNodeSlot(slot)) return true
-    const value = values[slot.name]
-    return value != null && Array.isArray(value) === slot.many
-  })
-}
-
-function scalarAst(
-  value: ActionScalar,
-  flag: Slot['flag'],
-  module: Ast.MutableModule,
-): Ast.Owned<Ast.MutableExpression> {
-  if (typeof value === 'function') return value(module)
-  if (flag === '') {
-    return typeof value === 'number' ?
-        Ast.tryNumberToEnso(value, module)!
-      : Ast.parseExpression(value, module)!
-  }
-  const cast = flag === '#' && !isNaN(Number(value)) ? Number(value) : value
-  return typeof cast === 'number' && !isNaN(cast) ?
-      Ast.tryNumberToEnso(cast, module)!
-    : Ast.TextLiteral.new(String(cast), module)
-}
-
-function valueAst(
-  value: ActionValue,
-  slot: Slot,
-  module: Ast.MutableModule,
-): Ast.Owned<Ast.MutableExpression> {
-  if (Array.isArray(value)) {
-    return Ast.Vector.build(
-      value as readonly ActionScalar[],
-      (element, elementModule) => scalarAst(element, slot.flag, elementModule),
-      module,
-    )
-  }
-  return scalarAst(value as ActionScalar, slot.flag, module)
+function isScalarList(value: ActionValue): value is readonly ActionScalar[] {
+  return Array.isArray(value)
 }
 
 type Fill = { node: true } | { node: false; slot: Slot; value: ActionValue }
 
-/** A pattern of `code`, each `__` filled in order: the node where `fill.node`, else the value. */
+/**
+ * What goes into each of `slots`: the node for `{{node}}`, else the value named by the slot.
+ * `undefined` when a value is missing, is a vector where one is not asked for (or the reverse),
+ * or is an empty vector. Only values `values` owns count: `{{toString}}` is not `Object`'s.
+ */
+function fillsFor(slots: readonly Slot[], values: ActionValues): Fill[] | undefined {
+  const fills: Fill[] = []
+  for (const slot of slots) {
+    if (isNodeSlot(slot)) {
+      fills.push({ node: true })
+      continue
+    }
+    const value = Object.hasOwn(values, slot.name) ? values[slot.name] : undefined
+    if (value == null) return undefined
+    if (isScalarList(value) ? !slot.many || value.length === 0 : slot.many) return undefined
+    fills.push({ node: false, slot, value })
+  }
+  return fills
+}
+
+/** `value` in the plain decimal notation Enso reads: never `1e-7` or `1e+21`. */
+function decimalNotation(value: number): string {
+  const text = value.toString()
+  const match = /^(-?)(\d)(?:\.(\d+))?e([+-])(\d+)$/.exec(text)
+  if (!match) return text
+  const [, sign, integer, fraction = '', exponentSign, exponent] = match
+  const digits = integer + fraction
+  return exponentSign === '-' ?
+      `${sign}0.${'0'.repeat(Number(exponent) - 1)}${digits}`
+    : sign + digits.padEnd(Number(exponent) + 1, '0')
+}
+
+/** An Enso number for `value`; `undefined` for `NaN` and the infinities, which Enso cannot write. */
+function numberAst(value: number, module: Ast.MutableModule) {
+  return Number.isFinite(value) ?
+      Ast.NumericLiteral.tryParseWithSign(decimalNotation(value), module)
+    : undefined
+}
+
+/**
+ * One value as an Enso expression. A `''` flag reads text as code. `#` writes text that reads as
+ * a number as that number, and `@` leaves it text; either writes a number as a number.
+ * `undefined` when the value cannot be written.
+ */
+function scalarAst(value: ActionScalar, flag: Slot['flag'], module: Ast.MutableModule) {
+  if (typeof value === 'function') return value(module)
+  if (flag === '') {
+    return typeof value === 'number' ? numberAst(value, module) : parseCode(value, module)
+  }
+  if (typeof value === 'number') return numberAst(value, module)
+  const number = Number(value)
+  return flag === '#' && !Number.isNaN(number) ?
+      numberAst(number, module)
+    : Ast.TextLiteral.new(value, module)
+}
+
+/** `code` as an expression; `undefined` when it is empty or not valid Enso. */
+function parseCode(code: string, module: Ast.MutableModule) {
+  const parsed = Ast.parseExpression(code, module)
+  let invalid = false
+  if (parsed)
+    Ast.visitRecursive(parsed, (ast) => {
+      if (ast instanceof Ast.Invalid) invalid = true
+    })
+  return invalid ? undefined : parsed
+}
+
+/** A vector for a `*` slot, else the one value; `undefined` when any of it cannot be written. */
+function valueAst(value: ActionValue, slot: Slot, module: Ast.MutableModule) {
+  return isScalarList(value) ?
+      Ast.Vector.tryBuild(value, (element, m) => scalarAst(element, slot.flag, m), module)
+    : scalarAst(value, slot.flag, module)
+}
+
+/**
+ * A pattern of `code`, each `__` filled in order. `undefined` when `code` does not parse, a value
+ * cannot be written, or the `__`s are not the places `fills` fills (a placeholder inside quotes,
+ * `{{node}}` twice) — so a pattern that is returned can always be instantiated with one node.
+ */
 function fillPattern(code: string, fills: readonly Fill[]): Pattern | undefined {
-  let template: Pattern
   try {
-    template = Pattern.parseExpression(code)
+    const template = Pattern.parseExpression(code)
+    const pattern = Pattern.new<Ast.Expression>((node) => {
+      const subtrees = fills.map((fill) =>
+        fill.node ? node : valueAst(fill.value, fill.slot, node.module),
+      )
+      return template.instantiateCopied(
+        subtrees.map((subtree) => {
+          if (!subtree) throw new Error('A value cannot be written as Enso')
+          return subtree
+        }),
+      )
+    })
+    const probe = Ast.Ident.tryParse('node')
+    assertDefined(probe)
+    pattern.instantiateCopied([probe])
+    return pattern
   } catch {
     return undefined
   }
-  return Pattern.new<Ast.Expression>((ast) =>
-    template.instantiateCopied(
-      fills.map((fill) => (fill.node ? ast : valueAst(fill.value, fill.slot, ast.module))),
-    ),
-  )
 }
 
 export type ChainStep = { template: string; values?: ActionValues } | { code: string }
@@ -132,7 +175,7 @@ export type ChainStep = { template: string; values?: ActionValues } | { code: st
  * One node of `steps` applied to the visualised node in turn, joined by the spaced dot
  * (`node.get 'tags' . at 1`); `firstSpaced` spaces the first dot too (`node . filter …`), as the
  * table toolbar's filter node is written. A `code` step is used as it is (a tree's node
- * expression); a `template` step is filled from its values.
+ * expression); a `template` step is filled as {@link actionPattern} fills a template.
  */
 export function chainPattern(
   steps: readonly ChainStep[],
@@ -147,10 +190,11 @@ export function chainPattern(
       continue
     }
     const { code, slots } = parseTemplate(step.template)
-    const values = step.values ?? {}
-    if (slots.some((slot) => slot.name === NODE) || !filled(slots, values)) return undefined
+    if (slots.some((slot) => slot.name === NODE)) return undefined
+    const stepFills = fillsFor(slots, step.values ?? {})
+    if (!stepFills) return undefined
     parts.push(code)
-    for (const slot of slots) fills.push({ node: false, slot, value: values[slot.name]! })
+    fills.push(...stepFills)
   }
   const [first, ...rest] = parts
   const code =
@@ -158,20 +202,26 @@ export function chainPattern(
   return fillPattern(code, fills)
 }
 
-/** The node of one action, filled from `values`; `undefined` when a value it needs is missing. */
+/**
+ * The node of one action, filled from `values`. `undefined` when the action cannot make a node
+ * from them, never a throw: a value is missing, empty or not writable as Enso, or the template is
+ * not a valid one.
+ *
+ * Placeholders: `{{#x}}` is the value of `x`, a number when it reads as one and else text;
+ * `{{\@x}}` the value as it is (a number stays a number, anything else is text); `{{x}}` an Enso
+ * expression (a string of code, or a builder); a `*` after the name, a non-empty vector of such
+ * values. A `new_node` template has to hold `{{node}}` once, the visualised node; a `chain` one
+ * continues from it.
+ */
 export function actionPattern(
   action: Pick<VizAction, 'kind' | 'template'>,
   values: ActionValues = {},
 ): Pattern | undefined {
   if (action.kind === 'chain') return chainPattern([{ template: action.template, values }])
   const { code, slots } = parseTemplate(action.template)
-  if (!slots.some(isNodeSlot) || !filled(slots, values)) return undefined
-  return fillPattern(
-    code,
-    slots.map((slot) =>
-      isNodeSlot(slot) ? { node: true } : { node: false, slot, value: values[slot.name]! },
-    ),
-  )
+  if (!slots.some(isNodeSlot)) return undefined
+  const fills = fillsFor(slots, values)
+  return fills && fillPattern(code, fills)
 }
 
 /** Whether an action needs no gesture: a chain without placeholders, a new node with only `{{node}}`. */
