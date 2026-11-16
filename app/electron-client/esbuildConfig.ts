@@ -39,7 +39,7 @@ export function bundlerOptions(outdir: string, devMode = false): esbuild.BuildOp
     // Native addons (`@napi-rs/keyring`'s per-platform binary) are copied next to the bundle and
     // `require`d from there; electron-builder unpacks them from the asar (`asarUnpack`), since a
     // `.node` file cannot be loaded from inside one.
-    loader: { '.node': 'copy' },
+    loader: { '.node': 'copy', '.md': 'text' },
     target: ['node20'], // electron31
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

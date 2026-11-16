@@ -1,5 +1,5 @@
 /**
- * @file The settings tabs, in their sidebar groups, each rendered by `SettingsTab.vue`: Local,
+ * @file The settings tabs, in their sidebar groups, each rendered by `SettingsTab.vue`: Local, AI,
  * Appearance and Keyboard shortcuts. A tab may also show sections contributed through
  * `$/providers/settingsContributions`, after its own.
  */
@@ -25,6 +25,7 @@ import HandwrittenCommentsSettingsSection from './HandwrittenCommentsSettingsSec
 import KeyboardShortcutsSettingsSection from './KeyboardShortcutsSettingsSection.vue'
 import LocalDirectoryButtons from './LocalDirectoryButtons.vue'
 import LocalVersionsSettingsSection from './LocalVersionsSettingsSection.vue'
+import McpSettingsSection from './McpSettingsSection.vue'
 import NoResults from './NoResults.vue'
 import SecretsSettingsSection from './SecretsSettingsSection.vue'
 import UpdatesSettingsSection from './UpdatesSettingsSection.vue'
@@ -161,6 +162,27 @@ const LOCAL_TAB: SettingsTabData = {
   ],
 }
 
+const AI_TAB: SettingsTabData = {
+  nameId: 'aiSettingsTab',
+  settingsTab: SettingsTabType.ai,
+  icon: SETTINGS_TAB_ICONS[SettingsTabType.ai],
+  sections: [
+    {
+      nameId: 'mcpSettingsSection',
+      // Only the desktop app runs the MCP server; a browser build has no `window.api`. The page
+      // does not list a tab without a visible section.
+      visible: () => window.api?.mcp != null,
+      entries: [
+        {
+          type: 'custom',
+          aliasesId: 'mcpSettingsCustomEntryAliases',
+          component: McpSettingsSection,
+        },
+      ],
+    },
+  ],
+}
+
 const APPEARANCE_TAB: SettingsTabData = {
   nameId: 'appearanceSettingsTab',
   settingsTab: SettingsTabType.appearance,
@@ -209,6 +231,6 @@ const KEYBOARD_SHORTCUTS_TAB: SettingsTabData = {
 
 /** The settings tabs, in their sidebar groups. */
 export const SETTINGS_DATA: readonly SettingsTabSectionData<SettingsTabData>[] = [
-  { nameId: 'generalSettingsTabSection', tabs: [LOCAL_TAB] },
+  { nameId: 'generalSettingsTabSection', tabs: [LOCAL_TAB, AI_TAB] },
   { nameId: 'lookAndFeelSettingsTabSection', tabs: [APPEARANCE_TAB, KEYBOARD_SHORTCUTS_TAB] },
 ]

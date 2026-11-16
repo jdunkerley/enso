@@ -27,7 +27,7 @@ import { shutdownClaudeAgent } from './ai/claudeAgent.js'
 import { parseArgs, withoutDeepLink, withoutInstallerFlags } from './configParser.js'
 import { VERSION } from './contentConfig.js'
 import { printInfo, VERSION_INFO } from './debug.js'
-import { initIpc, registerShortcuts, setChromeOptions } from './electron.js'
+import { initIpc, registerShortcuts, setChromeOptions, shutdownMcp } from './electron.js'
 import {
   getFileToOpen,
   handleOpenFile,
@@ -216,6 +216,10 @@ class App {
 
       this.electron.app.on('before-quit', () => {
         shutdownClaudeAgent()
+      })
+
+      this.electron.app.on('before-quit', () => {
+        void shutdownMcp()
       })
 
       this.electron.app.on('before-quit', () => {

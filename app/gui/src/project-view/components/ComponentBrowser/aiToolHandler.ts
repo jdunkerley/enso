@@ -83,7 +83,8 @@ async function handleToolCall(
   }
 }
 
-function formatLsError(err: unknown): string {
+/** Turns whatever a language-server evaluation failed with into its message text. */
+export function formatLsError(err: unknown): string {
   if (err == null) return 'unknown LS error'
   if (typeof err === 'string') return err
   if (err instanceof Error) return err.message
@@ -110,7 +111,7 @@ function formatLsError(err: unknown): string {
  * expression evaluates to a non-Text value) into a hint pointing at `.to_text` / `.to_json` /
  * `.catch_primitive`. Other messages pass through unchanged.
  */
-function translateEngineError(message: string): string {
+export function translateEngineError(message: string): string {
   const match = /^Cannot encode class ([\w$.]+) to byte array\.?$/.exec(message)
   if (match == null) return message
   const className = match[1]!

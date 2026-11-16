@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [External agent apps (Claude Code, Codex, GitHub Copilot) can connect to the
+  IDE over MCP and read the open project. Turn it on in Settings → AI.][782]
 - [The help panel shows each argument's type, default, widget and description in
   a tooltip on the component's node, and can expand the node to list them.
   Examples have a Copy button that pastes them into the graph as
@@ -504,6 +506,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[782]: https://github.com/jdunkerley/enso/pull/782
 [788]: https://github.com/jdunkerley/enso/pull/788
 [771]: https://github.com/jdunkerley/enso/pull/771
 [735]: https://github.com/jdunkerley/enso/pull/735
