@@ -32,7 +32,10 @@ No tool changes the execution environment, settings or secrets;
 
 1. Read the graph with `get_graph` first, so you build on what is there. With no
    project open, `get_app_state` tells you, `list_projects` finds one and
-   `open_project` or `create_project` opens it.
+   `open_project` or `create_project` opens it. The tools work on the project on
+   screen only; with several open (`open_projects` in `get_app_state`),
+   `switch_project` brings another one's tab on screen. It opens nothing: a path
+   that is not an open project's is refused.
 2. Look components up (`search_components`, then `get_component_docs`) before
    using them.
 3. Add a few nodes at a time with `add_nodes`: each statement is
@@ -52,8 +55,18 @@ No tool changes the execution environment, settings or secrets;
    `evaluate_expression` before building on a node.
 5. Group a run of nodes that does one job with `collapse_nodes`, and explain a
    node with `set_node_comment`.
-6. `select_nodes` and `open_method` are the only project tools that change the
-   selection, and with `get_visualization` the only ones that move the view; the
+6. Explain the workflow, or a function of the project after `open_method`, in
+   its documentation: the Markdown the user reads in the documentation panel.
+   `get_documentation` reads it. `set_documentation` replaces all of it, so read
+   it first and send the whole new text; an empty text clears it. To show a
+   chart or a picture, store it with `add_image` first, from an image file
+   (`path`) or as a picture of a node's visualization (`node_id`), and put the
+   `markdown` it returns into the text. An image goes into the project's
+   `images` folder, never replaces another, and is not removed if you drop it
+   from the text.
+7. `select_nodes` and `open_method` are the only project tools that change the
+   selection, and with `get_visualization` (and `add_image` of a `node_id`,
+   which takes its picture the same way) the only ones that move the view; the
    edits do not. `set_visualization` shows or hides a node's visualization.
    `get_visualization` lets you look at a node's visualization as the user sees
    it: `format: "image"` (the default) is a picture of it, `format: "data"` is
@@ -72,11 +85,14 @@ No tool changes the execution environment, settings or secrets;
    node's stored choice (the one on screen, or, for a hidden node, the one saved
    with it). An error that comes after the call showed or switched the
    visualization says so.
-7. Every tool that changes the project is refused while it is in Live mode: ask
-   the user to switch it back to Design. Reading, selecting and navigating
-   (`select_nodes`, `open_method`, `list_visualizations`) still work there;
-   `get_visualization` works there only for the visualization already on screen.
-8. Your edits are saved with the project as you make them. Do not turn Write on
+8. Every tool that changes the project is refused while it is in Live mode,
+   `set_documentation` included: ask the user to switch it back to Design.
+   Reading, selecting and navigating (`select_nodes`, `open_method`,
+   `list_visualizations`, `get_documentation`) still work there, and so does
+   `add_image` with a `path` (storing a file is not an edit);
+   `get_visualization`, and `add_image` with a `node_id`, work there only for
+   the visualization already on screen.
+9. Your edits are saved with the project as you make them. Do not turn Write on
    (writing a node's output: a file, a database table). Code that enables the
    output context (`with_enabled_context`, `with_enabled`, binding a runtime
    builtin, building a method name by reflection, looking a method up by a name
@@ -86,12 +102,12 @@ No tool changes the execution environment, settings or secrets;
    calling a function in the user's project that itself enables output, and
    changing a node upstream of one the user has switched Write on for (it
    re-runs with your change). Ask the user before doing either.
-9. Your edits form one undo step for the user until you pause for 10 seconds,
-   the user edits the project or leaves its tab, or `open_method` changes the
-   method; then the next edit starts a new step. Edits from several agents run
-   one at a time. An edit whose turn comes after the method on screen changed is
-   refused with nothing changed: call `get_graph` and try again. There is no
-   undo tool: to take a change back, edit or remove the nodes.
+10. Your edits form one undo step for the user until you pause for 10 seconds,
+    the user edits the project or leaves its tab, or `open_method` changes the
+    method; then the next edit starts a new step. Edits from several agents run
+    one at a time. An edit whose turn comes after the method on screen changed
+    is refused with nothing changed: call `get_graph` and try again. There is no
+    undo tool: to take a change back, edit or remove the nodes.
 
 ## Evaluating expressions
 
@@ -110,7 +126,7 @@ that supports a dry run (such as `.write` on Text or a Table) writes to a
 temporary file instead and returns that file's path; other writes fail. While
 the user has the project in Live mode, `evaluate_expression` is refused. Do not
 use it to save data, and do not turn Write on in it: the code that enables the
-output context is refused here as in the edits (item 8 above), and an expression
+output context is refused here as in the edits (item 9 above), and an expression
 that calls a function of the user's project which enables output can still
 write. Ask the user before doing that.
 

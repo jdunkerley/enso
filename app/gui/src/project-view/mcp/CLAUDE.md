@@ -300,6 +300,47 @@ captures that rectangle with `webContents.capturePage`.
   `ready` plus two frames alone gave stale pictures with the GPU off: see
   "Looking at a visualization" in `app/electron-client/src/mcp/CLAUDE.md`.
 
+## Documentation and images (`documentationTools.ts`, `imageTools.ts`)
+
+The documentation is the Markdown the documentation panel shows for the method
+on screen (`OpenedProjectDocumentationEditor.vue` reads
+`FunctionDef.mutableDocumentationMarkdown()`): `main`'s, the workflow's, at the
+top level, and a function of the project's after `open_method`.
+
+- **`get_documentation`** (an MCP tool) answers `{ method, text, truncated }`,
+  the text cut at `DOCUMENTATION_CHARS` (50,000). It changes nothing and works
+  in Live; with no method on screen, `NO_METHOD_ERROR`.
+- **`set_documentation`** (an MCP tool) replaces the **whole** text: in one
+  `module.edit`, through the edit session (refused in Live, part of the caller's
+  undo step, a version saved first, `checkAtTurn` before anything changes), it
+  deletes the method's Markdown and inserts `text` (`""` leaves it empty). The
+  current text is read again **at the edit's turn**, inside the run: an equal
+  text makes no module edit and answers `unchanged: true`, and, being inside the
+  session, is refused in Live like any other call. It answers
+  `{ method, characters, settled: true }`: documentation changes nothing the
+  engine computes, so it passes no affected ids. No find-and-replace: an agent
+  reads the text and sends it all back.
+- **`store_image`** is a window handler, **not an MCP tool**: main's `add_image`
+  (`app/electron-client/src/mcp/imageTool.ts`, which reads and checks the file
+  or captures the visualization) calls it with `{ data, name? | node_id? }`, the
+  bytes as base64. It is in no tool list and an agent cannot call it. It checks
+  again what main checked (one file name of letters, digits, spaces, `.`, `_`,
+  `-`, not a Windows device name, with an image extension; valid base64 of at
+  most `STORED_IMAGE_MAX_BYTES`, 10 MB) and writes through the documentation
+  editor's upload functions (`useProjectFiles`: `ensureDirExists` for the
+  `images` folder, `pickUniqueName`, which compares names case-insensitively, so
+  `Chart.png` gets `Chart_1.png` beside `chart.png`, and `writeFileBinary`), so
+  nothing is ever overwritten. Without a name, a picture is named after the
+  node's binding (`<name>.png`, `visualization.png` when it has none). Calls run
+  one at a time (`serialized`), so two cannot pick the same free name, and none
+  creates the folder or writes with less than `STORE_DEADLINE_MARGIN_MS` (5 s)
+  left before the call's deadline, so a file never lands after main has answered
+  that the call timed out. It answers `{ path, markdown, bytes }`: the URL the
+  editor's upload writes (`/images/<name>`, each segment `encodeURI`d),
+  `![<alt>](<path>)` with the editor's alternative text (the name without its
+  extension, `[` and `]` as `_`), and the size. Storing a file is not a module
+  edit: nothing joins the undo stack, and it works in Live.
+
 ## The edit session (`editSession.ts`)
 
 One per mounted graph editor, built in `useProjectMcpTools`: `releaseStep()` on
@@ -423,9 +464,10 @@ edit:
   otherwise wait the full 20 s), and `remove_nodes`' users of a removed node
   (from `db.nodeDependents`, the usages `deleteNodes` disconnects, read before
   the deletion);
-- none for `add_function`, `set_node_comment` and `set_visualization`: they
-  change nothing the engine computes, and settle at once (`settled: true` in
-  their results too, so every edit result has the field).
+- none for `add_function`, `set_node_comment`, `set_documentation` and
+  `set_visualization`: they change nothing the engine computes, and settle at
+  once (`settled: true` in their results too, so every edit result has the
+  field).
 
 The watch listens from the moment it is made (just before the edit) but counts
 only what arrives after `editApplied()`: a report from before belongs to an
@@ -502,4 +544,8 @@ under 10 s (two `edit_node` calls back to back on a node and its user, the
 second's type current in its own result; the same text again; a removed node's
 user). It also checks that code wrapped in the Write prefix is refused by
 `add_nodes`, `edit_node` and `evaluate_expression` and that the file it names is
-never written.
+never written, and it stores two images through `add_image` (both found in the
+project's `images` folder on disk), sets the documentation to text showing them
+and reads it back, also after closing and reopening the project.
+`integration-test/project-view/mcpDocumentation.spec.ts` drives the
+documentation tools and `store_image` against the mock.
