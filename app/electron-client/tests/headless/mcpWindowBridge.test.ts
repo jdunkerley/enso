@@ -286,6 +286,7 @@ describe('appTools', () => {
       'list_files',
       'create_project',
       'open_project',
+      'switch_project',
       'close_project',
     ])
   })
@@ -313,6 +314,9 @@ describe('appTools', () => {
     expect(await ok('open_project', {})).toBe(false)
     expect(await ok('open_project', { path: '/p' })).toBe(true)
     expect(await ok('list_projects', { directory: 'x'.repeat(1001) })).toBe(false)
+    expect(await ok('switch_project', {})).toBe(false)
+    expect(await ok('switch_project', { path: '/p' })).toBe(true)
+    expect(await ok('switch_project', { path: 'x'.repeat(1001) })).toBe(false)
     expect(await ok('close_project', {})).toBe(true)
   })
 })

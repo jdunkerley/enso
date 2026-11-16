@@ -14,6 +14,7 @@ export const APP_TOOL_NAMES = [
   'list_files',
   'create_project',
   'open_project',
+  'switch_project',
   'close_project',
 ] as const
 
@@ -85,6 +86,19 @@ export function appTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
         'a moment later. If it fails to open, the error says why.',
       inputSchema: { path: z.string().max(PATH_CHARS) },
       run: forward('open_project', OPEN_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'switch_project',
+      title: 'Switch to an open project',
+      description:
+        "Bring the tab of a project that is already open on screen. `path` is an open project's " +
+        '`path`, exactly as `get_app_state` lists it in `open_projects`; read it there first. ' +
+        'Returns `{ name, path }` once its graph is ready: the project tools then work on the ' +
+        'project switched to. A path that is not an open project is refused (the error lists ' +
+        'the open ones); it opens nothing, so use `open_project` for a project that is closed. ' +
+        'Your open undo step in the project you leave ends, as when the user changes tab.',
+      inputSchema: { path: z.string().max(PATH_CHARS) },
+      run: forward('switch_project'),
     },
     {
       name: 'close_project',

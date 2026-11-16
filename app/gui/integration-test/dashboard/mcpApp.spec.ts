@@ -129,3 +129,51 @@ test('create_project creates a project and opens it', async ({ drivePage, page, 
   const projects = (await callOk(page, 'list_projects')).projects
   expect(projects).toContainEqual({ ...created, open: true })
 })
+
+test('switch_project brings the other open project on screen', async ({ drivePage, page }) => {
+  await drivePage
+  await callOk(page, 'open_project', { path: MOCK_PROJECT.path })
+  const sales = await callOk(page, 'create_project', { name: 'Sales' })
+  await expect(page.getByRole('tab', { name: 'Sales' })).toHaveClass(/selected/)
+  expect((await callOk(page, 'get_app_state')).open_projects).toEqual([MOCK_PROJECT, sales])
+
+  // The agent's edit in the project on screen, then a switch away and back: the switch ended its
+  // undo step, so the next edit is a step of its own and one undo takes back only that.
+  const finalNode = async () => {
+    const graph = await callOk(page, 'get_graph', { previews: false })
+    return graph.nodes.find((node: { name: string | null }) => node.name === 'final')
+  }
+  await callOk(page, 'switch_project', { path: MOCK_PROJECT.path })
+  const final = (await finalNode()).id
+  await callOk(page, 'set_node_comment', { node_id: final, text: 'First' })
+
+  expect(await callOk(page, 'switch_project', { path: sales.path })).toEqual(sales)
+  await expect(page.getByRole('tab', { name: 'Sales' })).toHaveClass(/selected/)
+  expect((await callOk(page, 'get_app_state')).project).toEqual(sales)
+  expect((await callOk(page, 'get_graph', { previews: false })).nodes.length).toBeGreaterThan(0)
+
+  expect(await callOk(page, 'switch_project', { path: MOCK_PROJECT.path })).toEqual(MOCK_PROJECT)
+  await expect(page.getByRole('tab', { name: MOCK_PROJECT.name })).toHaveClass(/selected/)
+  expect((await callOk(page, 'get_app_state')).project).toEqual(MOCK_PROJECT)
+  // Already on screen: answers at once.
+  expect(await callOk(page, 'switch_project', { path: MOCK_PROJECT.path })).toEqual(MOCK_PROJECT)
+  await callOk(page, 'set_node_comment', { node_id: final, text: 'Second' })
+  expect((await finalNode()).comment).toBe('Second')
+  await page.locator('.GraphEditor').click({ position: { x: 10, y: 10 } })
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect.poll(async () => (await finalNode()).comment).toBe('First')
+})
+
+test('switch_project refuses a project that is not open, and opens nothing', async ({
+  drivePage,
+  page,
+}) => {
+  await drivePage
+  expect(await call(page, 'switch_project', { path: MOCK_PROJECT.path })).toEqual({
+    ok: false,
+    error:
+      `No open project has the path \`${MOCK_PROJECT.path}\`. No project is open. ` +
+      'Use `open_project` to open one that is closed.',
+  })
+  await expect(page.getByRole('tab', { name: MOCK_PROJECT.name })).toBeHidden()
+})
