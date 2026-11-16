@@ -608,6 +608,8 @@ function getPlotData(data: Data): Point[] {
 const errorMessage = computed(() => data.value.error_message)
 
 const createNewFilterNode = () => {
+  const action = brushAction.value
+  if (action == null) return
   const seriesLabels = Object.keys(data.value.axis)
     .filter((s) => s != 'x')
     .map((s) => data.value.axis[s as keyof AxesConfiguration].label)
@@ -622,8 +624,6 @@ const createNewFilterNode = () => {
   const yItemsVal = yItems.map((k) => Object.values(k)).flat(1)
   const minY = Math.min(...yItemsVal)
   const maxY = Math.max(...yItemsVal)
-  const action = brushAction.value
-  if (action == null) return
   const pattern = brushFilterPattern(action, seriesLabels, xColName, minX, maxX, minY, maxY)
   if (pattern) config.createNodes({ content: pattern, commit: true })
 }

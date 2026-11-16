@@ -6,14 +6,10 @@ import * as path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { brushFilterPattern, rowPattern } from '../ScatterplotVisualization/scatterNodes'
 import { findAction, parseVizActions, type VizAction } from '../vizActions'
+import { pinnedDir } from './pinnedGoldens'
 
 // The text of these nodes is pinned by `vizNodeTextSnapshot.test.ts` (once 3.2.7 rewires it); these
 // cases take the actions from the pinned goldens, as the scatter plot gets them from Enso.
-
-const pinnedDir = path.resolve(
-  __dirname,
-  '../../../../../../../test/Visualization_Tests/data/pinned',
-)
 
 function actionsOf(golden: string) {
   const message: unknown = JSON.parse(
@@ -50,6 +46,24 @@ describe('The brush filter node', () => {
   test('writes bounds that JS prints with an exponent in plain decimal', () => {
     expect(text(brushFilterPattern(brush, ['y'], 'x', 1e-7, 1e21, 0, 1))).toBe(
       "operator1.filter 'x' (..Between 0.0000001 1000000000000000000000) . filter 'y' (..Between 0 1)",
+    )
+  })
+
+  test('writes negative bounds at both ends', () => {
+    expect(text(brushFilterPattern(brush, ['y'], 'x', -3, -1, -20.5, -0.25))).toBe(
+      "operator1.filter 'x' (..Between -3 -1) . filter 'y' (..Between -20.5 -0.25)",
+    )
+  })
+
+  test('keeps a column name that needs quoting as text', () => {
+    expect(text(brushFilterPattern(brush, ['b c'], "it's", 0, 1, 2, 3))).toBe(
+      "operator1.filter 'it\\'s' (..Between 0 1) . filter 'b c' (..Between 2 3)",
+    )
+  })
+
+  test('keeps a column name that looks like a number as text', () => {
+    expect(text(brushFilterPattern(brush, ['2.5'], '1', 0, 1, 2, 3))).toBe(
+      "operator1.filter '1' (..Between 0 1) . filter '2.5' (..Between 2 3)",
     )
   })
 
@@ -96,7 +110,20 @@ describe("A point's row node", () => {
     expect(text(rowPattern(action('scatter_vector', 'open_row'), 0))).toBe('operator1.at 0')
   })
 
+  test('of a range, a pair, a list or a date range', () => {
+    expect(text(rowPattern(action('scatter_range', 'open_row'), 2))).toBe('operator1.at 2')
+  })
+
   test('makes no node for a row number Enso cannot write', () => {
     expect(rowPattern(action('scatter_vector', 'open_row'), Number.NaN)).toBeUndefined()
+  })
+})
+
+describe('A message without actions', () => {
+  test('offers neither the brush nor the point', () => {
+    // eslint-disable-next-line camelcase
+    const message = { data: [], axis: {}, is_multi_series: false, error_message: null }
+    expect(findAction(parseVizActions(message), 'brush_filter')).toBeUndefined()
+    expect(findAction(parseVizActions(message), 'open_row')).toBeUndefined()
   })
 })
