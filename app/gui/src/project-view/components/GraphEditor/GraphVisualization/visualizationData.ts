@@ -7,6 +7,7 @@ import type { ToValue } from '$/utils/reactivity'
 import LoadingErrorVisualization from '@/components/visualizations/LoadingErrorVisualization.vue'
 import LoadingVisualization from '@/components/visualizations/LoadingVisualization.vue'
 import type { ToolbarItem } from '@/components/visualizations/toolbar'
+import type { VisualizationStatus } from '@/mcp/visualizationRegistry'
 import {
   DEFAULT_VISUALIZATION_CONFIGURATION,
   DEFAULT_VISUALIZATION_IDENTIFIER,
@@ -303,6 +304,13 @@ export function useVisualizationData({
     return visualization.value
   })
 
+  /** Whether the view on screen is the real one, the loading one or the error one. */
+  const status = computed<VisualizationStatus>(() =>
+    effectiveVisualization.value === LoadingErrorVisualization ? 'error'
+    : effectiveVisualization.value === LoadingVisualization ? 'loading'
+    : 'ready',
+  )
+
   // Visualization-provided configuration
   const toolbarOverlay = ref(false)
   const toolbarDefinition = shallowRef<ToValue<Readonly<ToolbarItem[]>>>()
@@ -314,6 +322,7 @@ export function useVisualizationData({
   return {
     effectiveVisualization,
     effectiveVisualizationData,
+    status,
     updatePreprocessor,
     allVisualizations,
     currentVisualization,

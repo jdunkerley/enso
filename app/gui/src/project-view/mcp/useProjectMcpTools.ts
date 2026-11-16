@@ -19,6 +19,7 @@ import type { Identifier } from '@/util/qualifiedName'
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { onActivated, onDeactivated, onScopeDispose, watch } from 'vue'
+import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
 import { getComponentDocs, searchComponents, type CatalogueDeps } from './catalogueTools'
 import { EditSession } from './editSession'
 import {
@@ -27,11 +28,13 @@ import {
   removeNodes,
   setNodeComment,
   setVisualization,
+  toolError,
   type EditToolDeps,
 } from './editTools'
 import { evaluateExpression } from './evaluate'
-import { getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
+import { findNode, getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
 import { createMcpNodes } from './nodeCreation'
+import { panelQuiet } from './panelQuiet'
 import {
   afterGraphUpdate,
   onUserModuleTransaction,
@@ -40,12 +43,24 @@ import {
 } from './projectEvents'
 import { addFunction, collapseNodesTool, type StructureToolDeps } from './structureTools'
 import { openMethod, selectNodes, type ViewToolDeps } from './viewTools'
+import { lookupVisualization } from './visualizationRegistry'
+import {
+  getVisualizationData,
+  listVisualizations,
+  noSuchVisualizationError,
+  prepareVisualization,
+  type Edges,
+  type VisualizationToolDeps,
+} from './visualizationTools'
 
 /**
  * Like `aiToolHandler.ts`: under the main-process MCP server's timeout, so that the window's own
  * error reaches the caller first.
  */
 const EVALUATE_TIMEOUT_MS = 25_000
+/** How long to wait for a frame before going on without one: a hidden window draws none. */
+const FRAME_FALLBACK_MS = 100
+
 /** What only the graph editor has: its selection, its view and its navigation. */
 export interface McpEditorDeps {
   readonly selectedNodes: () => Iterable<NodeId>
@@ -61,13 +76,28 @@ export interface McpEditorDeps {
     ids: readonly NodeId[],
     name: Identifier | undefined,
   ) => Result<CollapseOutcome>
+  /** The graph editor's viewport, in CSS pixels of the window's client area. */
+  readonly viewRect: () => Edges
+  /** The graph's zoom: 1 is 100%. */
+  readonly scale: () => number
+  /** Moves the view, without animation, to show this client rectangle at 100% where it fits. */
+  readonly revealClientRect: (rect: Edges) => void
+  /** Whether the view is still moving. */
+  readonly viewMoving: () => boolean
+  /**
+   * The visualizations the node's type offers, in the order of the visualization toolbar's
+   * dropdown (the visualization store's `byType` for the node's type info).
+   */
+  readonly visualizationsFor: (nodeId: NodeId) => VisualizationIdentifier[]
 }
 
 /**
- * Registers the project tools for the open project: the five that read (get_graph, get_node,
- * search_components, get_component_docs, evaluate_expression), the seven that edit (add_nodes,
- * edit_node, remove_nodes, set_node_comment, set_visualization, collapse_nodes, add_function) and
- * the two that navigate (select_nodes, open_method).
+ * Registers the project tools for the open project: the six that read (get_graph, get_node,
+ * search_components, get_component_docs, evaluate_expression, list_visualizations), the seven
+ * that edit (add_nodes, edit_node, remove_nodes, set_node_comment, set_visualization,
+ * collapse_nodes, add_function) and the two that navigate (select_nodes, open_method); and the
+ * two that main's `get_visualization` calls (get_visualization_data, prepare_visualization),
+ * which are not MCP tools themselves.
  *
  * Every open project's graph editor stays mounted (the tabs are under `<KeepAlive>`), so the tools
  * must answer for the one on screen: this project's handlers are put first on activation and
@@ -205,10 +235,11 @@ export function useProjectMcpTools(
           return Ok()
         })
       },
-      setVisualization: (id, visible) => {
+      setVisualization: (id, visible, identifier) => {
         const g = graph()
         if (!g.db.nodeIdToNode.has(id)) return Err(`No node ${id}`)
-        g.setNodeVisualization(id, { visible })
+        // As choosing one in the toolbar writes it: the identifier in the node's metadata.
+        g.setNodeVisualization(id, { visible, ...(identifier ? { identifier } : {}) })
         return Ok()
       },
     }
@@ -252,6 +283,61 @@ export function useProjectMcpTools(
         return pointer.ok ? pointer.value.name : undefined
       },
       contextChanged: () => session.releaseStep(),
+    }
+  }
+
+  /**
+   * The visualization handlers' dependencies. Showing a hidden visualization, or switching to
+   * another, goes through the edit session, as `set_visualization` does.
+   */
+  function visualizationDeps(caller: McpCaller, deadline: number): VisualizationToolDeps {
+    const graph = currentProject.graph.value
+    const panelRect = (nodeId: string) =>
+      lookupVisualization(currentProject.id.value, nodeId)?.panel()?.getBoundingClientRect()
+    return {
+      findNode: (nodeId) => {
+        const found = findNode(graph.db, nodeId)
+        return found.ok ? { ok: true, value: found.value.id } : found
+      },
+      lookup: (nodeId) => lookupVisualization(currentProject.id.value, nodeId),
+      isShown: (nodeId) => graph.db.nodeIdToNode.get(nodeId as NodeId)?.vis?.visible ?? false,
+      storedName: (nodeId) => graph.db.nodeIdToNode.get(nodeId as NodeId)?.vis?.identifier?.name,
+      // As `GraphNodes.vue` passes `edited` to the node, which then unmounts its visualization.
+      isEdited: (nodeId) => graph.editedNodeInfo?.id === nodeId,
+      availableNames: (nodeId) =>
+        editor.visualizationsFor(nodeId as NodeId).map((identifier) => identifier.name),
+      show: (nodeId, visualization) => {
+        // Two visualizations of the same name from different modules: the first in the
+        // dropdown's order, which is the one `availableNames` lists first.
+        const offered = editor.visualizationsFor(nodeId as NodeId)
+        const identifier =
+          visualization != null ?
+            offered.find((candidate) => candidate.name === visualization)
+          : undefined
+        // The node's type may have changed since the name was checked: never show it unswitched.
+        if (visualization != null && identifier == null) {
+          const names = offered.map((candidate) => candidate.name)
+          return Promise.resolve(toolError(noSuchVisualizationError(visualization, names)))
+        }
+        return setVisualization(editDeps(caller, deadline), {
+          node_id: nodeId,
+          visible: true,
+          ...(identifier != null ? { identifier } : {}),
+        })
+      },
+      panelRect,
+      viewRect: editor.viewRect,
+      scale: editor.scale,
+      reveal: (nodeId) => {
+        const rect = panelRect(nodeId)
+        if (rect != null) editor.revealClientRect(rect)
+      },
+      viewMoving: editor.viewMoving,
+      nextFrame,
+      panelQuiet: (nodeId, budgetMs) =>
+        panelQuiet(lookupVisualization(currentProject.id.value, nodeId)?.panel(), budgetMs),
+      now: () => Date.now(),
+      deadline,
     }
   }
 
@@ -373,6 +459,33 @@ export function useProjectMcpTools(
       }
       return openMethod(viewDeps(), node_id != null ? { node_id } : {})
     },
+    list_visualizations: async (args, caller, deadline) => {
+      const node_id = args.node_id
+      if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
+      return listVisualizations(visualizationDeps(caller, deadline), { node_id })
+    },
+    get_visualization_data: async (args, caller, deadline) => {
+      const { node_id, visualization } = args
+      if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
+      if (visualization != null && typeof visualization !== 'string') {
+        return invalidArgument('visualization', 'a string')
+      }
+      return getVisualizationData(visualizationDeps(caller, deadline), {
+        node_id,
+        ...(visualization != null ? { visualization } : {}),
+      })
+    },
+    prepare_visualization: async (args, caller, deadline) => {
+      const { node_id, visualization } = args
+      if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
+      if (visualization != null && typeof visualization !== 'string') {
+        return invalidArgument('visualization', 'a string')
+      }
+      return prepareVisualization(visualizationDeps(caller, deadline), {
+        node_id,
+        ...(visualization != null ? { visualization } : {}),
+      })
+    },
   }
   // The project id is read when asked for, not kept: an editor stays with one project (its tab is
   // keyed by the project's id), so this is only belt and braces.
@@ -422,6 +535,17 @@ function nodeArea(graph: GraphStore, id: NodeId): Rect | undefined {
   if (area != null) return area
   const position = graph.db.nodeIdToNode.get(id)?.position
   return position != null ? new Rect(position, Vec2.Zero) : undefined
+}
+
+/** Resolves on the next animation frame, or after {@link FRAME_FALLBACK_MS} without one. */
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, FRAME_FALLBACK_MS)
+    requestAnimationFrame(() => {
+      clearTimeout(timer)
+      resolve()
+    })
+  })
 }
 
 function isStringArray(value: unknown): value is string[] {

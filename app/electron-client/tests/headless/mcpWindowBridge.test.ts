@@ -174,6 +174,7 @@ describe('projectTools', () => {
       'search_components',
       'get_component_docs',
       'evaluate_expression',
+      'list_visualizations',
     ])
     expect(EDIT_TOOL_NAMES).toEqual([
       'add_nodes',
