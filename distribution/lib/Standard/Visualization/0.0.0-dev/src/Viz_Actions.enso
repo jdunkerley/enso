@@ -37,6 +37,15 @@ type Viz_Actions
     ## ---
        private: true
        ---
+       The action of a value read item by item, `at {{#index}}`: a vector, an
+       array, or a value a visualisation charts through its `to_vector` and
+       that has an `at` taking a number. The same for each of them, so it is a
+       constant and its JSON is written once.
+    items -> Viz_Actions = Viz_Actions.Json _item_json [_item_action]
+
+    ## ---
+       private: true
+       ---
        The actions of `value`; none for a dataflow error.
     for value -> Viz_Actions = if value.is_error then Viz_Actions.none else Viz_Actions.from value
 
@@ -102,7 +111,7 @@ Viz_Actions.from (that:Any) =
    A vector's items, by number.
 Viz_Actions.from (that:Vector) =
     _ = that
-    Viz_Actions.Value [_item_action]
+    Viz_Actions.items
 
 ## ---
    private: true
@@ -110,6 +119,7 @@ Viz_Actions.from (that:Vector) =
    An array's items, by number.
 Viz_Actions.from (that:Array) =
     _ = that
-    Viz_Actions.Value [_item_action]
+    Viz_Actions.items
 
 private _item_action = Viz_Action.chain "open_row" "Get Item" "select_row" "at {{#index}}"
+private _item_json = '[' + _item_action.to_json_text + ']'
