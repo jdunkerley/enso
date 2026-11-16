@@ -8,7 +8,8 @@ import { ref } from 'vue'
 import { nodeExpressionPattern } from '../JSONVisualization/treeExpression'
 import { brushFilterPattern, rowPattern } from '../ScatterplotVisualization/scatterNodes'
 import { columnValueToEnso } from '../TableVisualization/columnValueToEnso'
-import { valueNodePattern, type ValueNodeAction } from '../TableVisualization/tableContextMenu'
+import { tableMenuEntries } from '../TableVisualization/tableContextMenu'
+import { viewLink } from '../TableVisualization/tableView'
 import type { GridFilterModel } from '../TableVisualization/tableVizFilterUtils'
 import { useTableVizToolbar, type SortModel } from '../TableVisualization/tableVizToolbar'
 import { isActionButton } from '../toolbar'
@@ -233,12 +234,14 @@ function capture(created: string[]) {
 
 // ---- DRIVERS: how the code makes each gesture's node. PRs 3.2 and 3.3 replace this block. ----
 
+/** The message Enso sends for a value, read from its pinned golden. */
+function pinnedMessage(golden: string): unknown {
+  return JSON.parse(fs.readFileSync(path.join(pinnedDir, `${golden}.json`), 'utf-8'))
+}
+
 /** The actions Enso sends for a value, read from its pinned golden. */
 function pinnedActions(golden: string): VizAction[] {
-  const message: unknown = JSON.parse(
-    fs.readFileSync(path.join(pinnedDir, `${golden}.json`), 'utf-8'),
-  )
-  return parseVizActions(message)
+  return parseVizActions(pinnedMessage(golden))
 }
 
 const TABLE_ACTIONS = pinnedActions('table_mem_table')
@@ -280,11 +283,13 @@ function menuNode(
   row: number | null,
   item: 'Get Column' | 'Get Row' | 'Get Value',
 ) {
-  const action: ValueNodeAction =
-    item === 'Get Column' ? 'at'
-    : item === 'Get Row' ? 'get_row'
-    : 'get_value'
-  return text(valueNodePattern(column, row, action))
+  const entries = tableMenuEntries(
+    TABLE_ACTIONS,
+    viewLink(pinnedMessage('table_mem_table')),
+    column,
+    row == null ? null : { '#': row, b: 'x' },
+  )
+  return text(entries.find((entry) => entry.name === item)?.pattern)
 }
 
 /** The scatter plot's "create component of selected points" node on a table. */
@@ -384,8 +389,8 @@ describe('Table right-click menu, on a table', () => {
     ['Get Value', 'Get Value', 'b', 2],
     ['Get Row at row 0', 'Get Row', 'b', 0],
     ['Get Value at row 0', 'Get Value', 'b', 0],
-    // The row-number column is a real column, with the id `#` (`INDEX_FIELD_NAME`). Right-clicking
-    // it builds these nodes, which are probably broken (no table has a column `#`): recorded as is.
+    // The row-number column has the id `#` (`INDEX_FIELD_NAME`) but is no column of the table, so
+    // it offers only the row. (Before 3.3.1 these made `at '#'` and `get_value '#' 2`.)
     ['Get Column on the row-number column', 'Get Column', '#', 2],
     ['Get Value on the row-number column', 'Get Value', '#', 2],
     ['Get Column with no column under the click', 'Get Column', null, 2],

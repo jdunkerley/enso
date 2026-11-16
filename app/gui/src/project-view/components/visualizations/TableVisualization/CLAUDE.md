@@ -29,7 +29,10 @@ The table visualisation (`../TableVisualization.vue`) and its helpers.
   with the value; the button is there when the value offers `sort`, `filter`,
   `remove_columns` or `reorder_columns` (`TABLE_TOOLBAR_ACTIONS`).
 - `columnValueToEnso.ts`: a cell's text as an Enso value of its column's type
-  (the toolbar's filters). `tableContextMenu.ts`: the right-click menu's nodes.
-  Both, the scatter plot's `scatterNodes.ts` and the Warnings visualisation's
-  node are pinned by `../__tests__/vizNodeTextSnapshot.test.ts`: a change to the
-  text of a created node is a visible change.
+  (the toolbar's filters). `tableContextMenu.ts`: the right-click menu, from the
+  value's `open_column`, `open_row` and `open_cell` actions (or the view's link
+  when it has no row action) filled from the clicked cell; the row is its `#`
+  number, which survives sorting. Both, the scatter plot's `scatterNodes.ts` and
+  the Warnings visualisation's node are pinned by
+  `../__tests__/vizNodeTextSnapshot.test.ts`: a change to the text of a created
+  node is a visible change.

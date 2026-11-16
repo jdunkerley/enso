@@ -292,7 +292,7 @@ function toField(name: string, options: FieldOptions, ctx: TableViewContext): Co
  * The node a link creates from a row: its template filled from the row, `{{#index}}` from the row
  * number. A link is the view's own `chain` action (Enso writes it beside the columns it reads).
  */
-function linkPattern(row: Record<string, unknown>, template: string) {
+export function linkPattern(row: Record<string, unknown>, template: string) {
   const values = Object.fromEntries(
     placeholderNames(template).map((name) => [
       name,
@@ -454,6 +454,15 @@ export function buildTableView(data: unknown, ctx: TableViewContext): TableView 
     case 'grid':
       return buildGrid(message, ctx)
   }
+}
+
+/** The view's link: its row-number column's, else its first link column's. */
+export function viewLink(
+  data: unknown,
+): { action: string; label?: string | undefined } | undefined {
+  const message = parseViewMessage(data)
+  if (message?.kind !== 'grid') return undefined
+  return message.index ?? message.columns.find((column) => column.link != null)?.link
 }
 
 /** What the component reads from `data` outside a refresh. */
