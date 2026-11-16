@@ -86,18 +86,43 @@ but no such entry has been detected`) and new, unreviewed copyrights/files.
   the GitHub heuristic (`files-keep` entries like
   `/<org>/<repo>/blob/<branch>/LICENSE`) are downloaded through
   `scala.sys.process` (`GithubHeuristic.scala`), which rejoins lines with the
-  host's line separator: CRLF on Windows, LF on Linux. The committed notices
-  were generated on Windows, so regenerating them in WSL rewrites ~14 of them
-  (SparseBitSet, yxdb, zstd-jni, grpc, jsoniter…) and every affected
-  `report-state`, even on an unchanged `develop`. **Run `gatherLicenses` on
-  Windows.** Git must not normalize them either (`core.autocrlf=input`, the
-  default on this Windows setup): stage the notices byte-for-byte with
-  `git -c core.autocrlf=false add distribution/**/THIRD-PARTY`. The same goes
-  for the review config here: some `files-add/*` and `copyright-add` files are
-  CRLF in git and feed `report-state`'s input hash, so stage renamed configs
-  with `git -c core.autocrlf=false add tools/legal-review` too. Then check
-  with `verifyLicensePackages` on a fresh Linux checkout, not the working tree
-  that generated them.
+  host's line separator: CRLF on Windows, LF on Linux. **The committed notices
+  are a mix of the two**, because distributions were regenerated on different
+  hosts over time: the engine's five heuristic files (jsoniter-scala,
+  pureconfig, fansi, sourcecode) are LF in git, while those of Google, Snowflake,
+  Excel and YXDB (grpc, zstd-jni, SparseBitSet, yxdb) are CRLF. A run on the
+  "wrong" host therefore rewrites some of them (and the `report-state` of
+  their distribution) without any change of substance. Do not commit that:
+  after a run, `git status`, and `git checkout` every notice that changed only
+  in line endings together with its distribution's `report-state`, unless the
+  distribution really changed. Keep only the `report-state` files of
+  distributions whose input hash or notices changed for a real reason. Git must
+  not normalize what you stage (`core.autocrlf=input`, the default on the
+  Windows setup, turns a CRLF working file into an LF blob and so breaks the
+  hash): `git -c core.autocrlf=false add distribution/**/THIRD-PARTY
+  tools/legal-review`. The check that matters is `verifyLicensePackages` (and
+  `verifyGeneratedPackage` for the engine, Base, Table, Image and Database) on
+  a fresh Linux checkout of what you committed, not the working tree that
+  generated it. `gatherLicenses` takes ~2 minutes in WSL from a clone on the
+  Linux filesystem and ~11 on Windows.
+- **The engine's input hash changes without any notice changing.** It covers
+  each component's own dependency list (module and licence name), so a change
+  of how sbt/coursier resolves a component moves the hash while the union of
+  notices, and so the output hash, stays the same. Bumping sbt to 1.13.1
+  (#713) did this: `language-server` and `runtime-and-langs` started listing
+  GraalVM's `js-language`, `regex`, `icu4j`, `xz` and tools modules. Nothing on
+  a PR notices, and `release.yml` is the only caller of
+  `verifyLicensePackages`, so it failed every night until a regeneration (the
+  engine's state at #716 had been generated on a branch from before #713 and
+  was already stale when merged). After any change to `project/`,
+  `build.sbt` or `build.properties`, run `sbt verifyLicensePackages`; it takes
+  seconds once `gatherLicenses` has been run once in the checkout.
+- A new empty std-bits project (a library split out of another, like
+  `std-edi` and `std-fixed-width`) gets a `components-without-dependencies`
+  entry in its distribution's config directory, with the true reason: it
+  depends on the GraalVM polyglot API (`provided`) and on other standard
+  libraries only. Without it `gatherLicenses` warns `License report for
+  component std-... is empty` and `develop` must print no warnings.
 - `gatherLicenses` **deletes** a config directory it cannot pair with a resolved
   package (`Review.warnAboutMissingDependencies`, reported only as a warning),
   on the assumption that the dependency was dropped. Pairing is by name prefix;
