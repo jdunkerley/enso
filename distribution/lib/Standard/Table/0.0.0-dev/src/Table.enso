@@ -4097,7 +4097,9 @@ Viz_Tree.from (that:Table) =
     column_count = that.column_count
     rows_text = Viz_Tree.count_text row_count "row" "rows"
     columns_text = Viz_Tree.count_text column_count "column" "columns"
-    column_child index = Viz_Tree_Child.Value index (Viz_Tree.from (that.at index)) (".at " + index.to_text)
+    ## Every column has the table's row count, so each reuses it: a database
+       table's page of columns would otherwise run a `COUNT(*)` per column.
+    column_child index = Viz_Tree_Child.Value index ((that.at index).viz_tree row_count) (".at " + index.to_text)
     columns_of start end = start.up_to end . map column_child
     column_of key = if key.is_a Integer && key >= 0 && key < column_count then column_child key else Nothing
     columns_tree = Viz_Tree.lookup_paged "array" column_count ("[" + columns_text + "]") columns_of column_of
