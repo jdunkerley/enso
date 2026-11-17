@@ -1303,6 +1303,20 @@ test.describe('Date widget', () => {
     expect(await moduleCode(page)).toMatch(/date1 = Date\.new \d+ \d+ 20\n/)
   })
 
+  test('the menu is as wide on a narrow node as on a wide one', async ({ editorPage, page }) => {
+    const { menu, open } = await dateNode(editorPage, page)
+    await open()
+    const narrow = (await menu.boundingBox())!.width
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    // The whole node `date1` is far wider than the unset argument of `since`.
+    const wide = locate.graphNodeByBinding(page, 'date1').locator('.WidgetDate')
+    await wide.click({ position: { x: 4, y: 4 } })
+    await wide.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    expect(Math.abs((await menu.boundingBox())!.width - narrow)).toBeLessThanOrEqual(1)
+  })
+
   test('a whole date node still selects and drags, and its first click does not open the menu', async ({
     editorPage,
     page,
@@ -1546,6 +1560,20 @@ test.describe('Time_Of_Day widget', () => {
     await menu.getByRole('listbox', { name: 'Minute' }).getByRole('option', { name: '30' }).click()
     await menu.getByRole('button', { name: 'Set' }).click()
     expect(await moduleCode(page)).toContain('time5 = Time_Of_Day.new 9 30\n')
+  })
+
+  test('the menu is as wide on a narrow node as on a wide one', async ({ editorPage, page }) => {
+    const { menu, open } = await timeNode(editorPage, page)
+    await open()
+    const narrow = (await menu.boundingBox())!.width
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    // The whole node `time4` (four arguments) is far wider than the unset argument of `since`.
+    const wide = locate.graphNodeByBinding(page, 'time4').locator('.WidgetTimeOfDay')
+    await wide.click({ position: { x: 4, y: 4 } })
+    await wide.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    expect(Math.abs((await menu.boundingBox())!.width - narrow)).toBeLessThanOrEqual(1)
   })
 
   test('the menu stays lined up under its argument as the node changes width', async ({

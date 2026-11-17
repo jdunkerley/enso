@@ -135,11 +135,3 @@ onMounted(() => {
     <PickerActions @cancel="close" @set="commitTime(true)" />
   </PickerMenuFrame>
 </template>
-
-<style scoped>
-/* Keep the frame at its own width: the reference (a whole `Date_Time.new` node with `second=` and
- * `zone=`) is far wider than a calendar, and the shell once stretched its floating box to it. */
-.DateTimeMenu {
-  width: max-content;
-}
-</style>

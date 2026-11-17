@@ -109,15 +109,19 @@ is already on the row, drawn by `WidgetIcon` at the root.
   lined up under the argument, kept there by `autoUpdate`, and shifted only by
   the screen's edge. `activityDropdownStyles` also shifts a dropdown to stay
   within the node, which pushed a menu wider than the rest of the node off its
-  argument (by 160 px for an unset argument at a node's end). **The menu is open
-  only when the widget asked for it** (`menuOpen`): editing a nested number
-  makes the widget's interaction active too (as it does for `WidgetSelection`,
-  which then opens its list), and must not show the menu. A nested number's
-  `@click.stop` keeps its clicks from toggling it. **At a node root the first
-  click is the node's**: `PickerShell` stops the click and toggles the menu only
-  when the node is already selected (`.GraphNode.selected`) and no modifier is
-  held; otherwise the click bubbles so the node selects (or, with Ctrl/Cmd,
-  edits). `WidgetTimeOfDay` likewise takes `Time_Of_Day.now`/`new` whole nodes.
+  argument (by 160 px for an unset argument at a node's end). **Every picker
+  menu is a fixed width** (200 px, set on `PickerMenuFrame`): the activity
+  dropdowns' `size` middleware also set the menu's `min-width` to its anchor's,
+  so a menu on a whole node grew with the node; `pickerMenuStyles` must not add
+  one back. **The menu is open only when the widget asked for it** (`menuOpen`):
+  editing a nested number makes the widget's interaction active too (as it does
+  for `WidgetSelection`, which then opens its list), and must not show the menu.
+  A nested number's `@click.stop` keeps its clicks from toggling it. **At a node
+  root the first click is the node's**: `PickerShell` stops the click and
+  toggles the menu only when the node is already selected
+  (`.GraphNode.selected`) and no modifier is held; otherwise the click bubbles
+  so the node selects (or, with Ctrl/Cmd, edits). `WidgetTimeOfDay` likewise
+  takes `Time_Of_Day.now`/`new` whole nodes.
 - `WidgetDateTime.vue` — the same for a `Date_Time`-typed input or item, and a
   whole node that is `Date_Time.now` or `Date_Time.new` (priority 53). Its menu
   (`WidgetDateTime/DateTimeMenu.vue`) is `Date_Time.now`, the date menu's
