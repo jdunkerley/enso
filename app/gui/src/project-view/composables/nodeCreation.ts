@@ -50,6 +50,8 @@ export interface NodeCreationOptions<Placement extends PlacementStrategy = Place
   placement: Placement
   expression: string
   binding?: string | undefined
+  /** The prefix of the new node's name when `binding` is absent. Unlike `binding`, it is never a rename. */
+  namePrefix?: string | undefined
   type?: Typename | undefined
   documentation?: string | undefined
   metadata?: Ast.NodeMetadataFields | undefined
@@ -116,7 +118,15 @@ export function useNodeCreation(
     return placedOptions
   }
 
-  function createNodes(nodesOptions: Iterable<NodeCreationOptions>) {
+  /**
+   * Create nodes. `inSameEdit` runs inside the edit that creates the nodes, after they are
+   * inserted, so a caller's own change is the same undo step; it receives the new nodes' names, in
+   * the order of `nodesOptions`.
+   */
+  function createNodes(
+    nodesOptions: Iterable<NodeCreationOptions>,
+    inSameEdit?: (edit: Ast.MutableModule, identifiers: readonly Ast.Identifier[]) => void,
+  ) {
     const placedNodes = placeNodes(nodesOptions)
     if (placedNodes.length === 0) return new Set()
     const graph = toValue(graphStore)
@@ -130,6 +140,7 @@ export function useNodeCreation(
     const identifiersRenameMap = new Map<Identifier, Identifier>()
     toValue(moduleStore).edit((edit) => {
       const statements = new Array<Ast.Owned<Ast.MutableStatement>>()
+      const identifiers: Ast.Identifier[] = []
       for (const options of placedNodes) {
         const rhs = Ast.parseExpression(options.expression, edit)
         if (!rhs) {
@@ -138,6 +149,7 @@ export function useNodeCreation(
         }
         const ident = getIdentifier(rhs, options, createdIdentifiers)
         createdIdentifiers.add(ident)
+        identifiers.push(ident)
         const { id, rootExpression } = newAssignmentNode(
           edit,
           ident,
@@ -151,6 +163,7 @@ export function useNodeCreation(
         graph.nodeRects.set(id, new Rect(Vec2.FromXY(options.metadata.position), Vec2.Zero))
       }
       insertNodeStatements(edit.getVersion(methodAst.value).bodyAsBlock(), statements)
+      inSameEdit?.(edit, identifiers)
       return Ok()
     })
     graph.doAfterUpdate(() => onCreated(created))
@@ -221,6 +234,7 @@ export function useNodeCreation(
   ): Ast.Identifier {
     const namePrefix =
       options.binding ? existingNameToPrefix(options.binding)
+      : options.namePrefix ? options.namePrefix
       : options.type ? typeToPrefix(options.type)
       : inferPrefixFromAst(expr)
     const ident = toValue(graphStore).generateLocallyUniqueIdent(namePrefix, alreadyCreated)

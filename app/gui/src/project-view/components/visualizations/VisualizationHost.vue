@@ -8,6 +8,7 @@ import { provideVisualizationConfig } from '@/providers/visualizationConfig'
 import { Ast } from '@/util/ast'
 import type { Vec2 } from '@/util/data/vec2'
 import { ProjectPath } from '@/util/projectPath'
+import { useHost } from 'vue'
 
 export interface VisualizationHostParams {
   visualization?: string | object
@@ -67,10 +68,18 @@ provideVisualizationConfig({
 })
 
 initializeActions()
+
+/**
+ * The custom element this runs in. An element that is removed from the page unmounts its app only
+ * a tick later, and a render queued before then would mount the visualization it is about to be
+ * given inside the removed element: its `setup` would run, and the listeners still on the removed
+ * element would act on what it requests, a second time. See the `key` in `GraphVisualization`.
+ */
+const host = useHost()
 </script>
 
 <template>
-  <Suspense>
+  <Suspense v-if="host?.isConnected !== false">
     <template #fallback><LoadingVisualization /></template>
     <component
       :is="props.params.visualization"

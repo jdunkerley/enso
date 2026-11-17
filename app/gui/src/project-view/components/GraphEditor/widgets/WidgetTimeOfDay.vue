@@ -19,6 +19,7 @@ import {
   TIME_OF_DAY_TYPE,
   parseTimeExpression,
   timeExpressionCode,
+  withKeptParts,
   type TimeChoice,
 } from '@/components/GraphEditor/widgets/WidgetTimeOfDay/timeExpression'
 import { ArgumentInfoKey } from '@/util/callTree'
@@ -43,11 +44,12 @@ const choice = computed(() => parseTimeExpression(unparenthesisedCode(props.inpu
 
 /** One choice is one edit, so one undo step: the import and the new code go in together. */
 function choose(picked: TimeChoice, done: () => void) {
+  const kept = withKeptParts(picked, choice.value)
   module.value.edit((edit) => {
     module.value.addMissingImports(edit, timeImport.value)
-    const code = timeExpressionCode(picked)
+    const code = timeExpressionCode(kept)
     const value =
-      picked.kind === 'time' ?
+      kept.kind === 'time' ?
         parenthesisedApplication(code, props.input.value, props.input.portId)
       : code
     return props.updateCallback({

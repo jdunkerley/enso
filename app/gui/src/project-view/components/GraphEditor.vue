@@ -77,6 +77,7 @@ import type { GraphNavigator } from '@/providers/graphNavigator'
 import { provideGraphNavigator } from '@/providers/graphNavigator'
 import { provideNodeColors } from '@/providers/graphNodeColors'
 import { provideNodeCreation } from '@/providers/graphNodeCreation'
+import { usePopOut } from '@/components/GraphEditor/popOut/popOut'
 import { provideGraphSelection } from '@/providers/graphSelection'
 import { provideStackNavigator } from '@/providers/graphStackNavigator'
 import { injectKeyboard } from '@/providers/keyboard'
@@ -276,6 +277,15 @@ const { scheduleCreateNode, createNodes, placeNode } = provideNodeCreation(
     }
   },
 )
+
+// Dragging an argument off a node pops it out into a node of its own.
+const { popOut } = usePopOut({
+  module,
+  graph: graphStore,
+  suggestionDb: () => suggestionDb.entries,
+  projectNames,
+  createNodes,
+})
 
 // === MCP tools ===
 
@@ -1019,6 +1029,7 @@ const contextMenuActions: DisplayableActionName[] = [
           <GraphNodes
             @enterNode="(id) => stackNavigator.enterNode(id)"
             @createNodes="createNodesFromSource"
+            @popOut="(_source, ...args) => popOut(...args)"
             @toggleDocPanel="toggleRightDockHelpPanel"
             @contextmenu.stop.prevent
           />

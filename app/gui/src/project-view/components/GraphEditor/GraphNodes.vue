@@ -13,6 +13,7 @@ import { injectGraphNavigator } from '@/providers/graphNavigator'
 import { useGraphSelection } from '@/providers/graphSelection'
 import type { UploadingFile as File, FileName } from '@/stores/awareness'
 import { useOngoingAiPrompts } from '@/stores/ongoingAiPrompts'
+import type { Ast } from '@/util/ast'
 import type { Vec2 } from '@/util/data/vec2'
 import { set } from 'lib0'
 import { computed } from 'vue'
@@ -20,6 +21,13 @@ import { computed } from 'vue'
 const emit = defineEmits<{
   enterNode: [nodeId: NodeId]
   createNodes: [source: NodeId, options: NodeCreationOptions[]]
+  popOut: [
+    source: NodeId,
+    portId: Ast.AstId,
+    argName: string,
+    argType: string | undefined,
+    scenePosition: Vec2,
+  ]
   toggleDocPanel: []
 }>()
 
@@ -84,6 +92,7 @@ const layerStyle = computed(() => ({
       @draggingCancelled="dragging.cancelDrag()"
       @enterNode="emit('enterNode', id)"
       @createNodes="emit('createNodes', id, $event)"
+      @popOut="(...args) => emit('popOut', id, ...args)"
       @toggleDocPanel="emit('toggleDocPanel')"
       @setNodeColor="graph.overrideNodeColor(id, $event)"
       @update:edited="graph.setEditedNode(id, $event)"

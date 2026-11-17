@@ -17,10 +17,17 @@ import {
   trackFormatConfig,
 } from '@/components/GraphEditor/widgets/WidgetFunction/formatForPath'
 import {
+  hiddenParameters,
+  insertPrefixArgument,
+  type HiddenParameter,
+} from '@/components/GraphEditor/widgets/WidgetFunction/hiddenParameters'
+import ParameterMenu from '@/components/GraphEditor/widgets/WidgetFunction/ParameterMenu.vue'
+import {
   getPotentialModuleFunctionPointer,
   useWidgetFunctionCallInfo,
 } from '@/components/GraphEditor/widgets/WidgetFunction/widgetFunctionCallInfo'
 import { injectFunctionInfo, provideFunctionInfo } from '@/providers/functionInfo'
+import { injectWidgetTree } from '@/providers/widgetTree'
 import { assert, assertUnreachable } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import type { AstId } from '@/util/ast/abstract'
@@ -46,6 +53,8 @@ const {
   graph,
   suggestionDb,
 } = useCurrentProject()
+
+const tree = injectWidgetTree()
 
 const exprInfo = computed(() => graph.value.db.getExpressionInfo(props.input.value.externalId))
 const outputType = computed(() => exprInfo.value?.typeInfo?.primaryType)
@@ -114,6 +123,29 @@ const innerInput = computed(() => {
 })
 
 /**
+ * The parameters the `…` menu offers. Opening the menu selects the node, which shows its details,
+ * so the list does not depend on them: the menu hides its button instead (`collapsed`).
+ */
+const hidden = computed(() => (application.value ? hiddenParameters(application.value) : []))
+
+/** Insert a hidden parameter with its default value's code. It is always written as a named argument. */
+function insertParameter(parameter: HiddenParameter) {
+  // A written default like `Auto_Detect` needs its import, in the same edit.
+  module.value.edit((edit) => {
+    const written = Ast.parseExpression(parameter.defaultCode, edit)
+    if (written) module.value.addDetectedImports(edit, written)
+    return applyArgUpdate(
+      {
+        edit,
+        portUpdate: { origin: parameter.portId, value: parameter.defaultCode },
+        directInteraction: true,
+      },
+      true,
+    )
+  })
+}
+
+/**
  * With `format` on `Auto_Detect`, a change of the `path` argument also adds the import of the
  * library whose format reads that file (`WidgetFunction/formatForPath.ts`), in the same edit, so
  * that one undo removes both. Then the update is processed as before.
@@ -141,9 +173,10 @@ function handleArgUpdate(update: WidgetUpdate): HandledUpdate {
 
 /**
  * Process an argument value update. Takes care of inserting assigned placeholder values, as well as
- * handling deletions of arguments and rewriting the applications to named as appropriate.
+ * handling deletions of arguments and rewriting the applications to named as appropriate. With
+ * `forceNamed`, an inserted placeholder value is always written as a named argument.
  */
-function applyArgUpdate(update: WidgetUpdate): HandledUpdate {
+function applyArgUpdate(update: WidgetUpdate, forceNamed: boolean = false): HandledUpdate {
   const app = application.value
   if (update.portUpdate && app instanceof ArgumentApplication) {
     if (!('value' in update.portUpdate)) {
@@ -173,13 +206,7 @@ function applyArgUpdate(update: WidgetUpdate): HandledUpdate {
         if (argApp.appTree instanceof Ast.OprApp) {
           edit.getVersion(argApp.appTree)[argApp.argument.index === 0 ? 'setLhs' : 'setRhs'](newArg)
         } else {
-          const name =
-            argApp.argument.insertAsNamed && isIdentifier(argApp.argument.argInfo.name) ?
-              argApp.argument.argInfo.name
-            : undefined
-          edit
-            .getVersion(argApp.appTree)
-            .updateValue((oldAppTree) => Ast.App.new(edit, oldAppTree, name, newArg))
+          insertPrefixArgument(edit, argApp.appTree, argApp.argument, newArg, forceNamed)
         }
         return props.updateCallback({ edit, directInteraction })
       } else if (value == null && argApp?.argument instanceof ArgumentAst) {
@@ -354,4 +381,11 @@ export const widgetDefinition = defineWidget(
 
 <template>
   <NodeWidget :input="innerInput" :updateCallback="handleArgUpdate" />
+  <ParameterMenu
+    v-if="hidden.length"
+    :port="props.input.value.id"
+    :collapsed="tree.showDetails"
+    :parameters="hidden"
+    @pick="insertParameter"
+  />
 </template>

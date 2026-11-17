@@ -1,6 +1,7 @@
 /**
- * @file The time-of-day menu: Time_Of_Day.now and the time field write the expected code, and the keyboard
- * edits the field, commits with Enter or blur, and cancels with Escape.
+ * @file The time-of-day menu: Time_Of_Day.now and the time field write the expected code, the keyboard
+ * edits the field, commits with Enter or blur, and cancels with Escape, and the columns pick a time
+ * that Set writes.
  */
 import userEvent from '@testing-library/user-event'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
@@ -28,6 +29,16 @@ function chosenCodes(wrapper: VueWrapper): string[] {
 }
 
 const segments = () => Array.from(document.querySelectorAll<HTMLElement>('[role="spinbutton"]'))
+const fieldText = () => segments().map((el) => el.textContent?.trim())
+/** The selected value of each column. */
+const selectedValues = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"]')).map((column) =>
+    column.querySelector('[aria-selected="true"]')?.textContent?.trim(),
+  )
+const columnValue = (unit: string, value: string) =>
+  Array.from(
+    document.querySelectorAll<HTMLElement>(`[role="listbox"][data-unit="${unit}"] [role="option"]`),
+  ).find((option) => option.textContent?.trim() === value)!
 
 describe('the time-of-day menu', () => {
   test('Now writes Time_Of_Day.now', async () => {
@@ -170,5 +181,80 @@ describe('the time-of-day menu', () => {
     await flushPromises()
     expect(wrapper.emitted('choose')).toBeUndefined()
     expect(segments()).toHaveLength(3)
+  })
+
+  test('the columns select the time the menu opens on, and the time of day for an unset value', async () => {
+    await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    expect(selectedValues()).toEqual(['14', '30'])
+    await mountMenu(undefined)
+    expect(selectedValues()).toEqual(['09', '05'])
+  })
+
+  test('a click on a column value changes the field and writes nothing; Set writes it', async () => {
+    const wrapper = await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    columnValue('hour', '16').click()
+    columnValue('minute', '45').click()
+    await flushPromises()
+    expect(fieldText()).toEqual(['16', '45'])
+    expect(selectedValues()).toEqual(['16', '45'])
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    // The field keeps the keyboard (a press on a value does not take the focus: Playwright checks it).
+    expect(document.activeElement).toBe(segments()[0])
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(chosenCodes(wrapper)).toEqual(['Time_Of_Day.new 16 45'])
+  })
+
+  test('a column pick is written by Enter in the field, too', async () => {
+    const wrapper = await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    columnValue('minute', '00').click()
+    await flushPromises()
+    await userEvent.keyboard('{Enter}')
+    expect(chosenCodes(wrapper)).toEqual(['Time_Of_Day.new 14 0'])
+  })
+
+  test('typing in the field moves the columns', async () => {
+    await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    await userEvent.keyboard('{ArrowUp}')
+    await flushPromises()
+    expect(selectedValues()).toEqual(['15', '30'])
+  })
+
+  test('with seconds, there is a column of seconds', async () => {
+    const wrapper = await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    await wrapper.get('[data-action="seconds"]').trigger('click')
+    await flushPromises()
+    expect(selectedValues()).toEqual(['14', '30', '00'])
+    columnValue('second', '15').click()
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(chosenCodes(wrapper)).toEqual(['Time_Of_Day.new 14 30 15'])
+  })
+
+  test('Set on an unset value writes the time shown', async () => {
+    const wrapper = await mountMenu(undefined)
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(chosenCodes(wrapper)).toEqual(['Time_Of_Day.new 9 5'])
+  })
+
+  test('Set without a change to a written time closes the menu and writes nothing', async () => {
+    const wrapper = await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    expect(wrapper.emitted('close')).toHaveLength(1)
+  })
+
+  test('Set writes nothing while a segment is cleared', async () => {
+    const wrapper = await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    await userEvent.keyboard('{Backspace}{Backspace}')
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(wrapper.emitted('choose')).toBeUndefined()
+  })
+
+  test('Cancel closes without writing, even after a pick', async () => {
+    const wrapper = await mountMenu({ kind: 'time', hour: 14, minute: 30, second: 0 })
+    columnValue('hour', '16').click()
+    await wrapper.get('[data-action="cancel"]').trigger('click')
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    await userEvent.click(document.body)
+    expect(wrapper.emitted('choose')).toBeUndefined()
   })
 })

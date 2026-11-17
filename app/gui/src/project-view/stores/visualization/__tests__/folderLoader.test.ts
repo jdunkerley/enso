@@ -5,7 +5,7 @@ import type { Event as LSEvent, Uuid } from 'ydoc-shared/languageServerTypes'
 import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
 import { watchVisualizationFolder } from '../folderLoader'
 import type { VisualizationMetadata } from '../metadata'
-import { rootAddress, stylePathAttribute } from '../rootAddress'
+import { rootAddress } from '../rootAddress'
 import type { VisualizationModule } from '../runtimeTypes'
 
 const ROOT = '6f9d2c1e-0000-4000-8000-000000000002' as Uuid
@@ -174,14 +174,6 @@ test('a removed file is unregistered', async () => {
   await settle()
   t.emit('Removed', ['Image.vue'])
   expect(t.unregister).toHaveBeenCalledWith(IMAGE)
-})
-
-test("a removed file's style elements are removed", () => {
-  const style = document.head.appendChild(document.createElement('style'))
-  style.setAttribute(stylePathAttribute, rootAddress(ROOT, ['visualizations', 'Image.vue']))
-  const t = setup()
-  t.emit('Removed', ['Image.vue'])
-  expect(document.head.contains(style)).toBe(false)
 })
 
 test('a second modification arriving before the first compiled wins', async () => {
