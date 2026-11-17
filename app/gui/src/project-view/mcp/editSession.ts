@@ -163,11 +163,19 @@ export interface EditRunOptions<T> {
   /**
    * Whether the edit, by its value, changed nothing (the text or the positions were already as
    * asked). Then no graph update and no execution follow, so the run answers at once with
-   * `settled: true` instead of waiting out {@link GRAPH_UPDATE_WAIT_MS}. Everything before the edit
-   * is as for any run: it is queued, refused in Live, saves a version and joins the caller's undo
-   * step (the edit decides at its turn, after those checks). False by default.
+   * `settled: true` instead of waiting out {@link GRAPH_UPDATE_WAIT_MS}. The edit decides at its
+   * turn, after the version save and the undo step's hold; to skip those too, answer from
+   * {@link noop}. False by default.
    */
   readonly unchanged?: (value: T) => boolean
+  /**
+   * Whether the edit is known to change nothing, decided at the run's turn (after the queue and the
+   * refusals, so Live mode still refuses) and before the version is saved or the undo step held:
+   * Ok(value) answers at once with `settled: true`, saving no version, holding no step and running
+   * no edit; Err refuses; undefined runs the edit as usual. Only a stepped run (an edit) asks. It
+   * must read the project as it is now and change nothing. None by default.
+   */
+  readonly noop?: () => Result<T> | undefined
   /**
    * When the caller stops waiting (`Date.now()` milliseconds; the tool dispatcher's deadline). The
    * run is refused unless {@link EDIT_MIN_REMAINING_MS} are left at its turn and after the version
@@ -421,6 +429,7 @@ export class EditSession {
         edit,
         options.affected ?? (() => ({})),
         options.unchanged ?? (() => false),
+        options.noop,
         options.deadline ?? Infinity,
         options.awaitsGraphUpdate ?? true,
         mode,
@@ -509,6 +518,7 @@ export class EditSession {
     edit: () => Result<T> | Promise<Result<T>>,
     affected: (value: T) => AffectedExpressions,
     unchanged: (value: T) => boolean,
+    noop: (() => Result<T> | undefined) | undefined,
     deadline: number,
     awaitsGraphUpdate: boolean,
     mode: RunMode,
@@ -524,6 +534,9 @@ export class EditSession {
       const refused = this.refusal(remaining)
       if (refused) return refused
       if (mode.stepped) {
+        // Before the version save and the hold: an edit that changes nothing costs neither.
+        const nothing = noop?.()
+        if (nothing) return nothing.ok ? Ok({ value: nothing.value, settled: true }) : nothing
         const key = callerKey(caller)
         if (this.release == null || this.stepCaller !== key) {
           this.releaseStep()

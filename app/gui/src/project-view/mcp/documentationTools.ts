@@ -93,8 +93,19 @@ export async function setDocumentation(
       })
       return edited.ok ? Ok({ unchanged: false }) : edited
     },
-    // An equal text edits nothing, so no graph update follows: the session answers at once.
-    { deadline: deps.deadline, unchanged: ({ unchanged }) => unchanged },
+    // An equal text edits nothing, so no graph update follows: the session answers at once, and,
+    // asked before the version save, saves no version and holds no undo step.
+    {
+      deadline: deps.deadline,
+      unchanged: ({ unchanged }) => unchanged,
+      noop: () => {
+        const sameMethod = checkAtTurn(deps, method)
+        if (!sameMethod.ok) return sameMethod
+        const ast = deps.currentMethod.ast
+        if (!ast.ok) return Err(NO_METHOD_ERROR)
+        return markdownOf(ast.value) === text ? Ok({ unchanged: true }) : undefined
+      },
+    },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult(

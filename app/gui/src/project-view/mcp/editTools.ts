@@ -315,6 +315,14 @@ export async function editNode(
       // code it already has changes nothing, and the engine then reports nothing (packaged app).
       affected: () => (codeChanged ? { changed: [id] } : {}),
       deadline: deps.deadline,
+      // The same code: no version, no undo step, no wait.
+      noop: () => {
+        const unchanged = checkAtTurn(deps, method, [id])
+        if (!unchanged.ok) return unchanged
+        const current = deps.db.nodeIdToNode.get(id)
+        if (current?.prefixes.enableRecording != null) return Err(writeOnNodeError(args.node_id))
+        return current?.innerExpr.code() === expression.value ? Ok(undefined) : undefined
+      },
     },
   )
   if (!outcome.ok) return errorResult(outcome)

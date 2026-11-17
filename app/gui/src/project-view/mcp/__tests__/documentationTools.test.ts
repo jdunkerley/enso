@@ -158,7 +158,7 @@ test('set_documentation with the text as it is at its turn makes no module edit'
 })
 
 /** A real session, in Design or Live mode, whose watches resolve at once. */
-function realSession(live: boolean) {
+function realSession(live: boolean, saveVersion: () => Promise<void> = async () => {}) {
   return new EditSession({
     isLive: () => live,
     isActive: () => true,
@@ -168,7 +168,7 @@ function realSession(live: boolean) {
     undo: () => false,
     redo: () => false,
     enablesOutput: () => false,
-    saveVersion: async () => {},
+    saveVersion,
     watchGraphUpdate: () => ({ updated: async () => true, cancel: () => {} }),
     watchExecution: () => ({ editApplied: () => {}, settled: async () => true, cancel: () => {} }),
     now: () => 0,
@@ -189,6 +189,21 @@ test('two calls at once: the second compares with the text the first left, and w
     settled: true,
   })
   expect(func.mutableDocumentationMarkdown().toJSON()).toBe(original)
+})
+
+test('the current text saves no version; a real change does', async () => {
+  const saveVersion = vi.fn(async () => {})
+  const { deps } = makeDeps({ session: realSession(false, saveVersion) })
+  const text = 'Adds two numbers.'
+  expect(valueOf(await setDocumentation(deps, { text }))).toEqual({
+    method: 'main',
+    characters: text.length,
+    settled: true,
+    unchanged: true,
+  })
+  expect(saveVersion).not.toHaveBeenCalled()
+  expect(valueOf(await setDocumentation(deps, { text: 'New' })).unchanged).toBeUndefined()
+  expect(saveVersion).toHaveBeenCalledTimes(1)
 })
 
 test('in Live mode the current text is refused like any other', async () => {

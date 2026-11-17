@@ -343,6 +343,28 @@ test('edit_node sets the content and answers with the node', async () => {
   expect(result).toEqual({ nodes: [expect.objectContaining({ id: a, name: 'a' })], settled: true })
 })
 
+test('edit_node with the code the node already has answers from `noop`, editing nothing', async () => {
+  const session = {
+    async run<T>(
+      _caller: unknown,
+      edit: () => Result<T> | Promise<Result<T>>,
+      options?: EditRunOptions<T>,
+    ) {
+      const nothing = options?.noop?.()
+      const result = nothing ?? (await edit())
+      if (!result.ok) return result
+      return Ok<EditOutcome<T>>({ value: result.value, settled: true })
+    },
+  }
+  const { deps, db } = makeDeps({ session })
+  const a = nodeNamed(db, 'a')
+  const same = valueOf(await editNode(deps, { node_id: a, expression: '1 + 2' }))
+  expect(same.nodes).toHaveLength(1)
+  expect(deps.setNodeContent).not.toHaveBeenCalled()
+  await editNode(deps, { node_id: a, expression: '3' })
+  expect(deps.setNodeContent).toHaveBeenCalledWith(a, '3')
+})
+
 test('edit_node refuses an unknown node, a statement and a syntax error', async () => {
   const { deps, db } = makeDeps()
   expect(toolError(await editNode(deps, { node_id: 'nope', expression: '1' }))).toContain(
