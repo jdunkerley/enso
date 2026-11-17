@@ -65,10 +65,13 @@ is already on the row, drawn by `WidgetIcon` at the root.
   `<NodeWidget>` over its own input, so the argument shows its real code
   (`Date.today`, or `Date.new` with `year`, `month` and `day` ports), plus a
   `SelectionArrow` under it; the arrow opens a menu (`WidgetDate/DateMenu.vue`:
-  `Date.today`, `Date.yesterday`, `Date.tomorrow`, then a Reka calendar) that
-  **replaces the whole value** in one `module.edit` (the import goes in the same
-  edit). Priority 51, after `WidgetSelection` (50), so an argument with its own
-  `@` dropdown keeps it, and before `WidgetArgumentName`, which draws the name
+  `Date.today`, `Date.yesterday`, `Date.tomorrow`, which write at once, then the
+  Reka calendar of `WidgetDate/DateCalendar.vue` and Cancel and Set: a day click
+  only selects the day, Set or Enter on a day writes it, a click outside writes
+  only a changed day, and Cancel and Escape write nothing) that **replaces the
+  whole value** in one `module.edit` (the import goes in the same edit).
+  Priority 51, after `WidgetSelection` (50), so an argument with its own `@`
+  dropdown keeps it, and before `WidgetArgumentName`, which draws the name
   inside it. `WidgetDate/dateExpression.ts` is the framework-free expression <->
   choice mapping. A specific date is written parenthesised
   (`(Date.new 2020 1 15)`) wherever it becomes an argument: an unparenthesised
@@ -82,41 +85,65 @@ is already on the row, drawn by `WidgetIcon` at the root.
   `docs/superpowers/specs/2026-11-15-date-widget-design.md`.
 - `WidgetTimeOfDay.vue` — the same for a `Time_Of_Day`-typed input (priority 52;
   `Time_Of_Day.now`, or `Time_Of_Day.new` with `hour`, `minute` and `second`
-  ports). Its menu (`WidgetTimeOfDay/TimeOfDayMenu.vue`) is `Time_Of_Day.now`, a
-  Reka `TimeField` (hours and minutes, seconds on request, written only when not
-  zero), scrollable columns of hours and minutes (and seconds) to pick from
-  (`WidgetTimeOfDay/TimeColumns.vue`, a plain `HourMinuteSecond` v-model, kept
-  apart for the Date_Time picker to reuse), and Cancel and Set. The field and
-  the columns show one draft: a pick in a column writes nothing and leaves the
-  focus in the field; typing scrolls the columns to the value. It reads any
-  `Time_Of_Day.new` of integer literals, positional or named, a missing part
-  being 0 (a bare `Time_Of_Day.new`; `Time_Of_Day.new 14`, which typing an hour
-  into the unset `hour` writes, since `WidgetFunction` inserts the first
-  trailing placeholder positionally; `hour=14`; `second=15` as the `…` menu and
-  `pretty` write it); an edit writes hour, minute and second positionally and
-  keeps the millisecond, microsecond and nanosecond as they were written
-  (`withKeptParts`). Set writes the draft (or only closes when it is the time
-  already written); Enter in the field, leaving it or a click outside the menu
-  writes it only if it was edited (the shell calls the handler the menu
-  registers with `setAccept` before it ends the interaction); Cancel, Escape and
-  the arrow's toggle do not. A cleared segment blocks the write until it is
-  filled in. `timeExpression.ts` is the mapping. The wrapper, its floating menu
-  and the interaction are `WidgetPicker/PickerShell.vue`, the menu frame is
+  ports). Its menu (`WidgetTimeOfDay/TimeOfDayMenu.vue`) is `Time_Of_Day.now`,
+  the time part of `WidgetTimeOfDay/TimeField.vue` (shared with the Date_Time
+  menu): a Reka `TimeField` (hours and minutes, seconds on request, written only
+  when not zero) over scrollable columns of hours and minutes (and seconds) to
+  pick from (`WidgetTimeOfDay/TimeColumns.vue`, a plain `HourMinuteSecond`
+  v-model), and then Cancel and Set (`WidgetPicker/PickerActions.vue`, shared
+  too). The field and the columns show one draft: a pick in a column writes
+  nothing and leaves the focus in the field; typing scrolls the columns to the
+  value. It reads any `Time_Of_Day.new` of integer literals, positional or
+  named, a missing part being 0 (a bare `Time_Of_Day.new`; `Time_Of_Day.new 14`,
+  which typing an hour into the unset `hour` writes, since `WidgetFunction`
+  inserts the first trailing placeholder positionally; `hour=14`; `second=15` as
+  the `…` menu and `pretty` write it); an edit writes hour, minute and second
+  positionally and keeps the millisecond, microsecond and nanosecond as they
+  were written (`withKeptParts`). Set writes the draft (or only closes when it
+  is the time already written); Enter in the field, leaving it or a click
+  outside the menu writes it only if it was edited (the shell calls the handler
+  the menu registers with `setAccept` before it ends the interaction); Cancel,
+  Escape and the arrow's toggle do not. A cleared segment blocks the write until
+  it is filled in. `timeExpression.ts` is the mapping. The wrapper, its floating
+  menu and the interaction are `WidgetPicker/PickerShell.vue`, the menu frame is
   `WidgetPicker/PickerMenuFrame.vue` and the parenthesising rule is
   `WidgetPicker/parentheses.ts`, all shared with `WidgetDate`. **The menu is
   positioned by `pickerMenuStyles`** (`WidgetSelection/styles.ts`): left edges
   lined up under the argument, kept there by `autoUpdate`, and shifted only by
   the screen's edge. `activityDropdownStyles` also shifts a dropdown to stay
   within the node, which pushed a menu wider than the rest of the node off its
-  argument (by 160 px for an unset argument at a node's end). **The menu is open
-  only when the widget asked for it** (`menuOpen`): editing a nested number
-  makes the widget's interaction active too (as it does for `WidgetSelection`,
-  which then opens its list), and must not show the menu. A nested number's
-  `@click.stop` keeps its clicks from toggling it. **At a node root the first
-  click is the node's**: `PickerShell` stops the click and toggles the menu only
-  when the node is already selected (`.GraphNode.selected`) and no modifier is
-  held; otherwise the click bubbles so the node selects (or, with Ctrl/Cmd,
-  edits). `WidgetTimeOfDay` likewise takes `Time_Of_Day.now`/`new` whole nodes.
+  argument (by 160 px for an unset argument at a node's end). **Every picker
+  menu is a fixed width** (200 px, set on `PickerMenuFrame`; the Date_Time menu
+  sets its own 380 px through `--picker-menu-width`): the activity dropdowns'
+  `size` middleware also set the menu's `min-width` to its anchor's, so a menu
+  on a whole node grew with the node; `pickerMenuStyles` must not add one back.
+  **The menu is open only when the widget asked for it** (`menuOpen`): editing a
+  nested number makes the widget's interaction active too (as it does for
+  `WidgetSelection`, which then opens its list), and must not show the menu. A
+  nested number's `@click.stop` keeps its clicks from toggling it. **At a node
+  root the first click is the node's**: `PickerShell` stops the click and
+  toggles the menu only when the node is already selected
+  (`.GraphNode.selected`) and no modifier is held; otherwise the click bubbles
+  so the node selects (or, with Ctrl/Cmd, edits). `WidgetTimeOfDay` likewise
+  takes `Time_Of_Day.now`/`new` whole nodes.
+- `WidgetDateTime.vue` — the same for a `Date_Time`-typed input or item, and a
+  whole node that is `Date_Time.now` or `Date_Time.new` (priority 53). Its menu
+  (`WidgetDateTime/DateTimeMenu.vue`) is `Date_Time.now`, then side by side the
+  date menu's calendar (`WidgetDate/DateCalendar.vue`) and the time menu's field
+  and columns (`WidgetTimeOfDay/TimeField.vue` with `fill`, hours and minutes,
+  seconds on request and shown when the value has a second, its columns as tall
+  as the calendar), then Cancel and Set across the bottom. `Date_Time.now`
+  writes at once; a day click and a column click only select; Set writes the
+  selected day at the field's time as `Date_Time.new y m d h mi` (with `s` when
+  seconds are shown and not zero); Enter in the field, leaving the menu or a
+  click outside writes only a changed day or time; Cancel and Escape write
+  nothing. `dateTimeExpression.ts` reads the arguments from the AST: year and
+  any of month … second, positional or named (`Date_Time.new 2026 11 17 14` is
+  14:00, so the menu opens on it), the missing ones taking `Date_Time.new`'s
+  defaults; an edit keeps everything after the second as written (the finer
+  parts and `zone`), writing the second positionally when a kept argument
+  follows it positionally, and the picker never writes a zone. A new item of a
+  `Vector Date_Time` starts as `Date_Time.now`.
 - `WidgetBoolean.vue` — a Boolean: a checkbox that flips it, then its code (an
   unset argument's default greyed), drawn after the argument name (priority
   101). The ▾ is `WidgetSelection`'s: it lists `True` and `False`, with their

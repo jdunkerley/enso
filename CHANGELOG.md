@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [A date-and-time picker for Date_Time values: Date_Time.now, a calendar beside
+  a time you can type or pick from hour, minute and second columns, then Set.
+  Date pickers also get Cancel and Set. Editing a value keeps its finer parts
+  and time zone.][832]
 - [Agents connected over MCP can arrange and move nodes, resize a visualization,
   and take a picture of the graph.][831]
 - [A Boolean argument shows its value next to the checkbox, and a dropdown under
@@ -461,6 +465,8 @@
 
 #### Enso Standard Library
 
+- [Date_Time's functions have typed arguments with working widgets, including
+  period dropdowns for start_of, end_of, + and -.][832]
 - [`Time_Of_Day`'s functions have typed arguments with working widgets: `+` and
   `-` offer each time period and `Duration.new` for a custom amount, `start_of`
   and `end_of` write `..Hour`, `to_date_time` has a time zone dropdown, and
@@ -541,6 +547,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[832]: https://github.com/jdunkerley/enso/pull/832
 [831]: https://github.com/jdunkerley/enso/pull/831
 [830]: https://github.com/jdunkerley/enso/pull/830
 [825]: https://github.com/jdunkerley/enso/pull/825
