@@ -111,7 +111,7 @@ function colorForType(type: string): RGBA {
  * copy (the GUI's `stopCopy`).
  */
 function stopCopy(event: KeyboardEvent) {
-  const isMac = /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)
+  const isMac = /mac os/i.test(navigator.userAgent)
   const mod = isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
   if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'c') {
     event.stopPropagation()
@@ -195,7 +195,7 @@ function renderRegularInterpolation(value: unknown, fgColor: RGBA, bgColor: RGBA
 <template>
   <div class="SQLVisualization scrollable" tabindex="-1" @wheel.stop.passive @keydown="stopCopy">
     <pre v-if="data.error" class="sql" v-text="data.error"></pre>
-    <!-- eslint-disable-next-line vue/no-v-html The code and every value are escaped (escapeHtml); only our own spans are markup. -->
+    <!-- eslint-disable-next-line vue/no-v-html The code and every value are escaped (escapeHtml); only our own `div.interpolation` wrappers are markup. -->
     <pre v-else class="sql" v-html="formatted"></pre>
   </div>
 </template>
