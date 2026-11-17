@@ -6,6 +6,9 @@ import viteConfig from './vite.config'
 const config = mergeConfig(
   viteConfig,
   defineConfig({
+    // A library visualization under `distribution/` imports `sql-formatter`; pnpm put no
+    // `node_modules` beside it, so resolve it from this package.
+    resolve: { dedupe: ['sql-formatter'] },
     test: {
       // We need to load environment variables locally: https://github.com/vitest-dev/vitest/issues/1148
       // Supposedly, vitest only loads environment variables beginning with VITE_.

@@ -2,6 +2,7 @@
 import { expect, test } from 'vitest'
 import type { VisualizationEntry, VisualizationStatus } from '../visualizationRegistry'
 import {
+  drawnVisualizationSize,
   EDITED_NODE_ERROR,
   getVisualizationData,
   listVisualizations,
@@ -10,11 +11,19 @@ import {
   STILL_LOADING_ERROR,
   VISUALIZATION_DATA_CHARS,
   VISUALIZATION_WAIT_MS,
+  type VisualizationSize,
   type VisualizationToolDeps,
 } from '../visualizationTools'
 
 const NODE = '00000000-0000-0000-0000-000000000001'
 const AVAILABLE = ['Table', 'JSON', 'Scatter Plot']
+/** The size the fake reports, as `size` does: a stored width, the default height. */
+const SIZE: VisualizationSize = {
+  width: 600,
+  height: 150,
+  default_width: false,
+  default_height: true,
+}
 const SHOWN_NOTE =
   ' The visualization was shown and stays shown (part of your undo step); hide it with ' +
   '`set_visualization` if the user did not ask to see it.'
@@ -95,6 +104,7 @@ function fake(overrides: Partial<Fake> = {}): {
     storedName: () => state.stored,
     isEdited: () => state.edited,
     availableNames: () => AVAILABLE,
+    size: () => SIZE,
     show: async (_nodeId, visualization) => {
       state.showCalls.push(visualization)
       if (!state.showResult.ok) return state.showResult
@@ -153,6 +163,7 @@ test('data: the view data of a shown visualization', async () => {
     changed: false,
     truncated: false,
     available: AVAILABLE,
+    size: SIZE,
     data: { rows: [1, 2] },
   })
 })
@@ -219,6 +230,7 @@ test('image: a visualization in view at 100% is not moved', async () => {
     changed: false,
     moved: false,
     available: AVAILABLE,
+    size: SIZE,
     rect: { x: 100, y: 100, width: 200, height: 150 },
   })
   expect(state.revealed).toBe(0)
@@ -289,6 +301,7 @@ test('list: a hidden node lists what it offers and is not shown', async () => {
     shown: false,
     visualization: null,
     available: AVAILABLE,
+    size: SIZE,
   })
   expect(state.showCalls).toEqual([])
 })
@@ -300,6 +313,7 @@ test('list: a shown node names the visualization on screen', async () => {
     shown: true,
     visualization: 'JSON',
     available: AVAILABLE,
+    size: SIZE,
   })
 })
 
@@ -420,5 +434,34 @@ test('an error when nothing was edited is unchanged', async () => {
   expect(await getVisualizationData(deps, { node_id: NODE, visualization: 'Table' })).toEqual({
     ok: false,
     error: STILL_LOADING_ERROR,
+  })
+})
+
+test('the size as drawn: the stored size, or the default, never below the minimums', () => {
+  // The default: the node's width or 200, and 150 high.
+  expect(drawnVisualizationSize(undefined, 120)).toEqual({
+    width: 200,
+    height: 150,
+    default_width: true,
+    default_height: true,
+  })
+  expect(drawnVisualizationSize({ width: null, height: null }, 340.4)).toEqual({
+    width: 340,
+    height: 150,
+    default_width: true,
+    default_height: true,
+  })
+  expect(drawnVisualizationSize({ width: 600, height: 400 }, 120)).toEqual({
+    width: 600,
+    height: 400,
+    default_width: false,
+    default_height: false,
+  })
+  // Never narrower than the node or 200, never lower than 32.
+  expect(drawnVisualizationSize({ width: 100, height: 10 }, 250)).toEqual({
+    width: 250,
+    height: 32,
+    default_width: false,
+    default_height: false,
   })
 })

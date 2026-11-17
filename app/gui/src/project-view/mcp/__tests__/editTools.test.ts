@@ -16,6 +16,8 @@ import {
   METHOD_CHANGED_ERROR,
   MISSING_NODES_NOTE,
   UNSETTLED_NOTE,
+  VISUALIZATION_SIZE_MAX,
+  VISUALIZATION_SIZE_MIN,
   addNodes,
   editNode,
   parseNodeExpression,
@@ -115,6 +117,8 @@ const pointer: MethodPointer = {
 const caller = { kind: 'external', name: 'claude-code' } as const
 /** The call's deadline, which each tool passes on to the session. */
 const DEADLINE = 123_456
+/** The size the fake reports for every node's visualization. */
+const DRAWN_SIZE = { width: 600, height: 400, default_width: false, default_height: false }
 
 /**
  * A session that runs each edit at once and reports `settled`. `affected` lists, per successful
@@ -175,6 +179,7 @@ function makeDeps(overrides: Partial<EditToolDeps> = {}, code = CODE) {
     deleteNodes: vi.fn(async () => Ok()),
     setNodeComment: vi.fn(() => Ok()),
     setVisualization: vi.fn(() => Ok()),
+    visualizationSize: vi.fn(() => DRAWN_SIZE),
     ...overrides,
   }
   return { deps, db, createNodes }
@@ -422,8 +427,12 @@ test('set_visualization shows the visualization and answers with the node', asyn
   const { deps, db } = makeDeps()
   const a = nodeNamed(db, 'a')
   const result = valueOf(await setVisualization(deps, { node_id: a, visible: true }))
-  expect(deps.setVisualization).toHaveBeenCalledWith(a, true, undefined)
-  expect(result).toEqual({ node: expect.objectContaining({ id: a }), settled: true })
+  expect(deps.setVisualization).toHaveBeenCalledWith(a, { visible: true })
+  expect(result).toEqual({
+    node: expect.objectContaining({ id: a }),
+    size: DRAWN_SIZE,
+    settled: true,
+  })
   expect(toolError(await setVisualization(deps, { node_id: 'nope', visible: false }))).toContain(
     'No node with id nope',
   )
@@ -435,8 +444,70 @@ test('set_visualization with an identifier passes it on in the same edit', async
   const a = nodeNamed(db, 'a')
   const identifier = { module: { kind: 'Builtin' as const }, name: 'JSON' }
   valueOf(await setVisualization(deps, { node_id: a, visible: true, identifier }))
-  expect(deps.setVisualization).toHaveBeenCalledExactlyOnceWith(a, true, identifier)
+  expect(deps.setVisualization).toHaveBeenCalledExactlyOnceWith(a, { visible: true, identifier })
   expect(session.affected).toHaveLength(1)
+})
+
+test('set_visualization passes width and height in the same edit as visible', async () => {
+  const session = fakeSession()
+  const { deps, db } = makeDeps({ session })
+  const a = nodeNamed(db, 'a')
+  valueOf(await setVisualization(deps, { node_id: a, visible: true, width: 600, height: 400 }))
+  expect(deps.setVisualization).toHaveBeenCalledExactlyOnceWith(a, {
+    visible: true,
+    width: 600,
+    height: 400,
+  })
+  expect(session.affected).toHaveLength(1)
+})
+
+test('set_visualization passes null for the default size, and leaves an omitted one out', async () => {
+  const { deps, db } = makeDeps()
+  const a = nodeNamed(db, 'a')
+  await setVisualization(deps, { node_id: a, visible: true, width: null, height: null })
+  expect(deps.setVisualization).toHaveBeenLastCalledWith(a, {
+    visible: true,
+    width: null,
+    height: null,
+  })
+  await setVisualization(deps, { node_id: a, visible: false, height: 250 })
+  expect(deps.setVisualization).toHaveBeenLastCalledWith(a, { visible: false, height: 250 })
+})
+
+test('set_visualization takes a size of 100 to 2,000, and refuses anything else before editing', async () => {
+  expect([VISUALIZATION_SIZE_MIN, VISUALIZATION_SIZE_MAX]).toEqual([100, 2_000])
+  const session = fakeSession()
+  const { deps, db } = makeDeps({ session })
+  const a = nodeNamed(db, 'a')
+  for (const size of [{ width: 99 }, { height: 2_001 }, { width: NaN }, { height: Infinity }]) {
+    const error = toolError(await setVisualization(deps, { node_id: a, visible: true, ...size }))
+    expect(error).toContain('100 to 2,000')
+    expect(error).toContain('null')
+  }
+  expect(deps.setVisualization).not.toHaveBeenCalled()
+  expect(session.deadlines).toEqual([])
+  for (const size of [{ width: 100 }, { height: 2_000 }]) {
+    expect((await setVisualization(deps, { node_id: a, visible: true, ...size })).ok).toBe(true)
+  }
+})
+
+test('set_visualization reports the size as drawn, read after the edit', async () => {
+  const read: string[] = []
+  const { deps, db } = makeDeps({
+    setVisualization: vi.fn(() => {
+      read.push('edit')
+      return Ok()
+    }),
+    visualizationSize: () => {
+      read.push('size')
+      return DRAWN_SIZE
+    },
+  })
+  const result = valueOf(
+    await setVisualization(deps, { node_id: nodeNamed(db, 'a'), visible: true, width: 600 }),
+  )
+  expect(read).toEqual(['edit', 'size'])
+  expect(result.size).toEqual(DRAWN_SIZE)
 })
 
 test('set_node_comment and set_visualization affect no expression, so they do not wait', async () => {
