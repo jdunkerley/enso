@@ -36,20 +36,25 @@ class RuntimeManagementTest extends InterpreterTest {
 
   /** Waits for `f` and returns how it ended: `Left` with the exception it
     * failed with, or `Right` with its value. A timeout fails the test with a
-    * thread dump. It must not run inside `intercept`, which would replace the
-    * dump with its own message.
+    * thread dump, taken before `onTimeout` runs. `onTimeout` lets a test stop
+    * the thread it left running, so that the later tests are not affected. It
+    * must not run inside `intercept`, which would replace the dump with its
+    * own message.
     */
   private def awaitOutcome[T](
-    f: java.util.concurrent.Future[T]
+    f: java.util.concurrent.Future[T],
+    onTimeout: () => Unit = () => ()
   ): Either[java.util.concurrent.ExecutionException, T] =
     try {
       Right(f.get(waitTimeoutSeconds, TimeUnit.SECONDS))
     } catch {
       case ex: java.util.concurrent.ExecutionException => Left(ex)
       case _: java.util.concurrent.TimeoutException =>
-        failWithThreadDump(
+        val dump = ThreadUtils.dumpAllStacktraces(
           s"A guest thread did not finish within $waitTimeoutSeconds seconds."
         )
+        onTimeout()
+        fail(dump)
     }
 
   /** Waits until `marker` occurs `count` times in the output so far. It never
@@ -222,7 +227,7 @@ class RuntimeManagementTest extends InterpreterTest {
         .toString should not include "Exception in finalizer"
     }
 
-    // The next three tests cover Note [A Thread Interrupt Is Sticky] in
+    // The next five tests cover Note [A Thread Interrupt Is Sticky] in
     // ThreadManager (#834).
     val interruptedMessage =
       "org.enso.interpreter.test.InterpreterException: org.enso.interpreter.runtime.control.ThreadInterruptedException"
@@ -271,7 +276,13 @@ class RuntimeManagementTest extends InterpreterTest {
       awaitOutput("Start.", 1)
       langCtx.getThreadManager.interruptThreads()
 
-      val ex = awaitOutcome(future) match {
+      // Without the re-arm the thread loops for ever. A second interrupt then
+      // reaches it (the swallowing is one-off), so a regression fails this
+      // test alone and does not leave a thread running into the next ones.
+      val ex = awaitOutcome(
+        future,
+        () => langCtx.getThreadManager.interruptThreads()
+      ) match {
         case Left(ex) => ex
         case Right(v) => fail("Unexpected value: " + v)
       }
@@ -319,14 +330,20 @@ class RuntimeManagementTest extends InterpreterTest {
 
       // The latch keeps every task waiting until all have started, so they
       // run on all the threads, including each thread interrupted above. A
-      // thread still carrying the interrupt would fail at its first poll.
+      // thread still carrying the interrupt would fail at its first poll, and
+      // so would one where the re-armed action that the interrupted task left
+      // pending ignored the flag and threw again.
       val started = new java.util.concurrent.CountDownLatch(parallelism)
       val counting = 0
         .until(parallelism)
         .map(_ =>
           langCtx.getThreadManager.submit(() => {
             started.countDown()
-            started.await(waitTimeoutSeconds, TimeUnit.SECONDS)
+            if (!started.await(waitTimeoutSeconds, TimeUnit.SECONDS)) {
+              throw new IllegalStateException(
+                s"Not every task started within $waitTimeoutSeconds seconds."
+              )
+            }
             main.execute(Long.box(1000000))
           }): java.util.concurrent.Future[org.graalvm.polyglot.Value]
         )
@@ -391,6 +408,73 @@ class RuntimeManagementTest extends InterpreterTest {
         "Handling.",
         "Handled."
       )
+    }
+
+    // A handler or destructor that never ends must still yield to a newer
+    // interrupt: only the interrupt that started it is deferred.
+    def interruptTwice(main: MainMethod, marker: String)(
+      langCtx: EnsoContext
+    ): Unit = {
+      consumeOut
+      val future: java.util.concurrent.Future[org.graalvm.polyglot.Value] =
+        langCtx.getThreadManager.submit(() => {
+          main.execute()
+        })
+      awaitOutput("Start.", 1)
+      langCtx.getThreadManager.interruptThreads()
+      awaitOutput(marker, 1)
+      langCtx.getThreadManager.interruptThreads()
+
+      val ex = awaitOutcome(future) match {
+        case Left(ex) => ex
+        case Right(v) => fail("Unexpected value: " + v)
+      }
+      ex.getMessage() shouldEqual interruptedMessage
+      consumeOut shouldEqual List("Start.", marker)
+    }
+
+    "Interrupt an interrupt handler that never ends" in {
+      val code =
+        """import Standard.Base.Runtime.Thread
+          |import Standard.Base.IO
+          |import Standard.Base.Nothing
+          |import Standard.Base.Data.Numbers.Number
+          |
+          |foo x =
+          |    if x == 0 then IO.println "Start." else Nothing
+          |    @Tail_Call foo x+1
+          |
+          |loop x = @Tail_Call loop x+1
+          |
+          |handler =
+          |    IO.println "Handling."
+          |    loop 0
+          |
+          |main = Thread.with_interrupt_handler (foo 0) handler
+          |""".stripMargin
+      interruptTwice(getMain(code), "Handling.")(leakContext())
+    }
+
+    "Interrupt a bracket destructor that never ends" in {
+      val code =
+        """import Standard.Base.IO
+          |import Standard.Base.Nothing
+          |import Standard.Base.Data.Numbers.Number
+          |from Standard.Base.Runtime.Managed_Resource import Managed_Resource
+          |
+          |foo x =
+          |    if x == 0 then IO.println "Start." else Nothing
+          |    @Tail_Call foo x+1
+          |
+          |loop x = @Tail_Call loop x+1
+          |
+          |close _ =
+          |    IO.println "Closing."
+          |    loop 0
+          |
+          |main = Managed_Resource.bracket Nothing (r-> close r) (_-> foo 0)
+          |""".stripMargin
+      interruptTwice(getMain(code), "Closing.")(leakContext())
     }
 
     /** Don't use this in production code, ever.
