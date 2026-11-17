@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
-import type { SuggestionEntryArgument } from '$/providers/openedProjects/suggestionDatabase/entry'
 import {
   Score,
   WidgetInput,
@@ -11,6 +10,10 @@ import { singleChoiceConfiguration } from '$/providers/openedProjects/widgetRegi
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import type { ToValue } from '$/utils/reactivity'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
+import {
+  booleanExpressionTags,
+  isBooleanArgument,
+} from '@/components/GraphEditor/widgets/WidgetBoolean/booleanValue'
 import SelectionArrow from '@/components/GraphEditor/widgets/WidgetSelection/SelectionArrow.vue'
 import SelectionSubmenu from '@/components/GraphEditor/widgets/WidgetSelection/SelectionSubmenu.vue'
 import { activityDropdownStyles } from '@/components/GraphEditor/widgets/WidgetSelection/styles'
@@ -34,7 +37,6 @@ import { injectWidgetTree } from '@/providers/widgetTree'
 import { Ast } from '@/util/ast'
 import { targetIsOutside } from '@/util/autoBlur'
 import { ArgumentInfoKey } from '@/util/callTree'
-import { arrayEquals } from '@/util/data/array'
 import { computed, ref, shallowRef, toRef, toValue, useTemplateRef, type VNode } from 'vue'
 
 const props = defineProps(widgetProps(widgetDefinition))
@@ -88,13 +90,19 @@ function makeExpressionFilter(pattern: Ast.Ast | string | undefined): Expression
   return undefined
 }
 
-const expressionTags = useExpressionTags({
+const configuredTags = useExpressionTags({
   dynamicConfig: () => props.input.dynamicConfig,
   staticTags: () => props.input[ArgumentInfoKey]?.info?.tagValues,
   suggestionDb: () => suggestionDbStore.value.entries,
   projectNames,
   libraryPublicTypes: () => suggestionDbStore.value.libraryPublicTypes,
 })
+/** A Boolean argument lists `True` and `False` with their imports, whatever its tag values say. */
+const expressionTags = computed(() =>
+  isBooleanArgument(props.input) && props.input.dynamicConfig == null ?
+    booleanExpressionTags(suggestionDbStore.value.entries)
+  : configuredTags.value,
+)
 
 const customTags = computed(
   () =>
@@ -232,13 +240,6 @@ export function withDropdownItems(input: WidgetInput, items: Iterable<DropdownIt
   return { ...input, [CustomDropdownItemsKey]: [...existingItems, ...items] }
 }
 
-function isHandledByCheckboxWidget(parameter: SuggestionEntryArgument | undefined): boolean {
-  return (
-    parameter?.tagValues != null &&
-    arrayEquals(Array.from(parameter.tagValues).sort(), ['False', 'True'])
-  )
-}
-
 function selectionScore(input: WidgetInput): Score {
   return (
     // We don’t want to show the dropdown until the dynamic config is received
@@ -246,7 +247,7 @@ function selectionScore(input: WidgetInput): Score {
     input[CustomDropdownItemsKey] != null ? Score.Perfect
     : input.dynamicConfig?.kind === 'Pending' ? Score.Mismatch
     : input.dynamicConfig?.kind === 'Single_Choice' ? Score.Perfect
-    : isHandledByCheckboxWidget(input[ArgumentInfoKey]?.info) ? Score.Mismatch
+    : isBooleanArgument(input) && input.dynamicConfig == null ? Score.Perfect
       // TODO[ao] here, instead of checking for existing dynamic config, we should rather return
       // Score.Good. But this does not work with WidgetArgument which would then take precedence
       // over selection (and we want to have name always under it)
