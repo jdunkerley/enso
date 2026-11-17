@@ -26,8 +26,7 @@ its glyph without infinite recursion.
 ## Icon rendering — render once, at the right layer
 
 The node's category icon is the responsibility of **one** widget per row. Don't
-draw a second icon from a downstream widget — that's the bug `WidgetAiPrompt`
-was originally guilty of.
+draw a second icon from a downstream widget.
 
 Two paths land an icon in the row:
 
@@ -43,9 +42,9 @@ Two paths land an icon in the row:
   `WidgetIcon` renders the glyph + recurses into the same input via
   `<NodeWidget>` for the rest of the row.
 
-So a custom widget that occupies the function-token slot of a static call (e.g.
-`WidgetAiPrompt` for AI nodes) must render only its own slot content. The icon
-is already on the row, drawn by `WidgetIcon` at the root.
+So a custom widget that occupies the function-token slot of a static call must
+render only its own slot content. The icon is already on the row, drawn by
+`WidgetIcon` at the root.
 
 ## File layout
 

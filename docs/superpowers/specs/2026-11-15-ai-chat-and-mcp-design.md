@@ -2,6 +2,15 @@
 
 Date: 2026-11-15. Status: design agreed in conversation, awaiting review.
 
+## Amendment, 2026-11-17: the in-app AI is removed
+
+The "Removal" section is done: the Component Browser's AI prompt mode, AI nodes
+and their placeholder, the AI prompt widget, and the spawned `claude` child with
+its IPC and private MCP server are gone from the IDE. Settings → AI keeps its
+name and holds only the MCP section. A project saved with an AI node still
+opens: the node is an ordinary call of a function in the project, and its
+`AI: <prompt>` comment an ordinary comment.
+
 ## Amendment, 2026-11-16: no chat panel
 
 After using the MCP server with Claude Code and Claude Desktop, the owner

@@ -41,7 +41,8 @@ too).
   `<name>.to_text` (10 s) in `get_node`, at most `NODE_PREVIEW_CHARS` (20,000).
   A longer text is cut and ends with `…`; a failed preview is left out. Previews
   do not interrupt the execution context on timeout; `evaluate_expression` does
-  (25 s budget, as `aiToolHandler.ts`).
+  (25 s budget). Its error text is made by `evaluationErrors.ts`
+  (`formatLsError`, `translateEngineError`).
 - **Nothing else limits the evaluations**: `queuedExecuteExpressionRaw` starts
   each one at once, and main does not cap a tool's result. So `get_graph` runs
   at most `GRAPH_PREVIEW_CONCURRENCY` (8) previews at a time and starts none
@@ -225,14 +226,13 @@ The user's switch is never changed by a tool.
 - Where the other edits go: `edit_node` → `graph.setNodeContent` (which returns
   the edit's `Result`); `remove_nodes` → `graph.deleteNodes` (the nodes using a
   removed one are disconnected, as when the user deletes); `set_node_comment` →
-  the statement's `mutableDocumentationText()` in one `module.edit`, as
-  `aiNode.ts` writes a prompt; `set_visualization` →
-  `graph.setNodeVisualization` with one `VisualizationUpdate`
-  `{ visible, identifier?, width?, height? }` (one layout setter call; a key
-  left out is not in the object, since the setter merges with `Object.assign`),
-  its answer's `size` read after the edit; `collapse_nodes` → the editor's
-  collapse with the same `CollapseDeps` as "Group components", without its
-  rename; `add_function` → one `module.edit` of the top-level block.
+  the statement's `mutableDocumentationText()` in one `module.edit`;
+  `set_visualization` → `graph.setNodeVisualization` with one
+  `VisualizationUpdate` `{ visible, identifier?, width?, height? }` (one layout
+  setter call; a key left out is not in the object, since the setter merges with
+  `Object.assign`), its answer's `size` read after the edit; `collapse_nodes` →
+  the editor's collapse with the same `CollapseDeps` as "Group components",
+  without its rename; `add_function` → one `module.edit` of the top-level block.
 - `GraphNodeComment.vue` reads the comment through `useYText`, so a comment
   written to the `Y.Text` from elsewhere (this tool, an undo) shows on a node
   that had none. Before, only a node already showing one updated.
