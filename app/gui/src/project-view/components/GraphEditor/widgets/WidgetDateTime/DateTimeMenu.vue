@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The date-time widget's menu: `Date_Time.now`, the calendar (the date menu's), the time
- * field and its columns (the time-of-day menu's `TimeField`, hours and minutes), and Cancel and Set.
+ * @file The date-time widget's menu: `Date_Time.now`, then side by side the calendar (the date
+ * menu's) and the time field and its columns (the time-of-day menu's `TimeField`, hours and minutes,
+ * as tall as the calendar), then Cancel and Set under both.
  * A day is written at the field's time, and a time on the value's day (today's for `now` or an
  * unset value). As in the time-of-day menu, a click on a column value changes the field and writes
  * nothing; Set writes the time as it stands; an edited time is also written by Enter, by leaving
@@ -122,16 +123,48 @@ onMounted(() => {
       </li>
     </ul>
     <hr class="divider" />
-    <DateCalendar ref="calendar" :selected="selectedDay" :shown="base" @pick="chooseDay" />
-    <hr class="divider" />
-    <TimeField
-      ref="field"
-      :initial="initialTime"
-      :initialShowSeconds="false"
-      :secondsToggle="false"
-      @enter="commitTime()"
-      @leave="onLeave"
-    />
+    <div class="panels">
+      <DateCalendar
+        ref="calendar"
+        class="calendarPanel"
+        :selected="selectedDay"
+        :shown="base"
+        @pick="chooseDay"
+      />
+      <TimeField
+        ref="field"
+        class="timePanel"
+        :initial="initialTime"
+        :initialShowSeconds="false"
+        :secondsToggle="false"
+        fill
+        @enter="commitTime()"
+        @leave="onLeave"
+      />
+    </div>
     <PickerActions @cancel="close" @set="commitTime(true)" />
   </PickerMenuFrame>
 </template>
+
+<style scoped>
+/* The calendar on the left (the date menu's width), the time on the right with its columns as tall
+ * as the calendar, and Cancel and Set under both. A fixed width, as every picker menu has. */
+.DateTimeMenu {
+  --picker-menu-width: 330px;
+}
+
+.panels {
+  display: flex;
+  gap: 8px;
+}
+
+.calendarPanel {
+  flex: none;
+  width: 186px;
+}
+
+.timePanel {
+  flex: 1;
+  min-width: 0;
+}
+</style>

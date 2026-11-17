@@ -25,8 +25,13 @@ const props = withDefaults(
     initialShowSeconds: boolean
     /** Whether "Add seconds"/"Hide seconds" is offered; true by default. */
     secondsToggle?: boolean
+    /**
+     * Whether to fill the height the parent gives it, the columns taking what the field leaves (the
+     * date-time menu lines them up with the calendar); otherwise the columns show five values.
+     */
+    fill?: boolean
   }>(),
-  { secondsToggle: true },
+  { secondsToggle: true, fill: false },
 )
 const emit = defineEmits<{
   /** Enter was pressed in the field. */
@@ -109,7 +114,7 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="container" class="TimeField" @focusout="onFocusOut">
+  <div ref="container" class="TimeField" :class="{ fill: props.fill }" @focusout="onFocusOut">
     <div class="field">
       <TimeFieldRoot
         v-slot="{ segments }"
@@ -137,7 +142,7 @@ defineExpose({
         {{ showSeconds ? 'Hide seconds' : 'Add seconds' }}
       </button>
     </div>
-    <TimeColumns v-model="columns" :seconds="showSeconds" class="columns" />
+    <TimeColumns v-model="columns" :seconds="showSeconds" :fill="props.fill" class="columns" />
   </div>
 </template>
 
@@ -189,5 +194,17 @@ defineExpose({
 
 .columns {
   margin-top: 4px;
+}
+
+.TimeField.fill {
+  display: flex;
+  flex-direction: column;
+
+  /* No height of their own (`contain: size`), so the parent's height decides, not their 24 or 60 values. */
+  & > .columns {
+    flex: 1;
+    min-height: 0;
+    contain: size;
+  }
 }
 </style>

@@ -1935,6 +1935,27 @@ test.describe('Date_Time widget', () => {
     )
   })
 
+  test('the menu has its own fixed width, on a narrow node as on a wide one, with the time beside the calendar', async ({
+    editorPage,
+    page,
+  }) => {
+    const { menu, open } = await dateTimeNode(editorPage, page)
+    await open()
+    const narrow = (await menu.boundingBox())!
+    // The time panel is to the right of the calendar, and its columns end where the calendar does.
+    const calendar = (await menu.locator('.calendarPanel').boundingBox())!
+    const time = (await menu.locator('.timePanel').boundingBox())!
+    expect(time.x).toBeGreaterThanOrEqual(calendar.x + calendar.width)
+    expect(Math.abs(time.y + time.height - (calendar.y + calendar.height))).toBeLessThanOrEqual(1)
+    // Wider than the date and time-of-day menus' 200 px: the date-time menu's own width.
+    expect(narrow.width).toBeGreaterThan(300)
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    // The whole node `dt1` (seven arguments) is far wider than the unset argument of `since`.
+    const { menu: wideMenu } = await openWholeNode(page)
+    expect(Math.abs((await wideMenu.boundingBox())!.width - narrow.width)).toBeLessThanOrEqual(1)
+  })
+
   test('Date_Time.now as a whole node has the picker', async ({ editorPage, page }) => {
     await dateTimeNode(editorPage, page)
     await expect(locate.graphNodeByBinding(page, 'dt2').locator('.WidgetDateTime')).toHaveCount(1)
