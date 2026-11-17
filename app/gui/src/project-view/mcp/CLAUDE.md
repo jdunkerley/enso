@@ -188,6 +188,18 @@ refused. A new route found later is added the same way, with a test in
 
 The user's switch is never changed by a tool.
 
+**Known defect, to be ticketed: the Write prefix does not write.** The prefix's
+shape (`… with_enabled_context Context.Output __ <| __`, three arguments) does
+not run on the current engine, whose `with_enabled_context context ~action`
+takes two (a node with it fails with "Method `<|` of type Text could not be
+found"). The UI's real Write action is a one-off
+`nodeExecution.recomputeOnce(id, 'Live')` (`GraphNode.vue`). So
+`prefixes.enableRecording` does not mark a node that writes; what writes is code
+that enables output (the two-argument
+`Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| …`,
+`Context.Output.with_enabled <| …`), which the history rule and `refresh` check
+for in the whole module. The prefix is not fixed in this branch.
+
 ## Edit, structure and view tools
 
 - `editTools.ts` (`add_nodes`, `edit_node`, `remove_nodes`, `set_node_comment`,
@@ -443,6 +455,23 @@ applied it starts two watches, one for the node database's next update and one
 for the engine's reports; after the edit it awaits the first, then the second
 (see "When an edit has settled" below). A refused or failed edit cancels both.
 
+**The unstepped path and the agents' own history.** `runUnstepped` is `run`
+without an undo step or a saved version: the same queue, refusals (disposed, off
+screen, Live, deadline; one shared `refusal`) and graph and settle waits, but it
+releases the held step at its turn, holds none and leaves the own-history state
+alone. `undo` and `redo` use it, and `refresh`. The session knows which undo
+steps are the agents' from the module's undo depth (`undoManager.undoDepth` /
+`redoDepth`, the `Y.UndoManager`'s stack lengths, via
+`EditSessionDeps.historyDepth`): `ownFloor` is the undo depth below which steps
+are not the agents' to undo, set to the depth at the start of the step
+(`stepBase`, read after the hold) by the first changed (not `unchanged`) edit;
+`ownRedoFloor` is the redo depth when the session's first `undo` since the last
+edit ran. Both are cleared by any foreign edit, the user's Ctrl+Z included, and
+`ownRedoFloor` by any changed edit of the session's. The listener also fires for
+the `Y.UndoManager`'s own transactions, so the session's `undo` and `redo` run
+with `inEdit` true and do not reset anything. The rule they keep is in "History"
+below.
+
 **A hidden editor never edits.** Removing the handlers on `onDeactivated` stops
 new calls, but not the ones already in the session: one queued behind a running
 edit (which can take 20 s), or one awaiting the version save. So the session
@@ -520,10 +549,20 @@ from `useCurrentProject()`):
     `local:autoImport`), and anything that is not a module transaction:
     selecting, panning, opening the Component Browser. `deselectAll` calls
     `undoStackBoundary()`, which splits the undo stack but leaves the session
-    holding; the agent's next edit then starts a new undo item, still in the
-    session's step.
+    holding; the agent's next changed edit then starts a new undo item, and the
+    depth rule ("History" below) seals the step: a background click while an
+    agent works costs the agents the `undo` of that step (the user's Ctrl+Z
+    still has it).
   - The window between an async edit's `await` and its commit
-    (`graph.deleteNodes` awaits the port updates) counts as the session's own.
+    (`graph.deleteNodes` awaits the port updates) counts as the session's own;
+    the depth rule catches what it can of a user's history change there.
+  - When the module's doc is replaced (`module().ast` changes), the listener is
+    called as well as re-subscribed: the new doc has a new undo stack, so the
+    session releases its step and clears both floors.
+- `historyDepth`, `undo`, `redo` → `undoManager.undoDepth` / `redoDepth`,
+  `undoManager.undoAbove(floor)` / `redoAbove(floor)` (`module.ts`).
+- `enablesOutput` → `writeRefusal` of `module.ast.root()` (`editorModuleRoot`),
+  true also when it cannot be read; `refresh`'s `moduleRoot` is the same.
 - `saveVersion` → `localVersioning.saveIfEnabled(projectStore.assetId, …)`.
 - `watchGraphUpdate` → `watchGraphUpdate(graph)` (`projectEvents.ts`): it queues
   a `graph.doAfterUpdate` callback when it is made, so an update that runs
@@ -537,6 +576,153 @@ from `useCurrentProject()`):
   stays queued until the next update and does nothing then. (`open_method` still
   uses `afterGraphUpdate`: nothing it does is awaited before it queues.)
 - `watchExecution` → `watchExecution(executionContext)` (`projectEvents.ts`).
+
+## History, versions, problems and refresh (`historyTools.ts`, `versionTools.ts`, `problemTools.ts`, `refreshTool.ts`)
+
+Pure functions over deps, wired in `useProjectMcpTools.ts`; unit tests beside
+the others.
+
+- **`undo` / `redo`**: `session.undo` / `session.redo`, which answer
+  `{ undone | redone: true, can_undo, can_redo }` with **no `settled`**: they do
+  not wait for the engine (the session's graph wait still runs), so the values
+  may still be computing. `undo` takes back the top step above `ownFloor`, made
+  by any connected agent; a step is a caller's run of edits (a step split by
+  `deselectAll`'s `undoStackBoundary()` is sealed by the depth rule below, so
+  the tools' "one `undo` may take back only part of it" is now a caution, not a
+  case known to happen). `redo` re-applies only steps above `ownRedoFloor`.
+  - **The rule.** An agent must never cause a write of a node's output that the
+    user did not click for. Code that enables output is what writes, so
+    `EditSessionDeps.enablesOutput()` (true when `writeRefusal` of the module's
+    root is not undefined, and when the root cannot be read; `editorModuleRoot`
+    in `useProjectMcpTools.ts`) is read at every stepped run's turn, just before
+    the edit, and again after it. A changed edit with either true **seals** the
+    step (`sealPending`). The step is **not** released: the caller's later edits
+    join it and save no further version, so a project whose main module
+    legitimately has such code costs one version and one Ctrl+Z step per run of
+    edits, not one per edit. While a sealed step is held, `can_undo` and
+    `can_redo` are false; when it is released for any reason (`releaseStep`: the
+    idle timer, a foreign edit, another caller, `runUnstepped`, so `undo` and
+    `redo` themselves, deactivation, `dispose`), `ownFloor` becomes the undo
+    depth read after the release and there is nothing to redo. A foreign edit
+    releases first (applying the seal) and then clears the floors, so the
+    foreign reset wins. `undo` and `redo` release the step before their checks,
+    so they see the applied seal. They are refused while `enablesOutput()` is
+    true (`UNDO_OUTPUT_ERROR`, `REDO_OUTPUT_ERROR`: ask the user to use Ctrl+Z
+    or Ctrl+Y). One that leaves it true is put back at once in the same
+    synchronous run, bounded to the one step it added, and sealed even if
+    putting it back throws (`reverse`, `try … finally`). It is a last resort:
+    the undo and the step put back are two transactions that reach the engine
+    separately, so the engine may have seen the state between them. Its answers
+    (`HISTORY_REVERSED_ERROR`, `HISTORY_NOT_REVERSED_ERROR`) therefore never say
+    "Nothing was changed" and tell the agent to tell the user; the pre-checks
+    and the depth rule must keep it unreachable. This is the only mechanism:
+    there is no per-tool "seals" option.
+  - **The depth rule.** While `inEdit` is true the foreign-edit listener ignores
+    everything (the session's own transactions reach it too), so a user's
+    history change during an async edit's `await` used to go unseen: a Ctrl+Y
+    put the user's step back above the floor; a user edit followed by a
+    background click (`undoStackBoundary()`) left a user item in the step and
+    the agent's next change in an item above it; a Ctrl+Z took a step from under
+    the floor. A held step is exactly one undo item (the session's edits merge
+    into it: `holdUndoStep` lifts the capture timeout, and the agents' edits are
+    one tracked origin), so after every changed stepped edit the session reads
+    `historyDepth().undo` and seals when it is not `stepBase + 1`. Each of those
+    three changes the depth, so each seals (the three cases in
+    `__tests__/editSessionUndoManager.test.ts`, with a real `Y.UndoManager`,
+    beside one checking that an ordinary step of several async agent edits is
+    one item and is not sealed; `mcpHistory.spec.ts` checks it against the real
+    module store). The rule errs towards sealing: a background click between two
+    agent edits splits the step too, and seals it.
+  - **The invariant.** Every step above `ownFloor` was made by session runs,
+    from a module without code that enables output, by edits that cannot add any
+    (`writeGuard` refuses it in everything an agent supplies). Undoing one can
+    only put back code that was in such a module. Any transaction the undo
+    manager records that the session did not make resets the floors.
+  - **Untracked changes.** An update from the server (the file changed on disk,
+    another client) and the derived writes (`local:autoLayout`, …) do not reset
+    the floors and are not on the stack. One can make an agent's step change
+    nothing, and `Y.UndoManager.undo()` (and `redo()`) then keeps popping into
+    the step below (`popStackItem` in yjs's `UndoManager.js`), which may be the
+    user's. So the session calls `undoManager.undoAbove(floor)` /
+    `redoAbove(floor)` (`undoHold.ts`), which take the steps below the floor off
+    the stack for the call and put them back; the module store reads its
+    `canUndo` / `canRedo` status again afterwards, because the manager's events
+    fired with the shorter stack and none fires when nothing changed. An undo
+    that changed nothing answers `NOTHING_LEFT_TO_UNDO_ERROR` (the steps above
+    the floor were dropped; nothing was changed), and redo
+    `NOTHING_LEFT_TO_REDO_ERROR`. Such a change can also bring code that enables
+    output into the module: the pre-check refuses then.
+  - **Not covered (the residuals).**
+    - A user edit that lands while an async edit is awaiting
+      (`graph.deleteNodes` awaits the port updates), with no boundary after it
+      in the same edit, merges into the session's item without changing the
+      depth, so the depth rule cannot see it: it joins the agents' step. Undoing
+      it can only put back code that was in the module before the edit, and a
+      module that had code enabling output before or after the edit seals the
+      step.
+    - A user's Ctrl+Z during the `await` that takes back the held step's own
+      item (from an earlier edit of the run) before the edit's change leaves the
+      depth at `stepBase + 1` again. Harmless: the edit's change clears the redo
+      stack, and the new item holds only that change.
+    - A user's history change during the waits after the edit (graph update,
+      settle) is an ordinary foreign edit (`inEdit` is false) and resets the
+      floors; only the edit's own `await` window is covered by the depth rule.
+    - The check covers only the module in the editor (`Main.enso`): not the
+      project's other modules, library functions that enable output themselves,
+      or `foreign` code.
+  - **Redo floor, why.** In every sequence found, the redo stack is empty at the
+    session's first `undo`: the edit that set the floor was a tracked
+    transaction, which clears the redo stack (`afterTransactionHandler`), and
+    any tracked transaction after it is foreign and resets the floors. The bound
+    costs nothing and keeps `redo` within its own steps if that ever changes; a
+    no-op redo step does make one `redo()` pop on into the step below (checked
+    in `__tests__/editSessionUndoManager.test.ts`).
+  - Tests: `__tests__/editSession.test.ts` (a counter fake: the floors, the
+    deferred seal, the refusals, the reversal) and
+    `__tests__/editSessionUndoManager.test.ts` (a real `Y.UndoManager`: the
+    review's two cases, where a plain `undo()` reaches the user's step and the
+    session's does not, and the depth rule). The packaged spec
+    (`app/electron-client/tests/mcp.spec.ts`, third test) runs it against code
+    that really writes.
+- **`save_version`**: `localVersioning` through the session's deps; never turns
+  versioning on, no node changes, works in Live.
+- **`get_problems`**: reads `db.getExpressionInfo` per node, the dataflow error
+  texts (`dataflowErrors.lookup`, waited for at most `PROBLEM_TEXT_WAIT_MS`) and
+  `projectStore.diagnostics`. Checked against the packaged app's real
+  diagnostics: a compile error's `location` lines are **0-based** (a diagnostic
+  at `location.start.line` 10 is line 11 of `Main.enso`; the tool adds 1), its
+  `path` is `{ rootId, segments: ['src', 'Main.enso'] }` (`isThisModule` takes
+  exactly that path, not any last segment `Main.enso`), and it carries the
+  `expressionId` of the node, so the line comes from that expression's span when
+  the module still has it and from `location` otherwise. The same compile error
+  also makes its node a `panic` (`Compile error: …`), so it is listed twice, as
+  a node and as a diagnostic. A dataflow error's text
+  (`bad = Error.throw "boom"`) arrives within the wait, without the ` (at …`
+  part; the node using it has the same message, so only the first has
+  `origin: true`.
+- **`refresh`**: `runUnstepped` with `executionContext.recompute('all')` (no
+  second argument: never `'Live'`, never per-expression configs, never
+  `recomputeOnce`). Refused in Live, and at the run's turn when
+  `writeRefusal(moduleRoot)` refuses: the code of the module in the editor
+  (`Main.enso`), read live, so it is never behind the node database. A node with
+  the GUI's Write prefix anywhere in it is refused by that alone (the prefix is
+  a call of `Standard.Base.Runtime.with_enabled_context`, whose identifier the
+  check matches), so there is no separate per-node check. Not checked: the
+  project's other modules, library functions that enable output themselves,
+  `foreign` code. **What `settled` waits for**: each **component** node of the
+  method on screen (`node.type === 'component'`) must report `Pending` and then
+  a value, as `changed` ids (the rule for an edited node, see "When an edit has
+  settled"). Checked in the packaged app: `recompute('all')` does report
+  `Pending` and then a value for every computed node, one whose value does not
+  change included (`refresh` of an ordinary project answers `settled: true` in
+  about 1 s). The first version also waited for the input and output nodes;
+  inside a function with an argument that never settled (`settled: false` after
+  the full 20 s), so they are left out (the engine sends nothing reliable for a
+  function's argument or for the bare name its output returns). The rule is not
+  "the first `executionComplete`": that arrives for every evaluation, see the
+  two wrong designs below. A refresh changes no node, so it passes
+  `awaitsGraphUpdate: false` and does not wait for a graph update that never
+  comes (it cost the full 2 s).
 
 ## When an edit has settled
 

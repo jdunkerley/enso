@@ -108,12 +108,14 @@ No tool changes the execution environment, settings or secrets;
    the one saved with it). An error that comes after the call showed or switched
    the visualization says so.
 9. Every tool that changes the project is refused while it is in Live mode,
-   `set_documentation`, `move_nodes` and `arrange_nodes` included: ask the user
-   to switch it back to Design. Reading, selecting and navigating
-   (`select_nodes`, `open_method`, `list_visualizations`, `get_documentation`,
-   `get_graph_image`) still work there, and so does `add_image` with a `path`
-   (storing a file is not an edit); `get_visualization`, and `add_image` with a
-   `node_id`, work there only for the visualization already on screen.
+   `set_documentation`, `move_nodes`, `arrange_nodes`, `undo`, `redo` and
+   `refresh` included: ask the user to switch it back to Design. Reading,
+   selecting and navigating (`select_nodes`, `open_method`,
+   `list_visualizations`, `get_documentation`, `get_graph_image`,
+   `get_problems`) still work there, and so do `save_version` (it changes no
+   node) and `add_image` with a `path` (storing a file is not an edit);
+   `get_visualization`, and `add_image` with a `node_id`, work there only for
+   the visualization already on screen.
 10. Your edits are saved with the project as you make them. Do not turn Write on
     (writing a node's output: a file, a database table). Code that enables the
     output context (`with_enabled_context`, `with_enabled`, binding a runtime
@@ -126,10 +128,45 @@ No tool changes the execution environment, settings or secrets;
     re-runs with your change). Ask the user before doing either.
 11. Your edits form one undo step for the user until you pause for 10 seconds,
     the user edits the project or leaves its tab, or `open_method` changes the
-    method; then the next edit starts a new step. Edits from several agents run
-    one at a time. An edit whose turn comes after the method on screen changed
-    is refused with nothing changed: call `get_graph` and try again. There is no
-    undo tool: to take a change back, edit or remove the nodes.
+    method; then the next edit starts a new step. `undo` takes the step back,
+    except while the project's main module has code that can enable output: then
+    agents' `undo` and `redo` are refused (the user can still undo with Ctrl+Z).
+    Edits from several agents run one at a time. An edit whose turn comes after
+    the method on screen changed is refused with nothing changed: call
+    `get_graph` and try again.
+12. `undo` takes back the most recent step of edits made by any connected agent,
+    not only yours, and `redo` re-applies what `undo` took back. A step is
+    usually every edit made without a 10 second pause, but one `undo` may take
+    back only part of it: check `can_undo` and call `get_graph`. `undo` does not
+    go past the user's last change: it takes back only agents' edits made since
+    the user last changed the project (any edit of the user's, their own Ctrl+Z
+    included, ends that), and is refused when there are none. `redo` only
+    re-applies what `undo` took back, until anyone edits again. Both are refused
+    while the project's main module has code that can enable output (the same
+    code the edit tools refuse to add) or cannot be read, because undoing or
+    redoing could run such code and write; and an edit you make while such code
+    is there, removing it included, cannot be undone by an agent. Ask the user
+    to undo with Ctrl+Z then. Neither waits for the engine: both answer
+    `can_undo` and `can_redo`, and the values may still be computing, so call
+    `get_graph` afterwards (a node still computing has `state` `pending`).
+13. Check and mend what you built. `get_problems` lists every error and warning
+    of the method on screen in one call. Fix the nodes with `origin: true` first
+    (the nodes that use them have the same error and usually clear by
+    themselves), and call it again while `pending` is not 0, or a `message` is
+    `null` (`messages_pending`): the engine has not finished. Its `diagnostics`
+    are the compile errors and warnings of the module, with the `line` of the
+    module. `refresh` computes every node again in Design, as the user's Refresh
+    button does, reading files and data sources again: use it after the user
+    changed a file or a table outside the IDE. It never turns Write on. It is
+    refused in Live mode, and when the code of the project's main module (the
+    module the graph shows) enables output anywhere, because the refresh would
+    run it and write again: ask the user to refresh then. It checks only that
+    module's code: not the project's other modules, not library functions that
+    turn output on themselves, and not `foreign` code. Do not refresh a project
+    that writes through them. `save_version` saves a version of the project, as
+    the user's Save a version does, with a one-line `comment`. It answers
+    `saved: false` when nothing changed, and is refused when the user has not
+    turned versions on: it never turns them on.
 
 ## Evaluating expressions
 

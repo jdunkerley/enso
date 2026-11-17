@@ -33,6 +33,15 @@ function is called in one undo step, however long the pauses (a visualization
 resize drag, with the pushes it causes); call the function, or every later
 change joins the step.
 
+`undoManager.undoAbove(floor)` / `redoAbove(floor)` (`undoHold.ts`) undo or redo
+the top step without being able to reach the `floor` lowest steps of the stack:
+a plain `Y.UndoManager.undo()` keeps popping past a step that changes nothing
+(one an untracked change already reverted) into the step below. They take the
+lower steps off the stack for the call and put them back, then read the
+`canUndo` / `canRedo` status again. The MCP edit session uses them, so that an
+agent's `undo` never reaches the user's steps (`$/project-view/mcp/CLAUDE.md`,
+"History").
+
 ## Carrying the module over a session replacement (#604)
 
 When the project's ydoc server session is replaced, `reconnectProject`

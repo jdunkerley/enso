@@ -3,6 +3,10 @@
 #### Enso IDE
 
 - [The SQL Query view colours keywords, strings, numbers and comments.][840]
+- [Agents connected over MCP can undo and redo their own edits, save a version,
+  list every error and warning of a function in one call, and refresh the
+  values. They never turn Write on: undo and refresh are refused while the
+  project's code turns output on.][844]
 - [A date-and-time picker for Date_Time values: Date_Time.now, a calendar beside
   a time you can type or pick from hour, minute and second columns, then Set.
   Date pickers also get Cancel and Set. Editing a value keeps its finer parts
@@ -549,6 +553,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [840]: https://github.com/jdunkerley/enso/pull/840
+[844]: https://github.com/jdunkerley/enso/pull/844
 [832]: https://github.com/jdunkerley/enso/pull/832
 [831]: https://github.com/jdunkerley/enso/pull/831
 [830]: https://github.com/jdunkerley/enso/pull/830
