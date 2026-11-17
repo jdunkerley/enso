@@ -11,7 +11,9 @@ import org.enso.interpreter.node.BaseNode;
 import org.enso.interpreter.node.callable.InvokeCallableNode;
 import org.enso.interpreter.node.callable.thunk.ThunkExecutorNode;
 import org.enso.interpreter.runtime.EnsoContext;
+import org.enso.interpreter.runtime.ThreadManager;
 import org.enso.interpreter.runtime.callable.argument.CallArgumentInfo;
+import org.enso.interpreter.runtime.control.ThreadInterruptedException;
 import org.enso.interpreter.runtime.type.TypesGen;
 
 /**
@@ -60,7 +62,8 @@ public abstract class BracketNode extends Node {
       Object constructor,
       Object destructor,
       Object action,
-      @Cached BranchProfile initializationFailedWithDataflowErrorProfile) {
+      @Cached BranchProfile initializationFailedWithDataflowErrorProfile,
+      @Cached BranchProfile interruptedProfile) {
     var ctx = EnsoContext.get(this);
     var state = ctx.currentState();
     Object resource =
@@ -69,10 +72,26 @@ public abstract class BracketNode extends Node {
       initializationFailedWithDataflowErrorProfile.enter();
       return resource;
     }
+    var interrupted = false;
+    var resume = false;
     try {
       return invokeActionNode.execute(action, frame, state, new Object[] {resource});
+    } catch (ThreadInterruptedException e) {
+      // The interrupt is sticky, so the destructor would be interrupted at its
+      // first poll and the resource leak: see Note [A Thread Interrupt Is
+      // Sticky] in ThreadManager.
+      interruptedProfile.enter();
+      resume = ThreadManager.suspendInterrupts();
+      interrupted = true;
+      throw e;
     } finally {
-      invokeDestructorNode.execute(destructor, frame, state, new Object[] {resource});
+      try {
+        invokeDestructorNode.execute(destructor, frame, state, new Object[] {resource});
+      } finally {
+        if (interrupted) {
+          ThreadManager.resumeInterrupts(resume);
+        }
+      }
     }
   }
 }

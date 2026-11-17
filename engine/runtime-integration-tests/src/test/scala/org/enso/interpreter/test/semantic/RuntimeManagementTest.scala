@@ -1,7 +1,11 @@
 package org.enso.interpreter.test.semantic
 
 import org.enso.interpreter.runtime.EnsoContext
-import org.enso.interpreter.test.{InterpreterContext, InterpreterTest}
+import org.enso.interpreter.test.{
+  InterpreterContext,
+  InterpreterException,
+  InterpreterTest
+}
 import org.enso.common.{LanguageInfo, MethodNames}
 
 import scala.ref.WeakReference
@@ -216,6 +220,175 @@ class RuntimeManagementTest extends InterpreterTest {
       interpreterContext
         .err()
         .toString should not include "Exception in finalizer"
+    }
+
+    // The next three tests cover Note [A Thread Interrupt Is Sticky] in
+    // ThreadManager (#834).
+    val interruptedMessage =
+      "org.enso.interpreter.test.InterpreterException: org.enso.interpreter.runtime.control.ThreadInterruptedException"
+
+    def leakContext(): EnsoContext = interpreterContext
+      .ctx()
+      .getBindings(LanguageInfo.ID)
+      .invokeMember(MethodNames.TopScope.LEAK_CONTEXT)
+      .asHostObject[EnsoContext]()
+
+    "Interrupt a thread again when it loses the interrupt" in {
+      // GraalVM 25.5 can lose the exception that the interrupt throws, and the
+      // guest loop then carries on. Swallowing the first exception in host code
+      // and running the loop again stands in for that loss, deterministically.
+      val langCtx = leakContext()
+      val code =
+        """import Standard.Base.IO
+          |import Standard.Base.Nothing
+          |import Standard.Base.Data.Numbers.Number
+          |
+          |foo x =
+          |    if x == 0 then IO.println "Start." else Nothing
+          |    @Tail_Call foo x+1
+          |
+          |main = foo 0
+          |""".stripMargin
+
+      consumeOut
+      val main      = getMain(code)
+      val swallowed = new java.util.concurrent.atomic.AtomicBoolean(false)
+      val future: java.util.concurrent.Future[org.graalvm.polyglot.Value] =
+        langCtx.getThreadManager.submit(() => {
+          var result: Option[org.graalvm.polyglot.Value] = None
+          while (result.isEmpty) {
+            try {
+              result = Some(main.execute())
+            } catch {
+              case ex: InterpreterException
+                  if ex.getMessage.contains("ThreadInterruptedException") &&
+                    !swallowed.get() =>
+                swallowed.set(true)
+            }
+          }
+          result.get
+        })
+      awaitOutput("Start.", 1)
+      langCtx.getThreadManager.interruptThreads()
+
+      val ex = awaitOutcome(future) match {
+        case Left(ex) => ex
+        case Right(v) => fail("Unexpected value: " + v)
+      }
+      swallowed.get() shouldBe true
+      ex.getMessage() shouldEqual interruptedMessage
+      consumeOut shouldEqual List("Start.", "Start.")
+    }
+
+    "Run new guest code on the threads of an interrupted task" in {
+      val langCtx = leakContext()
+      val code =
+        """import Standard.Base.IO
+          |import Standard.Base.Nothing
+          |import Standard.Base.Data.Numbers.Number
+          |
+          |foo x =
+          |    if x == 0 then IO.println "Start." else Nothing
+          |    @Tail_Call foo x+1
+          |
+          |count n = if n == 0 then "Done." else @Tail_Call count n-1
+          |
+          |main n = if n == 0 then foo 0 else count n
+          |""".stripMargin
+
+      consumeOut
+      val main = getMain(code)
+      // As many looping tasks as threads, so every thread is interrupted.
+      val looping = 0
+        .until(parallelism)
+        .map(_ =>
+          langCtx.getThreadManager.submit(() => {
+            main.execute(Long.box(0))
+          }): java.util.concurrent.Future[org.graalvm.polyglot.Value]
+        )
+      awaitOutput("Start.", parallelism)
+      langCtx.getThreadManager.interruptThreads()
+      looping.foreach(f =>
+        awaitOutcome(f) match {
+          case Left(ex) => ex.getMessage() shouldEqual interruptedMessage
+          case Right(v) => fail("Unexpected value: " + v)
+        }
+      )
+
+      // The latch keeps every task waiting until all have started, so they
+      // run on all the threads, including each thread interrupted above. A
+      // thread still carrying the interrupt would fail at its first poll.
+      val started = new java.util.concurrent.CountDownLatch(parallelism)
+      val counting = 0
+        .until(parallelism)
+        .map(_ =>
+          langCtx.getThreadManager.submit(() => {
+            started.countDown()
+            started.await(waitTimeoutSeconds, TimeUnit.SECONDS)
+            main.execute(Long.box(1000000))
+          }): java.util.concurrent.Future[org.graalvm.polyglot.Value]
+        )
+      counting.foreach(f =>
+        awaitOutcome(f) match {
+          case Left(ex) => fail("Unexpected failure", ex)
+          case Right(v) => v.asString() shouldEqual "Done."
+        }
+      )
+      consumeOut shouldEqual List.fill(parallelism)("Start.")
+    }
+
+    "Run an interrupt handler and a bracket destructor to completion" in {
+      // Both run guest code while the interrupt unwinds the thread, so the
+      // interrupt must not be delivered again until they return.
+      val langCtx = leakContext()
+      val code =
+        """import Standard.Base.Runtime.Thread
+          |import Standard.Base.IO
+          |import Standard.Base.Nothing
+          |import Standard.Base.Data.Numbers.Number
+          |from Standard.Base.Runtime.Managed_Resource import Managed_Resource
+          |
+          |foo x =
+          |    if x == 0 then IO.println "Start." else Nothing
+          |    @Tail_Call foo x+1
+          |
+          |count n = if n == 0 then Nothing else @Tail_Call count n-1
+          |
+          |close _ =
+          |    IO.println "Closing."
+          |    count 100000
+          |    IO.println "Closed."
+          |
+          |handler =
+          |    IO.println "Handling."
+          |    count 100000
+          |    IO.println "Handled."
+          |
+          |main =
+          |    Thread.with_interrupt_handler (Managed_Resource.bracket Nothing (r-> close r) (_-> foo 0)) handler
+          |""".stripMargin
+
+      consumeOut
+      val main = getMain(code)
+      val future: java.util.concurrent.Future[org.graalvm.polyglot.Value] =
+        langCtx.getThreadManager.submit(() => {
+          main.execute()
+        })
+      awaitOutput("Start.", 1)
+      langCtx.getThreadManager.interruptThreads()
+
+      val ex = awaitOutcome(future) match {
+        case Left(ex) => ex
+        case Right(v) => fail("Unexpected value: " + v)
+      }
+      ex.getMessage() shouldEqual interruptedMessage
+      consumeOut shouldEqual List(
+        "Start.",
+        "Closing.",
+        "Closed.",
+        "Handling.",
+        "Handled."
+      )
     }
 
     /** Don't use this in production code, ever.
