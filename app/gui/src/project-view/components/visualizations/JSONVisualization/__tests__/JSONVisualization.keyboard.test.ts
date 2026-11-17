@@ -460,18 +460,27 @@ describe('the entry menu from the keyboard', () => {
     expect(focused()).toBe('address')
   })
 
-  test('Escape on the entry closes the menu, returns the focus and goes no further', async () => {
+  // Escape itself is the popup's (`GridPopupMenu`, stubbed here and tested there): it asks to close
+  // and the tree gives the focus back to the entry.
+  test('the popup asking to close (Escape) returns the focus to the entry', async () => {
     const wrapper = await mountTree()
     row(wrapper, 'name').focus()
     await press(row(wrapper, 'name'), 'ContextMenu')
-    const reached = vi.fn()
-    window.addEventListener('keydown', reached)
-    const event = await press(row(wrapper, 'name'), 'Escape')
-    window.removeEventListener('keydown', reached)
+    popup(wrapper).vm.$emit('close')
+    await flushPromises()
     expect(popup(wrapper).exists()).toBe(false)
     expect(focused()).toBe('name')
-    expect(event.defaultPrevented).toBe(true)
-    expect(reached).not.toHaveBeenCalled()
+  })
+
+  test('a scroll of the tree closes a keyboard-opened menu and returns the focus', async () => {
+    const wrapper = await mountTree()
+    row(wrapper, 'name').focus()
+    await press(row(wrapper, 'name'), 'ContextMenu')
+    expect(popup(wrapper).exists()).toBe(true)
+    await wrapper.find('[data-testid="tree-scroller"]').trigger('scroll')
+    await flushPromises()
+    expect(popup(wrapper).exists()).toBe(false)
+    expect(focused()).toBe('name')
   })
 
   test('Escape with no menu open is left to the graph', async () => {

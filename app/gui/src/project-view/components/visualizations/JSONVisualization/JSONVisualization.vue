@@ -38,7 +38,7 @@ import {
 import { parseVizActions, plainActionToolbar } from '@/components/visualizations/vizActions'
 import { stopCopy } from '@/util/shortcuts'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
-import { useEventListener, useVirtualList } from '@vueuse/core'
+import { useVirtualList } from '@vueuse/core'
 import { computed, nextTick, shallowRef, watch } from 'vue'
 
 const { data } = defineProps<{ data: unknown }>()
@@ -163,10 +163,8 @@ function closeMenu(reason?: 'pointer') {
   if (target != null) void focusRow(rowKey(target))
 }
 
-/** The popup is placed from the click point and the keyboard is not its own: close it on Escape. */
-useEventListener(window, 'keydown', (event) => {
-  if (event.key === 'Escape') closeMenu()
-})
+// Escape and a scroll anywhere outside the popup close it from the popup itself (`GridPopupMenu`).
+// The tree's own scroll is inside a shadow root and never reaches `window`, so `@scroll` below.
 
 const scroller = computed(() => containerProps.ref.value)
 
@@ -243,12 +241,6 @@ function onKeydown(event: KeyboardEvent) {
   const target = event.target as Element | null
   const element = target?.closest<HTMLElement>('[data-row-key]')
   if (element == null) return
-  if (event.key === 'Escape' && menu.value != null) {
-    event.preventDefault()
-    event.stopPropagation()
-    closeMenu()
-    return
-  }
   const row = tree.rows.value.find((candidate) => rowKey(candidate) === element.dataset.rowKey)
   if (row == null) return
   // A button inside the row (a chevron or "Show more" the pointer focused) does its own Enter.

@@ -10,7 +10,7 @@ import { useResizeObserver } from '@/composables/events'
 import { injectInteractionHandler } from '@/providers/interactionHandler'
 import { endOnClickOutside, targetIsOutside } from '@/util/autoBlur'
 import { autoUpdate, flip, shift, useFloating } from '@floating-ui/vue'
-import { unrefElement } from '@vueuse/core'
+import { unrefElement, useEventListener } from '@vueuse/core'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { GridMenuItem } from './shared/AgGridTableView/gridPopupMenuItems'
 
@@ -125,6 +125,55 @@ function onKeydown(event: KeyboardEvent) {
   event.stopPropagation()
   target?.focus()
 }
+
+// The popup is placed from a click point and the keyboard is not its own: close it on Escape, and
+// when anything scrolls (it would otherwise float over content that moved away from the click) —
+// as the tree visualization's menu does. `scroll` does not bubble, so a capturing listener is the
+// only way to see every scroller; scrolling inside the popup itself is not a reason to close it.
+// A scroll inside a shadow root never reaches `window`: such a host (the grid) closes the popup
+// itself on its own scroll event.
+// Escape is listened for in the capture phase too: the grid stops a prevented key event from
+// bubbling (`AgGridTableView`'s `stopIfPrevented`), and AG Grid prevents Escape on a focused cell,
+// so a bubbling listener on `window` never saw it (found by the Playwright spec for #814).
+//
+// A scroll event is delivered at the next frame, after the scroll itself. The right-click that
+// opened the popup may have scrolled something (the browser scrolls a focused element into view),
+// and that event arrives after the popup has mounted — a user does not scroll in that first frame,
+// so scrolls are only taken as the user's once it has passed. (A `requestAnimationFrame` callback
+// runs after the frame's scroll events.) Without this, such a menu was closed ~30 ms after it
+// opened, which failed the sorted-table Playwright spec on Linux CI.
+const settled = ref(false)
+let settleFrame: number | undefined
+onMounted(() => {
+  settleFrame = requestAnimationFrame(() => {
+    settled.value = true
+  })
+})
+onUnmounted(() => {
+  if (settleFrame != null) cancelAnimationFrame(settleFrame)
+})
+// A key pressed inside the menu (a keyboard-opened one has the focus there) is the menu's own
+// `onKeydown`'s: it stops the key reaching the graph and asks to close once. This capture listener
+// runs first and would ask a second time, so it leaves those keys alone.
+useEventListener(
+  window,
+  'keydown',
+  (event: KeyboardEvent) => {
+    if (event.key !== 'Escape') return
+    const panel = unrefElement(menu)
+    if (event.target instanceof Node && panel?.contains(event.target)) return
+    emit('close')
+  },
+  { capture: true },
+)
+useEventListener(
+  window,
+  'scroll',
+  (event: Event) => {
+    if (settled.value && targetIsOutside(event, menu.value)) emit('close')
+  },
+  { capture: true, passive: true },
+)
 
 onMounted(() => {
   if (focusFirst) void nextTick(() => enabledButtons()[0]?.focus())
