@@ -1,7 +1,6 @@
 import type {
   AddImportNotification,
   AddRawImportNotification,
-  AddStyleNotification,
   AddURLImportNotification,
   CompilationErrorResponse,
   CompilationResultResponse,
@@ -15,11 +14,8 @@ import type {
   RegisterBuiltinModulesRequest,
 } from '@/stores/visualization/compiler'
 import Compiler from '@/stores/visualization/compiler?worker'
-import {
-  parseRootAddress,
-  rootAddressProtocol,
-  stylePathAttribute,
-} from '@/stores/visualization/rootAddress'
+import { createModuleImporter } from '@/stores/visualization/moduleImports'
+import { parseRootAddress, rootAddressProtocol } from '@/stores/visualization/rootAddress'
 import {
   InvalidVisualizationModuleError,
   VisualizationModule,
@@ -53,10 +49,15 @@ const workerCallbacks = new Map<
 >()
 
 /**
- * A map from the path of the module to the code of the module.
- * This is used to prevent duplicated modules, at the cost of increased memory usage.
+ * Publishes the modules the worker compiles to `moduleCache`, each with its CSS (which the worker
+ * sends in the module's own notification) set on its component, where a custom element looks for
+ * the CSS to put in its shadow root.
  */
-const moduleCode = new Map<string, string>()
+const addImport = createModuleImporter(
+  moduleCache,
+  (code) =>
+    import(/* @vite-ignore */ URL.createObjectURL(new Blob([code], { type: 'text/javascript' }))),
+)
 
 /** The reader for each content root a visualization has been compiled from. */
 const rootReaders = new Map<Uuid, DataServer>()
@@ -88,7 +89,6 @@ export async function compile(address: string, data: DataServer) {
           // === Worker Requests ===
           | FetchWorkerRequest
           // === Notifications ===
-          | AddStyleNotification
           | AddRawImportNotification
           | AddURLImportNotification
           | AddImportNotification
@@ -200,13 +200,6 @@ export async function compile(address: string, data: DataServer) {
             break
           }
           // === Notifications ===
-          case 'add-style-notification': {
-            const styleNode = document.createElement('style')
-            styleNode.setAttribute(stylePathAttribute, event.data.path)
-            styleNode.innerHTML = event.data.code
-            document.head.appendChild(styleNode)
-            break
-          }
           case 'add-raw-import-notification': {
             moduleCache[event.data.path] = event.data.value
             break
@@ -220,20 +213,7 @@ export async function compile(address: string, data: DataServer) {
             break
           }
           case 'add-import-notification': {
-            try {
-              if (moduleCode.get(event.data.path) === event.data.code) break
-              moduleCode.set(event.data.path, event.data.code)
-              const module = import(
-                /* @vite-ignore */
-                URL.createObjectURL(new Blob([event.data.code], { type: 'text/javascript' }))
-              )
-              // Required for 'compilation-result-response' handler above.
-              moduleCache[event.data.path] = module
-              moduleCache[event.data.path] = await module
-            } catch {
-              delete moduleCache[event.data.path]
-              // No error handling - the same Promise is awaited elsewhere.
-            }
+            await addImport(event.data.path, event.data.code, event.data.styles)
             break
           }
           // === Errors ===

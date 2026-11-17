@@ -85,3 +85,21 @@ export function submenuDropdownStyles(
     whileElementsMounted: autoUpdate,
   })
 }
+
+/**
+ * Positioning for a picker's menu (the date and time widgets): under its anchor, left edges lined
+ * up, and kept there. Unlike an activity dropdown, it is not shifted to stay within the node: a menu
+ * wider than the rest of the node would be pushed left, off its anchor, and by a different amount each
+ * time the node changes width. Only the screen's edge shifts it. `autoUpdate` moves it with the
+ * anchor when the anchor resizes or moves.
+ */
+export function pickerMenuStyles(
+  floatReference: Ref<Opt<HTMLElement>>,
+  menuElement: Ref<Opt<HTMLElement>>,
+) {
+  return useFloating(floatReference, menuElement, {
+    placement: 'bottom-start',
+    middleware: [offset(offsetSubmenu(true)), shift()],
+    whileElementsMounted: autoUpdate,
+  })
+}
