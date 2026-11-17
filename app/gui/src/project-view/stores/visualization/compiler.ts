@@ -17,7 +17,8 @@
  * a file in the project or in a library; an import stays in the root of the file that makes it.
  * - A `CompileRequest` is sent with id `1` and path `enso-root:<rootId>/visualizations/Viz.vue`.
  * - (begin `importVue`) The Worker `fetch`es the path.
- * - The CSS styles are compiled using `vue/compiler-sfc`, then sent as `AddStyleNotification`s.
+ * - The CSS styles are compiled using `vue/compiler-sfc`; they are sent with the module, in its
+ *   `AddImportNotification`, so that they belong to exactly that module.
  * - The Vue script is compiled using `vue/compiler-sfc` into TypeScript.
  * - The TypeScript is compiled using `sucrase` into JavaScript.
  * - (`rewriteImports`) Imports are analyzed and rewritten as required:
@@ -143,16 +144,6 @@ export interface FetchWorkerError {
 // These are sent when a subtask successfully completes execution.
 
 /**
- * Sent after compiling `<style>` and `<style scoped>` sections.
- * These should be attached to the DOM - placement does not matter.
- */
-export interface AddStyleNotification {
-  type: 'add-style-notification'
-  path: string
-  code: string
-}
-
-/**
  * Currently unused.
  *
  * Sent after compiling an import which does not result in a URL.
@@ -189,6 +180,12 @@ export interface AddImportNotification {
   type: 'add-import-notification'
   path: string
   code: string
+  /**
+   * The compiled `<style>` and `<style scoped>` blocks of the file, in file order. They are the
+   * module's `styles`: Vue copies them into the shadow root of a custom element that mounts the
+   * component (see `moduleStyles.ts`).
+   */
+  styles: string[]
 }
 
 // ======================================
@@ -276,9 +273,6 @@ function extractExtension(path: string) {
 
 const postMessage: <T>(message: T) => void = globalThis.postMessage
 
-function addStyle(path: string, code: string) {
-  postMessage<AddStyleNotification>({ type: 'add-style-notification', path, code })
-}
 // This is defined to allow for future expansion.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function addRawImport(path: string, value: unknown) {
@@ -292,8 +286,8 @@ function addUrlImport(path: string, mimeType: string, value: BlobPart) {
     value,
   })
 }
-function addImport(path: string, code: string) {
-  postMessage<AddImportNotification>({ type: 'add-import-notification', path, code })
+function addImport(path: string, code: string, styles: string[] = []) {
+  postMessage<AddImportNotification>({ type: 'add-import-notification', path, code, styles })
 }
 
 function fetchError(path: string, error: Error) {
@@ -378,8 +372,7 @@ async function importVue(path: string) {
     compileError(path, toError(error))
   }
   if (compiled != null) {
-    for (const style of compiled.styles) addStyle(path, style)
-    addImport(path, await rewriteImports(compiled.code, dir, compiled.id))
+    addImport(path, await rewriteImports(compiled.code, dir, compiled.id), compiled.styles)
   }
 }
 

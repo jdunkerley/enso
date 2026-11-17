@@ -15,9 +15,6 @@ import type { Uuid } from 'ydoc-shared/languageServerTypes'
 /** The custom URL protocol used internally for files in a content root. */
 export const rootAddressProtocol = 'enso-root:'
 
-/** The attribute marking a style element with the address of the file it came from. */
-export const stylePathAttribute = 'data-style-path'
-
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** The address of the file at `segments` inside the content root `rootId`. */

@@ -521,7 +521,7 @@ function onCellContextMenu(event: CellContextMenuEvent<TData>) {
   if (!rawItems.length) return
   // No `domEvent.preventDefault()` here: it would run too late to matter (see `stopIfPrevented`'s
   // comment above, on the synchronous `@contextmenu` handler that now does this instead).
-  contextMenuState.value = {
+  openContextMenu({
     point: { x: domEvent.clientX, y: domEvent.clientY },
     // `resolveGridMenuItems`'s parameter type narrows each item's `action` signature to the
     // subset of `IMenuActionParams` it actually invokes it with (`{ node, api }`) — see
@@ -535,11 +535,51 @@ function onCellContextMenu(event: CellContextMenuEvent<TData>) {
       column: event.column ?? null,
       node: event.node ?? null,
     }),
-  }
+  })
+}
+
+/**
+ * Every way of opening the menu goes through here, so that the scroll position it was opened at is
+ * always recorded (see {@link onBodyScroll}).
+ */
+function openContextMenu(state: NonNullable<typeof contextMenuState.value>) {
+  menuScrollPosition = bodyScrollPosition()
+  contextMenuState.value = state
 }
 
 function closeContextMenu() {
+  menuScrollPosition = undefined
   contextMenuState.value = null
+}
+
+/**
+ * Where the grid body is scrolled to *right now*. AG Grid 36 scrolls both axes in one element, the
+ * `.ag-grid-viewport` (`GridBodyCtrl.eGridViewport`), so its `scrollLeft` and `scrollTop` are read
+ * directly. The grid API's `getVerticalPixelRange` is not equivalent: it returns a cached
+ * `lastScrollTop` until the viewport's own `scroll` event invalidates it, so a position read right
+ * after the right-click can be stale.
+ */
+function bodyScrollPosition() {
+  const viewport = wrapper.value?.querySelector('.ag-grid-viewport')
+  return viewport == null ? undefined : { left: viewport.scrollLeft, top: viewport.scrollTop }
+}
+
+/** Where the grid body was scrolled to when the open menu was opened. */
+let menuScrollPosition: { left: number; top: number } | undefined
+
+/**
+ * Closes the menu when the user scrolls the grid. AG Grid raises `bodyScroll` asynchronously, like
+ * `cellContextMenu`, so the scroll that the right-click itself causes (AG Grid focuses the cell and
+ * brings it into view, as it does for the cell cut off at the table's edge) is reported *after* the
+ * menu opened, a millisecond later. It has already happened, so the position is unchanged since the
+ * menu opened: ignore it. (Closing on it made the menu flicker shut under the click that chose from
+ * it, which failed the sorted-table spec on Linux CI.)
+ */
+function onBodyScroll() {
+  const opened = menuScrollPosition
+  const now = bodyScrollPosition()
+  if (opened != null && now != null && now.left === opened.left && now.top === opened.top) return
+  closeContextMenu()
 }
 
 // === Cell-range selection ===
@@ -779,6 +819,7 @@ const customLocale = {
       @columnMoved="emit('columnMoved', $event)"
       @contextmenu="stopIfPrevented"
       @cellContextMenu="onCellContextMenu"
+      @bodyScroll="onBodyScroll"
     />
     <VueComponentHost :host="vueHost" />
     <GridPopupMenu
