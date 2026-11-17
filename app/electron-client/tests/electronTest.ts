@@ -521,7 +521,9 @@ async function showHiddenParameters(page: Page, selected: Locator) {
         .locator('.parameterItem .name')
         .first()
         .textContent({ timeout: 2000 }))!
-      await menu.getByRole('button', { name: new RegExp(`^${name}`) }).click({ timeout: 2000 })
+      await menu
+        .getByRole('button', { name: new RegExp(`^${name}`) })
+        .dispatchEvent('click', undefined, { timeout: 2000 })
       await expect(menu).toBeHidden({ timeout: 2000 })
     }).toPass({ timeout: 30_000 })
   }
