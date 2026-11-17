@@ -1067,25 +1067,22 @@ interface HistoryAnswer {
   redone?: boolean
   can_undo: boolean
   can_redo: boolean
-  settled: boolean
 }
 
 /**
- * The text of a node with Write on, as the Component Browser takes it. The GUI's Write prefix
- * (`Context.Output __ <| __`) reads as `with_enabled_context Output "design" <| …`, which this
- * engine's `with_enabled_context context ~action` (two parameters) rejects, so the hole holds the
- * write itself instead: it runs inside the enabled context, and the lambda it returns takes the
- * node's expression. The node matches the prefix (so the tools see a node with Write on), and
- * really writes its file, appending, each time it runs.
+ * Code the user types in the Component Browser that really writes on this engine: the two-argument
+ * `with_enabled_context context ~action` turns output on for its action, which appends `w` to the
+ * file each time the node runs. (The GUI's own Write prefix, `with_enabled_context Context.Output
+ * "design" <| …`, does not run here: the function takes two parameters.)
  */
-const WRITE_ON_CODE = (file: string) =>
-  `Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output (("w".write "${file}" on_existing_file=..Append).if_not_error (x -> x)) <| "write_on_marker"`
-/** What `get_graph` shows as that node's `code`: the prefix is not part of it. */
-const WRITE_ON_INNER = '"write_on_marker"'
-/** The end of the refusal of `refresh` when the module has a node with Write on. */
+const WRITE_CODE = (file: string) =>
+  `Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| "w".write "${file}" on_existing_file=..Append`
+/** The end of the refusal of `refresh` when the main module has code that enables output. */
 const REFRESH_WRITE_REFUSED = 'Ask the user to refresh.'
 /** The start of the refusal of `undo` when the agents have no step of their own to take back. */
-const NOTHING_TO_UNDO = 'There is nothing of yours to undo.'
+const NOTHING_TO_UNDO = "There is nothing of the agents' to undo."
+/** The start of the refusal of `undo` while the main module has code that enables output. */
+const UNDO_OUTPUT_REFUSED = 'The project has code that enables output'
 
 test('an MCP client undoes its edits, lists problems and refreshes, and none of it writes', async ({
   page,
@@ -1239,55 +1236,95 @@ test('an MCP client undoes its edits, lists problems and refreshes, and none of 
     if (version.isError) expect(textOf(version)).toContain('Versions are not kept')
     else expect(JSON.parse(textOf(version))).toHaveProperty('saved')
 
-    // 6. THE WRITE RULE. The user (here the test, through the Component Browser, typing code as
-    // the user does) makes a node with Write on: it writes its file each time it runs. Only the
-    // user can do this: the same code through `add_nodes` is refused (the other test).
-    await page.keyboard.press('Escape')
-    await page.getByTestId('add-component-button').click()
-    await expect(page.locator('.ComponentBrowser')).toBeVisible()
-    const input = page.getByTestId('component-editor-content')
-    await expect(input).toBeFocused()
-    await input.fill(WRITE_ON_CODE(writeTargetEnso))
-    await page.keyboard.press('Enter')
+    // 6. THE WRITE RULE: an agent never causes a write the user did not click for. The user (here
+    // the test, typing code in the Component Browser as the user does) makes a node that really
+    // writes its file each time it runs. The same code through `add_nodes` is refused (the other
+    // test).
+    const userCreatesNode = async (code: string) => {
+      await page.keyboard.press('Escape')
+      await page.getByTestId('add-component-button').click()
+      await expect(page.locator('.ComponentBrowser')).toBeVisible()
+      const input = page.getByTestId('component-editor-content')
+      await expect(input).toBeFocused()
+      await input.fill(code)
+      await page.keyboard.press('Enter')
+      await expect(page.locator('.ComponentBrowser')).toBeHidden()
+    }
+    const fileNow = async () => ({
+      content: await fs.readFile(writeTarget, 'utf8'),
+      mtime: (await fs.stat(writeTarget)).mtimeMs,
+    })
+    await userCreatesNode(WRITE_CODE(writeTargetEnso))
     await expect
       .poll(() => existsSync(writeTarget), { timeout: 120_000, intervals: [250] })
       .toBe(true)
-    // The node may run more than once while it settles: take the file as it is after that.
-    await page.waitForTimeout(5_000)
-    const writeNodeGraph = await getGraph()
-    const writeNode = writeNodeGraph.nodes.find((node) => node.code === WRITE_ON_INNER)
-    expect(writeNode, JSON.stringify(writeNodeGraph.nodes)).toBeDefined()
-    const contentBefore = await fs.readFile(writeTarget, 'utf8')
-    const mtimeBefore = (await fs.stat(writeTarget)).mtimeMs
-    note('the Write-on node has written its file', { contentBefore, mtimeBefore })
-
-    const refreshRefused = await callError('refresh')
-    note('refresh with a node with Write on', refreshRefused)
-    expect(refreshRefused).toContain(REFRESH_WRITE_REFUSED)
-    // Long enough for an execution to have happened and written.
+    // Long enough for any second run while the new node settles to have written.
     await page.waitForTimeout(8_000)
-    expect(await fs.readFile(writeTarget, 'utf8'), 'refresh did not write again').toBe(
-      contentBefore,
-    )
-    expect((await fs.stat(writeTarget)).mtimeMs).toBe(mtimeBefore)
+    const written = await fileNow()
+    note('the write node has written its file', written)
+    // (a) The user's node wrote once.
+    expect(written.content, 'the node wrote exactly once').toBe('w')
+    const writeNodeGraph = await getGraph()
+    const writeNode = writeNodeGraph.nodes.find((node) => node.code.includes(writeTargetEnso))
+    expect(writeNode, JSON.stringify(writeNodeGraph.nodes)).toBeDefined()
+    /** The file is as the user's node left it, after `ms` for anything running to write. */
+    const expectUnchanged = async (step: string, ms = 5_000) => {
+      await page.waitForTimeout(ms)
+      expect(await fileNow(), `${step}: the file was not written again`).toEqual(written)
+    }
 
-    // An agent's node after the user's, then the agent removes the Write-on node: the history is
-    // closed, so `undo` does not bring the node back (nor take back the agent's node).
+    // (b) `refresh` is refused, and nothing is written.
+    const refreshRefused = await callError('refresh')
+    note('refresh with code that writes', refreshRefused)
+    expect(refreshRefused).toContain(REFRESH_WRITE_REFUSED)
+    await expectUnchanged('refresh refused', 8_000)
+
+    // (c) An agent's edit elsewhere while that code is there, then `undo`: refused, and the edit
+    // stays.
     await callJson('add_nodes', { statements: ['after_write = 1'] })
+    await expectUnchanged('an agent added a node')
+    const undoWithWrite = await callError('undo')
+    note('undo of an agent edit while the write node exists', undoWithWrite)
+    expect(undoWithWrite).toContain(UNDO_OUTPUT_REFUSED)
+    expect(names(await getGraph())).toContain('after_write')
+    await expectUnchanged('undo refused')
+
+    // (d) The agent removes the write node; `undo` is refused, and it does not come back.
     const removed = await callJson<{ removed: string[] }>('remove_nodes', {
       node_ids: [writeNode!.id],
     })
     expect(removed.removed).toEqual([writeNode!.id])
-    expect(await callError('undo')).toContain(NOTHING_TO_UNDO)
+    const undoRemoval = await callError('undo')
+    note('undo after removing the write node', undoRemoval)
+    expect(undoRemoval).toContain(NOTHING_TO_UNDO)
     const afterUndo = await getGraph()
-    expect(afterUndo.nodes.some((node) => node.code === WRITE_ON_INNER)).toBe(false)
+    expect(afterUndo.nodes.some((node) => node.code.includes(writeTargetEnso))).toBe(false)
     expect(names(afterUndo)).toContain('after_write')
-    // With the node gone a refresh is allowed again, and still writes nothing.
+    await expectUnchanged('the removal was not undone', 8_000)
+
+    // (e) With the code gone, the agents' own history works again, from here on.
+    await callJson('add_nodes', { statements: ['after_gone = 2'] })
+    const undoneAfter = await callJson<HistoryAnswer>('undo')
+    note('undo with the write code gone', undoneAfter)
+    expect(undoneAfter).toEqual({ undone: true, can_undo: false, can_redo: true })
+    const graphAfterUndo = await getGraph()
+    expect(names(graphAfterUndo)).not.toContain('after_gone')
+    expect(graphAfterUndo.nodes.some((node) => node.code.includes(writeTargetEnso))).toBe(false)
+    const redoneAfter = await callJson<HistoryAnswer>('redo')
+    expect(redoneAfter).toEqual({ redone: true, can_undo: true, can_redo: false })
+    expect(names(await getGraph())).toContain('after_gone')
     const refreshedAfter = await callJson<{ refreshed: boolean; settled: boolean }>('refresh')
+    note('refresh with the write code gone', refreshedAfter)
     expect(refreshedAfter).toEqual({ refreshed: true, settled: true })
-    await page.waitForTimeout(5_000)
-    expect(await fs.readFile(writeTarget, 'utf8')).toBe(contentBefore)
-    expect((await fs.stat(writeTarget)).mtimeMs).toBe(mtimeBefore)
+    await expectUnchanged('undo, redo and refresh with the code gone')
+
+    // The control: the detection is real. The user makes the write node again, through the UI,
+    // and the file changes.
+    await userCreatesNode(WRITE_CODE(writeTargetEnso))
+    await expect
+      .poll(async () => (await fileNow()).content, { timeout: 120_000, intervals: [250] })
+      .not.toBe(written.content)
+    note('the user made the write node again', await fileNow())
     await callJson('close_project')
   } finally {
     await client.close()
