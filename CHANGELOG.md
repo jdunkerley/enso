@@ -2,6 +2,7 @@
 
 #### Enso IDE
 
+- [The SQL Query view colours keywords, strings, numbers and comments.][840]
 - [The Component Browser's AI prompt and AI nodes are removed, with the local
   `claude` agent behind them. AI agents work with the IDE through its MCP server
   (Settings → AI). A project that has an AI node still opens: the node is an
@@ -555,6 +556,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[840]: https://github.com/jdunkerley/enso/pull/840
 [841]: https://github.com/jdunkerley/enso/pull/841
 [844]: https://github.com/jdunkerley/enso/pull/844
 [832]: https://github.com/jdunkerley/enso/pull/832

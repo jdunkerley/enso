@@ -68,6 +68,115 @@ function placeholderPrefixFor(code: string) {
   return prefix
 }
 
+/** The words that are coloured as keywords (compared in upper case). */
+const KEYWORDS = new Set(
+  (
+    'ADD ALL ALTER AND ANY AS ASC BETWEEN BY CASE CAST CHECK COLUMN CONSTRAINT CREATE CROSS ' +
+    'CURRENT DEFAULT DELETE DESC DISTINCT DROP ELSE END EXCEPT EXISTS FALSE FETCH FILTER FIRST ' +
+    'FOLLOWING FOR FOREIGN FROM FULL GROUP HAVING IF ILIKE IN INDEX INNER INSERT INTERSECT ' +
+    'INTO IS JOIN KEY LAST LATERAL LEFT LIKE LIMIT NATURAL NOT NULL NULLS OFFSET ON OR ORDER ' +
+    'OUTER OVER PARTITION PRECEDING PRIMARY RANGE RECURSIVE REFERENCES RIGHT ROW ROWS SELECT SET ' +
+    'SIMILAR TABLE THEN TOP TRUE UNBOUNDED UNION UNIQUE UPDATE USING VALUES VIEW WHEN WHERE ' +
+    'WINDOW WITH'
+  ).split(' '),
+)
+
+/**
+ * The keywords that are also common function names (`LEFT(a, 3)`, `IF(b, 1, 2)`). They are coloured
+ * only when no `(` follows. It is not a rule for every keyword: `IN (`, `AND (` and `OVER (` are
+ * keywords. `FILTER` is left out, since `FILTER (WHERE …)` is the keyword.
+ */
+const KEYWORDS_ALSO_FUNCTIONS = new Set(['FIRST', 'IF', 'LAST', 'LEFT', 'RANGE', 'RIGHT', 'ROW'])
+
+/** Whether the text from `index` on begins, after optional whitespace, with `(`. */
+function opensCall(text: string, index: number) {
+  const open = /\s*\(/y
+  open.lastIndex = index
+  return open.test(text)
+}
+
+/** Whether a word, which ends at `end` in `text`, is coloured as a keyword. */
+function isKeyword(text: string, word: string, end: number) {
+  const upper = word.toUpperCase()
+  return KEYWORDS.has(upper) && !(KEYWORDS_ALSO_FUNCTIONS.has(upper) && opensCall(text, end))
+}
+
+/** The kinds of coloured token, each shown with the class `tok-<kind>`. */
+type TokenKind = 'keyword' | 'string' | 'identifier' | 'number' | 'comment'
+
+/** Wrap already-escaped text in a coloured token. */
+function renderToken(kind: TokenKind, text: string) {
+  return `<span class="tok-${kind}">${escapeHtml(text)}</span>`
+}
+
+/**
+ * The pattern of the tokens that are coloured. A comment or a string is matched whole, so a quote
+ * in a comment, or `--` or a keyword in a string, is not read as anything else. What matches
+ * none of them (operators, punctuation, spaces, other names) is left as it is.
+ */
+function tokenPattern(prefix: string, bracketIdentifiers: boolean) {
+  const placeholder = `${prefix}\\d+__`
+  const word = `(?!${placeholder})[\\p{L}_](?:(?!${placeholder})[\\p{L}\\p{N}_$])*`
+  return new RegExp(
+    [
+      `(?<placeholder>${prefix}(?<index>\\d+)__)`,
+      `(?<comment>--[^\\n]*|/\\*[\\s\\S]*?(?:\\*/|$))`,
+      `(?<string>'(?:[^']|'')*(?:'|$))`,
+      `(?<identifier>"(?:[^"]|"")*(?:"|$)|\`(?:[^\`]|\`\`)*(?:\`|$)${
+        // No `[` inside, so an unclosed one fails at the next `[` rather than rescanning the line.
+        bracketIdentifiers ? '|\\[[^\\]\\[\\n]*\\]' : ''
+      })`,
+      `(?<number>\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b)`,
+      `(?<word>${word})`,
+    ].join('|'),
+    'gu',
+  )
+}
+
+/**
+ * The HTML of formatted SQL: its tokens coloured and its placeholders replaced by the values. The
+ * text is tokenized before it is escaped, and each piece is escaped on its own as it is wrapped, so
+ * no SQL (or value) text reaches the page unescaped. A value is a chip and never tokenized.
+ *
+ * The placeholder is matched first, but never has to be found inside a string, quoted name or
+ * comment: sql-formatter substitutes only `?` tokens, and a `?` inside one of those is not a token,
+ * so a placeholder never sits inside a quoted piece of the formatted text.
+ */
+function highlightSql(
+  text: string,
+  prefix: string,
+  interpolations: SQLInterpolation[],
+  bracketIdentifiers: boolean,
+) {
+  const pattern = tokenPattern(prefix, bracketIdentifiers)
+  let html = ''
+  let end = 0
+  for (const match of text.matchAll(pattern)) {
+    html += escapeHtml(text.slice(end, match.index))
+    end = match.index + match[0].length
+    const groups = match.groups!
+    const interpolation =
+      groups.placeholder != null ? interpolations[Number(groups.index)] : undefined
+    if (groups.placeholder != null) {
+      html +=
+        interpolation != null ? renderInterpolationParameter(interpolation) : escapeHtml(match[0])
+    } else if (groups.comment != null) {
+      html += renderToken('comment', match[0])
+    } else if (groups.string != null) {
+      html += renderToken('string', match[0])
+    } else if (groups.identifier != null) {
+      html += renderToken('identifier', match[0])
+    } else if (groups.number != null) {
+      html += renderToken('number', match[0])
+    } else if (isKeyword(text, match[0], end)) {
+      html += renderToken('keyword', match[0])
+    } else {
+      html += escapeHtml(match[0])
+    }
+  }
+  return html + escapeHtml(text.slice(end))
+}
+
 const formatted = computed(() => {
   if (props.data.error != null || props.data.code == null) {
     return undefined
@@ -78,10 +187,9 @@ const formatted = computed(() => {
     params: interpolations.map((_, index) => `${prefix}${index}__`),
     language: language.value,
   })
-  return escapeHtml(text).replace(new RegExp(`${prefix}(\\d+)__`, 'g'), (match, index) => {
-    const interpolation = interpolations[Number(index)]
-    return interpolation != null ? renderInterpolationParameter(interpolation) : match
-  })
+  // `[name]` quotes an identifier in these dialects; elsewhere it is a subscript.
+  const bracketIdentifiers = language.value === 'transactsql' || language.value === 'sqlite'
+  return highlightSql(text, prefix, interpolations, bracketIdentifiers)
 })
 
 interface RGBA {
@@ -213,6 +321,31 @@ function renderRegularInterpolation(value: unknown, fgColor: RGBA, bgColor: RGBA
   font-size: 12px;
   margin-left: 7px;
   margin-top: 5px;
+}
+
+/*
+ * The colours of the code editor's default highlight style (CodeMirror's `defaultHighlightStyle`).
+ * A quoted identifier takes that palette's colour for special strings (`#e40`; it has no
+ * identifier tag of its own).
+ */
+:deep(.tok-keyword) {
+  color: #708;
+}
+
+:deep(.tok-string) {
+  color: #a11;
+}
+
+:deep(.tok-identifier) {
+  color: #e40;
+}
+
+:deep(.tok-number) {
+  color: #164;
+}
+
+:deep(.tok-comment) {
+  color: #940;
 }
 
 :deep(.interpolation) {
