@@ -58,6 +58,7 @@ export const EDIT_TOOL_NAMES = [
   'undo',
   'redo',
   'save_version',
+  'refresh',
   'select_nodes',
   'open_method',
 ] as const
@@ -491,6 +492,21 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
           .optional(),
       },
       run: forward('save_version', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'refresh',
+      title: 'Refresh the values',
+      description:
+        "Compute every node again in Design mode, as the user's Refresh button does, reading " +
+        'files and data sources again. Use it after the user changed a file or a table outside ' +
+        'the IDE. It never turns Write on and never runs a node in Live: it is refused while ' +
+        'the project is in Live mode, and when the project has a node the user switched Write ' +
+        'on for or code that enables output, because a refresh would run it (ask the user to ' +
+        'refresh then). It changes no node and joins no undo step; it ends yours. Returns ' +
+        '`refreshed` and `settled`: whether the engine reported every node of the function on ' +
+        'screen again in time. Call `get_graph` or `get_problems` afterwards.',
+      inputSchema: {},
+      run: forward('refresh', EDIT_TOOL_TIMEOUT_MS),
     },
     {
       name: 'select_nodes',

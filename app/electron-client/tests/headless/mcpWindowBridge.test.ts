@@ -192,6 +192,7 @@ describe('projectTools', () => {
       'undo',
       'redo',
       'save_version',
+      'refresh',
       'select_nodes',
       'open_method',
     ])
@@ -291,8 +292,8 @@ describe('edit tool arguments', () => {
     }
   })
 
-  test('get_problems takes no arguments', async () => {
-    for (const tool of ['get_problems']) {
+  test('get_problems and refresh take no arguments', async () => {
+    for (const tool of ['get_problems', 'refresh']) {
       expect(await ok(tool, {})).toBe(true)
     }
   })

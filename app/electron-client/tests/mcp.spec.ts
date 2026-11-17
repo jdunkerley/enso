@@ -116,6 +116,7 @@ test('an MCP client reads the open project and cannot write a file', async ({
         'move_nodes',
         'open_method',
         'redo',
+        'refresh',
         'remove_nodes',
         'save_version',
         'select_nodes',

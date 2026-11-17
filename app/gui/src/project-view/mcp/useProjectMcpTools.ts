@@ -54,6 +54,7 @@ import {
   watchExecution,
   watchGraphUpdate,
 } from './projectEvents'
+import { refreshTool } from './refreshTool'
 import { addFunction, collapseNodesTool, type StructureToolDeps } from './structureTools'
 import { saveVersion } from './versionTools'
 import { openMethod, prepareGraphImage, selectNodes, type ViewToolDeps } from './viewTools'
@@ -126,7 +127,7 @@ export interface McpEditorDeps {
 /**
  * Registers the project tools for the open project: the eight that read (get_graph, get_node,
  * search_components, get_component_docs, evaluate_expression, list_visualizations,
- * get_documentation, get_problems), the thirteen that edit (undo, redo, save_version,
+ * get_documentation, get_problems), the fourteen that edit (undo, redo, save_version, refresh,
  * add_nodes, edit_node, remove_nodes, set_node_comment,
  * set_documentation, set_visualization, move_nodes, arrange_nodes, collapse_nodes, add_function)
  * and the two that navigate (select_nodes, open_method); the two that main's `get_visualization`
@@ -624,6 +625,23 @@ export function useProjectMcpTools(
       )
     },
     get_problems: async () => getProblems(problemDeps()),
+    refresh: async (_args, caller, deadline) => {
+      const graph = currentProject.graph.value
+      const project = currentProject.store.value
+      return refreshTool({
+        session,
+        caller,
+        deadline,
+        // Read at the run's turn, as the session does.
+        isLive: () => isLive(currentProject.store.value),
+        db: graph.db,
+        moduleRoot: () => {
+          const ast = currentProject.graph.value.currentMethod.ast
+          return ast.ok ? ast.value.module.root() : undefined
+        },
+        executionContext: project.executionContext,
+      })
+    },
     undo: async (_args, caller, deadline) => undoTool({ session, caller, deadline }),
     redo: async (_args, caller, deadline) => redoTool({ session, caller, deadline }),
     collapse_nodes: async (args, caller, deadline) => {
