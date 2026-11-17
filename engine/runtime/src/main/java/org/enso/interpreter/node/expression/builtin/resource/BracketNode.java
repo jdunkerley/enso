@@ -11,7 +11,6 @@ import org.enso.interpreter.node.BaseNode;
 import org.enso.interpreter.node.callable.InvokeCallableNode;
 import org.enso.interpreter.node.callable.thunk.ThunkExecutorNode;
 import org.enso.interpreter.runtime.EnsoContext;
-import org.enso.interpreter.runtime.ThreadManager;
 import org.enso.interpreter.runtime.callable.argument.CallArgumentInfo;
 import org.enso.interpreter.runtime.control.ThreadInterruptedException;
 import org.enso.interpreter.runtime.type.TypesGen;
@@ -73,15 +72,15 @@ public abstract class BracketNode extends Node {
       return resource;
     }
     var interrupted = false;
-    var resume = false;
+    var resume = 0L;
     try {
       return invokeActionNode.execute(action, frame, state, new Object[] {resource});
     } catch (ThreadInterruptedException e) {
       // The interrupt is sticky, so the destructor would be interrupted at its
-      // first poll and the resource leak: see Note [A Thread Interrupt Is
-      // Sticky] in ThreadManager.
+      // first poll and the resource would leak: see Note [A Thread Interrupt Is
+      // Sticky] in ThreadManager. A newer interrupt still stops it.
       interruptedProfile.enter();
-      resume = ThreadManager.suspendInterrupts();
+      resume = ctx.getThreadManager().suspendInterrupts();
       interrupted = true;
       throw e;
     } finally {
@@ -89,7 +88,7 @@ public abstract class BracketNode extends Node {
         invokeDestructorNode.execute(destructor, frame, state, new Object[] {resource});
       } finally {
         if (interrupted) {
-          ThreadManager.resumeInterrupts(resume);
+          ctx.getThreadManager().resumeInterrupts(resume);
         }
       }
     }

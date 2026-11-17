@@ -8,7 +8,6 @@ import org.enso.interpreter.dsl.Suspend;
 import org.enso.interpreter.node.BaseNode;
 import org.enso.interpreter.node.callable.thunk.ThunkExecutorNode;
 import org.enso.interpreter.runtime.EnsoContext;
-import org.enso.interpreter.runtime.ThreadManager;
 import org.enso.interpreter.runtime.control.ThreadInterruptedException;
 
 @BuiltinMethod(
@@ -30,12 +29,14 @@ public class WithInterruptHandlerNode extends Node {
       interruptBranch.enter();
       // The interrupt is sticky, so the handler would be interrupted at its
       // first poll: see Note [A Thread Interrupt Is Sticky] in ThreadManager.
-      var resume = ThreadManager.suspendInterrupts();
+      // A newer interrupt still stops it.
+      var threadManager = ctx.getThreadManager();
+      var resume = threadManager.suspendInterrupts();
       try {
         handlerExecutorNode.executeThunk(
             frame, interrupt_handler, state, BaseNode.TailStatus.NOT_TAIL);
       } finally {
-        ThreadManager.resumeInterrupts(resume);
+        threadManager.resumeInterrupts(resume);
       }
       throw e;
     }

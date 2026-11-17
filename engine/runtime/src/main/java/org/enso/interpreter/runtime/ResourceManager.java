@@ -513,6 +513,12 @@ public final class ResourceManager {
      * it still abandons the finalizer, and from inside `ProcessItems` it would drop
      * the remaining queued items and leave the safepoint request set, stopping every
      * later GC finalizer for the context.
+     *
+     * `ThreadManager.suspendInterrupts`, which interrupt handlers and bracket
+     * destructors use, is deliberately not used here: it defers only the interrupts
+     * requested before it, and lets a newer one cut the code short (Note [A Thread
+     * Interrupt Is Sticky]). A finalizer is never run again, so being cut short by
+     * any interrupt, new or not, leaks its resource.
      */
 
     private void park() {
