@@ -90,6 +90,17 @@ test.each([
   ['Standard.Table.Main.Table', 'Standard.Table.Table'],
   ['Some.Path.Without.Main.Module', 'Some.Path.Without.Main.Module'],
   ['Standard.Base', 'Standard.Base'],
+  ['Standard.Base.Main_X.foo', 'Standard.Base.Main_X.foo'],
+  ['Standard.Base.Main_X', 'Standard.Base.Main_X'],
+  ['Standard.Base.X_Main', 'Standard.Base.X_Main'],
+  ['Standard.Base.X_Main.foo', 'Standard.Base.X_Main.foo'],
+  ['Standard.Base.Main1', 'Standard.Base.Main1'],
+  ['Standard.Base.Main.Main', 'Standard.Base.Main'],
+  ['Standard.Base.Main.Main_X', 'Standard.Base.Main_X'],
+  ['Standard.Base.Sub.Main', 'Standard.Base.Sub.Main'],
+  ['local.Main_Project.Main', 'local.Main_Project'],
+  ['local.Main_Project.Main.foo', 'local.Main_Project.foo'],
+  ['local.Main.Main', 'local.Main'],
 ])('normalizeQualifiedName drops Main module in %s', (name, expected) => {
   const qn = unwrap(tryQualifiedName(name))
   expect(normalizeQualifiedName(qn)).toEqual(unwrap(tryQualifiedName(expected)))
