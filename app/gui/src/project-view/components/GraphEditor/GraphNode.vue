@@ -302,11 +302,13 @@ const isRecordingOverridden = computed({
   },
   set(shouldOverride) {
     module.value.edit((edit) => {
-      const replacement =
-        shouldOverride && !projectStore.isRecordingEnabled ?
-          [Ast.TextLiteral.new(projectStore.executionMode, edit)]
-        : undefined
-      prefixes.value.modify(edit.getVersion(props.node.rootExpr), { enableRecording: replacement })
+      // The prefix takes no arguments of its own. A legacy three-argument prefix is always dropped:
+      // when Write is turned on it is replaced by the current form.
+      const replacement = shouldOverride && !projectStore.isRecordingEnabled ? [] : undefined
+      prefixes.value.modify(edit.getVersion(props.node.rootExpr), {
+        enableRecording: replacement,
+        enableRecordingLegacy: undefined,
+      })
       return Ok()
     })
   },

@@ -91,7 +91,7 @@ too).
 ## Write stays the user's (`writeGuard.ts`)
 
 The GUI's per-node Write is a code prefix (`util/ast/node.ts`:
-`Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output "design" <| …`),
+`Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| …`),
 so code an agent supplies could switch the output context on by itself. One
 check, `writeRefusal`, refuses such code everywhere an agent's code enters: a
 node statement (`parseNodeStatement`, `add_nodes`), a node expression
@@ -189,17 +189,19 @@ refused. A new route found later is added the same way, with a test in
 
 The user's switch is never changed by a tool.
 
-**Known defect, to be ticketed: the Write prefix does not write.** The prefix's
-shape (`… with_enabled_context Context.Output __ <| __`, three arguments) does
-not run on the current engine, whose `with_enabled_context context ~action`
-takes two (a node with it fails with "Method `<|` of type Text could not be
-found"). The UI's real Write action is a one-off
-`nodeExecution.recomputeOnce(id, 'Live')` (`GraphNode.vue`). So
-`prefixes.enableRecording` does not mark a node that writes; what writes is code
-that enables output (the two-argument
-`Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| …`,
-`Context.Output.with_enabled <| …`), which the history rule and `refresh` check
-for in the whole module. The prefix is not fixed in this branch.
+**The Write prefix** (#855). `prefixes.enableRecording` is
+`Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| __`,
+the two-argument form the engine's `with_enabled_context context ~action`
+accepts. It used to carry a third argument (the mode name, `"design"`), which
+failed with "Method `<|` of type Text could not be found". A project saved with
+that old form still opens: `util/ast/node.ts` has a second pattern,
+`enableRecordingLegacy`, folded into the node's `prefixes.enableRecording`, so
+the node shows Write on, the guards above still apply, and toggling Write in
+`GraphNode.vue` replaces it with the current form (on) or removes it (off). The
+UI's one-off Write button is separate:
+`nodeExecution.recomputeOnce(id, 'Live')`. Other code that enables output
+(`Context.Output.with_enabled <| …`) is not a prefix; the history rule and
+`refresh` check for it in the whole module.
 
 ## Edit, structure and view tools
 

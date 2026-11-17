@@ -13,6 +13,12 @@ import * as Y from 'yjs'
 export const prefixes = computed(() =>
   Prefixes.FromLines({
     enableRecording:
+      'Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| __',
+    // The form this prefix had when `with_enabled_context` took a mode name too. The engine no
+    // longer accepts it (it fails with "Method `<|` of type Text could not be found"), but a saved
+    // project may still contain it: it is recognised so the node shows Write on, and replaced by
+    // the current form (or removed) when the user toggles Write.
+    enableRecordingLegacy:
       'Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output __ <| __',
   }),
 )
@@ -60,7 +66,7 @@ export function nodeFromAst(ast: Ast.Statement, isOutput: boolean): NodeDataFrom
     pattern: assignment?.pattern,
     rootExpr: root,
     innerExpr,
-    prefixes: matches,
+    prefixes: { enableRecording: matches.enableRecording ?? matches.enableRecordingLegacy },
     primaryApplication: primaryApp,
     conditionalPorts: new Set(primaryApp?.accessChain ?? []),
     argIndex: undefined,

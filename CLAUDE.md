@@ -196,18 +196,20 @@ has silently produced a wrong result here:
   baselines and CI are. WSL is the practical route. **Source
   `~/.enso-toolchain.sh` first** — `~/.bashrc` returns early in non-interactive
   shells, so a bare `wsl -e bash -lc` has no GraalVM, sbt or Node and quietly
-  picks up the Windows binaries through `/mnt/c`. The script reads the GraalVM
-  and Node versions from the checkout (`graalMavenPackagesVersion`,
-  `.node-version`), so a version bump needs no edit. It finds both archive
-  names: `graalvm-community-openjdk-<release>+*` (25.0.x) and the innovation
-  line's `graalvm-community-<release>+*` (no `openjdk-`, downloaded from the
-  `graal-<release>` tag; #665 has the diff). Git cannot see a Windows worktree
-  from WSL, so the script falls back to the main checkout's versions: set
-  `ENSO_REPO=/mnt/c/.../<worktree>` to read a worktree's. Maven, which only
-  `tools/enso4igv` uses, is not part of it. WSL reaches the repo at
-  `/mnt/c/...`, so **give cargo its own target directory** — sharing `target/`
-  with the Windows build means every switch re-links the whole workspace, and
-  the two hosts evict each other's artifacts:
+  picks up the Windows binaries through `/mnt/c`. The script is
+  `tools/wsl/enso-toolchain.sh`, copied to `~/.enso-toolchain.sh`; its CLAUDE.md
+  says how to install the toolchain it looks for. Edit the repo copy, then copy
+  it again. The script reads the GraalVM and Node versions from the checkout
+  (`graalMavenPackagesVersion`, `.node-version`), so a version bump needs no
+  edit. It finds both archive names: `graalvm-community-openjdk-<release>+*`
+  (25.0.x) and the innovation line's `graalvm-community-<release>+*` (no
+  `openjdk-`, downloaded from the `graal-<release>` tag; #665 has the diff). Git
+  cannot see a Windows worktree from WSL, so the script falls back to the main
+  checkout's versions: set `ENSO_REPO=/mnt/c/.../<worktree>` to read a
+  worktree's. Maven, which only `tools/enso4igv` uses, is not part of it. WSL
+  reaches the repo at `/mnt/c/...`, so **give cargo its own target directory** —
+  sharing `target/` with the Windows build means every switch re-links the whole
+  workspace, and the two hosts evict each other's artifacts:
 
   ```bash
   wsl -e bash -lc '. ~/.enso-toolchain.sh && cd /mnt/c/Repos/Enso/ide && export CARGO_TARGET_DIR=$HOME/enso-target && cargo test --workspace'
