@@ -100,3 +100,250 @@ test('a placeholder-looking name in the SQL that matches a value is still shown 
   expect(pre.text().replace(/\s+/g, ' ')).toContain('SELECT __enso_param_0__')
   expect(pre.findAll('.interpolation')).toHaveLength(1)
 })
+
+// === Syntax colouring ===
+
+/** The text of each coloured token of one kind in the mounted view. */
+function tokens(code: string, kind: string, ...values: unknown[]) {
+  const wrapper = mount(SqlQuery.default, { props: sql(code, ...values) })
+  return wrapper
+    .get('pre.sql')
+    .findAll(`.tok-${kind}`)
+    .map((t) => t.text())
+}
+
+test('keywords are coloured, whatever their case', () => {
+  expect(tokens('SELECT a FROM t WHERE a IS NOT NULL', 'keyword')).toEqual([
+    'SELECT',
+    'FROM',
+    'WHERE',
+    'IS',
+    'NOT',
+    'NULL',
+  ])
+  // sql-formatter leaves a lower-case keyword as it was; it is a keyword all the same.
+  expect(tokens('select a from t where a is null', 'keyword')).toEqual([
+    'select',
+    'from',
+    'where',
+    'is',
+    'null',
+  ])
+})
+
+test('a word that only contains a keyword is not one', () => {
+  expect(tokens('SELECT selection, fromage, "order" FROM t', 'keyword')).toEqual(['SELECT', 'FROM'])
+})
+
+test('a function name is not a keyword', () => {
+  expect(tokens('SELECT COUNT(a), MAX(b) FROM t', 'keyword')).toEqual(['SELECT', 'FROM'])
+})
+
+test('string literals are coloured, a doubled quote staying inside', () => {
+  expect(tokens(`SELECT 'it''s', 'b' FROM t`, 'string')).toEqual([`'it''s'`, `'b'`])
+})
+
+test('a string holding -- or a keyword is one string token', () => {
+  expect(tokens(`SELECT 'a -- b', 'SELECT FROM' FROM t`, 'string')).toEqual([
+    `'a -- b'`,
+    `'SELECT FROM'`,
+  ])
+  expect(tokens(`SELECT 'a -- b', 'SELECT FROM' FROM t`, 'comment')).toEqual([])
+  expect(tokens(`SELECT 'a -- b', 'SELECT FROM' FROM t`, 'keyword')).toEqual(['SELECT', 'FROM'])
+})
+
+test('quoted identifiers are coloured, whatever their quotes', () => {
+  expect(tokens('SELECT "a b", `c` FROM t', 'identifier')).toEqual(['"a b"', '`c`'])
+  // sql-formatter reads [..] only in the T-SQL dialect.
+  const wrapper = mount(SqlQuery.default, {
+    props: { data: { ...sql('SELECT [a b] FROM t').data, dialect: 'transactsql' } },
+  })
+  expect(wrapper.get('pre.sql').get('.tok-identifier').text()).toBe('[a b]')
+})
+
+test('a quoted identifier holding a keyword or a quote is one token', () => {
+  expect(tokens(`SELECT "FROM 'x'" FROM t`, 'identifier')).toEqual([`"FROM 'x'"`])
+  expect(tokens(`SELECT "FROM 'x'" FROM t`, 'string')).toEqual([])
+})
+
+test('numbers are coloured', () => {
+  expect(tokens('SELECT 1, 2.5, 0.5, 1e10, 3.2E-4 FROM t LIMIT 10', 'number')).toEqual([
+    '1',
+    '2.5',
+    '0.5',
+    '1e10',
+    '3.2E-4',
+    '10',
+  ])
+})
+
+test('a digit inside a name is not a number', () => {
+  expect(tokens('SELECT col1, t2.x3 FROM t2', 'number')).toEqual([])
+})
+
+test('comments are coloured, to the end of the line or to the closing mark', () => {
+  // The formatter re-indents the second line of a block comment, so compare the words.
+  const comments = tokens('SELECT a -- the a\nFROM t /* from\nhere */ WHERE b', 'comment')
+  expect(comments.map((c) => c.replace(/\s+/g, ' '))).toEqual(['-- the a', '/* from here */'])
+})
+
+test('a comment holding a quote is one comment', () => {
+  const code = `SELECT a -- it's\nFROM t /* "x" ' */`
+  expect(tokens(code, 'comment')).toEqual(["-- it's", `/* "x" ' */`])
+  expect(tokens(code, 'string')).toEqual([])
+  expect(tokens(code, 'identifier')).toEqual([])
+})
+
+test('operators and punctuation keep the default colour', () => {
+  const wrapper = mount(SqlQuery.default, { props: sql('SELECT (a + b) * 2 FROM t') })
+  const pre = wrapper.get('pre.sql')
+  const coloured = pre.findAll('[class^="tok-"]').map((t) => t.text())
+  expect(coloured).toEqual(['SELECT', '2', 'FROM'])
+})
+
+test('a value that looks like SQL stays an uncoloured chip', () => {
+  const wrapper = mount(SqlQuery.default, {
+    props: sql('SELECT a FROM t WHERE b = ? AND c = ?', "SELECT 'x' -- y", 42),
+  })
+  const chips = wrapper.get('pre.sql').findAll('.interpolation')
+  expect(chips).toHaveLength(2)
+  for (const chip of chips) expect(chip.find('[class^="tok-"]').exists()).toBe(false)
+  expect(chips[0]!.text()).toBe(`'SELECT ''x'' -- y'`)
+  // Nothing of the value leaked into the tokens around it.
+  expect(tokens('SELECT a FROM t WHERE b = ?', 'string', "SELECT 'x'")).toEqual([])
+  expect(tokens('SELECT a FROM t WHERE b = ?', 'keyword', 'FROM')).toEqual([
+    'SELECT',
+    'FROM',
+    'WHERE',
+  ])
+})
+
+test('a quote in a value does not begin a string in the SQL after it', () => {
+  expect(tokens(`SELECT a FROM t WHERE b = ? AND c = 'z'`, 'string', "it's")).toEqual([`'z'`])
+})
+
+test('markup in a coloured token is shown as text', () => {
+  const wrapper = mount(SqlQuery.default, {
+    props: sql(`SELECT '<i>y</i>', "<b>q</b>" -- <u>c</u>\nFROM t`),
+  })
+  const pre = wrapper.get('pre.sql')
+  for (const tag of ['i', 'b', 'u']) expect(pre.find(tag).exists()).toBe(false)
+  expect(pre.get('.tok-string').text()).toBe(`'<i>y</i>'`)
+  expect(pre.get('.tok-identifier').text()).toBe('"<b>q</b>"')
+  expect(pre.get('.tok-comment').text()).toBe('-- <u>c</u>')
+})
+
+test('the placeholder guard holds while colouring', () => {
+  const wrapper = mount(SqlQuery.default, {
+    props: sql(`SELECT __enso_param_0__, '__enso_param_0__' FROM t WHERE b = ?`, 'x'),
+  })
+  const pre = wrapper.get('pre.sql')
+  expect(pre.findAll('.interpolation')).toHaveLength(1)
+  expect(pre.get('.tok-string').text()).toBe(`'__enso_param_0__'`)
+  expect(pre.text().replace(/\s+/g, ' ')).toContain('SELECT __enso_param_0__')
+})
+
+/** The text of each coloured token of one kind, in a given dialect. */
+function tokensIn(dialect: string, code: string, kind: string, ...values: unknown[]) {
+  const wrapper = mount(SqlQuery.default, {
+    props: { data: { ...sql(code, ...values).data, dialect } },
+  })
+  return wrapper
+    .get('pre.sql')
+    .findAll(`.tok-${kind}`)
+    .map((t) => t.text())
+}
+
+test('a word that is also a function name is a keyword only when no `(` follows', () => {
+  expect(tokens('SELECT a FROM t LEFT JOIN u ON t.k = u.k', 'keyword')).toEqual([
+    'SELECT',
+    'FROM',
+    'LEFT',
+    'JOIN',
+    'ON',
+  ])
+  expect(tokens('SELECT LEFT(a, 3), RIGHT (a, 2), IF(b, 1, 2) FROM t', 'keyword')).toEqual([
+    'SELECT',
+    'FROM',
+  ])
+  // A keyword that is followed by `(` is still a keyword.
+  expect(tokens('SELECT a FROM t WHERE a IN (1, 2) AND (b > 1)', 'keyword')).toEqual([
+    'SELECT',
+    'FROM',
+    'WHERE',
+    'IN',
+    'AND',
+  ])
+  expect(tokens('SELECT SUM(a) OVER (PARTITION BY b) FROM t', 'keyword')).toEqual([
+    'SELECT',
+    'OVER',
+    'PARTITION',
+    'BY',
+    'FROM',
+  ])
+})
+
+/**
+ * The tokenizer on text of our own choosing, with no placeholders to swap. sql-formatter rejects an
+ * unterminated string, quoted name or `[`, so the view never sees one, but the tokenizer must
+ * still be total.
+ */
+function highlighted(text: string, bracketIdentifiers = false) {
+  const wrapper = mount(SqlQuery.default, { props: { data: NO_SQL } })
+  const vm = wrapper.vm as unknown as {
+    highlightSql: (text: string, prefix: string, interpolations: [], brackets: boolean) => string
+  }
+  return vm.highlightSql(text, '__enso_param_', [], bracketIdentifiers)
+}
+
+test('an unterminated string, quoted name or block comment is coloured to the end', () => {
+  expect(highlighted("b = 'oops")).toBe('b = <span class="tok-string">&#39;oops</span>')
+  expect(highlighted('b = "oops')).toBe('b = <span class="tok-identifier">&#34;oops</span>')
+  expect(highlighted('a /* oops\nmore')).toBe('a <span class="tok-comment">/* oops\nmore</span>')
+})
+
+test('`[name]` is a quoted identifier only in the T-SQL and SQLite dialects', () => {
+  expect(tokensIn('transactsql', 'SELECT [a b] FROM t', 'identifier')).toEqual(['[a b]'])
+  expect(tokensIn('sqlite', 'SELECT [a b] FROM t', 'identifier')).toEqual(['[a b]'])
+  // In PostgreSQL `[..]` is an array literal or a subscript.
+  expect(tokensIn('postgresql', 'SELECT [a b], c[1] FROM t', 'identifier')).toEqual([])
+  expect(highlighted('SELECT [a b]', true)).toContain('tok-identifier')
+  expect(highlighted('SELECT [a b]', false)).not.toContain('tok-identifier')
+})
+
+test('many unclosed `[` on one line are tokenized in linear time', () => {
+  // The quadratic pattern took ~0.1 s for 20 000 and ~3 s for 100 000.
+  const text = `SELECT ${'['.repeat(100_000)} FROM t`
+  const start = performance.now()
+  expect(highlighted(text, true)).toContain('tok-keyword')
+  expect(performance.now() - start).toBeLessThan(1000)
+})
+
+test('a number or a word right next to a placeholder does not hide it', () => {
+  const html = highlighted('1__enso_param_0__ x__enso_param_1__ __enso_param_2__y')
+  // No value is given, so a placeholder shows as it is; each is still seen on its own.
+  expect(html).toBe('1__enso_param_0__ x__enso_param_1__ __enso_param_2__y')
+  const wrapper = mount(SqlQuery.default, { props: sql('SELECT a FROM t WHERE b = ?', 'p') })
+  const vm = wrapper.vm as unknown as {
+    highlightSql: (
+      text: string,
+      prefix: string,
+      interpolations: { enso_type: string; value: unknown }[],
+      brackets: boolean,
+    ) => string
+  }
+  const withValues = vm.highlightSql(
+    'x__enso_param_0__ 1__enso_param_1__ y',
+    '__enso_param_',
+    [
+      // eslint-disable-next-line camelcase -- The field name is the Enso side's.
+      { enso_type: TEXT, value: 'p' },
+      // eslint-disable-next-line camelcase -- The field name is the Enso side's.
+      { enso_type: TEXT, value: 'q' },
+    ],
+    false,
+  )
+  expect(withValues.match(/class="interpolation"/g)).toHaveLength(2)
+  expect(withValues).toMatch(/^x<div/)
+  expect(withValues).toContain('</div> y')
+})
