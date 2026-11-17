@@ -1,31 +1,32 @@
 ## Enso Signatures 1.0
 ## module Standard.Base.Data.Time.Time_Of_Day
 - type Time_Of_Day
-    - + self amount:(Standard.Base.Data.Time.Duration.Duration|Standard.Base.Data.Time.Time_Period.Time_Period) -> Standard.Base.Any.Any
-    - - self amount:(Standard.Base.Data.Time.Duration.Duration|Standard.Base.Data.Time.Time_Period.Time_Period) -> Standard.Base.Any.Any
+    - + self amount:(Standard.Base.Data.Time.Duration.Duration|Standard.Base.Data.Time.Time_Period.Time_Period) -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day!Standard.Base.Errors.Time_Error.Time_Error
+    - - self amount:(Standard.Base.Data.Time.Duration.Duration|Standard.Base.Data.Time.Time_Period.Time_Period) -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day!Standard.Base.Errors.Time_Error.Time_Error
     - < self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - <= self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - > self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - >= self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - date_add self amount:Standard.Base.Data.Numbers.Integer period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Any.Any
-    - date_diff self end:Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Any.Any
-    - date_part self period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Any.Any
+    - date_add self amount:Standard.Base.Data.Numbers.Integer period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day
+    - date_diff self end:Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Data.Numbers.Integer
+    - date_part self period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Data.Numbers.Integer
     - default_widget include_now:Standard.Base.Data.Boolean.Boolean= display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
-    - end_of self period:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - format self format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter -> Standard.Base.Any.Any
+    - end_of self period:Standard.Base.Data.Time.Time_Period.Time_Period= -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day
+    - format self format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter -> Standard.Base.Data.Text.Text
     - hour self -> Standard.Base.Data.Numbers.Integer
     - microsecond self -> Standard.Base.Data.Numbers.Integer
     - millisecond self -> Standard.Base.Data.Numbers.Integer
     - minute self -> Standard.Base.Data.Numbers.Integer
-    - nanosecond self include_milliseconds:Standard.Base.Any.Any= -> Standard.Base.Data.Numbers.Integer
-    - new hour:Standard.Base.Any.Any= minute:Standard.Base.Any.Any= second:Standard.Base.Any.Any= millisecond:Standard.Base.Any.Any= microsecond:Standard.Base.Any.Any= nanosecond:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - nanosecond self include_milliseconds:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Numbers.Integer
+    - new hour:Standard.Base.Data.Numbers.Integer= minute:Standard.Base.Data.Numbers.Integer= second:Standard.Base.Data.Numbers.Integer= millisecond:Standard.Base.Data.Numbers.Integer= microsecond:Standard.Base.Data.Numbers.Integer= nanosecond:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day!Standard.Base.Errors.Time_Error.Time_Error
     - now -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day
-    - parse text:Standard.Base.Data.Text.Text format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter= -> Standard.Base.Any.Any
-    - pretty self -> Standard.Base.Any.Any
+    - parse text:Standard.Base.Data.Text.Text format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter= -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day!Standard.Base.Errors.Time_Error.Time_Error
+    - pretty self -> Standard.Base.Data.Text.Text
     - second self -> Standard.Base.Data.Numbers.Integer
-    - start_of self period:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - to_date_time self date:Standard.Base.Any.Any zone:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - to_display_text self -> Standard.Base.Any.Any
-    - to_js_object self -> Standard.Base.Any.Any
+    - start_of self period:Standard.Base.Data.Time.Time_Period.Time_Period= -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day
+    - to_date_time self date:Standard.Base.Data.Time.Date.Date zone:Standard.Base.Data.Time.Time_Zone.Time_Zone= -> Standard.Base.Data.Time.Date_Time.Date_Time
+    - to_display_text self -> Standard.Base.Data.Text.Text
+    - to_js_object self -> Standard.Base.Data.Json.JS_Object
     - to_seconds self -> Standard.Base.Data.Numbers.Integer
+- make_time_period_selector display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
 - Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day.from that:Standard.Base.Data.Json.JS_Object -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day

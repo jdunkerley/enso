@@ -428,7 +428,8 @@ test.describe('Dynamic configuration updates', () => {
    */
   test('File browser widget', async ({ page, localApi, editorPage }) => {
     const node = await dataReadNodeWithMethodCallInfo(editorPage)
-    await node.click()
+    // Click the node's left edge: its middle may be on the `…` of the hidden parameters, which keeps the click.
+    await node.click({ position: { x: 8, y: 8 } })
     await expect(node.locator('.WidgetTopLevelArgument')).toHaveCount(3)
     const pathArg = node.locator('.WidgetTopLevelArgument').filter({ has: page.getByText('path') })
     await pathArg.click()
@@ -1367,7 +1368,7 @@ test.describe('Time_Of_Day widget', () => {
     setupApi: {
       local: () =>
         setMockMainFile(
-          'from Standard.Base import Data\n\nmain =\n    since = Data.seconds_since\n    time1 = Time_Of_Day.new 14 30\n    time2 = Time_Of_Day.now\n',
+          'from Standard.Base import Data\n\nmain =\n    since = Data.seconds_since\n    time1 = Time_Of_Day.new 14 30\n    time2 = Time_Of_Day.now\n    time3 = Time_Of_Day.new 14 30 second=15\n    time4 = Time_Of_Day.new 14 30 15 500\n    time5 = Time_Of_Day.new 9\n',
         ),
     },
   })
@@ -1483,6 +1484,85 @@ test.describe('Time_Of_Day widget', () => {
     )
   })
 
+  test('a click on an hour and a minute picks a time, and Set writes it', async ({
+    editorPage,
+    page,
+  }) => {
+    const { widget, menu, open } = await timeNode(editorPage, page)
+    await open()
+    const hour = menu.getByRole('listbox', { name: 'Hour' })
+    const minute = menu.getByRole('listbox', { name: 'Minute' })
+    await hour.getByRole('option', { name: '16' }).click()
+    await minute.getByRole('option', { name: '45' }).click()
+    // A pick writes nothing yet; the field shows it, and keeps the keyboard.
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('spinbutton')).toHaveText(['16', '45'])
+    await expect(menu.getByRole('spinbutton').first()).toBeFocused()
+    await expect(hour.getByRole('option', { selected: true })).toHaveText('16')
+    await expect(minute.getByRole('option', { selected: true })).toHaveText('45')
+    await menu.getByRole('button', { name: 'Set' }).click()
+    await expect(menu).toBeHidden()
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(2)
+    expect(await moduleCode(page)).toMatch(
+      /since = Data\.seconds_since \(Time_Of_Day\.new 16 45\)\n/,
+    )
+    // Reopened, the columns show the written time, scrolled into view.
+    await open()
+    await expect(hour.getByRole('option', { selected: true })).toHaveText('16')
+    await expect(hour.getByRole('option', { selected: true })).toBeInViewport()
+    await expect(minute.getByRole('option', { selected: true })).toBeInViewport()
+  })
+
+  test('Cancel closes the menu without writing', async ({ editorPage, page }) => {
+    const { menu, open } = await timeNode(editorPage, page)
+    await open()
+    await menu.getByRole('listbox', { name: 'Hour' }).getByRole('option', { name: '16' }).click()
+    await menu.getByRole('button', { name: 'Cancel' }).click()
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain('since = Data.seconds_since\n')
+  })
+
+  test('a Time_Of_Day.new with only an hour opens the menu on that hour', async ({
+    editorPage,
+    page,
+  }) => {
+    await timeNode(editorPage, page)
+    const widget = locate.graphNodeByBinding(page, 'time5').locator('.WidgetTimeOfDay')
+    const menu = page.locator('.TimeOfDayMenu')
+    await widget.click({ position: { x: 4, y: 4 } })
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('spinbutton')).toHaveText(['09', '00'])
+    await menu.getByRole('listbox', { name: 'Minute' }).getByRole('option', { name: '30' }).click()
+    await menu.getByRole('button', { name: 'Set' }).click()
+    expect(await moduleCode(page)).toContain('time5 = Time_Of_Day.new 9 30\n')
+  })
+
+  test('the menu stays lined up under its argument as the node changes width', async ({
+    editorPage,
+    page,
+  }) => {
+    const { node, widget, menu, open } = await timeNode(editorPage, page)
+    /** How far the menu's left edge is from the argument's. */
+    const misalignment = async () =>
+      Math.abs((await menu.boundingBox())!.x - (await widget.boundingBox())!.x)
+    // The unset argument is at the right end of a narrow node: the menu is wider than what is left.
+    await open()
+    expect(await misalignment()).toBeLessThan(3)
+    await page.keyboard.type('0915')
+    await menu.getByRole('button', { name: 'Set' }).click()
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(2)
+    await open()
+    expect(await misalignment()).toBeLessThan(3)
+    // The node widens to the left of the argument while the menu is open: the menu follows.
+    const before = (await widget.boundingBox())!.x
+    await node
+      .getByText('seconds_since')
+      .evaluate((el) => ((el as HTMLElement).style.paddingLeft = '120px'))
+    await expect.poll(async () => (await widget.boundingBox())!.x).toBeGreaterThan(before + 100)
+    await expect.poll(misalignment).toBeLessThan(3)
+  })
+
   test('typing a time and clicking outside the menu writes it', async ({ editorPage, page }) => {
     const { menu, open } = await timeNode(editorPage, page)
     await open()
@@ -1568,6 +1648,35 @@ test.describe('Time_Of_Day widget', () => {
     expect(await moduleCode(page)).toMatch(/time2 = Time_Of_Day.now$/m)
   })
 
+  test('editing a time with a named second keeps the second', async ({ editorPage, page }) => {
+    await timeNode(editorPage, page)
+    const node = locate.graphNodeByBinding(page, 'time3')
+    const widget = node.locator('.WidgetTimeOfDay')
+    const menu = page.locator('.TimeOfDayMenu')
+    await widget.click({ position: { x: 4, y: 4 } })
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('spinbutton')).toHaveText(['14', '30', '15'])
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain('time3 = Time_Of_Day.new 15 30 15\n')
+  })
+
+  test('editing a time with milliseconds keeps them', async ({ editorPage, page }) => {
+    await timeNode(editorPage, page)
+    const node = locate.graphNodeByBinding(page, 'time4')
+    const widget = node.locator('.WidgetTimeOfDay')
+    const menu = page.locator('.TimeOfDayMenu')
+    await widget.click({ position: { x: 4, y: 4 } })
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain('time4 = Time_Of_Day.new 15 30 15 500\n')
+  })
+
   test('one choice is one undo step, and the import is undone with it', async ({
     editorPage,
     page,
@@ -1581,7 +1690,7 @@ test.describe('Time_Of_Day widget', () => {
     await expect(widget).not.toContainText(/now/)
     const code = await moduleCode(page)
     expect(code).not.toContain('import Time_Of_Day')
-    expect(code).not.toContain('Time_Of_Day.now\n    time')
+    expect(code).not.toContain('seconds_since Time_Of_Day.now')
   })
 
   test('a parenthesised time is one undo step too', async ({ editorPage, page }) => {

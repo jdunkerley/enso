@@ -18,12 +18,16 @@ in a `visualizations/` folder.
   older compilation. The same code serves project and library folders.
 - `compilerMessaging.ts` — main-thread side of the compiler worker: sends
   compile requests, answers the worker's `fetch` requests from the data server,
-  adds styles and imports to the page.
+  makes the compiled modules importable and gives each component its CSS
+  (`moduleStyles.ts`).
 - `compiler.ts` — the Web Worker: fetches a file, compiles it with
   `compiler-sfc` and `sucrase`, rewrites and recursively compiles its imports.
   The header comment describes the message protocol.
 - `compileSfc.ts` — the Vue-SFC and TypeScript compile steps, shared by the
   worker and the tests.
+- `moduleStyles.ts` — carries a compiled file's CSS to the component's `styles`
+  (see "Styles" below), and the key that makes the host element anew per
+  component.
 - `rootAddress.ts` — the `enso-root:` address (below). Imported by the worker
   and the main thread, so it must stay free of the DOM.
 - `movedVisualizations.ts` — the table of visualizations that moved out of the
@@ -81,8 +85,40 @@ project.
 `resolveRelativeImport` throws for `../../<other root id>/x.vue`, and
 `parseRootAddress` refuses segments of `.`, `..` or holding `/` or `\`, so a
 library's visualization cannot read another library's (or the project's) files.
-The error is reported as a compile error of the importing file. Style elements
-carry the address in `data-style-path` so a change removes exactly its own.
+The error is reported as a compile error of the importing file.
+
+## Styles
+
+A visualization is shown inside the shadow root of `VisualizationHost`'s custom
+element, so a `<style>` in the document never reaches it. Vue copies a
+component's `styles` array into the shadow root when the component mounts (for a
+child component too), which is how the built-ins' CSS gets there. The run-time
+compiler does the same for a compiled file: the worker sends the file's compiled
+styles inside the module's own `add-import` notification (`styles`), and
+`createModuleImporter` (`moduleImports.ts`) sets them as `styles` on the default
+export (`attachStyles`) before the module is published. Carrying them in the
+same message is what keeps them atomic: styles sent apart and collected per path
+would stay behind when a file fails to compile or import, and be taken by
+whichever of two overlapping imports of a path finished its message first. The
+importer skips a notification only when both the code and the styles are those
+it last imported (an edit to a `<style>` can leave the code as it was). A `.vue`
+file a visualization imports is a module of its own and brings its CSS the same
+way; scoped rules still match because the worker adds the same `__scopeId` they
+are written for. Nothing is added to `document.head`.
+
+Vue never removes a component's CSS from a shadow root. `GraphVisualization`
+therefore gives the host element a `key` that is the identity of the last real
+visualization component (`hostKeyFor`, `visualizationKey`): another
+visualization, and a recompiled version of the same file (a new component), each
+get a fresh element and so a shadow root holding only their own rules; the
+loading and error views, which come with every preprocessor change, keep the
+key. An element that has been replaced unmounts its app a tick after it is
+removed, and the `params` it shares with its successor can change first, so
+`VisualizationHost` renders nothing once its element is disconnected
+(`useHost`); otherwise the new visualization would be set up inside the removed
+element too, and its requests (toolbar, preprocessor, nodes) would arrive twice.
+Removing a file unregisters the visualization; its component, and with it its
+CSS, goes when the host that shows it is replaced.
 
 ## Waiting for a library
 
@@ -124,6 +160,17 @@ Enso and Java code.
 - `__tests__/folderLoader.test.ts`, `libraryVisualizations.test.ts` — the
   watcher and the store, against a mocked language server (library root added
   later, `get` before the root arrives, the 10 s limit, removal, moved ids).
+- `__tests__/moduleStyles.test.ts` — compiles real `.vue` sources with
+  `compileSfc` and mounts them in the real `VisualizationHost` as a custom
+  element: the CSS reaches the shadow root (own and imported component),
+  applies, is not in the document, and a recompile shows only its own rules;
+  `hostKeyFor`.
+- `__tests__/moduleImports.test.ts` — `createModuleImporter`: styles go with
+  their own module, a failed import leaves none behind, overlapping imports of a
+  path, a style-only edit. The worker itself (`compiler.ts`) and the blob
+  `import()` in `compilerMessaging.ts` are not run by unit tests.
+- `components/GraphEditor/__tests__/visualizationHostSwitch.test.ts` — switching
+  visualizations in a keyed custom element sets the new one up once.
 - `__tests__/rootAddress.test.ts`, `movedVisualizations.test.ts`,
   `metadata.test.ts`, `availability.test.ts`, `compileSfc.test.ts`.
 - `__tests__/shippedVisualizations.test.ts` — finds every

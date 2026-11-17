@@ -82,17 +82,34 @@ is already on the row, drawn by `WidgetIcon` at the root.
   `docs/superpowers/specs/2026-11-15-date-widget-design.md`.
 - `WidgetTimeOfDay.vue` — the same for a `Time_Of_Day`-typed input (priority 52;
   `Time_Of_Day.now`, or `Time_Of_Day.new` with `hour`, `minute` and `second`
-  ports). Its menu (`WidgetTimeOfDay/TimeOfDayMenu.vue`) is `Time_Of_Day.now`
-  and a Reka `TimeField` (hours and minutes, seconds on request, written only
-  when not zero): Enter in the field, leaving it or a click outside the menu
-  writes it (the shell calls the handler the menu registers with `setAccept`
-  before it ends the interaction), Escape and the arrow's toggle do not. A
-  cleared segment blocks the write until it is filled in. `timeExpression.ts` is
-  the mapping. The wrapper, its floating menu and the interaction are
-  `WidgetPicker/PickerShell.vue`, the menu frame is
+  ports). Its menu (`WidgetTimeOfDay/TimeOfDayMenu.vue`) is `Time_Of_Day.now`, a
+  Reka `TimeField` (hours and minutes, seconds on request, written only when not
+  zero), scrollable columns of hours and minutes (and seconds) to pick from
+  (`WidgetTimeOfDay/TimeColumns.vue`, a plain `HourMinuteSecond` v-model, kept
+  apart for the Date_Time picker to reuse), and Cancel and Set. The field and
+  the columns show one draft: a pick in a column writes nothing and leaves the
+  focus in the field; typing scrolls the columns to the value. It reads any
+  `Time_Of_Day.new` of integer literals, positional or named, a missing part
+  being 0 (a bare `Time_Of_Day.new`; `Time_Of_Day.new 14`, which typing an hour
+  into the unset `hour` writes, since `WidgetFunction` inserts the first
+  trailing placeholder positionally; `hour=14`; `second=15` as the `…` menu and
+  `pretty` write it); an edit writes hour, minute and second positionally and
+  keeps the millisecond, microsecond and nanosecond as they were written
+  (`withKeptParts`). Set writes the draft (or only closes when it is the time
+  already written); Enter in the field, leaving it or a click outside the menu
+  writes it only if it was edited (the shell calls the handler the menu
+  registers with `setAccept` before it ends the interaction); Cancel, Escape and
+  the arrow's toggle do not. A cleared segment blocks the write until it is
+  filled in. `timeExpression.ts` is the mapping. The wrapper, its floating menu
+  and the interaction are `WidgetPicker/PickerShell.vue`, the menu frame is
   `WidgetPicker/PickerMenuFrame.vue` and the parenthesising rule is
   `WidgetPicker/parentheses.ts`, all shared with `WidgetDate`. **The menu is
-  open only when the widget asked for it** (`menuOpen`): editing a nested number
+  positioned by `pickerMenuStyles`** (`WidgetSelection/styles.ts`): left edges
+  lined up under the argument, kept there by `autoUpdate`, and shifted only by
+  the screen's edge. `activityDropdownStyles` also shifts a dropdown to stay
+  within the node, which pushed a menu wider than the rest of the node off its
+  argument (by 160 px for an unset argument at a node's end). **The menu is open
+  only when the widget asked for it** (`menuOpen`): editing a nested number
   makes the widget's interaction active too (as it does for `WidgetSelection`,
   which then opens its list), and must not show the menu. A nested number's
   `@click.stop` keeps its clicks from toggling it. **At a node root the first
@@ -131,3 +148,15 @@ is already on the row, drawn by `WidgetIcon` at the root.
   method's body context, 1 s timeout, so the node creation waits at most that
   long and one undo still removes node and import); `formatTypeForDrop` does
   both. The import goes in the node creation's edit.
+
+## Argument access
+
+- The `…` after a call's arguments (`WidgetFunction/ParameterMenu.vue`; which
+  parameters it offers: `WidgetFunction/hiddenParameters.ts`) adds a parameter
+  the call is not showing, always written as a named argument. The button hides
+  while it is the only selected node, unless its menu is open.
+- `WidgetPort` marks an argument that can be popped out with `data-pop-out-port`
+  (plus `data-pop-out-name` and `data-pop-out-type`); dragging it off the node
+  makes it a node of its own. The drag and the edit are in `../popOut/` - see
+  `../popOut/CLAUDE.md`. Inputs that handle `pointerdown` themselves (number,
+  text, slider) do not start a pop out.
