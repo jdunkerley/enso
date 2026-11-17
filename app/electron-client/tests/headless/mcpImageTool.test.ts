@@ -5,7 +5,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, expect, test } from 'vitest'
-import { fsImageFiles, IMAGE_MAX_BYTES, imageTool, type ImageFiles } from '../../src/mcp/imageTool'
+import {
+  fsImageFiles,
+  IMAGE_MAX_BYTES,
+  imageTool,
+  isNetworkPath,
+  type ImageFiles,
+} from '../../src/mcp/imageTool'
 import type { CapturedImage } from '../../src/mcp/visualizationTool'
 import { EDIT_TOOL_TIMEOUT_MS } from '../../src/mcp/windowBridge'
 
@@ -387,6 +393,56 @@ test('on Windows only a drive path is taken: network, device and drive-relative 
     expect((await definition.run({ path }, CALLER)).ok, path).toBe(true)
     expect(calls[0]?.args.name, path).toBe('x.png')
   }
+})
+
+/** A tool on `win32` whose files resolve (mapped drives, links) through `resolve`. */
+function toolWithResolve(
+  path: string,
+  resolve: (path: string) => Promise<string>,
+): { definition: ReturnType<typeof imageTool>; reads: string[] } {
+  const fake = fakeFiles({ [path]: { bytes: PNG } })
+  const definition = imageTool(
+    { call: async () => STORED },
+    async () => null,
+    { ...fake, resolve },
+    async () => {},
+    'win32',
+  )
+  return { definition, reads: fake.reads }
+}
+
+test('on Windows a mapped network drive is refused: it resolves to a network path', async () => {
+  const path = String.raw`Z:\charts\x.png`
+  const { definition, reads } = toolWithResolve(
+    path,
+    async () => String.raw`\\nas\share\charts\x.png`,
+  )
+  const error = errorOf(await definition.run({ path }, CALLER))
+  expect(error).toContain('network drive')
+  expect(error).toContain('local disk')
+  expect(reads).toEqual([])
+})
+
+test('on Windows a local drive, also one made with subst, is taken', async () => {
+  const path = String.raw`S:\x.png`
+  const { definition } = toolWithResolve(path, async () => String.raw`C:\real\x.png`)
+  expect((await definition.run({ path }, CALLER)).ok).toBe(true)
+})
+
+test('on Windows a path that cannot be resolved is refused, not assumed local', async () => {
+  const path = String.raw`C:\gone\x.png`
+  const { definition, reads } = toolWithResolve(path, async () => {
+    throw Object.assign(new Error('x'), { code: 'ENOENT' })
+  })
+  expect(errorOf(await definition.run({ path }, CALLER))).toContain('no file')
+  expect(reads).toEqual([])
+})
+
+test('the real file reader reports a network path as one', () => {
+  expect(isNetworkPath(String.raw`\\nas\share\x.png`)).toBe(true)
+  expect(isNetworkPath('//nas/share/x.png')).toBe(true)
+  expect(isNetworkPath(String.raw`C:\x.png`)).toBe(false)
+  expect(isNetworkPath('/home/x.png')).toBe(false)
 })
 
 test('elsewhere an absolute path is taken, and a relative one refused', async () => {

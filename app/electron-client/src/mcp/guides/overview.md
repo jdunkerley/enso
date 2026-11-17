@@ -160,13 +160,13 @@ No tool changes the execution environment, settings or secrets;
     changed a file or a table outside the IDE. It never turns Write on. It is
     refused in Live mode, and when the code of the project's main module (the
     module the graph shows) enables output anywhere, because the refresh would
-    run it and write again: ask the user to refresh then. It checks only that
-    module's code: not the project's other modules, not library functions that
-    turn output on themselves, and not `foreign` code. Do not refresh a project
-    that writes through them. `save_version` saves a version of the project, as
-    the user's Save a version does, with a one-line `comment`. It answers
-    `saved: false` when nothing changed, and is refused when the user has not
-    turned versions on: it never turns them on.
+    run it and write again, or when any other module of the project's own source
+    does: ask the user to refresh then. It does not check library code, library
+    functions that turn output on themselves, or `foreign` code. Do not refresh
+    a project that writes through them. `save_version` saves a version of the
+    project, as the user's Save a version does, with a one-line `comment`. It
+    answers `saved: false` when nothing changed, and is refused when the user
+    has not turned versions on: it never turns them on.
 
 ## Evaluating expressions
 

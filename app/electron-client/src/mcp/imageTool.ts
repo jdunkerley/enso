@@ -14,7 +14,13 @@
  * quotes the file's content. On Windows the path must be a drive path (`C:\...`): a network path
  * (`\\host\share`) would make `stat` connect, and authenticate, to that host, a device path
  * (`\\.\`, `\\?\`) reaches pipes and devices, and a further `:` names an alternate data stream
- * (`C:\notes.txt:x.png`), another file's hidden content.
+ * (`C:\notes.txt:x.png`), another file's hidden content. Only local files are taken: a drive
+ * letter can be a mapped network drive, so on Windows the path is also resolved with the native
+ * `realpath` (`GetFinalPathNameByHandle`), which turns `Z:\x.png` on a mapped drive into
+ * `\\server\share\x.png`, and a result that is a network path is refused before `stat` or `open`
+ * touch it. The same resolution catches a local junction or link whose target is a share. A drive
+ * made with `subst` resolves to its local target and is accepted. If the resolution itself fails,
+ * the file is refused (it cannot be shown to be local).
  *
  * For SVG only the start of the file is checked (an `<svg` element after the prologue), so a text
  * file that begins with `<svg` is copied whole. That is acceptable: such a file is one the agent
@@ -23,13 +29,17 @@
  */
 /* eslint-disable camelcase -- tool argument names are snake_case on the wire */
 import type { McpCaller, McpToolResult } from 'enso-common/src/mcp'
-import { constants as fsConstants } from 'node:fs'
-import { open, realpath, stat } from 'node:fs/promises'
+import { constants as fsConstants, realpath as realpathCallback } from 'node:fs'
+import { open, stat } from 'node:fs/promises'
 import { posix, win32 } from 'node:path'
+import { promisify } from 'node:util'
 import { z } from 'zod'
 import type { ToolDefinition } from './toolRegistry'
 import { pictureVisualization, sleepFor, type Capture } from './visualizationTool'
 import { EDIT_TOOL_TIMEOUT_MS, type WindowBridge } from './windowBridge'
+
+/** `fs.realpath.native`: the OS's own resolution, which sees through a mapped network drive. */
+const realpathNative = promisify(realpathCallback.native)
 
 export const IMAGE_TOOL_NAME = 'add_image'
 /** Most bytes of an image, read from a file or sent to the window. */
@@ -149,6 +159,11 @@ export interface ImageFileStat {
 
 /** How `add_image` reads a file; {@link fsImageFiles} outside tests. */
 export interface ImageFiles {
+  /**
+   * The path with every link and mapped drive resolved (native `realpath`). Called on Windows
+   * only; a result that starts with two backslashes is a network path.
+   */
+  resolve?(path: string): Promise<string>
   /** The file's kind and size, following symbolic links. */
   stat(path: string): Promise<ImageFileStat>
   /**
@@ -166,9 +181,12 @@ export interface ImageFiles {
  */
 export function fsImageFiles(): ImageFiles {
   return {
+    resolve: (path) => realpathNative(path),
     stat: (path) => stat(path),
     read: async (path, maxBytes) => {
-      const target = await realpath(path)
+      // Native, so that a mapped network drive resolves to its `\\server\share` form here too.
+      const target = await realpathNative(path)
+      if (process.platform === 'win32' && isNetworkPath(target)) throw new NetworkPathError()
       const flags =
         fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0) | (fsConstants.O_NONBLOCK ?? 0)
       const handle = await open(target, flags)
@@ -188,6 +206,20 @@ export function fsImageFiles(): ImageFiles {
         await handle.close()
       }
     },
+  }
+}
+
+/** Whether a resolved Windows path is on the network (`\\server\share\…`) or a device. */
+export function isNetworkPath(resolved: string): boolean {
+  return resolved.startsWith('\\\\') || resolved.startsWith('//')
+}
+
+/** The file is on a network drive. */
+class NetworkPathError extends Error {
+  /** The error's code, as Node's file errors have one. */
+  readonly code = 'ENETWORKPATH'
+  constructor() {
+    super('Network path')
   }
 }
 
@@ -214,6 +246,8 @@ function readError(error: unknown): string {
     case 'EACCES':
     case 'EPERM':
       return 'The file could not be read: permission denied.'
+    case 'ENETWORKPATH':
+      return NETWORK_DRIVE_ERROR
     case 'EISDIR':
     case 'ENOTREGULAR':
     case 'ELOOP':
@@ -270,6 +304,9 @@ type Loaded = { ok: true; bytes: Buffer; name: string } | { ok: false; error: st
 const NOT_LOCAL_ERROR =
   'Give the full path of a file on this computer, such as C:\\charts\\sales.png; network and ' +
   'device paths are not accepted.'
+const NETWORK_DRIVE_ERROR =
+  'The file is on a network drive. `add_image` stores only files on a local disk: copy the ' +
+  'image to a local disk and give that path.'
 const RELATIVE_ERROR = 'The `path` must be absolute: the full path of an image file.'
 
 /**
@@ -296,6 +333,13 @@ async function loadImageFile(
 ): Promise<Loaded> {
   const refusal = pathError(path, platform)
   if (refusal != null) return { ok: false, error: refusal }
+  if (platform === 'win32' && files.resolve != null) {
+    try {
+      if (isNetworkPath(await files.resolve(path))) return { ok: false, error: NETWORK_DRIVE_ERROR }
+    } catch (error) {
+      return { ok: false, error: readError(error) }
+    }
+  }
   const paths = platform === 'win32' ? win32 : posix
   const fileName = paths.basename(path)
   const extension = paths.extname(fileName).slice(1).toLowerCase()

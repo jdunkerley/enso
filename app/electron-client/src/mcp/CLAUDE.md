@@ -252,14 +252,22 @@ and `node_id`:
   (Note [add_image Reads Only Images]). On Windows only a drive path (`C:\…` or
   `C:/…`), with no other `:`: network (`\\host\share`), device (`\\.\`, `\\?\`)
   and alternate-data-stream (`C:\notes.txt:x.png`) paths are refused before
-  anything touches them; elsewhere any absolute path. The extension must be an
-  accepted image kind (`.png`, `.apng`, `.jpg`, `.jpeg`, `.gif`, `.webp`,
-  `.avif`, `.svg`: the documentation editor's list) **and** the leading bytes
-  that same kind, so a text file named `.png`, or a PNG named `.jpg`, is refused
-  and nothing is copied. A regular file (after links) of at most 10 MB
-  (`IMAGE_MAX_BYTES`), checked from its size before it is read and again while
-  reading. No error quotes the file's content. A `path` works in Live: storing a
-  file is not an edit.
+  anything touches them; elsewhere any absolute path. **Only local files**
+  (policy awaiting the owner's final OK, #861): a drive letter can be a mapped
+  network drive, so on Windows the path is resolved with the native `realpath`
+  first (`fs.realpath.native`), which gives `\\server\share\…` for a mapped
+  drive (or a junction into a share); a network result is refused with "The file
+  is on a network drive" before `stat` or `open`. A `subst` drive resolves to
+  its local target and is taken. A path that cannot be resolved is refused. Not
+  reliable: nothing was run against a real mapped drive (none available here),
+  only the documented behaviour of `GetFinalPathNameByHandle` through libuv. The
+  extension must be an accepted image kind (`.png`, `.apng`, `.jpg`, `.jpeg`,
+  `.gif`, `.webp`, `.avif`, `.svg`: the documentation editor's list) **and** the
+  leading bytes that same kind, so a text file named `.png`, or a PNG named
+  `.jpg`, is refused and nothing is copied. A regular file (after links) of at
+  most 10 MB (`IMAGE_MAX_BYTES`), checked from its size before it is read and
+  again while reading. No error quotes the file's content. A `path` works in
+  Live: storing a file is not an edit.
 - **`node_id`**: a picture of the node's visualization, taken exactly as
   `get_visualization` takes one (`pictureVisualization`, the same Live rules,
   `shown` and `moved` in the result), stored as PNG. The picture and the store
@@ -379,8 +387,9 @@ Five more project tools (definitions in `projectTools.ts`, handlers in
   the code of the project's main module (`Main.enso`, the module the graph
   shows) enables output anywhere, because the refresh would run it and write
   again; the agent asks the user to refresh. Its description and the guide say
-  what is not checked: other modules, library functions that enable output
-  themselves, `foreign` code.
+  what is not checked: library code, library functions that enable output
+  themselves, `foreign` code (the project's other modules are checked by the
+  window, `otherModules.ts`).
 
 ## The caller checks
 
@@ -418,9 +427,10 @@ authorise anything by it. The token is the only credential.
   (default off, port 39417, no token), written atomically (a temporary file,
   then a rename) with mode `0o600`, so only the user can read it where the
   platform enforces modes (Windows does not; no ACL code). Unknown fields are
-  ignored. A missing file (`ENOENT`) or malformed JSON means the defaults. Any
-  other read failure (busy, no permission) is an error, not a reset: no
-  migration, no new token, nothing written, and no server starts. The status
+  ignored. A missing file (`ENOENT`) means the defaults. Malformed JSON (or JSON
+  that is not an object) and any other read failure (busy, no permission) are
+  errors, not a reset (a warning is logged and the file is never overwritten):
+  no migration, no new token, nothing written, and no server starts. The status
   error "The MCP settings file could not be read: …" is reported whether or not
   the server is switched on, so Settings shows it; it lasts until the app
   restarts. The temporary file is removed first and created fresh, and synced
