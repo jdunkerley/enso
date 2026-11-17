@@ -57,6 +57,12 @@ components and workflows should not.
   the messages with the zod schema in
   `app/gui/src/project-view/components/visualizations/TableVisualization/tableView.ts`.
 - `src/Geo_Map.enso`, `src/Scatter_Plot.enso` — per-visualization preprocessors.
+- `visualizations/Geo_Map.vue` — the Geo Map view, shipped by this library
+  (`Id.Library "Standard.Visualization" "Geo Map"`; no longer in the GUI). Its
+  `defaultPreprocessor` is `Geo_Map.process_to_json_text`. It reads the user's
+  Mapbox token through `builtins` (an IDE setting), loads `mapbox-gl` as a
+  global from its `scripts` export, and keeps its root class
+  `GeoMapVisualization` (Sentry Replay blocks it).
 - `src/Table/Visualization.enso` — IDE entry points of the table view
   (`prepare_visualization`, `get_rows_for_table`,
   `get_distinct_values_for_column`), written against `Viz_Table`.

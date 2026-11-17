@@ -3,50 +3,12 @@ import VisualizationHost, {
 } from '@/components/visualizations/VisualizationHost.vue'
 import { Vec2 } from '@/util/data/vec2'
 import { afterEach, beforeAll, describe, expect, test } from 'vitest'
-// eslint-disable-next-line no-restricted-imports
-import * as vue from 'vue'
 import { defineCustomElement, nextTick, type Component } from 'vue'
-import { compileSfc } from '../compileSfc'
 import { attachStyles, hostKeyFor, visualizationKey } from '../moduleStyles'
+import { loadSfc, type SfcModules } from './loadSfc'
 
-/**
- * The worker's contribution to a compiled `.vue` file, in the test: the scope id it adds, and the
- * module's styles, which arrive with the module and are put on its component.
- */
-interface Compiled {
-  component: Component & { styles?: string[] }
-  styles: string[]
-}
-
-/**
- * Compile a `.vue` file with the run-time compiler's compile step and evaluate it the way the
- * browser evaluates the worker's output: the imports of `vue` and of other `.vue` files are
- * destructured from the module cache (`modules`), and the default export is the component.
- */
-function load(
-  path: string,
-  source: string,
-  modules: Record<string, { component: Compiled['component']; styles: string[] }>,
-): Compiled {
-  const compiled = compileSfc(source, path)
-  const body = compiled.code
-    .replace(
-      /import\s*\{([^}]*)\}\s*from\s*['"]vue['"]/g,
-      (_, names: string) => `const {${names.replace(/\bas\b/g, ':')}} = vue`,
-    )
-    .replace(
-      /import\s+(\w+)\s+from\s*['"]([^'"]+)['"]/g,
-      (_, name: string, from: string) =>
-        `const ${name} = modules[${JSON.stringify(from)}].component`,
-    )
-    .replace(/export default/, 'return')
-  const component = new Function('vue', 'modules', body)(vue, modules) as Compiled['component']
-  ;(component as { __scopeId?: string }).__scopeId = `data-v-${compiled.id}`
-  const styles = compiled.styles
-  attachStyles({ default: component }, styles)
-  modules[path] = { component, styles }
-  return { component, styles }
-}
+/** Load a `.vue` file; the files it imports are found in `modules` (see {@link loadSfc}). */
+const load = (path: string, source: string, modules: SfcModules) => loadSfc(source, path, modules)
 
 const VIZ = (rule: string) => `<script setup lang="ts">
 import Chip from './Chip.vue'

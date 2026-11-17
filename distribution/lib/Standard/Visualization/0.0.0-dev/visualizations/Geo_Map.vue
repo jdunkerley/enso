@@ -19,10 +19,13 @@ const DEFAULT_MAX_MAP_ZOOM = 18
 const FIT_PADDING = 10
 const MAPBOX_ID_PREFIX = 'vis-data-'
 
-type Data = RegularData | Layer | DataFrame
+// A library visualization is compiled at run time and not type-checked: it cannot use
+// `@types/geojson` or `mapbox-gl`'s types. These local types document what this file reads.
 
-interface RegularData {
-  layers: Layer[]
+/** A GeoJSON object (RFC 7946): a geometry, a Feature, or a collection of either. */
+export interface GeoJSON {
+  type: string
+  [key: string]: unknown
 }
 
 interface ScatterplotLayer {
@@ -32,7 +35,7 @@ interface ScatterplotLayer {
 
 interface GeoJsonLayer {
   type: 'GeoJsonLayer'
-  data: GeoJSON.GeoJSON | GeoJSON.Geometry[]
+  data: GeoJSON | GeoJSON[]
 }
 
 type Layer = ScatterplotLayer | GeoJsonLayer
@@ -55,43 +58,22 @@ interface DataFrame {
   df_label?: string[]
 }
 
-declare const mapboxgl: typeof import('mapbox-gl')
-</script>
+/** Mapbox GL, the global the `scripts` above load. */
+declare const mapboxgl: any
 
-<script setup lang="ts">
-import { useMapboxToken } from '$/providers/mapboxToken'
-import { redactAccessToken } from '$/utils/redact'
-import { useVisualizationConfig } from '@/util/visualizationBuiltins'
-import bbox from '@turf/bbox'
-import { computed, effectScope, onScopeDispose, useTemplateRef, watch, type EffectScope } from 'vue'
-import MapboxTokenMissing from './GeoMapVisualization/MapboxTokenMissing.vue'
-
-const props = defineProps<{ data: Data }>()
-const config = useVisualizationConfig()
-
-/**
- * The user's Mapbox access token (Settings → Local → Maps), or `null`. API limits:
- * https://docs.mapbox.com/api/#rate-limits
- */
-const mapboxToken = useMapboxToken()
-const mapNode = useTemplateRef('mapNode')
-
-const dataAsGeoJSONs = computed(() => {
-  const data: unknown = props.data
+/** The GeoJSON layers a visualization value describes; a value that is not a map gives none. */
+export function toGeoJSONs(data: unknown): GeoJSON[] {
   // Values that are not a map (a number, a vector, `{}` for a column) show the empty map.
   if (data == null || typeof data !== 'object') return []
-  if ('type' in props.data) {
-    return [layerToGeoJSON(props.data)]
-  } else if ('df_latitude' in props.data) {
-    return [dataframeToGeoJSON(props.data)]
-  } else if ('layers' in props.data && Array.isArray(props.data.layers)) {
-    return props.data.layers.map(layerToGeoJSON)
-  } else {
-    return []
+  if ('type' in data) return [layerToGeoJSON(data as Layer)]
+  if ('df_latitude' in data) return [dataframeToGeoJSON(data as DataFrame)]
+  if ('layers' in data && Array.isArray(data.layers)) {
+    return (data.layers as Layer[]).map(layerToGeoJSON)
   }
-})
+  return []
+}
 
-function layerToGeoJSON(layer: Layer): GeoJSON.GeoJSON {
+function layerToGeoJSON(layer: Layer): GeoJSON {
   switch (layer.type) {
     case 'Scatterplot_Layer':
       return {
@@ -121,41 +103,91 @@ function layerToGeoJSON(layer: Layer): GeoJSON.GeoJSON {
   }
 }
 
-function dataframeToGeoJSON(df: DataFrame): GeoJSON.GeoJSON {
-  const geojson: GeoJSON.GeoJSON = {
-    type: 'FeatureCollection',
-    features: [],
-  }
+function dataframeToGeoJSON(df: DataFrame): GeoJSON {
+  const features: GeoJSON[] = []
   for (let i = 0; i < df.df_latitude.length; i += 1) {
     const latitude = df.df_latitude[i]!
     const longitude = df.df_longitude[i]!
     const label = df.df_label?.[i]
     const color = df.df_color?.[i]
     const radius = df.df_radius?.[i]
-    geojson.features.push({
+    features.push({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [longitude, latitude] },
       properties: { label, color, radius },
     })
   }
-  return geojson
+  return { type: 'FeatureCollection', features }
 }
 
+/**
+ * `[west, south, east, north]` around every position in a GeoJSON value (heights ignored), or
+ * `undefined` when it has none. In place of `@turf/bbox`, which a library visualization cannot
+ * import.
+ */
+export function boundingBox(value: unknown): [number, number, number, number] | undefined {
+  let box: [number, number, number, number] | undefined
+  const visit = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      if (typeof node[0] === 'number' && typeof node[1] === 'number') {
+        const x = node[0]
+        const y = node[1]
+        box =
+          box ?
+            [Math.min(box[0], x), Math.min(box[1], y), Math.max(box[2], x), Math.max(box[3], y)]
+          : [x, y, x, y]
+      } else {
+        node.forEach(visit)
+      }
+    } else if (node != null && typeof node === 'object') {
+      const object = node as Record<string, unknown>
+      visit(object.coordinates)
+      visit(object.geometry)
+      visit(object.geometries)
+      visit(object.features)
+    }
+  }
+  visit(value)
+  return box
+}
+</script>
+
+<script setup lang="ts">
+import {
+  MapboxTokenMissing,
+  redactAccessToken,
+  useMapboxToken,
+  useVisualizationConfig,
+} from 'builtins'
+import { computed, effectScope, onScopeDispose, useTemplateRef, watch, type EffectScope } from 'vue'
+
+// A value that is not a map (a number, `null`) is shown too, as the empty map, and a typed prop
+// would warn about it.
+const props = defineProps<{ data: unknown }>()
+const config = useVisualizationConfig()
+
+/**
+ * The user's Mapbox access token (Settings → Local → Maps), or `null`. API limits:
+ * https://docs.mapbox.com/api/#rate-limits
+ */
+const mapboxToken = useMapboxToken()
+const mapNode = useTemplateRef('mapNode')
+
+const dataAsGeoJSONs = computed(() => toGeoJSONs(props.data))
+
 function boundingBoxOfCurrentData() {
-  let finalBBox: mapboxgl.LngLatBounds | undefined
+  let finalBBox: any
   for (const geojson of dataAsGeoJSONs.value) {
-    const layerBbox = bbox(geojson)
-    // `bbox` sometimes returns 3d box.
-    const layerBboxFlat: [number, number, number, number] =
-      layerBbox.length == 4 ? layerBbox : [layerBbox[0], layerBbox[1], layerBbox[3], layerBbox[4]]
-    finalBBox = finalBBox?.extend(layerBboxFlat) ?? new mapboxgl.LngLatBounds(layerBboxFlat)
+    const layerBbox = boundingBox(geojson)
+    if (layerBbox == null) continue
+    finalBBox = finalBBox?.extend(layerBbox) ?? new mapboxgl.LngLatBounds(layerBbox)
   }
   return finalBBox
 }
 
 class GeoMapVisualizationMap {
-  map: mapboxgl.Map
-  tooltip: mapboxgl.Popup
+  map: any
+  tooltip: any
   /** Mapbox sources currently attached to {@link map} */
   private mapSources: string[] = []
   /** Mapbox layers currently attached to {@link map} */
@@ -192,7 +224,7 @@ class GeoMapVisualizationMap {
     }
     // Mapbox's own errors name the failed URL, token included; log them redacted instead of letting
     // mapbox-gl print them raw.
-    this.map.on('error', (event) => {
+    this.map.on('error', (event: any) => {
       const error: unknown = event.error
       console.error(
         'Mapbox error:',
@@ -221,7 +253,7 @@ class GeoMapVisualizationMap {
 
     this.map.on('style.load', () => {
       // queryRenderedFeatures works only on loaded styles (otherwise we get exceptions).
-      this.map.on('mousemove', (event) => {
+      this.map.on('mousemove', (event: any) => {
         const feature = this.map.queryRenderedFeatures(event.point)[0]
         if (feature?.properties?.label) {
           popup.setLngLat(event.lngLat).setText(feature.properties.label).addTo(this.map)

@@ -539,9 +539,6 @@ importers:
       '@tanstack/vue-query':
         specifier: ^5.91.1
         version: 5.91.1(vue@3.5.43(typescript@6.0.3))
-      '@turf/bbox':
-        specifier: ^7.4.0
-        version: 7.4.0
       '@vue/reactivity':
         specifier: 'catalog:'
         version: 3.5.43
@@ -777,9 +774,6 @@ importers:
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0(supports-color@8.1.1)
-      mapbox-gl:
-        specifier: ^3.31.0
-        version: 3.31.0
       playwright:
         specifier: 'catalog:'
         version: 1.63.0
@@ -4151,15 +4145,6 @@ packages:
 
   '@tsconfig/node20@20.1.10':
     resolution: {integrity: sha512-5OZgdnxbFuvwm05iVwPXMU5/7iPuVDDZzAnxPDLj+kjN7fwQZSSVgHQhKTNkBPOO6Qef2D5MxPAoPLCGqE2VuQ==}
-
-  '@turf/bbox@7.4.0':
-    resolution: {integrity: sha512-yOX9lALc2GmjYUIE99+nRj7eZA7eDtx7Ixu/hrgIo+YqHvL1reaPVTC9rQWMHMm0pH0/WHjzk8uOpAHjptrudQ==}
-
-  '@turf/helpers@7.4.0':
-    resolution: {integrity: sha512-7PAwLZqOdRzTI5g9bHvUwlloAXPDH/mlajtryk0tw4ZwGMtmXsAyF4QundsAMfy4u48Fyd3AUqMXY0SMxqJGWg==}
-
-  '@turf/meta@7.4.0':
-    resolution: {integrity: sha512-3cLUvlEyDuSnMSzrjhaLAEiYR8xhbfWyTVQlrlEw40xL81d4KF4PqUWbjTXKpXZStdYbet2GCurl79KMypNw6g==}
 
   '@tybys/wasm-util@0.10.4':
     resolution: {integrity: sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A==}
@@ -7882,9 +7867,6 @@ packages:
   make-fetch-happen@14.0.3:
     resolution: {integrity: sha512-QMjGbFTP0blj97EeidG5hk/QhKQ3T4ICckQGLgz38QF7Vgbk6e6FTARN8KhKxyBbWn8R0HU+bnw8aSoFPD4qtQ==}
     engines: {node: ^18.17.0 || >=20.5.0}
-
-  mapbox-gl@3.31.0:
-    resolution: {integrity: sha512-7i25NyCPW5jnqsqJq3irgBBEoVTJgfZqTJJS446Q3ZuxyAb5Om75UIcxYIo38oz9eDswnBXr0riz+M/C8V7g3Q==}
 
   mark.js@8.11.1:
     resolution: {integrity: sha512-1I+1qpDt4idfgLQG+BNWmrqku+7/2bi5nLf4YwF8y8zXvmfiTBY3PV3ZibfrjBueCByROpuBjLLFCajqkgYoLQ==}
@@ -15382,24 +15364,6 @@ snapshots:
 
   '@tsconfig/node20@20.1.10': {}
 
-  '@turf/bbox@7.4.0':
-    dependencies:
-      '@turf/helpers': 7.4.0
-      '@turf/meta': 7.4.0
-      '@types/geojson': 7946.0.16
-      tslib: 2.8.1
-
-  '@turf/helpers@7.4.0':
-    dependencies:
-      '@types/geojson': 7946.0.16
-      tslib: 2.8.1
-
-  '@turf/meta@7.4.0':
-    dependencies:
-      '@turf/helpers': 7.4.0
-      '@types/geojson': 7946.0.16
-      tslib: 2.8.1
-
   '@tybys/wasm-util@0.10.4':
     dependencies:
       tslib: 2.8.1
@@ -19825,8 +19789,6 @@ snapshots:
       ssri: 12.0.0
     transitivePeerDependencies:
       - supports-color
-
-  mapbox-gl@3.31.0: {}
 
   mark.js@8.11.1: {}
 

@@ -53,13 +53,6 @@ type Id
     table : Id
     table = Id.Builtin "Table"
 
-    ## ---
-       private: true
-       ---
-       An identifier for the builtin Geo Map visualization
-    geo_map : Id
-    geo_map = Id.Builtin "Geo Map"
-
 ## ---
    private: true
    ---

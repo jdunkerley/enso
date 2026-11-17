@@ -3,14 +3,10 @@ import VisualizationHost, {
   type VisualizationHostParams,
 } from '@/components/visualizations/VisualizationHost.vue'
 import { Vec2 } from '@/util/data/vec2'
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeAll, expect, test } from 'vitest'
-// eslint-disable-next-line no-restricted-imports
-import * as vue from 'vue'
 import { defineCustomElement, nextTick, type Component } from 'vue'
-import { compileSfc } from '../compileSfc'
-import { attachStyles } from '../moduleStyles'
+import { loadShippedSfc } from './loadSfc'
 
 const SQL_QUERY = path.resolve(
   __dirname,
@@ -23,26 +19,13 @@ const SQL_QUERY = path.resolve(
  * layout is not under test), and the default export is the component, with its styles attached.
  */
 function loadShipped(): Component {
-  const compiled = compileSfc(readFileSync(SQL_QUERY, 'utf8'), 'SQL_Query.vue')
-  const body = compiled.code
-    .replace(
-      /import\s*\{([^}]*)\}\s*from\s*['"]vue['"]/g,
-      (_, names: string) => `const {${names.replace(/\bas\b/g, ':')}} = vue`,
-    )
-    .replace(
-      /import\s*\{([^}]*)\}\s*from\s*['"]sql-formatter['"]/g,
-      (_, names: string) => `const {${names.replace(/\bas\b/g, ':')}} = formatter`,
-    )
-    .replace(/export const /g, 'const ')
-    .replace(/export default/, 'return')
-  const component = new Function('vue', 'formatter', body)(vue, {
-    format: (code: string, options: { params: string[] }) =>
-      code.replace(/\?/g, () => options.params.shift() ?? '?'),
-    supportedDialects: ['sqlite'],
-  }) as Component & { __scopeId?: string }
-  component.__scopeId = `data-v-${compiled.id}`
-  attachStyles({ default: component }, compiled.styles)
-  return component
+  return loadShippedSfc(SQL_QUERY, 'SQL_Query.vue', {
+    'sql-formatter': {
+      format: (code: string, options: { params: string[] }) =>
+        code.replace(/\?/g, () => options.params.shift() ?? '?'),
+      supportedDialects: ['sqlite'],
+    },
+  }).component
 }
 
 const hostName = 'enso-test-host-sql-query-style'

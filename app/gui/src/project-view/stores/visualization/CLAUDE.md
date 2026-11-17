@@ -135,6 +135,21 @@ which `visualizationData.ts` catches and shows with the rejection's own text (it
 is not the "was not found in the library" error). A rejected wait is dropped
 from the cache, so a later request tries again.
 
+## Scripts
+
+A visualization may list `scripts` (URLs the view needs as globals, e.g. Geo
+Map's Mapbox GL). They load when the view is first requested, never when the
+file is compiled: a built-in's cached promise loads them itself
+(`resolveBuiltinVisualization`), and `get` wraps the promise of a `Library` or
+`CurrentProject` module the same way (`loadingScripts`, one wrapper per module
+promise). So opening a project downloads nothing, a visualization is offered
+(registered) without waiting for a CDN, and the library wait above is unchanged
+(the waiter resolves with the module; the scripts load on top). A URL loads once
+(`loadedScripts` holds its load promise, so concurrent requests wait for the
+same one); a script that fails to load is dropped from it, and its wrapper too,
+so a later `get` tries again, and the view opens regardless. Tested in
+`libraryVisualizations.test.ts`.
+
 ## Moved ids
 
 A node saves its visualization id in its metadata. When a built-in moves to a
@@ -143,20 +158,26 @@ library, `movedVisualizations.ts` maps the old id to the new one, and
 before the move keep their view. The saved metadata is rewritten only when the
 user changes the visualization.
 
-| Old id                | Now                                             |
-| --------------------- | ----------------------------------------------- |
-| `Builtin` `Image`     | `Library` `Standard.Image`, name `Image`        |
-| `Builtin` `SQL Query` | `Library` `Standard.Database`, name `SQL Query` |
+| Old id                | Now                                                |
+| --------------------- | -------------------------------------------------- |
+| `Builtin` `Image`     | `Library` `Standard.Image`, name `Image`           |
+| `Builtin` `SQL Query` | `Library` `Standard.Database`, name `SQL Query`    |
+| `Builtin` `Geo Map`   | `Library` `Standard.Visualization`, name `Geo Map` |
 
-Add a row when another built-in moves (Geo map → `Standard.Geo` is planned).
+Add a row when another built-in moves.
 
 ## What a library visualization can use
 
 The same as a project visualization: `vue`, `d3`, `sql-formatter` (a lazy chunk
 like `d3`; Standard.Database's SQL Query view formats with it), the GUI's
-`builtins` module (`useVisualizationConfig`, `defineKeybinds`), and scripts
-listed in `scripts`. Nothing wider; it runs in the IDE window with the trust of
-the library's own Enso and Java code.
+`builtins` module (`util/visualizationBuiltins.ts`: `useVisualizationConfig`,
+`defineKeybinds`, and for the map the IDE's Mapbox token setting:
+`useMapboxToken`, `redactAccessToken` and the `MapboxTokenMissing` empty state,
+which stay IDE code because the token is a Settings → Local → Maps value, not
+library data; `util/__tests__/visualizationBuiltins.test.ts` checks the empty
+state's CSS reaches the shadow root), and scripts listed in `scripts`. Nothing
+wider; it runs in the IDE window with the trust of the library's own Enso and
+Java code.
 
 The bare names are `BUILTIN_MODULE_NAMES` in `builtinModules.ts`, and nowhere
 else: `compilerMessaging.ts` provides one module per name (its table is
@@ -177,6 +198,10 @@ the list widens what every library can rely on, so it is the owner's decision
   element: the CSS reaches the shadow root (own and imported component),
   applies, is not in the document, and a recompile shows only its own rules;
   `hostKeyFor`.
+- `__tests__/loadSfc.ts` — the test helper that compiles a `.vue` source with
+  `compileSfc` and evaluates it as the browser evaluates the worker's output
+  (imports from a module table, styles attached); shared by
+  `moduleStyles.test.ts` and the shipped `…Style.test.ts` files.
 - `__tests__/moduleImports.test.ts` — `createModuleImporter`: styles go with
   their own module, a failed import leaves none behind, overlapping imports of a
   path, a style-only edit. The worker itself (`compiler.ts`) and the blob
@@ -196,8 +221,17 @@ the list widens what every library can rely on, so it is the owner's decision
   imports only the names in `BUILTIN_MODULE_NAMES` and its own relative files,
   with no dynamic `import()`.
 - `__tests__/shippedSqlQuery.test.ts` — Standard.Database's SQL Query view
-  mounted with sample data: formatting, coloured interpolations, escaping of the
-  SQL and of its values, a placeholder-looking name in the SQL, Ctrl+C.
+  mounted with sample data: formatting, syntax colouring (keywords, strings,
+  quoted identifiers, numbers, comments), coloured interpolations, escaping of
+  the SQL and of its values, a placeholder-looking name in the SQL, Ctrl+C.
+- `__tests__/shippedGeoMap.test.ts` — Standard.Visualization's Geo Map view with
+  `mapbox-gl` stubbed: the Mapbox token and its empty state, the redacted error
+  log, the Replay block class (`GeoMapVisualization`, which `$/utils/redact`'s
+  `REPLAY_BLOCK_SELECTORS` depends on), and `toGeoJSONs` / `boundingBox` (in
+  place of `@turf/bbox`) against the Enso goldens.
+- `__tests__/shippedGeoMapStyle.test.ts` — the same file compiled with
+  `compileSfc` and mounted in the real `VisualizationHost` custom element: its
+  scoped rules reach the shadow root.
 
 Run from `app/gui`:
 `CI=true corepack pnpm exec vitest run src/project-view/stores/visualization`

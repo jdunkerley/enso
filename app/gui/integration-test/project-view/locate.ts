@@ -151,7 +151,6 @@ function visualizationLocator(visSelector: string) {
 export const jsonVisualization = visualizationLocator('.JSONVisualization')
 export const tableVisualization = visualizationLocator('.TableVisualization')
 export const scatterplotVisualization = visualizationLocator('.ScatterplotVisualization')
-export const geoMapVisualization = visualizationLocator('.GeoMapVisualization')
 export const warningsVisualization = visualizationLocator('.WarningsVisualization')
 
 /** Type label on the visualisation */

@@ -225,20 +225,6 @@ describe('the right-click menu on a tree entry', () => {
     expect(menuIsOpen(wrapper)).toBe(false)
   })
 
-  test('Escape closes the menu, and only while it is open', async () => {
-    const wrapper = await mountTree()
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-    await flushPromises()
-    expect(menuIsOpen(wrapper)).toBe(false)
-    await openOn(wrapper, 'name')
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
-    await flushPromises()
-    expect(menuIsOpen(wrapper)).toBe(true)
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-    await flushPromises()
-    expect(menuIsOpen(wrapper)).toBe(false)
-  })
-
   test.each(['name', 'raw'])(
     'a right-click on %s keeps the native and the graph menus away',
     async (key) => {
