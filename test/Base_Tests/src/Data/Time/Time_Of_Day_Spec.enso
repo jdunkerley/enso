@@ -37,10 +37,18 @@ add_specs suite_builder =
             (t + (Duration.new seconds=15)) . should_equal (Time_Of_Day.new 12 30 15)
             (t - (Duration.new minutes=45)) . should_equal (Time_Of_Day.new 11 45)
 
-        group_builder.specify "+ and - offer each Time_Period and Duration.new" <|
+        group_builder.specify "+ and - take an autoscoped Time_Period, as their dropdown writes it" <|
+            t = Time_Of_Day.new 12 30
+            (t + ..Hour) . should_equal (Time_Of_Day.new 13 30)
+            (t - ..Minute) . should_equal (Time_Of_Day.new 12 29)
+            (t.+ ..Second) . should_equal (Time_Of_Day.new 12 30 1)
+            (t.- ..Hour) . should_equal (Time_Of_Day.new 11 30)
+
+        group_builder.specify "+ and - offer each Time_Period, autoscoped, and Duration.new" <|
             widget = make_time_period_selector
             labels = widget.values.map .label
-            labels . should_equal ["Time_Period.Hour", "Time_Period.Minute", "Time_Period.Second", "Time_Period.Millisecond", "Time_Period.Microsecond", "Time_Period.Nanosecond", "Duration.new"]
+            labels . should_equal ["..Hour", "..Minute", "..Second", "..Millisecond", "..Microsecond", "..Nanosecond", "Duration.new"]
+            widget.values.first.value . should_equal "..Hour"
             widget.values.last.value . should_equal "(Duration.new)"
 
         group_builder.specify "methods reject arguments of the wrong type" <|

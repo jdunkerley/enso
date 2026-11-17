@@ -609,12 +609,14 @@ type Time_Of_Day
    private: true
    ---
    The choices for an amount of time added to, or taken from, a Time_Of_Day:
-   each `Time_Period`, and `Duration.new` for a custom number of hours,
-   minutes and seconds. The whole names are written, as the argument takes
-   either type.
+   each `Time_Period`, written autoscoped (`..Hour`), and `Duration.new` for a
+   custom number of hours, minutes and seconds. `..Hour` resolves against the
+   `Duration | Time_Period` union: the engine tries each member in turn, and
+   only `Time_Period` has an `Hour` constructor (as `Column.date_part`'s
+   `Date_Period | Time_Period = ..Day` default does).
 make_time_period_selector display:Display=..When_Modified -> Widget =
     periods = ["Hour", "Minute", "Second", "Millisecond", "Microsecond", "Nanosecond"].map name->
-        code = "Time_Period." + name
+        code = ".." + name
         Option code code
     Widget.Single_Choice values=(periods + [Option "Duration.new" "(Duration.new)"]) display=display
 

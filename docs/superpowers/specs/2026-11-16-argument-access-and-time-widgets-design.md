@@ -99,8 +99,10 @@ nothing from A; B and C can be built alongside it.
   rest found by the assessment.
 - `start_of`/`end_of`: `(period : Time_Period = ..Hour)`, so the dropdown writes
   `..Hour`.
-- `+`/`-`: a dropdown of each `Time_Period` plus `Duration.new` for a custom
-  amount (like Date's `make_period_selector` with `Period.new`).
+- `+`/`-`: a dropdown of each `Time_Period`, written `..Hour`, plus
+  `Duration.new` for a custom amount (like Date's `make_period_selector` with
+  `Period.new`). `..Hour` resolves against the `Duration | Time_Period` union:
+  the engine tries each member in turn.
 - `to_date_time`: `date : Date` gets the date picker.
 - The comparators' `that` stays untyped, as for Date (#797).
 - An assessment table before and after, in this spec's appendix, as for Date.
@@ -193,19 +195,19 @@ Taken on: 2026-11-16, commit 1f0467354e, from the code (`Time_Of_Day.enso`, the
 regenerated API snapshot and the IDE's widget rules); the running IDE is checked
 in the PR's screenshots and the installer test. Only the rows that changed.
 
-| Function              | Argument                                        | Type (declared)            | Expected widget                         | Widget from the code                                | Result | Note                                                                  |
-| --------------------- | ----------------------------------------------- | -------------------------- | --------------------------------------- | --------------------------------------------------- | ------ | --------------------------------------------------------------------- |
-| new                   | hour · minute                                   | Integer                    | number, 0–23 / 0–59                     | number (`@hour`, `@minute` Numeric_Input)           | works  | The catalogue now sees `Integer`; returns `Time_Of_Day ! Time_Error`. |
-| new                   | second · millisecond · microsecond · nanosecond | Integer                    | number, shown when modified             | number (annotations)                                | works  | Typed `Integer`.                                                      |
-| parse                 | text · format                                   | Text · Date_Time_Formatter | text · format dropdown                  | text · `make_time_format_selector`                  | works  | Returns `Time_Of_Day ! Time_Error` instead of `Any`.                  |
-| nanosecond            | include_milliseconds                            | Boolean                    | checkbox                                | checkbox                                            | works  | The type moved onto the argument, so the catalogue sees `Boolean`.    |
-| start_of · end_of     | period                                          | Time_Period                | Time_Period dropdown, writing `..Hour`  | Time_Period dropdown (from the type)                | works  | Typed with a `..Hour` default; returns `Time_Of_Day`.                 |
-| to_date_time          | date                                            | Date                       | date picker                             | date picker                                         | works  | Typed `Date`; returns `Date_Time`.                                    |
-| to_date_time          | zone                                            | Time_Zone                  | time zone dropdown                      | time zone dropdown (`@zone`)                        | works  | `@zone` added, as `Date.to_date_time`.                                |
-| + · -                 | amount                                          | Duration \| Time_Period    | Time_Period dropdown and `Duration.new` | Time_Period dropdown and `Duration.new` (`@amount`) | works  | `@amount` added; returns `Time_Of_Day ! Time_Error`.                  |
-| date_part · date_diff | period · end                                    | Time_Period · Time_Of_Day  | unchanged                               | unchanged                                           | works  | Now returns `Integer` (was `Any`).                                    |
-| date_add · format     | —                                               | —                          | unchanged                               | unchanged                                           | works  | Now returns `Time_Of_Day` and `Text`.                                 |
-| > · >= · < · <=       | that                                            | (untyped)                  | —                                       | text box                                            | n/a    | Still untyped (#797).                                                 |
+| Function              | Argument                                        | Type (declared)            | Expected widget                         | Widget from the code                             | Result | Note                                                                  |
+| --------------------- | ----------------------------------------------- | -------------------------- | --------------------------------------- | ------------------------------------------------ | ------ | --------------------------------------------------------------------- |
+| new                   | hour · minute                                   | Integer                    | number, 0–23 / 0–59                     | number (`@hour`, `@minute` Numeric_Input)        | works  | The catalogue now sees `Integer`; returns `Time_Of_Day ! Time_Error`. |
+| new                   | second · millisecond · microsecond · nanosecond | Integer                    | number, shown when modified             | number (annotations)                             | works  | Typed `Integer`.                                                      |
+| parse                 | text · format                                   | Text · Date_Time_Formatter | text · format dropdown                  | text · `make_time_format_selector`               | works  | Returns `Time_Of_Day ! Time_Error` instead of `Any`.                  |
+| nanosecond            | include_milliseconds                            | Boolean                    | checkbox                                | checkbox                                         | works  | The type moved onto the argument, so the catalogue sees `Boolean`.    |
+| start_of · end_of     | period                                          | Time_Period                | Time_Period dropdown, writing `..Hour`  | Time_Period dropdown (from the type)             | works  | Typed with a `..Hour` default; returns `Time_Of_Day`.                 |
+| to_date_time          | date                                            | Date                       | date picker                             | date picker                                      | works  | Typed `Date`; returns `Date_Time`.                                    |
+| to_date_time          | zone                                            | Time_Zone                  | time zone dropdown                      | time zone dropdown (`@zone`)                     | works  | `@zone` added, as `Date.to_date_time`.                                |
+| + · -                 | amount                                          | Duration \| Time_Period    | Time_Period dropdown and `Duration.new` | `..Hour` dropdown and `Duration.new` (`@amount`) | works  | `@amount` added; returns `Time_Of_Day ! Time_Error`.                  |
+| date_part · date_diff | period · end                                    | Time_Period · Time_Of_Day  | unchanged                               | unchanged                                        | works  | Now returns `Integer` (was `Any`).                                    |
+| date_add · format     | —                                               | —                          | unchanged                               | unchanged                                        | works  | Now returns `Time_Of_Day` and `Text`.                                 |
+| > · >= · < · <=       | that                                            | (untyped)                  | —                                       | text box                                         | n/a    | Still untyped (#797).                                                 |
 
 ### Date_Time — before
 
