@@ -58,13 +58,15 @@ raw = conn.query (..Raw_SQL "SELECT id, name FROM users WHERE active = true")
   interpolated value coloured by its Enso type, keywords, strings, quoted
   identifiers, numbers and comments coloured with the code editor's palette (a
   small tokenizer in the file; it runs on the formatted text before escaping,
-  and never on a value), text selectable and Ctrl+C (Cmd+C on macOS) copying it.
-  It is not built with the IDE: the GUI compiles it at run time once the library
-  is loaded (it may import only `vue`, `sql-formatter` and the IDE's `builtins`;
-  see `app/gui/src/project-view/stores/visualization/CLAUDE.md`). Its
-  preprocessor, `Standard.Visualization.SQL.Visualization`, and the `SQL_Viz`
-  data type stay in Standard.Visualization, because Table converts to `SQL_Viz`
-  and Visualization cannot import Database. `DB_Table`'s `default_viz_id`
+  and never on a value; not handled: MySQL `#` comments, Postgres `E'…'` and
+  `$$…$$` strings, hex `0x…` numbers), text selectable and Ctrl+C (Cmd+C on
+  macOS) copying it. It is not built with the IDE: the GUI compiles it at run
+  time once the library is loaded (it may import only `vue`, `sql-formatter` and
+  the IDE's `builtins`; see
+  `app/gui/src/project-view/stores/visualization/CLAUDE.md`). Its preprocessor,
+  `Standard.Visualization.SQL.Visualization`, and the `SQL_Viz` data type stay
+  in Standard.Visualization, because Table converts to `SQL_Viz` and
+  Visualization cannot import Database. `DB_Table`'s `default_viz_id`
   (`DB_Table_Implementation`) answers
   `Id.Library "Standard.Database" "SQL Query"` to open it. A node saved with the
   old built-in id `SQL Query` still opens it (`movedVisualizations.ts`).

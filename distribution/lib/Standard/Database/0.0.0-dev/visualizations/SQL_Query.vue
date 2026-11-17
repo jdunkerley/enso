@@ -81,6 +81,26 @@ const KEYWORDS = new Set(
   ).split(' '),
 )
 
+/**
+ * The keywords that are also common function names (`LEFT(a, 3)`, `IF(b, 1, 2)`). They are coloured
+ * only when no `(` follows. It is not a rule for every keyword: `IN (`, `AND (` and `OVER (` are
+ * keywords. `FILTER` is left out, since `FILTER (WHERE …)` is the keyword.
+ */
+const KEYWORDS_ALSO_FUNCTIONS = new Set(['FIRST', 'IF', 'LAST', 'LEFT', 'RANGE', 'RIGHT', 'ROW'])
+
+/** Whether the text from `index` on begins, after optional whitespace, with `(`. */
+function opensCall(text: string, index: number) {
+  const open = /\s*\(/y
+  open.lastIndex = index
+  return open.test(text)
+}
+
+/** Whether a word, which ends at `end` in `text`, is coloured as a keyword. */
+function isKeyword(text: string, word: string, end: number) {
+  const upper = word.toUpperCase()
+  return KEYWORDS.has(upper) && !(KEYWORDS_ALSO_FUNCTIONS.has(upper) && opensCall(text, end))
+}
+
 /** The kinds of coloured token, each shown with the class `tok-<kind>`. */
 type TokenKind = 'keyword' | 'string' | 'identifier' | 'number' | 'comment'
 
@@ -103,7 +123,8 @@ function tokenPattern(prefix: string, bracketIdentifiers: boolean) {
       `(?<comment>--[^\\n]*|/\\*[\\s\\S]*?(?:\\*/|$))`,
       `(?<string>'(?:[^']|'')*(?:'|$))`,
       `(?<identifier>"(?:[^"]|"")*(?:"|$)|\`(?:[^\`]|\`\`)*(?:\`|$)${
-        bracketIdentifiers ? '|\\[[^\\]\\n]*\\]' : ''
+        // No `[` inside, so an unclosed one fails at the next `[` rather than rescanning the line.
+        bracketIdentifiers ? '|\\[[^\\]\\[\\n]*\\]' : ''
       })`,
       `(?<number>\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b)`,
       `(?<word>${word})`,
@@ -116,6 +137,10 @@ function tokenPattern(prefix: string, bracketIdentifiers: boolean) {
  * The HTML of formatted SQL: its tokens coloured and its placeholders replaced by the values. The
  * text is tokenized before it is escaped, and each piece is escaped on its own as it is wrapped, so
  * no SQL (or value) text reaches the page unescaped. A value is a chip and never tokenized.
+ *
+ * The placeholder is matched first, but never has to be found inside a string, quoted name or
+ * comment: sql-formatter substitutes only `?` tokens, and a `?` inside one of those is not a token,
+ * so a placeholder never sits inside a quoted piece of the formatted text.
  */
 function highlightSql(
   text: string,
@@ -143,7 +168,7 @@ function highlightSql(
       html += renderToken('identifier', match[0])
     } else if (groups.number != null) {
       html += renderToken('number', match[0])
-    } else if (KEYWORDS.has(match[0].toUpperCase())) {
+    } else if (isKeyword(text, match[0], end)) {
       html += renderToken('keyword', match[0])
     } else {
       html += escapeHtml(match[0])
@@ -298,7 +323,11 @@ function renderRegularInterpolation(value: unknown, fgColor: RGBA, bgColor: RGBA
   margin-top: 5px;
 }
 
-/* The colours of the code editor's default highlight style (CodeMirror's `defaultHighlightStyle`). */
+/*
+ * The colours of the code editor's default highlight style (CodeMirror's `defaultHighlightStyle`).
+ * A quoted identifier takes that palette's colour for special strings (`#e40`; it has no
+ * identifier tag of its own).
+ */
 :deep(.tok-keyword) {
   color: #708;
 }

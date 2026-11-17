@@ -242,3 +242,108 @@ test('the placeholder guard holds while colouring', () => {
   expect(pre.get('.tok-string').text()).toBe(`'__enso_param_0__'`)
   expect(pre.text().replace(/\s+/g, ' ')).toContain('SELECT __enso_param_0__')
 })
+
+/** The text of each coloured token of one kind, in a given dialect. */
+function tokensIn(dialect: string, code: string, kind: string, ...values: unknown[]) {
+  const wrapper = mount(SqlQuery.default, {
+    props: { data: { ...sql(code, ...values).data, dialect } },
+  })
+  return wrapper
+    .get('pre.sql')
+    .findAll(`.tok-${kind}`)
+    .map((t) => t.text())
+}
+
+test('a word that is also a function name is a keyword only when no `(` follows', () => {
+  expect(tokens('SELECT a FROM t LEFT JOIN u ON t.k = u.k', 'keyword')).toEqual([
+    'SELECT',
+    'FROM',
+    'LEFT',
+    'JOIN',
+    'ON',
+  ])
+  expect(tokens('SELECT LEFT(a, 3), RIGHT (a, 2), IF(b, 1, 2) FROM t', 'keyword')).toEqual([
+    'SELECT',
+    'FROM',
+  ])
+  // A keyword that is followed by `(` is still a keyword.
+  expect(tokens('SELECT a FROM t WHERE a IN (1, 2) AND (b > 1)', 'keyword')).toEqual([
+    'SELECT',
+    'FROM',
+    'WHERE',
+    'IN',
+    'AND',
+  ])
+  expect(tokens('SELECT SUM(a) OVER (PARTITION BY b) FROM t', 'keyword')).toEqual([
+    'SELECT',
+    'OVER',
+    'PARTITION',
+    'BY',
+    'FROM',
+  ])
+})
+
+/**
+ * The tokenizer on text of our own choosing, with no placeholders to swap. sql-formatter rejects an
+ * unterminated string, quoted name or `[`, so the view never sees one, but the tokenizer must
+ * still be total.
+ */
+function highlighted(text: string, bracketIdentifiers = false) {
+  const wrapper = mount(SqlQuery.default, { props: { data: NO_SQL } })
+  const vm = wrapper.vm as unknown as {
+    highlightSql: (text: string, prefix: string, interpolations: [], brackets: boolean) => string
+  }
+  return vm.highlightSql(text, '__enso_param_', [], bracketIdentifiers)
+}
+
+test('an unterminated string, quoted name or block comment is coloured to the end', () => {
+  expect(highlighted("b = 'oops")).toBe('b = <span class="tok-string">&#39;oops</span>')
+  expect(highlighted('b = "oops')).toBe('b = <span class="tok-identifier">&#34;oops</span>')
+  expect(highlighted('a /* oops\nmore')).toBe('a <span class="tok-comment">/* oops\nmore</span>')
+})
+
+test('`[name]` is a quoted identifier only in the T-SQL and SQLite dialects', () => {
+  expect(tokensIn('transactsql', 'SELECT [a b] FROM t', 'identifier')).toEqual(['[a b]'])
+  expect(tokensIn('sqlite', 'SELECT [a b] FROM t', 'identifier')).toEqual(['[a b]'])
+  // In PostgreSQL `[..]` is an array literal or a subscript.
+  expect(tokensIn('postgresql', 'SELECT [a b], c[1] FROM t', 'identifier')).toEqual([])
+  expect(highlighted('SELECT [a b]', true)).toContain('tok-identifier')
+  expect(highlighted('SELECT [a b]', false)).not.toContain('tok-identifier')
+})
+
+test('many unclosed `[` on one line are tokenized in linear time', () => {
+  // The quadratic pattern took ~0.1 s for 20 000 and ~3 s for 100 000.
+  const text = `SELECT ${'['.repeat(100_000)} FROM t`
+  const start = performance.now()
+  expect(highlighted(text, true)).toContain('tok-keyword')
+  expect(performance.now() - start).toBeLessThan(1000)
+})
+
+test('a number or a word right next to a placeholder does not hide it', () => {
+  const html = highlighted('1__enso_param_0__ x__enso_param_1__ __enso_param_2__y')
+  // No value is given, so a placeholder shows as it is; each is still seen on its own.
+  expect(html).toBe('1__enso_param_0__ x__enso_param_1__ __enso_param_2__y')
+  const wrapper = mount(SqlQuery.default, { props: sql('SELECT a FROM t WHERE b = ?', 'p') })
+  const vm = wrapper.vm as unknown as {
+    highlightSql: (
+      text: string,
+      prefix: string,
+      interpolations: { enso_type: string; value: unknown }[],
+      brackets: boolean,
+    ) => string
+  }
+  const withValues = vm.highlightSql(
+    'x__enso_param_0__ 1__enso_param_1__ y',
+    '__enso_param_',
+    [
+      // eslint-disable-next-line camelcase -- The field name is the Enso side's.
+      { enso_type: TEXT, value: 'p' },
+      // eslint-disable-next-line camelcase -- The field name is the Enso side's.
+      { enso_type: TEXT, value: 'q' },
+    ],
+    false,
+  )
+  expect(withValues.match(/class="interpolation"/g)).toHaveLength(2)
+  expect(withValues).toMatch(/^x<div/)
+  expect(withValues).toContain('</div> y')
+})
