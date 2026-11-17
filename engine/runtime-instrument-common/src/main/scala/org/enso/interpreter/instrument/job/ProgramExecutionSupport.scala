@@ -914,8 +914,7 @@ object ProgramExecutionSupport {
           )
       }
     } catch {
-      case e: Exception
-          if isTaskInterrupted || interruptOf(e).isDefined =>
+      case e: Exception if isTaskInterrupted || interruptOf(e).isDefined =>
         // Note [An Interrupted Visualization Is Not A Failure]
         rethrowIfInterrupted(Some(e))
         logger.trace(

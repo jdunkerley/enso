@@ -178,8 +178,8 @@ public final class ThreadManager extends GuestCodeExecutor {
   }
 
   /**
-   * Defers, until {@link #resumeInterrupts}, the interrupts already requested of the current thread.
-   * Use it in a {@code try}/{@code finally}:
+   * Defers, until {@link #resumeInterrupts}, the interrupts already requested of the current
+   * thread. Use it in a {@code try}/{@code finally}:
    *
    * <pre>
    * var resume = threadManager.suspendInterrupts();
