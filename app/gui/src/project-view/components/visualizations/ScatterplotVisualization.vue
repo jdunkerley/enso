@@ -8,6 +8,7 @@ import { getComputedFont, getTextWidthByFont } from '@/util/measurement'
 import { defineKeybinds } from '@/util/visualizationBuiltins'
 import { computed, ref, watch, watchEffect, watchPostEffect } from 'vue'
 import { brushFilterPattern, rowPattern } from './ScatterplotVisualization/scatterNodes'
+import { seriesColors, seriesEntries } from './ScatterplotVisualization/scatterSeries'
 import type { ToolbarItem } from './toolbar'
 import { findAction, parseVizActions, plainActionToolbar } from './vizActions'
 
@@ -331,13 +332,8 @@ const xTickFormat = computed(() => {
       return '%d/%m/%Y %H:%M:%S'
   }
 })
-const seriesLabels = computed(() =>
-  Object.keys(data.value.axis)
-    .filter((s) => s != 'x')
-    .map((s) => {
-      return data.value.axis[s as keyof AxesConfiguration].label
-    }),
-)
+const series = computed(() => seriesEntries(data.value.axis))
+const seriesLabels = computed(() => series.value.map((entry) => entry.label))
 
 const yLabelText = computed(() => {
   if (!data.value.is_multi_series) {
@@ -673,8 +669,8 @@ watchPostEffect(() => {
       []
     : allPlotData.filter((d) => d.label != null && d.label !== '')
 
-  const series = Object.keys(data.value.axis).filter((s) => s != 'x')
-  const color = d3.scaleOrdinal(d3.schemeCategory10).domain(series)
+  // Points and legend both look a series' colour up by its axis key, never by its label.
+  const color = seriesColors(series.value, d3.schemeCategory10, DEFAULT_FILL_COLOR)
 
   const colorScale =
     data.value.is_multi_series ?
@@ -744,14 +740,14 @@ watchPostEffect(() => {
 
     d3Legend.value
       .selectAll('circle')
-      .data(seriesLabels.value)
+      .data(series.value)
       .join((enter) => enter.append('circle').attr('r', 5).attr('cy', 9))
       .attr('cx', (d, i) => 90 + i * 120)
-      .style('fill', (d) => color(d) || DEFAULT_FILL_COLOR)
+      .style('fill', (d) => color(d.key))
 
     d3Legend.value
       .selectAll('text')
-      .data(seriesLabels.value)
+      .data(series.value)
       .join((enter) =>
         enter
           .append('text')
@@ -760,8 +756,8 @@ watchPostEffect(() => {
           .attr('alignment-baseline', 'middle'),
       )
       .attr('x', (d, i) => 100 + i * 120)
-      .text((d) => formatLabel(d))
-      .call((labels) => labels.append('title').text((d) => d))
+      .text((d) => formatLabel(d.label))
+      .call((labels) => labels.append('title').text((d) => d.label))
   }
 })
 
