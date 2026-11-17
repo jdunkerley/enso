@@ -27,8 +27,7 @@ import { dockTabActions, provideCodeTabFocus, useDockTab } from '@/components/Bo
 import CodeEditor from '@/components/CodeEditor.vue'
 import EngineLogPanel from '@/components/EngineLogs/EngineLogPanel.vue'
 import { markSeenWhile, useEngineLogStream } from '@/components/EngineLogs/engineLogStream'
-import ComponentBrowser, { type AiPromptSubmission } from '@/components/ComponentBrowser.vue'
-import { useAiToolHandler } from '@/components/ComponentBrowser/aiToolHandler'
+import ComponentBrowser from '@/components/ComponentBrowser.vue'
 import type { Usage } from '@/components/ComponentBrowser/input'
 import { usePlacement } from '@/components/ComponentBrowser/placement'
 import ContextMenuTrigger from '@/components/ContextMenuTrigger.vue'
@@ -82,7 +81,6 @@ import { provideGraphSelection } from '@/providers/graphSelection'
 import { provideStackNavigator } from '@/providers/graphStackNavigator'
 import { injectKeyboard } from '@/providers/keyboard'
 import { provideLanguageSupportExtensions } from '@/providers/languageSupportExtensions'
-import { provideOngoingAiPrompts } from '@/stores/ongoingAiPrompts'
 import { providePersisted } from '@/stores/persisted'
 import { provideVisualizationStore } from '@/stores/visualization'
 import { assert } from '@/util/assert'
@@ -93,7 +91,7 @@ import { Vec2 } from '@/util/data/vec2'
 import { isDef, type VueInstance } from '@vueuse/core'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import * as objects from 'enso-common/src/utilities/data/object'
-import { Err, Ok, unwrapOr } from 'enso-common/src/utilities/data/result'
+import { Err, Ok } from 'enso-common/src/utilities/data/result'
 import { set } from 'lib0'
 import {
   computed,
@@ -129,8 +127,6 @@ provideLanguageSupportExtensions({
 })
 
 const nodeExecution = provideNodeExecution(projectStore)
-const aiPrompts = provideOngoingAiPrompts()
-useAiToolHandler(aiPrompts)
 ;(window as any)._mockSuggestion = suggestionDb.mockSuggestion
 
 onMounted(() => {
@@ -610,7 +606,6 @@ const graphBindingsHandler = graphBindings.handler(
 // === Documentation Editor ===
 
 const overrideDisplayedDocs = ref<SuggestionId>()
-const aiMode = ref<boolean>(false)
 const docsForSelection = computed(() => {
   const selected = nodeSelection.tryGetSingleSelectedNode()
   if (!selected.ok) return Err('Select a single component to display help')
@@ -628,7 +623,7 @@ watchEffect(() => {
     {
       item: assetId.value,
       openedProject: projectInfo.value,
-      help: { item: displayedDocs.value, aiMode: aiMode.value },
+      help: { item: displayedDocs.value },
     },
   )
 })
@@ -656,7 +651,6 @@ function hideComponentBrowser() {
   componentBrowserOpened.value = false
   restoredComponentBrowserInput.value = undefined
   overrideDisplayedDocs.value = undefined
-  aiMode.value = false
 }
 
 function editWithComponentBrowser(node: NodeId, cursorPos: number) {
@@ -688,46 +682,6 @@ function commitComponentBrowser(
       expression: content,
       type,
       requiredImports,
-    })
-  }
-  hideComponentBrowser()
-}
-
-function handleAiAccepted(payload: AiPromptSubmission) {
-  if (payload.prompt.trim() === '') {
-    hideComponentBrowser()
-    return
-  }
-  const currentMethodName = unwrapOr(graphStore.currentMethod.pointer, undefined)?.name
-  if (!graphStore.currentMethod.ast.ok || currentMethodName == null) {
-    toasts.userActionFailed.show('Cannot create AI component: no current method loaded.')
-    hideComponentBrowser()
-    return
-  }
-  const methodAst = graphStore.currentMethod.ast.value
-  if (methodAst.body == null) {
-    toasts.userActionFailed.show('Cannot create AI component: current method has no body.')
-    hideComponentBrowser()
-    return
-  }
-  if (payload.editing != null) {
-    const result = aiPrompts.enqueueEdit({
-      prompt: payload.prompt,
-      sourceIdentifier: payload.sourceIdentifier,
-      methodId: methodAst.externalId,
-      methodBodyId: methodAst.body.externalId,
-      methodName: currentMethodName,
-      editNodeId: payload.editing.nodeId,
-    })
-    if (!result.ok) toasts.userActionFailed.reportError(result.error, 'Cannot edit AI prompt')
-  } else {
-    aiPrompts.enqueue({
-      prompt: payload.prompt,
-      sourceIdentifier: payload.sourceIdentifier,
-      methodId: methodAst.externalId,
-      methodBodyId: methodAst.body.externalId,
-      methodName: currentMethodName,
-      position: componentBrowserNodePosition.value,
     })
   }
   hideComponentBrowser()
@@ -1047,10 +1001,8 @@ const contextMenuActions: DisplayableActionName[] = [
             :graphEditorRoot="root"
             :restoredInput="restoredComponentBrowserInput"
             @accepted="commitComponentBrowser"
-            @acceptedAi="handleAiAccepted"
             @canceled="hideComponentBrowser"
             @selectedSuggestionId="overrideDisplayedDocs = $event"
-            @isAiPrompt="aiMode = $event"
           />
         </template>
         <TopBar

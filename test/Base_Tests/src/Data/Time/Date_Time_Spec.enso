@@ -2,6 +2,7 @@ from Standard.Base import all
 import Standard.Base.Errors.Common.Incomparable_Values
 import Standard.Base.Errors.Common.Type_Error
 import Standard.Base.Errors.Time_Error.Time_Error
+from Standard.Base.Data.Time.Date_Time import make_date_time_period_selector
 import Standard.Base.Runtime.Debug
 
 from Standard.Test import all
@@ -50,6 +51,45 @@ add_specs suite_builder =
             (Date_Time.new 2022 zone=(Time_Zone.parse "CET")).should_equal (Date_Time.new 2022 zone=(Time_Zone.parse "CET"))
             (Date_Time.new 2022 12 12).should_equal (Date_Time.new 2022 12 12)
             (Date_Time.new 2022 12 12).should_not_equal (Date_Time.new 1996)
+
+    suite_builder.group "Date_Time signatures" group_builder->
+        group_builder.specify "the period selectors list both kinds, and the custom amounts when asked" <|
+            periods = ["Date_Period.Year", "Date_Period.Quarter", "Date_Period.Month", "Date_Period.Week", "Date_Period.Day", "Time_Period.Hour", "Time_Period.Minute", "Time_Period.Second", "Time_Period.Millisecond", "Time_Period.Microsecond", "Time_Period.Nanosecond"]
+            make_date_time_period_selector.values.map .label . should_equal periods
+            amounts = make_date_time_period_selector include_custom=True
+            amounts.values.map .label . should_equal (periods + ["Period.new", "Duration.new"])
+            amounts.values.last.value . should_equal "(Duration.new)"
+
+        group_builder.specify "first_of_month and end_of_month are Dates" <|
+            dt = Date_Time.new 2020 2 15 10 30
+            dt.first_of_month . should_equal (Date.new 2020 2 1)
+            dt.end_of_month . should_equal (Date.new 2020 2 29)
+            Meta.type_of dt.first_of_month . should_equal_type Date
+            Meta.type_of dt.end_of_month . should_equal_type Date
+
+        group_builder.specify "start_of and end_of take either kind of period" <|
+            dt = Date_Time.new 2022 9 15 10 30 45
+            dt.start_of . should_equal (Date_Time.new 2022 9 1)
+            dt.start_of Time_Period.Hour . should_equal (Date_Time.new 2022 9 15 10)
+            dt.end_of Date_Period.Day . should_equal (Date_Time.new 2022 9 15 23 59 59 nanosecond=999999999)
+
+        group_builder.specify "+ and - take both kinds of period, a Period and a Duration" <|
+            dt = Date_Time.new 2020 1 31 12 0
+            (dt + Date_Period.Month) . should_equal (Date_Time.new 2020 2 29 12 0)
+            (dt + (Period.new days=1)) . should_equal (Date_Time.new 2020 2 1 12 0)
+            (dt - Time_Period.Hour) . should_equal (Date_Time.new 2020 1 31 11 0)
+            (dt - (Duration.new minutes=30)) . should_equal (Date_Time.new 2020 1 31 11 30)
+
+        group_builder.specify "methods reject arguments of the wrong type" <|
+            dt = Date_Time.new 2020 1 1 12 0
+            Test.expect_panic_with (dt.at_time_zone 5) Type_Error
+            Test.expect_panic_with (dt.set_time_zone 5) Type_Error
+            Test.expect_panic_with (dt.week_of_year 5) Type_Error
+            Test.expect_panic_with (dt.start_of 5) Type_Error
+            Test.expect_panic_with (dt.end_of "Month") Type_Error
+            Test.expect_panic_with (dt.add_work_days "a") Type_Error
+            Test.expect_panic_with (dt.add_work_days 1 holidays=5) Type_Error
+            Test.expect_panic_with (Date_Time.new 2020 nanosecond="a") Type_Error
 
     suite_builder.group "Unix epoch conversion" group_builder->
         group_builder.specify "should allow creating from second and nanosecond" <|

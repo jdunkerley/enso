@@ -199,9 +199,11 @@ registered by `GraphEditor.vue` while a project is on screen. The app tools
 `open_project`, `close_project`) are in `src/mcp/` (see its `CLAUDE.md`: every
 path must be in the Drive), registered once by `AppContainer.vue`. A new tool
 needs both halves. The Settings → AI tab turns the server on
-(`dashboard/layouts/Settings/CLAUDE.md`, "AI"). None of this is the in-app AI
-mode (`ComponentBrowser/aiToolHandler.ts`), which talks to the separate agent
-under `app/electron-client/src/ai/`.
+(`dashboard/layouts/Settings/CLAUDE.md`, "AI"). MCP is the IDE's only AI route:
+the Component Browser's AI prompt mode, AI nodes and the local agent behind them
+were removed. A project saved with an AI node still opens: the node is an
+ordinary call of a function in the project, and its `AI: <prompt>` comment an
+ordinary comment.
 
 ## Dashboard ↔ backend
 
@@ -238,8 +240,7 @@ their `name` prop against that list via `svgUseHref`
 (`src/project-view/util/icons.ts`); any unknown name silently falls through to a
 "missing" glyph. When you need an icon that isn't there yet, add a `<symbol>` to
 `icons.svg` and regenerate. Grep `iconName.ts` or `icons.svg` before using a new
-name — `ai_sparkle` was a painful example of an invented name that rendered
-blank.
+name: an invented one renders blank.
 
 **Drawing an icon:** follow
 [Style-Guide-Icons](https://github.com/jdunkerley/enso/wiki/Style-Guide-Icons)

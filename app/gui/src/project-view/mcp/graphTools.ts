@@ -365,7 +365,7 @@ export function truncate(
   return text.length > limit ? text.slice(0, limit) + ending(text.length) : text
 }
 
-/** The module's import statements, collected as `composables/ai.ts` does. */
+/** The module's import statements. */
 function moduleImports(moduleRoot: Ast.Ast | undefined): string[] {
   const imports: string[] = []
   if (moduleRoot instanceof Ast.BodyBlock) {

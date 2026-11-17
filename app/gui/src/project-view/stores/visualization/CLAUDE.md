@@ -221,8 +221,9 @@ the list widens what every library can rely on, so it is the owner's decision
   imports only the names in `BUILTIN_MODULE_NAMES` and its own relative files,
   with no dynamic `import()`.
 - `__tests__/shippedSqlQuery.test.ts` — Standard.Database's SQL Query view
-  mounted with sample data: formatting, coloured interpolations, escaping of the
-  SQL and of its values, a placeholder-looking name in the SQL, Ctrl+C.
+  mounted with sample data: formatting, syntax colouring (keywords, strings,
+  quoted identifiers, numbers, comments), coloured interpolations, escaping of
+  the SQL and of its values, a placeholder-looking name in the SQL, Ctrl+C.
 - `__tests__/shippedGeoMap.test.ts` — Standard.Visualization's Geo Map view with
   `mapbox-gl` stubbed: the Mapbox token and its empty state, the redacted error
   log, the Replay block class (`GeoMapVisualization`, which `$/utils/redact`'s

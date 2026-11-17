@@ -300,9 +300,9 @@ export function createProjectStore(
    * (no JSON parsing). Failure semantics match {@link queuedExecuteExpression}.
    *
    * `onTimeout` fires after the awaiting promise has resolved on timer expiry — callers use it
-   * to issue out-of-band cleanup that shouldn't block the resolved Promise. The AI tool handler
-   * uses this to send `executionContext/interrupt` so a stuck eval doesn't block subsequent
-   * verification calls.
+   * to issue out-of-band cleanup that shouldn't block the resolved Promise. The MCP
+   * `evaluate_expression` tool uses this to send `executionContext/interrupt` so a stuck eval
+   * doesn't block the calls after it.
    */
   function queuedExecuteExpressionRaw(
     expressionId: ExternalId,

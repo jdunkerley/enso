@@ -29,36 +29,6 @@ export enum Channel {
   /** Download a file using its URL. */
   downloadURL = 'download-url',
   handleMenuItem = 'handle-menu-item',
-  /** Run the local Claude agent to generate a User Defined Component body. */
-  generateAiComponent = 'generate-ai-component',
-  /** Main → renderer: tool call from the in-flight Claude turn; the renderer must echo `requestId`. */
-  aiToolCall = 'ai-tool-call',
-  /** Renderer → main: reply to a previously-issued {@link Channel.aiToolCall}. */
-  aiToolReply = 'ai-tool-reply',
-  /**
-   * Main → renderer: live progress events while a Claude turn runs. Each carries the originating
-   * request's id so the renderer can route to the correct placeholder. Payload shape is
-   * {@link AiProgressEvent} from `enso-common/src/ai`.
-   */
-  aiProgress = 'ai-progress',
-  /**
-   * Renderer → main: cancel an in-flight or queued AI component request, identified by the
-   * `requestId` carried in the original {@link generateAiComponent} payload.
-   */
-  cancelAiComponent = 'cancel-ai-component',
-  /**
-   * Renderer → main: query whether the local Claude agent can serve turns. Resolves with the
-   * current `AiAvailability` snapshot (from `enso-common/src/ai`) — `starting` until the
-   * priming turn completes, and always `unavailable` when `ENSO_AI_DISABLED=1` is set in the
-   * main process environment.
-   */
-  aiAvailability = 'ai-availability',
-  /**
-   * Main → renderer: broadcast whenever the local Claude agent's `AiAvailability`
-   * changes — priming completing, the child crashing, a context rotation. Sent to every live
-   * renderer, since availability is process-wide rather than per-request.
-   */
-  aiAvailabilityChanged = 'ai-availability-changed',
   /** Main → renderer: an MCP tool call the window must run; it replies with the same `requestId`. */
   mcpToolCall = 'mcp-tool-call',
   /** Renderer → main: reply to a previously-issued {@link Channel.mcpToolCall}. */

@@ -18,7 +18,6 @@ import { useText, type TextStore } from './text'
 /** Information about content of "Help" panel. */
 export interface DisplayedHelp {
   item: Result<SuggestionId | undefined>
-  aiMode: boolean
 }
 
 /**

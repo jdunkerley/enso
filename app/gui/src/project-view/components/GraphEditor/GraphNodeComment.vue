@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Node } from '$/providers/openedProjects/graph'
-import { readAiPrompt } from '@/components/GraphEditor/aiNode'
 import PlainTextEditor from '@/components/PlainTextEditor.vue'
 import { useFocusDelayed } from '@/composables/focus'
 import { nodeMutableDocumentation } from '@/util/ast/node'
@@ -20,21 +19,13 @@ const documentation = computed(() => nodeMutableDocumentation(props.node))
 // MCP tool) must show on a node that had none, and go when it is cleared.
 const documentationText = useYText(documentation)
 
-// AI-prompt docs are rendered inline by WidgetAiPrompt, not as a comment above the node. While the
-// comment is being edited it stays, whatever the text becomes: typing `AI: ` must not unmount the
-// editor under the user's cursor.
-const isAiPrompt = computed(() => {
-  const text = documentationText.value
-  return text != null && readAiPrompt(text) !== null
-})
-
 const { syncExt, connectSync } = useYTextSync(documentation, 'local:userAction:CommentEditor')
 
 syncRef(editing, useFocusDelayed(textEditorContent).focused)
 </script>
 <template>
   <div
-    v-if="documentation && (editing || (!isAiPrompt && documentationText?.trimStart()))"
+    v-if="documentation && (editing || documentationText?.trimStart())"
     class="GraphNodeComment"
     @keydown.enter.capture.stop="editing = false"
   >

@@ -1,5 +1,6 @@
 /** @file The element type of a `Vector`-typed argument, so each item gets the widget its type asks for. */
 import { DATE_TYPE } from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
+import { DATE_TIME_TYPE } from '@/components/GraphEditor/widgets/WidgetDateTime/dateTimeExpression'
 import { TIME_OF_DAY_TYPE } from '@/components/GraphEditor/widgets/WidgetTimeOfDay/timeExpression'
 
 /**
@@ -9,6 +10,7 @@ import { TIME_OF_DAY_TYPE } from '@/components/GraphEditor/widgets/WidgetTimeOfD
 const DEFAULT_ITEMS: Readonly<Record<string, string>> = {
   [DATE_TYPE]: 'Date.today',
   [TIME_OF_DAY_TYPE]: 'Time_Of_Day.now',
+  [DATE_TIME_TYPE]: 'Date_Time.now',
 }
 
 /** The code a new item of a list of `elementType` starts as, if that type has one. */
