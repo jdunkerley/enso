@@ -1,29 +1,19 @@
 <script setup lang="ts">
 /**
- * @file The date widget's menu: `Date.today`, `Date.yesterday` and `Date.tomorrow`, a divider, then a month calendar. It
- * knows nothing of the graph: it takes the value's current choice and emits the one that is made.
- * Choosing writes nothing here; `WidgetDate.vue` does that.
+ * @file The date widget's menu: `Date.today`, `Date.yesterday` and `Date.tomorrow`, a divider, a
+ * month calendar, then Cancel and Set. It knows nothing of the graph: it takes the value's current
+ * choice and emits the one that is made. Choosing writes nothing here; `WidgetDate.vue` does that.
  *
- * The calendar is Reka's `Calendar` (as the dashboard's `DatePicker` uses for its popover): arrows
- * move between days, Enter chooses one, PageUp and PageDown change the month. Escape asks to close.
+ * A relative choice writes at once. A click on a day selects it (it is marked) and writes nothing;
+ * Set writes the selected day (or only closes when it is the day already written, or when no day
+ * is selected). Enter on a day selects and writes it. A click outside the menu (the shell calls the
+ * handler given to `registerAccept`) writes the selected day only if it was changed; Cancel and
+ * Escape ask to close without it. The calendar is `DateCalendar.vue`.
  */
+import PickerActions from '@/components/GraphEditor/widgets/WidgetPicker/PickerActions.vue'
 import PickerMenuFrame from '@/components/GraphEditor/widgets/WidgetPicker/PickerMenuFrame.vue'
-import { CalendarDate, type DateValue } from '@internationalized/date'
-import {
-  CalendarCell,
-  CalendarCellTrigger,
-  CalendarGrid,
-  CalendarGridBody,
-  CalendarGridHead,
-  CalendarGridRow,
-  CalendarHeadCell,
-  CalendarHeader,
-  CalendarHeading,
-  CalendarNext,
-  CalendarPrev,
-  CalendarRoot,
-} from 'reka-ui'
-import { computed, nextTick, onMounted, shallowRef, useTemplateRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue'
+import DateCalendar from './DateCalendar.vue'
 import {
   RELATIVE_CHOICES,
   dateExpressionCode,
@@ -38,52 +28,63 @@ const props = defineProps<{
   choice: DateChoice | undefined
   /** Today's date; the browser's by default. A test sets it. */
   today?: YearMonthDay | undefined
+  /** As `TimeOfDayMenu`'s: the shell calls the handler on a click outside the menu. */
+  registerAccept?: ((accept: () => void) => void) | undefined
 }>()
 const emit = defineEmits<{
   choose: [choice: DateChoice]
   close: []
 }>()
 
-const root = useTemplateRef('root')
+const calendar = useTemplateRef<InstanceType<typeof DateCalendar>>('calendar')
 const today = computed(() => props.today ?? localToday())
-const toCalendarDate = ({ year, month, day }: YearMonthDay) => new CalendarDate(year, month, day)
 
-/** The day the calendar opens on, and marks as chosen when the value is a specific date. */
-const shownDay = computed(() => resolveChoice(props.choice ?? { kind: 'today' }, today.value))
-const selected = computed(() =>
-  props.choice?.kind === 'date' ? toCalendarDate(props.choice) : null,
-)
-const placeholder = shallowRef<DateValue>(toCalendarDate(shownDay.value))
-/** The dates `Date.new` takes and the widget recognises (`isValidDate`): years 100 to 9999. */
-const minValue = new CalendarDate(100, 1, 1)
-const maxValue = new CalendarDate(9999, 12, 31)
+/** The day the calendar opens on. */
+const shownDay = resolveChoice(props.choice ?? { kind: 'today' }, today.value)
+/** The day the value holds, when it is a specific date. */
+const writtenDay = props.choice?.kind === 'date' ? props.choice : undefined
+/** The day marked as selected: the written one until another is clicked. */
+const selectedDay = shallowRef<YearMonthDay | undefined>(writtenDay)
+/** Set once the menu has chosen or closes, so a later click outside writes nothing. */
+let settled = false
 
-/** Choosing the day that is already chosen changes nothing, so it only closes the menu. */
-function chooseDay(value: unknown) {
-  if (!(value instanceof CalendarDate)) return
-  if (selected.value?.compare(value) === 0) emit('close')
-  else emit('choose', { kind: 'date', year: value.year, month: value.month, day: value.day })
+const sameDay = (a: YearMonthDay | undefined, b: YearMonthDay | undefined) =>
+  a != null && b != null && a.year === b.year && a.month === b.month && a.day === b.day
+
+function chooseRelative(choice: DateChoice) {
+  settled = true
+  emit('choose', choice)
 }
 
-onMounted(() =>
-  nextTick(() => {
-    // Put the keyboard on the calendar: the chosen day, else today, else the day it opened on.
-    const days = (root.value?.$el as HTMLElement | undefined)?.querySelectorAll<HTMLElement>(
-      '[data-reka-calendar-cell-trigger]',
-    )
-    const inMonth = Array.from(days ?? []).filter((d) => !d.hasAttribute('data-outside-view'))
-    const target =
-      inMonth.find((d) => d.hasAttribute('data-selected')) ??
-      inMonth.find((d) => d.hasAttribute('data-today')) ??
-      inMonth.find((d) => d.getAttribute('tabindex') === '0') ??
-      inMonth[0]
-    target?.focus()
-  }),
-)
+/**
+ * Write the selected day, once, if it differs from the written one; with `always` (Set), a day that
+ * does not differ, or no selected day, only closes the menu.
+ */
+function commit(always = false) {
+  if (settled) return
+  const day = selectedDay.value
+  if (day == null || sameDay(day, writtenDay)) {
+    if (always) close()
+    return
+  }
+  settled = true
+  emit('choose', { kind: 'date', year: day.year, month: day.month, day: day.day })
+}
+
+function close() {
+  settled = true
+  emit('close')
+}
+
+onBeforeUnmount(() => (settled = true))
+onMounted(() => {
+  props.registerAccept?.(() => commit())
+  void nextTick(() => calendar.value?.focusDay())
+})
 </script>
 
 <template>
-  <PickerMenuFrame ref="root" class="DateMenu" ariaLabel="Pick a date" @close="emit('close')">
+  <PickerMenuFrame class="DateMenu" ariaLabel="Pick a date" @close="close">
     <ul class="relative">
       <li v-for="relative in RELATIVE_CHOICES" :key="relative.kind">
         <button
@@ -91,113 +92,20 @@ onMounted(() =>
           class="item"
           :class="{ selected: props.choice?.kind === relative.kind }"
           :data-choice="relative.kind"
-          @click="emit('choose', relative)"
+          @click="chooseRelative(relative)"
         >
           {{ dateExpressionCode(relative) }}
         </button>
       </li>
     </ul>
     <hr class="divider" />
-    <CalendarRoot
-      v-slot="{ weekDays, grid }"
-      v-model:placeholder="placeholder"
-      class="calendar"
-      :modelValue="selected"
-      :minValue="minValue"
-      :maxValue="maxValue"
-      :preventDeselect="true"
-      :fixedWeeks="true"
-      @update:modelValue="chooseDay"
-    >
-      <CalendarHeader class="calendarHeader">
-        <CalendarPrev class="navButton" aria-label="Previous month">&lsaquo;</CalendarPrev>
-        <CalendarHeading class="heading" />
-        <CalendarNext class="navButton" aria-label="Next month">&rsaquo;</CalendarNext>
-      </CalendarHeader>
-      <CalendarGrid v-for="month in grid" :key="month.value.toString()" class="grid">
-        <CalendarGridHead>
-          <CalendarGridRow class="row">
-            <CalendarHeadCell v-for="(day, i) in weekDays" :key="i" class="headCell">
-              {{ day }}
-            </CalendarHeadCell>
-          </CalendarGridRow>
-        </CalendarGridHead>
-        <CalendarGridBody>
-          <CalendarGridRow v-for="(week, w) in month.rows" :key="w" class="row">
-            <CalendarCell v-for="date in week" :key="date.toString()" :date="date">
-              <CalendarCellTrigger :day="date" :month="month.value" class="day" />
-            </CalendarCell>
-          </CalendarGridRow>
-        </CalendarGridBody>
-      </CalendarGrid>
-    </CalendarRoot>
+    <DateCalendar
+      ref="calendar"
+      :selected="selectedDay"
+      :shown="shownDay"
+      @pick="selectedDay = $event"
+      @enter="commit(true)"
+    />
+    <PickerActions @cancel="close" @set="commit(true)" />
   </PickerMenuFrame>
 </template>
-
-<style scoped>
-.calendarHeader {
-  display: flex;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.heading {
-  flex-grow: 1;
-  text-align: center;
-}
-
-.navButton {
-  width: var(--item-height);
-  height: var(--item-height);
-  border-radius: 50%;
-
-  &:hover {
-    background-color: var(--dropdown-item-hover-bg);
-  }
-}
-
-.grid {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.row {
-  display: flex;
-  justify-content: space-between;
-}
-
-.headCell {
-  width: var(--item-height);
-  text-align: center;
-  opacity: 0.5;
-}
-
-.day {
-  display: block;
-  width: var(--item-height);
-  height: var(--item-height);
-  line-height: var(--item-height);
-  text-align: center;
-  border-radius: 50%;
-  border: 1px solid transparent;
-
-  &:hover,
-  &:focus-visible {
-    background-color: var(--dropdown-item-hover-bg);
-  }
-
-  &[data-outside-view] {
-    opacity: 0.35;
-  }
-
-  &[data-today] {
-    font-weight: bold;
-    text-decoration: underline;
-  }
-
-  &[data-selected] {
-    background-color: var(--dropdown-item-selected-bg);
-    border-color: currentColor;
-  }
-}
-</style>

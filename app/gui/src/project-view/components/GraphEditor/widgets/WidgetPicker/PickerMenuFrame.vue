@@ -2,7 +2,9 @@
 /**
  * @file The frame of a widget's menu, shared by the date and time-of-day menus: a rounded dropdown
  * dialog that keeps its keys, clicks and wheel to itself, and asks to close on Escape. The slot
- * holds `.item` buttons (full-width rows) and `.divider` rules, which the frame styles.
+ * holds `.item` buttons (full-width rows) and `.divider` rules, which the frame styles. Every
+ * picker menu has a fixed width (200 px unless it sets `--picker-menu-width`), however wide its
+ * node or argument is.
  */
 defineProps<{ ariaLabel: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -26,7 +28,11 @@ const emit = defineEmits<{ close: [] }>()
 .PickerMenuFrame {
   --item-height: 23px;
   --dropdown-padding: 6px;
-  min-width: 200px;
+  /* A fixed width, whatever the node or argument it opens under: by default the calendar's natural
+   * width (189 px) with a little room, which the time field, its columns and Cancel/Set fit too; a
+   * menu that lays out more (the date-time menu) sets its own `--picker-menu-width`. Nothing here may
+   * follow the anchor's width (see `pickerMenuStyles`). */
+  width: var(--picker-menu-width, 200px);
   padding: var(--dropdown-padding);
   user-select: none;
   background-color: var(--dropdown-bg);

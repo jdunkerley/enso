@@ -26,6 +26,7 @@ from project.Data.Text.Extensions import all
 from project.Data.Time.Date import make_day_picker
 from project.Internal.Time.Date_Helpers import ensure_in_epoch, unix_epoch_start
 from project.Metadata import Display, Widget
+from project.Metadata.Choice import Option
 from project.Nothing import all
 from project.Widget_Helpers import make_date_time_format_selector
 
@@ -135,8 +136,7 @@ type Date_Time
     @microsecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
     @nanosecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
     @zone Time_Zone.default_widget
-    new : Integer -> Integer -> Integer -> Integer -> Integer -> Integer -> Integer -> Integer -> Integer -> Time_Zone -> Date_Time ! Time_Error
-    new (year:Integer=(Missing_Argument.throw "year")) (month:Integer=1) (day:Integer=1) (hour:Integer=0) (minute:Integer=0) (second:Integer=0) (millisecond:Integer=0) (microsecond:Integer=0) (nanosecond = 0) (zone:Time_Zone=Time_Zone.system) =
+    new (year:Integer=(Missing_Argument.throw "year")) (month:Integer=1) (day:Integer=1) (hour:Integer=0) (minute:Integer=0) (second:Integer=0) (millisecond:Integer=0) (microsecond:Integer=0) (nanosecond:Integer=0) (zone:Time_Zone=Time_Zone.system) -> Date_Time ! Time_Error =
         total_nanoseconds = nanosecond + microsecond * 1000 + millisecond * 1000000
         Panic.catch JException (Date_Helpers.date_time_new_builtin year month day hour minute second total_nanoseconds zone) cause->
             Error.throw (Time_Error.Error cause.payload.getMessage)
@@ -278,8 +278,7 @@ type Date_Time
        sensitive.
        - A close square bracket ']'.
     @format make_date_time_format_selector
-    parse : Text -> Date_Time_Formatter -> Date_Time ! Time_Error
-    parse text:Text format:Date_Time_Formatter=Date_Time_Formatter.default_enso_zoned_date_time =
+    parse (text : Text) (format : Date_Time_Formatter = Date_Time_Formatter.default_enso_zoned_date_time) -> Date_Time ! Time_Error =
         format.parse_date_time text
 
     ## ---
@@ -300,8 +299,7 @@ type Date_Time
 
              example_from_unix_epoch = Date_Time.from_unix_epoch_seconds 1601587200
        ```
-    from_unix_epoch_seconds : Integer -> Integer -> Date_Time
-    from_unix_epoch_seconds seconds:Integer nanoseconds:Integer=0 =
+    from_unix_epoch_seconds (seconds : Integer) (nanoseconds : Integer = 0) -> Date_Time =
         unix_epoch_start + Duration.new seconds=seconds nanoseconds=nanoseconds
 
     ## ---
@@ -320,8 +318,7 @@ type Date_Time
 
              example_from_unix_epoch = Date_Time.from_unix_epoch_milliseconds 1601587200000
        ```
-    from_unix_epoch_milliseconds : Integer -> Date_Time
-    from_unix_epoch_milliseconds milliseconds:Integer =
+    from_unix_epoch_milliseconds (milliseconds : Integer) -> Date_Time =
         unix_epoch_start + Duration.new milliseconds=milliseconds
 
     ## ---
@@ -504,8 +501,7 @@ type Date_Time
 
              example_epoch = Date_Time.now.to_unix_epoch_seconds
        ```
-    to_unix_epoch_seconds : Integer
-    to_unix_epoch_seconds self =
+    to_unix_epoch_seconds self -> Integer =
         (Duration.between unix_epoch_start self).total_seconds.floor
 
     ## ---
@@ -522,8 +518,7 @@ type Date_Time
 
              example_epoch = Date_Time.now.to_unix_epoch_milliseconds
        ```
-    to_unix_epoch_milliseconds : Integer
-    to_unix_epoch_milliseconds self =
+    to_unix_epoch_milliseconds self -> Integer =
         (Duration.between unix_epoch_start self).total_milliseconds.floor
 
     ## ---
@@ -531,8 +526,7 @@ type Date_Time
        ---
        Return the number of seconds from the Enso epoch start.
        See `Date_Time.enso_epoch_start`.
-    to_enso_epoch_seconds : Integer
-    to_enso_epoch_seconds self =
+    to_enso_epoch_seconds self -> Integer =
         (Duration.between Date_Time.enso_epoch_start self).total_seconds.floor
 
     ## ---
@@ -540,8 +534,7 @@ type Date_Time
        ---
        Return the number of milliseconds from the Enso epoch start.
        See `Date_Time.enso_epoch_start`.
-    to_enso_epoch_milliseconds : Integer
-    to_enso_epoch_milliseconds self =
+    to_enso_epoch_milliseconds self -> Integer =
         (Duration.between Date_Time.enso_epoch_start self).total_milliseconds.floor
 
     ## ---
@@ -582,8 +575,8 @@ type Date_Time
        first day of the week is Monday, and week 1 is the week containing the
        first Thursday of the year. Therefore it is important to properly specify
        the `locale` argument.
-    week_of_year : (Locale | Nothing) -> Integer
-    week_of_year self locale=Nothing =
+    @locale Locale.default_widget
+    week_of_year self (locale : Locale | Nothing = Nothing) -> Integer =
         ensure_in_epoch self <|
             if locale.is_nothing then Time_Utils.get_field_as_zoneddatetime self IsoFields.WEEK_OF_WEEK_BASED_YEAR else
                 Time_Utils.week_of_year_zoneddatetime self locale.java_locale
@@ -594,8 +587,7 @@ type Date_Time
        ---
        Returns if the date is in a leap year.
        Produces a warning for a Date that is before epoch start.
-    is_leap_year : Boolean
-    is_leap_year self = self.date.is_leap_year
+    is_leap_year self -> Boolean = self.date.is_leap_year
 
     ## ---
        group: DateTime
@@ -603,23 +595,20 @@ type Date_Time
        ---
        Returns the number of days in the year represented by this date.
        Produces a warning for a Date that is before epoch start.
-    length_of_year : Integer
-    length_of_year self = ensure_in_epoch self <| self.date.length_of_year
+    length_of_year self -> Integer = ensure_in_epoch self <| self.date.length_of_year
 
     ## ---
        icon: metadata
        ---
        Returns the century of the date.
-    century : Integer
-    century self = self.date.century
+    century self -> Integer = self.date.century
 
     ## ---
        group: Metadata
        icon: metadata
        ---
        Returns the quarter of the year the date falls into.
-    quarter : Integer
-    quarter self = Time_Utils.get_field_as_zoneddatetime self IsoFields.QUARTER_OF_YEAR
+    quarter self -> Integer = Time_Utils.get_field_as_zoneddatetime self IsoFields.QUARTER_OF_YEAR
 
     ## ---
        group: DateTime
@@ -627,8 +616,7 @@ type Date_Time
        ---
        Returns the number of days in the month represented by this date.
        Produces a warning for a Date that is before epoch start.
-    length_of_month : Integer
-    length_of_month self = ensure_in_epoch self <| self.date.length_of_month
+    length_of_month self -> Integer = ensure_in_epoch self <| self.date.length_of_month
 
     ## ---
        group: DateTime
@@ -636,8 +624,7 @@ type Date_Time
        ---
        Returns the date that is the first day of the month containing the
        specified date.
-    first_of_month : Integer
-    first_of_month self =
+    first_of_month self -> Date =
         Time_Utils.first_of_month self
 
     ## ---
@@ -646,24 +633,21 @@ type Date_Time
        ---
        Returns the date that is the last day of the month containing the
        specified date.
-    end_of_month : Integer
-    end_of_month self =
+    end_of_month self -> Date =
         Time_Utils.end_of_month self
 
     ## ---
        icon: metadata
        ---
        Returns the day of the year.
-    day_of_year : Integer
-    day_of_year self = Time_Utils.get_field_as_zoneddatetime self ChronoField.DAY_OF_YEAR
+    day_of_year self -> Integer = Time_Utils.get_field_as_zoneddatetime self ChronoField.DAY_OF_YEAR
 
     ## ---
        group: Metadata
        icon: metadata
        ---
        Returns the day of the week.
-    day_of_week : Day_Of_Week
-    day_of_week self =
+    day_of_week self -> Day_Of_Week =
         ensure_in_epoch self <|
             Day_Of_Week.from (Time_Utils.get_field_as_zoneddatetime self ChronoField.DAY_OF_WEEK) Day_Of_Week.Monday
 
@@ -673,8 +657,8 @@ type Date_Time
        ---
        Returns the first date within the `Time_Period` or `Date_Period`
        containing self.
-    start_of : (Date_Period|Time_Period) -> Date_Time
-    start_of self period=Date_Period.Month =
+    @period make_date_time_period_selector
+    start_of self (period : Date_Period | Time_Period = Date_Period.Month) -> Date_Time =
         adjusted = period.adjust_start self
         case period of
             _ : Date_Period -> Date_Period.Day.adjust_start adjusted
@@ -686,8 +670,8 @@ type Date_Time
        ---
        Returns the last date within the `Time_Period` or `Date_Period` containing
        self.
-    end_of : (Date_Period|Time_Period) -> Date_Time
-    end_of self period=Date_Period.Month =
+    @period make_date_time_period_selector
+    end_of self (period : Date_Period | Time_Period = Date_Period.Month) -> Date_Time =
         adjusted = period.adjust_end self
         case period of
             _ : Date_Period -> Date_Period.Day.adjust_end adjusted
@@ -730,8 +714,7 @@ type Date_Time
              example_at_time_zone = Date_Time.new 2020 . at_time_zone (Time_Zone.new -4)
        ```
     @zone Time_Zone.default_widget
-    at_time_zone : Time_Zone -> Date_Time
-    at_time_zone self zone =
+    at_time_zone self (zone : Time_Zone) -> Date_Time =
         Time_Utils.with_zone_same_instant self zone
 
     ## ---
@@ -755,8 +738,7 @@ type Date_Time
              example_at_time_zone = Date_Time.new 2020 . set_time_zone (Time_Zone.new -4)
        ```
     @zone Time_Zone.default_widget
-    set_time_zone : Time_Zone -> Date_Time
-    set_time_zone self zone =
+    set_time_zone self (zone : Time_Zone) -> Date_Time =
         Time_Utils.with_zone_same_local self zone
 
     ## ---
@@ -774,8 +756,7 @@ type Date_Time
 
              example_at_time_zone = Date_Time.new 2020 zone=(Time_Zone.parse "Europe/Moscow") . to_utc
        ```
-    to_utc : Date_Time
-    to_utc self =
+    to_utc self -> Date_Time =
         self.at_time_zone Time_Zone.utc
 
     ## ---
@@ -785,8 +766,8 @@ type Date_Time
        Returns a requested date-time part as integer.
        Produces a warning for a Date_Time that is before epoch start.
        See `Date_Time.enso_epoch_start`.
-    date_part : Date_Period | Time_Period -> Integer
-    date_part self (period : Date_Period | Time_Period) =
+    @period make_date_time_period_selector
+    date_part self (period : Date_Period | Time_Period) -> Integer =
         case period of
             Date_Period.Year        -> self.year
             Date_Period.Quarter     -> self.quarter
@@ -814,8 +795,8 @@ type Date_Time
        ## Arguments
         - `end`: A date-time to compute the difference from.
         - `period`: The period to compute the difference in.
-    date_diff : Date_Time -> Date_Period | Time_Period -> Integer
-    date_diff self (end : Date_Time) (period : Date_Period | Time_Period) = ensure_in_epoch self <|
+    @period make_date_time_period_selector
+    date_diff self (end : Date_Time) (period : Date_Period | Time_Period) -> Integer = ensure_in_epoch self <|
         Time_Utils.unit_datetime_difference period.to_java_unit self end
 
     ## ---
@@ -830,8 +811,8 @@ type Date_Time
         - `amount`: An integer specifying by how many periods to shift the
           date-time.
         - `period`: The period by which to shift.
-    date_add : Integer -> Date_Period | Time_Period -> Date_Time
-    date_add self (amount : Integer) (period : Date_Period | Time_Period) = ensure_in_epoch self <|
+    @period make_date_time_period_selector
+    date_add self (amount : Integer) (period : Date_Period | Time_Period) -> Date_Time = ensure_in_epoch self <|
         Time_Utils.unit_datetime_add period.to_java_unit self amount
 
     ## ---
@@ -862,8 +843,8 @@ type Date_Time
 
              example_plus = Date_Time.new 2020 + Date_Period.Quarter
        ```
-    + : (Duration | Period | Time_Period | Date_Period) -> Date_Time ! Time_Error
-    + self (amount : Duration | Period | Time_Period | Date_Period) =
+    @amount (make_date_time_period_selector include_custom=True)
+    + self (amount : Duration | Period | Time_Period | Date_Period) -> Date_Time ! Time_Error =
         case amount of
             duration : Duration ->
                 Panic.catch ArithmeticException (Date_Helpers.date_time_plus self duration) (err -> Error.throw (Time_Error.Error err.getMessage))
@@ -912,8 +893,7 @@ type Date_Time
        ```
              example_shift = Date_Time.new 2020 2 3 11 45 . add_work_days 5
        ```
-    add_work_days : Integer -> Vector Date -> Date_Time
-    add_work_days self days=1 holidays=[] =
+    add_work_days self (days : Integer = 1) (holidays : Vector Date = []) -> Date_Time =
         ensure_in_epoch self <|
             self.date.add_work_days days holidays . to_date_time self.time_of_day self.zone
 
@@ -947,8 +927,8 @@ type Date_Time
 
              example_plus = Date_Time.new 2020 - Date_Period.Quarter
        ```
-    - : (Duration | Period | Time_Period | Date_Period) -> Date_Time ! Time_Error
-    - self amount:(Duration | Period | Time_Period | Date_Period) =
+    @amount (make_date_time_period_selector include_custom=True)
+    - self (amount : Duration | Period | Time_Period | Date_Period) -> Date_Time ! Time_Error =
         result = case amount of
             duration : Duration ->
                 Panic.catch ArithmeticException (Date_Helpers.date_time_minus self duration) (err -> Error.throw (Time_Error.Error err.getMessage))
@@ -964,8 +944,7 @@ type Date_Time
        private: true
        ---
        Convert to a display representation of this Date_Time.
-    to_display_text : Text
-    to_display_text self =
+    to_display_text self -> Text =
         time_format = if self.nanosecond include_milliseconds=True == 0 then "HH:mm:ss" else "HH:mm:ss.fff"
         zone_format = if self.zone == Time_Zone.system then "" else "'['TT']'"
         self.format "yyyy-MM-dd "+time_format+zone_format
@@ -986,8 +965,7 @@ type Date_Time
        Returns a Text
 
                 Date_Time.new 2024 10 29 12 34
-    pretty : Text
-    pretty self =
+    pretty self -> Text =
         parts = Vector.build builder->
             builder.append ("Date_Time.new " + self.year.to_text + " " + self.month.to_text + " " + self.day.to_text)
             if self.hour != 0 then builder.append ((if builder.length!=1 then " hour=" else " ") + self.hour.to_text)
@@ -1010,8 +988,7 @@ type Date_Time
        ```
              example_to_json = Date_Time.now.to_js_object
        ```
-    to_js_object : JS_Object
-    to_js_object self =
+    to_js_object self -> JS_Object =
         type_pair = ["type", "Date_Time"]
         cons_pair = ["constructor", "new"]
         JS_Object.from_pairs [type_pair, cons_pair, ["year", self.year], ["month", self.month], ["day", self.day], ["hour", self.hour], ["minute", self.minute], ["second", self.second], ["nanosecond", self.nanosecond include_milliseconds=True], ["zone", self.zone]]
@@ -1115,8 +1092,7 @@ type Date_Time
        No offset is indicated by "Z". This can be customized as above, e.g.
        `ZZZZZ{0}`.
     @format make_date_time_format_selector
-    format : Date_Time_Formatter -> Text
-    format self format:Date_Time_Formatter =
+    format self (format : Date_Time_Formatter) -> Text =
         format.format_date_time self
 
     ## ---
@@ -1150,6 +1126,23 @@ type Date_Time
        ---
        Checks if `self` is less than or equal to `that`.
     <= self that = Comparable.<= self=self that
+
+## ---
+   private: true
+   ---
+   The choices for a period of a Date_Time: each `Date_Period`, then each
+   `Time_Period`, by their whole names (the arguments take either type, so an
+   auto-scoped name would not resolve). With `include_custom`, also
+   `Period.new` and `Duration.new`, for an amount added to or taken from it.
+make_date_time_period_selector (include_custom:Boolean=False) display:Display=..When_Modified -> Widget =
+    date_periods = ["Year", "Quarter", "Month", "Week", "Day"].map name->
+        code = "Date_Period." + name
+        Option code code
+    time_periods = ["Hour", "Minute", "Second", "Millisecond", "Microsecond", "Nanosecond"].map name->
+        code = "Time_Period." + name
+        Option code code
+    custom = if include_custom then [Option "Period.new" "(Period.new)", Option "Duration.new" "(Duration.new)"] else []
+    Widget.Single_Choice values=(date_periods + time_periods + custom) display=display
 
 ## ---
    private: true
