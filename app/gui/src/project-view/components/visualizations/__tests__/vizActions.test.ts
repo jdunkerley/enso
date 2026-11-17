@@ -86,6 +86,30 @@ describe('templates', () => {
     )
   })
   test.each([
+    ['9007199254740993', '9007199254740993'],
+    ['-9007199254740993', '-9007199254740993'],
+    ['+9007199254740993', '9007199254740993'],
+    ['00009007199254740993', '9007199254740993'],
+    ['123456789012345678901234567890', '123456789012345678901234567890'],
+    ['-0', '0'],
+    ['-000', '0'],
+  ])('# keeps every digit of the integer numeral %j', (value, code) => {
+    expect(text(actionPattern(chain('at {{#index}}'), { index: value }))).toBe(
+      `operator1.at ${code}`,
+    )
+  })
+  test('# keeps every digit of each integer of a vector', () => {
+    expect(text(actionPattern(chain('f {{#xs*}}'), { xs: ['9007199254740993', '2'] }))).toBe(
+      'operator1.f [9007199254740993, 2]',
+    )
+  })
+  test('# still reads a fraction or an exponent as a number', () => {
+    expect(text(actionPattern(chain('at {{#index}}'), { index: '1e30' }))).toBe(
+      'operator1.at 1000000000000000000000000000000',
+    )
+    expect(text(actionPattern(chain('at {{#index}}'), { index: '2.50' }))).toBe('operator1.at 2.5')
+  })
+  test.each([
     ['0x10'],
     ['0b11'],
     ['0o7'],

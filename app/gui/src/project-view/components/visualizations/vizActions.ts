@@ -119,6 +119,18 @@ function numberAst(value: number, module: Ast.MutableModule) {
  */
 const DECIMAL_NUMERAL = /^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/
 
+/** A {@link DECIMAL_NUMERAL} with no fraction and no exponent: an integer of any size. */
+const INTEGER_NUMERAL = /^[+-]?\d+$/
+
+/**
+ * An Enso integer for the integer numeral `value`. It does not go through `Number`, which rounds
+ * what is beyond 2^53 (`9007199254740993` would be written as `9007199254740992`, #828); `BigInt`
+ * keeps every digit and drops what Enso would not write (a `+`, leading zeros, the sign of `-0`).
+ */
+function integerAst(value: string, module: Ast.MutableModule) {
+  return Ast.NumericLiteral.tryParseWithSign(BigInt(value).toString(), module)
+}
+
 /**
  * One value as an Enso expression. A `''` flag reads text as code. `#` writes text that is a
  * decimal numeral as that number and any other text as text, and cannot write an empty value; `@`
@@ -133,6 +145,7 @@ function scalarAst(value: ActionScalar, flag: Slot['flag'], module: Ast.MutableM
   if (typeof value === 'number') return numberAst(value, module)
   if (flag === '#') {
     if (value === '') return undefined
+    if (INTEGER_NUMERAL.test(value)) return integerAst(value, module)
     if (DECIMAL_NUMERAL.test(value)) return numberAst(Number(value), module)
   }
   return Ast.TextLiteral.new(value, module)
