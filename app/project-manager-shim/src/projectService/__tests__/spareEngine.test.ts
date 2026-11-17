@@ -13,6 +13,17 @@ import {
 } from '../spareEngine.js'
 import { fakeSpareEnso, isAlive, spareEvents } from './fakeSpareEngine.js'
 
+/**
+ * How long to wait for what a real process does (start, log, exit). A wait returns as soon as its
+ * condition holds, so the budget costs nothing when all is well: it only bounds a genuine hang. It
+ * is long because the suite shares a CI runner with the whole package: on #831 and #844 the runner
+ * stalled for ten seconds or more (unrelated git tests in the same run reported `Saving a version
+ * timed out`), and a Node cold start inside the stall missed the former 10 s.
+ */
+const WAIT_MS = 45_000
+// The budget of a whole test and of its cleanup: the waits above, with room to spare.
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 })
+
 let root: string
 let log: string
 const engines: SpareEngine[] = []
@@ -42,7 +53,7 @@ async function fakePid(count: number): Promise<number> {
       expect(starts).toHaveLength(count)
       return starts[count - 1]!.pid
     },
-    { timeout: 10_000 },
+    { timeout: WAIT_MS },
   )
 }
 
@@ -54,7 +65,7 @@ async function closedByStdin(pid: number): Promise<void> {
       expect(events.some((e) => e.event === 'stdin-closed' && e.pid === pid)).toBe(true)
       expect(isAlive(pid)).toBe(false)
     },
-    { timeout: 10_000 },
+    { timeout: WAIT_MS },
   )
 }
 
@@ -96,7 +107,7 @@ test('a spare starts in the temporary directory, warms up, and is taken by its k
   const engine = spare()
   engine.start(await spawnOf('k1'))
   expect(engine.state).toBe('warming')
-  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: WAIT_MS })
   const [start] = await spareEvents(log)
   expect(start?.args).toEqual(['--jvm', '--standby', '--log-level', 'info'])
   expect(await fs.realpath(start!.cwd!)).toBe(await fs.realpath(os.tmpdir()))
@@ -108,7 +119,7 @@ test('a spare starts in the temporary directory, warms up, and is taken by its k
     expect(spareNotice(result, result.spare.startedAt + 3000)).toMatch(/pre-started spare used/)
     result.spare.child.stdin?.end()
   }
-}, 30_000)
+})
 
 test('a spare still warming up is taken as it is', async () => {
   const engine = spare()
@@ -125,22 +136,22 @@ test('a spare still warming up is taken as it is', async () => {
     result.spare.child.stdin?.end()
   }
   await closedByStdin(pid)
-}, 30_000)
+})
 
 test('the ready line is found when it arrives in two chunks, and only once complete', async () => {
   const lines: string[] = []
   const engine = spare({ log: (line) => lines.push(line) })
   engine.start(await spawnOf('k1', { READY_SPLIT: '1' }))
-  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: WAIT_MS })
   const ready = lines.filter((line) => line.startsWith('ready after '))
   expect(ready).toHaveLength(1)
   expect(ready[0]).toMatch(/\(42 ms from its own start\)$/)
-}, 30_000)
+})
 
 test('a spare with another key is stopped, not taken', async () => {
   const engine = spare()
   engine.start(await spawnOf('k1'))
-  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: WAIT_MS })
   const pid = await fakePid(1)
   const result = engine.take('k2')
   expect(result).toEqual({ kind: 'none', reason: 'the spare was started with other settings' })
@@ -149,7 +160,7 @@ test('a spare with another key is stopped, not taken', async () => {
   )
   expect(engine.state).toBe('none')
   await closedByStdin(pid)
-}, 30_000)
+})
 
 test('starting again with the same key keeps the running spare; a new key replaces it', async () => {
   const engine = spare()
@@ -164,12 +175,12 @@ test('starting again with the same key keeps the running spare; a new key replac
   expect(engine.state).toBe('warming')
   await fakePid(2)
   await closedByStdin(firstFake)
-}, 30_000)
+})
 
 test('a spare that dies is dropped, and its key is not started again until the failure is cleared', async () => {
   const engine = spare()
   engine.start(await spawnOf('k1', { SPARE_DIES: '1' }))
-  await vi.waitFor(() => expect(engine.state).toBe('none'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('none'), { timeout: WAIT_MS })
   expect(engine.take('k1')).toEqual({ kind: 'none', reason: 'the last spare failed' })
   engine.start(await spawnOf('k1', { SPARE_DIES: '1' }))
   expect(engine.state).toBe('none')
@@ -183,41 +194,41 @@ test('a spare that dies is dropped, and its key is not started again until the f
   engine.clearFailure()
   engine.start(await spawnOf('k1'))
   expect(engine.state).toBe('warming')
-}, 30_000)
+})
 
 test('a spare that has exited is not taken', async () => {
   const engine = spare()
   engine.start(await spawnOf('k1'))
-  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: WAIT_MS })
   process.kill(await fakePid(1))
-  await vi.waitFor(() => expect(engine.state).toBe('none'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('none'), { timeout: WAIT_MS })
   expect(engine.take('k1')).toEqual({ kind: 'none', reason: 'the last spare failed' })
-}, 30_000)
+})
 
 test('an executable that cannot be started is a failure, reported after spawn returns', async () => {
   const engine = spare()
   const missing = { ...(await spawnOf('k1')), command: path.join(root, 'no-such-enso'), args: [] }
   engine.start(missing)
-  await vi.waitFor(() => expect(engine.state).toBe('none'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('none'), { timeout: WAIT_MS })
   expect(engine.take('k1')).toEqual({ kind: 'none', reason: 'the last spare failed' })
   engine.start(missing)
   expect(engine.state).toBe('none')
-}, 30_000)
+})
 
 test('stop closes the spare', async () => {
   const engine = spare()
   engine.start(await spawnOf('k1'))
-  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: WAIT_MS })
   const pid = await fakePid(1)
   engine.stop('quitting')
   expect(engine.state).toBe('none')
   await closedByStdin(pid)
-}, 30_000)
+})
 
 test('a stopped spare that does not exit is killed after the grace period, with its children', async () => {
   const engine = spare({ stopGraceMs: 300 })
   engine.start(await spawnOf('k1', { SPARE_IGNORES_STDIN: '1' }))
-  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: WAIT_MS })
   const launcher = engine.pid!
   const pid = await fakePid(1)
   engine.stop('quitting')
@@ -226,35 +237,35 @@ test('a stopped spare that does not exit is killed after the grace period, with 
       expect(isAlive(pid)).toBe(false)
       expect(isAlive(launcher)).toBe(false)
     },
-    { timeout: 10_000 },
+    { timeout: WAIT_MS },
   )
   expect((await spareEvents(log)).some((e) => e.event === 'stdin-closed')).toBe(false)
-}, 30_000)
+})
 
 test('stop settles once the spare has exited', async () => {
   const engine = spare()
   engine.start(await spawnOf('k1'))
-  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: WAIT_MS })
   const pid = await fakePid(1)
   const stopped = engine.stop('quitting')
   expect(engine.alive).toBe(true)
   await stopped
   expect(engine.alive).toBe(false)
   await closedByStdin(pid)
-}, 30_000)
+})
 
 test('a bounded stop kills a spare that does not exit in time, and settles on its exit', async () => {
   // The grace period of a plain stop is far longer than the test.
   const engine = spare({ stopGraceMs: 60_000 })
   engine.start(await spawnOf('k1', { SPARE_IGNORES_STDIN: '1' }))
-  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: 10_000 })
+  await vi.waitFor(() => expect(engine.state).toBe('ready'), { timeout: WAIT_MS })
   const launcher = engine.pid!
   const pid = await fakePid(1)
   await engine.stop('quitting', { waitMs: 300 })
   expect(engine.alive).toBe(false)
   expect(isAlive(launcher)).toBe(false)
-  await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: 10_000 })
-}, 30_000)
+  await vi.waitFor(() => expect(isAlive(pid)).toBe(false), { timeout: WAIT_MS })
+})
 
 test('a bounded stop also waits for a spare stopped earlier that is still exiting', async () => {
   const engine = spare({ stopGraceMs: 60_000 })
@@ -271,9 +282,9 @@ test('a bounded stop also waits for a spare stopped earlier that is still exitin
       expect(isAlive(first)).toBe(false)
       expect(isAlive(second)).toBe(false)
     },
-    { timeout: 10_000 },
+    { timeout: WAIT_MS },
   )
-}, 30_000)
+})
 
 test("with no spare running, the notice gives the service's reason, or nothing when spares are off", () => {
   const engine = spare()
