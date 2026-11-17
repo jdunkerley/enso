@@ -5,14 +5,10 @@ import VisualizationHost, {
 } from '@/components/visualizations/VisualizationHost.vue'
 import { Vec2 } from '@/util/data/vec2'
 import * as builtins from '@/util/visualizationBuiltins'
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest'
-// eslint-disable-next-line no-restricted-imports
-import * as vue from 'vue'
 import { defineCustomElement, nextTick, type Component } from 'vue'
-import { compileSfc } from '../compileSfc'
-import { attachStyles } from '../moduleStyles'
+import { loadShippedSfc } from './loadSfc'
 
 const GEO_MAP = path.resolve(
   __dirname,
@@ -25,21 +21,7 @@ const GEO_MAP = path.resolve(
  * its styles attached.
  */
 function loadShipped(): Component {
-  const compiled = compileSfc(readFileSync(GEO_MAP, 'utf8'), 'Geo_Map.vue')
-  const body = compiled.code
-    .replace(
-      /import\s*\{([^}]*)\}\s*from\s*['"](vue|builtins)['"]/g,
-      (_, names: string, module: string) => `const {${names.replace(/\bas\b/g, ':')}} = ${module}`,
-    )
-    .replace(/export const /g, 'const ')
-    .replace(/export function /g, 'function ')
-    .replace(/export default/, 'return')
-  const component = new Function('vue', 'builtins', body)(vue, builtins) as Component & {
-    __scopeId?: string
-  }
-  component.__scopeId = `data-v-${compiled.id}`
-  attachStyles({ default: component }, compiled.styles)
-  return component
+  return loadShippedSfc(GEO_MAP, 'Geo_Map.vue', { builtins }).component
 }
 
 const hostName = 'enso-test-host-geo-map-style'

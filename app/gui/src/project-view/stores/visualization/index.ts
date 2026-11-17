@@ -101,8 +101,10 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
     const scriptsNode = document.head.appendChild(document.createElement('div'))
     scriptsNode.classList.add('visualization-scripts')
 
-    const loadedScripts = new Set<string>()
-    function loadScripts(module: VisualizationModule) {
+    /** The script URLs requested so far, with the load of each; a failed one is dropped to be retried. */
+    const loadedScripts = new Map<string, Promise<void>>()
+    /** Load the scripts of a module (once per URL); resolves to whether all of them loaded. */
+    async function loadScripts(module: VisualizationModule): Promise<boolean> {
       const promises: Promise<void>[] = []
       if ('scripts' in module && module.scripts) {
         if (!Array.isArray(module.scripts)) {
@@ -112,31 +114,61 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
         for (const url of scripts) {
           if (typeof url !== 'string') {
             console.warn('Visualization script should be a string, skipping URL:', url)
-          } else if (!loadedScripts.has(url)) {
-            loadedScripts.add(url)
+            continue
+          }
+          let loading = loadedScripts.get(url)
+          if (!loading) {
             const node = document.createElement('script')
             node.src = url
             // Some resources still set only "Access-Control-Allow-Origin" in the response.
             // We need to explicitly make a request CORS - see https://resourcepolicy.fyi
             node.crossOrigin = 'anonymous'
-            promises.push(
-              new Promise<void>((resolve, reject) => {
-                node.addEventListener('load', () => {
-                  resolve()
-                  // Once scripts are loaded and run, there is no need to keep the tag.
-                  node.remove()
-                })
-                node.addEventListener('error', () => {
-                  reject()
-                  node.remove()
-                })
-              }),
-            )
+            loading = new Promise<void>((resolve, reject) => {
+              node.addEventListener('load', () => {
+                resolve()
+                // Once scripts are loaded and run, there is no need to keep the tag.
+                node.remove()
+              })
+              node.addEventListener('error', () => {
+                // A later request tries again.
+                loadedScripts.delete(url)
+                reject(new Error(`Could not load the script ${url}`))
+                node.remove()
+              })
+            })
+            loadedScripts.set(url, loading)
             scriptsNode.appendChild(node)
           }
+          promises.push(loading)
         }
       }
-      return Promise.allSettled(promises)
+      const results = await Promise.allSettled(promises)
+      return results.every((result) => result.status === 'fulfilled')
+    }
+
+    /**
+     * A module of a project or library folder, with its scripts loaded: they are loaded when the
+     * module is first requested (as for a built-in), not when its file is compiled, so opening a
+     * project downloads nothing a view has not asked for. One wrapper per module promise; one whose
+     * scripts failed is dropped so that a later request loads them again.
+     */
+    const withScripts = new WeakMap<Promise<VisualizationModule>, Promise<VisualizationModule>>()
+    function loadingScripts(viz: Promise<VisualizationModule> | undefined) {
+      if (!viz) return undefined
+      let wrapped = withScripts.get(viz)
+      if (!wrapped) {
+        const loading: Promise<VisualizationModule> = viz.then(async (module) => {
+          if (!(await loadScripts(module)) && withScripts.get(viz) === loading) {
+            withScripts.delete(viz)
+          }
+          return module
+        })
+        // The requester handles a rejection; this keeps an unread one from being reported.
+        loading.catch(() => {})
+        wrapped = loading
+        withScripts.set(viz, wrapped)
+      }
+      return wrapped
     }
 
     /** Make a visualization known to the store, and release anything waiting for it. */
@@ -189,11 +221,8 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
           ls,
           rootId,
           module,
-          compile: async (address) => {
-            const viz = await compile(address, await proj.dataConnection)
-            await loadScripts(viz)
-            return viz
-          },
+          // Its scripts are loaded when the view is first requested (`get`), not here.
+          compile: async (address) => compile(address, await proj.dataConnection),
           register,
           unregister,
           quietIfMissing,
@@ -268,7 +297,10 @@ export const [provideVisualizationStore, useVisualizationStore] = createContextS
           }
         }
       }
-      return computed(() => cache.get(key))
+      // A built-in's promise loads its scripts itself; a folder's module has them loaded on use.
+      return computed(() =>
+        meta.module.kind === 'Builtin' ? cache.get(key) : loadingScripts(cache.get(key)),
+      )
     }
 
     function waitForLibraryVisualization(key: VisualizationId, library: string, name: string) {

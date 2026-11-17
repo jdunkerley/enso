@@ -135,6 +135,21 @@ which `visualizationData.ts` catches and shows with the rejection's own text (it
 is not the "was not found in the library" error). A rejected wait is dropped
 from the cache, so a later request tries again.
 
+## Scripts
+
+A visualization may list `scripts` (URLs the view needs as globals, e.g. Geo
+Map's Mapbox GL). They load when the view is first requested, never when the
+file is compiled: a built-in's cached promise loads them itself
+(`resolveBuiltinVisualization`), and `get` wraps the promise of a `Library` or
+`CurrentProject` module the same way (`loadingScripts`, one wrapper per module
+promise). So opening a project downloads nothing, a visualization is offered
+(registered) without waiting for a CDN, and the library wait above is unchanged
+(the waiter resolves with the module; the scripts load on top). A URL loads once
+(`loadedScripts` holds its load promise, so concurrent requests wait for the
+same one); a script that fails to load is dropped from it, and its wrapper too,
+so a later `get` tries again, and the view opens regardless. Tested in
+`libraryVisualizations.test.ts`.
+
 ## Moved ids
 
 A node saves its visualization id in its metadata. When a built-in moves to a
@@ -183,6 +198,10 @@ the list widens what every library can rely on, so it is the owner's decision
   element: the CSS reaches the shadow root (own and imported component),
   applies, is not in the document, and a recompile shows only its own rules;
   `hostKeyFor`.
+- `__tests__/loadSfc.ts` — the test helper that compiles a `.vue` source with
+  `compileSfc` and evaluates it as the browser evaluates the worker's output
+  (imports from a module table, styles attached); shared by
+  `moduleStyles.test.ts` and the shipped `…Style.test.ts` files.
 - `__tests__/moduleImports.test.ts` — `createModuleImporter`: styles go with
   their own module, a failed import leaves none behind, overlapping imports of a
   path, a style-only edit. The worker itself (`compiler.ts`) and the blob

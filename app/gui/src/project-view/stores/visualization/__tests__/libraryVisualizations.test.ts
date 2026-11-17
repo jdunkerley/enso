@@ -1,6 +1,6 @@
 import { Ok } from 'enso-common/src/utilities/data/result'
 import { ObservableV2 } from 'lib0/observable'
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createApp } from 'vue'
 import type { ContentRoot, Event as LSEvent, Uuid } from 'ydoc-shared/languageServerTypes'
 import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
@@ -169,6 +169,70 @@ test('the project watch compiles the project folder as the current project', asy
   )
   const mine = { module: { kind: 'CurrentProject' }, name: 'Image' } as const
   await expect(store.get(mine).value).resolves.toMatchObject({ name: 'Image' })
+})
+
+describe('the scripts of a library visualization', () => {
+  const SCRIPT = 'https://example.test/lib.js'
+  const scriptNodes = () =>
+    Array.from(document.head.querySelectorAll<HTMLScriptElement>('.visualization-scripts script'))
+
+  beforeEach(async () => {
+    for (const node of document.head.querySelectorAll('.visualization-scripts')) node.remove()
+    const { compile } = await import('@/stores/visualization/compilerMessaging')
+    vi.mocked(compile).mockResolvedValueOnce({
+      default: {},
+      name: 'Image',
+      inputType: 'Standard.Image.Image',
+      icon: 'image',
+      scripts: [SCRIPT],
+    } as never)
+  })
+
+  async function storeWithRegisteredViz() {
+    const created = createStore([libraryRoot])
+    await settle()
+    created.ls.fileEvent(LIBRARY_ROOT, 'Added', ['Image.vue'])
+    await settle()
+    return created
+  }
+
+  test('are not loaded when the visualization is registered', async () => {
+    const { store } = await storeWithRegisteredViz()
+    expect(scriptNodes()).toHaveLength(0)
+    // It is offered all the same, without waiting for any script.
+    expect(Array.from(store.byType(null))).toContainEqual(IMAGE_LIBRARY_ID)
+  })
+
+  test('are loaded by the first request, once', async () => {
+    const { store } = await storeWithRegisteredViz()
+    const first = store.get(IMAGE_LIBRARY_ID).value
+    await settle()
+    expect(scriptNodes().map((node) => node.src)).toEqual([SCRIPT])
+    // Another request neither adds a script nor gives a module before the script has loaded.
+    const second = store.get(IMAGE_LIBRARY_ID).value
+    await settle()
+    expect(scriptNodes()).toHaveLength(1)
+    scriptNodes()[0]!.dispatchEvent(new Event('load'))
+    await expect(first).resolves.toMatchObject({ name: 'Image' })
+    await expect(second).resolves.toMatchObject({ name: 'Image' })
+    expect(scriptNodes()).toHaveLength(0)
+  })
+
+  test('are loaded again by a later request when the load failed', async () => {
+    const { store } = await storeWithRegisteredViz()
+    const first = store.get(IMAGE_LIBRARY_ID).value
+    await settle()
+    const failed = scriptNodes()[0]!
+    failed.dispatchEvent(new Event('error'))
+    // The view still opens (a failed script is not a failed visualization).
+    await expect(first).resolves.toMatchObject({ name: 'Image' })
+    await settle()
+    void store.get(IMAGE_LIBRARY_ID).value
+    await settle()
+    const retried = scriptNodes()
+    expect(retried).toHaveLength(1)
+    expect(retried[0]).not.toBe(failed)
+  })
 })
 
 test('unmounting the store stops every watch', async () => {
