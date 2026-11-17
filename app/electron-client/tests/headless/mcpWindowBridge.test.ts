@@ -175,6 +175,7 @@ describe('projectTools', () => {
       'get_component_docs',
       'evaluate_expression',
       'list_visualizations',
+      'get_documentation',
     ])
     expect(EDIT_TOOL_NAMES).toEqual([
       'add_nodes',
@@ -183,6 +184,7 @@ describe('projectTools', () => {
       'collapse_nodes',
       'add_function',
       'set_node_comment',
+      'set_documentation',
       'set_visualization',
       'select_nodes',
       'open_method',
@@ -220,6 +222,7 @@ describe('projectTools argument bounds', () => {
     ['search_components', 'query', 500, {}],
     ['evaluate_expression', 'expression', 100_000, {}],
     ['evaluate_expression', 'node_id', 200, { expression: '1' }],
+    ['set_documentation', 'text', 100_000, {}],
   ] as const)('%s takes %s of at most %i characters', async (tool, arg, max, rest) => {
     const ok = await registry.call(tool, { ...rest, [arg]: 'x'.repeat(max) }, caller)
     expect(ok).toEqual({ ok: true, value: 'v' })
@@ -270,6 +273,12 @@ describe('edit tool arguments', () => {
     expect(await ok('open_method', {})).toBe(true)
   })
 
+  test('get_documentation takes nothing; set_documentation needs a text, which may be empty', async () => {
+    expect(await ok('get_documentation', {})).toBe(true)
+    expect(await ok('set_documentation', {})).toBe(false)
+    expect(await ok('set_documentation', { text: '' })).toBe(true)
+  })
+
   test('set_visualization needs a boolean', async () => {
     expect(await ok('set_visualization', { node_id: 'a', visible: 'yes' })).toBe(false)
     expect(await ok('set_visualization', { node_id: 'a', visible: true })).toBe(true)
@@ -286,6 +295,7 @@ describe('appTools', () => {
       'list_files',
       'create_project',
       'open_project',
+      'switch_project',
       'close_project',
     ])
   })
@@ -313,6 +323,9 @@ describe('appTools', () => {
     expect(await ok('open_project', {})).toBe(false)
     expect(await ok('open_project', { path: '/p' })).toBe(true)
     expect(await ok('list_projects', { directory: 'x'.repeat(1001) })).toBe(false)
+    expect(await ok('switch_project', {})).toBe(false)
+    expect(await ok('switch_project', { path: '/p' })).toBe(true)
+    expect(await ok('switch_project', { path: 'x'.repeat(1001) })).toBe(false)
     expect(await ok('close_project', {})).toBe(true)
   })
 })

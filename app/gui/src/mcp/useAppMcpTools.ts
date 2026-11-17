@@ -29,6 +29,12 @@ import { registerMcpAppToolHandlers, whenProjectToolsActive } from './toolDispat
  */
 const OPEN_WAIT_MS = 100_000
 /**
+ * How long `switch_project` waits for the project's tools to answer: inside main's
+ * `WINDOW_TOOL_TIMEOUT_MS` (30 s). An open project's editor stays mounted, so this is quick unless
+ * the project is still opening.
+ */
+const SWITCH_WAIT_MS = 20_000
+/**
  * How long `close_project` waits for the close (and its "Saved on close" version) to finish: inside
  * main's `WINDOW_TOOL_TIMEOUT_MS` (30 s). The close goes on after it.
  */
@@ -121,6 +127,20 @@ export function useAppMcpTools(): void {
     return Promise.race([ready, failed])
   }
 
+  async function showProject(path: string): Promise<boolean> {
+    const id = newProjectId(Path(path))
+    const tab = { type: 'project', id } as const
+    if (!container.isTabOpened(tab)) {
+      throw new Error('The project is no longer open. Call get_app_state.')
+    }
+    // As in `openProject`: waiting starts before the tab changes, and only this project's tools
+    // count. The editor of the project left removes its tools on deactivation, which also ends the
+    // agent's open undo step there, as when the user changes tab.
+    const ready = whenProjectToolsActive(id, SWITCH_WAIT_MS)
+    container.currentTab = tab
+    return ready
+  }
+
   async function closeCurrentProject(): Promise<boolean> {
     const tab = container.currentTab
     if (tab?.type !== 'project') return false
@@ -173,6 +193,7 @@ export function useAppMcpTools(): void {
         return { name: created.name, path: extractTypeAndPath(created.projectId).path }
       },
       openProject,
+      showProject,
       closeCurrentProject,
       state,
     }

@@ -15,15 +15,17 @@ default. No tool changes the execution environment, settings or secrets.
   are stripped before the registry sees them (`McpServer.validateToolInput` in
   `@modelcontextprotocol/sdk` 1.30; `mcpServer.test.ts` checks it). The
   registry's strict check binds callers that do not go through the SDK.
-- `projectTools.ts` — the definitions of the project tools: the six that read
-  (`VIEW_TOOL_NAMES`, `list_visualizations` among them) and the nine that edit
-  or navigate (`EDIT_TOOL_NAMES`). Each only forwards its arguments to the
-  window.
-- `visualizationTool.ts` — `get_visualization`, the one project tool whose `run`
-  does part of its work in main (see "Looking at a visualization").
-- `appTools.ts` — the six app tools (`get_app_state`, `list_projects`,
-  `list_files`, `create_project`, `open_project`, `close_project`), forwarded
-  the same way.
+- `projectTools.ts` — the definitions of the project tools: the seven that read
+  (`VIEW_TOOL_NAMES`, `list_visualizations` and `get_documentation` among them)
+  and the ten that edit or navigate (`EDIT_TOOL_NAMES`, `set_documentation`
+  among them). Each only forwards its arguments to the window.
+- `visualizationTool.ts` — `get_visualization`, a project tool whose `run` does
+  part of its work in main (see "Looking at a visualization").
+- `imageTool.ts` — `add_image`, the other one: main reads the file or captures
+  the picture, and the window stores it (see "Documentation and images").
+- `appTools.ts` — the seven app tools (`get_app_state`, `list_projects`,
+  `list_files`, `create_project`, `open_project`, `switch_project`,
+  `close_project`), forwarded the same way.
 - `windowBridge.ts` — `WindowBridge` forwards a call to the focused window (or
   the first one) over `Channel.mcpToolCall` and resolves with the reply
   (`Channel.mcpToolReply`, matched by `requestId`), or with an error when there
@@ -93,7 +95,8 @@ activated set answers (a project activates its set when its tab shows and
 removes it when hidden). With no project showing (the dashboard, or none open)
 the dispatcher answers that no project is open. Add, rename or change a tool on
 both sides, and keep its description and `guides/overview.md` in step with what
-the handler returns. Only `get_guide` runs entirely in main.
+the handler returns. Only `get_guide` runs entirely in main; `get_visualization`
+and `add_image` do part of their work there.
 
 ## Looking at a visualization
 
@@ -164,7 +167,70 @@ folder is outside the Drive", before anything is listed or opened.
 `create_project` and `open_project` answer once the opened project's own tools
 answer, waited for by its project id (`whenProjectToolsActive`), so the agent's
 next call reads that project and not another tab; main gives them 120 s, the
-window 100 s.
+window 100 s. `switch_project { path }` brings the tab of a project that is
+already open on screen and answers `{ name, path }` the same way, once its tools
+answer (30 s in main). The path is compared exactly with the open projects'
+paths as `get_app_state` lists them, never resolved against the disk, so it
+opens and creates nothing: any other path is refused with the open projects
+listed and a pointer to `open_project`. Leaving a tab ends the caller's undo
+step in the project left, as the user's tab change does.
+
+## Documentation and images
+
+`get_documentation` and `set_documentation` are plain forwards (30 s and 60 s)
+to the window handlers in `app/gui/src/project-view/mcp/documentationTools.ts`.
+The documentation is the Markdown the documentation panel shows for the function
+on screen: the workflow's at the top level, a function of the project's after
+`open_method`. `get_documentation` answers `{ method, text, truncated }` (at
+most 50,000 characters) and works in Live. `set_documentation { text }` (at most
+100,000 characters) **replaces all of it** in one module edit through the edit
+session (refused in Live, part of the caller's undo step) and answers
+`{ method, characters, settled: true }`; a text equal to the current one at the
+edit's turn edits nothing and adds `unchanged: true`, and is still refused in
+Live.
+
+`add_image { path | node_id, name? }` (`imageTool.ts`) stores an image in the
+project's `images` folder, for the documentation. It takes exactly one of `path`
+and `node_id`:
+
+- **`path`**: main reads the file with the user's rights, so it is checked first
+  (Note [add_image Reads Only Images]). On Windows only a drive path (`C:\…` or
+  `C:/…`), with no other `:`: network (`\\host\share`), device (`\\.\`, `\\?\`)
+  and alternate-data-stream (`C:\notes.txt:x.png`) paths are refused before
+  anything touches them; elsewhere any absolute path. The extension must be an
+  accepted image kind (`.png`, `.apng`, `.jpg`, `.jpeg`, `.gif`, `.webp`,
+  `.avif`, `.svg`: the documentation editor's list) **and** the leading bytes
+  that same kind, so a text file named `.png`, or a PNG named `.jpg`, is refused
+  and nothing is copied. A regular file (after links) of at most 10 MB
+  (`IMAGE_MAX_BYTES`), checked from its size before it is read and again while
+  reading. No error quotes the file's content. A `path` works in Live: storing a
+  file is not an edit.
+- **`node_id`**: a picture of the node's visualization, taken exactly as
+  `get_visualization` takes one (`pictureVisualization`, the same Live rules,
+  `shown` and `moved` in the result), stored as PNG. The picture and the store
+  are two window calls, so `prepare_visualization`'s answer carries the id of
+  the project that answered (`project_id`, which `get_visualization` does not
+  pass on to the agent), main sends it to `store_image`, and a different project
+  on screen by then refuses ("The project on screen changed …"). A `path` image
+  has no first call, so no id is sent or checked.
+
+`name` (at most 100 characters; letters, digits, spaces, `.`, `_`, `-`; no
+folders, no device name) chooses the stored name; its extension is set to match
+the image. By default the source file's name, or the node's. Main then sends the
+bytes as base64 to the window handler `store_image`
+(`app/gui/src/project-view/mcp/imageTools.ts`), which **is not an MCP tool**: it
+is in no tool list, and an agent cannot call it. It checks the name and size
+again and writes through the documentation editor's upload functions: the folder
+is made if missing, `pickUniqueName` picks a name no file has (`chart_1.png`
+when `chart.png` is taken; compared case-insensitively, so `Chart.png` never
+replaces `chart.png` on Windows or macOS), and nothing is ever overwritten.
+Stores run one at a time, so two cannot pick the same free name, and none
+creates or writes anything with less than 5 s left before the call's 60 s
+deadline (`STORE_DEADLINE_MARGIN_MS`). It answers `{ path, markdown, bytes }`:
+the project-relative URL the editor writes (`/images/<name>`), the Markdown
+`![<alt>](<path>)` to put into `set_documentation`'s text, and the size. Storing
+an image is not on the undo stack; an image no longer used stays for the user to
+delete (no tool deletes or renames one).
 
 ## Edits
 
@@ -350,31 +416,41 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   server), `mcpController.test.ts` (fake keyring and server),
   `mcpClientConfigs.test.ts`, `mcpClaudeDesktop.test.ts` (a temporary folder,
   never the real Claude folder), `mcpVisualizationTool.test.ts` (a fake bridge
-  and capture).
+  and capture), `mcpImageTool.test.ts` (a fake bridge, capture and file reader,
+  both path rules by an injected platform).
 - `tests/mcp.spec.ts` — the packaged app, two tests. The first: an SDK client
-  lists the 23 tools, reads the guide and the graph of a new project, searches
+  lists the 27 tools, reads the guide and the graph of a new project, searches
   components, evaluates, checks that an evaluation does not write the file it
   names (the answer names the dry-run file, which the test deletes), and that a
   request without the token is `401`. The second builds a project from the
-  dashboard against the real engine: `create_project`, `add_nodes` (with an
-  import line, and with a node in error that `edit_node` fixes),
-  `get_visualization` of the vector node's hidden visualization (a PNG of the
-  size its text states, not one flat colour, attached as `visualization.png`; 3
-  s later a second picture, byte for byte the same, the stale-frame check; then
-  its data; then `list_visualizations`, whose `available` holds the name the
-  picture reported, and a picture of another name from it, `changed` and not the
-  first picture's bytes, again the same 3 s later, attached as
-  `other-visualization.png`), code in the Write prefix refused by `add_nodes`,
+  dashboard against the real engine: `create_project`, `switch_project` (to the
+  project on screen, and to a path no tab has, refused with the open project
+  listed), `add_nodes` (with an import line, and with a node in error that
+  `edit_node` fixes), `get_visualization` of the vector node's hidden
+  visualization (a PNG of the size its text states, not one flat colour,
+  attached as `visualization.png`; 3 s later a second picture, byte for byte the
+  same, the stale-frame check; then its data; then `list_visualizations`, whose
+  `available` holds the name the picture reported, and a picture of another name
+  from it, `changed` and not the first picture's bytes, again the same 3 s
+  later, attached as `other-visualization.png`), `add_image` of that node
+  (`/images/numbers.png`, a PNG on disk of the stated size, attached as
+  `add-image-node.png`), of a PNG file in a temporary folder (the same bytes in
+  `images/chart.png`) and of a text file named `.png` (refused, nothing copied),
+  `set_documentation` of text with both images' Markdown, read back by
+  `get_documentation` and found in `Main.enso` on disk, then the same text again
+  (`unchanged: true`), code in the Write prefix refused by `add_nodes`,
   `edit_node` and `evaluate_expression` with the file it names never written,
   `edit_node` back to back on a node and its user (the second result current)
   and to the same text, a `remove_nodes` of a node with a user,
   `set_node_comment`, `set_visualization`, `select_nodes`, `collapse_nodes`,
   `open_method` in and out, `add_function`, one `Mod+Z` in the window taking
   back a whole `add_nodes` call, `remove_nodes`, `list_files`, the path rule,
-  `close_project` (the edits are in `Main.enso` on disk) and `open_project`; it
-  deletes the project it made. Neither can check the Live-mode refusals: nothing
-  in the UI switches a project to Live (the project's `executionMode` setting is
-  only read from its settings), so `app/gui/src/project-view/mcp/__tests__/`
-  covers them. The GUI side has its own Playwright specs:
-  `app/gui/integration-test/project-view/mcpEdit.spec.ts` and
+  `close_project` (the edits are in `Main.enso` on disk) and `open_project` (the
+  documentation read again is the text set); it deletes the project it made.
+  Neither can check the Live-mode refusals: nothing in the UI switches a project
+  to Live (the project's `executionMode` setting is only read from its
+  settings), so `app/gui/src/project-view/mcp/__tests__/` covers them. The GUI
+  side has its own Playwright specs:
+  `app/gui/integration-test/project-view/mcpEdit.spec.ts`,
+  `project-view/mcpDocumentation.spec.ts` and
   `integration-test/dashboard/mcpApp.spec.ts`.

@@ -219,3 +219,14 @@ test('only the final capture is scaled to the cap', async () => {
   expect(pngSize(bytes)).toEqual({ width: IMAGE_MAX_SIDE, height: 600 })
   expect(bytes[24]).toBe(1)
 })
+
+test('the project id the window answered with is not passed on to the agent', async () => {
+  const prepared = JSON.parse((PREPARED as { value: string }).value)
+  const { definition } = tool(() => ({
+    ok: true,
+    value: JSON.stringify({ ...prepared, project_id: 'p1' }),
+  }))
+  const result = await definition.run({ node_id: 'n' }, CALLER)
+  if (!result.ok) throw new Error(result.error)
+  expect(JSON.parse(result.value)).not.toHaveProperty('project_id')
+})

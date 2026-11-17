@@ -4,6 +4,8 @@
 
 - [A Boolean argument shows its value next to the checkbox, and a dropdown under
   it to choose True or False.][830]
+- [Agents connected over MCP can switch between open projects, read and rewrite
+  a workflow's or a function's documentation, and add images to it.][825]
 - [Libraries can provide their own visualizations][817]: a `.vue` file in a
   library's `visualizations/` folder appears in the view picker once the library
   is imported, and `Standard.Image` now ships the Image view this way.
@@ -538,6 +540,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [830]: https://github.com/jdunkerley/enso/pull/830
+[825]: https://github.com/jdunkerley/enso/pull/825
 [829]: https://github.com/jdunkerley/enso/pull/829
 [817]: https://github.com/jdunkerley/enso/pull/817
 [809]: https://github.com/jdunkerley/enso/pull/809
