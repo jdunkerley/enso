@@ -277,7 +277,9 @@ class RuntimeManagementTest extends InterpreterTest {
       }
       swallowed.get() shouldBe true
       ex.getMessage() shouldEqual interruptedMessage
-      consumeOut shouldEqual List("Start.", "Start.")
+      // The second run is interrupted at its first poll, which may come before
+      // or after it prints.
+      consumeOut.distinct shouldEqual List("Start.")
     }
 
     "Run new guest code on the threads of an interrupted task" in {
