@@ -443,6 +443,26 @@ applied it starts two watches, one for the node database's next update and one
 for the engine's reports; after the edit it awaits the first, then the second
 (see "When an edit has settled" below). A refused or failed edit cancels both.
 
+**The unstepped path and the agents' own history.** `runUnstepped` is `run`
+without an undo step or a saved version: the same queue, refusals (disposed, off
+screen, Live, deadline; one shared `refusal`) and graph and settle waits, but it
+releases the held step at its turn, holds none and leaves the own-history state
+alone. `undo` and `redo` use it (`NOTHING_TO_UNDO_ERROR`,
+`NOTHING_TO_REDO_ERROR`; `HistoryState` is `{ can_undo, can_redo }`). The
+session knows which undo steps are the agents' from the module's undo depth
+(`undoManager.undoDepth` / `redoDepth`, the `Y.UndoManager`'s stack lengths, via
+`EditSessionDeps.historyDepth`). **The rule**: `ownFloor` is the undo depth
+below which steps are not an agent's. It is set to the depth at the start of the
+step (`stepBase`, read after the hold) by the first changed (not `unchanged`)
+edit, and cleared by any foreign edit, the user's Ctrl+Z included. `undo` is
+allowed only while the depth is above the floor; `redo` only for what `undo`
+took back (`ownRedo`), until the next edit by anyone. The listener also fires
+for the `Y.UndoManager`'s own transactions, so the session's `undo` and `redo`
+run with `inEdit` true and do not reset anything. An edit whose value
+`sealsHistory` (removing a node with Write on) closes its step at once and
+raises the floor to the depth then, so undo never brings that node back. Why
+this is safe for Write is in `editSession.ts`'s file comment.
+
 **A hidden editor never edits.** Removing the handlers on `onDeactivated` stops
 new calls, but not the ones already in the session: one queued behind a running
 edit (which can take 20 s), or one awaiting the version save. So the session

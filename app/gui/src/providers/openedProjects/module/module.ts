@@ -223,6 +223,14 @@ export async function createModuleStore(
         const manager = moduleModel.value?.undoManager
         return manager ? holdUndoStep(manager) : () => {}
       },
+      /** How many steps the undo stack holds now (read at call time; 0 with no manager). */
+      get undoDepth(): number {
+        return moduleModel.value?.undoManager.undoStack.length ?? 0
+      },
+      /** How many steps the redo stack holds now (read at call time; 0 with no manager). */
+      get redoDepth(): number {
+        return moduleModel.value?.undoManager.redoStack.length ?? 0
+      },
       canUndo: computed(() => undoManagerStatus.canUndo),
       canRedo: computed(() => undoManagerStatus.canRedo),
     })

@@ -168,6 +168,12 @@ export function useProjectMcpTools(
         (source, callback) => watch(source, callback, { flush: 'sync' }),
         listener,
       ),
+    historyDepth: () => {
+      const undoManager = currentProject.module.value.undoManager
+      return { undo: undoManager.undoDepth, redo: undoManager.redoDepth }
+    },
+    undo: () => currentProject.module.value.undoManager.undo(),
+    redo: () => currentProject.module.value.undoManager.redo(),
     saveVersion: (comment) =>
       localVersioning.saveIfEnabled(currentProject.store.value.assetId, comment),
     watchGraphUpdate: () => watchGraphUpdate(currentProject.graph.value),
