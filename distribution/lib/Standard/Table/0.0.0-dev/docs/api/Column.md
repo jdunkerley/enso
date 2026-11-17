@@ -100,6 +100,7 @@
     - trim self where:Standard.Base.Data.Text.Location.Location= what:(Standard.Base.Data.Text.Text|Standard.Table.Column.Column)= -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
     - truncate self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)!Standard.Table.Errors.Invalid_Value_Type
     - value_type self -> Standard.Table.Value_Type.Value_Type
+    - viz_tree self size:Standard.Base.Data.Numbers.Integer -> Standard.Visualization.Viz_Tree.Viz_Tree
     - year self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)!Standard.Table.Errors.Invalid_Value_Type
     - zip self right:(Standard.Table.Column.Column|Standard.Table.Table.Table)= keep_unmatched:(Standard.Base.Data.Boolean.Boolean|Standard.Base.Data.Vector.Report_Unmatched)= right_prefix:Standard.Base.Data.Text.Text= on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior= -> Standard.Table.Table.Table
     - || self other:(Standard.Table.Column.Column|Standard.Base.Any.Any) -> (Standard.Table.Column.Column&Standard.Base.Any.Any)

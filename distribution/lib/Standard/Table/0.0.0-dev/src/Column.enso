@@ -48,7 +48,8 @@ type Column
        The column's tree for the JSON visualization, given its `size` (the row
        count). A table passes its own row count for each of its columns, which
        all share it, so a page of a database table's columns runs no `COUNT(*)`
-       query of its own (#772).
+       query of its own (#772). `size` must be the column's own length: the
+       tree's entries are read up to it.
     viz_tree self (size : Integer) -> Viz_Tree =
         label = "Column " + self.name.to_json + " (" + (Viz_Tree.count_text size "row" "rows") + ")"
         in_memory = self.is_a In_Memory_Column
