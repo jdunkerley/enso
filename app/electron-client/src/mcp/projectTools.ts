@@ -20,6 +20,9 @@ const DOCUMENTATION_CHARS = 100_000
 /** Most characters of one statement or expression an agent adds to a node. */
 const STATEMENT_CHARS = 20_000
 
+/** Most characters of the comment `save_version` writes. */
+const VERSION_COMMENT_CHARS = 500
+
 /** Most nodes one `move_nodes` call moves. */
 const MOVE_NODES_MAX = 200
 /** The farthest from the origin, in scene units, a node may be moved to on either axis. */
@@ -53,6 +56,7 @@ export const EDIT_TOOL_NAMES = [
   'arrange_nodes',
   'undo',
   'redo',
+  'save_version',
   'select_nodes',
   'open_method',
 ] as const
@@ -90,7 +94,7 @@ const EDIT_RULES =
   '`get_node` later.'
 
 /**
- * The project tools (the seven that read, the fourteen that edit or navigate), each forwarding its
+ * The project tools (the seven that read, the fifteen that edit or navigate), each forwarding its
  * arguments to the window through `bridge`.
  */
 export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
@@ -443,6 +447,26 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'to see the graph.',
       inputSchema: {},
       run: forward('redo', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'save_version',
+      title: 'Save a version of the project',
+      description:
+        "Save a version of the project in its local git repository, as the user's Save a " +
+        'version does, with `comment` (one line, at most 500 characters; without one the ' +
+        'version says it was saved by you). Returns `saved: true`, or `saved: false` with the ' +
+        '`reason` when nothing has changed since the last version. Refused when versions are ' +
+        'not kept for the project: only the user turns them on, with Save a version. It ' +
+        'changes no node, so it works in Live mode too and does not end your undo step. The ' +
+        'project is also saved as a version before your first edit.',
+      inputSchema: {
+        comment: z
+          .string()
+          .max(VERSION_COMMENT_CHARS)
+          .refine((text) => !/[\r\n]/.test(text), 'The comment must be one line.')
+          .optional(),
+      },
+      run: forward('save_version', EDIT_TOOL_TIMEOUT_MS),
     },
     {
       name: 'select_nodes',

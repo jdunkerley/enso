@@ -190,6 +190,7 @@ describe('projectTools', () => {
       'arrange_nodes',
       'undo',
       'redo',
+      'save_version',
       'select_nodes',
       'open_method',
     ])
@@ -287,6 +288,15 @@ describe('edit tool arguments', () => {
     for (const tool of ['undo', 'redo']) {
       expect(await ok(tool, {})).toBe(true)
     }
+  })
+
+  test('save_version takes an optional one-line comment of at most 500 characters', async () => {
+    expect(await ok('save_version', {})).toBe(true)
+    expect(await ok('save_version', { comment: 'x'.repeat(500) })).toBe(true)
+    expect(await ok('save_version', { comment: 'x'.repeat(501) })).toBe(false)
+    expect(await ok('save_version', { comment: 'a\nb' })).toBe(false)
+    expect(await ok('save_version', { comment: 'a\rb' })).toBe(false)
+    expect(await ok('save_version', { comment: 1 })).toBe(false)
   })
 
   test('get_graph takes an optional boolean `layout`', async () => {

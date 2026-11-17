@@ -138,7 +138,8 @@ function callerKey(caller: McpCaller): string {
   return caller.kind === 'chat' ? 'chat' : `external:${caller.name}`
 }
 
-function callerLabel(caller: McpCaller): string {
+/** How a caller is named in the versions and messages it causes: `the chat`, or the agent's name. */
+export function callerLabel(caller: McpCaller): string {
   return caller.kind === 'chat' ? 'the chat' : caller.name
 }
 

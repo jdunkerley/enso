@@ -54,6 +54,7 @@ import {
   watchGraphUpdate,
 } from './projectEvents'
 import { addFunction, collapseNodesTool, type StructureToolDeps } from './structureTools'
+import { saveVersion } from './versionTools'
 import { openMethod, prepareGraphImage, selectNodes, type ViewToolDeps } from './viewTools'
 import { lookupVisualization } from './visualizationRegistry'
 import {
@@ -124,7 +125,7 @@ export interface McpEditorDeps {
 /**
  * Registers the project tools for the open project: the seven that read (get_graph, get_node,
  * search_components, get_component_docs, evaluate_expression, list_visualizations,
- * get_documentation), the twelve that edit (undo, redo, add_nodes, edit_node, remove_nodes, set_node_comment,
+ * get_documentation), the thirteen that edit (undo, redo, save_version, add_nodes, edit_node, remove_nodes, set_node_comment,
  * set_documentation, set_visualization, move_nodes, arrange_nodes, collapse_nodes, add_function)
  * and the two that navigate (select_nodes, open_method); the two that main's `get_visualization`
  * calls (get_visualization_data, prepare_visualization), the one main's `add_image` calls
@@ -569,6 +570,25 @@ export function useProjectMcpTools(
         action,
         ...(node_ids != null ? { node_ids } : {}),
       })
+    },
+    save_version: async (args, caller) => {
+      const comment = args.comment
+      if (comment != null && typeof comment !== 'string') {
+        return invalidArgument('comment', 'a string')
+      }
+      // Not through the edit session: a version changes no module. `status` is read when the
+      // call runs, and a project whose versions are not kept is refused before `save` is called,
+      // which would otherwise offer to turn them on.
+      const projectId = currentProject.store.value.assetId
+      return saveVersion(
+        {
+          caller,
+          isActive: () => active,
+          status: () => localVersioning.statusOf(projectId),
+          save: (text) => localVersioning.save(projectId, text),
+        },
+        comment != null ? { comment } : {},
+      )
     },
     undo: async (_args, caller, deadline) => undoTool({ session, caller, deadline }),
     redo: async (_args, caller, deadline) => redoTool({ session, caller, deadline }),
