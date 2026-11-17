@@ -36,6 +36,12 @@ main =
     a = 1 + 2
     a`
 
+const CODE_WITH_ARGUMENT = `import Standard.Base.Data.Numbers
+
+main x =
+    y = x * 3
+    y`
+
 function makeDeps(
   overrides: Partial<RefreshToolDeps> = {},
   { code = CODE, settled = true, beforeTurn = () => {} } = {},
@@ -50,6 +56,8 @@ function makeDeps(
   db.updateNodes(func, { watchEffect })
   const recompute = vi.fn<RefreshToolDeps['executionContext']['recompute']>()
   const runOptions: EditRunOptions<readonly string[]>[] = []
+  /** What each action returned: the ids the refresh waits for. */
+  const actionValues: unknown[] = []
   const session: RefreshToolDeps['session'] = {
     async runUnstepped<T>(
       _caller: unknown,
@@ -61,6 +69,7 @@ function makeDeps(
       beforeTurn()
       runOptions.push(options as EditRunOptions<readonly string[]>)
       const result = await action()
+      if (result.ok) actionValues.push(result.value)
       return result.ok ? Ok({ value: result.value, settled }) : result
     },
   }
@@ -74,7 +83,7 @@ function makeDeps(
     executionContext: { recompute },
     ...overrides,
   }
-  return { deps, db, recompute, runOptions }
+  return { deps, db, recompute, runOptions, actionValues }
 }
 
 function valueOf(result: McpToolResult): Record<string, unknown> {
@@ -96,15 +105,36 @@ test('recomputes everything with exactly one argument, "all", and nothing else',
   expect(recompute.mock.calls[0]).toHaveLength(1)
 })
 
-test('settles on every node of the method on screen, as changed', async () => {
+test('settles on the computed nodes of the method on screen, as changed', async () => {
   const { deps, db, runOptions } = makeDeps()
   await refreshTool(deps)
-  const ids = [...db.nodeIdToNode.keys()]
+  const ids = [...db.nodeIdToNode.entries()]
+    .filter(([, node]) => node.type === 'component')
+    .map(([id]) => id)
   expect(ids.length).toBeGreaterThan(0)
   expect(runOptions).toHaveLength(1)
   expect(runOptions[0]?.deadline).toBe(DEADLINE)
   const affected = runOptions[0]?.affected?.(ids)
   expect(affected).toEqual({ changed: ids })
+})
+
+test('leaves out the input and output nodes, which the engine does not report on', async () => {
+  const { deps, db, actionValues } = makeDeps({}, { code: CODE_WITH_ARGUMENT })
+  await refreshTool(deps)
+  const all = [...db.nodeIdToNode.values()]
+  expect(all.some((node) => node.type === 'input')).toBe(true)
+  expect(all.some((node) => node.type === 'output')).toBe(true)
+  const components = [...db.nodeIdToNode.entries()]
+    .filter(([, node]) => node.type === 'component')
+    .map(([id]) => id)
+  expect(components).toHaveLength(1)
+  expect(actionValues).toEqual([components])
+})
+
+test('does not wait for a graph update, which a refresh never causes', async () => {
+  const { deps, runOptions } = makeDeps()
+  await refreshTool(deps)
+  expect(runOptions[0]?.awaitsGraphUpdate).toBe(false)
 })
 
 test('an unsettled refresh says so', async () => {

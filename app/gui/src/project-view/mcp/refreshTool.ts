@@ -51,7 +51,7 @@ export interface RefreshToolDeps {
  * on, or when {@link writeRefusal} refuses the whole module's code ({@link WRITE_ON_REFRESH_ERROR}:
  * the standard Write prefix contains `with_enabled_context`, so a Write-on node in any function
  * makes it answer). Answers `{ refreshed: true, settled }`, where `settled` says whether the engine
- * reported a value again for every node of the method on screen in time.
+ * reported a value again for every computed node of the method on screen in time.
  */
 export async function refreshTool(deps: RefreshToolDeps): Promise<McpToolResult> {
   if (deps.isLive()) return toolError(LIVE_REFRESH_ERROR)
@@ -67,7 +67,10 @@ export async function refreshTool(deps: RefreshToolDeps): Promise<McpToolResult>
       const ids: string[] = []
       for (const [id, node] of deps.db.nodeIdToNode) {
         if (node.prefixes.enableRecording != null) return Err(WRITE_ON_REFRESH_ERROR)
-        ids.push(id)
+        // Only the computed nodes report: the engine sends nothing for a function's argument (an
+        // input node) or for the bare name an output node returns, so waiting for those would
+        // always run out the 20 s.
+        if (node.type === 'component') ids.push(id)
       }
       // The one engine call: exactly this argument, no environment and no expression configs.
       deps.executionContext.recompute('all')
@@ -75,10 +78,8 @@ export async function refreshTool(deps: RefreshToolDeps): Promise<McpToolResult>
     },
     {
       deadline: deps.deadline,
-      // OPEN QUESTION (to check in the packaged app): `settled` needs a `Pending` and then a value
-      // for each of these, and it is not known that a recompute of 'all' reports `Pending` for a
-      // node whose value does not change. If it does not, settle on the first `executionComplete`
-      // after the call instead.
+      // A refresh changes no node, so no graph update follows: do not wait for one.
+      awaitsGraphUpdate: false,
       affected: (ids) => ({ changed: ids }),
     },
   )

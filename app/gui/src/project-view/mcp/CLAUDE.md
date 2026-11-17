@@ -574,14 +574,38 @@ the others.
   versioning on, no node changes, works in Live.
 - **`get_problems`**: reads `db.getExpressionInfo` per node, the dataflow error
   texts (`dataflowErrors.lookup`, waited for at most `PROBLEM_TEXT_WAIT_MS`) and
-  `projectStore.diagnostics`. SETTLING_NOTE_PROBLEMS
+  `projectStore.diagnostics`. Checked against the packaged app's real
+  diagnostics: a compile error's `location` lines are **0-based** (a diagnostic
+  at `location.start.line` 10 is line 11 of `Main.enso`; the tool adds 1), its
+  `path` is `{ rootId, segments: ['src', 'Main.enso'] }` (`isThisModule` takes
+  exactly that path, not any last segment `Main.enso`), and it carries the
+  `expressionId` of the node, so the line comes from that expression's span when
+  the module still has it and from `location` otherwise. The same compile error
+  also makes its node a `panic` (`Compile error: …`), so it is listed twice, as
+  a node and as a diagnostic. A dataflow error's text
+  (`bad = Error.throw "boom"`) arrives within the wait, without the ` (at …`
+  part; the node using it has the same message, so only the first has
+  `origin: true`.
 - **`refresh`**: `runUnstepped` with `executionContext.recompute('all')` (no
   second argument: never `'Live'`, never per-expression configs, never
   `recomputeOnce`). Refused in Live, and at the run's turn when
   `writeRefusal(moduleRoot)` refuses or any node of the method has
   `prefixes.enableRecording`: the standard Write prefix contains
   `with_enabled_context`, so a Write-on node anywhere in the module refuses it.
-  SETTLING_NOTE_REFRESH
+  **What `settled` waits for**: each **component** node of the method on screen
+  (`node.type === 'component'`) must report `Pending` and then a value, as
+  `changed` ids (the rule for an edited node, see "When an edit has settled").
+  Checked in the packaged app: `recompute('all')` does report `Pending` and then
+  a value for every computed node, one whose value does not change included
+  (`refresh` of an ordinary project answers `settled: true` in about 1 s). The
+  first version also waited for the input and output nodes; inside a function
+  with an argument that never settled (`settled: false` after the full 20 s), so
+  they are left out (the engine sends nothing reliable for a function's argument
+  or for the bare name its output returns). The rule is not "the first
+  `executionComplete`": that arrives for every evaluation, see the two wrong
+  designs below. A refresh changes no node, so it passes
+  `awaitsGraphUpdate: false` and does not wait for a graph update that never
+  comes (it cost the full 2 s).
 
 ## When an edit has settled
 

@@ -503,8 +503,8 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   and capture), `mcpImageTool.test.ts` (a fake bridge, capture and file reader,
   both path rules by an injected platform), `mcpGraphImageTool.test.ts` (a fake
   bridge and capture).
-- `tests/mcp.spec.ts` — the packaged app, two tests. The first: an SDK client
-  lists the 30 tools, reads the guide and the graph of a new project, searches
+- `tests/mcp.spec.ts` — the packaged app, three tests. The first: an SDK client
+  lists the 33 tools, reads the guide and the graph of a new project, searches
   components, evaluates, checks that an evaluation does not write the file it
   names (the answer names the dry-run file, which the test deletes), and that a
   request without the token is `401`. The second builds a project from the
@@ -538,8 +538,23 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   every node, attached as `graph.png`), one `Mod+Z` in the window taking back a
   whole `add_nodes` call, `remove_nodes`, `list_files`, the path rule,
   `close_project` (the edits are in `Main.enso` on disk) and `open_project` (the
-  documentation read again is the text set); it deletes the project it made.
-  Neither can check the Live-mode refusals: nothing in the UI switches a project
+  documentation read again is the text set); it deletes the project it made. The
+  third drives the five history tools against the real engine: `get_problems` on
+  a dataflow error and the node using it (message present, `origin` true then
+  false), on a compile error (its diagnostic's `line` is the 1-based line of
+  `Main.enso`), `refresh` (answers `settled: true`, also inside a function with
+  an argument), `undo` and `redo` of a step, `save_version` (refused: versions
+  are off in a new project), and the Write rule: a node with Write on, typed in
+  the Component Browser as the user would (it really writes its file,
+  appending), makes `refresh` refuse and the file is not written again (content
+  and modification time unchanged after 8 s); then `remove_nodes` of that node
+  closes the history, so `undo` is refused and the node does not come back, and
+  a `refresh` is allowed again and still writes nothing. The GUI's own Write
+  prefix (`Context.Output __ <| __`, `util/ast/node.ts`) does not run on this
+  engine, whose `with_enabled_context` takes two parameters (it fails with
+  "Method `<|` of type Text could not be found"), so the node's text puts the
+  write in the prefix's first hole (`WRITE_ON_CODE` in the spec). None of the
+  three can check the Live-mode refusals: nothing in the UI switches a project
   to Live (the project's `executionMode` setting is only read from its
   settings), so `app/gui/src/project-view/mcp/__tests__/` covers them. The GUI
   side has its own Playwright specs:

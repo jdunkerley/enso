@@ -115,6 +115,12 @@ export interface EditRunOptions<T> {
    * undo does not go. Only `run` reads it.
    */
   readonly sealsHistory?: (value: T) => boolean
+  /**
+   * Whether the run waits for the node database to update after the action ({@link
+   * GRAPH_UPDATE_WAIT_MS}). True by default; false for a run that changes no node (a refresh): no
+   * update comes, so waiting would only cost the full wait.
+   */
+  readonly awaitsGraphUpdate?: boolean
 }
 
 /** What a run answers: the edit's value, and whether the engine's results for it arrived in time. */
@@ -293,6 +299,7 @@ export class EditSession {
         options.affected ?? (() => ({})),
         options.unchanged ?? (() => false),
         options.deadline ?? Infinity,
+        options.awaitsGraphUpdate ?? true,
         mode,
       ),
     )
@@ -370,6 +377,7 @@ export class EditSession {
     affected: (value: T) => AffectedExpressions,
     unchanged: (value: T) => boolean,
     deadline: number,
+    awaitsGraphUpdate: boolean,
     mode: RunMode<T>,
   ): Promise<Result<EditOutcome<T>>> {
     let watch: ExecutionWatch | undefined
@@ -436,7 +444,7 @@ export class EditSession {
       // `finally`.
       if (unchanged(result.value)) return Ok({ value: result.value, settled: true })
       watch.editApplied()
-      await graphWatch.updated(GRAPH_UPDATE_WAIT_MS)
+      if (awaitsGraphUpdate) await graphWatch.updated(GRAPH_UPDATE_WAIT_MS)
       const settleMs = Math.max(0, Math.min(EDIT_SETTLE_MS, remaining() - EDIT_ANSWER_MARGIN_MS))
       const settled = await watch.settled(affected(result.value), settleMs)
       return Ok({ value: result.value, settled })

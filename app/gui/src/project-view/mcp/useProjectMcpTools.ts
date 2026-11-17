@@ -244,8 +244,9 @@ export function useProjectMcpTools(
         }
         return line
       },
-      // The module on screen is `Main.enso`; a diagnostic about another file is not about it.
-      isThisModule: (path) => path == null || path.segments.at(-1) === 'Main.enso',
+      // The module on screen is the project's `src/Main.enso` (the segments the language server
+      // sends, checked in the packaged app); a diagnostic about another file is not about it.
+      isThisModule: (path) => path == null || path.segments.join('/') === 'src/Main.enso',
     }
   }
 

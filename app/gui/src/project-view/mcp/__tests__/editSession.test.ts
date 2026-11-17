@@ -1037,6 +1037,18 @@ describe('an edit that changes nothing', () => {
     expect(graph.queued()).toBe(0)
   })
 
+  test('a run with awaitsGraphUpdate false does not wait for the graph, but does for the engine', async () => {
+    const t = setup()
+    const outcome = await t.session.runUnstepped(claude, () => Ok(0), {
+      awaitsGraphUpdate: false,
+    })
+    expect(outcome).toEqual(Ok({ value: 0, settled: true }))
+    expect(t.updated).not.toHaveBeenCalled()
+    const waits = await t.session.runUnstepped(claude, () => Ok(0))
+    expect(waits.ok).toBe(true)
+    expect(t.updated).toHaveBeenCalledTimes(1)
+  })
+
   test('a fake graph watch is cancelled and never awaited', async () => {
     const t = setup()
     await t.session.run(claude, () => Ok(0), { unchanged: () => true })

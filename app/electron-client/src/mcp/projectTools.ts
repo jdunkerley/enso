@@ -503,7 +503,7 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'the project is in Live mode, and when the project has a node the user switched Write ' +
         'on for or code that enables output, because a refresh would run it (ask the user to ' +
         'refresh then). It changes no node and joins no undo step; it ends yours. Returns ' +
-        '`refreshed` and `settled`: whether the engine reported every node of the function on ' +
+        '`refreshed` and `settled`: whether the engine reported every computed node of the function on ' +
         'screen again in time. Call `get_graph` or `get_problems` afterwards.',
       inputSchema: {},
       run: forward('refresh', EDIT_TOOL_TIMEOUT_MS),
