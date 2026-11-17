@@ -102,6 +102,7 @@ test('an MCP client reads the open project and cannot write a file', async ({
         'get_graph',
         'get_graph_image',
         'get_node',
+        'get_problems',
         'get_visualization',
         'list_visualizations',
         'search_components',

@@ -176,6 +176,7 @@ describe('projectTools', () => {
       'evaluate_expression',
       'list_visualizations',
       'get_documentation',
+      'get_problems',
     ])
     expect(EDIT_TOOL_NAMES).toEqual([
       'add_nodes',
@@ -286,6 +287,12 @@ describe('edit tool arguments', () => {
 
   test('undo and redo take no arguments', async () => {
     for (const tool of ['undo', 'redo']) {
+      expect(await ok(tool, {})).toBe(true)
+    }
+  })
+
+  test('get_problems takes no arguments', async () => {
+    for (const tool of ['get_problems']) {
       expect(await ok(tool, {})).toBe(true)
     }
   })

@@ -46,6 +46,7 @@ import {
 } from './layoutTools'
 import { createMcpNodes } from './nodeCreation'
 import { panelQuiet } from './panelQuiet'
+import { getProblems, type ProblemToolDeps } from './problemTools'
 import {
   afterGraphUpdate,
   moduleChangedBy,
@@ -123,9 +124,10 @@ export interface McpEditorDeps {
 }
 
 /**
- * Registers the project tools for the open project: the seven that read (get_graph, get_node,
+ * Registers the project tools for the open project: the eight that read (get_graph, get_node,
  * search_components, get_component_docs, evaluate_expression, list_visualizations,
- * get_documentation), the thirteen that edit (undo, redo, save_version, add_nodes, edit_node, remove_nodes, set_node_comment,
+ * get_documentation, get_problems), the thirteen that edit (undo, redo, save_version,
+ * add_nodes, edit_node, remove_nodes, set_node_comment,
  * set_documentation, set_visualization, move_nodes, arrange_nodes, collapse_nodes, add_function)
  * and the two that navigate (select_nodes, open_method); the two that main's `get_visualization`
  * calls (get_visualization_data, prepare_visualization), the one main's `add_image` calls
@@ -212,6 +214,37 @@ export function useProjectMcpTools(
       area: (id) => graph.visibleArea(id),
       // The rectangle and the zoom of the same moment, even during a zoom animation.
       view: () => ({ rect: editor.viewport(), scale: editor.viewportScale() }),
+    }
+  }
+
+  /** `get_problems`' dependencies, read when the call runs. */
+  function problemDeps(): ProblemToolDeps {
+    const graph = currentProject.graph.value
+    const project = currentProject.store.value
+    const source = currentProject.module.value.source
+    const spanOf = (id: Ast.AstId | undefined) => (id != null ? source.getSpan(id) : undefined)
+    return {
+      db: graph.db,
+      currentMethod: graph.currentMethod,
+      // Reads reactive state (the lookup starts the error's small visualization), so that the
+      // wait is told when the text arrives.
+      dataflowErrorMessage: (id) => project.dataflowErrors.lookup(id)?.value?.message,
+      diagnostics: () => project.diagnostics,
+      methodRange: () => {
+        const method = graph.currentMethod.ast
+        return method.ok ? spanOf(method.value.id) : undefined
+      },
+      expressionRange: (id) => spanOf(graph.db.idFromExternal(id)),
+      lineOf: (offset) => {
+        const text = source.text
+        let line = 1
+        for (let i = text.indexOf('\n'); i >= 0 && i < offset; i = text.indexOf('\n', i + 1)) {
+          line++
+        }
+        return line
+      },
+      // The module on screen is `Main.enso`; a diagnostic about another file is not about it.
+      isThisModule: (path) => path == null || path.segments.at(-1) === 'Main.enso',
     }
   }
 
@@ -590,6 +623,7 @@ export function useProjectMcpTools(
         comment != null ? { comment } : {},
       )
     },
+    get_problems: async () => getProblems(problemDeps()),
     undo: async (_args, caller, deadline) => undoTool({ session, caller, deadline }),
     redo: async (_args, caller, deadline) => redoTool({ session, caller, deadline }),
     collapse_nodes: async (args, caller, deadline) => {

@@ -41,6 +41,7 @@ export const VIEW_TOOL_NAMES = [
   'evaluate_expression',
   'list_visualizations',
   'get_documentation',
+  'get_problems',
 ] as const
 
 export const EDIT_TOOL_NAMES = [
@@ -217,6 +218,29 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         '`truncated: true`, when longer). Changes nothing, and works in Live mode too.',
       inputSchema: {},
       run: forward('get_documentation'),
+    },
+    {
+      name: 'get_problems',
+      title: 'List the errors and warnings',
+      description:
+        'List every error and warning of the function on screen in one call, without the ' +
+        'values `get_graph` also returns. Returns `{ method, nodes, diagnostics, errors, ' +
+        'warnings, pending, truncated }`. Each of `nodes` (in the order of `get_graph`, at most ' +
+        '100: errors and panics are kept before warnings, and `truncated` says some were ' +
+        'left out) has `id`, `name`, `state` (`panic`, `error` or `warning`) and `message`. ' +
+        'For an error or a panic `origin` is false when a node this one takes input from has ' +
+        'the same message, true otherwise: fix the `origin: true` nodes first, the rest ' +
+        'usually clear by themselves. A warning node has `warnings`, how many there are; its ' +
+        '`message` is the text of the first (null when the engine did not send it), and the ' +
+        'rest are in its `Warnings` visualization (`get_visualization` with that name). The ' +
+        'text of an error loads on first look and is waited for at most 5 seconds: a node ' +
+        'whose text did not arrive has `message: null`, and `messages_pending` counts them; ' +
+        'call again. `diagnostics` (at most 50) are the compile errors and warnings of the module ' +
+        'that lie in this function or have no position, each with `kind`, `message` and, when ' +
+        'known, the `line` of the module (`diagnostics_truncated` when there were more). `pending` is how many nodes are still computing: ' +
+        'when it is not 0, call again. Changes and runs nothing, and works in Live mode too.',
+      inputSchema: {},
+      run: forward('get_problems'),
     },
     {
       name: 'add_nodes',
