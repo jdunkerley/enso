@@ -558,7 +558,7 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   (the two-argument form; it appends to its file each time it runs), and the
   test checks that (a) it wrote once; (b) `refresh` is refused and the file's
   content and modification time are unchanged after 8 s; (c) after an agent's
-  `add_nodes` elsewhere `undo` is refused (code that enables output) and the
+  `add_nodes` elsewhere `undo` is refused (code that can enable output) and the
   edit stays; (d) after `remove_nodes` of the write node `undo` is refused, the
   node does not come back and the file is unchanged; (e) with the code gone an
   agent's node is undone and redone and `refresh` answers

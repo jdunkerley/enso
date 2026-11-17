@@ -128,9 +128,12 @@ No tool changes the execution environment, settings or secrets;
     re-runs with your change). Ask the user before doing either.
 11. Your edits form one undo step for the user until you pause for 10 seconds,
     the user edits the project or leaves its tab, or `open_method` changes the
-    method; then the next edit starts a new step. Edits from several agents run
-    one at a time. An edit whose turn comes after the method on screen changed
-    is refused with nothing changed: call `get_graph` and try again.
+    method; then the next edit starts a new step. `undo` takes the step back,
+    except while the project's main module has code that can enable output: then
+    agents' `undo` and `redo` are refused (the user can still undo with Ctrl+Z).
+    Edits from several agents run one at a time. An edit whose turn comes after
+    the method on screen changed is refused with nothing changed: call
+    `get_graph` and try again.
 12. `undo` takes back the most recent step of edits made by any connected agent,
     not only yours, and `redo` re-applies what `undo` took back. A step is
     usually every edit made without a 10 second pause, but one `undo` may take
@@ -139,10 +142,11 @@ No tool changes the execution environment, settings or secrets;
     the user last changed the project (any edit of the user's, their own Ctrl+Z
     included, ends that), and is refused when there are none. `redo` only
     re-applies what `undo` took back, until anyone edits again. Both are refused
-    while the project's main module has code that enables output, because
-    undoing or redoing could run it and write; and an edit you make while such
-    code is there, removing it included, cannot be undone by an agent. Ask the
-    user to undo with Ctrl+Z then. Neither waits for the engine: both answer
+    while the project's main module has code that can enable output (the same
+    code the edit tools refuse to add) or cannot be read, because undoing or
+    redoing could run such code and write; and an edit you make while such code
+    is there, removing it included, cannot be undone by an agent. Ask the user
+    to undo with Ctrl+Z then. Neither waits for the engine: both answer
     `can_undo` and `can_redo`, and the values may still be computing, so call
     `get_graph` afterwards (a node still computing has `state` `pending`).
 13. Check and mend what you built. `get_problems` lists every error and warning

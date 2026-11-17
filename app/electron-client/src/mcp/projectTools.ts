@@ -88,8 +88,9 @@ const EDIT_RULES =
   ' Refused while the project is in Live mode, and, with nothing changed, when the method on ' +
   'screen changed before the edit ran (call `get_graph` and try again). Your run of changes is ' +
   'one undo step for the user, until you pause for 10 seconds, the user edits or leaves the ' +
-  "project's tab, or `open_method` changes the method; `undo` takes it back. The project is " +
-  'saved as it is edited. ' +
+  "project's tab, or `open_method` changes the method; `undo` takes it back, except while the " +
+  "project's main module has code that can enable output: then agents' `undo` and `redo` are " +
+  'refused (the user can still undo with Ctrl+Z). The project is saved as it is edited. ' +
   WRITE_RULE +
   ' `settled: true`: the engine has reported results for the changed nodes, so the types ' +
   'and errors in this result are current. `settled: false`: it had not within 20 seconds; call ' +
@@ -457,9 +458,9 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'back only part of it: check `can_undo` and call `get_graph`. It does not go past the ' +
         "user's last change: it takes back only agents' edits made since the user last changed " +
         'the project, and is refused when there are none. Refused while the project is in Live ' +
-        "mode, and while the project's main module has code that enables output (such as " +
-        '`with_enabled_context`, in any node or function), because ' +
-        'undoing could run that code and write: ask the user to undo with Ctrl+Z then. Returns ' +
+        "mode, and while the project's main module has code that can enable output (the same " +
+        'code the edit tools refuse to add, in any node or function) or cannot be read, because ' +
+        'undoing could run such code and write: ask the user to undo with Ctrl+Z then. Returns ' +
         '`undone`, `can_undo` and `can_redo` (whether another call would do something). It does ' +
         'not wait for the engine: values may still be computing, so call `get_graph`, where a ' +
         'node still computing has `state` `pending`. Nodes that come back have the ids they ' +
@@ -473,9 +474,9 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       description:
         'Re-apply what `undo` took back, a step at a time. Refused when there is nothing to ' +
         'redo: an edit by anyone since the `undo` ends it. Refused while the project is in Live ' +
-        "mode, and while the project's main module has code that enables output (such as " +
-        '`with_enabled_context`, in any node or function), because ' +
-        'redoing could run that code and write: ask the user to redo with Ctrl+Y then. Returns ' +
+        "mode, and while the project's main module has code that can enable output (the same " +
+        'code the edit tools refuse to add, in any node or function) or cannot be read, because ' +
+        'redoing could run such code and write: ask the user to redo with Ctrl+Y then. Returns ' +
         '`redone`, `can_undo` and `can_redo`. It does not wait for the engine: values may still ' +
         'be computing, so call `get_graph`, where a node still computing has ' +
         '`state` `pending`.',

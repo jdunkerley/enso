@@ -549,10 +549,16 @@ from `useCurrentProject()`):
     `local:autoImport`), and anything that is not a module transaction:
     selecting, panning, opening the Component Browser. `deselectAll` calls
     `undoStackBoundary()`, which splits the undo stack but leaves the session
-    holding; the agent's next edit then starts a new undo item, still in the
-    session's step.
+    holding; the agent's next changed edit then starts a new undo item, and the
+    depth rule ("History" below) seals the step: a background click while an
+    agent works costs the agents the `undo` of that step (the user's Ctrl+Z
+    still has it).
   - The window between an async edit's `await` and its commit
-    (`graph.deleteNodes` awaits the port updates) counts as the session's own.
+    (`graph.deleteNodes` awaits the port updates) counts as the session's own;
+    the depth rule catches what it can of a user's history change there.
+  - When the module's doc is replaced (`module().ast` changes), the listener is
+    called as well as re-subscribed: the new doc has a new undo stack, so the
+    session releases its step and clears both floors.
 - `historyDepth`, `undo`, `redo` → `undoManager.undoDepth` / `redoDepth`,
   `undoManager.undoAbove(floor)` / `redoAbove(floor)` (`module.ts`).
 - `enablesOutput` → `writeRefusal` of `module.ast.root()` (`editorModuleRoot`),
@@ -580,22 +586,53 @@ the others.
   `{ undone | redone: true, can_undo, can_redo }` with **no `settled`**: they do
   not wait for the engine (the session's graph wait still runs), so the values
   may still be computing. `undo` takes back the top step above `ownFloor`, made
-  by any connected agent; a step is usually a caller's run of edits, but
-  `deselectAll`'s `undoStackBoundary()` can split it, so one `undo` may take
-  back only part of it. `redo` re-applies only steps above `ownRedoFloor`.
+  by any connected agent; a step is a caller's run of edits (a step split by
+  `deselectAll`'s `undoStackBoundary()` is sealed by the depth rule below, so
+  the tools' "one `undo` may take back only part of it" is now a caution, not a
+  case known to happen). `redo` re-applies only steps above `ownRedoFloor`.
   - **The rule.** An agent must never cause a write of a node's output that the
     user did not click for. Code that enables output is what writes, so
     `EditSessionDeps.enablesOutput()` (true when `writeRefusal` of the module's
     root is not undefined, and when the root cannot be read; `editorModuleRoot`
     in `useProjectMcpTools.ts`) is read at every stepped run's turn, just before
-    the edit, and again after it. A changed edit with either true **seals**: the
-    step is released, `ownFloor` becomes the depth after it and there is nothing
-    to redo. `undo` and `redo` are refused while it is true
-    (`UNDO_OUTPUT_ERROR`, `REDO_OUTPUT_ERROR`: ask the user to use Ctrl+Z or
-    Ctrl+Y), and one that leaves it true is reversed at once in the same
-    synchronous run, bounded to the one step it added, and sealed
-    (`HISTORY_REVERSED_ERROR`; the pre-checks should make that unreachable).
-    This is the only mechanism: there is no per-tool "seals" option.
+    the edit, and again after it. A changed edit with either true **seals** the
+    step (`sealPending`). The step is **not** released: the caller's later edits
+    join it and save no further version, so a project whose main module
+    legitimately has such code costs one version and one Ctrl+Z step per run of
+    edits, not one per edit. While a sealed step is held, `can_undo` and
+    `can_redo` are false; when it is released for any reason (`releaseStep`: the
+    idle timer, a foreign edit, another caller, `runUnstepped`, so `undo` and
+    `redo` themselves, deactivation, `dispose`), `ownFloor` becomes the undo
+    depth read after the release and there is nothing to redo. A foreign edit
+    releases first (applying the seal) and then clears the floors, so the
+    foreign reset wins. `undo` and `redo` release the step before their checks,
+    so they see the applied seal. They are refused while `enablesOutput()` is
+    true (`UNDO_OUTPUT_ERROR`, `REDO_OUTPUT_ERROR`: ask the user to use Ctrl+Z
+    or Ctrl+Y). One that leaves it true is put back at once in the same
+    synchronous run, bounded to the one step it added, and sealed even if
+    putting it back throws (`reverse`, `try … finally`). It is a last resort:
+    the undo and the step put back are two transactions that reach the engine
+    separately, so the engine may have seen the state between them. Its answers
+    (`HISTORY_REVERSED_ERROR`, `HISTORY_NOT_REVERSED_ERROR`) therefore never say
+    "Nothing was changed" and tell the agent to tell the user; the pre-checks
+    and the depth rule must keep it unreachable. This is the only mechanism:
+    there is no per-tool "seals" option.
+  - **The depth rule.** While `inEdit` is true the foreign-edit listener ignores
+    everything (the session's own transactions reach it too), so a user's
+    history change during an async edit's `await` used to go unseen: a Ctrl+Y
+    put the user's step back above the floor; a user edit followed by a
+    background click (`undoStackBoundary()`) left a user item in the step and
+    the agent's next change in an item above it; a Ctrl+Z took a step from under
+    the floor. A held step is exactly one undo item (the session's edits merge
+    into it: `holdUndoStep` lifts the capture timeout, and the agents' edits are
+    one tracked origin), so after every changed stepped edit the session reads
+    `historyDepth().undo` and seals when it is not `stepBase + 1`. Each of those
+    three changes the depth, so each seals (the three cases in
+    `__tests__/editSessionUndoManager.test.ts`, with a real `Y.UndoManager`,
+    beside one checking that an ordinary step of several async agent edits is
+    one item and is not sealed; `mcpHistory.spec.ts` checks it against the real
+    module store). The rule errs towards sealing: a background click between two
+    agent edits splits the step too, and seals it.
   - **The invariant.** Every step above `ownFloor` was made by session runs,
     from a module without code that enables output, by edits that cannot add any
     (`writeGuard` refuses it in everything an agent supplies). Undoing one can
@@ -615,14 +652,24 @@ the others.
     the floor were dropped; nothing was changed), and redo
     `NOTHING_LEFT_TO_REDO_ERROR`. Such a change can also bring code that enables
     output into the module: the pre-check refuses then.
-  - **Not covered.** A user edit that lands while an async edit is awaiting
-    (`graph.deleteNodes` awaits the port updates) is treated as the session's
-    own and joins its step. That is not a write route under this rule: undoing
-    it can only put back code from before the edit, and a module that had code
-    enabling output then seals the step (as one that has some after it does).
-    The check covers only the module in the editor (`Main.enso`): not the
-    project's other modules, library functions that enable output themselves, or
-    `foreign` code.
+  - **Not covered (the residuals).**
+    - A user edit that lands while an async edit is awaiting
+      (`graph.deleteNodes` awaits the port updates), with no boundary after it
+      in the same edit, merges into the session's item without changing the
+      depth, so the depth rule cannot see it: it joins the agents' step. Undoing
+      it can only put back code that was in the module before the edit, and a
+      module that had code enabling output before or after the edit seals the
+      step.
+    - A user's Ctrl+Z during the `await` that takes back the held step's own
+      item (from an earlier edit of the run) before the edit's change leaves the
+      depth at `stepBase + 1` again. Harmless: the edit's change clears the redo
+      stack, and the new item holds only that change.
+    - A user's history change during the waits after the edit (graph update,
+      settle) is an ordinary foreign edit (`inEdit` is false) and resets the
+      floors; only the edit's own `await` window is covered by the depth rule.
+    - The check covers only the module in the editor (`Main.enso`): not the
+      project's other modules, library functions that enable output themselves,
+      or `foreign` code.
   - **Redo floor, why.** In every sequence found, the redo stack is empty at the
     session's first `undo`: the edit that set the floor was a tracked
     transaction, which clears the redo stack (`afterTransactionHandler`), and
@@ -631,10 +678,10 @@ the others.
     no-op redo step does make one `redo()` pop on into the step below (checked
     in `__tests__/editSessionUndoManager.test.ts`).
   - Tests: `__tests__/editSession.test.ts` (a counter fake: the floors, the
-    seal, the refusals, the reversal) and
+    deferred seal, the refusals, the reversal) and
     `__tests__/editSessionUndoManager.test.ts` (a real `Y.UndoManager`: the
     review's two cases, where a plain `undo()` reaches the user's step and the
-    session's does not). The packaged spec
+    session's does not, and the depth rule). The packaged spec
     (`app/electron-client/tests/mcp.spec.ts`, third test) runs it against code
     that really writes.
 - **`save_version`**: `localVersioning` through the session's deps; never turns
