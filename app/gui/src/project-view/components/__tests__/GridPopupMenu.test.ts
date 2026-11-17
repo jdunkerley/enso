@@ -131,12 +131,18 @@ describe('GridPopupMenu', () => {
     // the popup caused (the browser scrolls a focused element into view) arrives after the popup
     // has mounted. It is not the user scrolling away from the popup (#814, found on Linux CI).
     test('a scroll delivered before the first frame leaves the popup open', async () => {
+      // The first frame is held back, so the test does not depend on how long mounting takes.
+      const frames: FrameRequestCallback[] = []
+      const raf = vi
+        .spyOn(window, 'requestAnimationFrame')
+        .mockImplementation((callback) => frames.push(callback))
       const { wrapper, onClose } = await mountPopup({ settled: false })
       const scroller = document.createElement('div')
       document.body.appendChild(scroller)
       scroller.dispatchEvent(new Event('scroll'))
       expect(onClose).not.toHaveBeenCalled()
-      await new Promise((resolve) => requestAnimationFrame(resolve))
+      raf.mockRestore()
+      for (const frame of frames.splice(0)) frame(performance.now())
       scroller.dispatchEvent(new Event('scroll'))
       expect(onClose).toHaveBeenCalledTimes(1)
       scroller.remove()
@@ -248,13 +254,19 @@ describe('GridPopupMenu', () => {
     })
 
     test('a scroll caused by focusing the first item is ignored; a later scroll closes the menu', async () => {
+      // The first frame is held back, so the test does not depend on how long mounting takes.
+      const frames: FrameRequestCallback[] = []
+      const raf = vi
+        .spyOn(window, 'requestAnimationFrame')
+        .mockImplementation((callback) => frames.push(callback))
       const wrapper = await mountMenu(true)
       const scroller = document.createElement('div')
       document.body.appendChild(scroller)
       // Focusing the first item may scroll it into view: delivered before the first frame.
       scroller.dispatchEvent(new Event('scroll'))
       expect(wrapper.emitted('close')).toBeUndefined()
-      await new Promise((resolve) => requestAnimationFrame(resolve))
+      raf.mockRestore()
+      for (const frame of frames.splice(0)) frame(performance.now())
       scroller.dispatchEvent(new Event('scroll'))
       expect(wrapper.emitted('close')).toEqual([[]])
       scroller.remove()
