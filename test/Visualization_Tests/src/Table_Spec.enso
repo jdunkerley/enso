@@ -151,6 +151,18 @@ add_specs suite_builder =
             Visualization.prepare_visualization Value_Type.Char . parse_json . should_equal (make_json Value_Type.Char)
             Visualization.prepare_visualization Value_Type.Unsupported_Data_Type . parse_json . should_equal (make_json Value_Type.Unsupported_Data_Type)
 
+        group_builder.specify "should offer the multi-filter only while the distinct values are listed" <|
+            ## The values are listed for fewer than 100 distinct ones (#778).
+            multi_filter n =
+                table = Table.new [["A", (0.up_to n).map i-> "text " + i.to_text]]
+                ## Read the column_info as that will force materialization of the metrics
+                table.column_info
+                vis = Visualization.prepare_visualization table 1000
+                vis.parse_json . get "columns" . at 0 . get "multi_filter"
+            multi_filter 99 . should_be_true
+            multi_filter 100 . should_be_false
+            multi_filter 101 . should_be_false
+
         group_builder.specify "should indicate number of Nothing/Nulls" <|
             vis = Visualization.prepare_visualization data.t3_with_nulls 3
             value_type_int = JS_Object.from_pairs [["constructor", "Integer"], ["display_text", "Integer (64 bits)"]]

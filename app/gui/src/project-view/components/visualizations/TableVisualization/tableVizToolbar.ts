@@ -11,6 +11,7 @@ import {
   actionMap,
   type FilterAction,
   type FilterType,
+  type FilterValue,
   type FilterValueRange,
   getFilterValue,
   type GridFilterModel,
@@ -90,7 +91,7 @@ function useSortFilterNodesButton({
     columnName: string,
     filterType: FilterType,
     filterAction: FilterAction | undefined,
-    value?: string[] | string | FilterValueRange,
+    value?: FilterValue,
   ) {
     const valueFormatter = getColumnValueToEnso(columnName)
     return (module: Ast.MutableModule): Ast.Owned<Ast.MutableExpression> => {
@@ -98,16 +99,18 @@ function useSortFilterNodesButton({
         return Ast.parseExpression(actionMap[filterAction], module)!
       }
       if (filterType === 'set') {
-        if (Array.isArray(value) && value.length === 1) {
+        // A Boolean column's values are JSON Booleans (#778); the formatters read their text.
+        const items = Array.isArray(value) ? value.map(String) : []
+        if (items.length === 1) {
           return conditionPattern.instantiateCopied([
             Ast.parseExpression('..Equal')!,
-            valueFormatter(value[0]!, module) as Expression | MutableExpression,
+            valueFormatter(items[0]!, module) as Expression | MutableExpression,
           ])
         }
         return conditionPattern.instantiateCopied([
           Ast.parseExpression('..Is_In')!,
           Ast.Vector.build(
-            value as string[],
+            items,
             (element, tempModule) => valueFormatter(element, tempModule),
             module,
           ),

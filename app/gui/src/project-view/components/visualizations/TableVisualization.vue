@@ -317,7 +317,11 @@ function createServer() {
       )
 
       try {
-        const response = await config.executeExpression(expressionFunction, 2000)
+        // No deadline either (Note [Row Pages Wait For The Engine]): a list that timed out stayed
+        // empty (#781). An answer for a table that has since been replaced is dropped.
+        const version = tableVersionHash.value
+        const response = await config.executeExpression(expressionFunction, null)
+        if (version !== tableVersionHash.value) return { success: false, data: [] }
         // `executeExpression` resolves to `null` while the visualization subdoc is still syncing,
         // and to an `Err` when evaluation fails — neither carries a `value`. Reading it
         // unconditionally turned both into an opaque "Cannot read properties of undefined", which
@@ -415,6 +419,11 @@ function createServer() {
  * is discarded with the session. The 5 s timeout was the only clean-up for that case; a grid that
  * keeps loading is the better failure than one claiming the table is empty. An answer that comes
  * after the table changed is dropped (`getData` compares `tableVersionHash`).
+ *
+ * A column filter's list of distinct values (`getSetFilterValues`) waits the same way: with the
+ * old 2 s limit the list stayed empty when the engine was busy (#781). The filter's `success`
+ * callback fills the list whenever the answer comes, and it is not called for a table that has
+ * been replaced.
  */
 
 interface Response {

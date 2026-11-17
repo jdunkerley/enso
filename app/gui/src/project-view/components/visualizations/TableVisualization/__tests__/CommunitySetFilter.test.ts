@@ -2,7 +2,7 @@ import type { IDoesFilterPassParams } from 'ag-grid-community'
 import { describe, expect, test, vi } from 'vitest'
 import { CommunitySetFilter, type CommunitySetFilterParams } from '../CommunitySetFilter'
 
-function makeFilter(values: string[]) {
+function makeFilter(values: (string | boolean)[]) {
   const filterChangedCallback = vi.fn()
   const filter = new CommunitySetFilter()
   const dataByValue = new Map(values.map((value) => [value, { col: value }]))
@@ -11,12 +11,12 @@ function makeFilter(values: string[]) {
     column: {},
     api: {},
     context: undefined,
-    getValue: (node: { data: { col: string } }) => node.data.col,
+    getValue: (node: { data: { col: string | boolean } }) => node.data.col,
     filterChangedCallback,
     filterModifiedCallback: vi.fn(),
     doesRowPassOtherFilter: () => true,
     rowModel: {},
-    values: (params: { success: (values: string[]) => void }) => params.success(values),
+    values: (params: { success: (values: (string | boolean)[]) => void }) => params.success(values),
   } as unknown as CommunitySetFilterParams)
   return { filter, filterChangedCallback, dataByValue }
 }
@@ -74,6 +74,21 @@ describe('CommunitySetFilter', () => {
     expect(labels).toEqual(['banana'])
     // Narrowing the visible list must not itself change which values are selected.
     expect(filter.isFilterActive()).toBe(false)
+  })
+
+  // The engine lists a Boolean column's values as JSON Booleans, which stay Booleans in the list
+  // (`distinctValuesSchema` is `z.unknown()`): typing in the search box threw on `toLowerCase`.
+  test('the search box works on a Boolean column', () => {
+    const { filter } = makeFilter([true, false])
+    const search = filter.getGui().querySelector<HTMLInputElement>('.community-set-filter-search')!
+    search.value = 'TR'
+    search.dispatchEvent(new Event('input'))
+
+    const labels = Array.from(filter.getGui().querySelectorAll('.community-set-filter-option')).map(
+      (el) => el.textContent,
+    )
+    expect(labels).toEqual(['true'])
+    expect(filter.getModel()).toBeNull()
   })
 
   test('doesFilterPass compares the cell value against the current selection', () => {

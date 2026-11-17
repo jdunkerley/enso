@@ -35,6 +35,7 @@ const COLUMN_TYPES = new Map([
   ['a', 'Integer'],
   ['b', 'Char'],
   ['d', 'Date'],
+  ['flag', 'Boolean'],
 ])
 
 interface State {
@@ -135,5 +136,17 @@ describe('The table toolbar, from the value actions', () => {
       ],
     })
     expect(nodes).toEqual([])
+  })
+})
+
+describe('The table toolbar, from a Boolean column set filter', () => {
+  // The engine lists a Boolean column's values as JSON Booleans (#778): `false` is not `'false'`.
+  test.each([
+    [[true], "operator1 . filter 'flag' (..Equal True)"],
+    [[false], "operator1 . filter 'flag' (..Equal False)"],
+    [[true, false], "operator1 . filter 'flag' (..Is_In [True, False])"],
+  ])('picking %j', (values, node) => {
+    const filters = [filter({ columnName: 'flag', filterType: 'set', values })]
+    expect(created(TABLE_ACTIONS, { filters })).toEqual([node])
   })
 })

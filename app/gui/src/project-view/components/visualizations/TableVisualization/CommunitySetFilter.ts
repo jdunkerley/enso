@@ -146,7 +146,7 @@ export class CommunitySetFilter implements IFilterComp {
     const search = this.searchInput.value.trim().toLowerCase()
     const visibleValues =
       search ?
-        this.allValues.filter((value) => value.toLowerCase().includes(search))
+        this.allValues.filter((value) => String(value).toLowerCase().includes(search))
       : this.allValues
 
     // Keyed off what is actually being rendered, not the unfiltered set: a search matching nothing
@@ -171,7 +171,7 @@ export class CommunitySetFilter implements IFilterComp {
           this.params.filterChangedCallback()
         })
 
-        label.append(checkbox, document.createTextNode(value))
+        label.append(checkbox, document.createTextNode(String(value)))
         return label
       }),
     )

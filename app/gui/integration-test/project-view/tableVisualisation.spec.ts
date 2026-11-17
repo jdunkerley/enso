@@ -85,6 +85,66 @@ test('Paged table shows rows the engine sends late', async ({ editorPage, page, 
   await expect(tableVisualization).not.toContainText('No Rows To Show')
 })
 
+const GET_DISTINCT = 'Standard.Visualization.Table.Visualization.get_distinct_values_for_column'
+
+/** Longer than the 2 s `executeExpression` timeout that a column's value list once had. */
+const PAST_OLD_FILTER_TIMEOUT_MS = 3000
+
+/**
+ Scenario (#781): the column filter of a paged table is opened while the engine is busy, so the
+    column's distinct values come after more than 2 s. The list must be filled when they come, not
+    stay empty.
+ */
+test('Column filter lists the values the engine sends late', async ({
+  editorPage,
+  page,
+  localApi,
+}) => {
+  test.slow()
+  await initGraph(editorPage)
+  await localApi.updateVisualization(
+    'Standard.Visualization.Table.Visualization.prepare_visualization',
+    {
+      kind: 'grid',
+      row_count: 3,
+      columns: [
+        {
+          name: 'Name',
+          value_type: { constructor: 'Char', display_text: 'Char' },
+          metrics: [{ name: 'Number of distinct', value: 3, type: 'Count' }],
+          multi_filter: true,
+        },
+      ],
+      index: { action: 'get_row {{#index}}' },
+      data: null,
+      version_hash: 'busy-engine-filter',
+      server: true,
+      options: { status_bar: true },
+    },
+  )
+  await graphNodeByBinding(page, 'aggregated').click()
+  await editorPage.press('Space')
+  const tableVisualization = locate.tableVisualization(page)
+  await expect(tableVisualization).toExist()
+  await expect.poll(() => localApi.pendingVisualizationRequests(GET_ROWS)).toBe(1)
+  await localApi.updateVisualization(GET_ROWS, {
+    row_count: 3,
+    index: [0, 1, 2],
+    data: [['alpha', 'beta', 'gamma']],
+  })
+  await expect(tableVisualization).toContainText('gamma')
+
+  const nameHeader = tableVisualization.locator('.ag-header-cell[col-id="Name"]')
+  await nameHeader.hover()
+  await nameHeader.locator('.ag-header-cell-filter-button').click()
+  // The engine is busy: the request for the values waits past the 2 s it was once given.
+  await expect.poll(() => localApi.pendingVisualizationRequests(GET_DISTINCT)).toBeGreaterThan(0)
+  await page.waitForTimeout(PAST_OLD_FILTER_TIMEOUT_MS)
+
+  await localApi.updateVisualization(GET_DISTINCT, { values: ['x-ray', 'yankee', 'zulu'] })
+  await expect(page.locator('.community-set-filter-option')).toHaveText(['x-ray', 'yankee', 'zulu'])
+})
+
 test('Column size can be set and is retained', async ({ editorPage, page, localApi }) => {
   await initGraph(editorPage)
 
