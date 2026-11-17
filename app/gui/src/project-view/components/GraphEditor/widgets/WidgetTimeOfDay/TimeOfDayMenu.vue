@@ -1,19 +1,22 @@
 <script setup lang="ts">
 /**
- * @file The time-of-day widget's menu: `Now`, a divider, then a time field of hours and minutes,
- * with seconds when asked for. It knows nothing of the graph: it takes the value's current choice and
- * emits the one that is made. Choosing writes nothing here; `WidgetTimeOfDay.vue` does that.
+ * @file The time-of-day widget's menu: `Now`, a divider, a time field of hours and minutes (with
+ * seconds when asked for), columns of hours and minutes to pick from, and Cancel and Set. It knows
+ * nothing of the graph: it takes the value's current choice and emits the one that is made. Choosing
+ * writes nothing here; `WidgetTimeOfDay.vue` does that.
  *
  * The field is Reka's `TimeField` (as the dashboard's time inputs are): digits fill a segment,
- * ArrowUp and ArrowDown change it, ArrowLeft and ArrowRight move between segments. Enter in the
- * field, leaving the field, or a click outside the menu (the shell calls the handler given to
- * `registerAccept`) chooses the time as it stands if it was edited and is complete; Escape asks to
- * close without it. A segment that was cleared makes the time incomplete: nothing is written until
- * it is filled in again.
+ * ArrowUp and ArrowDown change it, ArrowLeft and ArrowRight move between segments. The columns
+ * (`TimeColumns.vue`) show the same time: a click on a value changes it, as typing does, and typing
+ * scrolls the columns to it. Set writes the time as it stands. Enter in the field, leaving the field,
+ * or a click outside the menu (the shell calls the handler given to `registerAccept`) writes it only
+ * if it was edited; Cancel and Escape ask to close without it. A segment that was cleared makes the
+ * time incomplete: nothing is written until it is filled in again.
  */
 import PickerMenuFrame from '@/components/GraphEditor/widgets/WidgetPicker/PickerMenuFrame.vue'
 import { Time } from '@internationalized/date'
 import { TimeFieldInput, TimeFieldRoot } from 'reka-ui'
+import TimeColumns from './TimeColumns.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue'
 import { localNow, type HourMinuteSecond, type TimeChoice } from './timeExpression'
 
@@ -62,6 +65,15 @@ function edit(value: unknown) {
   draft.value = value
 }
 
+/** The columns' time: the field's last whole time. A pick there is an edit, as typing is. */
+const columns = computed<HourMinuteSecond>({
+  get: () => draft.value ?? toTime(initial),
+  set: (value) => {
+    incomplete.value = false
+    edit(toTime(value))
+  },
+})
+
 function toggleSeconds() {
   showSeconds.value = !showSeconds.value
   if (!showSeconds.value && draft.value != null) draft.value = draft.value.set({ second: 0 })
@@ -73,10 +85,17 @@ function chooseNow() {
   emit('choose', { kind: 'now' })
 }
 
-/** Write the field's time, once, if it was edited and is complete. */
-function commit() {
+/**
+ * Write the field's time, once, if it is complete and was edited (or, with `always`, unless it is the
+ * time the value holds already: Set then only closes the menu).
+ */
+function commit(always = false) {
   const time = draft.value
-  if (settled || !dirty.value || incomplete.value || time == null) return
+  if (settled || incomplete.value || time == null) return
+  if (!dirty.value) {
+    if (!always) return
+    if (props.choice?.kind === 'time') return close()
+  }
   settled = true
   emit('choose', {
     kind: 'time',
@@ -136,7 +155,7 @@ onMounted(() => {
         :hourCycle="24"
         aria-label="Time"
         class="timeField"
-        @keydown.enter.prevent="commit"
+        @keydown.enter.prevent="commit()"
         @update:modelValue="edit"
       >
         <template v-for="(segment, i) in segments" :key="i">
@@ -148,6 +167,11 @@ onMounted(() => {
       <button type="button" class="secondsToggle" data-action="seconds" @click="toggleSeconds">
         {{ showSeconds ? 'Hide seconds' : 'Add seconds' }}
       </button>
+    </div>
+    <TimeColumns v-model="columns" :seconds="showSeconds" class="columns" />
+    <div class="actions">
+      <button type="button" class="action" data-action="cancel" @click="close">Cancel</button>
+      <button type="button" class="action set" data-action="set" @click="commit(true)">Set</button>
     </div>
   </PickerMenuFrame>
 </template>
@@ -185,6 +209,32 @@ onMounted(() => {
 
   &[data-placeholder] {
     opacity: 0.5;
+  }
+}
+
+.columns {
+  margin-top: 4px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.action {
+  height: var(--item-height);
+  padding: 0 12px;
+  border-radius: calc(var(--item-height) / 2);
+
+  &:hover,
+  &:focus-visible {
+    background-color: var(--dropdown-item-hover-bg);
+  }
+
+  &.set {
+    background-color: var(--dropdown-item-selected-bg);
   }
 }
 

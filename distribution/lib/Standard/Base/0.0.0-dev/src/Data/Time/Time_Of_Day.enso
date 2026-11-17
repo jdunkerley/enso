@@ -92,8 +92,7 @@ type Time_Of_Day
     @millisecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
     @microsecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
     @nanosecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
-    new : Integer -> Integer -> Integer -> Integer -> Integer -> Integer -> Time_Of_Day ! Time_Error
-    new (hour = 0) (minute = 0) (second = 0) (millisecond = 0) (microsecond = 0) (nanosecond = 0) =
+    new (hour : Integer = 0) (minute : Integer = 0) (second : Integer = 0) (millisecond : Integer = 0) (microsecond : Integer = 0) (nanosecond : Integer = 0) -> Time_Of_Day ! Time_Error =
         total_nanoseconds = nanosecond + microsecond * 1000 + millisecond * 1000000
         Panic.catch JException (Date_Helpers.time_new_builtin hour minute second total_nanoseconds) caught_panic->
             Error.throw (Time_Error.Error caught_panic.payload.getMessage)
@@ -178,8 +177,7 @@ type Time_Of_Day
        digits will be accepted.
        - a: AM/PM marker.
     @format make_time_format_selector
-    parse : Text -> Date_Time_Formatter -> Time_Of_Day ! Time_Error
-    parse text:Text format:Date_Time_Formatter=Date_Time_Formatter.iso_time =
+    parse (text : Text) (format : Date_Time_Formatter = Date_Time_Formatter.iso_time) -> Time_Of_Day ! Time_Error =
         format.parse_time text
 
     ## ---
@@ -281,7 +279,7 @@ type Time_Of_Day
 
              example_nanosecond = Time_Of_Day.now.nanosecond
        ```
-    nanosecond self include_milliseconds=False:Boolean -> Integer =
+    nanosecond self (include_milliseconds : Boolean = False) -> Integer =
         Date_Helpers.time_nanoseconds self include_milliseconds
 
     ## ---
@@ -289,16 +287,14 @@ type Time_Of_Day
        icon: time
        ---
        Returns the first time within the `Time_Period` containing self.
-    start_of : Time_Period -> Time_Of_Day
-    start_of self period=Time_Period.Hour = period.adjust_start self
+    start_of self (period : Time_Period = ..Hour) -> Time_Of_Day = period.adjust_start self
 
     ## ---
        group: DateTime
        icon: time
        ---
        Returns the last time within the `Time_Period` containing self.
-    end_of : Time_Period -> Time_Of_Day
-    end_of self period=Time_Period.Hour = period.adjust_end self
+    end_of self (period : Time_Period = ..Hour) -> Time_Of_Day = period.adjust_end self
 
     ## ---
        group: Conversions
@@ -332,10 +328,10 @@ type Time_Of_Day
        ```
              from Standard.Base import Time_Of_Day
 
-             example_to_time = Time_Of_Day.new 12 30 . to_time (Date.new 2020)
+             example_to_time = Time_Of_Day.new 12 30 . to_date_time (Date.new 2020)
        ```
-    to_date_time : Date -> Time_Zone -> Date_Time
-    to_date_time self date (zone=Time_Zone.system) =
+    @zone Time_Zone.default_widget
+    to_date_time self (date : Date) (zone : Time_Zone = Time_Zone.system) -> Date_Time =
         Time_Utils.make_zoned_date_time date self zone
 
 
@@ -344,8 +340,7 @@ type Time_Of_Day
        icon: time
        ---
        Returns a requested time part as integer.
-    date_part : Time_Period -> Integer
-    date_part self (period : Time_Period) =
+    date_part self (period : Time_Period) -> Integer =
         case period of
             Time_Period.Hour        -> self.hour
             Time_Period.Minute      -> self.minute
@@ -366,8 +361,7 @@ type Time_Of_Day
        ## Arguments
         - `end`: A time of day to compute the difference from.
         - `period`: The period to compute the difference in.
-    date_diff : Time_Of_Day -> Time_Period -> Integer
-    date_diff self (end : Time_Of_Day) (period : Time_Period) =
+    date_diff self (end : Time_Of_Day) (period : Time_Period) -> Integer =
         Time_Utils.unit_time_difference period.to_java_unit self end
 
     ## ---
@@ -379,8 +373,7 @@ type Time_Of_Day
        ## Arguments
         - `amount`: An integer specifying by how many periods to shift the time.
         - `period`: The period by which to shift.
-    date_add : Integer -> Time_Period -> Time_Of_Day
-    date_add self (amount : Integer) (period : Time_Period) =
+    date_add self (amount : Integer) (period : Time_Period) -> Time_Of_Day =
         Time_Utils.unit_time_add period.to_java_unit self amount
 
     ## ---
@@ -410,8 +403,8 @@ type Time_Of_Day
 
              example_plus = Time_Of_Day.new + Time_Period.Hour
        ```
-    + : Duration | Time_Period -> Time_Of_Day ! Time_Error
-    + self (amount : Duration | Time_Period) =
+    @amount make_time_period_selector
+    + self (amount : Duration | Time_Period) -> Time_Of_Day ! Time_Error =
         case amount of
             duration : Duration -> Date_Helpers.time_plus self duration
             time_period : Time_Period ->
@@ -445,8 +438,8 @@ type Time_Of_Day
 
              example_plus = Time_Of_Day.new - Time_Period.Hour
        ```
-    - : Duration | Time_Period -> Time_Of_Day ! Time_Error
-    - self amount:(Duration | Time_Period) =
+    @amount make_time_period_selector
+    - self (amount : Duration | Time_Period) -> Time_Of_Day ! Time_Error =
         case amount of
             duration : Duration -> Date_Helpers.time_minus self duration
             time_period : Time_Period ->
@@ -463,8 +456,7 @@ type Time_Of_Day
        ```
              example_to_json = Time_Of_Day.now.to_js_object
        ```
-    to_js_object : JS_Object
-    to_js_object self =
+    to_js_object self -> JS_Object =
         type_pair = ["type", "Time_Of_Day"]
         cons_pair = ["constructor", "new"]
         JS_Object.from_pairs [type_pair, cons_pair, ["hour", self.hour], ["minute", self.minute], ["second", self.second], ["nanosecond", self.nanosecond include_milliseconds=True]]
@@ -473,8 +465,7 @@ type Time_Of_Day
        private: true
        ---
        Convert to a display representation of this Time_Of_Day.
-    to_display_text : Text
-    to_display_text self =
+    to_display_text self -> Text =
         if self.nanosecond include_milliseconds=True == 0 then self.format "HH:mm:ss" else
             self.format "HH:mm:ss.ffffff"
 
@@ -544,8 +535,7 @@ type Time_Of_Day
        digits will be accepted.
        - a: AM/PM marker.
     @format make_time_format_selector
-    format : Date_Time_Formatter -> Text
-    format self format:Date_Time_Formatter =
+    format self (format : Date_Time_Formatter) -> Text =
         format.format_time self
 
     ## ---
@@ -564,8 +554,7 @@ type Time_Of_Day
        Returns a Text
 
                 Time_Of_Day.new 12 34 millisecond=500
-    pretty : Text
-    pretty self =
+    pretty self -> Text =
         parts = Vector.build builder->
             builder.append "Time_Of_Day.new"
             if self.hour != 0 then builder.append ((if builder.length!=1 then " hour=" else " ") + self.hour.to_text)
@@ -615,6 +604,21 @@ type Time_Of_Day
        ---
        Checks if `self` is less than or equal to `that`.
     <= self that = Comparable.<= self=self that
+
+## ---
+   private: true
+   ---
+   The choices for an amount of time added to, or taken from, a Time_Of_Day:
+   each `Time_Period`, written autoscoped (`..Hour`), and `Duration.new` for a
+   custom number of hours, minutes and seconds. `..Hour` resolves against the
+   `Duration | Time_Period` union: the engine tries each member in turn, and
+   only `Time_Period` has an `Hour` constructor (as `Column.date_part`'s
+   `Date_Period | Time_Period = ..Day` default does).
+make_time_period_selector display:Display=..When_Modified -> Widget =
+    periods = ["Hour", "Minute", "Second", "Millisecond", "Microsecond", "Nanosecond"].map name->
+        code = ".." + name
+        Option code code
+    Widget.Single_Choice values=(periods + [Option "Duration.new" "(Duration.new)"]) display=display
 
 ## ---
    private: true
