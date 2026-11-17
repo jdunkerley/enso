@@ -1,12 +1,4 @@
 /** @file Shared API types exposed on `window.api` for both GUI and Electron. */
-import type {
-  AiAvailability,
-  AiComponentIpcReply,
-  AiComponentRequest,
-  AiProgressEvent,
-  AiToolCallReply,
-  AiToolCallRequest,
-} from 'enso-common/src/ai'
 import type { DownloadUrlOptions } from 'enso-common/src/download'
 import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
 import type {
@@ -69,36 +61,6 @@ export interface LogApi {
   readonly info: (msg: any[]) => void
   readonly warn: (msg: any[]) => void
   readonly error: (msg: any[]) => void
-}
-
-export interface AiApi {
-  /**
-   * The local Claude agent's current availability: `starting` until its priming turn completes,
-   * `ready` once the agent can serve turns, `unavailable` (with a displayable reason) when the
-   * `claude` CLI is missing, failed to prime, or was disabled via `ENSO_AI_DISABLED=1`.
-   * Availability changes over the life of the process — {@link AiApi.onAvailabilityChanged}
-   * carries the updates, and {@link useAiAvailability} keeps both in one reactive store.
-   */
-  readonly availability: () => Promise<AiAvailability>
-  /** Subscribe to {@link AiApi.availability} changes. Returns a disposer. */
-  readonly onAvailabilityChanged: (handler: (availability: AiAvailability) => void) => () => void
-  readonly generateComponent: (request: AiComponentRequest) => Promise<AiComponentIpcReply>
-  /**
-   * Subscribe to mid-turn tool calls; the handler must reply via {@link AiApi.replyToolCall}
-   * with the matching `requestId`. Returns a disposer.
-   */
-  readonly onToolCall: (handler: (request: AiToolCallRequest) => void) => () => void
-  readonly replyToolCall: (reply: AiToolCallReply) => void
-  /**
-   * Subscribe to live progress events for in-flight AI component requests.
-   */
-  readonly onProgress: (handler: (event: AiProgressEvent) => void) => () => void
-  /**
-   * Cancel an in-flight or queued AI component request. Settles the original
-   * `generateComponent` promise with a structured cancellation error. Idempotent — cancelling
-   * an unknown id is a no-op.
-   */
-  readonly cancel: (requestId: string) => void
 }
 
 /** Automatic updates; see `app/electron-client/src/updater.ts`. */
@@ -186,7 +148,6 @@ export interface ElectronApi {
   readonly fileBrowser: FileBrowserApi
   readonly versionInfo: VersionInfo
   readonly log: LogApi
-  readonly ai: AiApi
   readonly updater: UpdaterApi
   readonly secrets: SecretsApi
   readonly mcp?: McpApi

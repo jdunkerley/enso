@@ -2,7 +2,7 @@
 /**
  * @file Mode-switch button + popover for the Component Browser. Renders an icon for the
  * currently selected mode; clicking the icon opens a dropdown letting the user pick another
- * mode (component search, code edit, or AI). When the mode is locked (i.e. the CB was opened
+ * mode (component search or code edit). When the mode is locked (i.e. the CB was opened
  * on an existing node and the mode is determined by the node type), only the icon renders —
  * the dropdown does not open. Owns its own round "port" background so the surrounding editor
  * doesn't need to wrap us in another container.
@@ -13,12 +13,10 @@ import MenuButton from '@/components/MenuButton.vue'
 import MenuPanel from '@/components/MenuPanel.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { Icon } from '@/util/iconMetadata/iconName'
-import type { AiAvailability } from 'enso-common/src/ai'
 import { computed, ref } from 'vue'
 
-const { selectedMode, aiAvailability, modeLocked, codeEditIcon, asPort } = defineProps<{
+const { selectedMode, modeLocked, codeEditIcon, asPort } = defineProps<{
   selectedMode: ComponentBrowserMode
-  aiAvailability: AiAvailability
   modeLocked: boolean
   /** The icon to display for the "code editing" mode (varies by suggestion / node type). */
   codeEditIcon: Icon
@@ -34,54 +32,32 @@ interface ModeOption {
   readonly mode: ComponentBrowserMode
   readonly icon: Icon
   readonly label: string
-  readonly disabled: boolean
   readonly title: string
 }
 
-const aiTitle = computed(() => {
-  if (aiAvailability.status === 'ready') {
-    return 'Generate a User Defined Component from a natural-language prompt'
-  }
-  if (aiAvailability.status === 'starting') {
-    return 'The local Claude agent is still starting up; AI mode will be available shortly.'
-  }
-  return aiAvailability.reason
-})
-
 const options = computed<readonly ModeOption[]>(() => [
-  {
-    mode: 'aiPrompt',
-    icon: 'robot',
-    label: 'AI prompt',
-    disabled: aiAvailability.status !== 'ready',
-    title: aiTitle.value,
-  },
   {
     mode: 'componentBrowsing',
     icon: 'find',
     label: 'Component search',
-    disabled: false,
     title: 'Search the suggestion list',
   },
   {
     mode: 'codeEditing',
     icon: codeEditIcon,
     label: 'Code editing',
-    disabled: false,
     title: 'Edit the node as Enso code',
   },
 ])
 
 const currentIcon = computed<Icon>(() => {
-  if (selectedMode === 'aiPrompt') return 'robot'
   if (selectedMode === 'componentBrowsing') return 'find'
   return codeEditIcon
 })
 
 const dropdownOpen = ref(false)
 
-function pickMode(mode: ComponentBrowserMode, disabled: boolean): void {
-  if (disabled) return
+function pickMode(mode: ComponentBrowserMode): void {
   emit('update:selectedMode', mode)
   dropdownOpen.value = false
 }
@@ -112,9 +88,8 @@ function pickMode(mode: ComponentBrowserMode, disabled: boolean): void {
           :key="option.mode"
           class="modeOption"
           :class="{ selected: option.mode === selectedMode }"
-          :disabled="option.disabled"
           :title="option.title"
-          @activate="pickMode(option.mode, option.disabled)"
+          @activate="pickMode(option.mode)"
         >
           <SvgIcon :name="option.icon" class="optionIcon" />
           <span class="optionLabel">{{ option.label }}</span>
@@ -171,14 +146,6 @@ function pickMode(mode: ComponentBrowserMode, disabled: boolean): void {
 
 .modeOption.selected {
   background-color: var(--color-menu-entry-selected-bg, rgb(0 0 0 / 0.05));
-}
-
-/*
- * MenuButton dims disabled entries to 0.2, too faint for an entry whose purpose is to be noticed
- * and hovered for the hint explaining how to enable AI mode.
- */
-.modeMenuPanel .modeOption.disabled {
-  opacity: 0.45;
 }
 
 .optionLabel {

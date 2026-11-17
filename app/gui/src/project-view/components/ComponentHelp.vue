@@ -29,14 +29,12 @@ import { qnFromSegments, qnSegments, type QualifiedName } from '@/util/qualified
 import { EditorView } from '@codemirror/view'
 import { computed, watch } from 'vue'
 
-const props = defineProps<{ selectedEntry: SuggestionId | undefined; aiMode?: boolean }>()
+const props = defineProps<{ selectedEntry: SuggestionId | undefined }>()
 const emit = defineEmits<{ 'update:selectedEntry': [value: SuggestionId | undefined] }>()
 
 const { suggestionDb: db, projectNames } = useCurrentProject()
 
 const documentation = computed<Docs>(() => {
-  if (props.aiMode)
-    return placeholder('AI assistant mode: write query in natural language and press Enter.')
   const entry = props.selectedEntry
   return entry ?
       lookupDocumentation(db.value.entries, entry)
