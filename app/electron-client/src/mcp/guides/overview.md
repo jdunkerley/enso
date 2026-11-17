@@ -128,8 +128,9 @@ No tool changes the execution environment, settings or secrets;
     the user edits the project or leaves its tab, or `open_method` changes the
     method; then the next edit starts a new step. Edits from several agents run
     one at a time. An edit whose turn comes after the method on screen changed
-    is refused with nothing changed: call `get_graph` and try again. There is no
-    undo tool: to take a change back, edit or remove the nodes.
+    is refused with nothing changed: call `get_graph` and try again. `undo`
+    takes back one step of your own edits and `redo` re-applies it; neither goes
+    through the user's work, and both are refused in Live mode.
 
 ## Evaluating expressions
 

@@ -51,6 +51,8 @@ export const EDIT_TOOL_NAMES = [
   'set_visualization',
   'move_nodes',
   'arrange_nodes',
+  'undo',
+  'redo',
   'select_nodes',
   'open_method',
 ] as const
@@ -80,7 +82,7 @@ const EDIT_RULES =
   ' Refused while the project is in Live mode, and, with nothing changed, when the method on ' +
   'screen changed before the edit ran (call `get_graph` and try again). Your run of changes is ' +
   'one undo step for the user, until you pause for 10 seconds, the user edits or leaves the ' +
-  "project's tab, or `open_method` changes the method; there is no undo tool. The project is " +
+  "project's tab, or `open_method` changes the method; `undo` takes the step back. The project is " +
   'saved as it is edited. ' +
   WRITE_RULE +
   ' `settled: true`: the engine has reported results for the changed nodes, so the types ' +
@@ -88,7 +90,7 @@ const EDIT_RULES =
   '`get_node` later.'
 
 /**
- * The project tools (the seven that read, the twelve that edit or navigate), each forwarding its
+ * The project tools (the seven that read, the fourteen that edit or navigate), each forwarding its
  * arguments to the window through `bridge`.
  */
 export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
@@ -416,6 +418,31 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         node_ids: z.array(nodeId()).max(ARRANGE_NODES_MAX).optional(),
       },
       run: forward('arrange_nodes', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'undo',
+      title: 'Undo your last edits',
+      description:
+        'Take back one step of the edits made by agents: a step is every edit an agent made ' +
+        "without a 10 second pause. It never undoes the user's work: it takes back only " +
+        "agents' edits made since the user last changed the project, and is refused when there " +
+        'is none. Refused while the project is in Live mode. Returns `undone`, `can_undo` and ' +
+        '`can_redo` (whether another call would do something) and `settled` (see the edit ' +
+        'tools). Call `get_graph` afterwards to see the graph: nodes that come back have the ' +
+        'ids they had before.',
+      inputSchema: {},
+      run: forward('undo', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'redo',
+      title: 'Redo what undo took back',
+      description:
+        'Re-apply the step the last `undo` took back. Refused when there is nothing to redo: ' +
+        'an edit by anyone since the `undo` ends it. Refused while the project is in Live mode. ' +
+        'Returns `redone`, `can_undo`, `can_redo` and `settled`. Call `get_graph` afterwards ' +
+        'to see the graph.',
+      inputSchema: {},
+      run: forward('redo', EDIT_TOOL_TIMEOUT_MS),
     },
     {
       name: 'select_nodes',

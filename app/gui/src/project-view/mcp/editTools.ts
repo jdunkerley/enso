@@ -323,7 +323,8 @@ export async function editNode(
 
 /**
  * Removes the nodes. Refused, before anything changes, when any id is unknown or names the
- * method's argument or output. Answers with the ids removed.
+ * method's argument or output. Answers with the ids removed. Removing a node the user turned Write
+ * on for seals the agents' undo history (see `EditRunOptions.sealsHistory`).
  */
 export async function removeNodes(
   deps: EditToolDeps,
@@ -343,6 +344,8 @@ export async function removeNodes(
   // The nodes that used a removed one lose that input and are computed again. Read at the call's
   // turn, before the deletion, from the usages `deleteNodes` disconnects.
   let users: NodeId[] = []
+  // Whether a removed node has Write on, read at the turn, before the deletion.
+  let removesWriteOn = false
   const method = methodOnScreen(deps)
   const outcome = await deps.session.run(
     deps.caller,
@@ -351,9 +354,17 @@ export async function removeNodes(
       const unchanged = checkAtTurn(deps, method, ids)
       if (!unchanged.ok) return unchanged
       users = dependentsOf(deps, ids)
+      removesWriteOn = ids.some(
+        (id) => deps.db.nodeIdToNode.get(id)?.prefixes.enableRecording != null,
+      )
       return deps.deleteNodes(ids)
     },
-    { affected: () => ({ changed: users }), deadline: deps.deadline },
+    {
+      affected: () => ({ changed: users }),
+      deadline: deps.deadline,
+      // Undoing the removal would bring the node back and run it with Write on.
+      sealsHistory: () => removesWriteOn,
+    },
   )
   if (!outcome.ok) return errorResult(outcome)
   return settledResult({ removed: ids }, outcome.value)

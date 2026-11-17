@@ -35,6 +35,7 @@ import {
 } from './editTools'
 import { evaluateExpression } from './evaluate'
 import { findNode, getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
+import { redoTool, undoTool } from './historyTools'
 import { serialized, storeImage, withProjectId, type ImageToolDeps } from './imageTools'
 import {
   arrangeNodes,
@@ -123,7 +124,7 @@ export interface McpEditorDeps {
 /**
  * Registers the project tools for the open project: the seven that read (get_graph, get_node,
  * search_components, get_component_docs, evaluate_expression, list_visualizations,
- * get_documentation), the ten that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
+ * get_documentation), the twelve that edit (undo, redo, add_nodes, edit_node, remove_nodes, set_node_comment,
  * set_documentation, set_visualization, move_nodes, arrange_nodes, collapse_nodes, add_function)
  * and the two that navigate (select_nodes, open_method); the two that main's `get_visualization`
  * calls (get_visualization_data, prepare_visualization), the one main's `add_image` calls
@@ -569,6 +570,8 @@ export function useProjectMcpTools(
         ...(node_ids != null ? { node_ids } : {}),
       })
     },
+    undo: async (_args, caller, deadline) => undoTool({ session, caller, deadline }),
+    redo: async (_args, caller, deadline) => redoTool({ session, caller, deadline }),
     collapse_nodes: async (args, caller, deadline) => {
       const { node_ids, name } = args
       if (!isStringArray(node_ids)) return invalidArgument('node_ids', 'a list of strings')

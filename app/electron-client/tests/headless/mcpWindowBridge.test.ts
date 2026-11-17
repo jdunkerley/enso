@@ -188,6 +188,8 @@ describe('projectTools', () => {
       'set_visualization',
       'move_nodes',
       'arrange_nodes',
+      'undo',
+      'redo',
       'select_nodes',
       'open_method',
     ])
@@ -279,6 +281,12 @@ describe('edit tool arguments', () => {
     expect(await ok('get_documentation', {})).toBe(true)
     expect(await ok('set_documentation', {})).toBe(false)
     expect(await ok('set_documentation', { text: '' })).toBe(true)
+  })
+
+  test('undo and redo take no arguments', async () => {
+    for (const tool of ['undo', 'redo']) {
+      expect(await ok(tool, {})).toBe(true)
+    }
   })
 
   test('get_graph takes an optional boolean `layout`', async () => {
