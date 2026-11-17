@@ -18,7 +18,7 @@ import { focusIsIn, useEvent, useResizeObserver } from '@/composables/events'
 import { registerVisualization } from '@/mcp/visualizationRegistry'
 import { registerHandlers } from '@/providers/action'
 import type { VisualizationDataSource } from '@/stores/visualization'
-import { visualizationKey } from '@/stores/visualization/moduleStyles'
+import { hostKeyFor } from '@/stores/visualization/moduleStyles'
 import type { Opt } from '@/util/data/opt'
 import { Vec2 } from '@/util/data/vec2'
 import { computed, nextTick, ref, toRef, watch } from 'vue'
@@ -224,14 +224,13 @@ const nodeType = computed(() => props.typeinfo?.primaryType ?? undefined)
 /**
  * The visualization's custom element is made anew for each visualization component: the CSS of a
  * component stays in the shadow root it was mounted in, so a reused element would keep the rules of
- * a visualization it no longer shows (or of the version before a recompile).
+ * a visualization it no longer shows (or of the version before a recompile). The loading and error
+ * views come and go with every preprocessor change and are not a reason to start over, so the key
+ * is that of the last real visualization shown.
  */
-const hostKey = computed(() => {
-  const visualization = effectiveVisualization.value
-  return typeof visualization === 'object' || typeof visualization === 'function' ?
-      visualizationKey(visualization)
-    : undefined
-})
+const hostKey = computed<number | undefined>((previous) =>
+  hostKeyFor(status.value, effectiveVisualization.value, previous),
+)
 // Use proxy object instead of computed to keep granular reactive updates across the `params` prop fields.
 const visParams: VisualizationHostParams = proxyRefs({
   visualization: effectiveVisualization,

@@ -6,30 +6,7 @@
  */
 
 /**
- * The compiler worker sends a file's style blocks one by one, before the file's module. This holds
- * them until the module arrives, so that a recompiled file starts from nothing: a rule removed from
- * the file is gone from the module too.
- */
-export class StyleCollector {
-  private readonly pending = new Map<string, string[]>()
-
-  /** Remember one compiled `<style>` block of the file at `path`. */
-  add(path: string, css: string) {
-    const styles = this.pending.get(path)
-    if (styles) styles.push(css)
-    else this.pending.set(path, [css])
-  }
-
-  /** The style blocks of the file at `path` collected since the last call, in file order. */
-  take(path: string): string[] {
-    const styles = this.pending.get(path) ?? []
-    this.pending.delete(path)
-    return styles
-  }
-}
-
-/**
- * Give the component a module exports its CSS. A module with no styles, or whose default export is
+ * Give the component a module exports its CSS (the `styles` of the module's notification). A module with no styles, or whose default export is
  * not a component, is left as it is. Returns the module.
  */
 export function attachStyles<T>(module: T, styles: readonly string[]): T {
@@ -57,4 +34,23 @@ export function visualizationKey(component: object): number {
     keys.set(component, key)
   }
   return key
+}
+
+/**
+ * The `key` of the host element after the view on screen became `view` with `status`. Only a real
+ * visualization (`ready`) sets it; the loading and error views, which come and go with every
+ * preprocessor change, keep the key of the last real one, so the element is made anew only on a
+ * switch between visualizations or a recompile.
+ */
+export function hostKeyFor(
+  status: 'ready' | 'loading' | 'error',
+  view: unknown,
+  previous: number | undefined,
+): number | undefined {
+  return (
+      status === 'ready' &&
+        ((typeof view === 'object' && view !== null) || typeof view === 'function')
+    ) ?
+      visualizationKey(view)
+    : previous
 }

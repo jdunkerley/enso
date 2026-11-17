@@ -7,11 +7,11 @@ import { afterEach, beforeAll, describe, expect, test } from 'vitest'
 import * as vue from 'vue'
 import { defineCustomElement, nextTick, type Component } from 'vue'
 import { compileSfc } from '../compileSfc'
-import { attachStyles, StyleCollector, visualizationKey } from '../moduleStyles'
+import { attachStyles, hostKeyFor, visualizationKey } from '../moduleStyles'
 
 /**
  * The worker's contribution to a compiled `.vue` file, in the test: the scope id it adds, and the
- * module's styles, which the main thread collects before the module is imported.
+ * module's styles, which arrive with the module and are put on its component.
  */
 interface Compiled {
   component: Component & { styles?: string[] }
@@ -27,10 +27,8 @@ function load(
   path: string,
   source: string,
   modules: Record<string, { component: Compiled['component']; styles: string[] }>,
-  collector: StyleCollector,
 ): Compiled {
   const compiled = compileSfc(source, path)
-  for (const style of compiled.styles) collector.add(path, style)
   const body = compiled.code
     .replace(
       /import\s*\{([^}]*)\}\s*from\s*['"]vue['"]/g,
@@ -44,7 +42,7 @@ function load(
     .replace(/export default/, 'return')
   const component = new Function('vue', 'modules', body)(vue, modules) as Compiled['component']
   ;(component as { __scopeId?: string }).__scopeId = `data-v-${compiled.id}`
-  const styles = collector.take(path)
+  const styles = compiled.styles
   attachStyles({ default: component }, styles)
   modules[path] = { component, styles }
   return { component, styles }
@@ -112,9 +110,8 @@ const shadowCss = (el: HTMLElement) =>
 describe('the style of a visualization compiled at run time', () => {
   test('is in the shadow root the visualization is mounted in', async () => {
     const modules = {}
-    const chip = new StyleCollector()
-    load('./Chip.vue', CHIP, modules, chip)
-    const viz = load('./Viz.vue', VIZ('.pic { width: 100%; }'), modules, chip)
+    load('./Chip.vue', CHIP, modules)
+    const viz = load('./Viz.vue', VIZ('.pic { width: 100%; }'), modules)
     const host = await mountHost(viz.component)
     expect(shadowCss(host)).toMatch(/\.pic\[data-v-[0-9a-f]+\] \{\s*width: 100%/)
     expect(host.shadowRoot!.querySelector('img.pic')).not.toBeNull()
@@ -122,9 +119,8 @@ describe('the style of a visualization compiled at run time', () => {
 
   test('a scoped rule matches the element it is scoped to', async () => {
     const modules = {}
-    const collector = new StyleCollector()
-    load('./Chip.vue', CHIP, modules, collector)
-    const viz = load('./Viz.vue', VIZ('.pic { width: 100%; }'), modules, collector)
+    load('./Chip.vue', CHIP, modules)
+    const viz = load('./Viz.vue', VIZ('.pic { width: 100%; }'), modules)
     const host = await mountHost(viz.component)
     const img = host.shadowRoot!.querySelector('img.pic')!
     expect(declared(host, img, 'width')).toBe('100%')
@@ -132,9 +128,8 @@ describe('the style of a visualization compiled at run time', () => {
 
   test('of an imported .vue file is in the shadow root too', async () => {
     const modules = {}
-    const collector = new StyleCollector()
-    load('./Chip.vue', CHIP, modules, collector)
-    const viz = load('./Viz.vue', VIZ('.pic { width: 100%; }'), modules, collector)
+    load('./Chip.vue', CHIP, modules)
+    const viz = load('./Viz.vue', VIZ('.pic { width: 100%; }'), modules)
     const host = await mountHost(viz.component)
     expect(shadowCss(host)).toMatch(/\.chip\[data-v-[0-9a-f]+\] \{\s*display: inline-block/)
     const chip = host.shadowRoot!.querySelector('.chip')!
@@ -143,19 +138,17 @@ describe('the style of a visualization compiled at run time', () => {
 
   test('is not left in the document', async () => {
     const modules = {}
-    const collector = new StyleCollector()
-    load('./Chip.vue', CHIP, modules, collector)
-    const viz = load('./Viz.vue', VIZ('.pic { width: 100%; }'), modules, collector)
+    load('./Chip.vue', CHIP, modules)
+    const viz = load('./Viz.vue', VIZ('.pic { width: 100%; }'), modules)
     await mountHost(viz.component)
     expect(document.head.querySelectorAll('style').length).toBe(0)
   })
 
   test('a recompiled file brings its new rule, and the old one is not in the new view', async () => {
     const modules = {}
-    const collector = new StyleCollector()
-    load('./Chip.vue', CHIP, modules, collector)
-    const old = load('./Viz.vue', VIZ('.pic { width: 100%; }'), modules, collector)
-    const recompiled = load('./Viz.vue', VIZ('.pic { width: 50%; }'), modules, collector)
+    load('./Chip.vue', CHIP, modules)
+    const old = load('./Viz.vue', VIZ('.pic { width: 100%; }'), modules)
+    const recompiled = load('./Viz.vue', VIZ('.pic { width: 50%; }'), modules)
     expect(visualizationKey(recompiled.component)).not.toBe(visualizationKey(old.component))
     // The host is made anew for a new component (see `visualizationKey`), so its shadow root holds
     // exactly the rules of the component it shows.
@@ -163,18 +156,6 @@ describe('the style of a visualization compiled at run time', () => {
     expect(shadowCss(host)).toMatch(/width: 50%/)
     expect(shadowCss(host)).not.toMatch(/width: 100%/)
     expect(shadowCss(host).match(/\.chip\[/g)).toHaveLength(1)
-  })
-})
-
-describe('StyleCollector', () => {
-  test('hands over the styles of a path once, in order', () => {
-    const c = new StyleCollector()
-    c.add('a', '.a{}')
-    c.add('a', '.b{}')
-    c.add('b', '.c{}')
-    expect(c.take('a')).toEqual(['.a{}', '.b{}'])
-    expect(c.take('a')).toEqual([])
-    expect(c.take('b')).toEqual(['.c{}'])
   })
 })
 
@@ -200,5 +181,19 @@ describe('visualizationKey', () => {
     const b = {}
     expect(visualizationKey(a)).toBe(visualizationKey(a))
     expect(visualizationKey(a)).not.toBe(visualizationKey(b))
+  })
+})
+
+describe('hostKeyFor', () => {
+  test('follows the real visualizations and ignores the loading and error views', () => {
+    const a = {}
+    const b = {}
+    const keyA = hostKeyFor('ready', a, undefined)
+    expect(keyA).toBe(visualizationKey(a))
+    expect(hostKeyFor('loading', {}, keyA)).toBe(keyA)
+    expect(hostKeyFor('error', {}, keyA)).toBe(keyA)
+    expect(hostKeyFor('ready', a, keyA)).toBe(keyA)
+    expect(hostKeyFor('ready', b, keyA)).toBe(visualizationKey(b))
+    expect(hostKeyFor('loading', {}, undefined)).toBeUndefined()
   })
 })
