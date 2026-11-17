@@ -40,7 +40,8 @@ export function daysInMonth(year: number, month: number): number {
   return [4, 6, 9, 11].includes(month) ? 30 : 31
 }
 
-function isValidDate({ year, month, day }: YearMonthDay): boolean {
+/** Whether `Date.new` takes the date: years 100 to 9999, and a day the month has. */
+export function isValidDate({ year, month, day }: YearMonthDay): boolean {
   return (
     Number.isSafeInteger(year) &&
     year >= 100 &&

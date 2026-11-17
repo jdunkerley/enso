@@ -34,6 +34,10 @@ describe('defaultItemCode', () => {
     )
   })
 
+  test('a new date-time starts as now', () => {
+    expect(defaultItemCode('Standard.Base.Data.Time.Date_Time.Date_Time')).toBe('Date_Time.now')
+  })
+
   test('other types keep the placeholder', () => {
     expect(defaultItemCode('Standard.Base.Data.Text.Text')).toBeUndefined()
     expect(defaultItemCode(undefined)).toBeUndefined()
