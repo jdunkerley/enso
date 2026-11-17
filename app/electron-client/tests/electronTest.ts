@@ -511,7 +511,9 @@ async function showHiddenParameters(page: Page, selected: Locator) {
   const button = selected.locator('.parameterMenuButton:visible')
   const menu = page.getByRole('dialog', { name: 'More parameters' })
   for (let i = 0; i < 12 && (await button.count()) > 0; i++) {
-    await button.first().click()
+    // Not `click()`: the component is still settling, and Playwright waits for it to hold still.
+    await button.first().dispatchEvent('click')
+    await expect(menu).toBeVisible()
     const names = await menu.locator('.parameterItem .name').allTextContents()
     if (names.length === 0) return
     await menu.getByRole('button', { name: new RegExp(`^${names[0]}`) }).click()
