@@ -54,7 +54,7 @@ add_specs suite_builder =
 
     suite_builder.group "Date_Time signatures" group_builder->
         group_builder.specify "the period selectors list both kinds, and the custom amounts when asked" <|
-            periods = ["Date_Period.Year", "Date_Period.Quarter", "Date_Period.Month", "Date_Period.Week", "Date_Period.Day", "Time_Period.Hour", "Time_Period.Minute", "Time_Period.Second", "Time_Period.Millisecond", "Time_Period.Microsecond", "Time_Period.Nanosecond"]
+            periods = ["..Year", "..Quarter", "..Month", "..Week", "..Day", "..Hour", "..Minute", "..Second", "..Millisecond", "..Microsecond", "..Nanosecond"]
             make_date_time_period_selector.values.map .label . should_equal periods
             amounts = make_date_time_period_selector include_custom=True
             amounts.values.map .label . should_equal (periods + ["Period.new", "Duration.new"])
@@ -79,6 +79,26 @@ add_specs suite_builder =
             (dt + (Period.new days=1)) . should_equal (Date_Time.new 2020 2 1 12 0)
             (dt - Time_Period.Hour) . should_equal (Date_Time.new 2020 1 31 11 0)
             (dt - (Duration.new minutes=30)) . should_equal (Date_Time.new 2020 1 31 11 30)
+
+        group_builder.specify "periods can be autoscoped, as the dropdowns write them" <|
+            dt = Date_Time.new 2022 9 15 10 30 45
+            dt.start_of ..Month . should_equal (Date_Time.new 2022 9 1)
+            dt.start_of ..Hour . should_equal (Date_Time.new 2022 9 15 10)
+            dt.end_of ..Day . should_equal (Date_Time.new 2022 9 15 23 59 59 nanosecond=999999999)
+            dt.date_part ..Minute . should_equal 30
+            dt.date_part ..Quarter . should_equal 3
+            dt2 = Date_Time.new 2020 1 31 12 0
+            (dt2 + ..Hour) . should_equal (Date_Time.new 2020 1 31 13 0)
+            (dt2 - ..Hour) . should_equal (Date_Time.new 2020 1 31 11 0)
+            (dt2 + ..Month) . should_equal (Date_Time.new 2020 2 29 12 0)
+            (dt2 - ..Day) . should_equal (Date_Time.new 2020 1 30 12 0)
+            (dt2.+ ..Second) . should_equal (Date_Time.new 2020 1 31 12 0 1)
+
+        group_builder.specify "..Day over a DST change is a calendar day, not 24 hours" <|
+            zone = Time_Zone.parse "Europe/Paris"
+            dt = Date_Time.new 2020 3 28 12 0 zone=zone
+            (dt + ..Day) . should_equal (Date_Time.new 2020 3 29 12 0 zone=zone)
+            (dt + ..Day) . should_equal (dt + Date_Period.Day)
 
         group_builder.specify "methods reject arguments of the wrong type" <|
             dt = Date_Time.new 2020 1 1 12 0

@@ -1131,15 +1131,17 @@ type Date_Time
    private: true
    ---
    The choices for a period of a Date_Time: each `Date_Period`, then each
-   `Time_Period`, by their whole names (the arguments take either type, so an
-   auto-scoped name would not resolve). With `include_custom`, also
-   `Period.new` and `Duration.new`, for an amount added to or taken from it.
+   `Time_Period`, written autoscoped (`..Day`, `..Hour`). The two types share no
+   constructor name, so the engine's union check (which tries each member in
+   turn) resolves each one: `..Day` is always `Date_Period.Day`. With
+   `include_custom`, also `Period.new` and `Duration.new`, for an amount added
+   to or taken from it.
 make_date_time_period_selector (include_custom:Boolean=False) display:Display=..When_Modified -> Widget =
     date_periods = ["Year", "Quarter", "Month", "Week", "Day"].map name->
-        code = "Date_Period." + name
+        code = ".." + name
         Option code code
     time_periods = ["Hour", "Minute", "Second", "Millisecond", "Microsecond", "Nanosecond"].map name->
-        code = "Time_Period." + name
+        code = ".." + name
         Option code code
     custom = if include_custom then [Option "Period.new" "(Period.new)", Option "Duration.new" "(Duration.new)"] else []
     Widget.Single_Choice values=(date_periods + time_periods + custom) display=display
