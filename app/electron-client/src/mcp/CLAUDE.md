@@ -345,6 +345,43 @@ history and the routes review found (all now refused) are in
 descriptions (`WRITE_RULE` in `projectTools.ts`) and the guides tell the agent
 the same, and name the two ways its edits can still cause a write.
 
+## History, versions, problems and refresh
+
+Five more project tools (definitions in `projectTools.ts`, handlers in
+`app/gui/src/project-view/mcp/`: `historyTools.ts`, `versionTools.ts`,
+`problemTools.ts`, `refreshTool.ts`):
+
+- **`undo` / `redo`** go through the edit session without an undo step or a
+  saved version. `undo` takes back the most recent step of edits made by any
+  connected agent, and only those made since the user last changed the project
+  (a user edit, their own Ctrl+Z included, ends the agents' history); it is
+  refused when there are none. A step is usually every edit made without a 10 s
+  pause, but one `undo` may take back only part of it. `redo` re-applies only
+  what `undo` took back, until anyone edits. Neither waits for the engine: the
+  answer has no `settled`. **The rule** (an agent never causes a write the user
+  did not click for): both are refused while the project's main module has code
+  that enables output, and an edit made while it has some (removing it included)
+  cannot be undone by an agent. A change that does not go through the undo
+  manager (the file changed on disk) cannot make one `undo` reach the user's
+  steps: the session undoes above a floor. Not checked: the project's other
+  modules, library functions that enable output themselves, `foreign` code. The
+  details, the invariant and its limits are under "History" in
+  `app/gui/src/project-view/mcp/CLAUDE.md`. Both are refused in Live.
+- **`save_version`** saves a version as the user's Save a version does; it never
+  turns versioning on (refused when it is off), changes no node, and works in
+  Live.
+- **`get_problems`** reads the errors, panics and warnings of the method on
+  screen and the module's compile diagnostics. `origin: true` marks the node to
+  fix first; the agent calls again while `pending` is not 0. Reads only; works
+  in Live.
+- **`refresh`** computes every node again in Design (`recompute('all')` with no
+  environment argument), never turns Write on, and is refused in Live and when
+  the code of the project's main module (`Main.enso`, the module the graph
+  shows) enables output anywhere, because the refresh would run it and write
+  again; the agent asks the user to refresh. Its description and the guide say
+  what is not checked: other modules, library functions that enable output
+  themselves, `foreign` code.
+
 ## The caller checks
 
 Any local process can reach a loopback port, and a web page in the user's
@@ -473,8 +510,8 @@ only AI route.
   and capture), `mcpImageTool.test.ts` (a fake bridge, capture and file reader,
   both path rules by an injected platform), `mcpGraphImageTool.test.ts` (a fake
   bridge and capture).
-- `tests/mcp.spec.ts` — the packaged app, two tests. The first: an SDK client
-  lists the 30 tools, reads the guide and the graph of a new project, searches
+- `tests/mcp.spec.ts` — the packaged app, three tests. The first: an SDK client
+  lists the 33 tools, reads the guide and the graph of a new project, searches
   components, evaluates, checks that an evaluation does not write the file it
   names (the answer names the dry-run file, which the test deletes), and that a
   request without the token is `401`. The second builds a project from the
@@ -508,11 +545,32 @@ only AI route.
   every node, attached as `graph.png`), one `Mod+Z` in the window taking back a
   whole `add_nodes` call, `remove_nodes`, `list_files`, the path rule,
   `close_project` (the edits are in `Main.enso` on disk) and `open_project` (the
-  documentation read again is the text set); it deletes the project it made.
-  Neither can check the Live-mode refusals: nothing in the UI switches a project
-  to Live (the project's `executionMode` setting is only read from its
-  settings), so `app/gui/src/project-view/mcp/__tests__/` covers them. The GUI
-  side has its own Playwright specs:
-  `app/gui/integration-test/project-view/mcpEdit.spec.ts`,
+  documentation read again is the text set); it deletes the project it made. The
+  third drives the five history tools against the real engine: `get_problems` on
+  a dataflow error and the node using it (message present, `origin` true then
+  false), on a compile error (its diagnostic's `line` is the 1-based line of
+  `Main.enso`), `refresh` (answers `settled: true`, also inside a function with
+  an argument), `undo` and `redo` of a step, `save_version` (refused: versions
+  are off in a new project), and the Write rule, against a node that really
+  writes: the user (the test, typing in the Component Browser) makes a node with
+  `Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| "w".write …`
+  (the two-argument form; it appends to its file each time it runs), and the
+  test checks that (a) it wrote once; (b) `refresh` is refused and the file's
+  content and modification time are unchanged after 8 s; (c) after an agent's
+  `add_nodes` elsewhere `undo` is refused (code that can enable output) and the
+  edit stays; (d) after `remove_nodes` of the write node `undo` is refused, the
+  node does not come back and the file is unchanged; (e) with the code gone an
+  agent's node is undone and redone and `refresh` answers
+  `refreshed: true, settled: true`, the file still unchanged. The control: the
+  user makes the node again and the file changes, so the checks would have seen
+  a write. The GUI's own Write prefix (`Context.Output __ <| __`,
+  `util/ast/node.ts`) does not run on this engine, whose `with_enabled_context`
+  takes two parameters ("Method `<|` of type Text could not be found"), so the
+  test does not use it (a known defect,
+  `app/gui/src/project-view/mcp/CLAUDE.md`). None of the three can check the
+  Live-mode refusals: nothing in the UI switches a project to Live (the
+  project's `executionMode` setting is only read from its settings), so
+  `app/gui/src/project-view/mcp/__tests__/` covers them. The GUI side has its
+  own Playwright specs: `app/gui/integration-test/project-view/mcpEdit.spec.ts`,
   `project-view/mcpDocumentation.spec.ts` and
   `integration-test/dashboard/mcpApp.spec.ts`.

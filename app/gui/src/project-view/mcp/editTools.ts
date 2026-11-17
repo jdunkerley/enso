@@ -323,7 +323,8 @@ export async function editNode(
 
 /**
  * Removes the nodes. Refused, before anything changes, when any id is unknown or names the
- * method's argument or output. Answers with the ids removed.
+ * method's argument or output. Answers with the ids removed. Removing a node from a module that has
+ * code enabling output seals the agents' undo history, as any edit there does (`editSession.ts`).
  */
 export async function removeNodes(
   deps: EditToolDeps,

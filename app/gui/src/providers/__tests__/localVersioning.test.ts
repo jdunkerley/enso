@@ -665,6 +665,104 @@ describe('save', () => {
     expect(store.canSave(PROJECT)).toBe(expected)
   })
 
+  describe('the outcome', () => {
+    test('a commit is saved', async () => {
+      const { store } = setup()
+      store.watchProject(PROJECT, FLUSHED)
+      await expect(store.save(PROJECT)).resolves.toEqual({ kind: 'saved' })
+    })
+
+    test('nothing to commit is nothingToSave', async () => {
+      const { store } = setup({ commitVersion: vi.fn(async () => ({ id: null })) })
+      store.watchProject(PROJECT, FLUSHED)
+      await expect(store.save(PROJECT)).resolves.toEqual({ kind: 'nothingToSave' })
+    })
+
+    test('a declined write fails with its reason', async () => {
+      const { store } = setup()
+      store.watchProject(PROJECT, async () => ({
+        kind: 'declined',
+        reason: 'src/Main.enso was changed on disk.',
+      }))
+      await expect(store.save(PROJECT)).resolves.toEqual({
+        kind: 'failed',
+        reason: 'src/Main.enso was changed on disk.',
+      })
+    })
+
+    test('a failed commit fails with git’s message', async () => {
+      const { store } = setup({
+        commitVersion: vi.fn(async () => {
+          throw new Error('index.lock exists')
+        }),
+      })
+      store.watchProject(PROJECT, FLUSHED)
+      await expect(store.save(PROJECT)).resolves.toEqual({
+        kind: 'failed',
+        reason: 'index.lock exists',
+      })
+    })
+
+    test('a blocked repository fails with git’s message', async () => {
+      const { store } = setup({
+        versioningStatus: vi.fn(async () => status({ blocked: 'A merge is in progress.' })),
+      })
+      store.watchProject(PROJECT, FLUSHED)
+      await expect(store.save(PROJECT)).resolves.toEqual({
+        kind: 'failed',
+        reason: 'A merge is in progress.',
+      })
+    })
+
+    test('versions that are off fail, with the toast the user saw', async () => {
+      const { toasts, store } = setup({
+        versioningStatus: vi.fn(async () => status({ enabled: false, optedOut: true })),
+      })
+      store.watchProject(PROJECT, FLUSHED)
+      await expect(store.save(PROJECT)).resolves.toEqual({
+        kind: 'failed',
+        reason: 'versions are off for this folder',
+      })
+      expect(toasts.toasts.value[0]).toMatchObject({ type: 'info' })
+    })
+
+    test('a project that is not watched fails', async () => {
+      const { store } = setup()
+      await expect(store.save(PROJECT)).resolves.toEqual({
+        kind: 'failed',
+        reason: 'the project is not open',
+      })
+    })
+
+    test('a save that joins a running one has its outcome', async () => {
+      const gate = deferred<FlushOutcome>()
+      const { store } = setup()
+      store.watchProject(PROJECT, () => gate.promise)
+      const first = store.save(PROJECT)
+      const second = store.save(PROJECT, 'later')
+      gate.resolve({ kind: 'flushed' })
+      expect(await first).toEqual({ kind: 'saved' })
+      expect(await second).toEqual({ kind: 'saved' })
+    })
+
+    test('a save queued behind a committing one has its own outcome', async () => {
+      const commits = [deferred<{ id: string | null }>(), deferred<{ id: string | null }>()]
+      const commitVersion = vi.fn(async (_id: ProjectId, _message: string) => {
+        return commits[commitVersion.mock.calls.length - 1].promise
+      })
+      const { store } = setup({ commitVersion })
+      store.watchProject(PROJECT, FLUSHED)
+      const first = store.save(PROJECT)
+      await vi.waitFor(() => expect(commitVersion).toHaveBeenCalledTimes(1))
+      const second = store.save(PROJECT, 'again')
+      commits[0].resolve({ id: 'a'.repeat(40) })
+      await vi.waitFor(() => expect(commitVersion).toHaveBeenCalledTimes(2))
+      commits[1].resolve({ id: null })
+      expect(await first).toEqual({ kind: 'saved' })
+      expect(await second).toEqual({ kind: 'nothingToSave' })
+    })
+  })
+
   test('askToSave opens the dialog, whose Save saves with its comment', async () => {
     const { backend, modals, store } = setup()
     store.watchProject(PROJECT, FLUSHED)

@@ -1,7 +1,46 @@
+/* eslint-disable camelcase -- result field names are snake_case on the wire */
 /**
  * @file The edit session: every MCP edit tool runs through it. It serialises the edits, saves a
  * version before an agent's first edit, keeps the agent's edits in one undo step, and waits for the
  * graph and the execution to settle after each edit.
+ *
+ * It also tracks which undo steps are the agents' own, so that `undo` and `redo` stay above the
+ * user's last change, and offers {@link EditSession.runUnstepped}: the same queue, refusals and
+ * waits without an undo step or a saved version (undo, redo and refresh use it).
+ *
+ * The rule for undo and redo: an agent must never cause a write of a node's output that the user
+ * did not click for. Code that enables output is what writes, so:
+ *
+ * - **The invariant.** Every undo step above `ownFloor` was made by session runs, from a module with
+ *   no code that enables output (`deps.enablesOutput()`, `writeRefusal` over the whole module),
+ *   by edits that cannot add any (`writeGuard` refuses such code in everything an agent supplies).
+ *   A changed edit run from, or leaving, a module with such code seals the step: it stays held (so
+ *   that later edits join it and save no further version), agents cannot undo or redo while it is,
+ *   and when it is released, for whatever reason, the floor is raised to the depth after it, so
+ *   that step is never undone by an agent. The redo steps above `ownRedoFloor` are what the
+ *   session's own `undo` put there.
+ * - **The depth rule.** A held step is exactly one undo item: the session's edits merge into it.
+ *   After every changed stepped edit the undo depth must be `stepBase + 1`; anything else means
+ *   that something other than the session's edits changed the history while the edit ran (the
+ *   foreign-edit listener ignores everything while `inEdit` is true): a user's Ctrl+Y or Ctrl+Z,
+ *   or a boundary (a background click) splitting the step. The step is then sealed.
+ * - **What resets it.** Every module transaction the session did not make, the user's Ctrl+Z
+ *   included, clears both floors (`onForeignEdit`), except the untracked ones below.
+ * - **Untracked changes.** An update from the server (the file changed on disk, another client) or
+ *   a derived write (`local:autoLayout`, …) does not reset the floors and is not on the undo stack.
+ *   It can make an agent's step change nothing, and `Y.UndoManager.undo()` then goes on into the
+ *   step below; so the session's undo and redo cannot reach the steps below their floor
+ *   (`undoAbove` / `redoAbove` in `undoHold.ts`). Such a change can also bring code that enables
+ *   output into the module: `undo` and `redo` are refused while there is any, and one that leaves
+ *   any behind is reversed at once (the pre-checks should make that unreachable).
+ * - **Not covered.** A user edit that lands while an async edit is awaiting, with no boundary
+ *   after it, merges into the session's step without changing the depth, so the depth rule cannot
+ *   see it. Undoing it can only put back code that was in the module before the edit, and a module
+ *   that had code enabling output before or after the edit seals the step. A user's Ctrl+Z that
+ *   takes back the held step's own item before the edit's change also leaves the depth right; the
+ *   edit's change then clears the redo stack, and the new item holds only that change. The check
+ *   covers only the module in the editor (`Main.enso`): not other modules of the project, library
+ *   functions that enable output themselves, or `foreign` code.
  */
 import type { McpCaller } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
@@ -35,7 +74,41 @@ export const LIVE_EDIT_ERROR =
 export const PROJECT_CLOSED_ERROR = 'The project is no longer open.'
 /** The answer to an edit whose turn comes while the project's editor is not on screen. */
 export const NOT_ON_SCREEN_ERROR = 'The project is no longer on screen.'
+/** The answer to `undo` when no step of an agent's is on top of the undo stack. */
+export const NOTHING_TO_UNDO_ERROR =
+  "There is nothing of the agents' to undo. undo takes back only edits made by agents since the user last changed the project. To change anything else, edit or remove the nodes."
+/**
+ * The answer to `undo` when the agents' steps above the floor had all been reverted by something
+ * else (the file changed on disk, a derived write): they were dropped and nothing changed.
+ */
+export const NOTHING_LEFT_TO_UNDO_ERROR =
+  "Nothing was changed: the agents' edits left to undo had already been changed back by something else (for example the file changed on disk). There is nothing more to undo."
+/** The answer to `redo` when no step taken back by `undo` can be re-applied. */
+export const NOTHING_TO_REDO_ERROR =
+  'There is nothing to redo. redo re-applies only what undo took back, and only until the next edit.'
+/** The answer to `redo` when the steps `undo` took back could no longer be re-applied. */
+export const NOTHING_LEFT_TO_REDO_ERROR =
+  'Nothing was changed: what undo took back could no longer be re-applied, because something else has changed it since. There is nothing more to redo.'
+/**
+ * The answer to `undo` while the module has code that can enable output (what `writeRefusal`
+ * refuses, the code the edit tools refuse to add) or cannot be read.
+ */
+export const UNDO_OUTPUT_ERROR =
+  "The project's main module has code that can enable output (the same code the edit tools refuse to add), or cannot be read, and undoing could run such code and write. Ask the user to undo with Ctrl+Z."
+/** The answer to `redo` in the same case. */
+export const REDO_OUTPUT_ERROR =
+  "The project's main module has code that can enable output (the same code the edit tools refuse to add), or cannot be read, and redoing could run such code and write. Ask the user to redo with Ctrl+Y."
+/**
+ * The answer to an `undo` or `redo` that left code enabling output behind and was put back. The
+ * engine may have seen the state in between, so it does not say that nothing was changed.
+ */
+export const HISTORY_REVERSED_ERROR =
+  'That would have put code that can enable output back into the project, so the step was put back at once. The engine may have seen the change in between: tell the user, so that they can check the project. Ask them to undo or redo with Ctrl+Z or Ctrl+Y.'
+/** The answer when such a reversal did not change the project back, or failed. */
+export const HISTORY_NOT_REVERSED_ERROR =
+  'That put code that can enable output back into the project, and putting the step back failed. Tell the user at once, so that they can check the project before it runs.'
 
+/** The dependencies of an {@link EditSession}. */
 export interface EditSessionDeps {
   readonly isLive: () => boolean
   /** Whether the project's editor is on screen; a hidden project is never edited. */
@@ -44,6 +117,22 @@ export interface EditSessionDeps {
   readonly holdUndoStep: () => () => void
   /** Calls `listener` before any module edit that the session did not make; returns unsubscribe. */
   readonly onForeignEdit: (listener: () => void) => () => void
+  /** How many steps the module's undo stack and redo stack hold now. */
+  readonly historyDepth: () => { undo: number; redo: number }
+  /**
+   * Undoes the top step of the module's undo stack, unable to reach the `floor` lowest steps (a
+   * plain `Y.UndoManager.undo()` goes on below a step that changes nothing). Returns whether
+   * anything changed.
+   */
+  readonly undo: (floor: number) => boolean
+  /** Redoes the top step of the module's redo stack, unable to reach its `floor` lowest steps. */
+  readonly redo: (floor: number) => boolean
+  /**
+   * Whether the module in the editor has code that enables output (`writeRefusal` of its root is
+   * not undefined), or cannot be read. Read before and after every changed edit, and before and
+   * after every `undo` and `redo`.
+   */
+  readonly enablesOutput: () => boolean
   /** Rejects when the version cannot be saved. Resolves without doing anything when versions are off. */
   readonly saveVersion: (comment: string) => Promise<void>
   /**
@@ -62,6 +151,7 @@ export interface EditSessionDeps {
   readonly clearTimeout: (handle: unknown) => void
 }
 
+/** Options of {@link EditSession.run}; {@link EditSession.runUnstepped} takes the same. */
 export interface EditRunOptions<T> {
   /**
    * The external ids of the expressions the edit makes the engine compute (`added`: new nodes, the
@@ -84,18 +174,35 @@ export interface EditRunOptions<T> {
    * save, and its settle wait ends {@link EDIT_ANSWER_MARGIN_MS} before it. None: no limit.
    */
   readonly deadline?: number
+  /**
+   * Whether the run waits for the node database to update after the action ({@link
+   * GRAPH_UPDATE_WAIT_MS}). True by default; false for a run that changes no node (a refresh): no
+   * update comes, so waiting would only cost the full wait.
+   */
+  readonly awaitsGraphUpdate?: boolean
 }
 
+/** What a run answers: the edit's value, and whether the engine's results for it arrived in time. */
 export interface EditOutcome<T> {
   readonly value: T
   readonly settled: boolean
 }
 
+/** Whether a further `undo` or `redo` by an agent would do something. */
+export interface HistoryState {
+  readonly can_undo: boolean
+  readonly can_redo: boolean
+}
+
+/** How a run treats the undo history: with a step and a version (an edit), or without (the rest). */
+type RunMode = { readonly stepped: boolean }
+
 function callerKey(caller: McpCaller): string {
   return caller.kind === 'chat' ? 'chat' : `external:${caller.name}`
 }
 
-function callerLabel(caller: McpCaller): string {
+/** How a caller is named in the versions and messages it causes: `the chat`, or the agent's name. */
+export function callerLabel(caller: McpCaller): string {
   return caller.kind === 'chat' ? 'the chat' : caller.name
 }
 
@@ -103,7 +210,10 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Runs the edits of the agents, one at a time, each caller's in one undo step. */
+/**
+ * Runs the edits of the agents, one at a time, each caller's in one undo step, and remembers which
+ * undo steps are theirs (see the file comment for why undoing those is safe for Write).
+ */
 export class EditSession {
   private tail: Promise<unknown> = Promise.resolve()
   private release: (() => void) | undefined
@@ -112,11 +222,33 @@ export class EditSession {
   private inEdit = false
   private disposed = false
   private readonly unsubscribe: () => void
+  /**
+   * The undo depth at or below which a step is not the agents' to undo: undefined when the user
+   * changed the project since the last agent edit (or there was none).
+   */
+  private ownFloor: number | undefined
+  /**
+   * The redo depth when the session's first `undo` since the last edit ran: the redo steps above it
+   * are the ones that `undo` took back. Undefined when there are none to redo.
+   */
+  private ownRedoFloor: number | undefined
+  /** The undo depth when the held step was started. */
+  private stepBase = 0
+  /**
+   * Whether the held step is sealed: when it is released, `ownFloor` is raised to the depth after
+   * it ({@link releaseStep}). Agents cannot undo or redo while it is held.
+   */
+  private sealPending = false
 
-  /** Subscribes to foreign edits, which end the open step. */
+  /** Subscribes to foreign edits, which end the open step and the agents' own history. */
   constructor(private readonly deps: EditSessionDeps) {
+    // The undo manager's own transactions reach this listener too; the session's `undo` and `redo`
+    // run with `inEdit` true, so they do not reset the own history.
     this.unsubscribe = deps.onForeignEdit(() => {
-      if (!this.inEdit) this.releaseStep()
+      if (this.inEdit) return
+      this.releaseStep()
+      this.ownFloor = undefined
+      this.ownRedoFloor = undefined
     })
   }
 
@@ -130,6 +262,10 @@ export class EditSession {
    * `options.unchanged` says the edit changed nothing. `edit` returns Err to refuse without
    * changing anything.
    *
+   * A changed edit made when the module had code that enables output, or that leaves some, or
+   * after which the undo depth is not `stepBase + 1` (the depth rule), seals the agents' history:
+   * the step stays held, and once it is released `undo` cannot take it back (file comment).
+   *
    * `edit` should apply its module changes synchronously: a user edit that lands while an async
    * `edit` is awaiting is treated as the session's own. The step's idle period is measured from
    * the end of a run; no timer is pending while a run is in progress.
@@ -139,6 +275,145 @@ export class EditSession {
     edit: () => Result<T> | Promise<Result<T>>,
     options: EditRunOptions<T> = {},
   ): Promise<Result<EditOutcome<T>>> {
+    return this.enqueue(caller, edit, options, { stepped: true })
+  }
+
+  /**
+   * Runs `action` in the queue outside any undo step: the same refusals as {@link run} (disposed,
+   * off screen, Live, too close to the deadline), then the held step is released, no version is
+   * saved and no step is held; `action` runs marked as the session's own; then the same
+   * graph-update and settle waits as `run`. It leaves the own history alone.
+   */
+  runUnstepped<T>(
+    caller: McpCaller,
+    action: () => Result<T> | Promise<Result<T>>,
+    options: EditRunOptions<T> = {},
+  ): Promise<Result<EditOutcome<T>>> {
+    return this.enqueue(caller, action, options, { stepped: false })
+  }
+
+  /**
+   * Takes back the top undo step if it is the agents' own, unable to go below the floor. Refused,
+   * at its turn and with nothing changed, while the module has code that enables output
+   * ({@link UNDO_OUTPUT_ERROR}) and when there is no such step ({@link NOTHING_TO_UNDO_ERROR});
+   * answers {@link NOTHING_LEFT_TO_UNDO_ERROR} when the steps above the floor had all been reverted
+   * by something else, so that nothing changed. Answers what a further undo or redo could do. It
+   * does not wait for the engine: the values may still be computing.
+   */
+  async undo(
+    caller: McpCaller,
+    options: { deadline?: number } = {},
+  ): Promise<Result<HistoryState>> {
+    const result = await this.runUnstepped(
+      caller,
+      () => {
+        if (this.deps.enablesOutput()) return Err(UNDO_OUTPUT_ERROR)
+        if (!this.canUndo()) return Err(NOTHING_TO_UNDO_ERROR)
+        const redoBase = this.deps.historyDepth().redo
+        const changed = this.deps.undo(this.ownFloor!)
+        // The redo steps above this depth are the ones the session's undo took back.
+        if (changed) this.ownRedoFloor ??= redoBase
+        // Should be unreachable: every step above the floor was made from a module without such
+        // code, by edits that cannot add any, and the module had none just now.
+        if (this.deps.enablesOutput()) return this.reverse(changed, () => this.deps.redo(redoBase))
+        return changed ? Ok(undefined) : Err(NOTHING_LEFT_TO_UNDO_ERROR)
+      },
+      options,
+    )
+    return this.withState(result)
+  }
+
+  /**
+   * Re-applies the step the last {@link undo} took back, unable to reach redo steps that were not
+   * the session's. Refused, at its turn and with nothing changed, while the module has code that
+   * enables output ({@link REDO_OUTPUT_ERROR}) and once an edit by anyone has come since the undo
+   * ({@link NOTHING_TO_REDO_ERROR}). Answers what a further undo or redo could do.
+   */
+  async redo(
+    caller: McpCaller,
+    options: { deadline?: number } = {},
+  ): Promise<Result<HistoryState>> {
+    const result = await this.runUnstepped(
+      caller,
+      () => {
+        if (this.deps.enablesOutput()) return Err(REDO_OUTPUT_ERROR)
+        if (!this.canRedo()) return Err(NOTHING_TO_REDO_ERROR)
+        const undoBase = this.deps.historyDepth().undo
+        const changed = this.deps.redo(this.ownRedoFloor!)
+        // Should be unreachable, as for undo.
+        if (this.deps.enablesOutput()) return this.reverse(changed, () => this.deps.undo(undoBase))
+        return changed ? Ok(undefined) : Err(NOTHING_LEFT_TO_REDO_ERROR)
+      },
+      options,
+    )
+    return this.withState(result)
+  }
+
+  /**
+   * After an `undo` or `redo` that left code enabling output in the module: puts the step back at
+   * once, in the same synchronous run (`back`, bounded to the one step just added), then seals the
+   * history so that the step is not tried again, also when putting it back throws.
+   *
+   * A last resort: the undo and the step put back are two transactions, and each reaches the
+   * engine on its own, so the engine may have seen, and started running, the state between them.
+   * This path must stay unreachable: the pre-check refuses a module with such code, and every step
+   * above the floor was made from one without (the seal and the depth rule keep it so).
+   */
+  private reverse(changed: boolean, back: () => boolean): Result<never> {
+    let failed = false
+    try {
+      if (changed) failed = !back()
+    } catch (error) {
+      console.error('Cannot put back the undo or redo step', error)
+      failed = true
+    } finally {
+      this.seal()
+    }
+    return Err(
+      failed || this.deps.enablesOutput() ? HISTORY_NOT_REVERSED_ERROR : HISTORY_REVERSED_ERROR,
+    )
+  }
+
+  /**
+   * Seals the agents' history at the current step: no agent's `undo` reaches it or what is below,
+   * and nothing is left to redo. A held step stays held, marked sealed, and the floor is raised
+   * when it is released ({@link releaseStep}); with none held, it is raised to the depth now.
+   */
+  private seal(): void {
+    if (this.release != null) {
+      this.sealPending = true
+      return
+    }
+    this.ownFloor = this.deps.historyDepth().undo
+    this.ownRedoFloor = undefined
+  }
+
+  private canUndo(): boolean {
+    return (
+      !this.sealPending && this.ownFloor != null && this.deps.historyDepth().undo > this.ownFloor
+    )
+  }
+
+  private canRedo(): boolean {
+    return (
+      !this.sealPending &&
+      this.ownRedoFloor != null &&
+      this.deps.historyDepth().redo > this.ownRedoFloor
+    )
+  }
+
+  /** The history state, read now (after the action), for a successful run. */
+  private withState(result: Result<EditOutcome<undefined>>): Result<HistoryState> {
+    if (!result.ok) return result
+    return Ok({ can_undo: this.canUndo(), can_redo: this.canRedo() })
+  }
+
+  private enqueue<T>(
+    caller: McpCaller,
+    edit: () => Result<T> | Promise<Result<T>>,
+    options: EditRunOptions<T>,
+    mode: RunMode,
+  ): Promise<Result<EditOutcome<T>>> {
     // `execute` never rejects, so the queue cannot stall.
     const task = this.tail.then(() =>
       this.execute(
@@ -147,19 +422,31 @@ export class EditSession {
         options.affected ?? (() => ({})),
         options.unchanged ?? (() => false),
         options.deadline ?? Infinity,
+        options.awaitsGraphUpdate ?? true,
+        mode,
       ),
     )
     this.tail = task
     return task
   }
 
-  /** Releases the held undo step, if any, and forgets whose it was. The session stays usable. */
+  /**
+   * Releases the held undo step, if any, and forgets whose it was; a sealed step then raises the
+   * floor to the undo depth after the release. The session stays usable.
+   */
   releaseStep(): void {
     this.clearIdleTimer()
     const release = this.release
     this.release = undefined
     this.stepCaller = undefined
-    release?.()
+    try {
+      release?.()
+    } finally {
+      if (this.sealPending) {
+        this.sealPending = false
+        this.seal()
+      }
+    }
   }
 
   /** Releases any held step and stops listening. Safe to call twice. */
@@ -206,12 +493,25 @@ export class EditSession {
     }, EDIT_STEP_IDLE_MS)
   }
 
+  /**
+   * The refusals shared by every run, checked at its turn and again after a version save: Live
+   * mode, and too little time left before the call's deadline (main answers "timed out" at the
+   * deadline: an edit applied after it would be one the caller was told failed, and may retry).
+   */
+  private refusal(remaining: () => number): Result<never> | undefined {
+    if (this.deps.isLive()) return Err(LIVE_EDIT_ERROR)
+    if (remaining() < EDIT_MIN_REMAINING_MS) return Err(TIMED_OUT_BEFORE_RUN_ERROR)
+    return undefined
+  }
+
   private async execute<T>(
     caller: McpCaller,
     edit: () => Result<T> | Promise<Result<T>>,
     affected: (value: T) => AffectedExpressions,
     unchanged: (value: T) => boolean,
     deadline: number,
+    awaitsGraphUpdate: boolean,
+    mode: RunMode,
   ): Promise<Result<EditOutcome<T>>> {
     let watch: ExecutionWatch | undefined
     let graphWatch: GraphUpdateWatch | undefined
@@ -221,36 +521,44 @@ export class EditSession {
       if (!this.deps.isActive()) return Err(NOT_ON_SCREEN_ERROR)
       // The idle period is measured from the end of a run, so none is pending while one runs.
       this.clearIdleTimer()
-      if (this.deps.isLive()) return Err(LIVE_EDIT_ERROR)
-      // Main answers "timed out" at the deadline: an edit applied after it would be one the caller
-      // was told failed, and may retry.
-      if (remaining() < EDIT_MIN_REMAINING_MS) return Err(TIMED_OUT_BEFORE_RUN_ERROR)
-      const key = callerKey(caller)
-      if (this.release == null || this.stepCaller !== key) {
-        this.releaseStep()
-        try {
-          const saved = await this.raceDeadline(
-            this.deps.saveVersion(`Before changes by ${callerLabel(caller)}`),
-            remaining() - EDIT_MIN_REMAINING_MS,
-          )
-          // The save may still finish later; that is harmless.
-          if (!saved) return Err(TIMED_OUT_BEFORE_RUN_ERROR)
-        } catch (error) {
-          return Err(errorText(error))
+      const refused = this.refusal(remaining)
+      if (refused) return refused
+      if (mode.stepped) {
+        const key = callerKey(caller)
+        if (this.release == null || this.stepCaller !== key) {
+          this.releaseStep()
+          try {
+            const saved = await this.raceDeadline(
+              this.deps.saveVersion(`Before changes by ${callerLabel(caller)}`),
+              remaining() - EDIT_MIN_REMAINING_MS,
+            )
+            // The save may still finish later; that is harmless.
+            if (!saved) return Err(TIMED_OUT_BEFORE_RUN_ERROR)
+          } catch (error) {
+            return Err(errorText(error))
+          }
+          if (this.disposed) return Err(PROJECT_CLOSED_ERROR)
+          // The tab may have been switched, or the project put in Live, while the version was saving.
+          if (!this.deps.isActive()) return Err(NOT_ON_SCREEN_ERROR)
+          const refusedAfterSave = this.refusal(remaining)
+          if (refusedAfterSave) return refusedAfterSave
+          this.release = this.deps.holdUndoStep()
+          this.stepCaller = key
+          // Read after the hold, whose boundary closed anything before it.
+          this.stepBase = this.deps.historyDepth().undo
         }
-        if (this.disposed) return Err(PROJECT_CLOSED_ERROR)
-        // The tab may have been switched, or the project put in Live, while the version was saving.
-        if (!this.deps.isActive()) return Err(NOT_ON_SCREEN_ERROR)
-        if (this.deps.isLive()) return Err(LIVE_EDIT_ERROR)
-        if (remaining() < EDIT_MIN_REMAINING_MS) return Err(TIMED_OUT_BEFORE_RUN_ERROR)
-        this.release = this.deps.holdUndoStep()
-        this.stepCaller = key
+      } else {
+        // The held step ends here; a later edit starts a step of its own.
+        this.releaseStep()
       }
       let result: Result<T>
       // Both watches start before the edit: the node database may update during it, and the
       // engine may report the edit's results before the graph update is awaited.
       graphWatch = this.deps.watchGraphUpdate()
       watch = this.deps.watchExecution()
+      // Read at the run's turn, immediately before the edit: whether the module it changes has code
+      // that enables output, which undoing this edit could bring back or run again.
+      const enabledBefore = mode.stepped && this.deps.enablesOutput()
       this.inEdit = true
       try {
         result = await edit()
@@ -258,11 +566,23 @@ export class EditSession {
         this.inEdit = false
       }
       if (!result.ok) return result
+      if (mode.stepped && !unchanged(result.value)) {
+        this.ownFloor ??= this.stepBase
+        this.ownRedoFloor = undefined
+        // The depth rule: the held step is one undo item. Another depth means that something else
+        // changed the history while the edit ran, unseen by the foreign-edit listener.
+        const split = this.deps.historyDepth().undo !== this.stepBase + 1
+        if (split || enabledBefore || this.deps.enablesOutput()) {
+          // Sealed before any wait: a user edit during the waits releases the step, which applies
+          // the seal, and then resets the floor.
+          this.seal()
+        }
+      }
       // Nothing changed, so no graph update or execution will come: the watches are cancelled in
       // `finally`.
       if (unchanged(result.value)) return Ok({ value: result.value, settled: true })
       watch.editApplied()
-      await graphWatch.updated(GRAPH_UPDATE_WAIT_MS)
+      if (awaitsGraphUpdate) await graphWatch.updated(GRAPH_UPDATE_WAIT_MS)
       const settleMs = Math.max(0, Math.min(EDIT_SETTLE_MS, remaining() - EDIT_ANSWER_MARGIN_MS))
       const settled = await watch.settled(affected(result.value), settleMs)
       return Ok({ value: result.value, settled })

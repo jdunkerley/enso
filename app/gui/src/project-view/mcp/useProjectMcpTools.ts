@@ -35,6 +35,7 @@ import {
 } from './editTools'
 import { evaluateExpression } from './evaluate'
 import { findNode, getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
+import { redoTool, undoTool } from './historyTools'
 import { serialized, storeImage, withProjectId, type ImageToolDeps } from './imageTools'
 import {
   arrangeNodes,
@@ -45,6 +46,7 @@ import {
 } from './layoutTools'
 import { createMcpNodes } from './nodeCreation'
 import { panelQuiet } from './panelQuiet'
+import { getProblems, type ProblemToolDeps } from './problemTools'
 import {
   afterGraphUpdate,
   moduleChangedBy,
@@ -52,7 +54,9 @@ import {
   watchExecution,
   watchGraphUpdate,
 } from './projectEvents'
+import { refreshTool } from './refreshTool'
 import { addFunction, collapseNodesTool, type StructureToolDeps } from './structureTools'
+import { saveVersion } from './versionTools'
 import { openMethod, prepareGraphImage, selectNodes, type ViewToolDeps } from './viewTools'
 import { lookupVisualization } from './visualizationRegistry'
 import {
@@ -65,6 +69,7 @@ import {
   type VisualizationSize,
   type VisualizationToolDeps,
 } from './visualizationTools'
+import { writeRefusal } from './writeGuard'
 
 /** Under the main-process MCP server's timeout, so that the window's own error reaches the caller first. */
 const EVALUATE_TIMEOUT_MS = 25_000
@@ -118,9 +123,10 @@ export interface McpEditorDeps {
 }
 
 /**
- * Registers the project tools for the open project: the seven that read (get_graph, get_node,
+ * Registers the project tools for the open project: the eight that read (get_graph, get_node,
  * search_components, get_component_docs, evaluate_expression, list_visualizations,
- * get_documentation), the ten that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
+ * get_documentation, get_problems), the fourteen that edit (undo, redo, save_version, refresh,
+ * add_nodes, edit_node, remove_nodes, set_node_comment,
  * set_documentation, set_visualization, move_nodes, arrange_nodes, collapse_nodes, add_function)
  * and the two that navigate (select_nodes, open_method); the two that main's `get_visualization`
  * calls (get_visualization_data, prepare_visualization), the one main's `add_image` calls
@@ -145,6 +151,14 @@ export function useProjectMcpTools(
    */
   let active = true
 
+  /**
+   * The root of the module in the editor (the project's `Main.enso`), read live from the module
+   * store; undefined while it cannot be read.
+   */
+  function editorModuleRoot(): Ast.Ast | undefined {
+    return currentProject.module.value.ast?.root()
+  }
+
   const session = new EditSession({
     isLive: () => isLive(currentProject.store.value),
     isActive: () => active,
@@ -165,6 +179,16 @@ export function useProjectMcpTools(
         (source, callback) => watch(source, callback, { flush: 'sync' }),
         listener,
       ),
+    historyDepth: () => {
+      const undoManager = currentProject.module.value.undoManager
+      return { undo: undoManager.undoDepth, redo: undoManager.redoDepth }
+    },
+    undo: (floor) => currentProject.module.value.undoManager.undoAbove(floor),
+    redo: (floor) => currentProject.module.value.undoManager.redoAbove(floor),
+    enablesOutput: () => {
+      const root = editorModuleRoot()
+      return root == null || writeRefusal(root) != null
+    },
     saveVersion: (comment) =>
       localVersioning.saveIfEnabled(currentProject.store.value.assetId, comment),
     watchGraphUpdate: () => watchGraphUpdate(currentProject.graph.value),
@@ -201,6 +225,38 @@ export function useProjectMcpTools(
       area: (id) => graph.visibleArea(id),
       // The rectangle and the zoom of the same moment, even during a zoom animation.
       view: () => ({ rect: editor.viewport(), scale: editor.viewportScale() }),
+    }
+  }
+
+  /** `get_problems`' dependencies, read when the call runs. */
+  function problemDeps(): ProblemToolDeps {
+    const graph = currentProject.graph.value
+    const project = currentProject.store.value
+    const source = currentProject.module.value.source
+    const spanOf = (id: Ast.AstId | undefined) => (id != null ? source.getSpan(id) : undefined)
+    return {
+      db: graph.db,
+      currentMethod: graph.currentMethod,
+      // Reads reactive state (the lookup starts the error's small visualization), so that the
+      // wait is told when the text arrives.
+      dataflowErrorMessage: (id) => project.dataflowErrors.lookup(id)?.value?.message,
+      diagnostics: () => project.diagnostics,
+      methodRange: () => {
+        const method = graph.currentMethod.ast
+        return method.ok ? spanOf(method.value.id) : undefined
+      },
+      expressionRange: (id) => spanOf(graph.db.idFromExternal(id)),
+      lineOf: (offset) => {
+        const text = source.text
+        let line = 1
+        for (let i = text.indexOf('\n'); i >= 0 && i < offset; i = text.indexOf('\n', i + 1)) {
+          line++
+        }
+        return line
+      },
+      // The module on screen is the project's `src/Main.enso` (the segments the language server
+      // sends, checked in the packaged app); a diagnostic about another file is not about it.
+      isThisModule: (path) => path == null || path.segments.join('/') === 'src/Main.enso',
     }
   }
 
@@ -560,6 +616,43 @@ export function useProjectMcpTools(
         ...(node_ids != null ? { node_ids } : {}),
       })
     },
+    save_version: async (args, caller) => {
+      const comment = args.comment
+      if (comment != null && typeof comment !== 'string') {
+        return invalidArgument('comment', 'a string')
+      }
+      // Not through the edit session: a version changes no module. `status` is read when the
+      // call runs, and a project whose versions are not kept is refused before `save` is called,
+      // which would otherwise offer to turn them on.
+      const projectId = currentProject.store.value.assetId
+      return saveVersion(
+        {
+          caller,
+          isActive: () => active,
+          status: () => localVersioning.statusOf(projectId),
+          save: (text) => localVersioning.save(projectId, text),
+        },
+        comment != null ? { comment } : {},
+      )
+    },
+    get_problems: async () => getProblems(problemDeps()),
+    refresh: async (_args, caller, deadline) => {
+      const graph = currentProject.graph.value
+      const project = currentProject.store.value
+      return refreshTool({
+        session,
+        caller,
+        deadline,
+        // Read at the run's turn, as the session does.
+        isLive: () => isLive(currentProject.store.value),
+        db: graph.db,
+        // The same module the session checks before undo and redo.
+        moduleRoot: editorModuleRoot,
+        executionContext: project.executionContext,
+      })
+    },
+    undo: async (_args, caller, deadline) => undoTool({ session, caller, deadline }),
+    redo: async (_args, caller, deadline) => redoTool({ session, caller, deadline }),
     collapse_nodes: async (args, caller, deadline) => {
       const { node_ids, name } = args
       if (!isStringArray(node_ids)) return invalidArgument('node_ids', 'a list of strings')

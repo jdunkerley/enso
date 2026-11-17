@@ -91,7 +91,10 @@ export function submenuDropdownStyles(
  * up, and kept there. Unlike an activity dropdown, it is not shifted to stay within the node: a menu
  * wider than the rest of the node would be pushed left, off its anchor, and by a different amount each
  * time the node changes width. Only the screen's edge shifts it. `autoUpdate` moves it with the
- * anchor when the anchor resizes or moves.
+ * anchor when the anchor resizes or moves. There is deliberately no `size` middleware: the activity
+ * dropdowns' one sets the menu's `min-width` to the anchor's width, which made a picker menu grow
+ * with its node (a whole `Date.new` node's menu was 304 px, an unset argument's 200). The menu's
+ * width is its frame's (`PickerMenuFrame.vue`).
  */
 export function pickerMenuStyles(
   floatReference: Ref<Opt<HTMLElement>>,

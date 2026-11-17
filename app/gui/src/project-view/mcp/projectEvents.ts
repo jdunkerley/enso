@@ -28,8 +28,8 @@ export function isUserTransaction(origin: unknown): boolean {
  * Calls `listener` before every module transaction {@link isUserTransaction} accepts, from the
  * module's `beforeTransaction` event: before the change is applied, and so before the undo manager
  * records it (it records in `afterTransaction`). `module()` is read when the module's doc changes
- * (`ast` is replaced with it), so a new doc is listened to as well. Returns the unsubscribe
- * function.
+ * (`ast` is replaced with it), so a new doc is listened to as well, and `listener` is called
+ * then too: the new doc has its own undo stack. Returns the unsubscribe function.
  */
 export function onUserModuleTransaction(
   module: () => Pick<ModuleStore, 'onBeforeEdit' | 'ast'>,
@@ -44,7 +44,15 @@ export function onUserModuleTransaction(
     }).unregister
   }
   subscribe()
-  const stopWatching = watchSource(() => module().ast, subscribe)
+  // A new doc comes with a new undo stack, so whatever the listener knew of the old one is stale:
+  // tell it, as for a foreign edit (not on the first subscribe).
+  const stopWatching = watchSource(
+    () => module().ast,
+    () => {
+      subscribe()
+      listener()
+    },
+  )
   return () => {
     stopWatching()
     unregister()
