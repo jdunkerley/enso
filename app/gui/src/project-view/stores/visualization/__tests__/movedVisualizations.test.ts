@@ -19,3 +19,10 @@ test('the old builtin SQL Query id is read as the Standard.Database one', () => 
     name: 'SQL Query',
   })
 })
+
+test('the old builtin Geo Map id is read as the Standard.Visualization one', () => {
+  expect(canonicalVisualizationId({ module: { kind: 'Builtin' }, name: 'Geo Map' })).toEqual({
+    module: { kind: 'Library', name: 'Standard.Visualization' },
+    name: 'Geo Map',
+  })
+})

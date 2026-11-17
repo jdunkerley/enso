@@ -6,9 +6,18 @@ import viteConfig from './vite.config'
 const config = mergeConfig(
   viteConfig,
   defineConfig({
-    // A library visualization under `distribution/` imports `sql-formatter`; pnpm put no
-    // `node_modules` beside it, so resolve it from this package.
-    resolve: { dedupe: ['sql-formatter'] },
+    resolve: {
+      // A library visualization under `distribution/` imports `sql-formatter`; pnpm put no
+      // `node_modules` beside it, so resolve it from this package.
+      dedupe: ['sql-formatter'],
+      // A library visualization imports the IDE's `builtins` module by that bare name; the run-time
+      // compiler provides it (`compilerMessaging.ts`), and tests resolve it to the same file.
+      alias: {
+        builtins: fileURLToPath(
+          new URL('./src/project-view/util/visualizationBuiltins.ts', import.meta.url),
+        ),
+      },
+    },
     test: {
       // We need to load environment variables locally: https://github.com/vitest-dev/vitest/issues/1148
       // Supposedly, vitest only loads environment variables beginning with VITE_.

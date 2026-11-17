@@ -143,12 +143,13 @@ library, `movedVisualizations.ts` maps the old id to the new one, and
 before the move keep their view. The saved metadata is rewritten only when the
 user changes the visualization.
 
-| Old id                | Now                                             |
-| --------------------- | ----------------------------------------------- |
-| `Builtin` `Image`     | `Library` `Standard.Image`, name `Image`        |
-| `Builtin` `SQL Query` | `Library` `Standard.Database`, name `SQL Query` |
+| Old id                | Now                                                |
+| --------------------- | -------------------------------------------------- |
+| `Builtin` `Image`     | `Library` `Standard.Image`, name `Image`           |
+| `Builtin` `SQL Query` | `Library` `Standard.Database`, name `SQL Query`    |
+| `Builtin` `Geo Map`   | `Library` `Standard.Visualization`, name `Geo Map` |
 
-Add a row when another built-in moves (Geo map → `Standard.Geo` is planned).
+Add a row when another built-in moves.
 
 ## What a library visualization can use
 
@@ -203,6 +204,14 @@ the list widens what every library can rely on, so it is the owner's decision
 - `__tests__/shippedSqlQuery.test.ts` — Standard.Database's SQL Query view
   mounted with sample data: formatting, coloured interpolations, escaping of the
   SQL and of its values, a placeholder-looking name in the SQL, Ctrl+C.
+- `__tests__/shippedGeoMap.test.ts` — Standard.Visualization's Geo Map view with
+  `mapbox-gl` stubbed: the Mapbox token and its empty state, the redacted error
+  log, the Replay block class (`GeoMapVisualization`, which `$/utils/redact`'s
+  `REPLAY_BLOCK_SELECTORS` depends on), and `toGeoJSONs` / `boundingBox` (in
+  place of `@turf/bbox`) against the Enso goldens.
+- `__tests__/shippedGeoMapStyle.test.ts` — the same file compiled with
+  `compileSfc` and mounted in the real `VisualizationHost` custom element: its
+  scoped rules reach the shadow root.
 
 Run from `app/gui`:
 `CI=true corepack pnpm exec vitest run src/project-view/stores/visualization`

@@ -1,6 +1,7 @@
 /**
- * @file The user's Mapbox access token, which the map visualization (`GeoMapVisualization.vue`)
- * gives to Mapbox GL. The user enters it in Settings → Local → Maps (decision 8 of
+ * @file The user's Mapbox access token, which the map visualization (`Geo_Map.vue` in
+ * Standard.Visualization, through `builtins`) gives to Mapbox GL. The user enters it in
+ * Settings → Local → Maps (decision 8 of
  * `docs/superpowers/specs/2026-10-17-local-only-ide-design.md`); it is kept in `localStorage` and
  * sent nowhere but Mapbox. There is no fetch and no refresh: it is the user's own token.
  */

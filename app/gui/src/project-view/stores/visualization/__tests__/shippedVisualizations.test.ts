@@ -25,6 +25,12 @@ describe('visualizations shipped by the standard libraries', () => {
     )
   })
 
+  test('Standard.Visualization ships the Geo Map visualization', () => {
+    expect(shipped.map((s) => `${s.lib}/${path.basename(s.file)}`)).toContain(
+      'Visualization/Geo_Map.vue',
+    )
+  })
+
   test.each(shipped)('$lib/$name compiles with the run-time compiler', ({ file }) => {
     expect(() => compileSfc(readFileSync(file, 'utf8'), path.basename(file))).not.toThrow()
   })
