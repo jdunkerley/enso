@@ -499,7 +499,24 @@ async function showAll(page: Page, targets: Locator) {
 export async function showSelectedComponent(page: Page) {
   const selected = page.locator('.GraphNode.selected')
   await expect(selected).toHaveCount(1)
+  await showHiddenParameters(page, selected)
   await showAll(page, selected)
+}
+
+/**
+ * Add every parameter the selected component hides, through its `…` menu. Selecting a component
+ * does not show them (#836), and the exercises fill them in. Does nothing when there is no `…`.
+ */
+async function showHiddenParameters(page: Page, selected: Locator) {
+  const button = selected.locator('.parameterMenuButton')
+  const menu = page.getByRole('dialog', { name: 'More parameters' })
+  while ((await button.count()) > 0) {
+    await button.first().click()
+    const names = await menu.locator('.parameterItem .name').allTextContents()
+    if (names.length === 0) return
+    await menu.getByRole('button', { name: new RegExp(`^${names[0]}`) }).click()
+    await expect(menu).toBeHidden()
+  }
 }
 
 /**
