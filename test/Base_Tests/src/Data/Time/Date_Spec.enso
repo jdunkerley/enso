@@ -2,6 +2,7 @@ from Standard.Base import all
 import Standard.Base.Errors.Common.Incomparable_Values
 import Standard.Base.Errors.Common.Type_Error
 import Standard.Base.Errors.Time_Error.Time_Error
+from Standard.Base.Data.Time.Date import make_period_selector
 import Standard.Base.Runtime.Debug
 
 from Standard.Test import all
@@ -152,6 +153,25 @@ spec_with suite_builder name create_new_date parse_date pending=Nothing =
             time-Date_Period.Month . should_equal <| create_new_date 1969 12
             time-Date_Period.Week . should_equal <| create_new_date 1969 12 25
             time-Date_Period.Day . should_equal <| create_new_date 1969 12 31
+
+        group_builder.specify "+ and - take an autoscoped Date_Period, as their dropdown writes it" <|
+            d = create_new_date 1970
+            (d + ..Day) . should_equal <| create_new_date 1970 1 2
+            (d - ..Month) . should_equal <| create_new_date 1969 12
+            (d.+ ..Week) . should_equal <| create_new_date 1970 1 8
+            (d.- ..Year) . should_equal <| create_new_date 1969
+            (d + ..Quarter) . should_equal <| create_new_date 1970 4
+
+        group_builder.specify "up_to and down_to take an autoscoped step" <|
+            d = create_new_date 2021 12 5
+            (d.up_to (create_new_date 2022 1 1) step=..Week).to_vector . should_equal [d, create_new_date 2021 12 12, create_new_date 2021 12 19, create_new_date 2021 12 26]
+            (d.down_to (create_new_date 2021 11 1) step=..Month).to_vector . should_equal [d, create_new_date 2021 11 5]
+
+        group_builder.specify "the amount and step dropdown writes each Date_Period autoscoped, then Period.new" <|
+            widget = make_period_selector
+            widget.values.map .label . should_equal ["..Year", "..Quarter", "..Month", "..Week", "..Day", "Period.new"]
+            widget.values.first.value . should_equal "..Year"
+            widget.values.last.value . should_equal "(Period.new)"
 
         group_builder.specify "should support mixed addition and subtraction of Date_Period" <|
             time = create_new_date 1970
