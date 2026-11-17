@@ -15,7 +15,8 @@ import { findNode, jsonResult } from './graphTools'
 export const OPEN_METHOD_WAIT_MS = 5_000
 export const NOT_ENTERABLE_ERROR = 'That node is not a component defined in this project.'
 export const ALREADY_AT_TOP_ERROR = 'Already at the top level.'
-const NO_METHOD_ERROR = 'The graph editor shows no method now. Call get_graph.'
+/** The answer when the graph editor shows no method. */
+export const NO_METHOD_ERROR = 'The graph editor shows no method now. Call get_graph.'
 
 export interface ViewToolDeps {
   readonly db: GraphDb

@@ -7,6 +7,8 @@
   component for the entry (Shift+Enter for every entry beside it), and the
   context-menu key or Shift+F10 opens the entry's menu, which the arrow keys and
   Escape drive too.][822]
+- [Agents connected over MCP can switch between open projects, read and rewrite
+  a workflow's or a function's documentation, and add images to it.][825]
 - [Libraries can provide their own visualizations][817]: a `.vue` file in a
   library's `visualizations/` folder appears in the view picker once the library
   is imported, and `Standard.Image` now ships the Image view this way.
@@ -541,6 +543,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [822]: https://github.com/jdunkerley/enso/pull/822
+[825]: https://github.com/jdunkerley/enso/pull/825
 [829]: https://github.com/jdunkerley/enso/pull/829
 [817]: https://github.com/jdunkerley/enso/pull/817
 [809]: https://github.com/jdunkerley/enso/pull/809
