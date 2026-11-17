@@ -19,8 +19,10 @@ const SDK_PROCESSING_METADATA = 'sdkProcessingMetadata'
 
 /**
  * Elements Sentry Replay must not record at all: neither their attributes nor their children. The
- * map visualization is one, as Mapbox GL writes the access token into a link's `href` inside it.
- * Each such element also carries `data-sentry-block`, Replay's own marker, as a second safeguard.
+ * map visualization (`Geo_Map.vue` in Standard.Visualization) is one, as Mapbox GL writes the
+ * access token into a link's `href` inside it; its root element's class must stay
+ * `GeoMapVisualization`. Each such element also carries `data-sentry-block`, Replay's own marker, as
+ * a second safeguard.
  */
 export const REPLAY_BLOCK_SELECTORS: readonly string[] = ['.GeoMapVisualization']
 

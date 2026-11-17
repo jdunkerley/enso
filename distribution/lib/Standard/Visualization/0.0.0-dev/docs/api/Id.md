@@ -3,7 +3,6 @@
 - type Id
     - Builtin name:Standard.Base.Any.Any
     - Library library:Standard.Base.Any.Any name:Standard.Base.Any.Any
-    - geo_map -> Standard.Base.Any.Any
     - json -> Standard.Base.Any.Any
     - scatter_plot -> Standard.Base.Any.Any
     - table -> Standard.Base.Any.Any

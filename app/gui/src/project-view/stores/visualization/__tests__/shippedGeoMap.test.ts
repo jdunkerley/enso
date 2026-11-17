@@ -1,13 +1,23 @@
-/** @file The map visualization needs the user's Mapbox token, and says where to set it. */
+/** @file The Geo Map that Standard.Visualization ships needs the user's Mapbox token, and says where to set it. */
 import { mapboxSettingsStore } from '$/providers/mapboxToken'
 import { useText } from '$/providers/text'
 import { replayPrivacyOptions } from '$/utils/redact'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
+import { pinnedDir } from '@/components/visualizations/__tests__/pinnedGoldens'
 import { flushPromises } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import GeoMapVisualization from '../GeoMapVisualization.vue'
+import GeoMapVisualization, {
+  boundingBox,
+  dataType,
+  defaultPreprocessor,
+  name,
+  toGeoJSONs,
+} from '../../../../../../../distribution/lib/Standard/Visualization/0.0.0-dev/visualizations/Geo_Map.vue'
 
-vi.mock('@/util/visualizationBuiltins', () => ({
+vi.mock('@/util/visualizationBuiltins', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/util/visualizationBuiltins')>()),
   useVisualizationConfig: () => ({
     size: { x: 200, y: 200 },
     setToolbarOverlay: vi.fn(),
@@ -112,5 +122,67 @@ describe('the map visualization', () => {
     })
     expect(JSON.stringify(log.mock.calls)).not.toContain('pk.secret')
     log.mockRestore()
+  })
+})
+
+test('it is the Geo Map view of anything that converts to Viz_Table', () => {
+  expect(name).toBe('Geo Map')
+  expect(dataType).toBe('Standard.Visualization.Viz_Table.Viz_Table')
+  expect(defaultPreprocessor).toEqual(['Standard.Visualization.Geo_Map', 'process_to_json_text'])
+})
+
+describe('the bounding box (in place of @turf/bbox)', () => {
+  const golden = (file: string) => JSON.parse(readFileSync(path.join(pinnedDir, file), 'utf8'))
+
+  test('of a table of places is the box around them', () => {
+    expect(toGeoJSONs(golden('geo_mem_table.json')).map(boundingBox)).toEqual([
+      [-0.1, 48.8, 2.3, 51.5],
+    ])
+  })
+
+  test('of values that are not a map is nothing', () => {
+    expect(toGeoJSONs(golden('geo_vector.json'))).toEqual([])
+    expect(toGeoJSONs(golden('geo_mem_table_nothing_known.json'))).toEqual([])
+    expect(toGeoJSONs(golden('geo_connection.json'))).toEqual([])
+  })
+
+  test('covers points, lines, polygons and collections, ignoring heights', () => {
+    expect(
+      boundingBox({
+        type: 'GeometryCollection',
+        geometries: [
+          { type: 'Point', coordinates: [1, 2, 99] },
+          {
+            type: 'LineString',
+            coordinates: [
+              [-3, 4],
+              [5, -6],
+            ],
+          },
+          {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [0, 0],
+                [10, 0],
+                [10, 7],
+                [0, 0],
+              ],
+            ],
+          },
+        ],
+      }),
+    ).toEqual([-3, -6, 10, 7])
+    expect(
+      boundingBox({
+        type: 'FeatureCollection',
+        features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [4, 5] } }],
+      }),
+    ).toEqual([4, 5, 4, 5])
+  })
+
+  test('of an empty layer is undefined, so the map is not fitted to it', () => {
+    expect(boundingBox({ type: 'FeatureCollection', features: [] })).toBeUndefined()
+    expect(boundingBox({ type: 'Feature', geometry: null })).toBeUndefined()
   })
 })

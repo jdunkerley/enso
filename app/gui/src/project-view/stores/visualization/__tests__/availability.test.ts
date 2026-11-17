@@ -3,7 +3,6 @@ import {
   makeArgument,
   makeMethod,
 } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
-import * as geoMapVisualization from '@/components/visualizations/GeoMapVisualization.vue'
 import * as scatterplotVisualization from '@/components/visualizations/ScatterplotVisualization.vue'
 import * as tableVisualization from '@/components/visualizations/TableVisualization.vue'
 import {
@@ -17,6 +16,7 @@ import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
 import { assert, expect, test } from 'vitest'
 import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
 import * as sqlQueryVisualization from '../../../../../../../distribution/lib/Standard/Database/0.0.0-dev/visualizations/SQL_Query.vue'
+import * as geoMapVisualization from '../../../../../../../distribution/lib/Standard/Visualization/0.0.0-dev/visualizations/Geo_Map.vue'
 
 const VIZ_TABLE = 'Standard.Visualization.Viz_Table.Viz_Table'
 
@@ -40,7 +40,7 @@ const registered: [VisualizationIdentifier['module'], Registered][] = [
   [BUILTIN, tableVisualization],
   [BUILTIN, scatterplotVisualization],
   [{ kind: 'Library', name: 'Standard.Database' }, sqlQueryVisualization],
-  [BUILTIN, geoMapVisualization],
+  [{ kind: 'Library', name: 'Standard.Visualization' }, geoMapVisualization],
 ]
 for (const [module, { name, inputType, dataType, icon }] of registered) {
   metadata.set(toVisualizationId({ module, name }), {
