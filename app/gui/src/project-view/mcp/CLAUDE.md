@@ -558,6 +558,31 @@ from `useCurrentProject()`):
   uses `afterGraphUpdate`: nothing it does is awaited before it queues.)
 - `watchExecution` → `watchExecution(executionContext)` (`projectEvents.ts`).
 
+## History, versions, problems and refresh (`historyTools.ts`, `versionTools.ts`, `problemTools.ts`, `refreshTool.ts`)
+
+Pure functions over deps, wired in `useProjectMcpTools.ts`; unit tests beside
+the others.
+
+- **`undo` / `redo`**: `session.undo` / `session.redo` (see "The unstepped path
+  and the agents' own history" above for the floor). **Why own-history is safe
+  for Write**: every step above `ownFloor` holds only transactions made inside a
+  session run, because any other transaction resets the floor; a run never adds
+  the Write prefix, never edits or collapses a Write-on node, and the edit that
+  removes one seals the history. So undo and redo cannot make a node with Write
+  on appear. The packaged spec removes a Write-on node and shows `undo` refused.
+- **`save_version`**: `localVersioning` through the session's deps; never turns
+  versioning on, no node changes, works in Live.
+- **`get_problems`**: reads `db.getExpressionInfo` per node, the dataflow error
+  texts (`dataflowErrors.lookup`, waited for at most `PROBLEM_TEXT_WAIT_MS`) and
+  `projectStore.diagnostics`. SETTLING_NOTE_PROBLEMS
+- **`refresh`**: `runUnstepped` with `executionContext.recompute('all')` (no
+  second argument: never `'Live'`, never per-expression configs, never
+  `recomputeOnce`). Refused in Live, and at the run's turn when
+  `writeRefusal(moduleRoot)` refuses or any node of the method has
+  `prefixes.enableRecording`: the standard Write prefix contains
+  `with_enabled_context`, so a Write-on node anywhere in the module refuses it.
+  SETTLING_NOTE_REFRESH
+
 ## When an edit has settled
 
 `settled: true` means the engine has reported results for the nodes the edit

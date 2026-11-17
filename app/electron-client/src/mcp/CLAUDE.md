@@ -345,6 +345,35 @@ history and the routes review found (all now refused) are in
 descriptions (`WRITE_RULE` in `projectTools.ts`) and the guides tell the agent
 the same, and name the two ways its edits can still cause a write.
 
+## History, versions, problems and refresh
+
+Five more project tools (definitions in `projectTools.ts`, handlers in
+`app/gui/src/project-view/mcp/`: `historyTools.ts`, `versionTools.ts`,
+`problemTools.ts`, `refreshTool.ts`):
+
+- **`undo` / `redo`** go through the edit session without an undo step or a
+  saved version. `undo` takes back one step of agents' edits and only those made
+  since the user last changed the project (a user edit, their own Ctrl+Z
+  included, ends the agents' history), and is refused when there is none. It
+  never brings back a node with Write on: `remove_nodes` of such a node closes
+  the history above itself, so `undo` is refused afterwards. `redo` re-applies
+  only what `undo` took back, until anyone edits. Both are refused in Live.
+  **Why this is safe for Write**: every step they can reach was made inside a
+  session run, and no run adds the Write prefix, edits or collapses a Write-on
+  node, so neither direction can make one appear (`editSession.ts` file
+  comment).
+- **`save_version`** saves a version as the user's Save a version does; it never
+  turns versioning on (refused when it is off), changes no node, and works in
+  Live.
+- **`get_problems`** reads the errors, panics and warnings of the method on
+  screen and the module's compile diagnostics. `origin: true` marks the node to
+  fix first; the agent calls again while `pending` is not 0. Reads only; works
+  in Live.
+- **`refresh`** computes every node again in Design (`recompute('all')` with no
+  environment argument), never turns Write on, and is refused in Live and when
+  the module has a node with Write on or code that enables output, because the
+  refresh would run it and write again; the agent asks the user to refresh.
+
 ## The caller checks
 
 Any local process can reach a loopback port, and a web page in the user's
