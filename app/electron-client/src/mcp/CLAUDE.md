@@ -352,16 +352,21 @@ Five more project tools (definitions in `projectTools.ts`, handlers in
 `problemTools.ts`, `refreshTool.ts`):
 
 - **`undo` / `redo`** go through the edit session without an undo step or a
-  saved version. `undo` takes back one step of agents' edits and only those made
-  since the user last changed the project (a user edit, their own Ctrl+Z
-  included, ends the agents' history), and is refused when there is none. It
-  never brings back a node with Write on: `remove_nodes` of such a node closes
-  the history above itself, so `undo` is refused afterwards. `redo` re-applies
-  only what `undo` took back, until anyone edits. Both are refused in Live.
-  **Why this is safe for Write**: every step they can reach was made inside a
-  session run, and no run adds the Write prefix, edits or collapses a Write-on
-  node, so neither direction can make one appear (`editSession.ts` file
-  comment).
+  saved version. `undo` takes back the most recent step of edits made by any
+  connected agent, and only those made since the user last changed the project
+  (a user edit, their own Ctrl+Z included, ends the agents' history); it is
+  refused when there are none. A step is usually every edit made without a 10 s
+  pause, but one `undo` may take back only part of it. `redo` re-applies only
+  what `undo` took back, until anyone edits. Neither waits for the engine: the
+  answer has no `settled`. **The rule** (an agent never causes a write the user
+  did not click for): both are refused while the project's main module has code
+  that enables output, and an edit made while it has some (removing it included)
+  cannot be undone by an agent. A change that does not go through the undo
+  manager (the file changed on disk) cannot make one `undo` reach the user's
+  steps: the session undoes above a floor. Not checked: the project's other
+  modules, library functions that enable output themselves, `foreign` code. The
+  details, the invariant and its limits are under "History" in
+  `app/gui/src/project-view/mcp/CLAUDE.md`. Both are refused in Live.
 - **`save_version`** saves a version as the user's Save a version does; it never
   turns versioning on (refused when it is off), changes no node, and works in
   Live.
@@ -371,8 +376,11 @@ Five more project tools (definitions in `projectTools.ts`, handlers in
   in Live.
 - **`refresh`** computes every node again in Design (`recompute('all')` with no
   environment argument), never turns Write on, and is refused in Live and when
-  the module has a node with Write on or code that enables output, because the
-  refresh would run it and write again; the agent asks the user to refresh.
+  the code of the project's main module (`Main.enso`, the module the graph
+  shows) enables output anywhere, because the refresh would run it and write
+  again; the agent asks the user to refresh. Its description and the guide say
+  what is not checked: other modules, library functions that enable output
+  themselves, `foreign` code.
 
 ## The caller checks
 
@@ -544,20 +552,26 @@ one and stays as it is until the chat PR replaces the AI mode and removes it.
   false), on a compile error (its diagnostic's `line` is the 1-based line of
   `Main.enso`), `refresh` (answers `settled: true`, also inside a function with
   an argument), `undo` and `redo` of a step, `save_version` (refused: versions
-  are off in a new project), and the Write rule: a node with Write on, typed in
-  the Component Browser as the user would (it really writes its file,
-  appending), makes `refresh` refuse and the file is not written again (content
-  and modification time unchanged after 8 s); then `remove_nodes` of that node
-  closes the history, so `undo` is refused and the node does not come back, and
-  a `refresh` is allowed again and still writes nothing. The GUI's own Write
-  prefix (`Context.Output __ <| __`, `util/ast/node.ts`) does not run on this
-  engine, whose `with_enabled_context` takes two parameters (it fails with
-  "Method `<|` of type Text could not be found"), so the node's text puts the
-  write in the prefix's first hole (`WRITE_ON_CODE` in the spec). None of the
-  three can check the Live-mode refusals: nothing in the UI switches a project
-  to Live (the project's `executionMode` setting is only read from its
-  settings), so `app/gui/src/project-view/mcp/__tests__/` covers them. The GUI
-  side has its own Playwright specs:
-  `app/gui/integration-test/project-view/mcpEdit.spec.ts`,
+  are off in a new project), and the Write rule, against a node that really
+  writes: the user (the test, typing in the Component Browser) makes a node with
+  `Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| "w".write …`
+  (the two-argument form; it appends to its file each time it runs), and the
+  test checks that (a) it wrote once; (b) `refresh` is refused and the file's
+  content and modification time are unchanged after 8 s; (c) after an agent's
+  `add_nodes` elsewhere `undo` is refused (code that enables output) and the
+  edit stays; (d) after `remove_nodes` of the write node `undo` is refused, the
+  node does not come back and the file is unchanged; (e) with the code gone an
+  agent's node is undone and redone and `refresh` answers
+  `refreshed: true, settled: true`, the file still unchanged. The control: the
+  user makes the node again and the file changes, so the checks would have seen
+  a write. The GUI's own Write prefix (`Context.Output __ <| __`,
+  `util/ast/node.ts`) does not run on this engine, whose `with_enabled_context`
+  takes two parameters ("Method `<|` of type Text could not be found"), so the
+  test does not use it (a known defect,
+  `app/gui/src/project-view/mcp/CLAUDE.md`). None of the three can check the
+  Live-mode refusals: nothing in the UI switches a project to Live (the
+  project's `executionMode` setting is only read from its settings), so
+  `app/gui/src/project-view/mcp/__tests__/` covers them. The GUI side has its
+  own Playwright specs: `app/gui/integration-test/project-view/mcpEdit.spec.ts`,
   `project-view/mcpDocumentation.spec.ts` and
   `integration-test/dashboard/mcpApp.spec.ts`.

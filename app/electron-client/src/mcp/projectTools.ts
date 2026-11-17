@@ -88,7 +88,7 @@ const EDIT_RULES =
   ' Refused while the project is in Live mode, and, with nothing changed, when the method on ' +
   'screen changed before the edit ran (call `get_graph` and try again). Your run of changes is ' +
   'one undo step for the user, until you pause for 10 seconds, the user edits or leaves the ' +
-  "project's tab, or `open_method` changes the method; `undo` takes the step back. The project is " +
+  "project's tab, or `open_method` changes the method; `undo` takes it back. The project is " +
   'saved as it is edited. ' +
   WRITE_RULE +
   ' `settled: true`: the engine has reported results for the changed nodes, so the types ' +
@@ -450,15 +450,20 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
     },
     {
       name: 'undo',
-      title: 'Undo your last edits',
+      title: "Undo the agents' last edits",
       description:
-        'Take back one step of the edits made by agents: a step is every edit an agent made ' +
-        "without a 10 second pause. It never undoes the user's work: it takes back only " +
-        "agents' edits made since the user last changed the project, and is refused when there " +
-        'is none. Refused while the project is in Live mode. Returns `undone`, `can_undo` and ' +
-        '`can_redo` (whether another call would do something) and `settled` (see the edit ' +
-        'tools). Call `get_graph` afterwards to see the graph: nodes that come back have the ' +
-        'ids they had before.',
+        'Take back the most recent step of edits made by any connected agent, not only yours. ' +
+        'A step is usually every edit made without a 10 second pause, but one `undo` may take ' +
+        'back only part of it: check `can_undo` and call `get_graph`. It does not go past the ' +
+        "user's last change: it takes back only agents' edits made since the user last changed " +
+        'the project, and is refused when there are none. Refused while the project is in Live ' +
+        "mode, and while the project's main module has code that enables output (such as " +
+        '`with_enabled_context`, in any node or function), because ' +
+        'undoing could run that code and write: ask the user to undo with Ctrl+Z then. Returns ' +
+        '`undone`, `can_undo` and `can_redo` (whether another call would do something). It does ' +
+        'not wait for the engine: values may still be computing, so call `get_graph`, where a ' +
+        'node still computing has `state` `pending`. Nodes that come back have the ids they ' +
+        'had before.',
       inputSchema: {},
       run: forward('undo', EDIT_TOOL_TIMEOUT_MS),
     },
@@ -466,10 +471,14 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       name: 'redo',
       title: 'Redo what undo took back',
       description:
-        'Re-apply the step the last `undo` took back. Refused when there is nothing to redo: ' +
-        'an edit by anyone since the `undo` ends it. Refused while the project is in Live mode. ' +
-        'Returns `redone`, `can_undo`, `can_redo` and `settled`. Call `get_graph` afterwards ' +
-        'to see the graph.',
+        'Re-apply what `undo` took back, a step at a time. Refused when there is nothing to ' +
+        'redo: an edit by anyone since the `undo` ends it. Refused while the project is in Live ' +
+        "mode, and while the project's main module has code that enables output (such as " +
+        '`with_enabled_context`, in any node or function), because ' +
+        'redoing could run that code and write: ask the user to redo with Ctrl+Y then. Returns ' +
+        '`redone`, `can_undo` and `can_redo`. It does not wait for the engine: values may still ' +
+        'be computing, so call `get_graph`, where a node still computing has ' +
+        '`state` `pending`.',
       inputSchema: {},
       run: forward('redo', EDIT_TOOL_TIMEOUT_MS),
     },
@@ -500,9 +509,12 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         "Compute every node again in Design mode, as the user's Refresh button does, reading " +
         'files and data sources again. Use it after the user changed a file or a table outside ' +
         'the IDE. It never turns Write on and never runs a node in Live: it is refused while ' +
-        'the project is in Live mode, and when the project has a node the user switched Write ' +
-        'on for or code that enables output, because a refresh would run it (ask the user to ' +
-        'refresh then). It changes no node and joins no undo step; it ends yours. Returns ' +
+        "the project is in Live mode, and when the project's main module (the module the graph " +
+        'shows) has code that enables output anywhere (the forms the edit tools refuse, such as ' +
+        '`with_enabled_context`), because a refresh would run it and write again (ask the user to ' +
+        "refresh then). It does not check the project's other modules, library functions that " +
+        'turn output on themselves, or `foreign` code: do not refresh a project that writes ' +
+        'through them. It changes no node and joins no undo step; it ends yours. Returns ' +
         '`refreshed` and `settled`: whether the engine reported every computed node of the function on ' +
         'screen again in time. Call `get_graph` or `get_problems` afterwards.',
       inputSchema: {},

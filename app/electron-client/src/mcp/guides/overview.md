@@ -131,14 +131,20 @@ No tool changes the execution environment, settings or secrets;
     method; then the next edit starts a new step. Edits from several agents run
     one at a time. An edit whose turn comes after the method on screen changed
     is refused with nothing changed: call `get_graph` and try again.
-12. `undo` takes back one step of the edits agents made, and `redo` re-applies
-    the step the last `undo` took back. They never go through the user's work:
-    `undo` only takes back agents' edits made since the user last changed the
-    project (any edit of the user's, their own Ctrl+Z included, ends that), and
-    is refused when there is none. `undo` never brings back a node with Write
-    on: removing one with `remove_nodes` closes the history, so after it `undo`
-    is refused. `redo` only re-applies what `undo` took back, until anyone edits
-    again. Both answer `can_undo` and `can_redo`; call `get_graph` afterwards.
+12. `undo` takes back the most recent step of edits made by any connected agent,
+    not only yours, and `redo` re-applies what `undo` took back. A step is
+    usually every edit made without a 10 second pause, but one `undo` may take
+    back only part of it: check `can_undo` and call `get_graph`. `undo` does not
+    go past the user's last change: it takes back only agents' edits made since
+    the user last changed the project (any edit of the user's, their own Ctrl+Z
+    included, ends that), and is refused when there are none. `redo` only
+    re-applies what `undo` took back, until anyone edits again. Both are refused
+    while the project's main module has code that enables output, because
+    undoing or redoing could run it and write; and an edit you make while such
+    code is there, removing it included, cannot be undone by an agent. Ask the
+    user to undo with Ctrl+Z then. Neither waits for the engine: both answer
+    `can_undo` and `can_redo`, and the values may still be computing, so call
+    `get_graph` afterwards (a node still computing has `state` `pending`).
 13. Check and mend what you built. `get_problems` lists every error and warning
     of the method on screen in one call. Fix the nodes with `origin: true` first
     (the nodes that use them have the same error and usually clear by
@@ -148,9 +154,12 @@ No tool changes the execution environment, settings or secrets;
     module. `refresh` computes every node again in Design, as the user's Refresh
     button does, reading files and data sources again: use it after the user
     changed a file or a table outside the IDE. It never turns Write on. It is
-    refused in Live mode, and when the module has a node with Write on or code
-    that enables output, because the refresh would run it and write again: ask
-    the user to refresh then. `save_version` saves a version of the project, as
+    refused in Live mode, and when the code of the project's main module (the
+    module the graph shows) enables output anywhere, because the refresh would
+    run it and write again: ask the user to refresh then. It checks only that
+    module's code: not the project's other modules, not library functions that
+    turn output on themselves, and not `foreign` code. Do not refresh a project
+    that writes through them. `save_version` saves a version of the project, as
     the user's Save a version does, with a one-line `comment`. It answers
     `saved: false` when nothing changed, and is refused when the user has not
     turned versions on: it never turns them on.

@@ -44,11 +44,15 @@ really well. Let's still remove the ai bit." What that changes in this document:
     visualization.
 - **History, versions, problems and refresh** (owner's follow-on list,
   2026-11-16; plan `2026-11-17-mcp-history-and-problems.md`):
-  - `undo` and `redo` take back and re-apply the agents' own steps only. The
-    rule: `undo` moves only through agents' edits made since the user last
-    changed the project, and never brings back a node with Write on (removing
-    one closes the history); `redo` re-applies only what `undo` took back. That
-    is why they cannot cause a write. Both are refused in Live.
+  - `undo` and `redo` take back and re-apply the agents' own steps only: `undo`
+    moves only through agents' edits made since the user last changed the
+    project, and `redo` re-applies only what `undo` took back. The rule that
+    keeps them from causing a write (review of #844): an agent never causes a
+    write of a node's output that the user did not click for, so both are
+    refused while the project's main module has code that enables output, and an
+    agent's edit made while it has some cannot be undone by an agent. Not
+    covered: other modules, library functions that enable output themselves,
+    `foreign` code. Both are refused in Live.
   - `save_version` saves a version as the user's Save a version does and never
     turns versioning on.
   - `get_problems` lists every error and warning of the function on screen, with
@@ -57,8 +61,8 @@ really well. Let's still remove the ai bit." What that changes in this document:
   - `refresh` computes every node again in Design, as the Refresh button does.
     "Let's do refresh but not run as that would trigger the write tools. I want
     the user to have to do that themselves": it never turns Write on, and is
-    refused in Live and when the module has a node with Write on or code that
-    enables output; the agent asks the user to refresh.
+    refused in Live and when the code of the project's main module enables
+    output; the agent asks the user to refresh.
 
 ## Summary
 

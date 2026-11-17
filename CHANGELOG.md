@@ -4,8 +4,8 @@
 
 - [Agents connected over MCP can undo and redo their own edits, save a version,
   list every error and warning of a function in one call, and refresh the
-  values. They never turn Write on: a refresh is refused where it would
-  write.][844]
+  values. They never turn Write on: undo and refresh are refused while the
+  project's code turns output on.][844]
 - [Agents connected over MCP can arrange and move nodes, resize a visualization,
   and take a picture of the graph.][831]
 - [A Boolean argument shows its value next to the checkbox, and a dropdown under
