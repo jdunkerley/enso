@@ -117,7 +117,12 @@ test('choosing SQLite in the format dropdown adds its import; one undo removes b
 }) => {
   await editorPage
   const node = await dataReadNode(page)
-  await node.click()
+  // `format` is hidden by default: the `…` menu adds it.
+  await node.locator('.parameterMenuButton').click()
+  await page
+    .getByRole('dialog', { name: 'More parameters' })
+    .getByRole('button', { name: /^format/ })
+    .click()
   const formatArg = node
     .locator('.WidgetTopLevelArgument')
     .filter({ has: page.getByText('format') })

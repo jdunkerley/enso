@@ -1,4 +1,4 @@
-import { expect, type Page } from 'integration-test/base'
+import { expect, type Locator, type Page } from 'integration-test/base'
 import { mockMethodCallInfo } from './expressionUpdates'
 import * as locate from './locate'
 import { graphNodeByBinding } from './locate'
@@ -36,6 +36,25 @@ export async function openVisualization(page: Page, visName: string) {
 // ===============
 // === Widgets ===
 // ===============
+
+/**
+ * Show a node's hidden arguments: pick every parameter the `…` menu offers. Selecting a node does
+ * not show them (#836).
+ */
+export async function showHiddenArguments(page: Page, node: Locator) {
+  const button = node.locator('.parameterMenuButton')
+  const menu = page.getByRole('dialog', { name: 'More parameters' })
+  await expect(button.first()).toBeVisible()
+  await button.first().click()
+  const names = await menu.locator('.parameterItem .name').allTextContents()
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  for (const name of names) {
+    await button.first().click()
+    await menu.getByRole('button', { name: new RegExp(`^${name}`) }).click()
+    await expect(menu).toBeHidden()
+  }
+}
 
 /**
  * Create a Node with Table Input Widget.

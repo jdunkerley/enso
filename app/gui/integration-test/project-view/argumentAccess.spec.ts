@@ -73,6 +73,28 @@ test.describe('The … menu of hidden parameters', () => {
     await expect(menu.getByRole('button', { name: /^format/ })).toHaveCount(0)
   })
 
+  test('selecting a node does not show hidden arguments, and keeps the button', async ({
+    page,
+    editorPage,
+  }) => {
+    const { data } = await nodes(editorPage, page)
+    const args = data.locator('.WidgetTopLevelArgument')
+    await expect(args).toHaveCount(1)
+    await data.click({ position: { x: 8, y: 8 } })
+    await expect(data).toBeSelected()
+    await expect(args).toHaveCount(1)
+    await expect(data.locator('.parameterMenuButton')).toBeVisible()
+    // An argument the user set stays shown.
+    await data.locator('.parameterMenuButton').click()
+    await page
+      .getByRole('dialog', { name: 'More parameters' })
+      .getByRole('button', { name: /^format/ })
+      .click()
+    await expect(args).toHaveCount(2)
+    await actions.clickAtBackground(page)
+    await expect(args).toHaveCount(2)
+  })
+
   test('Escape, and a click on a node, close the menu; one menu is open at a time', async ({
     page,
     editorPage,

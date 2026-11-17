@@ -128,7 +128,7 @@ export class ArgumentPlaceholder extends Argument {
     return value == null || isRequiredArgument(this.argInfo) ? undefined : value
   }
 
-  /** Whether the argument should be hidden when the component isn't currently focused for editing. */
+  /** Whether the argument is hidden: an unset argument with a default (the `…` menu adds it). */
   override get hideByDefault(): boolean {
     return (
       this.argInfo.hasDefault &&
