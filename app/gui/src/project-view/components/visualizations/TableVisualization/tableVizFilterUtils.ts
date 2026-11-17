@@ -7,7 +7,13 @@ export type FilterType = 'number' | 'date' | 'set' | 'text'
  * - For 'is in' filtering, the filter value is a list of strings.
  * - For range filtering, the filter value consists of two values that define the range.
  */
-export type FilterValue = string | string[] | FilterValueRange
+export type FilterValue = string | SetFilterValues | FilterValueRange
+
+/**
+ * The values a set filter picked, as the engine listed them: a Boolean column's are JSON Booleans,
+ * not text (#778).
+ */
+export type SetFilterValues = Array<string | boolean>
 
 export const actionMap = {
   equals: '..Equal',
@@ -31,7 +37,7 @@ export type GridFilterModel = {
   filterTo?: string
   dateFrom?: string
   dateTo?: string
-  values?: string[]
+  values?: SetFilterValues
   filterAction?: FilterAction
 }
 export type FilterValueRange = {

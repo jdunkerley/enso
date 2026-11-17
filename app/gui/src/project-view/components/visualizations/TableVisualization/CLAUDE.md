@@ -22,12 +22,18 @@ The table visualisation (`../TableVisualization.vue`) and its helpers.
   and a page settled empty showed "No Rows To Show" (#777, Note [Row Pages Wait
   For The Engine]).
 - `tableVizFilterSetUpUtils.ts`, `tableVizFilterUtils.ts`,
-  `CommunitySetFilter.ts`: the filters. `TableVisualisationTooltip.ts`: the
-  header tooltip with the data quality metrics. `tableVizToolbar.ts`: the
-  toolbar. Its "create components" button, and the links' nodes in
-  `tableView.ts`, are built by `../vizActions.ts` from the `actions` Enso sends
-  with the value; the button is there when the value offers `sort`, `filter`,
-  `remove_columns` or `reorder_columns` (`TABLE_TOOLBAR_ACTIONS`).
+  `CommunitySetFilter.ts`: the filters. A set filter's values are what the
+  engine listed, so a Boolean column's are JSON Booleans, not text
+  (`TableVizDataSourceUtils.ts`, `setValue`: `True`/`False`; one picked is
+  `..Equal`, several `..Is_In`). The engine lists a column's distinct values for
+  fewer than 100 of them but sets `multi_filter` for 100 too, so `tableView.ts`
+  offers a Text column's set filter only below 100 (#778).
+  `TableVisualisationTooltip.ts`: the header tooltip with the data quality
+  metrics. `tableVizToolbar.ts`: the toolbar. Its "create components" button,
+  and the links' nodes in `tableView.ts`, are built by `../vizActions.ts` from
+  the `actions` Enso sends with the value; the button is there when the value
+  offers `sort`, `filter`, `remove_columns` or `reorder_columns`
+  (`TABLE_TOOLBAR_ACTIONS`).
 - `columnValueToEnso.ts`: a cell's text as an Enso value of its column's type
   (the toolbar's filters). `tableContextMenu.ts`: the right-click menu, from the
   value's `open_column`, `open_row` and `open_cell` actions (or the view's link
