@@ -165,11 +165,11 @@ Enso and Java code.
   element: the CSS reaches the shadow root (own and imported component),
   applies, is not in the document, and a recompile shows only its own rules;
   `hostKeyFor`.
-- `__tests__/moduleImports.test.ts` � `createModuleImporter`: styles go with
+- `__tests__/moduleImports.test.ts` — `createModuleImporter`: styles go with
   their own module, a failed import leaves none behind, overlapping imports of a
   path, a style-only edit. The worker itself (`compiler.ts`) and the blob
   `import()` in `compilerMessaging.ts` are not run by unit tests.
-- `components/GraphEditor/__tests__/visualizationHostSwitch.test.ts` � switching
+- `components/GraphEditor/__tests__/visualizationHostSwitch.test.ts` — switching
   visualizations in a keyed custom element sets the new one up once.
 - `__tests__/rootAddress.test.ts`, `movedVisualizations.test.ts`,
   `metadata.test.ts`, `availability.test.ts`, `compileSfc.test.ts`.

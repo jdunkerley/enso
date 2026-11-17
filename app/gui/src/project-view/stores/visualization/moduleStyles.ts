@@ -6,8 +6,9 @@
  */
 
 /**
- * Give the component a module exports its CSS (the `styles` of the module's notification). A module with no styles, or whose default export is
- * not a component, is left as it is. Returns the module.
+ * Give the component a module exports its CSS (the `styles` of the module's notification). A
+ * module with no styles, or whose default export is not a component, is left as it is. Returns the
+ * module.
  */
 export function attachStyles<T>(module: T, styles: readonly string[]): T {
   if (styles.length === 0) return module
