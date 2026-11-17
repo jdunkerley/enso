@@ -56,13 +56,6 @@ type Id
     ## ---
        private: true
        ---
-       An identifier for the builtin SQL Query visualization
-    sql_query : Id
-    sql_query = Id.Builtin "SQL Query"
-
-    ## ---
-       private: true
-       ---
        An identifier for the builtin Geo Map visualization
     geo_map : Id
     geo_map = Id.Builtin "Geo Map"

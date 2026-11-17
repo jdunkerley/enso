@@ -1,3 +1,4 @@
+import { BUILTIN_MODULE_NAMES, type BuiltinModuleName } from '@/stores/visualization/builtinModules'
 import type {
   AddImportNotification,
   AddRawImportNotification,
@@ -29,14 +30,24 @@ import * as vue from 'vue'
 import { Error as DataError } from 'ydoc-shared/binaryProtocol'
 import type { Uuid } from 'ydoc-shared/languageServerTypes'
 
-const moduleCache: Record<string, unknown> = {
-  __proto__: null,
+/** One module per allowed name; `satisfies` makes the compiler check both directions. */
+const builtinModules = {
   vue,
   builtins,
   get d3() {
     return import('d3')
   },
-}
+  // The SQL Query view of Standard.Database formats with it; a lazy chunk, as when it was built in.
+  get 'sql-formatter'() {
+    return import('sql-formatter')
+  },
+} satisfies Record<BuiltinModuleName, unknown>
+
+// Keeps the getters: a lazy module is imported only when a visualization asks for it.
+const moduleCache: Record<string, unknown> = Object.create(
+  null,
+  Object.getOwnPropertyDescriptors(builtinModules),
+)
 // @ts-expect-error Intentionally not defined in `env.d.ts` as it is a mistake to access this
 // anywhere else.
 window.__visualizationModules = moduleCache
@@ -76,7 +87,7 @@ export async function compile(address: string, data: DataServer) {
     const worker_ = (worker = new Compiler())
     postMessage<RegisterBuiltinModulesRequest>(worker, {
       type: 'register-builtin-modules-request',
-      modules: Object.keys(moduleCache),
+      modules: [...BUILTIN_MODULE_NAMES],
     })
     worker.addEventListener(
       'message',

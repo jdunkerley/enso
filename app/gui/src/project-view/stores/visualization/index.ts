@@ -4,7 +4,6 @@ import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase
 import * as geoMapVisualization from '@/components/visualizations/GeoMapVisualization.vue'
 import * as jsonVisualization from '@/components/visualizations/JSONVisualization'
 import * as scatterplotVisualization from '@/components/visualizations/ScatterplotVisualization.vue'
-import * as sqlVisualization from '@/components/visualizations/SQLVisualization.vue'
 import * as tableVisualization from '@/components/visualizations/TableVisualization.vue'
 import * as warningsVisualization from '@/components/visualizations/WarningsVisualization.vue'
 import { createContextStore } from '@/providers'
@@ -69,7 +68,6 @@ const builtinVisualizations: VisualizationModule[] = [
   jsonVisualization,
   tableVisualization,
   scatterplotVisualization,
-  sqlVisualization,
   geoMapVisualization,
   warningsVisualization,
 ]
