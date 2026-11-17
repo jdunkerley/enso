@@ -20,7 +20,9 @@ The table visualisation (`../TableVisualization.vue`) and its helpers.
   The component (`../TableVisualization.vue`, `getData`) requests a row page
   with no timeout (`executeExpression(…, null)`): a busy engine answers late,
   and a page settled empty showed "No Rows To Show" (#777, Note [Row Pages Wait
-  For The Engine]).
+  For The Engine]). A column filter's list of distinct values
+  (`getSetFilterValues`) waits the same way, so a late answer still fills it
+  (#781).
 - `tableVizFilterSetUpUtils.ts`, `tableVizFilterUtils.ts`,
   `CommunitySetFilter.ts`: the filters. A set filter's values are what the
   engine listed, so a Boolean column's are JSON Booleans, not text
