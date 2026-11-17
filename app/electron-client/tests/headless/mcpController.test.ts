@@ -241,10 +241,23 @@ describe('McpController', () => {
     expect(servers).toEqual([])
   })
 
-  test('a malformed settings file is the defaults', async () => {
-    await fs.writeFile(settingsPath, '{ not json')
-    expect(await controller().init()).toMatchObject({ enabled: false, port: 39417, error: null })
-  })
+  test.each(['{ not json', '[]', 'null', '5'])(
+    'a malformed settings file (%s) is reported and never overwritten',
+    async (content) => {
+      await fs.writeFile(settingsPath, content)
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const c = controller({ ENSO_MCP_ENABLED: '1' })
+      const status = await c.init()
+      expect(status.error).toMatch(/^The MCP settings file could not be read: /)
+      expect(status.error).toContain(settingsPath)
+      expect(status.running).toBe(false)
+      expect(warn).toHaveBeenCalledTimes(1)
+      warn.mockRestore()
+      await expect(c.replaceToken()).rejects.toThrow('could not be read')
+      expect(servers).toEqual([])
+      expect(await fs.readFile(settingsPath, 'utf8')).toBe(content)
+    },
+  )
 
   test('a leftover temporary file is replaced, not written into', async () => {
     await fs.writeFile(`${settingsPath}.tmp`, 'stale', { mode: 0o644 })
