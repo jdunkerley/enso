@@ -452,9 +452,10 @@
 
 #### Enso Standard Library
 
-- [`Time_Of_Day`'s functions have typed arguments with working widgets: a period
-  dropdown for `start_of`, `end_of`, `+` and `-`, a date picker and time zone
-  dropdown for `to_date_time`, and a checkbox for `nanosecond`.][829]
+- [`Time_Of_Day`'s functions have typed arguments with working widgets: `+` and
+  `-` offer each time period and `Duration.new` for a custom amount, `start_of`
+  and `end_of` write `..Hour`, `to_date_time` has a time zone dropdown, and
+  `nanosecond` a checkbox.][829]
 - [`Date`'s functions are documented with examples you can copy into the graph,
   and every argument has a widget][800]
 - [`Date.yesterday` and `Date.tomorrow` give the day before and after
