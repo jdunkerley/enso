@@ -1,17 +1,19 @@
 <script setup lang="ts">
 /**
- * @file The time-of-day widget's menu: `Now`, a divider, then a time field of hours and minutes,
- * with seconds when asked for. It knows nothing of the graph: it takes the value's current choice and
- * emits the one that is made. Choosing writes nothing here; `WidgetTimeOfDay.vue` does that.
+ * @file The time-of-day widget's menu: `Now`, a divider, a time field of hours and minutes (with
+ * seconds when asked for), columns of hours and minutes to pick from, and Cancel and Set. It knows
+ * nothing of the graph: it takes the value's current choice and emits the one that is made. Choosing
+ * writes nothing here; `WidgetTimeOfDay.vue` does that.
  *
- * The field is Reka's `TimeField` (as the dashboard's time inputs are): digits fill a segment,
- * ArrowUp and ArrowDown change it, ArrowLeft and ArrowRight move between segments. Enter in the
- * field, leaving the field, or a click outside the menu (the shell calls the handler given to
- * `registerAccept`) chooses the time as it stands if it was edited and is complete; Escape asks to
- * close without it. A segment that was cleared makes the time incomplete: nothing is written until
- * it is filled in again.
+ * The field and the columns are `TimeField.vue` (the date-time menu has them too): a click on a
+ * column value changes the field's time, as typing does, and typing scrolls the columns to it.
+ * Set writes the time as it stands. Enter in the field, leaving the field, or a click outside the
+ * menu (the shell calls the handler given to `registerAccept`) writes it only if it was edited;
+ * Cancel and Escape ask to close without it. A segment that was cleared makes the
+ * time incomplete: nothing is written until it is filled in again.
  */
 import PickerMenuFrame from '@/components/GraphEditor/widgets/WidgetPicker/PickerMenuFrame.vue'
+import PickerActions from '@/components/GraphEditor/widgets/WidgetPicker/PickerActions.vue'
 import { nextTick, onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
 import TimeField from './TimeField.vue'
 import { localNow, type HourMinuteSecond, type TimeChoice } from './timeExpression'
@@ -45,10 +47,16 @@ function chooseNow() {
   emit('choose', { kind: 'now' })
 }
 
-/** Write the field's time, once, if it was edited and is complete. */
-function commit() {
-  const time = field.value?.editedTime()
-  if (settled || time == null) return
+/**
+ * Write the field's time, once, if it is complete and was edited (or, with `always`, unless it is the
+ * time the value holds already: Set then only closes the menu).
+ */
+function commit(always = false) {
+  if (settled || field.value == null) return
+  const edited = field.value.editedTime()
+  const time = always ? field.value.currentTime() : edited
+  if (time == null) return
+  if (edited == null && props.choice?.kind === 'time') return close()
   settled = true
   emit('choose', { kind: 'time', ...time })
 }
@@ -69,7 +77,7 @@ function close() {
 onBeforeUnmount(() => (settled = true))
 
 onMounted(() => {
-  props.registerAccept?.(commit)
+  props.registerAccept?.(() => commit())
   void nextTick(() => field.value?.focus())
 })
 </script>
@@ -94,8 +102,9 @@ onMounted(() => {
       ref="field"
       :initial="initial"
       :initialShowSeconds="initialShowSeconds"
-      @enter="commit"
+      @enter="commit()"
       @leave="onLeave"
     />
+    <PickerActions @cancel="close" @set="commit(true)" />
   </PickerMenuFrame>
 </template>

@@ -1,14 +1,16 @@
 <script setup lang="ts">
 /**
- * @file The date-time widget's menu: `Date_Time.now`, the calendar (the date menu's) and the time
- * field (the time-of-day menu's, hours and minutes). A day is written at the field's time, and a
- * time on the value's day (today's for `now` or an unset value). Like the time-of-day menu, an
- * edited time is written by Enter, by leaving the menu, or by a click outside it (the shell calls
- * the handler given to `registerAccept`); Escape closes without it. It writes nothing itself:
- * `WidgetDateTime.vue` does that.
+ * @file The date-time widget's menu: `Date_Time.now`, the calendar (the date menu's), the time
+ * field and its columns (the time-of-day menu's `TimeField`, hours and minutes), and Cancel and Set.
+ * A day is written at the field's time, and a time on the value's day (today's for `now` or an
+ * unset value). As in the time-of-day menu, a click on a column value changes the field and writes
+ * nothing; Set writes the time as it stands; an edited time is also written by Enter, by leaving
+ * the menu, or by a click outside it (the shell calls the handler given to `registerAccept`); Cancel
+ * and Escape close without it. It writes nothing itself: `WidgetDateTime.vue` does that.
  */
 import DateCalendar from '@/components/GraphEditor/widgets/WidgetDate/DateCalendar.vue'
 import type { YearMonthDay } from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
+import PickerActions from '@/components/GraphEditor/widgets/WidgetPicker/PickerActions.vue'
 import PickerMenuFrame from '@/components/GraphEditor/widgets/WidgetPicker/PickerMenuFrame.vue'
 import TimeField from '@/components/GraphEditor/widgets/WidgetTimeOfDay/TimeField.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
@@ -68,10 +70,16 @@ function chooseDay(day: YearMonthDay) {
   choose({ ...day, hour: time.hour, minute: time.minute })
 }
 
-/** Write the field's time on the value's day (or today's), once, if it was edited and is complete. */
-function commitTime() {
-  const time = field.value?.editedTime()
-  if (settled || time == null) return
+/**
+ * Write the field's time on the value's day (or today's), once, if it is complete and was edited
+ * (or, with `always`, unless it is what the value holds already: Set then only closes the menu).
+ */
+function commitTime(always = false) {
+  if (settled || field.value == null) return
+  const edited = field.value.editedTime()
+  const time = always ? field.value.currentTime() : edited
+  if (time == null) return
+  if (edited == null && props.choice?.kind === 'dateTime') return close()
   choose({
     year: base.year,
     month: base.month,
@@ -93,7 +101,7 @@ function close() {
 
 onBeforeUnmount(() => (settled = true))
 onMounted(() => {
-  props.registerAccept?.(commitTime)
+  props.registerAccept?.(() => commitTime())
   void nextTick(() => calendar.value?.focusDay())
 })
 </script>
@@ -121,15 +129,16 @@ onMounted(() => {
       :initial="initialTime"
       :initialShowSeconds="false"
       :secondsToggle="false"
-      @enter="commitTime"
+      @enter="commitTime()"
       @leave="onLeave"
     />
+    <PickerActions @cancel="close" @set="commitTime(true)" />
   </PickerMenuFrame>
 </template>
 
 <style scoped>
-/* The shell stretches its floating box to the reference's width, which for a whole `Date_Time.new`
- * node with `second=` and `zone=` is far wider than a calendar: keep the frame at its own width. */
+/* Keep the frame at its own width: the reference (a whole `Date_Time.new` node with `second=` and
+ * `zone=`) is far wider than a calendar, and the shell once stretched its floating box to it. */
 .DateTimeMenu {
   width: max-content;
 }

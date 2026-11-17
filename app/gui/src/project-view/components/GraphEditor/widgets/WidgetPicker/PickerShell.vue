@@ -21,7 +21,7 @@ import type { WidgetTypeId } from '$/providers/openedProjects/widgetRegistry'
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import SelectionArrow from '@/components/GraphEditor/widgets/WidgetSelection/SelectionArrow.vue'
-import { activityDropdownStyles } from '@/components/GraphEditor/widgets/WidgetSelection/styles'
+import { pickerMenuStyles } from '@/components/GraphEditor/widgets/WidgetSelection/styles'
 import { unrefElement } from '@/composables/events'
 import { usePopoverRoot } from '@/providers/popoverRoot'
 import { provideSelectionArrow } from '@/providers/selectionArrow'
@@ -51,7 +51,7 @@ const floatReference = computed(
     topLevelArgument?.enclosingTopLevelArgument(widgetRoot.value, tree.rootElement) ??
     widgetRoot.value,
 )
-const { floatingStyles } = activityDropdownStyles(floatReference, menuElement, popoverRoot)
+const { floatingStyles } = pickerMenuStyles(floatReference, menuElement)
 
 const selectionArrow = provideSelectionArrow({
   node: () => props.widget.input.value,

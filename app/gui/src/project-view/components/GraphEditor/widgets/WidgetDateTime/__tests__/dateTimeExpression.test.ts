@@ -32,6 +32,13 @@ describe('parseDateTimeExpression', () => {
     ['Date_Time.new 2020', at(2020, 1, 1, 0, 0)],
     ['Date_Time.new 2020 2 29', at(2020, 2, 29, 0, 0)],
     ['Date_Time.new 2020 hour=9', at(2020, 1, 1, 9, 0)],
+    // Partial or named time parts, as typing into an unset hour or minute writes them: missing parts are 0.
+    ['Date_Time.new 2026 11 17 14', at(2026, 11, 17, 14, 0)],
+    ['Date_Time.new 2026 11 17 minute=30', at(2026, 11, 17, 0, 30)],
+    ['Date_Time.new 2026 11 17 hour=14 minute=30', at(2026, 11, 17, 14, 30)],
+    ['Date_Time.new 2026 11 17 14 second=15', at(2026, 11, 17, 14, 0, ['second=15'])],
+    ['Date_Time.new year=2026 month=11 day=17 hour=14 minute=30', at(2026, 11, 17, 14, 30)],
+    ['Date_Time.new 2026 day=17 hour=14', at(2026, 1, 17, 14, 0)],
     ['Date_Time.new 2020 1 15 9 30 45', at(2020, 1, 15, 9, 30, ['45'])],
     [
       'Date_Time.new 2020 1 15 9 30 second=45 zone=Time_Zone.utc',

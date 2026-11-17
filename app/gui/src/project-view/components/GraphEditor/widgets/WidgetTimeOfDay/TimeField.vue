@@ -1,15 +1,20 @@
 <script setup lang="ts">
 /**
- * @file A time field of hours and minutes, with seconds on request: Reka's `TimeField`, with a
- * button that adds or hides the seconds. It reports its time on request and tells when Enter is
- * pressed or the focus leaves it; what to do with the time is the parent's business.
+ * @file The time part of the time pickers (time of day, and date and time): a time field of hours and
+ * minutes, with seconds on request, and under it columns of the same time to pick from
+ * (`TimeColumns.vue`). It reports its time on request and tells when Enter is pressed or the focus
+ * leaves it; what to do with the time is the parent's business.
  *
- * A segment that was cleared makes the time incomplete: it is reported as `undefined` until it is
- * filled in again.
+ * The field is Reka's `TimeField` (as the dashboard's time inputs are): digits fill a segment,
+ * ArrowUp and ArrowDown change it, ArrowLeft and ArrowRight move between segments. The columns show
+ * the field's time: a click on a value changes it, as typing does (an edit, which writes nothing),
+ * and typing scrolls the columns to it. A segment that was cleared makes the time incomplete: it is
+ * reported as `undefined` until it is filled in again.
  */
 import { Time } from '@internationalized/date'
 import { TimeFieldInput, TimeFieldRoot } from 'reka-ui'
 import { computed, shallowRef, useTemplateRef } from 'vue'
+import TimeColumns from './TimeColumns.vue'
 import type { HourMinuteSecond } from './timeExpression'
 
 const props = withDefaults(
@@ -53,6 +58,12 @@ function edit(value: unknown) {
   if (draft.value == null || draft.value.compare(value) !== 0) dirty.value = true
   draft.value = value
 }
+
+/** The columns' time: the field's last whole time. A pick there is an edit, as typing is. */
+const columns = computed<HourMinuteSecond>({
+  get: () => draft.value ?? toTime(props.initial),
+  set: (value) => edit(toTime(value)),
+})
 
 function toggleSeconds() {
   showSeconds.value = !showSeconds.value
@@ -98,32 +109,35 @@ defineExpose({
 </script>
 
 <template>
-  <div ref="container" class="field" @focusout="onFocusOut">
-    <TimeFieldRoot
-      v-slot="{ segments }"
-      :modelValue="draft"
-      :granularity="granularity"
-      :hourCycle="24"
-      aria-label="Time"
-      class="timeField"
-      @keydown.enter.prevent="emit('enter')"
-      @update:modelValue="edit"
-    >
-      <template v-for="(segment, i) in segments" :key="i">
-        <TimeFieldInput :part="segment.part" class="segment" :class="segment.part">
-          {{ segment.value }}
-        </TimeFieldInput>
-      </template>
-    </TimeFieldRoot>
-    <button
-      v-if="props.secondsToggle"
-      type="button"
-      class="secondsToggle"
-      data-action="seconds"
-      @click="toggleSeconds"
-    >
-      {{ showSeconds ? 'Hide seconds' : 'Add seconds' }}
-    </button>
+  <div ref="container" class="TimeField" @focusout="onFocusOut">
+    <div class="field">
+      <TimeFieldRoot
+        v-slot="{ segments }"
+        :modelValue="draft"
+        :granularity="granularity"
+        :hourCycle="24"
+        aria-label="Time"
+        class="timeField"
+        @keydown.enter.prevent="emit('enter')"
+        @update:modelValue="edit"
+      >
+        <template v-for="(segment, i) in segments" :key="i">
+          <TimeFieldInput :part="segment.part" class="segment" :class="segment.part">
+            {{ segment.value }}
+          </TimeFieldInput>
+        </template>
+      </TimeFieldRoot>
+      <button
+        v-if="props.secondsToggle"
+        type="button"
+        class="secondsToggle"
+        data-action="seconds"
+        @click="toggleSeconds"
+      >
+        {{ showSeconds ? 'Hide seconds' : 'Add seconds' }}
+      </button>
+    </div>
+    <TimeColumns v-model="columns" :seconds="showSeconds" class="columns" />
   </div>
 </template>
 
@@ -171,5 +185,9 @@ defineExpose({
   &:focus-visible {
     opacity: 1;
   }
+}
+
+.columns {
+  margin-top: 4px;
 }
 </style>

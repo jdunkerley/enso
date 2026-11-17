@@ -2,13 +2,17 @@
 
 #### Enso IDE
 
-- [A date-and-time picker for Date_Time values: Date_Time.now, a calendar and a
-  time field. Editing a value keeps its seconds and time zone.][832]
+- [A date-and-time picker for Date_Time values: Date_Time.now, a calendar, and a
+  time you can type or pick from hour and minute columns, then Set. Editing a
+  value keeps its seconds and time zone.][832]
 - [Libraries can provide their own visualizations][817]: a `.vue` file in a
   library's `visualizations/` folder appears in the view picker once the library
   is imported, and `Standard.Image` now ships the Image view this way.
 - [Agents connected over MCP can list the visualizations a node offers and look
   at any of them, as a picture or as its data.][809]
+- [Drag an argument's value off a node to turn it into a node of its own,
+  connected back by an edge. A … after a component's arguments adds any of the
+  parameters it is not showing.][827]
 - [Right-clicking a table cell offers the components that the value's library
   describes for it (its row, column or value, or the table or sheet it links
   to), and right-clicking an entry of the JSON tree adds a component for it or
@@ -456,6 +460,10 @@
 
 - [Date_Time's functions have typed arguments with working widgets, including
   period dropdowns for start_of, end_of, + and -.][832]
+- [`Time_Of_Day`'s functions have typed arguments with working widgets: `+` and
+  `-` offer each time period and `Duration.new` for a custom amount, `start_of`
+  and `end_of` write `..Hour`, `to_date_time` has a time zone dropdown, and
+  `nanosecond` a checkbox.][829]
 - [`Date`'s functions are documented with examples you can copy into the graph,
   and every argument has a widget][800]
 - [`Date.yesterday` and `Date.tomorrow` give the day before and after
@@ -533,8 +541,10 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [832]: https://github.com/jdunkerley/enso/pull/832
+[829]: https://github.com/jdunkerley/enso/pull/829
 [817]: https://github.com/jdunkerley/enso/pull/817
 [809]: https://github.com/jdunkerley/enso/pull/809
+[827]: https://github.com/jdunkerley/enso/pull/827
 [800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795
 [790]: https://github.com/jdunkerley/enso/pull/790

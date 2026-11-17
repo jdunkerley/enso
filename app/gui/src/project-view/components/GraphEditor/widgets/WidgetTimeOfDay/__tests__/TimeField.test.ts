@@ -1,4 +1,4 @@
-/** @file The time field alone: what it reports as edited or current, and its events. */
+/** @file The time field alone: what it reports as edited or current, its events, and its columns. */
 import userEvent from '@testing-library/user-event'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, describe, expect, test } from 'vitest'
@@ -62,5 +62,26 @@ describe('the time field', () => {
     await userEvent.keyboard('{Backspace}{Backspace}')
     expect(field.editedTime()).toBeUndefined()
     expect(field.currentTime()).toBeUndefined()
+  })
+
+  test('a column pick is an edit, and the columns follow the field', async () => {
+    const { field } = await mountField({
+      initial: { hour: 14, minute: 30, second: 0 },
+      initialShowSeconds: false,
+    })
+    const columns = () => document.querySelectorAll('[role="listbox"]')
+    expect(columns()).toHaveLength(2)
+    Array.from(document.querySelectorAll<HTMLElement>('[data-unit="minute"] [role="option"]'))
+      .find((option) => option.textContent?.trim() === '45')!
+      .click()
+    await flushPromises()
+    expect(field.editedTime()).toEqual({ hour: 14, minute: 45, second: 0 })
+    await userEvent.keyboard('{ArrowUp}')
+    await flushPromises()
+    expect(
+      Array.from(columns()).map((c) =>
+        c.querySelector('[aria-selected="true"]')?.textContent?.trim(),
+      ),
+    ).toEqual(['15', '45'])
   })
 })

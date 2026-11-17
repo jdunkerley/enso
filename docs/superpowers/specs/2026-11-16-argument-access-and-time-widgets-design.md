@@ -99,8 +99,10 @@ nothing from A; B and C can be built alongside it.
   rest found by the assessment.
 - `start_of`/`end_of`: `(period : Time_Period = ..Hour)`, so the dropdown writes
   `..Hour`.
-- `+`/`-`: a dropdown of each `Time_Period` plus `Duration.new` for a custom
-  amount (like Date's `make_period_selector` with `Period.new`).
+- `+`/`-`: a dropdown of each `Time_Period`, written `..Hour`, plus
+  `Duration.new` for a custom amount (like Date's `make_period_selector` with
+  `Period.new`). `..Hour` resolves against the `Duration | Time_Period` union:
+  the engine tries each member in turn.
 - `to_date_time`: `date : Date` gets the date picker.
 - The comparators' `that` stays untyped, as for Date (#797).
 - An assessment table before and after, in this spec's appendix, as for Date.
@@ -157,7 +159,56 @@ nothing from A; B and C can be built alongside it.
 
 ### Time_Of_Day — before
 
-(Filled in by part C's first task.)
+Taken on: 2026-11-16, commit 0b9a387d0e (develop), from the code:
+`Time_Of_Day.enso`, its API snapshot and the IDE's widget rules (not in the
+running IDE). Rows marked "Corrected in the IDE" were checked against the
+packaged IDE built from #800's branch (the #829 screenshots): the IDE takes an
+argument's type from a separate signature line too, where the catalogue's API
+snapshot shows `Any`.
+
+| Function                                           | Argument                                        | Type (declared)                                                           | Expected widget                         | Widget from the code                                             | Result  | Note                                                                                                    |
+| -------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------- |
+| now                                                | —                                               | —                                                                         | —                                       | —                                                                | n/a     | No arguments.                                                                                           |
+| new                                                | hour · minute                                   | Integer (untyped inline; the signature line is not seen by the catalogue) | number, 0–23 / 0–59                     | number (`@hour`, `@minute` Numeric_Input)                        | works   | The ranges come from the annotations; the type is `Any` in the catalogue.                               |
+| new                                                | second · millisecond · microsecond · nanosecond | Integer (untyped)                                                         | number, shown when modified             | number (annotations)                                             | works   | Hidden until set; part A's `…` reaches them.                                                            |
+| parse                                              | text                                            | Text                                                                      | text                                    | text                                                             | works   |                                                                                                         |
+| parse                                              | format                                          | Date_Time_Formatter                                                       | format dropdown                         | `make_time_format_selector`                                      | works   | Return is `Any` in the catalogue.                                                                       |
+| hour · minute · second · millisecond · microsecond | —                                               | —                                                                         | —                                       | —                                                                | n/a     | No arguments.                                                                                           |
+| nanosecond                                         | include_milliseconds                            | Boolean (written `include_milliseconds=False:Boolean`)                    | checkbox                                | text box                                                         | missing | The ascription is on the default, so the catalogue sees `Any`.                                          |
+| start_of · end_of                                  | period                                          | Time_Period (untyped)                                                     | Time_Period dropdown, writing `..Hour`  | Time_Period dropdown of bare names, writing `Time_Period.Minute` | works   | Corrected in the IDE: the IDE reads the type from the signature line. Writes whole names, not `..Hour`. |
+| to_seconds                                         | —                                               | —                                                                         | —                                       | —                                                                | n/a     |                                                                                                         |
+| to_date_time                                       | date                                            | Date (untyped)                                                            | date picker                             | date picker                                                      | works   | Corrected in the IDE: the type comes from the signature line.                                           |
+| to_date_time                                       | zone                                            | Time_Zone (untyped)                                                       | time zone dropdown                      | text box                                                         | missing | No `@zone`, unlike `Date.to_date_time`.                                                                 |
+| date_part                                          | period                                          | Time_Period                                                               | Time_Period dropdown                    | Time_Period dropdown                                             | works   | Return `Any`.                                                                                           |
+| date_diff                                          | end                                             | Time_Of_Day                                                               | time picker                             | time picker                                                      | works   | Return `Any`.                                                                                           |
+| date_diff · date_add                               | period                                          | Time_Period                                                               | Time_Period dropdown                    | Time_Period dropdown                                             | works   |                                                                                                         |
+| date_add                                           | amount                                          | Integer                                                                   | number                                  | number                                                           | works   |                                                                                                         |
+| + · -                                              | amount                                          | Duration \| Time_Period                                                   | Time_Period dropdown and `Duration.new` | dropdown of `..Hour` … `..Nanosecond`, no `Duration.new`         | partial | Corrected in the IDE: no custom `Duration.new`.                                                         |
+| format                                             | format                                          | Date_Time_Formatter                                                       | format dropdown                         | format dropdown                                                  | works   | Return `Any`.                                                                                           |
+| > · >= · < · <=                                    | that                                            | (untyped)                                                                 | —                                       | text box                                                         | n/a     | Stays untyped (#797).                                                                                   |
+
+Hidden (`private: true`): `to_js_object`, `to_display_text`, `pretty`,
+`default_widget`, `Time_Of_Day.from`.
+
+#### After
+
+Taken on: 2026-11-16, commit 1f0467354e, from the code (`Time_Of_Day.enso`, the
+regenerated API snapshot and the IDE's widget rules); the running IDE is checked
+in the PR's screenshots and the installer test. Only the rows that changed.
+
+| Function              | Argument                                        | Type (declared)            | Expected widget                         | Widget from the code                             | Result | Note                                                                  |
+| --------------------- | ----------------------------------------------- | -------------------------- | --------------------------------------- | ------------------------------------------------ | ------ | --------------------------------------------------------------------- |
+| new                   | hour · minute                                   | Integer                    | number, 0–23 / 0–59                     | number (`@hour`, `@minute` Numeric_Input)        | works  | The catalogue now sees `Integer`; returns `Time_Of_Day ! Time_Error`. |
+| new                   | second · millisecond · microsecond · nanosecond | Integer                    | number, shown when modified             | number (annotations)                             | works  | Typed `Integer`.                                                      |
+| parse                 | text · format                                   | Text · Date_Time_Formatter | text · format dropdown                  | text · `make_time_format_selector`               | works  | Returns `Time_Of_Day ! Time_Error` instead of `Any`.                  |
+| nanosecond            | include_milliseconds                            | Boolean                    | checkbox                                | checkbox                                         | works  | The type moved onto the argument, so the catalogue sees `Boolean`.    |
+| start_of · end_of     | period                                          | Time_Period                | Time_Period dropdown, writing `..Hour`  | Time_Period dropdown (from the type)             | works  | Typed with a `..Hour` default; returns `Time_Of_Day`.                 |
+| to_date_time          | date                                            | Date                       | date picker                             | date picker                                      | works  | Typed `Date`; returns `Date_Time`.                                    |
+| to_date_time          | zone                                            | Time_Zone                  | time zone dropdown                      | time zone dropdown (`@zone`)                     | works  | `@zone` added, as `Date.to_date_time`.                                |
+| + · -                 | amount                                          | Duration \| Time_Period    | Time_Period dropdown and `Duration.new` | `..Hour` dropdown and `Duration.new` (`@amount`) | works  | `@amount` added; returns `Time_Of_Day ! Time_Error`.                  |
+| date_part · date_diff | period · end                                    | Time_Period · Time_Of_Day  | unchanged                               | unchanged                                        | works  | Now returns `Integer` (was `Any`).                                    |
+| date_add · format     | —                                               | —                          | unchanged                               | unchanged                                        | works  | Now returns `Time_Of_Day` and `Text`.                                 |
+| > · >= · < · <=       | that                                            | (untyped)                  | —                                       | text box                                         | n/a    | Still untyped (#797).                                                 |
 
 ### Date_Time — before
 
