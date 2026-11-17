@@ -39,13 +39,6 @@ export const test = base.extend<{
   testRunId: string
   projectsDir: string
   /**
-   * Whether the launched Electron process should spawn the local Claude agent. Default `false`
-   * — the test fixture sets `ENSO_AI_DISABLED=1` so a developer's locally-installed `claude` is
-   * not accidentally invoked during a non-AI spec. AI specs override with
-   * `test.use({ aiEnabled: true })`.
-   */
-  aiEnabled: boolean
-  /**
    * Whether the app opens the Getting_Started sample, as a fresh install does. Default `false`:
    * every spec starts with a fresh projects directory, and the fixture passes
    * `--no-welcome-project` so that it does not pay for a project open and close. The spec that
@@ -79,14 +72,13 @@ export const test = base.extend<{
     const projectsDir = path.join(os.tmpdir(), 'enso-test-projects', testRunId)
     await use(projectsDir)
   },
-  aiEnabled: [false, { option: true }],
   welcomeProject: [false, { option: true }],
   spareEngine: [false, { option: true }],
   extraEnv: [{}, { option: true }],
 
   /** Setup for all tests: Create an electron-based app instance. */
   app: async function (
-    { projectsDir, testRunId, aiEnabled, welcomeProject, spareEngine, extraEnv },
+    { projectsDir, testRunId, welcomeProject, spareEngine, extraEnv },
     use,
     testInfo,
   ) {
@@ -101,7 +93,6 @@ export const test = base.extend<{
       // Note [The Packaged-IDE Tests Run Without GPU Acceleration] in src/electron.ts.
       ENSO_TEST_DISABLE_GPU: '1',
       ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
-      ...(aiEnabled ? {} : { ENSO_AI_DISABLED: '1' }),
       ...(spareEngine ?
         { ENSO_SPARE_ENGINE: '1', ENSO_JVM_AOT_DIR: jvmAotDir }
       : { ENSO_SPARE_ENGINE: '0', ENSO_JVM_AOT: '0' }),
@@ -373,20 +364,6 @@ export async function getNewestProject(page: Page): Promise<Locator> {
 export async function visualizeData(page: Page) {
   const showViz = page.getByLabel('Show visualization (Space)')
   await showViz.click({ timeout: 5000 })
-}
-
-/**
- * Click the eye button to hide an already-shown visualization. Used between checkpoints in
- * multi-step AI tests so the next `.TableVisualization` locator only matches one element.
- *
- * When a visualization is open, the "Hide visualization (Space)" aria-label appears on both
- * the inline node-header toggle and the viz-panel toolbar toggle (both targeting the same
- * `isVisualizationEnabled` state, so clicking either dismisses the viz). `.first()` picks the
- * inline button deterministically and avoids Playwright's strict-mode duplicate-match error.
- */
-export async function hideVisualization(page: Page) {
-  const hideViz = page.getByLabel('Hide visualization (Space)').first()
-  await hideViz.click({ timeout: 5000 })
 }
 
 /**

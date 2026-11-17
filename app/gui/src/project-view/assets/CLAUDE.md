@@ -26,9 +26,9 @@ Stylesheets, fonts and icons for the project view (the graph editor).
   (variable woff2, v1.400, unmodified upstream files; see the README there).
   `--font-mono` is Neon (13px in the code editor), followed only by system
   monospace faces; Neon is preloaded from `index.html`.
-- `--font-code` is node text (expressions, bindings, component browser entries,
-  the AI pending node): the same stack as `--font-mono`. Nodes are ~14% wider
-  than they were in M PLUS 1; widths are measured per session, never saved.
+- `--font-code` is node text (expressions, bindings, component browser entries):
+  the same stack as `--font-mono`. Nodes are ~14% wider than they were in M PLUS
+  1; widths are measured per session, never saved.
 - `--font-mono-comment` is the code editor's comment face: `--font-mono`, or
   Monaspace Radon under the "Handwritten comments" setting
   (`:root.handwrittenComments`, on by default; the class comes from

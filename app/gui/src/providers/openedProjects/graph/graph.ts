@@ -179,36 +179,17 @@ export function createGraphStore(
     return andThen(currentMethodPointer.value, (ptr) => module.getMethodAst(ptr, edit))
   }
 
-  // Sources of "occupied" rects that aren't real graph nodes — currently the AI prompt
-  // placeholders. Each source is invoked from inside the `visibleNodeAreas` computed so its
-  // reactive reads are tracked. Use {@link registerExtraOccupiedAreas} to add/remove sources.
-  const extraOccupiedSources = shallowReactive(new Set<() => readonly Rect[]>())
-
-  // The currently visible nodes' areas (including visualization). AI placeholder rects are
-  // included so node placement avoids overlapping with in-flight prompts.
+  // The currently visible nodes' areas (including visualization).
   const visibleNodeAreas = computed(() => {
     const result: Rect[] = []
     for (const [id, rect] of nodeRects.entries()) {
       if (db.isNodeId(id)) result.push(rect)
     }
-    for (const source of extraOccupiedSources) result.push(...source())
     return result
   })
   function visibleArea(nodeId: NodeId): Rect | undefined {
     if (!db.isNodeId(nodeId)) return
     return nodeRects.get(nodeId)
-  }
-
-  /**
-   * Register a source of additional occupied-area rects (e.g. AI prompt placeholders) to be
-   * reflected in {@link visibleNodeAreas}. The source is read from a reactive computed, so it
-   * may pull from refs/computeds and return a snapshot. Returns an unregister callback.
-   */
-  function registerExtraOccupiedAreas(source: () => readonly Rect[]): () => void {
-    extraOccupiedSources.add(source)
-    return () => {
-      extraOccupiedSources.delete(source)
-    }
   }
 
   const db = new GraphDb(
@@ -811,7 +792,6 @@ export function createGraphStore(
     editedNodeInfo,
     visibleNodeAreas,
     visibleArea,
-    registerExtraOccupiedAreas,
     unregisterNodeRect,
     generateLocallyUniqueIdent,
     deleteNodes,

@@ -29,8 +29,8 @@ export interface McpServerOptions {
 
 /* Note [The MCP Server Checks Its Caller]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * The same reasoning as Note [The AI MCP Server Checks Its Caller], for the server that external
- * agent apps use. Any local process can reach a loopback port and a web page can send it
+ * The server binds to loopback, but that does not make every caller an agent app the user set
+ * up. Any local process can reach a loopback port and a web page can send it
  * requests, so each request must pass, before the MCP transport sees it:
  *
  * - no `Origin` header (a browser sends one on every `POST`; the agent apps send none): `403`;

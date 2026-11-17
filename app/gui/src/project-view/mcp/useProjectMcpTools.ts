@@ -71,10 +71,7 @@ import {
 } from './visualizationTools'
 import { writeRefusal } from './writeGuard'
 
-/**
- * Like `aiToolHandler.ts`: under the main-process MCP server's timeout, so that the window's own
- * error reaches the caller first.
- */
+/** Under the main-process MCP server's timeout, so that the window's own error reaches the caller first. */
 const EVALUATE_TIMEOUT_MS = 25_000
 /** How long to wait for a frame before going on without one: a hidden window draws none. */
 const FRAME_FALLBACK_MS = 100
@@ -536,7 +533,7 @@ export function useProjectMcpTools(
         {
           db: graph.db,
           currentMethod: graph.currentMethod,
-          // As `aiToolHandler.ts` does: on timeout, interrupt the execution context so that the
+          // On timeout, interrupt the execution context so that the
           // abandoned evaluation does not hold up the next call.
           evaluateRaw: (scope, text) =>
             project.queuedExecuteExpressionRaw(scope, text, EVALUATE_TIMEOUT_MS, () => {

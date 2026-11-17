@@ -20,7 +20,7 @@ const displayedId = computed({
       return
     }
     rightPanel.updateContext(container.currentTab, (ctx) => {
-      if (ctx.help == null) ctx.help = { item: newSelection, aiMode: false }
+      if (ctx.help == null) ctx.help = { item: newSelection }
       else ctx.help.item = newSelection
       return ctx
     })
@@ -33,7 +33,6 @@ const displayedId = computed({
     <ComponentHelp
       v-if="displayedId?.ok"
       :selectedEntry="displayedId.value"
-      :aiMode="rightPanel.context?.help?.aiMode ?? false"
       @update:selectedEntry="displayedId = Ok($event)"
     />
     <Result v-else-if="!displayedId.ok" status="info" :title="`${displayedId.error.payload}`" />

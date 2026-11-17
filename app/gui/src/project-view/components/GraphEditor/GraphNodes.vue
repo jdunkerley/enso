@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
 import type { NodeId } from '$/providers/openedProjects/graph'
-import AiPendingNode from '@/components/GraphEditor/AiPendingNode.vue'
 import GraphNode from '@/components/GraphEditor/GraphNode.vue'
 import type { VisualizationResize } from '@/components/GraphEditor/GraphVisualization/visualizationSize'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
@@ -12,7 +11,6 @@ import { useGlobalEventRegistry } from '@/providers/globalEventRegistry'
 import { injectGraphNavigator } from '@/providers/graphNavigator'
 import { useGraphSelection } from '@/providers/graphSelection'
 import type { UploadingFile as File, FileName } from '@/stores/awareness'
-import { useOngoingAiPrompts } from '@/stores/ongoingAiPrompts'
 import type { Ast } from '@/util/ast'
 import type { Vec2 } from '@/util/data/vec2'
 import { set } from 'lib0'
@@ -35,7 +33,6 @@ const { graph, store } = useCurrentProject()
 const selection = useGraphSelection()
 const dragging = useNodesDragging()
 const navigator = injectGraphNavigator()
-const aiPrompts = useOngoingAiPrompts()
 
 function resizeVisualization(id: NodeId, { width, height, position }: VisualizationResize) {
   graph.value.setNodeVisualization(
@@ -86,7 +83,7 @@ const layerStyle = computed(() => ({
       v-for="[id, node] in graph.db.nodeIdToNode.entries()"
       :key="id"
       :node="node"
-      :edited="id === graph.editedNodeInfo?.id || aiPrompts.hiddenNodeIds.has(id)"
+      :edited="id === graph.editedNodeInfo?.id"
       @dragging="nodeIsDragged(id, $event)"
       @draggingCommited="dragging.finishDrag()"
       @draggingCancelled="dragging.cancelDrag()"
@@ -109,13 +106,6 @@ const layerStyle = computed(() => ({
       :key="index"
       :name="nameAndFile[0]"
       :file="nameAndFile[1]"
-    />
-    <AiPendingNode
-      v-for="entry in aiPrompts.entriesForCurrentMethod"
-      :key="entry.id"
-      :pending="entry"
-      @cancel="aiPrompts.cancel(entry.id)"
-      @refresh="aiPrompts.refresh(entry.id)"
     />
   </div>
 </template>

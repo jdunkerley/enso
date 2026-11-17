@@ -20,7 +20,6 @@ vi.mock('@/composables/backend', () => ({
   }),
 }))
 vi.mock('$/utils/backendQuery', () => ({ backendMutationOptions: () => ({}) }))
-vi.mock('@/stores/aiAvailability', () => ({ useAiAvailability: () => ({}) }))
 vi.mock('../../backends', () => ({ useBackends: () => ({ localBackend }) }))
 vi.mock('../../text', () => ({ useText: () => ({}) }))
 vi.mock('../../localVersioning', () => ({ useLocalVersioning: () => ({}) }))

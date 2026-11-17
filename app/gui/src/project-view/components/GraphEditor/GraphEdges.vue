@@ -14,7 +14,6 @@ import type { GraphNavigator } from '@/providers/graphNavigator'
 import { useGraphSelection } from '@/providers/graphSelection'
 import { injectInteractionHandler, type Interaction } from '@/providers/interactionHandler'
 import type { PortId } from '@/providers/portInfo'
-import { useOngoingAiPrompts } from '@/stores/ongoingAiPrompts'
 import { Ast } from '@/util/ast'
 import { isAstId, type AstId } from '@/util/ast/abstract'
 import { Vec2 } from '@/util/data/vec2'
@@ -33,7 +32,6 @@ const {
 } = useCurrentProject()
 const selection = useGraphSelection(true)
 const interaction = injectInteractionHandler()
-const aiPrompts = useOngoingAiPrompts()
 const connectionToast = useToast.error()
 
 const props = defineProps<{
@@ -244,7 +242,7 @@ function createNewNodeFromPort(id: AstId) {
         />
         <template v-for="id in nodeIdsWithOutputPorts" :key="id">
           <GraphNodeOutputPorts
-            v-show="id !== graph.editedNodeInfo?.id && !aiPrompts.hiddenNodeIds.has(id)"
+            v-show="id !== graph.editedNodeInfo?.id"
             :nodeId="id"
             @newNodeClick="(portId) => createNewNodeFromPort(portId)"
             @newNodeDrag="(portId) => graph.createEdgeFromNewButton(portId)"

@@ -21,11 +21,6 @@ export async function waitForAppLoaded(page: Page) {
 
 export const test = base.extend<{
   featureFlags: Partial<FeatureFlags>
-  /**
-   * Whether the mocked Electron API should report the local Claude agent as available. Most
-   * specs assume `false`. AI specs opt in with `test.use({ aiAvailable: true })`.
-   */
-  aiAvailable: boolean
   /** The JDK AOT cache training's status when the page loads (`registerMocks`); `idle` by default. */
   jvmAotTrainingStatus: JvmAotTrainingStatus
   setupApi: {
@@ -42,7 +37,6 @@ export const test = base.extend<{
   editorPage: EditorPageActions
 }>({
   featureFlags: [{}, { option: true }],
-  aiAvailable: [false, { option: true }],
   jvmAotTrainingStatus: ['idle', { option: true }],
   setupApi: [{}, { option: true }],
   cloudRequests: [
@@ -69,10 +63,10 @@ export const test = base.extend<{
     setupApi.local?.(api)
     return use(api)
   },
-  drivePage: async ({ page, localApi, featureFlags, aiAvailable, jvmAotTrainingStatus }, use) => {
+  drivePage: async ({ page, localApi, featureFlags, jvmAotTrainingStatus }, use) => {
     // Only make sure that the local API mock is registered; the spec uses it through `localApi`.
     const _ = { localApi }
-    await registerMocks(page, featureFlags, { aiAvailable, jvmAotTrainingStatus })
+    await registerMocks(page, featureFlags, { jvmAotTrainingStatus })
     await page.goto('/')
     await waitForAppLoaded(page)
     await use(new DrivePageActions(page, {}))

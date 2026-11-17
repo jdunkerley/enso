@@ -23,7 +23,6 @@ vi.mock('@/composables/backend', () => ({ backendMutationOptions: () => ({}) }))
 vi.mock('$/utils/backendQuery', () => ({
   backendMutationOptions: () => ({ mutationKey: ['k'], networkMode: 'always', meta: {} }),
 }))
-vi.mock('@/stores/aiAvailability', () => ({ useAiAvailability: () => ({}) }))
 vi.mock('../../backends', () => ({
   useBackends: () => ({ localBackend }),
 }))

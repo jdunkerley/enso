@@ -2,11 +2,11 @@
  * @file The `evaluate_expression` MCP tool: evaluates an Enso expression to text in the scope of
  * the method on screen or of one of its nodes.
  */
-import { formatLsError, translateEngineError } from '@/components/ComponentBrowser/aiToolHandler'
 import { Ast } from '@/util/ast'
 import type { McpToolResult } from 'enso-common/src/mcp'
 import type { Result } from 'enso-common/src/utilities/data/result'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
+import { formatLsError, translateEngineError } from './evaluationErrors'
 import { findNode, truncate, type GraphToolDeps } from './graphTools'
 import { writeRefusal } from './writeGuard'
 
@@ -25,7 +25,7 @@ export const EVALUATE_ERROR_CHARS = 2_000
  * while `isLive()` says the project is in Live mode: an evaluation runs in the execution context's
  * environment, and in Live an expression's writes are real. With `node_id`, it runs at that node's
  * statement, where the node's own binding and every earlier one are in scope; without, it runs in
- * the method body, where all of the method's bindings are (as `aiToolHandler.ts` anchors it).
+ * the method body, where all of the method's bindings are.
  * Code that the Write guard refuses ({@link writeRefusal}) is refused before anything is evaluated.
  */
 export async function evaluateExpression(
