@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [Agents connected over MCP can arrange and move nodes, resize a visualization,
+  and take a picture of the graph.][831]
 - [A Boolean argument shows its value next to the checkbox, and a dropdown under
   it to choose True or False.][830]
 - [Agents connected over MCP can switch between open projects, read and rewrite
@@ -539,6 +541,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[831]: https://github.com/jdunkerley/enso/pull/831
 [830]: https://github.com/jdunkerley/enso/pull/830
 [825]: https://github.com/jdunkerley/enso/pull/825
 [829]: https://github.com/jdunkerley/enso/pull/829

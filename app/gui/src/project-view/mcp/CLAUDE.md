@@ -29,6 +29,13 @@ too).
   (`evaluate_expression`) are pure functions over `GraphToolDeps`, which is what
   makes them testable with `GraphDb.Mock()`. Results are JSON text
   (`JSON.stringify(value, null, 1)`).
+- `get_graph { layout: true }` adds each node's `position` (`node.position`,
+  rounded; absent when not finite, i.e. never placed) and `area`
+  (`graph.visibleArea`, the room it takes with its visualization; absent for a
+  node not drawn yet), and `view` `{ x, y, width, height, scale }`: the
+  navigator's `viewport` and the zoom it is drawn at now
+  (`McpEditorDeps.viewportScale`, the navigator's animated `scale`, not
+  `targetScale`, so the two belong to the same moment during a zoom).
 - Value previews are `<name>.to_display_text` (5 s) for each node with a value
   in `get_graph`, at most `GRAPH_PREVIEW_CHARS` (2,000) characters each, and
   `<name>.to_text` (10 s) in `get_node`, at most `NODE_PREVIEW_CHARS` (20,000).
@@ -184,14 +191,18 @@ The user's switch is never changed by a tool.
 ## Edit, structure and view tools
 
 - `editTools.ts` (`add_nodes`, `edit_node`, `remove_nodes`, `set_node_comment`,
-  `set_visualization`), `structureTools.ts` (`collapse_nodes`, `add_function`)
-  and `viewTools.ts` (`select_nodes`, `open_method`) are pure functions over
-  their deps, like the read tools. Each validates its arguments before anything
-  changes; the edits then run through the editor's one `EditSession`.
+  `set_visualization`), `structureTools.ts` (`collapse_nodes`, `add_function`),
+  `layoutTools.ts` (`move_nodes`, `arrange_nodes`) and `viewTools.ts`
+  (`select_nodes`, `open_method`, and the handler `prepare_graph_image`) are
+  pure functions over their deps, like the read tools. Each validates its
+  arguments before anything changes; the edits then run through the editor's one
+  `EditSession`.
 - **Edits never move the view or the selection.** Only `select_nodes` and
-  `open_method` do, and both work in Live. `select_nodes` sets the selection and
-  then calls `panToSelected`, as the editor does after creating a node; `[]`
-  clears it. `open_method` enters with `stackNavigator.enterNode` when
+  `open_method` change the selection; they, `prepare_visualization` and
+  `prepare_graph_image` move the view (see below). `select_nodes` and
+  `open_method` work in Live. `select_nodes` sets the selection and then calls
+  `panToSelected`, as the editor does after creating a node; `[]` clears it.
+  `open_method` enters with `stackNavigator.enterNode` when
   `graph.nodeCanBeEntered`, or leaves with `exitNode` (the editor's watcher
   clears the selection), releases an open edit step (the user's context
   changed), waits for the next graph update (at most `OPEN_METHOD_WAIT_MS`, 5 s)
@@ -216,9 +227,12 @@ The user's switch is never changed by a tool.
   removed one are disconnected, as when the user deletes); `set_node_comment` →
   the statement's `mutableDocumentationText()` in one `module.edit`, as
   `aiNode.ts` writes a prompt; `set_visualization` →
-  `graph.setNodeVisualization` (one layout setter call); `collapse_nodes` → the
-  editor's collapse with the same `CollapseDeps` as "Group components", without
-  its rename; `add_function` → one `module.edit` of the top-level block.
+  `graph.setNodeVisualization` with one `VisualizationUpdate`
+  `{ visible, identifier?, width?, height? }` (one layout setter call; a key
+  left out is not in the object, since the setter merges with `Object.assign`),
+  its answer's `size` read after the edit; `collapse_nodes` → the editor's
+  collapse with the same `CollapseDeps` as "Group components", without its
+  rename; `add_function` → one `module.edit` of the top-level block.
 - `GraphNodeComment.vue` reads the comment through `useYText`, so a comment
   written to the `Y.Text` from elsewhere (this tool, an undo) shows on a node
   that had none. Before, only a node already showing one updated.
@@ -243,7 +257,7 @@ captures that rectangle with `webContents.capturePage`.
   `fullscreen`), so nothing is a snapshot. A replaced component removes only its
   own entry.
 - **`list_visualizations`** (an MCP tool, unlike the two handlers) answers
-  `{ node_id, shown, visualization, available }`: whether the node's
+  `{ node_id, shown, visualization, available, size }`: whether the node's
   visualization is switched on, the name of the one mounted (null when none is),
   and `available`, the names the node's type offers in the toolbar dropdown's
   order. `available` comes from `McpEditorDeps.visualizationsFor`, which
@@ -253,6 +267,14 @@ captures that rectangle with `webContents.capturePage`.
   `GraphNode.vue` reads it): the store's `byType`, the same source as
   `allVisualizations` in `GraphVisualization/visualizationData.ts`. It shows,
   moves and edits nothing, so it works in Live.
+- **`size`** (`drawnVisualizationSize`), in every answer of the three:
+  `{ width, height, default_width, default_height }`, the visualization as
+  `GraphVisualization` draws it (`visualizationSize` of the stored size and
+  `graph.nodeBareSizes`' width: the node's width or 200, and 150 high, by
+  default; never below 200 wide or 32 high), rounded, and whether each is the
+  default (stored as null or absent). A hidden node's is what it would be.
+  `set_visualization`'s `width` and `height` (`VISUALIZATION_SIZE_MIN` 100 to
+  `VISUALIZATION_SIZE_MAX` 2,000, or null) are checked before the session runs.
 - **Both handlers** find the node in the method on screen. A `visualization`
   name the node does not offer is refused before anything changes ("The node has
   no visualization `X`. Available: …"). When the visualization is hidden, or a
@@ -292,13 +314,75 @@ captures that rectangle with `webContents.capturePage`.
   once when the panel is not in the DOM), then for two frames with the view
   still, and answers the panel's rectangle in CSS pixels, cut to the graph
   viewport (a full-screen visualization is not cut). A docked panel drawn over
-  the graph viewport is not detected. It is the one handler besides
-  `select_nodes` and `open_method` that moves the view; in Live it works only
-  for the visualization already on screen.
+  the graph viewport is not detected. With `prepare_graph_image` it is one of
+  the handlers besides `select_nodes` and `open_method` that move the view; in
+  Live it works only for the visualization already on screen.
 - Main captures until two captures in a row are the same (150 ms apart, at
   most 10) and caps the picture at 1,200 pixels on its longer side. Status
   `ready` plus two frames alone gave stale pictures with the GPU off: see
   "Looking at a visualization" in `app/electron-client/src/mcp/CLAUDE.md`.
+
+## Layout and the graph picture (`layoutTools.ts`, `viewTools.ts`)
+
+A position is module metadata, so `move_nodes` and `arrange_nodes` are edits
+like the others: through the edit session (refused in Live, part of the caller's
+undo step, `checkAtTurn` first), and each makes **one** `graph.setNodePositions`
+call with every node in it (its doc comment in
+`providers/openedProjects/graph/graph.ts` says why: the node database the layout
+reads is updated only when the transaction commits).
+
+- **`move_nodes { moves }`** refuses before any edit 0 or more than
+  `MOVE_NODES_MAX` (200) moves, a coordinate that is not finite or beyond
+  `MOVE_COORDINATE_LIMIT` (±1,000,000), an unknown node or the same node twice.
+  It calls `setNodePositions` even when every node is already there, because
+  that also releases the nodes they were pushing, and answers
+  `{ moved: [{ id, position }], settled: true }`, the positions read back.
+- **`arrange_nodes { action, node_ids? }`** runs the user's own commands, not
+  the menu's wrapped actions (which check the panel's focus and read the
+  selection): `tidy` → `McpEditorDeps.tidy` (`useGraphTidy(graph).tidy`, a lazy
+  closure in `GraphEditor.vue` because `graphTidy` is defined later in setup),
+  with `node_ids` when two or more, else the whole graph; the Align and Spacing
+  actions → `createSelectionAlignmentHandlers(graph)` with the nodes of
+  `node_ids` (at least two; `ARRANGE_NODES_MAX` 500). Neither the view nor the
+  selection changes. `arranged` counts the nodes of the method whose position
+  differs, compared **inside the edit**, after its commit (the node database
+  follows the module synchronously), so a move someone else makes while the
+  session waits is not counted. A node pushed aside that returns counts too.
+- **A call that changes nothing answers at once.** Each closure runs its change
+  in `LayoutToolDeps.moduleChanged` (`moduleChangedBy` in `projectEvents.ts`:
+  did a transaction on the module's document change or delete anything) and
+  returns `unchanged`, which it passes the session as
+  `EditRunOptions.unchanged`. True: the session answers `settled: true` without
+  waiting for a graph update, which would never come (before, such a call waited
+  out `GRAPH_UPDATE_WAIT_MS`: 2,027 ms measured). A position-only check would be
+  wrong: `setNodePositions` also clears `displaced` and releases pushed nodes
+  when the moved node stays. `set_documentation` passes `unchanged` too. The
+  version save and the step's hold still happen first: an empty step records
+  nothing.
+- **`prepare_graph_image`** (the window half of main's `get_graph_image`; not an
+  MCP tool) frames every node of the method, or the nodes of `node_ids` (1 to
+  `GRAPH_IMAGE_NODES_MAX`, 500; `[]` is `NO_NODE_IDS_ERROR`, an unknown one
+  refuses, a repeated one counts once). **The clear area**:
+  `McpEditorDeps.clearViewRect` is the viewport less the overlays drawn over it
+  (`clearArea`): the `TopBar` (absolute, at the top, inside the viewport), the
+  `SceneScroller`'s scroll bar tracks (right and bottom edges; transparent until
+  the scene is scrollable, but always laid out) and, while the dock is closed,
+  `BottomPanel`'s buttons (`bottomDockButtons`, absolute at the bottom left of
+  the editor, so over the viewport). Each takes its whole edge. **Framing**
+  (`graphImageFrame`): the drawn areas' bounding rectangle with
+  `GRAPH_IMAGE_MARGIN` (40) around it, at the largest zoom at which it fits the
+  clear area, clamped to 0.1–1, and shifted by the offset between the clear
+  area's centre and the viewport's, because `McpEditorDeps.frameScene`
+  (`panAndZoomTo(rect, scale, scale, true)`) centres in the whole viewport. So
+  no framed node sits under the top bar at any scale that fits. It then waits
+  while the view moves and for two still frames (giving up 2 s before the call's
+  deadline), and answers `{ rect, scale, nodes }`: the client rectangle of the
+  nodes and their margin as now drawn (`viewport` and `viewRect` convert scene
+  to client), cut to the clear area (at 10% a graph too large to fit is cut),
+  for main to capture; the zoom; and the nodes framed (a node not drawn yet is
+  skipped). An empty method is `EMPTY_METHOD_ERROR`; none drawn, "The nodes are
+  not drawn yet". It edits nothing, so it works in Live, and leaves the view
+  where it framed it.
 
 ## Documentation and images (`documentationTools.ts`, `imageTools.ts`)
 
@@ -469,10 +553,14 @@ edit:
   otherwise wait the full 20 s), and `remove_nodes`' users of a removed node
   (from `db.nodeDependents`, the usages `deleteNodes` disconnects, read before
   the deletion);
-- none for `add_function`, `set_node_comment`, `set_documentation` and
-  `set_visualization`: they change nothing the engine computes, and settle at
-  once (`settled: true` in their results too, so every edit result has the
-  field).
+- none for `add_function`, `set_node_comment`, `set_documentation`,
+  `set_visualization`, `move_nodes` and `arrange_nodes`: they change nothing the
+  engine computes, and settle at once (`settled: true` in their results too, so
+  every edit result has the field).
+
+An edit that changes nothing at all (`EditRunOptions.unchanged` true for its
+value) does not even wait for the graph update: see "Layout and the graph
+picture".
 
 The watch listens from the moment it is made (just before the edit) but counts
 only what arrives after `editApplied()`: a report from before belongs to an
@@ -543,14 +631,19 @@ the method (`mockExpressionValues`: `Pending`, then a `Value`, two
 `_mockExpressionUpdate` cannot stand in: it writes to the registry directly,
 which the watch does not see. Against the real engine,
 `app/electron-client/tests/mcp.spec.ts` builds a project through every edit and
-view tool in the packaged app, undoes one call with `Mod+Z`, and checks that
-each code-running edit answers `settled: true` with current types and states, in
-under 10 s (two `edit_node` calls back to back on a node and its user, the
-second's type current in its own result; the same text again; a removed node's
-user). It also checks that code wrapped in the Write prefix is refused by
-`add_nodes`, `edit_node` and `evaluate_expression` and that the file it names is
-never written, and it stores two images through `add_image` (both found in the
-project's `images` folder on disk), sets the documentation to text showing them
-and reads it back, also after closing and reopening the project.
+view tool in the packaged app (the layout tools, a visualization made 600 × 400
+and back, and a picture of the graph included), undoes one call with `Mod+Z`,
+and checks that each code-running edit answers `settled: true` with current
+types and states, in under 10 s (two `edit_node` calls back to back on a node
+and its user, the second's type current in its own result; the same text again;
+a removed node's user). It also checks that code wrapped in the Write prefix is
+refused by `add_nodes`, `edit_node` and `evaluate_expression` and that the file
+it names is never written, and it stores two images through `add_image` (both
+found in the project's `images` folder on disk), sets the documentation to text
+showing them and reads it back, also after closing and reopening the project.
 `integration-test/project-view/mcpDocumentation.spec.ts` drives the
-documentation tools and `store_image` against the mock.
+documentation tools and `store_image` against the mock; `mcpLayout.spec.ts`
+drives `get_graph { layout: true }`, `move_nodes`, `arrange_nodes` and
+`prepare_graph_image` (positions against the nodes on screen, the view and the
+selection left alone, one undo step, Live), and `mcpVisualization.spec.ts` the
+visualization tools, sizes included.

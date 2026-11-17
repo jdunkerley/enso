@@ -7,6 +7,8 @@ import {
 import { mockProjectNameStore } from '$/providers/openedProjects/projectNames'
 import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
+import { Rect } from '@/util/data/rect'
+import { Vec2 } from '@/util/data/vec2'
 import type { MethodPointer } from '@/util/methodPointer'
 import { stdPath } from '@/util/projectPath'
 import type { Identifier } from '@/util/qualifiedName'
@@ -62,6 +64,8 @@ function makeDeps(overrides: Partial<GetGraphDeps> = {}, code = CODE) {
     printType: projectNames.printProjectPath,
     evaluate,
     selection: () => [],
+    area: () => undefined,
+    view: () => ({ rect: Rect.XYWH(0, 0, 800, 600), scale: 1 }),
     ...overrides,
   }
   return { deps, db, registry, evaluate, func }
@@ -155,6 +159,49 @@ test('get_graph lists the selected nodes', async () => {
   selected.push(nodeNamed(db, 'b'), nodeNamed(db, 'a'))
   const graph = parseValue(await getGraph(deps, { previews: false }))
   expect(graph.selection).toEqual([nodeNamed(db, 'b'), nodeNamed(db, 'a')])
+})
+
+test('get_graph leaves out positions, areas and the view unless `layout` is true', async () => {
+  const { deps, db } = makeDeps({ area: () => Rect.XYWH(1, 2, 3, 4) })
+  db.nodeIdToNode.get(nodeNamed(db, 'a'))!.position = new Vec2(10, 20)
+  for (const args of [{ previews: false }, { previews: false, layout: false }]) {
+    const graph = parseValue(await getGraph(deps, args))
+    expect(graph.view).toBeUndefined()
+    for (const node of graph.nodes) {
+      expect(node.position).toBeUndefined()
+      expect(node.area).toBeUndefined()
+    }
+  }
+})
+
+test("get_graph with `layout` gives each node's position and area, rounded, and the view", async () => {
+  const areas = new Map<NodeId, Rect>()
+  const { deps, db } = makeDeps({
+    area: (id) => areas.get(id),
+    view: () => ({ rect: Rect.XYWH(-100.4, 50.6, 1280.2, 720.7), scale: 0.75 }),
+  })
+  const a = nodeNamed(db, 'a')
+  const b = nodeNamed(db, 'b')
+  db.nodeIdToNode.get(a)!.position = new Vec2(10.4, -20.6)
+  db.nodeIdToNode.get(b)!.position = new Vec2(300, 400)
+  areas.set(a, Rect.XYWH(10.4, -20.6, 120.5, 32.2))
+  const graph = parseValue(await getGraph(deps, { previews: false, layout: true }))
+  const nodeA = graph.nodes.find((n: { id: string }) => n.id === a)
+  const nodeB = graph.nodes.find((n: { id: string }) => n.id === b)
+  expect(nodeA.position).toEqual({ x: 10, y: -21 })
+  expect(nodeA.area).toEqual({ x: 10, y: -21, width: 121, height: 32 })
+  // Not drawn yet: no area.
+  expect(nodeB.position).toEqual({ x: 300, y: 400 })
+  expect(nodeB.area).toBeUndefined()
+  expect(graph.view).toEqual({ x: -100, y: 51, width: 1280, height: 721, scale: 0.75 })
+})
+
+test('get_graph with `layout` gives no position for a node that has none yet', async () => {
+  const { deps, db } = makeDeps()
+  db.nodeIdToNode.get(nodeNamed(db, 'a'))!.position = Vec2.Infinity
+  const graph = parseValue(await getGraph(deps, { previews: false, layout: true }))
+  const nodeA = graph.nodes.find((n: { name: string }) => n.name === 'a')
+  expect(nodeA).not.toHaveProperty('position')
 })
 
 test('get_graph previews each value node, cut to the limit, and leaves out failures', async () => {

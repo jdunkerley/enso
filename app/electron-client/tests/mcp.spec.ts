@@ -100,6 +100,7 @@ test('an MCP client reads the open project and cannot write a file', async ({
         'get_component_docs',
         'get_documentation',
         'get_graph',
+        'get_graph_image',
         'get_node',
         'get_visualization',
         'list_visualizations',
@@ -108,8 +109,10 @@ test('an MCP client reads the open project and cannot write a file', async ({
         'add_function',
         'add_image',
         'add_nodes',
+        'arrange_nodes',
         'collapse_nodes',
         'edit_node',
+        'move_nodes',
         'open_method',
         'remove_nodes',
         'select_nodes',
@@ -233,11 +236,47 @@ const NAME_LOOKUP_REFUSED =
 /** The first eight bytes of every PNG file. */
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
+/** A visualization's size as drawn, in scene units, and whether each is the default. */
+interface VisualizationSize {
+  width: number
+  height: number
+  default_width: boolean
+  default_height: boolean
+}
+
+/** The text beside a `get_visualization` picture. */
+interface PictureAbout {
+  visualization: string
+  shown: boolean
+  changed: boolean
+  available: string[]
+  size: VisualizationSize
+  /** The picture, in pixels. */
+  width: number
+  height: number
+}
+
+/** The size the test gives a visualization with `set_visualization`. */
+const LARGE_SIZE: VisualizationSize = {
+  width: 600,
+  height: 400,
+  default_width: false,
+  default_height: false,
+}
+
+/** A node's place, with `get_graph { layout: true }`: its top-left and the room it takes. */
+interface NodeLayout {
+  id: string
+  name: string | null
+  position?: { x: number; y: number }
+  area?: { x: number; y: number; width: number; height: number }
+}
+
 /** The states of a node that is neither an error nor a panic. */
 const NOT_FAILED = ['value', 'pending', 'unknown']
 
 test('an MCP client builds a project from the dashboard', async ({ page, testRunId }, testInfo) => {
-  // A cold engine's first execution of a new project, about twenty edits each waiting for its
+  // A cold engine's first execution of a new project, about twenty-five edits each waiting for its
   // execution, an 11 s pause, and a close and reopen.
   test.setTimeout(600_000)
   await waitForDashboard(page)
@@ -370,14 +409,9 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     expect(picture.isError, JSON.stringify(picture.content)).toBeFalsy()
     const { png, text } = imageOf(picture)
     note('get_visualization numbers (image)', text)
-    const about = JSON.parse(text) as {
-      visualization: string
-      shown: boolean
-      changed: boolean
-      available: string[]
-      width: number
-      height: number
-    }
+    const about = JSON.parse(text) as PictureAbout
+    // The default size: 150 high, and as wide as the node or 200.
+    expect(about.size).toMatchObject({ height: 150, default_width: true, default_height: true })
     expect(about.shown).toBe(true)
     expect(about.changed).toBe(false)
     // A PNG: the signature, then the size the text states, within the cap.
@@ -402,6 +436,52 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     expect(data.isError, textOf(data)).toBeFalsy()
     note('get_visualization numbers (data)', textOf(data))
     expect(JSON.parse(textOf(data))).toMatchObject({ shown: false, truncated: false })
+
+    // The same visualization made larger, then put back to its default size: the picture follows.
+    const enlarged = await callJson<{ size: VisualizationSize; settled: boolean }>(
+      'set_visualization',
+      { node_id: numbersId, visible: true, width: 600, height: 400 },
+    )
+    note('set_visualization numbers 600 x 400', enlarged)
+    expect(enlarged).toMatchObject({ size: LARGE_SIZE, settled: true })
+    const large = await callTool('get_visualization', { node_id: numbersId })
+    expect(large.isError, JSON.stringify(large.content)).toBeFalsy()
+    const largeImage = imageOf(large)
+    note('get_visualization numbers at 600 x 400 (image)', largeImage.text)
+    const largeAbout = JSON.parse(largeImage.text) as PictureAbout
+    expect(largeAbout).toMatchObject({
+      visualization: about.visualization,
+      shown: false,
+      changed: false,
+      size: LARGE_SIZE,
+    })
+    expect(largeImage.png.readUInt32BE(16)).toBe(largeAbout.width)
+    expect(largeImage.png.readUInt32BE(20)).toBe(largeAbout.height)
+    expect(largeAbout.width).toBeGreaterThan(about.width)
+    expect(largeAbout.height).toBeGreaterThan(about.height)
+    expect(new Set(largeImage.png.subarray(33)).size).toBeGreaterThan(32)
+    await testInfo.attach('viz-600x400.png', { body: largeImage.png, contentType: 'image/png' })
+    const reset = await callJson<{ size: VisualizationSize; settled: boolean }>(
+      'set_visualization',
+      { node_id: numbersId, visible: true, width: null, height: null },
+    )
+    note('set_visualization numbers back to the default size', reset)
+    expect(reset.size).toMatchObject({ default_width: true, default_height: true })
+    expect(reset.size).toEqual(about.size)
+    const small = await callTool('get_visualization', { node_id: numbersId })
+    expect(small.isError, JSON.stringify(small.content)).toBeFalsy()
+    const smallImage = imageOf(small)
+    note('get_visualization numbers at the default size again (image)', smallImage.text)
+    const smallAbout = JSON.parse(smallImage.text) as PictureAbout
+    expect(smallAbout.size).toEqual(about.size)
+    expect({ width: smallAbout.width, height: smallAbout.height }).toEqual({
+      width: about.width,
+      height: about.height,
+    })
+    await testInfo.attach('viz-default-again.png', {
+      body: smallImage.png,
+      contentType: 'image/png',
+    })
 
     // The node's other visualizations: offered, then one of them looked at by name.
     const offered = await callJson<{ shown: boolean; visualization: string; available: string[] }>(
@@ -794,7 +874,72 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     note('get_node doubled preview', doubledPreview)
     expect(doubledPreview).toContain('42')
 
-    // 9. Undo in the window. A caller's step ends 10 s after its last edit, so this call is a step
+    // 9. The layout: the positions, a node moved, the graph tidied, then a picture of it all.
+    const layoutGraph = () =>
+      callJson<{ nodes: NodeLayout[]; view: { scale: number } }>('get_graph', {
+        previews: false,
+        layout: true,
+      })
+    const laidOut = await layoutGraph()
+    note(
+      'get_graph with layout',
+      laidOut.nodes.map((node) => [node.name, node.position, node.area]),
+    )
+    expect(laidOut.view.scale).toBeGreaterThan(0)
+    for (const node of laidOut.nodes) {
+      expect(node.position, JSON.stringify(node)).toBeDefined()
+      expect(node.area, JSON.stringify(node)).toBeDefined()
+    }
+    const doubledNode = laidOut.nodes.find((node) => node.name === 'doubled')!
+    expect(doubledNode, JSON.stringify(laidOut.nodes)).toBeDefined()
+    const doubledTarget = {
+      x: doubledNode.position!.x + 300,
+      y: doubledNode.position!.y + 200,
+    }
+    const movedNodes = await callJson<{ moved: unknown[]; settled: boolean }>('move_nodes', {
+      moves: [{ node_id: doubledNode.id, ...doubledTarget }],
+    })
+    note('move_nodes doubled', movedNodes)
+    expectSettled('move_nodes', movedNodes)
+    expect(movedNodes.moved).toEqual([{ id: doubledNode.id, position: doubledTarget }])
+    const afterMove = await layoutGraph()
+    expect(afterMove.nodes.find((node) => node.id === doubledNode.id)?.position).toEqual(
+      doubledTarget,
+    )
+    const tidied = await callJson<{ action: string; arranged: number; settled: boolean }>(
+      'arrange_nodes',
+      { action: 'tidy' },
+    )
+    note('arrange_nodes tidy', tidied)
+    expectSettled('arrange_nodes tidy', tidied)
+    expect(tidied.action).toBe('tidy')
+    expect(tidied.arranged).toBeGreaterThanOrEqual(0)
+    const tidiedGraph = await layoutGraph()
+    note(
+      'get_graph with layout after tidy',
+      tidiedGraph.nodes.map((node) => [node.name, node.position]),
+    )
+    const graphPicture = await callTool('get_graph_image', {})
+    expect(graphPicture.isError, JSON.stringify(graphPicture.content)).toBeFalsy()
+    const graphImage = imageOf(graphPicture)
+    note('get_graph_image', graphImage.text)
+    const graphAbout = JSON.parse(graphImage.text) as {
+      scale: number
+      width: number
+      height: number
+      nodes: number
+    }
+    expect(graphAbout.nodes).toBe(tidiedGraph.nodes.length)
+    expect(graphAbout.scale).toBeGreaterThan(0)
+    expect(graphAbout.scale).toBeLessThanOrEqual(1)
+    expect(graphImage.png.subarray(0, 8).equals(PNG_SIGNATURE)).toBe(true)
+    expect(graphImage.png.readUInt32BE(16)).toBe(graphAbout.width)
+    expect(graphImage.png.readUInt32BE(20)).toBe(graphAbout.height)
+    expect(Math.max(graphAbout.width, graphAbout.height)).toBeLessThanOrEqual(1200)
+    expect(new Set(graphImage.png.subarray(33)).size).toBeGreaterThan(32)
+    await testInfo.attach('graph.png', { body: graphImage.png, contentType: 'image/png' })
+
+    // 10. Undo in the window. A caller's step ends 10 s after its last edit, so this call is a step
     // of its own: one undo takes back both its nodes, and nothing before them.
     await page.waitForTimeout(11_000)
     const toUndo = await callJson<{ nodes: NodeSummary[]; settled: boolean }>('add_nodes', {
@@ -810,7 +955,7 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     expect(names(afterUndo)).not.toContain('undo_b')
     expect(names(afterUndo)).toEqual(expect.arrayContaining(['doubled', 'tag', 'pair']))
 
-    // 10. Removing a node with a user: the user is computed again, and the result waits for it.
+    // 11. Removing a node with a user: the user is computed again, and the result waits for it.
     const pairOfNodes = await callJson<{ nodes: NodeSummary[]; settled: boolean }>('add_nodes', {
       statements: ['base = 5', 'uses_base = base + 1'],
     })
@@ -825,7 +970,7 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     const usesBase = nodeNamed(await getGraph(), 'uses_base')
     note('uses_base after its input was removed', usesBase)
 
-    // 11. Removing, listing, the Drive's path rule, closing and reopening.
+    // 12. Removing, listing, the Drive's path rule, closing and reopening.
     const removed = await callJson<{ removed: string[]; settled: boolean }>('remove_nodes', {
       node_ids: [pairId],
     })

@@ -68,6 +68,7 @@ import { unrefElement, useEventConditional } from '@/composables/events'
 import { useGraphPaletteActions } from '@/composables/graphPaletteActions'
 import { useNodeAppearanceCache } from '@/composables/nodeAppearanceCache'
 import { useProjectMcpTools } from '@/mcp/useProjectMcpTools'
+import { clearArea } from '@/mcp/viewTools'
 import type { PlacementStrategy } from '@/composables/nodeCreation'
 import { registerHandlers, toggledAction, type DisplayableActionName } from '@/providers/action'
 import { useGlobalEventRegistry } from '@/providers/globalEventRegistry'
@@ -303,9 +304,27 @@ useProjectMcpTools({
   canLeaveMethod: () => stackNavigator.allowNavigationLeft.value,
   leaveMethod: () => stackNavigator.exitNode(),
   viewport: () => graphNavigator.viewport,
+  viewportScale: () => graphNavigator.scale,
   collapseNodes: (ids, name) =>
     collapseNodesIntoFunction(collapseDeps(), ids, name ? { name } : {}),
   viewRect: () => viewportElem.value?.getBoundingClientRect() ?? new DOMRect(),
+  // The overlays drawn over the viewport: the top bar, the scroll bars and, while the dock is
+  // closed, its buttons at the bottom left (positioned in this editor, outside the viewport).
+  // Called only when a tool runs, after setup: `root` is defined below.
+  clearViewRect: () => {
+    const view = viewportElem.value
+    if (view == null) return new DOMRect()
+    const boxes = (within: ParentNode | null | undefined, selector: string) =>
+      Array.from(within?.querySelectorAll(selector) ?? [], (elem) => elem.getBoundingClientRect())
+    return clearArea(view.getBoundingClientRect(), {
+      top: boxes(view, '.TopBar'),
+      right: boxes(view, '.ScrollBar .track.vertical'),
+      bottom: [
+        ...boxes(view, '.ScrollBar .track.horizontal'),
+        ...boxes(root.value, '[data-testid="bottomDockButtons"]'),
+      ],
+    })
+  },
   scale: () => graphNavigator.targetScale,
   // `panAndZoomTo` centres the rectangle at the largest scale in [0.1, 1] at which it fits.
   revealClientRect: (rect) =>
@@ -317,6 +336,8 @@ useProjectMcpTools({
       1,
       true,
     ),
+  // The scale is chosen by the caller (`graphImageFrame`): the range is that one scale.
+  frameScene: (rect, scale) => graphNavigator.panAndZoomTo(rect, scale, scale, true),
   viewMoving: () => graphNavigator.transformChanging,
   // As `GraphNode.vue` passes the type info to its visualization's dropdown.
   visualizationsFor: (id) => {
@@ -324,6 +345,10 @@ useProjectMcpTools({
     const typeInfo = node && graphStore.db.getExpressionInfo(node.innerExpr.externalId)?.typeInfo
     return [...visualizationStore.byType(typeInfo)]
   },
+  // Called only when a tool runs, after setup: `graphTidy` is defined below.
+  tidy: (ids) => graphTidy.tidy(ids),
+  // The handlers themselves, not the menu's actions, which check the panel's focus.
+  alignment: createSelectionAlignmentHandlers(graphStore),
 })
 
 // === Clipboard Copy/Paste ===

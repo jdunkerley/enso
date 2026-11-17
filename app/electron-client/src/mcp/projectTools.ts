@@ -20,6 +20,16 @@ const DOCUMENTATION_CHARS = 100_000
 /** Most characters of one statement or expression an agent adds to a node. */
 const STATEMENT_CHARS = 20_000
 
+/** Most nodes one `move_nodes` call moves. */
+const MOVE_NODES_MAX = 200
+/** The farthest from the origin, in scene units, a node may be moved to on either axis. */
+const COORDINATE_LIMIT = 1_000_000
+/** Most nodes one `arrange_nodes` call lays out. */
+const ARRANGE_NODES_MAX = 500
+/** The smallest and largest width or height, in scene units, `set_visualization` sets. */
+const VISUALIZATION_SIZE_MIN = 100
+const VISUALIZATION_SIZE_MAX = 2_000
+
 export const VIEW_TOOL_NAMES = [
   'get_graph',
   'get_node',
@@ -39,6 +49,8 @@ export const EDIT_TOOL_NAMES = [
   'set_node_comment',
   'set_documentation',
   'set_visualization',
+  'move_nodes',
+  'arrange_nodes',
   'select_nodes',
   'open_method',
 ] as const
@@ -46,6 +58,9 @@ export const EDIT_TOOL_NAMES = [
 export const PROJECT_TOOL_NAMES = [...VIEW_TOOL_NAMES, ...EDIT_TOOL_NAMES] as const
 
 const nodeId = () => z.string().max(NAME_CHARS)
+/** A visualization's width or height: in scene units, `null` for the default, or left out. */
+const visualizationSize = () =>
+  z.number().finite().min(VISUALIZATION_SIZE_MIN).max(VISUALIZATION_SIZE_MAX).nullable().optional()
 
 /**
  * The Write rule, in the tool descriptions that take code. It says what the Write guard
@@ -73,7 +88,7 @@ const EDIT_RULES =
   '`get_node` later.'
 
 /**
- * The project tools (the seven that read, the ten that edit or navigate), each forwarding its
+ * The project tools (the seven that read, the twelve that edit or navigate), each forwarding its
  * arguments to the window through `bridge`.
  */
 export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
@@ -93,10 +108,16 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'connections from each node `code` and from `source`. When previews run out of ' +
         'time or space, `previews_skipped` counts the nodes left without one: a long graph ' +
         'returns fewer previews and cut texts, and `get_node` gives one node in full. ' +
-        '`selection` lists the ids of the nodes the user has selected. Call this first to ' +
+        '`selection` lists the ids of the nodes the user has selected. With `layout` true, ' +
+        'each node also has `position` `{ x, y }` (its top-left as stored) and `area` ' +
+        '`{ x, y, width, height }` (the room it takes on screen with its visualization; absent ' +
+        'for a node not drawn yet), and the result has `view` `{ x, y, width, height, scale }`, ' +
+        'the part of the graph on screen and the zoom it is drawn at (`scale`, 1 is 100%); ' +
+        'the rest in scene units (pixels at 100% zoom, x to the right, y down), rounded. ' +
+        'Call this first to ' +
         'see what the project does. Each `node_id` is stable across edits, so you can pass ' +
         'it to `get_node` and `evaluate_expression` later.',
-      inputSchema: { previews: z.boolean().optional() },
+      inputSchema: { previews: z.boolean().optional(), layout: z.boolean().optional() },
       run: forward('get_graph'),
     },
     {
@@ -172,8 +193,10 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'in the order of the dropdown in its visualization toolbar. Returns `{ node_id, ' +
         'shown, visualization, available }`: `shown`, whether its visualization is switched ' +
         'on; `visualization`, the name of the one on screen (null when none is); `available`, ' +
-        'the names to pass to `get_visualization` as `visualization`. Shows, moves and changes ' +
-        'nothing, and works in Live mode too.',
+        'the names to pass to `get_visualization` as `visualization`; `size`, `{ width, height, ' +
+        'default_width, default_height }`: its size as drawn in scene units (as it would be ' +
+        'when hidden) and whether each is the default. Shows, moves and changes nothing, and ' +
+        'works in Live mode too.',
       inputSchema: { node_id: nodeId() },
       run: forward('list_visualizations'),
     },
@@ -309,14 +332,90 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
     },
     {
       name: 'set_visualization',
-      title: 'Show or hide a visualization',
+      title: 'Show, hide or resize a visualization',
       description:
         'Show (`visible` true) or hide the visualization of the node `node_id` (from ' +
-        '`get_graph`) in the graph editor, for the user to look at. Returns `node`, the node, ' +
-        'and `settled` (always true: nothing is computed again).' +
+        '`get_graph`) in the graph editor, for the user to look at. `width` and `height` ' +
+        '(optional) set its size in scene units (pixels at 100% zoom), 100 to 2,000 each, ' +
+        'or `null` for the default (the width of the node or 200, and 150 high); one left out ' +
+        'stays as it is, and a size given with `visible` false is stored while the ' +
+        'visualization stays hidden. All of it is one edit. A larger visualization pushes the nodes around ' +
+        'it away, and they return when it shrinks. The size stays as set and is part of your ' +
+        'undo step: when the user did not ask for a large one, pass `null` for both to put it ' +
+        'back to the small default when you are done. The view never draws it narrower than ' +
+        'the node or 200, nor lower than 32. Returns `node`, the node, `size`, `{ width, ' +
+        'height, default_width, default_height }` (as drawn, and whether each is the ' +
+        'default), and `settled` (always true: nothing is computed again).' +
         EDIT_RULES,
-      inputSchema: { node_id: nodeId(), visible: z.boolean() },
+      inputSchema: {
+        node_id: nodeId(),
+        visible: z.boolean(),
+        width: visualizationSize(),
+        height: visualizationSize(),
+      },
       run: forward('set_visualization', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'move_nodes',
+      title: 'Move nodes',
+      description:
+        'Move nodes in the graph editor. Each of `moves` is `{ node_id, x, y }`: the new ' +
+        "position of the node's top-left, in scene units (pixels at 100% zoom, x to the right, " +
+        "y down). Read the current positions with `get_graph { layout: true }`; a node's " +
+        '`area` shows the room it needs, its visualization included, so leave a gap between ' +
+        'areas. All the moves are one edit; nodes the moved ones were pushing aside return to ' +
+        'their places. An unknown node, or the same node twice, refuses the whole call and ' +
+        'nothing moves. For a tidy result prefer `arrange_nodes`. Returns `moved`, each ' +
+        'node `{ id, position }` as stored afterwards, and `settled` (always true: nothing is ' +
+        'computed again).' +
+        EDIT_RULES,
+      inputSchema: {
+        moves: z
+          .array(
+            z.object({
+              node_id: nodeId(),
+              x: z.number().finite().min(-COORDINATE_LIMIT).max(COORDINATE_LIMIT),
+              y: z.number().finite().min(-COORDINATE_LIMIT).max(COORDINATE_LIMIT),
+            }),
+          )
+          .min(1)
+          .max(MOVE_NODES_MAX),
+      },
+      run: forward('move_nodes', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'arrange_nodes',
+      title: 'Arrange nodes',
+      description:
+        "Lay nodes out with the graph editor's own commands, as the user would. `action`: " +
+        '`tidy` (Tidy up: lays out the nodes of `node_ids`, or the whole graph without ' +
+        '`node_ids` or with fewer than two); `align_left`, `align_right`, `align_center`, ' +
+        '`align_top`, `align_bottom` (Align: line the nodes up on that edge or centre); ' +
+        '`space`, `space_tight`, `space_wide`, `space_none` (Spacing: stack the nodes ' +
+        'vertically with the default, tight, wide or no gap). The Align and Spacing actions ' +
+        'need at least two nodes in `node_ids` (ids from `get_graph`). An unknown or repeated ' +
+        'node refuses the call and nothing moves. All of it is one edit; the view and the ' +
+        'selection do not change. Returns `{ action, arranged, settled }`: `arranged`, the ' +
+        'number of nodes whose position changed (0 when they were already laid out), and ' +
+        '`settled` (always true: nothing is computed again). Read the new positions with ' +
+        '`get_graph { layout: true }`.' +
+        EDIT_RULES,
+      inputSchema: {
+        action: z.enum([
+          'tidy',
+          'align_left',
+          'align_right',
+          'align_center',
+          'align_top',
+          'align_bottom',
+          'space',
+          'space_tight',
+          'space_wide',
+          'space_none',
+        ]),
+        node_ids: z.array(nodeId()).max(ARRANGE_NODES_MAX).optional(),
+      },
+      run: forward('arrange_nodes', EDIT_TOOL_TIMEOUT_MS),
     },
     {
       name: 'select_nodes',
@@ -324,8 +423,9 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
       description:
         'Select the nodes in `node_ids` (from `get_graph`) in the graph editor, to point ' +
         'the user at them; an empty list clears the selection. This and `open_method` are ' +
-        'the only project tools that change the selection, and with `get_visualization` the ' +
-        'only ones that move the view: the edit tools leave both alone. Returns `selected`, ' +
+        'the only project tools that change the selection, and with `get_visualization` and ' +
+        '`get_graph_image` the only ones that move the view: the edit tools leave both alone. ' +
+        'Returns `selected`, ' +
         'the ids of the selected nodes. Works in Live mode too.',
       inputSchema: { node_ids: z.array(nodeId()).max(200) },
       run: forward('select_nodes'),

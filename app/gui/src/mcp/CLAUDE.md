@@ -4,8 +4,11 @@ The window side of the IDE's MCP server: the dispatcher every tool call goes
 through, and the app tools. The project tools (those that read and edit one
 project) are in `src/project-view/mcp/` (see its `CLAUDE.md`); the tool
 definitions are in `app/electron-client/src/mcp/` (`projectTools.ts`,
-`appTools.ts`). A tool needs both halves; keep each description in step with
-what its handler returns and refuses.
+`appTools.ts`, and `visualizationTool.ts`, `imageTool.ts` and
+`graphImageTool.ts` for the three tools that take a picture in main: their
+window handlers, such as `prepare_graph_image`, are registered as project tools
+but are not MCP tools). A tool needs both halves; keep each description in step
+with what its handler returns and refuses.
 
 - `toolDispatcher.ts` — started by `App.vue`. **Two kinds of registration**:
   - Project tools: `registerMcpToolHandlers`, one set per open project's graph

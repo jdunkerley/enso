@@ -24,6 +24,7 @@ import {
   type NodeSummary,
 } from './graphTools'
 import { hasSyntaxError, parseImportLines, quote } from './importLines'
+import type { VisualizationSize } from './visualizationTools'
 import { writeRefusal } from './writeGuard'
 
 /** Added to a result whose edit was not followed by a finished execution in time. */
@@ -37,6 +38,10 @@ export const METHOD_CHANGED_ERROR =
   'The method on screen changed before this edit ran. Nothing was changed; call get_graph and try again.'
 /** Most characters of an error from the session or a dependency. */
 export const EDIT_ERROR_CHARS = 2_000
+/** The smallest width or height, in scene units, `set_visualization` sets. */
+export const VISUALIZATION_SIZE_MIN = 100
+/** The largest width or height, in scene units, `set_visualization` sets. */
+export const VISUALIZATION_SIZE_MAX = 2_000
 
 export interface ParsedStatement {
   readonly binding: string | undefined
@@ -146,12 +151,24 @@ export interface EditToolDeps extends GraphToolDeps {
   readonly setNodeContent: (id: NodeId, expression: string) => Result<void>
   readonly deleteNodes: (ids: readonly NodeId[]) => Promise<Result<void>>
   readonly setNodeComment: (id: NodeId, text: string) => Result<void>
-  /** Shows or hides the node's visualization, and switches it to `identifier` when given. */
-  readonly setVisualization: (
-    id: NodeId,
-    visible: boolean,
-    identifier?: VisualizationIdentifier,
-  ) => Result<void>
+  /**
+   * Writes the node's visualization metadata in one `graph.setNodeVisualization` call: shows or
+   * hides it, and sets the identifier, width and height given (null: the default size); a key left
+   * out keeps its value.
+   */
+  readonly setVisualization: (id: NodeId, update: VisualizationUpdate) => Result<void>
+  /** The size of the node's visualization as drawn, from its metadata as the graph has it now. */
+  readonly visualizationSize: (id: NodeId) => VisualizationSize
+}
+
+/** What `set_visualization` writes to a node's visualization metadata, in one edit. */
+export interface VisualizationUpdate {
+  readonly visible: boolean
+  readonly identifier?: VisualizationIdentifier
+  /** In scene units; null for the default. */
+  readonly width?: number | null
+  /** In scene units; null for the default. */
+  readonly height?: number | null
 }
 
 type FoundNode = { id: NodeId; node: Node }
@@ -371,16 +388,39 @@ export async function setNodeComment(
 }
 
 /**
- * Shows or hides a node's visualization, and switches it to `identifier` in the same edit when one
- * is given (`get_visualization` does; the `set_visualization` tool never passes one). Answers with
- * the node and `settled: true` (nothing is computed again).
+ * Shows or hides a node's visualization, and in the same edit sets its `width` and `height` when
+ * given (null: the default) and switches it to `identifier` when one is given (`get_visualization`
+ * does; the `set_visualization` tool never passes one). A size outside
+ * {@link VISUALIZATION_SIZE_MIN} to {@link VISUALIZATION_SIZE_MAX} is refused before anything
+ * changes. Answers with the node, the size as drawn after the edit and `settled: true` (nothing
+ * is computed again).
  */
 export async function setVisualization(
   deps: EditToolDeps,
-  args: { node_id: string; visible: boolean; identifier?: VisualizationIdentifier },
+  args: {
+    node_id: string
+    visible: boolean
+    identifier?: VisualizationIdentifier
+    width?: number | null
+    height?: number | null
+  },
 ): Promise<McpToolResult> {
   const found = findNode(deps.db, args.node_id)
   if (!found.ok) return found
+  for (const dimension of ['width', 'height'] as const) {
+    const value = args[dimension]
+    if (value != null && !isVisualizationSize(value)) {
+      return toolError(
+        `The \`${dimension}\` must be 100 to 2,000 scene units, or null for the default size.`,
+      )
+    }
+  }
+  const update: VisualizationUpdate = {
+    visible: args.visible,
+    ...(args.identifier != null ? { identifier: args.identifier } : {}),
+    ...(args.width !== undefined ? { width: args.width } : {}),
+    ...(args.height !== undefined ? { height: args.height } : {}),
+  }
   const method = methodOnScreen(deps)
   const outcome = await deps.session.run(
     deps.caller,
@@ -389,12 +429,21 @@ export async function setVisualization(
     () => {
       const unchanged = checkAtTurn(deps, method, [found.value.id])
       if (!unchanged.ok) return unchanged
-      return deps.setVisualization(found.value.id, args.visible, args.identifier)
+      return deps.setVisualization(found.value.id, update)
     },
     { deadline: deps.deadline },
   )
   if (!outcome.ok) return errorResult(outcome)
-  return settledResult({ node: currentSummary(deps, found.value) }, outcome.value)
+  return settledResult(
+    { node: currentSummary(deps, found.value), size: deps.visualizationSize(found.value.id) },
+    outcome.value,
+  )
+}
+
+function isVisualizationSize(value: number): boolean {
+  return (
+    Number.isFinite(value) && value >= VISUALIZATION_SIZE_MIN && value <= VISUALIZATION_SIZE_MAX
+  )
 }
 
 /** The nodes, other than `removed`, that use any of `removed`. */
