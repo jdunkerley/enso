@@ -1040,7 +1040,7 @@ test('Autoscoped constructors', async ({ editorPage }) => {
     )
     .selectSingleNode('autoscoped')
     .withNode('autoscoped', async (node) => {
-      const groupBy = node.getByTestId('list-item-content')
+      const groupBy = node.getByTestId('list-item-content').first()
       await expect(groupBy).toBeVisible()
       await expect(groupBy.locator('.WidgetArgumentName')).toContainText(['column'])
     })

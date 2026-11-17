@@ -508,9 +508,9 @@ export async function showSelectedComponent(page: Page) {
  * does not show them (#836), and the exercises fill them in. Does nothing when there is no `…`.
  */
 async function showHiddenParameters(page: Page, selected: Locator) {
-  const button = selected.locator('.parameterMenuButton')
+  const button = selected.locator('.parameterMenuButton:visible')
   const menu = page.getByRole('dialog', { name: 'More parameters' })
-  while ((await button.count()) > 0) {
+  for (let i = 0; i < 12 && (await button.count()) > 0; i++) {
     await button.first().click()
     const names = await menu.locator('.parameterItem .name').allTextContents()
     if (names.length === 0) return
