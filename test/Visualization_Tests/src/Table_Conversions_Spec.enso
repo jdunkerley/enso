@@ -61,8 +61,8 @@ add_specs suite_builder =
         group_builder.specify "a database table has SQL" <|
             (SQL_Viz.from dt).dialect . should_equal "SQLite"
 
-        group_builder.specify "the default visualisation of a database table is the SQL view" <|
-            Id.from dt . should_equal Id.sql_query
+        group_builder.specify "the default visualisation of a database table is Standard.Database's SQL view" <|
+            Id.from dt . should_equal (Id.Library "Standard.Database" "SQL Query")
 
         group_builder.specify "a database table whose read fails shows the error as JSON" <|
             gone_connection = Database.connect SQLite.In_Memory

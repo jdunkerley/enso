@@ -32,6 +32,8 @@ in a `visualizations/` folder.
   and the main thread, so it must stay free of the DOM.
 - `movedVisualizations.ts` — the table of visualizations that moved out of the
   GUI (below).
+- `builtinModules.ts` — `BUILTIN_MODULE_NAMES`, the one list of bare module
+  names a run-time compiled visualization may import (below).
 - `metadata.ts` — `VisualizationMetadataDb`: id →
   `{ name, inputType, dataType, icon }`, and the lookup of visualizations by
   type (`visualizationsForTypes`, which also follows `Id.from` conversions).
@@ -141,19 +143,29 @@ library, `movedVisualizations.ts` maps the old id to the new one, and
 before the move keep their view. The saved metadata is rewritten only when the
 user changes the visualization.
 
-| Old id            | Now                                      |
-| ----------------- | ---------------------------------------- |
-| `Builtin` `Image` | `Library` `Standard.Image`, name `Image` |
+| Old id                | Now                                             |
+| --------------------- | ----------------------------------------------- |
+| `Builtin` `Image`     | `Library` `Standard.Image`, name `Image`        |
+| `Builtin` `SQL Query` | `Library` `Standard.Database`, name `SQL Query` |
 
-Add a row when another built-in moves (Geo map → `Standard.Geo`, SQL Query →
-`Standard.Database` are planned).
+Add a row when another built-in moves (Geo map → `Standard.Geo` is planned).
 
 ## What a library visualization can use
 
-The same as a project visualization: `vue`, `d3`, the GUI's `builtins` module
-(`useVisualizationConfig`, `defineKeybinds`), and scripts listed in `scripts`.
-Nothing wider; it runs in the IDE window with the trust of the library's own
-Enso and Java code.
+The same as a project visualization: `vue`, `d3`, `sql-formatter` (a lazy chunk
+like `d3`; Standard.Database's SQL Query view formats with it), the GUI's
+`builtins` module (`useVisualizationConfig`, `defineKeybinds`), and scripts
+listed in `scripts`. Nothing wider; it runs in the IDE window with the trust of
+the library's own Enso and Java code.
+
+The bare names are `BUILTIN_MODULE_NAMES` in `builtinModules.ts`, and nowhere
+else: `compilerMessaging.ts` provides one module per name (its table is
+`satisfies Record<BuiltinModuleName, unknown>`, so a name added to the list
+without a module fails the typecheck), the worker rewrites an import of any of
+them, and `shippedVisualizationImports.test.ts` fails when a shipped file
+imports a bare name outside the list (or uses a dynamic `import()`). Widening
+the list widens what every library can rely on, so it is the owner's decision
+(`sql-formatter` was added for the SQL Query view, approved 2026-11-16).
 
 ## Tests
 
@@ -180,6 +192,12 @@ Enso and Java code.
   check. `.github/workflows/gui-changed-files.yml` lists
   `distribution/lib/Standard/*/0.0.0-dev/visualizations/**`, so the GUI unit job
   runs when only such a file changes.
+- `__tests__/shippedVisualizationImports.test.ts` — every shipped visualization
+  imports only the names in `BUILTIN_MODULE_NAMES` and its own relative files,
+  with no dynamic `import()`.
+- `__tests__/shippedSqlQuery.test.ts` — Standard.Database's SQL Query view
+  mounted with sample data: formatting, coloured interpolations, escaping of the
+  SQL and of its values, a placeholder-looking name in the SQL, Ctrl+C.
 
 Run from `app/gui`:
 `CI=true corepack pnpm exec vitest run src/project-view/stores/visualization`

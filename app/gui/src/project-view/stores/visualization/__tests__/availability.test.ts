@@ -5,7 +5,6 @@ import {
 } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
 import * as geoMapVisualization from '@/components/visualizations/GeoMapVisualization.vue'
 import * as scatterplotVisualization from '@/components/visualizations/ScatterplotVisualization.vue'
-import * as sqlVisualization from '@/components/visualizations/SQLVisualization.vue'
 import * as tableVisualization from '@/components/visualizations/TableVisualization.vue'
 import {
   fromVisualizationId,
@@ -13,8 +12,11 @@ import {
   VisualizationMetadataDb,
   visualizationsForTypes,
 } from '@/stores/visualization/metadata'
+import type { VisualizationModule } from '@/stores/visualization/runtimeTypes'
 import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
 import { assert, expect, test } from 'vitest'
+import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
+import * as sqlQueryVisualization from '../../../../../../../distribution/lib/Standard/Database/0.0.0-dev/visualizations/SQL_Query.vue'
 
 const VIZ_TABLE = 'Standard.Visualization.Viz_Table.Viz_Table'
 
@@ -30,15 +32,18 @@ const suggestionDb = SuggestionDb.createMock([
   conversionFrom('Standard.Base.Any.Any'),
 ])
 
-// The builtin visualizations, registered as the visualization store does.
+// The builtin visualizations, and the library ones, registered as the visualization store does.
 const metadata = new VisualizationMetadataDb()
-for (const { name, inputType, dataType, icon } of [
-  tableVisualization,
-  scatterplotVisualization,
-  sqlVisualization,
-  geoMapVisualization,
-]) {
-  metadata.set(toVisualizationId({ module: { kind: 'Builtin' }, name }), {
+const BUILTIN = { kind: 'Builtin' } as const
+type Registered = Pick<VisualizationModule, 'name' | 'inputType' | 'dataType' | 'icon'>
+const registered: [VisualizationIdentifier['module'], Registered][] = [
+  [BUILTIN, tableVisualization],
+  [BUILTIN, scatterplotVisualization],
+  [{ kind: 'Library', name: 'Standard.Database' }, sqlQueryVisualization],
+  [BUILTIN, geoMapVisualization],
+]
+for (const [module, { name, inputType, dataType, icon }] of registered) {
+  metadata.set(toVisualizationId({ module, name }), {
     name,
     inputType,
     dataType,

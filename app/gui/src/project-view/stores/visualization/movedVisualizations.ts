@@ -6,6 +6,7 @@ import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
  */
 const MOVED: ReadonlyMap<string, VisualizationIdentifier> = new Map([
   ['Image', { module: { kind: 'Library', name: 'Standard.Image' }, name: 'Image' }],
+  ['SQL Query', { module: { kind: 'Library', name: 'Standard.Database' }, name: 'SQL Query' }],
 ])
 
 /**
