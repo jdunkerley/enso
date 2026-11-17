@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [Selecting a node no longer expands it to show every hidden argument. A node
+  shows the arguments that are set; the `…` after them adds the others.][850]
 - [The Component Browser's AI prompt and AI nodes are removed, with the local
   `claude` agent behind them. AI agents work with the IDE through its MCP server
   (Settings → AI). A project that has an AI node still opens: the node is an
@@ -557,6 +559,7 @@
 
 [841]: https://github.com/jdunkerley/enso/pull/841
 [844]: https://github.com/jdunkerley/enso/pull/844
+[850]: https://github.com/jdunkerley/enso/pull/850
 [832]: https://github.com/jdunkerley/enso/pull/832
 [831]: https://github.com/jdunkerley/enso/pull/831
 [830]: https://github.com/jdunkerley/enso/pull/830
