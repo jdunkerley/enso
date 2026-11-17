@@ -1,21 +1,27 @@
 /**
  * @file The MCP tools that change what the graph editor shows, not the project: `select_nodes` and
- * `open_method`. They are the only project tools that change the selection, and with
- * `prepare_visualization` (`visualizationTools.ts`, which brings a visualization into view to be
- * captured) the only ones that move the view. `select_nodes` and `open_method` work in Live mode
- * too; `prepare_visualization` works there only for a visualization already shown, since showing
- * one is an edit. Pure functions over {@link ViewToolDeps}.
+ * `open_method`, and the window handler `prepare_graph_image` (not an MCP tool: main's
+ * `get_graph_image` calls it, then captures the rectangle it answers). They are the only project tools that
+ * change the selection, and with `prepare_visualization` (`visualizationTools.ts`, which brings a
+ * visualization into view to be captured) the only ones that move the view. `select_nodes`,
+ * `open_method` and `prepare_graph_image` work in Live mode too; `prepare_visualization` works
+ * there only for a visualization already shown, since showing one is an edit. Pure functions over
+ * {@link ViewToolDeps} and {@link GraphImageDeps}.
  */
 import type { GraphDb, NodeId } from '$/providers/openedProjects/graph/graphDatabase'
+import { Rect } from '@/util/data/rect'
+import { Vec2 } from '@/util/data/vec2'
 import type { McpToolResult } from 'enso-common/src/mcp'
 import { toolError } from './editTools'
 import { findNode, jsonResult } from './graphTools'
+import type { Edges } from './visualizationTools'
 
 /** How long `open_method` waits for the graph to show the method it opened. */
 export const OPEN_METHOD_WAIT_MS = 5_000
 export const NOT_ENTERABLE_ERROR = 'That node is not a component defined in this project.'
 export const ALREADY_AT_TOP_ERROR = 'Already at the top level.'
-const NO_METHOD_ERROR = 'The graph editor shows no method now. Call get_graph.'
+/** The answer when the graph editor shows no method. */
+export const NO_METHOD_ERROR = 'The graph editor shows no method now. Call get_graph.'
 
 export interface ViewToolDeps {
   readonly db: GraphDb
@@ -73,4 +79,187 @@ export async function openMethod(
   await deps.waitForGraph(OPEN_METHOD_WAIT_MS)
   const method = deps.currentMethodName()
   return method != null ? jsonResult({ method }) : toolError(NO_METHOD_ERROR)
+}
+
+/** The margin around the framed nodes, in scene units. */
+export const GRAPH_IMAGE_MARGIN = 40
+/** Most `node_ids` one `get_graph_image` call frames. */
+export const GRAPH_IMAGE_NODES_MAX = 500
+/** The lowest scale the graph is framed at: 10%. */
+export const GRAPH_IMAGE_MIN_SCALE = 0.1
+/** The highest scale the graph is framed at: 100%, never larger. */
+export const GRAPH_IMAGE_MAX_SCALE = 1
+/** The answer for a method on screen with no nodes. */
+export const EMPTY_METHOD_ERROR =
+  'The method on screen has no nodes, so there is nothing to picture. Add nodes first.'
+/** The answer for `node_ids` given as an empty list. */
+export const NO_NODE_IDS_ERROR =
+  'Pass at least one node id in `node_ids`, or leave it out to picture every node.'
+/** The answer when none of the nodes has been drawn yet. */
+const NOT_DRAWN_ERROR = 'The nodes are not drawn yet. Try again in a moment.'
+/** The answer when the view did not stop moving before the call's deadline. */
+const VIEW_MOVING_ERROR = 'The graph view did not stop moving. Try again.'
+/** Left of the call's time for the reply to reach main. */
+const REPLY_MARGIN_MS = 2_000
+/** Frames to wait after the view stops moving, for the graph to repaint. */
+const SETTLE_FRAMES = 2
+
+/** What `prepare_graph_image` needs from the graph and the editor, read at call time. */
+export interface GraphImageDeps {
+  readonly db: GraphDb
+  /** The room the node takes on screen (`graph.visibleArea`); undefined before it is drawn. */
+  readonly area: (id: NodeId) => Rect | undefined
+  /** The graph editor's viewport, in CSS pixels of the window's client area. */
+  readonly viewRect: () => Edges
+  /**
+   * The part of the viewport no overlay covers (the top bar, the dock's buttons, the scroll bars),
+   * in the same pixels: see {@link clearArea}.
+   */
+  readonly clearRect: () => Edges
+  /** The part of the scene the viewport shows, in scene units. */
+  readonly viewport: () => Rect
+  /** The graph's zoom: 1 is 100%. */
+  readonly scale: () => number
+  /** Moves the view, without animation, to show `rect` (scene units) centred at `scale`. */
+  readonly frame: (rect: Rect, scale: number) => void
+  /** Whether the view is still moving. */
+  readonly viewMoving: () => boolean
+  /** Resolves on the next animation frame, or shortly after when the window draws none. */
+  readonly nextFrame: () => Promise<void>
+  /** The clock, in milliseconds. */
+  readonly now: () => number
+  /** When main stops waiting for the reply, in `now()` milliseconds. */
+  readonly deadline: number
+}
+
+/** The overlays along each edge of the viewport, as client rectangles. */
+export type EdgeOverlays = Partial<Record<'top' | 'bottom' | 'left' | 'right', readonly Edges[]>>
+
+/**
+ * The part of `view` the overlays leave clear: below every `top` overlay, above every `bottom`
+ * one, and between the `left` and `right` ones. An overlay that is empty (not laid out) or
+ * outside the view takes nothing.
+ */
+export function clearArea(view: Edges, overlays: EdgeOverlays): Edges {
+  const within = (edges: readonly Edges[] | undefined) =>
+    (edges ?? []).filter(
+      (o) =>
+        o.right > o.left &&
+        o.bottom > o.top &&
+        o.left < view.right &&
+        o.right > view.left &&
+        o.top < view.bottom &&
+        o.bottom > view.top,
+    )
+  return {
+    left: Math.max(view.left, ...within(overlays.left).map((o) => o.right)),
+    top: Math.max(view.top, ...within(overlays.top).map((o) => o.bottom)),
+    right: Math.min(view.right, ...within(overlays.right).map((o) => o.left)),
+    bottom: Math.min(view.bottom, ...within(overlays.bottom).map((o) => o.top)),
+  }
+}
+
+/**
+ * How to frame `areas`: `nodes`, their bounding area with {@link GRAPH_IMAGE_MARGIN} around it;
+ * `scale`, the largest at which it fits the clear part of the viewport, clamped to
+ * [{@link GRAPH_IMAGE_MIN_SCALE}, {@link GRAPH_IMAGE_MAX_SCALE}]; and `frame`, the rectangle to
+ * centre in the whole viewport (as the navigator does) so that `nodes` is centred in the clear
+ * part. Undefined for no areas.
+ */
+export function graphImageFrame(
+  areas: readonly Rect[],
+  view: Edges,
+  clear: Edges,
+): { nodes: Rect; frame: Rect; scale: number } | undefined {
+  const bounds = Rect.Bounding(...areas)
+  if (bounds == null) return undefined
+  const nodes = bounds.expand(GRAPH_IMAGE_MARGIN)
+  const fit = Math.min(
+    (clear.right - clear.left) / nodes.width,
+    (clear.bottom - clear.top) / nodes.height,
+  )
+  const scale = Math.min(GRAPH_IMAGE_MAX_SCALE, Math.max(GRAPH_IMAGE_MIN_SCALE, fit))
+  // How far the clear part's centre is from the viewport's, in client pixels.
+  const shift = new Vec2(
+    (clear.left + clear.right - view.left - view.right) / 2,
+    (clear.top + clear.bottom - view.top - view.bottom) / 2,
+  )
+  return { nodes, frame: nodes.offsetBy(shift.scale(-1 / scale)), scale }
+}
+
+function intersection(a: Edges, b: Edges): Edges {
+  return {
+    left: Math.max(a.left, b.left),
+    top: Math.max(a.top, b.top),
+    right: Math.min(a.right, b.right),
+    bottom: Math.min(a.bottom, b.bottom),
+  }
+}
+
+/** `rect`, in scene units, as client pixels of a viewport showing `scene` in `view`. */
+function sceneToClient(rect: Rect, scene: Rect, view: Edges): Edges {
+  const sx = (view.right - view.left) / scene.width
+  const sy = (view.bottom - view.top) / scene.height
+  return {
+    left: view.left + (rect.left - scene.left) * sx,
+    top: view.top + (rect.top - scene.top) * sy,
+    right: view.left + (rect.right - scene.left) * sx,
+    bottom: view.top + (rect.bottom - scene.top) * sy,
+  }
+}
+
+/**
+ * Frames the nodes of the method on screen (or those of `node_ids`: at least one, at most
+ * {@link GRAPH_IMAGE_NODES_MAX}; an unknown one refuses) in the part of the graph viewport clear of
+ * its overlays, without animation ({@link graphImageFrame}), waits for the view to stop moving and
+ * for two frames, and answers `{ rect, scale, nodes }`: the client rectangle of the framed nodes
+ * with their margin, cut to the clear part, for main to capture; the scale; and the number of
+ * nodes framed (those drawn). Moves the view and does not move it back; edits nothing, so it works
+ * in Live mode.
+ */
+export async function prepareGraphImage(
+  deps: GraphImageDeps,
+  args: { node_ids?: readonly string[] },
+): Promise<McpToolResult> {
+  const ids: NodeId[] = []
+  if (args.node_ids != null) {
+    if (args.node_ids.length === 0) return toolError(NO_NODE_IDS_ERROR)
+    if (args.node_ids.length > GRAPH_IMAGE_NODES_MAX) {
+      return toolError(`Pass at most ${GRAPH_IMAGE_NODES_MAX} node ids.`)
+    }
+    for (const nodeId of args.node_ids) {
+      const found = findNode(deps.db, nodeId)
+      if (!found.ok) return found
+      if (!ids.includes(found.value.id)) ids.push(found.value.id)
+    }
+  } else {
+    ids.push(...deps.db.nodeIdToNode.keys())
+  }
+  if (ids.length === 0) return toolError(EMPTY_METHOD_ERROR)
+  const areas = ids.map((id) => deps.area(id)).filter((area) => area != null)
+  const framing = graphImageFrame(areas, deps.viewRect(), deps.clearRect())
+  if (framing == null) return toolError(NOT_DRAWN_ERROR)
+  deps.frame(framing.frame, framing.scale)
+  const until = deps.deadline - REPLY_MARGIN_MS
+  while (deps.viewMoving()) {
+    if (deps.now() >= until) return toolError(VIEW_MOVING_ERROR)
+    await deps.nextFrame()
+  }
+  for (let still = 0; still < SETTLE_FRAMES;) {
+    if (deps.now() >= until) return toolError(VIEW_MOVING_ERROR)
+    await deps.nextFrame()
+    still = deps.viewMoving() ? 0 : still + 1
+  }
+  // The framed nodes and their margin where the view now shows them, cut to the clear part.
+  const rect = intersection(
+    sceneToClient(framing.nodes, deps.viewport(), deps.viewRect()),
+    deps.clearRect(),
+  )
+  const x = Math.round(rect.left)
+  const y = Math.round(rect.top)
+  return jsonResult({
+    rect: { x, y, width: Math.round(rect.right) - x, height: Math.round(rect.bottom) - y },
+    scale: Math.round(deps.scale() * 1000) / 1000,
+    nodes: areas.length,
+  })
 }

@@ -5,6 +5,7 @@ import * as Y from 'yjs'
 import {
   afterGraphUpdate,
   isUserTransaction,
+  moduleChangedBy,
   onUserModuleTransaction,
   watchExecution,
   watchGraphUpdate,
@@ -78,6 +79,55 @@ test('a new module doc is listened to instead of the old one', () => {
   second.transact(() => second.getMap('m').set('x', 1), 'local:userAction')
   expect(listener).toHaveBeenCalledTimes(1)
   stop()
+})
+
+test('moduleChangedBy: a write or a deletion is a change; an empty transaction or none is not', () => {
+  const doc = new Y.Doc()
+  const map = doc.getMap<number>('m')
+  const module = moduleOver(doc)
+  expect(moduleChangedBy(module, () => map.set('x', 1))).toBe(true)
+  expect(moduleChangedBy(module, () => map.delete('x'))).toBe(true)
+  // What graph.ts does for a position equal to the stored one: a transaction that writes nothing.
+  expect(moduleChangedBy(module, () => doc.transact(() => {}))).toBe(false)
+  expect(moduleChangedBy(module, () => {})).toBe(false)
+  // Several transactions: any change counts.
+  expect(
+    moduleChangedBy(module, () => {
+      doc.transact(() => {})
+      map.set('y', 2)
+    }),
+  ).toBe(true)
+})
+
+test('moduleChangedBy stops listening when f returns or throws', () => {
+  const doc = new Y.Doc()
+  const map = doc.getMap<number>('m')
+  const heard = vi.fn()
+  const unregister = vi.fn()
+  const module = {
+    onBeforeEdit: (f: (transaction: Y.Transaction) => void) => {
+      const listener = (transaction: Y.Transaction) => {
+        heard()
+        f(transaction)
+      }
+      doc.on('beforeTransaction', listener)
+      return {
+        unregister: () => {
+          unregister()
+          doc.off('beforeTransaction', listener)
+        },
+      }
+    },
+  }
+  moduleChangedBy(module, () => {})
+  expect(() =>
+    moduleChangedBy(module, () => {
+      throw new Error('boom')
+    }),
+  ).toThrow('boom')
+  expect(unregister).toHaveBeenCalledTimes(2)
+  map.set('z', 3)
+  expect(heard).not.toHaveBeenCalled()
 })
 
 test('afterGraphUpdate resolves on the update, or at the timeout without one', async () => {

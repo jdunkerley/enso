@@ -12,6 +12,7 @@ import { nodeIdFromOuterAst, type NodeId } from '$/providers/openedProjects/grap
 import { importedLibraries } from '$/providers/openedProjects/module/imports'
 import type { ProjectStore } from '$/providers/openedProjects/project'
 import type { CollapseOutcome } from '@/components/GraphEditor/collapseNodes'
+import { useProjectFiles } from '@/stores/projectFiles'
 import { Ast } from '@/util/ast'
 import { Rect } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
@@ -21,6 +22,7 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { onActivated, onDeactivated, onScopeDispose, watch } from 'vue'
 import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
 import { getComponentDocs, searchComponents, type CatalogueDeps } from './catalogueTools'
+import { getDocumentation, setDocumentation, type SetDocumentationDeps } from './documentationTools'
 import { EditSession } from './editSession'
 import {
   addNodes,
@@ -33,23 +35,34 @@ import {
 } from './editTools'
 import { evaluateExpression } from './evaluate'
 import { findNode, getGraph, getNode, type GetGraphDeps, type GraphToolDeps } from './graphTools'
+import { serialized, storeImage, withProjectId, type ImageToolDeps } from './imageTools'
+import {
+  arrangeNodes,
+  moveNodes,
+  type AlignmentHandlers,
+  type ArrangeToolDeps,
+  type NodeMove,
+} from './layoutTools'
 import { createMcpNodes } from './nodeCreation'
 import { panelQuiet } from './panelQuiet'
 import {
   afterGraphUpdate,
+  moduleChangedBy,
   onUserModuleTransaction,
   watchExecution,
   watchGraphUpdate,
 } from './projectEvents'
 import { addFunction, collapseNodesTool, type StructureToolDeps } from './structureTools'
-import { openMethod, selectNodes, type ViewToolDeps } from './viewTools'
+import { openMethod, prepareGraphImage, selectNodes, type ViewToolDeps } from './viewTools'
 import { lookupVisualization } from './visualizationRegistry'
 import {
+  drawnVisualizationSize,
   getVisualizationData,
   listVisualizations,
   noSuchVisualizationError,
   prepareVisualization,
   type Edges,
+  type VisualizationSize,
   type VisualizationToolDeps,
 } from './visualizationTools'
 
@@ -71,6 +84,11 @@ export interface McpEditorDeps {
   readonly leaveMethod: () => void
   /** The visible part of the scene. */
   readonly viewport: () => Rect
+  /**
+   * The zoom `viewport` is drawn at now (1 is 100%). During a zoom animation it is on its way to
+   * {@link scale}, the zoom the view is going to.
+   */
+  readonly viewportScale: () => number
   /** The graph editor's "Group components", without its follow-up (the rename it schedules). */
   readonly collapseNodes: (
     ids: readonly NodeId[],
@@ -78,10 +96,17 @@ export interface McpEditorDeps {
   ) => Result<CollapseOutcome>
   /** The graph editor's viewport, in CSS pixels of the window's client area. */
   readonly viewRect: () => Edges
+  /**
+   * The part of the viewport no overlay covers (the top bar, the dock's buttons, the scroll bars),
+   * in the same pixels (`clearArea` in `viewTools.ts`).
+   */
+  readonly clearViewRect: () => Edges
   /** The graph's zoom: 1 is 100%. */
   readonly scale: () => number
   /** Moves the view, without animation, to show this client rectangle at 100% where it fits. */
   readonly revealClientRect: (rect: Edges) => void
+  /** Moves the view, without animation, to show this scene rectangle centred at `scale`. */
+  readonly frameScene: (rect: Rect, scale: number) => void
   /** Whether the view is still moving. */
   readonly viewMoving: () => boolean
   /**
@@ -89,15 +114,21 @@ export interface McpEditorDeps {
    * dropdown (the visualization store's `byType` for the node's type info).
    */
   readonly visualizationsFor: (nodeId: NodeId) => VisualizationIdentifier[]
+  /** Tidy up (`useGraphTidy`): the given nodes when two or more, else the whole graph. */
+  readonly tidy: (ids: readonly NodeId[] | undefined) => void
+  /** The Align and Spacing handlers, without the menu's check of the panel's focus. */
+  readonly alignment: AlignmentHandlers
 }
 
 /**
- * Registers the project tools for the open project: the six that read (get_graph, get_node,
- * search_components, get_component_docs, evaluate_expression, list_visualizations), the seven
- * that edit (add_nodes, edit_node, remove_nodes, set_node_comment, set_visualization,
- * collapse_nodes, add_function) and the two that navigate (select_nodes, open_method); and the
- * two that main's `get_visualization` calls (get_visualization_data, prepare_visualization),
- * which are not MCP tools themselves.
+ * Registers the project tools for the open project: the seven that read (get_graph, get_node,
+ * search_components, get_component_docs, evaluate_expression, list_visualizations,
+ * get_documentation), the ten that edit (add_nodes, edit_node, remove_nodes, set_node_comment,
+ * set_documentation, set_visualization, move_nodes, arrange_nodes, collapse_nodes, add_function)
+ * and the two that navigate (select_nodes, open_method); the two that main's `get_visualization`
+ * calls (get_visualization_data, prepare_visualization), the one main's `add_image` calls
+ * (store_image) and the one main's `get_graph_image` calls (prepare_graph_image), which are not
+ * MCP tools themselves.
  *
  * Every open project's graph editor stays mounted (the tabs are under `<KeepAlive>`), so the tools
  * must answer for the one on screen: this project's handlers are put first on activation and
@@ -166,7 +197,14 @@ export function useProjectMcpTools(
   }
 
   function getGraphDeps(): GetGraphDeps {
-    return { ...graphDeps(), selection: editor.selectedNodes }
+    const graph = currentProject.graph.value
+    return {
+      ...graphDeps(),
+      selection: editor.selectedNodes,
+      area: (id) => graph.visibleArea(id),
+      // The rectangle and the zoom of the same moment, even during a zoom animation.
+      view: () => ({ rect: editor.viewport(), scale: editor.viewportScale() }),
+    }
   }
 
   function catalogueDeps(): CatalogueDeps {
@@ -235,13 +273,15 @@ export function useProjectMcpTools(
           return Ok()
         })
       },
-      setVisualization: (id, visible, identifier) => {
+      setVisualization: (id, update) => {
         const g = graph()
         if (!g.db.nodeIdToNode.has(id)) return Err(`No node ${id}`)
-        // As choosing one in the toolbar writes it: the identifier in the node's metadata.
-        g.setNodeVisualization(id, { visible, ...(identifier ? { identifier } : {}) })
+        // As choosing one in the toolbar writes it (the identifier in the node's metadata), and as
+        // a resize handle writes the size: one call, which also pushes or releases the neighbours.
+        g.setNodeVisualization(id, update)
         return Ok()
       },
+      visualizationSize: (id) => sizeOf(graph(), id),
     }
   }
 
@@ -264,6 +304,35 @@ export function useProjectMcpTools(
       addDetectedImports: (edit, scope) => {
         module().addDetectedImports(edit, scope)
       },
+    }
+  }
+
+  /** The layout tools' dependencies: positions are module metadata, edited through the session. */
+  function layoutDeps(caller: McpCaller, deadline: number): ArrangeToolDeps {
+    const graph = currentProject.graph.value
+    return {
+      db: graph.db,
+      currentMethod: graph.currentMethod,
+      session,
+      caller,
+      deadline,
+      setNodePositions: (moves) => currentProject.graph.value.setNodePositions(moves),
+      moduleChanged: (f) => moduleChangedBy(currentProject.module.value, f),
+      tidy: editor.tidy,
+      alignment: editor.alignment,
+    }
+  }
+
+  /** `set_documentation`'s dependencies: one module edit, through the edit session. */
+  function documentationDeps(caller: McpCaller, deadline: number): SetDocumentationDeps {
+    const graph = currentProject.graph.value
+    return {
+      db: graph.db,
+      currentMethod: graph.currentMethod,
+      session,
+      caller,
+      deadline,
+      editModule: (f) => currentProject.module.value.edit(f),
     }
   }
 
@@ -306,6 +375,7 @@ export function useProjectMcpTools(
       isEdited: (nodeId) => graph.editedNodeInfo?.id === nodeId,
       availableNames: (nodeId) =>
         editor.visualizationsFor(nodeId as NodeId).map((identifier) => identifier.name),
+      size: (nodeId) => sizeOf(currentProject.graph.value, nodeId as NodeId),
       show: (nodeId, visualization) => {
         // Two visualizations of the same name from different modules: the first in the
         // dropdown's order, which is the one `availableNames` lists first.
@@ -341,13 +411,39 @@ export function useProjectMcpTools(
     }
   }
 
+  /**
+   * `store_image`'s dependencies: the project's file functions, as the documentation editor's
+   * upload uses them, and the node names for a picture's default name.
+   */
+  function imageDeps(deadline: number): ImageToolDeps {
+    const graph = currentProject.graph.value
+    return {
+      files: useProjectFiles(currentProject.store.value),
+      nodeName: (nodeId) => {
+        const found = findNode(graph.db, nodeId)
+        return found.ok ? found.value.node.pattern?.code() : undefined
+      },
+      projectId: () => currentProject.id.value,
+      now: () => Date.now(),
+      deadline,
+    }
+  }
+  // One store at a time: two images of the same name must not pick the same free name.
+  const storeImageInTurn = serialized(storeImage)
+
   const handlers: Record<string, McpToolHandler> = {
     get_graph: async (args) => {
-      const previews = args.previews
+      const { previews, layout } = args
       if (previews != null && typeof previews !== 'boolean') {
         return invalidArgument('previews', 'a boolean')
       }
-      return getGraph(getGraphDeps(), previews != null ? { previews } : {})
+      if (layout != null && typeof layout !== 'boolean') {
+        return invalidArgument('layout', 'a boolean')
+      }
+      return getGraph(getGraphDeps(), {
+        ...(previews != null ? { previews } : {}),
+        ...(layout != null ? { layout } : {}),
+      })
     },
     get_node: async (args) => {
       const node_id = args.node_id
@@ -427,11 +523,45 @@ export function useProjectMcpTools(
       if (typeof text !== 'string') return invalidArgument('text', 'a string')
       return setNodeComment(editDeps(caller, deadline), { node_id, text })
     },
+    get_documentation: async () => {
+      const graph = currentProject.graph.value
+      return getDocumentation({ db: graph.db, currentMethod: graph.currentMethod })
+    },
+    set_documentation: async (args, caller, deadline) => {
+      const text = args.text
+      if (typeof text !== 'string') return invalidArgument('text', 'a string')
+      return setDocumentation(documentationDeps(caller, deadline), { text })
+    },
     set_visualization: async (args, caller, deadline) => {
-      const { node_id, visible } = args
+      const { node_id, visible, width, height } = args
       if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
       if (typeof visible !== 'boolean') return invalidArgument('visible', 'a boolean')
-      return setVisualization(editDeps(caller, deadline), { node_id, visible })
+      if (!isSizeArgument(width)) return invalidArgument('width', 'a number or null')
+      if (!isSizeArgument(height)) return invalidArgument('height', 'a number or null')
+      return setVisualization(editDeps(caller, deadline), {
+        node_id,
+        visible,
+        ...(width !== undefined ? { width } : {}),
+        ...(height !== undefined ? { height } : {}),
+      })
+    },
+    move_nodes: async (args, caller, deadline) => {
+      const moves = args.moves
+      if (!Array.isArray(moves) || !moves.every(isNodeMove)) {
+        return invalidArgument('moves', 'a list of `{ node_id, x, y }`')
+      }
+      return moveNodes(layoutDeps(caller, deadline), { moves })
+    },
+    arrange_nodes: async (args, caller, deadline) => {
+      const { action, node_ids } = args
+      if (typeof action !== 'string') return invalidArgument('action', 'a string')
+      if (node_ids != null && !isStringArray(node_ids)) {
+        return invalidArgument('node_ids', 'a list of strings')
+      }
+      return arrangeNodes(layoutDeps(caller, deadline), {
+        action,
+        ...(node_ids != null ? { node_ids } : {}),
+      })
     },
     collapse_nodes: async (args, caller, deadline) => {
       const { node_ids, name } = args
@@ -475,16 +605,59 @@ export function useProjectMcpTools(
         ...(visualization != null ? { visualization } : {}),
       })
     },
+    store_image: async (args, _caller, deadline) => {
+      const { data, name, node_id, project_id } = args
+      if (typeof data !== 'string') return invalidArgument('data', 'a string')
+      if (name != null && typeof name !== 'string') return invalidArgument('name', 'a string')
+      if (node_id != null && typeof node_id !== 'string') {
+        return invalidArgument('node_id', 'a string')
+      }
+      if (project_id != null && typeof project_id !== 'string') {
+        return invalidArgument('project_id', 'a string')
+      }
+      return storeImageInTurn(imageDeps(deadline), {
+        data,
+        ...(name != null ? { name } : {}),
+        ...(node_id != null ? { node_id } : {}),
+        ...(project_id != null ? { project_id } : {}),
+      })
+    },
+    prepare_graph_image: async (args, _caller, deadline) => {
+      const node_ids = args.node_ids
+      if (node_ids != null && !isStringArray(node_ids)) {
+        return invalidArgument('node_ids', 'a list of strings')
+      }
+      const graph = currentProject.graph.value
+      return prepareGraphImage(
+        {
+          db: graph.db,
+          area: (id) => graph.visibleArea(id),
+          viewRect: editor.viewRect,
+          clearRect: editor.clearViewRect,
+          viewport: editor.viewport,
+          scale: editor.scale,
+          frame: editor.frameScene,
+          viewMoving: editor.viewMoving,
+          nextFrame,
+          now: () => Date.now(),
+          deadline,
+        },
+        node_ids != null ? { node_ids } : {},
+      )
+    },
     prepare_visualization: async (args, caller, deadline) => {
       const { node_id, visualization } = args
       if (typeof node_id !== 'string') return invalidArgument('node_id', 'a string')
       if (visualization != null && typeof visualization !== 'string') {
         return invalidArgument('visualization', 'a string')
       }
-      return prepareVisualization(visualizationDeps(caller, deadline), {
+      const prepared = await prepareVisualization(visualizationDeps(caller, deadline), {
         node_id,
         ...(visualization != null ? { visualization } : {}),
       })
+      // Which project took the picture: `add_image` stores it there only. Main does not pass it
+      // on to the agent.
+      return withProjectId(prepared, currentProject.id.value)
     },
   }
   // The project id is read when asked for, not kept: an editor stays with one project (its tab is
@@ -529,6 +702,17 @@ function lastNode(graph: GraphStore): NodeId | undefined {
   return last
 }
 
+/**
+ * The size of the node's visualization as drawn: its stored size under the node's measured width
+ * (0 before the node is measured, which leaves the 200 minimum).
+ */
+function sizeOf(graph: GraphStore, id: NodeId): VisualizationSize {
+  return drawnVisualizationSize(
+    graph.db.nodeIdToNode.get(id)?.vis,
+    graph.nodeBareSizes.get(id)?.x ?? 0,
+  )
+}
+
 /** The node's area on screen; its position alone before it has been rendered. */
 function nodeArea(graph: GraphStore, id: NodeId): Rect | undefined {
   const area = graph.visibleArea(id)
@@ -546,6 +730,17 @@ function nextFrame(): Promise<void> {
       resolve()
     })
   })
+}
+
+function isNodeMove(value: unknown): value is NodeMove {
+  if (typeof value !== 'object' || value == null) return false
+  const { node_id, x, y } = value as Record<string, unknown>
+  return typeof node_id === 'string' && typeof x === 'number' && typeof y === 'number'
+}
+
+/** A visualization size argument: a number, null (the default) or absent. */
+function isSizeArgument(value: unknown): value is number | null | undefined {
+  return value === undefined || value === null || typeof value === 'number'
 }
 
 function isStringArray(value: unknown): value is string[] {

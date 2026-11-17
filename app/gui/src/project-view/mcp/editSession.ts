@@ -71,6 +71,14 @@ export interface EditRunOptions<T> {
    */
   readonly affected?: (value: T) => AffectedExpressions
   /**
+   * Whether the edit, by its value, changed nothing (the text or the positions were already as
+   * asked). Then no graph update and no execution follow, so the run answers at once with
+   * `settled: true` instead of waiting out {@link GRAPH_UPDATE_WAIT_MS}. Everything before the edit
+   * is as for any run: it is queued, refused in Live, saves a version and joins the caller's undo
+   * step (the edit decides at its turn, after those checks). False by default.
+   */
+  readonly unchanged?: (value: T) => boolean
+  /**
    * When the caller stops waiting (`Date.now()` milliseconds; the tool dispatcher's deadline). The
    * run is refused unless {@link EDIT_MIN_REMAINING_MS} are left at its turn and after the version
    * save, and its settle wait ends {@link EDIT_ANSWER_MARGIN_MS} before it. None: no limit.
@@ -118,8 +126,9 @@ export class EditSession {
    * after the version save; a run past both finishes); joins or starts the caller's undo step
    * (saving a version before the first edit of a step, raced against the deadline); runs `edit`
    * marked as the session's own, watching the execution from just before it; waits for the graph
-   * update and for execution to settle (at most until shortly before the deadline).
-   * `edit` returns Err to refuse without changing anything.
+   * update and for execution to settle (at most until shortly before the deadline), unless
+   * `options.unchanged` says the edit changed nothing. `edit` returns Err to refuse without
+   * changing anything.
    *
    * `edit` should apply its module changes synchronously: a user edit that lands while an async
    * `edit` is awaiting is treated as the session's own. The step's idle period is measured from
@@ -132,7 +141,13 @@ export class EditSession {
   ): Promise<Result<EditOutcome<T>>> {
     // `execute` never rejects, so the queue cannot stall.
     const task = this.tail.then(() =>
-      this.execute(caller, edit, options.affected ?? (() => ({})), options.deadline ?? Infinity),
+      this.execute(
+        caller,
+        edit,
+        options.affected ?? (() => ({})),
+        options.unchanged ?? (() => false),
+        options.deadline ?? Infinity,
+      ),
     )
     this.tail = task
     return task
@@ -195,6 +210,7 @@ export class EditSession {
     caller: McpCaller,
     edit: () => Result<T> | Promise<Result<T>>,
     affected: (value: T) => AffectedExpressions,
+    unchanged: (value: T) => boolean,
     deadline: number,
   ): Promise<Result<EditOutcome<T>>> {
     let watch: ExecutionWatch | undefined
@@ -242,6 +258,9 @@ export class EditSession {
         this.inEdit = false
       }
       if (!result.ok) return result
+      // Nothing changed, so no graph update or execution will come: the watches are cancelled in
+      // `finally`.
+      if (unchanged(result.value)) return Ok({ value: result.value, settled: true })
       watch.editApplied()
       await graphWatch.updated(GRAPH_UPDATE_WAIT_MS)
       const settleMs = Math.max(0, Math.min(EDIT_SETTLE_MS, remaining() - EDIT_ANSWER_MARGIN_MS))

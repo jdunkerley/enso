@@ -176,6 +176,7 @@ function makeDeps(overrides: Partial<AppToolDeps> = {}): AppToolDeps {
       path: `${directory}/${name}`,
     })),
     openProject: vi.fn(async () => true),
+    showProject: vi.fn(async () => true),
     closeCurrentProject: vi.fn(async () => true),
     state: () => ({
       page: 'project',
@@ -197,7 +198,7 @@ function value(result: McpToolResult) {
   return JSON.parse(result.value)
 }
 
-test('The handlers are the six app tools', () => {
+test('The handlers are the seven app tools', () => {
   expect(Object.keys(appToolHandlers(() => makeDeps())).sort()).toEqual([
     'close_project',
     'create_project',
@@ -205,6 +206,7 @@ test('The handlers are the six app tools', () => {
     'list_files',
     'list_projects',
     'open_project',
+    'switch_project',
   ])
 })
 
@@ -395,6 +397,97 @@ describe('open_project', () => {
 
   test('refuses a missing path', async () => {
     expect(await run(makeDeps(), 'open_project', {})).toEqual({
+      ok: false,
+      error: 'The argument `path` must be a string.',
+    })
+  })
+})
+
+describe('switch_project', () => {
+  const ALPHA = { name: 'Alpha', path: `${ROOT}/Alpha` }
+  const BETA = { name: 'Beta', path: `${ROOT}/Beta` }
+  const twoOpen = () =>
+    makeDeps({
+      state: () => ({ page: 'project', project: ALPHA, openProjects: [ALPHA, BETA] }),
+    })
+
+  test('brings an open project on screen and answers once its tools answer', async () => {
+    const deps = twoOpen()
+    expect(value(await run(deps, 'switch_project', { path: BETA.path }))).toEqual(BETA)
+    expect(deps.showProject).toHaveBeenCalledWith(BETA.path)
+  })
+
+  test('opens nothing, creates nothing and never reads the disk', async () => {
+    const deps = twoOpen()
+    await run(deps, 'switch_project', { path: BETA.path })
+    await run(deps, 'switch_project', { path: `${ROOT}/Gamma` })
+    expect(deps.openProject).not.toHaveBeenCalled()
+    expect(deps.createProject).not.toHaveBeenCalled()
+    expect(deps.listDirectory).not.toHaveBeenCalled()
+  })
+
+  test('the project on screen answers at once', async () => {
+    const deps = twoOpen()
+    expect(value(await run(deps, 'switch_project', { path: ALPHA.path }))).toEqual(ALPHA)
+    expect(deps.showProject).not.toHaveBeenCalled()
+  })
+
+  test('refuses a path that is not an open project, naming the open ones', async () => {
+    const deps = twoOpen()
+    expect(await run(deps, 'switch_project', { path: `${ROOT}/Gamma` })).toEqual({
+      ok: false,
+      error:
+        `No open project has the path \`${ROOT}/Gamma\`. Open projects: ${ALPHA.path}, ${BETA.path}. ` +
+        'Use `open_project` to open one that is closed.',
+    })
+    expect(deps.showProject).not.toHaveBeenCalled()
+  })
+
+  test('compares the path exactly as get_app_state reports it, without resolving it', async () => {
+    const deps = twoOpen()
+    for (const path of [`${ROOT}/Beta/`, `${ROOT}/./Beta`, `${ROOT}/x/../Beta`, 'Beta']) {
+      const result = await run(deps, 'switch_project', { path })
+      expect(result.ok).toBe(false)
+    }
+    expect(deps.showProject).not.toHaveBeenCalled()
+  })
+
+  test('with no project open, says so', async () => {
+    const deps = makeDeps({ state: () => ({ page: 'dashboard', project: null, openProjects: [] }) })
+    expect(await run(deps, 'switch_project', { path: BETA.path })).toEqual({
+      ok: false,
+      error:
+        `No open project has the path \`${BETA.path}\`. No project is open. ` +
+        'Use `open_project` to open one that is closed.',
+    })
+  })
+
+  test('a project whose tools do not answer in time says to look again', async () => {
+    const deps = makeDeps({
+      state: () => ({ page: 'project', project: ALPHA, openProjects: [ALPHA, BETA] }),
+      showProject: async () => false,
+    })
+    expect(await run(deps, 'switch_project', { path: BETA.path })).toEqual({
+      ok: false,
+      error: STILL_OPENING_ERROR,
+    })
+  })
+
+  test('a failure to show the project answers its error', async () => {
+    const deps = makeDeps({
+      state: () => ({ page: 'project', project: ALPHA, openProjects: [ALPHA, BETA] }),
+      showProject: async () => {
+        throw new Error('The project was closed.')
+      },
+    })
+    expect(await run(deps, 'switch_project', { path: BETA.path })).toEqual({
+      ok: false,
+      error: 'The project was closed.',
+    })
+  })
+
+  test('refuses a missing path', async () => {
+    expect(await run(twoOpen(), 'switch_project', {})).toEqual({
       ok: false,
       error: 'The argument `path` must be a string.',
     })

@@ -954,3 +954,107 @@ describe('waiting for the graph update', () => {
     expect(t.openWatches()).toHaveLength(0)
   })
 })
+
+describe('an edit that changes nothing', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  test('answers at once, settled, without waiting for a graph update or an execution', async () => {
+    const graph = fakeGraph()
+    const t = setup({ watchGraphUpdate: () => watchGraphUpdate(graph) })
+    const done = vi.fn()
+    void t.session
+      .run(claude, () => Ok({ unchanged: true }), {
+        unchanged: (value) => value.unchanged,
+        affected: () => ({ changed: ['x'] }),
+      })
+      .then(done)
+    // No graph update comes and no timer is advanced.
+    await vi.advanceTimersByTimeAsync(0)
+    expect(done).toHaveBeenCalledWith(Ok({ value: { unchanged: true }, settled: true }))
+    expect(t.settle).not.toHaveBeenCalled()
+  })
+
+  test('the watches it started are cancelled, and no timer or live callback is left', async () => {
+    const graph = fakeGraph()
+    const t = setup({ watchGraphUpdate: () => watchGraphUpdate(graph) })
+    await t.session.run(claude, () => Ok(0), { unchanged: () => true })
+    expect(t.watches).toHaveLength(1)
+    expect(t.watches[0]!.cancel).toHaveBeenCalled()
+    expect(t.watches[0]!.editApplied).not.toHaveBeenCalled()
+    expect(t.openWatches()).toHaveLength(0)
+    // Only the step's idle timer is left.
+    expect(vi.getTimerCount()).toBe(0)
+    expect(t.pending()).toHaveLength(1)
+    graph.update()
+    expect(graph.queued()).toBe(0)
+  })
+
+  test('a fake graph watch is cancelled and never awaited', async () => {
+    const t = setup()
+    await t.session.run(claude, () => Ok(0), { unchanged: () => true })
+    expect(t.graphWatches).toHaveLength(1)
+    expect(t.graphWatches[0]!.cancel).toHaveBeenCalled()
+    expect(t.updated).not.toHaveBeenCalled()
+    expect(t.openWatches()).toHaveLength(0)
+  })
+
+  test('an edit that reports a change still waits for the graph update', async () => {
+    const graph = fakeGraph()
+    const t = setup({ watchGraphUpdate: () => watchGraphUpdate(graph) })
+    const done = vi.fn()
+    void t.session
+      .run(claude, () => Ok({ unchanged: false }), { unchanged: (value) => value.unchanged })
+      .then(done)
+    await vi.advanceTimersByTimeAsync(GRAPH_UPDATE_WAIT_MS - 1)
+    expect(done).not.toHaveBeenCalled()
+    graph.update()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(done).toHaveBeenCalledWith(Ok({ value: { unchanged: false }, settled: true }))
+    expect(t.settle).toHaveBeenCalled()
+  })
+
+  test('is refused in Live and keeps its place in the queue and the step', async () => {
+    const t = setup()
+    t.setLive(true)
+    const edit = vi.fn(() => Ok(0))
+    expect(errorOf(await t.session.run(claude, edit, { unchanged: () => true }))).toBe(
+      LIVE_EDIT_ERROR,
+    )
+    expect(edit).not.toHaveBeenCalled()
+    t.setLive(false)
+    const order: string[] = []
+    const first = t.session.run(claude, () => {
+      order.push('first')
+      return Ok(0)
+    })
+    const second = t.session.run(
+      claude,
+      () => {
+        order.push('second')
+        return Ok(0)
+      },
+      { unchanged: () => true },
+    )
+    await Promise.all([first, second])
+    expect(order).toEqual(['first', 'second'])
+    // It joined the caller's step: one version, one hold.
+    expect(t.deps.saveVersion).toHaveBeenCalledTimes(1)
+    expect(t.deps.holdUndoStep).toHaveBeenCalledTimes(1)
+  })
+
+  test('is refused with too little time left, before it runs', async () => {
+    const t = setup({ now: () => 0 })
+    const edit = vi.fn(() => Ok(0))
+    const result = await t.session.run(claude, edit, {
+      unchanged: () => true,
+      deadline: EDIT_MIN_REMAINING_MS - 1,
+    })
+    expect(errorOf(result)).toBe(TIMED_OUT_BEFORE_RUN_ERROR)
+    expect(edit).not.toHaveBeenCalled()
+  })
+})

@@ -92,16 +92,18 @@ export function useProjectFiles(projectStore: ProjectStoreSubset) {
   /**
    * Return a name for a file which does not collide with existing files in `path`.
    *
-   * First choice is `suggestedName`, and then try to apply a numeric suffix to stem.
+   * First choice is `suggestedName`, and then try to apply a numeric suffix to stem. Names are
+   * compared without regard to case: on Windows and macOS `Chart.png` is the file `chart.png`, and
+   * writing it would replace that file.
    */
   async function pickUniqueName(path: Path, suggestedName: string): Promise<Result<string>> {
     const files = await lsRpc.listFiles(path)
     if (!files.ok) return files
-    const existingNames = new Set(files.value.paths.map((path) => path.name))
+    const existingNames = new Set(files.value.paths.map((path) => path.name.toLowerCase()))
     const { basename, extension = '' } = basenameAndExtension(suggestedName)
     let candidate = suggestedName
     let num = 1
-    while (existingNames.has(candidate)) {
+    while (existingNames.has(candidate.toLowerCase())) {
       candidate = `${basename}_${num}.${extension}`
       num += 1
     }

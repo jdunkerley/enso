@@ -32,7 +32,10 @@ No tool changes the execution environment, settings or secrets;
 
 1. Read the graph with `get_graph` first, so you build on what is there. With no
    project open, `get_app_state` tells you, `list_projects` finds one and
-   `open_project` or `create_project` opens it.
+   `open_project` or `create_project` opens it. The tools work on the project on
+   screen only; with several open (`open_projects` in `get_app_state`),
+   `switch_project` brings another one's tab on screen. It opens nothing: a path
+   that is not an open project's is refused.
 2. Look components up (`search_components`, then `get_component_docs`) before
    using them.
 3. Add a few nodes at a time with `add_nodes`: each statement is
@@ -42,56 +45,91 @@ No tool changes the execution environment, settings or secrets;
 4. Read the result of every edit. `add_nodes` and `edit_node` return the nodes
    they made or changed, with their types and errors; `collapse_nodes` returns
    the function's name and the node that calls it; `set_node_comment` and
-   `set_visualization` return the node; `remove_nodes` returns only the ids it
-   removed and `add_function` only the function's name, so after either call
-   `get_graph` to see the nodes they affected. `settled: true`: the engine has
-   reported results for the changed nodes, so the types and errors in this
-   result are current. `settled: false`: it had not within 20 seconds; call
-   `get_node` later. When a node has an error or the wrong type, fix it with
-   `edit_node`; use `remove_nodes` to drop a node. Check with `get_node` or
+   `set_visualization` return the node (and `set_visualization` its `size`);
+   `move_nodes` returns the positions as stored and `arrange_nodes` how many
+   nodes it moved (`arranged`); `remove_nodes` returns only the ids it removed
+   and `add_function` only the function's name, so after either call `get_graph`
+   to see the nodes they affected. `settled: true`: the engine has reported
+   results for the changed nodes, so the types and errors in this result are
+   current. `settled: false`: it had not within 20 seconds; call `get_node`
+   later. When a node has an error or the wrong type, fix it with `edit_node`;
+   use `remove_nodes` to drop a node. Check with `get_node` or
    `evaluate_expression` before building on a node.
 5. Group a run of nodes that does one job with `collapse_nodes`, and explain a
    node with `set_node_comment`.
-6. `select_nodes` and `open_method` are the only project tools that change the
-   selection, and with `get_visualization` the only ones that move the view; the
-   edits do not. `set_visualization` shows or hides a node's visualization.
-   `get_visualization` lets you look at a node's visualization as the user sees
-   it: `format: "image"` (the default) is a picture of it, `format: "data"` is
-   the data the view was given (at most 20,000 characters). It shows a hidden
-   visualization first (`shown: true`), as `set_visualization` does; hide it
-   again if the user did not ask to see it. For a picture it may also move the
-   view (`moved: true`) to bring the visualization on screen. To read values,
-   `get_node` and `evaluate_expression` are better; use `get_visualization` to
-   see a chart or what the user is looking at. `list_visualizations` names the
-   visualizations a node offers (`available`, in the order of its toolbar's
-   dropdown) and the one on screen, and changes nothing; every
-   `get_visualization` result has `available` too. Pass one of those names as
-   `visualization` to look at it: a name that is not the node's choice switches
-   the node to it, and it stays switched, as part of your undo step; name the
-   previous one to switch back. `changed: true` means this call changed the
-   node's stored choice (the one on screen, or, for a hidden node, the one saved
-   with it). An error that comes after the call showed or switched the
-   visualization says so.
-7. Every tool that changes the project is refused while it is in Live mode: ask
-   the user to switch it back to Design. Reading, selecting and navigating
-   (`select_nodes`, `open_method`, `list_visualizations`) still work there;
-   `get_visualization` works there only for the visualization already on screen.
-8. Your edits are saved with the project as you make them. Do not turn Write on
-   (writing a node's output: a file, a database table). Code that enables the
-   output context (`with_enabled_context`, `with_enabled`, binding a runtime
-   builtin, building a method name by reflection, looking a method up by a name
-   in text, or evaluating text as code) is refused. Only the user turns Write
-   on, by clicking it on a node; `edit_node` and `collapse_nodes` refuse a node
-   they did. Your edits can still cause a write in two ways you should avoid:
-   calling a function in the user's project that itself enables output, and
-   changing a node upstream of one the user has switched Write on for (it
-   re-runs with your change). Ask the user before doing either.
-9. Your edits form one undo step for the user until you pause for 10 seconds,
-   the user edits the project or leaves its tab, or `open_method` changes the
-   method; then the next edit starts a new step. Edits from several agents run
-   one at a time. An edit whose turn comes after the method on screen changed is
-   refused with nothing changed: call `get_graph` and try again. There is no
-   undo tool: to take a change back, edit or remove the nodes.
+6. Lay the graph out so the user can follow it. `get_graph` with `layout: true`
+   adds each node's `position` (its top-left) and `area` (the room it takes, its
+   visualization included) and the `view` on screen, in scene units (pixels at
+   100% zoom, x to the right, y down). Prefer `arrange_nodes`, the editor's own
+   commands: `tidy` lays out the whole graph, or the nodes of `node_ids`; the
+   Align and Spacing actions line up or stack two or more nodes. Use
+   `move_nodes` only for what they cannot do, and leave a gap between the nodes'
+   areas. Neither changes the view or the selection, and both are part of your
+   undo step. To see the result as the user does, take a picture with
+   `get_graph_image` (item 8).
+7. Explain the workflow, or a function of the project after `open_method`, in
+   its documentation: the Markdown the user reads in the documentation panel.
+   `get_documentation` reads it. `set_documentation` replaces all of it, so read
+   it first and send the whole new text; an empty text clears it. To show a
+   chart or a picture, store it with `add_image` first, from an image file
+   (`path`) or as a picture of a node's visualization (`node_id`), and put the
+   `markdown` it returns into the text. An image goes into the project's
+   `images` folder, never replaces another, and is not removed if you drop it
+   from the text.
+8. `select_nodes` and `open_method` are the only project tools that change the
+   selection, and with `get_visualization` (and `add_image` of a `node_id`,
+   which takes its picture the same way) and `get_graph_image` the only ones
+   that move the view; the edits do not. `set_visualization` shows or hides a
+   node's visualization, and its `width` and `height` (100 to 2,000 scene units,
+   or `null` for the default) resize it: a larger one pushes the nodes around it
+   away, and they return when it shrinks. The size stays as set, so when the
+   user did not ask for a large one, pass `null` for both when you are done.
+   `get_graph_image` is a picture of the graph: it frames every node of the
+   method, or those of `node_ids`, at up to 100% zoom, pictures just those nodes
+   with a small margin, and leaves the view there. Below 10% zoom not every node
+   fits. With many nodes the zoom is low and the text not legible; frame fewer
+   to read them. `get_visualization` lets you look at a node's visualization as
+   the user sees it: `format: "image"` (the default) is a picture of it,
+   `format: "data"` is the data the view was given (at most 20,000 characters).
+   It shows a hidden visualization first (`shown: true`), as `set_visualization`
+   does; hide it again if the user did not ask to see it. For a picture it may
+   also move the view (`moved: true`) to bring the visualization on screen. To
+   read values, `get_node` and `evaluate_expression` are better; use
+   `get_visualization` to see a chart or what the user is looking at. The
+   picture is at the visualization's current size (`size` in the result): to see
+   more of a table or chart, make it larger with `set_visualization` first.
+   `list_visualizations` names the visualizations a node offers (`available`, in
+   the order of its toolbar's dropdown) and the one on screen, and changes
+   nothing; every `get_visualization` result has `available` too. Pass one of
+   those names as `visualization` to look at it: a name that is not the node's
+   choice switches the node to it, and it stays switched, as part of your undo
+   step; name the previous one to switch back. `changed: true` means this call
+   changed the node's stored choice (the one on screen, or, for a hidden node,
+   the one saved with it). An error that comes after the call showed or switched
+   the visualization says so.
+9. Every tool that changes the project is refused while it is in Live mode,
+   `set_documentation`, `move_nodes` and `arrange_nodes` included: ask the user
+   to switch it back to Design. Reading, selecting and navigating
+   (`select_nodes`, `open_method`, `list_visualizations`, `get_documentation`,
+   `get_graph_image`) still work there, and so does `add_image` with a `path`
+   (storing a file is not an edit); `get_visualization`, and `add_image` with a
+   `node_id`, work there only for the visualization already on screen.
+10. Your edits are saved with the project as you make them. Do not turn Write on
+    (writing a node's output: a file, a database table). Code that enables the
+    output context (`with_enabled_context`, `with_enabled`, binding a runtime
+    builtin, building a method name by reflection, looking a method up by a name
+    in text, or evaluating text as code) is refused. Only the user turns Write
+    on, by clicking it on a node; `edit_node` and `collapse_nodes` refuse a node
+    they did. Your edits can still cause a write in two ways you should avoid:
+    calling a function in the user's project that itself enables output, and
+    changing a node upstream of one the user has switched Write on for (it
+    re-runs with your change). Ask the user before doing either.
+11. Your edits form one undo step for the user until you pause for 10 seconds,
+    the user edits the project or leaves its tab, or `open_method` changes the
+    method; then the next edit starts a new step. Edits from several agents run
+    one at a time. An edit whose turn comes after the method on screen changed
+    is refused with nothing changed: call `get_graph` and try again. There is no
+    undo tool: to take a change back, edit or remove the nodes.
 
 ## Evaluating expressions
 
@@ -110,9 +148,9 @@ that supports a dry run (such as `.write` on Text or a Table) writes to a
 temporary file instead and returns that file's path; other writes fail. While
 the user has the project in Live mode, `evaluate_expression` is refused. Do not
 use it to save data, and do not turn Write on in it: the code that enables the
-output context is refused here as in the edits (item 8 above), and an expression
-that calls a function of the user's project which enables output can still
-write. Ask the user before doing that.
+output context is refused here as in the edits (item 10 above), and an
+expression that calls a function of the user's project which enables output can
+still write. Ask the user before doing that.
 
 ## Cap reads at the lowest layer
 

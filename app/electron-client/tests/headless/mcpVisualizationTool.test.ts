@@ -63,6 +63,9 @@ function tool(
   return { definition, calls, rects, sleeps }
 }
 
+/** The size the window reports with a visualization. */
+const SIZE = { width: 600, height: 150, default_width: false, default_height: true }
+
 const PREPARED: McpToolResult = {
   ok: true,
   value: JSON.stringify({
@@ -72,6 +75,7 @@ const PREPARED: McpToolResult = {
     changed: true,
     moved: true,
     available: ['Table', 'JSON'],
+    size: SIZE,
     rect: { x: 10, y: 20, width: 200, height: 150 },
   }),
 }
@@ -106,6 +110,7 @@ test('image is the default: the prepared rectangle is captured', async () => {
         changed: true,
         moved: true,
         available: ['Table', 'JSON'],
+        size: SIZE,
         width: 200,
         height: 150,
       },
@@ -218,4 +223,15 @@ test('only the final capture is scaled to the cap', async () => {
   const bytes = Buffer.from(result.image!.data, 'base64')
   expect(pngSize(bytes)).toEqual({ width: IMAGE_MAX_SIDE, height: 600 })
   expect(bytes[24]).toBe(1)
+})
+
+test('the project id the window answered with is not passed on to the agent', async () => {
+  const prepared = JSON.parse((PREPARED as { value: string }).value)
+  const { definition } = tool(() => ({
+    ok: true,
+    value: JSON.stringify({ ...prepared, project_id: 'p1' }),
+  }))
+  const result = await definition.run({ node_id: 'n' }, CALLER)
+  if (!result.ok) throw new Error(result.error)
+  expect(JSON.parse(result.value)).not.toHaveProperty('project_id')
 })

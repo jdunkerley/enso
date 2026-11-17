@@ -19,6 +19,12 @@ describe('visualizations shipped by the standard libraries', () => {
     expect(shipped.map((s) => `${s.lib}/${path.basename(s.file)}`)).toContain('Image/Image.vue')
   })
 
+  test('Standard.Database ships the SQL Query visualization', () => {
+    expect(shipped.map((s) => `${s.lib}/${path.basename(s.file)}`)).toContain(
+      'Database/SQL_Query.vue',
+    )
+  })
+
   test.each(shipped)('$lib/$name compiles with the run-time compiler', ({ file }) => {
     expect(() => compileSfc(readFileSync(file, 'utf8'), path.basename(file))).not.toThrow()
   })

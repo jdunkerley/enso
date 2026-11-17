@@ -4,12 +4,14 @@ import { initJvmAotIpc } from '@/jvmAotIpc'
 import { resolveLogFileToReveal } from '@/logFileReveal'
 import { appTools } from '@/mcp/appTools'
 import { claudeDesktopConfigDirectory } from '@/mcp/claudeDesktop'
+import { graphImageTool } from '@/mcp/graphImageTool'
 import { Guides, guideTool } from '@/mcp/guides'
+import { fsImageFiles, imageTool } from '@/mcp/imageTool'
 import { McpController } from '@/mcp/mcpController'
 import { McpHttpServer } from '@/mcp/mcpServer'
 import { projectTools } from '@/mcp/projectTools'
 import { ToolRegistry } from '@/mcp/toolRegistry'
-import { visualizationTool } from '@/mcp/visualizationTool'
+import { visualizationTool, type Capture } from '@/mcp/visualizationTool'
 import { WindowBridge } from '@/mcp/windowBridge'
 import * as paths from '@/paths'
 import {
@@ -104,20 +106,21 @@ function initMcp(electron: Electron | undefined, electronIsDev: boolean) {
   const registry = new ToolRegistry()
   for (const tool of projectTools(bridge)) registry.register(tool)
   for (const tool of appTools(bridge)) registry.register(tool)
-  registry.register(
-    visualizationTool(bridge, async (rect) => {
-      const window = mcpWindow()
-      if (window == null || window.isDestroyed() || window.isMinimized()) return null
-      // `capturePage` takes device-independent pixels; a zoomed page's CSS pixels are larger.
-      const zoom = window.webContents.getZoomFactor()
-      return window.webContents.capturePage({
-        x: Math.round(rect.x * zoom),
-        y: Math.round(rect.y * zoom),
-        width: Math.round(rect.width * zoom),
-        height: Math.round(rect.height * zoom),
-      })
-    }),
-  )
+  const capture: Capture = async (rect) => {
+    const window = mcpWindow()
+    if (window == null || window.isDestroyed() || window.isMinimized()) return null
+    // `capturePage` takes device-independent pixels; a zoomed page's CSS pixels are larger.
+    const zoom = window.webContents.getZoomFactor()
+    return window.webContents.capturePage({
+      x: Math.round(rect.x * zoom),
+      y: Math.round(rect.y * zoom),
+      width: Math.round(rect.width * zoom),
+      height: Math.round(rect.height * zoom),
+    })
+  }
+  registry.register(visualizationTool(bridge, capture))
+  registry.register(imageTool(bridge, capture, fsImageFiles()))
+  registry.register(graphImageTool(bridge, capture))
   registry.register(guideTool(guides))
   const controller = new McpController({
     settingsPath: join(app.getPath('userData'), 'mcp-settings.json'),

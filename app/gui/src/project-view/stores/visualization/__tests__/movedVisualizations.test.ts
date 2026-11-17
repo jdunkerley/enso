@@ -12,3 +12,10 @@ test('other ids are unchanged', () => {
   const table = { module: { kind: 'Builtin' }, name: 'Table' } as const
   expect(canonicalVisualizationId(table)).toBe(table)
 })
+
+test('the old builtin SQL Query id is read as the Standard.Database one', () => {
+  expect(canonicalVisualizationId({ module: { kind: 'Builtin' }, name: 'SQL Query' })).toEqual({
+    module: { kind: 'Library', name: 'Standard.Database' },
+    name: 'SQL Query',
+  })
+})

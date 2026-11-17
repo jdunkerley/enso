@@ -175,6 +175,7 @@ describe('projectTools', () => {
       'get_component_docs',
       'evaluate_expression',
       'list_visualizations',
+      'get_documentation',
     ])
     expect(EDIT_TOOL_NAMES).toEqual([
       'add_nodes',
@@ -183,7 +184,10 @@ describe('projectTools', () => {
       'collapse_nodes',
       'add_function',
       'set_node_comment',
+      'set_documentation',
       'set_visualization',
+      'move_nodes',
+      'arrange_nodes',
       'select_nodes',
       'open_method',
     ])
@@ -220,6 +224,7 @@ describe('projectTools argument bounds', () => {
     ['search_components', 'query', 500, {}],
     ['evaluate_expression', 'expression', 100_000, {}],
     ['evaluate_expression', 'node_id', 200, { expression: '1' }],
+    ['set_documentation', 'text', 100_000, {}],
   ] as const)('%s takes %s of at most %i characters', async (tool, arg, max, rest) => {
     const ok = await registry.call(tool, { ...rest, [arg]: 'x'.repeat(max) }, caller)
     expect(ok).toEqual({ ok: true, value: 'v' })
@@ -270,9 +275,62 @@ describe('edit tool arguments', () => {
     expect(await ok('open_method', {})).toBe(true)
   })
 
+  test('get_documentation takes nothing; set_documentation needs a text, which may be empty', async () => {
+    expect(await ok('get_documentation', {})).toBe(true)
+    expect(await ok('set_documentation', {})).toBe(false)
+    expect(await ok('set_documentation', { text: '' })).toBe(true)
+  })
+
+  test('get_graph takes an optional boolean `layout`', async () => {
+    expect(await ok('get_graph', { layout: true })).toBe(true)
+    expect(await ok('get_graph', { layout: 'yes' })).toBe(false)
+  })
+
+  test('move_nodes takes 1 to 200 moves of finite coordinates within ±1,000,000', async () => {
+    const move = (x: number, y = 0) => ({ node_id: 'a', x, y })
+    expect(await ok('move_nodes', { moves: [move(10.5, -20)] })).toBe(true)
+    expect(await ok('move_nodes', { moves: [move(1_000_000, -1_000_000)] })).toBe(true)
+    expect(await ok('move_nodes', { moves: [] })).toBe(false)
+    expect(await ok('move_nodes', { moves: Array.from({ length: 200 }, () => move(0)) })).toBe(true)
+    expect(await ok('move_nodes', { moves: Array.from({ length: 201 }, () => move(0)) })).toBe(
+      false,
+    )
+    expect(await ok('move_nodes', { moves: [move(1_000_001)] })).toBe(false)
+    expect(await ok('move_nodes', { moves: [move(0, -1_000_001)] })).toBe(false)
+    expect(await ok('move_nodes', { moves: [move(Infinity)] })).toBe(false)
+    expect(await ok('move_nodes', { moves: [move(NaN)] })).toBe(false)
+    expect(await ok('move_nodes', { moves: [{ node_id: 'a', x: 1 }] })).toBe(false)
+    expect(await ok('move_nodes', { moves: [{ node_id: 'x'.repeat(201), x: 1, y: 1 }] })).toBe(
+      false,
+    )
+  })
+
+  test('arrange_nodes takes a known action and up to 500 node ids', async () => {
+    expect(await ok('arrange_nodes', { action: 'tidy' })).toBe(true)
+    expect(await ok('arrange_nodes', { action: 'space_none', node_ids: ['a', 'b'] })).toBe(true)
+    expect(await ok('arrange_nodes', { action: 'shuffle' })).toBe(false)
+    expect(await ok('arrange_nodes', {})).toBe(false)
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => `n${i}`)
+    expect(await ok('arrange_nodes', { action: 'tidy', node_ids: ids(500) })).toBe(true)
+    expect(await ok('arrange_nodes', { action: 'tidy', node_ids: ids(501) })).toBe(false)
+  })
+
   test('set_visualization needs a boolean', async () => {
     expect(await ok('set_visualization', { node_id: 'a', visible: 'yes' })).toBe(false)
     expect(await ok('set_visualization', { node_id: 'a', visible: true })).toBe(true)
+  })
+
+  test('set_visualization takes an optional width and height of 100 to 2,000, or null', async () => {
+    const set = (size: Record<string, unknown>) =>
+      ok('set_visualization', { node_id: 'a', visible: true, ...size })
+    expect(await set({ width: 600, height: 400 })).toBe(true)
+    expect(await set({ width: 100, height: 2_000 })).toBe(true)
+    expect(await set({ width: 450.5 })).toBe(true)
+    expect(await set({ width: null, height: null })).toBe(true)
+    expect(await set({ width: 99 })).toBe(false)
+    expect(await set({ height: 2_001 })).toBe(false)
+    expect(await set({ width: Infinity })).toBe(false)
+    expect(await set({ height: '400' })).toBe(false)
   })
 })
 
@@ -286,6 +344,7 @@ describe('appTools', () => {
       'list_files',
       'create_project',
       'open_project',
+      'switch_project',
       'close_project',
     ])
   })
@@ -313,6 +372,9 @@ describe('appTools', () => {
     expect(await ok('open_project', {})).toBe(false)
     expect(await ok('open_project', { path: '/p' })).toBe(true)
     expect(await ok('list_projects', { directory: 'x'.repeat(1001) })).toBe(false)
+    expect(await ok('switch_project', {})).toBe(false)
+    expect(await ok('switch_project', { path: '/p' })).toBe(true)
+    expect(await ok('switch_project', { path: 'x'.repeat(1001) })).toBe(false)
     expect(await ok('close_project', {})).toBe(true)
   })
 })

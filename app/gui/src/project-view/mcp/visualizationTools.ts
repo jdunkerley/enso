@@ -7,6 +7,7 @@
  * named, if any. Also the `list_visualizations` tool: the visualizations a node offers. Pure
  * functions over {@link VisualizationToolDeps}.
  */
+import { visualizationSize } from '@/components/GraphEditor/GraphVisualization/visualizationSize'
 import type { McpToolResult } from 'enso-common/src/mcp'
 import { toolError } from './editTools'
 import { jsonResult } from './graphTools'
@@ -44,6 +45,37 @@ export interface Edges {
   readonly bottom: number
 }
 
+/**
+ * A visualization's size as the tools report it: `width` and `height`, the content area as drawn
+ * in scene units (`visualizationSize`: the stored size, or the default, never below the view's
+ * minimums), and whether each dimension is the default (stored as null).
+ */
+export interface VisualizationSize {
+  readonly width: number
+  readonly height: number
+  readonly default_width: boolean
+  readonly default_height: boolean
+}
+
+/**
+ * The size of a visualization with the stored `vis` size under a node `nodeWidth` wide, as
+ * `GraphVisualization.vue` draws it, rounded. No metadata, or a null dimension, is the default.
+ */
+export function drawnVisualizationSize(
+  vis: { readonly width: number | null; readonly height: number | null } | null | undefined,
+  nodeWidth: number,
+): VisualizationSize {
+  const width = vis?.width ?? null
+  const height = vis?.height ?? null
+  const drawn = visualizationSize(width, height, nodeWidth)
+  return {
+    width: Math.round(drawn.x),
+    height: Math.round(drawn.y),
+    default_width: width == null,
+    default_height: height == null,
+  }
+}
+
 /** What the two handlers need from the project and the graph editor, read at call time. */
 export interface VisualizationToolDeps {
   /** The node of that id in the method on screen. */
@@ -58,6 +90,8 @@ export interface VisualizationToolDeps {
   readonly isEdited: (nodeId: string) => boolean
   /** The names of the visualizations the node's type offers, in the toolbar's order. */
   readonly availableNames: (nodeId: string) => string[]
+  /** The node's visualization's size as drawn, from its metadata ({@link drawnVisualizationSize}). */
+  readonly size: (nodeId: string) => VisualizationSize
   /**
    * Switches it on, and to `visualization` when one is named, in one edit as `set_visualization`
    * does: through the edit session, with its refusals.
@@ -130,9 +164,9 @@ function editedBy(ready: Extract<Ready, { ok: true }>): Edited {
 }
 
 /**
- * The visualizations the node offers, whether its visualization is switched on, and the name of
- * the one on screen (null when none is mounted). Shows, moves and edits nothing, so it works in
- * Live mode.
+ * The visualizations the node offers, whether its visualization is switched on, the name of the
+ * one on screen (null when none is mounted) and its size. Shows, moves and edits nothing, so it
+ * works in Live mode.
  */
 export async function listVisualizations(
   deps: VisualizationToolDeps,
@@ -145,6 +179,7 @@ export async function listVisualizations(
     shown: deps.isShown(found.value),
     visualization: deps.lookup(found.value)?.name() ?? null,
     available: deps.availableNames(found.value),
+    size: deps.size(found.value),
   })
 }
 
@@ -233,6 +268,7 @@ export async function getVisualizationData(
     changed: ready.changed,
     truncated,
     available: ready.available,
+    size: deps.size(ready.nodeId),
     data: truncated ? text.slice(0, VISUALIZATION_DATA_CHARS) : parsedOrText(data),
   })
 }
@@ -298,6 +334,7 @@ export async function prepareVisualization(
     changed: ready.changed,
     moved,
     available: ready.available,
+    size: deps.size(nodeId),
     rect: { x, y, width, height },
   })
 }

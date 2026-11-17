@@ -168,7 +168,15 @@ test('list_visualizations names what a hidden node offers and leaves it hidden',
     shown: false,
     visualization: null,
     available: expect.arrayContaining(['JSON', 'Table']),
+    // The default size: as wide as the node or 200, and 150 high.
+    size: {
+      width: expect.any(Number),
+      height: 150,
+      default_width: true,
+      default_height: true,
+    },
   })
+  expect(listed.size.width).toBeGreaterThanOrEqual(200)
   await expect(visualizationOf(page, final)).toHaveCount(0)
 })
 
@@ -275,4 +283,109 @@ test('in Live mode the visualization on screen answers by name; another is refus
   })
   expect(refused.ok).toBe(false)
   expect(refused.error).toContain('Live mode')
+})
+
+/** The graph's zoom, from `get_graph`'s view: 1 is 100%. */
+async function scaleOf(page: Page): Promise<number> {
+  return (await callOk(page, 'get_graph', { previews: false, layout: true })).view.scale
+}
+
+/** The panel's size on screen, in scene units: its box divided by the zoom. */
+async function panelSize(page: Page, id: string) {
+  const box = await panelOf(page, id).boundingBox()
+  assert(box != null)
+  const scale = await scaleOf(page)
+  return { width: box.width / scale, height: box.height / scale }
+}
+
+test('set_visualization sizes the panel, every description reports it, and null resets it', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const final = await nodeId(page, 'final')
+
+  const set = await callOk(page, 'set_visualization', {
+    node_id: final,
+    visible: true,
+    width: 600,
+    height: 400,
+  })
+  const large = { width: 600, height: 400, default_width: false, default_height: false }
+  expect(set.size).toEqual(large)
+  await expect(visualizationOf(page, final)).toBeVisible()
+  await expect
+    .poll(async () => Math.abs((await panelSize(page, final)).width - 600))
+    .toBeLessThan(2)
+  expect(Math.abs((await panelSize(page, final)).height - 400)).toBeLessThan(2)
+  expect((await callOk(page, 'get_visualization_data', { node_id: final })).size).toEqual(large)
+  expect((await callOk(page, 'list_visualizations', { node_id: final })).size).toEqual(large)
+  expect((await callOk(page, 'prepare_visualization', { node_id: final })).size).toEqual(large)
+
+  const reset = await callOk(page, 'set_visualization', {
+    node_id: final,
+    visible: true,
+    width: null,
+    height: null,
+  })
+  expect(reset.size).toEqual(
+    expect.objectContaining({ height: 150, default_width: true, default_height: true }),
+  )
+  await expect
+    .poll(async () => Math.abs((await panelSize(page, final)).height - 150))
+    .toBeLessThan(2)
+  expect(Math.abs((await panelSize(page, final)).width - reset.size.width)).toBeLessThan(2)
+})
+
+test('one undo after a resize restores the previous size', async ({ editorPage, page }) => {
+  await editorPage
+  const final = await nodeId(page, 'final')
+  await callOk(page, 'set_visualization', { node_id: final, visible: true })
+  await expect(visualizationOf(page, final)).toBeVisible()
+  const before = await panelSize(page, final)
+
+  // Another caller: its edit is an undo step of its own, so the undo leaves the panel shown.
+  const resized = await page.evaluate(
+    (node_id) =>
+      (
+        window as unknown as {
+          __mcpCall: (tool: string, args: unknown, caller: unknown) => Promise<ToolResult>
+        }
+      ).__mcpCall(
+        'set_visualization',
+        { node_id, visible: true, width: 600, height: 400 },
+        { kind: 'external', name: 'codex' },
+      ),
+    final,
+  )
+  assert(resized.ok, resized.error)
+  await expect.poll(async () => Math.round((await panelSize(page, final)).height)).toBe(400)
+
+  await locate.graphEditor(page).click({ position: { x: 10, y: 10 } })
+  await page.keyboard.press('ControlOrMeta+Z')
+  await expect
+    .poll(async () => Math.abs((await panelSize(page, final)).height - before.height))
+    .toBeLessThan(2)
+  expect(Math.abs((await panelSize(page, final)).width - before.width)).toBeLessThan(2)
+  await expect(visualizationOf(page, final)).toBeVisible()
+})
+
+test('in Live mode a resize is refused and the size is kept', async ({ editorPage, page }) => {
+  await editorPage
+  const final = await nodeId(page, 'final')
+  await callOk(page, 'set_visualization', { node_id: final, visible: true })
+  await expect(visualizationOf(page, final)).toBeVisible()
+  const before = await panelSize(page, final)
+  await goLive()
+  const refused = await deliver(page, 'set_visualization', {
+    node_id: final,
+    visible: true,
+    width: 600,
+    height: 400,
+  })
+  expect(refused.ok).toBe(false)
+  expect(refused.error).toContain('Live mode')
+  const after = await panelSize(page, final)
+  expect(Math.abs(after.width - before.width)).toBeLessThan(2)
+  expect(Math.abs(after.height - before.height)).toBeLessThan(2)
 })

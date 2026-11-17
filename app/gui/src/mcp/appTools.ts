@@ -1,7 +1,7 @@
 /**
  * @file The MCP app tools: what the IDE is showing, the projects and files on the Drive, and
- * creating, opening and closing a project, so that an agent can start from nothing. Their
- * definitions (names, descriptions, argument schemas) are in
+ * creating, opening, switching between and closing projects, so that an agent can start from
+ * nothing. Their definitions (names, descriptions, argument schemas) are in
  * `app/electron-client/src/mcp/appTools.ts`. The handlers are pure functions over
  * {@link AppToolDeps}, which `useAppMcpTools` builds from the app's stores at call time.
  *
@@ -10,6 +10,7 @@
  * external program look at the user's disk, and must not reach past the folders the Drive shows.
  */
 /* eslint-disable camelcase -- argument and result names are snake_case on the wire */
+import { toolError } from '@/mcp/editTools'
 import { jsonResult, truncate } from '@/mcp/graphTools'
 import type { McpToolResult } from 'enso-common/src/mcp'
 import type { McpToolHandler } from './toolDispatcher'
@@ -65,6 +66,12 @@ export interface AppToolDeps {
    * the opening failed with.
    */
   readonly openProject: (path: string, name: string) => Promise<boolean>
+  /**
+   * Brings the tab of the open project at the path on screen, and resolves `true` once its project
+   * tools answer, or `false` when they do not at the wait's end. Opens nothing: rejects when the
+   * project has no tab.
+   */
+  readonly showProject: (path: string) => Promise<boolean>
   /** Closes the project on screen; `false` when no project tab is on screen. */
   readonly closeCurrentProject: () => Promise<boolean>
   readonly state: () => AppState
@@ -303,15 +310,22 @@ export async function listFiles(
   })
 }
 
-/** Opens the project and waits until its project tools answer. */
-async function openAndWait(deps: AppToolDeps, project: ProjectRef): Promise<McpToolResult> {
+/** Answers `{ name, path }` once `ready` resolves `true`, or why not. */
+async function answerWhenReady(
+  project: ProjectRef,
+  ready: () => Promise<boolean>,
+): Promise<McpToolResult> {
   try {
-    const ready = await deps.openProject(project.path, project.name)
-    if (!ready) return { ok: false, error: STILL_OPENING_ERROR }
+    if (!(await ready())) return { ok: false, error: STILL_OPENING_ERROR }
   } catch (error) {
     return { ok: false, error: errorMessage(error) }
   }
   return jsonResult(projectRef(project))
+}
+
+/** Opens the project and waits until its project tools answer. */
+function openAndWait(deps: AppToolDeps, project: ProjectRef): Promise<McpToolResult> {
+  return answerWhenReady(project, () => deps.openProject(project.path, project.name))
 }
 
 /**
@@ -344,6 +358,31 @@ export async function openProject(
   )
   if (project == null) return { ok: false, error: NO_PROJECT_AT_PATH_ERROR }
   return openAndWait(deps, { name: project.name, path: project.path })
+}
+
+/**
+ * `switch_project`: brings the tab of the open project at the path on screen and answers
+ * `{ name, path }` once its project tools answer. The path is compared, exactly, with the open
+ * projects' paths as `get_app_state` reports them, and never resolved against the disk: this opens
+ * and creates nothing.
+ */
+export async function switchProject(
+  deps: AppToolDeps,
+  { path }: { path: string },
+): Promise<McpToolResult> {
+  const state = deps.state()
+  const project = state.openProjects.find((open) => open.path === path)
+  if (project == null) {
+    const open =
+      state.openProjects.length === 0 ?
+        'No project is open.'
+      : `Open projects: ${state.openProjects.map((open) => open.path).join(', ')}.`
+    return toolError(
+      `No open project has the path \`${path}\`. ${open} Use \`open_project\` to open one that is closed.`,
+    )
+  }
+  if (state.project?.path === path) return jsonResult(projectRef(project))
+  return answerWhenReady(project, () => deps.showProject(project.path))
 }
 
 /** Why a project name cannot be used; `null` when it can. */
@@ -430,6 +469,10 @@ export function appToolHandlers(deps: () => AppToolDeps): Record<string, McpTool
     open_project: async ({ path }) => {
       if (typeof path !== 'string') return invalidArgument('path', 'a string')
       return openProject(deps(), { path })
+    },
+    switch_project: async ({ path }) => {
+      if (typeof path !== 'string') return invalidArgument('path', 'a string')
+      return switchProject(deps(), { path })
     },
     close_project: async () => closeProject(deps()),
   }

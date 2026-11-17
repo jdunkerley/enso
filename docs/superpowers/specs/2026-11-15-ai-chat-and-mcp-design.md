@@ -2,6 +2,47 @@
 
 Date: 2026-11-15. Status: design agreed in conversation, awaiting review.
 
+## Amendment, 2026-11-16: no chat panel
+
+After using the MCP server with Claude Code and Claude Desktop, the owner
+dropped the chat panel: "I don't think I want a chat pane any more the MCP works
+really well. Let's still remove the ai bit." What that changes in this document:
+
+- **Dropped:** the chat panel, the chat agent in Electron main, the Anthropic
+  and OpenAI-compatible adapters, the API-key setting, stored conversations, and
+  the `chat` caller kind. The sections "Chat agent", "Chat panel", "Chat panel
+  behaviour" and "Why the chat uses an API key" describe work that will not be
+  done. MCP is the only AI route.
+- **Still to do:** the "Removal" section (the Component Browser's AI prompt, AI
+  nodes, their placeholder, the stored prompt and the spawned `claude` child).
+  Settings → AI then holds only the MCP section.
+- **No migration:** no project with AI nodes needs converting (owner,
+  2026-11-16).
+- **Activity icon:** the activity feed has no chat panel to live in. The owner's
+  direction: an icon in the app that shows agent activity and is also where MCP
+  can be turned on ("If we add an AI activity icon it could show to enable the
+  MCP"). Its design is not settled.
+- **The token moves out of the keychain** (owner, 2026-11-16: "As we only allow
+  local host not needed to be as secret"). It is stored in the app's MCP
+  settings file under the user's data folder. This replaces "keychain token" in
+  the Decisions table and the Security section. The token already sits in plain
+  text in each agent app's own configuration, so the keychain protected little;
+  the `Origin` and `Host` checks, which stop web pages, are unchanged.
+- **Undecided:** what the effectiveness suite drives.
+- **Added tools** (owner's requests, same day):
+  - `get_visualization` and `list_visualizations` (pull request #809).
+  - `switch_project`: bring an open project's tab on screen. `get_app_state`
+    already lists the open projects and the one on screen.
+  - `get_documentation` and `set_documentation`: read and replace the
+    documentation of the function on screen, which is the workflow's
+    documentation at the top level and a user-defined function's after
+    `open_method`. Whole-text replace. An edit like the others: one undo step,
+    refused in Live.
+  - `add_image`: store an image in the project's `images` folder and answer with
+    the Markdown that shows it, for the agent to put in the documentation. The
+    image is a file on the user's machine, or a picture of a node's
+    visualization.
+
 ## Summary
 
 The IDE's AI feature today is a prompt in the Component Browser that generates

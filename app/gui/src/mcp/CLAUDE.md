@@ -4,8 +4,11 @@ The window side of the IDE's MCP server: the dispatcher every tool call goes
 through, and the app tools. The project tools (those that read and edit one
 project) are in `src/project-view/mcp/` (see its `CLAUDE.md`); the tool
 definitions are in `app/electron-client/src/mcp/` (`projectTools.ts`,
-`appTools.ts`). A tool needs both halves; keep each description in step with
-what its handler returns and refuses.
+`appTools.ts`, and `visualizationTool.ts`, `imageTool.ts` and
+`graphImageTool.ts` for the three tools that take a picture in main: their
+window handlers, such as `prepare_graph_image`, are registered as project tools
+but are not MCP tools). A tool needs both halves; keep each description in step
+with what its handler returns and refuses.
 
 - `toolDispatcher.ts` — started by `App.vue`. **Two kinds of registration**:
   - Project tools: `registerMcpToolHandlers`, one set per open project's graph
@@ -33,9 +36,19 @@ what its handler returns and refuses.
     refuses a run with too little time left (see
     `src/project-view/mcp/CLAUDE.md`). Handlers that do not edit ignore it.
 - `appTools.ts` — `get_app_state`, `list_projects`, `list_files`,
-  `create_project`, `open_project`, `close_project`: pure functions over
-  `AppToolDeps`, tested with fakes. Names are cut at `NAME_CHARS` (300), lists
-  at `MAX_ENTRIES` (500, with `truncated: true`).
+  `create_project`, `open_project`, `switch_project`, `close_project`: pure
+  functions over `AppToolDeps`, tested with fakes. Names are cut at `NAME_CHARS`
+  (300), lists at `MAX_ENTRIES` (500, with `truncated: true`).
+- `switch_project` takes no path through `resolveAllowedPath`: it compares the
+  agent's path exactly with the open projects' paths from `state()` (as
+  `get_app_state` lists them) and refuses any other, listing the open ones, so
+  it never touches the disk and opens nothing. The project already on screen
+  answers at once; another is shown by `showProject` (`useAppMcpTools.ts`),
+  which brings its tab up (rejecting when it has none) and waits, as opening
+  does, for that project's tools to answer (`whenProjectToolsActive`, at most
+  `SWITCH_WAIT_MS`, 20 s, inside main's 30 s). The editor of the project left
+  removes its tools on deactivation, which also ends the agent's open undo step
+  there.
 - **Paths are the security boundary.** An external agent can list folders and
   open projects with these tools, so every path goes through
   `resolveAllowedPath` against the Drive's root and the saved local folders
