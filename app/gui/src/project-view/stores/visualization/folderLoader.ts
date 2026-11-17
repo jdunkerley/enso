@@ -1,5 +1,5 @@
 import type { VisualizationMetadata } from '@/stores/visualization/metadata'
-import { rootAddress, stylePathAttribute } from '@/stores/visualization/rootAddress'
+import { rootAddress } from '@/stores/visualization/rootAddress'
 import {
   InvalidVisualizationModuleError,
   type VisualizationModule,
@@ -84,12 +84,6 @@ export function watchVisualizationFolder({
     const id: VisualizationIdentifier | undefined = name != null ? { module, name } : undefined
     abortControllers.get(file)?.abort()
     abortControllers.delete(file)
-    // FIXME [sb]: Ideally these should be deleted as late as possible, instead of immediately.
-    for (const el of document.querySelectorAll(
-      `[${stylePathAttribute}="${CSS.escape(address)}"]`,
-    )) {
-      el.remove()
-    }
     switch (kind) {
       case 'Added':
       case 'Modified': {
