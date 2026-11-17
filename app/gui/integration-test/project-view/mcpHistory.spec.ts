@@ -92,12 +92,12 @@ test('undo removes what an agent added and redo brings it back', async ({ editor
   assert(id != null)
 
   const undone = await callOk(page, 'undo')
-  expect(undone).toEqual({ undone: true, can_undo: false, can_redo: true, settled: true })
+  expect(undone).toEqual({ undone: true, can_undo: false, can_redo: true })
   await expect(locate.graphNodeByBinding(page, 'agent_one')).toBeHidden()
   await expect(locate.graphNode(page)).toHaveCount(nodesCount)
 
   const redone = await callOk(page, 'redo')
-  expect(redone).toEqual({ redone: true, can_undo: true, can_redo: false, settled: true })
+  expect(redone).toEqual({ redone: true, can_undo: true, can_redo: false })
   await expect(locate.graphNodeByBinding(page, 'agent_one')).toBeVisible()
   // The node has the id it had before.
   const back = (await callOk(page, 'get_graph', { previews: false })) as Graph
@@ -108,7 +108,7 @@ test('undo with nothing to undo is refused', async ({ editorPage, page }) => {
   await editorPage
   const refused = await call(page, 'undo')
   expect(refused.ok).toBe(false)
-  expect(refused.error).toContain('nothing of yours to undo')
+  expect(refused.error).toContain("nothing of the agents' to undo")
   const redo = await call(page, 'redo')
   expect(redo.ok).toBe(false)
   expect(redo.error).toContain('nothing to redo')
@@ -125,7 +125,7 @@ test("undo never takes back the user's edit, and leaves it intact", async ({
 
   const refused = await call(page, 'undo')
   expect(refused.ok).toBe(false)
-  expect(refused.error).toContain('nothing of yours to undo')
+  expect(refused.error).toContain("nothing of the agents' to undo")
   // Neither the user's deletion nor the agent's node earlier than it was touched.
   await expect(locate.graphNodeByBinding(page, 'list')).toBeHidden()
   await expect(locate.graphNodeByBinding(page, 'agent_one')).toBeVisible()

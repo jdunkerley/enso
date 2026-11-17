@@ -69,6 +69,7 @@ import {
   type VisualizationSize,
   type VisualizationToolDeps,
 } from './visualizationTools'
+import { writeRefusal } from './writeGuard'
 
 /**
  * Like `aiToolHandler.ts`: under the main-process MCP server's timeout, so that the window's own
@@ -153,6 +154,14 @@ export function useProjectMcpTools(
    */
   let active = true
 
+  /**
+   * The root of the module in the editor (the project's `Main.enso`), read live from the module
+   * store; undefined while it cannot be read.
+   */
+  function editorModuleRoot(): Ast.Ast | undefined {
+    return currentProject.module.value.ast?.root()
+  }
+
   const session = new EditSession({
     isLive: () => isLive(currentProject.store.value),
     isActive: () => active,
@@ -177,8 +186,12 @@ export function useProjectMcpTools(
       const undoManager = currentProject.module.value.undoManager
       return { undo: undoManager.undoDepth, redo: undoManager.redoDepth }
     },
-    undo: () => currentProject.module.value.undoManager.undo(),
-    redo: () => currentProject.module.value.undoManager.redo(),
+    undo: (floor) => currentProject.module.value.undoManager.undoAbove(floor),
+    redo: (floor) => currentProject.module.value.undoManager.redoAbove(floor),
+    enablesOutput: () => {
+      const root = editorModuleRoot()
+      return root == null || writeRefusal(root) != null
+    },
     saveVersion: (comment) =>
       localVersioning.saveIfEnabled(currentProject.store.value.assetId, comment),
     watchGraphUpdate: () => watchGraphUpdate(currentProject.graph.value),
@@ -636,10 +649,8 @@ export function useProjectMcpTools(
         // Read at the run's turn, as the session does.
         isLive: () => isLive(currentProject.store.value),
         db: graph.db,
-        moduleRoot: () => {
-          const ast = currentProject.graph.value.currentMethod.ast
-          return ast.ok ? ast.value.module.root() : undefined
-        },
+        // The same module the session checks before undo and redo.
+        moduleRoot: editorModuleRoot,
         executionContext: project.executionContext,
       })
     },

@@ -1,4 +1,4 @@
-import { holdUndoStep } from '$/providers/openedProjects/module/undoHold'
+import { holdUndoStep, redoAbove, undoAbove } from '$/providers/openedProjects/module/undoHold'
 import type { ProjectStore } from '$/providers/openedProjects/project'
 import { ConditionVariable } from '$/utils/ConditionVariable'
 import { proxyRefs } from '$/utils/reactivity'
@@ -222,6 +222,32 @@ export async function createModuleStore(
       holdStep(): () => void {
         const manager = moduleModel.value?.undoManager
         return manager ? holdUndoStep(manager) : () => {}
+      },
+      /**
+       * Undo the top step, unable to reach the `floor` lowest steps of the stack (`undoAbove` in
+       * `undoHold.ts`: a plain `undo()` goes on below a step that changes nothing). Returns
+       * whether anything changed.
+       */
+      undoAbove(floor: number): boolean {
+        const manager = moduleModel.value?.undoManager
+        if (manager == null) return false
+        try {
+          return undoAbove(manager, floor)
+        } finally {
+          // The manager's events fired while the lower steps were off the stack, and none fires
+          // when nothing changed: read the status again with the whole stack back.
+          undoManagerStatus.update(manager)
+        }
+      },
+      /** Redo the top step, unable to reach the `floor` lowest steps of the redo stack. */
+      redoAbove(floor: number): boolean {
+        const manager = moduleModel.value?.undoManager
+        if (manager == null) return false
+        try {
+          return redoAbove(manager, floor)
+        } finally {
+          undoManagerStatus.update(manager)
+        }
       },
       /** How many steps the undo stack holds now (read at call time; 0 with no manager). */
       get undoDepth(): number {

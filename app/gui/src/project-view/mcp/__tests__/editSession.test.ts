@@ -9,12 +9,17 @@ import {
   EDIT_STEP_IDLE_MS,
   EditSession,
   GRAPH_UPDATE_WAIT_MS,
+  HISTORY_NOT_REVERSED_ERROR,
+  HISTORY_REVERSED_ERROR,
   LIVE_EDIT_ERROR,
   NOT_ON_SCREEN_ERROR,
+  NOTHING_LEFT_TO_UNDO_ERROR,
   NOTHING_TO_REDO_ERROR,
   NOTHING_TO_UNDO_ERROR,
   PROJECT_CLOSED_ERROR,
+  REDO_OUTPUT_ERROR,
   TIMED_OUT_BEFORE_RUN_ERROR,
+  UNDO_OUTPUT_ERROR,
   type EditSessionDeps,
 } from '../editSession'
 import {
@@ -70,8 +75,10 @@ function setup({
   const timers: { f: () => void; ms: number; handle: number; cleared: boolean }[] = []
   const unsubscribe = vi.fn()
   // A counter-backed undo history: a changed edit in a held step adds one item to the step (once),
-  // `undo` and `redo` move one between the stacks, like the module's Y.UndoManager does.
-  const history = { undo: 0, redo: 0, stepOpen: false, stepHasItem: false }
+  // `undo` and `redo` move one between the stacks above their floor, like the module's
+  // Y.UndoManager with `undoAbove` / `redoAbove` does. `output` is whether the module has code that
+  // enables output.
+  const history = { undo: 0, redo: 0, stepOpen: false, stepHasItem: false, output: false }
   const release = vi.fn(() => {
     log.push('release')
     history.stepOpen = false
@@ -91,18 +98,23 @@ function setup({
     },
     historyDepth: () => ({ undo: history.undo, redo: history.redo }),
     // Like the real manager, undo and redo are transactions the foreign-edit listener sees.
-    undo: vi.fn(() => {
+    undo: vi.fn((floor: number) => {
+      if (history.undo <= floor) return false
       log.push('undo')
       foreign?.()
       history.undo--
       history.redo++
+      return true
     }),
-    redo: vi.fn(() => {
+    redo: vi.fn((floor: number) => {
+      if (history.redo <= floor) return false
       log.push('redo')
       foreign?.()
       history.redo--
       history.undo++
+      return true
     }),
+    enablesOutput: vi.fn(() => history.output),
     saveVersion: vi.fn(async (comment: string) => {
       log.push(`save:${comment}`)
     }),
@@ -1119,9 +1131,9 @@ describe('EditSession own history', () => {
   beforeEach(() => {
     t = setup()
   })
-  const state = (result: Result<{ value: { can_undo: boolean; can_redo: boolean } }>) => {
+  const state = (result: Result<{ can_undo: boolean; can_redo: boolean }>) => {
     if (!result.ok) throw new Error(result.error.message(''))
-    return result.value.value
+    return result.value
   }
 
   test('undo with no edits is refused', async () => {
@@ -1163,14 +1175,6 @@ describe('EditSession own history', () => {
     expect(t.deps.undo).toHaveBeenCalledTimes(2)
   })
 
-  test("undo does not go below the agents' first step when the user had history", async () => {
-    t.history.undo = 3
-    await t.session.run(claude, t.changed(1))
-    expect((await t.session.undo(claude)).ok).toBe(true)
-    expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_TO_UNDO_ERROR)
-    expect(t.history.undo).toBe(3)
-  })
-
   test('a foreign edit after an agent edit makes undo refuse', async () => {
     await t.session.run(claude, t.changed(1))
     t.userEdit()
@@ -1197,22 +1201,169 @@ describe('EditSession own history', () => {
     expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_TO_UNDO_ERROR)
   })
 
-  test('a sealing edit makes undo refuse, though later edits can be undone down to the seal', async () => {
+  test("undo passes the floor, and does not go below the agents' first step", async () => {
+    t.history.undo = 3
+    await t.session.run(claude, t.changed(1))
+    expect((await t.session.undo(claude)).ok).toBe(true)
+    expect(t.deps.undo).toHaveBeenCalledWith(3)
+    expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_TO_UNDO_ERROR)
+    expect(t.history.undo).toBe(3)
+  })
+
+  test('an undo that changes nothing answers so, and leaves nothing to redo', async () => {
+    t.history.undo = 2
+    await t.session.run(claude, t.changed(1))
+    // Every step above the floor had been reverted by something untracked: the bounded undo drops
+    // them and stops at the floor, changing nothing.
+    vi.mocked(t.deps.undo).mockImplementationOnce(() => {
+      t.history.undo = 2
+      return false
+    })
+    expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_LEFT_TO_UNDO_ERROR)
+    expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_TO_UNDO_ERROR)
+    expect(errorOf(await t.session.redo(claude))).toBe(NOTHING_TO_REDO_ERROR)
+  })
+
+  test('redo passes the redo depth of the first undo as its floor', async () => {
     await t.session.run(claude, t.changed(1))
     t.fire()
-    // The sealing edit's step closes at once, and becomes the floor.
-    await t.session.run(claude, t.changed('seal'), { sealsHistory: () => true })
+    await t.session.run(claude, t.changed(2))
+    // A redo step below the session's own (as if it had been there before the first undo).
+    t.history.redo = 1
+    await t.session.undo(claude)
+    await t.session.undo(claude)
+    expect(t.history.redo).toBe(3)
+    expect(state(await t.session.redo(claude))).toEqual({ can_undo: true, can_redo: true })
+    expect(state(await t.session.redo(claude))).toEqual({ can_undo: true, can_redo: false })
+    expect(t.deps.redo).toHaveBeenNthCalledWith(1, 1)
+    expect(t.deps.redo).toHaveBeenNthCalledWith(2, 1)
+    expect(errorOf(await t.session.redo(claude))).toBe(NOTHING_TO_REDO_ERROR)
+    expect(t.history.redo).toBe(1)
+  })
+
+  test('a changed edit in a module with code that enables output seals the history', async () => {
+    await t.session.run(claude, t.changed(1))
+    t.fire()
+    // Code that enables output arrives without the session seeing an edit (the file on disk).
+    t.history.output = true
+    await t.session.run(claude, t.changed(2))
+    // The step closed at once.
     expect(t.release).toHaveBeenCalledTimes(2)
+    expect(errorOf(await t.session.undo(claude))).toBe(UNDO_OUTPUT_ERROR)
+    // With that code gone again, the sealed step and those below it are still out of reach.
+    t.history.output = false
     expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_TO_UNDO_ERROR)
+    // A later edit from a module without such code can be undone, down to the seal.
     await t.session.run(claude, t.changed(3))
     expect(state(await t.session.undo(claude))).toEqual({ can_undo: false, can_redo: true })
     expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_TO_UNDO_ERROR)
     expect(t.deps.undo).toHaveBeenCalledTimes(1)
   })
 
-  test('a sealing edit is not sealed when the edit fails', async () => {
-    await t.session.run(claude, () => Err('no'), { sealsHistory: () => true })
+  test('a changed edit that leaves code enabling output seals the history', async () => {
+    await t.session.run(claude, () => {
+      t.history.output = true
+      return t.changed(1)()
+    })
+    t.history.output = false
+    expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_TO_UNDO_ERROR)
+    expect(t.deps.undo).not.toHaveBeenCalled()
+  })
+
+  test('the output check is read before the edit runs', async () => {
+    t.history.output = true
+    await t.session.run(claude, () => {
+      // The edit removes the code (as removing the node that has it does).
+      t.history.output = false
+      return t.changed(1)()
+    })
+    expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_TO_UNDO_ERROR)
+    expect(t.deps.undo).not.toHaveBeenCalled()
+  })
+
+  test('an unchanged or failed edit in a module with such code does not seal', async () => {
+    await t.session.run(claude, t.changed(1))
+    t.history.output = true
+    await t.session.run(claude, () => Ok(0), { unchanged: () => true })
+    await t.session.run(claude, () => Err('no'))
     expect(t.release).not.toHaveBeenCalled()
+    t.history.output = false
+    expect((await t.session.undo(claude)).ok).toBe(true)
+  })
+
+  test('undo and redo are refused while the module has code that enables output', async () => {
+    await t.session.run(claude, t.changed(1))
+    t.fire()
+    await t.session.run(claude, t.changed(2))
+    await t.session.undo(claude)
+    t.history.output = true
+    expect(errorOf(await t.session.undo(claude))).toBe(UNDO_OUTPUT_ERROR)
+    expect(errorOf(await t.session.redo(claude))).toBe(REDO_OUTPUT_ERROR)
+    expect(t.deps.undo).toHaveBeenCalledTimes(1)
+    expect(t.deps.redo).not.toHaveBeenCalled()
+  })
+
+  test('an undo that leaves code enabling output is reversed at once, and sealed', async () => {
+    t.history.undo = 1
+    await t.session.run(claude, t.changed(1))
+    const before = { ...t.history }
+    vi.mocked(t.deps.undo).mockImplementationOnce((floor) => {
+      expect(floor).toBe(1)
+      t.history.undo--
+      t.history.redo++
+      t.history.output = true
+      return true
+    })
+    vi.mocked(t.deps.redo).mockImplementationOnce((floor) => {
+      // Bounded to the one step the undo just added.
+      expect(floor).toBe(before.redo)
+      t.history.redo--
+      t.history.undo++
+      t.history.output = false
+      return true
+    })
+    expect(errorOf(await t.session.undo(claude))).toBe(HISTORY_REVERSED_ERROR)
+    expect(t.deps.redo).toHaveBeenCalledTimes(1)
+    expect(t.history).toMatchObject({ undo: before.undo, redo: before.redo, output: false })
+    // Sealed: the step is not tried again, and there is nothing to redo.
+    expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_TO_UNDO_ERROR)
+    expect(errorOf(await t.session.redo(claude))).toBe(NOTHING_TO_REDO_ERROR)
+  })
+
+  test('a redo that leaves code enabling output is reversed at once, and sealed', async () => {
+    await t.session.run(claude, t.changed(1))
+    await t.session.undo(claude)
+    const before = { ...t.history }
+    vi.mocked(t.deps.redo).mockImplementationOnce(() => {
+      t.history.redo--
+      t.history.undo++
+      t.history.output = true
+      return true
+    })
+    vi.mocked(t.deps.undo).mockImplementationOnce((floor) => {
+      // Bounded to the one step the redo just added.
+      expect(floor).toBe(before.undo)
+      t.history.undo--
+      t.history.redo++
+      t.history.output = false
+      return true
+    })
+    expect(errorOf(await t.session.redo(claude))).toBe(HISTORY_REVERSED_ERROR)
+    expect(t.history).toMatchObject({ undo: before.undo, redo: before.redo, output: false })
+    expect(errorOf(await t.session.undo(claude))).toBe(NOTHING_TO_UNDO_ERROR)
+    expect(errorOf(await t.session.redo(claude))).toBe(NOTHING_TO_REDO_ERROR)
+  })
+
+  test('a reversal that cannot change the project back says so', async () => {
+    await t.session.run(claude, t.changed(1))
+    vi.mocked(t.deps.undo).mockImplementationOnce(() => {
+      t.history.undo--
+      t.history.redo++
+      t.history.output = true
+      return true
+    })
+    vi.mocked(t.deps.redo).mockImplementationOnce(() => false)
+    expect(errorOf(await t.session.undo(claude))).toBe(HISTORY_NOT_REVERSED_ERROR)
   })
 
   test.each([

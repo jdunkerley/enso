@@ -21,9 +21,9 @@ import { writeRefusal } from './writeGuard'
 /** The answer to `refresh` while the project is in Live mode. */
 export const LIVE_REFRESH_ERROR =
   'The project is in Live mode, where a refresh writes outputs. Ask the user to refresh, or to switch the project back to Design.'
-/** The answer to `refresh` when the module has a node with Write on, or code that enables output. */
+/** The answer to `refresh` when the project's main module has code that enables output. */
 export const WRITE_ON_REFRESH_ERROR =
-  'This project has a node with Write on, or code that enables output, and a refresh would run it and write again. Ask the user to refresh.'
+  "The project's main module has code that enables output, and a refresh would run it and write again. Ask the user to refresh."
 /** The answer to `refresh` when the module on screen cannot be read. */
 export const NO_MODULE_ERROR = 'The module on screen cannot be read now. Try again in a moment.'
 
@@ -38,7 +38,7 @@ export interface RefreshToolDeps {
   readonly isLive: () => boolean
   /** The graph of the method on screen: its nodes are those the refresh must report on. */
   readonly db: Pick<GraphDb, 'nodeIdToNode'>
-  /** The root of the module on screen, whose code is checked for anything that enables output. */
+  /** The root of the module in the editor, whose code is checked for anything that enables output. */
   readonly moduleRoot: () => Ast.Ast | undefined
   /** Only `recompute`, which this tool calls with `'all'` and nothing else. */
   readonly executionContext: Pick<ExecutionContext, 'recompute'>
@@ -47,10 +47,12 @@ export interface RefreshToolDeps {
 /**
  * `refresh`: asks the engine to compute every node again, in the context's environment (Design).
  * Refused, before anything is queued, in Live mode ({@link LIVE_REFRESH_ERROR}); and, at the run's
- * turn and with nothing called, in Live mode again, when any node of the method on screen has Write
- * on, or when {@link writeRefusal} refuses the whole module's code ({@link WRITE_ON_REFRESH_ERROR}:
- * the standard Write prefix contains `with_enabled_context`, so a Write-on node in any function
- * makes it answer). Answers `{ refreshed: true, settled }`, where `settled` says whether the engine
+ * turn and with nothing called, in Live mode again, and when {@link writeRefusal} refuses the code of
+ * the module in the editor, the project's `Main.enso` ({@link WRITE_ON_REFRESH_ERROR}). That covers
+ * a node with the GUI's Write prefix anywhere in the module: the prefix is the call
+ * `Standard.Base.Runtime.with_enabled_context …`, whose identifier the check matches. It does not
+ * cover the project's other modules, library functions that enable output themselves, or
+ * `foreign` code. Answers `{ refreshed: true, settled }`, where `settled` says whether the engine
  * reported a value again for every computed node of the method on screen in time.
  */
 export async function refreshTool(deps: RefreshToolDeps): Promise<McpToolResult> {
@@ -58,15 +60,15 @@ export async function refreshTool(deps: RefreshToolDeps): Promise<McpToolResult>
   const outcome = await deps.session.runUnstepped(
     deps.caller,
     () => {
-      // Checked here, at the run's turn: Live may have begun, or Write been switched on, while
-      // the call waited in the queue.
+      // Checked here, at the run's turn: Live may have begun, or code enabling output been added,
+      // while the call waited in the queue. The module's code is read live, so it is never behind
+      // the node database (which a node's Write prefix would otherwise be read from).
       if (deps.isLive()) return Err(LIVE_REFRESH_ERROR)
       const root = deps.moduleRoot()
       if (root == null) return Err(NO_MODULE_ERROR)
       if (writeRefusal(root) != null) return Err(WRITE_ON_REFRESH_ERROR)
       const ids: string[] = []
       for (const [id, node] of deps.db.nodeIdToNode) {
-        if (node.prefixes.enableRecording != null) return Err(WRITE_ON_REFRESH_ERROR)
         // Only the computed nodes report: the engine sends nothing for a function's argument (an
         // input node) or for the bare name an output node returns, so waiting for those would
         // always run out the 20 s.

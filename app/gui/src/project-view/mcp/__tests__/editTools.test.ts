@@ -127,16 +127,12 @@ const DRAWN_SIZE = { width: 600, height: 400, default_width: false, default_heig
 function fakeSession(settled = true): Pick<EditSession, 'run'> & {
   affected: AffectedExpressions[]
   deadlines: (number | undefined)[]
-  /** What each run's `sealsHistory` answered, for runs that passed one. */
-  seals: boolean[]
 } {
   const affected: AffectedExpressions[] = []
   const deadlines: (number | undefined)[] = []
-  const seals: boolean[] = []
   return {
     affected,
     deadlines,
-    seals,
     async run<T>(
       _caller: unknown,
       edit: () => Result<T> | Promise<Result<T>>,
@@ -146,7 +142,6 @@ function fakeSession(settled = true): Pick<EditSession, 'run'> & {
       const result = await edit()
       if (!result.ok) return result
       affected.push(options?.affected?.(result.value) ?? {})
-      if (options?.sealsHistory) seals.push(options.sealsHistory(result.value))
       return Ok<EditOutcome<T>>({ value: result.value, settled })
     },
   }
@@ -307,8 +302,9 @@ test('add_nodes in Live mode is refused by the session, and nothing is created',
     holdUndoStep: () => () => {},
     onForeignEdit: () => () => {},
     historyDepth: () => ({ undo: 0, redo: 0 }),
-    undo: () => {},
-    redo: () => {},
+    undo: () => false,
+    redo: () => false,
+    enablesOutput: () => false,
     saveVersion: async () => {},
     watchGraphUpdate: () => ({ updated: async () => true, cancel: () => {} }),
     watchExecution: () => ({ settled: async () => true, cancel: () => {} }),
@@ -420,27 +416,6 @@ test('remove_nodes deletes the nodes and lists them', async () => {
   const result = valueOf(await removeNodes(deps, { node_ids: [a, b, a] }))
   expect(deps.deleteNodes).toHaveBeenCalledWith([a, b])
   expect(result).toEqual({ removed: [a, b], settled: true })
-})
-
-test('remove_nodes does not seal the history for nodes without Write on', async () => {
-  const session = fakeSession()
-  const { deps, db } = makeDeps({ session })
-  await removeNodes(deps, { node_ids: [nodeNamed(db, 'a')] })
-  expect(session.seals).toEqual([false])
-})
-
-test('remove_nodes of a node with Write on seals the history', async () => {
-  const session = fakeSession()
-  const { deps, db } = makeDeps({ session }, WRITE_ON_CODE)
-  const w = nodeNamed(db, 'w')
-  expect(db.nodeIdToNode.get(w)!.prefixes.enableRecording).toBeDefined()
-  vi.mocked(deps.deleteNodes).mockImplementation(async (ids) => {
-    // The node is gone once removed, so the answer must have been read before.
-    for (const id of ids) db.nodeIdToNode.delete(id)
-    return Ok()
-  })
-  await removeNodes(deps, { node_ids: [nodeNamed(db, 'a'), w] })
-  expect(session.seals).toEqual([true])
 })
 
 test('set_node_comment writes the comment and answers with the node', async () => {

@@ -15,6 +15,7 @@ import {
   refreshTool,
   type RefreshToolDeps,
 } from '../refreshTool'
+import { WRITE_PREFIX } from './outputEnablingCode'
 
 const caller = { kind: 'external', name: 'claude-code' } as const
 const DEADLINE = 123_456
@@ -26,14 +27,44 @@ main =
     b = a * 2
     b`
 
+/**
+ * Code that really writes on the current engine, in another function of the module than the one on
+ * screen: `with_enabled_context` takes two parameters, the context and the action.
+ */
 const CODE_WITH_ENABLING_FUNCTION = `import Standard.Base.Data.Numbers
 
-other =
-    Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output "design" <|
-        1
+other p =
+    Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| "x".write p
 
 main =
     a = 1 + 2
+    a`
+
+/** The method form, which really writes too, in a node of the method on screen. */
+const CODE_WITH_ENABLING_METHOD = `import Standard.Base.Data.Numbers
+
+main =
+    a = 1 + 2
+    w = Standard.Base.Runtime.Context.Output.with_enabled <| "x".write "x.txt"
+    a`
+
+/** A node with the GUI's Write prefix (`util/ast/node.ts`), in another function of the module. */
+const CODE_WITH_WRITE_PREFIX_NODE = `import Standard.Base.Data.Numbers
+
+other =
+    w = ${WRITE_PREFIX}"x".write "x.txt"
+    w
+
+main =
+    a = 1 + 2
+    a`
+
+/** A node with the GUI's Write prefix in the method on screen. */
+const CODE_WITH_WRITE_PREFIX_NODE_ON_SCREEN = `import Standard.Base.Data.Numbers
+
+main =
+    a = 1 + 2
+    w = ${WRITE_PREFIX}"x".write "x.txt"
     a`
 
 const CODE_WITH_ARGUMENT = `import Standard.Base.Data.Numbers
@@ -44,7 +75,11 @@ main x =
 
 function makeDeps(
   overrides: Partial<RefreshToolDeps> = {},
-  { code = CODE, settled = true, beforeTurn = () => {} } = {},
+  {
+    code = CODE,
+    settled = true,
+    beforeTurn = () => {},
+  }: { code?: string; settled?: boolean; beforeTurn?: () => void } = {},
 ) {
   const db = GraphDb.Mock(undefined, undefined, mockProjectNameStore())
   const { root } = Ast.parseUpdatingIdMap(code)
@@ -172,40 +207,37 @@ test('Live mode that begins while the call waits for its turn is refused, nothin
   expect(recompute).not.toHaveBeenCalled()
 })
 
-test('a node with Write on in the method refuses, nothing called', async () => {
-  const { deps, db, recompute } = makeDeps({
-    // The action runs at once: the node database would otherwise rebuild the node first.
-    session: {
-      async runUnstepped<T>(_caller: unknown, action: () => Result<T> | Promise<Result<T>>) {
-        const result = await action()
-        return result.ok ? Ok({ value: result.value, settled: true }) : result
-      },
-    },
-  })
-  const [id, node] = [...db.nodeIdToNode.entries()][0]!
-  db.nodeIdToNode.set(id, { ...node, prefixes: { enableRecording: [] } })
+test.each([
+  ['with_enabled_context in another function', CODE_WITH_ENABLING_FUNCTION],
+  ['Context.Output.with_enabled in a node on screen', CODE_WITH_ENABLING_METHOD],
+  ['a node with the Write prefix in another function', CODE_WITH_WRITE_PREFIX_NODE],
+])('code that enables output (%s) refuses, nothing called', async (_name, code) => {
+  const { deps, recompute } = makeDeps({}, { code })
   expect(errorOf(await refreshTool(deps))).toBe(WRITE_ON_REFRESH_ERROR)
   expect(recompute).not.toHaveBeenCalled()
 })
 
-test('a node that has Write switched on while the call waited for its turn refuses', async () => {
-  const fixture: { db?: GraphDb } = {}
-  const { deps, db, recompute } = makeDeps(
-    {},
+test('a node with the Write prefix in the method on screen refuses, as the module check', async () => {
+  const { deps, db, recompute } = makeDeps({}, { code: CODE_WITH_WRITE_PREFIX_NODE_ON_SCREEN })
+  // The node database sees the prefix too; the module check alone refuses it.
+  expect([...db.nodeIdToNode.values()].some((node) => node.prefixes.enableRecording != null)).toBe(
+    true,
+  )
+  expect(errorOf(await refreshTool(deps))).toBe(WRITE_ON_REFRESH_ERROR)
+  expect(recompute).not.toHaveBeenCalled()
+})
+
+test('code that enables output added while the call waited for its turn refuses', async () => {
+  const later = Ast.parseUpdatingIdMap(CODE_WITH_ENABLING_FUNCTION).root
+  let root: Ast.Ast = Ast.parseUpdatingIdMap(CODE).root
+  const { deps, recompute } = makeDeps(
+    { moduleRoot: () => root },
     {
       beforeTurn: () => {
-        const [id, node] = [...fixture.db!.nodeIdToNode.entries()][0]!
-        fixture.db!.nodeIdToNode.set(id, { ...node, prefixes: { enableRecording: [] } })
+        root = later
       },
     },
   )
-  fixture.db = db
-  expect(errorOf(await refreshTool(deps))).toBe(WRITE_ON_REFRESH_ERROR)
-  expect(recompute).not.toHaveBeenCalled()
-})
-
-test('code in another function of the module that enables output refuses, nothing called', async () => {
-  const { deps, recompute } = makeDeps({}, { code: CODE_WITH_ENABLING_FUNCTION })
   expect(errorOf(await refreshTool(deps))).toBe(WRITE_ON_REFRESH_ERROR)
   expect(recompute).not.toHaveBeenCalled()
 })
