@@ -2,6 +2,11 @@
 
 #### Enso IDE
 
+- [The JSON and tree view can be used from the keyboard: Tab enters it, the
+  arrow keys move between entries and open or close branches, Enter adds a
+  component for the entry (Shift+Enter for every entry beside it), and the
+  context-menu key or Shift+F10 opens the entry's menu, which the arrow keys and
+  Escape drive too.][822]
 - [The SQL Query view colours keywords, strings, numbers and comments.][840]
 - [The Component Browser's AI prompt and AI nodes are removed, with the local
   `claude` agent behind them. AI agents work with the IDE through its MCP server
@@ -560,6 +565,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [846]: https://github.com/jdunkerley/enso/pull/846
+[822]: https://github.com/jdunkerley/enso/pull/822
 [840]: https://github.com/jdunkerley/enso/pull/840
 [841]: https://github.com/jdunkerley/enso/pull/841
 [844]: https://github.com/jdunkerley/enso/pull/844
