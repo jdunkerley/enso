@@ -5,7 +5,7 @@
 - [Agents connected over MCP can undo and redo their own edits, save a version,
   list every error and warning of a function in one call, and refresh the
   values. They never turn Write on: a refresh is refused where it would
-  write.][NNN]
+  write.][844]
 - [Agents connected over MCP can arrange and move nodes, resize a visualization,
   and take a picture of the graph.][831]
 - [A Boolean argument shows its value next to the checkbox, and a dropdown under
@@ -545,7 +545,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[844]: https://github.com/jdunkerley/enso/pull/844
 [831]: https://github.com/jdunkerley/enso/pull/831
 [830]: https://github.com/jdunkerley/enso/pull/830
 [825]: https://github.com/jdunkerley/enso/pull/825
