@@ -93,13 +93,12 @@ saved in its metadata (`displaced`). Four things to keep:
 
 - **Change a node's visualization or position through the store's setters**
   (`setNodeVisualization`, `setNodesVisualization`, `setNodePositions` for a
-  move by hand, `releasePushedBy` for a removal inside an edit, and
-  `repointPushedBy` when a node is replaced in place, so it keeps what it
-  pushes). They lay out before they write, in one edit, so the pushes share the
-  action's undo step. `setNodePosition` alone is for a drag's frames.
-  `setNodePositions` makes every node it is given forget its home, moved or not
-  (Tidy up over the whole graph clears every home), so a finished drag passes
-  only the nodes that actually moved: a click is not a move.
+  move by hand, `releasePushedBy` for a removal inside an edit). They lay out
+  before they write, in one edit, so the pushes share the action's undo step.
+  `setNodePosition` alone is for a drag's frames. `setNodePositions` makes every
+  node it is given forget its home, moved or not (Tidy up over the whole graph
+  clears every home), so a finished drag passes only the nodes that actually
+  moved: a click is not a move.
 - **Call a layout setter at most once per outer transaction**, passing every
   node in that one call: the node database it lays out against is updated only
   when the transaction commits, so a second call in the same `batchEdits` or
