@@ -73,11 +73,15 @@ test('a new module doc is listened to instead of the old one', () => {
   const current = ref(moduleOver(first))
   const listener = vi.fn()
   const stop = onUserModuleTransaction(() => current.value as never, syncWatch, listener)
-  current.value = moduleOver(second)
-  first.transact(() => first.getMap('m').set('x', 1), 'local:userAction')
+  // Not on the first subscribe.
   expect(listener).not.toHaveBeenCalled()
-  second.transact(() => second.getMap('m').set('x', 1), 'local:userAction')
+  current.value = moduleOver(second)
+  // A new doc has a new undo stack: the listener is told, as for a foreign edit.
   expect(listener).toHaveBeenCalledTimes(1)
+  first.transact(() => first.getMap('m').set('x', 1), 'local:userAction')
+  expect(listener).toHaveBeenCalledTimes(1)
+  second.transact(() => second.getMap('m').set('x', 1), 'local:userAction')
+  expect(listener).toHaveBeenCalledTimes(2)
   stop()
 })
 

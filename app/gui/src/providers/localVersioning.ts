@@ -93,6 +93,29 @@ export type RepositoryOffer =
   /** The user accepted, but creating or enabling the repository failed (a toast says why). */
   | 'failed'
 
+/** What became of a {@link LocalVersioningStore.save}, besides the toast the user saw. */
+export type SaveVersionOutcome =
+  /** A version was committed. */
+  | { kind: 'saved' }
+  /** Nothing had changed since the last version, so none was made. */
+  | { kind: 'nothingToSave' }
+  /** No version was made: `reason` says why in a sentence, without a leading capital. */
+  | { kind: 'failed'; reason: string }
+
+/** The placeholder a save's `done` holds until the save starts. */
+function notStarted(): Promise<SaveVersionOutcome> {
+  return Promise.resolve({ kind: 'failed', reason: 'the save did not start' })
+}
+
+/** Why a save that found no repository in use made no version, for each offer that is not ready. */
+const OFFER_FAILURE_REASONS: Readonly<Record<Exclude<RepositoryOffer, 'ready'>, string>> = {
+  declined: 'versions are off for this folder',
+  outsideRoot: 'the project is outside the projects folder and in no git repository',
+  noGit: 'git was not found, so no versions are kept',
+  unavailable: 'versions are not available for this project',
+  failed: 'the repository could not be set up',
+}
+
 const TIMED_OUT = Symbol('timed out')
 
 /** Create the store. The app uses the global one, {@link useLocalVersioning}. */
@@ -407,8 +430,8 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
 
   /** A save being made, and what it can still take. */
   interface RunningSave {
-    /** Settles when the save does; set right after the save starts. */
-    done: Promise<void>
+    /** Settles with the save's outcome; set right after the save starts. */
+    done: Promise<SaveVersionOutcome>
     /** The comment the commit will carry; a save that joins before `committing` adds to it. */
     comment: string
     /** The commit has been requested: the comment can no longer change, nor the content. */
@@ -441,7 +464,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   }
 
   /** Run `running` as the project's save; once it settles, the queued one (if any) takes over. */
-  function run(projectId: ProjectId, running: RunningSave): Promise<void> {
+  function run(projectId: ProjectId, running: RunningSave): Promise<SaveVersionOutcome> {
     saving.set(projectId, running)
     running.done = makeSave(projectId, running).finally(() => {
       if (saving.get(projectId) !== running) return
@@ -462,11 +485,16 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
    * has been requested the running save has what it has (the content as flushed, the comment as
    * given), so the request is queued as one save to make after it, which takes the later edits
    * and carries the comments of every request queued meanwhile.
+   *
+   * Resolves to what became of the save it took part in (a joined one shares the running save's
+   * outcome), and never rejects. The user is told by toasts as before; the outcome is for callers
+   * that are not the user. Note that a save asks to turn versioning on when it is off for the
+   * project (see {@link offerRepository}): a caller that must not do that checks the status first.
    */
-  function save(projectId: ProjectId, comment = ''): Promise<void> {
+  function save(projectId: ProjectId, comment = ''): Promise<SaveVersionOutcome> {
     const existing = saving.get(projectId)
     if (existing == null) {
-      return run(projectId, { comment, committing: false, done: Promise.resolve() })
+      return run(projectId, { comment, committing: false, done: notStarted() })
     }
     if (!existing.committing) {
       addComment(existing, comment)
@@ -477,7 +505,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
         comment: '',
         committing: false,
         followUp: true,
-        done: Promise.resolve(),
+        done: notStarted(),
       }
       existing.next = next
       addComment(next, comment)
@@ -490,7 +518,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     return existing.next.done
   }
 
-  async function makeSave(projectId: ProjectId, running: RunningSave) {
+  async function makeSave(projectId: ProjectId, running: RunningSave): Promise<SaveVersionOutcome> {
     const project = watched.get(projectId)
     const backend = deps.localBackend()
     if (project == null || backend == null) {
@@ -498,7 +526,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       if (running.followUp === true && running.comment.trim() !== '') {
         deps.toasts.show(deps.getText('versionCommentNotSaved'), { type: 'warning' })
       }
-      return
+      return { kind: 'failed', reason: 'the project is not open' }
     }
     const offer = await offerRepository(projectId, 'save')
     if (offer !== 'ready') {
@@ -508,12 +536,12 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       } else if (offer === 'outsideRoot') {
         deps.toasts.show(deps.getText('versioningNotForThisFolder'), { type: 'info' })
       }
-      return
+      return { kind: 'failed', reason: OFFER_FAILURE_REASONS[offer] }
     }
     const blocked = statuses.get(projectId)?.blocked
     if (blocked != null) {
       deps.toasts.show(deps.getText('versioningBlocked', blocked), { type: 'error' })
-      return
+      return { kind: 'failed', reason: blocked }
     }
     // The flush and the commit can take seconds: a loading toast, which the outcome replaces.
     const toastId = `versioning-save-${++saveCount}`
@@ -534,7 +562,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       const written = await project.flush()
       if (written.kind === 'declined') {
         finish('error', `${deps.getText('saveVersionError')}: ${written.reason}`)
-        return
+        return { kind: 'failed', reason: written.reason }
       }
       running.committing = true
       const { id } = await backend.commitVersion(projectId, running.comment)
@@ -545,14 +573,16 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
         } else {
           finish('info', deps.getText('versionNothingToSave'))
         }
-      } else {
-        finish(
-          'success',
-          deps.getText(written.kind === 'waited' ? 'versionSavedAfterWaiting' : 'versionSaved'),
-        )
+        return { kind: 'nothingToSave' }
       }
+      finish(
+        'success',
+        deps.getText(written.kind === 'waited' ? 'versionSavedAfterWaiting' : 'versionSaved'),
+      )
+      return { kind: 'saved' }
     } catch (error) {
       finish('error', `${deps.getText('saveVersionError')}: ${getMessageOrToString(error)}`)
+      return { kind: 'failed', reason: getMessageOrToString(error) }
     } finally {
       await refresh(projectId)
     }
