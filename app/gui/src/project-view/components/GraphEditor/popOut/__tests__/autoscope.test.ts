@@ -19,19 +19,19 @@ describe('qualifyAutoscoped', () => {
   test('a bare auto-scoped value', () => {
     const e = parse('..Month')
     expect(qualifyAutoscoped(e, new Map([[e.id, DATE_PERIOD]]), has)).toEqual(
-      Ok('Date_Period.Month'),
+      Ok({ code: 'Date_Period.Month', types: [DATE_PERIOD] }),
     )
   })
   test('the head of an application, typed at the application', () => {
     const e = parse('..Week Day_Of_Week.Sunday')
     expect(qualifyAutoscoped(e, new Map([[e.id, DATE_PERIOD]]), has)).toEqual(
-      Ok('Date_Period.Week Day_Of_Week.Sunday'),
+      Ok({ code: 'Date_Period.Week Day_Of_Week.Sunday', types: [DATE_PERIOD] }),
     )
   })
   test('a union picks the member with the constructor', () => {
     const e = parse('..Month')
     expect(qualifyAutoscoped(e, new Map([[e.id, `${PERIOD} | ${DATE_PERIOD}`]]), has)).toEqual(
-      Ok('Date_Period.Month'),
+      Ok({ code: 'Date_Period.Month', types: [DATE_PERIOD] }),
     )
   })
   test('nested, typed by the argument it sits in', () => {
@@ -42,7 +42,19 @@ describe('qualifyAutoscoped', () => {
       return true
     })
     expect(qualifyAutoscoped(e, new Map([[id!, DATE_PERIOD]]), has)).toEqual(
-      Ok('d.up_to e step=Date_Period.Month'),
+      Ok({ code: 'd.up_to e step=Date_Period.Month', types: [DATE_PERIOD] }),
+    )
+  })
+  test('a type used twice is reported once', () => {
+    const e = parse('..Week ..Month')
+    let ids: Ast.AstId[] = []
+    Ast.visitRecursive(e, (a) => {
+      if (a instanceof Ast.AutoscopedIdentifier) ids = [...ids, a.id]
+      return true
+    })
+    const types = new Map(ids.map((id) => [id, DATE_PERIOD]))
+    expect(qualifyAutoscoped(e, types, has)).toEqual(
+      Ok({ code: 'Date_Period.Week Date_Period.Month', types: [DATE_PERIOD] }),
     )
   })
   test('no expected type: Err with the name', () => {
@@ -51,6 +63,8 @@ describe('qualifyAutoscoped', () => {
   })
   test('no auto-scoped names: the code unchanged', () => {
     const e = parse('Date.new 2020 1 15')
-    expect(qualifyAutoscoped(e, new Map(), has)).toEqual(Ok('Date.new 2020 1 15'))
+    expect(qualifyAutoscoped(e, new Map(), has)).toEqual(
+      Ok({ code: 'Date.new 2020 1 15', types: [] }),
+    )
   })
 })

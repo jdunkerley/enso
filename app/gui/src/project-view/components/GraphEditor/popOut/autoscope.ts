@@ -27,6 +27,12 @@ function expectedTypeAt(
     return expectedTypes.get(parent.id)
 }
 
+/** Rewritten code, and the types (fully qualified, distinct) its constructors were qualified by. */
+export interface Qualified {
+  code: string
+  types: string[]
+}
+
 /**
  * The expression's code with each auto-scoped constructor (`..Month`, including the head of an
  * application such as `..Week Day_Of_Week.Sunday`) written as `<Type>.<Constructor>`, where
@@ -34,14 +40,15 @@ function expectedTypeAt(
  * AST id to the expected type there (as the language server reports it, e.g.
  * `Standard.Base.Data.Time.Date_Period.Date_Period`, or a union `A | B`); the type of an
  * auto-scoped name is looked up at the name itself, then at its enclosing application.
- * For a union, the member that `hasConstructor` confirms is used.
+ * For a union, the member that `hasConstructor` confirms is used. The types used are returned
+ * with the code, so that the caller can import them.
  * Returns `Err(name)` naming the first constructor whose type cannot be determined.
  */
 export function qualifyAutoscoped(
   expr: Ast.Expression,
   expectedTypes: ReadonlyMap<Ast.AstId, string>,
   hasConstructor: HasConstructor,
-): Result<string, string> {
+): Result<Qualified, string> {
   // Types are keyed by the original's ids, so resolve them there, then rewrite a copy of the same
   // shape in the same order.
   const originals = autoscopedIn(expr)
@@ -50,19 +57,21 @@ export function qualifyAutoscoped(
   const targets = autoscopedIn(copy)
   if (targets.length !== originals.length) return Err('..')
   const replacements: [Ast.AutoscopedIdentifier, string][] = []
+  const used = new Set<string>()
   for (const [i, target] of targets.entries()) {
     const name = target.identifier.code()
     const type = types[i]
     const members = type?.split('|').map((member) => member.trim()) ?? []
     const member = members.length === 1 ? members[0] : members.find((m) => hasConstructor(m, name))
     if (!member) return Err(`..${name}`)
+    used.add(member)
     replacements.push([target, `${qnLastSegment(member as Ast.QualifiedName)}.${name}`])
   }
   for (const [target, code] of replacements) {
     const replacement = Ast.parseExpression(code, copy.module)
     if (!replacement) return Err(`..${target.identifier.code()}`)
-    if (target.id === copy.id) return Ok(replacement.code())
+    if (target.id === copy.id) return Ok({ code: replacement.code(), types: [...used] })
     copy.module.replace(target.id, replacement)
   }
-  return Ok(copy.code())
+  return Ok({ code: copy.code(), types: [...used] })
 }

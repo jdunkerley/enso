@@ -1,6 +1,8 @@
 import type { MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
+import type { SuggestionEntry } from '$/providers/openedProjects/suggestionDatabase/entry'
 import {
   makeArgument,
+  makeConstructor,
   makeMethod,
 } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
 import { Ast } from '@/util/ast'
@@ -11,7 +13,7 @@ import { tryQualifiedName, type Identifier } from '@/util/qualifiedName'
 import { unwrap } from 'enso-common/src/utilities/data/result'
 import { assert, expect, test } from 'vitest'
 import { assertDefined } from 'ydoc-shared/util/assert'
-import { expectedTypesIn } from '../expectedTypes'
+import { expectedTypesIn, resolvedAutoscopedTypes } from '../expectedTypes'
 
 const DATE_PERIOD = 'Standard.Base.Data.Time.Date_Period.Date_Period'
 
@@ -118,4 +120,55 @@ test('calls without info contribute nothing', () => {
   const e = Ast.parseExpression('foo ..Month')!
   const types = expectedTypesIn(e, undefined, { getMethodCallInfo: () => undefined })
   expect(types.size).toBe(0)
+})
+
+const DELIMITED_FORMAT = 'Standard.Table.Delimited.Delimited_Format.Delimited_Format'
+const delimited = makeConstructor(`${DELIMITED_FORMAT}.Delimited`, {
+  args: [makeArgument('delimiter', 'Standard.Base.Data.Text.Text')],
+})
+
+/** A database that knows `entry` as the call at each of `ids`. */
+function callDb(entry: SuggestionEntry, ids: Ast.AstId[]) {
+  const info = (id: Ast.AstId): MethodCallInfo => ({
+    methodCall: {
+      methodPointer: {
+        module: stdPath('Standard.Table.Delimited.Delimited_Format'),
+        definedOnType: stdPath(DELIMITED_FORMAT),
+        name: entry.name as Identifier,
+      },
+      notAppliedArguments: [],
+    },
+    methodCallSource: id,
+    suggestion: entry,
+  })
+  return { getMethodCallInfo: (id: Ast.AstId) => (ids.includes(id) ? info(id) : undefined) }
+}
+
+test("resolved: a bare auto-scoped constructor takes its entry's type", () => {
+  const e = Ast.parseExpression('..Delimited')!
+  const types = resolvedAutoscopedTypes(e, callDb(delimited, [e.id]))
+  expect(types.get(e.id)?.equals(stdPath(DELIMITED_FORMAT))).toBe(true)
+})
+
+test('resolved: the head of an application, with the info at the application', () => {
+  const e = Ast.parseExpression("..Delimited ','")!
+  const types = resolvedAutoscopedTypes(e, callDb(delimited, [e.id]))
+  expect(types.get(findAutoscoped(e).id)?.equals(stdPath(DELIMITED_FORMAT))).toBe(true)
+})
+
+test('resolved: only a constructor of the same name', () => {
+  const e = Ast.parseExpression('..Delimited')!
+  const other = makeConstructor(`${DELIMITED_FORMAT}.Other`)
+  expect(resolvedAutoscopedTypes(e, callDb(other, [e.id])).size).toBe(0)
+  expect(resolvedAutoscopedTypes(e, callDb(upToEntry, [e.id])).size).toBe(0)
+})
+
+test('resolved: an auto-scoped argument is not resolved by the call it is passed to', () => {
+  const e = Ast.parseExpression('foo ..Delimited')!
+  expect(resolvedAutoscopedTypes(e, callDb(delimited, [e.id])).size).toBe(0)
+})
+
+test('resolved: nothing without info', () => {
+  const e = Ast.parseExpression('..Delimited')!
+  expect(resolvedAutoscopedTypes(e, { getMethodCallInfo: () => undefined }).size).toBe(0)
 })
