@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [The Component Browser's AI prompt and AI nodes are removed, with the local
+  `claude` agent behind them. AI agents work with the IDE through its MCP server
+  (Settings → AI). A project that has an AI node still opens: the node is an
+  ordinary component, and its prompt an ordinary comment.][841]
 - [Agents connected over MCP can arrange and move nodes, resize a visualization,
   and take a picture of the graph.][831]
 - [A Boolean argument shows its value next to the checkbox, and a dropdown under
@@ -541,6 +545,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[841]: https://github.com/jdunkerley/enso/pull/841
 [831]: https://github.com/jdunkerley/enso/pull/831
 [830]: https://github.com/jdunkerley/enso/pull/830
 [825]: https://github.com/jdunkerley/enso/pull/825
