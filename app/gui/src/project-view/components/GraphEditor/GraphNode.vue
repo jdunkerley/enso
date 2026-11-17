@@ -29,6 +29,7 @@ import GraphNodeMessage from '@/components/GraphEditor/GraphNodeMessage.vue'
 import GraphNodeSubmenu from '@/components/GraphEditor/GraphNodeSubmenu.vue'
 import GraphVisualization from '@/components/GraphEditor/GraphVisualization.vue'
 import type { VisualizationResize } from '@/components/GraphEditor/GraphVisualization/visualizationSize'
+import { usePopOutDrag } from '@/components/GraphEditor/popOut/usePopOutDrag'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
@@ -39,6 +40,7 @@ import { useEvent, useResizeObserver } from '@/composables/events'
 import { useProgressBackground } from '@/composables/progressBar'
 import type { ActionHandler, DisplayableActionName } from '@/providers/action'
 import { registerHandlers, toggledAction } from '@/providers/action'
+import { useGlobalEventRegistry } from '@/providers/globalEventRegistry'
 import { injectGraphNavigator } from '@/providers/graphNavigator'
 import { injectNodeColors } from '@/providers/graphNodeColors'
 import { useGraphSelection } from '@/providers/graphSelection'
@@ -70,6 +72,7 @@ const emit = defineEmits<{
   replaceSelection: []
   enterNode: []
   createNodes: [options: NodeCreationOptions[]]
+  popOut: [portId: Ast.AstId, argName: string, argType: string | undefined, scenePosition: Vec2]
   setNodeColor: [color: string | undefined]
   toggleDocPanel: []
   'update:edited': [cursorPosition: number]
@@ -251,10 +254,25 @@ const transform = computed(() => {
   return `translate(${x}px, ${y}px)`
 })
 
+// A drag that starts on an argument pops it out instead of moving the node.
+const popOutDrag = usePopOutDrag({
+  clientToScenePos: (client) => navigator?.clientToScenePos(client),
+  nodeRect: () => graph.nodeRects.get(nodeId.value),
+  popOut: ({ port, name, type }, position) => emit('popOut', port, name, type, position),
+  isPointerDown: () => isPointerDown.value,
+  isDragged: () => isDragged.value,
+  keyEvents: useGlobalEventRegistry().globalEventRegistryPre,
+})
 const { isDragged, isPointerDown, pointerEvents } = useClickableDraggable({
-  dragMove: (fullOffset) => emit('dragging', fullOffset),
-  dragCommit: () => emit('draggingCommited'),
-  dragCancel: () => emit('draggingCancelled'),
+  dragMove: (fullOffset) => {
+    if (!popOutDrag.dragMove(fullOffset)) emit('dragging', fullOffset)
+  },
+  dragCommit: () => {
+    if (!popOutDrag.dragCommit()) emit('draggingCommited')
+  },
+  dragCancel: () => {
+    if (!popOutDrag.dragCancel()) emit('draggingCancelled')
+  },
   click: (e: MouseEvent) => {
     nodeSelection?.handleSelectionOf(e, new Set([nodeId.value]))
     nodeEditHandler(e)
@@ -262,6 +280,16 @@ const { isDragged, isPointerDown, pointerEvents } = useClickableDraggable({
   doubleClick: () => emit('enterNode'),
 })
 watch(isDragged, () => graph.db.moveNodeToTop(nodeId.value))
+const popOutGhost = computed(() => {
+  const ghost = popOutDrag.ghost.value
+  if (ghost == null || !isDragged.value) return undefined
+  const code = module.value.ast?.tryGet(ghost.source.port)?.code() ?? ''
+  const { x, y } = ghost.position.sub(nodePosition.value)
+  return {
+    text: code.length > 40 ? `${code.slice(0, 39)}…` : code,
+    style: { transform: `translate(${x}px, ${y}px)` },
+  }
+})
 // A node removed while it is being dragged (deleted, or undone) sends no pointer events any more:
 // end the drag here, or it would hold its undo step open.
 onBeforeUnmount(() => {
@@ -565,6 +593,7 @@ resizeHandles.onResizeHeight((value) => emit('update:height', value))
       <div
         :class="{ content: true, dragged: isDragged }"
         :style="contentNodeStyle"
+        @pointerdown.capture="popOutDrag.pointerdown"
         v-on="pointerEvents"
         @pointerenter="((nodeHovered = true), updateNodeHover($event))"
         @pointerleave="((nodeHovered = false), updateNodeHover(undefined))"
@@ -582,6 +611,13 @@ resizeHandles.onResizeHeight((value) => emit('update:height', value))
           :expanded="expanded"
         />
         <ResizeHandles v-if="isExpanded" bottom v-on="resizeHandles.events" />
+        <div
+          v-if="popOutGhost"
+          class="popOutGhost"
+          :style="popOutGhost.style"
+          data-testid="popOutGhost"
+          v-text="popOutGhost.text"
+        />
       </div>
     </ContextMenuTrigger>
     <div class="statuses">
@@ -740,6 +776,21 @@ resizeHandles.onResizeHeight((value) => emit('update:height', value))
 
 .dragged {
   cursor: grabbing !important;
+}
+
+/* The argument being popped out, following the pointer. Positioned from the node's top-left. */
+.popOutGhost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 2px 8px;
+  border-radius: var(--node-port-border-radius);
+  background-color: var(--color-node-primary);
+  color: var(--color-text-inversed);
+  opacity: 0.85;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: var(--z-index-component);
 }
 
 /* We use this instead of "v-show", because we want the node content being still laid out,
