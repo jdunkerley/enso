@@ -20,6 +20,9 @@ const DOCUMENTATION_CHARS = 100_000
 /** Most characters of one statement or expression an agent adds to a node. */
 const STATEMENT_CHARS = 20_000
 
+/** Most characters of the comment `save_version` writes. */
+const VERSION_COMMENT_CHARS = 500
+
 /** Most nodes one `move_nodes` call moves. */
 const MOVE_NODES_MAX = 200
 /** The farthest from the origin, in scene units, a node may be moved to on either axis. */
@@ -38,6 +41,7 @@ export const VIEW_TOOL_NAMES = [
   'evaluate_expression',
   'list_visualizations',
   'get_documentation',
+  'get_problems',
 ] as const
 
 export const EDIT_TOOL_NAMES = [
@@ -51,6 +55,10 @@ export const EDIT_TOOL_NAMES = [
   'set_visualization',
   'move_nodes',
   'arrange_nodes',
+  'undo',
+  'redo',
+  'save_version',
+  'refresh',
   'select_nodes',
   'open_method',
 ] as const
@@ -80,15 +88,16 @@ const EDIT_RULES =
   ' Refused while the project is in Live mode, and, with nothing changed, when the method on ' +
   'screen changed before the edit ran (call `get_graph` and try again). Your run of changes is ' +
   'one undo step for the user, until you pause for 10 seconds, the user edits or leaves the ' +
-  "project's tab, or `open_method` changes the method; there is no undo tool. The project is " +
-  'saved as it is edited. ' +
+  "project's tab, or `open_method` changes the method; `undo` takes it back, except while the " +
+  "project's main module has code that can enable output: then agents' `undo` and `redo` are " +
+  'refused (the user can still undo with Ctrl+Z). The project is saved as it is edited. ' +
   WRITE_RULE +
   ' `settled: true`: the engine has reported results for the changed nodes, so the types ' +
   'and errors in this result are current. `settled: false`: it had not within 20 seconds; call ' +
   '`get_node` later.'
 
 /**
- * The project tools (the seven that read, the twelve that edit or navigate), each forwarding its
+ * The project tools (the seven that read, the fifteen that edit or navigate), each forwarding its
  * arguments to the window through `bridge`.
  */
 export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition[] {
@@ -211,6 +220,29 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         '`truncated: true`, when longer). Changes nothing, and works in Live mode too.',
       inputSchema: {},
       run: forward('get_documentation'),
+    },
+    {
+      name: 'get_problems',
+      title: 'List the errors and warnings',
+      description:
+        'List every error and warning of the function on screen in one call, without the ' +
+        'values `get_graph` also returns. Returns `{ method, nodes, diagnostics, errors, ' +
+        'warnings, pending, truncated }`. Each of `nodes` (in the order of `get_graph`, at most ' +
+        '100: errors and panics are kept before warnings, and `truncated` says some were ' +
+        'left out) has `id`, `name`, `state` (`panic`, `error` or `warning`) and `message`. ' +
+        'For an error or a panic `origin` is false when a node this one takes input from has ' +
+        'the same message, true otherwise: fix the `origin: true` nodes first, the rest ' +
+        'usually clear by themselves. A warning node has `warnings`, how many there are; its ' +
+        '`message` is the text of the first (null when the engine did not send it), and the ' +
+        'rest are in its `Warnings` visualization (`get_visualization` with that name). The ' +
+        'text of an error loads on first look and is waited for at most 5 seconds: a node ' +
+        'whose text did not arrive has `message: null`, and `messages_pending` counts them; ' +
+        'call again. `diagnostics` (at most 50) are the compile errors and warnings of the module ' +
+        'that lie in this function or have no position, each with `kind`, `message` and, when ' +
+        'known, the `line` of the module (`diagnostics_truncated` when there were more). `pending` is how many nodes are still computing: ' +
+        'when it is not 0, call again. Changes and runs nothing, and works in Live mode too.',
+      inputSchema: {},
+      run: forward('get_problems'),
     },
     {
       name: 'add_nodes',
@@ -416,6 +448,78 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         node_ids: z.array(nodeId()).max(ARRANGE_NODES_MAX).optional(),
       },
       run: forward('arrange_nodes', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'undo',
+      title: "Undo the agents' last edits",
+      description:
+        'Take back the most recent step of edits made by any connected agent, not only yours. ' +
+        'A step is usually every edit made without a 10 second pause, but one `undo` may take ' +
+        'back only part of it: check `can_undo` and call `get_graph`. It does not go past the ' +
+        "user's last change: it takes back only agents' edits made since the user last changed " +
+        'the project, and is refused when there are none. Refused while the project is in Live ' +
+        "mode, and while the project's main module has code that can enable output (the same " +
+        'code the edit tools refuse to add, in any node or function) or cannot be read, because ' +
+        'undoing could run such code and write: ask the user to undo with Ctrl+Z then. Returns ' +
+        '`undone`, `can_undo` and `can_redo` (whether another call would do something). It does ' +
+        'not wait for the engine: values may still be computing, so call `get_graph`, where a ' +
+        'node still computing has `state` `pending`. Nodes that come back have the ids they ' +
+        'had before.',
+      inputSchema: {},
+      run: forward('undo', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'redo',
+      title: 'Redo what undo took back',
+      description:
+        'Re-apply what `undo` took back, a step at a time. Refused when there is nothing to ' +
+        'redo: an edit by anyone since the `undo` ends it. Refused while the project is in Live ' +
+        "mode, and while the project's main module has code that can enable output (the same " +
+        'code the edit tools refuse to add, in any node or function) or cannot be read, because ' +
+        'redoing could run such code and write: ask the user to redo with Ctrl+Y then. Returns ' +
+        '`redone`, `can_undo` and `can_redo`. It does not wait for the engine: values may still ' +
+        'be computing, so call `get_graph`, where a node still computing has ' +
+        '`state` `pending`.',
+      inputSchema: {},
+      run: forward('redo', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'save_version',
+      title: 'Save a version of the project',
+      description:
+        "Save a version of the project in its local git repository, as the user's Save a " +
+        'version does, with `comment` (one line, at most 500 characters; without one the ' +
+        'version says it was saved by you). Returns `saved: true`, or `saved: false` with the ' +
+        '`reason` when nothing has changed since the last version. Refused when versions are ' +
+        'not kept for the project: only the user turns them on, with Save a version. It ' +
+        'changes no node, so it works in Live mode too and does not end your undo step. The ' +
+        'project is also saved as a version before your first edit.',
+      inputSchema: {
+        comment: z
+          .string()
+          .max(VERSION_COMMENT_CHARS)
+          .refine((text) => !/[\r\n]/.test(text), 'The comment must be one line.')
+          .optional(),
+      },
+      run: forward('save_version', EDIT_TOOL_TIMEOUT_MS),
+    },
+    {
+      name: 'refresh',
+      title: 'Refresh the values',
+      description:
+        "Compute every node again in Design mode, as the user's Refresh button does, reading " +
+        'files and data sources again. Use it after the user changed a file or a table outside ' +
+        'the IDE. It never turns Write on and never runs a node in Live: it is refused while ' +
+        "the project is in Live mode, and when the project's main module (the module the graph " +
+        'shows) has code that enables output anywhere (the forms the edit tools refuse, such as ' +
+        '`with_enabled_context`), because a refresh would run it and write again (ask the user to ' +
+        "refresh then). It does not check the project's other modules, library functions that " +
+        'turn output on themselves, or `foreign` code: do not refresh a project that writes ' +
+        'through them. It changes no node and joins no undo step; it ends yours. Returns ' +
+        '`refreshed` and `settled`: whether the engine reported every computed node of the function on ' +
+        'screen again in time. Call `get_graph` or `get_problems` afterwards.',
+      inputSchema: {},
+      run: forward('refresh', EDIT_TOOL_TIMEOUT_MS),
     },
     {
       name: 'select_nodes',

@@ -102,6 +102,7 @@ test('an MCP client reads the open project and cannot write a file', async ({
         'get_graph',
         'get_graph_image',
         'get_node',
+        'get_problems',
         'get_visualization',
         'list_visualizations',
         'search_components',
@@ -114,11 +115,15 @@ test('an MCP client reads the open project and cannot write a file', async ({
         'edit_node',
         'move_nodes',
         'open_method',
+        'redo',
+        'refresh',
         'remove_nodes',
+        'save_version',
         'select_nodes',
         'set_documentation',
         'set_node_comment',
         'set_visualization',
+        'undo',
         // The app tools.
         'close_project',
         'create_project',
@@ -1031,6 +1036,299 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
   } finally {
     await client.close()
     // The engine lets go of the project's files a moment after the project closes.
+    if (projectPath != null) {
+      await fs.rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 })
+    }
+  }
+})
+
+/** What `get_problems` answers (the fields this spec reads). */
+interface Problems {
+  method: string
+  nodes: {
+    id: string
+    name: string | null
+    state: string
+    message: string | null
+    origin?: boolean
+    warnings?: number
+  }[]
+  diagnostics: { kind: string; message: string; line?: number }[]
+  errors: number
+  warnings: number
+  pending: number
+  truncated: boolean
+  messages_pending?: number
+}
+
+/** The answer of `undo` and `redo` (the fields this spec reads). */
+interface HistoryAnswer {
+  undone?: boolean
+  redone?: boolean
+  can_undo: boolean
+  can_redo: boolean
+}
+
+/**
+ * Code the user types in the Component Browser that really writes on this engine: the two-argument
+ * `with_enabled_context context ~action` turns output on for its action, which appends `w` to the
+ * file each time the node runs. (The GUI's own Write prefix, `with_enabled_context Context.Output
+ * "design" <| …`, does not run here: the function takes two parameters.)
+ */
+const WRITE_CODE = (file: string) =>
+  `Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| "w".write "${file}" on_existing_file=..Append`
+/** The end of the refusal of `refresh` when the main module has code that enables output. */
+const REFRESH_WRITE_REFUSED = 'Ask the user to refresh.'
+/** The start of the refusal of `undo` when the agents have no step of their own to take back. */
+const NOTHING_TO_UNDO = "There is nothing of the agents' to undo."
+/** The start of the refusal of `undo` while the main module has code that can enable output. */
+const UNDO_OUTPUT_REFUSED = "The project's main module has code that can enable output"
+
+test('an MCP client undoes its edits, lists problems and refreshes, and none of it writes', async ({
+  page,
+  testRunId,
+}, testInfo) => {
+  // A cold engine's first execution of a new project, about fifteen edits each waiting for its
+  // execution, an 11 s pause, and the waits that prove a file is not written again.
+  test.setTimeout(600_000)
+  await waitForDashboard(page)
+
+  const client = await connectClient()
+  let lastCallMs = 0
+  const callTool = async (name: string, args: Record<string, unknown>) => {
+    const start = Date.now()
+    const result = await client.callTool({ name, arguments: args })
+    lastCallMs = Date.now() - start
+    return result
+  }
+  const note = (step: string, value: unknown) =>
+    console.log(`[${testRunId}] ${step} (${lastCallMs} ms): ${JSON.stringify(value)}`)
+  const callJson = async <T>(name: string, args: Record<string, unknown> = {}): Promise<T> => {
+    const result = await callTool(name, args)
+    expect(result.isError, `${name} ${JSON.stringify(args)}: ${textOf(result)}`).toBeFalsy()
+    return JSON.parse(textOf(result)) as T
+  }
+  const callError = async (name: string, args: Record<string, unknown> = {}) => {
+    const result = await callTool(name, args)
+    expect(result.isError, `${name} must be refused: ${textOf(result)}`).toBe(true)
+    return textOf(result)
+  }
+  const getGraph = () => callJson<Graph>('get_graph', {})
+  const names = (graph: Graph) => graph.nodes.map((node) => node.name)
+  const nodeNamed = (graph: Graph, name: string): NodeSummary => {
+    const node = graph.nodes.find((n) => n.name === name)
+    expect(node, `a node named ${name} in ${JSON.stringify(graph.nodes)}`).toBeDefined()
+    return node!
+  }
+  /** `get_problems`, called again until the engine is done and every message has arrived. */
+  const getProblems = async (): Promise<Problems> => {
+    let last: Problems | undefined
+    await expect
+      .poll(
+        async () => {
+          last = await callJson<Problems>('get_problems')
+          return last.pending === 0 && last.messages_pending == null
+        },
+        { timeout: 60_000, intervals: [500] },
+      )
+      .toBe(true)
+    return last!
+  }
+
+  const writeTarget = path.join(os.tmpdir(), `enso-mcp-refresh-write-${Date.now()}.txt`)
+  const writeTargetEnso = writeTarget.replace(/\\/g, '/')
+  await fs.rm(writeTarget, { force: true })
+  let projectPath: string | undefined
+  try {
+    const created = await callJson<{ name: string; path: string }>('create_project', {
+      name: 'Mcp_History',
+    })
+    projectPath = created.path
+    const mainFile = path.join(created.path, 'src', 'Main.enso')
+    await expect
+      .poll(async () => (await getGraph()).nodes.map((node) => node.state), { timeout: 180_000 })
+      .toContain('value')
+
+    // 1. A dataflow error and a node that uses it: both carry the message, and only the first is
+    // where to start.
+    await callJson('add_nodes', {
+      statements: ['bad = Error.throw "boom from the test"', 'after_bad = bad + 1'],
+    })
+    const chain = await getProblems()
+    note('get_problems on an error and the node that uses it', chain)
+    const bad = chain.nodes.find((node) => node.name === 'bad')
+    const afterBad = chain.nodes.find((node) => node.name === 'after_bad')
+    expect(bad, JSON.stringify(chain.nodes)).toMatchObject({ state: 'error', origin: true })
+    expect(afterBad, JSON.stringify(chain.nodes)).toMatchObject({ state: 'error', origin: false })
+    expect(bad?.message).toContain('boom from the test')
+    expect(afterBad?.message).toContain('boom from the test')
+
+    // 2. A compile error in the method on screen: its diagnostic has the module's 1-based line.
+    await callJson('add_nodes', { statements: ['broken_ref = this_name_does_not_exist + 1'] })
+    await expect
+      .poll(async () => fs.readFile(mainFile, 'utf8'), { timeout: 30_000, intervals: [100] })
+      .toContain('broken_ref = this_name_does_not_exist + 1')
+    const source = await fs.readFile(mainFile, 'utf8')
+    const brokenLine = source.split(/\r?\n/).findIndex((line) => line.includes('broken_ref =')) + 1
+    expect(brokenLine).toBeGreaterThan(0)
+    const compile = await getProblems()
+    note('get_problems with a name that does not exist', { brokenLine, compile })
+    await testInfo.attach('problems.json', {
+      body: JSON.stringify({ brokenLine, chain, compile }, null, 1),
+      contentType: 'application/json',
+    })
+    const diagnostic = compile.diagnostics.find((d) =>
+      d.message.includes('this_name_does_not_exist'),
+    )
+    expect(diagnostic, JSON.stringify(compile.diagnostics)).toBeDefined()
+    expect(diagnostic?.kind).toBe('error')
+    expect(diagnostic?.line).toBe(brokenLine)
+
+    // 3. `refresh` with errors on screen, and then on an ordinary project: it settles.
+    const refreshedWithErrors = await callJson<{ refreshed: boolean; settled: boolean }>('refresh')
+    note('refresh with errors on screen', refreshedWithErrors)
+    expect(refreshedWithErrors).toEqual({ refreshed: true, settled: true })
+    const graph = await getGraph()
+    await callJson('remove_nodes', {
+      node_ids: ['bad', 'after_bad', 'broken_ref'].map((name) => nodeNamed(graph, name).id),
+    })
+    const refreshed = await callJson<{ refreshed: boolean; settled: boolean }>('refresh')
+    note('refresh on an ordinary project', refreshed)
+    expect(refreshed).toEqual({ refreshed: true, settled: true })
+    expect(lastCallMs, 'refresh answered in time').toBeLessThan(EDIT_ANSWER_MS)
+
+    // A function with an argument: its input node, as the graph editor draws it, must report too.
+    await callJson('add_function', { source: 'triple x =\n    y = x * 3\n    y' })
+    const calling = await callJson<{ nodes: NodeSummary[] }>('add_nodes', {
+      statements: ['tripled = Main.triple 5'],
+    })
+    const inside = await callJson<{ method: string }>('open_method', {
+      node_id: calling.nodes[0]!.id,
+    })
+    expect(inside.method).toBe('triple')
+    note('the nodes of a function with an argument', (await getGraph()).nodes)
+    const refreshedInside = await callJson<{ refreshed: boolean; settled: boolean }>('refresh')
+    note('refresh inside a function with an argument', refreshedInside)
+    expect(refreshedInside).toEqual({ refreshed: true, settled: true })
+    expect(lastCallMs, 'refresh answered in time').toBeLessThan(EDIT_ANSWER_MS)
+    note('the nodes of the function after the refresh', (await getGraph()).nodes)
+    await callJson('open_method', {})
+
+    // 4. Undo and redo of one step of the agent's own. A pause of 11 s ends the step the removal
+    // above belongs to, so these two nodes are a step of their own.
+    await page.waitForTimeout(11_000)
+    await callJson('add_nodes', { statements: ['hist_a = 1', 'hist_b = hist_a + 1'] })
+    expect(names(await getGraph())).toEqual(expect.arrayContaining(['hist_a', 'hist_b']))
+    const undone = await callJson<HistoryAnswer>('undo')
+    note('undo', undone)
+    expect(undone).toMatchObject({ undone: true, can_redo: true })
+    expect(names(await getGraph())).not.toContain('hist_a')
+    expect(names(await getGraph())).not.toContain('hist_b')
+    const redone = await callJson<HistoryAnswer>('redo')
+    note('redo', redone)
+    expect(redone).toMatchObject({ redone: true, can_redo: false })
+    expect(names(await getGraph())).toEqual(expect.arrayContaining(['hist_a', 'hist_b']))
+    expect(await callError('redo')).toContain('nothing')
+
+    // 5. A version: saved, or nothing to save; refused when the user has not turned versions on.
+    const version = await callTool('save_version', { comment: 'Saved by the packaged test' })
+    note('save_version', textOf(version))
+    if (version.isError) expect(textOf(version)).toContain('Versions are not kept')
+    else expect(JSON.parse(textOf(version))).toHaveProperty('saved')
+
+    // 6. THE WRITE RULE: an agent never causes a write the user did not click for. The user (here
+    // the test, typing code in the Component Browser as the user does) makes a node that really
+    // writes its file each time it runs. The same code through `add_nodes` is refused (the other
+    // test).
+    const userCreatesNode = async (code: string) => {
+      await page.keyboard.press('Escape')
+      await page.getByTestId('add-component-button').click()
+      await expect(page.locator('.ComponentBrowser')).toBeVisible()
+      const input = page.getByTestId('component-editor-content')
+      await expect(input).toBeFocused()
+      await input.fill(code)
+      await page.keyboard.press('Enter')
+      await expect(page.locator('.ComponentBrowser')).toBeHidden()
+    }
+    const fileNow = async () => ({
+      content: await fs.readFile(writeTarget, 'utf8'),
+      mtime: (await fs.stat(writeTarget)).mtimeMs,
+    })
+    await userCreatesNode(WRITE_CODE(writeTargetEnso))
+    await expect
+      .poll(() => existsSync(writeTarget), { timeout: 120_000, intervals: [250] })
+      .toBe(true)
+    // Long enough for any second run while the new node settles to have written.
+    await page.waitForTimeout(8_000)
+    const written = await fileNow()
+    note('the write node has written its file', written)
+    // (a) The user's node wrote once.
+    expect(written.content, 'the node wrote exactly once').toBe('w')
+    const writeNodeGraph = await getGraph()
+    const writeNode = writeNodeGraph.nodes.find((node) => node.code.includes(writeTargetEnso))
+    expect(writeNode, JSON.stringify(writeNodeGraph.nodes)).toBeDefined()
+    /** The file is as the user's node left it, after `ms` for anything running to write. */
+    const expectUnchanged = async (step: string, ms = 5_000) => {
+      await page.waitForTimeout(ms)
+      expect(await fileNow(), `${step}: the file was not written again`).toEqual(written)
+    }
+
+    // (b) `refresh` is refused, and nothing is written.
+    const refreshRefused = await callError('refresh')
+    note('refresh with code that writes', refreshRefused)
+    expect(refreshRefused).toContain(REFRESH_WRITE_REFUSED)
+    await expectUnchanged('refresh refused', 8_000)
+
+    // (c) An agent's edit elsewhere while that code is there, then `undo`: refused, and the edit
+    // stays.
+    await callJson('add_nodes', { statements: ['after_write = 1'] })
+    await expectUnchanged('an agent added a node')
+    const undoWithWrite = await callError('undo')
+    note('undo of an agent edit while the write node exists', undoWithWrite)
+    expect(undoWithWrite).toContain(UNDO_OUTPUT_REFUSED)
+    expect(names(await getGraph())).toContain('after_write')
+    await expectUnchanged('undo refused')
+
+    // (d) The agent removes the write node; `undo` is refused, and it does not come back.
+    const removed = await callJson<{ removed: string[] }>('remove_nodes', {
+      node_ids: [writeNode!.id],
+    })
+    expect(removed.removed).toEqual([writeNode!.id])
+    const undoRemoval = await callError('undo')
+    note('undo after removing the write node', undoRemoval)
+    expect(undoRemoval).toContain(NOTHING_TO_UNDO)
+    const afterUndo = await getGraph()
+    expect(afterUndo.nodes.some((node) => node.code.includes(writeTargetEnso))).toBe(false)
+    expect(names(afterUndo)).toContain('after_write')
+    await expectUnchanged('the removal was not undone', 8_000)
+
+    // (e) With the code gone, the agents' own history works again, from here on.
+    await callJson('add_nodes', { statements: ['after_gone = 2'] })
+    const undoneAfter = await callJson<HistoryAnswer>('undo')
+    note('undo with the write code gone', undoneAfter)
+    expect(undoneAfter).toEqual({ undone: true, can_undo: false, can_redo: true })
+    const graphAfterUndo = await getGraph()
+    expect(names(graphAfterUndo)).not.toContain('after_gone')
+    expect(graphAfterUndo.nodes.some((node) => node.code.includes(writeTargetEnso))).toBe(false)
+    const redoneAfter = await callJson<HistoryAnswer>('redo')
+    expect(redoneAfter).toEqual({ redone: true, can_undo: true, can_redo: false })
+    expect(names(await getGraph())).toContain('after_gone')
+    const refreshedAfter = await callJson<{ refreshed: boolean; settled: boolean }>('refresh')
+    note('refresh with the write code gone', refreshedAfter)
+    expect(refreshedAfter).toEqual({ refreshed: true, settled: true })
+    await expectUnchanged('undo, redo and refresh with the code gone')
+
+    // The control: the detection is real. The user makes the write node again, through the UI,
+    // and the file changes.
+    await userCreatesNode(WRITE_CODE(writeTargetEnso))
+    await expect
+      .poll(async () => (await fileNow()).content, { timeout: 120_000, intervals: [250] })
+      .not.toBe(written.content)
+    note('the user made the write node again', await fileNow())
+    await callJson('close_project')
+  } finally {
+    await client.close()
+    await fs.rm(writeTarget, { force: true })
     if (projectPath != null) {
       await fs.rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 })
     }
