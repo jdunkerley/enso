@@ -1,16 +1,29 @@
 <script setup lang="ts">
 import { PAGE_SIZE, type TreeRow } from '@/components/visualizations/JSONVisualization/lazyTree'
+import { isNavigable, rowKey } from '@/components/visualizations/JSONVisualization/treeKeys'
 import { svgUseHref } from '@/util/icons'
 import { computed } from 'vue'
 
-const { row } = defineProps<{ row: TreeRow }>()
+const { row, tabStop = false } = defineProps<{
+  row: TreeRow
+  /** Whether this row is the tree's one tab stop (the others are reached with the arrow keys). */
+  tabStop?: boolean
+}>()
 const emit = defineEmits<{
   toggle: []
   more: []
   retry: []
   activate: [all: boolean]
   menu: [event: MouseEvent]
+  /** The browser's context menu was asked for by a key, with this row focused. */
+  menuKey: []
 }>()
+
+/** Entries and the "Show more" and error rows take the focus; the others are not tree items. */
+const navigable = computed(() => isNavigable(row))
+const expandedState = computed(() =>
+  row.kind === 'entry' && row.entry.kind !== 'leaf' ? row.expanded : undefined,
+)
 
 /** Indentation per level, in pixels. */
 const INDENT_PX = 16
@@ -52,14 +65,31 @@ const moreText = computed(() =>
 </script>
 
 <template>
-  <div class="TreeRow" :class="row.kind" :style="{ paddingLeft: `${row.depth * INDENT_PX}px` }">
+  <!-- The row is the tree item (the buttons inside are mouse conveniences, the keys are in
+       `treeKeys.ts`); a keyboard-made `contextmenu` event lands on the row itself, not on `.content`. -->
+  <div
+    class="TreeRow"
+    :class="row.kind"
+    :style="{ paddingLeft: `${row.depth * INDENT_PX}px` }"
+    :data-row-key="navigable ? rowKey(row) : undefined"
+    :role="navigable ? 'treeitem' : undefined"
+    :tabindex="
+      navigable ?
+        tabStop ? 0
+        : -1
+      : undefined
+    "
+    :aria-level="navigable ? row.depth : undefined"
+    :aria-expanded="expandedState"
+    @contextmenu.self.prevent.stop="emit('menuKey')"
+  >
     <template v-if="row.kind === 'root' || row.kind === 'entry'">
       <button
         v-if="row.kind === 'entry' && row.entry.kind !== 'leaf'"
         class="arrow"
         :class="{ open: row.expanded }"
         :aria-label="row.expanded ? 'Collapse' : 'Expand'"
-        :aria-expanded="row.expanded"
+        tabindex="-1"
         @click.stop="emit('toggle')"
       >
         <svg class="chevron" viewBox="0 0 16 16"><use :href="svgUseHref('chevron_right')" /></svg>
@@ -83,13 +113,14 @@ const moreText = computed(() =>
     <button
       v-else-if="row.kind === 'more'"
       class="more"
+      tabindex="-1"
       @click.stop="emit('more')"
       v-text="moreText"
     />
     <span v-else-if="row.kind === 'loading'" class="loading">Loading…</span>
     <span v-else class="error">
       <span v-text="`couldn't load: ${row.message}`" />
-      <button class="retry" @click.stop="emit('retry')">Retry</button>
+      <button class="retry" tabindex="-1" @click.stop="emit('retry')">Retry</button>
     </span>
   </div>
 </template>
@@ -102,6 +133,15 @@ const moreText = computed(() =>
   white-space: nowrap;
   overflow: hidden;
   font-family: var(--font-mono);
+}
+
+.TreeRow[tabindex] {
+  outline: none;
+}
+
+.TreeRow[tabindex]:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .arrow {
