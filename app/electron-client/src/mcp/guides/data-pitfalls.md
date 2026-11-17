@@ -1,17 +1,21 @@
 # Data-analysis pitfalls
 
-- **Distinct-value samples are incomplete.** `column.to_vector.distinct.take 30`
-  only shows the first 30 distinct values; rarer variants can sit far past that
-  window. When enumerating valid categorical values to filter on (status codes,
-  region labels, error categories), first check
-  `column.to_vector.distinct.length.to_text`. If the count exceeds your `take`,
-  widen it or use `column.to_vector.distinct.to_json` to get them all.
+- **Distinct-value samples are incomplete.**
+  `(table.distinct ["Status"]).take 30` only shows the first 30 distinct values;
+  rarer variants can sit far past that window. When enumerating valid
+  categorical values to filter on (status codes, region labels, error
+  categories), first check `(table.distinct ["Status"]).row_count.to_text`. If
+  the count exceeds your `take`, widen it or use
+  `(table.distinct ["Status"]).at "Status" . to_vector . to_json` to get them
+  all. Count them in the table, not with `to_vector.distinct`: on a database
+  table `to_vector` stops at 1,000 values.
 - **Real-world categoricals have casing and whitespace variants.** A single
   column may hold `"Active"`, `"ACTIVE"` and `"active "` for the same label, or
   `"USA"` and `"U.S.A."` for the same country. Inspect the full distinct set
   before hard-coding a filter list, or normalise both sides
-  (`.to_case ..Lower . trim`) before comparing. A filter that misses one variant
-  silently drops the rows that use it.
+  (`.to_case ..Lower . trim`, which work on a whole text column) before
+  comparing. A filter that misses one variant silently drops the rows that use
+  it.
 - **`Column == X` with a type-mismatched `X` returns a Boolean Column containing
   `Nothing`, not `False`.** Reducing such columns with `||` or `&&` produces
   `Nothing` cells, and `Filter_Condition.Is_False`, `..Equal False` and

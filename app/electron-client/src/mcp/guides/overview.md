@@ -40,8 +40,10 @@ No tool changes the execution environment, settings or secrets;
    using them.
 3. Add a few nodes at a time with `add_nodes`: each statement is
    `name = expression`, and later statements may use the names of earlier ones.
-   Pass whole import lines in `imports`. Use `add_function` for a top-level
-   function and call it from a node as `Main.<name> args`.
+   Write whole-table operations, not `map` (see the section below), and read
+   several files with one `Data.read_many`. Pass whole import lines in
+   `imports`. Use `add_function` for a top-level function and call it from a
+   node as `Main.<name> args`.
 4. Read the result of every edit. `add_nodes` and `edit_node` return the nodes
    they made or changed, with their types and errors; `collapse_nodes` returns
    the function's name and the node that calls it; `set_node_comment` and
@@ -167,6 +169,49 @@ No tool changes the execution environment, settings or secrets;
     the user's Save a version does, with a one-line `comment`. It answers
     `saved: false` when nothing changed, and is refused when the user has not
     turned versions on: it never turns them on.
+
+## Write whole-table operations
+
+Enso tables are columnar: a Table or Column method runs once over every row, and
+on a database table it becomes SQL. A `map` with a lambda calls back into the
+interpreter for each value; on a database column it fails
+(`Unsupported_Database_Operation`), `.rows` downloads the whole table, and a
+database column's `.to_vector` silently stops at 1,000 values (with only a
+warning). Reach for `map` only when no Table or Column method does the job.
+
+- New or changed column: `table.set (expr "[Price] * [Quantity]") as="Total"`,
+  or Column arithmetic and methods (`table.at "Price" * 1.2`, `.round 2`,
+  `.trim`, `.text_replace`, `.parse`, `.fill_nothing`, `.iif`). Not
+  `column.map (x -> x * 1.2)`, and never `.to_vector.map` then `Table.new`.
+- Several columns at once: `table.parse`, `table.cast`, `table.text_replace`,
+  `table.fill_nothing`, `table.format` take a list of columns.
+- Rows: `table.filter "Age" (..Greater 30)` or
+  `table.filter (expr "[Start] < [End]")`, not `table.rows.filter`.
+- Group, count, look up, reshape: `aggregate`, `distinct`, `running`,
+  `add_row_number`, `join`, `merge` (add columns from a lookup table), `replace`
+  (map values through a lookup table or Dictionary), `cross_tab`, `transpose`,
+  `split_to_rows`, `split_to_columns`. Not a `Dictionary` built by hand and
+  applied with `map`.
+- Search with `search_components` and `self_type` set to `Table` or `Column`
+  before deciding that no method exists.
+
+## Read several files at once
+
+`Data.read_many` reads a list of files and, by default, unions them into one
+table with a `Path` column saying which file each row came from. Use it instead
+of `map`ping `Data.read` over files and then `union`ing the results:
+
+- A folder: `Data.read_many (Data.list "<dir>" name_filter="*.csv")`.
+- A Vector of paths or URLs: `Data.read_many ["<a>", "<b>"]`.
+- A Table with a `path` column (or a single column): each file's rows are joined
+  to the row that named it, keeping the table's other columns.
+- `format=` applies one format to every file, for example
+  `format=(..Delimited row_limit=(..First 100))` to cap each one.
+- `return=..With_New_Column` keeps one row per file with the loaded value in a
+  `Value` column, for files that are not tables.
+
+A file that fails to load becomes a warning and contributes no rows; pass
+`on_problems=..Report_Error` to stop at the first failure instead.
 
 ## Evaluating expressions
 
