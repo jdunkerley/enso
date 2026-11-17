@@ -101,8 +101,13 @@ export const widgetDefinition = defineWidget(
 
 <template>
   <PickerShell class="WidgetDate" :widget="props">
-    <template #menu="{ close, done }">
-      <DateMenu :choice="choice" @choose="choose($event, done)" @close="close" />
+    <template #menu="{ close, done, setAccept }">
+      <DateMenu
+        :choice="choice"
+        :registerAccept="setAccept"
+        @choose="choose($event, done)"
+        @close="close"
+      />
     </template>
   </PickerShell>
 </template>

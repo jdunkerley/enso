@@ -16,6 +16,8 @@ const model = defineModel<HourMinuteSecond>({ required: true })
 const props = defineProps<{
   /** Whether to show the seconds column. */
   seconds?: boolean
+  /** Whether the columns take the height their parent gives them rather than five values' height. */
+  fill?: boolean
 }>()
 
 type Unit = keyof HourMinuteSecond
@@ -64,7 +66,7 @@ onMounted(centreSelected)
 </script>
 
 <template>
-  <div ref="root" class="TimeColumns">
+  <div ref="root" class="TimeColumns" :class="{ fill: props.fill }">
     <template v-for="column in COLUMNS" :key="column.unit">
       <ul
         v-if="column.unit !== 'second' || props.seconds"
@@ -106,6 +108,11 @@ onMounted(centreSelected)
   height: calc(var(--item-height, 23px) * var(--visible-values));
   overflow-y: auto;
   scrollbar-width: none;
+}
+
+/* In a parent that sets the height, the columns stretch to it (they are the row's flex items). */
+.fill > .column {
+  height: auto;
 }
 
 .value {

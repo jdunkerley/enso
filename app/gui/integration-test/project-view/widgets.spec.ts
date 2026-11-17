@@ -1196,6 +1196,7 @@ test.describe('Date widget', () => {
     const { widget, menu, open } = await dateNode(editorPage, page)
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
     expect(await moduleCode(page)).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 15\)\n/)
@@ -1213,6 +1214,7 @@ test.describe('Date widget', () => {
     const { widget, menu, open } = await dateNode(editorPage, page)
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
     const day = widget.locator('.WidgetNumber').nth(2)
     await day.click()
@@ -1228,26 +1230,45 @@ test.describe('Date widget', () => {
     const { widget, menu, open } = await dateNode(editorPage, page)
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
     await open()
     await menu.locator(days).nth(15).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     const code = await moduleCode(page)
     expect(code).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 16\)\n/)
     expect(code).not.toMatch(/since = Data\.days_since Date\.new/)
   })
 
-  test('choosing the day that is already chosen only closes the menu', async ({
+  test('a day click selects and writes nothing; Cancel closes the menu', async ({
+    editorPage,
+    page,
+  }) => {
+    const { menu, open } = await dateNode(editorPage, page)
+    await open()
+    const day = menu.locator(days).nth(14)
+    await day.click()
+    await expect(day).toHaveAttribute('data-selected')
+    await expect(menu).toBeVisible()
+    await menu.getByRole('button', { name: 'Cancel' }).click()
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain('since = Data.days_since\n')
+  })
+
+  test('Set on the day that is already chosen only closes the menu', async ({
     editorPage,
     page,
   }) => {
     const { widget, menu, open } = await dateNode(editorPage, page)
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     // One undo step takes the date back out: the second click wrote nothing.
     await page.keyboard.press('ControlOrMeta+Z')
@@ -1299,8 +1320,23 @@ test.describe('Date widget', () => {
     await widget.click({ position: { x: 4, y: 4 } })
     await expect(menu).toBeVisible()
     await menu.locator(days).nth(19).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     expect(await moduleCode(page)).toMatch(/date1 = Date\.new \d+ \d+ 20\n/)
+  })
+
+  test('the menu is as wide on a narrow node as on a wide one', async ({ editorPage, page }) => {
+    const { menu, open } = await dateNode(editorPage, page)
+    await open()
+    const narrow = (await menu.boundingBox())!.width
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    // The whole node `date1` is far wider than the unset argument of `since`.
+    const wide = locate.graphNodeByBinding(page, 'date1').locator('.WidgetDate')
+    await wide.click({ position: { x: 4, y: 4 } })
+    await wide.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    expect(Math.abs((await menu.boundingBox())!.width - narrow)).toBeLessThanOrEqual(1)
   })
 
   test('a whole date node still selects and drags, and its first click does not open the menu', async ({
@@ -1347,11 +1383,13 @@ test.describe('Date widget', () => {
     const { widget, menu, open } = await dateNode(editorPage, page)
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
     // Edits within the undo manager's capture timeout (500 ms) merge into one step.
     await page.waitForTimeout(600)
     await open()
     await menu.locator(days).nth(15).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     await page.keyboard.press('ControlOrMeta+Z')
     expect(await moduleCode(page)).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 15\)\n/)
@@ -1538,6 +1576,20 @@ test.describe('Time_Of_Day widget', () => {
     expect(await moduleCode(page)).toContain('time5 = Time_Of_Day.new 9 30\n')
   })
 
+  test('the menu is as wide on a narrow node as on a wide one', async ({ editorPage, page }) => {
+    const { menu, open } = await timeNode(editorPage, page)
+    await open()
+    const narrow = (await menu.boundingBox())!.width
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    // The whole node `time4` (four arguments) is far wider than the unset argument of `since`.
+    const wide = locate.graphNodeByBinding(page, 'time4').locator('.WidgetTimeOfDay')
+    await wide.click({ position: { x: 4, y: 4 } })
+    await wide.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    expect(Math.abs((await menu.boundingBox())!.width - narrow)).toBeLessThanOrEqual(1)
+  })
+
   test('the menu stays lined up under its argument as the node changes width', async ({
     editorPage,
     page,
@@ -1711,6 +1763,219 @@ test.describe('Time_Of_Day widget', () => {
     await page.keyboard.press('ControlOrMeta+Z')
     await expect(widget.locator('.WidgetNumber')).toHaveCount(0)
     expect(await moduleCode(page)).not.toContain('import Time_Of_Day')
+  })
+})
+
+test.describe('Date_Time widget', () => {
+  const DATE_TIME_TYPE = 'Standard.Base.Data.Time.Date_Time.Date_Time'
+  const days = '[data-reka-calendar-cell-trigger]:not([data-outside-view])'
+  test.afterEach(restoreMockMainFile)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile(
+          'from Standard.Base import Data\n\nmain =\n    since = Data.hours_since\n    dt1 = Date_Time.new 2020 1 15 9 30 second=45 zone=Time_Zone.utc\n    dt2 = Date_Time.now\n    dt3 = Date_Time.new 2026 11 17 14\n',
+        ),
+    },
+  })
+
+  /** A `Data.hours_since` call whose only argument, `moment`, is a `Date_Time` with no `@` annotation. */
+  async function dateTimeNode(editorPage: EditorPageActions, page: Page) {
+    await editorPage
+      .mockSuggestion({
+        type: 'type',
+        module: 'Standard.Base.Data.Time.Date_Time',
+        name: 'Date_Time',
+        params: [],
+        reexport: 'Standard.Base.Main',
+      })
+      .mockSuggestion({
+        type: 'method',
+        module: 'Standard.Base.Data',
+        name: 'hours_since',
+        arguments: [
+          {
+            name: 'moment',
+            reprType: DATE_TIME_TYPE,
+            isSuspended: false,
+            hasDefault: false,
+          },
+        ],
+        selfType: 'Standard.Base.Data',
+        returnType: 'Standard.Base.Data.Numbers.Integer',
+        isStatic: true,
+        annotations: [],
+      })
+    await mockMethodCallInfo(page, 'since', {
+      methodPointer: {
+        module: 'Standard.Base.Data',
+        definedOnType: 'Standard.Base.Data',
+        name: 'hours_since',
+      },
+      notAppliedArguments: [0],
+    })
+    const node = locate.graphNodeByBinding(page, 'since')
+    const widget = node.locator('.WidgetDateTime')
+    await expect(widget).toHaveCount(1)
+    const menu = page.locator('.DateTimeMenu')
+    /** Opens the menu: the arrow under the argument appears on hover. */
+    const open = async () => {
+      await widget.hover()
+      await expect(widget.locator('svg.arrow')).toBeVisible()
+      // The corner, not the middle: the middle of a written `Date_Time.new` is a number field.
+      await widget.click({ position: { x: 4, y: 4 } })
+      await expect(menu).toBeVisible()
+    }
+    return { node, widget, menu, open }
+  }
+
+  /** The module's code; the code editor is closed again afterwards. */
+  async function moduleCode(page: Page): Promise<string> {
+    await page.keyboard.press('ControlOrMeta+`')
+    await expect(page.locator('.CodeEditor')).toBeVisible()
+    const code = await page.evaluate(() => (window as any).__codeEditorApi.textContent())
+    await page.keyboard.press('ControlOrMeta+`')
+    await expect(page.locator('.CodeEditor')).toBeHidden()
+    return code
+  }
+
+  test('a Date_Time argument: now writes the code it names, with the import', async ({
+    editorPage,
+    page,
+  }) => {
+    const { widget, menu, open } = await dateTimeNode(editorPage, page)
+    await open()
+    await expect(menu.locator('.item')).toHaveText(['Date_Time.now'])
+    await expect(menu.getByRole('spinbutton')).toHaveCount(2)
+    await menu.getByRole('button', { name: 'Date_Time.now' }).click()
+    await expect(menu).toBeHidden()
+    await expect(widget).toContainText(/Date_Time\W*now/)
+    const code = await moduleCode(page)
+    expect(code).toContain('since = Data.hours_since Date_Time.now')
+    expect(code).toContain('from Standard.Base import Date_Time')
+  })
+
+  test('a day writes Date_Time.new, parenthesised, with five ports', async ({
+    editorPage,
+    page,
+  }) => {
+    const { widget, menu, open } = await dateTimeNode(editorPage, page)
+    await open()
+    await menu.locator(days).nth(19).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
+    await expect(menu).toBeHidden()
+    await expect(widget.locator('.WidgetNumber')).toHaveCount(5)
+    expect(await moduleCode(page)).toMatch(
+      /since = Data\.hours_since \(Date_Time\.new \d+ \d+ 20 \d+ \d+\)\n/,
+    )
+  })
+
+  test('a time typed and Enter writes it on today', async ({ editorPage, page }) => {
+    const { menu, open } = await dateTimeNode(editorPage, page)
+    await open()
+    await menu.getByRole('spinbutton').first().focus()
+    await page.keyboard.type('0930')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toMatch(
+      /since = Data\.hours_since \(Date_Time\.new \d+ \d+ \d+ 9 30\)\n/,
+    )
+  })
+
+  /** The whole node `dt1`, opened: one click selects it, the next opens the menu. */
+  async function openWholeNode(page: Page) {
+    const node = locate.graphNodeByBinding(page, 'dt1')
+    const widget = node.locator('.WidgetDateTime')
+    const menu = page.locator('.DateTimeMenu')
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(node).toHaveClass(/selected/)
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    return { node, widget, menu }
+  }
+
+  test('a day picked on a whole node keeps its second and zone', async ({ editorPage, page }) => {
+    await dateTimeNode(editorPage, page)
+    const { menu } = await openWholeNode(page)
+    await menu.locator(days).nth(19).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain(
+      'dt1 = Date_Time.new 2020 1 20 9 30 45 zone=Time_Zone.utc\n',
+    )
+  })
+
+  test('a time edited on a whole node keeps its day, second and zone', async ({
+    editorPage,
+    page,
+  }) => {
+    await dateTimeNode(editorPage, page)
+    const { menu } = await openWholeNode(page)
+    await menu.getByRole('spinbutton').first().focus()
+    await page.keyboard.press('ArrowUp')
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain(
+      'dt1 = Date_Time.new 2020 1 15 10 30 45 zone=Time_Zone.utc\n',
+    )
+  })
+
+  test('a Date_Time.new with only an hour opens on that hour; a column pick and Set write it', async ({
+    editorPage,
+    page,
+  }) => {
+    await dateTimeNode(editorPage, page)
+    const node = locate.graphNodeByBinding(page, 'dt3')
+    const widget = node.locator('.WidgetDateTime')
+    const menu = page.locator('.DateTimeMenu')
+    await widget.click({ position: { x: 4, y: 4 } })
+    await widget.click({ position: { x: 4, y: 4 } })
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('spinbutton')).toHaveText(['14', '00'])
+    await menu.getByRole('listbox', { name: 'Minute' }).getByRole('option', { name: '30' }).click()
+    await expect(menu.getByRole('spinbutton')).toHaveText(['14', '30'])
+    await expect(menu).toBeVisible()
+    await menu.getByRole('button', { name: 'Set' }).click()
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain('dt3 = Date_Time.new 2026 11 17 14 30\n')
+  })
+
+  test('Cancel after a column pick writes nothing', async ({ editorPage, page }) => {
+    await dateTimeNode(editorPage, page)
+    const { menu } = await openWholeNode(page)
+    await menu.getByRole('listbox', { name: 'Hour' }).getByRole('option', { name: '16' }).click()
+    await menu.getByRole('button', { name: 'Cancel' }).click()
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain(
+      'dt1 = Date_Time.new 2020 1 15 9 30 second=45 zone=Time_Zone.utc\n',
+    )
+  })
+
+  test('the menu has its own fixed width, on a narrow node as on a wide one, with the time beside the calendar', async ({
+    editorPage,
+    page,
+  }) => {
+    const { menu, open } = await dateTimeNode(editorPage, page)
+    await open()
+    const narrow = (await menu.boundingBox())!
+    // The time panel is to the right of the calendar, and its columns end where the calendar does.
+    const calendar = (await menu.locator('.calendarPanel').boundingBox())!
+    const time = (await menu.locator('.timePanel').boundingBox())!
+    expect(time.x).toBeGreaterThanOrEqual(calendar.x + calendar.width)
+    expect(Math.abs(time.y + time.height - (calendar.y + calendar.height))).toBeLessThanOrEqual(1)
+    // Wider than the date and time-of-day menus' 200 px: the date-time menu's own width, with room
+    // for a third (seconds) column; `dt1` below opens with seconds.
+    expect(narrow.width).toBeGreaterThan(300)
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    // The whole node `dt1` (seven arguments) is far wider than the unset argument of `since`.
+    const { menu: wideMenu } = await openWholeNode(page)
+    expect(Math.abs((await wideMenu.boundingBox())!.width - narrow.width)).toBeLessThanOrEqual(1)
+  })
+
+  test('Date_Time.now as a whole node has the picker', async ({ editorPage, page }) => {
+    await dateTimeNode(editorPage, page)
+    await expect(locate.graphNodeByBinding(page, 'dt2').locator('.WidgetDateTime')).toHaveCount(1)
   })
 })
 
