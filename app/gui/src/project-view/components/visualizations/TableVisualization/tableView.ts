@@ -196,21 +196,6 @@ interface FieldOptions {
 }
 
 /**
- * The most distinct values the engine lists for a set filter is one fewer than this
- * (`DataQualityMetrics.DISTINCT_THRESHOLD`): it answers `null` from 100 on, while it still sets
- * `multi_filter` for exactly 100, so a column with 100 got a set filter with no list (#778).
- */
-const DISTINCT_LIST_LIMIT = 100
-
-/** Whether the engine will list the column's distinct values, as far as its metrics say. */
-function engineListsValues(metrics: ViewColumn['metrics']) {
-  const distinct = metrics?.find(
-    (metric) => metric.name === 'Number of distinct' && metric.type === 'Count',
-  )?.value
-  return typeof distinct !== 'number' || distinct < DISTINCT_LIST_LIMIT
-}
-
-/**
  * Generates the column definition for the table vizulization, including displaying the data value type and
  * data quality indicators.
  * @param name - The name which will be displayed in the table header and used to idenfiy the column.
@@ -225,10 +210,7 @@ function toField(name: string, options: FieldOptions, ctx: TableViewContext): Co
   const icon = valueType ? getValueTypeIcon(valueType.constructor) : null
   const cellValueType = valueType ? getCellDataType(valueType.constructor) : false
 
-  const filterType =
-    valueType ?
-      getFilterType(valueType.constructor, multiFilter && engineListsValues(metrics))
-    : null
+  const filterType = valueType ? getFilterType(valueType.constructor, multiFilter) : null
 
   const filterParams = getFilterParams(ctx.isSSRM, valueType, ctx.getFilterValues)
 

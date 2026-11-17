@@ -98,6 +98,15 @@ describe('templates', () => {
       `operator1.at ${code}`,
     )
   })
+  // A numeral too large for a double (about 309 digits) used to read as `Infinity` and give no node.
+  test.each([['1'.padEnd(400, '0')], ['-' + '9'.repeat(400)]])(
+    '# writes an integer numeral too large for a double exactly (%#)',
+    (value) => {
+      expect(text(actionPattern(chain('at {{#index}}'), { index: value }))).toBe(
+        `operator1.at ${value}`,
+      )
+    },
+  )
   test('# keeps every digit of each integer of a vector', () => {
     expect(text(actionPattern(chain('f {{#xs*}}'), { xs: ['9007199254740993', '2'] }))).toBe(
       'operator1.f [9007199254740993, 2]',

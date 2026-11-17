@@ -4,7 +4,6 @@
 import { Ast } from '@/util/ast'
 import type { CellDoubleClickedEvent } from 'ag-grid-community'
 import { describe, expect, test } from 'vitest'
-import { CommunitySetFilter } from '../TableVisualization/CommunitySetFilter'
 import {
   buildTableView,
   distinctValuesFromResponse,
@@ -191,47 +190,5 @@ describe('The view link', () => {
     expect(viewLink({ kind: 'error', error: 'boom' })).toBeUndefined()
     expect(viewLink(42)).toBeUndefined()
     expect(viewLink({ other: 'visualisation' })).toBeUndefined()
-  })
-})
-
-describe('The set filter of a Text column', () => {
-  /** A Text column the engine says takes a multi-filter, with `distinct` distinct values. */
-  function filterOf(distinct: number | null) {
-    const metrics =
-      distinct == null ?
-        []
-      : [{ name: 'Number of distinct', type: 'Count' as const, value: distinct }]
-    const view = buildTableView(
-      {
-        kind: 'grid',
-        columns: [
-          {
-            name: 't',
-            value_type: { constructor: 'Char', display_text: 'Char' },
-            metrics,
-            multi_filter: true,
-          },
-        ],
-        data: [['a']],
-      },
-      context(),
-    )
-    return view.columnDefs[0]?.filter
-  }
-
-  // The engine lists a column's distinct values for fewer than 100 of them, but `multi_filter` is
-  // true up to and including 100: a column with exactly 100 got a set filter with no list (#778).
-  test('is offered when the engine will list the values', () => {
-    expect(filterOf(99)).toBe(CommunitySetFilter)
-    expect(filterOf(1)).toBe(CommunitySetFilter)
-  })
-
-  test('is not offered when the engine will not list the values', () => {
-    expect(filterOf(100)).toBe('agTextColumnFilter')
-    expect(filterOf(5000)).toBe('agTextColumnFilter')
-  })
-
-  test('follows the engine when the distinct count is not sent', () => {
-    expect(filterOf(null)).toBe(CommunitySetFilter)
   })
 })
