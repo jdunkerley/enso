@@ -27,7 +27,6 @@ import {
   useWidgetFunctionCallInfo,
 } from '@/components/GraphEditor/widgets/WidgetFunction/widgetFunctionCallInfo'
 import { injectFunctionInfo, provideFunctionInfo } from '@/providers/functionInfo'
-import { injectWidgetTree } from '@/providers/widgetTree'
 import { assert, assertUnreachable } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import type { AstId } from '@/util/ast/abstract'
@@ -53,8 +52,6 @@ const {
   graph,
   suggestionDb,
 } = useCurrentProject()
-
-const tree = injectWidgetTree()
 
 const exprInfo = computed(() => graph.value.db.getExpressionInfo(props.input.value.externalId))
 const outputType = computed(() => exprInfo.value?.typeInfo?.primaryType)
@@ -123,8 +120,8 @@ const innerInput = computed(() => {
 })
 
 /**
- * The parameters the `…` menu offers. Opening the menu selects the node, which shows its details,
- * so the list does not depend on them: the menu hides its button instead (`collapsed`).
+ * The parameters the `…` menu offers: the unset ones with a default, which the tree hides.
+ * Selecting the node does not show them; the menu is the way to reach them.
  */
 const hidden = computed(() => (application.value ? hiddenParameters(application.value) : []))
 
@@ -384,7 +381,6 @@ export const widgetDefinition = defineWidget(
   <ParameterMenu
     v-if="hidden.length"
     :port="props.input.value.id"
-    :collapsed="tree.showDetails"
     :parameters="hidden"
     @pick="insertParameter"
   />

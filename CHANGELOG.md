@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [Selecting a node no longer expands it to show every hidden argument. A node
+  shows the arguments that are set; the `…` after them adds the others.][850]
 - [The JSON and tree view can be used from the keyboard: Tab enters it, the
   arrow keys move between entries and open or close branches, Enter adds a
   component for the entry (Shift+Enter for every entry beside it), and the
@@ -569,6 +571,7 @@
 [840]: https://github.com/jdunkerley/enso/pull/840
 [841]: https://github.com/jdunkerley/enso/pull/841
 [844]: https://github.com/jdunkerley/enso/pull/844
+[850]: https://github.com/jdunkerley/enso/pull/850
 [832]: https://github.com/jdunkerley/enso/pull/832
 [831]: https://github.com/jdunkerley/enso/pull/831
 [830]: https://github.com/jdunkerley/enso/pull/830

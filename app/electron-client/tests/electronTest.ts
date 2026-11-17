@@ -499,7 +499,34 @@ async function showAll(page: Page, targets: Locator) {
 export async function showSelectedComponent(page: Page) {
   const selected = page.locator('.GraphNode.selected')
   await expect(selected).toHaveCount(1)
+  await showHiddenParameters(page, selected)
   await showAll(page, selected)
+}
+
+/**
+ * Add every parameter the selected component hides, through its `…` menu. Selecting a component
+ * does not show them (#836), and the exercises fill them in. Does nothing when there is no `…`.
+ */
+async function showHiddenParameters(page: Page, selected: Locator) {
+  const button = selected.locator('.parameterMenuButton:visible')
+  const menu = page.getByRole('dialog', { name: 'More parameters' })
+  for (let i = 0; i < 12 && (await button.count()) > 0; i++) {
+    // The component re-renders as the engine answers, and that closes the menu: open it again.
+    await expect(async () => {
+      if (!(await menu.isVisible())) {
+        // Not `click()`: Playwright waits for the component to hold still, and it does not.
+        await button.first().dispatchEvent('click')
+      }
+      const name = (await menu
+        .locator('.parameterItem .name')
+        .first()
+        .textContent({ timeout: 2000 }))!
+      await menu
+        .getByRole('button', { name: new RegExp(`^${name}`) })
+        .dispatchEvent('click', undefined, { timeout: 2000 })
+      await expect(menu).toBeHidden({ timeout: 2000 })
+    }).toPass({ timeout: 30_000 })
+  }
 }
 
 /**

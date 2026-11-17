@@ -1,6 +1,6 @@
 /**
  * @file The parameters of a call that are not shown, for the `…` menu: unset arguments with a
- * default that the widget tree hides unless the node is being edited.
+ * default that the widget tree hides.
  */
 import type { PortId } from '@/providers/portInfo'
 import { Ast } from '@/util/ast'
