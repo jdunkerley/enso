@@ -13,26 +13,29 @@ import { Ast } from '@/util/ast'
 /** The qualified name of the `Date_Time` type. */
 export const DATE_TIME_TYPE = 'Standard.Base.Data.Time.Date_Time.Date_Time'
 
-/** A date and a time to the minute: what the picker writes. */
+/** A date and a time to the second: what the picker writes. */
 export interface DateTimeParts extends YearMonthDay {
   readonly hour: number
   readonly minute: number
+  readonly second: number
 }
 
 /** What the value stands for: the current instant, or a specific one. */
 export type DateTimeChoice =
   | { readonly kind: 'now' }
   | ({ readonly kind: 'dateTime' } & DateTimeParts & {
-        /** The arguments after the minute, as written (`45`, `second=45`, `zone=Time_Zone.utc`); absent when none. */
+        /** The arguments after the second, as written (`500`, `millisecond=500`, `zone=Time_Zone.utc`); absent when none. */
         readonly kept?: readonly string[]
       })
 
 /** The parameters the picker writes, in `Date_Time.new`'s order. */
-const PICKED = ['year', 'month', 'day', 'hour', 'minute'] as const
+const PICKED = ['year', 'month', 'day', 'hour', 'minute', 'second'] as const
 type Picked = (typeof PICKED)[number]
-/** The parameters an edit keeps, in `Date_Time.new`'s order after the minute. */
-const KEPT = ['second', 'millisecond', 'microsecond', 'nanosecond', 'zone'] as const
+/** The parameters an edit keeps, in `Date_Time.new`'s order after the second. */
+const KEPT = ['millisecond', 'microsecond', 'nanosecond', 'zone'] as const
 const INTEGER = /^\d+$/
+/** A kept argument written by name (`zone=…`); any other was written positionally. */
+const NAMED = /^\w+=/
 
 /** The arguments of an application chain, first to last, and its callee. */
 function callArguments(expr: Ast.Ast): {
@@ -52,7 +55,7 @@ function callArguments(expr: Ast.Ast): {
 }
 
 /**
- * The arguments of a well-formed `Date_Time.new` call: the code written for year to minute, by
+ * The arguments of a well-formed `Date_Time.new` call: the code written for year to second, by
  * name, and the kept arguments as written. A positional argument after a named one, an argument
  * given twice, an unknown name or too many positional arguments make a call malformed.
  */
@@ -92,10 +95,10 @@ function dateTimeNewArguments(
 
 /**
  * The choice that the code stands for, or `undefined` when it is not `Date_Time.now` or a
- * `Date_Time.new` whose year (required) and month, day, hour and minute (each optional) are integer
+ * `Date_Time.new` whose year (required) and month, day, hour, minute and second (each optional) are integer
  * literals, positional or named, followed by any of `Date_Time.new`'s other arguments, which are
  * kept as written. A positional argument after a named one, an argument given twice, an unknown
- * name, a computed year … minute, or an impossible date or time is not ours.
+ * name, a computed year … second, or an impossible date or time is not ours.
  */
 export function parseDateTimeExpression(code: string | undefined): DateTimeChoice | undefined {
   if (code?.trim() === 'Date_Time.now') return { kind: 'now' }
@@ -114,14 +117,16 @@ export function parseDateTimeExpression(code: string | undefined): DateTimeChoic
     day: parts.day ?? 1,
     hour: parts.hour ?? 0,
     minute: parts.minute ?? 0,
+    second: parts.second ?? 0,
   }
-  if (!isValidDate(value) || value.hour > 23 || value.minute > 59) return undefined
+  if (!isValidDate(value) || value.hour > 23 || value.minute > 59 || value.second > 59)
+    return undefined
   return kept.length > 0 ? { kind: 'dateTime', ...value, kept } : { kind: 'dateTime', ...value }
 }
 
 /**
- * The arguments after the minute of a well-formed `Date_Time.new` call, as written, whether or not
- * its year … minute are literals (`Date_Time.new y 1 15 zone=Time_Zone.utc` keeps `zone=…`);
+ * The arguments after the second of a well-formed `Date_Time.new` call, as written, whether or not
+ * its year … second are literals (`Date_Time.new y 1 15 zone=Time_Zone.utc` keeps `zone=…`);
  * `undefined` for any other code or when there are none.
  */
 export function keptDateTimeArguments(code: string | undefined): readonly string[] | undefined {
@@ -129,13 +134,20 @@ export function keptDateTimeArguments(code: string | undefined): readonly string
   return kept != null && kept.length > 0 ? kept : undefined
 }
 
-/** The code that a choice writes: year to minute positionally (each a port), then the kept arguments. */
+/**
+ * The code that a choice writes: year to minute positionally (each a port), the second when it is not
+ * zero or a kept argument follows it positionally (which needs it), then the kept arguments.
+ */
 export function dateTimeExpressionCode(choice: DateTimeChoice): string {
   if (choice.kind === 'now') return 'Date_Time.now'
-  const { year, month, day, hour, minute } = choice
-  return [`Date_Time.new ${year} ${month} ${day} ${hour} ${minute}`, ...(choice.kept ?? [])].join(
-    ' ',
-  )
+  const { year, month, day, hour, minute, second } = choice
+  const kept = choice.kept ?? []
+  const withSecond = second !== 0 || kept.some((arg) => !NAMED.test(arg))
+  return [
+    `Date_Time.new ${year} ${month} ${day} ${hour} ${minute}`,
+    ...(withSecond ? [String(second)] : []),
+    ...kept,
+  ].join(' ')
 }
 
 /**
@@ -156,7 +168,7 @@ export function withKeptArguments(
   return kept == null || kept.length === 0 ? picked : { ...picked, kept }
 }
 
-/** The local date and time of `now`, to the minute. */
+/** The local date and time of `now`, to the second. */
 export function localDateTimeNow(now: Date = new Date()): DateTimeParts {
   return {
     year: now.getFullYear(),
@@ -164,5 +176,6 @@ export function localDateTimeNow(now: Date = new Date()): DateTimeParts {
     day: now.getDate(),
     hour: now.getHours(),
     minute: now.getMinutes(),
+    second: now.getSeconds(),
   }
 }

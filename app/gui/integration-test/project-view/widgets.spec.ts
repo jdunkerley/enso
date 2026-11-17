@@ -1196,6 +1196,7 @@ test.describe('Date widget', () => {
     const { widget, menu, open } = await dateNode(editorPage, page)
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
     expect(await moduleCode(page)).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 15\)\n/)
@@ -1213,6 +1214,7 @@ test.describe('Date widget', () => {
     const { widget, menu, open } = await dateNode(editorPage, page)
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
     const day = widget.locator('.WidgetNumber').nth(2)
     await day.click()
@@ -1228,26 +1230,45 @@ test.describe('Date widget', () => {
     const { widget, menu, open } = await dateNode(editorPage, page)
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
     await open()
     await menu.locator(days).nth(15).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     const code = await moduleCode(page)
     expect(code).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 16\)\n/)
     expect(code).not.toMatch(/since = Data\.days_since Date\.new/)
   })
 
-  test('choosing the day that is already chosen only closes the menu', async ({
+  test('a day click selects and writes nothing; Cancel closes the menu', async ({
+    editorPage,
+    page,
+  }) => {
+    const { menu, open } = await dateNode(editorPage, page)
+    await open()
+    const day = menu.locator(days).nth(14)
+    await day.click()
+    await expect(day).toHaveAttribute('data-selected')
+    await expect(menu).toBeVisible()
+    await menu.getByRole('button', { name: 'Cancel' }).click()
+    await expect(menu).toBeHidden()
+    expect(await moduleCode(page)).toContain('since = Data.days_since\n')
+  })
+
+  test('Set on the day that is already chosen only closes the menu', async ({
     editorPage,
     page,
   }) => {
     const { widget, menu, open } = await dateNode(editorPage, page)
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     // One undo step takes the date back out: the second click wrote nothing.
     await page.keyboard.press('ControlOrMeta+Z')
@@ -1299,6 +1320,7 @@ test.describe('Date widget', () => {
     await widget.click({ position: { x: 4, y: 4 } })
     await expect(menu).toBeVisible()
     await menu.locator(days).nth(19).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     expect(await moduleCode(page)).toMatch(/date1 = Date\.new \d+ \d+ 20\n/)
   })
@@ -1361,11 +1383,13 @@ test.describe('Date widget', () => {
     const { widget, menu, open } = await dateNode(editorPage, page)
     await open()
     await menu.locator(days).nth(14).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(widget.locator('.WidgetNumber')).toHaveCount(3)
     // Edits within the undo manager's capture timeout (500 ms) merge into one step.
     await page.waitForTimeout(600)
     await open()
     await menu.locator(days).nth(15).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     await page.keyboard.press('ControlOrMeta+Z')
     expect(await moduleCode(page)).toMatch(/since = Data\.days_since \(Date\.new \d+ \d+ 15\)\n/)
@@ -1848,6 +1872,7 @@ test.describe('Date_Time widget', () => {
     const { widget, menu, open } = await dateTimeNode(editorPage, page)
     await open()
     await menu.locator(days).nth(19).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     await expect(widget.locator('.WidgetNumber')).toHaveCount(5)
     expect(await moduleCode(page)).toMatch(
@@ -1883,9 +1908,10 @@ test.describe('Date_Time widget', () => {
     await dateTimeNode(editorPage, page)
     const { menu } = await openWholeNode(page)
     await menu.locator(days).nth(19).click()
+    await menu.getByRole('button', { name: 'Set', exact: true }).click()
     await expect(menu).toBeHidden()
     expect(await moduleCode(page)).toContain(
-      'dt1 = Date_Time.new 2020 1 20 9 30 second=45 zone=Time_Zone.utc\n',
+      'dt1 = Date_Time.new 2020 1 20 9 30 45 zone=Time_Zone.utc\n',
     )
   })
 
@@ -1900,7 +1926,7 @@ test.describe('Date_Time widget', () => {
     await page.keyboard.press('Enter')
     await expect(menu).toBeHidden()
     expect(await moduleCode(page)).toContain(
-      'dt1 = Date_Time.new 2020 1 15 10 30 second=45 zone=Time_Zone.utc\n',
+      'dt1 = Date_Time.new 2020 1 15 10 30 45 zone=Time_Zone.utc\n',
     )
   })
 
@@ -1947,7 +1973,8 @@ test.describe('Date_Time widget', () => {
     const time = (await menu.locator('.timePanel').boundingBox())!
     expect(time.x).toBeGreaterThanOrEqual(calendar.x + calendar.width)
     expect(Math.abs(time.y + time.height - (calendar.y + calendar.height))).toBeLessThanOrEqual(1)
-    // Wider than the date and time-of-day menus' 200 px: the date-time menu's own width.
+    // Wider than the date and time-of-day menus' 200 px: the date-time menu's own width, with room
+    // for a third (seconds) column; `dt1` below opens with seconds.
     expect(narrow.width).toBeGreaterThan(300)
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()

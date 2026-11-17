@@ -1,6 +1,7 @@
 /**
- * @file The date widget's menu: the relative choices and the calendar write the expected code, and
- * the keyboard opens onto the calendar, moves, chooses and closes.
+ * @file The date widget's menu: the relative choices write at once, a day click selects and Set
+ * writes it, Cancel and Escape write nothing, and the keyboard opens onto the calendar, moves,
+ * chooses and closes.
  */
 import userEvent from '@testing-library/user-event'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
@@ -13,12 +14,19 @@ const TODAY: YearMonthDay = { year: 2026, month: 11, day: 15 }
 let mounted: VueWrapper | undefined
 afterEach(() => mounted?.unmount())
 
-async function mountMenu(choice: DateChoice | undefined) {
+async function mountMenu(
+  choice: DateChoice | undefined,
+  registerAccept?: (accept: () => void) => void,
+) {
+  mounted?.unmount()
   // The calendar marks "today" by the system clock when it renders, so the clock is `TODAY`'s then.
   // A fake clock would also stop the keyboard events of `userEvent`, so it is only held while mounting.
   vi.useFakeTimers({ toFake: ['Date'], now: new Date(TODAY.year, TODAY.month - 1, TODAY.day, 12) })
   try {
-    mounted = mount(DateMenu, { props: { choice, today: TODAY }, attachTo: document.body })
+    mounted = mount(DateMenu, {
+      props: { choice, today: TODAY, registerAccept },
+      attachTo: document.body,
+    })
     await flushPromises()
   } finally {
     vi.useRealTimers()
@@ -60,10 +68,54 @@ describe('the date menu', () => {
     expect(wrapper.find('[data-reka-calendar-cell-trigger]').exists()).toBe(true)
   })
 
-  test('a calendar day writes Date.new for it', async () => {
+  test('a calendar day is selected, not written; Set writes Date.new for it', async () => {
     const wrapper = await mountMenu(undefined)
     await userEvent.click(day(20))
+    expect(day(20).hasAttribute('data-selected')).toBe(true)
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    await wrapper.get('[data-action="set"]').trigger('click')
     expect(chosenCodes(wrapper)).toEqual(['Date.new 2026 11 20'])
+  })
+
+  test('Cancel after a day click closes and writes nothing', async () => {
+    const wrapper = await mountMenu({ kind: 'date', year: 2026, month: 11, day: 10 })
+    await userEvent.click(day(20))
+    await wrapper.get('[data-action="cancel"]').trigger('click')
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    expect(wrapper.emitted('choose')).toBeUndefined()
+  })
+
+  test('Escape after a day click closes and writes nothing', async () => {
+    const wrapper = await mountMenu({ kind: 'date', year: 2026, month: 11, day: 10 })
+    await userEvent.click(day(20))
+    await userEvent.keyboard('{Escape}')
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    expect(wrapper.emitted('choose')).toBeUndefined()
+  })
+
+  test('a click outside writes a changed day, once, and nothing without a change', async () => {
+    let accept: (() => void) | undefined
+    const wrapper = await mountMenu(
+      { kind: 'date', year: 2026, month: 11, day: 10 },
+      (handler) => (accept = handler),
+    )
+    accept!()
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    await userEvent.click(day(20))
+    accept!()
+    accept!()
+    expect(chosenCodes(wrapper)).toEqual(['Date.new 2026 11 20'])
+  })
+
+  test('Set without a selected day, or on the written day, only closes', async () => {
+    let wrapper = await mountMenu(undefined)
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    wrapper = await mountMenu({ kind: 'date', year: 2026, month: 11, day: 10 })
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
   test('the calendar opens on the current month of a specific date, and marks it', async () => {
@@ -98,18 +150,20 @@ describe('the date menu', () => {
     expect(wrapper.emitted('choose')).toBeUndefined()
   })
 
-  test('clicking the day that is already chosen closes the menu and writes nothing', async () => {
+  test('Enter on the day that is already chosen closes the menu and writes nothing', async () => {
     const wrapper = await mountMenu({ kind: 'date', year: 2026, month: 11, day: 10 })
-    await userEvent.click(day(10))
+    await userEvent.keyboard('{Enter}')
     expect(wrapper.emitted('choose')).toBeUndefined()
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
-  test('clicking another day writes it and does not ask to close', async () => {
+  test('clicking a day writes nothing and does not ask to close', async () => {
     const wrapper = await mountMenu({ kind: 'date', year: 2026, month: 11, day: 10 })
     await userEvent.click(day(11))
-    expect(chosenCodes(wrapper)).toEqual(['Date.new 2026 11 11'])
+    expect(wrapper.emitted('choose')).toBeUndefined()
     expect(wrapper.emitted('close')).toBeUndefined()
+    expect(day(11).hasAttribute('data-selected')).toBe(true)
+    expect(day(10).hasAttribute('data-selected')).toBe(false)
   })
 
   test('the calendar stops at year 100, the earliest the widget recognises', async () => {

@@ -1,6 +1,7 @@
 /**
- * @file The date-time menu: Date_Time.now, a day and a time each write the expected code; a day keeps
- * the time and a time keeps the day; the columns pick a time that Set writes, and Cancel closes.
+ * @file The date-time menu: Date_Time.now writes at once; a day click and a column click select, and
+ * Set writes the selected day at the field's time; Enter, leaving and a click outside write only an
+ * edit; Cancel and Escape write nothing; seconds can be added, and are shown when the value has them.
  */
 import userEvent from '@testing-library/user-event'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
@@ -12,7 +13,7 @@ import {
   type DateTimeParts,
 } from '../dateTimeExpression'
 
-const NOW: DateTimeParts = { year: 2026, month: 11, day: 15, hour: 9, minute: 5 }
+const NOW: DateTimeParts = { year: 2026, month: 11, day: 15, hour: 9, minute: 5, second: 7 }
 const JAN_15: DateTimeChoice = {
   kind: 'dateTime',
   year: 2020,
@@ -20,7 +21,9 @@ const JAN_15: DateTimeChoice = {
   day: 15,
   hour: 14,
   minute: 30,
+  second: 0,
 }
+const JAN_15_SECONDS: DateTimeChoice = { ...JAN_15, second: 45 }
 
 let mounted: VueWrapper | undefined
 afterEach(() => mounted?.unmount())
@@ -66,52 +69,60 @@ const columnValue = (unit: string, value: string) =>
   ).find((option) => option.textContent?.trim() === value)!
 
 describe('the date-time menu', () => {
-  test('lists Date_Time.now, then the calendar, then hours and minutes, then Cancel and Set', async () => {
+  test('lists Date_Time.now, the calendar, hours and minutes with Add seconds, then Cancel and Set', async () => {
     const wrapper = await mountMenu(undefined)
     expect(wrapper.findAll('.item').map((item) => item.text())).toEqual(['Date_Time.now'])
     expect(wrapper.find('[data-reka-calendar-cell-trigger]').exists()).toBe(true)
     expect(segments()).toHaveLength(2)
     expect(selectedValues()).toEqual(['09', '05'])
-    expect(document.querySelector('[data-action="seconds"]')).toBeNull()
+    expect(wrapper.get('[data-action="seconds"]').text()).toBe('Add seconds')
     expect(wrapper.find('[data-action="cancel"]').exists()).toBe(true)
     expect(wrapper.find('[data-action="set"]').exists()).toBe(true)
   })
 
-  test('the field and the columns open on the time the value holds', async () => {
+  test('Date_Time.now writes Date_Time.now at once', async () => {
+    const wrapper = await mountMenu(JAN_15)
+    await wrapper.get('[data-choice="now"]').trigger('click')
+    expect(chosenCodes(wrapper)).toEqual(['Date_Time.now'])
+  })
+
+  test('the field and the columns open on the value, with seconds only when it has them', async () => {
     await mountMenu(JAN_15)
     expect(fieldText()).toEqual(['14', '30'])
     expect(selectedValues()).toEqual(['14', '30'])
+    await mountMenu(JAN_15_SECONDS)
+    expect(fieldText()).toEqual(['14', '30', '45'])
+    expect(selectedValues()).toEqual(['14', '30', '45'])
   })
 
-  test('a click on a column value changes the field and writes nothing; Set writes it', async () => {
+  test("a day click selects the day and writes nothing; Set writes it at the value's time", async () => {
     const wrapper = await mountMenu(JAN_15)
-    columnValue('hour', '16').click()
-    columnValue('minute', '45').click()
-    await flushPromises()
-    expect(fieldText()).toEqual(['16', '45'])
-    expect(wrapper.emitted('choose')).toBeUndefined()
-    await wrapper.get('[data-action="set"]').trigger('click')
-    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 15 16 45'])
-  })
-
-  test('a day picked after a column pick takes the picked time', async () => {
-    const wrapper = await mountMenu(JAN_15)
-    columnValue('hour', '08').click()
     day(20).click()
     await flushPromises()
+    expect(day(20).hasAttribute('data-selected')).toBe(true)
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    expect(wrapper.emitted('close')).toBeUndefined()
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 20 14 30'])
+  })
+
+  test('Set writes the selected day and a column pick together', async () => {
+    const wrapper = await mountMenu(JAN_15)
+    day(20).click()
+    columnValue('hour', '08').click()
+    await flushPromises()
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    await wrapper.get('[data-action="set"]').trigger('click')
     expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 20 8 30'])
   })
 
-  test('typing in the field moves the columns', async () => {
-    await mountMenu(JAN_15)
-    segments()[0]!.focus()
-    await userEvent.keyboard('{ArrowUp}')
+  test('on an unset value, Set writes the selected day, or today, at the current time', async () => {
+    let wrapper = await mountMenu(undefined)
+    day(20).click()
     await flushPromises()
-    expect(selectedValues()).toEqual(['15', '30'])
-  })
-
-  test('Set on an unset value writes today at the time shown', async () => {
-    const wrapper = await mountMenu(undefined)
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2026 11 20 9 5'])
+    wrapper = await mountMenu(undefined)
     await wrapper.get('[data-action="set"]').trigger('click')
     expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2026 11 15 9 5'])
   })
@@ -124,6 +135,8 @@ describe('the date-time menu', () => {
 
   test('Set without a change to a written value closes the menu and writes nothing', async () => {
     const wrapper = await mountMenu(JAN_15)
+    day(15).click()
+    await flushPromises()
     await wrapper.get('[data-action="set"]').trigger('click')
     expect(wrapper.emitted('choose')).toBeUndefined()
     expect(wrapper.emitted('close')).toHaveLength(1)
@@ -137,8 +150,79 @@ describe('the date-time menu', () => {
     expect(wrapper.emitted('choose')).toBeUndefined()
   })
 
-  test('Cancel closes without writing, even after a pick', async () => {
+  test('a click on a column value changes the field and writes nothing', async () => {
     const wrapper = await mountMenu(JAN_15)
+    columnValue('hour', '16').click()
+    columnValue('minute', '45').click()
+    await flushPromises()
+    expect(fieldText()).toEqual(['16', '45'])
+    expect(wrapper.emitted('choose')).toBeUndefined()
+  })
+
+  test('typing in the field moves the columns', async () => {
+    await mountMenu(JAN_15)
+    segments()[0]!.focus()
+    await userEvent.keyboard('{ArrowUp}')
+    await flushPromises()
+    expect(selectedValues()).toEqual(['15', '30'])
+  })
+
+  test("Enter in the field writes an edited time on the value's day, or on the selected day", async () => {
+    let wrapper = await mountMenu(JAN_15)
+    segments()[0]!.focus()
+    await userEvent.keyboard('{ArrowUp}{Enter}')
+    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 15 15 30'])
+    wrapper = await mountMenu(JAN_15)
+    day(20).click()
+    await flushPromises()
+    segments()[0]!.focus()
+    await userEvent.keyboard('{ArrowUp}{Enter}')
+    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 20 15 30'])
+  })
+
+  test('Enter in the field without an edit writes nothing', async () => {
+    const wrapper = await mountMenu(JAN_15)
+    segments()[0]!.focus()
+    await userEvent.keyboard('{Enter}')
+    expect(wrapper.emitted('choose')).toBeUndefined()
+  })
+
+  test("Enter on a day selects it and writes it at the field's time", async () => {
+    const wrapper = await mountMenu(JAN_15)
+    expect(document.activeElement).toBe(day(15))
+    await userEvent.keyboard('{ArrowRight}{Enter}')
+    await vi.waitFor(() => expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 16 14 30']))
+  })
+
+  test('with seconds added, the second is written', async () => {
+    const wrapper = await mountMenu(JAN_15)
+    await wrapper.get('[data-action="seconds"]').trigger('click')
+    await flushPromises()
+    expect(selectedValues()).toEqual(['14', '30', '00'])
+    columnValue('second', '15').click()
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 15 14 30 15'])
+  })
+
+  test('hiding the seconds writes up to the minute', async () => {
+    const wrapper = await mountMenu(JAN_15_SECONDS)
+    await wrapper.get('[data-action="seconds"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 15 14 30'])
+  })
+
+  test('a day picked with seconds shown keeps the second', async () => {
+    const wrapper = await mountMenu(JAN_15_SECONDS)
+    day(20).click()
+    await flushPromises()
+    await wrapper.get('[data-action="set"]').trigger('click')
+    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 20 14 30 45'])
+  })
+
+  test('Cancel closes without writing, even after a day and a column pick', async () => {
+    const wrapper = await mountMenu(JAN_15)
+    day(20).click()
     columnValue('hour', '16').click()
     await wrapper.get('[data-action="cancel"]').trigger('click')
     expect(wrapper.emitted('close')).toHaveLength(1)
@@ -146,52 +230,9 @@ describe('the date-time menu', () => {
     expect(wrapper.emitted('choose')).toBeUndefined()
   })
 
-  test('Date_Time.now writes Date_Time.now', async () => {
-    const wrapper = await mountMenu(JAN_15)
-    await wrapper.get('[data-choice="now"]').trigger('click')
-    expect(chosenCodes(wrapper)).toEqual(['Date_Time.now'])
-  })
-
-  test("a day is written at the value's time", async () => {
-    const wrapper = await mountMenu(JAN_15)
-    day(20).click()
-    await flushPromises()
-    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 20 14 30'])
-  })
-
-  test('on an unset value, a day is written at the current time', async () => {
-    const wrapper = await mountMenu(undefined)
-    day(20).click()
-    await flushPromises()
-    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2026 11 20 9 5'])
-  })
-
-  test("an edited time is written on the value's day", async () => {
-    const wrapper = await mountMenu(JAN_15)
-    segments()[0]!.focus()
-    await userEvent.keyboard('{ArrowUp}{Enter}')
-    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 15 15 30'])
-  })
-
-  test('a day picked after a time edit takes the edited time', async () => {
-    const wrapper = await mountMenu(JAN_15)
-    segments()[0]!.focus()
-    await userEvent.keyboard('{ArrowUp}')
-    day(20).click()
-    await flushPromises()
-    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 20 15 30'])
-  })
-
-  test('the chosen day without a time edit only closes', async () => {
-    const wrapper = await mountMenu(JAN_15)
-    day(15).click()
-    await flushPromises()
-    expect(wrapper.emitted('choose')).toBeUndefined()
-    expect(wrapper.emitted('close')).toHaveLength(1)
-  })
-
   test('Escape closes without writing, even after an edit', async () => {
     const wrapper = await mountMenu(JAN_15)
+    day(20).click()
     segments()[0]!.focus()
     await userEvent.keyboard('{ArrowUp}{Escape}')
     expect(wrapper.emitted('close')).toHaveLength(1)
@@ -199,12 +240,19 @@ describe('the date-time menu', () => {
     expect(wrapper.emitted('choose')).toBeUndefined()
   })
 
-  test('the accept hook writes an edited time, once', async () => {
+  test('the accept hook writes an edited day or time, once, and nothing without an edit', async () => {
     let accept: (() => void) | undefined
-    const wrapper = await mountMenu(JAN_15, (handler) => (accept = handler))
+    let wrapper = await mountMenu(JAN_15, (handler) => (accept = handler))
+    accept!()
+    expect(wrapper.emitted('choose')).toBeUndefined()
+    day(20).click()
+    await flushPromises()
+    accept!()
+    accept!()
+    expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 20 14 30'])
+    wrapper = await mountMenu(JAN_15, (handler) => (accept = handler))
     segments()[0]!.focus()
     await userEvent.keyboard('{ArrowUp}')
-    accept!()
     accept!()
     expect(chosenCodes(wrapper)).toEqual(['Date_Time.new 2020 1 15 15 30'])
   })

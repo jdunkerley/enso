@@ -14,6 +14,16 @@ const at = (
   hour: number,
   minute: number,
   kept?: string[],
+): DateTimeChoice => atSecond(year, month, day, hour, minute, 0, kept)
+
+const atSecond = (
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  kept?: string[],
 ): DateTimeChoice => ({
   kind: 'dateTime',
   year,
@@ -21,6 +31,7 @@ const at = (
   day,
   hour,
   minute,
+  second,
   ...(kept ? { kept } : {}),
 })
 
@@ -36,13 +47,17 @@ describe('parseDateTimeExpression', () => {
     ['Date_Time.new 2026 11 17 14', at(2026, 11, 17, 14, 0)],
     ['Date_Time.new 2026 11 17 minute=30', at(2026, 11, 17, 0, 30)],
     ['Date_Time.new 2026 11 17 hour=14 minute=30', at(2026, 11, 17, 14, 30)],
-    ['Date_Time.new 2026 11 17 14 second=15', at(2026, 11, 17, 14, 0, ['second=15'])],
+    ['Date_Time.new 2026 11 17 14 second=15', atSecond(2026, 11, 17, 14, 0, 15)],
     ['Date_Time.new year=2026 month=11 day=17 hour=14 minute=30', at(2026, 11, 17, 14, 30)],
     ['Date_Time.new 2026 day=17 hour=14', at(2026, 1, 17, 14, 0)],
-    ['Date_Time.new 2020 1 15 9 30 45', at(2020, 1, 15, 9, 30, ['45'])],
+    ['Date_Time.new 2020 1 15 9 30 45', atSecond(2020, 1, 15, 9, 30, 45)],
     [
       'Date_Time.new 2020 1 15 9 30 second=45 zone=Time_Zone.utc',
-      at(2020, 1, 15, 9, 30, ['second=45', 'zone=Time_Zone.utc']),
+      atSecond(2020, 1, 15, 9, 30, 45, ['zone=Time_Zone.utc']),
+    ],
+    [
+      'Date_Time.new 2020 1 15 9 30 45 millisecond=500',
+      atSecond(2020, 1, 15, 9, 30, 45, ['millisecond=500']),
     ],
     [
       'Date_Time.new 2020 1 15 zone=(Time_Zone.parse "Europe/London")',
@@ -50,7 +65,7 @@ describe('parseDateTimeExpression', () => {
     ],
     [
       'Date_Time.new 2020 1 15 9 30 45 500 0 0 Time_Zone.utc',
-      at(2020, 1, 15, 9, 30, ['45', '500', '0', '0', 'Time_Zone.utc']),
+      atSecond(2020, 1, 15, 9, 30, 45, ['500', '0', '0', 'Time_Zone.utc']),
     ],
   ] satisfies [string, DateTimeChoice][])('%j is a choice', (code, expected) => {
     expect(parseDateTimeExpression(code)).toEqual(expected)
@@ -67,6 +82,8 @@ describe('parseDateTimeExpression', () => {
     'Date_Time.new 99 1 1',
     'Date_Time.new 2020 1 15 24 0',
     'Date_Time.new 2020 1 15 9 60',
+    'Date_Time.new 2020 1 15 9 30 60',
+    'Date_Time.new 2020 1 15 9 30 second=s',
     'Date_Time.new 2020 hour=9 10',
     'Date_Time.new 2020 month=2 month=3',
     'Date_Time.new 2020 1 month=2',
@@ -86,11 +103,18 @@ describe('dateTimeExpressionCode', () => {
     [{ kind: 'now' }, 'Date_Time.now'],
     [at(2020, 1, 15, 9, 30), 'Date_Time.new 2020 1 15 9 30'],
     [at(2020, 1, 1, 0, 0), 'Date_Time.new 2020 1 1 0 0'],
+    // The second is written when it is not zero, or when a finer part follows it positionally.
+    [atSecond(2020, 1, 15, 9, 30, 45), 'Date_Time.new 2020 1 15 9 30 45'],
     [
-      at(2020, 1, 15, 9, 30, ['second=45', 'zone=Time_Zone.utc']),
-      'Date_Time.new 2020 1 15 9 30 second=45 zone=Time_Zone.utc',
+      atSecond(2020, 1, 15, 9, 30, 45, ['zone=Time_Zone.utc']),
+      'Date_Time.new 2020 1 15 9 30 45 zone=Time_Zone.utc',
     ],
-    [at(2020, 1, 15, 9, 30, ['45', '500']), 'Date_Time.new 2020 1 15 9 30 45 500'],
+    [atSecond(2020, 1, 15, 9, 30, 45, ['500']), 'Date_Time.new 2020 1 15 9 30 45 500'],
+    [at(2020, 1, 15, 9, 30, ['500']), 'Date_Time.new 2020 1 15 9 30 0 500'],
+    [
+      at(2020, 1, 15, 9, 30, ['zone=Time_Zone.utc']),
+      'Date_Time.new 2020 1 15 9 30 zone=Time_Zone.utc',
+    ],
   ] satisfies [DateTimeChoice, string][])('%j writes %s', (choice, code) => {
     expect(dateTimeExpressionCode(choice)).toBe(code)
     expect(parseDateTimeExpression(code)).toEqual(choice)
@@ -98,11 +122,11 @@ describe('dateTimeExpressionCode', () => {
 })
 
 describe('withKeptArguments', () => {
-  const current = at(2020, 1, 15, 9, 30, ['second=45', 'zone=Time_Zone.utc'])
+  const current = atSecond(2020, 1, 15, 9, 30, 45, ['millisecond=500', 'zone=Time_Zone.utc'])
 
-  test('an edit keeps the arguments after the minute', () => {
-    expect(withKeptArguments(at(2021, 3, 4, 10, 0), current)).toEqual(
-      at(2021, 3, 4, 10, 0, ['second=45', 'zone=Time_Zone.utc']),
+  test('an edit keeps the arguments after the second, and takes its own second', () => {
+    expect(withKeptArguments(atSecond(2021, 3, 4, 10, 0, 15), current)).toEqual(
+      atSecond(2021, 3, 4, 10, 0, 15, ['millisecond=500', 'zone=Time_Zone.utc']),
     )
   })
 
@@ -121,14 +145,15 @@ describe('withKeptArguments', () => {
 describe('keptDateTimeArguments', () => {
   test.each([
     ['Date_Time.new y 1 15 zone=Time_Zone.utc', ['zone=Time_Zone.utc']],
-    ['Date_Time.new (2000 + 20) 1 15 9 30 45', ['45']],
-    ['Date_Time.new 2020 1 15 9 30 second=45', ['second=45']],
+    ['Date_Time.new (2000 + 20) 1 15 9 30 45 500', ['500']],
+    ['Date_Time.new 2020 1 15 9 30 second=45 zone=Time_Zone.utc', ['zone=Time_Zone.utc']],
   ])('%s keeps %j', (code, kept) => {
     expect(keptDateTimeArguments(code)).toEqual(kept)
   })
 
   test.each([
     'Date_Time.new 2020 1 15',
+    'Date_Time.new 2020 1 15 9 30 second=45',
     'Date_Time.new 2020 hour=9 10',
     'Date_Time.new 2020 2020',
     'Date_Time.new 2020 foo=1',

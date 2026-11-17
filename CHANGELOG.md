@@ -2,9 +2,10 @@
 
 #### Enso IDE
 
-- [A date-and-time picker for Date_Time values: Date_Time.now, a calendar, and a
-  time you can type or pick from hour and minute columns, then Set. Editing a
-  value keeps its seconds and time zone.][832]
+- [A date-and-time picker for Date_Time values: Date_Time.now, a calendar beside
+  a time you can type or pick from hour, minute and second columns, then Set.
+  Date pickers also get Cancel and Set. Editing a value keeps its finer parts
+  and time zone.][832]
 - [Libraries can provide their own visualizations][817]: a `.vue` file in a
   library's `visualizations/` folder appears in the view picker once the library
   is imported, and `Standard.Image` now ships the Image view this way.

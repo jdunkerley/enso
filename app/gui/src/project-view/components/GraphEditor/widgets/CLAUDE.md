@@ -65,19 +65,22 @@ is already on the row, drawn by `WidgetIcon` at the root.
   `<NodeWidget>` over its own input, so the argument shows its real code
   (`Date.today`, or `Date.new` with `year`, `month` and `day` ports), plus a
   `SelectionArrow` under it; the arrow opens a menu (`WidgetDate/DateMenu.vue`:
-  `Date.today`, `Date.yesterday`, `Date.tomorrow`, then the Reka calendar of
-  `WidgetDate/DateCalendar.vue`) that **replaces the whole value** in one
-  `module.edit` (the import goes in the same edit). Priority 51, after
-  `WidgetSelection` (50), so an argument with its own `@` dropdown keeps it, and
-  before `WidgetArgumentName`, which draws the name inside it.
-  `WidgetDate/dateExpression.ts` is the framework-free expression <-> choice
-  mapping. A specific date is written parenthesised (`(Date.new 2020 1 15)`)
-  wherever it becomes an argument: an unparenthesised application written as a
-  string splits into one group per argument. The decision is made on the AST the
-  _port_ names (`parenthesisedApplication(code, value, portId)`), not on the
-  value's parent: `WidgetGroup` hands its inner expression on with the Group's
-  port, so the write replaces the parentheses too. Only a node's expression and
-  a vector item are written bare. The menu opens on the current value through
+  `Date.today`, `Date.yesterday`, `Date.tomorrow`, which write at once, then the
+  Reka calendar of `WidgetDate/DateCalendar.vue` and Cancel and Set: a day click
+  only selects the day, Set or Enter on a day writes it, a click outside writes
+  only a changed day, and Cancel and Escape write nothing) that **replaces the
+  whole value** in one `module.edit` (the import goes in the same edit).
+  Priority 51, after `WidgetSelection` (50), so an argument with its own `@`
+  dropdown keeps it, and before `WidgetArgumentName`, which draws the name
+  inside it. `WidgetDate/dateExpression.ts` is the framework-free expression <->
+  choice mapping. A specific date is written parenthesised
+  (`(Date.new 2020 1 15)`) wherever it becomes an argument: an unparenthesised
+  application written as a string splits into one group per argument. The
+  decision is made on the AST the _port_ names
+  (`parenthesisedApplication(code, value, portId)`), not on the value's parent:
+  `WidgetGroup` hands its inner expression on with the Group's port, so the
+  write replaces the parentheses too. Only a node's expression and a vector item
+  are written bare. The menu opens on the current value through
   `unparenthesisedCode`. Design:
   `docs/superpowers/specs/2026-11-15-date-widget-design.md`.
 - `WidgetTimeOfDay.vue` — the same for a `Time_Of_Day`-typed input (priority 52;
@@ -111,7 +114,7 @@ is already on the row, drawn by `WidgetIcon` at the root.
   within the node, which pushed a menu wider than the rest of the node off its
   argument (by 160 px for an unset argument at a node's end). **Every picker
   menu is a fixed width** (200 px, set on `PickerMenuFrame`; the Date_Time menu
-  sets its own 330 px through `--picker-menu-width`): the activity dropdowns'
+  sets its own 380 px through `--picker-menu-width`): the activity dropdowns'
   `size` middleware also set the menu's `min-width` to its anchor's, so a menu
   on a whole node grew with the node; `pickerMenuStyles` must not add one back.
   **The menu is open only when the widget asked for it** (`menuOpen`): editing a
@@ -127,15 +130,19 @@ is already on the row, drawn by `WidgetIcon` at the root.
   whole node that is `Date_Time.now` or `Date_Time.new` (priority 53). Its menu
   (`WidgetDateTime/DateTimeMenu.vue`) is `Date_Time.now`, then side by side the
   date menu's calendar (`WidgetDate/DateCalendar.vue`) and the time menu's field
-  and columns (`WidgetTimeOfDay/TimeField.vue` with `fill`, hours and minutes
-  only, its columns as tall as the calendar), then Cancel and Set across the
-  bottom, which behave as they do there. A day, Set or an edited time writes
-  `Date_Time.new y m d h mi`; a day keeps the field's time and a time keeps the
-  value's day. `dateTimeExpression.ts` reads the arguments from the AST: year
-  and any of month … minute, positional or named (`Date_Time.new 2026 11 17 14`
-  is 14:00, so the menu opens on it), the missing ones taking `Date_Time.new`'s
-  defaults; an edit keeps everything after the minute as written (`second`, the
-  finer parts, `zone`), and the picker never writes a zone. A new item of a
+  and columns (`WidgetTimeOfDay/TimeField.vue` with `fill`, hours and minutes,
+  seconds on request and shown when the value has a second, its columns as tall
+  as the calendar), then Cancel and Set across the bottom. `Date_Time.now`
+  writes at once; a day click and a column click only select; Set writes the
+  selected day at the field's time as `Date_Time.new y m d h mi` (with `s` when
+  seconds are shown and not zero); Enter in the field, leaving the menu or a
+  click outside writes only a changed day or time; Cancel and Escape write
+  nothing. `dateTimeExpression.ts` reads the arguments from the AST: year and
+  any of month … second, positional or named (`Date_Time.new 2026 11 17 14` is
+  14:00, so the menu opens on it), the missing ones taking `Date_Time.new`'s
+  defaults; an edit keeps everything after the second as written (the finer
+  parts and `zone`), writing the second positionally when a kept argument
+  follows it positionally, and the picker never writes a zone. A new item of a
   `Vector Date_Time` starts as `Date_Time.now`.
 - `WidgetFileBrowser.vue` — a file, folder or `Enso_Secret` argument's dropdown:
   `WidgetFileBrowser/localBrowser.ts` (the native file dialog),

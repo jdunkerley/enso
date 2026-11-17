@@ -3,7 +3,8 @@
  * @file A month calendar: it opens on the shown day's month, marks the selected day and emits every day picked.
  *
  * The calendar is Reka's `Calendar` (as the dashboard's `DatePicker` uses for its popover): arrows
- * move between days, Enter picks one, PageUp and PageDown change the month.
+ * move between days, Enter picks one (and then emits `enter`, so a menu can write it as Enter in a
+ * time field does), PageUp and PageDown change the month.
  */
 import { CalendarDate, type DateValue } from '@internationalized/date'
 import {
@@ -32,6 +33,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** Every day clicked or chosen with Enter, the selected one too. */
   pick: [day: YearMonthDay]
+  /** Enter was pressed on a day, after it was picked. */
+  enter: []
 }>()
 
 const root = useTemplateRef('root')
@@ -42,6 +45,16 @@ const placeholder = shallowRef<DateValue>(toCalendarDate(props.shown))
 /** The dates `Date.new` takes and the widget recognises (`isValidDate`): years 100 to 9999. */
 const minValue = new CalendarDate(100, 1, 1)
 const maxValue = new CalendarDate(9999, 12, 31)
+
+/**
+ * Reka's day handles Enter and stops it, so it is seen here on the way down, and `enter` is emitted
+ * once Reka has picked the day (after this event's handlers).
+ */
+function onEnter(event: KeyboardEvent) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+  if (!(event.target as HTMLElement | null)?.hasAttribute('data-reka-calendar-cell-trigger')) return
+  setTimeout(() => emit('enter'))
+}
 
 function pick(value: unknown) {
   if (!(value instanceof CalendarDate)) return
@@ -77,6 +90,7 @@ defineExpose({
     :preventDeselect="true"
     :fixedWeeks="true"
     @update:modelValue="pick"
+    @keydown.enter.capture="onEnter"
   >
     <CalendarHeader class="calendarHeader">
       <CalendarPrev class="navButton" aria-label="Previous month">&lsaquo;</CalendarPrev>
