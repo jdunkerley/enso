@@ -1,8 +1,8 @@
 /** @file Code that turns the output context on, and code that only looks like it, for the tests. */
 
-/** The GUI's per-node Write prefix (`util/ast/node.ts`), with the design environment filled in. */
+/** The GUI's per-node Write prefix (`util/ast/node.ts`). */
 export const WRITE_PREFIX =
-  'Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output "design" <| '
+  'Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output <| '
 
 /** Expressions that turn the output context on, in every form an entry point must refuse. */
 export const ENABLING_EXPRESSIONS = [

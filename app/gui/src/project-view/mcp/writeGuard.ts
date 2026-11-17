@@ -1,7 +1,7 @@
 /**
  * @file The one check that keeps an agent from turning Write on. The GUI's per-node Write is a code
  * prefix (`util/ast/node.ts`: `Standard.Base.Runtime.with_enabled_context
- * Standard.Base.Runtime.Context.Output "design" <| …`), so code an agent supplies could switch the
+ * Standard.Base.Runtime.Context.Output <| …`), so code an agent supplies could switch the
  * output context on by itself. Every place an agent's code enters the project or the engine refuses
  * such code: a node statement (`add_nodes`), a node expression (`edit_node`), a function definition
  * (`add_function`), an import line (`add_nodes`) and an evaluated expression
