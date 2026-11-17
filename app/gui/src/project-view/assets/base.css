@@ -345,8 +345,8 @@
     BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
     "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
   /* Monaspace Neon is the code font (#110): `--font-mono` covers the code editor, docs code, tables
-     and visualizations; `--font-code` covers node text — node expressions and bindings, component
-     browser entries and the AI pending node (#112). Neon is preloaded from `index.html`. Node widths
+     and visualizations; `--font-code` covers node text — node expressions and bindings and component
+     browser entries (#112). Neon is preloaded from `index.html`. Node widths
      are measured, never saved, so the face changes no project data. */
   --font-mono:
     "Monaspace Neon", /* System monospace font stack */ ui-monospace,

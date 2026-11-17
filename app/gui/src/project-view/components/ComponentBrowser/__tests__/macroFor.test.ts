@@ -48,12 +48,7 @@ function offered(db: SuggestionDb, pattern: string) {
 }
 
 function newInput(db: SuggestionDb) {
-  const input = useComponentBrowserInput(
-    () => false,
-    GraphDb.Mock(ComputedValueRegistry.Mock()),
-    db,
-    ref(),
-  )
+  const input = useComponentBrowserInput(GraphDb.Mock(ComputedValueRegistry.Mock()), db, ref())
   input.reset({ type: 'newNode' })
   return input
 }

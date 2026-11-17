@@ -19,7 +19,6 @@ export async function recordCloudRequests(page: Page): Promise<string[]> {
 }
 
 export interface RegisterMocksOptions {
-  readonly aiAvailable?: boolean
   /**
    * The JDK AOT cache training's status that the mocked Electron API answers when the page asks on
    * load; `idle` (nothing trains) by default. A spec changes it with {@link setJvmAotTrainingStatus}.
@@ -46,7 +45,7 @@ export async function registerMocks(
     mockDate(page),
     mockUnneededUrls(page),
     mockFeatureFlags(page, featureFlags),
-    mockElectronApi(page, options.aiAvailable ?? false, options.jvmAotTrainingStatus ?? 'idle'),
+    mockElectronApi(page, options.jvmAotTrainingStatus ?? 'idle'),
     addMockClipboardInitScript(page),
   ])
 }
@@ -79,14 +78,10 @@ async function mockFeatureFlags(page: Page, featureFlags: Partial<FeatureFlags>)
 }
 
 // Mock FileBrowserApi that is usually provided by Electron.
-async function mockElectronApi(
-  page: Page,
-  aiAvailable: boolean,
-  jvmAotTrainingStatus: JvmAotTrainingStatus,
-) {
+async function mockElectronApi(page: Page, jvmAotTrainingStatus: JvmAotTrainingStatus) {
   await test.step('Mock electron API', () => {
     return page.addInitScript(
-      ({ aiAvailable, jvmAotTrainingStatus }) => {
+      ({ jvmAotTrainingStatus }) => {
         Object.defineProperty(window, 'api', {
           value: {
             navigation: {
@@ -110,106 +105,6 @@ async function mockElectronApi(
               electron: 'MOCK-electron-version',
               chrome: 'MOCK-chrome-version',
             },
-            // The AI mock works in two modes. By default, `generateComponent` resolves immediately
-            // with a hardcoded body — that's what `aiNodes.spec.ts` exercises. Tests can flip
-            // `window.__aiMockController.deferred = true` to switch to driver mode, where each
-            // request waits in `pending` until the test resolves it; this is what
-            // `aiPlaceholder.spec.ts` uses to observe the placeholder lifecycle. The controller
-            // additionally records the most recent request payload so edit-flow tests can assert
-            // on the `editContext` field sent to the agent.
-            ai: ((): unknown => {
-              interface AiRequest {
-                requestId: string
-                prompt: string
-                context: {
-                  sourceIdentifier?: string
-                  editContext?: { previousPrompt: string; previousDefinition?: string }
-                }
-              }
-              interface AiReply {
-                result:
-                  | { ok: true; value: unknown }
-                  | { ok: false; error: { payload: string; context: never[] } }
-                usage: null
-              }
-              interface Controller {
-                aiAvailable: boolean
-                deferred: boolean
-                pending: Map<string, (reply: AiReply) => void>
-                progressHandlers: Array<(event: unknown) => void>
-                cancels: string[]
-                lastRequest: AiRequest | null
-                requests: AiRequest[]
-              }
-              const w = window as unknown as { __aiMockController: Controller }
-              w.__aiMockController = {
-                aiAvailable,
-                deferred: false,
-                pending: new Map(),
-                progressHandlers: [],
-                cancels: [],
-                lastRequest: null,
-                requests: [],
-              }
-              const immediateReply = (request: AiRequest): AiReply => {
-                const src = request.context.sourceIdentifier
-                const value =
-                  src != null ?
-                    {
-                      functionName: 'ai_helper',
-                      argumentNames: ['input'],
-                      body: `result = input\nresult`,
-                      callArguments: [src],
-                    }
-                  : {
-                      functionName: 'ai_helper',
-                      argumentNames: [],
-                      body: `result = 42\nresult`,
-                      callArguments: [],
-                    }
-                return { result: { ok: true, value }, usage: null }
-              }
-              return {
-                availability: (): Promise<{ status: string; reason?: string }> =>
-                  Promise.resolve(
-                    w.__aiMockController.aiAvailable ?
-                      { status: 'ready' }
-                    : { status: 'unavailable', reason: 'Claude Code is not installed.' },
-                  ),
-                onAvailabilityChanged: (): (() => void) => () => {},
-                generateComponent: (request: AiRequest): Promise<AiReply> => {
-                  w.__aiMockController.lastRequest = request
-                  w.__aiMockController.requests.push(request)
-                  if (!w.__aiMockController.deferred) {
-                    return Promise.resolve(immediateReply(request))
-                  }
-                  return new Promise((resolve) => {
-                    w.__aiMockController.pending.set(request.requestId, resolve)
-                  })
-                },
-                onProgress: (handler: (event: unknown) => void): (() => void) => {
-                  w.__aiMockController.progressHandlers.push(handler)
-                  return () => {
-                    const list = w.__aiMockController.progressHandlers
-                    const idx = list.indexOf(handler)
-                    if (idx !== -1) list.splice(idx, 1)
-                  }
-                },
-                cancel: (requestId: string): void => {
-                  w.__aiMockController.cancels.push(requestId)
-                  const resolve = w.__aiMockController.pending.get(requestId)
-                  if (resolve != null) {
-                    w.__aiMockController.pending.delete(requestId)
-                    resolve({
-                      result: { ok: false, error: { payload: 'Cancelled by user', context: [] } },
-                      usage: null,
-                    })
-                  }
-                },
-                onToolCall: () => () => {},
-                replyToolCall: () => {},
-              }
-            })(),
             // The MCP server: status lives on `window.__mcpMockStatus`, the last copied client on
             // `window.__mcpCopied`, so tests can read and seed them.
             mcp: ((): unknown => {
@@ -325,7 +220,7 @@ async function mockElectronApi(
           }, // satisfies import('$/electronApi').ElectronApi,
         })
       },
-      { aiAvailable, jvmAotTrainingStatus },
+      { jvmAotTrainingStatus },
     )
   })
 }

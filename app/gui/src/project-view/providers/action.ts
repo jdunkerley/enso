@@ -394,9 +394,6 @@ const undisplayableActions = {
   'componentBrowser.acceptInput': {
     shortcut: componentBrowserBindings.bindings['componentBrowser.acceptInput'],
   },
-  'componentBrowser.acceptAIPrompt': {
-    shortcut: componentBrowserBindings.bindings['componentBrowser.acceptAIPrompt'],
-  },
   'componentBrowser.switchPanelFocus': {
     shortcut: componentBrowserBindings.bindings['componentBrowser.switchPanelFocus'],
   },

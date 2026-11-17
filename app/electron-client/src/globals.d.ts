@@ -69,15 +69,6 @@ declare global {
       // @ts-expect-error The index signature is intentional to disallow unknown env vars.
       readonly NODE_ENV?: string
 
-      // === AI agent properties ===
-
-      // @ts-expect-error The index signature is intentional to disallow unknown env vars.
-      readonly ENSO_AI_CLAUDE_EXTRA_ARGS?: string
-      // @ts-expect-error The index signature is intentional to disallow unknown env vars.
-      readonly ENSO_AI_SOFT_CONTEXT_THRESHOLD?: string
-      // @ts-expect-error The index signature is intentional to disallow unknown env vars.
-      readonly ENSO_AI_HARD_CONTEXT_THRESHOLD?: string
-
       // === Local secrets ===
 
       // @ts-expect-error The index signature is intentional to disallow unknown env vars.

@@ -4,7 +4,6 @@ import {
   useProjectNames,
   useSuggestionDbStore,
 } from '$/components/WithCurrentProject.vue'
-import type { NodeId } from '$/providers/openedProjects/graph'
 import type { RequiredImport } from '$/providers/openedProjects/module/imports'
 import type { Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { debouncedGetter } from '$/utils/reactivity'
@@ -23,7 +22,6 @@ import { groupColorStyle } from '@/composables/nodeColors'
 import { registerHandlers, toggledAction, type Action } from '@/providers/action'
 import { injectNodeColors } from '@/providers/graphNodeColors'
 import { injectInteractionHandler, type Interaction } from '@/providers/interactionHandler'
-import { useAiAvailability } from '@/stores/aiAvailability'
 import type { VisualizationDataSource } from '@/stores/visualization'
 import { isNodeOutside, targetIsOutside } from '@/util/autoBlur'
 import { tryGetIndex } from '@/util/data/array'
@@ -33,7 +31,7 @@ import { Vec2 } from '@/util/data/vec2'
 import * as objects from 'enso-common/src/utilities/data/object'
 import { Ok } from 'enso-common/src/utilities/data/result'
 import type { ComponentInstance } from 'vue'
-import { computed, onMounted, onUnmounted, ref, toRef, toValue, watch, watchEffect } from 'vue'
+import { computed, onMounted, onUnmounted, ref, toValue, watch, watchEffect } from 'vue'
 import type { SuggestionId } from 'ydoc-shared/languageServerTypes/suggestions'
 import { Range } from 'ydoc-shared/util/data/range'
 import type { VisualizationIdentifier } from 'ydoc-shared/yjsModel'
@@ -70,24 +68,14 @@ const props = defineProps<{
   restoredInput?: CarriedComponentBrowserInput | undefined
 }>()
 
-/** Payload emitted when the user accepts an AI prompt. */
-export interface AiPromptSubmission {
-  readonly prompt: string
-  readonly sourceIdentifier: string | undefined
-  /** When set, the prompt is an edit of an existing AI node identified by `nodeId`. */
-  readonly editing?: { readonly nodeId: NodeId }
-}
-
 const emit = defineEmits<{
   accepted: [
     searcherExpression: string,
     requiredImports: RequiredImport[],
     firstAppliedReturnType: Typename | undefined,
   ]
-  acceptedAi: [payload: AiPromptSubmission]
   canceled: []
   selectedSuggestionId: [id: SuggestionId | undefined]
-  isAiPrompt: [boolean]
 }>()
 
 const cbRoot = ref<HTMLElement>()
@@ -108,11 +96,7 @@ const cbOpen: Interaction = {
     emit('canceled')
   },
   end: () => {
-    if (input.interpretation.mode === 'aiPrompt') {
-      acceptAiInput()
-    } else {
-      acceptInput()
-    }
+    acceptInput()
   },
 }
 
@@ -197,8 +181,7 @@ const selectedSuggestion = computed(() => {
 
 // === Input and Filtering ===
 
-const aiAgent = useAiAvailability()
-const input = useComponentBrowserInput(toRef(aiAgent, 'ready'))
+const input = useComponentBrowserInput()
 
 onUnmounted(() => {
   graphStore.cbEditedEdge = undefined
@@ -298,10 +281,6 @@ const isVisualizationVisible = ref(true)
 // === Documentation Panel ===
 
 watch(selectedSuggestionId, (id) => emit('selectedSuggestionId', id))
-watch(
-  () => input.interpretation,
-  (interpretation) => emit('isAiPrompt', interpretation.mode === 'aiPrompt'),
-)
 
 // === Accepting Entry ===
 
@@ -340,39 +319,16 @@ function acceptInput() {
   interaction.ended(cbOpen)
 }
 
-function acceptAiInput() {
-  if (input.interpretation.mode !== 'aiPrompt') return
-  // Reaching `aiPrompt` mode on an `editNode` usage means `reset()` recognised an AI assignment
-  // and locked the mode to it — that's the signal that this submission is an edit of `usage.node`.
-  const editing =
-    props.usage.type === 'editNode' ? ({ nodeId: props.usage.node } as const) : undefined
-  emit('acceptedAi', {
-    prompt: input.interpretation.prompt,
-    sourceIdentifier: input.selfArgument,
-    ...(editing != null ? { editing } : {}),
-  })
-  interaction.ended(cbOpen)
-}
-
 // === Action Handlers ===
 
 const insideComponentBrowsing = computed(() => input.interpretation.mode === 'componentBrowsing')
 const editSuggestionEnabled = computed(
-  () =>
-    !input.modeLocked &&
-    (input.interpretation.mode === 'componentBrowsing' || input.interpretation.mode === 'aiPrompt'),
+  () => !input.modeLocked && input.interpretation.mode === 'componentBrowsing',
 )
 const actions = registerHandlers({
   'componentBrowser.editSuggestion': {
     enabled: editSuggestionEnabled,
     action: () => {
-      if (input.selectedMode === 'aiPrompt') {
-        // In AI mode, Shift+Enter switches to component search. The typed text is preserved as
-        // the search filter — the user often wants to triage components matching what they
-        // started typing as an AI prompt.
-        input.setSelectedMode('componentBrowsing')
-        return
-      }
       const result = applyComponent()
       if (!result.ok) result.error.log('Cannot apply component')
     },
@@ -395,10 +351,6 @@ const actions = registerHandlers({
   },
   'componentBrowser.acceptInput': {
     action: acceptInput,
-  },
-  'componentBrowser.acceptAIPrompt': {
-    available: () => input.interpretation.mode == 'aiPrompt',
-    action: acceptAiInput,
   },
   'componentBrowser.switchPanelFocus': { action: () => componentList.value?.switchPanelFocus() },
   'list.moveUp': { action: () => componentList.value?.moveUp() },
@@ -472,7 +424,6 @@ defineExpose({
       :interpretation="input.interpretation"
       :selectedMode="input.selectedMode"
       :modeLocked="input.modeLocked"
-      :aiAvailability="aiAgent.availability"
       :nodeColor="nodeColor"
       :style="{ '--component-editor-padding': cssComponentEditorPadding }"
       @update:selectedMode="input.setSelectedMode"

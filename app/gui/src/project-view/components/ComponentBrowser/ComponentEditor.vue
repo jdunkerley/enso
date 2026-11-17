@@ -11,7 +11,6 @@ import ModeMenu from '@/components/ComponentBrowser/ModeMenu.vue'
 import { useCodeMirror, useStringSync } from '@/util/codemirror'
 import { DEFAULT_ICON, iconOfNode, suggestionEntryToIcon } from '@/util/getIconName'
 import type { Icon } from '@/util/iconMetadata/iconName'
-import type { AiAvailability } from 'enso-common/src/ai'
 import { computed, useTemplateRef, watch, type ComponentInstance, type DeepReadonly } from 'vue'
 import { Range } from 'ydoc-shared/util/data/range'
 
@@ -23,7 +22,6 @@ const props = defineProps<{
   interpretation: ComponentBrowserInterpretation
   selectedMode: ComponentBrowserMode
   modeLocked: boolean
-  aiAvailability: AiAvailability
   nodeColor: string
 }>()
 const emit = defineEmits<{ 'update:selectedMode': [mode: ComponentBrowserMode] }>()
@@ -77,7 +75,6 @@ const rootStyle = computed(() => {
   <div class="ComponentEditor define-node-colors" :style="rootStyle">
     <ModeMenu
       :selectedMode="props.selectedMode"
-      :aiAvailability="props.aiAvailability"
       :modeLocked="props.modeLocked"
       :codeEditIcon="codeEditIcon"
       :asPort="props.interpretation.mode !== 'componentBrowsing'"
