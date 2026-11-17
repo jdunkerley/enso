@@ -154,9 +154,14 @@ Add a row when another built-in moves (Geo map → `Standard.Geo` is planned).
 
 The same as a project visualization: `vue`, `d3`, `sql-formatter` (a lazy chunk
 like `d3`; Standard.Database's SQL Query view formats with it), the GUI's
-`builtins` module (`useVisualizationConfig`, `defineKeybinds`), and scripts
-listed in `scripts`. Nothing wider; it runs in the IDE window with the trust of
-the library's own Enso and Java code.
+`builtins` module (`util/visualizationBuiltins.ts`: `useVisualizationConfig`,
+`defineKeybinds`, and for the map the IDE's Mapbox token setting:
+`useMapboxToken`, `redactAccessToken` and the `MapboxTokenMissing` empty state,
+which stay IDE code because the token is a Settings → Local → Maps value, not
+library data; `util/__tests__/visualizationBuiltins.test.ts` checks the empty
+state's CSS reaches the shadow root), and scripts listed in `scripts`. Nothing
+wider; it runs in the IDE window with the trust of the library's own Enso and
+Java code.
 
 The bare names are `BUILTIN_MODULE_NAMES` in `builtinModules.ts`, and nowhere
 else: `compilerMessaging.ts` provides one module per name (its table is

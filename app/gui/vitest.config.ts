@@ -26,8 +26,9 @@ const config = mergeConfig(
         // `GridPopupMenu.test.ts` needs its real stylesheet actually applied — it's a regression
         // guard for a bug where the component's styles silently never applied at all — so opt only
         // that one component's style modules back in, rather than enabling CSS processing (and its
-        // cost) suite-wide.
-        include: [/GridPopupMenu/],
+        // cost) suite-wide. `visualizationBuiltins.test.ts` likewise checks that `MapboxTokenMissing`
+        // (which `builtins` gives to library visualizations) brings its CSS into a shadow root.
+        include: [/GridPopupMenu/, /MapboxTokenMissing/],
       },
     },
   }),

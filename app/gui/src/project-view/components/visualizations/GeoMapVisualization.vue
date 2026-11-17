@@ -64,7 +64,7 @@ import { redactAccessToken } from '$/utils/redact'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
 import bbox from '@turf/bbox'
 import { computed, effectScope, onScopeDispose, useTemplateRef, watch, type EffectScope } from 'vue'
-import MapboxTokenMissing from './GeoMapVisualization/MapboxTokenMissing.vue'
+import MapboxTokenMissing from './MapboxTokenMissing.vue'
 
 const props = defineProps<{ data: Data }>()
 const config = useVisualizationConfig()
