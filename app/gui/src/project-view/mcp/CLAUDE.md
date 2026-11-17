@@ -667,9 +667,16 @@ the others.
     - A user's history change during the waits after the edit (graph update,
       settle) is an ordinary foreign edit (`inEdit` is false) and resets the
       floors; only the edit's own `await` window is covered by the depth rule.
-    - The check covers only the module in the editor (`Main.enso`): not the
-      project's other modules, library functions that enable output themselves,
-      or `foreign` code.
+    - The session's own check covers only the module in the editor
+      (`Main.enso`). The handlers for `undo`, `redo` and `refresh` also check
+      every other module of the project (every `.enso` under `src/`, subfolders
+      included) before they queue, through `otherModules.ts`
+      (`enablesOutputInOtherModules`: lists and reads the files, parses them,
+      applies `writeRefusal`; a module that cannot be listed or read refuses
+      too). **Library code is not checked**: libraries the project imports,
+      library functions that enable output themselves, and `foreign` code. The
+      files are read when the call arrives, so a user's edit to another module
+      between the check and the run is not seen.
   - **Redo floor, why.** In every sequence found, the redo stack is empty at the
     session's first `undo`: the edit that set the floor was a tracked
     transaction, which clears the redo stack (`afterTransactionHandler`), and
@@ -707,8 +714,9 @@ the others.
   (`Main.enso`), read live, so it is never behind the node database. A node with
   the GUI's Write prefix anywhere in it is refused by that alone (the prefix is
   a call of `Standard.Base.Runtime.with_enabled_context`, whose identifier the
-  check matches), so there is no separate per-node check. Not checked: the
-  project's other modules, library functions that enable output themselves,
+  check matches), so there is no separate per-node check. The project's other
+  modules are checked by the handler first (`otherModules.ts`, as for `undo`).
+  Not checked: library code, library functions that enable output themselves,
   `foreign` code. **What `settled` waits for**: each **component** node of the
   method on screen (`node.type === 'component'`) must report `Pending` and then
   a value, as `changed` ids (the rule for an edited node, see "When an edit has
