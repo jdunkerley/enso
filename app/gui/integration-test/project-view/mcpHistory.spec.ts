@@ -104,6 +104,28 @@ test('undo removes what an agent added and redo brings it back', async ({ editor
   expect(back.nodes.find((n) => n.name === 'agent_one')?.id).toBe(id)
 })
 
+test('a run of several edits is one undo item: one undo takes it all back', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const nodesCount = await locate.graphNode(page).count()
+  await callOk(page, 'add_nodes', { statements: ['agent_one = 1'] })
+  await callOk(page, 'add_nodes', { statements: ['agent_two = 2'] })
+  const graph = (await callOk(page, 'get_graph', { previews: false })) as Graph
+  const two = graph.nodes.find((n) => n.name === 'agent_two')?.id
+  assert(two != null)
+  // An async edit (`graph.deleteNodes` awaits the port updates) in the same step.
+  await callOk(page, 'remove_nodes', { node_ids: [two] })
+  await expect(locate.graphNodeByBinding(page, 'agent_two')).toBeHidden()
+
+  // Not sealed by the depth rule: the step is one item, and one undo takes all of it back.
+  const undone = await callOk(page, 'undo')
+  expect(undone).toEqual({ undone: true, can_undo: false, can_redo: true })
+  await expect(locate.graphNodeByBinding(page, 'agent_one')).toBeHidden()
+  await expect(locate.graphNode(page)).toHaveCount(nodesCount)
+})
+
 test('undo with nothing to undo is refused', async ({ editorPage, page }) => {
   await editorPage
   const refused = await call(page, 'undo')

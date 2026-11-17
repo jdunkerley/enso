@@ -14,9 +14,16 @@
  * - **The invariant.** Every undo step above `ownFloor` was made by session runs, from a module with
  *   no code that enables output (`deps.enablesOutput()`, `writeRefusal` over the whole module),
  *   by edits that cannot add any (`writeGuard` refuses such code in everything an agent supplies).
- *   A changed edit run from, or leaving, a module with such code seals: the step is closed and the
- *   floor raised to the depth after it, so that step is never undone by an agent. The redo steps
- *   above `ownRedoFloor` are what the session's own `undo` put there.
+ *   A changed edit run from, or leaving, a module with such code seals the step: it stays held (so
+ *   that later edits join it and save no further version), agents cannot undo or redo while it is,
+ *   and when it is released, for whatever reason, the floor is raised to the depth after it, so
+ *   that step is never undone by an agent. The redo steps above `ownRedoFloor` are what the
+ *   session's own `undo` put there.
+ * - **The depth rule.** A held step is exactly one undo item: the session's edits merge into it.
+ *   After every changed stepped edit the undo depth must be `stepBase + 1`; anything else means
+ *   that something other than the session's edits changed the history while the edit ran (the
+ *   foreign-edit listener ignores everything while `inEdit` is true): a user's Ctrl+Y or Ctrl+Z,
+ *   or a boundary (a background click) splitting the step. The step is then sealed.
  * - **What resets it.** Every module transaction the session did not make, the user's Ctrl+Z
  *   included, clears both floors (`onForeignEdit`), except the untracked ones below.
  * - **Untracked changes.** An update from the server (the file changed on disk, another client) or
@@ -26,10 +33,12 @@
  *   (`undoAbove` / `redoAbove` in `undoHold.ts`). Such a change can also bring code that enables
  *   output into the module: `undo` and `redo` are refused while there is any, and one that leaves
  *   any behind is reversed at once (the pre-checks should make that unreachable).
- * - **Not covered.** A user edit that lands while an async edit is awaiting is treated as the
- *   session's own and joins its step. Under this rule that is not a route to a write: undoing it
- *   can only put back code that was in the module before the edit, and a module that had code
- *   enabling output then seals the step, as one that has some after the edit does. The check
+ * - **Not covered.** A user edit that lands while an async edit is awaiting, with no boundary
+ *   after it, merges into the session's step without changing the depth, so the depth rule cannot
+ *   see it. Undoing it can only put back code that was in the module before the edit, and a module
+ *   that had code enabling output before or after the edit seals the step. A user's Ctrl+Z that
+ *   takes back the held step's own item before the edit's change also leaves the depth right; the
+ *   edit's change then clears the redo stack, and the new item holds only that change. The check
  *   covers only the module in the editor (`Main.enso`): not other modules of the project, library
  *   functions that enable output themselves, or `foreign` code.
  */
@@ -80,18 +89,24 @@ export const NOTHING_TO_REDO_ERROR =
 /** The answer to `redo` when the steps `undo` took back could no longer be re-applied. */
 export const NOTHING_LEFT_TO_REDO_ERROR =
   'Nothing was changed: what undo took back could no longer be re-applied, because something else has changed it since. There is nothing more to redo.'
-/** The answer to `undo` while the module has code that enables output. */
+/**
+ * The answer to `undo` while the module has code that can enable output (what `writeRefusal`
+ * refuses, the code the edit tools refuse to add) or cannot be read.
+ */
 export const UNDO_OUTPUT_ERROR =
-  'The project has code that enables output, and undoing could run it and write. Ask the user to undo with Ctrl+Z.'
-/** The answer to `redo` while the module has code that enables output. */
+  "The project's main module has code that can enable output (the same code the edit tools refuse to add), or cannot be read, and undoing could run such code and write. Ask the user to undo with Ctrl+Z."
+/** The answer to `redo` in the same case. */
 export const REDO_OUTPUT_ERROR =
-  'The project has code that enables output, and redoing could run it and write. Ask the user to redo with Ctrl+Y.'
-/** The answer to an `undo` or `redo` that left code enabling output behind and was reversed. */
+  "The project's main module has code that can enable output (the same code the edit tools refuse to add), or cannot be read, and redoing could run such code and write. Ask the user to redo with Ctrl+Y."
+/**
+ * The answer to an `undo` or `redo` that left code enabling output behind and was put back. The
+ * engine may have seen the state in between, so it does not say that nothing was changed.
+ */
 export const HISTORY_REVERSED_ERROR =
-  'That would have put code that enables output back into the project, so it was reversed at once. Nothing was changed. Ask the user to undo or redo with Ctrl+Z or Ctrl+Y.'
-/** The answer when such a reversal did not change the project back. */
+  'That would have put code that can enable output back into the project, so the step was put back at once. The engine may have seen the change in between: tell the user, so that they can check the project. Ask them to undo or redo with Ctrl+Z or Ctrl+Y.'
+/** The answer when such a reversal did not change the project back, or failed. */
 export const HISTORY_NOT_REVERSED_ERROR =
-  'That put code that enables output back into the project, and it could not be reversed. Tell the user at once, so that they can check the project before it runs.'
+  'That put code that can enable output back into the project, and putting the step back failed. Tell the user at once, so that they can check the project before it runs.'
 
 /** The dependencies of an {@link EditSession}. */
 export interface EditSessionDeps {
@@ -219,6 +234,11 @@ export class EditSession {
   private ownRedoFloor: number | undefined
   /** The undo depth when the held step was started. */
   private stepBase = 0
+  /**
+   * Whether the held step is sealed: when it is released, `ownFloor` is raised to the depth after
+   * it ({@link releaseStep}). Agents cannot undo or redo while it is held.
+   */
+  private sealPending = false
 
   /** Subscribes to foreign edits, which end the open step and the agents' own history. */
   constructor(private readonly deps: EditSessionDeps) {
@@ -242,8 +262,9 @@ export class EditSession {
    * `options.unchanged` says the edit changed nothing. `edit` returns Err to refuse without
    * changing anything.
    *
-   * A changed edit made when the module had code that enables output, or that leaves some, seals
-   * the agents' history: its step is closed and `undo` cannot take it back (file comment).
+   * A changed edit made when the module had code that enables output, or that leaves some, or
+   * after which the undo depth is not `stepBase + 1` (the depth rule), seals the agents' history:
+   * the step stays held, and once it is released `undo` cannot take it back (file comment).
    *
    * `edit` should apply its module changes synchronously: a user edit that lands while an async
    * `edit` is awaiting is treated as the session's own. The step's idle period is measured from
@@ -329,32 +350,56 @@ export class EditSession {
   }
 
   /**
-   * After an `undo` or `redo` that left code enabling output in the module: takes it back at once,
-   * in the same synchronous run (`back`, bounded to the one step just added), then seals the
-   * history so that the step is not tried again.
+   * After an `undo` or `redo` that left code enabling output in the module: puts the step back at
+   * once, in the same synchronous run (`back`, bounded to the one step just added), then seals the
+   * history so that the step is not tried again, also when putting it back throws.
+   *
+   * A last resort: the undo and the step put back are two transactions, and each reaches the
+   * engine on its own, so the engine may have seen, and started running, the state between them.
+   * This path must stay unreachable: the pre-check refuses a module with such code, and every step
+   * above the floor was made from one without (the seal and the depth rule keep it so).
    */
   private reverse(changed: boolean, back: () => boolean): Result<never> {
-    if (changed) back()
-    this.seal()
-    return Err(this.deps.enablesOutput() ? HISTORY_NOT_REVERSED_ERROR : HISTORY_REVERSED_ERROR)
+    let failed = false
+    try {
+      if (changed) failed = !back()
+    } catch (error) {
+      console.error('Cannot put back the undo or redo step', error)
+      failed = true
+    } finally {
+      this.seal()
+    }
+    return Err(
+      failed || this.deps.enablesOutput() ? HISTORY_NOT_REVERSED_ERROR : HISTORY_REVERSED_ERROR,
+    )
   }
 
   /**
-   * Closes the held step and raises the floor to the undo depth now, so that no agent's `undo`
-   * reaches what is below; nothing is left to redo.
+   * Seals the agents' history at the current step: no agent's `undo` reaches it or what is below,
+   * and nothing is left to redo. A held step stays held, marked sealed, and the floor is raised
+   * when it is released ({@link releaseStep}); with none held, it is raised to the depth now.
    */
   private seal(): void {
-    this.releaseStep()
+    if (this.release != null) {
+      this.sealPending = true
+      return
+    }
     this.ownFloor = this.deps.historyDepth().undo
     this.ownRedoFloor = undefined
   }
 
   private canUndo(): boolean {
-    return this.ownFloor != null && this.deps.historyDepth().undo > this.ownFloor
+    return (
+      !this.sealPending && this.ownFloor != null && this.deps.historyDepth().undo > this.ownFloor
+    )
   }
 
   private canRedo(): boolean {
-    return this.ownRedoFloor != null && this.deps.historyDepth().redo > this.ownRedoFloor
+    return (
+      !this.sealPending &&
+      this.ownRedoFloor != null &&
+      this.deps.historyDepth().redo > this.ownRedoFloor
+    )
   }
 
   /** The history state, read now (after the action), for a successful run. */
@@ -385,13 +430,23 @@ export class EditSession {
     return task
   }
 
-  /** Releases the held undo step, if any, and forgets whose it was. The session stays usable. */
+  /**
+   * Releases the held undo step, if any, and forgets whose it was; a sealed step then raises the
+   * floor to the undo depth after the release. The session stays usable.
+   */
   releaseStep(): void {
     this.clearIdleTimer()
     const release = this.release
     this.release = undefined
     this.stepCaller = undefined
-    release?.()
+    try {
+      release?.()
+    } finally {
+      if (this.sealPending) {
+        this.sealPending = false
+        this.seal()
+      }
+    }
   }
 
   /** Releases any held step and stops listening. Safe to call twice. */
@@ -514,9 +569,12 @@ export class EditSession {
       if (mode.stepped && !unchanged(result.value)) {
         this.ownFloor ??= this.stepBase
         this.ownRedoFloor = undefined
-        if (enabledBefore || this.deps.enablesOutput()) {
-          // Sealed before any wait: a user edit during the waits resets the floor, which must not
-          // then be overwritten.
+        // The depth rule: the held step is one undo item. Another depth means that something else
+        // changed the history while the edit ran, unseen by the foreign-edit listener.
+        const split = this.deps.historyDepth().undo !== this.stepBase + 1
+        if (split || enabledBefore || this.deps.enablesOutput()) {
+          // Sealed before any wait: a user edit during the waits releases the step, which applies
+          // the seal, and then resets the floor.
           this.seal()
         }
       }

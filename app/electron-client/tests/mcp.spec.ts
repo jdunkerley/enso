@@ -1081,8 +1081,8 @@ const WRITE_CODE = (file: string) =>
 const REFRESH_WRITE_REFUSED = 'Ask the user to refresh.'
 /** The start of the refusal of `undo` when the agents have no step of their own to take back. */
 const NOTHING_TO_UNDO = "There is nothing of the agents' to undo."
-/** The start of the refusal of `undo` while the main module has code that enables output. */
-const UNDO_OUTPUT_REFUSED = 'The project has code that enables output'
+/** The start of the refusal of `undo` while the main module has code that can enable output. */
+const UNDO_OUTPUT_REFUSED = "The project's main module has code that can enable output"
 
 test('an MCP client undoes its edits, lists problems and refreshes, and none of it writes', async ({
   page,

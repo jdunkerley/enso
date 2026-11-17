@@ -77,10 +77,95 @@ function setup() {
     expect(result.ok).toBe(true)
     session.releaseStep()
   }
+  /**
+   * An agent's async edit through the session that leaves its step held: `f` runs while the edit
+   * is in progress (`inEdit`), and may await and act for the user meanwhile.
+   */
+  const heldEdit = async (f: () => Promise<void>) => {
+    const result = await session.run(agent, async () => {
+      await f()
+      return Ok(undefined)
+    })
+    expect(result.ok).toBe(true)
+  }
+  /** A change made as the agent's edit makes it (`module.edit`'s origin). */
+  const agentChange = (f: () => void) => doc.transact(f, USER)
   /** A change the undo manager does not track. */
   const untracked = (f: () => void) => doc.transact(f, PROVIDER)
-  return { doc, nodes, manager, session, userEdit, agentEdit, untracked }
+  return { doc, nodes, manager, session, userEdit, agentEdit, heldEdit, agentChange, untracked }
 }
+
+/** Lets the other side of an `await` run. */
+const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+test('the depth rule: a held step of several async agent edits is exactly one undo item', async () => {
+  const { nodes, manager, session, userEdit, heldEdit, agentChange } = setup()
+  userEdit(() => nodes.set('U', 1))
+  const base = manager.undoStack.length
+  await heldEdit(async () => agentChange(() => nodes.set('A', 1)))
+  await heldEdit(async () => {
+    agentChange(() => nodes.set('B', 1))
+    await tick()
+    agentChange(() => nodes.set('C', 1))
+  })
+  await heldEdit(async () => {
+    await tick()
+    agentChange(() => nodes.delete('A'))
+  })
+  expect(manager.undoStack.length).toBe(base + 1)
+  // Not sealed: one undo takes the whole step back, and stops at the user's.
+  expect(await session.undo(agent)).toEqual(Ok({ can_undo: false, can_redo: true }))
+  expect([...nodes.keys()]).toEqual(['U'])
+})
+
+test('the depth rule: a user redo during an async edit seals the step', async () => {
+  const { nodes, manager, session, userEdit, heldEdit, agentChange } = setup()
+  userEdit(() => nodes.set('W', 'write node'))
+  // The user's own Ctrl+Z: their step is on the redo stack.
+  manager.undo()
+  await heldEdit(async () => {
+    await tick()
+    // The user's Ctrl+Y lands while the edit awaits: their step is back, above the floor.
+    manager.redo()
+    agentChange(() => nodes.set('A', 1))
+  })
+  session.releaseStep()
+  expect(errorOf(await session.undo(agent))).toBe(NOTHING_TO_UNDO_ERROR)
+  expect(nodes.get('W')).toBe('write node')
+  expect(nodes.get('A')).toBe(1)
+})
+
+test('the depth rule: a boundary inside the step, then more changes, seals the step', async () => {
+  const { doc, nodes, manager, session, heldEdit, agentChange } = setup()
+  await heldEdit(async () => {
+    agentChange(() => nodes.set('A', 1))
+    await tick()
+    // The user edits while the edit awaits, then clicks the background (deselectAll's boundary).
+    doc.transact(() => nodes.set('U', 1), USER)
+    manager.stopCapturing()
+    agentChange(() => nodes.set('B', 1))
+  })
+  session.releaseStep()
+  expect(errorOf(await session.undo(agent))).toBe(NOTHING_TO_UNDO_ERROR)
+  expect(nodes.get('U')).toBe(1)
+})
+
+test('the depth rule: a user undo during an async edit seals the step', async () => {
+  const { nodes, manager, session, agentEdit, heldEdit, agentChange } = setup()
+  await agentEdit(() => nodes.set('A', 1))
+  await heldEdit(async () => {
+    await tick()
+    // The user's Ctrl+Z lands while the edit awaits, before its change: it takes back the step
+    // below, and the edit's change then makes a new item at the same depth.
+    manager.undo()
+    agentChange(() => nodes.set('B', 1))
+  })
+  session.releaseStep()
+  expect(errorOf(await session.undo(agent))).toBe(NOTHING_TO_UNDO_ERROR)
+  expect(errorOf(await session.redo(agent))).toBe(NOTHING_TO_REDO_ERROR)
+  expect(nodes.has('A')).toBe(false)
+  expect(nodes.get('B')).toBe(1)
+})
 
 test("reviewer's case 1: an agent's node removed by an untracked change; undo stops at the floor", async () => {
   const { nodes, manager, session, userEdit, agentEdit, untracked } = setup()
