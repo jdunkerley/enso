@@ -1041,3 +1041,259 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     }
   }
 })
+
+/** What `get_problems` answers (the fields this spec reads). */
+interface Problems {
+  method: string
+  nodes: {
+    id: string
+    name: string | null
+    state: string
+    message: string | null
+    origin?: boolean
+    warnings?: number
+  }[]
+  diagnostics: { kind: string; message: string; line?: number }[]
+  errors: number
+  warnings: number
+  pending: number
+  truncated: boolean
+  messages_pending?: number
+}
+
+/** The answer of `undo` and `redo` (the fields this spec reads). */
+interface HistoryAnswer {
+  undone?: boolean
+  redone?: boolean
+  can_undo: boolean
+  can_redo: boolean
+  settled: boolean
+}
+
+/**
+ * The text of a node with Write on, as the Component Browser takes it. The GUI's Write prefix
+ * (`Context.Output __ <| __`) reads as `with_enabled_context Output "design" <| …`, which this
+ * engine's `with_enabled_context context ~action` (two parameters) rejects, so the hole holds the
+ * write itself instead: it runs inside the enabled context, and the lambda it returns takes the
+ * node's expression. The node matches the prefix (so the tools see a node with Write on), and
+ * really writes its file, appending, each time it runs.
+ */
+const WRITE_ON_CODE = (file: string) =>
+  `Standard.Base.Runtime.with_enabled_context Standard.Base.Runtime.Context.Output (("w".write "${file}" on_existing_file=..Append).if_not_error (x -> x)) <| "write_on_marker"`
+/** What `get_graph` shows as that node's `code`: the prefix is not part of it. */
+const WRITE_ON_INNER = '"write_on_marker"'
+/** The end of the refusal of `refresh` when the module has a node with Write on. */
+const REFRESH_WRITE_REFUSED = 'Ask the user to refresh.'
+/** The start of the refusal of `undo` when the agents have no step of their own to take back. */
+const NOTHING_TO_UNDO = 'There is nothing of yours to undo.'
+
+test('an MCP client undoes its edits, lists problems and refreshes, and none of it writes', async ({
+  page,
+  testRunId,
+}, testInfo) => {
+  // A cold engine's first execution of a new project, about fifteen edits each waiting for its
+  // execution, an 11 s pause, and the waits that prove a file is not written again.
+  test.setTimeout(600_000)
+  await waitForDashboard(page)
+
+  const client = await connectClient()
+  let lastCallMs = 0
+  const callTool = async (name: string, args: Record<string, unknown>) => {
+    const start = Date.now()
+    const result = await client.callTool({ name, arguments: args })
+    lastCallMs = Date.now() - start
+    return result
+  }
+  const note = (step: string, value: unknown) =>
+    console.log(`[${testRunId}] ${step} (${lastCallMs} ms): ${JSON.stringify(value)}`)
+  const callJson = async <T>(name: string, args: Record<string, unknown> = {}): Promise<T> => {
+    const result = await callTool(name, args)
+    expect(result.isError, `${name} ${JSON.stringify(args)}: ${textOf(result)}`).toBeFalsy()
+    return JSON.parse(textOf(result)) as T
+  }
+  const callError = async (name: string, args: Record<string, unknown> = {}) => {
+    const result = await callTool(name, args)
+    expect(result.isError, `${name} must be refused: ${textOf(result)}`).toBe(true)
+    return textOf(result)
+  }
+  const getGraph = () => callJson<Graph>('get_graph', {})
+  const names = (graph: Graph) => graph.nodes.map((node) => node.name)
+  const nodeNamed = (graph: Graph, name: string): NodeSummary => {
+    const node = graph.nodes.find((n) => n.name === name)
+    expect(node, `a node named ${name} in ${JSON.stringify(graph.nodes)}`).toBeDefined()
+    return node!
+  }
+  /** `get_problems`, called again until the engine is done and every message has arrived. */
+  const getProblems = async (): Promise<Problems> => {
+    let last: Problems | undefined
+    await expect
+      .poll(
+        async () => {
+          last = await callJson<Problems>('get_problems')
+          return last.pending === 0 && last.messages_pending == null
+        },
+        { timeout: 60_000, intervals: [500] },
+      )
+      .toBe(true)
+    return last!
+  }
+
+  const writeTarget = path.join(os.tmpdir(), `enso-mcp-refresh-write-${Date.now()}.txt`)
+  const writeTargetEnso = writeTarget.replace(/\\/g, '/')
+  await fs.rm(writeTarget, { force: true })
+  let projectPath: string | undefined
+  try {
+    const created = await callJson<{ name: string; path: string }>('create_project', {
+      name: 'Mcp_History',
+    })
+    projectPath = created.path
+    const mainFile = path.join(created.path, 'src', 'Main.enso')
+    await expect
+      .poll(async () => (await getGraph()).nodes.map((node) => node.state), { timeout: 180_000 })
+      .toContain('value')
+
+    // 1. A dataflow error and a node that uses it: both carry the message, and only the first is
+    // where to start.
+    await callJson('add_nodes', {
+      statements: ['bad = Error.throw "boom from the test"', 'after_bad = bad + 1'],
+    })
+    const chain = await getProblems()
+    note('get_problems on an error and the node that uses it', chain)
+    const bad = chain.nodes.find((node) => node.name === 'bad')
+    const afterBad = chain.nodes.find((node) => node.name === 'after_bad')
+    expect(bad, JSON.stringify(chain.nodes)).toMatchObject({ state: 'error', origin: true })
+    expect(afterBad, JSON.stringify(chain.nodes)).toMatchObject({ state: 'error', origin: false })
+    expect(bad?.message).toContain('boom from the test')
+    expect(afterBad?.message).toContain('boom from the test')
+
+    // 2. A compile error in the method on screen: its diagnostic has the module's 1-based line.
+    await callJson('add_nodes', { statements: ['broken_ref = this_name_does_not_exist + 1'] })
+    await expect
+      .poll(async () => fs.readFile(mainFile, 'utf8'), { timeout: 30_000, intervals: [100] })
+      .toContain('broken_ref = this_name_does_not_exist + 1')
+    const source = await fs.readFile(mainFile, 'utf8')
+    const brokenLine = source.split(/\r?\n/).findIndex((line) => line.includes('broken_ref =')) + 1
+    expect(brokenLine).toBeGreaterThan(0)
+    const compile = await getProblems()
+    note('get_problems with a name that does not exist', { brokenLine, compile })
+    await testInfo.attach('problems.json', {
+      body: JSON.stringify({ brokenLine, chain, compile }, null, 1),
+      contentType: 'application/json',
+    })
+    const diagnostic = compile.diagnostics.find((d) =>
+      d.message.includes('this_name_does_not_exist'),
+    )
+    expect(diagnostic, JSON.stringify(compile.diagnostics)).toBeDefined()
+    expect(diagnostic?.kind).toBe('error')
+    expect(diagnostic?.line).toBe(brokenLine)
+
+    // 3. `refresh` with errors on screen, and then on an ordinary project: it settles.
+    const refreshedWithErrors = await callJson<{ refreshed: boolean; settled: boolean }>('refresh')
+    note('refresh with errors on screen', refreshedWithErrors)
+    expect(refreshedWithErrors).toEqual({ refreshed: true, settled: true })
+    const graph = await getGraph()
+    await callJson('remove_nodes', {
+      node_ids: ['bad', 'after_bad', 'broken_ref'].map((name) => nodeNamed(graph, name).id),
+    })
+    const refreshed = await callJson<{ refreshed: boolean; settled: boolean }>('refresh')
+    note('refresh on an ordinary project', refreshed)
+    expect(refreshed).toEqual({ refreshed: true, settled: true })
+    expect(lastCallMs, 'refresh answered in time').toBeLessThan(EDIT_ANSWER_MS)
+
+    // A function with an argument: its input node, as the graph editor draws it, must report too.
+    await callJson('add_function', { source: 'triple x =\n    y = x * 3\n    y' })
+    const calling = await callJson<{ nodes: NodeSummary[] }>('add_nodes', {
+      statements: ['tripled = Main.triple 5'],
+    })
+    const inside = await callJson<{ method: string }>('open_method', {
+      node_id: calling.nodes[0]!.id,
+    })
+    expect(inside.method).toBe('triple')
+    note('the nodes of a function with an argument', (await getGraph()).nodes)
+    const refreshedInside = await callJson<{ refreshed: boolean; settled: boolean }>('refresh')
+    note('refresh inside a function with an argument', refreshedInside)
+    expect(refreshedInside).toEqual({ refreshed: true, settled: true })
+    expect(lastCallMs, 'refresh answered in time').toBeLessThan(EDIT_ANSWER_MS)
+    note('the nodes of the function after the refresh', (await getGraph()).nodes)
+    await callJson('open_method', {})
+
+    // 4. Undo and redo of one step of the agent's own. A pause of 11 s ends the step the removal
+    // above belongs to, so these two nodes are a step of their own.
+    await page.waitForTimeout(11_000)
+    await callJson('add_nodes', { statements: ['hist_a = 1', 'hist_b = hist_a + 1'] })
+    expect(names(await getGraph())).toEqual(expect.arrayContaining(['hist_a', 'hist_b']))
+    const undone = await callJson<HistoryAnswer>('undo')
+    note('undo', undone)
+    expect(undone).toMatchObject({ undone: true, can_redo: true })
+    expect(names(await getGraph())).not.toContain('hist_a')
+    expect(names(await getGraph())).not.toContain('hist_b')
+    const redone = await callJson<HistoryAnswer>('redo')
+    note('redo', redone)
+    expect(redone).toMatchObject({ redone: true, can_redo: false })
+    expect(names(await getGraph())).toEqual(expect.arrayContaining(['hist_a', 'hist_b']))
+    expect(await callError('redo')).toContain('nothing')
+
+    // 5. A version: saved, or nothing to save; refused when the user has not turned versions on.
+    const version = await callTool('save_version', { comment: 'Saved by the packaged test' })
+    note('save_version', textOf(version))
+    if (version.isError) expect(textOf(version)).toContain('Versions are not kept')
+    else expect(JSON.parse(textOf(version))).toHaveProperty('saved')
+
+    // 6. THE WRITE RULE. The user (here the test, through the Component Browser, typing code as
+    // the user does) makes a node with Write on: it writes its file each time it runs. Only the
+    // user can do this: the same code through `add_nodes` is refused (the other test).
+    await page.keyboard.press('Escape')
+    await page.getByTestId('add-component-button').click()
+    await expect(page.locator('.ComponentBrowser')).toBeVisible()
+    const input = page.getByTestId('component-editor-content')
+    await expect(input).toBeFocused()
+    await input.fill(WRITE_ON_CODE(writeTargetEnso))
+    await page.keyboard.press('Enter')
+    await expect
+      .poll(() => existsSync(writeTarget), { timeout: 120_000, intervals: [250] })
+      .toBe(true)
+    // The node may run more than once while it settles: take the file as it is after that.
+    await page.waitForTimeout(5_000)
+    const writeNodeGraph = await getGraph()
+    const writeNode = writeNodeGraph.nodes.find((node) => node.code === WRITE_ON_INNER)
+    expect(writeNode, JSON.stringify(writeNodeGraph.nodes)).toBeDefined()
+    const contentBefore = await fs.readFile(writeTarget, 'utf8')
+    const mtimeBefore = (await fs.stat(writeTarget)).mtimeMs
+    note('the Write-on node has written its file', { contentBefore, mtimeBefore })
+
+    const refreshRefused = await callError('refresh')
+    note('refresh with a node with Write on', refreshRefused)
+    expect(refreshRefused).toContain(REFRESH_WRITE_REFUSED)
+    // Long enough for an execution to have happened and written.
+    await page.waitForTimeout(8_000)
+    expect(await fs.readFile(writeTarget, 'utf8'), 'refresh did not write again').toBe(
+      contentBefore,
+    )
+    expect((await fs.stat(writeTarget)).mtimeMs).toBe(mtimeBefore)
+
+    // An agent's node after the user's, then the agent removes the Write-on node: the history is
+    // closed, so `undo` does not bring the node back (nor take back the agent's node).
+    await callJson('add_nodes', { statements: ['after_write = 1'] })
+    const removed = await callJson<{ removed: string[] }>('remove_nodes', {
+      node_ids: [writeNode!.id],
+    })
+    expect(removed.removed).toEqual([writeNode!.id])
+    expect(await callError('undo')).toContain(NOTHING_TO_UNDO)
+    const afterUndo = await getGraph()
+    expect(afterUndo.nodes.some((node) => node.code === WRITE_ON_INNER)).toBe(false)
+    expect(names(afterUndo)).toContain('after_write')
+    // With the node gone a refresh is allowed again, and still writes nothing.
+    const refreshedAfter = await callJson<{ refreshed: boolean; settled: boolean }>('refresh')
+    expect(refreshedAfter).toEqual({ refreshed: true, settled: true })
+    await page.waitForTimeout(5_000)
+    expect(await fs.readFile(writeTarget, 'utf8')).toBe(contentBefore)
+    expect((await fs.stat(writeTarget)).mtimeMs).toBe(mtimeBefore)
+    await callJson('close_project')
+  } finally {
+    await client.close()
+    await fs.rm(writeTarget, { force: true })
+    if (projectPath != null) {
+      await fs.rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 })
+    }
+  }
+})
