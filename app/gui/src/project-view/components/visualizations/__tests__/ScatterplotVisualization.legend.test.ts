@@ -39,10 +39,15 @@ test("each legend entry has the colour of its series' points", async () => {
     () => () => h(Suspense, null, () => h(ScatterplotVisualization, { data: DATA })),
   )
   const { wrapper } = await mountWithProviders(Host)
-  await vi.waitFor(async () => {
-    await flushPromises()
-    expect(wrapper.findAll('circle.scatterPoint').length).toBeGreaterThan(0)
-  })
+  // The first `import('d3')` of a run can take seconds to transform, longer than `waitFor`'s
+  // default second.
+  await vi.waitFor(
+    async () => {
+      await flushPromises()
+      expect(wrapper.findAll('circle.scatterPoint').length).toBeGreaterThan(0)
+    },
+    { timeout: 10_000 },
+  )
   const fill = (el: Element) => (el as SVGElement).style.fill
   const points = wrapper.findAll('circle.scatterPoint').map((c) => fill(c.element))
   // The points come series by series: the first two are Sales, the next two Cost.

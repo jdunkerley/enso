@@ -55,10 +55,14 @@ raw = conn.query (..Raw_SQL "SELECT id, name FROM users WHERE active = true")
   `Viz_Table` and `SQL_Viz`.
 - `visualizations/SQL_Query.vue` — the SQL Query view of a `DB_Table` or
   `DB_Column`: the generated SQL pretty-printed with `sql-formatter`, each
-  interpolated value coloured by its Enso type, text selectable and Ctrl+C
-  (Cmd+C on macOS) copying it. It is not built with the IDE: the GUI compiles it
-  at run time once the library is loaded (it may import only `vue`,
-  `sql-formatter` and the IDE's `builtins`; see
+  interpolated value coloured by its Enso type, keywords, strings, quoted
+  identifiers, numbers and comments coloured with the code editor's palette (a
+  small tokenizer in the file; it runs on the formatted text before escaping,
+  and never on a value; not handled: MySQL `#` comments, Postgres `E'…'` and
+  `$$…$$` strings, hex `0x…` numbers), text selectable and Ctrl+C (Cmd+C on
+  macOS) copying it. It is not built with the IDE: the GUI compiles it at run
+  time once the library is loaded (it may import only `vue`, `sql-formatter` and
+  the IDE's `builtins`; see
   `app/gui/src/project-view/stores/visualization/CLAUDE.md`). Its preprocessor,
   `Standard.Visualization.SQL.Visualization`, and the `SQL_Viz` data type stay
   in Standard.Visualization, because Table converts to `SQL_Viz` and
