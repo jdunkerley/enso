@@ -121,6 +121,16 @@ export const convertSortModel = (request: RowsRequestParams, columnHeaders: stri
   return { sortColIndexes, sortDirections }
 }
 
+/**
+ * One value of a set filter, as the engine sent it: a Boolean column's `true` and `false` are
+ * Booleans (`True` and `False` in Enso, #778), and any other value is typed by its text.
+ */
+function setValue(value: string | boolean, columnType: string | undefined): ValueTypeArgumentChild {
+  if (typeof value === 'boolean' || columnType === 'Boolean')
+    return { valueType: 'Boolean', value: String(value) }
+  return { valueType: getCellValueType(value), value }
+}
+
 export const convertFilterModel = (
   gridFilterModelList: Array<GridFilterModel>,
   columnHeaders: string[],
@@ -133,8 +143,11 @@ export const convertFilterModel = (
       filterColumnNames.map((colName) => `${columnHeaders.findIndex((h: string) => colName === h)}`)
     : 'Nothing'
 
+  // One chosen Boolean is `..Equal True`; a vector is not a Boolean to compare a column with.
+  const isSingleBoolean = (filter: GridFilterModel) =>
+    colTypeMap.get(filter.columnName) === 'Boolean' && filter.values?.length === 1
   const getSetFilterAction = (filter: GridFilterModel) =>
-    colTypeMap.get(filter.columnName) === 'Boolean' ? '..Equal' : '..Is_In'
+    isSingleBoolean(filter) ? '..Equal' : '..Is_In'
 
   const filterActions =
     filterColumnNames.length ?
@@ -147,6 +160,7 @@ export const convertFilterModel = (
 
   const valueMap = gridFilterModelList.map((filter) => {
     return {
+      singleBoolean: isSingleBoolean(filter),
       valType: colTypeMap.get(filter.columnName),
       action: actionMap[filter.filterAction as FilterAction],
       value: getFilterValue(filter),
@@ -157,9 +171,8 @@ export const convertFilterModel = (
     valueMap.length ?
       valueMap.map((value) => {
         if (value.action === undefined && Array.isArray(value.value)) {
-          const parseValues = value.value.map((val) => {
-            return { valueType: getCellValueType(val), value: val }
-          })
+          const parseValues = value.value.map((val) => setValue(val, value.valType))
+          if (value.singleBoolean) return parseValues[0]!
           return { valueType: 'Mixed', value: parseValues } as ValueTypeArgumentParent
         }
 

@@ -11,12 +11,26 @@ interface VisualizationSelectorOptions {
   types: ToValue<ReadonlyArray<VisualizationIdentifier>>
 }
 
-function visLabel(id: VisualizationIdentifier) {
+/**
+ * The label of `id` in the picker, among the `offered` visualizations. A standard library's
+ * visualization is one of the IDE's own views and shows its bare name; any other keeps where it is
+ * from, and so does one that shares its name with another offered visualization (else two entries
+ * would read alike).
+ */
+export function visualizationLabel(
+  id: VisualizationIdentifier,
+  offered: ReadonlyArray<VisualizationIdentifier>,
+) {
   switch (id.module.kind) {
     case 'Builtin':
       return id.name
-    case 'Library':
-      return `${id.name} (from library ${id.module.name})`
+    case 'Library': {
+      const isStandard = id.module.name.startsWith('Standard.')
+      const nameIsShared = offered.some(
+        (other) => other.name === id.name && visKey(other) !== visKey(id),
+      )
+      return isStandard && !nameIsShared ? id.name : `${id.name} (from library ${id.module.name})`
+    }
     case 'CurrentProject':
       return `${id.name} (from project)`
   }
@@ -41,7 +55,7 @@ export function useVisualizationSelector({ selectedType, types }: VisualizationS
         visKey(vis),
         {
           icon: visualizationStore.icon(vis) ?? 'columns_increasing',
-          label: visLabel(vis),
+          label: visualizationLabel(vis, toValue(types)),
         },
       ]),
     ),

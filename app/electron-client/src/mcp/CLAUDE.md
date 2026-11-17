@@ -563,13 +563,10 @@ only AI route.
   agent's node is undone and redone and `refresh` answers
   `refreshed: true, settled: true`, the file still unchanged. The control: the
   user makes the node again and the file changes, so the checks would have seen
-  a write. The GUI's own Write prefix (`Context.Output __ <| __`,
-  `util/ast/node.ts`) does not run on this engine, whose `with_enabled_context`
-  takes two parameters ("Method `<|` of type Text could not be found"), so the
-  test does not use it (a known defect,
-  `app/gui/src/project-view/mcp/CLAUDE.md`). None of the three can check the
-  Live-mode refusals: nothing in the UI switches a project to Live (the
-  project's `executionMode` setting is only read from its settings), so
+  a write. The test types the two-argument form by hand; the GUI's own Write
+  prefix (`util/ast/node.ts`) is the same form since #855. None of the three can
+  check the Live-mode refusals: nothing in the UI switches a project to Live
+  (the project's `executionMode` setting is only read from its settings), so
   `app/gui/src/project-view/mcp/__tests__/` covers them. The GUI side has its
   own Playwright specs: `app/gui/integration-test/project-view/mcpEdit.spec.ts`,
   `project-view/mcpDocumentation.spec.ts` and

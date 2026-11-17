@@ -27,8 +27,17 @@ public class WithInterruptHandlerNode extends Node {
       return actExecutorNode.executeThunk(frame, action, state, BaseNode.TailStatus.NOT_TAIL);
     } catch (ThreadInterruptedException e) {
       interruptBranch.enter();
-      handlerExecutorNode.executeThunk(
-          frame, interrupt_handler, state, BaseNode.TailStatus.NOT_TAIL);
+      // The interrupt is sticky, so the handler would be interrupted at its
+      // first poll: see Note [A Thread Interrupt Is Sticky] in ThreadManager.
+      // A newer interrupt still stops it.
+      var threadManager = ctx.getThreadManager();
+      var resume = threadManager.suspendInterrupts();
+      try {
+        handlerExecutorNode.executeThunk(
+            frame, interrupt_handler, state, BaseNode.TailStatus.NOT_TAIL);
+      } finally {
+        threadManager.resumeInterrupts(resume);
+      }
       throw e;
     }
   }

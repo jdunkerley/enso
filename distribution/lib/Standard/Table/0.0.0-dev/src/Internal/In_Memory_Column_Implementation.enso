@@ -87,7 +87,10 @@ type In_Memory_Column_Implementation
     to_sql_viz (this_column : Column & In_Memory_Column) =
         Panic.throw (No_Such_Conversion.Error SQL_Viz this_column Nothing)
 
-    table_version_hash (this_column : Column & In_Memory_Column) = "Column-" + this_column.java_column.getStorage.uniqueKey.to_text
+    ## A renamed column shares its storage with the original, so the name is
+       part of the key: the table view shows it (#773). The key before the
+       name is a number, so no name can run into it.
+    table_version_hash (this_column : Column & In_Memory_Column) = "Column-" + this_column.java_column.getStorage.uniqueKey.to_text + "-" + this_column.name
 
     display (this_column : Column & In_Memory_Column) show_rows:Integer format_terminal:Boolean =
         this_column.to_table.display show_rows format_terminal

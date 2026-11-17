@@ -254,7 +254,7 @@ public abstract class DataQualityMetrics {
       if (currentResult != null) {
         current.put(NOTHING_COUNT, currentResult.nothingCount);
         current.put(DISTINCT_COUNT, currentResult.distinctCount);
-        current.put(USE_MULTI_FILTER, currentResult.distinctCount <= DISTINCT_THRESHOLD);
+        current.put(USE_MULTI_FILTER, currentResult.distinctCount < DISTINCT_THRESHOLD);
         if (currentResult.distinctJson != null) {
           current.put(DISTINCT_JSON, currentResult.distinctJson);
         }

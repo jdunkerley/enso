@@ -16,7 +16,9 @@ export {
 
 const identifierRegexPart = '(?:(?:[a-zA-Z_][0-9]*)+|[-!$%&*+,/:;<=>?@\\^|~]+)'
 const qnRegex = new RegExp(`^${identifierRegexPart}(?:\\.${identifierRegexPart})*$`)
-const mainSegmentRegex = new RegExp(`^(${identifierRegexPart}\\.${identifierRegexPart})\\.Main`)
+const mainSegmentRegex = new RegExp(
+  `^(${identifierRegexPart}\\.${identifierRegexPart})\\.Main(?=\\.|$)`,
+)
 
 /** Returns the string if it's a valid {@link Identifier}. */
 export function tryIdentifier(str: string): Result<Identifier> {

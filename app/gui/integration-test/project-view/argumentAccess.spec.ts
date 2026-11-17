@@ -244,3 +244,121 @@ test.describe('Pop out', () => {
     await expect(locate.graphNodeByBinding(page, 'end1')).toHaveCount(0)
   })
 })
+
+/**
+ * `data = Data.<method> 'data.csv' (..Delimited ',')`: `format`'s declared type gives no
+ * `Delimited` constructor (`Any`, as `Data.read`'s untyped `format` is, or `File_Format`, which
+ * the mock's `Data.read` declares); the engine resolves the call to `Delimited_Format.Delimited`.
+ */
+for (const { method, formatType } of [
+  { method: 'load', formatType: 'Standard.Base.Any.Any' },
+  { method: 'read', formatType: undefined },
+]) {
+  test.describe(`Pop out of an auto-scoped value in Data.${method}'s format`, () => {
+    const FORMAT_MODULE = 'Standard.Table.Delimited.Delimited_Format'
+    const FORMAT_TYPE = `${FORMAT_MODULE}.Delimited_Format`
+    const VALUE = "..Delimited ','"
+
+    test.afterEach(restoreMockMainFile)
+    test.use({
+      setupApi: {
+        local: () =>
+          setMockMainFile(
+            `from Standard.Base import Data\n\nmain =\n    data = Data.${method} 'data.csv' (${VALUE})\n`,
+          ),
+      },
+    })
+
+    async function dataNode(editorPage: EditorPageActions, page: Page) {
+      if (formatType != null) {
+        const arg = (name: string) => ({
+          name,
+          reprType: formatType,
+          isSuspended: false,
+          hasDefault: false,
+        })
+        await editorPage.mockSuggestion({
+          type: 'method',
+          module: 'Standard.Base.Data',
+          name: method,
+          arguments: [arg('path'), arg('format')],
+          selfType: 'Standard.Base.Data',
+          returnType: 'Standard.Base.Any.Any',
+          isStatic: true,
+          annotations: [],
+        })
+      }
+      await editorPage
+        .mockSuggestion({
+          type: 'type',
+          module: FORMAT_MODULE,
+          name: 'Delimited_Format',
+          params: [],
+          reexport: 'Standard.Table',
+        })
+        .mockSuggestion({
+          type: 'constructor',
+          module: FORMAT_MODULE,
+          name: 'Delimited',
+          arguments: [
+            {
+              name: 'delimiter',
+              reprType: 'Standard.Base.Data.Text.Text',
+              isSuspended: false,
+              hasDefault: false,
+            },
+          ],
+          returnType: FORMAT_TYPE,
+          annotations: [],
+        })
+      await mockMethodCallInfo(page, 'data', {
+        methodPointer: {
+          module: 'Standard.Base.Data',
+          definedOnType: 'Standard.Base.Data',
+          name: method,
+        },
+        notAppliedArguments: method === 'read' ? [2] : [],
+      })
+      const delimited = {
+        methodPointer: { module: FORMAT_MODULE, definedOnType: FORMAT_TYPE, name: 'Delimited' },
+      }
+      await mockMethodCallInfo(
+        page,
+        { binding: 'data', expr: VALUE },
+        { ...delimited, notAppliedArguments: [] },
+      )
+      await mockMethodCallInfo(
+        page,
+        { binding: 'data', expr: '..Delimited' },
+        { ...delimited, notAppliedArguments: [0] },
+      )
+      const node = locate.graphNodeByBinding(page, 'data')
+      const port = node.locator('[data-pop-out-name="format"]')
+      await expect(port).toHaveCount(1)
+      const handle = port.getByText('Delimited', { exact: false }).first()
+      return { node, handle }
+    }
+
+    test('the resolved constructor qualifies it, and its type is imported', async ({
+      editorPage,
+      page,
+    }) => {
+      const { handle } = await dataNode(editorPage, page)
+      const box = (await handle.boundingBox())!
+      const x = box.x + 4
+      const y = box.y + box.height / 2
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      await page.mouse.move(x, y + 50, { steps: 5 })
+      await page.mouse.move(x, y + 200, { steps: 5 })
+      await page.mouse.up()
+      const popped = locate.graphNodeByBinding(page, 'format1')
+      await expect(popped).toHaveCount(1)
+      await expect(await locate.edgesFromNode(page, popped)).toHaveCount(1)
+      const code = await moduleCode(page)
+      expect(code).toContain("format1 = Delimited_Format.Delimited ','")
+      expect(code).toContain(`data = Data.${method} 'data.csv' format1`)
+      expect(code).toContain('from Standard.Table import Delimited_Format')
+    })
+  })
+}

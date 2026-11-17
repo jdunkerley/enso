@@ -44,7 +44,11 @@ import org.enso.polyglot.runtime.Runtime.Api
 
 import java.io.File
 import java.util.UUID
-import java.util.concurrent.{CompletionStage, ExecutionException}
+import java.util.concurrent.{
+  CompletionException,
+  CompletionStage,
+  ExecutionException
+}
 import java.util.function.{Consumer, Supplier}
 import scala.jdk.OptionConverters.RichOptional
 import scala.util.Try
@@ -852,6 +856,8 @@ object ProgramExecutionSupport {
           )
 
         case Left(UpsertVisualizationJob.EvaluationFailed(message, result)) =>
+          // Note [An Interrupted Visualization Is Not A Failure]
+          rethrowIfInterrupted(None)
           ctx.endpoint.sendToClient(
             Api.Response(
               Api.VisualizationExpressionFailed(
@@ -908,6 +914,13 @@ object ProgramExecutionSupport {
           )
       }
     } catch {
+      case e: Exception if isTaskInterrupted || interruptOf(e).isDefined =>
+        // Note [An Interrupted Visualization Is Not A Failure]
+        rethrowIfInterrupted(Some(e))
+        logger.trace(
+          "Processing of unevaluated visualization {} was interrupted.",
+          unevaluated.id
+        )
       case e: Exception =>
         logger.error(
           "Failed to process unevaluated visualization {}: {}",
@@ -929,6 +942,54 @@ object ProgramExecutionSupport {
           )
         )
     }
+  }
+
+  /* Note [An Interrupted Visualization Is Not A Failure]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * A visualization evaluated on a guest thread whose task has been interrupted
+   * fails with the `ThreadInterruptedException`, usually wrapped in an
+   * `ExecutionException` (the nested `ThreadManager.submit` returns a failed
+   * future), or with a failure that keeps only its message (`EvaluationFailed`).
+   * Reported, it showed a spurious `VisualizationExpressionFailed` or evaluation
+   * failure. The interrupt is sticky (Note [A Thread Interrupt Is Sticky] in
+   * `ThreadManager`), so the task cannot finish anyway: on such a thread these
+   * sites rethrow the interrupt instead, as `LookupServicesNode` does, and the
+   * execution ends as interrupted. On a job thread, which runs no guest task, an
+   * interrupt in the chain is dropped without a report, as a bare
+   * `ThreadInterruptedException` already was.
+   */
+
+  /** Whether the current thread runs a guest task that has been interrupted. */
+  private def isTaskInterrupted(implicit ctx: RuntimeContext): Boolean =
+    ctx.executionService.getContext.getThreadManager.isInterrupted
+
+  /** Throws the interrupt if the current thread runs a guest task that has
+    * been interrupted. See Note [An Interrupted Visualization Is Not A Failure].
+    *
+    * @param error the failure the interrupt caused, if known
+    */
+  private def rethrowIfInterrupted(
+    error: Option[Throwable]
+  )(implicit ctx: RuntimeContext): Unit =
+    if (isTaskInterrupted) {
+      throw error
+        .flatMap(interruptOf)
+        .getOrElse(new ThreadInterruptedException(error.orNull))
+    }
+
+  /** The `ThreadInterruptedException` that `error` is, or wraps in an
+    * `ExecutionException` or `CompletionException`.
+    */
+  @scala.annotation.tailrec
+  private def interruptOf(
+    error: Throwable
+  ): Option[ThreadInterruptedException] = error match {
+    case e: ThreadInterruptedException => Some(e)
+    case e: ExecutionException if e.getCause != null =>
+      interruptOf(e.getCause)
+    case e: CompletionException if e.getCause != null =>
+      interruptOf(e.getCause)
+    case _ => None
   }
 
   private def executeVisualization(
@@ -1003,8 +1064,11 @@ object ProgramExecutionSupport {
     expressionId: UUID,
     expressionValue: AnyRef
   )(implicit ctx: RuntimeContext): Unit = {
-    visualizationResultToBytes(visualizationResult) match {
-      case Left(_: ThreadInterruptedException) =>
+    val visualizationBytes = visualizationResultToBytes(visualizationResult)
+    // Note [An Interrupted Visualization Is Not A Failure]
+    visualizationBytes.left.foreach(e => rethrowIfInterrupted(Some(e)))
+    visualizationBytes match {
+      case Left(error) if interruptOf(error).isDefined =>
 
       case Left(throwable) =>
         val error = throwable match {

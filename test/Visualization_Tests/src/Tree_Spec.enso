@@ -319,6 +319,17 @@ add_specs suite_builder =
             keys_of (child_tree (child_tree tree "columns") 0) . should_equal [0, 1, 2]
             connection.close
 
+        group_builder.specify "a database table's columns page reuses the table's row count, running no query of its own" <|
+            connection = Database.connect SQLite.In_Memory
+            wide = Table.new (0.up_to 20 . map i-> ["c" + i.to_text, [1, 2, 3]])
+            db_table = wide.select_into_database_table connection "tree_wide" temporary=True
+            columns = child_tree (Viz_Tree.from db_table) "columns"
+            # With the connection closed, any query (a column's `COUNT(*)`) fails.
+            connection.close
+            page = columns.children 0 100
+            page.length . should_equal 20
+            page.map (c-> c.tree.label) . should_equal (0.up_to 20 . map i-> 'Column "c' + i.to_text + '" (3 rows)')
+
         group_builder.specify "a Text key on a database table's rows misses at once, without reading the table" <|
             connection = Database.connect SQLite.In_Memory
             big = Table.new [["x", 0.up_to 3000 . to_vector]]

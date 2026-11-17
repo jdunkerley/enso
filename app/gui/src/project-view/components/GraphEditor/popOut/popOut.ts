@@ -1,6 +1,10 @@
 import type { GraphStore } from '$/providers/openedProjects/graph'
 import type { MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
 import type { ModuleStore } from '$/providers/openedProjects/module'
+import {
+  requiredImportsByProjectPath,
+  type RequiredImport,
+} from '$/providers/openedProjects/module/imports'
 import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import { SuggestionKind } from '$/providers/openedProjects/suggestionDatabase/entry'
@@ -10,11 +14,12 @@ import type { NodeCreation } from '@/composables/nodeCreation'
 import { Ast } from '@/util/ast'
 import { ArgumentInfoKey } from '@/util/callTree'
 import type { Vec2 } from '@/util/data/vec2'
+import type { ProjectPath } from '@/util/projectPath'
 import { useToast } from '@/util/toast'
 import type { Result } from 'enso-common/src/utilities/data/result'
 import { toValue } from 'vue'
-import { qualifyAutoscoped, type HasConstructor } from './autoscope'
-import { expectedTypesIn } from './expectedTypes'
+import { qualifyAutoscoped, type HasConstructor, type Qualified } from './autoscope'
+import { expectedTypesIn, resolvedAutoscopedTypes } from './expectedTypes'
 
 /** Whether a widget input is an argument that can be popped out (Global Constraints). */
 export function canPopOut(input: WidgetInput): boolean {
@@ -27,14 +32,23 @@ export function canPopOut(input: WidgetInput): boolean {
   )
 }
 
-/** The code of the node a popped-out argument becomes, or Err with the unresolved name. */
+/**
+ * The code of the node a popped-out argument becomes (with the types it qualified auto-scoped
+ * constructors by), or Err with the unresolved name. An auto-scoped constructor takes the type the
+ * graph database resolved it to (`resolvedAutoscopedTypes`), as the widgets do; only when there is
+ * none, the type expected at its position. `printType` writes a resolved type as the language
+ * server reports types.
+ */
 export function popOutCode(
   arg: Ast.Expression,
   argType: string | undefined,
   graphDb: { getMethodCallInfo(id: Ast.AstId): MethodCallInfo | undefined },
   hasConstructor: HasConstructor,
-): Result<string, string> {
-  return qualifyAutoscoped(arg, expectedTypesIn(arg, argType, graphDb), hasConstructor)
+  printType: (type: ProjectPath) => string,
+): Result<Qualified, string> {
+  const types = expectedTypesIn(arg, argType, graphDb)
+  for (const [id, type] of resolvedAutoscopedTypes(arg, graphDb)) types.set(id, printType(type))
+  return qualifyAutoscoped(arg, types, hasConstructor)
 }
 
 /** The ids of `ast` and all its ancestors, innermost first. */
@@ -77,7 +91,7 @@ export function usePopOut(deps: {
   module: ToValue<Pick<ModuleStore, 'ast'>>
   graph: ToValue<Pick<GraphStore, 'db'>>
   suggestionDb: ToValue<SuggestionDb>
-  projectNames: Pick<ProjectNameStore, 'parseProjectPathRaw'>
+  projectNames: Pick<ProjectNameStore, 'parseProjectPathRaw' | 'serializeProjectPathForBackend'>
   createNodes: NodeCreation['createNodes']
 }) {
   const toast = useToast.error()
@@ -89,6 +103,14 @@ export function usePopOut(deps: {
       toValue(deps.suggestionDb).getEntryByProjectPath(path.value)?.kind ===
       SuggestionKind.Constructor
     )
+  }
+
+  /** The imports the qualified names need; a type the suggestion database lacks needs none. */
+  function importsFor(types: string[]): RequiredImport[] {
+    return types.flatMap((type) => {
+      const path = deps.projectNames.parseProjectPathRaw(type)
+      return path.ok ? requiredImportsByProjectPath(toValue(deps.suggestionDb), path.value) : []
+    })
   }
 
   function popOut(
@@ -104,17 +126,20 @@ export function usePopOut(deps: {
     while (arg instanceof Ast.Group && arg.expression) arg = arg.expression
     let target: Ast.Expression = arg
     for (let p = target.parent(); p instanceof Ast.Group; p = target.parent()) target = p
-    const code = popOutCode(arg, argType, toValue(deps.graph).db, hasConstructor)
+    const code = popOutCode(arg, argType, toValue(deps.graph).db, hasConstructor, (type) =>
+      deps.projectNames.serializeProjectPathForBackend(type),
+    )
     if (!code.ok) {
-      toast.show(`Can't pop out: the type of \`${code.error}\` is not known.`)
+      toast.show(`Can't pop out: the type of \`${code.error.payload}\` is not known.`)
       return
     }
     deps.createNodes(
       [
         {
           placement: { type: 'fixed', position },
-          expression: code.value,
+          expression: code.value.code,
           namePrefix: argName,
+          requiredImports: importsFor(code.value.types),
         },
       ],
       (edit, [ident]) => {

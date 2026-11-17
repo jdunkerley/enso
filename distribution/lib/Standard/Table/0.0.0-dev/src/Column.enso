@@ -43,6 +43,31 @@ type Column
         self.implementation.table_version_hash self.underlying
 
     ## ---
+       private: true
+       ---
+       The column's tree for the JSON visualization, given its `size` (the row
+       count). A table passes its own row count for each of its columns, which
+       all share it, so a page of a database table's columns runs no `COUNT(*)`
+       query of its own (#772). `size` must be the column's own length: the
+       tree's entries are read up to it.
+    viz_tree self (size : Integer) -> Viz_Tree =
+        label = "Column " + self.name.to_json + " (" + (Viz_Tree.count_text size "row" "rows") + ")"
+        in_memory = self.is_a In_Memory_Column
+        value_child index value = Viz_Tree_Child.Value index (Viz_Tree.from value) (".at " + index.to_text)
+        ## An in-memory column reads each value of the page by index, and copies
+           nothing.
+        in_memory_page start end = start.up_to end . map index-> value_child index (self.at index)
+        ## A database column with no ordering cannot `take` a range, so it reads the
+           values up to the end of the page and drops those before it.
+        database_page start end =
+            page = self.take (start.up_to end) . catch Illegal_Argument _->
+                (self.read (..First end)).drop (..First start)
+            page.to_vector.map_with_index i-> value->
+                value_child (start + i) value
+        in_memory_value key = if key.is_a Integer && key >= 0 && key < size then value_child key (self.at key) else Nothing
+        if in_memory then Viz_Tree.lookup_paged "array" size label in_memory_page in_memory_value else Viz_Tree.paged "array" size label database_page
+
+    ## ---
        icon: convert
        ---
        Creates a new column given a name and a vector of elements.
@@ -2711,23 +2736,7 @@ Viz_Json.from (that:Column) =
    ---
    The column's values for the JSON visualization, read a page at a time (a
    database column reads only that page), each reached with `.at index`.
-Viz_Tree.from (that:Column) =
-    size = that.row_count
-    label = "Column " + that.name.to_json + " (" + (Viz_Tree.count_text size "row" "rows") + ")"
-    in_memory = that.is_a In_Memory_Column
-    value_child index value = Viz_Tree_Child.Value index (Viz_Tree.from value) (".at " + index.to_text)
-    ## An in-memory column reads each value of the page by index, and copies
-       nothing.
-    in_memory_page start end = start.up_to end . map index-> value_child index (that.at index)
-    ## A database column with no ordering cannot `take` a range, so it reads the
-       values up to the end of the page and drops those before it.
-    database_page start end =
-        page = that.take (start.up_to end) . catch Illegal_Argument _->
-            (that.read (..First end)).drop (..First start)
-        page.to_vector.map_with_index i-> value->
-            value_child (start + i) value
-    in_memory_value key = if key.is_a Integer && key >= 0 && key < size then value_child key (that.at key) else Nothing
-    if in_memory then Viz_Tree.lookup_paged "array" size label in_memory_page in_memory_value else Viz_Tree.paged "array" size label database_page
+Viz_Tree.from (that:Column) = that.viz_tree that.row_count
 
 ## ---
    private: true
