@@ -262,7 +262,7 @@ class RuntimeManagementTest extends InterpreterTest {
             } catch {
               case ex: InterpreterException
                   if ex.getMessage.contains("ThreadInterruptedException") &&
-                    !swallowed.get() =>
+                  !swallowed.get() =>
                 swallowed.set(true)
             }
           }
