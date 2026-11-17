@@ -70,9 +70,13 @@ const PAYLOAD_CONSTRUCTOR = {
   [InboundPayload.CHECKSUM_BYTES_CMD]: ChecksumBytesCommand,
 } satisfies Record<InboundPayload, new () => Table>
 
-/** TODO: Add docs */
+/**
+ * The mock data connection: files are read through `readFile`, and written through `writeFile`,
+ * which answers whether it took the file (a refused write is `AccessDenied`, as without one).
+ */
 export function mockDataWSHandler(
   readFile: (segments: string[]) => Promise<ArrayBuffer | null | undefined>,
+  writeFile: (segments: string[], contents: Uint8Array) => boolean = () => false,
 ) {
   return async (message: ArrayBuffer) => {
     const binaryMessage = InboundMessage.getRootAsInboundMessage(new ByteBuffer(message))
@@ -97,6 +101,13 @@ export function mockDataWSHandler(
         break
       }
       case InboundPayload.WRITE_FILE_CMD: {
+        const payload_ = payload as WriteFileCommand
+        const path = payload_.path()
+        const contents = payload_.contentsArray()
+        if (path && contents && writeFile(pathSegments(path), contents)) {
+          response = { type: OutboundPayload.SUCCESS, offset: Success.createSuccess(builder) }
+          break
+        }
         response = createError(
           builder,
           LanguageServerErrorCode.AccessDenied,

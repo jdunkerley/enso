@@ -10,9 +10,11 @@ import { YjsChannel } from 'ydoc-channel'
 import { ErrorCode } from 'ydoc-shared/languageServer'
 import type {
   ContextId,
+  FileAttributes,
   LibraryComponentGroup,
   LibraryLoadFailure,
   Path,
+  UTCDateTime,
   Uuid,
   response,
 } from 'ydoc-shared/languageServerTypes'
@@ -161,6 +163,59 @@ const fileTree = {
       ]).buffer
     },
   },
+}
+
+/** The names written to `images/` through the data connection, until {@link restoreMockImages}. */
+const writtenImages = new Set<string>()
+
+/** The names of the mock project's files in `images/`, those written by the GUI included. */
+export function mockImageNames(): string[] {
+  return Object.keys(fileTree.images)
+}
+
+/** Forget the images the GUI wrote: `images/` has only the mock's own again. */
+export function restoreMockImages() {
+  const images: FileTree = fileTree.images
+  for (const name of writtenImages) delete images[name]
+  writtenImages.clear()
+}
+
+/**
+ * Takes a file the GUI writes, as the documentation editor's upload and `store_image` write one:
+ * only a new file directly in `images/`. Anything else stays refused (the mock is read-only).
+ */
+function writeMockFile(segments: string[], contents: Uint8Array): boolean {
+  const [folder, name, ...rest] = segments
+  if (folder !== 'images' || name == null || rest.length > 0) return false
+  const images: FileTree = fileTree.images
+  if (name in images) return false
+  images[name] = contents.slice().buffer
+  writtenImages.add(name)
+  return true
+}
+
+/** The attributes `file/info` answers for the entry at `segments`; undefined when there is none. */
+function mockFileInfo(rootId: Uuid, segments: readonly string[]): FileAttributes | undefined {
+  let entry: FileTree | string | ArrayBuffer | undefined = fileTree
+  for (const segment of segments) {
+    if (entry == null || typeof entry === 'string' || entry instanceof ArrayBuffer) return
+    entry = entry[segment]
+  }
+  if (entry == null) return
+  const name = segments.at(-1) ?? ''
+  const parent = { rootId, segments: segments.slice(0, -1) }
+  const isFile = typeof entry === 'string' || entry instanceof ArrayBuffer
+  const time = new Date(0).toISOString() as UTCDateTime
+  return {
+    creationTime: time,
+    lastAccessTime: time,
+    lastModifiedTime: time,
+    kind: isFile ? { type: 'File', name, path: parent } : { type: 'Directory', name, path: parent },
+    byteSize:
+      typeof entry === 'string' ? entry.length
+      : entry instanceof ArrayBuffer ? entry.byteLength
+      : 0,
+  }
 }
 
 const encoder = new TextEncoder()
@@ -644,6 +699,19 @@ export const mockLSHandler = async (
       return { needsRestart: true } satisfies response.SetParentEdition
     case 'capability/acquire':
       return {}
+    case 'file/info': {
+      const data_ = params as { path: Path }
+      const attributes =
+        data_.path?.rootId === mockProjectId ?
+          mockFileInfo(data_.path.rootId, data_.path.segments)
+        : undefined
+      if (!attributes)
+        return Promise.reject({
+          code: ErrorCode.FILE_NOT_FOUND,
+          message: `'/${data_.path?.segments.join('/')}' not found.`,
+        })
+      return { attributes } satisfies response.FileInfo
+    }
     case 'file/list': {
       const data_ = params as { path: Path }
       if (!data_.path) return Promise.reject(`'path' parameter missing in '${method}'`)
@@ -867,7 +935,7 @@ export const mockDataHandler = mockDataWSHandler(async (segments) => {
     return
   }
   return await file?.arrayBuffer()
-})
+}, writeMockFile)
 
 /**
  * The mock ydoc server's session (Note [A New Server Session] in `ydoc-shared`'s `yjsModel.ts`):

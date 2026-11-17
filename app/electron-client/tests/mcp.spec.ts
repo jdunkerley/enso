@@ -98,6 +98,7 @@ test('an MCP client reads the open project and cannot write a file', async ({
         // The project tools that read.
         'evaluate_expression',
         'get_component_docs',
+        'get_documentation',
         'get_graph',
         'get_node',
         'get_visualization',
@@ -105,12 +106,14 @@ test('an MCP client reads the open project and cannot write a file', async ({
         'search_components',
         // The project tools that edit or navigate.
         'add_function',
+        'add_image',
         'add_nodes',
         'collapse_nodes',
         'edit_node',
         'open_method',
         'remove_nodes',
         'select_nodes',
+        'set_documentation',
         'set_node_comment',
         'set_visualization',
         // The app tools.
@@ -120,6 +123,7 @@ test('an MCP client reads the open project and cannot write a file', async ({
         'list_files',
         'list_projects',
         'open_project',
+        'switch_project',
       ].sort(),
     )
 
@@ -226,6 +230,9 @@ const EVAL_REFUSED = 'Code that evaluates text as code (Debug.eval) is refused.'
 const NAME_LOOKUP_REFUSED =
   'Code that looks a method up by a name in text (Polyglot.get_member, Polyglot.invoke) is refused.'
 
+/** The first eight bytes of every PNG file. */
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
 /** The states of a node that is neither an error nor a panic. */
 const NOT_FAILED = ['value', 'pending', 'unknown']
 
@@ -302,10 +309,32 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     note('create_project', created)
     expect(created.name).toBe(projectName)
     projectPath = created.path
-    const onScreen = await callJson<{ page: string; project: unknown }>('get_app_state')
+    const onScreen = await callJson<{
+      page: string
+      project: unknown
+      open_projects: { name: string; path: string }[]
+    }>('get_app_state')
     note('get_app_state after create_project', onScreen)
     expect(onScreen.page).toBe('project')
     expect(onScreen.project).toEqual(created)
+    expect(onScreen.open_projects).toEqual([created])
+
+    // Switching tabs: the project on screen answers itself; a path no tab has is refused with the
+    // open projects listed, and nothing is opened.
+    const switched = await callJson<{ name: string; path: string }>('switch_project', {
+      path: created.path,
+    })
+    note('switch_project to the project on screen', switched)
+    expect(switched).toEqual(created)
+    const notOpen = path.join(path.dirname(created.path), 'No_Such_Project')
+    const switchRefused = await callError('switch_project', { path: notOpen })
+    note('switch_project to a path no tab has', switchRefused)
+    expect(switchRefused).toContain('No open project has the path')
+    expect(switchRefused).toContain(`Open projects: ${created.path}.`)
+    expect(switchRefused).toContain('open_project')
+    expect((await callJson<{ open_projects: unknown[] }>('get_app_state')).open_projects).toEqual([
+      created,
+    ])
 
     // The template's first execution, so that each edit below settles in its 20 s.
     await expect
@@ -420,6 +449,111 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     expect(otherSecond.png.equals(otherImage.png), 'the other picture is the settled one').toBe(
       true,
     )
+
+    // Images for the documentation, stored in the project's `images` folder on disk: a picture of
+    // the vector's visualization, a PNG file from outside the Drive, and a text file named `.png`,
+    // which is refused.
+    const imagesFolder = path.join(created.path, 'images')
+    /** The file on disk an `add_image` result's project-relative URL names. */
+    const onDisk = (url: string) =>
+      path.join(
+        created.path,
+        ...decodeURI(url)
+          .split('/')
+          .filter((segment) => segment !== ''),
+      )
+    const fromNode = await callJson<{
+      path: string
+      markdown: string
+      bytes: number
+      shown: boolean
+      moved: boolean
+    }>('add_image', { node_id: numbersId })
+    note('add_image of the numbers visualization', fromNode)
+    expect(fromNode.path).toBe('/images/numbers.png')
+    expect(fromNode.markdown).toBe('![numbers](/images/numbers.png)')
+    // Its visualization was on screen already.
+    expect(fromNode.shown).toBe(false)
+    expect(typeof fromNode.moved).toBe('boolean')
+    const nodePng = await fs.readFile(onDisk(fromNode.path))
+    expect(nodePng.subarray(0, 8).equals(PNG_SIGNATURE)).toBe(true)
+    expect(nodePng.length).toBe(fromNode.bytes)
+    expect(new Set(nodePng.subarray(33)).size).toBeGreaterThan(32)
+    await testInfo.attach('add-image-node.png', { body: nodePng, contentType: 'image/png' })
+
+    /** The documentation written below, read again after the project is reopened. */
+    let savedDocumentation: string | undefined
+    const sourceFolder = await fs.mkdtemp(path.join(os.tmpdir(), 'enso-mcp-image-'))
+    try {
+      const chart = path.join(sourceFolder, 'chart.png')
+      await fs.writeFile(chart, png)
+      const fromFile = await callJson<{ path: string; markdown: string; bytes: number }>(
+        'add_image',
+        { path: chart },
+      )
+      note('add_image of a PNG file', fromFile)
+      expect(fromFile).toEqual({
+        path: '/images/chart.png',
+        markdown: '![chart](/images/chart.png)',
+        bytes: png.length,
+      })
+      expect((await fs.readFile(onDisk(fromFile.path))).equals(png)).toBe(true)
+
+      const notPng = path.join(sourceFolder, 'notes.png')
+      await fs.writeFile(notPng, 'These are notes, not a picture.\n')
+      const notPngRefused = await callError('add_image', { path: notPng })
+      note('add_image of a text file named .png', notPngRefused)
+      expect(notPngRefused).toContain('The file is not a PNG image')
+      expect(notPngRefused).not.toContain('These are notes')
+      expect((await fs.readdir(imagesFolder)).sort()).toEqual(['chart.png', 'numbers.png'])
+
+      // The documentation of `main`, replaced as a whole with text showing both images, then read
+      // back; the same text again changes nothing.
+      const before = await callJson<{ method: string; text: string; truncated: boolean }>(
+        'get_documentation',
+      )
+      note('get_documentation of a new project', before)
+      expect(before.method).toBe('main')
+      expect(before.truncated).toBe(false)
+      const documentation =
+        'Adds up the numbers, from ten.\n\n' +
+        `The numbers:\n\n${fromNode.markdown}\n\n` +
+        `A chart from a file:\n\n${fromFile.markdown}`
+      const documented = await callJson<{
+        method: string
+        characters: number
+        settled: boolean
+        unchanged?: boolean
+      }>('set_documentation', { text: documentation })
+      note('set_documentation', documented)
+      expect(documented).toEqual({
+        method: 'main',
+        characters: documentation.length,
+        settled: true,
+      })
+      const readBack = await callJson<{ method: string; text: string; truncated: boolean }>(
+        'get_documentation',
+      )
+      note('get_documentation after set_documentation', readBack)
+      expect(readBack).toEqual({ method: 'main', text: documentation, truncated: false })
+      const docSavingSince = Date.now()
+      await expect
+        .poll(async () => fs.readFile(mainFile, 'utf8'), { timeout: 30_000, intervals: [100] })
+        .toContain('Adds up the numbers, from ten.')
+      note(
+        'the documentation in Main.enso on disk, ms after it answered',
+        Date.now() - docSavingSince,
+      )
+      expect(await fs.readFile(mainFile, 'utf8')).toContain(fromFile.markdown)
+      const sameDocumentation = await callJson<{ unchanged?: boolean }>('set_documentation', {
+        text: documentation,
+      })
+      note('set_documentation with the same text', sameDocumentation)
+      expect(sameDocumentation.unchanged).toBe(true)
+      savedDocumentation = documentation
+    } finally {
+      await fs.rm(sourceFolder, { recursive: true, force: true })
+    }
 
     // Code that turns Write on by the routes the guard knows (the Write prefix, `with_enabled_context`
     // / `with_enabled` anywhere, reflection, a runtime builtin, text evaluated as code, a method
@@ -743,6 +877,10 @@ test('an MCP client builds a project from the dashboard', async ({ page, testRun
     expect(names(rebuilt)).not.toContain('undo_a')
     expect(rebuilt.nodes.some((node) => node.code.includes('sum_numbers'))).toBe(true)
     expect(rebuilt.imports).toContain(xmlImport)
+    // The documentation, read from the file the engine loaded, is the text that was set.
+    const reread = await callJson<{ method: string; text: string }>('get_documentation')
+    note('get_documentation after reopening', reread)
+    expect(reread).toMatchObject({ method: 'main', text: savedDocumentation })
 
     await callJson('close_project')
   } finally {
