@@ -9,10 +9,18 @@ part A).
   to qualified ones (`Date_Period.Month`), since they mean nothing outside their
   argument.
 - `expectedTypes.ts` - `expectedTypesIn`: the type expected at each argument
-  inside a value, which `qualifyAutoscoped` needs.
+  inside a value; `resolvedAutoscopedTypes`: the type of each auto-scoped
+  constructor the graph database has resolved (the method call info of the
+  application it heads, as `WidgetFunction` uses to show the constructor's
+  arguments; the entry's `memberOf`). `qualifyAutoscoped` needs one of them.
 - `popOut.ts` - `canPopOut`, `popOutCode` and `usePopOut`: the eligibility
   check, the code of the new node, and the edit (one undo step, through
-  `createNodes`'s `inSameEdit`).
+  `createNodes`'s `inSameEdit`, with the imports of the types written).
+
+A resolved constructor's type wins over the declared one; the declared type is
+only the fallback. Declared types mislead: `Data.read`'s `format` is untyped
+(`Any`), and a declared interface such as `File_Format` has no `Delimited`
+constructor even though `..Delimited` is valid there (#837).
 
 - `usePopOutDrag.ts` - the drag's state (source, ghost, Escape, drop outside the
   node). `GraphNode.vue` feeds it from its own `useClickableDraggable`: a drag
