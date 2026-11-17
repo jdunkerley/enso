@@ -6,14 +6,6 @@
  */
 import * as debug from '@/debug'
 import * as ipc from '@/ipc'
-import type {
-  AiAvailability,
-  AiComponentIpcReply,
-  AiComponentRequest,
-  AiProgressEvent,
-  AiToolCallReply,
-  AiToolCallRequest,
-} from 'enso-common/src/ai'
 import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
 import type {
   McpClientKind,
@@ -148,43 +140,6 @@ const system: ElectronApi['system'] = {
   },
 }
 
-const ai: ElectronApi['ai'] = {
-  availability: (): Promise<AiAvailability> =>
-    electron.ipcRenderer.invoke(ipc.Channel.aiAvailability),
-  onAvailabilityChanged: (handler: (availability: AiAvailability) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, payload: AiAvailability) =>
-      handler(payload)
-    electron.ipcRenderer.on(ipc.Channel.aiAvailabilityChanged, listener)
-    return () => {
-      electron.ipcRenderer.removeListener(ipc.Channel.aiAvailabilityChanged, listener)
-    }
-  },
-  generateComponent: (request: AiComponentRequest): Promise<AiComponentIpcReply> =>
-    electron.ipcRenderer.invoke(ipc.Channel.generateAiComponent, request),
-  onToolCall: (handler: (request: AiToolCallRequest) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, request: AiToolCallRequest) =>
-      handler(request)
-    electron.ipcRenderer.on(ipc.Channel.aiToolCall, listener)
-    return () => {
-      electron.ipcRenderer.removeListener(ipc.Channel.aiToolCall, listener)
-    }
-  },
-  replyToolCall: (reply: AiToolCallReply): void => {
-    electron.ipcRenderer.send(ipc.Channel.aiToolReply, reply)
-  },
-  onProgress: (handler: (event: AiProgressEvent) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, payload: AiProgressEvent) =>
-      handler(payload)
-    electron.ipcRenderer.on(ipc.Channel.aiProgress, listener)
-    return () => {
-      electron.ipcRenderer.removeListener(ipc.Channel.aiProgress, listener)
-    }
-  },
-  cancel: (requestId: string): void => {
-    electron.ipcRenderer.send(ipc.Channel.cancelAiComponent, { requestId })
-  },
-}
-
 const updater: ElectronApi['updater'] = {
   mode: () => electron.ipcRenderer.invoke(ipc.Channel.updaterMode),
   check: (allowPrerelease) =>
@@ -268,7 +223,6 @@ const api: ElectronApi = {
       electron.ipcRenderer.send(ipc.Channel.error, msg)
     },
   },
-  ai,
   updater,
   secrets,
   mcp,

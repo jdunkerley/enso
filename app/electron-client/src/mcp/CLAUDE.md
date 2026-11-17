@@ -494,12 +494,11 @@ say so. This prevents accidental writes; it is not a security boundary (see
 "Edits" above): an expression can still call a function of the user's project
 that enables output.
 
-## Not the AI mode's server
+## The only MCP server
 
-`src/ai/aiMcpServer.ts` is a different MCP server: the one the in-app AI mode's
-own `claude` child uses, on a random port with a per-launch token in a config
-file (see "AI tool bridge" in `../../CLAUDE.md`). It shares no code with this
-one and stays as it is until the chat PR replaces the AI mode and removes it.
+The in-app AI prompt mode had an MCP server of its own (under `src/ai/`, for its
+`claude` child process). It was removed with that mode; this server is the IDE's
+only AI route.
 
 ## Tests
 

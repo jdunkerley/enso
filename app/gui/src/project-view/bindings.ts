@@ -75,7 +75,6 @@ export const componentBrowserBindings = defineKeybinds('component-browser', {
   'componentBrowser.acceptInputAsCode': ['Enter'],
   'componentBrowser.switchToCodeEditMode': ['Mod+Tab'],
   'componentBrowser.acceptInput': ['Mod+Enter'],
-  'componentBrowser.acceptAIPrompt': ['Enter'],
   'componentBrowser.switchPanelFocus': ['Tab'],
 })
 

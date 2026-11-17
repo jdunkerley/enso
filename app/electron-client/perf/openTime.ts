@@ -553,7 +553,6 @@ async function measureLaunch(
     ...credentialFreeEnv(process.env),
     ENSO_TEST: 'true',
     ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
-    ENSO_AI_DISABLED: '1',
     ENSO_LOG_DIRECTORY: logDir,
     // The shim's own JDK AOT cache (`project-manager-shim/jvmAot`) is a directory of the run's,
     // never the user's own cache. A `jvm` engine points it at `<out>/jvm-aot`

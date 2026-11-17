@@ -1,4 +1,3 @@
-import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
 import { initJvmAotIpc } from '@/jvmAotIpc'
 import { resolveLogFileToReveal } from '@/logFileReveal'
@@ -300,13 +299,6 @@ export function initIpc(
       return retval
     },
   )
-
-  // Fire-and-forget: the MCP server's HTTP listener boots async, but startup must not block on it.
-  void (async () => {
-    const stdlibRoot = paths.stdlibRoot(electron, electronIsDev)
-    const mcpConfigPath = await initAiMcpServer()
-    initClaudeAgentIpc({ stdlibRoot, mcpConfigPath })
-  })()
 
   initMcp(electron, electronIsDev)
 

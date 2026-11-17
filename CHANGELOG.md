@@ -7,6 +7,10 @@
   component for the entry (Shift+Enter for every entry beside it), and the
   context-menu key or Shift+F10 opens the entry's menu, which the arrow keys and
   Escape drive too.][822]
+- [The Component Browser's AI prompt and AI nodes are removed, with the local
+  `claude` agent behind them. AI agents work with the IDE through its MCP server
+  (Settings → AI). A project that has an AI node still opens: the node is an
+  ordinary component, and its prompt an ordinary comment.][841]
 - [Agents connected over MCP can undo and redo their own edits, save a version,
   list every error and warning of a function in one call, and refresh the
   values. They never turn Write on: undo and refresh are refused while the
@@ -557,6 +561,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [822]: https://github.com/jdunkerley/enso/pull/822
+[841]: https://github.com/jdunkerley/enso/pull/841
 [844]: https://github.com/jdunkerley/enso/pull/844
 [832]: https://github.com/jdunkerley/enso/pull/832
 [831]: https://github.com/jdunkerley/enso/pull/831

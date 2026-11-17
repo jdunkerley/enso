@@ -17,11 +17,9 @@ import {
 } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { proxyRefs, type ToValue } from '$/utils/reactivity'
 import type { Filter, SelfArg } from '@/components/ComponentBrowser/filtering'
-import { isAiAssignment, readAiPrompt } from '@/components/GraphEditor/aiNode'
 import type { CarriedComponentBrowserInput } from '@/components/GraphEditor/viewCarryOver'
 import { Ast } from '@/util/ast'
 import { selfArgSeparator } from '@/util/ast/abstract'
-import { nodeDocumentationText } from '@/util/ast/node'
 import { ANY_TYPE } from '@/util/ensoTypes'
 import type { ProjectPath } from '@/util/projectPath'
 import { qnLastSegment } from '@/util/qualifiedName'
@@ -64,30 +62,23 @@ export type ComponentBrowserInterpretation =
       code: string
       appliedSuggestion?: SuggestionEntry
     }
-  | {
-      mode: 'aiPrompt'
-      prompt: string
-    }
 
 /**
  * The user-selectable mode tag — the `mode` discriminator of {@link ComponentBrowserInterpretation}:
  * - `componentBrowsing` when the user is searching the suggestion list to add a new component,
- * - `codeEditing` for free-form code editing on a new or existing node,
- * - `aiPrompt` for typing a natural-language prompt that the local Claude agent expands into a
- *   User Defined Component.
+ * - `codeEditing` for free-form code editing on a new or existing node.
  */
 export type ComponentBrowserMode = ComponentBrowserInterpretation['mode']
 
 /**
  * The mode the user last picked by hand, shared by every Component Browser in the window and
- * `undefined` until they pick one. Deliberately not persisted: a fresh app start opens in the
- * AI-if-available default rather than in whatever the last session ended on.
+ * `undefined` until they pick one. Deliberately not persisted: a fresh app start opens in
+ * component browsing rather than in whatever the last session ended on.
  */
 const useLastPickedMode = createGlobalState(() => ref<ComponentBrowserMode>())
 
 /** Component Browser Input Data */
 export function useComponentBrowserInput(
-  aiAvailable: ToValue<boolean> = () => false,
   graphDb: ToValue<GraphDb> = toRef(useCurrentProject().graph.value, 'db'),
   suggestionDb: ToValue<SuggestionDb> = toRef(useCurrentProject().suggestionDb.value, 'entries'),
   lastPickedMode: Ref<ComponentBrowserMode | undefined> = useLastPickedMode(),
@@ -159,9 +150,6 @@ export function useComponentBrowserInput(
   }
 
   const interpretation: ComputedRef<ComponentBrowserInterpretation> = computed(() => {
-    if (selectedMode.value === 'aiPrompt') {
-      return { mode: 'aiPrompt', prompt: text.value }
-    }
     if (selectedMode.value === 'codeEditing') {
       return {
         mode: 'codeEditing',
@@ -343,22 +331,11 @@ export function useComponentBrowserInput(
         break
       case 'editNode': {
         const editedNode = graphDbValue.nodeIdToNode.get(usage.node)
-        // An AI assignment opens in AI-prompt mode only if AI is currently available; without
-        // a live agent there is no way to submit a new prompt, so fall through to code
-        // editing instead of leaving the user staring at a disabled AI mode.
-        if (editedNode && isAiAssignment(editedNode.outerAst) && toValue(aiAvailable)) {
-          const prompt = readAiPrompt(nodeDocumentationText(editedNode)) ?? ''
-          selectedMode.value = 'aiPrompt'
-          sourceNodeIdentifier.value = undefined
-          text.value = prompt
-          selection.value = Range.emptyAt(prompt.length)
-        } else {
-          selectedMode.value = 'codeEditing'
-          const parsed = extractSourceNode(editedNode?.innerExpr.code() ?? '')
-          text.value = parsed.text
-          sourceNodeIdentifier.value = parsed.sourceNodeIdentifier
-          selection.value = Range.emptyAt(usage.cursorPos - parsed.textOffset)
-        }
+        selectedMode.value = 'codeEditing'
+        const parsed = extractSourceNode(editedNode?.innerExpr.code() ?? '')
+        text.value = parsed.text
+        sourceNodeIdentifier.value = parsed.sourceNodeIdentifier
+        selection.value = Range.emptyAt(usage.cursorPos - parsed.textOffset)
         break
       }
     }
@@ -368,13 +345,10 @@ export function useComponentBrowserInput(
 
   /**
    * The mode a freshly-opened Component Browser starts in: the one the user last picked, else
-   * AI when it is available. A remembered `aiPrompt` degrades to component browsing while the
-   * agent is unavailable, so the CB never opens on a mode that cannot be submitted.
+   * component browsing.
    */
   function modeForNewNode(): ComponentBrowserMode {
-    const remembered = lastPickedMode.value
-    if (remembered != null && (remembered !== 'aiPrompt' || toValue(aiAvailable))) return remembered
-    return toValue(aiAvailable) ? 'aiPrompt' : 'componentBrowsing'
+    return lastPickedMode.value ?? 'componentBrowsing'
   }
 
   function extractSourceNode(expression: string) {
@@ -408,10 +382,10 @@ export function useComponentBrowserInput(
   /**
    * Put back an input carried over a session replacement, after {@link reset}. The mode is set as
    * it was, not picked: it does not become the default for later Component Browsers. A mode the
-   * usage locks, or AI while the agent is unavailable, is kept as {@link reset} chose it.
+   * usage locks is kept as {@link reset} chose it.
    */
   function restore(saved: CarriedComponentBrowserInput) {
-    if (!modeLocked.value && (saved.mode !== 'aiPrompt' || toValue(aiAvailable))) {
+    if (!modeLocked.value) {
       selectedMode.value = saved.mode
     }
     const selfArgument = saved.selfArgument
