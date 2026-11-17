@@ -196,8 +196,9 @@ the list widens what every library can rely on, so it is the owner's decision
   imports only the names in `BUILTIN_MODULE_NAMES` and its own relative files,
   with no dynamic `import()`.
 - `__tests__/shippedSqlQuery.test.ts` — Standard.Database's SQL Query view
-  mounted with sample data: formatting, coloured interpolations, escaping of the
-  SQL and of its values, a placeholder-looking name in the SQL, Ctrl+C.
+  mounted with sample data: formatting, syntax colouring (keywords, strings,
+  quoted identifiers, numbers, comments), coloured interpolations, escaping of
+  the SQL and of its values, a placeholder-looking name in the SQL, Ctrl+C.
 
 Run from `app/gui`:
 `CI=true corepack pnpm exec vitest run src/project-view/stores/visualization`
