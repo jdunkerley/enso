@@ -25,44 +25,37 @@ export type TimeChoice =
         readonly finer?: readonly string[]
       })
 
-/** `Time_Of_Day.new`, hour and minute as integer literals, then the rest of the arguments. */
-const TIME_NEW = /^Time_Of_Day\.new\s+(\d+)\s+(\d+)((?:\s+\S+)*)$/
+/** `Time_Of_Day.new`, then its arguments. */
+const TIME_NEW = /^Time_Of_Day\.new((?:\s+\S+)*)$/
 const INTEGER = /^\d+$/
-const NAMED = /^(second|millisecond|microsecond|nanosecond)=(\d+)$/
-/** The arguments after the minute, in `Time_Of_Day.new`'s order. */
-const AFTER_MINUTE = ['second', 'millisecond', 'microsecond', 'nanosecond'] as const
-type AfterMinute = (typeof AFTER_MINUTE)[number]
+const NAMED = /^(hour|minute|second|millisecond|microsecond|nanosecond)=(\d+)$/
+/** `Time_Of_Day.new`'s arguments, in its order. */
+const PARTS = ['hour', 'minute', 'second', 'millisecond', 'microsecond', 'nanosecond'] as const
+type Part = (typeof PARTS)[number]
 /**
  * Each part's largest value, as `Time_Of_Day.new` documents them. These are the
  * largest values it accepts for each part on its own (it sums the sub-second
  * parts into one nanosecond count), which are wider than the 0–999 ranges its
  * number widgets offer.
  */
-const MAX: Readonly<Record<AfterMinute, number>> = {
+const MAX: Readonly<Record<Part, number>> = {
+  hour: 23,
+  minute: 59,
   second: 59,
   millisecond: 999,
   microsecond: 999_999,
   nanosecond: 999_999_999,
 }
-
-function isValidTime({ hour, minute, second }: HourMinuteSecond): boolean {
-  return (
-    Number.isSafeInteger(hour) &&
-    hour >= 0 &&
-    hour <= 23 &&
-    minute >= 0 &&
-    minute <= 59 &&
-    second >= 0 &&
-    second <= 59
-  )
-}
+/** The parts the menu edits; the others are kept as they were written. */
+const EDITED: ReadonlySet<Part> = new Set(['hour', 'minute', 'second'])
 
 /**
  * The choice that the code stands for, or `undefined` when the code is not one of the shapes:
- * `Time_Of_Day.now`, and `Time_Of_Day.new` with an hour and a minute as integer literals followed
- * by a second and the finer parts, positional or named, as integer literals. Anything else (a
- * variable, a computed argument, a named hour or minute, an argument given twice, a positional
- * argument after a named one, an hour of 24) is not ours.
+ * `Time_Of_Day.now`, and `Time_Of_Day.new` with any of its arguments as integer literals,
+ * positional or named; a part not given is 0, as it is `Time_Of_Day.new`'s default. So a bare
+ * `Time_Of_Day.new`, `Time_Of_Day.new 14` (what typing an hour into the unset `hour` writes) and
+ * `Time_Of_Day.new hour=14` are all times. Anything else (a variable, a computed argument, an
+ * argument given twice, a positional argument after a named one, an hour of 24) is not ours.
  */
 export function parseTimeExpression(code: string | undefined): TimeChoice | undefined {
   const text = code?.trim()
@@ -70,15 +63,15 @@ export function parseTimeExpression(code: string | undefined): TimeChoice | unde
   if (text === 'Time_Of_Day.now') return { kind: 'now' }
   const match = TIME_NEW.exec(text)
   if (match == null) return undefined
-  const values: Partial<Record<AfterMinute, number>> = {}
+  const values: Partial<Record<Part, number>> = {}
   const finer: string[] = []
   let named = false
   let next = 0
-  for (const arg of (match[3] ?? '').split(/\s+/).filter(Boolean)) {
-    let name: AfterMinute
+  for (const arg of (match[1] ?? '').split(/\s+/).filter(Boolean)) {
+    let name: Part
     let value: number
     if (INTEGER.test(arg)) {
-      const positional = AFTER_MINUTE[next++]
+      const positional = PARTS[next++]
       if (named || positional == null) return undefined
       name = positional
       value = Number(arg)
@@ -86,19 +79,14 @@ export function parseTimeExpression(code: string | undefined): TimeChoice | unde
       const byName = NAMED.exec(arg)
       if (byName == null) return undefined
       named = true
-      name = byName[1] as AfterMinute
+      name = byName[1] as Part
       value = Number(byName[2])
     }
-    if (name in values || value > MAX[name]) return undefined
+    if (name in values || !Number.isSafeInteger(value) || value > MAX[name]) return undefined
     values[name] = value
-    if (name !== 'second') finer.push(arg)
+    if (!EDITED.has(name)) finer.push(arg)
   }
-  const time = {
-    hour: Number(match[1]),
-    minute: Number(match[2]),
-    second: values.second ?? 0,
-  }
-  if (!isValidTime(time)) return undefined
+  const time = { hour: values.hour ?? 0, minute: values.minute ?? 0, second: values.second ?? 0 }
   return finer.length > 0 ? { kind: 'time', ...time, finer } : { kind: 'time', ...time }
 }
 

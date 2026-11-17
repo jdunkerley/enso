@@ -30,6 +30,20 @@ describe('parseTimeExpression', () => {
       'Time_Of_Day.new 14 30 15 7 8 9',
       { kind: 'time', hour: 14, minute: 30, second: 15, finer: ['7', '8', '9'] },
     ],
+    // Missing parts are 0: a bare call, a prefix of the positional arguments, named hour and minute.
+    ['Time_Of_Day.new', { kind: 'time', hour: 0, minute: 0, second: 0 }],
+    ['Time_Of_Day.new 14', { kind: 'time', hour: 14, minute: 0, second: 0 }],
+    ['Time_Of_Day.new hour=14', { kind: 'time', hour: 14, minute: 0, second: 0 }],
+    ['Time_Of_Day.new minute=30', { kind: 'time', hour: 0, minute: 30, second: 0 }],
+    ['Time_Of_Day.new 14 minute=30', { kind: 'time', hour: 14, minute: 30, second: 0 }],
+    ['Time_Of_Day.new hour=14 minute=30', { kind: 'time', hour: 14, minute: 30, second: 0 }],
+    ['Time_Of_Day.new minute=30 hour=14', { kind: 'time', hour: 14, minute: 30, second: 0 }],
+    ['Time_Of_Day.new 14 second=15', { kind: 'time', hour: 14, minute: 0, second: 15 }],
+    ['Time_Of_Day.new second=15', { kind: 'time', hour: 0, minute: 0, second: 15 }],
+    [
+      'Time_Of_Day.new hour=9 millisecond=500',
+      { kind: 'time', hour: 9, minute: 0, second: 0, finer: ['millisecond=500'] },
+    ],
   ] satisfies [string, TimeChoice][])('%j is a time choice', (code, expected) => {
     expect(parseTimeExpression(code)).toEqual(expected)
   })
@@ -37,8 +51,6 @@ describe('parseTimeExpression', () => {
   test.each([
     undefined,
     '',
-    'Time_Of_Day.new',
-    'Time_Of_Day.new 14',
     'time1',
     'Time_Of_Day.new 24',
     'Time_Of_Day.new 14 60',
@@ -49,9 +61,15 @@ describe('parseTimeExpression', () => {
     'Time_Of_Day.new 14 30 zone=15',
     'Time_Of_Day.new 14 30 15 7 8 9 10',
     'Time_Of_Day.new 14 30 15 millisecond=1000',
-    // Named arguments, and other literals or computed arguments.
-    'Time_Of_Day.new hour=14',
-    'Time_Of_Day.new 14 minute=30',
+    'Time_Of_Day.new hour=24',
+    'Time_Of_Day.new minute=60',
+    'Time_Of_Day.new 14 hour=15',
+    'Time_Of_Day.new hour=14 hour=15',
+    'Time_Of_Day.new hour=14 30',
+    'Time_Of_Day.new minute=30 14',
+    'Time_Of_Day.new hour=x',
+    'Time_Of_Day.new hour=-1',
+    // Other literals or computed arguments.
     'Time_Of_Day.new 14.5',
     'Time_Of_Day.new -1',
     "Time_Of_Day.new '14'",
