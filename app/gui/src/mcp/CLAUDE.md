@@ -35,10 +35,17 @@ with what its handler returns and refuses.
     the call timed out, so an edit must not be applied then: the edit session
     refuses a run with too little time left (see
     `src/project-view/mcp/CLAUDE.md`). Handlers that do not edit ignore it.
-- `appTools.ts` — `get_app_state`, `list_projects`, `list_files`,
-  `create_project`, `open_project`, `switch_project`, `close_project`: pure
-  functions over `AppToolDeps`, tested with fakes. Names are cut at `NAME_CHARS`
-  (300), lists at `MAX_ENTRIES` (500, with `truncated: true`).
+- `appTools.ts` — the assembler: it narrows the arguments of `get_app_state`,
+  `list_projects`, `list_files`, `create_project`, `open_project`,
+  `switch_project` and `close_project` (`appToolHandlers`) and re-exports the
+  group modules' API. The tools are pure functions over `AppToolDeps`, tested
+  with fakes, one module per group: `appStateTools.ts` (`get_app_state`),
+  `appDriveTools.ts` (`list_projects`, `list_files`) and `appProjectTools.ts`
+  (`create_project`, `open_project`, `switch_project`, `close_project`).
+  `appToolSupport.ts` has the types (`AppToolDeps`, …), constants and helpers
+  they share, and `appPaths.ts` the path checks (`resolveAllowedPath`). Names
+  are cut at `NAME_CHARS` (300), lists at `MAX_ENTRIES` (500, with
+  `truncated: true`).
 - `switch_project` takes no path through `resolveAllowedPath`: it compares the
   agent's path exactly with the open projects' paths from `state()` (as
   `get_app_state` lists them) and refuses any other, listing the open ones, so
