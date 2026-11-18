@@ -36,12 +36,13 @@ exists (the desktop app), as the Settings → AI tab does.
 
 ### The icon
 
-The existing `robot` symbol (`icons.svg`), which is already the Settings → AI
-tab's icon (`configurations/settingsTabs.ts`), so the two read as one feature.
-No new glyph, so the icon rules of #95 (Style-Guide-Icons, `iconStyle.test.ts`)
-are untouched. The state is shown by the glyph's tone and a small badge drawn in
-CSS at its bottom right (6px, a 1px ring of the bar's background), not by
-variants of the symbol:
+A new symbol, `mcp_activity`, in `icons.svg` (owner's decision, 2026-11-18: not
+the Settings → AI tab's `robot`). It is drawn to the icon rules of #95
+(Style-Guide-Icons; `iconStyle.test.ts` must pass): an agent connected to the
+IDE, e.g. a plug or a link node, legible at 16px. The before/after screenshots
+show it at 1× and 2× in both themes. The state is shown by the glyph's tone and
+a small badge drawn in CSS at its bottom right (6px, a 1px ring of the bar's
+background), not by variants of the symbol:
 
 | State         | When (from main's status and activity)                                                     | Glyph                  | Badge                                            |
 | ------------- | ------------------------------------------------------------------------------------------ | ---------------------- | ------------------------------------------------ |
@@ -351,18 +352,12 @@ Controls over the agent (disconnect, stop, revoke): Settings' New token is the
 way to cut an app off. A full history, a per-call detail view, notifications,
 and any record of what a call did.
 
-## Open questions for the owner
+## Decisions (owner, 2026-11-18)
 
-1. **How long counts as "connected"?** Stateless HTTP gives no connection to
-   watch. Recommendation: **15 minutes** since the client's last request, with
-   "Last seen …" after that. Shorter makes an agent that is thinking look gone;
-   longer makes a closed one look present.
-2. **Five calls, cleared when the server stops?** Recommendation: **yes** to
-   both: five fits the popover without scrolling, and an off server has nothing
-   to explain. The record still survives a window reload.
-3. **Tell refused from error?** It needs the small `refused` flag on the
-   window's rule refusals. Recommendation: **yes**: a refusal means the house
-   rules worked (Live, the Write rule), an error means something broke, and the
-   user should see which.
-4. **The `robot` glyph?** Recommendation: **reuse it** (the Settings → AI tab's
-   icon) with a CSS badge, rather than draw a new symbol.
+1. **Connected** means a request in the last **15 minutes**; after that the
+   popover says "Last seen …".
+2. **Five calls**, cleared when the server stops (a window reload keeps them).
+3. **Refused and error are told apart**, through the `refused` flag on the
+   window's rule refusals.
+4. **A new icon** (`mcp_activity`, see "The icon"), not the `robot` glyph; the
+   state is still a CSS badge.
