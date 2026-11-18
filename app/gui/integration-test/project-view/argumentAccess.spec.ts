@@ -436,3 +436,119 @@ for (const { method, formatType } of [
     })
   })
 }
+
+/**
+ * `data = Data.read 'data.csv' (..Delimited ',' row_limit=(..First 10))`: the popped-out `..First`
+ * is an argument of `..Delimited`. Its type, `Rows_To_Read`, is not exported from
+ * `Standard.Table`'s `Main` and shares its name with the module defining it, which
+ * `from Standard.Table import all` does not import either (#883).
+ */
+test.describe('Pop out of an auto-scoped value nested in ..Delimited', () => {
+  const FORMAT_MODULE = 'Standard.Table.Delimited.Delimited_Format'
+  const FORMAT_TYPE = `${FORMAT_MODULE}.Delimited_Format`
+  const ROWS_MODULE = 'Standard.Table.Rows_To_Read'
+  const ROWS_TYPE = `${ROWS_MODULE}.Rows_To_Read`
+  const FIRST = '..First 10'
+  const VALUE = `..Delimited ',' row_limit=(${FIRST})`
+
+  test.afterEach(restoreMockMainFile)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile(
+          `from Standard.Base import Data\nfrom Standard.Table import all\n\nmain =\n    data = Data.read 'data.csv' (${VALUE})\n`,
+        ),
+    },
+  })
+
+  test('the nested constructor is qualified, and its type is imported from its module', async ({
+    editorPage,
+    page,
+  }) => {
+    const arg = (name: string, reprType: string) => ({
+      name,
+      reprType,
+      isSuspended: false,
+      hasDefault: false,
+    })
+    await editorPage
+      .mockSuggestion({
+        type: 'type',
+        module: FORMAT_MODULE,
+        name: 'Delimited_Format',
+        params: [],
+        reexport: 'Standard.Table',
+      })
+      .mockSuggestion({
+        type: 'constructor',
+        module: FORMAT_MODULE,
+        name: 'Delimited',
+        arguments: [arg('delimiter', 'Standard.Base.Data.Text.Text'), arg('row_limit', ROWS_TYPE)],
+        returnType: FORMAT_TYPE,
+        annotations: [],
+      })
+      .mockSuggestion({ type: 'module', module: ROWS_MODULE })
+      .mockSuggestion({ type: 'type', module: ROWS_MODULE, name: 'Rows_To_Read', params: [] })
+      .mockSuggestion({
+        type: 'constructor',
+        module: ROWS_MODULE,
+        name: 'First',
+        arguments: [arg('rows', 'Standard.Base.Data.Numbers.Integer')],
+        returnType: ROWS_TYPE,
+        annotations: [],
+      })
+    await mockMethodCallInfo(page, 'data', {
+      methodPointer: {
+        module: 'Standard.Base.Data',
+        definedOnType: 'Standard.Base.Data',
+        name: 'read',
+      },
+      notAppliedArguments: [2],
+    })
+    const delimited = {
+      methodPointer: { module: FORMAT_MODULE, definedOnType: FORMAT_TYPE, name: 'Delimited' },
+    }
+    await mockMethodCallInfo(
+      page,
+      { binding: 'data', expr: VALUE },
+      { ...delimited, notAppliedArguments: [] },
+    )
+    await mockMethodCallInfo(
+      page,
+      { binding: 'data', expr: '..Delimited' },
+      { ...delimited, notAppliedArguments: [0, 1] },
+    )
+    const first = {
+      methodPointer: { module: ROWS_MODULE, definedOnType: ROWS_TYPE, name: 'First' },
+    }
+    await mockMethodCallInfo(
+      page,
+      { binding: 'data', expr: FIRST },
+      { ...first, notAppliedArguments: [] },
+    )
+    await mockMethodCallInfo(
+      page,
+      { binding: 'data', expr: '..First' },
+      { ...first, notAppliedArguments: [0] },
+    )
+    const node = locate.graphNodeByBinding(page, 'data')
+    const port = node.locator('[data-pop-out-name="row_limit"]')
+    await expect(port).toHaveCount(1)
+    const handle = port.getByText('First', { exact: false }).first()
+    const box = (await handle.boundingBox())!
+    const x = box.x + 4
+    const y = box.y + box.height / 2
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x, y + 50, { steps: 5 })
+    await page.mouse.move(x, y + 200, { steps: 5 })
+    await page.mouse.up()
+    const popped = locate.graphNodeByBinding(page, 'row_limit1')
+    await expect(popped).toHaveCount(1)
+    await expect(await locate.edgesFromNode(page, popped)).toHaveCount(1)
+    const code = await moduleCode(page)
+    expect(code).toContain('row_limit1 = Rows_To_Read.First 10')
+    expect(code).toContain("..Delimited ',' row_limit=row_limit1")
+    expect(code).toContain('from Standard.Table.Rows_To_Read import Rows_To_Read')
+  })
+})

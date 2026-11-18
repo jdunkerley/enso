@@ -530,10 +530,15 @@ export function detectImportConflicts(
     : undefined
   if (!name) return
   const conflictingIds = suggestionDb.conflictingNames.lookup(name)
+  const entry = suggestionDb.get(entryId)
 
   for (const id of conflictingIds) {
     if (id === entryId) continue
     const e = suggestionDb.get(id)
+    // The module that defines the entry, named like it (`Rows_To_Read.Rows_To_Read`, Enso's usual
+    // layout), is no conflict. Its qualified import counts as covered by an `import all` of its
+    // parent, which brings in only what the parent exports.
+    if (e?.kind === SuggestionKind.Module && entry && e.definedIn.equals(entry.definedIn)) continue
     const required = e ? requiredImports(suggestionDb, e) : []
     for (const req of required) {
       if (existingImports.some((existing) => covers(existing, req))) {
