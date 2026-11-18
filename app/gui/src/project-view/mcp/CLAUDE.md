@@ -12,6 +12,29 @@ rename one on both sides, and keep the description in step with what the handler
 returns (`app/electron-client/src/mcp/guides/overview.md` describes the tools
 too).
 
+**File map.** Three layers, one module per tool group in each:
+
+- `useProjectMcpTools.ts` is the assembler: it builds the edit session and the
+  `ProjectToolContext` (`projectToolContext.ts`, which also has `McpEditorDeps`,
+  what only the editor has, and the helpers several groups share: `graphDeps`,
+  `invalidArgument`, `isStringArray`, `isLive`, `sizeOf`, `nextFrame`), merges
+  the groups' handlers and registers them. A new tool's handler goes in its
+  group's module, not here.
+- `<group>Handlers.ts` narrow the arguments, build the group's deps from the
+  context at call time and call the tool: `readHandlers.ts` (`get_graph`,
+  `get_node`, `search_components`, `get_component_docs`, `evaluate_expression`,
+  `get_problems`), `editHandlers.ts` (`add_nodes`, `edit_node`, `remove_nodes`,
+  `set_node_comment`, `set_visualization`; its `editDeps` is also what the
+  visualization handlers show a visualization through), `structureHandlers.ts`
+  (`collapse_nodes`, `add_function`), `layoutHandlers.ts` (`move_nodes`,
+  `arrange_nodes`), `viewHandlers.ts` (`select_nodes`, `open_method`,
+  `prepare_graph_image`), `historyHandlers.ts` (`undo`, `redo`, `save_version`,
+  `refresh`), `documentationHandlers.ts` (`get_documentation`,
+  `set_documentation`, `store_image`) and `visualizationHandlers.ts`
+  (`list_visualizations`, `get_visualization_data`, `prepare_visualization`).
+- `<group>Tools.ts` (`graphTools.ts`, `editTools.ts`, …) are the pure functions
+  over deps that the handlers call, tested without Vue.
+
 - **The project on screen answers.** Every open project's `GraphEditor.vue`
   stays mounted (the tabs in `MiddlePanel.vue` are under `<KeepAlive>`), so each
   registers its own handlers, with its project's id (which the app tools'
@@ -64,9 +87,9 @@ too).
 - `evaluate_expression` is refused while the project is in Live mode
   (`LIVE_MODE_ERROR`), before anything is evaluated: an evaluation runs in the
   execution context's environment, and in Live an expression's writes are real.
-  `useProjectMcpTools` reads the mode (and the context's environment) at call
-  time. The `get_graph` and `get_node` previews still run in Live: they are
-  fixed expressions (`to_display_text`, `to_text`, `catch_primitive`).
+  `readHandlers.ts` reads the mode (and the context's environment) at call time.
+  The `get_graph` and `get_node` previews still run in Live: they are fixed
+  expressions (`to_display_text`, `to_text`, `catch_primitive`).
 - Expressions on a node run at the node's statement (`outerAst.externalId`),
   where its own binding is in scope; without a node, in the method body. A node
   id is the right-hand side's id, where the node's own name is still
@@ -306,7 +329,7 @@ captures that rectangle with `webContents.capturePage`.
   longer offers the name when the edit runs, `show` refuses rather than showing
   it unswitched. Visible and identifier go in **one** `setNodeVisualization`
   call, as choosing it in the toolbar writes the node's metadata, and it stays
-  switched. `useProjectMcpTools.ts` turns the name into an identifier: of two
+  switched. `visualizationHandlers.ts` turns the name into an identifier: of two
   visualizations of the same name from different modules, the first in the
   dropdown's order. They then wait for the entry to stop loading **and**, when a
   name was given, to have that name (the old view can stay mounted and `ready`
@@ -589,8 +612,8 @@ from `useCurrentProject()`):
 
 ## History, versions, problems and refresh (`historyTools.ts`, `versionTools.ts`, `problemTools.ts`, `refreshTool.ts`)
 
-Pure functions over deps, wired in `useProjectMcpTools.ts`; unit tests beside
-the others.
+Pure functions over deps, wired in `historyHandlers.ts` (`get_problems` in
+`readHandlers.ts`); unit tests beside the others.
 
 - **`undo` / `redo`**: `session.undo` / `session.redo`, which answer
   `{ undone | redone: true, can_undo, can_redo }` with **no `settled`**: they do
