@@ -1034,6 +1034,39 @@ describe('an edit that changes nothing', () => {
     expect(t.settle).not.toHaveBeenCalled()
   })
 
+  test('a noop answer saves no version, holds no step, runs no edit and waits for nothing', async () => {
+    const t = setup()
+    const edit = vi.fn(() => Ok(1))
+    const outcome = await t.session.run(claude, edit, { noop: () => Ok(7) })
+    expect(outcome).toEqual(Ok({ value: 7, settled: true }))
+    expect(edit).not.toHaveBeenCalled()
+    expect(t.deps.saveVersion).not.toHaveBeenCalled()
+    expect(t.deps.holdUndoStep).not.toHaveBeenCalled()
+    expect(t.deps.historyDepth().undo).toBe(0)
+    expect(t.updated).not.toHaveBeenCalled()
+    expect(t.settle).not.toHaveBeenCalled()
+  })
+
+  test('a noop that has no answer runs the edit as usual, saving a version', async () => {
+    const t = setup()
+    const edit = vi.fn(() => Ok(1))
+    const outcome = await t.session.run(claude, edit, { noop: () => undefined })
+    expect(outcome.ok).toBe(true)
+    expect(edit).toHaveBeenCalledTimes(1)
+    expect(t.deps.saveVersion).toHaveBeenCalledTimes(1)
+  })
+
+  test('a noop refusal refuses, and Live mode still refuses first', async () => {
+    const t = setup()
+    const refused = await t.session.run(claude, () => Ok(1), { noop: () => Err('no') })
+    expect(errorOf(refused)).toBe('no')
+    expect(t.deps.saveVersion).not.toHaveBeenCalled()
+    t.setLive(true)
+    const noop = vi.fn(() => Ok(1))
+    expect(errorOf(await t.session.run(claude, () => Ok(1), { noop }))).toBe(LIVE_EDIT_ERROR)
+    expect(noop).not.toHaveBeenCalled()
+  })
+
   test('the watches it started are cancelled, and no timer or live callback is left', async () => {
     const graph = fakeGraph()
     const t = setup({ watchGraphUpdate: () => watchGraphUpdate(graph) })

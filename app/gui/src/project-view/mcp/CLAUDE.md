@@ -370,9 +370,17 @@ reads is updated only when the transaction commits).
   waiting for a graph update, which would never come (before, such a call waited
   out `GRAPH_UPDATE_WAIT_MS`: 2,027 ms measured). A position-only check would be
   wrong: `setNodePositions` also clears `displaced` and releases pushed nodes
-  when the moved node stays. `set_documentation` passes `unchanged` too. The
-  version save and the step's hold still happen first: an empty step records
-  nothing.
+  when the moved node stays. `set_documentation` passes `unchanged` too. For
+  these the version save and the step's hold still happen first (the edit is
+  what finds out): an empty step records nothing.
+- **A call known to change nothing before it runs saves no version either**
+  (#856). `EditRunOptions.noop` is asked at a stepped run's turn, after the
+  refusals (Live still refuses) and **before** the version save and the hold: Ok
+  answers at once with `settled: true` (no edit, no version, no step), Err
+  refuses, undefined runs the edit. `set_documentation` (the text equals the
+  current) and `edit_node` (the code equals the node's) use it. `move_nodes` and
+  `arrange_nodes` cannot (see above: only running the edit tells), so they still
+  save a version.
 - **`prepare_graph_image`** (the window half of main's `get_graph_image`; not an
   MCP tool) frames every node of the method, or the nodes of `node_ids` (1 to
   `GRAPH_IMAGE_NODES_MAX`, 500; `[]` is `NO_NODE_IDS_ERROR`, an unknown one
