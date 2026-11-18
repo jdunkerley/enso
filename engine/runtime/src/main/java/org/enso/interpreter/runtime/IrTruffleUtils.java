@@ -56,6 +56,13 @@ final class IrTruffleUtils {
     }
 
     @Override
+    protected TypeCheckValueNode forEigentypeName(CompilerContext.Module module, String name) {
+      var sb = TruffleCompilerModuleScopeBuilder.fromCompilerModule(module);
+      var typ = sb.getType(name, true);
+      return TypeCheckValueNode.single(comment, typ.getEigentype());
+    }
+
+    @Override
     protected TypeCheckValueNode forPolyglot(CompilerContext.Module module, String name) {
       var m = org.enso.interpreter.runtime.Module.fromCompilerModule(module);
       var typ = m.getScope().getPolyglotSymbolSupplier(name);
