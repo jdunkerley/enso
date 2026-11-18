@@ -127,6 +127,9 @@ export const ArgumentNameShownKey: unique symbol = Symbol.for('WidgetInput:Argum
 }
 
 .name {
+  /* Centred on the row like the values beside it; a small sans name sits low in a code-height box. */
+  align-self: center;
+  padding-bottom: 2px;
   opacity: 0.6;
   font-family: var(--font-sans);
   font-size: 12px;

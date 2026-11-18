@@ -60,7 +60,7 @@ function pick(parameter: HiddenParameter) {
 <template>
   <button
     ref="buttonElement"
-    class="parameterMenuButton widgetApplyPadding clickable"
+    class="parameterMenuButton clickable"
     :class="{ nested }"
     type="button"
     aria-label="Add argument"
@@ -78,10 +78,10 @@ function pick(parameter: HiddenParameter) {
           :key="parameter.name"
           type="button"
           class="item parameterItem"
+          :title="parameter.type"
           @click="pick(parameter)"
         >
           <span class="name">{{ parameter.name }}</span>
-          <span v-if="parameter.type" class="type">{{ parameter.type }}</span>
         </button>
       </PickerMenuFrame>
     </div>
@@ -93,20 +93,24 @@ function pick(parameter: HiddenParameter) {
   flex: none;
   display: grid;
   place-items: center;
-  width: var(--node-port-height);
-  height: var(--node-port-height);
+  /* The node's row can be taller than a port (a value chip with padding): stay in its middle. */
+  align-self: center;
+  /* Its own gap, not the token padding: after a bare function name that padding can be zero. */
+  margin-left: var(--widget-token-pad-unit);
+  width: 20px;
+  height: 20px;
   border-radius: var(--radius-full);
   background-color: rgb(255 255 255 / 0.92);
   color: var(--color-node-primary);
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1;
 
   &.nested {
-    width: 20px;
-    height: 20px;
-    font-size: 14px;
+    width: 16px;
+    height: 16px;
+    font-size: 12px;
   }
 
   &:hover,
@@ -122,9 +126,5 @@ function pick(parameter: HiddenParameter) {
 .parameterItem {
   justify-content: space-between;
   gap: 16px;
-}
-
-.type {
-  opacity: 0.6;
 }
 </style>
