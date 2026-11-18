@@ -7,6 +7,11 @@
 - [A plug icon at the right end of the top bar shows whether AI agents (MCP) are
   off, have a problem, are on, connected or working. Click it to see the
   connected app and its last five calls, or to turn MCP on.][878]
+- [Selecting a node no longer expands it to show every hidden argument: a
+  round ＋ after a call's arguments, shown while the node is selected, adds any
+  of that call's other arguments, and a call inside another call's argument is
+  outlined with its own ＋. Every argument now shows its name, even when its
+  value is given by position][850]
 - [The JSON and tree view can be used from the keyboard: Tab enters it, the
   arrow keys move between entries and open or close branches, Enter adds a
   component for the entry (Shift+Enter for every entry beside it), and the

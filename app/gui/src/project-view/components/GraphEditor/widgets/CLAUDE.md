@@ -96,7 +96,7 @@ render only its own slot content. The icon is already on the row, drawn by
   named, a missing part being 0 (a bare `Time_Of_Day.new`; `Time_Of_Day.new 14`,
   which typing an hour into the unset `hour` writes, since `WidgetFunction`
   inserts the first trailing placeholder positionally; `hour=14`; `second=15` as
-  the `…` menu and `pretty` write it); an edit writes hour, minute and second
+  the ＋ menu and `pretty` write it); an edit writes hour, minute and second
   positionally and keeps the millisecond, microsecond and nanosecond as they
   were written (`withKeptParts`). Set writes the draft (or only closes when it
   is the time already written); Enter in the field, leaving it or a click
@@ -177,10 +177,21 @@ render only its own slot content. The icon is already on the row, drawn by
 
 ## Argument access
 
-- The `…` after a call's arguments (`WidgetFunction/ParameterMenu.vue`; which
-  parameters it offers: `WidgetFunction/hiddenParameters.ts`) adds a parameter
-  the call is not showing, always written as a named argument. The button stays
-  while the node is selected (selecting a node does not show hidden arguments).
+- Each call with hidden parameters has a round ＋ after its arguments
+  (`WidgetFunction/ParameterMenu.vue`; which parameters it offers:
+  `WidgetFunction/hiddenParameters.ts`), shown only while the node is the only
+  selected one (`showDetails`; the node may grow on selection). Its menu lists
+  only that call's parameters; a pick is always written as a named argument. A
+  call nested inside another call's argument (`WidgetFunction` under another
+  one, with arguments of its own) is drawn as an outlined group (`.nestedCall`)
+  with its smaller ＋ inside, after its own last argument; the outer
+  call's ＋ ends the node, inside it. Selecting a node does not show its hidden
+  arguments.
+- Every argument shows its parameter's name (`WidgetArgumentName`): every prefix
+  argument, set or not, positional or named, at any depth, and an infix operand
+  whose parameter has a name of its own (not `self`, `that`, `lhs`, `rhs`). The
+  argument is drawn as a chip of its own (name, small and dim, then the value);
+  a top-level argument with a chip drops the separator line before it.
 - `WidgetPort` marks an argument that can be popped out with `data-pop-out-port`
   (plus `data-pop-out-name` and `data-pop-out-type`); dragging it off the node
   makes it a node of its own. The drag and the edit are in `../popOut/` - see

@@ -128,13 +128,18 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     await page.getByText('input', { exact: true }).click()
     await page.getByRole('button', { name: 'currency_code', exact: true }).click()
 
-    // `operation` and `as` have defaults, so they are hidden: add each from the `…` menu.
+    // `operation` and `as` have defaults, so they are hidden: add each with a ＋.
     const operation = await addParameter(page, 'operation')
     await openDropdownInArgument(page, operation)
     await page.getByRole('button', { name: 'Text', exact: true }).click()
 
-    // `..Text` has an `operation` of its own, which it shows.
-    await page.getByText('operation', { exact: true }).click()
+    // `..Text` has an `operation` of its own, which it shows. Every argument shows its name, so
+    // the component shows two: the `operation` set to `..Text`, then `..Text`'s own (the last).
+    const operations = page.locator('.GraphNode.selected').getByText('operation', { exact: true })
+    await expect(operations).toHaveCount(2)
+    // The component has grown past the view's edge: bring it back into view.
+    await showSelectedComponent(page)
+    await operations.last().click()
     await page.getByRole('button', { name: 'length', exact: true }).click()
 
     // Typing in the column name
@@ -212,7 +217,8 @@ test('Exercise 1', async ({ page, projectsDir }) => {
 
     // Set the filtered text value
     await showSelectedComponent(page)
-    await fillWidgetText(page, 'filter..Equal“”', 'Savings Account')
+    // A container's text includes its arguments' names (`to`).
+    await fillWidgetText(page, 'filter..Equalto“”', 'Savings Account')
   })
 
   // ---------------- Objective 4 ----------------
@@ -303,10 +309,11 @@ test('Exercise 2', async ({ page, projectsDir }) => {
     )
 
     // Choosing parameters
+    // The new item's `..Name` column: the innermost drop-down showing it in the selected component.
     await page
-      .locator('div')
-      .filter({ hasText: /^‘product_name’$/ })
-      .nth(4)
+      .locator('.GraphNode.selected .WidgetSelection')
+      .filter({ hasText: /‘product_name’$/ })
+      .last()
       .click()
     await page.getByRole('button', { name: 'Count', exact: true }).click()
 
@@ -386,7 +393,7 @@ test('Exercise 2', async ({ page, projectsDir }) => {
     await openDropdownInWidget(page, 'input')
     await page.getByRole('button', { name: 'currency_code', exact: true }).click()
 
-    // `operation` has a default, so it is hidden: add it from the `…` menu.
+    // `operation` has a default, so it is hidden: add it with a ＋.
     const operation = await addParameter(page, 'operation')
     await openDropdownInArgument(page, operation)
     await page.getByRole('button', { name: 'if', exact: true }).click()
@@ -402,7 +409,8 @@ test('Exercise 2', async ({ page, projectsDir }) => {
 
     // Write in the textbox
     await showSelectedComponent(page)
-    await fillWidgetText(page, '..Equal“”', 'G')
+    // A container's text includes its arguments' names (`to`).
+    await fillWidgetText(page, '..Equalto“”', 'G')
 
     await showSelectedComponent(page)
     await page.getByText('true_value', { exact: true }).click()
@@ -410,7 +418,7 @@ test('Exercise 2', async ({ page, projectsDir }) => {
 
     // // Write in the textbox
     await showSelectedComponent(page)
-    await fillWidgetText(page, '..If(..Equal“G”)“”', 'GBP', 1)
+    await fillWidgetText(page, '..Ifcondition(..Equalto“G”)true_value“”', 'GBP', 1)
 
     await showSelectedComponent(page)
     await page.getByText('false_value', { exact: true }).click()

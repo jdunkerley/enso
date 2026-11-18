@@ -27,6 +27,7 @@ import {
   useWidgetFunctionCallInfo,
 } from '@/components/GraphEditor/widgets/WidgetFunction/widgetFunctionCallInfo'
 import { injectFunctionInfo, provideFunctionInfo } from '@/providers/functionInfo'
+import { injectWidgetTree } from '@/providers/widgetTree'
 import { assert, assertUnreachable } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import type { AstId } from '@/util/ast/abstract'
@@ -120,10 +121,22 @@ const innerInput = computed(() => {
 })
 
 /**
- * The parameters the `…` menu offers: the unset ones with a default, which the tree hides.
+ * The parameters this call's ＋ menu offers: the unset ones with a default, which the tree hides.
  * Selecting the node does not show them; the menu is the way to reach them.
  */
 const hidden = computed(() => (application.value ? hiddenParameters(application.value) : []))
+
+const tree = injectWidgetTree(true)
+const parentCall = injectFunctionInfo(true)
+/** The ＋ shows only while the node is selected (the only selected node). */
+const showParameterMenu = computed(() => hidden.value.length > 0 && !!tree?.showDetails)
+/**
+ * A call inside another call's argument. It is drawn as an outlined group, so that its ＋, after
+ * its own last argument, clearly belongs to it; the outermost call's ＋ ends the node.
+ */
+const nested = computed(
+  () => parentCall != null && application.value instanceof ArgumentApplication,
+)
 
 /** Insert a hidden parameter with its default value's code. It is always written as a named argument. */
 function insertParameter(parameter: HiddenParameter) {
@@ -377,11 +390,32 @@ export const widgetDefinition = defineWidget(
 </script>
 
 <template>
-  <NodeWidget :input="innerInput" :updateCallback="handleArgUpdate" />
-  <ParameterMenu
-    v-if="hidden.length"
-    :port="props.input.value.id"
-    :parameters="hidden"
-    @pick="insertParameter"
-  />
+  <div v-if="nested" class="WidgetFunction nestedCall widgetParent widgetRounded">
+    <NodeWidget :input="innerInput" :updateCallback="handleArgUpdate" />
+    <ParameterMenu
+      v-if="showParameterMenu"
+      :port="props.input.value.id"
+      :parameters="hidden"
+      nested
+      @pick="insertParameter"
+    />
+  </div>
+  <template v-else>
+    <NodeWidget :input="innerInput" :updateCallback="handleArgUpdate" />
+    <ParameterMenu
+      v-if="showParameterMenu"
+      :port="props.input.value.id"
+      :parameters="hidden"
+      :nested="false"
+      @pick="insertParameter"
+    />
+  </template>
 </template>
+
+<style scoped>
+.nestedCall {
+  gap: var(--widget-token-pad-unit);
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: var(--node-port-border-radius);
+}
+</style>

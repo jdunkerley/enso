@@ -503,17 +503,17 @@ export async function showSelectedComponent(page: Page) {
 }
 
 /**
- * Add the hidden parameter `name` to the selected component through a `…` menu, as a user does:
- * selecting a component does not show its hidden parameters (#836). A component has a `…` for
- * each call that hides some (`set` and the `Simple_Expression` in its `value`, say); the first
+ * Add the hidden parameter `name` to the selected component through a ＋ menu, as a user does:
+ * selecting a component does not show its hidden parameters (#836). A selected component has a ＋
+ * for each call that hides some (`set` and the `Simple_Expression` in its `value`, say); the first
  * whose menu offers `name` is used. The parameter is written with its default value. Returns the
  * added argument, and brings the component, which has grown, back into view.
  */
 export async function addParameter(page: Page, name: string): Promise<Locator> {
   const selected = page.locator('.GraphNode.selected')
   await expect(selected).toHaveCount(1)
-  const buttons = selected.locator('.parameterMenuButton')
-  const menu = page.getByRole('dialog', { name: 'More parameters' })
+  const buttons = selected.getByRole('button', { name: 'Add argument' })
+  const menu = page.getByRole('dialog', { name: 'Add argument' })
   const item = menu.getByRole('button', { name: new RegExp(`^${name}( |$)`) })
   await expect(buttons.first()).toBeVisible()
   // The component re-renders as the engine answers (types, widget configurations), which can
@@ -534,7 +534,7 @@ export async function addParameter(page: Page, name: string): Promise<Locator> {
       await page.keyboard.press('Escape')
       await expect(menu).toBeHidden({ timeout: 2000 })
     }
-    throw new Error(`No "…" menu of the selected component offers "${name}"`)
+    throw new Error(`No ＋ menu of the selected component offers "${name}"`)
   }).toPass({ timeout: 30_000 })
   const argument = selected.locator(`[data-pop-out-name="${name}"]`)
   await expect(argument).toHaveCount(1)

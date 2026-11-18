@@ -15,13 +15,13 @@ async function moduleCode(page: Page): Promise<string> {
   return code
 }
 
-test.describe('The … menu of hidden parameters', () => {
+test.describe('The ＋ of hidden parameters', () => {
   test.afterEach(restoreMockMainFile)
   test.use({
     setupApi: {
       local: () =>
         setMockMainFile(
-          'from Standard.Base import Data\n\nmain =\n    data = Data.read\n    wrapped = Data.read Data.read_many\n',
+          "from Standard.Base import Data\n\nmain =\n    data = Data.read\n    wrapped = Data.read Data.read_many\n    nested = Data.read (Data.read_many 'a.csv')\n",
         ),
     },
   })
@@ -33,6 +33,7 @@ test.describe('The … menu of hidden parameters', () => {
       name: 'read',
     },
   }
+  const READ_MANY = { ...READ.methodPointer, name: 'read_many' }
 
   async function nodes(editorPage: EditorPageActions, page: Page) {
     await mockMethodCallInfo(
@@ -44,73 +45,118 @@ test.describe('The … menu of hidden parameters', () => {
     await mockMethodCallInfo(
       page,
       { binding: 'wrapped', expr: 'Data.read_many' },
-      {
-        methodPointer: { ...READ.methodPointer, name: 'read_many' },
-        notAppliedArguments: [0, 1, 2, 3],
-      },
+      { methodPointer: READ_MANY, notAppliedArguments: [0, 1, 2, 3] },
+    )
+    await mockMethodCallInfo(page, 'nested', { ...READ, notAppliedArguments: [1, 2] })
+    await mockMethodCallInfo(
+      page,
+      { binding: 'nested', expr: "Data.read_many 'a.csv'" },
+      { methodPointer: READ_MANY, notAppliedArguments: [1, 2, 3] },
     )
     const data = editorPage.locateNodes('data')
     const wrapped = editorPage.locateNodes('wrapped')
-    await expect(data.locator('.parameterMenuButton')).toHaveCount(1)
-    await expect(wrapped.locator('.parameterMenuButton')).toHaveCount(2)
-    return { data, wrapped }
+    const nested = editorPage.locateNodes('nested')
+    await expect(data.locator('.WidgetTopLevelArgument')).toHaveCount(1)
+    return { data, wrapped, nested }
   }
+
+  test('a ＋ per call, shown only while the node is selected', async ({ page, editorPage }) => {
+    const { data, wrapped } = await nodes(editorPage, page)
+    await expect(page.getByRole('button', { name: 'Add argument' })).toHaveCount(0)
+    await data.click({ position: { x: 8, y: 8 } })
+    await expect(data).toBeSelected()
+    await expect(actions.addArgumentButtons(data)).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Add argument' })).toHaveCount(1)
+    // Inside the node, at its end.
+    const nodeBox = (await data.locator('.content').boundingBox())!
+    const buttonBox = (await actions.addArgumentButtons(data).boundingBox())!
+    expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(nodeBox.x + nodeBox.width)
+    expect(buttonBox.x + buttonBox.width).toBeGreaterThan(nodeBox.x + nodeBox.width - 20)
+    await actions.clickAtBackground(page)
+    await expect(page.getByRole('button', { name: 'Add argument' })).toHaveCount(0)
+    // Two selected nodes: neither shows them.
+    await data.click({ position: { x: 8, y: 8 } })
+    await wrapped.click({ position: { x: 8, y: 8 }, modifiers: ['Shift'] })
+    await expect(wrapped).toBeSelected()
+    await expect(page.getByRole('button', { name: 'Add argument' })).toHaveCount(0)
+  })
+
+  test("a nested call's ＋ is inside its group, and its menu lists only its parameters", async ({
+    page,
+    editorPage,
+  }) => {
+    const { wrapped } = await nodes(editorPage, page)
+    await wrapped.click({ position: { x: 8, y: 8 } })
+    await expect(wrapped).toBeSelected()
+    const buttons = actions.addArgumentButtons(wrapped)
+    await expect(buttons).toHaveCount(2)
+    const group = wrapped.locator('.nestedCall')
+    await expect(group).toHaveCount(1)
+    await expect(group).toContainText('read_many')
+    await expect(group.getByRole('button', { name: 'Add argument' })).toHaveCount(1)
+    // The outer call's ends the node.
+    const outer = await actions.openAddArgumentMenu(page, wrapped, buttons.last())
+    await expect(outer.locator('.parameterItem .name')).toHaveText(['format', 'on_problems'])
+    await page.keyboard.press('Escape')
+    await expect(outer).toBeHidden()
+    const inner = await actions.openAddArgumentMenu(
+      page,
+      wrapped,
+      group.getByRole('button', { name: 'Add argument' }),
+    )
+    await expect(inner.locator('.parameterItem .name')).toHaveText(['on_problems'])
+    await inner.getByRole('button', { name: /^on_problems/ }).click()
+    await expect(inner).toBeHidden()
+    expect(await moduleCode(page)).toContain('wrapped = Data.read (Data.read_many on_problems=')
+  })
 
   test('picking a parameter writes it as a named argument', async ({ page, editorPage }) => {
     const { data } = await nodes(editorPage, page)
-    await data.locator('.parameterMenuButton').click()
-    await page
-      .getByRole('dialog', { name: 'More parameters' })
-      .getByRole('button', { name: /^format/ })
-      .click()
-    await expect(page.getByRole('dialog', { name: 'More parameters' })).toBeHidden()
+    await actions.addArgument(page, data, 'format')
     expect(await moduleCode(page)).toContain('data = Data.read format=Auto_Detect')
     await actions.clickAtBackground(page)
-    // `on_problems` is still hidden, so the button stays, and the menu no longer lists `format`.
-    await data.locator('.parameterMenuButton').click()
-    const menu = page.getByRole('dialog', { name: 'More parameters' })
+    // `on_problems` is still hidden, so the ＋ stays, and the menu no longer lists `format`.
+    const menu = await actions.openAddArgumentMenu(page, data)
     await expect(menu.getByRole('button', { name: /^on_problems/ })).toBeVisible()
     await expect(menu.getByRole('button', { name: /^format/ })).toHaveCount(0)
   })
 
-  test('selecting a node does not show hidden arguments, and keeps the button', async ({
-    page,
-    editorPage,
-  }) => {
+  test('selecting a node does not show hidden arguments', async ({ page, editorPage }) => {
     const { data } = await nodes(editorPage, page)
     const args = data.locator('.WidgetTopLevelArgument')
-    await expect(args).toHaveCount(1)
     await data.click({ position: { x: 8, y: 8 } })
     await expect(data).toBeSelected()
     await expect(args).toHaveCount(1)
-    await expect(data.locator('.parameterMenuButton')).toBeVisible()
     // An argument the user set stays shown.
-    await data.locator('.parameterMenuButton').click()
-    await page
-      .getByRole('dialog', { name: 'More parameters' })
-      .getByRole('button', { name: /^format/ })
-      .click()
+    await actions.addArgument(page, data, 'format')
     await expect(args).toHaveCount(2)
     await actions.clickAtBackground(page)
     await expect(args).toHaveCount(2)
   })
 
-  test('Escape, and a click on a node, close the menu; one menu is open at a time', async ({
+  test('every argument shows its name: a positional one in a nested call too', async ({
     page,
     editorPage,
   }) => {
+    const { nested } = await nodes(editorPage, page)
+    // In document order: `path`'s chip holds the nested call, whose set `paths` is positional.
+    await expect(nested.locator('.WidgetArgumentName > .name')).toHaveText([
+      'path',
+      'paths',
+      'format',
+      'return',
+    ])
+    await expect(nested.locator('.WidgetArgumentName').nth(1)).toContainText('a.csv')
+  })
+
+  test('Escape, and a click on a node, close the menu', async ({ page, editorPage }) => {
     const { data, wrapped } = await nodes(editorPage, page)
-    const menu = page.getByRole('dialog', { name: 'More parameters' })
-    await data.locator('.parameterMenuButton').click()
-    await expect(menu).toBeVisible()
+    const menu = await actions.openAddArgumentMenu(page, data)
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
 
-    await actions.clickAtBackground(page)
-    await data.locator('.parameterMenuButton').click()
+    await actions.addArgumentButtons(data).click()
     await expect(menu).toBeVisible()
-    await wrapped.locator('.parameterMenuButton').first().click()
-    await expect(menu).toHaveCount(1)
     await wrapped.click({ position: { x: 8, y: 8 } })
     await expect(menu).toBeHidden()
   })
