@@ -265,10 +265,11 @@ object DistributionPackage {
       // library is serialised ("Unable to write cache data"). A library whose
       // sources changed has no cache here (its directory was copied afresh);
       // one re-indexed only for its missing catalogue does, so drop it.
-      modifiedLibs.foreach(dir =>
-        IO.delete(dir / ".enso" / "cache" / "bindings")
-      )
-      try {
+      def dropBindingsCaches(): Unit =
+        modifiedLibs.foreach(dir =>
+          IO.delete(dir / ".enso" / "cache" / "bindings")
+        )
+      def index(): Unit =
         invokeIndexStdLibs(
           libRootDirs  = modifiedLibs,
           javaOpts     = javaOpts,
@@ -276,6 +277,21 @@ object DistributionPackage {
           log          = log,
           env          = env
         )
+      dropBindingsCaches()
+      try {
+        try {
+          index()
+        } catch {
+          // Note [Standard Library Indexing Is Retried Once]
+          case e: IndexingFailed =>
+            log.warn(
+              s"${e.getMessage} Trying once more: an identical second run " +
+              "has passed before (#860). If this attempt passes, the errors " +
+              "above are that flake; please add them to issue #860."
+            )
+            dropBindingsCaches()
+            index()
+        }
       } catch {
         case e: Throwable =>
           // `Tracked.diffInputs` has already recorded these libraries as
@@ -286,6 +302,46 @@ object DistributionPackage {
       }
     }
   }
+
+  /** The indexing process exited with an error (not a timeout). */
+  private class IndexingFailed(message: String)
+      extends RuntimeException(message)
+
+  /* Note [Standard Library Indexing Is Retried Once]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Once (15 Nov 2026, `ide-local` right after merging a `develop` that
+   * changed `Standard.Table`), indexing failed on a library whose sources had
+   * not changed, and an identical second run passed (#860):
+   *
+   *   …\Tableau_Format.enso: error: Wrong number of fields when matching on
+   *     Tableau_Format.Hyper_File. Expected 1 fields, but provided 0
+   *   …\Tableau_Format.enso: error: Wrong number of fields when matching on
+   *     Tableau_Format.Hyper_Table. Expected 2 fields, but provided 0
+   *   …\Tableau_Format.enso:135:47: error: The name `t` could not be found.
+   *
+   * The source has `Tableau_Format.Hyper_Table _ t -> t`, so the compiler saw
+   * constructor patterns without their fields, and the first two errors had no
+   * position. The odd paths it printed (`lib\Standard\Database\built-distribution\…`)
+   * mean nothing: `DiagnosticFormatter` relativises a path to the repository
+   * root and then resolves it against the working directory, which here is
+   * `lib\Standard\Database`.
+   *
+   * The cause is not known. It did not recur in 45 runs of this step's
+   * command on the same nine libraries (fresh `.enso` directories each time;
+   * some with `Table`'s sources changed between runs; 24 of them as two
+   * concurrent checkouts sharing the per-user IR cache, one with an older
+   * `Tableau_Format.enso`), and none of the failed CI runs from 14 to 17 Nov
+   * 2026 shows it (CI has no shared user cache). The per-user IR cache
+   * (`ModuleCache`) is shared by every checkout of the same version and does
+   * not check its data digest (Note [A Cache Is Written By Renaming] in
+   * `Cache` says it does), so a write from another checkout racing a read is
+   * one suspect; nothing confirms it.
+   *
+   * So a failed run is tried once more, with the bindings caches dropped
+   * again, as the second manual run was. A real compilation error fails twice
+   * and costs one more run (about 30 s); a timeout is not retried. The warning
+   * asks for the first attempt's errors, which are what #860 needs.
+   */
 
   private object FileOnlyFilter extends sbt.io.FileFilter {
     def accept(arg: File): Boolean = arg.isFile
@@ -446,7 +502,7 @@ object DistributionPackage {
       )
     }
     if (runningProcess.exitValue() != 0) {
-      throw new RuntimeException(s"Cannot compile [$libNames].")
+      throw new IndexingFailed(s"Cannot compile [$libNames].")
     } else {
       log.info(
         s"Successfully generated indexes for libraries [$libNames] in $current seconds."

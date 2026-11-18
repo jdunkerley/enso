@@ -25,10 +25,11 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   re-indexes a library whose sources changed or that has no `catalogue.json`
   (unless its `package.yaml` says `catalogue: false`), and drops those
   libraries' bindings caches first: on Windows a memory-mapped one cannot be
-  overwritten later in the same indexing process.
-  `EngineBundle.librariesNotBundled` names the standard libraries the IDE bundle
-  leaves out (and `IRCaches.checkCacheSizes` does not count):
-  `Database_Test_Suite`. `createEnginePackage` also copies
+  overwritten later in the same indexing process. A failed indexing run is tried
+  once more (Note [Standard Library Indexing Is Retried Once], #860: a one-off
+  failure whose cause is unknown). `EngineBundle.librariesNotBundled` names the
+  standard libraries the IDE bundle leaves out (and `IRCaches.checkCacheSizes`
+  does not count): `Database_Test_Suite`. `createEnginePackage` also copies
   `distribution/engine/jvm.options` to the package root (beside `component/`),
   and `EngineDistributionChecks.afterBuild` fails when it is missing: the
   launcher (`engine/runner` `JvmOptions`) and the shell launchers read it.
