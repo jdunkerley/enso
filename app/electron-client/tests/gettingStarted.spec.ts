@@ -137,6 +137,8 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     // the component shows two: the `operation` set to `..Text`, then `..Text`'s own (the last).
     const operations = page.locator('.GraphNode.selected').getByText('operation', { exact: true })
     await expect(operations).toHaveCount(2)
+    // The component has grown past the view's edge: bring it back into view.
+    await showSelectedComponent(page)
     await operations.last().click()
     await page.getByRole('button', { name: 'length', exact: true }).click()
 
@@ -215,7 +217,8 @@ test('Exercise 1', async ({ page, projectsDir }) => {
 
     // Set the filtered text value
     await showSelectedComponent(page)
-    await fillWidgetText(page, 'filter..Equal“”', 'Savings Account')
+    // A container's text includes its arguments' names (`to`).
+    await fillWidgetText(page, 'filter..Equalto“”', 'Savings Account')
   })
 
   // ---------------- Objective 4 ----------------
@@ -306,11 +309,10 @@ test('Exercise 2', async ({ page, projectsDir }) => {
     )
 
     // Choosing parameters
-    // The new item's `..Name` value: the innermost element showing it in the selected component.
+    // The new item's `..Name` column: the innermost drop-down showing it in the selected component.
     await page
-      .locator('.GraphNode.selected')
-      .locator('div')
-      .filter({ hasText: /^‘product_name’$/ })
+      .locator('.GraphNode.selected .WidgetSelection')
+      .filter({ hasText: /‘product_name’$/ })
       .last()
       .click()
     await page.getByRole('button', { name: 'Count', exact: true }).click()
@@ -407,7 +409,8 @@ test('Exercise 2', async ({ page, projectsDir }) => {
 
     // Write in the textbox
     await showSelectedComponent(page)
-    await fillWidgetText(page, '..Equal“”', 'G')
+    // A container's text includes its arguments' names (`to`).
+    await fillWidgetText(page, '..Equalto“”', 'G')
 
     await showSelectedComponent(page)
     await page.getByText('true_value', { exact: true }).click()
@@ -415,7 +418,7 @@ test('Exercise 2', async ({ page, projectsDir }) => {
 
     // // Write in the textbox
     await showSelectedComponent(page)
-    await fillWidgetText(page, '..If(..Equal“G”)“”', 'GBP', 1)
+    await fillWidgetText(page, '..Ifcondition(..Equalto“G”)true_value“”', 'GBP', 1)
 
     await showSelectedComponent(page)
     await page.getByText('false_value', { exact: true }).click()
