@@ -135,11 +135,7 @@ class DiagnosticFormatter(
       override def toString: String =
         try {
           val parsedPath = Path.of(path)
-          RepositoryFinder
-            .rewritePath(parsedPath)
-            .toAbsolutePath
-            .normalize()
-            .toString
+          RepositoryFinder.displayPath(parsedPath).toString
         } catch {
           case _: IllegalArgumentException =>
             path

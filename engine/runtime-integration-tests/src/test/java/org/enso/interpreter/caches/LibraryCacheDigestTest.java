@@ -345,6 +345,69 @@ public class LibraryCacheDigestTest {
     assertStaleCacheIsNotUsed(first, second, "Shapes", 1L, 1L);
   }
 
+  /**
+   * #872: a module's IR cache records the digest of its data, and a cache whose data does not match
+   * it (a racing write of another checkout, a damaged file) is rejected, not deserialised. Here the
+   * data is intact and only the recorded digest is wrong, so without the check the cache loads.
+   */
+  @Test
+  public void aModuleCacheWhoseDataDigestDoesNotMatchIsRejected() throws IOException {
+    var root = createLibrary("first", FIRST);
+    assertEquals(1L, run(root, ctx -> {}));
+    var meta = findIrCache("Helpers.meta");
+    assertNotNull("running writes Helpers's IR cache", meta);
+
+    var bytes = Files.readAllBytes(meta);
+    var rest = new java.io.ByteArrayOutputStream();
+    String sourceDigest;
+    try (var in = new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes))) {
+      sourceDigest = in.readUTF();
+      in.readUTF(); // the blob digest
+      in.transferTo(rest);
+    }
+    var out = new java.io.ByteArrayOutputStream();
+    try (var dos = new DataOutputStream(out)) {
+      dos.writeUTF(sourceDigest);
+      dos.writeUTF("0".repeat(40));
+      rest.writeTo(dos);
+    }
+    Files.write(meta, out.toByteArray());
+
+    var loaded = new boolean[] {true};
+    assertEquals(
+        1L,
+        run(
+            root,
+            ctx -> {
+              var found = ctx.findModule("local." + name + ".Helpers");
+              loaded[0] = found.isPresent() && found.get().wasLoadedFromCache();
+            }));
+    assertFalse("Helpers is compiled, not loaded from the cache", loaded[0]);
+  }
+
+  /** The same for data that is damaged: the module is compiled again, and the program runs. */
+  @Test
+  public void aCorruptedModuleCacheIsRecompiled() throws IOException {
+    var root = createLibrary("first", FIRST);
+    assertEquals(1L, run(root, ctx -> {}));
+    var ir = findIrCache("Helpers.ir");
+    assertNotNull("running writes Helpers's IR cache", ir);
+    var data = Files.readAllBytes(ir);
+    data[data.length - 1] ^= 0x5A;
+    Files.write(ir, data);
+
+    var loaded = new boolean[] {true};
+    assertEquals(
+        1L,
+        run(
+            root,
+            ctx -> {
+              var found = ctx.findModule("local." + name + ".Helpers");
+              loaded[0] = found.isPresent() && found.get().wasLoadedFromCache();
+            }));
+    assertFalse("Helpers is compiled, not loaded from the cache", loaded[0]);
+  }
+
   @Test
   public void theSameSourcesShareModuleIR() throws IOException {
     var first = createLibrary("first", FIRST);

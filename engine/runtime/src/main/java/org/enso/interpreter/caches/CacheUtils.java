@@ -117,7 +117,8 @@ final class CacheUtils {
    */
   static String computeDigestFromBytes(ByteBuffer bytes) {
     var sha = messageDigest();
-    sha.update(bytes);
+    // A duplicate: updating a digest consumes the buffer, which the caller still has to read.
+    sha.update(bytes.duplicate());
     return Hex.toHexString(sha.digest());
   }
 
