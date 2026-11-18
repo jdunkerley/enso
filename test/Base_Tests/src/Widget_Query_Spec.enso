@@ -148,6 +148,34 @@ add_specs suite_builder =
             error = error_of (Widget_Query.resolve_call sample spec_module sample_type "missing" ["arg"])
             error.get "step" . should_equal "lookup"
 
+    suite_builder.group "Widget_Query failures are logged once, with their causes and stack" group_builder->
+        sample = Sample.Value "a label"
+        method name = Widget_Method.Value spec_module sample_type name
+        no_cache = _-> Nothing
+
+        group_builder.specify "an error's entry has the method, the argument, the step, the message and the cause" <|
+            result = Widget_Query.resolve_argument (method "fails_with_error") "arg" sample no_cache
+            result.should_be_a Argument_Result.Failed
+            text = result.failure.log_text
+            text.should_contain "`arg` of enso_dev.Base_Tests.Widget_Query_Spec.Sample.fails_with_error"
+            text.should_contain "failed at the annotation: "
+            text.should_contain "no choices"
+            text.should_contain "caused by: "
+            text.should_contain "the cause"
+
+        group_builder.specify "a panic's entry has its stack" <|
+            result = Widget_Query.resolve_argument (method "fails_with_panic") "arg" sample no_cache
+            result.failure.stack.is_empty . should_be_false
+            result.failure.log_text . should_contain '\n    at '
+
+        group_builder.specify "is logged once per method, argument, inputs, step and message" <|
+            failure = (Widget_Query.resolve_argument (method "fails_with_error") "arg" sample no_cache).failure
+            inputs = "test inputs " + Random.uuid
+            Widget_Query.log_failure failure inputs . should_be_true
+            Widget_Query.log_failure failure inputs . should_be_false
+            Widget_Query.log_failure failure inputs+"2" . should_be_true
+
+
     suite_builder.group "LogOnce" group_builder->
         group_builder.specify "is true only the first time it sees a key" <|
             key = "Widget_Query_Spec " + Random.uuid
