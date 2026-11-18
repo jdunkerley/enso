@@ -39,7 +39,7 @@ type Data
     create =
         upload table connection = if connection.is_nothing then Nothing else
             table.select_into_database_table connection ("t"+column_count.to_text) temporary=True
-        duck = Panic.catch Any (Database.connect (DuckDB.In_Memory)) (_-> Nothing)
+        duck = (Panic.catch Any (Database.connect (DuckDB.In_Memory)) (_-> Nothing)).catch Any (_-> Nothing)
         Data.Value (make_table column_count) (upload (make_table column_count True) (Database.connect (SQLite.In_Memory))) (upload (make_table column_count) duck)
 
 ## A backend: its name, its table in `Data`, and the method pointer's module

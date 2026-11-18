@@ -7,13 +7,16 @@ median values =
     sorted = values.sort
     sorted.at (sorted.length.div 2)
 
+## `cold_ms` is the first call per backend and query (the engine and JIT are
+   already warm after the first backend); `warm_ms` is the median of 10 more.
 main =
     data = Widget_Query_Bench.Data.create
     IO.println "backend\tmethod\tcold_ms\twarm_ms\tkb\tflag"
     Widget_Query_Bench.backends.each backend->
+        # Force the table now, so `cold_ms` excludes building or uploading it.
+        _ = backend.table data
         Widget_Query_Bench.queries.each query->
-            call = Widget_Query_Bench.run_query backend data query
-            cold = time_ms call
+            cold = time_ms (Widget_Query_Bench.run_query backend data query)
             warm = median (0.up_to 10 . map _-> time_ms (Widget_Query_Bench.run_query backend data query))
             out = Widget_Query_Bench.run_query backend data query
             kb = if out.is_nothing then 0 else (out.length / 1024.0).round 1
