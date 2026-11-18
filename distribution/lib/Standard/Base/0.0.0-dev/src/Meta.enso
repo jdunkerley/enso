@@ -443,6 +443,41 @@ get_annotation target method parameter_name = @Tail_Call Meta_Helpers.get_annota
 ## ---
    private: true
    ---
+   The annotation of the parameter `parameter_name` of exactly the method
+   `method_name` that the module `module_name` defines on `type_name`: an
+   instance method, a static method or a constructor. `type_name` is a type's
+   qualified name, or the module's for a module method. The IDE names methods
+   this way (its method pointers), so an extension method or a method of `Any`
+   is found even when dispatch on a value would pick another one.
+
+   ## Arguments
+    - `module_name`: The qualified name of the module that defines the method.
+    - `type_name`: The qualified name of the type (or module) it is defined on.
+    - `method_name`: The method's or constructor's name.
+    - `parameter_name`: The name of the parameter.
+
+   ## Returns
+   The evaluated annotation, or `Nothing` when the parameter has none. A
+   `No_Such_Method` or `Module_Does_Not_Exist` error when there is no such
+   method.
+get_method_annotation (module_name : Text) (type_name : Text) (method_name : Text) (parameter_name : Text) -> Any =
+    @Tail_Call Meta_Helpers.get_method_annotation_builtin module_name type_name method_name parameter_name
+
+## ---
+   private: true
+   ---
+   The type named `qualified_name`, or else the module of that name (the type
+   its module methods are defined on). A type wins over a module of the same
+   name: `Standard.Base.Data.Boolean.Boolean` is the type.
+
+   ## Arguments
+    - `qualified_name`: The type's or the module's qualified name.
+find_type_or_module (qualified_name : Text) -> Any =
+    Meta_Helpers.find_type_or_module_builtin qualified_name
+
+## ---
+   private: true
+   ---
    Represents a polyglot language.
 type Language
     ## ---
