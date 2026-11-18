@@ -18,8 +18,6 @@ const props = defineProps<{
   /** The call's port: the menu's interaction is keyed on it. */
   port: PortId
   parameters: HiddenParameter[]
-  /** The node shows its details, which include these parameters: the button hides (unless open). */
-  collapsed: boolean
 }>()
 const emit = defineEmits<{ pick: [HiddenParameter] }>()
 
@@ -59,7 +57,6 @@ function pick(parameter: HiddenParameter) {
 
 <template>
   <button
-    v-show="!collapsed || open"
     ref="buttonElement"
     class="parameterMenuButton widgetSingleLine widgetApplyPadding clickable"
     type="button"

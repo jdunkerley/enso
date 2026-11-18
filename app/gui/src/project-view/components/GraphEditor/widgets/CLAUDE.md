@@ -179,8 +179,8 @@ render only its own slot content. The icon is already on the row, drawn by
 
 - The `…` after a call's arguments (`WidgetFunction/ParameterMenu.vue`; which
   parameters it offers: `WidgetFunction/hiddenParameters.ts`) adds a parameter
-  the call is not showing, always written as a named argument. The button hides
-  while it is the only selected node, unless its menu is open.
+  the call is not showing, always written as a named argument. The button stays
+  while the node is selected (selecting a node does not show hidden arguments).
 - `WidgetPort` marks an argument that can be popped out with `data-pop-out-port`
   (plus `data-pop-out-name` and `data-pop-out-type`); dragging it off the node
   makes it a node of its own. The drag and the edit are in `../popOut/` - see
