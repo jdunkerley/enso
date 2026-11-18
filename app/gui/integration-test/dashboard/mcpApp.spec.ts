@@ -52,6 +52,7 @@ test('get_app_state reports the dashboard and no project', async ({ drivePage, p
   expect(await call(page, 'get_graph', { previews: false })).toEqual({
     ok: false,
     error: NO_PROJECT_ERROR,
+    refused: true,
   })
 })
 
@@ -108,6 +109,7 @@ test('close_project returns to the dashboard', async ({ drivePage, page }) => {
   expect(await call(page, 'get_graph', { previews: false })).toEqual({
     ok: false,
     error: NO_PROJECT_ERROR,
+    refused: true,
   })
   expect(await call(page, 'close_project')).toEqual({
     ok: false,
