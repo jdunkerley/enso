@@ -1,0 +1,71 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Widget_Query
+
+from Standard.Table import Table
+from Standard.Database import all
+from Standard.SQLite import all
+from Standard.DuckDB import all
+
+from Standard.Test import Bench
+
+options = Bench.options . set_warmup (Bench.phase_conf 1 2) . set_measure (Bench.phase_conf 1 3)
+
+column_count = 500
+row_count = 1000
+
+## A table of `width` columns of five kinds (integer, float, text, date,
+   boolean) and `row_count` rows. SQLite stores dates as text.
+make_table width (date_as_text : Boolean = False) =
+    columns = 0.up_to width . map i->
+        values = case i % 5 of
+            0 -> 0.up_to row_count . map j-> j+i
+            1 -> 0.up_to row_count . map j-> (j*0.5)+i
+            2 -> 0.up_to row_count . map j-> "t"+(j%50).to_text
+            3 -> 0.up_to row_count . map j->
+                date = (Date.new 2020 1 1) + (Period.new days=(j%365))
+                if date_as_text then date.to_text else date
+            _ -> 0.up_to row_count . map j-> (j%2)==0
+        ["c"+i.to_text, values]
+    Table.new columns
+
+## The baseline's widget queries: method and arguments.
+queries = [["select_columns", ["columns"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["join", ["on", "join_kind"]]]
+
+## The tables, built when first used. `duckdb` is `Nothing` where DuckDB
+   cannot start (the benchmark job also runs off Linux).
+type Data
+    Value ~memory ~sqlite ~duckdb
+
+    create =
+        upload table connection = if connection.is_nothing then Nothing else
+            table.select_into_database_table connection ("t"+column_count.to_text) temporary=True
+        duck = Panic.catch Any (Database.connect (DuckDB.In_Memory)) (_-> Nothing)
+        Data.Value (make_table column_count) (upload (make_table column_count True) (Database.connect (SQLite.In_Memory))) (upload (make_table column_count) duck)
+
+## A backend: its name, its table in `Data`, and the method pointer's module
+   and type for it.
+type Backend
+    Value name:Text table:(Data -> Any) module_name:Text type_name:Text
+
+## A database table's widgets resolve against `Standard.Table.Table`, not
+   `DB_Table`.
+backends =
+    table_module = "Standard.Table.Table"
+    table_type = "Standard.Table.Table.Table"
+    [Backend.Value "In_Memory" (d-> d.memory) table_module table_type, Backend.Value "SQLite" (d-> d.sqlite) table_module table_type, Backend.Value "DuckDB" (d-> d.duckdb) table_module table_type]
+
+## One widget query, as the IDE makes it; `Nothing` when the backend is absent.
+run_query (backend : Backend) data query =
+    table = backend.table data
+    if table.is_nothing then Nothing else
+        Widget_Query.resolve_call table backend.module_name backend.type_name query.first query.second
+
+collect_benches = Bench.build builder->
+    data = Data.create
+    backends.each backend->
+        builder.group ("Widget_Query_" + backend.name + "_" + column_count.to_text) options group_builder->
+            queries.each query->
+                group_builder.specify query.first <|
+                    run_query backend data query
+
+main = collect_benches . run_main
