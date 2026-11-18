@@ -1,0 +1,24 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+main =
+    n1 = 10
+    n2 = n1 + 1
+    n3 = n1 * 2
+    n4 = n2 + n3
+    n5 = n4 + 1
+    n6 = n3 - 1
+    n7 = n5 + n6
+    n8 = n7 * 2
+    n9 = n6 + 3
+    n10 = n8 + n9
+    n11 = n10 - n7
+    n12 = n11 + n1
+    n12
+
+
+
+#### METADATA ####
+[[{"index":{"value":108},"size":{"value":2}},"eb591ab7-e10c-4ecf-8a04-e91180c04b69"],[{"index":{"value":120},"size":{"value":6}},"15da54ce-d688-4531-8278-4ef0f78903b3"],[{"index":{"value":136},"size":{"value":6}},"2874e178-248a-44e0-89f2-c4cda7b033bb"],[{"index":{"value":152},"size":{"value":7}},"10e1d649-857a-49cd-8cfa-53f937be7050"],[{"index":{"value":169},"size":{"value":6}},"4f59fb8e-744b-4f6f-84b7-df4fff097926"],[{"index":{"value":185},"size":{"value":6}},"1139e9af-b4a2-4974-87b9-6c2a21981a85"],[{"index":{"value":201},"size":{"value":7}},"23a606f5-207a-4961-8413-172e3624275e"],[{"index":{"value":218},"size":{"value":6}},"8be57855-f5ce-473d-8aef-286b7f5c8a87"],[{"index":{"value":234},"size":{"value":6}},"7d1a67d3-26aa-48b3-8020-cc6e493100a3"],[{"index":{"value":251},"size":{"value":7}},"7509ddb9-59d8-4345-8268-e1d9bbc73e6e"],[{"index":{"value":269},"size":{"value":8}},"06d583c8-0734-4ada-863d-a5cd374563f1"],[{"index":{"value":288},"size":{"value":8}},"6741cb71-c19f-4569-8417-ea0a365bc4cf"]]
+{"ide":{"node":{"eb591ab7-e10c-4ecf-8a04-e91180c04b69":{"position":{"vector":[-16,0]}},"15da54ce-d688-4531-8278-4ef0f78903b3":{"position":{"vector":[-16,-72]}},"2874e178-248a-44e0-89f2-c4cda7b033bb":{"position":{"vector":[-16,-144]}},"10e1d649-857a-49cd-8cfa-53f937be7050":{"position":{"vector":[-16,-216]}},"4f59fb8e-744b-4f6f-84b7-df4fff097926":{"position":{"vector":[-16,-288]}},"1139e9af-b4a2-4974-87b9-6c2a21981a85":{"position":{"vector":[-16,-360]}},"23a606f5-207a-4961-8413-172e3624275e":{"position":{"vector":[-16,-432]}},"8be57855-f5ce-473d-8aef-286b7f5c8a87":{"position":{"vector":[-16,-504]}},"7d1a67d3-26aa-48b3-8020-cc6e493100a3":{"position":{"vector":[-16,-576]}},"7509ddb9-59d8-4345-8268-e1d9bbc73e6e":{"position":{"vector":[-16,-648]}},"06d583c8-0734-4ada-863d-a5cd374563f1":{"position":{"vector":[-16,-720]}},"6741cb71-c19f-4569-8417-ea0a365bc4cf":{"position":{"vector":[-16,-792]}}},"widget":{},"import":{}}}

@@ -1,0 +1,27 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+## Trims `text` and puts each word in title case.
+
+   ## Arguments
+   - `text`: The name to tidy up, such as `  alice SMITH`.
+
+   ## Examples
+   ### A messy name
+   ```
+   name = '  alice SMITH'
+   tidy = Main.clean_names name
+   ```
+clean_names text =
+    text.trim.to_case ..Title
+
+## Tidies three names and counts them.
+
+   Each name goes through `clean_names`.
+main =
+    raw = ['  alice SMITH', 'bOB  jones ', 'carol   white']
+    first_name = Main.clean_names (raw.at 0)
+    cleaned = raw.map Main.clean_names
+    summary = [first_name, cleaned.length]
+    summary

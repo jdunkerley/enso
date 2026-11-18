@@ -60,6 +60,7 @@ import {
 import { enableAll } from './security.js'
 import { Config, Server } from './server.js'
 import { holdQuitForSpareEngine } from './spareQuit.js'
+import { useTestUserDataDirectory } from './testUserData.js'
 
 type Electron = typeof import('electron')
 
@@ -622,6 +623,8 @@ class App {
       this.showErrorBox(PRODUCT_NAME, err.stack ?? err.toString())
       this.exit(1)
     })
+    // Before anything reads `userData`, the logger included.
+    if (this.electron) useTestUserDataDirectory(this.electron.app)
     setupLogger(this.electron)
     if (args.version) {
       await this.printVersion()

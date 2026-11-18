@@ -1,0 +1,12 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+main =
+    customers = Data.read (enso_project.data / 'customers.csv') (..Delimited headers=..Has_Headers)
+    orders = Data.read (enso_project.data / 'orders.csv') (..Delimited headers=..Has_Headers)
+    joiners = customers.filter 'joined' (..Between (Date.new 2024 1 1) (Date.new 2024 12 31))
+    with_orders = joiners.join orders ..Left_Outer [..Equals 'id' 'customer_id']
+    totals = with_orders.aggregate ['region'] [..Sum 'amount' 'total']
+    result = totals.sort ['region']
+    result
