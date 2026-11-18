@@ -128,7 +128,7 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     await page.getByText('input', { exact: true }).click()
     await page.getByRole('button', { name: 'currency_code', exact: true }).click()
 
-    // `operation` and `as` have defaults, so they are hidden: add each with the add-argument control.
+    // `operation` and `as` have defaults, so they are hidden: add each with a ＋.
     const operation = await addParameter(page, 'operation')
     await openDropdownInArgument(page, operation)
     await page.getByRole('button', { name: 'Text', exact: true }).click()
@@ -386,7 +386,7 @@ test('Exercise 2', async ({ page, projectsDir }) => {
     await openDropdownInWidget(page, 'input')
     await page.getByRole('button', { name: 'currency_code', exact: true }).click()
 
-    // `operation` has a default, so it is hidden: add it with the add-argument control.
+    // `operation` has a default, so it is hidden: add it with a ＋.
     const operation = await addParameter(page, 'operation')
     await openDropdownInArgument(page, operation)
     await page.getByRole('button', { name: 'if', exact: true }).click()

@@ -37,35 +37,46 @@ export async function openVisualization(page: Page, visName: string) {
 // === Widgets ===
 // ===============
 
-/** The node's add-argument control, shown right of it while it is the only selected node. */
-export function addArgumentButton(node: Locator) {
+/**
+ * The node's ＋ buttons, one per call with hidden parameters, shown while the node is the only
+ * selected one. A nested call's comes first (after its own arguments); the last is the outer
+ * call's, at the node's end.
+ */
+export function addArgumentButtons(node: Locator) {
   return node.getByRole('button', { name: 'Add argument' })
 }
 
-/** The open menu of the add-argument control. */
+/** The open menu of a ＋ button. */
 export function addArgumentMenu(page: Page) {
   return page.getByRole('dialog', { name: 'Add argument' })
 }
 
-/** Select the node (by its left edge, clear of its widgets) and open its add-argument menu. */
-export async function openAddArgumentMenu(page: Page, node: Locator) {
+/**
+ * Select the node (by its left edge, clear of its widgets) and open the menu of one of its ＋
+ * buttons: by default the outer call's.
+ */
+export async function openAddArgumentMenu(
+  page: Page,
+  node: Locator,
+  button: Locator = addArgumentButtons(node).last(),
+) {
   await node.click({ position: { x: 8, y: 8 } })
   await expect(node).toBeSelected()
-  await addArgumentButton(node).click()
+  await button.click()
   await expect(addArgumentMenu(page)).toBeVisible()
   return addArgumentMenu(page)
 }
 
-/** Add the hidden parameter `name` to the node through its add-argument menu. */
-export async function addArgument(page: Page, node: Locator, name: string) {
-  const menu = await openAddArgumentMenu(page, node)
+/** Add the hidden parameter `name` to the node through a ＋ menu (by default the outer call's). */
+export async function addArgument(page: Page, node: Locator, name: string, button?: Locator) {
+  const menu = await openAddArgumentMenu(page, node, button)
   await menu.getByRole('button', { name: new RegExp(`^${name}( |$)`) }).click()
   await expect(menu).toBeHidden()
 }
 
 /**
- * Show a node's hidden arguments: pick every parameter the add-argument menu offers. Selecting a
- * node does not show them (#836).
+ * Show a node's hidden arguments: pick every parameter the outer call's ＋ menu offers. Selecting
+ * a node does not show them (#836).
  */
 export async function showHiddenArguments(page: Page, node: Locator) {
   const menu = await openAddArgumentMenu(page, node)

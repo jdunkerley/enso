@@ -15,7 +15,7 @@ async function moduleCode(page: Page): Promise<string> {
   return code
 }
 
-test.describe('The add-argument control', () => {
+test.describe('The ＋ of hidden parameters', () => {
   test.afterEach(restoreMockMainFile)
   test.use({
     setupApi: {
@@ -60,45 +60,53 @@ test.describe('The add-argument control', () => {
     return { data, wrapped, nested }
   }
 
-  test('shown only while the node is selected', async ({ page, editorPage }) => {
+  test('a ＋ per call, shown only while the node is selected', async ({ page, editorPage }) => {
     const { data, wrapped } = await nodes(editorPage, page)
     await expect(page.getByRole('button', { name: 'Add argument' })).toHaveCount(0)
     await data.click({ position: { x: 8, y: 8 } })
     await expect(data).toBeSelected()
-    await expect(actions.addArgumentButton(data)).toBeVisible()
+    await expect(actions.addArgumentButtons(data)).toHaveCount(1)
     await expect(page.getByRole('button', { name: 'Add argument' })).toHaveCount(1)
-    // Outside the node, on its right.
+    // Inside the node, at its end.
     const nodeBox = (await data.locator('.content').boundingBox())!
-    const buttonBox = (await actions.addArgumentButton(data).boundingBox())!
-    expect(buttonBox.x).toBeGreaterThanOrEqual(nodeBox.x + nodeBox.width)
+    const buttonBox = (await actions.addArgumentButtons(data).boundingBox())!
+    expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(nodeBox.x + nodeBox.width)
+    expect(buttonBox.x + buttonBox.width).toBeGreaterThan(nodeBox.x + nodeBox.width - 20)
     await actions.clickAtBackground(page)
     await expect(page.getByRole('button', { name: 'Add argument' })).toHaveCount(0)
-    // Two selected nodes: neither shows it.
+    // Two selected nodes: neither shows them.
     await data.click({ position: { x: 8, y: 8 } })
     await wrapped.click({ position: { x: 8, y: 8 }, modifiers: ['Shift'] })
     await expect(wrapped).toBeSelected()
     await expect(page.getByRole('button', { name: 'Add argument' })).toHaveCount(0)
   })
 
-  test('a node with nested calls has one control, its menu grouped by call', async ({
+  test("a nested call's ＋ is inside its group, and its menu lists only its parameters", async ({
     page,
     editorPage,
   }) => {
     const { wrapped } = await nodes(editorPage, page)
-    const menu = await actions.openAddArgumentMenu(page, wrapped)
-    await expect(wrapped.getByRole('button', { name: 'Add argument' })).toHaveCount(1)
-    await expect(menu.locator('.groupHeading')).toHaveText(['read', 'read_many'])
-    await expect(menu.locator('.parameterItem .name')).toHaveText([
-      'format',
-      'on_problems',
-      'on_problems',
-    ])
-    // The nested call's `on_problems` goes into `Data.read_many`.
-    await menu
-      .getByRole('button', { name: /^on_problems/ })
-      .last()
-      .click()
-    await expect(menu).toBeHidden()
+    await wrapped.click({ position: { x: 8, y: 8 } })
+    await expect(wrapped).toBeSelected()
+    const buttons = actions.addArgumentButtons(wrapped)
+    await expect(buttons).toHaveCount(2)
+    const group = wrapped.locator('.nestedCall')
+    await expect(group).toHaveCount(1)
+    await expect(group).toContainText('read_many')
+    await expect(group.getByRole('button', { name: 'Add argument' })).toHaveCount(1)
+    // The outer call's ends the node.
+    const outer = await actions.openAddArgumentMenu(page, wrapped, buttons.last())
+    await expect(outer.locator('.parameterItem .name')).toHaveText(['format', 'on_problems'])
+    await page.keyboard.press('Escape')
+    await expect(outer).toBeHidden()
+    const inner = await actions.openAddArgumentMenu(
+      page,
+      wrapped,
+      group.getByRole('button', { name: 'Add argument' }),
+    )
+    await expect(inner.locator('.parameterItem .name')).toHaveText(['on_problems'])
+    await inner.getByRole('button', { name: /^on_problems/ }).click()
+    await expect(inner).toBeHidden()
     expect(await moduleCode(page)).toContain('wrapped = Data.read (Data.read_many on_problems=')
   })
 
@@ -107,12 +115,10 @@ test.describe('The add-argument control', () => {
     await actions.addArgument(page, data, 'format')
     expect(await moduleCode(page)).toContain('data = Data.read format=Auto_Detect')
     await actions.clickAtBackground(page)
-    // `on_problems` is still hidden, so the control stays, and the menu no longer lists `format`.
+    // `on_problems` is still hidden, so the ＋ stays, and the menu no longer lists `format`.
     const menu = await actions.openAddArgumentMenu(page, data)
     await expect(menu.getByRole('button', { name: /^on_problems/ })).toBeVisible()
     await expect(menu.getByRole('button', { name: /^format/ })).toHaveCount(0)
-    // A single call's menu has no headings.
-    await expect(menu.locator('.groupHeading')).toHaveCount(0)
   })
 
   test('selecting a node does not show hidden arguments', async ({ page, editorPage }) => {
@@ -149,7 +155,7 @@ test.describe('The add-argument control', () => {
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
 
-    await actions.addArgumentButton(data).click()
+    await actions.addArgumentButtons(data).click()
     await expect(menu).toBeVisible()
     await wrapped.click({ position: { x: 8, y: 8 } })
     await expect(menu).toBeHidden()

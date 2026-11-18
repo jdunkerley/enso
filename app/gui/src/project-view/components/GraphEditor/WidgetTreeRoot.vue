@@ -81,8 +81,6 @@ export const ICON_WIDTH = 16
     v-on="layoutTransitions.events"
   >
     <NodeWidget :input="input" :updateCallback="updateCallback" />
-    <!-- Controls that need the tree's context but sit outside its layout. -->
-    <slot />
   </div>
 </template>
 

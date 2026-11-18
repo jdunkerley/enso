@@ -118,7 +118,7 @@ test('choosing SQLite in the format dropdown adds its import; one undo removes b
 }) => {
   await editorPage
   const node = await dataReadNode(page)
-  // `format` is hidden by default: the add-argument control adds it.
+  // `format` is hidden by default: its ＋ adds it.
   await actions.addArgument(page, node, 'format')
   const formatArg = node
     .locator('.WidgetTopLevelArgument')

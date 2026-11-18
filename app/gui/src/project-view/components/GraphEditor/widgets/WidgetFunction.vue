@@ -19,9 +19,9 @@ import {
 import {
   hiddenParameters,
   insertPrefixArgument,
-  nextParameterGroupOrder,
   type HiddenParameter,
 } from '@/components/GraphEditor/widgets/WidgetFunction/hiddenParameters'
+import ParameterMenu from '@/components/GraphEditor/widgets/WidgetFunction/ParameterMenu.vue'
 import {
   getPotentialModuleFunctionPointer,
   useWidgetFunctionCallInfo,
@@ -121,35 +121,22 @@ const innerInput = computed(() => {
 })
 
 /**
- * The parameters the node's add-argument control offers for this call: the unset ones with a
- * default, which the tree hides. Selecting the node does not show them; the control is the way to
- * reach them.
+ * The parameters this call's ＋ menu offers: the unset ones with a default, which the tree hides.
+ * Selecting the node does not show them; the menu is the way to reach them.
  */
 const hidden = computed(() => (application.value ? hiddenParameters(application.value) : []))
 
 const tree = injectWidgetTree(true)
-const groupKey = Symbol('hiddenParameters')
-const groupOrder = nextParameterGroupOrder()
-const callDepth = computed(() => {
-  let depth = 0
-  for (let ast = props.input.value.parent(); ast; ast = ast.parent()) depth += 1
-  return depth
-})
-const callName = computed(
-  () => methodCallInfo.value?.suggestion.name ?? props.input.value.code().split(/\s/)[0] ?? '',
+const parentCall = injectFunctionInfo(true)
+/** The ＋ shows only while the node is selected (the only selected node). */
+const showParameterMenu = computed(() => hidden.value.length > 0 && !!tree?.showDetails)
+/**
+ * A call inside another call's argument. It is drawn as an outlined group, so that its ＋, after
+ * its own last argument, clearly belongs to it; the outermost call's ＋ ends the node.
+ */
+const nested = computed(
+  () => parentCall != null && application.value instanceof ArgumentApplication,
 )
-watchEffect((onCleanup) => {
-  if (!tree || hidden.value.length === 0) return
-  const groups = tree.hiddenParameterGroups
-  groups.set(groupKey, {
-    callName: callName.value,
-    depth: callDepth.value,
-    order: groupOrder,
-    parameters: hidden.value,
-    insert: insertParameter,
-  })
-  onCleanup(() => groups.delete(groupKey))
-})
 
 /** Insert a hidden parameter with its default value's code. It is always written as a named argument. */
 function insertParameter(parameter: HiddenParameter) {
@@ -403,5 +390,32 @@ export const widgetDefinition = defineWidget(
 </script>
 
 <template>
-  <NodeWidget :input="innerInput" :updateCallback="handleArgUpdate" />
+  <div v-if="nested" class="WidgetFunction nestedCall widgetParent widgetRounded">
+    <NodeWidget :input="innerInput" :updateCallback="handleArgUpdate" />
+    <ParameterMenu
+      v-if="showParameterMenu"
+      :port="props.input.value.id"
+      :parameters="hidden"
+      nested
+      @pick="insertParameter"
+    />
+  </div>
+  <template v-else>
+    <NodeWidget :input="innerInput" :updateCallback="handleArgUpdate" />
+    <ParameterMenu
+      v-if="showParameterMenu"
+      :port="props.input.value.id"
+      :parameters="hidden"
+      :nested="false"
+      @pick="insertParameter"
+    />
+  </template>
 </template>
+
+<style scoped>
+.nestedCall {
+  gap: var(--widget-token-pad-unit);
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: var(--node-port-border-radius);
+}
+</style>
