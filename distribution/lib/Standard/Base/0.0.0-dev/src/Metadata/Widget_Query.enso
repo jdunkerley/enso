@@ -1,0 +1,250 @@
+import project.Any.Any
+import project.Data.Numbers.Integer
+import project.Data.Text.Text
+import project.Data.Vector.Vector
+import project.Errors.Common.Module_Does_Not_Exist
+import project.Errors.Common.No_Such_Method
+import project.Function.Function
+import project.Meta
+import project.Metadata.Widget
+import project.Panic.Caught_Panic
+import project.Panic.Panic
+import project.Runtime
+import project.Warning.Warning
+from project.Data.Boolean import Boolean, False, True
+from project.Data.Json.Extensions import all
+from project.Data.Text.Extensions import all
+from project.Error import all
+from project.Logging import all
+from project.Nothing import all
+
+polyglot java import java.lang.Throwable
+polyglot java import org.enso.base.LogOnce
+
+## ---
+   private: true
+   ---
+   The IDE's widget query for a call: for each of `argument_names`, the widget
+   the method's annotation gives, or why there is none. The IDE calls it as a
+   method-pointer visualization on the call's subject, so nothing is compiled
+   in the user's module.
+
+   The method is the one the call names (the IDE's method pointer), found
+   exactly: a static method, an extension method or a method of `Any` gets its
+   own annotations.
+
+   Each failure is also logged once (`log_failure`), and the query is timed
+   under `Standard.Base.Logging.Progress` (the IDE's performance timings).
+
+   ## Arguments
+    - `value`: The call's subject (the visualized expression's value).
+    - `module_name`: The module that defines the method.
+    - `type_name`: The type the method is defined on (the module, for a module
+      method).
+    - `method_name`: The method's or constructor's name.
+    - `argument_names`: The arguments to resolve.
+    - `uuids`: JSON mapping argument names to expression ids, read by
+      annotations that take `cache`.
+    - `subject_is_type`: Whether the subject an annotation sees is the type
+      named by `type_name` rather than `value` (a call with no subject
+      expression, such as an autoscoped constructor).
+
+   ## Returns
+   `{"arguments":[[<name>,{"widget":<widget or null>}|{"error":{"step":…,"message":…}}],…]}`,
+   read by `app/gui/src/providers/openedProjects/widgetRegistry/configuration.ts`
+   (`widgetQueryAnswerSchema`).
+resolve_call (value : Any) (module_name : Text) (type_name : Text) (method_name : Text) (argument_names : Vector Text) (uuids : Text = "{}") (subject_is_type : Boolean = False) -> Text =
+    method = Widget_Method.Value module_name type_name method_name
+    Progress.run label=method.qualified_name up_to=1 handle_name="Widget_Query."+method.qualified_name action=_->
+        subject = if subject_is_type then Meta.find_type_or_module type_name else Warning.clear value
+        cache = _cache_from uuids
+        inputs = _inputs_key subject uuids
+        entries = argument_names.map argument->
+            result = resolve_argument method argument subject cache
+            _ = case result of
+                Argument_Result.Failed failure -> log_failure failure inputs
+                _ -> False
+            '[' + argument.to_json + ',' + result.to_json + ']'
+        '{"arguments":[' + (entries.join ",") + ']}'
+
+## ---
+   private: true
+   ---
+   The widget of one argument, or why there is none. An annotation is a
+   `Widget`, or a function of the subject, which may also take `cache`.
+
+   ## Arguments
+    - `method`: The method.
+    - `argument`: The argument's name.
+    - `subject`: What a function annotation is applied to.
+    - `cache`: Looks an argument's value up by name or index (`uuids`).
+resolve_argument (method : Widget_Method) (argument : Text) subject (cache : Function) -> Argument_Result =
+    Panic.catch Any handler=(caught-> Argument_Result.Failed (_failure_from_panic method argument caught)) <|
+        annotation = Meta.get_method_annotation method.module_name method.type_name method.method_name argument
+        if annotation.is_error && (_is_lookup_error annotation.catch) then Argument_Result.Failed (_failure_from_error method argument "lookup" annotation) else
+            widget = case annotation of
+                f : Function ->
+                    with_cache = Meta.meta f . arguments pending=True defaulted=True . contains "cache"
+                    applied = if with_cache then f cache=cache else f
+                    applied subject
+                _ -> annotation
+            _as_result method argument widget
+
+## ---
+   private: true
+   ---
+   Logs `failure` at Warning, once per method, argument, inputs, step and
+   message in this engine session: a widget that fails on every keystroke is
+   logged once.
+
+   ## Arguments
+    - `failure`: The failure.
+    - `inputs`: What the result depends on: the subject's type and the uuids.
+
+   ## Returns
+   Whether it logged.
+log_failure (failure : Widget_Failure) (inputs : Text) -> Boolean =
+    key = failure.method.module_name + "|" + failure.method.qualified_name + "|" + failure.argument + "|" + inputs + "|" + failure.step + "|" + failure.message
+    first = LogOnce.firstTime key
+    if first then Widget_Query.log_internal failure.log_text ..Warning
+    first
+
+## ---
+   private: true
+   ---
+   The method a widget query is for, as the IDE's method pointer names it.
+
+   ## Arguments
+    - `module_name`: The module that defines the method.
+    - `type_name`: The type it is defined on, or the module.
+    - `method_name`: Its name.
+type Widget_Method
+    ## ---
+       private: true
+       ---
+    Value module_name:Text type_name:Text method_name:Text
+
+    ## ---
+       private: true
+       ---
+       `<type>.<name>`.
+    qualified_name self -> Text = self.type_name + "." + self.method_name
+
+## ---
+   private: true
+   ---
+   Why the widget of one argument could not be resolved.
+
+   ## Arguments
+    - `method`: The method.
+    - `argument`: The argument's name.
+    - `step`: `"lookup"` (no such method or module) or `"annotation"`
+      (evaluating the annotation failed, or did not give a `Widget`).
+    - `message`: What went wrong.
+    - `causes`: The error's causes, outermost first.
+    - `stack`: For a panic, its Enso stack trace.
+type Widget_Failure
+    ## ---
+       private: true
+       ---
+    Value method:Widget_Method argument:Text step:Text message:Text causes:(Vector Text) stack:(Vector Text)
+
+    ## ---
+       private: true
+       ---
+       The failure as the IDE reads it.
+    to_json self -> Text =
+        '{"step":' + self.step.to_json + ',"message":' + self.message.to_json + '}'
+
+    ## ---
+       private: true
+       ---
+       The failure as one log entry.
+    log_text self -> Text =
+        head = "The widget of `" + self.argument + "` of " + self.method.qualified_name + " (defined in " + self.method.module_name + ") failed at the " + self.step + ": " + self.message
+        causes = self.causes.map cause-> '\n    caused by: ' + cause
+        stack = self.stack.map element-> '\n    ' + element
+        head + (causes.join "") + (stack.join "")
+
+## ---
+   private: true
+   ---
+   The result for one argument.
+type Argument_Result
+    ## ---
+       private: true
+       ---
+       The argument's widget (`Nothing`: none) and its JSON.
+    Resolved widget:(Widget | Nothing) json:Text
+
+    ## ---
+       private: true
+       ---
+       The widget could not be resolved.
+    Failed failure:Widget_Failure
+
+    ## ---
+       private: true
+       ---
+       `{"widget":…}` or `{"error":…}`.
+    to_json self -> Text = case self of
+        Argument_Result.Resolved _ json -> '{"widget":' + json + '}'
+        Argument_Result.Failed failure -> '{"error":' + failure.to_json + '}'
+
+private _as_result (method : Widget_Method) (argument : Text) widget -> Argument_Result =
+    if widget.is_error then Argument_Result.Failed (_failure_from_error method argument "annotation" widget) else
+        case widget of
+            Nothing -> Argument_Result.Resolved Nothing "null"
+            _ : Widget ->
+                json = widget.to_json
+                if json.is_error then Argument_Result.Failed (_failure_from_error method argument "annotation" json) else
+                    Argument_Result.Resolved widget json
+            _ ->
+                message = "The annotation gave " + (Meta.type_of widget . to_text) + ", not a Widget."
+                Argument_Result.Failed (Widget_Failure.Value method argument "annotation" message [] [])
+
+private _is_lookup_error payload -> Boolean = case payload of
+    _ : No_Such_Method -> True
+    _ : Module_Does_Not_Exist -> True
+    _ -> False
+
+private _failure_from_error (method : Widget_Method) (argument : Text) (step : Text) error -> Widget_Failure =
+    payload = error.catch
+    Widget_Failure.Value method argument step (_describe payload) (_cause_chain payload) []
+
+private _failure_from_panic (method : Widget_Method) (argument : Text) (caught : Caught_Panic) -> Widget_Failure =
+    payload = caught.payload
+    stack = caught.stack_trace . take 20 . map .to_display_text
+    Widget_Failure.Value method argument "annotation" (_describe payload) (_cause_chain payload) stack
+
+private _describe value -> Text = case value of
+    t : Throwable -> t.getClass.getName + ": " + (t.getMessage . if_nothing "")
+    _ -> value.to_display_text
+
+## The causes of an error, outermost first: a Java exception's `getCause`, or
+   an Enso error's `cause` (or `inner_error`) field. At most ten.
+private _cause_chain value (depth : Integer = 0) -> Vector Text =
+    if depth >= 10 then [] else
+        next = _cause_of value
+        if next.is_nothing then [] else [_describe next] + (_cause_chain next depth+1)
+
+private _cause_of value = case value of
+    t : Throwable -> t.getCause
+    _ -> case Meta.meta value of
+        atom : Meta.Atom ->
+            names = atom.constructor.fields . catch Any (_-> [])
+            index = names.index_of name-> (name == "cause") || (name == "inner_error")
+            if index.is_nothing then Nothing else atom.fields.at index
+        _ -> Nothing
+
+private _cache_from (uuids : Text) -> Function =
+    other_args = uuids.parse_json
+    cache (name_or_index : Text | Integer) =
+        case other_args.get name_or_index.to_text of
+            uuid : Text -> Runtime.value_for_uuid uuid
+            _ -> Nothing
+    cache
+
+private _inputs_key subject (uuids : Text) -> Text =
+    subject_type = (Meta.type_of subject . to_text) . catch Any (_-> "<error>")
+    subject_type + "|" + uuids
