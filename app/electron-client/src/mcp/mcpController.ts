@@ -137,10 +137,12 @@ export class McpController {
           this.fileUnreadable = `The MCP settings file could not be read: ${messageOf(e)}`
         }
       }
-      try {
-        // Malformed JSON keeps the existing rule: the defaults.
-        const parsed: unknown = text == null ? null : JSON.parse(text)
-        if (typeof parsed === 'object' && parsed != null) {
+      if (text != null) {
+        try {
+          const parsed: unknown = JSON.parse(text)
+          if (typeof parsed !== 'object' || parsed == null || Array.isArray(parsed)) {
+            throw new Error('it is not a JSON object')
+          }
           const { enabled, port, token } = parsed as {
             enabled?: unknown
             port?: unknown
@@ -149,9 +151,14 @@ export class McpController {
           this.fileEnabled = enabled === true
           if (isValidPort(port)) this.filePort = port
           if (typeof token === 'string' && token !== '') this.fileToken = token
+        } catch (e) {
+          // Malformed is not "no file": quietly using the defaults would let the next save replace
+          // the file, and its token with it. Leave it alone and say so.
+          this.fileUnreadable =
+            `The MCP settings file could not be read: ${messageOf(e)} (${this.options.settingsPath}). ` +
+            'The file is left unchanged and the server stays off; fix or delete the file, then restart.'
+          console.warn(`[MCP] ${this.fileUnreadable}`)
         }
-      } catch {
-        // Malformed: the defaults.
       }
       return this.apply()
     })

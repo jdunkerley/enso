@@ -3,7 +3,7 @@ import { Err, Ok, type Result, withContext } from 'enso-common/src/utilities/dat
 import { basenameAndExtension } from 'enso-common/src/utilities/file'
 import { Error as DataError } from 'ydoc-shared/binaryProtocol'
 import { ErrorCode, RemoteRpcError } from 'ydoc-shared/languageServer'
-import type { Path } from 'ydoc-shared/languageServerTypes'
+import type { FileSystemObject, Path } from 'ydoc-shared/languageServerTypes'
 
 export type ProjectFiles = ReturnType<typeof useProjectFiles>
 
@@ -110,7 +110,17 @@ export function useProjectFiles(projectStore: ProjectStoreSubset) {
     return Ok(candidate)
   }
 
+  /** The entries of a directory; a directory that does not exist has none. */
+  async function listDirectory(path: Path): Promise<Result<FileSystemObject[]>> {
+    const files = await lsRpc.listFiles(path)
+    if (files.ok) return Ok(files.value.paths)
+    const cause = files.error.payload.cause
+    if (cause instanceof RemoteRpcError && cause.code === ErrorCode.FILE_NOT_FOUND) return Ok([])
+    return files
+  }
+
   return {
+    listDirectory,
     projectRootId,
     readFileBinary,
     writeFileBinary,

@@ -51,8 +51,8 @@ export interface RefreshToolDeps {
  * the module in the editor, the project's `Main.enso` ({@link WRITE_ON_REFRESH_ERROR}). That covers
  * a node with the GUI's Write prefix anywhere in the module: the prefix is the call
  * `Standard.Base.Runtime.with_enabled_context …`, whose identifier the check matches. It does not
- * cover the project's other modules, library functions that enable output themselves, or
- * `foreign` code. Answers `{ refreshed: true, settled }`, where `settled` says whether the engine
+ * cover library code, library functions that enable output themselves, or `foreign` code. The
+ * project's other modules are checked by the handler before it calls this (`otherModules.ts`). Answers `{ refreshed: true, settled }`, where `settled` says whether the engine
  * reported a value again for every computed node of the method on screen in time.
  */
 export async function refreshTool(deps: RefreshToolDeps): Promise<McpToolResult> {

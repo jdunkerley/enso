@@ -45,6 +45,7 @@ import {
   type NodeMove,
 } from './layoutTools'
 import { createMcpNodes } from './nodeCreation'
+import { enablesOutputInOtherModules } from './otherModules'
 import { panelQuiet } from './panelQuiet'
 import { getProblems, type ProblemToolDeps } from './problemTools'
 import {
@@ -481,6 +482,13 @@ export function useProjectMcpTools(
       deadline,
     }
   }
+  /**
+   * Why `undo`, `redo` and `refresh` are refused because of the project's modules other than
+   * `Main.enso` (see `otherModules.ts`; library code is not checked).
+   */
+  function otherModulesRefusal(): Promise<string | undefined> {
+    return enablesOutputInOtherModules(useProjectFiles(currentProject.store.value))
+  }
   // One store at a time: two images of the same name must not pick the same free name.
   const storeImageInTurn = serialized(storeImage)
 
@@ -637,6 +645,8 @@ export function useProjectMcpTools(
     },
     get_problems: async () => getProblems(problemDeps()),
     refresh: async (_args, caller, deadline) => {
+      const otherModules = await otherModulesRefusal()
+      if (otherModules != null) return toolError(otherModules)
       const graph = currentProject.graph.value
       const project = currentProject.store.value
       return refreshTool({
@@ -651,8 +661,16 @@ export function useProjectMcpTools(
         executionContext: project.executionContext,
       })
     },
-    undo: async (_args, caller, deadline) => undoTool({ session, caller, deadline }),
-    redo: async (_args, caller, deadline) => redoTool({ session, caller, deadline }),
+    undo: async (_args, caller, deadline) => {
+      const otherModules = await otherModulesRefusal()
+      if (otherModules != null) return toolError(otherModules)
+      return undoTool({ session, caller, deadline })
+    },
+    redo: async (_args, caller, deadline) => {
+      const otherModules = await otherModulesRefusal()
+      if (otherModules != null) return toolError(otherModules)
+      return redoTool({ session, caller, deadline })
+    },
     collapse_nodes: async (args, caller, deadline) => {
       const { node_ids, name } = args
       if (!isStringArray(node_ids)) return invalidArgument('node_ids', 'a list of strings')

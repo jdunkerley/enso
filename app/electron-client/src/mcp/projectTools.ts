@@ -513,9 +513,9 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         "the project is in Live mode, and when the project's main module (the module the graph " +
         'shows) has code that enables output anywhere (the forms the edit tools refuse, such as ' +
         '`with_enabled_context`), because a refresh would run it and write again (ask the user to ' +
-        "refresh then). It does not check the project's other modules, library functions that " +
-        'turn output on themselves, or `foreign` code: do not refresh a project that writes ' +
-        'through them. It changes no node and joins no undo step; it ends yours. Returns ' +
+        "refresh then); the same goes for any other module of the project's own source. It " +
+        'does not check library code, library functions that turn output on themselves, or ' +
+        '`foreign` code: do not refresh a project that writes through them. It changes no node and joins no undo step; it ends yours. Returns ' +
         '`refreshed` and `settled`: whether the engine reported every computed node of the function on ' +
         'screen again in time. Call `get_graph` or `get_problems` afterwards.',
       inputSchema: {},

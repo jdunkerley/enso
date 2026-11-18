@@ -39,8 +39,9 @@
  *   that had code enabling output before or after the edit seals the step. A user's Ctrl+Z that
  *   takes back the held step's own item before the edit's change also leaves the depth right; the
  *   edit's change then clears the redo stack, and the new item holds only that change. The check
- *   covers only the module in the editor (`Main.enso`): not other modules of the project, library
- *   functions that enable output themselves, or `foreign` code.
+ *   covers the module in the editor (`Main.enso`) live, and the tools check the project's other
+ *   modules (every `.enso` under `src/`, `otherModules.ts`) before `undo` and `redo` queue: not
+ *   library code, library functions that enable output themselves, or `foreign` code.
  */
 import type { McpCaller } from 'enso-common/src/mcp'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
