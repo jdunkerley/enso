@@ -1,19 +1,20 @@
 from Standard.Base import all
+import Standard.Base.Metadata.Widget
+
+import Standard.Visualization.Widgets
 
 from Standard.Test import all
 
-import project.Widgets.Database_Widgets_Spec
-import project.Widgets.File_Format_Widgets_Spec
-import project.Widgets.Table_Widgets_Spec
-import project.Widgets.Text_Widgets_Spec
-import project.Widgets.Widget_Helpers_Spec
-
+## `get_widget_json` is what the GUI calls until PR 1b: an array of
+   `[argument, widget or null]` pairs. PR 1b deletes it, with this test.
 add_specs suite_builder =
-    Table_Widgets_Spec.add_specs suite_builder
-    Database_Widgets_Spec.add_specs suite_builder
-    File_Format_Widgets_Spec.add_specs suite_builder
-    Text_Widgets_Spec.add_specs suite_builder
-    Widget_Helpers_Spec.add_specs suite_builder
+    suite_builder.group "Widgets.get_widget_json (until PR 1b)" group_builder->
+        group_builder.specify "keeps its array-of-pairs answer" <|
+            json = Widgets.get_widget_json Data .read ["format", "on_problems"]
+            json.should_start_with '[["format",{"constructor":"Single_Choice","values":['
+            parsed = json.parse_json
+            parsed.map .first . should_equal ["format", "on_problems"]
+            parsed.second.second . should_equal Nothing
 
 main filter=Nothing =
     suite = Test.build suite_builder->

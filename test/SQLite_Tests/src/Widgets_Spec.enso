@@ -8,10 +8,18 @@ from Standard.Database import all
 from Standard.SQLite import all
 from Standard.Base.Metadata.Choice import Option
 
-import Standard.Visualization.Widgets
+import Standard.Base.Metadata.Widget_Query
 
 from Standard.Test import all
 
+
+sqlite_module = "Standard.SQLite.SQLite_Connection"
+sqlite_type = "Standard.SQLite.SQLite_Connection.SQLite_Connection"
+table_module = "Standard.Table.Table"
+table_type = "Standard.Table.Table.Table"
+
+## The answer for one argument whose widget is `widget`.
+answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
 
 add_specs suite_builder =
     connection = Database.connect (SQLite.In_Memory)
@@ -21,7 +29,7 @@ add_specs suite_builder =
 
     suite_builder.group "Widgets for In-Database Connection with table types" group_builder->
         group_builder.specify "works for `tables`" <|
-            result = Widgets.get_widget_json connection .tables ["types"]
+            result = Widget_Query.resolve_call connection sqlite_module sqlite_type "tables" ["types"]
             result.should_contain "'TABLE'"
             result.should_contain "'VIEW'"
 
@@ -29,27 +37,27 @@ add_specs suite_builder =
         group_builder.specify "works for `query` and `read`" <|
             table_choices = ['a_table', 'another', 'mock_table'] . map n-> Choice.Option n n.pretty
             choices = table_choices + [Option '<Table_Name>' '..Table_Name ""', Option '<Raw_SQL>' '..Raw_SQL ""']
-            expect = '[["query",' + Widget.Single_Choice choices Nothing Display.Always . to_json + ']]'
-            Widgets.get_widget_json connection .query ["query"] . should_equal expect
-            Widgets.get_widget_json connection .read ["query"] . should_equal expect
+            expect = answer "query" (Widget.Single_Choice choices Nothing Display.Always)
+            Widget_Query.resolve_call connection sqlite_module sqlite_type "query" ["query"] . should_equal expect
+            Widget_Query.resolve_call connection sqlite_module sqlite_type "read" ["query"] . should_equal expect
 
     suite_builder.group "Widgets for In-Database Table with column name sets" group_builder->
         mock_table = connection.query "mock_table"
 
         group_builder.specify "works for `get` and `at`" <|
             choices = mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = '[["selector",' + Widget.Single_Choice choices Nothing Display.Always . to_json + ']]'
-            Widgets.get_widget_json mock_table .get ["selector"] . should_equal expect
-            Widgets.get_widget_json mock_table .at ["selector"] . should_equal expect
+            expect = answer "selector" (Widget.Single_Choice choices Nothing Display.Always)
+            Widget_Query.resolve_call mock_table table_module table_type "get" ["selector"] . should_equal expect
+            Widget_Query.resolve_call mock_table table_module table_type "at" ["selector"] . should_equal expect
 
         group_builder.specify "works for `filter`" <|
             choices = [Choice.Option "<Expression>" "(expr '[A]')"] + mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = '[["column",' + Widget.Single_Choice choices Nothing Display.Always . to_json + ']]'
-            Widgets.get_widget_json mock_table .filter ["column"] . should_equal expect
+            expect = answer "column" (Widget.Single_Choice choices Nothing Display.Always)
+            Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
 
     suite_builder.group "Widgets for Database" group_builder->
         group_builder.specify "works for `connect`, listing every installed backend" <|
-            result = Widgets.get_widget_json Database .connect ["details"]
+            result = Widget_Query.resolve_call Nothing "Standard.Database.Connection.Database" "Standard.Database.Connection.Database" "connect" ["details"] subject_is_type=True
             result.should_contain "SQLite"
             result.should_contain "Postgres"
             # No file of this project imports these libraries: discovery finds them.
