@@ -1147,8 +1147,23 @@ object BindingsMap {
       s"The Self type is not applicable outside of a type definition"
   }
 
-  /** A metadata-friendly storage for resolutions */
-  case class Resolution(target: ResolvedName) extends IRPass.IRMetadata {
+  /** A metadata-friendly storage for resolutions.
+    *
+    * @param target the symbol the name resolved to
+    * @param isEigentype `true` when the name is `X.type` in a type position: it
+    *   denotes the eigentype of `target` (the type of the type object `X`), not
+    *   the type of `X`'s values. Only ever `true` with a [[ResolvedType]]
+    *   target. See Note [Eigentype References] in `EigentypeReference.java`.
+    */
+  case class Resolution(target: ResolvedName, isEigentype: Boolean)
+      extends IRPass.IRMetadata {
+
+    /** The qualified name this resolution denotes: the target's, with `type`
+      * appended for an eigentype (`Standard.Base.Data.Locale.Locale.type`).
+      */
+    def referencedName: QualifiedName =
+      if (isEigentype) target.qualifiedName.createChild("type")
+      else target.qualifiedName
 
     /** The name of the metadata as a string. */
     override val metadataName: String = "Resolution"
@@ -1175,6 +1190,13 @@ object BindingsMap {
       *         not be preserved
       */
     override def duplicate(): Option[IRPass.IRMetadata] = Some(this)
+  }
+
+  object Resolution {
+
+    /** A resolution of a name to `target` itself, not to its eigentype. */
+    def apply(target: ResolvedName): Resolution =
+      Resolution(target, isEigentype = false)
   }
 
   /** A reference to a module.

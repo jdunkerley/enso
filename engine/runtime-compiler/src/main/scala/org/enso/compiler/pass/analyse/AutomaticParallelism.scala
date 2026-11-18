@@ -529,7 +529,7 @@ object AutomaticParallelism extends IRPass {
           MethodCalls,
           classOf[MethodCalls.Metadata]
         ) match {
-          case Some(Resolution(method: ResolvedModuleMethod)) =>
+          case Some(Resolution(method: ResolvedModuleMethod, _)) =>
             val methodIr = method.unsafeGetIr("Invalid method call resolution.")
             val isParallelize = methodIr
               .getMetadata(

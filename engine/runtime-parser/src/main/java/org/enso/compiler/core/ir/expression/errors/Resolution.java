@@ -88,7 +88,7 @@ public final class Resolution extends ResolutionErrorGen {
     return Option.apply(identifiedLocation());
   }
 
-  sealed interface Reason {
+  public sealed interface Reason {
     String explain(Name originalName);
   }
 
@@ -179,6 +179,26 @@ public final class Resolution extends ResolutionErrorGen {
           + " resolved to a module, "
           + "but modules are not allowed in "
           + context;
+    }
+  }
+
+  /**
+   * {@code X.type} where {@code X} is not a type: only a type has an eigentype. See Note
+   * [Eigentype References] in {@code org.enso.compiler.pass.resolve.EigentypeReference}.
+   *
+   * @param kind what {@code X} is instead, e.g. "a module"
+   */
+  public record NotAType(String kind) implements Reason {
+    @Override
+    public String explain(Name originalName) {
+      var name = originalName.name();
+      var prefix = name.substring(0, name.lastIndexOf('.'));
+      return "The name "
+          + name
+          + " is not valid: `.type` must follow a type, but "
+          + prefix
+          + " is "
+          + kind;
     }
   }
 

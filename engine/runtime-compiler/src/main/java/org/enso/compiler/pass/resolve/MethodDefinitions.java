@@ -136,6 +136,10 @@ public final class MethodDefinitions implements MiniPassFactory {
                           var sourceTypeExpr = conversionMethod.sourceTypeName();
                           Name resolvedName =
                               switch (sourceTypeExpr) {
+                                // Note [Eigentype References]
+                                case Name.Qualified eigen
+                                    when EigentypeReference.isEigentypeReference(eigen) ->
+                                    resolveEigentype(eigen, bindingsMap);
                                 case Name name -> resolveType(name, bindingsMap);
                                 default ->
                                     Conversion.create(
@@ -241,11 +245,11 @@ public final class MethodDefinitions implements MiniPassFactory {
                     "a method definition target"));
           }
           case ResolvedModule resMod -> {
-            MetadataInteropHelpers.updateMetadata(typePointer, INSTANCE, new Resolution(resMod));
+            MetadataInteropHelpers.updateMetadata(typePointer, INSTANCE, new Resolution(resMod, false));
             return typePointer;
           }
           case ResolvedType resType -> {
-            MetadataInteropHelpers.updateMetadata(typePointer, INSTANCE, new Resolution(resType));
+            MetadataInteropHelpers.updateMetadata(typePointer, INSTANCE, new Resolution(resType, false));
             return typePointer;
           }
           case ResolvedPolyglotSymbol ignored -> {
@@ -285,6 +289,18 @@ public final class MethodDefinitions implements MiniPassFactory {
       } else {
         throw new CompilerError("Unexpected kind of name for method reference");
       }
+    }
+
+    /** Resolves a conversion source spelt {@code X.type}. Note [Eigentype References]. */
+    private static Name resolveEigentype(
+        Name.Qualified eigenName, BindingsMap availableSymbolsMap) {
+      var resolved = EigentypeReference.resolve(eigenName, availableSymbolsMap);
+      if (resolved.isLeft()) {
+        return org.enso.compiler.core.ir.expression.errors.Resolution.create(
+            eigenName, resolved.swap().toOption().get());
+      }
+      MetadataInteropHelpers.updateMetadata(eigenName, INSTANCE, resolved.toOption().get());
+      return eigenName;
     }
   }
 }

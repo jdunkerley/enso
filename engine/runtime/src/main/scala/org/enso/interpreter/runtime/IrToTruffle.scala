@@ -1434,7 +1434,10 @@ private[runtime] class IrToTruffle(
                 case None =>
                   Left(BadPatternMatch.NonVisibleConstructor(constructor.name))
                 case Some(
-                      BindingsMap.Resolution(BindingsMap.ResolvedModule(mod))
+                      BindingsMap.Resolution(
+                        BindingsMap.ResolvedModule(mod),
+                        _
+                      )
                     ) =>
                   val branchCodeNode =
                     createBranchCodeNodeForConstructorPattern(
@@ -1453,7 +1456,8 @@ private[runtime] class IrToTruffle(
                   )
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedConstructor(tp, resolvedCons)
+                        BindingsMap.ResolvedConstructor(tp, resolvedCons),
+                        _
                       )
                     ) =>
                   val atomCons =
@@ -1488,7 +1492,8 @@ private[runtime] class IrToTruffle(
                   Right(r)
                 case Some(
                       BindingsMap.Resolution(
-                        binding @ BindingsMap.ResolvedType(_, _)
+                        binding @ BindingsMap.ResolvedType(_, _),
+                        _
                       )
                     ) =>
                   val tpe =
@@ -1518,7 +1523,8 @@ private[runtime] class IrToTruffle(
                   Right(branchNode)
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedPolyglotSymbol(mod, symbol)
+                        BindingsMap.ResolvedPolyglotSymbol(mod, symbol),
+                        _
                       )
                     ) =>
                   val branchCodeNode =
@@ -1544,7 +1550,8 @@ private[runtime] class IrToTruffle(
                   )
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedPolyglotField(typ, symbol)
+                        BindingsMap.ResolvedPolyglotField(typ, symbol),
+                        _
                       )
                     ) =>
                   val branchCodeNode =
@@ -1598,7 +1605,8 @@ private[runtime] class IrToTruffle(
                   })
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedModuleMethod(_, _)
+                        BindingsMap.ResolvedModuleMethod(_, _),
+                        _
                       )
                     ) =>
                   throw new CompilerError(
@@ -1606,7 +1614,8 @@ private[runtime] class IrToTruffle(
                   )
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedExtensionMethod(_, _)
+                        BindingsMap.ResolvedExtensionMethod(_, _),
+                        _
                       )
                     ) =>
                   throw new CompilerError(
@@ -1614,7 +1623,8 @@ private[runtime] class IrToTruffle(
                   )
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedConversionMethod(_, _)
+                        BindingsMap.ResolvedConversionMethod(_, _),
+                        _
                       )
                     ) =>
                   throw new CompilerError(
@@ -1681,7 +1691,8 @@ private[runtime] class IrToTruffle(
               Left(BadPatternMatch.NonVisibleType(typePattern.tpe.name))
             case Some(
                   BindingsMap.Resolution(
-                    binding @ BindingsMap.ResolvedType(_, _)
+                    binding @ BindingsMap.ResolvedType(_, _),
+                    _
                   )
                 ) =>
               // Using .getTypes because .getType may return an associated type
@@ -1717,7 +1728,8 @@ private[runtime] class IrToTruffle(
               }
             case Some(
                   BindingsMap.Resolution(
-                    BindingsMap.ResolvedPolyglotSymbol(mod, symbol)
+                    BindingsMap.ResolvedPolyglotSymbol(mod, symbol),
+                    _
                   )
                 ) =>
               val polySymbol =
@@ -1759,7 +1771,7 @@ private[runtime] class IrToTruffle(
                   )
                 )
               }
-            case Some(BindingsMap.Resolution(resolved)) =>
+            case Some(BindingsMap.Resolution(resolved, _)) =>
               throw new CompilerError(
                 s"Impossible ${resolved} here, should be caught by Patterns resolution pass."
               )
