@@ -133,8 +133,11 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     await openDropdownInArgument(page, operation)
     await page.getByRole('button', { name: 'Text', exact: true }).click()
 
-    // `..Text` has an `operation` of its own, which it shows.
-    await page.getByText('operation', { exact: true }).click()
+    // `..Text` has an `operation` of its own, which it shows. Every argument shows its name, so
+    // the component shows two: the `operation` set to `..Text`, then `..Text`'s own (the last).
+    const operations = page.locator('.GraphNode.selected').getByText('operation', { exact: true })
+    await expect(operations).toHaveCount(2)
+    await operations.last().click()
     await page.getByRole('button', { name: 'length', exact: true }).click()
 
     // Typing in the column name
@@ -303,10 +306,12 @@ test('Exercise 2', async ({ page, projectsDir }) => {
     )
 
     // Choosing parameters
+    // The new item's `..Name` value: the innermost element showing it in the selected component.
     await page
+      .locator('.GraphNode.selected')
       .locator('div')
       .filter({ hasText: /^‘product_name’$/ })
-      .nth(4)
+      .last()
       .click()
     await page.getByRole('button', { name: 'Count', exact: true }).click()
 
