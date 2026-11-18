@@ -252,22 +252,16 @@ and `node_id`:
   (Note [add_image Reads Only Images]). On Windows only a drive path (`C:\…` or
   `C:/…`), with no other `:`: network (`\\host\share`), device (`\\.\`, `\\?\`)
   and alternate-data-stream (`C:\notes.txt:x.png`) paths are refused before
-  anything touches them; elsewhere any absolute path. **Only local files**
-  (policy awaiting the owner's final OK, #861): a drive letter can be a mapped
-  network drive, so on Windows the path is resolved with the native `realpath`
-  first (`fs.realpath.native`), which gives `\\server\share\…` for a mapped
-  drive (or a junction into a share); a network result is refused with "The file
-  is on a network drive" before `stat` or `open`. A `subst` drive resolves to
-  its local target and is taken. A path that cannot be resolved is refused. Not
-  reliable: nothing was run against a real mapped drive (none available here),
-  only the documented behaviour of `GetFinalPathNameByHandle` through libuv. The
-  extension must be an accepted image kind (`.png`, `.apng`, `.jpg`, `.jpeg`,
-  `.gif`, `.webp`, `.avif`, `.svg`: the documentation editor's list) **and** the
-  leading bytes that same kind, so a text file named `.png`, or a PNG named
-  `.jpg`, is refused and nothing is copied. A regular file (after links) of at
-  most 10 MB (`IMAGE_MAX_BYTES`), checked from its size before it is read and
-  again while reading. No error quotes the file's content. A `path` works in
-  Live: storing a file is not an edit.
+  anything touches them; elsewhere any absolute path. A mapped network drive
+  (`Z:\…`) is accepted: the user connected it themselves (owner's decision,
+  #861). Only paths the agent types that would make Windows connect to a host
+  are refused. The extension must be an accepted image kind (`.png`, `.apng`,
+  `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.svg`: the documentation editor's
+  list) **and** the leading bytes that same kind, so a text file named `.png`,
+  or a PNG named `.jpg`, is refused and nothing is copied. A regular file (after
+  links) of at most 10 MB (`IMAGE_MAX_BYTES`), checked from its size before it
+  is read and again while reading. No error quotes the file's content. A `path`
+  works in Live: storing a file is not an edit.
 - **`node_id`**: a picture of the node's visualization, taken exactly as
   `get_visualization` takes one (`pictureVisualization`, the same Live rules,
   `shown` and `moved` in the result), stored as PNG. The picture and the store
