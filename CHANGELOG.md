@@ -2,8 +2,10 @@
 
 #### Enso IDE
 
-- [Selecting a node no longer expands it to show every hidden argument. A node
-  shows the arguments that are set; the `…` after them adds the others.][850]
+- [Selecting a node no longer expands it to show every hidden argument: a "+
+  argument" button beside the selected node adds any of them, grouped by the
+  call they belong to. Every argument now shows its name, even when its value is
+  given by position.][850]
 - [The JSON and tree view can be used from the keyboard: Tab enters it, the
   arrow keys move between entries and open or close branches, Enter adds a
   component for the entry (Shift+Enter for every entry beside it), and the

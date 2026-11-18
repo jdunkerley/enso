@@ -8,6 +8,7 @@ import {
   type WidgetUpdate,
 } from '$/providers/openedProjects/widgetRegistry'
 import { WidgetEditHandlerParent } from '$/providers/openedProjects/widgetRegistry/editHandler'
+import AddArgumentControl from '@/components/GraphEditor/widgets/WidgetFunction/AddArgumentControl.vue'
 import { DisplayIcon } from '@/components/GraphEditor/widgets/WidgetIcon.vue'
 import WidgetTreeRoot from '@/components/GraphEditor/WidgetTreeRoot.vue'
 import { useGraphSelection } from '@/providers/graphSelection'
@@ -88,5 +89,7 @@ export const ICON_WIDTH = 16
     :expanded="expanded"
     :updateCallback="handleWidgetUpdates"
     @currentEditChanged="onCurrentEditChange"
-  />
+  >
+    <AddArgumentControl v-if="showDetails" :port="ast.id" />
+  </WidgetTreeRoot>
 </template>

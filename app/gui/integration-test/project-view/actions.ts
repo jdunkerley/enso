@@ -37,23 +37,42 @@ export async function openVisualization(page: Page, visName: string) {
 // === Widgets ===
 // ===============
 
+/** The node's add-argument control, shown right of it while it is the only selected node. */
+export function addArgumentButton(node: Locator) {
+  return node.getByRole('button', { name: 'Add argument' })
+}
+
+/** The open menu of the add-argument control. */
+export function addArgumentMenu(page: Page) {
+  return page.getByRole('dialog', { name: 'Add argument' })
+}
+
+/** Select the node (by its left edge, clear of its widgets) and open its add-argument menu. */
+export async function openAddArgumentMenu(page: Page, node: Locator) {
+  await node.click({ position: { x: 8, y: 8 } })
+  await expect(node).toBeSelected()
+  await addArgumentButton(node).click()
+  await expect(addArgumentMenu(page)).toBeVisible()
+  return addArgumentMenu(page)
+}
+
+/** Add the hidden parameter `name` to the node through its add-argument menu. */
+export async function addArgument(page: Page, node: Locator, name: string) {
+  const menu = await openAddArgumentMenu(page, node)
+  await menu.getByRole('button', { name: new RegExp(`^${name}( |$)`) }).click()
+  await expect(menu).toBeHidden()
+}
+
 /**
- * Show a node's hidden arguments: pick every parameter the `…` menu offers. Selecting a node does
- * not show them (#836).
+ * Show a node's hidden arguments: pick every parameter the add-argument menu offers. Selecting a
+ * node does not show them (#836).
  */
 export async function showHiddenArguments(page: Page, node: Locator) {
-  const button = node.locator('.parameterMenuButton')
-  const menu = page.getByRole('dialog', { name: 'More parameters' })
-  await expect(button.first()).toBeVisible()
-  await button.first().click()
+  const menu = await openAddArgumentMenu(page, node)
   const names = await menu.locator('.parameterItem .name').allTextContents()
   await page.keyboard.press('Escape')
   await expect(menu).toBeHidden()
-  for (const name of names) {
-    await button.first().click()
-    await menu.getByRole('button', { name: new RegExp(`^${name}`) }).click()
-    await expect(menu).toBeHidden()
-  }
+  for (const name of names) await addArgument(page, node, name)
 }
 
 /**

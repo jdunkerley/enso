@@ -1,10 +1,11 @@
 import type { PrimaryApplication } from '$/providers/openedProjects/graph/graphDatabase'
 import type { WidgetEditHandlerRoot } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import { proxyRefs } from '$/utils/reactivity'
+import type { HiddenParameterGroup } from '@/components/GraphEditor/widgets/WidgetFunction/hiddenParameters'
 import { createContextStore } from '@/providers'
 import { Ast } from '@/util/ast'
 import type { Opt } from '@/util/data/opt'
-import { computed, shallowRef, type Ref, type ShallowUnwrapRef } from 'vue'
+import { computed, shallowReactive, shallowRef, type Ref, type ShallowUnwrapRef } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 
 export const [provideWidgetTree, injectWidgetTree] = createContextStore(
@@ -19,6 +20,11 @@ export const [provideWidgetTree, injectWidgetTree] = createContextStore(
     primaryApplication: Ref<PrimaryApplication>,
   ) => {
     const { setCurrentEditRoot, currentEdit } = useCurrentEdit()
+    /**
+     * The hidden parameters of each call in the tree, keyed by the call's widget instance: the
+     * node's one add-argument control offers them all.
+     */
+    const hiddenParameterGroups = shallowReactive(new Map<symbol, HiddenParameterGroup>())
 
     return proxyRefs({
       externalId,
@@ -30,6 +36,7 @@ export const [provideWidgetTree, injectWidgetTree] = createContextStore(
       primaryApplication,
       setCurrentEditRoot,
       currentEdit,
+      hiddenParameterGroups,
     })
   },
 )

@@ -128,7 +128,7 @@ export class ArgumentPlaceholder extends Argument {
     return value == null || isRequiredArgument(this.argInfo) ? undefined : value
   }
 
-  /** Whether the argument is hidden: an unset argument with a default (the `…` menu adds it). */
+  /** Whether the argument is hidden: an unset argument with a default (the add-argument menu adds it). */
   override get hideByDefault(): boolean {
     return (
       this.argInfo.hasDefault &&

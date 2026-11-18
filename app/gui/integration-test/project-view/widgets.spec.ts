@@ -637,7 +637,7 @@ test('Selection widgets in Data.read node', async ({ editorPage, page }) => {
   const topLevelArgs = node.locator('.WidgetTopLevelArgument')
   await expect(topLevelArgs).toHaveCount(1)
 
-  // Selecting the node does not show the rest; the `…` menu does
+  // Selecting the node does not show the rest; the add-argument control does
   await actions.showHiddenArguments(page, node)
   await expect(topLevelArgs).toHaveCount(3)
 
@@ -879,9 +879,8 @@ test('Manage aggregates in `aggregate` node', async ({ editorPage, page }) => {
     .expectNodeTopLevelArgumentCount('aggregated', 1)
 
   const node = editorPage.locateNodes('aggregated')
-  // The `…` menu offers them
-  await node.locator('.parameterMenuButton').click()
-  const menu = page.getByRole('dialog', { name: 'More parameters' })
+  // The add-argument control offers them
+  const menu = await actions.openAddArgumentMenu(page, node)
   await expect(menu.getByRole('button', { name: /^group_by/ })).toBeVisible()
   await expect(menu.getByRole('button', { name: /^columns/ })).toHaveCount(0)
   await page.keyboard.press('Escape')
@@ -2071,7 +2070,7 @@ test.describe('Boolean widget', () => {
     expect(await moduleCode(page)).toContain('kept = Data.keep_rows False\n')
   })
 
-  test('an unset argument stays hidden when selected; the `…` menu adds it with a checkbox', async ({
+  test('an unset argument stays hidden when selected; the add-argument control adds it with a checkbox', async ({
     editorPage,
     page,
   }) => {

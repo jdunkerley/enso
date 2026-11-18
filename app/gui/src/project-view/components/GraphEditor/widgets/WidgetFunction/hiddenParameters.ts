@@ -1,6 +1,6 @@
 /**
- * @file The parameters of a call that are not shown, for the `…` menu: unset arguments with a
- * default that the widget tree hides.
+ * @file The parameters of a call that are not shown, for the node's add-argument menu: unset
+ * arguments with a default that the widget tree hides.
  */
 import type { PortId } from '@/providers/portInfo'
 import { Ast } from '@/util/ast'
@@ -15,6 +15,35 @@ export interface HiddenParameter {
   type: string | undefined
   /** The code inserted: the default value's code. */
   defaultCode: string
+}
+
+/** One call's hidden parameters, as the node's add-argument menu lists them. */
+export interface HiddenParameterGroup {
+  /** The called function's name: the group's heading. */
+  callName: string
+  /** How deep the call is in the node's expression: outer calls are listed first. */
+  depth: number
+  /** The order the call registered in, which breaks a tie in `depth`. */
+  order: number
+  parameters: HiddenParameter[]
+  /** Insert one of `parameters` into the call, with its default value. */
+  insert: (parameter: HiddenParameter) => void
+}
+
+let parameterGroupCount = 0
+
+/** A new {@link HiddenParameterGroup.order}: groups are numbered in the order they register. */
+export function nextParameterGroupOrder(): number {
+  return parameterGroupCount++
+}
+
+/** The groups that have a hidden parameter, outer calls first. */
+export function orderedParameterGroups(
+  groups: Iterable<HiddenParameterGroup>,
+): HiddenParameterGroup[] {
+  return [...groups]
+    .filter((group) => group.parameters.length > 0)
+    .sort((a, b) => a.depth - b.depth || a.order - b.order)
 }
 
 function shortType(type: string | undefined): string | undefined {

@@ -7,6 +7,7 @@ import {
   setMockPublicTypes,
   updateVisualizationData,
 } from 'integration-test/mock/lsHandler'
+import * as actions from './actions'
 import { mockMethodCallInfo } from './expressionUpdates'
 import * as locate from './locate'
 
@@ -117,12 +118,8 @@ test('choosing SQLite in the format dropdown adds its import; one undo removes b
 }) => {
   await editorPage
   const node = await dataReadNode(page)
-  // `format` is hidden by default: the `…` menu adds it.
-  await node.locator('.parameterMenuButton').click()
-  await page
-    .getByRole('dialog', { name: 'More parameters' })
-    .getByRole('button', { name: /^format/ })
-    .click()
+  // `format` is hidden by default: the add-argument control adds it.
+  await actions.addArgument(page, node, 'format')
   const formatArg = node
     .locator('.WidgetTopLevelArgument')
     .filter({ has: page.getByText('format') })

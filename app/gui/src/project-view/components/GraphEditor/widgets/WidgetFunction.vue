@@ -19,14 +19,15 @@ import {
 import {
   hiddenParameters,
   insertPrefixArgument,
+  nextParameterGroupOrder,
   type HiddenParameter,
 } from '@/components/GraphEditor/widgets/WidgetFunction/hiddenParameters'
-import ParameterMenu from '@/components/GraphEditor/widgets/WidgetFunction/ParameterMenu.vue'
 import {
   getPotentialModuleFunctionPointer,
   useWidgetFunctionCallInfo,
 } from '@/components/GraphEditor/widgets/WidgetFunction/widgetFunctionCallInfo'
 import { injectFunctionInfo, provideFunctionInfo } from '@/providers/functionInfo'
+import { injectWidgetTree } from '@/providers/widgetTree'
 import { assert, assertUnreachable } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import type { AstId } from '@/util/ast/abstract'
@@ -120,10 +121,35 @@ const innerInput = computed(() => {
 })
 
 /**
- * The parameters the `…` menu offers: the unset ones with a default, which the tree hides.
- * Selecting the node does not show them; the menu is the way to reach them.
+ * The parameters the node's add-argument control offers for this call: the unset ones with a
+ * default, which the tree hides. Selecting the node does not show them; the control is the way to
+ * reach them.
  */
 const hidden = computed(() => (application.value ? hiddenParameters(application.value) : []))
+
+const tree = injectWidgetTree(true)
+const groupKey = Symbol('hiddenParameters')
+const groupOrder = nextParameterGroupOrder()
+const callDepth = computed(() => {
+  let depth = 0
+  for (let ast = props.input.value.parent(); ast; ast = ast.parent()) depth += 1
+  return depth
+})
+const callName = computed(
+  () => methodCallInfo.value?.suggestion.name ?? props.input.value.code().split(/\s/)[0] ?? '',
+)
+watchEffect((onCleanup) => {
+  if (!tree || hidden.value.length === 0) return
+  const groups = tree.hiddenParameterGroups
+  groups.set(groupKey, {
+    callName: callName.value,
+    depth: callDepth.value,
+    order: groupOrder,
+    parameters: hidden.value,
+    insert: insertParameter,
+  })
+  onCleanup(() => groups.delete(groupKey))
+})
 
 /** Insert a hidden parameter with its default value's code. It is always written as a named argument. */
 function insertParameter(parameter: HiddenParameter) {
@@ -378,10 +404,4 @@ export const widgetDefinition = defineWidget(
 
 <template>
   <NodeWidget :input="innerInput" :updateCallback="handleArgUpdate" />
-  <ParameterMenu
-    v-if="hidden.length"
-    :port="props.input.value.id"
-    :parameters="hidden"
-    @pick="insertParameter"
-  />
 </template>
