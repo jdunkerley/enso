@@ -94,6 +94,7 @@ import project.System.Temporary_File_Spec
 
 import project.Logging_Spec
 import project.Metadata_Spec
+import project.Widget_Query_Spec
 import project.Random_Spec
 
 
@@ -182,6 +183,7 @@ main filter=Nothing =
         Logging_Spec.add_specs suite_builder
         Random_Spec.add_specs suite_builder
         Metadata_Spec.add_specs suite_builder
+        Widget_Query_Spec.add_specs suite_builder
         Decimal_Spec.add_specs suite_builder
         Runner_Spec.add_specs suite_builder
 

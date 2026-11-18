@@ -1,0 +1,34 @@
+from Standard.Base import all
+import Standard.Base.Errors.Common.Module_Does_Not_Exist
+import Standard.Base.Errors.Common.No_Such_Method
+import Standard.Base.Random.Random
+
+from Standard.Test import all
+
+polyglot java import org.enso.base.LogOnce
+
+## This module as the IDE names it.
+spec_module = "enso_dev.Base_Tests.Widget_Query_Spec"
+
+add_three a b c = a + b + c
+
+add_specs suite_builder =
+    suite_builder.group "Meta.call_module_method" group_builder->
+        group_builder.specify "applies a module's method to the value, then to the arguments" <|
+            Meta.call_module_method spec_module "add_three" [2, 3] 1 . should_equal 6
+
+        group_builder.specify "fails for a module that is not loaded, or a method it lacks" <|
+            Meta.call_module_method "enso_dev.Base_Tests.No_Such_Module" "f" [] 1 . should_fail_with Module_Does_Not_Exist
+            Meta.call_module_method spec_module "no_such_method" [] 1 . should_fail_with No_Such_Method
+
+    suite_builder.group "LogOnce" group_builder->
+        group_builder.specify "is true only the first time it sees a key" <|
+            key = "Widget_Query_Spec " + Random.uuid
+            LogOnce.firstTime key . should_be_true
+            LogOnce.firstTime key . should_be_false
+            LogOnce.firstTime key+"x" . should_be_true
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

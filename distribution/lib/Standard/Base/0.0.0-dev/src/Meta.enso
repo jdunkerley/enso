@@ -478,6 +478,26 @@ find_type_or_module (qualified_name : Text) -> Any =
 ## ---
    private: true
    ---
+   Applies the method `method_name` of the module `module_name` to `value` and
+   then to each of `arguments`, in order. The IDE evaluates expressions in a
+   user's module that call a library's IDE entry point (a visualization's next
+   page of rows, say). A fully qualified name of a library the module does not
+   import does not compile, but `Standard.Base.Meta.call_module_method`
+   always does. The library must be loaded.
+
+   ## Arguments
+    - `module_name`: The qualified name of the module.
+    - `method_name`: The name of a method the module defines.
+    - `arguments`: The arguments after `value`.
+    - `value`: The first argument.
+call_module_method (module_name : Text) (method_name : Text) (arguments : Vector) value -> Any =
+    function = Meta_Helpers.get_module_method_builtin module_name method_name
+    module = Meta_Helpers.find_type_or_module_builtin module_name
+    arguments.fold (function module value) applied-> argument-> applied argument
+
+## ---
+   private: true
+   ---
    Represents a polyglot language.
 type Language
     ## ---
