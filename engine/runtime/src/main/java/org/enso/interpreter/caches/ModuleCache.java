@@ -34,7 +34,10 @@ public final class ModuleCache
   public static Cache<ModuleCache.CachedModule, ModuleCache.Metadata> create(
       org.enso.interpreter.runtime.Module module) {
     var mc = new ModuleCache(module);
-    return Cache.create(mc, Level.FINEST, module.getName().toString(), true, false);
+    // The data digest is checked: IR caches are shared per user, so a racing write of another
+    // checkout can pair one write's metadata with another's data. See Note [A Cache Is Written By
+    // Renaming] in `Cache`.
+    return Cache.create(mc, Level.FINEST, module.getName().toString(), true, true);
   }
 
   @Override
