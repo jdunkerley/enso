@@ -8,6 +8,7 @@ import * as debug from '@/debug'
 import * as ipc from '@/ipc'
 import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
 import type {
+  McpActivitySnapshot,
   McpClientKind,
   McpStatus,
   McpToolCallReply,
@@ -179,6 +180,15 @@ const mcp: ElectronApi['mcp'] = {
     electron.ipcRenderer.on(ipc.Channel.mcpStatusChanged, listener)
     return () => {
       electron.ipcRenderer.removeListener(ipc.Channel.mcpStatusChanged, listener)
+    }
+  },
+  activity: () => electron.ipcRenderer.invoke(ipc.Channel.mcpActivity),
+  onActivityChanged: (handler: (activity: McpActivitySnapshot) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, activity: McpActivitySnapshot) =>
+      handler(activity)
+    electron.ipcRenderer.on(ipc.Channel.mcpActivityChanged, listener)
+    return () => {
+      electron.ipcRenderer.removeListener(ipc.Channel.mcpActivityChanged, listener)
     }
   },
   setEnabled: (enabled: boolean) => electron.ipcRenderer.invoke(ipc.Channel.mcpSetEnabled, enabled),

@@ -32,6 +32,12 @@ too).
   `refresh`), `documentationHandlers.ts` (`get_documentation`,
   `set_documentation`, `store_image`) and `visualizationHandlers.ts`
   (`list_visualizations`, `get_visualization_data`, `prepare_visualization`).
+- `refusals.ts` wraps every registered handler (`markingRefusals`, in
+  `useProjectMcpTools.ts`): a failure whose text is, or contains, one of the
+  house rules' answers (Live mode, the Write rule, the undo floor, versions not
+  kept) gets `refused: true`, which main's activity record shows as "Refused"
+  instead of "Error"; the agent receives the same text. A new rule's answer goes
+  in `RULE_REFUSALS`. The dispatcher marks `NO_PROJECT_ERROR` itself.
 - `<group>Tools.ts` (`graphTools.ts`, `editTools.ts`, …) are the pure functions
   over deps that the handlers call, tested without Vue.
 

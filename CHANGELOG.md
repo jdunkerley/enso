@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [A plug icon at the right end of the top bar shows whether AI agents (MCP) are
+  off, have a problem, are on, connected or working. Click it to see the
+  connected app and its last five calls, or to turn MCP on.][878]
 - [The JSON and tree view can be used from the keyboard: Tab enters it, the
   arrow keys move between entries and open or close branches, Enter adds a
   component for the entry (Shift+Enter for every entry beside it), and the
@@ -561,6 +564,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[878]: https://github.com/jdunkerley/enso/pull/878
 [822]: https://github.com/jdunkerley/enso/pull/822
 [840]: https://github.com/jdunkerley/enso/pull/840
 [841]: https://github.com/jdunkerley/enso/pull/841

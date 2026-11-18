@@ -198,12 +198,19 @@ registered by `GraphEditor.vue` while a project is on screen. The app tools
 (`get_app_state`, `list_projects`, `list_files`, `create_project`,
 `open_project`, `close_project`) are in `src/mcp/` (see its `CLAUDE.md`: every
 path must be in the Drive), registered once by `AppContainer.vue`. A new tool
-needs both halves. The Settings → AI tab turns the server on
-(`dashboard/layouts/Settings/CLAUDE.md`, "AI"). MCP is the IDE's only AI route:
-the Component Browser's AI prompt mode, AI nodes and the local agent behind them
-were removed. A project saved with an AI node still opens: the node is an
-ordinary call of a function in the project, and its `AI: <prompt>` comment an
-ordinary comment.
+needs both halves. The top bar's **activity icon**
+(`components/AppContainer/McpActivityButton.vue`, desktop app only, its own
+element in `AppContainer.vue`) shows the server's state (off, problem, idle,
+connected, active), and its view-only popover the connected app, its last five
+calls and an Enable button; `mcpActivityState.ts` is the state logic and the
+`mcp_activity` icon its glyph, the state a CSS badge. A failure the house rules
+caused carries `refused: true` (`project-view/mcp/refusals.ts`), which the
+popover shows as "Refused" rather than "Error". The Settings → AI tab turns the
+server on (`dashboard/layouts/Settings/CLAUDE.md`, "AI"). MCP is the IDE's only
+AI route: the Component Browser's AI prompt mode, AI nodes and the local agent
+behind them were removed. A project saved with an AI node still opens: the node
+is an ordinary call of a function in the project, and its `AI: <prompt>` comment
+an ordinary comment.
 
 ## Dashboard ↔ backend
 

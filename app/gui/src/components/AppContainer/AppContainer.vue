@@ -21,6 +21,7 @@ import { normalizeSlashes } from 'enso-common/src/utilities/file'
 import { ConfigProvider } from 'reka-ui'
 import { onMounted, onUnmounted, shallowRef, toRefs } from 'vue'
 import LeftPanel from './LeftPanel.vue'
+import McpActivityButton from './McpActivityButton.vue'
 import MiddlePanel from './MiddlePanel.vue'
 import RightPanel from './RightPanel.vue'
 import TabBar from './TabBar.vue'
@@ -28,6 +29,8 @@ import TabBar from './TabBar.vue'
 
 <script setup lang="ts">
 const fullscreenRoot = shallowRef<HTMLElement>()
+/** The MCP activity icon exists only in the desktop app. */
+const hasMcp = window.api?.mcp != null
 
 const openedProjects = useOpenedProjects()
 const containerData = useContainerData()
@@ -93,13 +96,18 @@ onUnmounted(() => {
         <ModalHost />
         <LeftPanel :class="{ noMiddlePanel: !middlePanelShown }" />
         <div class="tabPanel" :class="{ noMiddlePanel: !middlePanelShown }">
-          <div class="bar">
+          <div class="bar" :class="{ withMcpActivity: hasMcp }">
             <TabBar />
           </div>
           <div class="belowBar">
             <MiddlePanel v-if="middlePanelShown" />
             <RightPanel />
           </div>
+        </div>
+        <!-- Its own element, not a child of `.bar`: with no tab open `.bar` has no width, and the
+        Drive at start-up is where MCP is most often turned on. -->
+        <div v-if="hasMcp" class="mcpActivity">
+          <McpActivityButton />
         </div>
         <div ref="fullscreenRoot" class="FullscreenRoot" @wheel.stop />
       </PopoverRootProvider>
@@ -159,6 +167,24 @@ onUnmounted(() => {
   /* The tab bar runs between the rails: the right panel's rail (48px) goes to the top. */
   padding: 0 48px 0 0;
   z-index: 1;
+}
+
+/* The tabs stop short of the MCP activity icon (32px and a 4px gap). */
+.bar.withMcpActivity {
+  padding-right: 84px;
+}
+
+/* At the strip's top right, left of the right rail, above the left panel that expands over the
+strip when there is no middle panel. */
+.mcpActivity {
+  position: absolute;
+  top: 0;
+  right: 48px;
+  height: var(--top-bar-height);
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+  z-index: 3;
 }
 
 .TabBar {
