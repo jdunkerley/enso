@@ -1,5 +1,5 @@
 import type EditorPageActions from 'integration-test/actions/EditorPageActions'
-import { expect, test, type Page } from 'integration-test/base'
+import { expect, test, type Locator, type Page } from 'integration-test/base'
 import { restoreMockMainFile, setMockMainFile } from 'integration-test/mock/lsHandler'
 import * as actions from './actions'
 import { mockMethodCallInfo } from './expressionUpdates'
@@ -108,6 +108,34 @@ test.describe('The ＋ of hidden parameters', () => {
     await inner.getByRole('button', { name: /^on_problems/ }).click()
     await expect(inner).toBeHidden()
     expect(await moduleCode(page)).toContain('wrapped = Data.read (Data.read_many on_problems=')
+  })
+
+  test('each ＋ is centred on its row, and its plus in its circle', async ({
+    page,
+    editorPage,
+  }) => {
+    // `nested` has a text value chip ('a.csv'), taller than a bare token: the row is not a port high.
+    const { nested } = await nodes(editorPage, page)
+    await nested.click({ position: { x: 8, y: 8 } })
+    await expect(nested).toBeSelected()
+    const buttons = actions.addArgumentButtons(nested)
+    await expect(buttons).toHaveCount(2)
+    const middle = async (locator: Locator) => {
+      const box = (await locator.boundingBox())!
+      return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+    }
+    const rows = [
+      { button: buttons.last(), row: nested.locator('.content') },
+      { button: buttons.first(), row: nested.locator('.nestedCall') },
+    ]
+    for (const { button, row } of rows) {
+      const buttonMiddle = await middle(button)
+      expect(Math.abs(buttonMiddle.y - (await middle(row)).y)).toBeLessThanOrEqual(1)
+      // The plus is drawn, not a font glyph, so its middle is the circle's in any font.
+      const plusMiddle = await middle(button.locator('svg'))
+      expect(Math.abs(plusMiddle.x - buttonMiddle.x)).toBeLessThanOrEqual(0.5)
+      expect(Math.abs(plusMiddle.y - buttonMiddle.y)).toBeLessThanOrEqual(0.5)
+    }
   })
 
   test('picking a parameter writes it as a named argument', async ({ page, editorPage }) => {

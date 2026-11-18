@@ -68,7 +68,10 @@ function pick(parameter: HiddenParameter) {
     @pointerdown.stop
     @click.stop="toggle"
   >
-    <span aria-hidden="true">+</span>
+    <!-- Drawn, not a "+" glyph: a glyph sits where its font's metrics put it, off-centre in some. -->
+    <svg class="plus" viewBox="0 0 10 10" aria-hidden="true">
+      <path d="M5 1.5v7M1.5 5h7" />
+    </svg>
   </button>
   <Teleport v-if="open" :to="popoverRoot">
     <div ref="menuElement" class="menuElement widgetOutOfLayout" :style="floatingStyles">
@@ -97,25 +100,35 @@ function pick(parameter: HiddenParameter) {
   align-self: center;
   /* Its own gap, not the token padding: after a bare function name that padding can be zero. */
   margin-left: var(--widget-token-pad-unit);
+  padding: 0;
   width: 20px;
   height: 20px;
   border-radius: var(--radius-full);
   background-color: rgb(255 255 255 / 0.92);
   color: var(--color-node-primary);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1;
 
   &.nested {
     width: 16px;
     height: 16px;
-    font-size: 12px;
   }
 
   &:hover,
   &[aria-expanded='true'] {
     background-color: white;
+  }
+}
+
+.plus {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+
+  .nested & {
+    width: 8px;
+    height: 8px;
   }
 }
 
