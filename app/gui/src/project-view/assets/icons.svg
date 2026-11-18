@@ -641,6 +641,11 @@
     <path fill-rule="evenodd" clip-rule="evenodd" d="M6.08 2.01C6.45 2.05 6.71 2.38 6.66 2.75L6.42 4.67H10.41L10.67 2.58C10.72 2.22 11.05 1.96 11.42 2.01C11.78 2.05 12.04 2.38 11.99 2.75L11.76 4.67H13.33C13.7 4.67 14 4.97 14 5.33C14 5.7 13.7 6 13.33 6H11.59L11.09 10H13.33C13.7 10 14 10.3 14 10.67C14 11.03 13.7 11.33 13.33 11.33H10.92L10.66 13.42C10.62 13.78 10.28 14.04 9.92 13.99C9.55 13.95 9.29 13.62 9.34 13.25L9.58 11.33H5.59L5.33 13.42C5.28 13.78 4.95 14.04 4.58 13.99C4.22 13.95 3.96 13.62 4.01 13.25L4.24 11.33H2.67C2.3 11.33 2 11.03 2 10.67C2 10.3 2.3 10 2.67 10H4.41L4.91 6H2.67C2.3 6 2 5.7 2 5.33C2 4.97 2.3 4.67 2.67 4.67H5.08L5.34 2.58C5.38 2.22 5.72 1.96 6.08 2.01ZM6.26 6L5.76 10H9.74L10.24 6H6.26Z" fill="currentColor"></path>
   </symbol>
 
+  <symbol id="mcp_activity" viewBox="0 0 16 16" width="16" height="16" fill="none">
+    <rect x="3" y="5" width="10" height="5" rx="1" fill="currentColor"/>
+    <path d="M5 2V5M11 2V5M8 10V14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+
   <symbol id="metadata" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <rect opacity="0.3" x="1" y="1" width="14" height="14" rx="2" fill="currentColor"/>
     <path d="M3 3H5V5H3V3ZM7 3H13V5H7V3ZM3 7H5V9H3V7ZM7 7H13V9H7V7ZM3 11H5V13H3V11ZM7 11H13V13H7V11Z" fill="currentColor"/>

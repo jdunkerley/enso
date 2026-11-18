@@ -37,6 +37,10 @@ export enum Channel {
   mcpStatus = 'mcp-status',
   /** Main → renderer: broadcast whenever the MCP server's `McpStatus` changes. */
   mcpStatusChanged = 'mcp-status-changed',
+  /** Renderer → main: query the MCP server's `McpActivitySnapshot` (who called what, lately). */
+  mcpActivity = 'mcp-activity',
+  /** Main → renderer: a new `McpActivitySnapshot`. */
+  mcpActivityChanged = 'mcp-activity-changed',
   /** Renderer → main: enable or disable the MCP server; resolves with the new `McpStatus`. */
   mcpSetEnabled = 'mcp-set-enabled',
   /** Renderer → main: change the MCP server's port; resolves with the new `McpStatus`. */

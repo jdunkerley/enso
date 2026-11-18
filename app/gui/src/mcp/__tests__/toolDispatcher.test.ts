@@ -111,7 +111,10 @@ test('A tool with no handler says that no project is open', async () => {
     caller,
     timeoutMs: TIMEOUT_MS,
   })
-  expect(reply).toEqual({ requestId: 'r2', result: { ok: false, error: NO_PROJECT_ERROR } })
+  expect(reply).toEqual({
+    requestId: 'r2',
+    result: { ok: false, error: NO_PROJECT_ERROR, refused: true },
+  })
 })
 
 test('A handler that throws is answered with its message', async () => {
@@ -163,7 +166,7 @@ test('A removed (deactivated) project does not answer, and activating it restore
   const b = project('B')
   b.remove()
   a.remove()
-  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR })
+  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR, refused: true })
   b.activate()
   expect(await graphFrom(call)).toEqual({ ok: true, value: 'B' })
 })
@@ -199,7 +202,7 @@ test('App tools answer on the dashboard, while project tools there still say no 
       })
     ).result,
   ).toEqual({ ok: true, value: 'dashboard' })
-  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR })
+  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR, refused: true })
 })
 
 test('App tools answer whichever project is on screen or hidden', async () => {
@@ -220,7 +223,7 @@ test('App tools answer whichever project is on screen or hidden', async () => {
   expect(await graphFrom(call)).toEqual({ ok: true, value: 'A' })
   a.remove()
   expect(await appState()).toEqual({ ok: true, value: 'app' })
-  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR })
+  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR, refused: true })
 })
 
 test('App tools do not count as a project being shown', () => {
@@ -246,7 +249,7 @@ test('Unregistering the app tools stops them answering', async () => {
         timeoutMs: TIMEOUT_MS,
       })
     ).result,
-  ).toEqual({ ok: false, error: NO_PROJECT_ERROR })
+  ).toEqual({ ok: false, error: NO_PROJECT_ERROR, refused: true })
 })
 
 // === Waiting for a project's tools ===
@@ -350,7 +353,7 @@ test('A deactivated project never answers, and is not waited into answering', as
   const b = project('B')
   b.remove()
   expect(activeProjectToolsId()).toBeUndefined()
-  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR })
+  expect(await graphFrom(call)).toEqual({ ok: false, error: NO_PROJECT_ERROR, refused: true })
 })
 
 test('Waiting is not resolved by the app tools registering', async () => {

@@ -75,6 +75,8 @@ default. No tool changes the execution environment, settings or secrets.
   set-up only while the server is on
   (`app/gui/src/dashboard/layouts/Settings/CLAUDE.md`, "AI"). Tests inject a
   temporary folder; never point one at the real Claude folder.
+- `mcpActivity.ts` — `McpActivity`, the in-memory record behind the top bar's
+  activity icon (see "The activity record").
 - `clientConfigs.ts` — that setup text per client (`claude mcp add` command,
   Claude Desktop `mcp-remote` JSON, Codex TOML, Copilot JSON for VS Code and the
   CLI, a generic `mcpServers` block), each checked against the vendor's
@@ -414,6 +416,34 @@ tools (`McpCaller`, `kind: 'external'`) comes from the request's `User-Agent`:
 its first product token (`callerName`, at most 64 characters, `unknown` when
 there is none). It is a label for display and logs, chosen by the client: never
 authorise anything by it. The token is the only credential.
+
+## The activity record (the top bar's icon)
+
+`McpActivity` (`mcpActivity.ts`) is made once in `initMcp` and handed to every
+`McpHttpServer` the controller creates (a server exists per start). It keeps, in
+memory only: up to 8 **clients** keyed by the `User-Agent` product token
+(display name, version, last seen) and the last **5 calls** (`id`, client, tool,
+`startedAt`, `endedAt`, `outcome`). `mcpServer.ts` feeds it: `seen(token)` for
+every request that passed the caller checks (a refused request records nothing),
+`named(token, clientInfo)` when `server.server.getClientVersion()` is non-null
+after `handleRequest` (that is exactly an `initialize`; the title, else the
+name, is stored under the token and shown for later requests), and `start`/`end`
+around `registry.call`. The outcome is `refused` when the result has
+`refused: true` (set by the window's house rules: `refusals.ts` in
+`app/gui/src/project-view/mcp/`, and `add_image`'s path rule here), `error` for
+any other failure, `ok` otherwise. **A call holds only the tool's name, the
+client, times and outcome**: never arguments, results, error text or paths
+(`mcpActivity.test.ts` checks a marker string never reaches a snapshot). It is
+cleared when a server stops (`McpHttpServer.stop`), so turning MCP off or
+restarting it starts empty; a window reload keeps it because it lives here.
+Names are chosen by the client: trimmed to 64 characters, control characters
+removed, rendered as text. `Channel.mcpActivity` answers a snapshot and
+`Channel.mcpActivityChanged` pushes one: at once for a new client (or one back
+after the 15-minute connected window lapsed), a start, an end, a name and a
+clear; a `lastSeenAt` that only moves is broadcast at most every 5 s.
+`window.api.mcp.activity()` / `onActivityChanged` are the window's side
+(`McpApi`); the types and the window constants (`MCP_CONNECTED_WINDOW_MS`,
+`MCP_ACTIVE_WINDOW_MS`) are in `app/common/src/mcp.ts`.
 
 ## Settings, token and environment overrides
 
