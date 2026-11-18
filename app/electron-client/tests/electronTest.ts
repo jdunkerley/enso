@@ -499,34 +499,53 @@ async function showAll(page: Page, targets: Locator) {
 export async function showSelectedComponent(page: Page) {
   const selected = page.locator('.GraphNode.selected')
   await expect(selected).toHaveCount(1)
-  await showHiddenParameters(page, selected)
   await showAll(page, selected)
 }
 
 /**
- * Add every parameter the selected component hides, through its `…` menu. Selecting a component
- * does not show them (#836), and the exercises fill them in. Does nothing when there is no `…`.
+ * Add the hidden parameter `name` to the selected component through a `…` menu, as a user does:
+ * selecting a component does not show its hidden parameters (#836). A component has a `…` for
+ * each call that hides some (`set` and the `Simple_Expression` in its `value`, say); the first
+ * whose menu offers `name` is used. The parameter is written with its default value. Returns the
+ * added argument, and brings the component, which has grown, back into view.
  */
-async function showHiddenParameters(page: Page, selected: Locator) {
-  const button = selected.locator('.parameterMenuButton:visible')
+export async function addParameter(page: Page, name: string): Promise<Locator> {
+  const selected = page.locator('.GraphNode.selected')
+  await expect(selected).toHaveCount(1)
+  const buttons = selected.locator('.parameterMenuButton')
   const menu = page.getByRole('dialog', { name: 'More parameters' })
-  for (let i = 0; i < 12 && (await button.count()) > 0; i++) {
-    // The component re-renders as the engine answers, and that closes the menu: open it again.
-    await expect(async () => {
-      if (!(await menu.isVisible())) {
-        // Not `click()`: Playwright waits for the component to hold still, and it does not.
-        await button.first().dispatchEvent('click')
+  const item = menu.getByRole('button', { name: new RegExp(`^${name}( |$)`) })
+  await expect(buttons.first()).toBeVisible()
+  // The component re-renders as the engine answers (types, widget configurations), which can
+  // close an open menu or replace a button: start again until the item is picked.
+  await expect(async () => {
+    if (await menu.isVisible()) await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden({ timeout: 2000 })
+    for (const button of await buttons.all()) {
+      // Not `click()`: Playwright waits for the component to hold still, and while it grows it
+      // does not.
+      await button.dispatchEvent('click')
+      await expect(menu).toBeVisible({ timeout: 2000 })
+      if ((await item.count()) > 0) {
+        await item.dispatchEvent('click', undefined, { timeout: 2000 })
+        await expect(menu).toBeHidden({ timeout: 2000 })
+        return
       }
-      const name = (await menu
-        .locator('.parameterItem .name')
-        .first()
-        .textContent({ timeout: 2000 }))!
-      await menu
-        .getByRole('button', { name: new RegExp(`^${name}`) })
-        .dispatchEvent('click', undefined, { timeout: 2000 })
+      await page.keyboard.press('Escape')
       await expect(menu).toBeHidden({ timeout: 2000 })
-    }).toPass({ timeout: 30_000 })
-  }
+    }
+    throw new Error(`No "…" menu of the selected component offers "${name}"`)
+  }).toPass({ timeout: 30_000 })
+  const argument = selected.locator(`[data-pop-out-name="${name}"]`)
+  await expect(argument).toHaveCount(1)
+  await showAll(page, selected)
+  return argument
+}
+
+/** Open the drop-down of an argument (as returned by `addParameter`). */
+export async function openDropdownInArgument(page: Page, argument: Locator) {
+  await argument.locator('.WidgetSelection').first().click()
+  await expect(page.locator('.DropdownWidget[data-transitioning]')).toHaveCount(0)
 }
 
 /**
