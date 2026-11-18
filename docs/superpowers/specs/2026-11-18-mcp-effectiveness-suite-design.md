@@ -279,20 +279,11 @@ tasks with their solutions, `--self-check` green on Windows and Linux, unit
 tests, and a first real run (one repeat, `sonnet`) whose `report.md` goes in the
 PR description. Label `CI: No changelog needed` (nothing user-visible).
 
-## Open questions for the owner
+## Decisions (owner, 2026-11-18)
 
-1. **Authentication: API key or your subscription?** `--bare` (no `CLAUDE.md`,
-   memory, hooks or plugins from your machine: the cleanest measurement) uses
-   `ANTHROPIC_API_KEY` only. Without `--bare`, the subscription login works but
-   your user settings, memory and plugins leak into the agent's context unless
-   each is turned off separately. **Recommendation:** `--bare` with an API key,
-   read from the environment; `total_cost_usd` is then the real cost.
-2. **Default model and repeats.** **Recommendation:** `sonnet`, one repeat by
-   default (about 7 tasks × 1–3 USD), and `--repeat 3` when judging a change.
-3. **Results folder.** **Recommendation:** `~/enso-mcp-eval/`, outside the
-   repository; nothing committed. If you want history in git, a branch of its
-   own (as `pr-screenshots`) rather than `develop`.
-4. **The task list.** Seven as above. **Recommendation:** start with these, and
-   add a task only with a fixture, a reference solution and a value check;
-   prompts that need downloaded data (the old Preppin' Data challenges) stay
-   out.
+1. **`--bare` with an API key** (`ANTHROPIC_API_KEY` from the environment), so
+   `total_cost_usd` is the real cost.
+2. **`sonnet`, one repeat by default**; `--repeat 3` when judging a change.
+3. **Results in `~/enso-mcp-eval/`**, outside the repository; nothing committed.
+4. **The seven tasks above** to start; a task is added only with a fixture, a
+   reference solution and a value check.
