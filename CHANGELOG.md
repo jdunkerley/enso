@@ -482,6 +482,9 @@
 
 #### Enso Standard Library
 
+- [The period and amount dropdowns of `Date` and `Date_Time` (`+`, `-`, `up_to`,
+  `start_of` and so on) write `..Day`, `..Month`, `..Hour` rather than
+  `Date_Period.Day`, like `Time_Of_Day`'s.][846]
 - [Date_Time's functions have typed arguments with working widgets, including
   period dropdowns for start_of, end_of, + and -.][832]
 - [`Time_Of_Day`'s functions have typed arguments with working widgets: `+` and
@@ -565,6 +568,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [878]: https://github.com/jdunkerley/enso/pull/878
+[846]: https://github.com/jdunkerley/enso/pull/846
 [822]: https://github.com/jdunkerley/enso/pull/822
 [840]: https://github.com/jdunkerley/enso/pull/840
 [841]: https://github.com/jdunkerley/enso/pull/841

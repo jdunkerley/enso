@@ -59,12 +59,12 @@ These were settled before the design and everything below follows from them.
 
 ## Pieces
 
-| Piece | What                                                                               | Spec          |
-| ----- | ---------------------------------------------------------------------------------- | ------------- |
-| 1     | Data types, the dependency flip, charts on the table type, availability by type    | this document |
-| 2     | Object and JSON explorer                                                           | to be written |
-| 3     | Node actions from any visualisation                                                | to be written |
-| 4     | Widgets query by method pointer; new projects drop `import Standard.Visualization` | to be written |
+| Piece | What                                                                               | Spec                                                                |
+| ----- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 1     | Data types, the dependency flip, charts on the table type, availability by type    | this document                                                       |
+| 2     | Object and JSON explorer                                                           | to be written                                                       |
+| 3     | Node actions from any visualisation                                                | to be written                                                       |
+| 4     | Widgets query by method pointer; new projects drop `import Standard.Visualization` | [widgets by conversion](2026-11-18-widgets-by-conversion-design.md) |
 
 Pieces 2 and 3 depend on piece 1's dependency flip and not on each other. Piece
 4 is independent of 2 and 3.
