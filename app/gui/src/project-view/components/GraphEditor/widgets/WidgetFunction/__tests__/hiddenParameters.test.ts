@@ -83,7 +83,7 @@ test('a parameter configured to always show is not hidden', () => {
 })
 
 test('the placeholder flags: only later unset parameters ask to be named (the menu names every pick)', () => {
-  // The `…` menu passes `forceNamed`, so the first one is named too (see the insertion tests).
+  // The ＋ menu passes `forceNamed`, so the first one is named too (see the insertion tests).
   const app = applicationOf('Date_Time.new 2020 1 15')
   assert(app instanceof ArgumentApplication)
   const named = new Map(
