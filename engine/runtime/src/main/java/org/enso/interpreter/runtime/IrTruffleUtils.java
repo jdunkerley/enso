@@ -57,6 +57,7 @@ final class IrTruffleUtils {
 
     @Override
     protected TypeCheckValueNode forEigentypeName(CompilerContext.Module module, String name) {
+      // See Note [Eigentype References] in EigentypeReference.java.
       var sb = TruffleCompilerModuleScopeBuilder.fromCompilerModule(module);
       var typ = sb.getType(name, true);
       return TypeCheckValueNode.single(comment, typ.getEigentype());

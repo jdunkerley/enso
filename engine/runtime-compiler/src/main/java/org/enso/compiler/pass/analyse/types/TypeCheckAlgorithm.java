@@ -126,6 +126,7 @@ public abstract class TypeCheckAlgorithm<R, E extends Exception> {
             case BindingsMap.ResolvedType binding -> {
               var module = binding.module().unsafeAsModule("convert to module");
               var name = binding.tp().name();
+              // See Note [Eigentype References] in EigentypeReference.java.
               yield res.isEigentype() ? forEigentypeName(module, name) : forName(module, name);
             }
             case BindingsMap.ResolvedPolyglotSymbol ps -> {
