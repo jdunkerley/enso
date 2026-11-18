@@ -1,7 +1,7 @@
 /**
  * @file The rail footer (#83, #566), at the bottom of the left rail: the Settings, Documentation
- * and About buttons, whose actions are global; no account, notifications or offline notice, no cloud-only
- * buttons.
+ * and About buttons, whose actions are global, and in the desktop app the MCP activity icon above
+ * them (#864); no account, notifications or offline notice, no cloud-only buttons.
  */
 import { useAboutModal } from '$/components/AboutModal/aboutModal'
 import { useActionsStore } from '$/providers/actions'
@@ -9,6 +9,8 @@ import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
+import { flushPromises } from '@vue/test-utils'
+import { MCP_DEFAULT_PORT } from 'enso-common/src/mcp'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive, shallowRef } from 'vue'
 import RailFooter from '../RailFooter.vue'
@@ -129,6 +131,43 @@ describe('RailFooter', () => {
     aboutButton().click()
     expect(useAboutModal().isOpen.value).toBe(true)
     expect(document.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  test('in the desktop app the MCP activity icon comes first, directly above Settings', async () => {
+    const status = {
+      enabled: false,
+      port: MCP_DEFAULT_PORT,
+      running: false,
+      error: null,
+      lockedByEnvironment: false,
+    }
+    vi.stubGlobal('api', {
+      ...window.api,
+      mcp: {
+        status: () => Promise.resolve(status),
+        activity: () => Promise.resolve({ clients: [], calls: [] }),
+        setEnabled: () => Promise.resolve(status),
+        onStatusChanged: () => () => {},
+        onActivityChanged: () => () => {},
+      },
+    })
+    try {
+      await mountFooter()
+      await flushPromises()
+      const mcpButton = must(
+        document.querySelector<HTMLElement>('[data-testid="mcp-activity-button"]'),
+      )
+      expect([...document.querySelectorAll('button')]).toEqual([
+        mcpButton,
+        settingsButton(),
+        documentationButton(),
+        aboutButton(),
+      ])
+      expect(mcpButton.getAttribute('aria-label')).toBe(getText('mcpActivityNameOff'))
+      expect(textOf(mcpButton)).toBe('')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   test('the buttons work from the keyboard', async () => {

@@ -75,7 +75,7 @@ default. No tool changes the execution environment, settings or secrets.
   set-up only while the server is on
   (`app/gui/src/dashboard/layouts/Settings/CLAUDE.md`, "AI"). Tests inject a
   temporary folder; never point one at the real Claude folder.
-- `mcpActivity.ts` — `McpActivity`, the in-memory record behind the top bar's
+- `mcpActivity.ts` — `McpActivity`, the in-memory record behind the left rail's
   activity icon (see "The activity record").
 - `clientConfigs.ts` — that setup text per client (`claude mcp add` command,
   Claude Desktop `mcp-remote` JSON, Codex TOML, Copilot JSON for VS Code and the
@@ -417,7 +417,7 @@ its first product token (`callerName`, at most 64 characters, `unknown` when
 there is none). It is a label for display and logs, chosen by the client: never
 authorise anything by it. The token is the only credential.
 
-## The activity record (the top bar's icon)
+## The activity record (the left rail's icon)
 
 `McpActivity` (`mcpActivity.ts`) is made once in `initMcp` and handed to every
 `McpHttpServer` the controller creates (a server exists per start). It keeps, in

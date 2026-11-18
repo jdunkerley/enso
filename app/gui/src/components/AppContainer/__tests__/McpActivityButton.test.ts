@@ -127,6 +127,18 @@ describe('without the desktop app', () => {
 })
 
 describe('the icon', () => {
+  test('is a rail button, labelled with its state while the rail is extended', async () => {
+    fake.status.mockResolvedValue(ON)
+    await mountWithProviders(McpActivityButton)
+    await mountWithProviders(McpActivityButton, { props: { extended: true } })
+    await flushPromises()
+    const [collapsed, extended] = [
+      ...document.querySelectorAll('[data-testid="mcp-activity-button"]'),
+    ].slice(-2)
+    expect(collapsed?.textContent.trim()).toBe('')
+    expect(extended?.textContent.trim()).toBe(getText('mcpActivityNameIdle'))
+  })
+
   test('is off, with no badge, when MCP is off', async () => {
     await mountButton(OFF)
     expect(button()?.getAttribute('aria-label')).toBe(getText('mcpActivityNameOff'))

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The three buttons at the bottom of the left rail, under the divider: Settings (the cog),
- * Documentation (the user documentation site's introduction, in the browser) and About (#566).
- * `LeftPanel.vue` mounts it.
+ * @file The buttons at the bottom of the left rail, under the divider: in the desktop app the MCP
+ * activity icon (`McpActivityButton.vue`, #864), then Settings (the cog), Documentation (the user
+ * documentation site's introduction, in the browser) and About (#566). `LeftPanel.vue` mounts it.
  *
  * All are plain rail buttons, labelled when the rail is extended. Their actions, and "Download
  * app" (only without a local backend, and with no button), are global while this is mounted
@@ -22,6 +22,7 @@ import { useToasts } from '$/providers/toasts'
 import { download } from '$/utils/download'
 import { getDownloadUrl } from '$/utils/github'
 import SvgButton from '@/components/SvgButton.vue'
+import McpActivityButton from './McpActivityButton.vue'
 
 const { extended = false } = defineProps<{
   /** The rail is expanded: the buttons show their labels, as the rail's other buttons do. */
@@ -70,6 +71,7 @@ useMenuEntries<MenuEntryAction>(() => [
 
 <template>
   <div class="RailFooter">
+    <McpActivityButton :extended="extended" />
     <SvgButton
       class="RailButton"
       name="settings"

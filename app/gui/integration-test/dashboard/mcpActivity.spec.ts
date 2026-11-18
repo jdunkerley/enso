@@ -1,10 +1,12 @@
 /**
- * @file The MCP activity icon at the right end of the top bar, against the mocked
- * `window.api.mcp`: it is there on the Drive with no tab open and with a project open, Enable turns
- * MCP on, a seeded activity record renders its client and calls, and its link opens Settings → AI.
+ * @file The MCP activity icon in the left rail, above Settings, against the mocked
+ * `window.api.mcp`: it is there on the Drive with no tab open and with a project open, its popover
+ * opens to its right inside the window, Enable turns MCP on, a seeded activity record renders its
+ * client and calls, and its link opens Settings → AI.
  */
 import { expect, test, type Page } from 'integration-test/base'
 import { TEXT } from '../actions'
+import { parkMouse } from '../actions/utilities'
 
 /** What main would send: one client and one call of each outcome. */
 const ACTIVITY = (now: number) => ({
@@ -86,6 +88,41 @@ test('the icon is on the Drive with no tab open, off, and Enable turns MCP on', 
   await page.keyboard.press('Escape')
   await expect(popover).toBeHidden()
   await expect(icon(page)).toBeFocused()
+})
+
+test('the icon is in the left rail, directly above Settings, and its popover opens to its right inside the window', async ({
+  page,
+  drivePage,
+}) => {
+  void drivePage
+  const footerButtons = page.locator('.leftBar .RailFooter').getByRole('button')
+  await expect(footerButtons.nth(0)).toHaveAttribute('data-testid', 'mcp-activity-button')
+  await expect(footerButtons.nth(1)).toHaveAccessibleName(TEXT.settingsShortcut)
+  const iconBox = (await icon(page).boundingBox())!
+  const settingsBox = (await footerButtons.nth(1).boundingBox())!
+  expect(iconBox.x).toBeCloseTo(settingsBox.x, 0)
+  expect(iconBox.y + iconBox.height).toBeLessThanOrEqual(settingsBox.y)
+  // The rail is 48px wide.
+  expect(iconBox.x + iconBox.width).toBeLessThanOrEqual(48)
+
+  await icon(page).click()
+  await parkMouse(page)
+  const popover = page.getByTestId('mcp-activity-popover')
+  await expect(popover).toBeVisible()
+  // Seeded with a full record, so that it is as tall as it gets.
+  await popover.getByRole('button', { name: TEXT.mcpActivityEnable }).click()
+  await emitActivity(page)
+  await expect(page.getByTestId('mcp-activity-calls').getByRole('listitem')).toHaveCount(5)
+  const viewport = page.viewportSize()!
+  await expect(async () => {
+    const box = (await popover.boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(48)
+    expect(box.y).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width)
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height)
+    // Its bottom is level with the icon's, unless the window's edge pushes it up.
+    expect(box.y + box.height).toBeGreaterThanOrEqual(iconBox.y + iconBox.height - 1)
+  }).toPass()
 })
 
 test('a seeded record shows the client and one call of each outcome', async ({

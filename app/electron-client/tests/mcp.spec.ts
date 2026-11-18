@@ -200,8 +200,8 @@ test('an MCP client reads the open project and cannot write a file', async ({
   })
   expect(anonymous.status).toBe(401)
 
-  // The window's activity record (the top bar's icon) names the client that introduced itself and
-  // lists its last calls; the refused anonymous request left no trace in it.
+  // The window's activity record (the left rail's icon) names the client that introduced itself
+  // and lists its last calls; the refused anonymous request left no trace in it.
   const activity = await page.evaluate(() =>
     (
       window as unknown as {
