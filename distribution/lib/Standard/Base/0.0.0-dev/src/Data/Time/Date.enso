@@ -1271,11 +1271,13 @@ type Date
    private: true
    ---
    The choices for an amount of time added to, or stepped from, a Date: each
-   `Date_Period`, and `Period.new` for a custom number of years, months and
-   days. The whole names are written, as the argument takes either type.
+   `Date_Period`, written autoscoped (`..Day`), and `Period.new` for a custom
+   number of years, months and days. `..Day` resolves against the
+   `Period | Date_Period` union: the engine tries each member in turn, and
+   only `Date_Period` has a `Day` constructor.
 make_period_selector display:Display=..When_Modified -> Widget =
     periods = ["Year", "Quarter", "Month", "Week", "Day"].map name->
-        code = "Date_Period." + name
+        code = ".." + name
         Option code code
     Widget.Single_Choice values=(periods + [Option "Period.new" "(Period.new)"]) display=display
 
