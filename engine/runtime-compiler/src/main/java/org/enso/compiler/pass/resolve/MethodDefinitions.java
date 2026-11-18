@@ -245,11 +245,13 @@ public final class MethodDefinitions implements MiniPassFactory {
                     "a method definition target"));
           }
           case ResolvedModule resMod -> {
-            MetadataInteropHelpers.updateMetadata(typePointer, INSTANCE, new Resolution(resMod, false));
+            MetadataInteropHelpers.updateMetadata(
+                typePointer, INSTANCE, new Resolution(resMod, false));
             return typePointer;
           }
           case ResolvedType resType -> {
-            MetadataInteropHelpers.updateMetadata(typePointer, INSTANCE, new Resolution(resType, false));
+            MetadataInteropHelpers.updateMetadata(
+                typePointer, INSTANCE, new Resolution(resType, false));
             return typePointer;
           }
           case ResolvedPolyglotSymbol ignored -> {

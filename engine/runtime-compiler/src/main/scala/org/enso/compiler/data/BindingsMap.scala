@@ -1158,6 +1158,11 @@ object BindingsMap {
   case class Resolution(target: ResolvedName, isEigentype: Boolean)
       extends IRPass.IRMetadata {
 
+    require(
+      !isEigentype || target.isInstanceOf[ResolvedType],
+      s"An eigentype resolution needs a type, got $target"
+    )
+
     /** The qualified name this resolution denotes: the target's, with `type`
       * appended for an eigentype (`Standard.Base.Data.Locale.Locale.type`).
       */

@@ -183,8 +183,8 @@ public final class Resolution extends ResolutionErrorGen {
   }
 
   /**
-   * {@code X.type} where {@code X} is not a type: only a type has an eigentype. See Note
-   * [Eigentype References] in {@code org.enso.compiler.pass.resolve.EigentypeReference}.
+   * {@code X.type} where {@code X} is not a type: only a type has an eigentype. See Note [Eigentype
+   * References] in {@code org.enso.compiler.pass.resolve.EigentypeReference}.
    *
    * @param kind what {@code X} is instead, e.g. "a module"
    */

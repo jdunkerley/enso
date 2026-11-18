@@ -49,8 +49,7 @@ public final class EigentypeReference {
     }
     var targets = found.toOption().get();
     if (targets.size() != 1) {
-      return new Left<>(
-          new Resolution.ResolverError(new BindingsMap.ResolutionAmbiguous(targets)));
+      return new Left<>(new Resolution.ResolverError(new BindingsMap.ResolutionAmbiguous(targets)));
     }
     if (targets.head() instanceof BindingsMap.ResolvedType type) {
       return new Right<>(new BindingsMap.Resolution(type, true));
