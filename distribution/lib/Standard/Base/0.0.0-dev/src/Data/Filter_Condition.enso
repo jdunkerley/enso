@@ -12,7 +12,7 @@ import project.Meta
 from project.Data.Boolean import Boolean, False, True
 from project.Data.Filter_Condition.Filter_Condition import all
 from project.Data.Text.Extensions import all
-from project.Metadata import Display, make_single_choice, Widget
+from project.Metadata import make_single_choice, Widget
 from project.Metadata.Choice import Option
 from project.Nothing import all
 from project.Widget_Helpers import make_any_selector
@@ -155,7 +155,11 @@ type Filter_Condition
        will not be matched.
     Regex_Match (pattern = (Missing_Argument.throw "pattern")) keep_or_remove:Filter_Action=..Keep
 
-    ## Is the value contained in `values`?
+    ## ---
+       arguments:
+         values: always
+       ---
+       Is the value contained in `values`?
 
        ## Remarks
 
@@ -295,7 +299,7 @@ type Filter_Condition
        private: true
        ---
        Creates a Single_Choice Widget for Filter_Conditions.
-    default_widget include_comparable:Boolean=True include_text:Boolean=True include_boolean:Boolean=True include_nullable:Boolean=True include_numeric:Boolean=True include_date:Boolean=True include_time:Boolean=True include_date_time:Boolean=True display:Display=..When_Modified -> Widget =
+    default_widget include_comparable:Boolean=True include_text:Boolean=True include_boolean:Boolean=True include_nullable:Boolean=True include_numeric:Boolean=True include_date:Boolean=True include_time:Boolean=True include_date_time:Boolean=True -> Widget =
         options = Vector.build builder->
             equatable_types = make_any_selector add_text=include_text add_boolean=include_boolean add_number=include_numeric add_date=include_date add_time=include_time add_date_time=include_date_time
             builder.append (Option "..Equal" "..Equal" [["to", equatable_types]])
@@ -325,7 +329,7 @@ type Filter_Condition
                 builder.append (Option "..Is_True" "..Is_True")
                 builder.append (Option "..Is_False" "..Is_False")
 
-            value_editor = Widget.Vector_Editor item_editor=equatable_types display=Display.Always item_default='""'
+            value_editor = Widget.Vector_Editor item_editor=equatable_types item_default='""'
             builder.append (Option "..Is_In" "..Is_In" [["values", value_editor]])
 
             if include_numeric then
@@ -338,7 +342,7 @@ type Filter_Condition
                 builder.append (Option "..Is_Empty" "..Is_Empty")
                 builder.append (Option "..Not_Empty" "..Not_Empty")
 
-        make_single_choice options display=display
+        make_single_choice options
 
 ## Specifies the action of a Filter_Condition.
 type Filter_Action

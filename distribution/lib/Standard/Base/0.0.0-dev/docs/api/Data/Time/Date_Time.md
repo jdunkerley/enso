@@ -52,5 +52,5 @@
     - week_of_year self locale:(Standard.Base.Data.Locale.Locale|Standard.Base.Nothing.Nothing)= -> Standard.Base.Data.Numbers.Integer
     - year self -> Standard.Base.Data.Numbers.Integer
     - zone self -> Standard.Base.Data.Time.Time_Zone.Time_Zone
-- make_date_time_period_selector include_custom:Standard.Base.Data.Boolean.Boolean= display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+- make_date_time_period_selector include_custom:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Metadata.Widget
 - Standard.Base.Data.Time.Date_Time.Date_Time.from that:Standard.Base.Data.Json.JS_Object -> Standard.Base.Data.Time.Date_Time.Date_Time

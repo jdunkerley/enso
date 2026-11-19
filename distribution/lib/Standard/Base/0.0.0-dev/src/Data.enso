@@ -93,7 +93,7 @@ from project.System.File_Format import Auto_Detect, File_Format
    for more details.
    The cached values are retained as long as the project remains open. Closing a
    project will clear the cache.
-@path (Text_Input display=..Always)
+@path (Text_Input)
 @format File_Format.default_widget
 read : Text | URI | File -> File_Format -> Problem_Behavior -> Any ! File_Error
 read path=(Missing_Argument.throw "path") format=Auto_Detect (on_problems : Problem_Behavior = ..Report_Warning) = case path of
@@ -163,7 +163,7 @@ read path=(Missing_Argument.throw "path") format=Auto_Detect (on_problems : Prob
    for more details.
    The cached values are retained as long as the project remains open. Closing a
    project will clear the cache.
-@paths (Vector_Editor item_editor=File_Browse item_default='""' display=..Always)
+@paths (Vector_Editor item_editor=File_Browse item_default='""')
 @format File_Format.default_widget
 @return Return_As.default_widget
 read_many : Many_Files_List -> File_Format -> Return_As -> Problem_Behavior -> Any ! File_Error
@@ -211,7 +211,7 @@ read_many (paths : Many_Files_List = Missing_Argument.throw "paths") format=Auto
 
          example_read = Data.read_text Examples.csv_path
    ```
-@path (Text_Input display=..Always)
+@path (Text_Input)
 @encoding Encoding.default_widget
 read_text : (Text | File) -> Encoding -> Problem_Behavior -> Text
 read_text path=(Missing_Argument.throw "path") (encoding : Encoding = Encoding.default) (on_problems : Problem_Behavior = ..Report_Warning) =
@@ -221,6 +221,8 @@ read_text path=(Missing_Argument.throw "path") (encoding : Encoding = Encoding.d
    group: File
    icon: folder
    suggested: 3
+   arguments:
+     directory: always
    ---
    Lists files in a directory.
 
@@ -276,7 +278,7 @@ read_text path=(Missing_Argument.throw "path") (encoding : Encoding = Encoding.d
    listed directory, to list files recursively you need to use a filter like
    `"**.txt"` or `"*/*"` (which will match only files that are exactly one
    directory down from the listed directory) or no filter at all.
-@directory (Folder_Browse display=..Always)
+@directory (Folder_Browse)
 @name_filter File_Format.name_filter_widget
 list : Text | File -> Text -> Boolean -> Vector File
 list (directory=enso_project.root) (name_filter:Text="") recursive:Boolean=False =
@@ -291,6 +293,8 @@ list (directory=enso_project.root) (name_filter:Text="") recursive:Boolean=False
    group: Web
    icon: data_download
    suggested: 4
+   arguments:
+     method: always
    ---
    Reads data from a web API.
 
@@ -346,7 +350,7 @@ list (directory=enso_project.root) (name_filter:Text="") recursive:Boolean=False
    download the file locally. Download sizes are not constrained by either limit.
    If the entire cache goes over the total cache size limit, the
    least-recently-used entries are removed.
-@uri (Text_Input display=..Always)
+@uri (Text_Input)
 @method HTTP_Method.default_fetch_widget
 @format Data_Read_Helpers.format_widget_with_raw_response
 @headers Header.default_widget
@@ -359,6 +363,8 @@ fetch (uri:(URI | Text)=(Missing_Argument.throw "uri")) (method:HTTP_Method=..Ge
    group: Web
    icon: data_upload
    suggested: 8
+   arguments:
+     method: always
    ---
    Writes data to a web API.
 
@@ -484,7 +490,7 @@ fetch (uri:(URI | Text)=(Missing_Argument.throw "uri")) (method:HTTP_Method=..Ge
    `Content-Type` header.
    If a value for `encoding` is specified, but no value for `content_type` is
    specified, then `"text/plain"` is used as the content type.
-@uri (Text_Input display=..Always)
+@uri (Text_Input)
 @method HTTP_Method.default_post_widget
 @headers Header.default_widget
 @response_format Data_Read_Helpers.format_widget_with_raw_response
@@ -496,6 +502,8 @@ post (uri:(URI | Text)=(Missing_Argument.throw "uri")) (body:Request_Body=..Empt
 ## ---
    group: Web
    icon: data_download
+   arguments:
+     method: always
    ---
    Fetches from the provided URI and if successful writes to the file. Returns an
    error if the status code does not represent a successful response.
@@ -514,7 +522,7 @@ post (uri:(URI | Text)=(Missing_Argument.throw "uri")) (body:Request_Body=..Empt
       to `HTTP_Method.Get`.
     - `headers`: The headers to send with the request. Defaults to an empty
       vector.
-@uri (Text_Input display=..Always)
+@uri (Text_Input)
 @method HTTP_Method.default_fetch_widget
 @headers Header.default_widget
 download : (URI | Text) -> Writable_File -> Download_Mode -> HTTP_Method -> Vector (Header | Pair Text Text) -> File ! Request_Error | HTTP_Error
@@ -535,6 +543,8 @@ download (uri:(URI | Text)=(Missing_Argument.throw "uri")) file:Writable_File (r
    group: Web
    icon: data_download
    suggested: 5
+   arguments:
+     method: always
    ---
    Read data from a set of URIs.
 
@@ -576,7 +586,7 @@ download (uri:(URI | Text)=(Missing_Argument.throw "uri")) file:Writable_File (r
    for more details.
    The cached values are retained as long as the project remains open. Closing a
    project will clear the cache.
-@uris Vector_Editor item_editor=Text_Input item_default='""' display=..Always
+@uris Vector_Editor item_editor=Text_Input item_default='""'
 @method HTTP_Method.default_fetch_widget
 @format Data_Read_Helpers.format_widget_with_raw_response
 @headers Header.default_widget
@@ -612,6 +622,8 @@ fetch_many (uris:Vector=(Missing_Argument.throw "uris")) (method:HTTP_Method=..G
    aliases: [download, http get]
    group: Web
    icon: data_download
+   arguments:
+     method: always
    ---
    Read data from a set of URIs.
 
@@ -659,7 +671,7 @@ fetch_many (uris:Vector=(Missing_Argument.throw "uris")) (method:HTTP_Method=..G
    for more details.
    The cached values are retained as long as the project remains open. Closing a
    project will clear the cache.
-@initial_uri (Text_Input display=..Always)
+@initial_uri (Text_Input)
 @method HTTP_Method.default_fetch_widget
 @format Data_Read_Helpers.format_widget_with_raw_response
 @headers Header.default_widget

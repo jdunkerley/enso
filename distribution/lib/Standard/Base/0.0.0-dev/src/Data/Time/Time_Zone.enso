@@ -9,7 +9,7 @@ import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Errors.Time_Error.Time_Error
 import project.Internal.Time.Date_Helpers
 import project.Panic.Panic
-from project.Metadata import Display, make_single_choice, Widget
+from project.Metadata import make_single_choice, Widget
 from project.Metadata.Choice import Option
 
 polyglot java import java.lang.Exception as JException
@@ -78,6 +78,8 @@ type Time_Zone
 
     ## ---
        icon: time
+       arguments:
+         hours: always
        ---
        Obtains an instance of `Time_Zone` using an offset in hours, minutes and
        seconds from the UTC zone.
@@ -97,9 +99,9 @@ type Time_Zone
 
              example_new = Time_Zone.new 1 1 50
        ```
-    @hours (Widget.Numeric_Input minimum=-18 maximum=18 display=Display.Always)
-    @minutes (Widget.Numeric_Input minimum=-59 maximum=59 display=Display.When_Modified)
-    @seconds (Widget.Numeric_Input minimum=-59 maximum=59 display=Display.When_Modified)
+    @hours (Widget.Numeric_Input minimum=-18 maximum=18)
+    @minutes (Widget.Numeric_Input minimum=-59 maximum=59)
+    @seconds (Widget.Numeric_Input minimum=-59 maximum=59)
     new : Integer -> Integer -> Integer -> Time_Zone
     new (hours:Integer = 0) (minutes:Integer = 0) (seconds:Integer = 0) =
         Date_Helpers.tz_new_builtin hours minutes seconds
@@ -146,7 +148,7 @@ type Time_Zone
 
              example_parse = Time_Zone.parse "+03:02:01"
        ```
-    @id (make_single_choice Time_Zone.zone_names Display.Always)
+    @id (make_single_choice Time_Zone.zone_names)
     parse id:Text -> Time_Zone ! Time_Error =
         Panic.catch JException handler=(catch -> Error.throw (Time_Error.Error catch.payload.getMessage)) <|
             Date_Helpers.tz_parse_builtin id
@@ -209,9 +211,9 @@ type Time_Zone
        private: true
        ---
        Gets the default drop down option for Time_Zone.
-    default_widget display:Display=..When_Modified -> Widget =
+    default_widget -> Widget =
         options = [Option "System" "Time_Zone.system", Option "Local" "Time_Zone.local", Option "UTC" "Time_Zone.utc", Option "Named" "(Time_Zone.parse 'UTC')", Option "custom" "(Time_Zone.new 1 0 0)"]
-        Widget.Single_Choice values=options display=display
+        Widget.Single_Choice values=options
 
     ## ---
        icon: time

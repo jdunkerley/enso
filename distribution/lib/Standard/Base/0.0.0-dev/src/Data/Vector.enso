@@ -27,7 +27,7 @@ from project.Data.Boolean import Boolean, False, True
 from project.Data.Ordering import all
 from project.Data.Range.Extensions import all
 from project.Error import all
-from project.Metadata import Display, Widget
+from project.Metadata import Widget
 from project.Nothing import all
 from project.Runtime import assert
 from project.Widget_Helpers import make_separator_selector
@@ -308,6 +308,8 @@ type Vector a
        group: Selections
        icon: parse
        suggested: 4
+       arguments:
+         index: always
        ---
        Gets an element from the vector at a specified index (0-based).
 
@@ -328,13 +330,15 @@ type Vector a
        ```
              [1, 2, 3].at -1 == 3
        ```
-    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1 display=Display.Always)
+    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1)
     at : Integer -> Any ! Index_Out_Of_Bounds
     at self index:Integer=0 = Array_Like_Helpers.at self index
 
     ## ---
        icon: parse
        suggested: 5
+       arguments:
+         index: always
        ---
        Gets an element from the vector at a specified index (0-based).
        If the index is invalid then `if_missing` is returned.
@@ -344,7 +348,7 @@ type Vector a
           is also allowed be negative, then the elements are indexed from the
           back of the vector, i.e. -1 will correspond to the last element.
         - `if_missing`: The value to return if the index is out of bounds.
-    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1 display=Display.Always)
+    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1)
     get : Integer -> Any -> Any
     get self index:Integer=0 ~if_missing=Nothing =
         Array_Like_Helpers.get self index if_missing
@@ -1087,6 +1091,8 @@ type Vector a
     ## ---
        group: Calculations
        icon: join
+       arguments:
+         separator: always
        ---
        When `self` is a vector of text values, concatenates all the values by
        interspersing them with `separator`.
@@ -1141,6 +1147,8 @@ type Vector a
        group: Selections
        icon: parse
        suggested: 6
+       arguments:
+         range: always
        ---
        Creates a new `Vector` with only the specified range of elements from the
        input, removing any elements outside the range.
@@ -1161,6 +1169,8 @@ type Vector a
         - skip
        group: Selections
        icon: parse
+       arguments:
+         range: always
        ---
        Creates a new `Vector`, removing any elements from the specified range.
 

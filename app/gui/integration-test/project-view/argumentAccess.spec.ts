@@ -104,7 +104,11 @@ test.describe('The ＋ of hidden parameters', () => {
       wrapped,
       group.getByRole('button', { name: 'Add argument' }),
     )
-    await expect(inner.locator('.parameterItem .name')).toHaveText(['on_problems'])
+    await expect(inner.locator('.parameterItem .name')).toHaveText([
+      'format',
+      'return',
+      'on_problems',
+    ])
     await inner.getByRole('button', { name: /^on_problems/ }).click()
     await expect(inner).toBeHidden()
     expect(await moduleCode(page)).toContain('wrapped = Data.read (Data.read_many on_problems=')
@@ -168,12 +172,7 @@ test.describe('The ＋ of hidden parameters', () => {
   }) => {
     const { nested } = await nodes(editorPage, page)
     // In document order: `path`'s chip holds the nested call, whose set `paths` is positional.
-    await expect(nested.locator('.WidgetArgumentName > .name')).toHaveText([
-      'path',
-      'paths',
-      'format',
-      'return',
-    ])
+    await expect(nested.locator('.WidgetArgumentName > .name')).toHaveText(['path', 'paths'])
     await expect(nested.locator('.WidgetArgumentName').nth(1)).toContainText('a.csv')
   })
 
@@ -187,6 +186,86 @@ test.describe('The ＋ of hidden parameters', () => {
     await expect(menu).toBeVisible()
     await wrapped.click({ position: { x: 8, y: 8 } })
     await expect(menu).toBeHidden()
+  })
+})
+
+/**
+ * `arguments: { peek: selected }` in a method's doc front matter: the argument shows while its
+ * node is the sole selection, and then the ＋ menu does not list it.
+ */
+test.describe('An argument displayed `selected`', () => {
+  test.afterEach(restoreMockMainFile)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile(
+          'from Standard.Base import Data\n\nmain =\n    first = Data.demo_selected\n    second = Data.demo_selected\n',
+        ),
+    },
+  })
+
+  const DEMO = {
+    methodPointer: {
+      module: 'Standard.Base.Data',
+      definedOnType: 'Standard.Base.Data',
+      name: 'demo_selected',
+    },
+    notAppliedArguments: [0, 1, 2],
+  }
+
+  async function nodes(editorPage: EditorPageActions, page: Page) {
+    const arg = (name: string) => ({
+      name,
+      reprType: 'Standard.Base.Any.Any',
+      isSuspended: false,
+      hasDefault: true,
+      defaultValue: '0',
+    })
+    await editorPage.mockSuggestion({
+      type: 'method',
+      module: 'Standard.Base.Data',
+      name: 'demo_selected',
+      arguments: [arg('peek'), arg('skip'), arg('flag')],
+      selfType: 'Standard.Base.Data',
+      returnType: 'Standard.Base.Any.Any',
+      isStatic: true,
+      documentation: ' ---\narguments:\n  peek: selected\n---\nA method with a selected argument.',
+      annotations: [],
+    })
+    await mockMethodCallInfo(page, 'first', DEMO)
+    await mockMethodCallInfo(page, 'second', DEMO)
+    return {
+      first: editorPage.locateNodes('first'),
+      second: editorPage.locateNodes('second'),
+    }
+  }
+
+  test('shows only while its node is the sole selection, and is then not in the ＋ menu', async ({
+    page,
+    editorPage,
+  }) => {
+    const { first, second } = await nodes(editorPage, page)
+    const args = first.locator('.WidgetTopLevelArgument')
+    // Not selected: hidden.
+    await expect(first).toBeVisible()
+    await expect(args).toHaveCount(0)
+    // Sole selection: shown, with its name, and not offered by the ＋.
+    const menu = await actions.openAddArgumentMenu(page, first)
+    await expect(args).toHaveCount(1)
+    await expect(first.locator('.WidgetArgumentName > .name')).toHaveText(['peek'])
+    await expect(menu.locator('.parameterItem .name')).toHaveText(['skip', 'flag'])
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    // Two nodes selected: hidden again.
+    await second.click({ position: { x: 8, y: 8 }, modifiers: ['Shift'] })
+    await expect(second).toBeSelected()
+    await expect(first).toBeSelected()
+    await expect(args).toHaveCount(0)
+    await expect(second.locator('.WidgetTopLevelArgument')).toHaveCount(0)
+    // Deselected: hidden.
+    await actions.clickAtBackground(page)
+    await expect(locate.selectedNodes(page)).toHaveCount(0)
+    await expect(args).toHaveCount(0)
   })
 })
 

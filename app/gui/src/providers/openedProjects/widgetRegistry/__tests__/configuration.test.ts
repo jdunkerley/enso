@@ -1,15 +1,13 @@
 import { assert, expect, test } from 'vitest'
 import {
   type Choice,
-  DisplayMode,
   flattenChoice,
   multipleChoiceConfiguration,
   singleChoiceConfiguration,
   widgetConfigurationSchema,
 } from '../configuration'
 
-const dynamicConfig = (): { label: string; values: Choice[] } => ({
-  label: 'split_at',
+const dynamicConfig = (): { values: Choice[] } => ({
   values: [
     {
       label: 'whitespace',
@@ -17,12 +15,7 @@ const dynamicConfig = (): { label: string; values: Choice[] } => ({
         {
           value: 'space',
           label: null,
-          parameters: [
-            [
-              'starting_from',
-              { kind: 'Numeric_Input', minimum: 0, maximum: 100, display: DisplayMode.Always },
-            ],
-          ],
+          parameters: [['starting_from', { kind: 'Numeric_Input', minimum: 0, maximum: 100 }]],
         },
         {
           value: 'newline',
@@ -35,12 +28,12 @@ const dynamicConfig = (): { label: string; values: Choice[] } => ({
     {
       label: 'character',
       value: 'character',
-      parameters: [['character', { kind: 'Text_Input', display: DisplayMode.Always }]],
+      parameters: [['character', { kind: 'Text_Input' }]],
     },
     {
       label: 'regex',
       value: 'regex',
-      parameters: [['regex', { kind: 'Text_Input', display: DisplayMode.Always }]],
+      parameters: [['regex', { kind: 'Text_Input' }]],
     },
   ],
 })
@@ -50,12 +43,7 @@ const expectedPossibleFunctions = new Map([
     'space',
     {
       kind: 'FunctionCall',
-      parameters: new Map([
-        [
-          'starting_from',
-          { kind: 'Numeric_Input', minimum: 0, maximum: 100, display: DisplayMode.Always },
-        ],
-      ]),
+      parameters: new Map([['starting_from', { kind: 'Numeric_Input', minimum: 0, maximum: 100 }]]),
     },
   ],
   ['newline', { kind: 'FunctionCall', parameters: new Map() }],
@@ -63,14 +51,14 @@ const expectedPossibleFunctions = new Map([
     'character',
     {
       kind: 'FunctionCall',
-      parameters: new Map([['character', { kind: 'Text_Input', display: DisplayMode.Always }]]),
+      parameters: new Map([['character', { kind: 'Text_Input' }]]),
     },
   ],
   [
     'regex',
     {
       kind: 'FunctionCall',
-      parameters: new Map([['regex', { kind: 'Text_Input', display: DisplayMode.Always }]]),
+      parameters: new Map([['regex', { kind: 'Text_Input' }]]),
     },
   ],
 ])
@@ -99,7 +87,6 @@ test('a choice keeps the type it requires and its file name patterns', () => {
   const parsed = widgetConfigurationSchema.parse({
     type: 'Widget',
     constructor: 'Single_Choice',
-    label: null,
     values: [
       {
         label: 'Auto Detect',
@@ -116,7 +103,6 @@ test('a choice keeps the type it requires and its file name patterns', () => {
         patterns: ['*.sqlite', '*.db'],
       },
     ],
-    display: { type: 'Display', constructor: 'When_Modified' },
   })
   assert(parsed.kind === 'Single_Choice')
   expect(parsed.values[0]).not.toHaveProperty('requires')
@@ -127,4 +113,26 @@ test('a choice keeps the type it requires and its file name patterns', () => {
     requires: 'Standard.SQLite.SQLite_Format.SQLite_Format',
     patterns: ['*.sqlite', '*.db'],
   })
+})
+
+test('an answer from an older library, still carrying display and label, parses without them', () => {
+  const parsed = widgetConfigurationSchema.parse({
+    type: 'Widget',
+    constructor: 'Single_Choice',
+    label: 'placeholder',
+    values: [{ label: 'A', value: "'A'", parameters: [], icon: '' }],
+    display: { type: 'Display', constructor: 'Always' },
+  })
+  expect(parsed).toEqual({
+    kind: 'Single_Choice',
+    values: [{ label: 'A', value: "'A'", parameters: [], icon: '' }],
+  })
+  expect(parsed).not.toHaveProperty('display')
+  expect(parsed).not.toHaveProperty('label')
+
+  const textInput = widgetConfigurationSchema.parse({
+    constructor: 'Text_Input',
+    display: { type: 'Display', constructor: 'When_Modified' },
+  })
+  expect(textInput).toEqual({ kind: 'Text_Input' })
 })

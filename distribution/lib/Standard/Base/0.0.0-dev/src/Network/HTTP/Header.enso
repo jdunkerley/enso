@@ -10,7 +10,6 @@ import project.Error.Error
 import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Function.Function
 import project.Meta
-import project.Metadata.Display
 import project.Metadata.Widget
 from project.Data.Ordering import all
 from project.Data.Text.Extensions import all
@@ -294,7 +293,7 @@ type Header
     ## ---
        private: true
        ---
-    default_widget (display : Display = ..When_Modified) -> Widget =
+    default_widget -> Widget =
         fqn = "Header"
 
         custom = [Option "Custom" fqn+".new '' ''"]
@@ -305,8 +304,8 @@ type Header
         content_type = [Option "Content-Type" fqn+".content_type ''" [["value", content_type_widget], ["encoding", Encoding.default_widget]]]
         values = custom + accept + authorization + basic_auth + bearer_auth + content_type
 
-        item_editor = Single_Choice values=values display=..Always
-        Vector_Editor item_editor item_default='Header.new "header" "value"' display=display
+        item_editor = Single_Choice values=values
+        Vector_Editor item_editor item_default='Header.new "header" "value"'
 
 ## ---
    private: true

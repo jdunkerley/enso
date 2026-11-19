@@ -9,7 +9,6 @@ import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Errors.Problem_Behavior.Problem_Behavior
 import project.Function.Function
 import project.Meta
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Panic.Panic
 from project.Data.Boolean import Boolean, False, True
@@ -67,9 +66,9 @@ type Return_As
     ## ---
        private: true
        ---
-    default_widget display:Display=..When_Modified -> Widget =
+    default_widget -> Widget =
         options = SPI._get_known_return_classes.flat_map .get_dropdown_options
-        Single_Choice display=display values=options
+        Single_Choice values=options
 
 ## ---
    private: true

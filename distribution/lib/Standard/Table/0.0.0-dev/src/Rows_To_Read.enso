@@ -1,6 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Runtime.Context
-from Standard.Base.Metadata import Display, make_single_choice, Widget
+from Standard.Base.Metadata import make_single_choice, Widget
 
 import project.Errors.Not_All_Rows_Downloaded
 import project.Table.Table
@@ -23,8 +23,8 @@ type Rows_To_Read
     ## ---
        private: true
        ---
-    default_widget display:Display=..When_Modified -> Widget =
-        make_single_choice [["All_Rows", "..All_Rows"], ["First", "..First"]] display=display
+    default_widget -> Widget =
+        make_single_choice [["All_Rows", "..All_Rows"], ["First", "..First"]]
 
     ## ---
        private: true

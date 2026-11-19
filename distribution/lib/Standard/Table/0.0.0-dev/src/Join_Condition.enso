@@ -1,7 +1,11 @@
 from Standard.Base import all
 
 type Join_Condition
-    ## Correlates rows from the two tables if the `left` element is equal to the
+    ## ---
+       arguments:
+         right: always
+       ---
+       Correlates rows from the two tables if the `left` element is equal to the
        `right` element.
        `Nothing` (or null in database) is considered equal to itself.
 
@@ -10,7 +14,11 @@ type Join_Condition
           index of a column in the right table.
     Equals (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "")
 
-    ## Correlates rows from the two tables if the `left` element is equal to the
+    ## ---
+       arguments:
+         right: always
+       ---
+       Correlates rows from the two tables if the `left` element is equal to the
        `right` element, ignoring case. This is only supported for text columns.
        Case insensitive comparisons may mean a database has to perform a row
        scan, which can cause a performance degradation.
@@ -23,7 +31,12 @@ type Join_Condition
     @locale Locale.default_widget
     Equals_Ignore_Case (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "") (locale : Locale = Locale.default)
 
-    ## Correlates rows from the two tables if the `left` element fits between the
+    ## ---
+       arguments:
+         right_lower: always
+         right_upper: always
+       ---
+       Correlates rows from the two tables if the `left` element fits between the
        `right_lower` and `right_upper` elements. The comparison is inclusive for
        both lower and upper bounds.
        If any of the values on row are `Nothing` (or null in database) then the

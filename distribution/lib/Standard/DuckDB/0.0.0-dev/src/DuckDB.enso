@@ -82,6 +82,9 @@ type DuckDB
     ## ---
        group: Standard.Base.Input
        icon: spatial
+       arguments:
+         as: always
+         key_columns: always
        ---
        ToDo: Hidden until we do a shared in memory instance.
        Reads a spatial file into a new In-Memory DuckDB database.
@@ -98,9 +101,9 @@ type DuckDB
 
        ## Table.load_to_duckdb -> bulk load from DuckDB to the share memory instance
        ## Table.export_as_duckdb -> bulk load to DuckDB and then write as a file
-    @path Text_Input display=..Always
-    @as Text_Input display=..Always
-    @key_columns Vector_Editor display=..Always item_editor=Text_Input item_default='"Column"'
+    @path Text_Input
+    @as Text_Input
+    @key_columns Vector_Editor item_editor=Text_Input item_default='"Column"'
     open_spatial_file : Text | URI | File -> Text -> Vector Text -> DB_Table
     private open_spatial_file path=(Missing_Argument.throw "path") as:Text="NewSpatialTable" key_columns:Vector=[] =
         connect = DuckDB.In_Memory.connect

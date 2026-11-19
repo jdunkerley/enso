@@ -62,8 +62,8 @@ type Dictionary key value
        ```
              example_singleton = Dictionary.singleton "my_key" 2
        ```
-    @key (make_all_selector ..Always)
-    @value (make_all_selector ..Always)
+    @key make_all_selector
+    @value make_all_selector
     singleton : Any -> Any -> Dictionary
     singleton key value = Dictionary.empty.insert key value
 
@@ -84,8 +84,8 @@ type Dictionary key value
           meaning that if two entries in the vector share the same key, an
           `Illegal_Argument` error is raised. If set to `False`, the last entry
           with a given key will be kept.
-    @keys (Vector_Editor item_editor=make_all_selector display=..Always item_default="Nothing")
-    @values (Vector_Editor item_editor=make_all_selector display=..Always item_default="Nothing")
+    @keys (Vector_Editor item_editor=make_all_selector item_default="Nothing")
+    @values (Vector_Editor item_editor=make_all_selector item_default="Nothing")
     from_keys_and_values : Vector Any -> Vector Any -> Boolean -> Dictionary ! Illegal_Argument
     from_keys_and_values keys:Vector values:Vector error_on_duplicates:Boolean=True =
         if keys.length != values.length then Error.throw (Illegal_Argument.Error "`Dictionary.from_keys_and_values` encountered two vectors of different lengths.") else
@@ -185,8 +185,8 @@ type Dictionary key value
        ## Errors
         - If a floating-point value is used as a key, a `Floating_Point_Equality`
           warning is attached.
-    @key (make_all_selector ..Always)
-    @value (make_all_selector ..Always)
+    @key make_all_selector
+    @value make_all_selector
     insert : Any -> Any -> Boolean -> Dictionary
     insert self key=(Missing_Argument.throw "key") value=(Missing_Argument.throw "value") no_warning:Boolean=False =
         new_dict = Array_Like_Helpers.dict_insert self key value
@@ -273,7 +273,7 @@ type Dictionary key value
        icon: preparation
        ---
        Returns True iff the Dictionary contains the given `key`.
-    @key (make_all_selector ..Always)
+    @key make_all_selector
     contains_key : Any -> Boolean
     contains_key self key = Array_Like_Helpers.dict_contains_key self key
 
@@ -536,7 +536,7 @@ type Dictionary key value
    ---
 key_widget dict:Dictionary -> Widget =
     values = dict.keys.map k-> Option k.to_text k.pretty
-    Single_Choice display=..Always values=values
+    Single_Choice values=values
 
 ## ---
    private: true
@@ -545,8 +545,8 @@ key_value_widget -> Widget =
     fqn = Pair.to Meta.Type . qualified_name . take (..Before_Last '.')
     default = 'pair "key" Nothing'
     pair = Option "Pair" fqn+".pair" [["first", make_all_selector], ["second", make_all_selector]]
-    item_editor = Single_Choice display=..Always values=[pair]
-    Vector_Editor item_editor=item_editor display=..Always item_default=default
+    item_editor = Single_Choice values=[pair]
+    Vector_Editor item_editor=item_editor item_default=default
 
 ## Convert a Vector of key-value pairs to a Dictionary.
 Dictionary.from (that:Vector) (error_on_duplicates:Boolean=True) =

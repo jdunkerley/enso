@@ -1,5 +1,6 @@
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import { Score, WidgetInput, type WidgetProps } from '$/providers/openedProjects/widgetRegistry'
+import type { WidgetConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
 import {
   useBrowserTypeInfo,
   useCurrentPath,
@@ -10,7 +11,6 @@ import {
 import { widgetDefinition as selectionWidget } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import { assertDefined } from '@/util/assert'
 import { Ast } from '@/util/ast'
-import type { DynamicConfig } from '@/util/callTree'
 import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
 import type { Identifier } from '@/util/qualifiedName'
 import { unwrap } from 'enso-common/src/utilities/data/result'
@@ -25,7 +25,7 @@ interface TypeInfoCase {
   description: string
   input: {
     types: string[] | undefined
-    dynamicConfig: DynamicConfig | undefined
+    dynamicConfig: WidgetConfiguration | undefined
   }
   expected: Partial<BrowserTypeInfo>
 }

@@ -1,7 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Data.Vector.No_Wrap
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
-import Standard.Base.Metadata.Display
 from Standard.Base.Metadata.Widget import Vector_Editor
 from Standard.Base.Widget_Helpers import make_date_format_selector, make_date_time_format_selector, make_time_format_selector
 
@@ -33,7 +32,13 @@ polyglot java import org.enso.table.parsing.TypeInferringParser
 polyglot java import org.enso.table.parsing.WhitespaceStrippingParser
 
 type Data_Formatter
-    ## Specifies options for reading text data in a table to more specific types
+    ## ---
+       arguments:
+         datetime_formats: always
+         date_formats: always
+         time_formats: always
+       ---
+       Specifies options for reading text data in a table to more specific types
        and serializing them back.
        For date and time formats, see `Date_Time_Formatter`.
 
@@ -65,6 +70,8 @@ type Data_Formatter
     ## ---
        private: true
        advanced: true
+       arguments:
+         type: always
        ---
        Parse a Text into a value.
 
@@ -119,6 +126,10 @@ type Data_Formatter
 
     ## ---
        icon: convert
+       arguments:
+         datetime_formats: always
+         date_formats: always
+         time_formats: always
        ---
        Specify values for Date/Time parsing.
        A plain text pattern can be provided and it will be automatically
@@ -396,5 +407,5 @@ wrap_text_in_vector v = case v of
 ## ---
    private: true
    ---
-make_vector_widget single_choice_widget display=Display.Always =
-    Vector_Editor item_editor=single_choice_widget item_default=single_choice_widget.values.first.value display=display
+make_vector_widget single_choice_widget =
+    Vector_Editor item_editor=single_choice_widget item_default=single_choice_widget.values.first.value

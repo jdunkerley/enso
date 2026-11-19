@@ -59,7 +59,6 @@ test.describe('choosing a backend in the Database.connect dropdown', () => {
         {
           type: 'Widget',
           constructor: 'Single_Choice',
-          label: null,
           values: [
             {
               type: 'Choice',
@@ -69,7 +68,6 @@ test.describe('choosing a backend in the Database.connect dropdown', () => {
               parameters: [],
             },
           ],
-          display: { type: 'Display', constructor: 'Always' },
         },
       ],
     ])

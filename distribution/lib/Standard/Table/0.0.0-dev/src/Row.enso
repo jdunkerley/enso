@@ -48,6 +48,8 @@ type Row
 
     ## ---
        icon: parse
+       arguments:
+         column: always
        ---
        Gets the value of the specified column.
 
@@ -62,6 +64,8 @@ type Row
     ## ---
        group: Standard.Base.Selections
        icon: parse
+       arguments:
+         column: always
        ---
        Gets the value of the specified column.
 

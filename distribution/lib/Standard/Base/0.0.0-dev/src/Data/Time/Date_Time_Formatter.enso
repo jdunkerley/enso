@@ -32,6 +32,8 @@ type Date_Time_Formatter
 
     ## ---
        icon: convert
+       arguments:
+         pattern: always
        ---
        Creates a formatter from a simple date-time format pattern.
        Every letter in the pattern is interpreted as a pattern character as

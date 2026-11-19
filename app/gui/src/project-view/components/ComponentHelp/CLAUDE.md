@@ -11,7 +11,7 @@ component, or of the entry highlighted in the component browser. F1
 - `DocsBreadcrumbs.vue`, `DocsHeader.vue`, `DocsList.vue` — the top bar's path
   and the lists below the text. The entry's component group (its category) sits
   at the top bar's right, so the text's front-matter tags leave it out
-  (`withoutFrontMatterGroup` in `sections.ts`).
+  (`withoutFrontMatterIdeKeys` in `sections.ts`).
 - `DocsSignature.vue` / `signature.ts` — a function's signature drawn as the
   docs site draws it (`docs-site/src/components/ComponentNode.tsx`), in a graph
   node's font (`--font-code`): name and arguments on the group colour, optional
@@ -44,7 +44,9 @@ component, or of the entry highlighted in the component browser. F1
   a GFM table, by the docs site generator's rule
   (`docs-site/generator/src/mdx.ts`).
 - `metadata.ts` — the doc comments' front matter (also used by the docs site's
-  generator).
+  generator). The panel drops the `group` and `arguments` keys from the front
+  matter it shows (`sections.ts`): `arguments:` is display configuration, not
+  documentation.
 
 The text itself is a read-only `MarkdownEditor`; its look (the docs site's) is
 in `../MarkdownEditor/`, from the `--docs-*` tokens in `assets/base.css`.

@@ -18,7 +18,6 @@ import project.Errors.Common.Type_Error
 import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Errors.No_Such_Key.No_Such_Key
 import project.Meta
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Nothing.Nothing
 import project.Panic.Panic
@@ -411,9 +410,9 @@ type JS_Object
    private: true
    ---
    Make a field name selector
-make_field_name_selector : JS_Object -> Display -> Widget
-make_field_name_selector js_object display:Display=..Always =
-    Single_Choice display=display values=(js_object.field_names.map n->(Option n n.pretty))
+make_field_name_selector : JS_Object -> Widget
+make_field_name_selector js_object =
+    Single_Choice values=(js_object.field_names.map n->(Option n n.pretty))
 
 ## ---
    private: true
@@ -512,8 +511,8 @@ key_value_widget =
     fqn = Pair.to Meta.Type . qualified_name . take (..Before_Last '.')
     default = 'pair "key" Nothing'
     pair = Option "Pair" fqn+".pair" [["first", Text_Input], ["second", make_all_selector]]
-    item_editor = Single_Choice display=..Always values=[pair]
-    Vector_Editor item_editor=item_editor display=..Always item_default=default
+    item_editor = Single_Choice values=[pair]
+    Vector_Editor item_editor=item_editor item_default=default
 
 ## ---
    icon: parse

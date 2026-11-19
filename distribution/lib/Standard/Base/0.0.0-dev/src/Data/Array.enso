@@ -25,7 +25,7 @@ import project.Meta
 import project.Nothing.Nothing
 from project.Data.Boolean import Boolean, False
 from project.Data.Range.Extensions import all
-from project.Metadata import Display, Widget
+from project.Metadata import Widget
 
 ## The type of primitive mutable arrays.
 @Builtin_Type
@@ -34,6 +34,8 @@ type Array
        group: Selections
        icon: parse
        suggested: 4
+       arguments:
+         index: always
        ---
        Gets an element from the array at a specified index (0-based).
 
@@ -54,7 +56,7 @@ type Array
        ```
              [1, 2, 3].to_array.at -1 == 3
        ```
-    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1 display=Display.Always)
+    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1)
     at : Integer -> Any ! Index_Out_Of_Bounds
     at self index:Integer=0 = Array_Like_Helpers.at self index
 
@@ -181,6 +183,8 @@ type Array
        group: Selections
        icon: parse
        suggested: 6
+       arguments:
+         range: always
        ---
        Creates a new `Vector` with only the specified range of elements from the
        input, removing any elements outside the range.
@@ -201,6 +205,8 @@ type Array
         - skip
        group: Selections
        icon: parse
+       arguments:
+         range: always
        ---
        Creates a new `Vector`, removing any elements from the specified range.
 
@@ -862,6 +868,8 @@ type Array
     ## ---
        icon: parse
        suggested: 5
+       arguments:
+         index: always
        ---
        Gets an element from the array at a specified index (0-based).
        If the index is invalid then `if_missing` is returned.
@@ -871,7 +879,7 @@ type Array
           is also allowed be negative, then the elements are indexed from the
           back of the array, i.e. -1 will correspond to the last element.
         - `if_missing`: The value to return if the index is out of bounds.
-    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1 display=Display.Always)
+    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1)
     get : Integer -> Any -> Any
     get self index:Integer=0 ~if_missing=Nothing =
         Array_Like_Helpers.get self index if_missing

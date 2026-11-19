@@ -1,4 +1,5 @@
 import type { WidgetInput, WidgetUpdate } from '$/providers/openedProjects/widgetRegistry'
+import type { WidgetConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
 import type { ToValue } from '$/utils/reactivity'
 import { withDropdownItems } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import {
@@ -8,7 +9,6 @@ import {
 import type { PortId } from '@/providers/portInfo'
 import { Ast } from '@/util/ast'
 import { Pattern } from '@/util/ast/match'
-import type { DynamicConfig } from '@/util/callTree'
 import { methodPointerEquals, type MethodPointer } from '@/util/methodPointer'
 import { ProjectPath, printAbsoluteProjectPath, type AbsoluteProjectPath } from '@/util/projectPath'
 import { qnJoin, type Identifier, type QualifiedName } from '@/util/qualifiedName'
@@ -100,7 +100,7 @@ export function useBrowserTypeInfo({
   dynamicConfig,
 }: {
   reprType: ToValue<string | undefined>
-  dynamicConfig: ToValue<DynamicConfig | undefined>
+  dynamicConfig: ToValue<WidgetConfiguration | undefined>
 }): ComputedRef<BrowserTypeInfo> {
   const reprTypeInfo = computed(() => {
     const type = toValue(reprType)

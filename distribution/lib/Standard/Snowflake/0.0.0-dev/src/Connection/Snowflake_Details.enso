@@ -32,7 +32,7 @@ type Snowflake_Details
         - `database`: The name of the database to connect to.
         - `schema`: The name of the schema to connect to.
         - `warehouse`: The name of the warehouse to use.
-    @account (Text_Input display=..Always)
+    @account (Text_Input)
     @credentials Widgets.password_or_keypair_widget
     Snowflake (account:Text=(Missing_Argument.throw "account")) (credentials:Credentials|Key_Pair_Credentials|Enso_Secret=(Missing_Argument.throw "credentials")) database:Text="SNOWFLAKE" schema:Text="*" warehouse:Text=""
 

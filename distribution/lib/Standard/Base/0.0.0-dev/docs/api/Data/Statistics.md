@@ -34,7 +34,7 @@
     - Standard_Deviation population:Standard.Base.Data.Boolean.Boolean=
     - Sum
     - Variance population:Standard.Base.Data.Boolean.Boolean=
-    - bulk_widget display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - bulk_widget -> Standard.Base.Metadata.Widget
     - compute data:Standard.Base.Any.Any statistic:Standard.Base.Data.Statistics.Statistic= -> Standard.Base.Any.Any
     - compute_bulk data:Standard.Base.Any.Any statistics:Standard.Base.Data.Vector.Vector= -> Standard.Base.Any.Any
     - covariance_matrix data:Standard.Base.Any.Any -> Standard.Base.Any.Any

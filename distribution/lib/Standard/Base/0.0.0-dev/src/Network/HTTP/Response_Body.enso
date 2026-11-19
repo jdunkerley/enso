@@ -7,7 +7,6 @@ import project.Data.Vector.Vector
 import project.Errors.File_Error.File_Error
 import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Meta
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Network.HTTP.HTTP_Error.HTTP_Error
 import project.Network.URI.URI
@@ -93,6 +92,8 @@ type Response_Body
        aliases: [parse]
        group: Input
        icon: convert
+       arguments:
+         format: always
        ---
        Uses the format to decode the body.
        If using `Auto_Detect`, the content-type will be used to determine the
@@ -204,7 +205,7 @@ type Response_Body
              example_write =
                 Examples.get_geo_data.write Examples.scratch_file
        ```
-    @file (Widget.Text_Input display=Display.Always)
+    @file (Widget.Text_Input)
     write : Writable_File -> Existing_File_Behavior -> File
     write self file:Writable_File on_existing_file:Existing_File_Behavior=..Backup =
         self.with_stream body_stream->
@@ -225,7 +226,7 @@ can_decode type = Meta.meta type . methods . contains "read_stream"
 decode_format_selector : Widget
 decode_format_selector =
     options = File_Format.dropdown_options [Auto_Detect] (File_Format_SPI.get_types.filter can_decode)
-    Single_Choice display=Display.Always values=options
+    Single_Choice values=options
 
 ## ---
    private: true

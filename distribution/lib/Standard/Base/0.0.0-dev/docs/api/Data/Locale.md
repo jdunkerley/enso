@@ -9,7 +9,7 @@
     - china -> Standard.Base.Any.Any
     - country self -> Standard.Base.Any.Any
     - default -> Standard.Base.Any.Any
-    - default_widget display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - default_widget -> Standard.Base.Metadata.Widget
     - display_country self -> Standard.Base.Any.Any
     - display_language self -> Standard.Base.Any.Any
     - display_variant self -> Standard.Base.Any.Any

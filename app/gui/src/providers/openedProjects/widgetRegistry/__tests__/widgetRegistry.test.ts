@@ -7,10 +7,7 @@ import {
   type WidgetDefinition,
   type WidgetModule,
 } from '$/providers/openedProjects/widgetRegistry'
-import {
-  DisplayMode,
-  argsWidgetConfigurationSchema,
-} from '$/providers/openedProjects/widgetRegistry/configuration'
+import { argsWidgetConfigurationSchema } from '$/providers/openedProjects/widgetRegistry/configuration'
 import type { PortId } from '@/providers/portInfo'
 import { Ast } from '@/util/ast'
 import { ApplicationKind, ArgumentInfoKey } from '@/util/callTree'
@@ -167,11 +164,6 @@ describe('Engine-provided configuration', () => {
           icon: '',
         },
       ],
-      label: null,
-      display: {
-        type: 'Display',
-        constructor: 'Always',
-      },
       allow_custom: true,
     },
   ]
@@ -182,10 +174,6 @@ describe('Engine-provided configuration', () => {
       constructor: 'Vector_Editor',
       item_editor: singleChoiceData[1],
       item_default: 'Text',
-      display: {
-        type: 'Display',
-        constructor: 'Always',
-      },
     },
   ]
 
@@ -194,8 +182,6 @@ describe('Engine-provided configuration', () => {
     {
       kind: 'Single_Choice',
       values: [{ label: 'First', value: '(Index_Sub_Range.First 1)', parameters: [] }],
-      label: null,
-      display: DisplayMode.Always,
     },
   ]
 

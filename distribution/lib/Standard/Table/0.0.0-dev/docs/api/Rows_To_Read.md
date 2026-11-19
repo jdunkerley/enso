@@ -6,7 +6,7 @@
     - First_With_Warning rows:Standard.Base.Data.Numbers.Integer=
     - attach_warning self input:Standard.Table.Table.Table -> Standard.Table.Table.Table
     - attach_warning_vector self input:Standard.Base.Data.Vector.Vector -> Standard.Base.Data.Vector.Vector
-    - default_widget display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - default_widget -> Standard.Base.Metadata.Widget
     - rows_to_read self -> (Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)
     - rows_to_write self -> (Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)
 - type When

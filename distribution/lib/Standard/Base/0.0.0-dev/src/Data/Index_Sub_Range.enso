@@ -10,7 +10,6 @@ import project.Errors.Common.Type_Error
 import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Function.Function
 import project.Meta
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Nothing.Nothing
 import project.Panic.Panic
@@ -22,12 +21,20 @@ from project.Metadata.Widget import Numeric_Input, Single_Choice, Vector_Editor
 from project.Random import Random
 
 type Index_Sub_Range
-    ## Select the first `count` items.
+    ## ---
+       arguments:
+         count: always
+       ---
+       Select the first `count` items.
        Selects no items if `count` is less than or equal to 0.
        Selects all items  if `count` is greater than the length of the input.
     First (count : Integer = 1)
 
-    ## Select the last `count` characters.
+    ## ---
+       arguments:
+         count: always
+       ---
+       Select the last `count` characters.
        Selects no items if `count` is less than or equal to 0.
        Selects all items  if `count` is greater than the length of the input.
     Last (count : Integer = 1)
@@ -45,7 +52,11 @@ type Index_Sub_Range
        the end of the collection.
     By_Index (indexes : (Integer | Range | Vector (Integer | Range)) = Missing_Argument.throw "indexes")
 
-    ## Gets a random sample of entries, without repetitions.
+    ## ---
+       arguments:
+         count: always
+       ---
+       Gets a random sample of entries, without repetitions.
        If `count` is greater than the length of the input, a random permutation
        of all elements from the input is selected.
     Sample (count : Integer = 1) (seed:Integer=0)
@@ -79,8 +90,8 @@ type Index_Sub_Range
        `Range` too.
     default_options : (Integer|Nothing) -> Vector Option
     default_options count:(Integer|Nothing)=Nothing =
-        count_editor = if count.is_nothing then Numeric_Input else Numeric_Input minimum=1 maximum=count display=Display.Always
-        index_editor = if count.is_nothing then Numeric_Input else Numeric_Input minimum=0 maximum=(count-1) display=Display.Always
+        count_editor = if count.is_nothing then Numeric_Input else Numeric_Input minimum=1 maximum=count
+        index_editor = if count.is_nothing then Numeric_Input else Numeric_Input minimum=0 maximum=(count-1)
 
         o1 = Option "First" "..First" [["count", count_editor]]
         o2 = Option "Last" "..Last" [["count", count_editor]]
@@ -94,8 +105,8 @@ type Index_Sub_Range
     ## ---
        private: true
        ---
-    default_widget count:(Integer|Nothing)=Nothing display:Display=..Always -> Widget =
-        Single_Choice display=display (Index_Sub_Range.default_options count)
+    default_widget count:(Integer|Nothing)=Nothing -> Widget =
+        Single_Choice (Index_Sub_Range.default_options count)
 
 ## ---
    private: true

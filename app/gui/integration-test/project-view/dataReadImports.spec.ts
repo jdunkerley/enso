@@ -24,7 +24,6 @@ const FORMAT_CONFIG = [
     {
       type: 'Widget',
       constructor: 'Single_Choice',
-      label: null,
       values: [
         {
           label: 'Auto Detect',
@@ -41,7 +40,6 @@ const FORMAT_CONFIG = [
           patterns: ['*.sqlite', '*.db'],
         },
       ],
-      display: { type: 'Display', constructor: 'When_Modified' },
     },
   ],
 ]

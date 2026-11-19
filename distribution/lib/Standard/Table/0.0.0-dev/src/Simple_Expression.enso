@@ -1,6 +1,5 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.Widget
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Single_Choice, Vector_Editor
@@ -20,6 +19,8 @@ from project.Internal.Filter_Condition_Helpers import make_filter_column
 type Simple_Expression
     ## ---
        private: true
+       arguments:
+         input: always
        ---
        A simple expression based off an input column and an operation to perform.
     Simple_Expr (input : Column_Ref|Expression|Any = (..Index 0)) (operation : Simple_Calculation = ..Copy)
@@ -84,7 +85,7 @@ type Simple_Expression
        private: true
        ---
        Create a widget for operation
-    default_widget table:Table_Ref display:Display=..Always -> Widget =
+    default_widget table:Table_Ref -> Widget =
         with_everything = Widget_Helpers.make_column_ref_by_name_selector table add_text=True add_number=True add_boolean=True add_date=True add_time=True add_date_time=True add_nothing=True
         with_number_text = Widget_Helpers.make_column_ref_by_name_selector table add_text=True add_number=True
         filter_cond = Widget_Helpers.make_filter_condition_selector table
@@ -111,37 +112,61 @@ type Simple_Expression
 
         input_column = Widget_Helpers.make_column_ref_by_name_selector table add_text=True add_number=True add_boolean=True add_date=True add_time=True add_date_time=True columns_first=True
         derived = Option "<Simple Expression>" "..Simple_Expr" [["input", input_column], ["operation", Single_Choice options]]
-        Single_Choice [derived, expression]+sql_function+constants display=display
+        Single_Choice [derived, expression]+sql_function+constants
 
 ## Defines a set of Text based operations.
 type Text_Operation
-    ## Takes the first characters from the input column.
+    ## ---
+       arguments:
+         length: always
+       ---
+       Takes the first characters from the input column.
     Left (length : Column_Ref|Expression|Integer = 1)
 
-    ## Takes the first characters from the input column.
+    ## ---
+       arguments:
+         length: always
+       ---
+       Takes the first characters from the input column.
     Right (length : Column_Ref|Expression|Integer = 1)
 
     ## Returns the character length of the input column.
     Length
 
-    ## Removes the specified characters, by default any whitespace, from the
+    ## ---
+       arguments:
+         what: always
+       ---
+       Removes the specified characters, by default any whitespace, from the
        start, the end, or both ends of the input.
     Trim (where:Location=..Both) (what:Column_Ref|Expression|Text = "")
 
-    ## Does the input start with the specified prefix.
+    ## ---
+       arguments:
+         prefix: always
+       ---
+       Does the input start with the specified prefix.
     Starts_With (prefix:Column_Ref|Expression|Text = "")
 
-    ## Does the input end with the specified suffix.
+    ## ---
+       arguments:
+         suffix: always
+       ---
+       Does the input end with the specified suffix.
     Ends_With (suffix:Column_Ref|Expression|Text = "")
 
-    ## Does the input contain the specified substring.
+    ## ---
+       arguments:
+         substring: always
+       ---
+       Does the input contain the specified substring.
     Contains (substring:Column_Ref|Expression|Text = "")
 
     ## ---
        private: true
        ---
-    create_widget : Table_Ref -> Display -> Widget
-    create_widget table:Table_Ref display:Display=Display.Always =
+    create_widget : Table_Ref -> Widget
+    create_widget table:Table_Ref =
         with_number = Widget_Helpers.make_column_ref_by_name_selector table add_number=True
         with_text = Widget_Helpers.make_column_ref_by_name_selector table add_text=True
 
@@ -153,7 +178,7 @@ type Text_Operation
             builder.append (Option "starts_with" "..Starts_With" [["prefix", with_text]])
             builder.append (Option "ends_with" "..Ends_With" [["suffix", with_text]])
             builder.append (Option "contains" "..Contains" [["substring", with_text]])
-        Single_Choice options display=display
+        Single_Choice options
 
     ## ---
        private: true
@@ -172,23 +197,43 @@ type Text_Operation
 
 ## Defines a set of Math based operations.
 type Math_Operation
-    ## Subtract two values/columns.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Subtract two values/columns.
     Subtract (rhs : Column_Ref|Expression|Number = 0)
 
-    ## Multiply two values/columns.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Multiply two values/columns.
     Multiply (rhs : Column_Ref|Expression|Number = 1)
 
-    ## Divide a fixed value or column by another value or column.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Divide a fixed value or column by another value or column.
     Divide (rhs : Column_Ref|Expression|Number = 1)
 
     ## Negate a column.
     Negate
 
-    ## Compute the remainder of a fixed value or column divided by another value
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Compute the remainder of a fixed value or column divided by another value
        or column.
     Mod (rhs : Column_Ref|Expression|Number = 1)
 
-    ## Raise a fixed value or column to the power of another value or column.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Raise a fixed value or column to the power of another value or column.
     Power (rhs : Column_Ref|Expression|Number = 1)
 
     ## Rounds values in the column to the specified precision.
@@ -212,8 +257,8 @@ type Math_Operation
     ## ---
        private: true
        ---
-    create_widget : Table_Ref -> Display -> Widget
-    create_widget table:Table_Ref display:Display=Display.Always =
+    create_widget : Table_Ref -> Widget
+    create_widget table:Table_Ref =
         with_number = Widget_Helpers.make_column_ref_by_name_selector table add_number=True
 
         options = Vector.build builder->
@@ -229,7 +274,7 @@ type Math_Operation
             builder.append (Option "truncate" "..Truncate")
             builder.append (Option "absolute" "..Absolute")
             builder.append (Option "signum" "..Signum")
-        Single_Choice options display=display
+        Single_Choice options
 
     ## ---
        private: true
@@ -257,7 +302,11 @@ type Math_Operation
 
 ## Defines a set of Date based operations.
 type Date_Operation
-    ## Adds a period to a date/time column.
+    ## ---
+       arguments:
+         length: always
+       ---
+       Adds a period to a date/time column.
     Add (length : Column_Ref|Expression|Integer = 1) (period : Date_Period|Time_Period = Date_Period.Day)
 
     ## Returns part of a date/time column.
@@ -290,8 +339,8 @@ type Date_Operation
     ## ---
        private: true
        ---
-    create_widget : Table_Ref -> Display -> Widget
-    create_widget table:Table_Ref display:Display=Display.Always =
+    create_widget : Table_Ref -> Widget
+    create_widget table:Table_Ref =
         with_number = Widget_Helpers.make_column_ref_by_name_selector table add_number=True
         with_date = Widget_Helpers.make_column_ref_by_name_selector table add_date=True add_date_time=True
 
@@ -306,7 +355,7 @@ type Date_Operation
             builder.append (Option "hour" "..Hour")
             builder.append (Option "minute" "..Minute")
             builder.append (Option "second" "..Second")
-        Single_Choice options display=display
+        Single_Choice options
 
     ## ---
        private: true
@@ -331,24 +380,32 @@ type Logical_Operation
     ## Negate a boolean column.
     Not
 
-    ## Boolean AND on two boolean columns.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Boolean AND on two boolean columns.
     And (rhs : Column_Ref|Expression|Boolean = True)
 
-    ## Boolean OR on two boolean columns.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Boolean OR on two boolean columns.
     Or (rhs : Column_Ref|Expression|Boolean =  False)
 
     ## ---
        private: true
        ---
-    create_widget : Table_Ref -> Display -> Widget
-    create_widget table:Table_Ref display:Display=Display.Always =
+    create_widget : Table_Ref -> Widget
+    create_widget table:Table_Ref =
         with_boolean = Widget_Helpers.make_column_ref_by_name_selector table add_boolean=True
 
         options = Vector.build builder->
             builder.append (Option "not" "..Not")
             builder.append (Option "and" "..And" [["rhs", with_boolean]])
             builder.append (Option "or" "..Or" [["rhs", with_boolean]])
-        Single_Choice options display=display
+        Single_Choice options
 
     ## ---
        private: true
@@ -366,16 +423,32 @@ type Simple_Calculation
     ## Creates a copy of the input column.
     Copy
 
-    ## Perform a Text Operation
+    ## ---
+       arguments:
+         operation: always
+       ---
+       Perform a Text Operation
     Text (operation : Text_Operation = ..Left 1)
 
-    ## Perform a Math Operation
+    ## ---
+       arguments:
+         operation: always
+       ---
+       Perform a Math Operation
     Math (operation : Math_Operation = ..Subtract 0)
 
-    ## Perform a Date Operation
+    ## ---
+       arguments:
+         operation: always
+       ---
+       Perform a Date Operation
     Date (operation : Date_Operation = ..Add)
 
-    ## Perform a Logical Operation
+    ## ---
+       arguments:
+         operation: always
+       ---
+       Perform a Logical Operation
     Logical (operation : Logical_Operation = ..Not)
 
     ## Add two values/columns.
@@ -434,7 +507,13 @@ type Simple_Calculation
     ## Boolean OR on two boolean columns.
     Or (rhs : Column_Ref|Expression|Boolean =  False)
 
-    ## If input meets a condition return true value, otherwise false value.
+    ## ---
+       arguments:
+         condition: always
+         true_value: always
+         false_value: always
+       ---
+       If input meets a condition return true value, otherwise false value.
        The `true_value` and `false_value` can be either a constant or a column.
     If (condition:Filter_Condition=(..Equal True)) (true_value:Column_Ref|Expression|Any = True) (false_value:Column_Ref|Expression|Any = False)
 
@@ -466,5 +545,9 @@ type Simple_Calculation
        instant.
     Set_Time_Zone
 
-    ## Formats a column with the specified format.
+    ## ---
+       arguments:
+         format: always
+       ---
+       Formats a column with the specified format.
     Format (format : Text = "")

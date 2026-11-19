@@ -9,7 +9,6 @@ import project.Error.Error
 import project.Errors.Common.Index_Out_Of_Bounds
 import project.Errors.Common.Type_Error
 import project.Errors.Illegal_Argument.Illegal_Argument
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Panic.Panic
 import project.Random.Random
@@ -71,9 +70,9 @@ type Text_Sub_Range
        The widget for `Text_Sub_Range` also displays options for
        `Index_Sub_Range` since the former is supposed to 'expand' the latter and
        is always used together with it.
-    default_widget display:Display=..When_Modified -> Widget =
+    default_widget -> Widget =
         options = Index_Sub_Range.default_options + Text_Sub_Range.default_options
-        Single_Choice display=display options
+        Single_Choice options
 
 type Codepoint_Ranges
     ## ---

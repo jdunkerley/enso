@@ -4,7 +4,7 @@
     - account self -> Standard.Base.Any.Any
     - create_time self -> Standard.Base.Any.Any
     - currency self -> Standard.Base.Any.Any
-    - default_widget self_arg:Standard.Base.Any.Any cache:Standard.Base.Any.Any display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - default_widget self_arg:Standard.Base.Any.Any cache:Standard.Base.Any.Any -> Standard.Base.Metadata.Widget
     - dimensions self credentials:Standard.Google.Google_Credential.Google_Credential= -> Standard.Base.Any.Any
     - id self -> Standard.Base.Any.Any
     - metrics self credentials:Standard.Google.Google_Credential.Google_Credential= -> Standard.Base.Any.Any

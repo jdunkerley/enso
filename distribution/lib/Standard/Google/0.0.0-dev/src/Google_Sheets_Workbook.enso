@@ -1,7 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Data.Vector.No_Wrap
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.Widget
 from Standard.Base.Enso_Cloud.Enso_Secret import as_credential_reference
 from Standard.Base.Metadata import make_single_choice
@@ -110,6 +109,9 @@ type Google_Sheets_Workbook
        group: Standard.Base.Input
        icon: data_input
        suggested: 2
+       arguments:
+         sheet_names: always
+         return: always
        ---
        Reads one or more sheets into a Table.
 
@@ -269,12 +271,12 @@ private _read_sheets workbook:Google_Sheets_Workbook (sheet_names : Vector Text)
 
 
 ## Creates widget for read_many sheet selector
-private _sheet_selector_widget workbook:Google_Sheets_Workbook display:Display=Display.Always -> Widget =
+private _sheet_selector_widget workbook:Google_Sheets_Workbook -> Widget =
     names = workbook.sheet_names.map n-> Option n n.pretty
-    Multiple_Choice display=display values=names
+    Multiple_Choice values=names
 
 
 ## Creates a query widget for the `read` method.
-private _query_widget wb:Google_Sheets_Workbook display:Display=..Always -> Widget =
+private _query_widget wb:Google_Sheets_Workbook -> Widget =
     options = [Option "<By Index>" "1"] + (wb.sheet_names . to_vector . map t-> Option t t.pretty) + (wb.named_ranges . to_vector . map t-> Option t t.pretty)
-    Single_Choice display=display values=options
+    Single_Choice values=options

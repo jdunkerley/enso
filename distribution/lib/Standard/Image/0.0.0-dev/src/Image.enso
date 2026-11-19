@@ -2,7 +2,7 @@ from Standard.Base import all
 import Standard.Base.Errors.File_Error.File_Error
 import Standard.Base.Runtime.Context
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
-from Standard.Base.Metadata import Display, Widget
+from Standard.Base.Metadata import Widget
 import Standard.Visualization.Id.Id
 
 import project.Histogram.Histogram
@@ -115,7 +115,7 @@ type Image
        ```
              image.write path image [Write_Flag.JPEG_Quality 40, Write_Flag.JPEG_Progressive]
        ```
-    @path (Widget.Text_Input display=Display.Always)
+    @path (Widget.Text_Input)
     write : Writable_File  -> (Write_Flag | Vector) -> Nothing ! File_Error
     write self path:Writable_File flags=[] =
         Context.Output.check_enabled disabled_message="As writing is disabled, cannot write to a file. Press the Write button ▶ to perform the operation."

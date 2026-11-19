@@ -210,13 +210,28 @@ render only its own slot content. The icon is already on the row, drawn by
   outer call's ＋ ends the node, inside it. An operator call gets the outline
   only when it has hidden parameters. The outline is an inset `box-shadow`,
   never a `border`, so a group is as high as a port at any depth and the node
-  stays one line. Selecting a node does not show its hidden arguments.
+  stays one line. Selecting a node does not show its hidden arguments, except
+  those the method's doc front matter marks `selected`.
 - Operator chains (`util/operatorChain.ts`, `chainRole`): a run of operators
   with the same precedence (from the parser, `Ast.binaryOperatorInfo`) is one
   flat row; an operand that is a chain of a different precedence, or one in
   parentheses, is a capsule (`WidgetApplication`'s `.operatorCapsule`, a darker
   tint, port-high, padded only at the sides), and `WidgetGroup` drops the
   parentheses around it. Operators are drawn as written.
+- **Display comes from the doc front matter, not the widget.** A method's
+  `arguments:` map (`always`, `selected`, `when_modified`; see
+  `suggestionDatabase/documentation.ts`, `entry.argumentDisplay`) decides
+  whether an argument shows on the collapsed node. An argument with no default
+  always shows; otherwise the front matter decides, `when_modified` (shown once
+  set, else via ＋) being the default. `ArgumentPlaceholder.isHidden(selected)`
+  takes `selected` = the node is the sole selection, so a `selected` argument
+  shows while its node is the only one selected and hides again with two
+  selected. The ＋ menu never lists a `selected` argument that is currently
+  shown. It is known statically, before the engine answers, so an `always`
+  argument no longer pops in (a pending widget query does not force it shown)
+  and shows even if its widget query fails. Widgets have no `display` or `label`
+  (`Choice.Option`'s `label` stays); the engine's `ArgumentDisplayCheck`
+  validates the block and `lintEnso` fails the standard library build on it.
 - Every argument shows its parameter's name (`WidgetArgumentName`): every prefix
   argument, set or not, positional or named, at any depth. No operand of an
   infix operator shows a name. The argument is drawn as a chip of its own (name,

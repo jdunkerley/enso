@@ -3,7 +3,7 @@ import {
   panelText,
   sectionRanges,
   splitSections,
-  withoutFrontMatterGroup,
+  withoutFrontMatterIdeKeys,
 } from '@/components/ComponentHelp/sections'
 import { expect, test } from 'vitest'
 
@@ -105,7 +105,7 @@ test('panelText gives an empty body to a section whose heading is the last line'
   expect(panelText('Text.\n\n## Remarks', [])).toEqual({ main: 'Text.', remarks: '' })
 })
 
-test('withoutFrontMatterGroup drops only the group key of the front matter', () => {
+test('withoutFrontMatterIdeKeys drops only the group and arguments keys of the front matter', () => {
   const doc = [
     '---',
     'aliases: [now]',
@@ -114,8 +114,25 @@ test('withoutFrontMatterGroup drops only the group key of the front matter', () 
     '---',
     'group: stays in the body',
   ].join('\n')
-  expect(withoutFrontMatterGroup(doc)).toBe(
+  expect(withoutFrontMatterIdeKeys(doc)).toBe(
     ['---', 'aliases: [now]', 'icon: calendar', '---', 'group: stays in the body'].join('\n'),
   )
-  expect(withoutFrontMatterGroup('No front matter.')).toBe('No front matter.')
+  expect(withoutFrontMatterIdeKeys('No front matter.')).toBe('No front matter.')
+})
+
+test('withoutFrontMatterIdeKeys drops the arguments block with its entries', () => {
+  const doc = [
+    '---',
+    'icon: join',
+    'group: Standard.Base.Join',
+    'arguments:',
+    '  on: always',
+    '  join_kind: selected',
+    'aliases: [merge]',
+    '---',
+    'arguments: stays in the body',
+  ].join('\n')
+  expect(withoutFrontMatterIdeKeys(doc)).toBe(
+    ['---', 'icon: join', 'aliases: [merge]', '---', 'arguments: stays in the body'].join('\n'),
+  )
 })

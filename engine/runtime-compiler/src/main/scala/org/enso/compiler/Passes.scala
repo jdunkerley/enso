@@ -11,6 +11,7 @@ import org.enso.compiler.pass.analyse.types.{
 import org.enso.compiler.pass.desugar._
 import org.enso.compiler.pass.lint.unusedimports.UnusedImports
 import org.enso.compiler.pass.lint.{
+  ArgumentDisplayCheck,
   ModuleNameConflicts,
   NoDuplicateSelfInMethodCalls,
   NoSelfInStatic,
@@ -108,6 +109,7 @@ class Passes(config: CompilerConfig) {
             List(
               UnusedBindings,
               PrivateBuiltinMethodsCheck.INSTANCE,
+              ArgumentDisplayCheck.INSTANCE,
               NoSelfInStatic,
               NoDuplicateSelfInMethodCalls.INSTANCE
             )

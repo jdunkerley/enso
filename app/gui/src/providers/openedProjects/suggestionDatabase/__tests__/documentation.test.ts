@@ -1,5 +1,6 @@
 import { mockProjectNameStore } from '$/providers/openedProjects/projectNames'
 import {
+  documentationData,
   getDocumentationSummary,
   getGroupIndex,
 } from '$/providers/openedProjects/suggestionDatabase/documentation'
@@ -49,4 +50,30 @@ test.each`
   const parsed = ensoMarkdownParser.parse(prerendered)
   const cursor = parsed.cursor()
   expect(getDocumentationSummary(cursor.node, prerendered)).toBe(expectedSummary)
+})
+
+const doc = (yaml: string) => `---\n${yaml}---\nSummary.`
+
+test.each([
+  {
+    yaml: 'arguments:\n  on: always\n  join_kind: selected\n  x: when_modified\n',
+    expected: [
+      ['on', 'always'],
+      ['join_kind', 'selected'],
+      ['x', 'when_modified'],
+    ],
+  },
+  { yaml: 'icon: join\n', expected: [] },
+  // An unknown value drops only that entry.
+  { yaml: 'arguments:\n  a: always\n  b: sometimes\n', expected: [['a', 'always']] },
+  // A non-map is ignored, not fatal to the other keys.
+  { yaml: 'icon: join\narguments: always\n', expected: [] },
+])('argumentDisplay from $yaml', ({ yaml, expected }) => {
+  const data = documentationData(doc(yaml), undefined, [])
+  expect([...data.argumentDisplay.entries()]).toEqual(expected)
+})
+
+test('arguments: does not disturb the other keys', () => {
+  const data = documentationData(doc('icon: join\narguments:\n  on: always\n'), undefined, [])
+  expect(data.iconName).toBe('join')
 })

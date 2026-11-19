@@ -1,6 +1,5 @@
 import project.Data.Text.Text
 import project.Errors.Common.Missing_Argument
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Network.URI.URI
 import project.System.File.File
@@ -11,14 +10,14 @@ from project.Metadata.Widget import Single_Choice, Text_Input, Vector_Editor
 ## The attachment of an email.
 type Email_Attachment
     ## A file attachment.
-    @file (Widget.Text_Input display=Display.Always)
+    @file (Widget.Text_Input)
     File file:Text|URI|File|File_Like=(Missing_Argument.throw "file") name:Text=""
 
     ## ---
        private: true
        ---
-    default_widget (display : Display = ..Always) -> Widget =
-        Single_Choice values=[Option "..File" "..File"] display=display
+    default_widget -> Widget =
+        Single_Choice values=[Option "..File" "..File"]
 
 ## ---
    private: true

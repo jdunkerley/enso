@@ -1,11 +1,11 @@
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import type { WidgetConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
 import * as widgetCfg from '$/providers/openedProjects/widgetRegistry/configuration'
-import { DisplayMode } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { syntheticPortId, type PortId } from '@/providers/portInfo'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { GraphDb, MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
 import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
+import type { ArgumentDisplay } from '$/providers/openedProjects/suggestionDatabase/documentation'
 import {
   isRequiredArgument,
   type CallableSuggestionEntry,
@@ -32,6 +32,7 @@ class ArgumentFactory {
     private callId: AstId,
     private kind: ApplicationKind,
     private widgetCfg: widgetCfg.FunctionCall | undefined,
+    private display: ReadonlyMap<string, ArgumentDisplay> | undefined,
   ) {}
 
   placeholder(index: number, info: SuggestionEntryArgument, insertAsNamed: boolean) {
@@ -42,6 +43,7 @@ class ArgumentFactory {
       index,
       info,
       insertAsNamed,
+      this.display?.get(info.name),
     )
     argument.queryError = this.queryError(info.name)
     return argument
@@ -73,7 +75,6 @@ class ArgumentFactory {
   }
 }
 
-export type DynamicConfig = WidgetConfiguration & { display?: DisplayMode }
 type WidgetInputValue = Ast.Expression | Ast.Token | string | undefined
 abstract class Argument {
   /** Why the engine has no widget for this argument, if its widget query failed. */
@@ -82,7 +83,7 @@ abstract class Argument {
   protected constructor(
     public callId: AstId,
     public kind: ApplicationKind,
-    public dynamicConfig: DynamicConfig | undefined,
+    public dynamicConfig: WidgetConfiguration | undefined,
     public index: number | undefined,
     public argInfo: SuggestionEntryArgument | undefined,
   ) {}
@@ -94,7 +95,8 @@ abstract class Argument {
     return this.argInfo && `${this.callId}[${this.argInfo.name}]`
   }
 
-  get hideByDefault(): boolean {
+  /** Whether the argument is hidden on its node, given whether the node is the sole selection. */
+  isHidden(_selected: boolean): boolean {
     return false
   }
 
@@ -122,10 +124,12 @@ export class ArgumentPlaceholder extends Argument {
   constructor(
     callId: AstId,
     kind: ApplicationKind,
-    dynamicConfig: DynamicConfig | undefined,
+    dynamicConfig: WidgetConfiguration | undefined,
     index: number,
     argInfo: SuggestionEntryArgument,
     public insertAsNamed: boolean,
+    /** The argument's display in its method's front matter, if listed. */
+    public display: ArgumentDisplay | undefined,
   ) {
     super(callId, kind, dynamicConfig, index, argInfo)
   }
@@ -141,13 +145,21 @@ export class ArgumentPlaceholder extends Argument {
     return value == null || isRequiredArgument(this.argInfo) ? undefined : value
   }
 
-  /** Whether the argument is hidden: an unset argument with a default (its call's ＋ menu adds it). */
-  override get hideByDefault(): boolean {
-    return (
-      this.argInfo.hasDefault &&
-      !isRequiredArgument(this.argInfo) &&
-      this.dynamicConfig?.display !== DisplayMode.Always
-    )
+  /**
+   * Whether the argument is hidden on its node: an unset argument with a default, unless its
+   * method's front matter shows it (`always`, or `selected` while its node is the sole
+   * selection). A hidden argument is in its call's ＋ menu.
+   */
+  override isHidden(selected: boolean): boolean {
+    if (!this.argInfo.hasDefault || isRequiredArgument(this.argInfo)) return false
+    switch (this.display ?? 'when_modified') {
+      case 'always':
+        return false
+      case 'selected':
+        return !selected
+      case 'when_modified':
+        return true
+    }
   }
 }
 
@@ -157,7 +169,7 @@ export class ArgumentAst extends Argument {
   constructor(
     callId: AstId,
     kind: ApplicationKind,
-    dynamicConfig: DynamicConfig | undefined,
+    dynamicConfig: WidgetConfiguration | undefined,
     index: number | undefined,
     argInfo: SuggestionEntryArgument | undefined,
     public ast: Ast.Expression,
@@ -254,7 +266,12 @@ export class ArgumentApplication {
   private static FromInterpretedInfix(interpreted: InterpretedInfix, callInfo: CallInfo) {
     const { suggestion, widgetCfg } = callInfo
 
-    const makeArg = new ArgumentFactory(interpreted.appTree.id, ApplicationKind.Infix, widgetCfg)
+    const makeArg = new ArgumentFactory(
+      interpreted.appTree.id,
+      ApplicationKind.Infix,
+      widgetCfg,
+      suggestion?.argumentDisplay,
+    )
     const argFor = (key: 'lhs' | 'rhs', index: number) => {
       const tree = interpreted[key]
       const info = tryGetIndex(suggestion?.arguments, index) ?? unknownArgInfoNamed(key)
@@ -330,7 +347,12 @@ export class ArgumentApplication {
 
     let nextArgDefinition: ReturnType<typeof takeNextArgumentFromDefinition>
 
-    const makeArg = new ArgumentFactory(interpreted.func.id, ApplicationKind.Prefix, widgetCfg)
+    const makeArg = new ArgumentFactory(
+      interpreted.func.id,
+      ApplicationKind.Prefix,
+      widgetCfg,
+      suggestion?.argumentDisplay,
+    )
 
     // Always insert a placeholder for the missing argument at the first position that is legal
     // and don't invalidate further positional arguments, treating the named arguments at correct

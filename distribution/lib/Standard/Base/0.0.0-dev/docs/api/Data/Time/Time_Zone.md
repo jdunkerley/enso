@@ -1,7 +1,7 @@
 ## Enso Signatures 1.0
 ## module Standard.Base.Data.Time.Time_Zone
 - type Time_Zone
-    - default_widget display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - default_widget -> Standard.Base.Metadata.Widget
     - local -> Standard.Base.Any.Any
     - new hours:Standard.Base.Data.Numbers.Integer= minutes:Standard.Base.Data.Numbers.Integer= seconds:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Any.Any
     - offset self at:Standard.Base.Any.Any -> Standard.Base.Any.Any

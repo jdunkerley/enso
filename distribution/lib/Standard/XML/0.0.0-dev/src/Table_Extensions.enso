@@ -13,6 +13,10 @@ import project.XML.XML_Document
 ## ---
    group: Standard.Base.Conversions
    icon: convert
+   arguments:
+     element_columns: always
+     attribute_columns: always
+     value_column: always
    ---
    Returns an `XML_Document` representation of the table.
 

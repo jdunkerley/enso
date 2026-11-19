@@ -45,7 +45,7 @@ from project.Data.Numbers import Float, Integer, Number, Number_Parse_Error
 from project.Data.Range.Extensions import all
 from project.Data.Text.Text_Cleanse import Cleansable_Text, Text_Cleanse
 from project.Error import all
-from project.Metadata import Display, make_single_choice, Widget
+from project.Metadata import make_single_choice, Widget
 from project.Nothing import all
 from project.Widget_Helpers import make_data_cleanse_vector_selector, make_date_format_selector, make_date_time_format_selector, make_delimiter_selector, make_regex_text_widget, make_time_format_selector
 
@@ -188,6 +188,8 @@ Text.each self function =
    aliases: [get character]
    group: Selections
    icon: split
+   arguments:
+     index: always
    ---
    Returns a character from the text at the specified index (0-based).
 
@@ -209,7 +211,7 @@ Text.each self function =
    A character is defined as an Extended Grapheme Cluster, see Unicode Standard
    Annex 29. This is the smallest unit that still has semantic meaning in most
    text-processing applications.
-@index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1 display=Display.Always)
+@index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1)
 Text.at : Integer -> Text ! Index_Out_Of_Bounds
 Text.at self index:Integer=0 =
     self.get index (Error.throw (Index_Out_Of_Bounds.Error index self.length))
@@ -217,6 +219,8 @@ Text.at self index:Integer=0 =
 ## ---
    aliases: [get character]
    icon: split
+   arguments:
+     index: always
    ---
    Returns a character from the text at the specified index (0-based).
    If the index is invalid then `if_missing` is returned.
@@ -240,7 +244,7 @@ Text.at self index:Integer=0 =
    A character is defined as an Extended Grapheme Cluster, see Unicode Standard
    Annex 29. This is the smallest unit that still has semantic meaning in most
    text-processing applications.
-@index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1 display=Display.Always)
+@index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1)
 Text.get : Integer -> Any -> Any
 Text.get self index:Integer=0 ~if_missing=Nothing =
     new_index = if index < 0 then index + self.length else index
@@ -347,6 +351,8 @@ Text.characters self =
    aliases: [match]
    group: Selections
    icon: find
+   arguments:
+     pattern: always
    ---
    Find the regular expression `pattern` in `self`, returning the first match if
    present or `Nothing` if not found.
@@ -382,6 +388,8 @@ Text.find self pattern:(Regex | Text)=".*" case_sensitivity:Case_Sensitivity=..S
    aliases: [matches]
    group: Selections
    icon: find
+   arguments:
+     pattern: always
    ---
    Finds all the matches of the regular expression `pattern` in `self`, returning
    a Vector. If not found, will be an empty Vector.
@@ -476,6 +484,8 @@ Text.to_regex self case_insensitive=False = Regex.compile self case_insensitive
    aliases: [parse, tokenize]
    group: Conversions
    icon: split
+   arguments:
+     delimiter: always
    ---
    Takes a delimiter and returns the vector that results from splitting `self` on
    each of its occurrences.
@@ -1420,6 +1430,10 @@ Text.to_case self case_option:Case=..Lower locale:Locale=Locale.default =
 ## ---
    group: Calculations
    icon: text
+   arguments:
+     length: always
+     with_pad: always
+     at: always
    ---
    Returns the input padded to the specified `length`, using the `with_pad`
    string repeated at the start or the end.
@@ -1447,8 +1461,8 @@ Text.to_case self case_option:Case=..Lower locale:Locale=Locale.default =
          "HELLO".pad 8 "AB" == "HELLOABA"
          "HELLO".pad 8 "AB" ..Left == "BABHELLO"
    ```
-@length (Widget.Numeric_Input display=Display.Always)
-@with_pad (Widget.Text_Input display=Display.Always)
+@length (Widget.Numeric_Input)
+@with_pad (Widget.Text_Input)
 @at (make_single_choice [["Left", "..Left"], ["Right", "..Right"]])
 Text.pad : Integer -> Text -> Location -> Text
 Text.pad self length:Integer=0 with_pad:Text=' ' at:Location=..Right = case at of
@@ -1469,6 +1483,9 @@ Text.pad self length:Integer=0 with_pad:Text=' ' at:Location=..Right = case at o
 ## ---
    group: Text
    icon: text
+   arguments:
+     where: always
+     what: always
    ---
    This function removes the specified `trim_characters`, by default any
    whitespace, from the start, the end, or both ends of the input.
@@ -1496,7 +1513,7 @@ Text.pad self length:Integer=0 with_pad:Text=' ' at:Location=..Right = case at o
         "ABBA123".trim ..Left "ABC" == "123"
    ```
 @where (make_single_choice [["Both", "..Both"], ["Left", "..Left"], ["Right", "..Right"]])
-@what (Widget.Text_Input display=Display.Always)
+@what (Widget.Text_Input)
 Text.trim : Location -> (Text | (Text -> Boolean)) -> Text
 Text.trim self where:Location=..Both what=_.is_whitespace =
     predicate = case what of
@@ -1865,6 +1882,8 @@ Text.parse_json self = Json.parse self
    aliases: [date from text, to_date]
    group: Conversions
    icon: convert
+   arguments:
+     format: always
    ---
    Converts text containing a date into a Date object.
    This method will return a `Time_Error` if the provided time cannot be parsed.
@@ -1959,6 +1978,8 @@ Text.parse_date self format:Date_Time_Formatter=Date_Time_Formatter.iso_date =
    aliases: [date_time from text]
    group: Conversions
    icon: convert
+   arguments:
+     format: always
    ---
    Obtains an instance of `Date_Time` from a text such as
    "2007-12-03T10:15:30+01:00 Europe/Paris".
@@ -2088,6 +2109,8 @@ Text.parse_date_time self format:Date_Time_Formatter=Date_Time_Formatter.default
    aliases: [time_of_day from text, to_time_of_day]
    group: Conversions
    icon: convert
+   arguments:
+     format: always
    ---
    Obtains an instance of `Time_Of_Day` from a text such as "10:15".
    This method will return a `Time_Error` if the provided time cannot be parsed.

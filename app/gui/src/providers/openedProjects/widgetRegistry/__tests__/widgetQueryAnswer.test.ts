@@ -1,16 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import {
-  DisplayMode,
   functionCallFromAnswer,
   widgetQueryAnswerSchema,
   type FunctionCall,
 } from '../configuration'
 
-const textInput = {
-  type: 'Widget',
-  constructor: 'Text_Input',
-  display: { type: 'Display', constructor: 'Always' },
-}
+const textInput = { type: 'Widget', constructor: 'Text_Input' }
 
 describe('widgetQueryAnswerSchema', () => {
   test('reads widgets, nulls and errors, in order', () => {
@@ -23,7 +18,7 @@ describe('widgetQueryAnswerSchema', () => {
     })
     expect(parsed.arguments.map(([name]) => name)).toEqual(['a', 'b', 'c'])
     expect(parsed.arguments[0]![1]).toMatchObject({
-      widget: { kind: 'Text_Input', display: DisplayMode.Always },
+      widget: { kind: 'Text_Input' },
     })
     expect(parsed.arguments[1]![1]).toEqual({ widget: null })
     expect(parsed.arguments[2]![1]).toEqual({
@@ -59,7 +54,7 @@ describe('functionCallFromAnswer', () => {
   test('lets an inherited parameter win, as before', () => {
     const inherited: FunctionCall = {
       kind: 'FunctionCall',
-      parameters: new Map([['a', { kind: 'Boolean_Input', display: DisplayMode.Always }]]),
+      parameters: new Map([['a', { kind: 'Boolean_Input' }]]),
     }
     const answer = widgetQueryAnswerSchema.parse({
       arguments: [['a', { widget: textInput }]],

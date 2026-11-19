@@ -1,6 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
-from Standard.Base.Metadata import Display, make_single_choice, Widget
+from Standard.Base.Metadata import make_single_choice, Widget
 from Standard.Base.Metadata.Choice import Option
 
 import project.Google_Analytics.Google_Analytics
@@ -86,16 +86,16 @@ type Google_Analytics_Property
     ## ---
        private: true
        ---
-    default_widget self_arg cache display:Display=..Always -> Widget =
+    default_widget self_arg cache -> Widget =
         _ = self_arg
 
         credentials = cache.if_not_nothing <| cache "credentials"
         used_credentials = if credentials != Nothing then credentials else Google_Credential.default
 
         properties = Google_Analytics.list_properties credentials=used_credentials account=..All_Accounts limit=(..First 10)
-        if properties.is_error then Widget.Text_Input display=display else
+        if properties.is_error then Widget.Text_Input else
             options = properties . map p->(Option (p.name + " (" + p.id + ")") p.id.pretty)
-            make_single_choice options display=display
+            make_single_choice options
 
 ## ---
    private: true

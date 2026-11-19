@@ -35,6 +35,8 @@ Text.to_uri self = URI.parse self
    group: Input
    icon: data_input
    suggested: 3
+   arguments:
+     method: always
    ---
    Fetches from the URI and returns the response, parsing the body if the
    content-type is recognised. Returns an  error if the status code does not
@@ -61,6 +63,8 @@ URI.fetch self (method:HTTP_Method=..Get) headers=[] format=Auto_Detect =
    group: Output
    icon: data_upload
    suggested: 4
+   arguments:
+     method: always
    ---
    Writes the provided data to the provided URI. Returns the response, parsing
    the body if the content-type is recognised. Returns an  error if the status

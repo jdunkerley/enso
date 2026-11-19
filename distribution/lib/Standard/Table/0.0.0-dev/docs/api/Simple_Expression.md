@@ -11,13 +11,13 @@
     - Second
     - Truncate
     - Year
-    - create_widget table:Standard.Table.Internal.Table_Ref.Table_Ref display:Standard.Base.Metadata.Display= -> Standard.Base.Any.Any
+    - create_widget table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Any.Any
     - evaluate self column:Standard.Base.Any.Any table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Any.Any
 - type Logical_Operation
     - And rhs:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Boolean.Boolean)=
     - Not
     - Or rhs:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Boolean.Boolean)=
-    - create_widget table:Standard.Table.Internal.Table_Ref.Table_Ref display:Standard.Base.Metadata.Display= -> Standard.Base.Any.Any
+    - create_widget table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Any.Any
     - evaluate self column:Standard.Base.Any.Any table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Any.Any
 - type Math_Operation
     - Absolute
@@ -32,7 +32,7 @@
     - Signum
     - Subtract rhs:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Numbers.Number)=
     - Truncate
-    - create_widget table:Standard.Table.Internal.Table_Ref.Table_Ref display:Standard.Base.Metadata.Display= -> Standard.Base.Any.Any
+    - create_widget table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Any.Any
     - evaluate self column:Standard.Base.Any.Any table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Any.Any
 - type Simple_Calculation
     - Add rhs:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Numbers.Number|Standard.Base.Data.Text.Text)=
@@ -71,7 +71,7 @@
 - type Simple_Expression
     - From input:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Any.Any)= operation:Standard.Table.Simple_Expression.Simple_Calculation=
     - Simple_Expr input:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Any.Any)= operation:Standard.Table.Simple_Expression.Simple_Calculation=
-    - default_widget table:Standard.Table.Internal.Table_Ref.Table_Ref display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - default_widget table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Metadata.Widget
     - evaluate self table:Standard.Table.Internal.Table_Ref.Table_Ref use_input_name:Standard.Base.Data.Boolean.Boolean on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior -> Standard.Base.Any.Any
 - type Text_Operation
     - Contains substring:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Text.Text)=
@@ -81,5 +81,5 @@
     - Right length:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Numbers.Integer)=
     - Starts_With prefix:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Text.Text)=
     - Trim where:Standard.Base.Data.Text.Location.Location= what:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Text.Text)=
-    - create_widget table:Standard.Table.Internal.Table_Ref.Table_Ref display:Standard.Base.Metadata.Display= -> Standard.Base.Any.Any
+    - create_widget table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Any.Any
     - evaluate self column:Standard.Base.Any.Any table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Any.Any

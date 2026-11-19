@@ -16,7 +16,7 @@ import Standard.Base.Logging.Log_Level
 import Standard.Base.Logging.Progress
 import Standard.Base.Runtime.State
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
-from Standard.Base.Metadata import Display, make_single_choice, Widget
+from Standard.Base.Metadata import make_single_choice, Widget
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Widget_Helpers import make_any_selector, make_data_cleanse_vector_selector, make_delimiter_selector
 
@@ -269,9 +269,6 @@ type Table
        that table. If there are columns that do not appear in the first table,
        they are appended to the end of the resulting table in the order they
        appear in the input.
-    # TODO: `tables` should always show (it had `display=Display.Always`, on an
-    # annotation with no `item_editor`) once display moves to front matter
-    # (widgets PR 2).
     @columns_to_keep Columns_To_Keep.default_widget
     from_union (tables : Vector Table) columns_to_keep:Columns_To_Keep=..In_Any_Warn_On_Missing match_columns:Match_Columns=..By_Name on_problems:Problem_Behavior=..Report_Warning -> Table & In_Memory_Table & Any ! No_Output_Columns | Illegal_Argument =
         all_tables = (tables.map t-> t:Table)
@@ -355,6 +352,8 @@ type Table
     ## ---
        group: Standard.Base.Selections
        icon: select_column
+       arguments:
+         selector: always
        ---
        Returns the column with the given name or index.
 
@@ -404,6 +403,8 @@ type Table
 
     ## ---
        icon: select_column
+       arguments:
+         selector: always
        ---
        Returns the column with the given name or index.
 
@@ -451,6 +452,9 @@ type Table
        aliases: [cell value, get cell]
        group: Standard.Base.Selections
        icon: select_cell
+       arguments:
+         selector: always
+         if_missing: always
        ---
        Gets a value from the table.
 
@@ -544,6 +548,8 @@ type Table
        group: Standard.Base.Selections
        icon: select_column
        suggested: 1
+       arguments:
+         columns: always
        ---
        Creates a new table with a chosen subset of columns.
 
@@ -684,6 +690,8 @@ type Table
         - select fields
        group: Standard.Base.Selections
        icon: select_column
+       arguments:
+         columns: always
        ---
        Creates a new table with the chosen set of columns, as specified by the
        `columns`, removed from the input table. Any unmatched input columns will
@@ -904,6 +912,8 @@ type Table
     ## ---
        group: Standard.Base.Selections
        icon: select_column
+       arguments:
+         columns: always
        ---
        Reorders the columns by moving the selected columns to the start (or end)
        of the Table. By default, the selected columns are moved to the front.
@@ -1257,6 +1267,9 @@ type Table
        group: Standard.Base.Calculations
        icon: transform
        suggested: 7
+       arguments:
+         group_by: always
+         columns: always
        ---
        Groups the rows in the table.
        The columns argument specifies which additional aggregations to perform
@@ -1442,6 +1455,8 @@ type Table
        private: true
        group: Standard.Base.Selections
        icon: order
+       arguments:
+         columns: always
        ---
        Deprecated - use `Table.sort` instead.
     @columns Widget_Helpers.make_order_by_selector
@@ -1453,6 +1468,8 @@ type Table
        group: Standard.Base.Selections
        icon: preparation
        suggested: 5
+       arguments:
+         columns: always
        ---
        Returns unique rows within the specified columns from the table.
 
@@ -1523,6 +1540,8 @@ type Table
     ## ---
        group: Standard.Base.Selections
        icon: preparation
+       arguments:
+         columns: always
        ---
        Returns the set of rows which are duplicated within the specified columns
        from the input table.
@@ -1563,6 +1582,10 @@ type Table
         - to_boolean: type=..Boolean
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         columns: always
+         type: always
+         format: always
        ---
        Parses columns within a `Table` into a more specific value type.
        By default, it looks at all `Text` columns and attempts to deduce the type
@@ -1713,6 +1736,8 @@ type Table
        aliases: [to_char, to_string, to_text]
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         format: always
        ---
        Formats specified columns to text, optionally using a specified format.
        The original columns are replaced by the formatted columns.
@@ -1892,6 +1917,8 @@ type Table
        aliases: [auto_value_types]
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         columns: always
        ---
        Automatically detect the appropriate data type and size for specified
        columns and change them, based on the contents.
@@ -1944,6 +1971,8 @@ type Table
        private: true
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         columns: always
        ---
        Deprecated: Use `auto_cast` instead.
        Change the value type of table columns to a more specific one, based on
@@ -2219,6 +2248,8 @@ type Table
        group: Standard.Base.Selections
        icon: preparation
        suggested: 2
+       arguments:
+         filter: always
        ---
        Creates a new table with a filtered subset of rows.
 
@@ -2368,6 +2399,8 @@ type Table
        aliases: [first, head, keep, last, limit, sample, slice, tail, top]
        group: Standard.Base.Selections
        icon: select_row
+       arguments:
+         range: always
        ---
        Creates a new Table with the specified range of rows from the input Table.
 
@@ -2407,6 +2440,8 @@ type Table
        aliases: [remove, skip]
        group: Standard.Base.Selections
        icon: select_row
+       arguments:
+         range: always
        ---
        Creates a new Table from the input with the specified range of rows
        removed.
@@ -2454,6 +2489,9 @@ type Table
        group: Standard.Base.Values
        icon: column_add
        suggested: 6
+       arguments:
+         name: always
+         from: always
        ---
        Adds a new column to the table enumerating the rows.
 
@@ -2484,10 +2522,10 @@ type Table
        cases. The grouping and ordering settings affect how the row numbers are
        assigned to each row, but the order of the rows itself is not changed by
        this operation.
-    @name (Widget.Text_Input display=..Always)
-    @from (Widget.Numeric_Input display=..Always)
-    @group_by (Widget_Helpers.make_column_name_multi_selector display=..When_Modified)
-    @order_by (Widget_Helpers.make_order_by_selector display=..When_Modified)
+    @name (Widget.Text_Input)
+    @from (Widget.Numeric_Input)
+    @group_by (Widget_Helpers.make_column_name_multi_selector)
+    @order_by (Widget_Helpers.make_order_by_selector)
     add_row_number self name:Text="Row" from:Integer=0 step:Integer=1 (group_by : Vector (Text | Integer | Regex) | Text | Integer | Regex = []) (order_by : Vector | Text = []) on_problems:Problem_Behavior=..Report_Warning -> Table & Any = _profile_time_execution "Table.add_row_number" <|
         self.implementation.add_row_number self.underlying name from step group_by order_by on_problems
 
@@ -2495,6 +2533,9 @@ type Table
        aliases: [add group column, bucket, group id, tile]
        group: Standard.Base.Values
        icon: column_add
+       arguments:
+         name: always
+         from: always
        ---
        Adds a new column to the table enumerating groups of rows, assigning each
        row to one group number. All rows in each group will get the same number.
@@ -2592,9 +2633,9 @@ type Table
        the group numbers are assigned, depending on the grouping method.  The
        order of the rows itself is not changed by this operation.
        In the database backends, the ordering of rows is backend-dependent.
-    @grouping_method (Widget_Helpers.make_grouping_method_selector display=..Always)
-    @name (Widget.Text_Input display=..Always)
-    @from (Widget.Numeric_Input display=..Always)
+    @grouping_method (Widget_Helpers.make_grouping_method_selector)
+    @name (Widget.Text_Input)
+    @from (Widget.Numeric_Input)
     add_group_number self (grouping_method : Grouping_Method = Missing_Argument.throw "grouping_method") name:Text="Group" from:Integer=0 step:Integer=1 on_problems:Problem_Behavior=..Report_Warning -> Table & Any = _profile_time_execution "Table.add_group_number" <|
         self.implementation.add_group_number self.underlying grouping_method name from step on_problems
 
@@ -2619,7 +2660,7 @@ type Table
         - `name`: The name of the new column. Defaults to "Group".
         - `from`: The starting value for the enumeration. Defaults to 0.
         - `step`: The amount to increment the enumeration by. Defaults to 1.
-    @over (t-> make_single_choice ([Option "<Row>" "..Row"] + t.column_names) display=..When_Modified)
+    @over (t-> make_single_choice ([Option "<Row>" "..Row"] + t.column_names))
     find_group_number self (predicate=Missing_Argument.throw "predicate") (over:Predicate_Over = ..Row) group_row:Group_Row=..First name:Text="Group" from:Integer=0 step:Integer=1 on_problems:Problem_Behavior=..Report_Warning -> Table & Any = _profile_time_execution "Table.find_group_number" <|
         self.implementation.find_group_number self.underlying predicate over group_row name from step on_problems
 
@@ -2865,6 +2906,9 @@ type Table
        group: Standard.Base.Calculations
        icon: join
        suggested: 4
+       arguments:
+         join_kind: selected
+         on: always
        ---
        Joins two tables using the specified join conditions.
 
@@ -3034,6 +3078,8 @@ type Table
        aliases: [hlookup, join, lookup, vlookup, xlookup]
        group: Standard.Base.Calculations
        icon: join
+       arguments:
+         key_columns: always
        ---
        Merges this table with a lookup table New values are looked up in the
        lookup table based on the `key_columns`.
@@ -3182,6 +3228,8 @@ type Table
        aliases: [join by row position]
        group: Standard.Base.Calculations
        icon: join
+       arguments:
+         keep_unmatched: always
        ---
        Joins two tables by zipping rows from both tables together - the first row
        of the left table is correlated with the first one of the right one etc.
@@ -3304,9 +3352,6 @@ type Table
        that table. If there are columns that do not appear in the first table,
        they are appended to the end of the resulting table in the order they
        appear in the input.
-    # TODO: `tables` should always show (it had `display=Display.Always`, on an
-    # annotation with no `item_editor`) once display moves to front matter
-    # (widgets PR 2).
     @columns_to_keep Columns_To_Keep.default_widget
     union self (tables : Table | Vector = Missing_Argument.throw "tables") columns_to_keep:Columns_To_Keep=..In_Any_Warn_On_Missing match_columns:Match_Columns=..By_Name on_problems:Problem_Behavior=..Report_Warning -> Table & Any = _profile_time_execution "Table.union" <|
         self.implementation.union self.underlying tables columns_to_keep match_columns on_problems
@@ -3397,6 +3442,8 @@ type Table
        group: Standard.Base.Calculations
        icon: map_row
        suggested: 10
+       arguments:
+         key_columns: always
        ---
        Pivots a subset of the table's columns to rows.
 
@@ -3458,6 +3505,9 @@ type Table
        group: Standard.Base.Calculations
        icon: column_add
        suggested: 11
+       arguments:
+         group_by: always
+         values: always
        ---
        Pivots the table's rows to columns using a aggregation.
 
@@ -3556,6 +3606,8 @@ type Table
        group: Standard.Base.File
        icon: data_output
        suggested: 9
+       arguments:
+         format: always
        ---
        Saves the table's data to a file.
 
@@ -3617,7 +3669,7 @@ type Table
        write out the table as plain text, the user needs to convert the Table to
        Text (e.g. using `to_delimited` method) and then use the `Text.write`
        function.
-    @path (Widget.File_Browse existing_only=False display=Display.Always)
+    @path (Widget.File_Browse existing_only=False)
     @format Widget_Helpers.write_table_selector
     write self (path : Writable_File = Missing_Argument.throw "path") format=Auto_Detect on_existing_file:Existing_File_Behavior=..Backup match_columns:Match_Columns=..By_Name on_problems:Problem_Behavior=..Report_Warning -> File | Any ! Column_Count_Mismatch | Illegal_Argument | File_Error =
         self.implementation.write self.underlying path format on_existing_file match_columns on_problems
@@ -3706,6 +3758,9 @@ type Table
        aliases: [regex, substitute]
        group: Standard.Base.Text
        icon: column_add
+       arguments:
+         term: always
+         new_text: always
        ---
        Replaces the first, or all occurrences of `term` with `new_text` in each
        row of the specified column. If `term` is empty, the function returns the
@@ -3757,6 +3812,8 @@ type Table
     ## ---
        group: Standard.Base.Text
        icon: column_add
+       arguments:
+         remove: always
        ---
        Applies the specified cleansing operations to text values in each column
        specified in `columns`.
@@ -3830,6 +3887,10 @@ type Table
         - r squared: ..R_Squared
        group: Standard.Base.Values
        icon: column_add
+       arguments:
+         of: always
+         group_by: always
+         order_by: always
        ---
        Adds a new column to the table with a running calculation.
 
@@ -3872,6 +3933,10 @@ type Table
        aliases: [displace, lag, lead, shift, slide]
        group: Standard.Base.Values
        icon: column_add
+       arguments:
+         n: always
+         group_by: always
+         order_by: always
        ---
        Returns a table with new columns offset by n rows, where missing values
        have been replaced with the provided fill_with strategy.
@@ -3923,7 +3988,7 @@ type Table
        they are offset, but the order of the rows itself is not changed by this
        operation.
     @columns (Widget_Helpers.make_column_name_multi_selector add_regex=True add_by_type=True)
-    @n (Widget.Numeric_Input display=..Always)
+    @n (Widget.Numeric_Input)
     @default (self-> Widget_Helpers.make_fill_default_value_selector)
     @group_by (Widget_Helpers.make_column_name_multi_selector add_regex=True)
     @order_by Widget_Helpers.make_order_by_selector

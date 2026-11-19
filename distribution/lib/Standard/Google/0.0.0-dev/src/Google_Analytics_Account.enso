@@ -1,5 +1,5 @@
 from Standard.Base import all
-from Standard.Base.Metadata import Display, make_single_choice, Widget
+from Standard.Base.Metadata import make_single_choice, Widget
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Text_Input, Vector_Editor
 
@@ -77,7 +77,7 @@ type Google_Analytics_Account_Filter
     All_Accounts
 
     ## Filter to a single account
-    @account (Text_Input display=..Always)
+    @account (Text_Input)
     Account account:Text|Google_Analytics_Account
 
     ## Filter to set of accounts
@@ -87,7 +87,7 @@ type Google_Analytics_Account_Filter
     ## ---
        private: true
        ---
-    default_widget self_arg cache display:Display=..Always -> Widget =
+    default_widget self_arg cache -> Widget =
         _ = self_arg
 
         default = [Option "<All>" "..All_Accounts", Option "<Account>" "..Account", Option "<Multiple Accounts>" "..Accounts"]
@@ -98,7 +98,7 @@ type Google_Analytics_Account_Filter
         accounts = Google_Analytics.list_accounts credentials=used_credentials limit=(..First 10)
         if accounts.is_error then make_single_choice default else
             options = accounts . map p->(Option (p.name + " (" + p.id + ")") "..Account "+p.id.pretty)
-            make_single_choice default+options display=display
+            make_single_choice default+options
 
     ## ---
        private: true

@@ -3,11 +3,7 @@ import {
   makeArgument,
   makeMethod,
 } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
-import {
-  DisplayMode,
-  type WidgetConfiguration,
-  type WithDisplay,
-} from '$/providers/openedProjects/widgetRegistry/configuration'
+import type { WidgetConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { Ast } from '@/util/ast'
 import { ArgumentApplication, ArgumentAst, interpretCall } from '@/util/callTree'
 import { MODULE_CALL } from '@/util/moduleCall'
@@ -38,10 +34,8 @@ const option = (label: string, value: string, requires?: string, patterns?: stri
   ...(patterns ? { patterns } : {}),
 })
 
-const FORMAT_CONFIG: WidgetConfiguration & WithDisplay = {
+const FORMAT_CONFIG: WidgetConfiguration = {
   kind: 'Single_Choice',
-  label: null,
-  display: DisplayMode.WhenModified,
   values: [
     option('Auto Detect', 'Standard.Base.System.File_Format.Auto_Detect'),
     option('SQLite', '..SQLite', SQLITE, ['*.sqlite', '*.db']),
@@ -131,12 +125,7 @@ describe('formatTypeForPath', () => {
   })
   test('without a choice configuration, nothing', () => {
     expect(formatTypeForPath('/data/Sales.db', undefined)).toBeUndefined()
-    expect(
-      formatTypeForPath('/data/Sales.db', {
-        kind: 'Text_Input',
-        display: DisplayMode.Always,
-      }),
-    ).toBeUndefined()
+    expect(formatTypeForPath('/data/Sales.db', { kind: 'Text_Input' })).toBeUndefined()
   })
 })
 
@@ -281,7 +270,6 @@ describe('formatTypeForDrop', () => {
           widget: {
             type: 'Widget',
             constructor: 'Single_Choice',
-            label: null,
             values: [
               {
                 label: 'SQLite',
@@ -292,7 +280,6 @@ describe('formatTypeForDrop', () => {
                 patterns: ['*.db'],
               },
             ],
-            display: { type: 'Display', constructor: 'When_Modified' },
           },
         },
       ],
@@ -354,13 +341,11 @@ describe('formatTypeForDroppedFile', () => {
   const widget = {
     type: 'Widget',
     constructor: 'Single_Choice',
-    label: null,
     values: [
       choice('Auto Detect', 'Standard.Base.System.File_Format.Auto_Detect'),
       choice('SQLite', '..SQLite', SQLITE, ['*.sqlite', '*.db']),
       choice('Delimited', '..Delimited', TABLE_DELIMITED, ['*.csv']),
     ],
-    display: { type: 'Display', constructor: 'When_Modified' },
   }
   const widgetJson = { arguments: [['format', { widget }]] }
   test('the dropped-file query names only Standard.Base', () => {

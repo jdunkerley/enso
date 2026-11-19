@@ -2,7 +2,6 @@ from Standard.Base import all
 
 import Standard.Base.Metadata.Choice
 import Standard.Base.Metadata.Widget
-import Standard.Base.Metadata.Display
 
 from Standard.Database import all
 from Standard.SQLite import all
@@ -38,7 +37,7 @@ add_specs suite_builder =
         group_builder.specify "works for `query` and `read`" <|
             table_choices = ['a_table', 'another', 'mock_table'] . map n-> Choice.Option n n.pretty
             choices = table_choices + [Option '<Table_Name>' '..Table_Name ""', Option '<Raw_SQL>' '..Raw_SQL ""']
-            expect = answer "query" (Widget.Single_Choice choices Nothing Display.Always)
+            expect = answer "query" (Widget.Single_Choice choices)
             Widget_Query.resolve_call connection sqlite_module sqlite_type "query" ["query"] . should_equal expect
             Widget_Query.resolve_call connection sqlite_module sqlite_type "read" ["query"] . should_equal expect
 
@@ -47,13 +46,13 @@ add_specs suite_builder =
 
         group_builder.specify "works for `get` and `at`" <|
             choices = mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = answer "selector" (Widget.Single_Choice choices Nothing Display.Always)
+            expect = answer "selector" (Widget.Single_Choice choices)
             Widget_Query.resolve_call mock_table table_module table_type "get" ["selector"] . should_equal expect
             Widget_Query.resolve_call mock_table table_module table_type "at" ["selector"] . should_equal expect
 
         group_builder.specify "works for `filter`" <|
             choices = [Choice.Option "<Expression>" "(expr '[A]')"] + mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = answer "column" (Widget.Single_Choice choices Nothing Display.Always)
+            expect = answer "column" (Widget.Single_Choice choices)
             Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
 
     suite_builder.group "Widgets for Database" group_builder->

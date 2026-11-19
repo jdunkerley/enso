@@ -23,7 +23,7 @@
     - Left
     - Right
     - to_java self -> Standard.Fixed_Width.Fixed_Width_Format.Justification
-- _make_fixed_width_layout_widget display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+- _make_fixed_width_layout_widget -> Standard.Base.Metadata.Widget
 - Standard.Fixed_Width.Fixed_Width_Format.Fixed_Width_Layout.from that:Standard.Table.Table.Table -> Standard.Fixed_Width.Fixed_Width_Format.Fixed_Width_Layout
 - Standard.Fixed_Width.Fixed_Width_Format.Fixed_Width_Layout.from that:Standard.Table.Column.Column -> Standard.Fixed_Width.Fixed_Width_Format.Fixed_Width_Layout
 - Standard.Fixed_Width.Fixed_Width_Format.Fixed_Width_Layout.from that:Standard.Base.Data.Vector.Vector -> Standard.Fixed_Width.Fixed_Width_Format.Fixed_Width_Layout

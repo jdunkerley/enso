@@ -6,7 +6,6 @@ import project.Enso_Cloud.Data_Link_Helpers
 import project.Errors.Common.Dry_Run_Operation
 import project.Errors.Common.Missing_Argument
 import project.Errors.Illegal_Argument.Illegal_Argument
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Network.Email.Email
 import project.Network.Email.Email_Address.Email_Address
@@ -30,13 +29,18 @@ type Email
        aliases: [mail]
        group: Web
        icon: email
+       arguments:
+         to: always
+         cc: always
+         bcc: always
+         attachments: always
        ---
        Creates an email object.
     @from Email_Address.default_widget
     @to _email_vector_widget
     @cc _email_vector_widget
     @bcc _email_vector_widget
-    @attachments Vector_Editor Email_Attachment.default_widget item_default="..File" display=..Always
+    @attachments Vector_Editor Email_Attachment.default_widget item_default="..File"
     new from:Email_Address=(Missing_Argument.throw "from") to:(Vector Email_Address)=[] cc:(Vector Email_Address)=[] bcc:(Vector Email_Address)=[] subject:Text="" body:Email_Body="" attachments:(Vector Email_Attachment)=[] -> Email =
         resolved_to = to.map a->(a:Email_Address) on_problems=No_Wrap.Value
         resolved_cc = cc.map a->(a:Email_Address) on_problems=No_Wrap.Value
@@ -49,6 +53,11 @@ type Email
        aliases: [mail]
        group: Web
        icon: email
+       arguments:
+         to: always
+         cc: always
+         bcc: always
+         attachments: always
        ---
        Sends an email.
 
@@ -58,7 +67,7 @@ type Email
     @to _email_vector_widget
     @cc _email_vector_widget
     @bcc _email_vector_widget
-    @attachments Vector_Editor Email_Attachment.default_widget item_default="..File" display=..Always
+    @attachments Vector_Editor Email_Attachment.default_widget item_default="..File"
     @provider Email_Provider.default_widget
     send from:Email_Address=(Missing_Argument.throw "from") to:(Vector Email_Address)=[] cc:(Vector Email_Address)=[] bcc:(Vector Email_Address)=[] subject:Text="" body:Email_Body="" attachments:(Vector Email_Attachment)=[] provider=(Missing_Argument.throw "provider") -> Send_Response =
         if from.is_error then from
@@ -107,5 +116,5 @@ private _send_email_with_provider email provider =
         warning = Dry_Run_Operation.Warning "As writing is disabled, email not sent. Press the Write button ▶ to send it."
         Warning.attach warning (Send_Response.Dry_Run email)
 
-private _email_vector_widget (display : Display = ..Always) -> Widget =
-    Vector_Editor Email_Address.default_widget item_default="'receiver@domain.com'" display=display
+private _email_vector_widget -> Widget =
+    Vector_Editor Email_Address.default_widget item_default="'receiver@domain.com'"

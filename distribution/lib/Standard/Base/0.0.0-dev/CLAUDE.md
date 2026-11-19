@@ -81,6 +81,12 @@ result = "not a number".parse_integer.catch _-> 0
   arguments, so nothing is compiled in the user's module); the one in-frame
   query, the dropped file's `format` options, goes through
   `Meta.call_module_method`, with the `Data` module as the value.
+- **Widgets carry no display.** `Widget` constructors have no `display` or
+  `label` (`Metadata.Display` is gone; `Choice.Option`'s `label` stays). Which
+  arguments the node shows is the `arguments:` map in the method's doc front
+  matter (`always`, `selected`, `when_modified`), beside `group` and `icon`;
+  arguments with no default always show. The compiler's `ArgumentDisplayCheck`
+  validates it and `lintEnso` fails the build on a mistake.
 - `Meta.get_method_annotation`, `Meta.find_type_or_module` and
   `Meta.call_module_method` are for the IDE only (`private: true`); do not use
   them in library code.

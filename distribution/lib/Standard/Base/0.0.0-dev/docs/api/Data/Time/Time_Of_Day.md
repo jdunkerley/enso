@@ -10,7 +10,7 @@
     - date_add self amount:Standard.Base.Data.Numbers.Integer period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day
     - date_diff self end:Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Data.Numbers.Integer
     - date_part self period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Data.Numbers.Integer
-    - default_widget include_now:Standard.Base.Data.Boolean.Boolean= display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - default_widget include_now:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Metadata.Widget
     - end_of self period:Standard.Base.Data.Time.Time_Period.Time_Period= -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day
     - format self format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter -> Standard.Base.Data.Text.Text
     - hour self -> Standard.Base.Data.Numbers.Integer
@@ -28,5 +28,5 @@
     - to_display_text self -> Standard.Base.Data.Text.Text
     - to_js_object self -> Standard.Base.Data.Json.JS_Object
     - to_seconds self -> Standard.Base.Data.Numbers.Integer
-- make_time_period_selector display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+- make_time_period_selector -> Standard.Base.Metadata.Widget
 - Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day.from that:Standard.Base.Data.Json.JS_Object -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day

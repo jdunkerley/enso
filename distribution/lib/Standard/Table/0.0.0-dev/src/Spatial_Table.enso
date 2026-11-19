@@ -92,6 +92,10 @@ type Spatial_Table
        aliases: [create_lines]
        group: Standard.Base.Calculations
        icon: spatial
+       arguments:
+         column: always
+         group_by: always
+         order_by: always
        ---
        Merges a set of points into a Spatial line objects.
 
@@ -128,6 +132,10 @@ type Spatial_Table
        aliases: [create_polygon]
        group: Standard.Base.Calculations
        icon: spatial
+       arguments:
+         column: always
+         group_by: always
+         order_by: always
        ---
        Merges a set of points into a Spatial polygon objects.
 
@@ -163,6 +171,8 @@ type Spatial_Table
     ## ---
        group: Standard.Base.Calculations
        icon: spatial
+       arguments:
+         column: always
        ---
        Gets the geometry type of each spatial object in the spatial column.
 
@@ -182,6 +192,8 @@ type Spatial_Table
        aliases: [st_x]
        group: Standard.Base.Calculations
        icon: spatial
+       arguments:
+         column: always
        ---
        Gets the longitude values from each point in the spatial column.
 
@@ -201,6 +213,8 @@ type Spatial_Table
        aliases: [st_y]
        group: Standard.Base.Calculations
        icon: spatial
+       arguments:
+         column: always
        ---
        Gets the latitude values from each point in the spatial column.
 
@@ -219,6 +233,8 @@ type Spatial_Table
     ## ---
        group: Standard.Base.Calculations
        icon: spatial
+       arguments:
+         column: always
        ---
        Gets the centroid point of each spatial object in the spatial column.
 
@@ -235,6 +251,8 @@ type Spatial_Table
     ## ---
        group: Standard.Base.Calculations
        icon: spatial
+       arguments:
+         column: always
        ---
        Gets the bounding box surrounding each spatial object in the spatial column.
 
@@ -251,6 +269,8 @@ type Spatial_Table
     ## ---
        group: Standard.Base.Calculations
        icon: spatial
+       arguments:
+         column: always
        ---
        Gets the perimeter of each spatial object in the spatial column in meters.
        Note this assumes that the spatial objects are in WGS84 coordinate system (EPSG:4326).
@@ -268,6 +288,8 @@ type Spatial_Table
     ## ---
        group: Standard.Base.Calculations
        icon: spatial
+       arguments:
+         column: always
        ---
        Gets the area of each spatial object in the spatial column in meters².
        Note this assumes that the spatial objects are in WGS84 coordinate system (EPSG:4326).
@@ -365,6 +387,8 @@ type Spatial_Table
     ## ---
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         column: always
        ---
        Converts the spatial objects in the specified column to GeoJSON format.
 
@@ -383,6 +407,8 @@ type Spatial_Table
     ## ---
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         column: always
        ---
        Converts a text column in GeoJSON format to spatial objects.
 
@@ -401,6 +427,8 @@ type Spatial_Table
     ## ---
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         column: always
        ---
        Converts the spatial objects in the specified column to Well Known Text
        format.
@@ -420,6 +448,8 @@ type Spatial_Table
     ## ---
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         column: always
        ---
        Converts a text column in Well Known Text format to spatial objects.
 
@@ -438,6 +468,8 @@ type Spatial_Table
     ## ---
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         column: always
        ---
        Creates the smallest convex polygon that can enclose each object in the
        specified column. Use this in conjunction with an ST_Union aggregation to
@@ -495,33 +527,69 @@ Table.from (that:Spatial_Table) = that.parent
 
 ## Additional join kind for Spatial Table joins
 type Spatial_Join_Condition
-    ## Do the left and right spatial objects have at least one point in common.
+    ## ---
+       arguments:
+         right: always
+       ---
+       Do the left and right spatial objects have at least one point in common.
     Intersect (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "")
 
-    ## Does the whole of the right object lie inside the left object.
+    ## ---
+       arguments:
+         right: always
+       ---
+       Does the whole of the right object lie inside the left object.
     Contains (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "")
 
-    ## Does the whole of the right object lie inside the left object not
+    ## ---
+       arguments:
+         right: always
+       ---
+       Does the whole of the right object lie inside the left object not
        touching the boundary.
     Contains_Properly (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "")
 
-    ## Does the whole of the left object lie inside the right object
+    ## ---
+       arguments:
+         right: always
+       ---
+       Does the whole of the left object lie inside the right object
        (equivalent to `Contains right left`).
     Within (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "")
 
-    ## Does left object overlap right object.
+    ## ---
+       arguments:
+         right: always
+       ---
+       Does left object overlap right object.
     Overlaps (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "")
 
-    ## Does left object touch right object.
+    ## ---
+       arguments:
+         right: always
+       ---
+       Does left object touch right object.
     Touches (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "")
 
-    ## Does left object crosses right object.
+    ## ---
+       arguments:
+         right: always
+       ---
+       Does left object crosses right object.
     Crosses (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "")
 
-    ## Does left object cover right object.
+    ## ---
+       arguments:
+         right: always
+       ---
+       Does left object cover right object.
     Covers (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "")
 
-    ## Is left object covered by right object.
+    ## ---
+       arguments:
+         right: always
+       ---
+       Is left object covered by right object.
     Covered_By (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "")
 
     ## Resolves Spatial_Join_Condition into Join_Conditions
@@ -578,8 +646,8 @@ Join_Condition.from (that:Spatial_Join_Condition) = case that of
 private _spatial_widget table single_choice:Boolean=False =
     col_names = table.spatial_columns.map .name
     col_opts = col_names.map n-> Option n n.pretty
-    if single_choice then Single_Choice [Option "<Expression>" "(expr '["+col_names.first+"]')"]+col_opts display=..Always else
-        Multiple_Choice col_opts display=..Always
+    if single_choice then Single_Choice [Option "<Expression>" "(expr '["+col_names.first+"]')"]+col_opts else
+        Multiple_Choice col_opts
 
 private _resolve_column column parent = case column of
     _ : Column -> column

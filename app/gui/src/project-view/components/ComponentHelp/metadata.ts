@@ -39,6 +39,8 @@ export const documentationMetadataSchema = z.object({
   deprecated: z.boolean().optional().catch(orUndefined),
   icon: z.string().optional().catch(orUndefined),
   group: z.string().optional().catch(orUndefined),
+  /** Per-argument display on a collapsed node: `always`, `selected` or `when_modified`. */
+  arguments: z.record(z.string(), z.unknown()).optional().catch(orUndefined),
   private: z.boolean().optional().catch(orUndefined),
   unstable: z.boolean().optional().catch(orUndefined),
   suggested: z.number().optional().catch(orUndefined),

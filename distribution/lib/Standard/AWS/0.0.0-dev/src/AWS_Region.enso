@@ -1,5 +1,4 @@
 from Standard.Base import all
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.Widget
 from Standard.Base.Metadata.Choice import Option
 
@@ -33,11 +32,11 @@ type AWS_Region
     ## ---
        private: true
        ---
-    default_widget (display : Display = ..When_Modified) -> Widget =
+    default_widget -> Widget =
         options = [Option "Default" ("..Default")] + AWS_Region.all_region_ids.map id->
             code = "(..Region "+id.pretty+")"
             Option id code
-        Widget.Single_Choice values=options display=display
+        Widget.Single_Choice values=options
 
     ## ---
        private: true

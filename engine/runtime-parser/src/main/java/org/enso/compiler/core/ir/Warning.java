@@ -7,7 +7,8 @@ import scala.Function1;
 
 /** A trait for all warnings in Enso's IR. */
 public sealed interface Warning extends Diagnostic
-    permits Warning.DiscardedValue,
+    permits Warning.ArgumentDisplay,
+        Warning.DiscardedValue,
         Warning.DuplicatedImport,
         Warning.FailedParallelism,
         Warning.NoSuchMethod,
@@ -109,6 +110,20 @@ public sealed interface Warning extends Diagnostic
     @Override
     public String message(Function1<IdentifiedLocation, String> source) {
       return "A @Builtin_Method must be private.";
+    }
+  }
+
+  /**
+   * A problem with the {@code arguments} map of a method's or constructor's documentation front
+   * matter, which the IDE reads to decide whether an argument shows on a collapsed node.
+   *
+   * @param identifiedLocation the location of the method or constructor
+   * @param text the message
+   */
+  record ArgumentDisplay(IdentifiedLocation identifiedLocation, String text) implements Warning {
+    @Override
+    public String message(Function1<IdentifiedLocation, String> source) {
+      return text;
     }
   }
 

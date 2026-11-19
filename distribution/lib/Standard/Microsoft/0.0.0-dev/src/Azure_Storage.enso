@@ -1,7 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Data.Array_Proxy.Array_Proxy
 import Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.Widget
 from Standard.Base.Metadata.Choice import Option
 
@@ -62,9 +61,9 @@ type Azure_Blob_Storage
     ## ---
        private: true
        ---
-    default_widget (display : Display = ..When_Modified) -> Widget =
+    default_widget -> Widget =
         options = ["Default", "Environment", "CLI", "Client_Secret", "SAS_Token"].map k-> Option k (".."+k)
-        Widget.Single_Choice values=options display=display
+        Widget.Single_Choice values=options
 
 
 ## Enso representation of the Azure Storage Account

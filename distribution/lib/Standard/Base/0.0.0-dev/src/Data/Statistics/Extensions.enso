@@ -33,12 +33,14 @@ Vector.compute self statistic:Statistic=..Count =
 
 ## ---
    icon: column_add
+   arguments:
+     statistics: always
    ---
    Compute statistics on the vector (ignoring Nothing and NaN values).
 
    ## Arguments
     - `statistics`: Set of statistics to calculate.
-@statistics (Statistic.bulk_widget display=..Always)
+@statistics (Statistic.bulk_widget)
 Vector.compute_bulk : Vector Statistic -> Vector Any
 Vector.compute_bulk self statistics:Vector=[..Count, ..Sum] =
     Statistic.compute_bulk self statistics
@@ -75,13 +77,15 @@ Vector.running self statistic:Statistic=..Count =
 
 ## ---
    icon: math
+   arguments:
+     statistics: always
    ---
    Compute a set running statistics on the vector (ignoring Nothing and NaN
    values).
 
    ## Arguments
     - `statistics`: Set of statistics to calculate.
-@statistics (Statistic.bulk_widget display=..Always)
+@statistics (Statistic.bulk_widget)
 Vector.running_bulk : Vector Statistic -> Vector Any
 Vector.running_bulk self (statistics:(Vector Statistic)=[..Count, ..Sum]) =
     Statistic.running_bulk self statistics

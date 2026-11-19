@@ -4,6 +4,7 @@ import { entryMethodPointer } from '$/providers/openedProjects/suggestionDatabas
 import { WidgetInput, defineWidget, widgetProps } from '$/providers/openedProjects/widgetRegistry'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import SizeTransition from '@/components/SizeTransition.vue'
+import { injectWidgetTree } from '@/providers/widgetTree'
 import { Ast } from '@/util/ast'
 import { ArgumentApplication, ArgumentApplicationKey } from '@/util/callTree'
 import { chainRole, type ChainRole } from '@/util/operatorChain'
@@ -74,7 +75,10 @@ const operatorStyle = computed(() => {
 const infixWidgetInput = computed(() =>
   mapOrUndefined(application.value.infixOperator, WidgetInput.FromAst),
 )
-const showArgument = computed(() => !application.value.argument.hideByDefault)
+const tree = injectWidgetTree(true)
+const showArgument = computed(
+  () => !application.value.argument.isHidden(tree?.showDetails ?? false),
+)
 const argumentWidgetInput = computed(() => {
   return application.value.argument.toWidgetInput()
 })

@@ -21,6 +21,25 @@ function warnUnknownIconNameOnce(iconName: string) {
   }
 }
 
+/** Whether an argument with a default shows on a collapsed node (front matter `arguments:`). */
+export type ArgumentDisplay = 'always' | 'selected' | 'when_modified'
+const ARGUMENT_DISPLAYS: ReadonlySet<string> = new Set(['always', 'selected', 'when_modified'])
+function isArgumentDisplay(value: unknown): value is ArgumentDisplay {
+  return typeof value === 'string' && ARGUMENT_DISPLAYS.has(value)
+}
+
+/** Argument display values already warned about via {@link warnUnknownArgumentDisplayOnce}. */
+const warnedArgumentDisplays = new Set<string>()
+
+/** In dev builds, log a warning the first time an unrecognized `arguments:` value is seen. */
+function warnUnknownArgumentDisplayOnce(value: unknown) {
+  const key = String(value)
+  DEV: if (!warnedArgumentDisplays.has(key)) {
+    warnedArgumentDisplays.add(key)
+    console.warn(`Unknown argument display in documentation front matter: ${key}`)
+  }
+}
+
 /** The macros one entry contributes to the component named `target`. */
 export interface MacroContribution {
   /** The target component's fully qualified name. */
@@ -43,6 +62,8 @@ export interface DocumentationData {
   suggestedRank: number | undefined
   isPrivate: boolean
   isUnstable: boolean
+  /** Per-argument display from the front matter's `arguments:`; absent means `when_modified`. */
+  argumentDisplay: ReadonlyMap<string, ArgumentDisplay>
 }
 
 /** @internal */
@@ -96,6 +117,12 @@ export function documentationData(
   const knownIconName = iconName != null && isIconName(iconName) ? iconName : undefined
   if (iconName != null && knownIconName == null) warnUnknownIconNameOnce(iconName)
 
+  const argumentDisplay = new Map<string, ArgumentDisplay>()
+  for (const [name, value] of Object.entries(metadata?.arguments ?? {})) {
+    if (isArgumentDisplay(value)) argumentDisplay.set(name, value)
+    else warnUnknownArgumentDisplayOnce(value)
+  }
+
   return {
     documentation: prerendered,
     documentationSummary: summary,
@@ -116,5 +143,6 @@ export function documentationData(
     isPrivate: isPrivate,
     isUnstable: isUnstable,
     suggestedRank: suggestedRank,
+    argumentDisplay,
   }
 }

@@ -15,7 +15,6 @@ import project.Errors.Unimplemented.Unimplemented
 import project.Function.Function
 import project.Internal.Telemetry
 import project.Meta
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Panic.Panic
 import project.Runtime
@@ -186,8 +185,8 @@ type File_Format
     ## ---
        private: true
        ---
-    default_widget display:Display=..When_Modified -> Widget =
-        Single_Choice display=display values=(File_Format.dropdown_options [Auto_Detect])
+    default_widget -> Widget =
+        Single_Choice values=(File_Format.dropdown_options [Auto_Detect])
 
     ## ---
        private: true
@@ -199,7 +198,7 @@ type File_Format
         options = [Option "Any file" '""'] + known_patterns.map file_name_pattern->
             value = (_combine_patterns file_name_pattern.patterns) . pretty
             Option file_name_pattern.display_name value
-        Single_Choice display=Display.When_Modified values=options
+        Single_Choice values=options
 
 ## Combines a set of file name patterns into a single pattern that will match any
    of them.

@@ -1,5 +1,5 @@
 from Standard.Base import all
-from Standard.Base.Metadata import Choice, Display, make_single_choice, Widget
+from Standard.Base.Metadata import Choice, make_single_choice, Widget
 
 polyglot java import org.enso.table.data.table.join.JoinKind as Java_Join_Kind
 
@@ -42,8 +42,8 @@ type Join_Kind
     ## ---
        private: true
        ---
-    default_widget display:Display=..When_Modified -> Widget =
-        make_single_choice [Choice.Option "..Inner" "..Inner" icon="join_inner", Choice.Option "..Left_Outer" "..Left_Outer" icon="join_left_outer", Choice.Option "..Right_Outer" "..Right_Outer" icon="join_right_outer", Choice.Option "..Full" "..Full" icon="join_full", Choice.Option "..Left_Exclusive" "..Left_Exclusive" icon="join_left_exclusive", Choice.Option "..Right_Exclusive" "..Right_Exclusive" icon="join_right_exclusive"] display=display
+    default_widget -> Widget =
+        make_single_choice [Choice.Option "..Inner" "..Inner" icon="join_inner", Choice.Option "..Left_Outer" "..Left_Outer" icon="join_left_outer", Choice.Option "..Right_Outer" "..Right_Outer" icon="join_right_outer", Choice.Option "..Full" "..Full" icon="join_full", Choice.Option "..Left_Exclusive" "..Left_Exclusive" icon="join_left_exclusive", Choice.Option "..Right_Exclusive" "..Right_Exclusive" icon="join_right_exclusive"]
 
     ## ---
        private: true

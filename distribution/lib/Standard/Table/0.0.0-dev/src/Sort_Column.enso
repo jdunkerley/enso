@@ -6,7 +6,11 @@ type Sort_Column
        selector.
     Name (name:Text=(Missing_Argument.throw "name")) direction:Sort_Direction=..Ascending
 
-    ## A column to sort by, selected by its index.
+    ## ---
+       arguments:
+         index: always
+       ---
+       A column to sort by, selected by its index.
     Index index:Integer=0 direction:Sort_Direction=..Ascending
 
     ## A selector allowing to match columns by their name.

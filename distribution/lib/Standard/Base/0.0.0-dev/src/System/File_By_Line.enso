@@ -13,7 +13,7 @@ from project.Data.Boolean import Boolean
 from project.Data.Range.Extensions import all
 from project.Data.Text.Extensions import all
 from project.Logging import all
-from project.Metadata import Display, Widget
+from project.Metadata import Widget
 
 polyglot java import java.io.File as Java_File
 polyglot java import java.nio.charset.Charset
@@ -204,7 +204,7 @@ type File_By_Line
 
        ## Arguments
         - `predicate`: The predicate to filter by.
-    @predicate (Widget.Text_Input display=Display.Always)
+    @predicate (Widget.Text_Input)
     filter : Text | (Text -> Boolean) -> File_By_Line
     filter self predicate =
         ## Create the predicate
