@@ -6,8 +6,12 @@
  */
 import { AssetType, extractTypeAndPath, ProjectId } from 'enso-common/src/services/Backend'
 import {
+  ENGINE_LOG_APPEND_PATH,
   ENGINE_LOG_HEARTBEAT_MS,
   ENGINE_LOG_STREAM_PATH,
+  formatAppendedLines,
+  parseEngineLogAppendBody,
+  type EngineLogAppendBody,
   type EngineLogEndReason,
 } from 'enso-common/src/services/engineLogs'
 import type { SequencedEngineLogEvent } from '../engineLogs/channel.js'
@@ -16,6 +20,11 @@ import type { EngineLogHub } from '../engineLogs/hub.js'
 const HTTP_STATUS_OK = 200
 const HTTP_STATUS_BAD_REQUEST = 400
 const HTTP_STATUS_METHOD_NOT_ALLOWED = 405
+const HTTP_STATUS_NO_CONTENT = 204
+const HTTP_STATUS_NOT_FOUND = 404
+const HTTP_STATUS_PAYLOAD_TOO_LARGE = 413
+/** The largest append body: a widget error with its issues is a few KB. */
+const MAX_APPEND_BYTES = 64 * 1024
 
 /** The slice of `http.IncomingMessage` the stream uses. */
 export interface EventStreamRequest {
@@ -82,7 +91,7 @@ function projectPathOf(project: string): string | undefined {
 }
 
 function sendText(
-  response: EventStreamResponse,
+  response: Pick<EventStreamResponse, 'writeHead' | 'end'>,
   status: number,
   headers: Readonly<Record<string, string>>,
   text: string,
@@ -200,4 +209,71 @@ export function handleEngineLogStream(
     options.heartbeatMs ?? ENGINE_LOG_HEARTBEAT_MS,
   )
   cleanups.push(() => clearInterval(heartbeat))
+}
+
+/** Whether a request URL (or path) is the append route. */
+export function isEngineLogAppendRequest(url: string): boolean {
+  return new URL(url, 'http://localhost').pathname === ENGINE_LOG_APPEND_PATH
+}
+
+/** The slice of `http.IncomingMessage` the append route uses: its body is read as a stream. */
+export interface AppendRequest extends AsyncIterable<Buffer | string> {
+  readonly url?: string | undefined
+  readonly method?: string | undefined
+}
+
+/**
+ * Serve `POST /api/engine-logs/append`: add the IDE's line to the open project's engine log, as
+ * `gui` lines of the stream (live only: the session's file does not have them). Hosts route it
+ * after `acceptLocalRequest`. The body is bounded and validated, and the project can only be one
+ * the hub already holds open: nothing in the body names a path to write to.
+ */
+export async function handleEngineLogAppend(
+  request: AppendRequest,
+  response: Pick<EventStreamResponse, 'writeHead' | 'end'>,
+  hub: EngineLogHub | undefined,
+  headers: Readonly<Record<string, string>>,
+  now: () => Date = () => new Date(),
+): Promise<void> {
+  if (request.method !== 'POST') {
+    sendText(response, HTTP_STATUS_METHOD_NOT_ALLOWED, headers, 'Only POST is allowed.', {
+      Allow: 'POST',
+    })
+    return
+  }
+  const chunks: Buffer[] = []
+  let size = 0
+  for await (const chunk of request) {
+    const buffer = typeof chunk === 'string' ? Buffer.from(chunk) : chunk
+    size += buffer.length
+    if (size > MAX_APPEND_BYTES) {
+      sendText(response, HTTP_STATUS_PAYLOAD_TOO_LARGE, headers, 'The line is too long.')
+      return
+    }
+    chunks.push(buffer)
+  }
+  let body: EngineLogAppendBody | undefined
+  try {
+    body = parseEngineLogAppendBody(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+  } catch {
+    body = undefined
+  }
+  const projectPath = body && projectPathOf(body.project)
+  if (body == null || projectPath == null) {
+    sendText(
+      response,
+      HTTP_STATUS_BAD_REQUEST,
+      headers,
+      'Expected {project, level, logger, message}.',
+    )
+    return
+  }
+  const channel = hub?.get(projectPath)
+  if (channel == null) {
+    sendText(response, HTTP_STATUS_NOT_FOUND, headers, 'The project is not open.')
+    return
+  }
+  channel.appendGuiLines(formatAppendedLines(body, now()))
+  response.writeHead(HTTP_STATUS_NO_CONTENT, { ...headers })
+  response.end()
 }

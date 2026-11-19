@@ -44,9 +44,11 @@ import { createGzip } from 'node:zlib'
 import * as projectManagement from 'project-manager-shim'
 import {
   acceptLocalRequest,
+  handleEngineLogAppend,
   handleEngineLogStream,
   handleFilesystemCommand,
   handleProjectServiceRequest,
+  isEngineLogAppendRequest,
   isEngineLogStreamRequest,
   isProjectServiceRequest,
 } from 'project-manager-shim/handler'
@@ -146,6 +148,8 @@ export class ProjectManagerShimMiddleware {
     if (isEngineLogStreamRequest(requestPath)) {
       // No project service yet means no project is open: the stream says so and ends.
       handleEngineLogStream(request, response, this.projectService?.engineLogs, COMMON_HEADERS)
+    } else if (isEngineLogAppendRequest(requestPath)) {
+      void handleEngineLogAppend(request, response, this.projectService?.engineLogs, COMMON_HEADERS)
     } else if (isProjectServiceRequest(requestPath)) {
       handleProjectServiceRequest(
         request,

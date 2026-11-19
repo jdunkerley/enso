@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'vitest'
-import { ENGINE_LOG_STREAM_PATH, engineLoggingArgs, engineLogStreamUrl } from '../engineLogs'
+import {
+  ENGINE_LOG_STREAM_PATH,
+  engineLoggingArgs,
+  engineLogStreamUrl,
+  formatAppendedLines,
+  GUI_WIDGETS_LOGGER,
+  parseEngineLogAppendBody,
+} from '../engineLogs'
 
 describe('engineLogStreamUrl', () => {
   test('names the project', () => {
@@ -38,5 +45,26 @@ describe('engineLoggingArgs', () => {
 
   test('passes both when both are on', () => {
     expect(engineLoggingArgs({ sqlQueries: true, performanceTimings: true })).toHaveLength(4)
+  })
+})
+
+describe('appended GUI lines', () => {
+  test('format as an entry the Logs panel parses, continuation lines raw', () => {
+    const lines = formatAppendedLines(
+      { project: 'p', level: 'WARN', logger: GUI_WIDGETS_LOGGER, message: 'first\n  second' },
+      new Date('2026-11-18T10:00:00.000Z'),
+    )
+    expect(lines).toEqual([
+      '[WARN] [2026-11-18T10:00:00.000Z] [enso.gui.Widgets] first',
+      '  second',
+    ])
+  })
+
+  test('accept only a complete body with a known level', () => {
+    const body = { project: 'p', level: 'DEBUG', logger: 'l', message: 'm' }
+    expect(parseEngineLogAppendBody(body)).toEqual(body)
+    expect(parseEngineLogAppendBody({ ...body, level: 'TRACE' })).toBeUndefined()
+    expect(parseEngineLogAppendBody({ ...body, message: 3 })).toBeUndefined()
+    expect(parseEngineLogAppendBody(null)).toBeUndefined()
   })
 })
