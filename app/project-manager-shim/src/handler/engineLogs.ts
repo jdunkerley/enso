@@ -243,15 +243,36 @@ export async function handleEngineLogAppend(
   }
   const chunks: Buffer[] = []
   let size = 0
-  for await (const chunk of request) {
-    const buffer = typeof chunk === 'string' ? Buffer.from(chunk) : chunk
-    size += buffer.length
-    if (size > MAX_APPEND_BYTES) {
-      sendText(response, HTTP_STATUS_PAYLOAD_TOO_LARGE, headers, 'The line is too long.')
-      return
+  let answered = false
+  try {
+    for await (const chunk of request) {
+      // Not `break`: that would destroy the request, and with it the socket the 413 goes out on.
+      // The rest of an oversized body is read and dropped.
+      if (answered) continue
+      const buffer = typeof chunk === 'string' ? Buffer.from(chunk) : chunk
+      size += buffer.length
+      if (size > MAX_APPEND_BYTES) {
+        answered = true
+        chunks.length = 0
+        sendText(response, HTTP_STATUS_PAYLOAD_TOO_LARGE, headers, 'The line is too long.', {
+          Connection: 'close',
+        })
+      } else {
+        chunks.push(buffer)
+      }
     }
-    chunks.push(buffer)
+  } catch {
+    // The client went away mid-body: there is no one to answer, but the response must end.
+    if (!answered) {
+      try {
+        response.end()
+      } catch {
+        // The socket is gone already.
+      }
+    }
+    return
   }
+  if (answered) return
   let body: EngineLogAppendBody | undefined
   try {
     body = parseEngineLogAppendBody(JSON.parse(Buffer.concat(chunks).toString('utf8')))

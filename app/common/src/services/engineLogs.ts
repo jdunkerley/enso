@@ -118,6 +118,11 @@ export const GUI_PERFORMANCE_LOGGER = 'enso.gui.performance'
 export type EngineLogAppendLevel = 'ERROR' | 'WARN' | 'INFO' | 'DEBUG'
 const APPEND_LEVELS: readonly string[] = ['ERROR', 'WARN', 'INFO', 'DEBUG']
 
+/** What a logger name may be: nothing that could close its bracket or end the line. */
+const LOGGER_NAME = /^[\w.$-]+$/
+/** The most lines one append adds; the rest are replaced by a marker line. */
+export const MAX_APPENDED_LINES = 200
+
 /** The body of {@link ENGINE_LOG_APPEND_PATH}. `project` is the GUI's project id. */
 export interface EngineLogAppendBody {
   readonly project: string
@@ -132,15 +137,26 @@ export function parseEngineLogAppendBody(json: unknown): EngineLogAppendBody | u
   const { project, level, logger, message } = json as Record<string, unknown>
   if (typeof project !== 'string' || typeof logger !== 'string' || typeof message !== 'string')
     return undefined
+  if (!LOGGER_NAME.test(logger)) return undefined
   if (typeof level !== 'string' || !APPEND_LEVELS.includes(level)) return undefined
   return { project, level: level as EngineLogAppendLevel, logger, message }
 }
 
 /**
  * The lines an append adds: the first starts an entry, `[LEVEL] [time] [logger] text`, as the
- * engine's file lines do (`logEntry.ts`); the rest continue it.
+ * engine's file lines do (`logEntry.ts`); the rest continue it, indented so that no message can
+ * forge an entry of its own. Control characters other than tab are dropped, and at most
+ * {@link MAX_APPENDED_LINES} lines are kept (then a marker says how many were not).
  */
 export function formatAppendedLines(body: EngineLogAppendBody, now: Date): string[] {
-  const [first = '', ...rest] = body.message.split(/\r?\n/)
-  return [`[${body.level}] [${now.toISOString()}] [${body.logger}] ${first}`, ...rest]
+  // eslint-disable-next-line no-control-regex
+  const clean = body.message.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+  const [first = '', ...rest] = clean.split(/\r\n|\n|\r/)
+  const kept = rest.slice(0, MAX_APPENDED_LINES - 1)
+  const dropped = rest.length - kept.length
+  return [
+    `[${body.level}] [${now.toISOString()}] [${body.logger}] ${first}`,
+    ...kept.map((line) => `    ${line}`),
+    ...(dropped > 0 ? [`    … (${dropped} more lines)`] : []),
+  ]
 }

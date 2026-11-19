@@ -376,7 +376,7 @@ export class Server {
         response,
         this.projectService.engineLogs,
         Object.fromEntries(COOP_COEP_CORP_HEADERS),
-      )
+      ).catch((error) => console.error('Could not append to the engine log.', error))
     } else if (isProjectServiceRequest(requestUrl)) {
       const headers = Object.fromEntries(COOP_COEP_CORP_HEADERS)
       handleProjectServiceRequest(

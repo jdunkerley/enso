@@ -330,3 +330,31 @@ describe('handleEngineLogAppend', () => {
     expect(big.status).toBe(413)
   })
 })
+
+describe('handleEngineLogAppend aborts', () => {
+  test('a body that fails mid-read ends the response instead of rejecting', async () => {
+    const request: AppendRequest = {
+      method: 'POST',
+      async *[Symbol.asyncIterator]() {
+        yield Buffer.from('{')
+        throw new Error('aborted')
+      },
+    }
+    const response = new FakeResponse()
+    await expect(handleEngineLogAppend(request, response, hub, {})).resolves.toBeUndefined()
+    expect(response.ended).toBe(true)
+  })
+
+  test('an oversized body in several chunks is answered 413 once', async () => {
+    const request: AppendRequest = {
+      method: 'POST',
+      async *[Symbol.asyncIterator]() {
+        for (let i = 0; i < 5; i++) yield Buffer.alloc(20_000, 'x')
+      },
+    }
+    const response = new FakeResponse()
+    await handleEngineLogAppend(request, response, hub, {})
+    expect(response.status).toBe(413)
+    expect(response.headers.Connection).toBe('close')
+  })
+})

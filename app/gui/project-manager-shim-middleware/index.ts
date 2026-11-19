@@ -149,7 +149,12 @@ export class ProjectManagerShimMiddleware {
       // No project service yet means no project is open: the stream says so and ends.
       handleEngineLogStream(request, response, this.projectService?.engineLogs, COMMON_HEADERS)
     } else if (isEngineLogAppendRequest(requestPath)) {
-      void handleEngineLogAppend(request, response, this.projectService?.engineLogs, COMMON_HEADERS)
+      void handleEngineLogAppend(
+        request,
+        response,
+        this.projectService?.engineLogs,
+        COMMON_HEADERS,
+      ).catch((error) => console.error('Could not append to the engine log.', error))
     } else if (isProjectServiceRequest(requestPath)) {
       handleProjectServiceRequest(
         request,

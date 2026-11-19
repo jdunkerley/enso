@@ -5,6 +5,7 @@ import {
   engineLogStreamUrl,
   formatAppendedLines,
   GUI_WIDGETS_LOGGER,
+  MAX_APPENDED_LINES,
   parseEngineLogAppendBody,
 } from '../engineLogs'
 
@@ -49,14 +50,14 @@ describe('engineLoggingArgs', () => {
 })
 
 describe('appended GUI lines', () => {
-  test('format as an entry the Logs panel parses, continuation lines raw', () => {
+  test('format as an entry the Logs panel parses, continuation lines indented', () => {
     const lines = formatAppendedLines(
       { project: 'p', level: 'WARN', logger: GUI_WIDGETS_LOGGER, message: 'first\n  second' },
       new Date('2026-11-18T10:00:00.000Z'),
     )
     expect(lines).toEqual([
       '[WARN] [2026-11-18T10:00:00.000Z] [enso.gui.Widgets] first',
-      '  second',
+      '      second',
     ])
   })
 
@@ -66,5 +67,37 @@ describe('appended GUI lines', () => {
     expect(parseEngineLogAppendBody({ ...body, level: 'TRACE' })).toBeUndefined()
     expect(parseEngineLogAppendBody({ ...body, message: 3 })).toBeUndefined()
     expect(parseEngineLogAppendBody(null)).toBeUndefined()
+  })
+})
+
+describe('appended GUI lines are hardened', () => {
+  const body = { project: 'p', level: 'WARN', logger: 'enso.gui.Widgets', message: 'm' } as const
+  const now = new Date('2026-11-18T10:00:00.000Z')
+
+  test('a logger that could break the entry format is refused', () => {
+    expect(parseEngineLogAppendBody({ ...body, logger: 'a] [b' })).toBeUndefined()
+    expect(parseEngineLogAppendBody({ ...body, logger: 'x\ny' })).toBeUndefined()
+    expect(parseEngineLogAppendBody({ ...body, logger: '' })).toBeUndefined()
+    expect(parseEngineLogAppendBody({ ...body, logger: 'Standard.Base$Inner-1' })).toBeDefined()
+  })
+
+  test('continuation lines are indented, and every line break splits', () => {
+    const lines = formatAppendedLines(
+      { ...body, message: 'a\r\n[ERROR] [t] [forged] x\r[INFO] [t] [f] y\nz' },
+      now,
+    )
+    expect(lines.slice(1)).toEqual(['    [ERROR] [t] [forged] x', '    [INFO] [t] [f] y', '    z'])
+  })
+
+  test('control characters other than tab are stripped', () => {
+    const lines = formatAppendedLines({ ...body, message: 'a\u001b[31m\u0000b\tc' }, now)
+    expect(lines[0]).toMatch(/a\[31mb\tc$/)
+  })
+
+  test('the lines of one append are capped, with a marker', () => {
+    const message = Array.from({ length: 500 }, (_, i) => `l${i}`).join('\n')
+    const lines = formatAppendedLines({ ...body, message }, now)
+    expect(lines).toHaveLength(MAX_APPENDED_LINES + 1)
+    expect(lines.at(-1)).toBe(`    … (${500 - MAX_APPENDED_LINES} more lines)`)
   })
 })
