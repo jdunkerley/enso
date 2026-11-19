@@ -1,0 +1,12 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+main =
+    sales_file = enso_project.data / 'sales.csv'
+    sales = Data.read sales_file (..Delimited headers=..Has_Headers)
+    north = sales.filter 'region' (..Equal 'North')
+    revenue = north.set (north.at 'unit' * north.at 'price') 'revenue'
+    by_product = revenue.aggregate ['product'] [..Sum 'revenue' 'total']
+    result = by_product.sort [..Name 'total' ..Descending]
+    result

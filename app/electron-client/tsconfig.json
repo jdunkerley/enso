@@ -9,5 +9,13 @@
     "types": ["node"]
   },
   "extends": "../../tsconfig.json",
-  "include": ["../vitest.node.base.ts", "./*.ts", "./src", "./tasks", "./tests", "./perf"]
+  "include": [
+    "../vitest.node.base.ts",
+    "./*.ts",
+    "./src",
+    "./tasks",
+    "./tests",
+    "./perf",
+    "./mcp-eval"
+  ]
 }

@@ -1,0 +1,12 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+main =
+    sales = Data.read (enso_project.data / 'sales.csv') (..Delimited headers=..Has_Headers)
+    north = sales.filter 'region' (..Equal 'North')
+    in_2025 = north.filter 'date' (..Between (Date.new 2025 1 1) (Date.new 2025 12 31))
+    revenue = in_2025.set (in_2025.at 'units' * in_2025.at 'price') 'revenue'
+    by_product = revenue.aggregate ['product'] [..Sum 'revenue' 'total']
+    result = by_product.sort [..Name 'total' ..Descending]
+    result

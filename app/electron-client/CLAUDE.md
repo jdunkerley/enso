@@ -307,6 +307,12 @@ once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
   `<userData>/engine/` is an earlier IDE's copy inherited through an update's
   relaunch, and `prepareAppImageEngine` removes it from the environment
   (`isEngineCopyPath`).
+- `ENSO_TEST_USER_DATA_DIR` — an absolute path used as Electron's `userData`
+  (`src/testUserData.ts`, called from `index.ts` before the logger and the
+  single-instance lock). Electron's `--user-data-dir` does not work: the app's
+  own argument parser refuses it as unknown. The MCP effectiveness suite
+  (`mcp-eval/`) sets it, so a run never touches the user's profile and can run
+  beside the user's own IDE; the Playwright fixture could use it too.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
   `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.
@@ -365,6 +371,15 @@ project and checks `Spare engine: used …` and the engine log's
 `Engine: pre-started spare used` notice in the Logs tab (a stderr line, so shown
 with the Engine source ticked). It has no retries (a retry repeats the training)
 and a 400 s budget.
+
+## MCP effectiveness suite
+
+`mcp-eval/` drives Claude Code against the packaged IDE's MCP server on seven
+tasks and scores them (on demand, never in CI, costs money:
+`corepack pnpm --filter enso run mcp-eval -- --budget-usd <n>`; `--self-check`
+and `--dry-run` cost nothing). See `mcp-eval/CLAUDE.md`. Where a packaged IDE
+and its launcher are, without needing a built `dist/ide/`, is
+`tests/ideLocator.ts` (`tests/packagedIde.ts` builds on it).
 
 ## Open-time harness
 

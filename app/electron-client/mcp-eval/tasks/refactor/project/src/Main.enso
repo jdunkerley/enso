@@ -1,0 +1,14 @@
+from Standard.Base import all
+from Standard.Table import all
+import Standard.Visualization
+
+main =
+    raw = Table.new [['name', ['  Ann ', 'bob', ' Cy', 'bob', 'Dee']], ['score', [10, 20, Nothing, 20, 40]]]
+    trimmed = raw.set ((raw.at 'name').map (n-> n.trim)) 'name'
+    unique = trimmed.distinct ['name']
+    scored = unique.filter 'score' (..Not_Nothing)
+    cleaned = scored.sort ['name']
+    total = (cleaned.at 'score').to_vector.fold 0 (+)
+    count = cleaned.row_count
+    result = Table.new [['total', [total]], ['count', [count]]]
+    result
