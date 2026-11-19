@@ -35,7 +35,7 @@ class ArgumentFactory {
   ) {}
 
   placeholder(index: number, info: SuggestionEntryArgument, insertAsNamed: boolean) {
-    return new ArgumentPlaceholder(
+    const argument = new ArgumentPlaceholder(
       this.callId,
       this.kind,
       this.dynamicConfig(info.name),
@@ -43,6 +43,8 @@ class ArgumentFactory {
       info,
       insertAsNamed,
     )
+    argument.queryError = this.queryError(info.name)
+    return argument
   }
 
   argument(
@@ -50,7 +52,7 @@ class ArgumentFactory {
     index: number | undefined,
     info: SuggestionEntryArgument | undefined,
   ) {
-    return new ArgumentAst(
+    const argument = new ArgumentAst(
       this.callId,
       this.kind,
       info && this.dynamicConfig(info.name),
@@ -58,6 +60,12 @@ class ArgumentFactory {
       info,
       ast,
     )
+    argument.queryError = info && this.queryError(info.name)
+    return argument
+  }
+
+  private queryError(name: string) {
+    return this.widgetCfg?.errors?.get(name)
   }
 
   private dynamicConfig(name: string) {
@@ -68,6 +76,9 @@ class ArgumentFactory {
 export type DynamicConfig = WidgetConfiguration & { display?: DisplayMode }
 type WidgetInputValue = Ast.Expression | Ast.Token | string | undefined
 abstract class Argument {
+  /** Why the engine has no widget for this argument, if its widget query failed. */
+  queryError: widgetCfg.WidgetQueryError | undefined = undefined
+
   protected constructor(
     public callId: AstId,
     public kind: ApplicationKind,
@@ -94,6 +105,8 @@ abstract class Argument {
       expectedType: this.argInfo?.reprType,
       [ArgumentInfoKey]: { info: this.argInfo, appKind: this.kind, argId: this.argId },
       dynamicConfig: this.dynamicConfig,
+      // Only when it failed: the widget registry matches the key's presence.
+      ...(this.queryError ? { [WidgetQueryErrorKey]: this.queryError } : {}),
     }
   }
 }
@@ -128,7 +141,7 @@ export class ArgumentPlaceholder extends Argument {
     return value == null || isRequiredArgument(this.argInfo) ? undefined : value
   }
 
-  /** Whether the argument should be hidden when the component isn't currently focused for editing. */
+  /** Whether the argument is hidden: an unset argument with a default (its call's ＋ menu adds it). */
   override get hideByDefault(): boolean {
     return (
       this.argInfo.hasDefault &&
@@ -650,9 +663,12 @@ function filterNotAppliedArguments(
 
 export const ArgumentApplicationKey: unique symbol = Symbol.for('WidgetInput:ArgumentApplication')
 export const ArgumentInfoKey: unique symbol = Symbol.for('WidgetInput:ArgumentInfo')
+/** Set on an argument whose widget query failed: `WidgetQueryError.vue` shows it. */
+export const WidgetQueryErrorKey: unique symbol = Symbol.for('WidgetInput:WidgetQueryError')
 declare module '$/providers/openedProjects/widgetRegistry' {
   export interface WidgetInput {
     [ArgumentApplicationKey]?: ArgumentApplication
+    [WidgetQueryErrorKey]?: widgetCfg.WidgetQueryError
     [ArgumentInfoKey]?: {
       appKind: ApplicationKind
       info: SuggestionEntryArgument | undefined

@@ -4,6 +4,7 @@
  * makes it reactive.
  */
 import {
+  GUI_PERFORMANCE_LOGGER,
   PERFORMANCE_LOGGER,
   SQL_QUERY_LOGGER,
   type EngineLogEndReason,
@@ -210,6 +211,7 @@ export function logOrigin(loggerName: string): LogOrigin {
   if (underRoot(loggerName, USER_LOGGER_ROOT)) return 'user'
   if (loggerName === SQL_QUERY_LOGGER) return 'sql'
   if (underRoot(loggerName, PERFORMANCE_LOGGER)) return 'performance'
+  if (underRoot(loggerName, GUI_PERFORMANCE_LOGGER)) return 'performance'
   if (STD_BITS_PACKAGE_ROOTS.some((root) => underRoot(loggerName, root))) return 'library'
   return ENGINE_LOGGER_ROOTS.some((root) => underRoot(loggerName, root)) ? 'engine' : 'library'
 }

@@ -201,6 +201,8 @@ export interface AnyToTarget {
 export interface FunctionCall {
   kind: 'FunctionCall'
   parameters: Map<string, (WidgetConfiguration & WithDisplay) | null>
+  /** Why the engine has no widget for these arguments (`Widget_Query.resolve_call`'s errors). */
+  errors?: Map<string, WidgetQueryError> | undefined
 }
 
 /**
@@ -281,6 +283,43 @@ export type ArgumentWidgetConfiguration = z.infer<typeof argumentSchema>
 
 export const argsWidgetConfigurationSchema = z.array(argumentSchema)
 export type ArgsWidgetConfiguration = z.infer<typeof argsWidgetConfigurationSchema>
+
+/** Why the engine could not resolve an argument's widget (Enso `Widget_Failure.to_json`). */
+export const widgetQueryErrorSchema = z.object({
+  step: z.string(),
+  message: z.string(),
+})
+export type WidgetQueryError = z.infer<typeof widgetQueryErrorSchema>
+
+const argumentResultSchema = z.union([
+  z.object({ widget: widgetConfigurationSchema.nullable() }),
+  z.object({ error: widgetQueryErrorSchema }),
+])
+
+/**
+ * The answer of `Standard.Base.Metadata.Widget_Query.resolve_call`: for each argument asked
+ * for, in order, its widget (`null`: none) or why it has none. An object, so that later fields (a
+ * column list sent once, PR 5) can join `arguments`.
+ */
+export const widgetQueryAnswerSchema = z.object({
+  arguments: z.array(z.tuple([argNameSchema, argumentResultSchema])),
+})
+export type WidgetQueryAnswer = z.infer<typeof widgetQueryAnswerSchema>
+
+/** {@link functionCallConfiguration} of an answer: its widgets as parameters, its errors apart. */
+export function functionCallFromAnswer(
+  answer: WidgetQueryAnswer,
+  inherited?: FunctionCall,
+): FunctionCall {
+  const parameters: ArgumentWidgetConfiguration[] = []
+  const errors = new Map<string, WidgetQueryError>()
+  for (const [name, result] of answer.arguments) {
+    if ('error' in result) errors.set(name, result.error)
+    else parameters.push([name, result.widget])
+  }
+  const call = functionCallConfiguration(parameters, inherited)
+  return errors.size > 0 ? { ...call, errors } : call
+}
 
 /**
  * Create {@link WidgetConfiguration} object from parameters received from the engine, possibly

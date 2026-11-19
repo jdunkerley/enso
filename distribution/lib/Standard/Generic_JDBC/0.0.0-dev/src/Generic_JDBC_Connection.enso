@@ -2,7 +2,7 @@ from Standard.Base import all
 import Standard.Base.Errors.Common.Type_Error
 import Standard.Base.Runtime.Context
 from Standard.Base.Metadata.Choice import Option
-from Standard.Base.Metadata.Widget import Single_Choice, Vector_Editor
+from Standard.Base.Metadata.Widget import Single_Choice, Text_Input, Vector_Editor
 
 import Standard.Table.Rows_To_Read.Rows_To_Read
 from Standard.Table import Table
@@ -256,7 +256,7 @@ type Generic_JDBC_Connection
        - "A_": matches the tables "AB" and "AC".
        - "A%": matches the tables "ABC" and "ADEF".
     @database (self-> Single_Choice values=(self.databases . map d-> Option d d.pretty))
-    @table_types (self -> Vector_Editor item_default="")
+    @table_types (Vector_Editor item_editor=Text_Input item_default='""')
     tables self name_like:Text="" database:Text|Nothing=self.database schema:Text="" table_types:Vector=[] -> Table =
         catalog = if database == "" then self.database else database
         used_table_pattern = if name_like == "" then Nothing else name_like

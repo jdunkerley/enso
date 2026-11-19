@@ -65,7 +65,8 @@ components and workflows should not.
   `GeoMapVisualization` (Sentry Replay blocks it).
 - `src/Table/Visualization.enso` — IDE entry points of the table view
   (`prepare_visualization`, `get_rows_for_table`,
-  `get_distinct_values_for_column`), written against `Viz_Table`.
+  `get_distinct_values_for_column`, and `column_names_json`, the table
+  expression editor's column names), written against `Viz_Table`.
 - `src/SQL/Visualization.enso` — the preprocessor of the SQL Query view, written
   against `SQL_Viz`. The view itself is no longer in the GUI: Standard.Database
   ships it as `visualizations/SQL_Query.vue`
@@ -73,8 +74,9 @@ components and workflows should not.
   names this module.
 - `src/Internal/Chart_Limits.enso` — the row bounds and `local_rows`, which the
   charts use to read a bounded number of rows from any `Viz_Table`.
-- `src/Widgets.enso`, `src/Id.enso`, `src/Warnings.enso`, `src/File_Upload.enso`
-  — supporting IDE utilities.
+- `src/Id.enso`, `src/Warnings.enso`, `src/File_Upload.enso` — supporting IDE
+  utilities. (`src/Widgets.enso` is gone: widget queries are
+  `Standard.Base.Metadata.Widget_Query`.)
 
 ## Data types
 
@@ -189,6 +191,14 @@ text, or an object starting with `_display_text_`; `{"_missing_":true}` is a
 cell its row lacks. A row page is `{"row_count","index","data"}`; distinct
 values `{"values"}`. Changing it means regenerating the goldens and keeping the
 GUI snapshot (`__tests__/tableViewSnapshot.test.ts`) unchanged.
+
+## How the GUI reaches this library
+
+The GUI calls this library's entry points by method pointer, or in a node's
+frame through `Standard.Base.Meta.call_module_method`, never by a fully
+qualified name: a name of a library the user's module does not import does not
+compile. So no user module needs `import Standard.Visualization`, and a new
+project and the samples do not have it. The library only needs to be loaded.
 
 ## Things to avoid in generated code
 

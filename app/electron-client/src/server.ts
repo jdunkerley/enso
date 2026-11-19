@@ -17,9 +17,11 @@ import type { LocalSamples } from 'project-manager-shim'
 import * as projectManagement from 'project-manager-shim'
 import {
   acceptLocalRequest,
+  handleEngineLogAppend,
   handleEngineLogStream,
   handleFilesystemCommand,
   handleProjectServiceRequest,
+  isEngineLogAppendRequest,
   isEngineLogStreamRequest,
   isProjectServiceRequest,
 } from 'project-manager-shim/handler'
@@ -368,6 +370,13 @@ export class Server {
         this.projectService.engineLogs,
         Object.fromEntries(COOP_COEP_CORP_HEADERS),
       )
+    } else if (isEngineLogAppendRequest(requestUrl)) {
+      void handleEngineLogAppend(
+        request,
+        response,
+        this.projectService.engineLogs,
+        Object.fromEntries(COOP_COEP_CORP_HEADERS),
+      ).catch((error) => console.error('Could not append to the engine log.', error))
     } else if (isProjectServiceRequest(requestUrl)) {
       const headers = Object.fromEntries(COOP_COEP_CORP_HEADERS)
       handleProjectServiceRequest(

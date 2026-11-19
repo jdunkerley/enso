@@ -68,7 +68,7 @@ testProjects:
     testImports: [Base_Tests]
   Format_Discovery_Tests:
     imports: [Base, Table, Test]
-    loads: [EDI, Excel, YXDB]
+    loads: [EDI, Excel, Image, SQLite, YXDB]
     testImports: []
   Generic_JDBC_Tests:
     imports:
@@ -87,6 +87,7 @@ testProjects:
     testImports: [Base_Tests]
   SQLite_Tests:
     imports: [Base, Database, Database_Test_Suite, SQLite, Table, Test]
+    loads: [AWS, DuckDB, Microsoft, Postgres, Snowflake]
     testImports: [Base_Tests]
   Snowflake_Tests:
     imports: [Base, Database, Database_Test_Suite, Snowflake, Table, Test]
@@ -117,8 +118,6 @@ testProjects:
         Base,
         Database,
         Examples,
-        Excel,
-        Geo,
         Image,
         SQLite,
         Table,

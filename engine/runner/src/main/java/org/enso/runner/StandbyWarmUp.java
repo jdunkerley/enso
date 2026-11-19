@@ -38,7 +38,10 @@ final class StandbyWarmUp implements Standby.WarmUp {
   /** The stderr line printed once the warm-up's `main` has returned (not when it was cancelled). */
   static final String FINISHED = "standby: warm-up finished";
 
-  /** The default template's imports (Standard.Database and Standard.Examples included). */
+  /**
+   * The default template's imports (Standard.Database and Standard.Examples included), plus
+   * Standard.Visualization, which the IDE loads.
+   */
   static final String MAIN_SOURCE =
       """
       from Standard.Base import all

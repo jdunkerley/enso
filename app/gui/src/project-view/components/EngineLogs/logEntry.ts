@@ -15,7 +15,8 @@ export interface LogEntry {
   readonly event: string
 }
 
-const ENTRY_RE = new RegExp(`\\[(${LOG_LEVELS.join('|')})] \\[([^\\]]+)] \\[([^\\]]+)] (.*)`)
+/** Anchored: an entry starts its line, so an indented continuation line cannot pass for one. */
+const ENTRY_RE = new RegExp(`^\\[(${LOG_LEVELS.join('|')})] \\[([^\\]]+)] \\[([^\\]]+)] (.*)`)
 
 /** Parse a log line that starts an entry; `undefined` for any other line (a stack trace's, say). */
 export function parseEntry(line: string): LogEntry | undefined {

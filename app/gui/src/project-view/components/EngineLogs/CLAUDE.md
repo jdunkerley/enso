@@ -12,6 +12,11 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
 
 - `logEntry.ts` — `parseEntry` and `LOG_LEVELS`: the start of an entry,
   `[LEVEL] [time] [logger] message`.
+- The `gui` source: lines the IDE adds (`POST /api/engine-logs/append`,
+  `$/providers/engineLogAppend.ts`). They are live only: not in the session's
+  file, so not in Download or the session log tab. `enso.gui.Widgets` (the IDE's
+  widget problems) is Engine; `enso.gui.performance` (widget timings) is
+  Performance.
 - `engineLogModel.ts` — framework-free rows built from the stream's events.
   - Level rules: stderr is ERROR; a line that starts no entry takes its entry's
     level.

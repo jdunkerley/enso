@@ -147,6 +147,11 @@ public abstract class BuildScopeFromModuleAlgorithm<TypeScopeReferenceType, Impo
     }
   }
 
+  /**
+   * The type a conversion's source or target names. {@code X.type} (a resolution with {@link
+   * BindingsMap.Resolution#isEigentype()}) names X's eigentype, the route static methods take. See
+   * Note [Eigentype References] in {@code EigentypeReference}.
+   */
   protected final TypeScopeReferenceType getTypeResolution(IR expr) {
     var resolution =
         MetadataInteropHelpers.getMetadataOrNull(
@@ -157,7 +162,7 @@ public abstract class BuildScopeFromModuleAlgorithm<TypeScopeReferenceType, Impo
 
     return switch (resolution.target()) {
       case BindingsMap.ResolvedType resolvedType ->
-          associatedTypeFromResolvedType(resolvedType, false);
+          associatedTypeFromResolvedType(resolvedType, resolution.isEigentype());
       case BindingsMap.ResolvedModule resolvedModule ->
           associatedTypeFromResolvedModule(resolvedModule);
       default ->

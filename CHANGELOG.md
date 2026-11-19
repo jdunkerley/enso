@@ -5,6 +5,15 @@
 - [A plug icon at the right end of the top bar shows whether AI agents (MCP) are
   off, have a problem, are on, connected or working. Click it to see the
   connected app and its last five calls, or to turn MCP on.][878]
+- [Widgets show why they could not load, instead of disappearing: a warning
+  marker on the argument gives the reason, the argument stays editable, and the
+  Logs panel has the details. New projects no longer import
+  `Standard.Visualization`.][891]
+- [Selecting a node no longer expands it to show every hidden argument: a
+  round ＋ after a call's arguments, shown while the node is selected, adds any
+  of that call's other arguments, and a call inside another call's argument is
+  outlined with its own ＋. Every argument now shows its name, even when its
+  value is given by position][850]
 - [The JSON and tree view can be used from the keyboard: Tab enters it, the
   arrow keys move between entries and open or close branches, Enter adds a
   component for the entry (Shift+Enter for every entry beside it), and the
@@ -568,11 +577,13 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [878]: https://github.com/jdunkerley/enso/pull/878
+[891]: https://github.com/jdunkerley/enso/pull/891
 [846]: https://github.com/jdunkerley/enso/pull/846
 [822]: https://github.com/jdunkerley/enso/pull/822
 [840]: https://github.com/jdunkerley/enso/pull/840
 [841]: https://github.com/jdunkerley/enso/pull/841
 [844]: https://github.com/jdunkerley/enso/pull/844
+[850]: https://github.com/jdunkerley/enso/pull/850
 [832]: https://github.com/jdunkerley/enso/pull/832
 [831]: https://github.com/jdunkerley/enso/pull/831
 [830]: https://github.com/jdunkerley/enso/pull/830

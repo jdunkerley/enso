@@ -54,6 +54,7 @@ import org.enso.compiler.pass.analyse.{
 import org.enso.compiler.pass.analyse.alias.AliasMetadata
 import org.enso.compiler.pass.analyse.alias.graph.{Graph => AliasGraph}
 import org.enso.compiler.pass.resolve.{
+  EigentypeReference,
   ExpressionAnnotations,
   GenericAnnotations,
   GlobalNames,
@@ -1033,22 +1034,40 @@ private[runtime] class IrToTruffle(
                     targetTp != null,
                     s"Target type should be defined in module ${module.getName}"
                   )
-                  actualModule.getBindingsMap.resolveName(
-                    conversionMethod.sourceTpName
-                  ) match {
+                  // See Note [Eigentype References] in EigentypeReference.java.
+                  val sourceIsEigentype = EigentypeReference
+                    .isEigentypeReference(conversionMethod.sourceTpName)
+                  val sourceResolution =
+                    if (sourceIsEigentype)
+                      EigentypeReference
+                        .resolve(
+                          conversionMethod.sourceTpName,
+                          actualModule.getBindingsMap
+                        )
+                        .map(resolution => List(resolution.target))
+                    else
+                      actualModule.getBindingsMap.resolveName(
+                        conversionMethod.sourceTpName
+                      )
+                  sourceResolution match {
                     case Right(
-                          List(BindingsMap.ResolvedType(modWithSourceTp, _))
+                          List(
+                            BindingsMap.ResolvedType(modWithSourceTp, sourceIr)
+                          )
                         ) =>
                       val sourceTpScope =
                         asScope(modWithSourceTp.unsafeAsModule())
-                      val sourceTp = sourceTpScope.getType(
-                        conversionMethod.sourceTpName,
+                      val sourceValueTp = sourceTpScope.getType(
+                        sourceIr.name,
                         true
                       )
                       org.enso.common.Asserts.assertInJvm(
-                        sourceTp != null,
+                        sourceValueTp != null,
                         s"Source type should be defined in module ${module.getName}"
                       )
+                      val sourceTp =
+                        if (sourceIsEigentype) sourceValueTp.getEigentype
+                        else sourceValueTp
                       val conversionFun =
                         actualScope
                           .asModuleScope()
@@ -1434,7 +1453,10 @@ private[runtime] class IrToTruffle(
                 case None =>
                   Left(BadPatternMatch.NonVisibleConstructor(constructor.name))
                 case Some(
-                      BindingsMap.Resolution(BindingsMap.ResolvedModule(mod))
+                      BindingsMap.Resolution(
+                        BindingsMap.ResolvedModule(mod),
+                        _
+                      )
                     ) =>
                   val branchCodeNode =
                     createBranchCodeNodeForConstructorPattern(
@@ -1453,7 +1475,8 @@ private[runtime] class IrToTruffle(
                   )
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedConstructor(tp, resolvedCons)
+                        BindingsMap.ResolvedConstructor(tp, resolvedCons),
+                        _
                       )
                     ) =>
                   val atomCons =
@@ -1488,7 +1511,8 @@ private[runtime] class IrToTruffle(
                   Right(r)
                 case Some(
                       BindingsMap.Resolution(
-                        binding @ BindingsMap.ResolvedType(_, _)
+                        binding @ BindingsMap.ResolvedType(_, _),
+                        _
                       )
                     ) =>
                   val tpe =
@@ -1518,7 +1542,8 @@ private[runtime] class IrToTruffle(
                   Right(branchNode)
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedPolyglotSymbol(mod, symbol)
+                        BindingsMap.ResolvedPolyglotSymbol(mod, symbol),
+                        _
                       )
                     ) =>
                   val branchCodeNode =
@@ -1544,7 +1569,8 @@ private[runtime] class IrToTruffle(
                   )
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedPolyglotField(typ, symbol)
+                        BindingsMap.ResolvedPolyglotField(typ, symbol),
+                        _
                       )
                     ) =>
                   val branchCodeNode =
@@ -1598,7 +1624,8 @@ private[runtime] class IrToTruffle(
                   })
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedModuleMethod(_, _)
+                        BindingsMap.ResolvedModuleMethod(_, _),
+                        _
                       )
                     ) =>
                   throw new CompilerError(
@@ -1606,7 +1633,8 @@ private[runtime] class IrToTruffle(
                   )
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedExtensionMethod(_, _)
+                        BindingsMap.ResolvedExtensionMethod(_, _),
+                        _
                       )
                     ) =>
                   throw new CompilerError(
@@ -1614,7 +1642,8 @@ private[runtime] class IrToTruffle(
                   )
                 case Some(
                       BindingsMap.Resolution(
-                        BindingsMap.ResolvedConversionMethod(_, _)
+                        BindingsMap.ResolvedConversionMethod(_, _),
+                        _
                       )
                     ) =>
                   throw new CompilerError(
@@ -1681,7 +1710,8 @@ private[runtime] class IrToTruffle(
               Left(BadPatternMatch.NonVisibleType(typePattern.tpe.name))
             case Some(
                   BindingsMap.Resolution(
-                    binding @ BindingsMap.ResolvedType(_, _)
+                    binding @ BindingsMap.ResolvedType(_, _),
+                    _
                   )
                 ) =>
               // Using .getTypes because .getType may return an associated type
@@ -1717,7 +1747,8 @@ private[runtime] class IrToTruffle(
               }
             case Some(
                   BindingsMap.Resolution(
-                    BindingsMap.ResolvedPolyglotSymbol(mod, symbol)
+                    BindingsMap.ResolvedPolyglotSymbol(mod, symbol),
+                    _
                   )
                 ) =>
               val polySymbol =
@@ -1759,7 +1790,7 @@ private[runtime] class IrToTruffle(
                   )
                 )
               }
-            case Some(BindingsMap.Resolution(resolved)) =>
+            case Some(BindingsMap.Resolution(resolved, _)) =>
               throw new CompilerError(
                 s"Impossible ${resolved} here, should be caught by Patterns resolution pass."
               )

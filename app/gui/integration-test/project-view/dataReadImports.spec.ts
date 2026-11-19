@@ -7,6 +7,7 @@ import {
   setMockPublicTypes,
   updateVisualizationData,
 } from 'integration-test/mock/lsHandler'
+import * as actions from './actions'
 import { mockMethodCallInfo } from './expressionUpdates'
 import * as locate from './locate'
 
@@ -117,7 +118,8 @@ test('choosing SQLite in the format dropdown adds its import; one undo removes b
 }) => {
   await editorPage
   const node = await dataReadNode(page)
-  await node.click()
+  // `format` is hidden by default: its ＋ adds it.
+  await actions.addArgument(page, node, 'format')
   const formatArg = node
     .locator('.WidgetTopLevelArgument')
     .filter({ has: page.getByText('format') })

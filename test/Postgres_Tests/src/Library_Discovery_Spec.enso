@@ -34,7 +34,7 @@ add_specs suite_builder =
             db_file.delete
 
         group_builder.specify "Database.connect's dropdown lists SQLite" <|
-            main_src = 'from Standard.Base import all\nfrom Standard.Database import all\nimport Standard.Visualization.Widgets\n\nmain =\n    IO.println (Widgets.get_widget_json Database .connect ["details"])\n'
+            main_src = 'from Standard.Base import all\nfrom Standard.Database import all\nimport Standard.Base.Metadata.Widget_Query\n\nmain =\n    IO.println (Widget_Query.resolve_call Nothing "Standard.Database.Connection.Database" "Standard.Database.Connection.Database" "connect" ["details"] subject_is_type=True)\n'
             output = run_project main_src
             output.should_contain "SQLite.From_File"
             output.should_contain "Postgres.Server"

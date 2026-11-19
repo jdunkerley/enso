@@ -66,12 +66,13 @@ function useColumnNamesVisConfig(options: ColumnNamesVisConfigOptions) {
 }
 
 const GET_COLUMNS_METHOD = 'column_names_json' as Ast.Identifier
-const WIDGETS_ENSO_PATH = ProjectPath.create(
+const TABLE_VISUALIZATION_PATH = ProjectPath.create(
   'Standard.Visualization' as QualifiedName,
-  'Widgets' as Ast.Identifier,
+  'Table.Visualization' as QualifiedName,
 )
-const COLUMNS_METHOD = {
-  module: WIDGETS_ENSO_PATH,
-  definedOnType: WIDGETS_ENSO_PATH,
+/** `Standard.Visualization.Table.Visualization.column_names_json`. Exported for tests. */
+export const COLUMNS_METHOD = {
+  module: TABLE_VISUALIZATION_PATH,
+  definedOnType: TABLE_VISUALIZATION_PATH,
   name: GET_COLUMNS_METHOD,
 }

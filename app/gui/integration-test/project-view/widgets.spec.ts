@@ -2,6 +2,7 @@ import type EditorPageActions from 'integration-test/actions/EditorPageActions'
 import { expect, test, type Locator, type Page } from 'integration-test/base'
 import {
   clearMockWidgetConfigurations,
+  lastWidgetQueryArguments,
   restoreMockMainFile,
   restoreMockWidgetConfigurations,
   setMockMainFile,
@@ -331,7 +332,7 @@ test.describe('Dynamic configuration updates', () => {
   test('Dynamic dropdown', async ({ page, localApi, editorPage }) => {
     const node = await dataReadNodeWithMethodCallInfo(editorPage)
     const topLevelArgs = node.locator('.WidgetTopLevelArgument')
-    await node.click()
+    await actions.showHiddenArguments(page, node)
     await expect(topLevelArgs).toHaveCount(3)
 
     // No dropdown is shown until dynamic configuration arrives.
@@ -374,6 +375,49 @@ test.describe('Dynamic configuration updates', () => {
     await formatDropdown.expectVisibleWithOptions(['Csv', 'Excel'])
   })
 
+  test('A widget whose query failed shows the error and stays editable', async ({
+    page,
+    localApi,
+    editorPage,
+  }) => {
+    const node = await dataReadNodeWithMethodCallInfo(editorPage)
+    await localApi.updateVisualization('.read', {
+      arguments: [['format', { error: { step: 'annotation', message: 'No formats today' } }]],
+    })
+    // With an answer, an unset `format` is hidden (its placeholder shows only while the query is
+    // pending): set it, so that its argument is drawn with the marker.
+    await actions.showHiddenArguments(page, node)
+    const formatArg = node
+      .locator('.WidgetTopLevelArgument')
+      .filter({ has: page.getByText('format') })
+    const marker = formatArg.getByTestId('widget-query-error')
+    await expect(marker).toBeVisible()
+    await expect(marker).toHaveAttribute('aria-label', 'No widget: No formats today')
+    await marker.hover()
+    await expect(page.locator('.Tooltip').getByText('No widget: No formats today')).toBeVisible()
+    // Still editable: the format's static tags give the fallback dropdown.
+    const dropdown = new DropDownLocator(formatArg)
+    await formatArg.click()
+    await dropdown.expectVisible()
+    await expect(dropdown.items.first()).toBeVisible()
+  })
+
+  test('An answer the IDE cannot read reaches the Logs panel', async ({
+    page,
+    localApi,
+    editorPage,
+  }) => {
+    const calls = localApi.trackCalls()
+    const node = await dataReadNodeWithMethodCallInfo(editorPage)
+    await actions.showHiddenArguments(page, node)
+    await localApi.updateVisualization('.read', { arguments: 'not a list' })
+    await expect
+      .poll(() => calls.engineLogAppends.map((entry) => entry.logger))
+      .toContain('enso.gui.Widgets')
+    // The node still shows its arguments, as without a widget.
+    await expect(node.locator('.WidgetTopLevelArgument')).toHaveCount(3)
+  })
+
   /**
    * Check that numeric widget is displayed even if dynamic configuration is not provided.
    * Unlike dynamic dropdowns, numeric widget can work normally without dynamic configuration.
@@ -399,6 +443,7 @@ test.describe('Dynamic configuration updates', () => {
       notAppliedArguments: [2, 3, 4, 5],
     })
     const topLevelArgs = node.locator('.WidgetTopLevelArgument')
+    await actions.showHiddenArguments(page, node)
     await expect(topLevelArgs).toHaveCount(5)
     await expect(node.locator('.WidgetNumber')).toBeVisible()
     await expect(node.locator('.WidgetNumber')).toHaveValue('1')
@@ -428,8 +473,7 @@ test.describe('Dynamic configuration updates', () => {
    */
   test('File browser widget', async ({ page, localApi, editorPage }) => {
     const node = await dataReadNodeWithMethodCallInfo(editorPage)
-    // Click the node's left edge: its middle may be on the `…` of the hidden parameters, which keeps the click.
-    await node.click({ position: { x: 8, y: 8 } })
+    await actions.showHiddenArguments(page, node)
     await expect(node.locator('.WidgetTopLevelArgument')).toHaveCount(3)
     const pathArg = node.locator('.WidgetTopLevelArgument').filter({ has: page.getByText('path') })
     await pathArg.click()
@@ -467,7 +511,7 @@ test.describe('Dynamic configuration updates', () => {
       notAppliedArguments: [1, 2, 3, 4],
     })
     const node = locate.graphNodeByBinding(page, 'aggregated')
-    await node.click()
+    await actions.showHiddenArguments(page, node)
     await expect(node.locator('.WidgetTopLevelArgument')).toHaveCount(4)
     // Top-level configuration, including configuration for child widgets.
     await localApi.updateVisualization('.aggregate', [
@@ -637,8 +681,8 @@ test('Selection widgets in Data.read node', async ({ editorPage, page }) => {
   const topLevelArgs = node.locator('.WidgetTopLevelArgument')
   await expect(topLevelArgs).toHaveCount(1)
 
-  // Check arguments after selecting node
-  await node.click()
+  // Selecting the node does not show the rest; its ＋ does
+  await actions.showHiddenArguments(page, node)
   await expect(topLevelArgs).toHaveCount(3)
 
   // Set value on `on_problems` (static drop-down)
@@ -662,7 +706,7 @@ test('Selection widgets in Data.read node', async ({ editorPage, page }) => {
     },
     notAppliedArguments: [0, 1],
   })
-  await page.getByText('Report_Error').click()
+  await onProblemsArg.getByText('Report_Error').first().click()
   await onProblemsDropdown.expectVisibleWithOptions([
     '..Ignore',
     '..Report_Warning',
@@ -875,10 +919,16 @@ test('Manage aggregates in `aggregate` node', async ({ editorPage, page }) => {
     // Check initially visible arguments
     .expectNodeTopLevelArgumentCount('aggregated', 1)
     .selectSingleNode('aggregated')
-    // Check arguments after selecting node
-    .expectNodeTopLevelArgumentCount('aggregated', 3)
+    // Selecting the node does not show the hidden arguments
+    .expectNodeTopLevelArgumentCount('aggregated', 1)
 
   const node = editorPage.locateNodes('aggregated')
+  // Its ＋ offers them
+  const menu = await actions.openAddArgumentMenu(page, node)
+  await expect(menu.getByRole('button', { name: /^group_by/ })).toBeVisible()
+  await expect(menu.getByRole('button', { name: /^columns/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
   // Add first aggregate
   const columnsArg = node
     .locator('.WidgetTopLevelArgument')
@@ -1033,10 +1083,20 @@ test('Autoscoped constructors', async ({ editorPage }) => {
     )
     .selectSingleNode('autoscoped')
     .withNode('autoscoped', async (node) => {
-      const groupBy = node.getByTestId('list-item-content')
+      const groupBy = node.getByTestId('list-item-content').first()
       await expect(groupBy).toBeVisible()
-      await expect(groupBy.locator('.WidgetArgumentName')).toContainText(['column', 'as“”'])
+      await expect(groupBy.locator('.WidgetArgumentName')).toContainText(['column'])
     })
+  // The nested autoscoped constructor's widgets are asked for by method pointer, with the
+  // constructor's type as the subject.
+  expect(lastWidgetQueryArguments('.Group_By')).toEqual([
+    "'Standard.Table.Aggregate_Column'",
+    "'Standard.Table.Aggregate_Column.Aggregate_Column'",
+    "'Group_By'",
+    expect.any(String),
+    expect.any(String),
+    'True',
+  ])
 })
 
 test('Table widget', async ({ editorPage, page }) => {
@@ -2064,17 +2124,18 @@ test.describe('Boolean widget', () => {
     expect(await moduleCode(page)).toContain('kept = Data.keep_rows False\n')
   })
 
-  test('an unset argument shows its default greyed, and the checkbox writes the flipped value', async ({
+  test('an unset argument stays hidden when selected; its ＋ adds it with a checkbox', async ({
     editorPage,
     page,
   }) => {
     const { node, widget, checkbox } = await booleanNode(editorPage, page, 'unset')
-    // Unset arguments show only while the node is selected.
-    await node.click()
+    await node.click({ position: { x: 8, y: 8 } })
+    await expect(widget).toHaveCount(0)
+    await actions.showHiddenArguments(page, node)
     await expect(widget).toHaveCount(1)
-    await expect(widget.locator('.defaultValue')).toHaveText('False')
+    await expect(widget).toContainText('False')
     await checkbox.click()
-    await expect(widget.locator('.defaultValue')).toHaveCount(0)
+    await expect(widget).toContainText('True')
     expect(await moduleCode(page)).toMatch(/unset = Data\.keep_rows (keep=)?True\n/)
   })
 
@@ -2085,14 +2146,6 @@ test.describe('Boolean widget', () => {
     const selection = node.locator('.WidgetSelection').first()
     await selection.hover()
     await expect(selection.locator('svg.arrow')).toBeVisible()
-  })
-
-  test('an unset argument has its arrow under the greyed default', async ({ editorPage, page }) => {
-    const { node, widget } = await booleanNode(editorPage, page, 'unset')
-    await node.click()
-    await expect(widget.locator('.defaultValue')).toHaveText('False')
-    await node.locator('.WidgetSelection').first().hover()
-    await expect(widget.locator('.defaultValue svg.arrow')).toBeVisible()
   })
 
   test('an infix operand keeps its checkbox and has no arrow', async ({ editorPage, page }) => {

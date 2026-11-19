@@ -347,6 +347,45 @@ public class UnusedImportsTest {
   }
 
   @Test
+  public void usedSymbols_EigentypeConversionSource() {
+    compilerCtx.createModule(
+        QualifiedName.fromString("local.Proj.Module"),
+        """
+        type T
+        type U
+            Value x
+        """);
+    var mainMod =
+        compilerCtx.createModule(
+            QualifiedName.fromString("local.Proj.Main"),
+            """
+            from project.Module import T, U
+            T.from (that:U.type) = 42
+            """);
+    compilerCtx.getCompiler().run(mainMod);
+    expectNoWarnings(mainMod.getIr());
+  }
+
+  @Test
+  public void usedSymbols_EigentypeAscription() {
+    compilerCtx.createModule(
+        QualifiedName.fromString("local.Proj.Module"),
+        """
+        type U
+            Value x
+        """);
+    var mainMod =
+        compilerCtx.createModule(
+            QualifiedName.fromString("local.Proj.Main"),
+            """
+            from project.Module import U
+            foo (x:U.type) = x
+            """);
+    compilerCtx.getCompiler().run(mainMod);
+    expectNoWarnings(mainMod.getIr());
+  }
+
+  @Test
   public void noWarning_WhenImportingSymbolFromReexport() {
     compilerCtx.createModule(
         QualifiedName.fromString("local.Proj.Other_Module"),

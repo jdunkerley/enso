@@ -5,13 +5,14 @@
  */
 import type { WidgetUpdate } from '$/providers/openedProjects/widgetRegistry'
 import {
-  argsWidgetConfigurationSchema,
   flattenChoice,
+  widgetQueryAnswerSchema,
   type WidgetConfiguration,
 } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { Ast } from '@/util/ast'
 import type { AstId } from '@/util/ast/abstract'
 import { ArgumentAst, type ArgumentApplication, type ArgumentPlaceholder } from '@/util/callTree'
+import { MODULE_CALL } from '@/util/moduleCall'
 import { qnLastSegment, tryQualifiedName } from '@/util/qualifiedName'
 
 /** The argument whose value is the file to read (`Data.read`'s). */
@@ -195,25 +196,24 @@ export async function formatTypeForDrop(
 }
 
 /**
- * The expression that asks the engine for `Data.read`'s `format` widget configuration, as the
- * `format` argument's own query does (`widgetFunctionCallInfo.ts`), but without a node to hang it
- * on: a file dropped on the graph has none yet.
+ * The query for `Data.read`'s `format` widget, as the `format` argument's own query asks it
+ * (`widgetQuery.ts`), but in the current method's frame: a file dropped on the graph has no node to
+ * hang a method-pointer visualization on. It names only `Standard.Base`, so the module needs no
+ * import. The subject is the `Data` module: it is passed as the value, which `resolve_call` takes as
+ * its subject.
  */
-export const DATA_READ_FORMAT_WIDGET_QUERY =
-  'Standard.Visualization.Widgets.get_widget_json Standard.Base.Data .read ["format"] "{}"'
+export const DATA_READ_FORMAT_WIDGET_QUERY = `${MODULE_CALL} 'Standard.Base.Metadata.Widget_Query' 'resolve_call' ['Standard.Base.Data', 'Standard.Base.Data', 'read', ['format']] Standard.Base.Data`
 
 /**
  * The format type whose library reads a file dropped on the graph (which becomes
- * `Data.read '<name>'` with `format` on `Auto_Detect`): `widgetJson` is the answer to
+ * `Data.read '<name>'` with `format` on `Auto_Detect`): `answer` is the answer to
  * {@link DATA_READ_FORMAT_WIDGET_QUERY}, matched as a `path` update is
  * ({@link formatTypeForPath}). `undefined` when the answer is unusable.
  */
-export function formatTypeForDroppedFile(
-  fileName: string,
-  widgetJson: unknown,
-): string | undefined {
-  const parsed = argsWidgetConfigurationSchema.safeParse(widgetJson)
+export function formatTypeForDroppedFile(fileName: string, answer: unknown): string | undefined {
+  const parsed = widgetQueryAnswerSchema.safeParse(answer)
   if (!parsed.success) return undefined
-  const format = parsed.data.find(([name]) => name === FORMAT_ARGUMENT)?.[1]
-  return formatTypeForPath(fileName, format ?? undefined)
+  const format = parsed.data.arguments.find(([name]) => name === FORMAT_ARGUMENT)?.[1]
+  const widget = format && 'widget' in format ? format.widget : undefined
+  return formatTypeForPath(fileName, widget ?? undefined)
 }

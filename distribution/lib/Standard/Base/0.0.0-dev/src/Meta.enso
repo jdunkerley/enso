@@ -443,6 +443,65 @@ get_annotation target method parameter_name = @Tail_Call Meta_Helpers.get_annota
 ## ---
    private: true
    ---
+   The annotation of the parameter `parameter_name` of exactly the method
+   `method_name` that the module `module_name` defines on `type_name`: an
+   instance method, a static method or a constructor. `type_name` is a type's
+   qualified name, or the module's for a module method. The IDE names methods
+   this way (its method pointers), so an extension method or a method of `Any`
+   is found even when dispatch on a value would pick another one.
+
+   ## Arguments
+    - `module_name`: The qualified name of the module that defines the method.
+    - `type_name`: The qualified name of the type (or module) it is defined on.
+    - `method_name`: The method's or constructor's name.
+    - `parameter_name`: The name of the parameter.
+
+   ## Returns
+   The evaluated annotation, or `Nothing` when the parameter has none. A
+   `No_Such_Method` or `Module_Does_Not_Exist` error when there is no such
+   method.
+get_method_annotation (module_name : Text) (type_name : Text) (method_name : Text) (parameter_name : Text) -> Any =
+    @Tail_Call Meta_Helpers.get_method_annotation_builtin module_name type_name method_name parameter_name
+
+## ---
+   private: true
+   ---
+   The type named `qualified_name`, or else the module of that name (the type
+   its module methods are defined on). A type wins over a module of the same
+   name: `Standard.Base.Data.Boolean.Boolean` is the type.
+
+   ## Arguments
+    - `qualified_name`: The type's or the module's qualified name.
+find_type_or_module (qualified_name : Text) -> Any =
+    Meta_Helpers.find_type_or_module_builtin qualified_name
+
+## ---
+   private: true
+   ---
+   Applies the method `method_name` of the module `module_name` to `value` and
+   `arguments` in one call, as `module.method value a b c` is written: the
+   defaults of the parameters that no argument is given for are filled in after
+   all of them are applied. The IDE evaluates expressions in a
+   user's module that call a library's IDE entry point (a visualization's next
+   page of rows, say). A fully qualified name of a library the module does not
+   import does not compile, but `Standard.Base.Meta.call_module_method`
+   always does. The library must be loaded.
+
+   It applies the method's function directly, so it bypasses the check that
+   keeps a project-private method out of other projects. It is an escape hatch
+   for the IDE only; library code must not use it.
+
+   ## Arguments
+    - `module_name`: The qualified name of the module.
+    - `method_name`: The name of a method the module defines.
+    - `arguments`: The arguments after `value`.
+    - `value`: The first argument.
+call_module_method (module_name : Text) (method_name : Text) (arguments : Vector) value -> Any =
+    @Tail_Call Meta_Helpers.call_module_method_builtin module_name method_name value arguments
+
+## ---
+   private: true
+   ---
    Represents a polyglot language.
 type Language
     ## ---

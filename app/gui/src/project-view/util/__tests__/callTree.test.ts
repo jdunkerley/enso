@@ -23,6 +23,7 @@ import {
   ArgumentPlaceholder,
   getMethodCallInfoRecursively,
   interpretCall,
+  WidgetQueryErrorKey,
 } from '@/util/callTree'
 import type { MethodCall } from '@/util/methodPointer'
 import { parseAbsoluteProjectPath } from '@/util/projectPath'
@@ -475,3 +476,28 @@ function checkArgsConfig(
     current = current.target
   }
 }
+
+test('an argument whose widget query failed carries the error, the others do not', () => {
+  const ast = Ast.parseExpression('a.func x y')!
+  const call = ArgumentApplication.FromInterpretedWithInfo(interpretCall(ast), {
+    suggestion: prefixFixture.mockSuggestion,
+    widgetCfg: {
+      kind: 'FunctionCall',
+      parameters: new Map(),
+      errors: new Map([['b', { step: 'annotation', message: 'boom' }]]),
+    },
+    subjectAsSelf: true,
+  })
+  assert(call instanceof ArgumentApplication)
+  const inputs = new Map(
+    [...call.iterApplications()].map((app) => [
+      app.argument.argInfo?.name,
+      app.argument.toWidgetInput(),
+    ]),
+  )
+  expect(inputs.get('b')?.[WidgetQueryErrorKey]).toEqual({
+    step: 'annotation',
+    message: 'boom',
+  })
+  expect(WidgetQueryErrorKey in inputs.get('a')!).toBe(false)
+})

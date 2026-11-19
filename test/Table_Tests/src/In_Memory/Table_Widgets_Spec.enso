@@ -1,0 +1,77 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Choice
+import Standard.Base.Metadata.Display
+import Standard.Base.Metadata.Widget
+import Standard.Base.Metadata.Widget_Query
+
+from Standard.Table import Table
+
+from Standard.Test import all
+
+table_module = "Standard.Table.Table"
+table_type = "Standard.Table.Table.Table"
+
+answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
+
+add_specs suite_builder =
+    suite_builder.group "Widgets for In-Memory with column name sets" group_builder->
+        mock_table = Table.from_rows ["A", "B C", 'D "E"', "F.G/H\I"] []
+
+        group_builder.specify "works for `get` and `at`" <|
+            choices = mock_table.column_names . map n-> Choice.Option n n.pretty
+            expect = answer "selector" (Widget.Single_Choice choices Nothing Display.Always)
+            Widget_Query.resolve_call mock_table table_module table_type "get" ["selector"] . should_equal expect
+            Widget_Query.resolve_call mock_table table_module table_type "at" ["selector"] . should_equal expect
+
+        group_builder.specify "works for `filter`" <|
+            choices = [Choice.Option "<Expression>" "(expr '[A]')"] + mock_table.column_names . map n-> Choice.Option n n.pretty
+            expect = answer "column" (Widget.Single_Choice choices Nothing Display.Always)
+            Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
+
+        group_builder.specify "works for `join` with `right` table" <|
+            abc = ["A", "B", "C"]
+            uvw = ["U", "V", "W", "A"]
+            self_mock_table = Table.from_rows abc []
+            right_mock_table = Table.from_rows uvw []
+
+            mock_cache name = case name of
+                "right" -> right_mock_table
+                _ -> Nothing
+
+            with_json = Standard.Table.Internal.Widget_Helpers.make_join_condition_selector self_mock_table cache=mock_cache
+            with_json.should_be_a Widget.With_JSON_Cache
+
+            res = case with_json of
+                Widget.With_JSON_Cache parent _ -> parent
+                _ -> with_json
+            res.should_be_a Widget.Vector_Editor
+
+            arr = case res of
+                Widget.Vector_Editor item _ _ _ -> item.values
+                _ -> Test.fail "Expecting Vector_Editor"
+
+            arr.length . should_equal 3
+
+            labels = arr.map e->
+                Meta.type_of e . should_equal Choice
+
+                e.parameters.map f->
+                    unwrapped = case f.second of
+                        Widget.With_JSON_Cache parent _ -> parent
+                        _ -> f.second
+                    options = unwrapped.values . map .label
+                    case f.first of
+                        "left" -> options . should_equal abc
+                        "right" -> options . should_equal uvw
+                        "right_lower" -> options . should_equal uvw
+                        "right_upper" -> options . should_equal uvw
+                        _ -> Test.fail "Unexpected options "+options.to_text+" for "+e.first
+
+                e.label
+
+            labels . should_equal ['Equals', 'Equals (Ignore Case)', 'Between']
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

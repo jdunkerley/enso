@@ -1073,6 +1073,17 @@ buffer; the runner feeds it through `EngineLogSink` (`engineStarted`,
   `enso-common/src/services/engineLogs.ts`. A write to a socket that has gone
   away ends the subscription quietly instead of throwing into the channel.
 
+- **Append.** `POST /api/engine-logs/append` (`handleEngineLogAppend`), body
+  `{project, level, logger, message}`: the IDE adds a `gui` line to the open
+  project's channel (live only: not in the session file). The logger must match
+  `[\w.$-]+`, the first line becomes `[LEVEL] [time] [logger] text`, the others
+  are split on every line break and indented, control characters are dropped,
+  and at most 200 lines are kept (a marker line says how many were not), so a
+  message cannot forge an entry (the panel's `ENTRY_RE` is anchored to the line
+  start). Statuses: 204 added; 400 not a valid body or unknown project id; 404
+  the project is not open; 405 not a POST; 413 over 64 KiB (the rest of the body
+  is drained, so the socket survives to carry the 413). A body that fails
+  mid-read ends the response. Both hosts route it and log a handler rejection.
 - **Ordering (#280).** Node reports a child's `exit` before its stdio has
   drained, so the old engine's last stderr (a crash dump) can still be in the
   pipe. `ChildProcessHandle.waitForDrain` waits for `close` (bounded by 1 s,

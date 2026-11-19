@@ -8,7 +8,7 @@ import {
 import { mockProjectNameStore } from '$/providers/openedProjects/projectNames'
 import { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import type { SuggestionEntry } from '$/providers/openedProjects/suggestionDatabase/entry'
-import { makeType } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
+import { makeModule, makeType } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
 import { Ast } from '@/util/ast'
 import type { ProjectPath } from '@/util/projectPath'
 import { tryQualifiedName, type Identifier } from '@/util/qualifiedName'
@@ -149,4 +149,19 @@ test('only the given scope is looked at', () => {
   expect(missingImports(root, db(POSTGRES, THING), [], other.statement)).toEqual([
     unqualified('Standard.Things', 'Thing'),
   ])
+})
+
+test('a type does not conflict with the module of the same name that defines it', () => {
+  // `Rows_To_Read` is defined in `Standard.Table.Rows_To_Read` and not exported from the
+  // library's `Main`, so `from Standard.Table import all` brings in neither it nor its module.
+  const suggestions = db(
+    makeModule('Standard.Table.Rows_To_Read'),
+    makeType('Standard.Table.Rows_To_Read.Rows_To_Read'),
+  )
+  const code = 'from Standard.Table import all\n\nmain =\n    x = Rows_To_Read.First 10\n'
+  const root = Ast.parseBlock(code)
+  const existing = [...analyzeImports(root, projectNames)]
+  const wanted = unqualified('Standard.Table.Rows_To_Read', 'Rows_To_Read')
+  expect(detect(code, suggestions)).toEqual([wanted])
+  expect(detectImportConflicts(suggestions, existing, wanted)).toBeUndefined()
 })

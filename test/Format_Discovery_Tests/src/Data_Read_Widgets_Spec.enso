@@ -1,0 +1,47 @@
+from Standard.Base import all
+
+import Standard.Base.Metadata.Widget_Query
+
+from Standard.Test import all
+
+
+add_specs suite_builder =
+    suite_builder.group "Widgets for Data.read" group_builder->
+        # As the IDE calls them: `Data.read` has no subject expression, so the
+        # subject an annotation sees is the `Data` module (`subject_is_type`).
+        group_builder.specify "should provide a list of loaded file formats" <|
+            result = Widget_Query.resolve_call Nothing "Standard.Base.Data" "Standard.Base.Data" "read" ["format"] subject_is_type=True
+            result.should_contain "Auto Detect"
+            result.should_contain "Plain Text"
+            result.should_contain "Excel Workbook"
+            result.should_contain "Excel Sheet"
+            result.should_contain "SQLite"
+
+        group_builder.specify "should name each registered format's type and file patterns" <|
+            result = Widget_Query.resolve_call Nothing "Standard.Base.Data" "Standard.Base.Data" "read" ["format"] subject_is_type=True
+            result.should_contain '"label":"SQLite","value":"..SQLite","parameters":[],"icon":"","requires":"Standard.SQLite.SQLite_Format.SQLite_Format","patterns":["*.sqlite","*.db"]}'
+            result.should_contain '"label":"Delimited","value":"..Delimited","parameters":[],"icon":"","requires":"Standard.Table.Delimited.Delimited_Format.Delimited_Format","patterns":["*.csv","*.tsv","*.tab"]}'
+            result.should_contain '"label":"Excel Sheet","value":"..Sheet","parameters":[],"icon":"","requires":"Standard.Excel.Excel_Format.Excel_Format"'
+
+        group_builder.specify "should give Auto Detect neither field" <|
+            result = Widget_Query.resolve_call Nothing "Standard.Base.Data" "Standard.Base.Data" "read" ["format"] subject_is_type=True
+            result.should_contain '{"label":"Auto Detect","value":"Standard.Base.System.File_Format.Auto_Detect","parameters":[],"icon":""}'
+
+        group_builder.specify "should fill the fields in Data.fetch's formats, and not in Raw Response" <|
+            result = Widget_Query.resolve_call Nothing "Standard.Base.Data" "Standard.Base.Data" "fetch" ["format"] subject_is_type=True
+            result.should_contain '"requires":"Standard.SQLite.SQLite_Format.SQLite_Format"'
+            result.should_contain '{"label":"Raw HTTP Response","value":"Standard.Base.Data.Raw_Response","parameters":[],"icon":""}'
+
+        group_builder.specify "should provide a list of available file name patterns" <|
+            result = Widget_Query.resolve_call Nothing "Standard.Base.Data" "Standard.Base.Data" "list" ["name_filter"] subject_is_type=True
+            result.should_contain "*.txt"
+            result.should_contain "*.xls"
+            result.should_contain "*.csv"
+            result.should_contain "*.png"
+            result.should_contain "Any file"
+            result.should_contain "All known formats"
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

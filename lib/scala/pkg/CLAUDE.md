@@ -25,7 +25,12 @@ and loads packages. Used by the compiler, the runtime and every CLI tool.
   `src/main/resources/default/src/Main.enso` names every AST's id, so the first
   open of a new project needs no id-assigning edit (which would re-execute it).
   Regenerate the map with `UPDATE_TEMPLATE_ID_MAP=1` (see
-  `app/ydoc-server/CLAUDE.md`) after changing the template's code.
+  `app/ydoc-server/CLAUDE.md`) after changing the template's code. After
+  removing or inserting lines, first shift the id map's spans and re-deflate the
+  metadata `snapshot` (the id map resolves against it whenever it differs from
+  the file), so the welcome node keeps its id; a regeneration after that changes
+  no span and no code (it re-mints the other entries' random ids, which is why
+  the shifted file is the one to commit).
 
 ## Testing
 

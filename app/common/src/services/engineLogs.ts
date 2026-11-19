@@ -15,8 +15,8 @@ export const ENGINE_LOG_HEARTBEAT_MS = 15_000
 /** How many of the newest events the server keeps per project, to replay on (re)connection. */
 export const ENGINE_LOG_REPLAY_CAPACITY = 5_000
 
-/** Where a line came from: the session's log file, or the engine's stderr. */
-export type EngineLogSource = 'file' | 'stderr'
+/** Where a line came from: the session's log file, the engine's stderr, or the IDE itself. */
+export type EngineLogSource = 'file' | 'stderr' | 'gui'
 
 /** `line`: one line of the log, as the engine wrote it. */
 export interface EngineLogLineData {
@@ -106,4 +106,57 @@ export function engineLoggingArgs(options: EngineLoggingOptions | undefined): st
   if (options?.sqlQueries === true) levels.push([SQL_QUERY_LOGGER, 'info'])
   if (options?.performanceTimings === true) levels.push([PERFORMANCE_LOGGER, 'debug'])
   return levels.flatMap(([logger, level]) => ['--vm.D', `${logger}.Logger.level=${level}`])
+}
+
+/** `POST`: a line of the IDE's for the open project's Logs panel (live only, not in the file). */
+export const ENGINE_LOG_APPEND_PATH = '/api/engine-logs/append'
+/** The IDE's widget problems (Engine source). */
+export const GUI_WIDGETS_LOGGER = 'enso.gui.Widgets'
+/** The IDE's own timings (Performance source). */
+export const GUI_PERFORMANCE_LOGGER = 'enso.gui.performance'
+
+export type EngineLogAppendLevel = 'ERROR' | 'WARN' | 'INFO' | 'DEBUG'
+const APPEND_LEVELS: readonly string[] = ['ERROR', 'WARN', 'INFO', 'DEBUG']
+
+/** What a logger name may be: nothing that could close its bracket or end the line. */
+const LOGGER_NAME = /^[\w.$-]+$/
+/** The most lines one append adds; the rest are replaced by a marker line. */
+export const MAX_APPENDED_LINES = 200
+
+/** The body of {@link ENGINE_LOG_APPEND_PATH}. `project` is the GUI's project id. */
+export interface EngineLogAppendBody {
+  readonly project: string
+  readonly level: EngineLogAppendLevel
+  readonly logger: string
+  readonly message: string
+}
+
+/** `json` as an append body, or `undefined` when it is not one. */
+export function parseEngineLogAppendBody(json: unknown): EngineLogAppendBody | undefined {
+  if (typeof json !== 'object' || json == null) return undefined
+  const { project, level, logger, message } = json as Record<string, unknown>
+  if (typeof project !== 'string' || typeof logger !== 'string' || typeof message !== 'string')
+    return undefined
+  if (!LOGGER_NAME.test(logger)) return undefined
+  if (typeof level !== 'string' || !APPEND_LEVELS.includes(level)) return undefined
+  return { project, level: level as EngineLogAppendLevel, logger, message }
+}
+
+/**
+ * The lines an append adds: the first starts an entry, `[LEVEL] [time] [logger] text`, as the
+ * engine's file lines do (`logEntry.ts`); the rest continue it, indented so that no message can
+ * forge an entry of its own. Control characters other than tab are dropped, and at most
+ * {@link MAX_APPENDED_LINES} lines are kept (then a marker says how many were not).
+ */
+export function formatAppendedLines(body: EngineLogAppendBody, now: Date): string[] {
+  // eslint-disable-next-line no-control-regex
+  const clean = body.message.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+  const [first = '', ...rest] = clean.split(/\r\n|\n|\r/)
+  const kept = rest.slice(0, MAX_APPENDED_LINES - 1)
+  const dropped = rest.length - kept.length
+  return [
+    `[${body.level}] [${now.toISOString()}] [${body.logger}] ${first}`,
+    ...kept.map((line) => `    ${line}`),
+    ...(dropped > 0 ? [`    … (${dropped} more lines)`] : []),
+  ]
 }

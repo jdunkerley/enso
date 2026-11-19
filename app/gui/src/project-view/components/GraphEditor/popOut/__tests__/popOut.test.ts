@@ -69,6 +69,10 @@ const delimited = makeConstructor(`${DELIMITED_FORMAT}.Delimited`, {
   ],
 })
 const withQuotes = makeConstructor(`${QUOTE_STYLE}.With_Quotes`)
+const ROWS_TO_READ = 'Standard.Table.Rows_To_Read.Rows_To_Read'
+const first = makeConstructor(`${ROWS_TO_READ}.First`, {
+  args: [{ ...makeArgument('rows', 'Standard.Base.Data.Numbers.Integer'), hasDefault: true }],
+})
 
 /** A graph database that knows `entry` as the call at each AST id of `calls`. */
 function callDb(calls: [Ast.AstId, SuggestionEntry][]) {
@@ -359,6 +363,34 @@ describe('usePopOut', () => {
       },
     ])
     expect(s.block.code().trim()).toBe('x = Data.read end1')
+  })
+
+  test('a ..First nested in ..Delimited becomes a node of Rows_To_Read, with its import', () => {
+    // `Rows_To_Read` is not exported from `Standard.Table`'s Main: it is imported from its module.
+    const db = new SuggestionDb()
+    db.set(1, makeType(ROWS_TO_READ))
+    db.set(2, first)
+    const s = setup(
+      "x = Data.read 'f.csv' (..Delimited ',' row_limit=(..First 10))",
+      names,
+      db,
+      false,
+      (target) => callDb([[target.id, first]]),
+    )
+    s.popOut(ROWS_TO_READ)
+    expect(s.created).toHaveLength(1)
+    expect(s.created[0]).toMatchObject({ expression: 'Rows_To_Read.First 10' })
+    expect(s.created[0]!.requiredImports).toEqual([
+      {
+        kind: 'Unqualified',
+        from: ProjectPath.create(
+          'Standard.Table' as QualifiedName,
+          'Rows_To_Read' as QualifiedName,
+        ),
+        import: 'Rows_To_Read',
+      },
+    ])
+    expect(s.block.code().trim()).toBe("x = Data.read 'f.csv' (..Delimited ',' row_limit=end1)")
   })
 
   test('an Any-typed ..Delimited that nothing resolves makes no node', () => {

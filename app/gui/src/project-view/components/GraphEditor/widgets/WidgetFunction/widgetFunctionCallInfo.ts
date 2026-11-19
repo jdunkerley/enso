@@ -1,3 +1,4 @@
+import { reportWidgetSchemaMismatch, reportWidgetTiming } from '$/providers/engineLogAppend'
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import type { ProjectStore } from '$/providers/openedProjects/project'
 import type { NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'
@@ -6,9 +7,9 @@ import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
 import { entryIsAnnotatable } from '$/providers/openedProjects/suggestionDatabase/entry'
 import type { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import {
-  argsWidgetConfigurationSchema,
-  functionCallConfiguration,
+  functionCallFromAnswer,
   pending,
+  widgetQueryAnswerSchema,
   type FunctionCall,
 } from '$/providers/openedProjects/widgetRegistry/configuration'
 import type { ToValue } from '$/utils/reactivity'
@@ -21,12 +22,12 @@ import {
   interpretCall,
 } from '@/util/callTree'
 import type { MethodPointer } from '@/util/methodPointer'
-import { ProjectPath } from '@/util/projectPath'
+import type { ProjectPath } from '@/util/projectPath'
 import type { Opt } from 'enso-common/src/utilities/data/opt'
-import { computed, toValue, type DeepReadonly } from 'vue'
+import { computed, toValue, watch, type DeepReadonly } from 'vue'
 import type { IdentifierOrOperatorIdentifier } from 'ydoc-shared/ast'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
-import { GET_WIDGETS_METHOD, WIDGETS_ENSO_MODULE, WIDGETS_ENSO_PATH } from './consts'
+import { widgetQueryConfiguration } from './widgetQuery'
 
 /**
  * A composable gathering information about call for WidgetFunction basing on AST and
@@ -36,7 +37,7 @@ export function useWidgetFunctionCallInfo(
   input: ToValue<WidgetInput & { value: Ast.Expression }>,
   graphDb: ToValue<GraphDb>,
   // Cannot be ToValue - see TODO next to visualizationData
-  project: ToValue<Pick<ProjectStore, 'useVisualizationData' | 'moduleProjectPath'>>,
+  project: ToValue<Pick<ProjectStore, 'useVisualizationData' | 'moduleProjectPath' | 'assetId'>>,
   projectNames: ToValue<ProjectNameStore>,
   groups: ToValue<DeepReadonly<GroupInfo[]>>,
 ) {
@@ -106,53 +107,27 @@ export function useWidgetFunctionCallInfo(
   })
 
   const visualizationConfig = computed<Opt<NodeVisualizationConfiguration>>(() => {
-    const args = ArgumentApplication.collectArgumentNamesAndUuids(
-      interpreted.value,
-      methodCallInfo.value,
-    )
-
     const info = methodCallInfo.value
     if (!info) return null
     if (!entryIsAnnotatable(info.suggestion)) return null
     const annotatedArgs = annotatedArguments.value
     if (!annotatedArgs?.length) return null
-    const name = info.suggestion.name
-    const positionalArgumentsExpressions = [
-      `.${name}`,
-      Ast.Vector.build(annotatedArgs, Ast.TextLiteral.new).code(),
-      Ast.TextLiteral.new(JSON.stringify(args)).code(),
-    ]
-
-    let modulePath: ProjectPath = WIDGETS_ENSO_PATH
-    const projectNamesValue = toValue(projectNames)
-    const _project = toValue(project)
-    if (_project.moduleProjectPath?.ok) {
-      modulePath = _project.moduleProjectPath.value
-    }
-    const moduleFqn = projectNamesValue.serializeProjectPathForBackend(modulePath)
-
-    const expressionId = widgetQuerySubjectExpressionId.value
-    if (expressionId != null) {
-      return {
-        expressionId,
-        visualizationModule: moduleFqn,
-        expression: {
-          module: WIDGETS_ENSO_PATH,
-          definedOnType: WIDGETS_ENSO_PATH,
-          name: GET_WIDGETS_METHOD,
-        },
-        positionalArgumentsExpressions,
-      }
-    } else {
-      // In the case when no clear subject expression exists (for example in autoscoped constructor),
-      // we assume that this is a static function call and create the subject by using resolved type name.
-      return {
-        expressionId: toValue(input).value.externalId,
-        visualizationModule: moduleFqn,
-        expression: `_ -> ${WIDGETS_ENSO_MODULE}.${GET_WIDGETS_METHOD} ${projectNamesValue.printProjectPath(info.suggestion.memberOf)}`,
-        positionalArgumentsExpressions,
-      }
-    }
+    const names = toValue(projectNames)
+    const pointer = info.methodCall.methodPointer
+    // No subject expression (an autoscoped constructor, a static call with no subject): the query
+    // hangs on the call itself, and annotations see the method's type, as before.
+    const subjectId = widgetQuerySubjectExpressionId.value
+    return widgetQueryConfiguration(
+      subjectId ?? toValue(input).value.externalId,
+      {
+        module: names.serializeProjectPathForBackend(pointer.module),
+        definedOnType: names.serializeProjectPathForBackend(pointer.definedOnType),
+        name: pointer.name,
+      },
+      annotatedArgs,
+      ArgumentApplication.collectArgumentNamesAndUuids(interpreted.value, info),
+      subjectId == null,
+    )
   })
 
   const subjectTypeMatchesMethod = computed(() => {
@@ -183,18 +158,49 @@ export function useWidgetFunctionCallInfo(
   //  change, or useCurrentRef should not return ref.
   const visualizationData = toValue(project).useVisualizationData(visualizationConfig)
 
-  const widgetConfiguration = computed(() => {
+  const queryMethod = computed(() => {
+    const pointer = methodCallInfo.value?.methodCall.methodPointer
+    if (!pointer) return ''
+    return `${toValue(projectNames).serializeProjectPathForBackend(pointer.definedOnType)}.${pointer.name}`
+  })
+
+  const parsedAnswer = computed(() => {
     const data = visualizationData.value
-    if (data?.ok) {
-      const parseResult = argsWidgetConfigurationSchema.safeParse(data.value)
-      if (parseResult.success) {
-        return functionCallConfiguration(parseResult.data, inheritedConfig.value)
-      } else {
-        console.error('Unable to parse widget configuration.', data, parseResult.error)
-      }
-    } else if (data != null && !data.ok) {
-      data.error.log('Cannot load dynamic configuration')
-    }
+    if (data == null) return undefined
+    if (!data.ok) return { kind: 'failed' as const, error: data.error }
+    const startedAt = performance.now()
+    const parsed = widgetQueryAnswerSchema.safeParse(data.value)
+    const parseMs = performance.now() - startedAt
+    return parsed.success ?
+        { kind: 'answer' as const, answer: parsed.data, startedAt, parseMs }
+      : { kind: 'mismatch' as const, issues: parsed.error.issues }
+  })
+
+  // Side effects of an answer, outside the computed: the reports, and the timing once the node has
+  // rendered it (`flush: 'post'` runs after the DOM update). The reporters deduplicate mismatches
+  // and drop timings unless the performance-timings setting is on.
+  watch(
+    parsedAnswer,
+    (parsed) => {
+      const projectId = toValue(project).assetId
+      if (parsed?.kind === 'failed') parsed.error.log('Cannot load dynamic configuration')
+      else if (parsed?.kind === 'mismatch')
+        reportWidgetSchemaMismatch(projectId, queryMethod.value, parsed.issues)
+      else if (parsed?.kind === 'answer')
+        reportWidgetTiming(
+          projectId,
+          queryMethod.value,
+          parsed.parseMs,
+          performance.now() - parsed.startedAt,
+        )
+    },
+    { flush: 'post' },
+  )
+
+  const widgetConfiguration = computed(() => {
+    const parsed = parsedAnswer.value
+    if (parsed?.kind === 'answer')
+      return functionCallFromAnswer(parsed.answer, inheritedConfig.value)
     const parameters: FunctionCall['parameters'] = new Map(inheritedConfig.value?.parameters ?? [])
     annotatedArguments.value?.forEach((name) => {
       if (parameters.get(name) == null) parameters.set(name, pending())
@@ -238,6 +244,7 @@ export function useWidgetFunctionCallInfo(
 
   return {
     methodCallInfo,
+    widgetConfiguration,
     application,
     subject,
     subjectInfo,

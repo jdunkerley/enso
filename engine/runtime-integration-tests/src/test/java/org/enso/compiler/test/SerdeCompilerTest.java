@@ -47,6 +47,16 @@ public class SerdeCompilerTest {
     parseSerializedModule("Ascription_Test", null);
   }
 
+  /**
+   * A conversion from a type object, {@code Target.from (that : Source.type)}, keeps its eigentype
+   * flag through the IR cache. Lose it and both conversions of the project register from {@code
+   * Source}, so the reloaded module fails. See Note [Eigentype References].
+   */
+  @Test
+  public void testEigentypeConversionSurvivesCache() throws Exception {
+    parseSerializedModule("Eigentype_Test", null);
+  }
+
   private void parseSerializedModule(String projectName, String forbiddenMessage)
       throws InterruptedException, ExecutionException, IOException, TimeoutException {
     Module old;

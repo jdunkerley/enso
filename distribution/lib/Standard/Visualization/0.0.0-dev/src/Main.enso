@@ -14,5 +14,4 @@ export project.Tree
 
 export project.Warnings
 
-export project.Widgets
 

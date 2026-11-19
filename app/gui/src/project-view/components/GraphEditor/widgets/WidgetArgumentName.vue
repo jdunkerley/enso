@@ -68,15 +68,33 @@ function hasKnownArgumentName(input: WidgetInput): input is WidgetInput & {
   return !WidgetInput.isToken(input) && input[ArgumentInfoKey]?.info != null
 }
 
+/**
+ * An infix operand's parameter names that say nothing the operator does not: the left operand is
+ * always `self`, a binary operator's right one is usually `that`, and an operator without
+ * suggestion info names them `lhs` and `rhs`.
+ */
+const UNINFORMATIVE_OPERAND_NAMES = new Set(['self', 'that', 'lhs', 'rhs'])
+
+/**
+ * Whether an argument shows its parameter's name: every prefix argument, set or not, positional or
+ * named, at any depth, and an infix operand whose parameter has a name of its own (the `amount` of
+ * `Date.+`).
+ */
+function showsArgumentName(
+  input: WidgetInput & {
+    [ArgumentInfoKey]: { appKind: ApplicationKind; info: SuggestionEntryArgument }
+  },
+): boolean {
+  if (WidgetInput.isPlaceholder(input)) return true
+  const { appKind, info } = input[ArgumentInfoKey]
+  return appKind === ApplicationKind.Prefix || !UNINFORMATIVE_OPERAND_NAMES.has(info.name)
+}
+
 export const widgetDefinition = defineWidget(
   hasKnownArgumentName,
   {
     priority: 100,
-    score: (props) => {
-      const isTopArg =
-        props.nesting < 2 && props.input[ArgumentInfoKey].appKind === ApplicationKind.Prefix
-      return WidgetInput.isPlaceholder(props.input) || isTopArg ? Score.Perfect : Score.Mismatch
-    },
+    score: (props) => (showsArgumentName(props.input) ? Score.Perfect : Score.Mismatch),
   },
   import.meta.hot,
 )
@@ -85,7 +103,7 @@ export const ArgumentNameShownKey: unique symbol = Symbol.for('WidgetInput:Argum
 </script>
 
 <template>
-  <div class="WidgetArgumentName widgetParent" :class="{ primary, missing }">
+  <div class="WidgetArgumentName widgetParent widgetRounded" :class="{ primary, missing }">
     <RequiredArgumentArrow
       v-if="showArrow"
       :hide="visuallyHideArrow"
@@ -101,12 +119,20 @@ export const ArgumentNameShownKey: unique symbol = Symbol.for('WidgetInput:Argum
 </template>
 
 <style scoped>
+/* Each argument is a chip of its own: its parameter's name, small and dim, then its value. */
 .WidgetArgumentName {
   gap: var(--widget-token-pad-unit);
+  border-radius: var(--node-port-border-radius);
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .name {
+  /* Centred on the row like the values beside it; a small sans name sits low in a code-height box. */
+  align-self: center;
+  padding-bottom: 2px;
   opacity: 0.6;
+  font-family: var(--font-sans);
+  font-size: 12px;
   border-radius: var(--node-port-border-radius);
   transition:
     background-color,

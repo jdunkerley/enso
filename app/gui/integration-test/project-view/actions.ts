@@ -1,4 +1,4 @@
-import { expect, type Page } from 'integration-test/base'
+import { expect, type Locator, type Page } from 'integration-test/base'
 import { mockMethodCallInfo } from './expressionUpdates'
 import * as locate from './locate'
 import { graphNodeByBinding } from './locate'
@@ -36,6 +36,55 @@ export async function openVisualization(page: Page, visName: string) {
 // ===============
 // === Widgets ===
 // ===============
+
+/**
+ * The node's ＋ buttons, one per call with hidden parameters, shown while the node is the only
+ * selected one. A nested call's comes first (after its own arguments); the last is the outer
+ * call's, at the node's end.
+ */
+export function addArgumentButtons(node: Locator) {
+  return node.getByRole('button', { name: 'Add argument' })
+}
+
+/** The open menu of a ＋ button. */
+export function addArgumentMenu(page: Page) {
+  return page.getByRole('dialog', { name: 'Add argument' })
+}
+
+/**
+ * Select the node (by its left edge, clear of its widgets) and open the menu of one of its ＋
+ * buttons: by default the outer call's.
+ */
+export async function openAddArgumentMenu(
+  page: Page,
+  node: Locator,
+  button: Locator = addArgumentButtons(node).last(),
+) {
+  await node.click({ position: { x: 8, y: 8 } })
+  await expect(node).toBeSelected()
+  await button.click()
+  await expect(addArgumentMenu(page)).toBeVisible()
+  return addArgumentMenu(page)
+}
+
+/** Add the hidden parameter `name` to the node through a ＋ menu (by default the outer call's). */
+export async function addArgument(page: Page, node: Locator, name: string, button?: Locator) {
+  const menu = await openAddArgumentMenu(page, node, button)
+  await menu.getByRole('button', { name: new RegExp(`^${name}( |$)`) }).click()
+  await expect(menu).toBeHidden()
+}
+
+/**
+ * Show a node's hidden arguments: pick every parameter the outer call's ＋ menu offers. Selecting
+ * a node does not show them (#836).
+ */
+export async function showHiddenArguments(page: Page, node: Locator) {
+  const menu = await openAddArgumentMenu(page, node)
+  const names = await menu.locator('.parameterItem .name').allTextContents()
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  for (const name of names) await addArgument(page, node, name)
+}
 
 /**
  * Create a Node with Table Input Widget.

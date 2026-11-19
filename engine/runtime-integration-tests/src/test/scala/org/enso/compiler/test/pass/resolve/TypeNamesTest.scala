@@ -3,7 +3,8 @@ package org.enso.compiler.test.pass.resolve
 import org.enso.compiler.Passes
 import org.enso.compiler.context.{FreshNameSupply, InlineContext, ModuleContext}
 import org.enso.compiler.Implicits.AsMetadata
-import org.enso.compiler.core.ir.{Diagnostic, Expression, Module}
+import org.enso.compiler.core.ir.{Diagnostic, Expression, Module, Name}
+import org.enso.compiler.data.BindingsMap
 import org.enso.compiler.core.ir.expression.errors
 import org.enso.compiler.data.BindingsMap.ResolutionNotFound
 import org.enso.compiler.pass.{PassConfiguration, PassGroup, PassManager}
@@ -131,6 +132,57 @@ class TypeNamesTest extends CompilerTest {
         .asInstanceOf[errors.Resolution.ResolverError]
         .explain()
         .isInstanceOf[ResolutionNotFound.type] shouldBe true
+    }
+
+    "should resolve `X.type` to the eigentype of X" in {
+      val ir =
+        """
+          |type A
+          |    Value x
+          |
+          |foo : A.type -> A
+          |foo t = A.Value 1
+          |""".stripMargin.preprocessModule.resolve
+
+      val meta = ir.bindings.last
+        .getMetadata(TypeSignatures, classOf[TypeSignatures.Metadata])
+      meta shouldBe defined
+      meta.get.signature.preorder.collect { case err: Diagnostic =>
+        err
+      } shouldBe Nil
+      val eigen = meta.get.signature.preorder.collect {
+        case q: Name.Qualified => q
+      }
+      eigen.length shouldEqual 1
+      eigen.head.getMetadata(TypeNames, classOf[TypeNames.Metadata]) match {
+        case Some(
+              BindingsMap.Resolution(tp: BindingsMap.ResolvedType, true)
+            ) =>
+          tp.tp.name shouldEqual "A"
+        case other =>
+          fail(s"Expected the eigentype of A, got $other")
+      }
+    }
+
+    "should report a module before `.type`" in {
+      val ir =
+        """
+          |type A
+          |
+          |foo : Test_Module.type -> A
+          |foo t = t
+          |""".stripMargin.preprocessModule.resolve
+
+      val meta = ir.bindings.last
+        .getMetadata(TypeSignatures, classOf[TypeSignatures.Metadata])
+      val diagnostics = meta.get.signature.preorder.collect {
+        case err: Diagnostic => err
+      }
+      diagnostics.length shouldEqual 1
+      val failure = diagnostics.head.asInstanceOf[errors.Resolution]
+      failure.reason() shouldBe a[errors.Resolution.NotAType]
+      failure.reason().explain(failure.originalName()) shouldEqual
+      "The name Test_Module.type is not valid: `.type` must follow a type, but Test_Module is a module"
     }
 
     "should report every failed name resolution" in {

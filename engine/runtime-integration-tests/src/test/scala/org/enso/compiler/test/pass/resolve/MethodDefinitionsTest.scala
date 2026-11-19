@@ -183,6 +183,55 @@ class MethodDefinitionsTest extends CompilerTest {
     }
   }
 
+  "Method definition resolution of `.type` conversion sources" should {
+    implicit val ctx: ModuleContext = mkModuleContext
+
+    val ir =
+      """
+        |type Foo
+        |    Value x
+        |type Bar
+        |
+        |Bar.from (that : Foo.type) = undefined
+        |Bar.from (that : Test_Module.type) = undefined
+        |Bar.from (that : Foo.Value.type) = undefined
+        |""".stripMargin.preprocessModule.analyse
+
+    val conversions = ir.bindings.collect {
+      case c: definition.Method.Conversion => c
+    }
+
+    "resolve `X.type` to the eigentype of X" in {
+      conversions.length shouldEqual 3
+      conversions(0).sourceTypeName.getMetadata(
+        MethodDefinitions.INSTANCE,
+        classOf[BindingsMap.Resolution]
+      ) match {
+        case Some(
+              BindingsMap.Resolution(tp: BindingsMap.ResolvedType, true)
+            ) =>
+          tp.tp.name shouldEqual "Foo"
+        case other =>
+          fail(s"Expected the eigentype of Foo, got $other")
+      }
+    }
+
+    "reject a module before `.type`" in {
+      val err =
+        conversions(1).sourceTypeName.asInstanceOf[errors.Resolution]
+      err.reason() shouldBe a[errors.Resolution.NotAType]
+      err.reason().explain(err.originalName()) shouldEqual
+      "The name Test_Module.type is not valid: `.type` must follow a type, but Test_Module is a module"
+    }
+
+    "reject a constructor before `.type`" in {
+      val err =
+        conversions(2).sourceTypeName.asInstanceOf[errors.Resolution]
+      err.reason().explain(err.originalName()) shouldEqual
+      "The name Foo.Value.type is not valid: `.type` must follow a type, but Foo.Value is a constructor"
+    }
+  }
+
   "Method definitions pass" should {
     implicit val ctx: ModuleContext = mkModuleContext
 

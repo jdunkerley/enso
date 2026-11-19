@@ -206,7 +206,8 @@ final class DocsUtils {
     var typeNameOpt = ir.passData().get(TypeNames$.MODULE$);
     if (typeNameOpt.isDefined()) {
       var typeName = (BindingsMap.Resolution) typeNameOpt.get();
-      return typeName.target().qualifiedName();
+      // Note [Eigentype References]: `X.type` prints as `….X.type`.
+      return typeName.referencedName();
     }
     return null;
   }

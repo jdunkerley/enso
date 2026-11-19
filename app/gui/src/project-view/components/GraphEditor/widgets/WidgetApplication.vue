@@ -4,7 +4,6 @@ import { entryMethodPointer } from '$/providers/openedProjects/suggestionDatabas
 import { WidgetInput, defineWidget, widgetProps } from '$/providers/openedProjects/widgetRegistry'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import SizeTransition from '@/components/SizeTransition.vue'
-import { injectWidgetTree } from '@/providers/widgetTree'
 import { Ast } from '@/util/ast'
 import { ArgumentApplication, ArgumentApplicationKey } from '@/util/callTree'
 import { mapOrUndefined } from 'enso-common/src/utilities/data/opt'
@@ -12,7 +11,6 @@ import { computed } from 'vue'
 import { FunctionName } from './WidgetFunctionName.vue'
 
 const props = defineProps(widgetProps(widgetDefinition))
-const tree = injectWidgetTree()
 
 const application = computed(() => props.input[ArgumentApplicationKey])
 const { module } = useCurrentProject()
@@ -66,7 +64,7 @@ const operatorStyle = computed(() => {
 const infixWidgetInput = computed(() =>
   mapOrUndefined(application.value.infixOperator, WidgetInput.FromAst),
 )
-const showArgument = computed(() => tree.showDetails || !application.value.argument.hideByDefault)
+const showArgument = computed(() => !application.value.argument.hideByDefault)
 const argumentWidgetInput = computed(() => {
   return application.value.argument.toWidgetInput()
 })

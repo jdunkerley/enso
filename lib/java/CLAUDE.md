@@ -12,7 +12,11 @@ Java support libraries for the engine. Two shapes live together here:
    - `interpreter-dsl/` — annotation processor that generates Truffle `Node`
      boilerplate (`@BuiltinMethod`, `@Specialization`, etc.).
    - `persistance/` + `persistance-dsl/` — custom serialization framework used
-     by `engine/polyglot-api/` and IR caches. Annotation-driven.
+     by `engine/polyglot-api/` and IR caches. Annotation-driven. The version
+     stamp that rejects old caches hashes the registered `@Persistable` ids, not
+     their fields: a new constructor parameter on a persisted class must also
+     bump `serialVersionUID` in `persistance/…/PerMap.java` (to the PR number),
+     or caches written by the previous build are read with the new layout.
    - `os-environment/` — OS-specific helpers: the user's directories
      (`Directories`) and, on Windows, `main`'s arguments recovered from the wide
      command line (`Arguments`, `WindowsArguments`; Note [Arguments Outside The

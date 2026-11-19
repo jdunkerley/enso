@@ -47,5 +47,9 @@ export const widgetDefinition = defineWidget(
     margin-right: var(--widget-token-pad-unit);
     border-left: 1px solid rgb(0 0 0 / calc(0.12 * var(--size-transition-progress, 1)));
   }
+  /* An argument that shows its name is a chip, which already sets it apart. */
+  &:has(.WidgetArgumentName):before {
+    border-left-color: transparent;
+  }
 }
 </style>
