@@ -2,6 +2,7 @@ import {
   mockProjectNameStore,
   type ProjectNameStore,
 } from '$/providers/openedProjects/projectNames'
+import type { ArgumentDisplay } from '$/providers/openedProjects/suggestionDatabase/documentation'
 import type {
   MethodSuggestionEntry,
   SuggestionEntry,
@@ -136,15 +137,23 @@ interface DocOptions {
   aliases?: string[]
   group?: string
   icon?: string
+  /** Per-argument display, as in the front matter's `arguments:`. */
+  arguments?: Record<string, ArgumentDisplay>
 }
 function makeDocumentation({
   aliases,
   group,
   icon,
+  arguments: argumentDisplay,
   documentation,
 }: DocOptions & CommonOptions): string {
   if (documentation != null) return documentation
-  return frontmatter({ aliases, group, ...(icon != null ? { icon } : {}) })
+  return frontmatter({
+    aliases,
+    group,
+    ...(icon != null ? { icon } : {}),
+    ...(argumentDisplay != null ? { arguments: argumentDisplay } : {}),
+  })
 }
 
 /** Mock a module method suggestion entry. */

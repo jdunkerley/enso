@@ -70,16 +70,36 @@ test('an expression that is not an application has no hidden parameters', () => 
   expect(hiddenParameters(ast)).toEqual([])
 })
 
+/** `Date_Time.new` whose front matter sets the display of some of its arguments. */
+function dateTimeNewWith(display: Record<string, 'always' | 'selected' | 'when_modified'>) {
+  return makeMethod('Standard.Base.Data.Time.Date_Time.Date_Time.new', {
+    args: dateTimeNew.arguments,
+    arguments: display,
+  })
+}
+
+function hiddenNamesWith(display: Record<string, 'always' | 'selected' | 'when_modified'>) {
+  const ast = Ast.parseExpression('Date_Time.new 2020 1 15')
+  assertDefined(ast)
+  const app = ArgumentApplication.FromInterpretedWithInfo(interpretCall(ast), {
+    suggestion: dateTimeNewWith(display),
+    widgetCfg: undefined,
+    subjectAsSelf: true,
+  })
+  return hiddenParameters(app).map((p) => p.name)
+}
+
 test('a parameter configured to always show is not hidden', () => {
-  const hidden = hiddenParameters(
-    applicationOf('Date_Time.new 2020 1 15', {
-      kind: 'FunctionCall',
-      parameters: new Map([
-        ['zone', { kind: 'Boolean_Input', display: widgetCfg.DisplayMode.Always }],
-      ]),
-    }),
-  )
-  expect(hidden.map((p) => p.name)).toEqual(['hour', 'minute', 'second'])
+  expect(hiddenNamesWith({ zone: 'always' })).toEqual(['hour', 'minute', 'second'])
+})
+
+test('a `selected` parameter is not in the ＋ menu', () => {
+  // The menu shows only while the node is selected, and then a `selected` parameter is on the node.
+  expect(hiddenNamesWith({ minute: 'selected' })).toEqual(['hour', 'second', 'zone'])
+})
+
+test('a `when_modified` parameter is in the ＋ menu', () => {
+  expect(hiddenNamesWith({ minute: 'when_modified' })).toEqual(['hour', 'minute', 'second', 'zone'])
 })
 
 test('the placeholder flags: only later unset parameters ask to be named (the menu names every pick)', () => {

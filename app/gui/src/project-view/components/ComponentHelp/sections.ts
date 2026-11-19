@@ -126,19 +126,26 @@ export function panelText(
 }
 
 /**
- * Prerendered Markdown with the `group` key dropped from its front matter: the help panel shows the
- * category in its top bar instead.
+ * Prerendered Markdown with the `group` and `arguments` keys dropped from its front matter: the
+ * help panel shows the category in its top bar, and argument display is the node's business.
  */
-export function withoutFrontMatterGroup(prerendered: string): string {
+export function withoutFrontMatterIdeKeys(prerendered: string): string {
   const front = children(ensoMarkdownParser.parse(prerendered).topNode).find(
     (block) => block.name === 'YAMLFrontMatter',
   )
   const content = front?.getChild('YAMLContent')
   if (!content) return prerendered
-  const yaml = prerendered
-    .slice(content.from, content.to)
-    .split('\n')
-    .filter((line) => !/^group\s*:/.test(line))
-    .join('\n')
-  return prerendered.slice(0, content.from) + yaml + prerendered.slice(content.to)
+  const kept: string[] = []
+  let inArguments = false
+  for (const line of prerendered.slice(content.from, content.to).split('\n')) {
+    if (/^arguments\s*:/.test(line)) {
+      inArguments = true
+    } else if (inArguments && /^\s+\S/.test(line)) {
+      // An entry of the `arguments` map: indented deeper than its key.
+    } else {
+      inArguments = false
+      if (!/^group\s*:/.test(line)) kept.push(line)
+    }
+  }
+  return prerendered.slice(0, content.from) + kept.join('\n') + prerendered.slice(content.to)
 }

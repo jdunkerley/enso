@@ -30,7 +30,7 @@ import { parseAbsoluteProjectPath } from '@/util/projectPath'
 import { tryQualifiedName, type Identifier } from '@/util/qualifiedName'
 import { fail } from 'assert'
 import { unwrap } from 'enso-common/src/utilities/data/result'
-import { assert, expect, test } from 'vitest'
+import { assert, describe, expect, test } from 'vitest'
 import type { ExpressionUpdatePayload } from 'ydoc-shared/languageServerTypes'
 import { assertDefined, assertEqual, assertNotEqual } from 'ydoc-shared/util/assert'
 
@@ -500,4 +500,53 @@ test('an argument whose widget query failed carries the error, the others do not
     message: 'boom',
   })
   expect(WidgetQueryErrorKey in inputs.get('a')!).toBe(false)
+})
+
+describe('ArgumentPlaceholder.isHidden', () => {
+  // `f a b=1 c=2 d=3 e=(Missing_Argument.throw "e")`, front matter:
+  // b: always, c: selected (d unlisted → when_modified).
+  const withDefault = (name: string, defaultValue: string) => ({
+    ...makeArgument(name),
+    hasDefault: true,
+    defaultValue,
+  })
+  const suggestion = makeModuleMethod('local.Foo.Bar.f', {
+    args: [
+      makeArgument('a'),
+      withDefault('b', '1'),
+      withDefault('c', '2'),
+      withDefault('d', '3'),
+      withDefault('e', 'Missing_Argument.throw "e"'),
+    ],
+    arguments: { b: 'always', c: 'selected' },
+  })
+
+  function placeholderNamed(name: string): ArgumentPlaceholder {
+    const ast = Ast.parseExpression('f')
+    assertDefined(ast)
+    const call = ArgumentApplication.FromInterpretedWithInfo(interpretCall(ast), {
+      suggestion,
+      widgetCfg: undefined,
+      subjectAsSelf: true,
+    })
+    assert(call instanceof ArgumentApplication)
+    const found = [...call.iterApplications()]
+      .map(({ argument }) => argument)
+      .find((arg) => arg instanceof ArgumentPlaceholder && arg.argInfo.name === name)
+    assert(found instanceof ArgumentPlaceholder)
+    return found
+  }
+
+  const cases = [
+    { name: 'a', selected: false, hidden: false }, // no default
+    { name: 'e', selected: false, hidden: false }, // Missing_Argument default
+    { name: 'b', selected: false, hidden: false }, // always
+    { name: 'c', selected: false, hidden: true }, // selected, node not selected
+    { name: 'c', selected: true, hidden: false }, // selected, node selected
+    { name: 'd', selected: false, hidden: true }, // when_modified
+    { name: 'd', selected: true, hidden: true },
+  ]
+  test.each(cases)('$name selected=$selected → hidden=$hidden', ({ name, selected, hidden }) => {
+    expect(placeholderNamed(name).isHidden(selected)).toBe(hidden)
+  })
 })

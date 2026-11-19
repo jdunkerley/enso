@@ -14,7 +14,7 @@ import { HistoryStack } from '@/components/ComponentHelp/history'
 import type { Docs, FunctionDocs, TypeDocs } from '@/components/ComponentHelp/ir'
 import { lookupDocumentation, placeholder } from '@/components/ComponentHelp/ir'
 import { exampleCodeText, exampleToNodes } from '@/components/ComponentHelp/examples'
-import { panelText, withoutFrontMatterGroup } from '@/components/ComponentHelp/sections'
+import { panelText, withoutFrontMatterIdeKeys } from '@/components/ComponentHelp/sections'
 import { resultTablesAsTables } from '@/components/ComponentHelp/resultTables'
 import { entrySignature } from '@/components/ComponentHelp/signature'
 import { clipboardNodeData, writeClipboard } from '@/components/GraphEditor/graphClipboard'
@@ -48,7 +48,7 @@ const text = computed(() => {
   const docs = documentation.value
   if (docs.kind === 'Placeholder') return { main: '', remarks: '' }
   const names = signature.value?.params.map((p) => p.name) ?? []
-  const { main, remarks } = panelText(withoutFrontMatterGroup(docs.documentation), names)
+  const { main, remarks } = panelText(withoutFrontMatterIdeKeys(docs.documentation), names)
   return { main: resultTablesAsTables(main), remarks: resultTablesAsTables(remarks) }
 })
 

@@ -1,6 +1,7 @@
 /**
  * @file The parameters of a call that are not shown, for the `…` menu: unset arguments with a
- * default that the widget tree hides.
+ * default that the node does not show (its front matter's `arguments:` decides: `always`, or
+ * `selected` while the menu is up).
  */
 import type { PortId } from '@/providers/portInfo'
 import { Ast } from '@/util/ast'
@@ -35,7 +36,9 @@ export function hiddenParameters(
   for (const { argument } of application.iterApplications()) {
     if (
       argument instanceof ArgumentPlaceholder &&
-      argument.hideByDefault &&
+      // The menu shows only while the node is the sole selection, so `selected` arguments are
+      // visible then.
+      argument.isHidden(true) &&
       argument.argInfo.defaultValue != null
     ) {
       result.push({

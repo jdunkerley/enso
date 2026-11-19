@@ -77,6 +77,9 @@ abstract class BaseSuggestionEntry implements SuggestionEntryCommon {
   get iconName() {
     return this.documentationData.iconName
   }
+  get argumentDisplay() {
+    return this.documentationData.argumentDisplay
+  }
   get groupIndex() {
     return this.documentationData.groupIndex
   }
