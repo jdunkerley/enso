@@ -145,4 +145,37 @@ public class ExportConversionMethodTest {
       assertThat(mainExportedSyms.get("from").size(), is(2));
     }
   }
+
+  /** See Note [Eigentype References] in EigentypeReference.java. */
+  @Test
+  public void conversionFromTypeObjectCanBeExported() throws IOException {
+    var aMod =
+        new SourceModule(
+            QualifiedName.fromString("A_Module"),
+            """
+            type A_Type
+                Value
+            type B_Type
+                Value v
+            B_Type.from (_:A_Type.type) = B_Type.Value 42
+            """);
+    var mainMod =
+        new SourceModule(
+            QualifiedName.fromString("Main"),
+            """
+            import project.A_Module.A_Type
+            import project.A_Module.B_Type
+            export project.A_Module.from
+            main = (B_Type.from A_Type).v
+            """);
+    var projDir = tempFolder.newFolder().toPath();
+    ProjectUtils.createProject("Proj", Set.of(aMod, mainMod), projDir);
+
+    ProjectUtils.testProjectRun(
+        projDir,
+        res -> {
+          assertThat(res.isNumber(), is(true));
+          assertThat(res.asInt(), is(42));
+        });
+  }
 }

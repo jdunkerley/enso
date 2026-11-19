@@ -54,6 +54,7 @@ import org.enso.compiler.pass.analyse.{
 import org.enso.compiler.pass.analyse.alias.AliasMetadata
 import org.enso.compiler.pass.analyse.alias.graph.{Graph => AliasGraph}
 import org.enso.compiler.pass.resolve.{
+  EigentypeReference,
   ExpressionAnnotations,
   GenericAnnotations,
   GlobalNames,
@@ -1033,22 +1034,40 @@ private[runtime] class IrToTruffle(
                     targetTp != null,
                     s"Target type should be defined in module ${module.getName}"
                   )
-                  actualModule.getBindingsMap.resolveName(
-                    conversionMethod.sourceTpName
-                  ) match {
+                  // See Note [Eigentype References] in EigentypeReference.java.
+                  val sourceIsEigentype = EigentypeReference
+                    .isEigentypeReference(conversionMethod.sourceTpName)
+                  val sourceResolution =
+                    if (sourceIsEigentype)
+                      EigentypeReference
+                        .resolve(
+                          conversionMethod.sourceTpName,
+                          actualModule.getBindingsMap
+                        )
+                        .map(resolution => List(resolution.target))
+                    else
+                      actualModule.getBindingsMap.resolveName(
+                        conversionMethod.sourceTpName
+                      )
+                  sourceResolution match {
                     case Right(
-                          List(BindingsMap.ResolvedType(modWithSourceTp, _))
+                          List(
+                            BindingsMap.ResolvedType(modWithSourceTp, sourceIr)
+                          )
                         ) =>
                       val sourceTpScope =
                         asScope(modWithSourceTp.unsafeAsModule())
-                      val sourceTp = sourceTpScope.getType(
-                        conversionMethod.sourceTpName,
+                      val sourceValueTp = sourceTpScope.getType(
+                        sourceIr.name,
                         true
                       )
                       org.enso.common.Asserts.assertInJvm(
-                        sourceTp != null,
+                        sourceValueTp != null,
                         s"Source type should be defined in module ${module.getName}"
                       )
+                      val sourceTp =
+                        if (sourceIsEigentype) sourceValueTp.getEigentype
+                        else sourceValueTp
                       val conversionFun =
                         actualScope
                           .asModuleScope()

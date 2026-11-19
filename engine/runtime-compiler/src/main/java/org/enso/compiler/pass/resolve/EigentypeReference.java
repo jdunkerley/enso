@@ -3,7 +3,6 @@ package org.enso.compiler.pass.resolve;
 import org.enso.compiler.core.ir.Name;
 import org.enso.compiler.core.ir.expression.errors.Resolution;
 import org.enso.compiler.data.BindingsMap;
-import scala.collection.immutable.List;
 import scala.util.Either;
 import scala.util.Left;
 import scala.util.Right;
@@ -29,9 +28,18 @@ public final class EigentypeReference {
   }
 
   /**
+   * Whether {@code name}, a dotted name as recorded in a {@link BindingsMap.ConversionMethod}, is
+   * spelt {@code X.type}.
+   */
+  public static boolean isEigentypeReference(String name) {
+    var lastDot = name.lastIndexOf('.');
+    return lastDot > 0 && TYPE_SEGMENT.equals(name.substring(lastDot + 1));
+  }
+
+  /**
    * Resolves {@code X.type}: {@code X} must resolve to exactly one type.
    *
-   * @param name a name for which {@link #isEigentypeReference} holds
+   * @param name a name for which {@link #isEigentypeReference(Name)} holds
    * @param bindings the bindings of the module the name is in
    * @return the resolution of {@code X}, marked as its eigentype, or why there is none
    */
@@ -42,7 +50,27 @@ public final class EigentypeReference {
     for (int i = 0; i < name.parts().size() - 1; i++) {
       typeNames.add(name.parts().apply(i).name());
     }
-    List<String> typeParts = scala.jdk.javaapi.CollectionConverters.asScala(typeNames).toList();
+    return resolveType(typeNames, bindings);
+  }
+
+  /**
+   * Resolves {@code X.type} given as a dotted name, as a {@link BindingsMap.ConversionMethod}
+   * records a conversion's source (for example when the conversion is exported).
+   *
+   * @param name a name for which {@link #isEigentypeReference(String)} holds
+   * @param bindings the bindings of the module the name is in
+   * @return the resolution of {@code X}, marked as its eigentype, or why there is none
+   */
+  public static Either<Resolution.Reason, BindingsMap.Resolution> resolve(
+      String name, BindingsMap bindings) {
+    assert isEigentypeReference(name) : name;
+    var typeNames = java.util.List.of(name.substring(0, name.lastIndexOf('.')).split("\\."));
+    return resolveType(typeNames, bindings);
+  }
+
+  private static Either<Resolution.Reason, BindingsMap.Resolution> resolveType(
+      java.util.List<String> typeNames, BindingsMap bindings) {
+    var typeParts = scala.jdk.javaapi.CollectionConverters.asScala(typeNames).toList();
     var found = bindings.resolveQualifiedName(typeParts);
     if (found.isLeft()) {
       return new Left<>(new Resolution.ResolverError(found.swap().toOption().get()));
@@ -92,6 +120,10 @@ public final class EigentypeReference {
    * - `TypeResolver.getResolvedTypeFromBindingsMap` (static analysis): an
    *   `X.type` ascription types the argument as the type object `X`, so its
    *   static methods are found;
+   * - `IrToTruffle` (an exported conversion, `export M.from`): the
+   *   `ConversionMethod` records the source as the string `X.type`, which is
+   *   resolved through `EigentypeReference.resolve(String, …)` and registered
+   *   from the eigentype;
    * - `SuggestionBuilder.buildTypeSignature` and `DocsUtils.extractFqnOrNull`
    *   (through `Resolution.referencedName`): the name is reported as
    *   `….X.type`, so the IDE does not mistake a conversion from the type object
