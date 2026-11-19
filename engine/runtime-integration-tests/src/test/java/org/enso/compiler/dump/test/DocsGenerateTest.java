@@ -520,6 +520,23 @@ public class DocsGenerateTest {
         containsString("Main.Target.from _:Main.Source -> Main.Target"));
   }
 
+  @Test
+  public void conversionFromTypeObject() throws Exception {
+    var code =
+        """
+        type Source
+            Value x
+        type Target
+        Target.from (that:Source.type) = 42
+        """;
+    var sig = DumpTestUtils.generateSignatures(ctxRule, code, "Main");
+    var sigLine = lastLine(sig);
+    assertThat(
+        "Conversion from the type object: " + sigLine,
+        sigLine,
+        containsString("Main.Target.from that:Main.Source.type -> Main.Target"));
+  }
+
   private static void assertSingleBlankArgument(String methodName, String sig) {
     var sigLine = lastLine(sig);
     var regex = ".*" + methodName + " _:Standard.Base.Any.Any ->.*";
