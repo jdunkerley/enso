@@ -14,6 +14,8 @@ resolved_widget json argument =
     widget.should_not_equal Nothing
     widget
 
+option_labels widget = widget.get "values" . map o-> o.get "label"
+
 add_specs suite_builder =
     column_module = "Standard.Table.Column"
     column_type = "Standard.Table.Column.Column"
@@ -34,11 +36,11 @@ add_specs suite_builder =
         group_builder.specify "the `range` of Column.take, Column.drop, Table.take and Table.drop" <|
             ["take", "drop"].each method->
                 column_json = Widget_Query.resolve_call column column_module column_type method ["range"]
-                column_labels = resolved_widget column_json "range" . get "values" . map o-> o.get "label"
+                column_labels = option_labels (resolved_widget column_json "range")
                 column_labels.should_contain "First"
                 column_labels.should_contain "By_Index"
                 table_json = Widget_Query.resolve_call table table_module table_type method ["range"]
-                resolved_widget table_json "range" . get "values" . map o-> o.get "label" . should_contain "First"
+                option_labels (resolved_widget table_json "range") . should_contain "First"
 
         group_builder.specify "the `n` of Column.offset is limited by the row count" <|
             json = Widget_Query.resolve_call column column_module column_type "offset" ["n"]
