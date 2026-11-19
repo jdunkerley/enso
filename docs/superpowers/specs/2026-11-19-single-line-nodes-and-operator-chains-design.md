@@ -47,9 +47,8 @@ are each one flat row.
   operand of an operator, informative or not (this drops #850's rule for infix
   operands, such as `amount` on `Date.+`; prefix arguments keep their chips).
 - **Each operand keeps its port**, so it still takes an edge, opens its widget
-  and pops out. What is lost: the intermediate sub-expression (`a + b` inside
-  `a + b + c`) is no longer a port of its own. It never was a meaningful drop
-  target, and with no visible box there is nothing to aim at.
+  and pops out. Ports are unchanged: the intermediate sub-expression (`a + b`
+  inside `a + b + c`) stays a port, with no visible box until an edge connects.
 
 ### A change of precedence is a capsule
 
