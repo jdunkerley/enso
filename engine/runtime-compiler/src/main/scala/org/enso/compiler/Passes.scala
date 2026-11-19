@@ -11,10 +11,10 @@ import org.enso.compiler.pass.analyse.types.{
 import org.enso.compiler.pass.desugar._
 import org.enso.compiler.pass.lint.unusedimports.UnusedImports
 import org.enso.compiler.pass.lint.{
+  ArgumentDisplayCheck,
   ModuleNameConflicts,
   NoDuplicateSelfInMethodCalls,
   NoSelfInStatic,
-  ArgumentDisplayCheck,
   PrivateBuiltinMethodsCheck,
   ShadowedPatternFields,
   UnusedBindings
