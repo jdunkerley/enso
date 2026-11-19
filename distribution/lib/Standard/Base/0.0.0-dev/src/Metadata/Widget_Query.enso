@@ -20,6 +20,7 @@ from project.Nothing import all
 
 polyglot java import java.lang.Throwable
 polyglot java import org.enso.base.LogOnce
+polyglot java import org.slf4j.LoggerFactory
 
 ## ---
    private: true
@@ -94,7 +95,10 @@ resolve_argument (method : Widget_Method) (argument : Text) subject (cache : Fun
    ---
    Logs `failure` at Warning, once per method, argument, inputs, step and
    message in this engine process: a widget that fails on every keystroke is
-   logged once.
+   logged once. The logger is `Standard.Base.Metadata.Widget_Query`, named
+   directly (as `Internal.Telemetry` does): `log_internal` names it after the
+   type of its receiver, and a module is not a value static analysis accepts
+   there.
 
    ## Arguments
     - `failure`: The failure.
@@ -105,7 +109,10 @@ resolve_argument (method : Widget_Method) (argument : Text) subject (cache : Fun
 log_failure (failure : Widget_Failure) (inputs : Text) -> Boolean =
     key = failure.method.module_name + "|" + failure.method.qualified_name + "|" + failure.argument + "|" + inputs + "|" + failure.step + "|" + failure.message
     first = LogOnce.firstTime key
-    if first then Widget_Query.log_internal failure.log_text ..Warning
+    if first then
+        builder = LoggerFactory.getLogger "Standard.Base.Metadata.Widget_Query" . atWarn
+        builder.setMessage failure.log_text
+        builder.log
     first
 
 ## ---
