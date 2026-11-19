@@ -50,8 +50,9 @@ suites), TypeScript + Vue 3 + zod + `yaml` (GUI), vitest, Playwright, Node
 - `selected` means "shown while the node is the **sole** selection" — the same
   `showDetails` the widget tree already provides (#850).
 - Behaviour-preserving migration: every argument shown today because its widget
-  says `Always` gets `always`; nothing else changes. This PR gives no
-  standard-library argument `selected` (owner question, see the end).
+  says `Always` gets `always`; nothing else changes — with one deliberate
+  exception: `Table.join`'s `join_kind` becomes `selected` as the proof of
+  concept (owner decision 2026-11-19; today it is `When_Modified`).
 - `Choice.Option`'s `label` and `File_Type.Option`'s `label` stay.
 - Warning class `Warning.ArgumentDisplay` with `@Persistable` id **797**
   (checked free on develop 722582f042; re-check with `git grep "id = 797"`).
@@ -1058,6 +1059,14 @@ The task adds front matter only, proved equal to today's behaviour.
       `tables: always` to each front matter; if it has none it is always shown
       already. Either way delete the two `#` TODO comments.
 
+- [ ] **Step 5b: The `selected` proof of concept.** Add `join_kind: selected` to
+      `Table.join`'s front matter (`Table.enso` ~2983; the only `join` with
+      `@join_kind` — `DB_Table` has none). It is the one intended difference
+      from the inventory: record it in the ledger, and the Task 3 cross-check
+      gate is "zero disagreements except `Table.join.join_kind`". Keep
+      `Join_Kind.default_widget` itself unchanged (its `display` goes in Task 4
+      with the rest).
+
 - [ ] **Step 6: Check it.** Build and lint; the check rejects any wrong name,
       required argument or typo:
 
@@ -1372,6 +1381,9 @@ The task adds front matter only, proved equal to today's behaviour.
       verified (e.g. suites needing cloud credentials); the owner's installer
       checklist:
   - a Table `join`: `on` shows immediately, before the engine answers;
+  - the same `join`: `join_kind` is hidden while the node is not selected,
+    appears when it is the only selected node, is not in the ＋ menu while
+    shown, and hides again with two nodes selected;
   - a node using `Aggregate_Column.Sum`: its `column` shows as before;
   - the ＋ menu lists the same arguments as on develop for `read`, `aggregate`,
     `filter`;
@@ -1398,6 +1410,8 @@ The task adds front matter only, proved equal to today's behaviour.
 
 ## Owner questions (before Task 3)
 
-1. Should any standard-library argument become `selected` in this PR (the spec's
-   example is `join`'s `join_kind`)? The plan says **no** — behaviour-preserving
-   — and leaves `selected` to later per-method choices.
+1. ~~Should any standard-library argument become `selected` in this PR?~~
+   **Decided 2026-11-19: yes, `Table.join`'s `join_kind` only**, as the proof of
+   concept (Task 3 Step 5b). Everything else stays behaviour-preserving. The
+   PR's screenshots and installer checklist include a `join` node: `join_kind`
+   hidden when unselected, shown when it is the sole selection.
