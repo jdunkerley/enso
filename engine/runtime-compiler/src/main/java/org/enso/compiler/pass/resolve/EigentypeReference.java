@@ -89,6 +89,9 @@ public final class EigentypeReference {
    *   registered from the eigentype, the route static methods already take;
    * - `TypeCheckAlgorithm.extractAscribedType` (`forEigentypeName`): only the
    *   type object passes the check;
+   * - `TypeResolver.getResolvedTypeFromBindingsMap` (static analysis): an
+   *   `X.type` ascription types the argument as the type object `X`, so its
+   *   static methods are found;
    * - `SuggestionBuilder.buildTypeSignature` and `DocsUtils.extractFqnOrNull`
    *   (through `Resolution.referencedName`): the name is reported as
    *   `….X.type`, so the IDE does not mistake a conversion from the type object

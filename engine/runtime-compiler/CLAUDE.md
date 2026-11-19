@@ -18,11 +18,12 @@ The IR itself lives in `engine/runtime-parser`.
   ascription). `pass/resolve/EigentypeReference.java` resolves it once to a
   `BindingsMap.Resolution` of X with `isEigentype = true`; read the flag (or
   `Resolution.referencedName`), never the name's spelling. Note [Eigentype
-  References] lists the consumers. Static analysis does not match such a
-  conversion: `StaticModuleScope` accepts an `ATOM_EIGEN_TYPE` source so the
-  module still builds, but `MethodTypeResolver.findConversion` looks sources up
-  as atom types only, so a conversion from a type object is never found
-  statically (no false results, just no inference).
+  References] lists the consumers. Static analysis types an `X.type` ascription
+  as the type object `X` (`TypeResolver`), but does not match a conversion from
+  one: `StaticModuleScope` accepts an `ATOM_EIGEN_TYPE` source so the module
+  still builds, but `MethodTypeResolver.findConversion` looks sources up as atom
+  types only, so a conversion from a type object is never found statically (no
+  inference for `W.from X`, rather than a wrong one).
 
 ## Tests
 
