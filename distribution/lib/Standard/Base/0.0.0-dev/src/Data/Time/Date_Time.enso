@@ -52,7 +52,14 @@ type Date_Time
     ## ---
        icon: time
        ---
-       Obtains the start of the epoch for Enso.
+       The start of the Enso epoch, 15 October 1582, at midnight UTC.
+
+       ## Examples
+       ### The start of the Enso epoch
+       ```
+       start = Date_Time.enso_epoch_start
+       # → 1582-10-15 00:00:00Z[UTC]
+       ```
 
        ## Remarks
 
@@ -74,15 +81,12 @@ type Date_Time
        icon: time
        suggested: 11
        ---
-       Reads the current date-time in the system timezone.
+       The current date and time, from the system clock in the system timezone.
 
        ## Examples
-       ### Get the current time
-
+       ### The current date and time
        ```
-             from Standard.Base import Date_Time
-
-             example_now = Date_Time.now
+       time = Date_Time.now
        ```
     now -> Date_Time = Date_Helpers.date_time_now
 
@@ -95,41 +99,48 @@ type Date_Time
          hour: always
          minute: always
        ---
-       Obtains an instance of `Date_Time` from a year, month, day, hour, minute,
-       second, nanosecond and timezone.
+       Constructs a new `Date_Time` from a year, month, day, hour, minute, second,
+       millisecond, microsecond, nanosecond and timezone.
 
        Returns a `Time_Error` if the provided time cannot be represented.
 
        ## Arguments
-        - `year`: The year to represent, any Integer is valid.
-        - `month`: the month-of-year to represent, from 1 (January) to 12
-          (December)
-        - `day`: the day-of-month to represent, from 1 to 31 and must be valid
-          for the year and month
-        - `hour`: the hour-of-day to represent, from 0 to 23
-        - `minute`: the minute-of-hour to represent, from 0 to 59
-        - `second`: the second-of-minute to represent, from 0 to 59
-        - `millisecond`: the millisecond-of-second to represent, from 0 to 999.
-        - `microsecond`: the microsecond-of-second to represent, from 0 to
-          999,999.
-        - `nanosecond`: The nano-of-second to represent, from 0 to 999,999,999.
-        - `zone`: the timezone
+       - `year`: The year to represent. Any integer is valid.
+       - `month`: The month-of-year to represent, from 1 (January) to 12 (December).
+       - `day`: The day-of-month to represent, from 1 to 31. It must be valid for the
+         year and month.
+       - `hour`: The hour-of-day to represent, from 0 to 23.
+       - `minute`: The minute-of-hour to represent, from 0 to 59.
+       - `second`: The second-of-minute to represent, from 0 to 59.
+       - `millisecond`: The millisecond-of-second to represent, from 0 to 999.
+       - `microsecond`: The microsecond-of-millisecond to represent, from 0 to 999.
+       - `nanosecond`: The nanosecond-of-microsecond to represent, from 0 to 999.
+       - `zone`: The timezone. By default it is the system timezone.
 
        ## Examples
-       ### Create a new zoned date time at Unix epoch.
-
+       ### A date-time from its parts
        ```
-             from Standard.Base import Date_Time, Time_Zone
-
-             example_new = Date_Time.new 1970 (zone = Time_Zone.utc)
+       time = Date_Time.new 2020 12 23 11 45 zone=Time_Zone.utc
+       # → 2020-12-23 11:45:00Z[UTC]
        ```
 
-       ### Get the 5 August 1986 at midnight.
-
+       ### The start of a year
        ```
-             from Standard.Base import Date_Time, Time_Zone
+       time = Date_Time.new 1970 zone=Time_Zone.utc
+       # → 1970-01-01 00:00:00Z[UTC]
+       ```
 
-             example_new = Date_Time.new 1986 8 5
+       ### A time with a fraction of a second
+       ```
+       time = Date_Time.new 2020 12 23 11 45 30 millisecond=250 zone=Time_Zone.utc
+       # → 2020-12-23 11:45:30.25Z[UTC]
+       ```
+
+       ### A date that does not exist
+       ```
+       time = Date_Time.new 2020 2 30
+       result = time.catch Any _-> "not a date"
+       # → "not a date"
        ```
     @year (Widget.Numeric_Input)
     @month (Widget.Numeric_Input minimum=1 maximum=12)
@@ -153,72 +164,56 @@ type Date_Time
        arguments:
          format: always
        ---
-       Obtains an instance of `Time` from a text such as
-       "2007-12-03T10:15:30+01:00 Europe/Paris".
-       This method will return a `Time_Error` if the provided time cannot be
-       parsed.
+       Converts text containing a date and time into a `Date_Time`.
+
+       Returns a `Time_Error` if the provided `text` cannot be parsed using the
+       provided `format`.
 
        ## Arguments
-        - `text`: The text representing the time to be parsed.
-        - `format`: A pattern describing how to parse the text, or a
-          `Date_Time_Formatter`.
+       - `text`: The text to try and parse as a date-time.
+       - `format`: A pattern describing how to parse the text, or a
+         `Date_Time_Formatter`. By default the text is read as an ISO-8601 date-time
+         with an optional zone, such as `2007-12-03T10:15:30+01:00[Europe/Paris]`.
 
        ## Examples
-       ### Parse UTC time.
-
+       ### Parse a UTC date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_parse = Date_Time.parse "2020-10-01T04:11:12Z"
+       time = Date_Time.parse "2020-10-01T04:11:12Z"
+       # → 2020-10-01 04:11:12Z
        ```
 
-       ### Parse UTC-04:00 time.
-
+       ### Parse a date-time with an offset
        ```
-             from Standard.Base import Date_Time
-
-             example_parse = Date_Time.parse "2020-10-01T04:11:12-04:00"
+       time = Date_Time.parse "2020-10-01T04:11:12-04:00"
+       # → 2020-10-01 04:11:12-04:00
        ```
 
-       ### Parse UTC-04:00 time specifying New York timezone.
-
+       ### Parse a date-time with an offset and a timezone
        ```
-             from Standard.Base import Date_Time
-
-             example_parse = Date_Time.parse "2020-10-01T04:11:12-04:00[America/New_York]"
+       time = Date_Time.parse "2020-10-01T04:11:12-04:00[America/New_York]"
+       # → 2020-10-01 04:11:12-04:00[America/New_York]
        ```
 
-       ### Parse UTC-04:00 time with nanoseconds.
-
+       ### Parse a date-time with a fraction of a second
        ```
-             from Standard.Base import Date_Time
-
-             example_parse = Date_Time.parse "2020-10-01T04:11:12.177528-04:00"
+       time = Date_Time.parse "2020-10-01T04:11:12.177528-04:00"
+       # → 2020-10-01 04:11:12.177528-04:00
        ```
 
-       ### Recover from the parse error.
-
+       ### Parse a date-time with a custom format
        ```
-             from Standard.Base import Date_Time
-
-             example_parse = Date_Time.parse "2020-10-01" . catch Time_Error (_->Date_Time.now)
+       time = Date_Time.parse "2020-05-06 04:30:20" "yyyy-MM-dd HH:mm:ss"
        ```
 
-       ### Parse "2020-05-06 04:30:20" as Date_Time
-
+       ### Parse a date-time with words in it
        ```
-             from Standard.Base import Date_Time
-
-             example_parse = Date_Time.parse "2020-05-06 04:30:20" "yyyy-MM-dd HH:mm:ss"
+       time = Date_Time.parse "06 of May 2020 at 04:30AM" "dd 'of' MMMM yyyy 'at' hh:mma"
        ```
 
-       ### Parse "06 of May 2020 at 04:30AM" as Date_Tme
-
+       ### Fall back to the current time when the text is not a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_parse =
-                Date_Time.parse "06 of May 2020 at 04:30AM" "dd 'of' MMMM yyyy 'at' hh:mma"
+       parsed = Date_Time.parse "2020-10-01"
+       time = parsed.catch Any _-> Date_Time.now
        ```
 
        ## Remarks
@@ -291,20 +286,18 @@ type Date_Time
     ## ---
        icon: convert
        ---
-       Creates a new `Date_Time` from a Unix epoch timestamp in seconds (and
-       optional nanoseconds).
+       Creates a `Date_Time` from a Unix epoch timestamp in seconds, and optionally
+       nanoseconds. The result is in UTC.
 
        ## Arguments
-        - `seconds`: The number of seconds since the Unix epoch.
-        - `nanoseconds`: The number of nanoseconds within the second.
+       - `seconds`: The number of seconds since the Unix epoch, 1 January 1970 UTC.
+       - `nanoseconds`: The number of nanoseconds to add within the second.
 
        ## Examples
-       ### Create a new `Date_Time` from a Unix epoch timestamp.
-
+       ### A date-time from a Unix timestamp
        ```
-             from Standard.Base import Date_Time
-
-             example_from_unix_epoch = Date_Time.from_unix_epoch_seconds 1601587200
+       time = Date_Time.from_unix_epoch_seconds 1601587200
+       # → 2020-10-01 21:20:00Z[UTC]
        ```
     from_unix_epoch_seconds (seconds : Integer) (nanoseconds : Integer = 0) -> Date_Time =
         unix_epoch_start + Duration.new seconds=seconds nanoseconds=nanoseconds
@@ -312,18 +305,18 @@ type Date_Time
     ## ---
        icon: convert
        ---
-       Creates a new `Date_Time` from a Unix epoch timestamp in milliseconds.
+       Creates a `Date_Time` from a Unix epoch timestamp in milliseconds. The result is
+       in UTC.
 
        ## Arguments
-        - `milliseconds`: The number of milliseconds since the Unix epoch.
+       - `milliseconds`: The number of milliseconds since the Unix epoch, 1 January
+         1970 UTC.
 
        ## Examples
-       ### Create a new `Date_Time` from a Unix epoch timestamp.
-
+       ### A date-time from a Unix timestamp in milliseconds
        ```
-             from Standard.Base import Date_Time
-
-             example_from_unix_epoch = Date_Time.from_unix_epoch_milliseconds 1601587200000
+       time = Date_Time.from_unix_epoch_milliseconds 1601587200000
+       # → 2020-10-01 21:20:00Z[UTC]
        ```
     from_unix_epoch_milliseconds (milliseconds : Integer) -> Date_Time =
         unix_epoch_start + Duration.new milliseconds=milliseconds
@@ -332,15 +325,14 @@ type Date_Time
        group: Metadata
        icon: metadata
        ---
-       Get the year portion of the time.
+       The year of this date-time.
 
        ## Examples
-       ### Get the current year.
-
+       ### The year of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_year = Date_Time.now.year
+       time = Date_Time.new 2020 12 23 11 45 30
+       year = time.year
+       # → 2020
        ```
     year self -> Integer = Date_Helpers.date_time_year self
 
@@ -348,15 +340,14 @@ type Date_Time
        group: Metadata
        icon: metadata
        ---
-       Get the month portion of the time as a number from 1 to 12.
+       The month of this date-time, as a number from 1 (January) to 12 (December).
 
        ## Examples
-       ### Get the current month.
-
+       ### The month of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_month = Date_Time.now.month
+       time = Date_Time.new 2020 12 23 11 45 30
+       month = time.month
+       # → 12
        ```
     month self -> Integer = Date_Helpers.date_time_month self
 
@@ -364,15 +355,14 @@ type Date_Time
        group: Metadata
        icon: metadata
        ---
-       Get the day portion of the time.
+       The day of the month of this date-time, from 1 to 31.
 
        ## Examples
-       ### Get the current day.
-
+       ### The day of the month of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_day = Date_Time.now.day
+       time = Date_Time.new 2020 12 23 11 45 30
+       day = time.day
+       # → 23
        ```
     day self -> Integer = Date_Helpers.date_time_day self
 
@@ -380,15 +370,14 @@ type Date_Time
        group: Metadata
        icon: metadata
        ---
-       Get the hour portion of the time.
+       The hour of this date-time, from 0 to 23.
 
        ## Examples
-       ### Get the current hour.
-
+       ### The hour of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_hour = Date_Time.now.hour
+       time = Date_Time.new 2020 12 23 11 45 30
+       hour = time.hour
+       # → 11
        ```
     hour self -> Integer = Date_Helpers.date_time_hour self
 
@@ -396,15 +385,14 @@ type Date_Time
        group: Metadata
        icon: metadata
        ---
-       Get the minute portion of the time.
+       The minute of this date-time, from 0 to 59.
 
        ## Examples
-       ### Get the current minute.
-
+       ### The minute of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_minute = Date_Time.now.minute
+       time = Date_Time.new 2020 12 23 11 45 30
+       minute = time.minute
+       # → 45
        ```
     minute self -> Integer = Date_Helpers.date_time_minute self
 
@@ -412,15 +400,14 @@ type Date_Time
        group: Metadata
        icon: metadata
        ---
-       Get the second portion of the time.
+       The second of this date-time, from 0 to 59.
 
        ## Examples
-       ### Get the current second.
-
+       ### The second of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_second = Date_Time.now.second
+       time = Date_Time.new 2020 12 23 11 45 30
+       second = time.second
+       # → 30
        ```
     second self -> Integer = Date_Helpers.date_time_second self
 
@@ -428,15 +415,14 @@ type Date_Time
        group: Metadata
        icon: metadata
        ---
-       Get the millisecond portion of the time.
+       The millisecond part of the second of this date-time, from 0 to 999.
 
        ## Examples
-       ### Get the current millisecond.
-
+       ### The millisecond of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_millisecond = Date_Time.now.millisecond
+       time = Date_Time.new 2020 12 23 11 45 30 millisecond=250
+       millisecond = time.millisecond
+       # → 250
        ```
     millisecond self -> Integer = Date_Helpers.date_time_millisecond self
 
@@ -444,15 +430,14 @@ type Date_Time
        group: Metadata
        icon: metadata
        ---
-       Get the microsecond portion of the time.
+       The microsecond part of the millisecond of this date-time, from 0 to 999.
 
        ## Examples
-       ### Get the current microsecond.
-
+       ### The microsecond of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_microsecond = Date_Time.now.microsecond
+       time = Date_Time.new 2020 12 23 11 45 30 millisecond=250 microsecond=125
+       microsecond = time.microsecond
+       # → 125
        ```
     microsecond self -> Integer = Date_Helpers.date_time_microsecond self
 
@@ -460,20 +445,25 @@ type Date_Time
        group: Metadata
        icon: metadata
        ---
-       Get the nanosecond portion of the time.
+       The nanosecond part of the microsecond of this date-time, from 0 to 999.
 
        ## Arguments
-        - `include_milliseconds`: Specifies if the whole fractional part of the
-          second should be returned as nanoseconds. Defaults to `False`, meaning
-          it will only return the nanosecond part in the range 0-999.
+       - `include_milliseconds`: Whether to return the whole fractional part of the
+         second, in nanoseconds, instead of just the part below a microsecond.
 
        ## Examples
-       ### Get the current nanosecond.
-
+       ### The nanosecond of a date-time
        ```
-             from Standard.Base import Date_Time
+       time = Date_Time.new 2020 12 23 11 45 30 millisecond=250 microsecond=125 nanosecond=7
+       nanosecond = time.nanosecond
+       # → 7
+       ```
 
-             example_nanosecond = Date_Time.now.nanosecond
+       ### The whole fraction of a second, in nanoseconds
+       ```
+       time = Date_Time.new 2020 12 23 11 45 30 millisecond=250 microsecond=125 nanosecond=7
+       nanoseconds = time.nanosecond include_milliseconds=True
+       # → 250125007
        ```
     nanosecond self include_milliseconds:Boolean=False -> Integer =
         Date_Helpers.date_time_nanosecond self include_milliseconds
@@ -482,31 +472,29 @@ type Date_Time
        group: DateTime
        icon: metadata
        ---
-       Get the timezone for the time.
+       The timezone of this date-time.
 
        ## Examples
-       ### Get the current timezone.
-
+       ### The timezone of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_zone = Date_Time.now.zone
+       time = Date_Time.new 2020 12 23 11 45 zone=Time_Zone.utc
+       zone = time.zone
+       # → UTC
        ```
     zone self -> Time_Zone = Date_Helpers.date_time_zone self
 
     ## ---
        icon: convert
        ---
-       Return the number of seconds from the Unix epoch start (1.1.1970) If this
-       Date_Time is before the epoch start, returns a negative number.
+       The number of seconds from the start of the Unix epoch, 1 January 1970 UTC, to
+       this date-time. It is negative for a date-time before the epoch.
 
        ## Examples
-       ### Get the current number of seconds from the Unix epoch.
-
+       ### The Unix timestamp of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_epoch = Date_Time.now.to_unix_epoch_seconds
+       time = Date_Time.new 2020 10 1 zone=Time_Zone.utc
+       seconds = time.to_unix_epoch_seconds
+       # → 1601510400
        ```
     to_unix_epoch_seconds self -> Integer =
         (Duration.between unix_epoch_start self).total_seconds.floor
@@ -514,16 +502,15 @@ type Date_Time
     ## ---
        icon: convert
        ---
-       Return the number of milliseconds from the Unix epoch start.
-       If this Date_Time is before an epoch start, returns a negative number.
+       The number of milliseconds from the start of the Unix epoch, 1 January 1970 UTC,
+       to this date-time. It is negative for a date-time before the epoch.
 
        ## Examples
-       ### Get the current number of milliseconds from the Enso epoch.
-
+       ### The Unix timestamp of a date-time in milliseconds
        ```
-             from Standard.Base import Date_Time
-
-             example_epoch = Date_Time.now.to_unix_epoch_milliseconds
+       time = Date_Time.new 2020 10 1 zone=Time_Zone.utc
+       milliseconds = time.to_unix_epoch_milliseconds
+       # → 1601510400000
        ```
     to_unix_epoch_milliseconds self -> Integer =
         (Duration.between unix_epoch_start self).total_milliseconds.floor
@@ -531,16 +518,32 @@ type Date_Time
     ## ---
        icon: convert
        ---
-       Return the number of seconds from the Enso epoch start.
-       See `Date_Time.enso_epoch_start`.
+       The number of seconds from the start of the Enso epoch to this date-time. See
+       `Date_Time.enso_epoch_start`.
+
+       ## Examples
+       ### A day after the start of the Enso epoch
+       ```
+       time = Date_Time.new 1582 10 16 zone=Time_Zone.utc
+       seconds = time.to_enso_epoch_seconds
+       # → 86400
+       ```
     to_enso_epoch_seconds self -> Integer =
         (Duration.between Date_Time.enso_epoch_start self).total_seconds.floor
 
     ## ---
        icon: convert
        ---
-       Return the number of milliseconds from the Enso epoch start.
+       The number of milliseconds from the start of the Enso epoch to this date-time.
        See `Date_Time.enso_epoch_start`.
+
+       ## Examples
+       ### A day after the start of the Enso epoch
+       ```
+       time = Date_Time.new 1582 10 16 zone=Time_Zone.utc
+       milliseconds = time.to_enso_epoch_milliseconds
+       # → 86400000
+       ```
     to_enso_epoch_milliseconds self -> Integer =
         (Duration.between Date_Time.enso_epoch_start self).total_milliseconds.floor
 
@@ -548,16 +551,14 @@ type Date_Time
        group: DateTime
        icon: metadata
        ---
-       Convert this point in time to time of day, discarding the time zone
-       information.
+       The time of day of this date-time, discarding the date and the timezone.
 
        ## Examples
-       ### Convert the current time to a time of day.
-
+       ### The time of day of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_time_of_day = Date_Time.now.time_of_day
+       time = Date_Time.new 2020 12 23 11 45 30
+       time_of_day = time.time_of_day
+       # → 11:45:30
        ```
     time_of_day self -> Time_Of_Day =
         Date_Helpers.date_time_of_day self
@@ -565,12 +566,27 @@ type Date_Time
     ## ---
        icon: metadata
        ---
-       Returns the number of week of year this date falls into.
-       Produces a warning for a Date that is before epoch start.
+       The number of the week of the year this date-time falls into.
+       Produces a warning for a date-time that is before epoch start.
 
        ## Arguments
-        - `locale`: the locale used to define the notion of weeks of year. If no
-          locale is provided, then the ISO 8601 week of year is used.
+       - `locale`: The locale that defines the notion of weeks of year. If no locale
+         is given, the ISO 8601 week of year is used.
+
+       ## Examples
+       ### The ISO week of a date-time at the start of a year
+       ```
+       time = Date_Time.new 2021 1 1 11 45
+       week = time.week_of_year
+       # → 53
+       ```
+
+       ### The week of the same date-time in the US
+       ```
+       time = Date_Time.new 2021 1 1 11 45
+       week = time.week_of_year Locale.us
+       # → 1
+       ```
 
        ## Remarks
 
@@ -592,45 +608,108 @@ type Date_Time
        group: DateTime
        icon: metadata
        ---
-       Returns if the date is in a leap year.
-       Produces a warning for a Date that is before epoch start.
+       Whether this date-time is in a leap year.
+       Produces a warning for a date-time that is before epoch start.
+
+       ## Examples
+       ### A leap year
+       ```
+       time = Date_Time.new 2000 3 1
+       is_leap = time.is_leap_year
+       # → True
+       ```
+
+       ### A century that is not a leap year
+       ```
+       time = Date_Time.new 1900 3 1
+       is_leap = time.is_leap_year
+       # → False
+       ```
     is_leap_year self -> Boolean = self.date.is_leap_year
 
     ## ---
        group: DateTime
        icon: metadata
        ---
-       Returns the number of days in the year represented by this date.
-       Produces a warning for a Date that is before epoch start.
+       The number of days in the year of this date-time, 365 or 366.
+       Produces a warning for a date-time that is before epoch start.
+
+       ## Examples
+       ### The length of a leap year
+       ```
+       time = Date_Time.new 2020 3 1
+       days = time.length_of_year
+       # → 366
+       ```
+
+       ### The length of an ordinary year
+       ```
+       time = Date_Time.new 2021 3 1
+       days = time.length_of_year
+       # → 365
+       ```
     length_of_year self -> Integer = ensure_in_epoch self <| self.date.length_of_year
 
     ## ---
        icon: metadata
        ---
-       Returns the century of the date.
+       The century of this date-time, counting 2000 as the last year of the 20th
+       century.
+       Returns an `Illegal_Argument` error for a year before the common era.
+
+       ## Examples
+       ### The century of the year 2000
+       ```
+       time = Date_Time.new 2000 1 1
+       century = time.century
+       # → 20
+       ```
     century self -> Integer = self.date.century
 
     ## ---
        group: Metadata
        icon: metadata
        ---
-       Returns the quarter of the year the date falls into.
+       The quarter of the year this date-time falls into, from 1 to 4.
+
+       ## Examples
+       ### The quarter of a date-time
+       ```
+       time = Date_Time.new 2020 12 23 11 45 30
+       quarter = time.quarter
+       # → 4
+       ```
     quarter self -> Integer = Time_Utils.get_field_as_zoneddatetime self IsoFields.QUARTER_OF_YEAR
 
     ## ---
        group: DateTime
        icon: metadata
        ---
-       Returns the number of days in the month represented by this date.
-       Produces a warning for a Date that is before epoch start.
+       The number of days in the month of this date-time.
+       Produces a warning for a date-time that is before epoch start.
+
+       ## Examples
+       ### The length of a leap-year February
+       ```
+       time = Date_Time.new 2020 2 10
+       days = time.length_of_month
+       # → 29
+       ```
     length_of_month self -> Integer = ensure_in_epoch self <| self.date.length_of_month
 
     ## ---
        group: DateTime
        icon: metadata
        ---
-       Returns the date that is the first day of the month containing the
-       specified date.
+       The first day of the month of this date-time, as a `Date`.
+
+       ## Examples
+       ### The first day of December
+       ```
+       time = Date_Time.new 2020 12 23 11 45 30
+       first = time.first_of_month
+       # → 2020-12-01
+       ```
     first_of_month self -> Date =
         Time_Utils.first_of_month self
 
@@ -638,22 +717,46 @@ type Date_Time
        group: DateTime
        icon: metadata
        ---
-       Returns the date that is the last day of the month containing the
-       specified date.
+       The last day of the month of this date-time, as a `Date`.
+
+       ## Examples
+       ### The last day of a leap-year February
+       ```
+       time = Date_Time.new 2020 2 10 11 45
+       last = time.end_of_month
+       # → 2020-02-29
+       ```
     end_of_month self -> Date =
         Time_Utils.end_of_month self
 
     ## ---
        icon: metadata
        ---
-       Returns the day of the year.
+       The day of the year of this date-time, counting 1 January as day 1.
+
+       ## Examples
+       ### The last day of a leap year
+       ```
+       time = Date_Time.new 2020 12 31 11 45
+       day = time.day_of_year
+       # → 366
+       ```
     day_of_year self -> Integer = Time_Utils.get_field_as_zoneddatetime self ChronoField.DAY_OF_YEAR
 
     ## ---
        group: Metadata
        icon: metadata
        ---
-       Returns the day of the week.
+       The day of the week of this date-time.
+       Produces a warning for a date-time that is before epoch start.
+
+       ## Examples
+       ### The day of the week of a date-time
+       ```
+       time = Date_Time.new 2020 12 23 11 45
+       day = time.day_of_week
+       # → Wednesday
+       ```
     day_of_week self -> Day_Of_Week =
         ensure_in_epoch self <|
             Day_Of_Week.from (Time_Utils.get_field_as_zoneddatetime self ChronoField.DAY_OF_WEEK) Day_Of_Week.Monday
@@ -662,8 +765,27 @@ type Date_Time
        group: DateTime
        icon: time
        ---
-       Returns the first date within the `Time_Period` or `Date_Period`
-       containing self.
+       The first moment of the period of the given kind that contains this date-time.
+
+       ## Arguments
+       - `period`: The kind of period to find the start of. A `Date_Period` (year,
+         quarter, month, week or day) gives midnight on its first day, a `Time_Period`
+         (hour down to nanosecond) gives the start of that hour, minute and so on.
+
+       ## Examples
+       ### The start of the quarter
+       ```
+       time = Date_Time.new 2020 12 23 11 45 30 zone=Time_Zone.utc
+       start = time.start_of Date_Period.Quarter
+       # → 2020-10-01 00:00:00Z[UTC]
+       ```
+
+       ### The start of the hour
+       ```
+       time = Date_Time.new 2020 12 23 11 45 30 zone=Time_Zone.utc
+       start = time.start_of Time_Period.Hour
+       # → 2020-12-23 11:00:00Z[UTC]
+       ```
     @period make_date_time_period_selector
     start_of self (period : Date_Period | Time_Period = Date_Period.Month) -> Date_Time =
         adjusted = period.adjust_start self
@@ -675,8 +797,28 @@ type Date_Time
        group: DateTime
        icon: time
        ---
-       Returns the last date within the `Time_Period` or `Date_Period` containing
-       self.
+       The last moment of the period of the given kind that contains this date-time,
+       to the nanosecond.
+
+       ## Arguments
+       - `period`: The kind of period to find the end of. A `Date_Period` (year,
+         quarter, month, week or day) gives the end of its last day, a `Time_Period`
+         (hour down to nanosecond) gives the end of that hour, minute and so on.
+
+       ## Examples
+       ### The end of the month
+       ```
+       time = Date_Time.new 2020 12 23 11 45 30 zone=Time_Zone.utc
+       last = time.end_of Date_Period.Month
+       # → 2020-12-31 23:59:59.999999999Z[UTC]
+       ```
+
+       ### The end of the hour
+       ```
+       time = Date_Time.new 2020 12 23 11 45 30 zone=Time_Zone.utc
+       last = time.end_of Time_Period.Hour
+       # → 2020-12-23 11:59:59.999999999Z[UTC]
+       ```
     @period make_date_time_period_selector
     end_of self (period : Date_Period | Time_Period = Date_Period.Month) -> Date_Time =
         adjusted = period.adjust_end self
@@ -689,16 +831,14 @@ type Date_Time
        group: DateTime
        icon: metadata
        ---
-       Convert this point in time to date, discarding the time of day
-       information.
+       The date of this date-time, discarding the time of day and the timezone.
 
        ## Examples
-       ### Convert the current time to a date.
-
+       ### The date of a date-time
        ```
-             from Standard.Base import Date_Time
-
-             example_date = Date_Time.now.date
+       time = Date_Time.new 2020 12 23 11 45 30
+       date = time.date
+       # → 2020-12-23
        ```
     date self -> Date = Date_Helpers.date_time_date self
 
@@ -707,18 +847,17 @@ type Date_Time
        group: DateTime
        icon: time
        ---
-       Convert the time instant to the same instant in the provided time zone.
+       The same instant as this date-time, written in the provided timezone.
 
        ## Arguments
-        - `zone`: The timezone to convert the time instant into.
+       - `zone`: The timezone to convert the date-time into.
 
        ## Examples
-       ### Convert time instance to -04:00 timezone.
-
+       ### Midday UTC as a time at UTC-04:00
        ```
-             from Standard.Base import Date_Time, Time_Zone
-
-             example_at_time_zone = Date_Time.new 2020 . at_time_zone (Time_Zone.new -4)
+       time = Date_Time.new 2020 1 1 12 zone=Time_Zone.utc
+       local = time.at_time_zone (Time_Zone.new -4)
+       # → 2020-01-01 08:00:00-04:00
        ```
     @zone Time_Zone.default_widget
     at_time_zone self (zone : Time_Zone) -> Date_Time =
@@ -729,20 +868,18 @@ type Date_Time
        group: DateTime
        icon: time
        ---
-       Constructs a new time instant by changing the time zone but not altering
-       the local date-time, which results in a value representing a different
-       instant.
+       Changes the timezone of this date-time without changing its local date and
+       time, which makes it a different instant.
 
        ## Arguments
-        - `zone`: The timezone to change the time instant's zone to.
+       - `zone`: The timezone to put the date-time into.
 
        ## Examples
-       ### Convert time instance to -04:00 timezone.
-
+       ### Keep the local time and change the zone
        ```
-             from Standard.Base import Date_Time, Time_Zone
-
-             example_at_time_zone = Date_Time.new 2020 . set_time_zone (Time_Zone.new -4)
+       time = Date_Time.new 2020 1 1 12 zone=Time_Zone.utc
+       local = time.set_time_zone (Time_Zone.new -4)
+       # → 2020-01-01 12:00:00-04:00
        ```
     @zone Time_Zone.default_widget
     set_time_zone self (zone : Time_Zone) -> Date_Time =
@@ -753,15 +890,14 @@ type Date_Time
        group: DateTime
        icon: time
        ---
-       Convert the time instant to the same instant in UTC.
+       The same instant as this date-time, written in UTC.
 
        ## Examples
-       ### Convert time instance to UTC.
-
+       ### A Moscow time in UTC
        ```
-             from Standard.Base import Date_Time, Time_Zone
-
-             example_at_time_zone = Date_Time.new 2020 zone=(Time_Zone.parse "Europe/Moscow") . to_utc
+       time = Date_Time.new 2020 6 1 12 zone=(Time_Zone.parse "Europe/Moscow")
+       utc = time.to_utc
+       # → 2020-06-01 09:00:00Z[UTC]
        ```
     to_utc self -> Date_Time =
         self.at_time_zone Time_Zone.utc
@@ -770,9 +906,29 @@ type Date_Time
        group: DateTime
        icon: time
        ---
-       Returns a requested date-time part as integer.
-       Produces a warning for a Date_Time that is before epoch start.
+       A part of this date-time, as a number: the year, quarter, month, week of the
+       year or day of the month, or the hour, minute, second, millisecond, microsecond
+       or nanosecond.
+       Produces a warning for a date-time that is before epoch start.
        See `Date_Time.enso_epoch_start`.
+
+       ## Arguments
+       - `period`: Which part of the date-time to return.
+
+       ## Examples
+       ### The quarter of a date-time
+       ```
+       time = Date_Time.new 2020 12 23 11 45
+       quarter = time.date_part Date_Period.Quarter
+       # → 4
+       ```
+
+       ### The minute of a date-time
+       ```
+       time = Date_Time.new 2020 12 23 11 45
+       minute = time.date_part Time_Period.Minute
+       # → 45
+       ```
     @period make_date_time_period_selector
     date_part self (period : Date_Period | Time_Period) -> Integer =
         case period of
@@ -792,16 +948,31 @@ type Date_Time
        group: DateTime
        icon: time
        ---
-       Computes a time difference between the two date-times.
-       It returns an integer expressing how many periods fit between the two
-       date-times.
-       The difference will be positive if `end` is greater than `self`.
-       Produces a warning for a Date_Time that is before epoch start.
+       Computes the difference between two date-times as a whole number of periods.
+       The difference is positive if `end` is after this date-time.
+       Produces a warning for a date-time that is before epoch start.
        See `Date_Time.enso_epoch_start`.
 
        ## Arguments
-        - `end`: A date-time to compute the difference from.
-        - `period`: The period to compute the difference in.
+       - `end`: The date-time to compute the difference to.
+       - `period`: The kind of period to count.
+
+       ## Examples
+       ### The whole months between two date-times
+       ```
+       time = Date_Time.new 2020 1 1 zone=Time_Zone.utc
+       finish = Date_Time.new 2020 12 23 zone=Time_Zone.utc
+       months = time.date_diff finish Date_Period.Month
+       # → 11
+       ```
+
+       ### The whole hours between two date-times
+       ```
+       time = Date_Time.new 2020 12 23 8 30 zone=Time_Zone.utc
+       finish = Date_Time.new 2020 12 23 17 15 zone=Time_Zone.utc
+       hours = time.date_diff finish Time_Period.Hour
+       # → 8
+       ```
     @period make_date_time_period_selector
     date_diff self (end : Date_Time) (period : Date_Period | Time_Period) -> Integer = ensure_in_epoch self <|
         Time_Utils.unit_datetime_difference period.to_java_unit self end
@@ -810,14 +981,29 @@ type Date_Time
        group: DateTime
        icon: time
        ---
-       Shifts the date-time by a specified period.
-       Produces a warning for a Date_Time that is before epoch start.
+       Shifts this date-time by a number of periods.
+       Produces a warning for a date-time that is before epoch start.
        See `Date_Time.enso_epoch_start`.
 
        ## Arguments
-        - `amount`: An integer specifying by how many periods to shift the
-          date-time.
-        - `period`: The period by which to shift.
+       - `amount`: How many periods to shift the date-time by. A negative number shifts
+         it back.
+       - `period`: The kind of period to shift by.
+
+       ## Examples
+       ### A month after the end of January
+       ```
+       time = Date_Time.new 2020 1 31 11 45 zone=Time_Zone.utc
+       shifted = time.date_add 1 Date_Period.Month
+       # → 2020-02-29 11:45:00Z[UTC]
+       ```
+
+       ### Three hours earlier
+       ```
+       time = Date_Time.new 2020 1 1 1 30 zone=Time_Zone.utc
+       shifted = time.date_add -3 Time_Period.Hour
+       # → 2019-12-31 22:30:00Z[UTC]
+       ```
     @period make_date_time_period_selector
     date_add self (amount : Integer) (period : Date_Period | Time_Period) -> Date_Time = ensure_in_epoch self <|
         Time_Utils.unit_datetime_add period.to_java_unit self amount
@@ -827,28 +1013,26 @@ type Date_Time
        group: Operators
        icon: time
        ---
-       Add the specified amount of time to this instant to produce a new instant.
+       Adds an amount of time to this date-time to get another date-time.
 
        ## Arguments
-        - `amount`: The amount of time to add to this instant, It can be a
-          `Duration`, `Period`, `Time_Period`, or `Date_Period`.
+       - `amount`: The amount of time to add: a `Duration`, a `Period` for a custom
+         number of years, months and days, or a `Time_Period` or `Date_Period` for one
+         unit.
 
        ## Examples
-       ### Add 15 years and 3 hours to a zoned date time.
-
+       ### Add 15 years and 3 hours
        ```
-             from Standard.Base import Date_Time, Period
-             from Standard.Base.Data.Time import Duration
-
-             example_plus = Date_Time.new 2020 + (Period.new years=15) + (Duration.new hours=3)
+       time = Date_Time.new 2020 zone=Time_Zone.utc
+       later = time + (Period.new years=15) + (Duration.new hours=3)
+       # → 2035-01-01 03:00:00Z[UTC]
        ```
 
-       ### Add one quarter to a zoned date time.
-
+       ### Add a quarter
        ```
-             from Standard.Base import Date_Time, Date_Period
-
-             example_plus = Date_Time.new 2020 + Date_Period.Quarter
+       time = Date_Time.new 2020 zone=Time_Zone.utc
+       later = time + Date_Period.Quarter
+       # → 2020-04-01 00:00:00Z[UTC]
        ```
     @amount (make_date_time_period_selector include_custom=True)
     + self (amount : Duration | Period | Time_Period | Date_Period) -> Date_Time ! Time_Error =
@@ -866,40 +1050,44 @@ type Date_Time
        group: DateTime
        icon: time
        ---
-       Shift the date by the specified amount of business days.
-       For the purpose of this method, the business days are defined to be Monday
-       through Friday.
-       Produces a warning if called on a Date_Time that is before an epoch start.
+       Shifts this date-time by a number of working days, Monday to Friday. The time of
+       day is kept.
+       Produces a warning for a date-time that is before epoch start.
        See `Date_Time.enso_epoch_start`.
-       This method always returns a day which is a business day - if the shift
-       amount is zero, the closest following business day is returned. For the
-       purpose of calculating the shift, the holidays are treated as if we were
-       starting at the next business day after them, for example counting the
-       shift starting on Saturday or Sunday works as if we were counting the
-       shift from Monday (for positive shifts). So shifting Sunday by zero days
-       will return Monday, but shifting it by one day will return a Tuesday (so
-       that there is the full work day - Monday) within the interval. For
-       negative shifts, shifting either Saturday or Sunday one day backwards will
-       return Friday, but shifting Monday one day backwards will return a Friday.
-       The whole logic is made consistent with `work_days_until`, so that the
-       following properties hold:
-       date.work_days_until (date.add_work_days N) == N for any N >= 0
-       (date.add_work_days N).work_days_until date == -N for any N < 0 The time
-       of day is preserved, only the date is shifted.
 
        ## Arguments
-        - `amount`: The number of business days to shift the date by. If `amount`
-          is zero, the current date is returned, unless it is a weekend or a
-          holiday, in which case the next business day is returned.
-        - `holidays`: An optional list of dates of custom holidays that should
-          also be skipped. If it is not provided, only weekends are skipped.
+       - `days`: The number of working days to shift by. A negative number shifts back.
+         If it is zero, the date-time is kept, unless it falls on a weekend or a
+         holiday, in which case the next working day is returned.
+       - `holidays`: Dates to skip as well. Weekends are already skipped.
 
        ## Examples
-       ### Shift the date by 5 business days.
+       ### Five working days after a Monday
+       ```
+       time = Date_Time.new 2020 2 3 11 45 zone=Time_Zone.utc
+       later = time.add_work_days 5
+       # → 2020-02-10 11:45:00Z[UTC]
+       ```
 
+       ### Skipping a holiday
        ```
-             example_shift = Date_Time.new 2020 2 3 11 45 . add_work_days 5
+       time = Date_Time.new 2020 2 3 11 45 zone=Time_Zone.utc
+       holidays = [Date.new 2020 2 5]
+       later = time.add_work_days 5 holidays
+       # → 2020-02-11 11:45:00Z[UTC]
        ```
+
+       ## Remarks
+
+       ### Weekends
+       The result is always a working day. A shift of zero from a Saturday or Sunday
+       gives the Monday after. A shift of one from a Sunday gives the Tuesday, so that
+       the Monday is a whole working day within the interval. A shift of one day back
+       from a Saturday, a Sunday or a Monday gives the Friday before.
+
+       This is consistent with `Date.work_days_until`: `date.work_days_until
+       (date.add_work_days n)` is `n` for any `n >= 0`, and
+       `(date.add_work_days n).work_days_until date` is `-n` for any `n < 0`.
     add_work_days self (days : Integer = 1) (holidays : Vector Date = []) -> Date_Time =
         ensure_in_epoch self <|
             self.date.add_work_days days holidays . to_date_time self.time_of_day self.zone
@@ -909,30 +1097,27 @@ type Date_Time
        group: Operators
        icon: time
        ---
-       Subtract the specified amount of time from this instant to get a new
-       instant.
-       Produces a warning if the resulting date time is before an Enso epoch.
+       Subtracts an amount of time from this date-time to get another date-time.
+       Produces a warning if the resulting date-time is before the Enso epoch start.
 
        ## Arguments
-        - `amount`: The amount of time to add to this instant, It can be a
-          `Duration`, `Period`, `Time_Period`, or `Date_Period`.
+       - `amount`: The amount of time to subtract: a `Duration`, a `Period` for a
+         custom number of years, months and days, or a `Time_Period` or `Date_Period`
+         for one unit.
 
        ## Examples
-       ### Subtract 1 year, 9 months and 12 hours from a zoned date time.
-
+       ### Subtract 1 year, 9 months and 5 hours
        ```
-             from Standard.Base import Date_Time
-             import Standard.Base.Data.Time.Duration
-
-             example_minus = Date_Time.new 2020 - (Period.new years=1) - (Period.new months=9) - (Duration.new hours=5)
+       time = Date_Time.new 2020 zone=Time_Zone.utc
+       earlier = time - (Period.new years=1 months=9) - (Duration.new hours=5)
+       # → 2018-03-31 19:00:00Z[UTC]
        ```
 
-       ### Subtract one quarter from a zoned date time.
-
+       ### Subtract a quarter
        ```
-             from Standard.Base import Date_Time, Date_Period
-
-             example_plus = Date_Time.new 2020 - Date_Period.Quarter
+       time = Date_Time.new 2020 zone=Time_Zone.utc
+       earlier = time - Date_Period.Quarter
+       # → 2019-10-01 00:00:00Z[UTC]
        ```
     @amount (make_date_time_period_selector include_custom=True)
     - self (amount : Duration | Period | Time_Period | Date_Period) -> Date_Time ! Time_Error =
@@ -1004,50 +1189,40 @@ type Date_Time
        group: Conversions
        icon: convert
        ---
-       Format this time as text using the specified format specifier.
+       Formats this date-time as text using the provided format specifier.
 
        ## Arguments
-        - `format`: A pattern describing how to format the text, or a
-          `Date_Time_Formatter`.
+       - `format`: A pattern describing how to format the text, or a
+         `Date_Time_Formatter`.
 
        ## Examples
-       ### Format "2020-10-08T16:41:13+03:00[Europe/Moscow]" as
-         "2020-10-08T16:41:13+03:00[Europe/Moscow]".
-
+       ### Format a date-time with the month's name
        ```
-             from Standard.Base import Date_Time
-
-             example_format =
-                Date_Time.parse "2020-10-08T16:41:13+03:00[Europe/Moscow]" . format "yyyy-MM-dd'T'HH:mm:ssZZZZ'['tt']'"
+       time = Date_Time.new 2020 10 8 16 41 13 zone=Time_Zone.utc
+       text = time.format "d MMMM yyyy h:mm a"
+       # → "8 October 2020 4:41 PM"
        ```
 
-       ### Format "2020-10-08T16:41:13+03:00[Europe/Moscow]" as
-         "Thursday October 8 4:41 PM".
+       ### Format a date-time with a short weekday and month
        ```
-             from Standard.Base import Date_Time
-
-             example_format =
-                Date_Time.parse "2020-10-08T16:41:13+03:00[Europe/Moscow]" . format "EEEE MMMM d h:mm a"
+       time = Date_Time.new 2020 10 8 16 41 13 zone=Time_Zone.utc
+       text = time.format "ddd MMM d (HH:mm)"
+       # → "Thu Oct 8 (16:41)"
        ```
 
-       ### Format "2020-10-08T16:41:13+03:00[Europe/Moscow]" as
-         "Thu Oct 8 (16:41)".
-
+       ### Format a date-time with its offset and zone
        ```
-             from Standard.Base import Date_Time
-
-             example_format =
-                Date_Time.parse "2020-10-08T16:41:13+03:00[Europe/Moscow]" . format "EEE MMM d (HH:mm)"
+       time = Date_Time.parse "2020-10-08T16:41:13+03:00[Europe/Moscow]"
+       text = time.format "yyyy-MM-dd'T'HH:mm:ssZZZZZ'['TT']'"
+       # → "2020-10-08T16:41:13+03:00[Europe/Moscow]"
        ```
 
-       ### Format "2020-06-21T16:41:13+03:00" with French locale as "21. juin 2020"
-
+       ### Format a date-time in a particular locale
        ```
-             from Standard.Base import Date_Time
-             import Standard.Base.Data.Locale.Locale
-
-             example_format =
-                 Date_Time.parse "2020-06-21T16:41:13+03:00" . format "d. MMMM yyyy" (Locale.new "fr")
+       time = Date_Time.new 2020 6 21 16 41 13 zone=Time_Zone.utc
+       formatter = Date_Time_Formatter.from "d. MMMM yyyy" (Locale.new "fr")
+       text = time.format formatter
+       # → "21. juin 2020"
        ```
 
        ## Remarks
@@ -1107,7 +1282,25 @@ type Date_Time
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than `that`.
+       Checks if this date-time is after `that` date-time.
+
+       ## Arguments
+       - `that`: The date-time to compare with.
+
+       ## Examples
+       ### A date-time compared with another
+       ```
+       time = Date_Time.new 2020 12 23 11 45 zone=Time_Zone.utc
+       other = Date_Time.new 2020 12 23 9 15 zone=Time_Zone.utc
+       result = time > other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date-time picker. Connect a date-time, or type one such as
+       `Date_Time.new 2020 1 1`.
     > self that = Comparable.> self=self that
 
     ## ---
@@ -1115,7 +1308,25 @@ type Date_Time
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than or equal to `that`.
+       Checks if this date-time is the same as, or after, `that` date-time.
+
+       ## Arguments
+       - `that`: The date-time to compare with.
+
+       ## Examples
+       ### A date-time compared with another
+       ```
+       time = Date_Time.new 2020 12 23 11 45 zone=Time_Zone.utc
+       other = Date_Time.new 2020 12 23 11 45 zone=Time_Zone.utc
+       result = time >= other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date-time picker. Connect a date-time, or type one such as
+       `Date_Time.new 2020 1 1`.
     >= self that = Comparable.>= self=self that
 
     ## ---
@@ -1123,7 +1334,25 @@ type Date_Time
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than `that`.
+       Checks if this date-time is before `that` date-time.
+
+       ## Arguments
+       - `that`: The date-time to compare with.
+
+       ## Examples
+       ### A date-time compared with another
+       ```
+       time = Date_Time.new 2020 12 23 11 45 zone=Time_Zone.utc
+       other = Date_Time.new 2020 12 23 9 15 zone=Time_Zone.utc
+       result = time < other
+       # → False
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date-time picker. Connect a date-time, or type one such as
+       `Date_Time.new 2020 1 1`.
     < self that = Comparable.< self=self that
 
     ## ---
@@ -1131,7 +1360,25 @@ type Date_Time
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than or equal to `that`.
+       Checks if this date-time is the same as, or before, `that` date-time.
+
+       ## Arguments
+       - `that`: The date-time to compare with.
+
+       ## Examples
+       ### A date-time compared with another
+       ```
+       time = Date_Time.new 2020 12 23 11 45 zone=Time_Zone.utc
+       other = Date_Time.new 2020 12 23 11 45 zone=Time_Zone.utc
+       result = time <= other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no date-time picker. Connect a date-time, or type one such as
+       `Date_Time.new 2020 1 1`.
     <= self that = Comparable.<= self=self that
 
 ## ---
