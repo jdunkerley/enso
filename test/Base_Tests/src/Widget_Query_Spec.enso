@@ -6,7 +6,7 @@ import Standard.Base.Errors.Illegal_State.Illegal_State
 import Standard.Base.Metadata.Choice
 import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Query
-from Standard.Base.Metadata.Widget_Query import Argument_Result, Widget_Failure, Widget_Method
+from Standard.Base.Metadata.Widget_Query import Argument_Result, Widget_Method
 
 from Standard.Test import all
 
