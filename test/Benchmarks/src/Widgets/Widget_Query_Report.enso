@@ -1,0 +1,24 @@
+from Standard.Base import all
+import project.Widgets.Widget_Query_Bench
+
+time_ms ~action = (Duration.time_execution action).first.nanoseconds / 1000000.0
+
+median values =
+    sorted = values.sort
+    sorted.at (sorted.length.div 2)
+
+## `cold_ms` is the first call per backend and query (the engine and JIT are
+   already warm after the first backend); `warm_ms` is the median of 10 more.
+main =
+    data = Widget_Query_Bench.Data.create
+    IO.println "backend\tmethod\tcold_ms\twarm_ms\tkb\tflag"
+    Widget_Query_Bench.backends.each backend->
+        # Force the table now, so `cold_ms` excludes building or uploading it.
+        _ = backend.table data
+        Widget_Query_Bench.queries.each query->
+            cold = time_ms (Widget_Query_Bench.run_query backend data query)
+            warm = median (0.up_to 10 . map _-> time_ms (Widget_Query_Bench.run_query backend data query))
+            out = Widget_Query_Bench.run_query backend data query
+            kb = if out.is_nothing then 0 else (out.length / 1024.0).round 1
+            flag = if out.is_nothing then "ABSENT" else if out.contains '"error"' then "ERROR" else ""
+            IO.println (backend.name + '\t' + query.first + '\t' + (cold.round 2).to_text + '\t' + (warm.round 2).to_text + '\t' + kb.to_text + '\t' + flag)

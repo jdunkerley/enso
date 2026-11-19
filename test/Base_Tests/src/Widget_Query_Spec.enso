@@ -1,0 +1,189 @@
+from Standard.Base import all
+import Standard.Base.Errors.Common.Module_Does_Not_Exist
+import Standard.Base.Errors.Common.No_Such_Method
+import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+import Standard.Base.Errors.Illegal_State.Illegal_State
+import Standard.Base.Metadata.Choice
+import Standard.Base.Metadata.Widget
+import Standard.Base.Metadata.Widget_Query
+from Standard.Base.Metadata.Widget_Query import Argument_Result, Widget_Method
+
+from Standard.Test import all
+
+polyglot java import org.enso.base.LogOnce
+
+## This module as the IDE names it.
+spec_module = "enso_dev.Base_Tests.Widget_Query_Spec"
+
+add_three a b c = a + b + c
+
+
+sample_type = spec_module + ".Sample"
+
+type Sample
+    @label (Widget.Text_Input)
+    Value label
+
+    @arg (Widget.Boolean_Input)
+    probe self (arg = 0) = arg
+
+    @arg (Widget.Numeric_Input)
+    make (arg = 0) = Sample.Value arg
+
+    @arg _choice_of_label
+    of_self self (arg = 0) = arg
+
+    @arg _choice_of_cache
+    of_cache self (arg = 0) (other = 0) = arg + other
+
+    @arg (Error.throw (Illegal_Argument.Error "no choices" (Illegal_State.Error "the cause")))
+    fails_with_error self (arg = 0) = arg
+
+    @arg _panics
+    fails_with_panic self (arg = 0) = arg
+
+    @arg ("not a widget")
+    not_a_widget self (arg = 0) = arg
+
+    plain self (arg = 0) = arg
+
+    @first (Widget.Boolean_Input)
+    @second (Error.throw (Illegal_Argument.Error "second fails"))
+    two self (first = 0) (second = 0) = first + second
+
+## Defined on `Any`: a `Sample` value has its own `probe`.
+@arg (Widget.Folder_Browse)
+Any.probe self (arg = 0) = arg
+
+## An extension method of a type defined elsewhere.
+@range (Widget.Secret_Browse)
+Text.widget_probe self (range = 0) = range
+
+@arg (Widget.Text_Input)
+module_probe (arg = 0) = arg
+
+private _choice_of_label subject -> Widget =
+    Widget.Single_Choice [Choice.Option subject.label]
+
+private _choice_of_cache _ cache=Nothing -> Widget =
+    Widget.Single_Choice [Choice.Option (cache "other" . to_text)]
+
+private _panics subject = Panic.throw (Illegal_State.Error "boom for "+subject.label)
+
+## The answer for one argument whose widget is `widget`.
+answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
+
+## The error part of the answer for the one argument asked for.
+error_of answer_json = answer_json.parse_json . get "arguments" . first . second . get "error"
+
+add_specs suite_builder =
+    suite_builder.group "Meta.call_module_method" group_builder->
+        group_builder.specify "applies a module's method to the value, then to the arguments" <|
+            Meta.call_module_method spec_module "add_three" [2, 3] 1 . should_equal 6
+
+        group_builder.specify "fails for a module that is not loaded, or a method it lacks" <|
+            Meta.call_module_method "enso_dev.Base_Tests.No_Such_Module" "f" [] 1 . should_fail_with Module_Does_Not_Exist
+            Meta.call_module_method spec_module "no_such_method" [] 1 . should_fail_with No_Such_Method
+
+
+    suite_builder.group "Widget_Query.resolve_call finds exactly the method a call names" group_builder->
+        sample = Sample.Value "a label"
+
+        group_builder.specify "an instance method" <|
+            Widget_Query.resolve_call sample spec_module sample_type "probe" ["arg"] . should_equal (answer "arg" Widget.Boolean_Input)
+
+        group_builder.specify "a method of Any, although the value's own type defines one of that name" <|
+            Meta.get_annotation sample .probe "arg" . should_equal Widget.Boolean_Input
+            Widget_Query.resolve_call sample spec_module "Standard.Base.Any.Any" "probe" ["arg"] . should_equal (answer "arg" Widget.Folder_Browse)
+
+        group_builder.specify "a static method, called on the type" <|
+            Widget_Query.resolve_call Sample spec_module sample_type "make" ["arg"] . should_equal (answer "arg" Widget.Numeric_Input)
+
+        group_builder.specify "a constructor, with the type as the subject (an autoscoped call)" <|
+            Widget_Query.resolve_call Nothing spec_module sample_type "Value" ["label"] subject_is_type=True . should_equal (answer "label" Widget.Text_Input)
+
+        group_builder.specify "an extension method defined in another module than its type" <|
+            Widget_Query.resolve_call "abc" spec_module "Standard.Base.Data.Text.Text" "widget_probe" ["range"] . should_equal (answer "range" Widget.Secret_Browse)
+
+        group_builder.specify "a module method" <|
+            Widget_Query.resolve_call Nothing spec_module spec_module "module_probe" ["arg"] subject_is_type=True . should_equal (answer "arg" Widget.Text_Input)
+
+    suite_builder.group "Widget_Query.resolve_call evaluates annotations as before" group_builder->
+        sample = Sample.Value "a label"
+
+        group_builder.specify "a function of self" <|
+            Widget_Query.resolve_call sample spec_module sample_type "of_self" ["arg"] . should_equal (answer "arg" (Widget.Single_Choice [Choice.Option "a label"]))
+
+        group_builder.specify "a function of self taking cache, which reads the uuids" <|
+            Widget_Query.resolve_call sample spec_module sample_type "of_cache" ["arg"] "{}" . should_equal (answer "arg" (Widget.Single_Choice [Choice.Option "Nothing"]))
+
+        group_builder.specify "no annotation gives a null widget" <|
+            Widget_Query.resolve_call sample spec_module sample_type "plain" ["arg"] . should_equal '{"arguments":[["arg",{"widget":null}]]}'
+
+        group_builder.specify "each argument independently, in the order asked" <|
+            json = Widget_Query.resolve_call sample spec_module sample_type "two" ["second", "first"]
+            arguments = json.parse_json . get "arguments"
+            arguments.map .first . should_equal ["second", "first"]
+            arguments.first.second.get "error" . get "message" . should_contain "second fails"
+            arguments.second.second.get "widget" . get "constructor" . should_equal "Boolean_Input"
+
+    suite_builder.group "Widget_Query.resolve_call gives errors as results" group_builder->
+        sample = Sample.Value "a label"
+
+        group_builder.specify "an annotation that is an error" <|
+            error = error_of (Widget_Query.resolve_call sample spec_module sample_type "fails_with_error" ["arg"])
+            error.get "step" . should_equal "annotation"
+            error.get "message" . should_contain "no choices"
+
+        group_builder.specify "an annotation that panics" <|
+            error = error_of (Widget_Query.resolve_call sample spec_module sample_type "fails_with_panic" ["arg"])
+            error.get "step" . should_equal "annotation"
+            error.get "message" . should_contain "boom for a label"
+
+        group_builder.specify "an annotation that is not a Widget" <|
+            error = error_of (Widget_Query.resolve_call sample spec_module sample_type "not_a_widget" ["arg"])
+            error.get "message" . should_contain "not a Widget"
+
+        group_builder.specify "a method that does not exist" <|
+            error = error_of (Widget_Query.resolve_call sample spec_module sample_type "missing" ["arg"])
+            error.get "step" . should_equal "lookup"
+
+    suite_builder.group "Widget_Query failures are logged once, with their causes and stack" group_builder->
+        sample = Sample.Value "a label"
+        method name = Widget_Method.Value spec_module sample_type name
+        no_cache = _-> Nothing
+
+        group_builder.specify "an error's entry has the method, the argument, the step, the message and the cause" <|
+            result = Widget_Query.resolve_argument (method "fails_with_error") "arg" sample no_cache
+            result.should_be_a Argument_Result.Failed
+            text = result.failure.log_text
+            text.should_contain "`arg` of enso_dev.Base_Tests.Widget_Query_Spec.Sample.fails_with_error"
+            text.should_contain "failed at the annotation: "
+            text.should_contain "no choices"
+            text.should_contain "caused by: "
+            text.should_contain "the cause"
+
+        group_builder.specify "a panic's entry has its stack" <|
+            result = Widget_Query.resolve_argument (method "fails_with_panic") "arg" sample no_cache
+            result.failure.stack.is_empty . should_be_false
+            result.failure.log_text . should_contain '\n    at '
+
+        group_builder.specify "is logged once per method, argument, inputs, step and message" <|
+            failure = (Widget_Query.resolve_argument (method "fails_with_error") "arg" sample no_cache).failure
+            inputs = "test inputs " + Random.uuid
+            Widget_Query.log_failure failure inputs . should_be_true
+            Widget_Query.log_failure failure inputs . should_be_false
+            Widget_Query.log_failure failure inputs+"2" . should_be_true
+
+
+    suite_builder.group "LogOnce" group_builder->
+        group_builder.specify "is true only the first time it sees a key" <|
+            key = "Widget_Query_Spec " + Random.uuid
+            LogOnce.firstTime key . should_be_true
+            LogOnce.firstTime key . should_be_false
+            LogOnce.firstTime key+"x" . should_be_true
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

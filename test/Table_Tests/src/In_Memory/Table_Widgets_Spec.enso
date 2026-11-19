@@ -1,16 +1,17 @@
 from Standard.Base import all
-
 import Standard.Base.Metadata.Choice
-import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Display
+import Standard.Base.Metadata.Widget
+import Standard.Base.Metadata.Widget_Query
 
 from Standard.Table import Table
-from Standard.Geo import all
-
-import Standard.Visualization.Widgets
 
 from Standard.Test import all
 
+table_module = "Standard.Table.Table"
+table_type = "Standard.Table.Table.Table"
+
+answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
 
 add_specs suite_builder =
     suite_builder.group "Widgets for In-Memory with column name sets" group_builder->
@@ -18,14 +19,14 @@ add_specs suite_builder =
 
         group_builder.specify "works for `get` and `at`" <|
             choices = mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = '[["selector",' + Widget.Single_Choice choices Nothing Display.Always . to_json + ']]'
-            Widgets.get_widget_json mock_table .get ["selector"] . should_equal expect
-            Widgets.get_widget_json mock_table .at ["selector"] . should_equal expect
+            expect = answer "selector" (Widget.Single_Choice choices Nothing Display.Always)
+            Widget_Query.resolve_call mock_table table_module table_type "get" ["selector"] . should_equal expect
+            Widget_Query.resolve_call mock_table table_module table_type "at" ["selector"] . should_equal expect
 
         group_builder.specify "works for `filter`" <|
             choices = [Choice.Option "<Expression>" "(expr '[A]')"] + mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = '[["column",' + Widget.Single_Choice choices Nothing Display.Always . to_json + ']]'
-            Widgets.get_widget_json mock_table .filter ["column"] . should_equal expect
+            expect = answer "column" (Widget.Single_Choice choices Nothing Display.Always)
+            Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
 
         group_builder.specify "works for `join` with `right` table" <|
             abc = ["A", "B", "C"]
@@ -70,13 +71,7 @@ add_specs suite_builder =
 
             labels . should_equal ['Equals', 'Equals (Ignore Case)', 'Between']
 
-        group_builder.specify "works for `geo_distance`" <|
-            choices = [Choice.Option "<Number Value>" "0", Choice.Option "<Expression>" "(expr '[A]')"]
-            expect = '[["lat1",' + Widget.Single_Choice choices Nothing Display.Always . to_json + ']]'
-            Widgets.get_widget_json mock_table .geo_distance ["lat1"] . should_equal expect
-
 main filter=Nothing =
     suite = Test.build suite_builder->
         add_specs suite_builder
     suite.run_with_filter filter
-

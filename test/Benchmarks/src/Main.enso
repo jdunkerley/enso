@@ -47,6 +47,7 @@ import project.Vector.Operations
 import project.Vector.Sort
 import project.Vector.Zip_Benchmark
 import project.Warnings
+import project.Widgets.Widget_Query_Bench
 
 all_benchmarks -> Vector Bench =
     Vector.build builder->
@@ -81,6 +82,7 @@ all_benchmarks -> Vector Bench =
         builder.append Multi_Value_Key.collect_benches
         builder.append Mixed_Operations.collect_benches
         builder.append Unary_Column_Operations.collect_benches
+        builder.append Widget_Query_Bench.collect_benches
 
         # Text
         builder.append Build.collect_benches

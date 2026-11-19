@@ -1,0 +1,25 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Choice
+import Standard.Base.Metadata.Display
+import Standard.Base.Metadata.Widget
+import Standard.Base.Metadata.Widget_Query
+
+from Standard.Table import Table
+from Standard.Geo import all
+
+from Standard.Test import all
+
+answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
+
+add_specs suite_builder =
+    suite_builder.group "Geo widgets" group_builder->
+        group_builder.specify "geo_distance, an extension method of Table defined in Standard.Geo" <|
+            mock_table = Table.from_rows ["A", "B C", 'D "E"', "F.G/H\I"] []
+            choices = [Choice.Option "<Number Value>" "0", Choice.Option "<Expression>" "(expr '[A]')"]
+            expect = answer "lat1" (Widget.Single_Choice choices Nothing Display.Always)
+            Widget_Query.resolve_call mock_table "Standard.Geo.Table_Extensions" "Standard.Table.Table.Table" "geo_distance" ["lat1"] . should_equal expect
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter
