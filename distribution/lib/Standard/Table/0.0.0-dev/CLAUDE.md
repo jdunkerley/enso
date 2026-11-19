@@ -49,6 +49,13 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
 
 ## Things to avoid in generated code
 
+- `Column.map`, `Table.rows` and `.to_vector.map` where a Table or Column method
+  exists — `table.set (expr "[Price] * [Qty]") as="Total"`, Column arithmetic,
+  `text_replace`, `trim`, `parse`, `fill_nothing`, `iif`, `filter`, `aggregate`,
+  `merge`/`replace` for lookups. They run over the whole column at once and on a
+  database table become SQL; `map` fails on a database column and its
+  `to_vector` stops at 1,000 values.
+
 - Joins with mismatched key types silently produce mismatch markers — verify
   column types are compatible before joining.
 

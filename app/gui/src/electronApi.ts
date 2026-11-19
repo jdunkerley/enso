@@ -3,6 +3,7 @@ import type { DownloadUrlOptions } from 'enso-common/src/download'
 import type { JvmAotTrainingStatus } from 'enso-common/src/jvmAot'
 import type {
   ClaudeDesktopStatus,
+  McpActivitySnapshot,
   McpClientKind,
   McpStatus,
   McpToolCallReply,
@@ -129,6 +130,9 @@ export interface McpApi {
   readonly replyToolCall: (reply: McpToolCallReply) => void
   readonly status: () => Promise<McpStatus>
   readonly onStatusChanged: (handler: (status: McpStatus) => void) => () => void
+  /** Who has used the server and its last few calls; never what they asked or got. */
+  readonly activity: () => Promise<McpActivitySnapshot>
+  readonly onActivityChanged: (handler: (activity: McpActivitySnapshot) => void) => () => void
   readonly setEnabled: (enabled: boolean) => Promise<McpStatus>
   readonly setPort: (port: number) => Promise<McpStatus>
   readonly replaceToken: () => Promise<McpStatus>

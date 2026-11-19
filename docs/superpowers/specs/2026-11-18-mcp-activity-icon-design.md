@@ -8,31 +8,25 @@ amendment of 2026-11-16, "Activity icon").
 
 The MCP server is off by default and lives in Settings → AI. Once it is on,
 nothing in the app says so, nor whether an agent is using it. The owner's
-decision: **a top-bar icon, greyed when MCP is off. Clicking it opens a
-view-only popover**: the connected app, its last few tool calls, an **Enable
-MCP** button when MCP is off, and a link to Settings → AI. **No controls over
-the agent** (no disconnect, no stop).
+decision: **an icon (in the left rail, above Settings; see "Where"), greyed when
+MCP is off. Clicking it opens a view-only popover**: the connected app, its last
+few tool calls, an **Enable MCP** button when MCP is off, and a link to Settings
+→ AI. **No controls over the agent** (no disconnect, no stop).
 
 ## What the user sees
 
 ### Where
 
-The app's top bar is the 3rem strip of `AppContainer.vue` (`--top-bar-height`):
-the tabs (`TabBar.vue`) run in `.bar`, between the left rail and the right
-panel's rail, both of which run up through the strip. The icon goes at the
-**right end of the strip, immediately left of the right rail**, on every page
-(the Drive, a project, Settings, a session log): the server serves the whole
-app, not one project.
-
-It is **not** a child of `.bar`. With no tab open `middlePanelShown` is false,
-`.tabPanel` shrinks to the right rail and `.bar` has no width, so a button in it
-would vanish on the Drive at start-up, the most common place to turn MCP on. It
-is its own element in `AppContainer.vue` (`McpActivityButton.vue`, in
-`$/components/AppContainer/`), positioned absolutely at the strip's top right
-(`right: 48px`, the rail), above the left panel (which expands over the strip
-when the middle panel is hidden). `.bar`'s right padding grows by the button's
-width, so the tabs scroll under nothing. It renders only when `window.api.mcp`
-exists (the desktop app), as the Settings → AI tab does.
+**Owner decision 2026-11-18: the left rail, directly above Settings.** The first
+placement, at the right end of the top bar, clashed with the full-screen button
+on the owner's hand-test. The icon is the first of the rail footer's buttons
+(`RailFooter.vue`: MCP, Settings, Documentation, About), below the divider at
+the bottom of the left rail, so it is on every page (the Drive with no tab open,
+a project, Settings, a session log): the server serves the whole app, not one
+project. It is a rail button like its neighbours (`SvgButton`, the rail's hover,
+tooltip and size; its state's sentence as its label while the rail is expanded).
+It renders only when `window.api.mcp` exists (the desktop app), as the Settings
+→ AI tab does.
 
 ### The icon
 
@@ -41,7 +35,7 @@ the Settings → AI tab's `robot`). It is drawn to the icon rules of #95
 (Style-Guide-Icons; `iconStyle.test.ts` must pass): an agent connected to the
 IDE, e.g. a plug or a link node, legible at 16px. The before/after screenshots
 show it at 1× and 2× in both themes. The state is shown by the glyph's tone and
-a small badge drawn in CSS at its bottom right (6px, a 1px ring of the bar's
+a small badge drawn in CSS at its bottom right (6px, a 1px ring of the rail's
 background), not by variants of the symbol:
 
 | State         | When (from main's status and activity)                                                     | Glyph                  | Badge                                            |
@@ -59,8 +53,11 @@ same text as the button's accessible name, below).
 ### The popover
 
 `Popover` (`$/components/Dialog/`), modal (the default: Escape or a press
-outside closes it, focus returns to the icon), placed `bottom-end` under the
-icon, about 320px wide. It shows; it does not control. The mockups below.
+outside closes it, focus returns to the icon), placed `right-end`: to the right
+of the icon, clear of the rail, its bottom level with the icon's and pushed up
+or down only to stay inside the window (12px from its edges), about 320px wide.
+It is anchored to the icon's square, not the button, which widens with its label
+while the rail is expanded. It shows; it does not control. The mockups below.
 
 **Off**
 
@@ -341,10 +338,10 @@ otherwise). `mcpWarning` and `mcpLockedByEnvironment` are reused.
 
 ## Screenshots
 
-The implementation PR attaches before and after images of the top bar (Drive
-with no tab, and a project) and one image per popover state (off, error, on
-idle, connected, active), through the orphan `pr-screenshots` branch, per the
-standing rule. A UI feature: the owner tests an installer before it merges.
+The implementation PR attaches before and after images of the rail (Drive with
+no tab, and a project) and one image per popover state (off, error, on idle,
+connected, active), through the orphan `pr-screenshots` branch, per the standing
+rule. A UI feature: the owner tests an installer before it merges.
 
 ## Out of scope
 

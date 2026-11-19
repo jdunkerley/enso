@@ -204,11 +204,20 @@ render only its own slot content. The icon is already on the row, drawn by
   `WidgetFunction/hiddenParameters.ts`), shown only while the node is the only
   selected one (`showDetails`; the node may grow on selection). Its menu lists
   only that call's parameters; a pick is always written as a named argument. A
-  call nested inside another call's argument (`WidgetFunction` under another
-  one, with arguments of its own) is drawn as an outlined group (`.nestedCall`)
-  with its smaller ＋ inside, after its own last argument; the outer
-  call's ＋ ends the node, inside it. Selecting a node does not show its hidden
-  arguments, except those the method's doc front matter marks `selected`.
+  prefix call nested inside another call's argument (`WidgetFunction` under
+  another one, with arguments of its own) is drawn as an outlined group
+  (`.nestedCall`) with its smaller ＋ inside, after its own last argument; the
+  outer call's ＋ ends the node, inside it. An operator call gets the outline
+  only when it has hidden parameters. The outline is an inset `box-shadow`,
+  never a `border`, so a group is as high as a port at any depth and the node
+  stays one line. Selecting a node does not show its hidden arguments, except
+  those the method's doc front matter marks `selected`.
+- Operator chains (`util/operatorChain.ts`, `chainRole`): a run of operators
+  with the same precedence (from the parser, `Ast.binaryOperatorInfo`) is one
+  flat row; an operand that is a chain of a different precedence, or one in
+  parentheses, is a capsule (`WidgetApplication`'s `.operatorCapsule`, a darker
+  tint, port-high, padded only at the sides), and `WidgetGroup` drops the
+  parentheses around it. Operators are drawn as written.
 - **Display comes from the doc front matter, not the widget.** A method's
   `arguments:` map (`always`, `selected`, `when_modified`; see
   `suggestionDatabase/documentation.ts`, `entry.argumentDisplay`) decides
@@ -224,10 +233,10 @@ render only its own slot content. The icon is already on the row, drawn by
   (`Choice.Option`'s `label` stays); the engine's `ArgumentDisplayCheck`
   validates the block and `lintEnso` fails the standard library build on it.
 - Every argument shows its parameter's name (`WidgetArgumentName`): every prefix
-  argument, set or not, positional or named, at any depth, and an infix operand
-  whose parameter has a name of its own (not `self`, `that`, `lhs`, `rhs`). The
-  argument is drawn as a chip of its own (name, small and dim, then the value);
-  a top-level argument with a chip drops the separator line before it.
+  argument, set or not, positional or named, at any depth. No operand of an
+  infix operator shows a name. The argument is drawn as a chip of its own (name,
+  small and dim, then the value); a top-level argument with a chip drops the
+  separator line before it.
 - `WidgetPort` marks an argument that can be popped out with `data-pop-out-port`
   (plus `data-pop-out-name` and `data-pop-out-type`); dragging it off the node
   makes it a node of its own. The drag and the edit are in `../popOut/` - see

@@ -6,6 +6,7 @@ import { claudeDesktopConfigDirectory } from '@/mcp/claudeDesktop'
 import { graphImageTool } from '@/mcp/graphImageTool'
 import { Guides, guideTool } from '@/mcp/guides'
 import { fsImageFiles, imageTool } from '@/mcp/imageTool'
+import { McpActivity } from '@/mcp/mcpActivity'
 import { McpController } from '@/mcp/mcpController'
 import { McpHttpServer } from '@/mcp/mcpServer'
 import { projectTools } from '@/mcp/projectTools'
@@ -121,13 +122,19 @@ function initMcp(electron: Electron | undefined, electronIsDev: boolean) {
   registry.register(imageTool(bridge, capture, fsImageFiles()))
   registry.register(graphImageTool(bridge, capture))
   registry.register(guideTool(guides))
+  // One record for every server the controller creates: a server exists per start.
+  const activity = new McpActivity((snapshot) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(Channel.mcpActivityChanged, snapshot)
+    }
+  })
   const controller = new McpController({
     settingsPath: join(app.getPath('userData'), 'mcp-settings.json'),
     claudeDesktopDirectory: claudeDesktopConfigDirectory(process.platform, process.env, homedir()),
     entry: keyringEntries,
     env: process.env,
     createServer: (port, token) =>
-      new McpHttpServer({ registry, guides, port, token, version: BUILD_INFO.version }),
+      new McpHttpServer({ registry, guides, port, token, version: BUILD_INFO.version, activity }),
     onStatusChanged: (status) => {
       for (const window of BrowserWindow.getAllWindows()) {
         if (!window.isDestroyed()) window.webContents.send(Channel.mcpStatusChanged, status)
@@ -137,6 +144,7 @@ function initMcp(electron: Electron | undefined, electronIsDev: boolean) {
   mcpBridge = bridge
   mcpController = controller
   ipcMain.handle(Channel.mcpStatus, () => controller.status())
+  ipcMain.handle(Channel.mcpActivity, () => activity.snapshot())
   ipcMain.handle(Channel.mcpSetEnabled, (_event, enabled: unknown) => {
     if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean')
     return controller.setEnabled(enabled)

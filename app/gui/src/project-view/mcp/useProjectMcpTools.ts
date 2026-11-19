@@ -19,6 +19,7 @@ import { layoutHandlers } from './layoutHandlers'
 import { onUserModuleTransaction, watchExecution, watchGraphUpdate } from './projectEvents'
 import { isLive, type McpEditorDeps, type ProjectToolContext } from './projectToolContext'
 import { readHandlers } from './readHandlers'
+import { markingRefusals } from './refusals'
 import { structureHandlers } from './structureHandlers'
 import { viewHandlers } from './viewHandlers'
 import { visualizationHandlers } from './visualizationHandlers'
@@ -123,7 +124,12 @@ export function useProjectMcpTools(
   }
   // The project id is read when asked for, not kept: an editor stays with one project (its tab is
   // keyed by the project's id), so this is only belt and braces.
-  const registration = registerMcpToolHandlers(handlers, () => currentProject.id.value)
+  const registration = registerMcpToolHandlers(
+    Object.fromEntries(
+      Object.entries(handlers).map(([tool, handler]) => [tool, markingRefusals(handler)]),
+    ),
+    () => currentProject.id.value,
+  )
   onActivated(() => {
     active = true
     registration.activate()

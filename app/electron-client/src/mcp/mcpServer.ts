@@ -14,6 +14,7 @@ import {
 } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { Guides, guideUri } from './guides'
+import type { McpActivity } from './mcpActivity'
 import type { ToolRegistry } from './toolRegistry'
 
 const MCP_PATH = '/mcp'
@@ -25,6 +26,11 @@ export interface McpServerOptions {
   readonly port: number
   readonly token: string
   readonly version: string
+  /**
+   * Where requests and calls are recorded for the window's activity icon. Shared by every server
+   * the controller creates; cleared when this server stops.
+   */
+  readonly activity?: McpActivity | undefined
 }
 
 /* Note [The MCP Server Checks Its Caller]
@@ -118,12 +124,14 @@ export class McpHttpServer {
       this.httpServer.closeAllConnections()
     })
     this.boundPort = undefined
+    // A stopped server (turned off, or restarted on a new port or token) leaves no history.
+    this.options.activity?.clear()
   }
 
   // Fresh server per request: the SDK rejects `connect()` on an already-wired Protocol and our
   // HTTP transport is stateless (one transport per request).
   private createMcpServer(userAgent: string | undefined): McpServer {
-    const { registry, guides, version } = this.options
+    const { registry, guides, version, activity } = this.options
     const server = new McpServer(
       { name: 'enso', version },
       { capabilities: { tools: {}, resources: {} }, instructions: guides.instructions },
@@ -135,10 +143,21 @@ export class McpHttpServer {
         async (args) => {
           // Note [The MCP Caller Name Comes From The User-Agent]
           const clientName = server.server.getClientVersion()?.name ?? callerName(userAgent)
+          // Only the tool's name is recorded: never `args` or the result (Note [The MCP Activity
+          // Record Holds No Data]).
+          const callId = activity?.start(callerName(userAgent), tool.name)
           const result = await registry.call(tool.name, args, {
             kind: 'external',
             name: clientName,
           })
+          if (callId != null) {
+            activity?.end(
+              callId,
+              result.ok ? 'ok'
+              : result.refused === true ? 'refused'
+              : 'error',
+            )
+          }
           if (!result.ok) {
             return { content: [{ type: 'text' as const, text: result.error }], isError: true }
           }
@@ -212,7 +231,11 @@ export class McpHttpServer {
         res.end('not found')
         return
       }
-      const server = this.createMcpServer(req.headers['user-agent'])
+      const userAgent = req.headers['user-agent']
+      // The request passed the caller checks: its client is a connected app.
+      const token = callerName(userAgent)
+      this.options.activity?.seen(token)
+      const server = this.createMcpServer(userAgent)
       // The cast works around the SDK typing `sessionIdGenerator` as a non-optional
       // `() => string` even though `undefined` (stateless) is accepted at runtime.
       const transport = new StreamableHTTPServerTransport({
@@ -227,6 +250,16 @@ export class McpHttpServer {
       // concrete class actually exposes it as optional.
       await server.connect(transport as unknown as Parameters<typeof server.connect>[0])
       await transport.handleRequest(req, res)
+      // Non-null exactly when this request was an `initialize` (Note [The MCP Caller Name Comes
+      // From The User-Agent]): the app's own name for itself, kept under its token.
+      const info = server.server.getClientVersion()
+      if (info != null) {
+        this.options.activity?.named(token, {
+          name: info.name,
+          title: info.title,
+          version: info.version,
+        })
+      }
     } catch (err) {
       console.warn('[MCP] error handling request:', err)
       if (!res.headersSent) {

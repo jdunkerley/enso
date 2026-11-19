@@ -4,6 +4,13 @@
 
 - [Arguments a component always shows appear on its node at once, and a library
   can show an argument only while its node is selected][896]
+- [A plug icon in the left rail, above Settings, shows whether AI agents (MCP)
+  are off, have a problem, are on, connected or working. Click it to see the
+  connected app and its last five calls, or to turn MCP on.][878]
+- [Operator expressions read as code on one line: a run of the same kind of
+  operator (`a + b + c`) is one flat row, a part that binds differently
+  (`2 * 3 + 4`) is shaded, and parameter names no longer appear between
+  operands. Nodes stay one line high however deeply their calls nest.][895]
 - [Widgets show why they could not load, instead of disappearing: a warning
   marker on the argument gives the reason, the argument stays editable, and the
   Logs panel has the details. New projects no longer import
@@ -576,6 +583,8 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [896]: https://github.com/jdunkerley/enso/pull/896
+[878]: https://github.com/jdunkerley/enso/pull/878
+[895]: https://github.com/jdunkerley/enso/pull/895
 [891]: https://github.com/jdunkerley/enso/pull/891
 [846]: https://github.com/jdunkerley/enso/pull/846
 [822]: https://github.com/jdunkerley/enso/pull/822

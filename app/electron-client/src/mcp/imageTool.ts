@@ -265,7 +265,8 @@ function nameFromSource(fileName: string, extension: string): string {
   return RESERVED_NAME.test(name) ? `_${name}` : name
 }
 
-type Loaded = { ok: true; bytes: Buffer; name: string } | { ok: false; error: string }
+type Loaded =
+  { ok: true; bytes: Buffer; name: string } | { ok: false; error: string; refused?: true }
 
 const NOT_LOCAL_ERROR =
   'Give the full path of a file on this computer, such as C:\\charts\\sales.png; network and ' +
@@ -295,7 +296,7 @@ async function loadImageFile(
   platform: NodeJS.Platform,
 ): Promise<Loaded> {
   const refusal = pathError(path, platform)
-  if (refusal != null) return { ok: false, error: refusal }
+  if (refusal != null) return { ok: false, error: refusal, refused: true }
   const paths = platform === 'win32' ? win32 : posix
   const fileName = paths.basename(path)
   const extension = paths.extname(fileName).slice(1).toLowerCase()

@@ -173,7 +173,7 @@ async function runHandler(
   deadline: number,
 ): Promise<McpToolResult> {
   const handler = handlerFor(tool)
-  if (handler == null) return { ok: false, error: NO_PROJECT_ERROR }
+  if (handler == null) return { ok: false, error: NO_PROJECT_ERROR, refused: true }
   try {
     return await handler(args, caller, deadline)
   } catch (error) {

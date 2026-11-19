@@ -7,6 +7,7 @@ import {
 } from '$/providers/openedProjects/widgetRegistry'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import { Ast } from '@/util/ast'
+import { isCapsuledGroup } from '@/util/operatorChain'
 import { computed } from 'vue'
 
 const props = defineProps(widgetProps(widgetDefinition))
@@ -22,8 +23,9 @@ const child = computed(() => {
   else return undefined
 })
 
-// There is no need to display parenthesis for top-level groups.
-const displayParenthesis = computed(() => props.nesting >= 2)
+// There is no need to display parenthesis for top-level groups, nor around a chain drawn as a
+// capsule: the capsule shows the grouping.
+const displayParenthesis = computed(() => props.nesting >= 2 && !isCapsuledGroup(props.input.value))
 </script>
 
 <script lang="ts">

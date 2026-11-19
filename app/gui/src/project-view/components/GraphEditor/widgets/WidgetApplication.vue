@@ -7,6 +7,7 @@ import SizeTransition from '@/components/SizeTransition.vue'
 import { injectWidgetTree } from '@/providers/widgetTree'
 import { Ast } from '@/util/ast'
 import { ArgumentApplication, ArgumentApplicationKey } from '@/util/callTree'
+import { chainRole, type ChainRole } from '@/util/operatorChain'
 import { mapOrUndefined } from 'enso-common/src/utilities/data/opt'
 import { computed } from 'vue'
 import { FunctionName } from './WidgetFunctionName.vue'
@@ -43,8 +44,17 @@ const targetMaybePort = computed(() => {
   }
 })
 
+/** An infix level's place in its operator chain; a `capsule` is drawn as a tinted capsule. */
+const role = computed((): ChainRole | undefined => {
+  const appTree = application.value.appTree
+  return application.value.infixOperator != null && appTree instanceof Ast.OprApp ?
+      chainRole(appTree)
+    : undefined
+})
+
 const appClass = computed(() => {
-  return application.value.infixOperator != null ? 'infix' : 'prefix'
+  if (application.value.infixOperator == null) return 'prefix'
+  return role.value === 'capsule' ? 'infix operatorCapsule widgetRounded' : 'infix'
 })
 
 const operatorStyle = computed(() => {
@@ -83,7 +93,7 @@ export const widgetDefinition = defineWidget(
 </script>
 
 <template>
-  <div class="WidgetApplication widgetParent" :class="appClass">
+  <div class="WidgetApplication widgetParent" :class="appClass" :data-chain-role="role">
     <NodeWidget :input="targetMaybePort" :nest="application.isInnermost" />
     <div v-if="infixWidgetInput" class="infixOp widgetParent" :style="operatorStyle">
       <NodeWidget :input="infixWidgetInput" />
@@ -99,6 +109,16 @@ export const widgetDefinition = defineWidget(
   &.prefix {
     gap: var(--widget-token-pad-unit);
   }
+}
+
+.WidgetApplication.operatorCapsule {
+  /* A darker tint for a chain inside another: same height as a port, padded only at the sides. */
+  height: var(--node-port-height);
+  padding: 0 3px;
+  gap: 4px;
+  align-items: center;
+  border-radius: var(--node-port-border-radius);
+  background: rgb(0 0 0 / 0.2);
 }
 
 .infixOp {

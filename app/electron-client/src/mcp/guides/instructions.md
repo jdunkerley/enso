@@ -6,4 +6,5 @@ name in text, or evaluating text as code) is refused. Only the user turns Write
 on, by clicking it on a node. Your edits can still cause a write in two ways:
 calling a function in the user's project that enables output, and changing a
 node upstream of one the user switched Write on for (it re-runs). Ask the user
-before either.
+before either. Prefer Table and Column methods to `map`, and `Data.read_many` to
+one read per file.

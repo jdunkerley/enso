@@ -14,7 +14,16 @@ export interface McpImage {
 /** What a tool returns: text (and optionally an image), or an error sentence. */
 export type McpToolResult =
   | { readonly ok: true; readonly value: string; readonly image?: McpImage }
-  | { readonly ok: false; readonly error: string }
+  | {
+      readonly ok: false
+      readonly error: string
+      /**
+       * True when a house rule refused the call (Live mode, the Write rule, the undo floor, no
+       * project open, a path rule) rather than the call failing. Only the activity record reads it;
+       * the agent receives the same error either way.
+       */
+      readonly refused?: true
+    }
 
 /** Main → window. `args` has passed the tool's schema. */
 export interface McpToolCallRequest {
@@ -36,6 +45,46 @@ export interface McpToolCallReply {
 }
 
 export const MCP_DEFAULT_PORT = 39417
+
+/** How a recorded call stands: running, or how it ended. */
+export type McpCallOutcome = 'running' | 'ok' | 'refused' | 'error'
+
+/**
+ * One recorded tool call. It holds the tool's name, who called, when, and the outcome: never the
+ * arguments, the result or the error text, which can hold the user's data.
+ */
+export interface McpActivityCall {
+  readonly id: number
+  readonly client: string
+  readonly tool: string
+  /** Epoch milliseconds, on main's clock. */
+  readonly startedAt: number
+  readonly endedAt: number | null
+  readonly outcome: McpCallOutcome
+}
+
+/** An agent app that has used the server. */
+export interface McpActivityClient {
+  readonly name: string
+  readonly version: string | null
+  /** Epoch milliseconds, on main's clock. */
+  readonly lastSeenAt: number
+}
+
+/** What main tells the window about the server's use; see `McpActivity` in `electron-client`. */
+export interface McpActivitySnapshot {
+  /** Most recently seen first. */
+  readonly clients: readonly McpActivityClient[]
+  /** Newest first, at most {@link MCP_ACTIVITY_MAX_CALLS}. */
+  readonly calls: readonly McpActivityCall[]
+}
+
+/** How many calls the activity record keeps. */
+export const MCP_ACTIVITY_MAX_CALLS = 5
+/** A client counts as connected for this long after its last request (15 minutes). */
+export const MCP_CONNECTED_WINDOW_MS = 15 * 60 * 1000
+/** The icon counts as active for this long after a call ends (10 seconds). */
+export const MCP_ACTIVE_WINDOW_MS = 10 * 1000
 
 export interface McpStatus {
   readonly enabled: boolean

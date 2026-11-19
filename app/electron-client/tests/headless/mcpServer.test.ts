@@ -9,6 +9,7 @@ import * as path from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { z } from 'zod'
 import { Guides } from '../../src/mcp/guides'
+import { McpActivity } from '../../src/mcp/mcpActivity'
 import { callerName, McpHttpServer, refusal } from '../../src/mcp/mcpServer'
 import { ToolRegistry } from '../../src/mcp/toolRegistry'
 
@@ -258,5 +259,107 @@ describe('McpHttpServer', () => {
     await third.start()
     await third.stop()
     // `afterEach` stops `server` again: stopping must be harmless.
+  })
+})
+
+describe('McpHttpServer activity', () => {
+  let guidesRoot: string
+  let activity: McpActivity
+  let server: McpHttpServer
+  let client: Client | undefined
+
+  beforeEach(async () => {
+    guidesRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-activity-'))
+    activity = new McpActivity(() => {})
+    const registry = new ToolRegistry()
+    registry.register({
+      name: 'echo',
+      title: 'Echo',
+      description: 'Echoes its text.',
+      inputSchema: { text: z.string() },
+      run: async (args) => ({ ok: true, value: args.text as string }),
+    })
+    registry.register({
+      name: 'rule',
+      title: 'Rule',
+      description: 'Refused by a rule.',
+      inputSchema: {},
+      run: async () => ({ ok: false, error: 'a rule', refused: true }),
+    })
+    registry.register({
+      name: 'fail',
+      title: 'Fail',
+      description: 'Fails.',
+      inputSchema: {},
+      run: async () => ({ ok: false, error: 'it failed' }),
+    })
+    server = new McpHttpServer({
+      registry,
+      guides: new Guides(guidesRoot),
+      port: 0,
+      token: TOKEN,
+      version: '1.2.3',
+      activity,
+    })
+    await server.start()
+  })
+  afterEach(async () => {
+    await client?.close()
+    client = undefined
+    await server.stop()
+    fs.rmSync(guidesRoot, { recursive: true, force: true })
+  })
+
+  async function connect(): Promise<Client> {
+    client = new Client({ name: 'test-client', title: 'Test Client', version: '9' })
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(server.url), {
+        requestInit: {
+          headers: { Authorization: `Bearer ${TOKEN}`, 'User-Agent': 'test-agent/1.0' },
+        },
+      }) as Parameters<Client['connect']>[0],
+    )
+    return client
+  }
+
+  test('an initialize then a call records one client by its title and one call', async () => {
+    const connected = await connect()
+    await connected.callTool({ name: 'echo', arguments: { text: 'PRIVATE-TEXT' } })
+    const snapshot = activity.snapshot()
+    expect(snapshot.clients.map((c) => [c.name, c.version])).toEqual([['Test Client', '9']])
+    expect(snapshot.calls.map((c) => [c.client, c.tool, c.outcome])).toEqual([
+      ['Test Client', 'echo', 'ok'],
+    ])
+    expect(JSON.stringify(snapshot)).not.toContain('PRIVATE-TEXT')
+  })
+
+  test('tells a refused call from a failed one', async () => {
+    const connected = await connect()
+    await connected.callTool({ name: 'rule', arguments: {} })
+    await connected.callTool({ name: 'fail', arguments: {} })
+    expect(activity.snapshot().calls.map((c) => [c.tool, c.outcome])).toEqual([
+      ['fail', 'error'],
+      ['rule', 'refused'],
+    ])
+  })
+
+  test('a request without the token records nothing', async () => {
+    const response = await fetch(server.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+    })
+    expect(response.status).toBe(401)
+    expect(activity.snapshot()).toEqual({ clients: [], calls: [] })
+  })
+
+  test('stopping the server clears the record', async () => {
+    await (await connect()).callTool({ name: 'echo', arguments: { text: 'x' } })
+    expect(activity.snapshot().calls).toHaveLength(1)
+    await server.stop()
+    expect(activity.snapshot()).toEqual({ clients: [], calls: [] })
   })
 })
