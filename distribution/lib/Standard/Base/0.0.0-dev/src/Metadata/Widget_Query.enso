@@ -91,6 +91,7 @@ resolve_call (value : Any) (module_name : Text) (type_name : Text) (method_name 
 resolve_type (type_name : Text) -> Text =
     method = Widget_Method.Value type_name type_name "from"
     Progress.run label=type_name up_to=1 handle_name="Widget_Query.resolve_type "+type_name action=_->
+        ## `module_name` of the method is the type's name: the conversion is looked up on the type.
         result = resolve_type_argument method type_name
         _ = case result of
             Argument_Result.Failed failure -> log_failure failure "type"
@@ -102,15 +103,14 @@ resolve_type (type_name : Text) -> Text =
    ---
    `resolve_type`'s result before it is logged (exposed for the tests).
 resolve_type_argument (method : Widget_Method) (type_name : Text) -> Argument_Result =
-    ## A missing conversion is a panic (or, from some call paths, an error): the type has no default.
-    handler caught = case caught.payload of
-        _ : No_Such_Conversion -> Argument_Result.Resolved Nothing "null"
-        _ -> Argument_Result.Failed (_failure_from_panic method "" caught step="type_default")
-    Panic.catch Any handler=handler <|
-        typ = Meta.find_type_or_module type_name
-        if typ.is_error then Argument_Result.Failed (_failure_from_error method "" "lookup" typ) else
+    typ = Meta.find_type_or_module type_name
+    if typ.is_error then Argument_Result.Failed (_failure_from_error method "" "lookup" typ) else
+        handler caught = case _is_missing_default caught.payload typ of
+            True -> Argument_Result.Resolved Nothing "null"
+            False -> Argument_Result.Failed (_failure_from_panic method "" caught step="type_default")
+        Panic.catch Any handler=handler <|
             widget = Widget.from typ
-            if widget.is_error && (widget.catch . is_a No_Such_Conversion) then Argument_Result.Resolved Nothing "null" else
+            if widget.is_error && (_is_missing_default widget.catch typ) then Argument_Result.Resolved Nothing "null" else
                 _as_result method "" widget step="type_default"
 
 ## ---
@@ -256,6 +256,12 @@ private _as_result (method : Widget_Method) (argument : Text) widget (step : Tex
             _ ->
                 message = "The annotation gave " + (Meta.type_of widget . to_text) + ", not a Widget."
                 Argument_Result.Failed (Widget_Failure.Value method argument step message [] [])
+
+## Whether `payload` is the top-level miss: no `Widget.from` for `typ` itself. A
+   `No_Such_Conversion` raised inside the type's own conversion is not.
+private _is_missing_default payload typ -> Boolean = case payload of
+    c : No_Such_Conversion -> (c.target == Widget) && (c.that == typ)
+    _ -> False
 
 private _is_lookup_error payload -> Boolean = case payload of
     _ : No_Such_Method -> True

@@ -72,6 +72,16 @@ type No_Default
 type Broken_Default
     Value
 
+type Nested_Missing
+    Value
+
+type Lacks_Conversion
+    Value
+
+Widget.from (that : Nested_Missing.type) -> Widget =
+    _ = that
+    Widget.from Lacks_Conversion
+
 Widget.from (that : Broken_Default.type) -> Widget =
     _ = that
     Error.throw (Illegal_State.Error "broken on purpose")
@@ -241,6 +251,9 @@ add_specs suite_builder =
             json = Widget_Query.resolve_type spec_module+".Broken_Default" . parse_json
             json.get "error" . get "step" . should_equal "type_default"
             json.get "error" . get "message" . should_contain "broken on purpose"
+        group_builder.specify "answers a type_default error when the conversion itself hits a missing conversion" <|
+            json = Widget_Query.resolve_type spec_module+".Nested_Missing" . parse_json
+            json.get "error" . get "step" . should_equal "type_default"
         group_builder.specify "a failing type default's log entry names the type" <|
             method = Widget_Method.Value spec_module+".Broken_Default" spec_module+".Broken_Default" "from"
             result = Widget_Query.resolve_type_argument method spec_module+".Broken_Default"
