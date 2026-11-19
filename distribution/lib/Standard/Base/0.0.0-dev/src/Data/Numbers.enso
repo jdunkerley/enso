@@ -374,6 +374,8 @@ type Number
     ## ---
        group: Conversions
        icon: convert
+       arguments:
+         format: always
        ---
        Converts a numeric value to a string, using the Java DecimalFormat
        formatter.

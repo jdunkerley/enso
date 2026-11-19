@@ -89,6 +89,11 @@ type Date_Time
     ## ---
        group: Constants
        icon: time
+       arguments:
+         month: always
+         day: always
+         hour: always
+         minute: always
        ---
        Obtains an instance of `Date_Time` from a year, month, day, hour, minute,
        second, nanosecond and timezone.
@@ -145,6 +150,8 @@ type Date_Time
        aliases: [time from text]
        group: Conversions
        icon: convert
+       arguments:
+         format: always
        ---
        Obtains an instance of `Time` from a text such as
        "2007-12-03T10:15:30+01:00 Europe/Paris".

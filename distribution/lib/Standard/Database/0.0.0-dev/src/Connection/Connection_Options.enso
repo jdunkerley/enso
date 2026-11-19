@@ -6,7 +6,11 @@ from Standard.Base.Metadata.Widget import Single_Choice, Text_Input, Vector_Edit
 from Standard.Base.Widget_Helpers import make_text_secret_selector
 
 type Connection_Options
-    ## Additional customization options for the JDBC connection.
+    ## ---
+       arguments:
+         options: always
+       ---
+       Additional customization options for the JDBC connection.
        Hold a set of key value pairs used to configure the connection.
     @options Connection_Options.default_widget
     Value options:Vector=[]

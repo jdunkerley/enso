@@ -193,6 +193,8 @@ type Date_Range
     ## ---
        group: Selections
        icon: parse
+       arguments:
+         index: always
        ---
        Gets an element from the range at a specified index (0-based).
 
@@ -220,6 +222,8 @@ type Date_Range
 
     ## ---
        icon: parse
+       arguments:
+         index: always
        ---
        Gets an element from the range at a specified index (0-based).
        If the index is invalid then `if_missing` is returned.

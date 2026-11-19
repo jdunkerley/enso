@@ -93,6 +93,8 @@ type Response_Body
        aliases: [parse]
        group: Input
        icon: convert
+       arguments:
+         format: always
        ---
        Uses the format to decode the body.
        If using `Auto_Detect`, the content-type will be used to determine the

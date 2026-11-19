@@ -383,6 +383,9 @@ type Excel_Workbook
        group: Standard.Base.Input
        icon: data_input
        suggested: 2
+       arguments:
+         sheet_names: always
+         return: always
        ---
        Reads one or more sheets into a Table.
 

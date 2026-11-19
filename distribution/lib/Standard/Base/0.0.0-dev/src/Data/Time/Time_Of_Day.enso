@@ -55,6 +55,9 @@ type Time_Of_Day
     ## ---
        group: Constants
        icon: time
+       arguments:
+         hour: always
+         minute: always
        ---
        Obtains an instance of `Time_Of_Day` from an hour, minute, second and
        nanosecond.
@@ -100,6 +103,8 @@ type Time_Of_Day
     ## ---
        group: Conversions
        icon: convert
+       arguments:
+         format: always
        ---
        Obtains an instance of `Time_Of_Day` from a text such as "10:15".
 

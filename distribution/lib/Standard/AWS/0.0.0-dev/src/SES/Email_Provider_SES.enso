@@ -11,7 +11,12 @@ import project.SES.Internal.Email_Provider_SES_Implementation.Email_Provider_SES
 
 ## Sends emails using Amazon SES.
 type Email_Provider_SES
-    ## Amazon Simple Email Service provider.
+    ## ---
+       arguments:
+         region: always
+         credentials: always
+       ---
+       Amazon Simple Email Service provider.
 
        ## Arguments
         - `region`: AWS region where SES is enabled.

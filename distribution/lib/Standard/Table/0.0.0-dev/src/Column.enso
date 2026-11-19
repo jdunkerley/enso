@@ -1434,6 +1434,9 @@ type Column
        aliases: [regex, substitute]
        group: Standard.Base.Text
        icon: column_add
+       arguments:
+         term: always
+         new_text: always
        ---
        Replaces the first, or all occurrences of `term` with `new_text` in each
        row. If `term` is empty, the function returns the column unchanged.
@@ -1632,6 +1635,8 @@ type Column
     ## ---
        group: Standard.Base.DateTime
        icon: time
+       arguments:
+         period: always
        ---
        Gets the date part of the date/time value.
        Returns a column of `Integer` type.
@@ -1642,6 +1647,8 @@ type Column
     ## ---
        group: Standard.Base.DateTime
        icon: time
+       arguments:
+         period: always
        ---
        Computes a time difference between the two dates.
        It returns a column of integers expressing how many periods fit between
@@ -1671,6 +1678,8 @@ type Column
     ## ---
        group: Standard.Base.DateTime
        icon: time
+       arguments:
+         period: always
        ---
        Shifts the date/time by a specified period, returning a new date/time
        column of the same type.
@@ -1720,6 +1729,9 @@ type Column
     ## ---
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         type: always
+         format: always
        ---
        Parses a text column into values.
        In the Database backends, the default formatting settings of the
@@ -1805,6 +1817,8 @@ type Column
     ## ---
        group: Standard.Base.Conversions
        icon: convert
+       arguments:
+         format: always
        ---
        Format a `Column` using a format string (or `Column` of format strings).
 
@@ -2062,6 +2076,8 @@ type Column
        aliases: [join by row position]
        group: Standard.Base.Calculations
        icon: join
+       arguments:
+         keep_unmatched: always
        ---
        Joins this column with another column (or table) by zipping rows from both
        together - the first row of the left column is correlated with the first
@@ -2405,6 +2421,8 @@ type Column
        aliases: [first, head, keep, last, limit, sample, slice, tail, top]
        group: Standard.Base.Selections
        icon: parse
+       arguments:
+         range: always
        ---
        Creates a new Column with the specified range of rows from the input
        Column.
@@ -2445,6 +2463,8 @@ type Column
        aliases: [remove, skip]
        group: Standard.Base.Selections
        icon: parse
+       arguments:
+         range: always
        ---
        Creates a new Column from the input with the specified range of rows
        removed.
@@ -2580,6 +2600,8 @@ type Column
 
     ## ---
        icon: transform
+       arguments:
+         statistics: always
        ---
        Compute statistics on the column.
 

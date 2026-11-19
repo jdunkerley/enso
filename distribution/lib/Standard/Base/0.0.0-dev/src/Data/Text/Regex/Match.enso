@@ -319,6 +319,8 @@ type Match
 
     ## ---
        icon: split
+       arguments:
+         index: always
        ---
        Gets the grapheme span matched by the group with the provided index, or a
        default value if the group did not participate in the match.
@@ -335,6 +337,8 @@ type Match
     ## ---
        group: Selections
        icon: split
+       arguments:
+         index: always
        ---
        Gets the grapheme span matched by the group with the provided index, or a
        default value if the group did not participate in the match.

@@ -33,6 +33,8 @@ Vector.compute self statistic:Statistic=..Count =
 
 ## ---
    icon: column_add
+   arguments:
+     statistics: always
    ---
    Compute statistics on the vector (ignoring Nothing and NaN values).
 
@@ -75,6 +77,8 @@ Vector.running self statistic:Statistic=..Count =
 
 ## ---
    icon: math
+   arguments:
+     statistics: always
    ---
    Compute a set running statistics on the vector (ignoring Nothing and NaN
    values).

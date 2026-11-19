@@ -221,6 +221,8 @@ read_text path=(Missing_Argument.throw "path") (encoding : Encoding = Encoding.d
    group: File
    icon: folder
    suggested: 3
+   arguments:
+     directory: always
    ---
    Lists files in a directory.
 
@@ -291,6 +293,8 @@ list (directory=enso_project.root) (name_filter:Text="") recursive:Boolean=False
    group: Web
    icon: data_download
    suggested: 4
+   arguments:
+     method: always
    ---
    Reads data from a web API.
 
@@ -359,6 +363,8 @@ fetch (uri:(URI | Text)=(Missing_Argument.throw "uri")) (method:HTTP_Method=..Ge
    group: Web
    icon: data_upload
    suggested: 8
+   arguments:
+     method: always
    ---
    Writes data to a web API.
 
@@ -496,6 +502,8 @@ post (uri:(URI | Text)=(Missing_Argument.throw "uri")) (body:Request_Body=..Empt
 ## ---
    group: Web
    icon: data_download
+   arguments:
+     method: always
    ---
    Fetches from the provided URI and if successful writes to the file. Returns an
    error if the status code does not represent a successful response.
@@ -535,6 +543,8 @@ download (uri:(URI | Text)=(Missing_Argument.throw "uri")) file:Writable_File (r
    group: Web
    icon: data_download
    suggested: 5
+   arguments:
+     method: always
    ---
    Read data from a set of URIs.
 
@@ -612,6 +622,8 @@ fetch_many (uris:Vector=(Missing_Argument.throw "uris")) (method:HTTP_Method=..G
    aliases: [download, http get]
    group: Web
    icon: data_download
+   arguments:
+     method: always
    ---
    Read data from a set of URIs.
 

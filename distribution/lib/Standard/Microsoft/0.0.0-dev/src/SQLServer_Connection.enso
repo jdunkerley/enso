@@ -419,6 +419,8 @@ type SQLServer_Connection
 
     ## ---
        icon: data_output
+       arguments:
+         on_existing_file: always
        ---
        Creates a Data Link that will open the same connection.
     @path (File_Browse file_types=[File_Type.Option "DataLink" ["datalink"]] existing_only=False display=..Always)

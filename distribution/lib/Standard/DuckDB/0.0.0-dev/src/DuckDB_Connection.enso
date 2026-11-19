@@ -241,6 +241,9 @@ type DuckDB_Connection
        aliases: [import, load, open, read, sql]
        group: Standard.Base.Input
        icon: data_input
+       arguments:
+         as: always
+         key_columns: always
        ---
        Reads a file into a new table in the database and returns a query
        referencing the new table.
@@ -280,6 +283,9 @@ type DuckDB_Connection
        aliases: [import, load, open, read, sql]
        group: Standard.Base.Input
        icon: spatial
+       arguments:
+         as: always
+         key_columns: always
        ---
        Reads a spatial file into a new table in the database and returns a
        query referencing the new table. An RTree index will be created on
@@ -332,6 +338,8 @@ type DuckDB_Connection
     ## ---
        group: Standard.Base.Database
        icon: drive
+       arguments:
+         as: always
        ---
        Creates an index on an existing table.
 
@@ -371,6 +379,8 @@ type DuckDB_Connection
     ## ---
        group: Standard.Base.Database
        icon: spatial
+       arguments:
+         as: always
        ---
        Creates a RTree index on a single column in an existing table.
 
@@ -709,6 +719,8 @@ type DuckDB_Connection
 
     ## ---
        icon: data_output
+       arguments:
+         on_existing_file: always
        ---
        Writes a table to a file using DuckDB's writing capabilities.
 
@@ -754,6 +766,8 @@ type DuckDB_Connection
 
     ## ---
        icon: data_output
+       arguments:
+         on_existing_file: always
        ---
        Writes a table to a file using DuckDB's writing capabilities.
 

@@ -22,7 +22,11 @@ from project.Widget_Helpers import make_all_selector
 
 ## The HTTP POST request body.
 type Request_Body
-    ## Request body with text.
+    ## ---
+       arguments:
+         content_type: always
+       ---
+       Request body with text.
 
        ## Arguments
         - `text`: The plain text in the request body.

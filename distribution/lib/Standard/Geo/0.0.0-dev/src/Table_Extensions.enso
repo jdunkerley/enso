@@ -9,6 +9,9 @@ from Standard.Table import Column, Column_Ref, Table, Value_Type
 ## ---
    unstable: true
    icon: geo_map_distance
+   arguments:
+     lat1: always
+     long1: always
    ---
    Computes the distance between two latitude/longitude points on each row of the
    table.

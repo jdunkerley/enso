@@ -155,7 +155,11 @@ type Filter_Condition
        will not be matched.
     Regex_Match (pattern = (Missing_Argument.throw "pattern")) keep_or_remove:Filter_Action=..Keep
 
-    ## Is the value contained in `values`?
+    ## ---
+       arguments:
+         values: always
+       ---
+       Is the value contained in `values`?
 
        ## Remarks
 

@@ -308,6 +308,8 @@ type Vector a
        group: Selections
        icon: parse
        suggested: 4
+       arguments:
+         index: always
        ---
        Gets an element from the vector at a specified index (0-based).
 
@@ -335,6 +337,8 @@ type Vector a
     ## ---
        icon: parse
        suggested: 5
+       arguments:
+         index: always
        ---
        Gets an element from the vector at a specified index (0-based).
        If the index is invalid then `if_missing` is returned.
@@ -1087,6 +1091,8 @@ type Vector a
     ## ---
        group: Calculations
        icon: join
+       arguments:
+         separator: always
        ---
        When `self` is a vector of text values, concatenates all the values by
        interspersing them with `separator`.
@@ -1141,6 +1147,8 @@ type Vector a
        group: Selections
        icon: parse
        suggested: 6
+       arguments:
+         range: always
        ---
        Creates a new `Vector` with only the specified range of elements from the
        input, removing any elements outside the range.
@@ -1161,6 +1169,8 @@ type Vector a
         - skip
        group: Selections
        icon: parse
+       arguments:
+         range: always
        ---
        Creates a new `Vector`, removing any elements from the specified range.
 

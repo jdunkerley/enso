@@ -159,6 +159,8 @@ type Response
        aliases: [parse]
        group: Conversions
        icon: data_input
+       arguments:
+         format: always
        ---
        Uses the format to decode the body.
        If using `Auto_Detect`, the content-type will be used to determine the

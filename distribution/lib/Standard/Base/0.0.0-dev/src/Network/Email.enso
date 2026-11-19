@@ -30,6 +30,11 @@ type Email
        aliases: [mail]
        group: Web
        icon: email
+       arguments:
+         to: always
+         cc: always
+         bcc: always
+         attachments: always
        ---
        Creates an email object.
     @from Email_Address.default_widget
@@ -49,6 +54,11 @@ type Email
        aliases: [mail]
        group: Web
        icon: email
+       arguments:
+         to: always
+         cc: always
+         bcc: always
+         attachments: always
        ---
        Sends an email.
 

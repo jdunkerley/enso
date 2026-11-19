@@ -77,7 +77,11 @@ type In_Memory_Table
 
         from_java_table (Java_Table.new cols)
 
-    ## Converts all table contents to a text value in delimited format.
+    ## ---
+       arguments:
+         delimiter: always
+       ---
+       Converts all table contents to a text value in delimited format.
 
        ## Arguments
         - `format`: Allows to customize the delimiter and other settings of the

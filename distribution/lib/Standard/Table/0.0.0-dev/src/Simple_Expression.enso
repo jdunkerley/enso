@@ -20,6 +20,8 @@ from project.Internal.Filter_Condition_Helpers import make_filter_column
 type Simple_Expression
     ## ---
        private: true
+       arguments:
+         input: always
        ---
        A simple expression based off an input column and an operation to perform.
     Simple_Expr (input : Column_Ref|Expression|Any = (..Index 0)) (operation : Simple_Calculation = ..Copy)
@@ -115,26 +117,50 @@ type Simple_Expression
 
 ## Defines a set of Text based operations.
 type Text_Operation
-    ## Takes the first characters from the input column.
+    ## ---
+       arguments:
+         length: always
+       ---
+       Takes the first characters from the input column.
     Left (length : Column_Ref|Expression|Integer = 1)
 
-    ## Takes the first characters from the input column.
+    ## ---
+       arguments:
+         length: always
+       ---
+       Takes the first characters from the input column.
     Right (length : Column_Ref|Expression|Integer = 1)
 
     ## Returns the character length of the input column.
     Length
 
-    ## Removes the specified characters, by default any whitespace, from the
+    ## ---
+       arguments:
+         what: always
+       ---
+       Removes the specified characters, by default any whitespace, from the
        start, the end, or both ends of the input.
     Trim (where:Location=..Both) (what:Column_Ref|Expression|Text = "")
 
-    ## Does the input start with the specified prefix.
+    ## ---
+       arguments:
+         prefix: always
+       ---
+       Does the input start with the specified prefix.
     Starts_With (prefix:Column_Ref|Expression|Text = "")
 
-    ## Does the input end with the specified suffix.
+    ## ---
+       arguments:
+         suffix: always
+       ---
+       Does the input end with the specified suffix.
     Ends_With (suffix:Column_Ref|Expression|Text = "")
 
-    ## Does the input contain the specified substring.
+    ## ---
+       arguments:
+         substring: always
+       ---
+       Does the input contain the specified substring.
     Contains (substring:Column_Ref|Expression|Text = "")
 
     ## ---
@@ -172,23 +198,43 @@ type Text_Operation
 
 ## Defines a set of Math based operations.
 type Math_Operation
-    ## Subtract two values/columns.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Subtract two values/columns.
     Subtract (rhs : Column_Ref|Expression|Number = 0)
 
-    ## Multiply two values/columns.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Multiply two values/columns.
     Multiply (rhs : Column_Ref|Expression|Number = 1)
 
-    ## Divide a fixed value or column by another value or column.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Divide a fixed value or column by another value or column.
     Divide (rhs : Column_Ref|Expression|Number = 1)
 
     ## Negate a column.
     Negate
 
-    ## Compute the remainder of a fixed value or column divided by another value
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Compute the remainder of a fixed value or column divided by another value
        or column.
     Mod (rhs : Column_Ref|Expression|Number = 1)
 
-    ## Raise a fixed value or column to the power of another value or column.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Raise a fixed value or column to the power of another value or column.
     Power (rhs : Column_Ref|Expression|Number = 1)
 
     ## Rounds values in the column to the specified precision.
@@ -257,7 +303,11 @@ type Math_Operation
 
 ## Defines a set of Date based operations.
 type Date_Operation
-    ## Adds a period to a date/time column.
+    ## ---
+       arguments:
+         length: always
+       ---
+       Adds a period to a date/time column.
     Add (length : Column_Ref|Expression|Integer = 1) (period : Date_Period|Time_Period = Date_Period.Day)
 
     ## Returns part of a date/time column.
@@ -331,10 +381,18 @@ type Logical_Operation
     ## Negate a boolean column.
     Not
 
-    ## Boolean AND on two boolean columns.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Boolean AND on two boolean columns.
     And (rhs : Column_Ref|Expression|Boolean = True)
 
-    ## Boolean OR on two boolean columns.
+    ## ---
+       arguments:
+         rhs: always
+       ---
+       Boolean OR on two boolean columns.
     Or (rhs : Column_Ref|Expression|Boolean =  False)
 
     ## ---
@@ -366,16 +424,32 @@ type Simple_Calculation
     ## Creates a copy of the input column.
     Copy
 
-    ## Perform a Text Operation
+    ## ---
+       arguments:
+         operation: always
+       ---
+       Perform a Text Operation
     Text (operation : Text_Operation = ..Left 1)
 
-    ## Perform a Math Operation
+    ## ---
+       arguments:
+         operation: always
+       ---
+       Perform a Math Operation
     Math (operation : Math_Operation = ..Subtract 0)
 
-    ## Perform a Date Operation
+    ## ---
+       arguments:
+         operation: always
+       ---
+       Perform a Date Operation
     Date (operation : Date_Operation = ..Add)
 
-    ## Perform a Logical Operation
+    ## ---
+       arguments:
+         operation: always
+       ---
+       Perform a Logical Operation
     Logical (operation : Logical_Operation = ..Not)
 
     ## Add two values/columns.
@@ -434,7 +508,13 @@ type Simple_Calculation
     ## Boolean OR on two boolean columns.
     Or (rhs : Column_Ref|Expression|Boolean =  False)
 
-    ## If input meets a condition return true value, otherwise false value.
+    ## ---
+       arguments:
+         condition: always
+         true_value: always
+         false_value: always
+       ---
+       If input meets a condition return true value, otherwise false value.
        The `true_value` and `false_value` can be either a constant or a column.
     If (condition:Filter_Condition=(..Equal True)) (true_value:Column_Ref|Expression|Any = True) (false_value:Column_Ref|Expression|Any = False)
 
@@ -466,5 +546,9 @@ type Simple_Calculation
        instant.
     Set_Time_Zone
 
-    ## Formats a column with the specified format.
+    ## ---
+       arguments:
+         format: always
+       ---
+       Formats a column with the specified format.
     Format (format : Text = "")

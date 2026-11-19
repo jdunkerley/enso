@@ -5,7 +5,11 @@ type DuckDB_Format
     ## Use the format automatically determined from the file extension.
     Auto
 
-    ## Write the file in CSV format.
+    ## ---
+       arguments:
+         delimiter: always
+       ---
+       Write the file in CSV format.
 
        ## Arguments:
         - `delimiter`: The character that separates fields in the file. Default is a comma (",").

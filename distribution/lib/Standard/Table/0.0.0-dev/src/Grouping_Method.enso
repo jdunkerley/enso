@@ -9,7 +9,11 @@ type Grouping_Method
           together. At least one column must be specified.
     Unique (on:(Vector | Text | Integer | Regex)=(Missing_Argument.throw "on"))
 
-    ## Create the specified number of groups with the same number of rows in each
+    ## ---
+       arguments:
+         order_by: always
+       ---
+       Create the specified number of groups with the same number of rows in each
        group (except possibly the last one).
 
        ## Arguments
@@ -20,7 +24,11 @@ type Grouping_Method
          the table.
     Equal_Count (group_count:Integer=5) (order_by:(Vector | Text)=[])
 
-    ## Create the specified number of groups such that the sum of the values in
+    ## ---
+       arguments:
+         order_by: always
+       ---
+       Create the specified number of groups such that the sum of the values in
        the specified column is approximately equal for each group.
        For k groups and a column whose values sum to N, each group will be at
        least (N/k), except possibly the last one.

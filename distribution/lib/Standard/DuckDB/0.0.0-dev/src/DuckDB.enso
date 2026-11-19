@@ -82,6 +82,9 @@ type DuckDB
     ## ---
        group: Standard.Base.Input
        icon: spatial
+       arguments:
+         as: always
+         key_columns: always
        ---
        ToDo: Hidden until we do a shared in memory instance.
        Reads a spatial file into a new In-Memory DuckDB database.

@@ -15,6 +15,8 @@ from project.Internal.Upload.Helpers.Default_Arguments import default_key_column
 ## ---
    group: Standard.Base.Database
    icon: data_output
+   arguments:
+     primary_key: always
    ---
    Creates a new database table from this in-memory table.
 
@@ -64,6 +66,8 @@ Table.select_into_database_table self connection (table_name : Text) primary_key
 ## ---
    group: Standard.Base.Database
    icon: data_output
+   arguments:
+     key_columns: always
    ---
    Updates the target table with the contents of this table.
 
@@ -128,6 +132,8 @@ Table.update_rows self (source_table : Table = Missing_Argument.throw "source_ta
 ## ---
    group: Standard.Base.Database
    icon: data_output
+   arguments:
+     key_columns: always
    ---
    Removes rows from a database table.
    It returns the count of the rows that have been deleted.

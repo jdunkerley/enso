@@ -142,6 +142,8 @@ type XML_Document
     ## ---
        group: Selections
        icon: parse
+       arguments:
+         key: always
        ---
        Gets a child element of an XML document.
 
@@ -174,6 +176,8 @@ type XML_Document
     ## ---
        group: Selections
        icon: parse
+       arguments:
+         key: always
        ---
        Gets the child element of the inner XML Element
 
@@ -189,6 +193,8 @@ type XML_Document
     ## ---
        group: Selections
        icon: parse
+       arguments:
+         key: always
        ---
        Gets a child or attribute of an XML document.
 
@@ -480,6 +486,8 @@ type XML_Element
     ## ---
        group: Selections
        icon: parse
+       arguments:
+         key: always
        ---
        Gets a child of an XML element.
 
@@ -512,6 +520,8 @@ type XML_Element
     ## ---
        group: Selections
        icon: parse
+       arguments:
+         key: always
        ---
        Gets a child or attribute of an XML element.
 

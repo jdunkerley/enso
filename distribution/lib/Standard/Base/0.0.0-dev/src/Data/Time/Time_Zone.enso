@@ -78,6 +78,8 @@ type Time_Zone
 
     ## ---
        icon: time
+       arguments:
+         hours: always
        ---
        Obtains an instance of `Time_Zone` using an offset in hours, minutes and
        seconds from the UTC zone.

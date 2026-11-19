@@ -125,6 +125,8 @@ type Range
     ## ---
        group: Selections
        icon: parse
+       arguments:
+         index: always
        ---
        Gets an element from the Range at a specified index (0-based).
 
@@ -152,6 +154,8 @@ type Range
 
     ## ---
        icon: parse
+       arguments:
+         index: always
        ---
        Gets an element from the Range at a specified index (0-based).
        If the index is invalid then `if_missing` is returned.

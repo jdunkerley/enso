@@ -87,6 +87,9 @@ type Date
     ## ---
        group: Constants
        icon: calendar
+       arguments:
+         month: always
+         day: always
        ---
        Constructs a new Date from a year, month, and day.
 
@@ -122,6 +125,8 @@ type Date
        aliases: [date from text]
        group: Conversions
        icon: convert
+       arguments:
+         format: always
        ---
        Converts text containing a date into a Date object.
 
@@ -1065,6 +1070,8 @@ type Date
     ## ---
        group: Conversions
        icon: convert
+       arguments:
+         format: always
        ---
        Formats this date as text using the provided format specifier.
 

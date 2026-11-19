@@ -14,6 +14,8 @@ from project.Errors import SQL_Error
    group: Standard.Base.Database
    icon: drive
    suggested: 5
+   arguments:
+     options: always
    ---
    Connects to database.
 

@@ -33,7 +33,13 @@ polyglot java import org.enso.table.parsing.TypeInferringParser
 polyglot java import org.enso.table.parsing.WhitespaceStrippingParser
 
 type Data_Formatter
-    ## Specifies options for reading text data in a table to more specific types
+    ## ---
+       arguments:
+         datetime_formats: always
+         date_formats: always
+         time_formats: always
+       ---
+       Specifies options for reading text data in a table to more specific types
        and serializing them back.
        For date and time formats, see `Date_Time_Formatter`.
 
@@ -65,6 +71,8 @@ type Data_Formatter
     ## ---
        private: true
        advanced: true
+       arguments:
+         type: always
        ---
        Parse a Text into a value.
 
@@ -119,6 +127,10 @@ type Data_Formatter
 
     ## ---
        icon: convert
+       arguments:
+         datetime_formats: always
+         date_formats: always
+         time_formats: always
        ---
        Specify values for Date/Time parsing.
        A plain text pattern can be provided and it will be automatically

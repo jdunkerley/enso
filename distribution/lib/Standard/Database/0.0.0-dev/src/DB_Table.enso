@@ -290,6 +290,8 @@ type DB_Table
     ## ---
        group: Standard.Base.Output
        icon: data_output
+       arguments:
+         on_existing_file: always
        ---
        Creates a Data Link that will act as a view into the query represented by
        this table.

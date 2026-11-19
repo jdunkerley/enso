@@ -52,7 +52,11 @@ type Excel_Format
     @default_sheet Text_Input
     Workbook (xls_format : Excel_File_Format | Infer = Infer) (default_sheet : Text = "EnsoSheet")
 
-    ## Reads a sheet from an Excel file as a `Table`.
+    ## ---
+       arguments:
+         sheet: always
+       ---
+       Reads a sheet from an Excel file as a `Table`.
 
        ## Arguments
         - `sheet`: The sheet number or name.

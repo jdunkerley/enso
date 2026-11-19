@@ -21,6 +21,9 @@ type Google_Analytics
        group: Standard.Base.Web
        icon: cloud_from
        suggested: 9
+       arguments:
+         dimensions: always
+         metrics: always
        ---
        Reads data from the Google Analytics Reporting API.
 
@@ -56,6 +59,8 @@ type Google_Analytics
 
     ## ---
        icon: data_input
+       arguments:
+         credentials: always
        ---
        Reads the set of accounts from Google Analytics Admin API.
 
@@ -80,6 +85,8 @@ type Google_Analytics
 
     ## ---
        icon: data_input
+       arguments:
+         account: always
        ---
        Reads the set of properties from Google Analytics Admin API.
 

@@ -32,6 +32,8 @@ type Delimited_Format
            - delimited: format=..Delimited
            - csv: format=..Delimited
            - tab_delimited: format=(..Delimited '\t')
+       arguments:
+         delimiter: always
        ---
        Read delimited files such as CSVs into a Table.
        When reading this format, the following problems may occur:

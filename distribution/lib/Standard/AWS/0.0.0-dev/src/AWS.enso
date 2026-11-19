@@ -21,6 +21,8 @@ type AWS
     ## ---
        aliases: [download, http get]
        icon: data_input
+       arguments:
+         method: always
        ---
        Fetches from an AWS URI signing the request with the necessary headers,
        and returns the response, parsing the body if the content-type is
@@ -58,6 +60,8 @@ type AWS
        macros:
         - put: method=..Put
        icon: data_upload
+       arguments:
+         method: always
        ---
        Writes the provided data to the provided AWS URI signing the request with
        the necessary headers.
