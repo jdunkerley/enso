@@ -7,7 +7,6 @@ import project.Enso_Cloud.Data_Link.Data_Link
 import project.Enso_Cloud.Data_Link_Helpers
 import project.Errors.Deprecated.Deprecated
 import project.Errors.Problem_Behavior.Problem_Behavior
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Network.HTTP.Cache_Policy.Cache_Policy
 import project.Network.HTTP.HTTP
@@ -62,7 +61,7 @@ decode_http_response_following_data_links response format =
    private: true
    ---
 format_widget_with_raw_response -> Widget =
-    Single_Choice display=Display.When_Modified values=(File_Format.dropdown_options [Auto_Detect, Raw_Response])
+    Single_Choice values=(File_Format.dropdown_options [Auto_Detect, Raw_Response])
 
 ## ---
    private: true

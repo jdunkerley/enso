@@ -32,7 +32,7 @@ type Hashset
           occurrence of each duplicated element is retained in the set. If set to
           `True` it will raise an `Illegal_Argument` if duplicate elements are
           encountered.
-    @values (Vector_Editor item_editor=make_all_selector display=..Always item_default="Nothing")
+    @values (Vector_Editor item_editor=make_all_selector item_default="Nothing")
     from_vector (values : Vector) (error_on_duplicates : Boolean = False) -> Hashset ! Illegal_Argument =
         pairs_array = Array_Proxy.new values.length (i-> [values.at i, Nothing])
         pairs = Vector.from_polyglot_array pairs_array
@@ -122,7 +122,7 @@ type Hashset
        icon: row_add
        ---
        Adds a value to this set.
-    @value (make_all_selector ..Always)
+    @value make_all_selector
     insert self value:Any -> Hashset =
         dictionary = self.underlying_dictionary.insert value Nothing
         Hashset.Value dictionary

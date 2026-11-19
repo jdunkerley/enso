@@ -63,7 +63,7 @@ list_buckets credentials:AWS_Credential=..Default -> Vector Text ! S3_Error =
     - If the bucket does not exist, an `S3_Bucket_Not_Found` error is thrown.
     - If more items are available than the `max_count` parameter, a
       `More_Records_Available` warning is attached to the result.
-@bucket (Text_Input display=..Always)
+@bucket (Text_Input)
 @credentials AWS_Credential.default_widget
 list_objects (bucket : Text = Missing_Argument.throw "bucket") prefix:Text="" credentials:AWS_Credential=..Default max_count:Integer=1000 -> Vector S3_File ! S3_Error =
     names = read_bucket bucket prefix credentials delimiter="" max_count=max_count . second
@@ -81,8 +81,8 @@ list_objects (bucket : Text = Missing_Argument.throw "bucket") prefix:Text="" cr
     - `key`: the key of the object.
     - `credentials`: AWS credentials. If not provided, the default credentials
       will be used.
-@bucket (Text_Input display=..Always)
-@key (Text_Input display=..Always)
+@bucket (Text_Input)
+@key (Text_Input)
 @credentials AWS_Credential.default_widget
 list_object_versions (bucket : Text = Missing_Argument.throw "bucket") (key : Text = Missing_Argument.throw "key") credentials:AWS_Credential=..Default -> Vector Text =
     client = _make_client_for_bucket bucket credentials
@@ -106,8 +106,8 @@ list_object_versions (bucket : Text = Missing_Argument.throw "bucket") (key : Te
        string is provided, the latest version will be fetched.
     - `credentials`: AWS credentials. If not provided, the default credentials
       will be used.
-@bucket (Text_Input display=..Always)
-@key (Text_Input display=..Always)
+@bucket (Text_Input)
+@key (Text_Input)
 @credentials AWS_Credential.default_widget
 get_object (bucket : Text = Missing_Argument.throw "bucket") (key : Text = Missing_Argument.throw "key") version_id:Text="" credentials:AWS_Credential=..Default -> Response_Body ! S3_Error =
     client = _make_client_for_bucket bucket credentials
@@ -132,8 +132,8 @@ get_object (bucket : Text = Missing_Argument.throw "bucket") (key : Text = Missi
       default is 1 minute.
     - `credentials`: AWS credentials. If not provided, the default credentials
       will be used.
-@bucket (Text_Input display=..Always)
-@key (Text_Input display=..Always)
+@bucket (Text_Input)
+@key (Text_Input)
 @duration Duration.default_widget
 @credentials AWS_Credential.default_widget
 presigned_url (bucket : Text = Missing_Argument.throw "bucket") (key : Text = Missing_Argument.throw "key") version_id:Text="" duration:Duration=(Duration.of_minutes 1) credentials:AWS_Credential=..Default -> URI ! S3_Error =
@@ -163,7 +163,7 @@ presigned_url (bucket : Text = Missing_Argument.throw "bucket") (key : Text = Mi
       `AWS_SDK_Error` will be raised.
     - If the bucket does not exist, an `S3_Bucket_Not_Found` error is thrown.
     - If the object does not exist, an `S3_Key_Not_Found` error is thrown.
-@bucket (Text_Input display=..Always)
+@bucket (Text_Input)
 @credentials AWS_Credential.default_widget
 head (bucket : Text = Missing_Argument.throw "bucket") key:Text="" credentials:AWS_Credential=..Default -> Dictionary Text Any ! S3_Error =
     response = raw_head bucket key "" credentials
@@ -183,8 +183,8 @@ head (bucket : Text = Missing_Argument.throw "bucket") key:Text="" credentials:A
       will be used.
     - `body`: the content to upload, either as a File or as Text. If an S3_File is provided then will use the
        copy_object. This allows for copying objects within S3 without downloading them first, which is more efficient.
-@bucket (Text_Input display=..Always)
-@key (Text_Input display=..Always)
+@bucket (Text_Input)
+@key (Text_Input)
 @credentials AWS_Credential.default_widget
 put_object (bucket : Text = Missing_Argument.throw "bucket") (key : Text = Missing_Argument.throw "key") (body:(S3_File | File_Like | Text) = Missing_Argument.throw "body") credentials:AWS_Credential=..Default -> S3_File =
     Context.Output.check_enabled disabled_message="As writing is disabled, cannot write to S3. Press the Write button ▶ to perform the operation."

@@ -31,5 +31,5 @@
     - with_format self type:Standard.Base.Any.Any format:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - with_number_formatting self decimal_point:Standard.Base.Any.Any= thousand_separator:Standard.Base.Any.Any= allow_leading_zeros:Standard.Base.Any.Any= allow_exponential_notation:Standard.Base.Any.Any= -> Standard.Base.Any.Any
     - wrap_base_parser self base_parser:Standard.Base.Any.Any -> Standard.Base.Any.Any
-- make_vector_widget single_choice_widget:Standard.Base.Any.Any display:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+- make_vector_widget single_choice_widget:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - wrap_text_in_vector v:Standard.Base.Any.Any -> Standard.Base.Any.Any

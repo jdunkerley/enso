@@ -125,7 +125,7 @@ type Snowflake_Connection
 
        ## Arguments
         - database: The name of the database to connect to.
-    @warehouse (self-> Single_Choice display=..Always values=(self.warehouses . map d-> Option d d.pretty))
+    @warehouse (self-> Single_Choice values=(self.warehouses . map d-> Option d d.pretty))
     set_warehouse : Text -> Connection ! SQL_Error
     set_warehouse self warehouse =
         if warehouse == self.warehouse then self else
@@ -152,7 +152,7 @@ type Snowflake_Connection
 
        ## Arguments
         - database: The name of the database to connect to.
-    @database (self-> Single_Choice display=..Always values=(self.databases . map d-> Option d d.pretty))
+    @database (self-> Single_Choice values=(self.databases . map d-> Option d d.pretty))
     set_database : Text -> Connection ! SQL_Error
     set_database self database =
         if database . equals_ignore_case self.database then self else
@@ -358,7 +358,7 @@ type Snowflake_Connection
           write operation and will only run if the output context is enabled. If
           set to `False`, the query is expected to be a read operation and will
           run regardless of the output context. Defaults to `True`.
-    @query Text_Input display=..Always
+    @query Text_Input
     @limit Rows_To_Read.default_widget
     execute_query : Text | SQL_Statement -> Rows_To_Read -> Boolean -> Table
     execute_query self query (limit : Rows_To_Read = ..First_With_Warning 1000) write_operation:Boolean=True =
@@ -459,7 +459,7 @@ type Snowflake_Connection
          on_existing_file: always
        ---
        Creates a Data Link that will open the same connection.
-    @path (File_Browse file_types=[File_Type.Option "DataLink" ["datalink"]] existing_only=False display=..Always)
+    @path (File_Browse file_types=[File_Type.Option "DataLink" ["datalink"]] existing_only=False)
     @on_existing_file (Existing_File_Behavior.widget include_backup=False include_append=False)
     save_as_data_link self path:(Enso_File | File) (on_existing_file:Existing_File_Behavior = ..Error) =
         self.base_connection.save_as_data_link path on_existing_file
@@ -583,7 +583,7 @@ type Snowflake_Connection
        A vector of files that were downloaded or if none were found, the
        value specified by `if_not_found`.
     @stage make_stage_selector
-    @directory (Folder_Browse display=..Always)
+    @directory (Folder_Browse)
     get_from_stage : Identifier -> Text -> File -> Text -> Any -> Table ! Stage_Not_Found
     get_from_stage self stage:Identifier=(Missing_Argument.throw "stage") path:Text=(Missing_Argument.throw "path") directory=(Missing_Argument.throw "directory") pattern:Text="" ~if_not_found=(Error.throw Not_Found) =
         if directory.is_a File == False then Error.throw (Illegal_Argument.Error "Only local folders are supported for downloading from Snowflake stages.")
@@ -617,7 +617,7 @@ type Snowflake_Connection
 
        ## Returns
        The name of the uploaded file in the stage.
-    @file (Text_Input display=..Always)
+    @file (Text_Input)
     @stage make_stage_selector
     put_to_stage : Text | URI | File -> Identifier -> Text -> Boolean -> Text ! Stage_Not_Found | Snowflake_Error
     put_to_stage self file stage:Identifier=(Missing_Argument.throw "stage") path:Text="" overwrite:Boolean=False =
@@ -845,12 +845,12 @@ private make_stage_selector connection include_home:Boolean=True =
     stages = (if include_home then [Option "~" "..Name '~'"] else [])
         + connection.stage_names.map .to_option
         + [Option "<Name>" "..Name", Option "<Name and Schema>" "..Name_And_Schema"]
-    Single_Choice display=..Always values=stages
+    Single_Choice values=stages
 
 private make_file_format_selector connection =
     formats = connection.file_format_names.map .to_option
         + [Option "<Name>" "..Name", Option "<Name and Schema>" "..Name_And_Schema"]
-    Single_Choice display=..Always values=formats
+    Single_Choice values=formats
 
 private auth_jdbc_properties credentials = case credentials of
     Credentials.Username_And_Password username password ->

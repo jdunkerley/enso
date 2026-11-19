@@ -1,7 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Errors.Common.Type_Error
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
-import Standard.Base.Metadata.Display
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
 import Standard.Base.System.File_Format.File_Name_Pattern
 import Standard.Base.System.File_Format_Metadata.File_Format_Metadata
@@ -68,7 +67,7 @@ type Excel_Format
         - `row_limit`: The maximum number of rows to read.
         - `xls_format`: The Excel file format. XLSX for Excel 2007 and later, XLS for
            Excel 97-2003. `Infer` will attempt to deduce this from the extension of the filename.
-    @sheet (Text_Input display=Display.Always)
+    @sheet (Text_Input)
     @row_limit Rows_To_Read.default_widget
     Sheet (sheet:(Integer|Text)=1) (headers:Headers=..Detect_Headers) (skip_rows:Integer=0) (row_limit:Rows_To_Read=..All_Rows) (xls_format:Excel_File_Format|Infer=Infer)
 

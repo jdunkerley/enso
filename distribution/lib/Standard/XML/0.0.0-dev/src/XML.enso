@@ -11,7 +11,7 @@ from Standard.Visualization.Internal.View_Json import View_Column, View_Link
 from Standard.Visualization.Viz_Json import Viz_Json
 from Standard.Visualization.Viz_Table import Viz_Table
 from Standard.Visualization.Viz_Tree import Viz_Tree, Viz_Tree_Child
-from Standard.Base.Metadata import Display, make_single_choice, Widget
+from Standard.Base.Metadata import make_single_choice, Widget
 
 import Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns
 from Standard.Table import Prefix_Name, Table
@@ -298,7 +298,7 @@ type XML_Document
        then this function will write to a temporary file. This temporary file
        will be automatically deleted on exit of the Enso process.
        This allows for building the workflow without affecting the real files.
-    @path (Widget.Text_Input display=Display.Always)
+    @path (Widget.Text_Input)
     @encoding Encoding.default_widget
     write self path:Writable_File=(Missing_Argument.throw "path") (encoding : Encoding = Encoding.utf_8) (on_existing_file : Existing_File_Behavior = ..Backup) (include_xml_declaration : Boolean = True) (on_problems : Problem_Behavior = ..Report_Warning) -> File =
         write_impl self.java_document path encoding on_existing_file include_xml_declaration on_problems
@@ -726,7 +726,7 @@ type XML_Element
        then this function will write to a temporary file. This temporary file
        will be automatically deleted on exit of the Enso process.
        This allows for building the workflow without affecting the real files.
-    @path (Widget.Text_Input display=Display.Always)
+    @path (Widget.Text_Input)
     @encoding Encoding.default_widget
     write self path:Writable_File=(Missing_Argument.throw "path") (encoding : Encoding = Encoding.utf_8) (on_existing_file : Existing_File_Behavior = ..Backup) (include_xml_declaration : Boolean = True) (on_problems : Problem_Behavior = ..Report_Warning) -> File =
         write_impl self.java_element path encoding on_existing_file include_xml_declaration on_problems

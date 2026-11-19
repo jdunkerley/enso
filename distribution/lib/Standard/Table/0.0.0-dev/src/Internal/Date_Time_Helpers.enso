@@ -1,6 +1,5 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.Widget
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Single_Choice
@@ -62,4 +61,4 @@ make_period_selector_for_column column =
         Value_Type.Time -> time_periods
         # Some fallback is needed for the type mismatch case. Throwing an error will not work as expected as just the widget code will fail. (TODO right?)
         _ -> [Option ("Expected a date/time column but got "+column_type.to_display_text+".") "Date_Period.Day"]
-    Single_Choice display=Display.Always values=values
+    Single_Choice values=values

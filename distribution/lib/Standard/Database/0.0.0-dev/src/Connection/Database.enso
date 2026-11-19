@@ -1,5 +1,4 @@
 from Standard.Base import all
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.Widget
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Single_Choice
@@ -44,7 +43,7 @@ connection_details_widget =
         name = pair.first
         code = pair.second
         Option name code
-    Single_Choice display=Display.Always values=choices
+    Single_Choice values=choices
 
 ## ---
    private: true

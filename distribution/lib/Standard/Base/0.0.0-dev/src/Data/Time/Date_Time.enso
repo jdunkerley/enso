@@ -25,7 +25,7 @@ from project.Data.Boolean import Boolean, False, True
 from project.Data.Text.Extensions import all
 from project.Data.Time.Date import make_day_picker
 from project.Internal.Time.Date_Helpers import ensure_in_epoch, unix_epoch_start
-from project.Metadata import Display, Widget
+from project.Metadata import Widget
 from project.Metadata.Choice import Option
 from project.Nothing import all
 from project.Widget_Helpers import make_date_time_format_selector
@@ -131,15 +131,15 @@ type Date_Time
 
              example_new = Date_Time.new 1986 8 5
        ```
-    @year (Widget.Numeric_Input display=Display.Always)
-    @month (Widget.Numeric_Input minimum=1 maximum=12 display=Display.Always)
+    @year (Widget.Numeric_Input)
+    @month (Widget.Numeric_Input minimum=1 maximum=12)
     @day make_day_picker
-    @hour (Widget.Numeric_Input minimum=0 maximum=23 display=Display.Always)
-    @minute (Widget.Numeric_Input minimum=0 maximum=59 display=Display.Always)
-    @second (Widget.Numeric_Input minimum=0 maximum=59 display=Display.When_Modified)
-    @millisecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
-    @microsecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
-    @nanosecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
+    @hour (Widget.Numeric_Input minimum=0 maximum=23)
+    @minute (Widget.Numeric_Input minimum=0 maximum=59)
+    @second (Widget.Numeric_Input minimum=0 maximum=59)
+    @millisecond (Widget.Numeric_Input minimum=0 maximum=999)
+    @microsecond (Widget.Numeric_Input minimum=0 maximum=999)
+    @nanosecond (Widget.Numeric_Input minimum=0 maximum=999)
     @zone Time_Zone.default_widget
     new (year:Integer=(Missing_Argument.throw "year")) (month:Integer=1) (day:Integer=1) (hour:Integer=0) (minute:Integer=0) (second:Integer=0) (millisecond:Integer=0) (microsecond:Integer=0) (nanosecond:Integer=0) (zone:Time_Zone=Time_Zone.system) -> Date_Time ! Time_Error =
         total_nanoseconds = nanosecond + microsecond * 1000 + millisecond * 1000000
@@ -1143,7 +1143,7 @@ type Date_Time
    turn) resolves each one: `..Day` is always `Date_Period.Day`. With
    `include_custom`, also `Period.new` and `Duration.new`, for an amount added
    to or taken from it.
-make_date_time_period_selector (include_custom:Boolean=False) display:Display=..When_Modified -> Widget =
+make_date_time_period_selector (include_custom:Boolean=False) -> Widget =
     date_periods = ["Year", "Quarter", "Month", "Week", "Day"].map name->
         code = ".." + name
         Option code code
@@ -1151,7 +1151,7 @@ make_date_time_period_selector (include_custom:Boolean=False) display:Display=..
         code = ".." + name
         Option code code
     custom = if include_custom then [Option "Period.new" "(Period.new)", Option "Duration.new" "(Duration.new)"] else []
-    Widget.Single_Choice values=(date_periods + time_periods + custom) display=display
+    Widget.Single_Choice values=(date_periods + time_periods + custom)
 
 ## ---
    private: true

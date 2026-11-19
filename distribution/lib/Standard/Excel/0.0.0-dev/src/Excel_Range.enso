@@ -149,7 +149,7 @@ type Excel_Range
        icon: data_input
        ---
        Create a Range for a single cell.
-    @column Widget.Text_Input display=..Always
+    @column Widget.Text_Input
     for_cell : Text -> (Text|Integer) -> Integer -> Excel_Range
     for_cell sheet column row =
         col_index = Excel_Range.column_index column
@@ -164,7 +164,7 @@ type Excel_Range
        icon: data_input
        ---
        Create an Excel_Range for a range of cells.
-    @left Widget.Text_Input display=..Always
+    @left Widget.Text_Input
     @right Widget.Text_Input
     for_range : Text -> (Text|Integer) -> Integer -> (Text|Integer) -> Integer -> Excel_Range
     for_range sheet left top right bottom =
@@ -183,7 +183,7 @@ type Excel_Range
        icon: data_input
        ---
        Create an Excel_Range for a set of columns.
-    @left Widget.Text_Input display=..Always
+    @left Widget.Text_Input
     @right Widget.Text_Input
     for_columns : Text -> (Text|Integer) -> (Text|Integer) -> Excel_Range
     for_columns sheet left (right=left) =

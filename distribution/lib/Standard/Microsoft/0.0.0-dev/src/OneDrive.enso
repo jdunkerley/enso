@@ -56,8 +56,8 @@ type OneDrive
        icon: cloud
        ---
        Writes a file to the user's OneDrive.
-    @path Text_Input display=..Always
-    @destination Text_Input display=..Always
+    @path Text_Input
+    @destination Text_Input
     @credential Secret_Browse
     write : Text | URI | File -> Text | OneDrive_File -> File | Enso_Secret | Microsoft365_Credential -> OneDrive_File
     write source=(Missing_Argument.throw "source") (destination:(Text | OneDrive_File)=Missing_Argument.throw "destination") (credential : File | Enso_Secret | Microsoft365_Credential = _default_credential destination) -> OneDrive_File =

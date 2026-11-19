@@ -4,7 +4,6 @@ import project.Error.Error
 import project.Errors.Encoding_Error.Encoding_Error
 import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Meta
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Panic.Panic
 import project.Warning.Warning
@@ -23,10 +22,10 @@ type Encoding
        private: true
        ---
        Gets the default drop down option for Encoding.
-    default_widget display:Display=..When_Modified -> Widget =
+    default_widget -> Widget =
         fqn = Encoding.to Meta.Type . qualified_name
         values = [Option "UTF-8" fqn+".utf_8", Option "ASCII" fqn+".ascii", Option "UTF-16LE" fqn+".utf_16_le", Option "UTF-16BE" fqn+".utf_16_be", Option "UTF-32LE" fqn+".utf_32_le", Option "UTF-32BE" fqn+".utf_32_be", Option "Windows-1250" fqn+".windows_1250", Option "Windows-1251" fqn+".windows_1251", Option "Windows-1252" fqn+".windows_1252", Option "Windows-1253" fqn+".windows_1253", Option "Windows-1254" fqn+".windows_1254", Option "Windows-1255" fqn+".windows_1255", Option "Windows-1256" fqn+".windows_1256", Option "Windows-1257" fqn+".windows_1257", Option "Windows-1258" fqn+".windows_1258"]
-        Single_Choice values=values display=display
+        Single_Choice values=values
 
     ## ---
        private: true

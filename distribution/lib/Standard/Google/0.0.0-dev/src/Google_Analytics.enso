@@ -1,5 +1,5 @@
 from Standard.Base import all
-from Standard.Base.Metadata import Display, make_single_choice, Widget
+from Standard.Base.Metadata import make_single_choice, Widget
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Single_Choice, Text_Input, Vector_Editor
 
@@ -39,7 +39,7 @@ type Google_Analytics
         - `credentials`: The Google credentials to use. Default is to use the
           Google Application Default Credentials in the environment variables.
           See [application-default-credentials](https://cloud.google.com/docs/authentication/application-default-credentials).
-    @credentials (Google_Credential.default_widget display=..Always)
+    @credentials (Google_Credential.default_widget)
     @property Google_Analytics_Property.default_widget
     @dimensions _make_dimensions_vector_selector
     @metrics _make_metrics_vector_selector
@@ -71,7 +71,7 @@ type Google_Analytics
         - `limit`: The maximum number of accounts to read. Default is 1000.
         - `include_deleted`: Whether to include deleted accounts. Default is
           False.
-    @credentials (Google_Credential.default_widget display=..Always)
+    @credentials (Google_Credential.default_widget)
     @limit Rows_To_Read.default_widget
     list_accounts : Google_Credential -> Rows_To_Read -> Boolean -> Vector
     list_accounts credentials:Google_Credential=..Default (limit : Rows_To_Read = ..First_With_Warning 1000) include_deleted:Boolean=False -> Vector =
@@ -123,7 +123,7 @@ type Google_Analytics
         - `credentials`: The Google credentials to use. Default is to use the
           Google Application Default Credentials in the environment variables.
           See [application-default-credentials](https://cloud.google.com/docs/authentication/application-default-credentials).
-    @credentials (Google_Credential.default_widget display=..Always)
+    @credentials (Google_Credential.default_widget)
     @property Google_Analytics_Property.default_widget
     list_metrics : Google_Credential -> Google_Analytics_Property -> Vector
     list_metrics credentials:Google_Credential=(Missing_Argument.throw "credentials") property:Google_Analytics_Property=(Missing_Argument.throw "property") -> Vector =
@@ -142,7 +142,7 @@ type Google_Analytics
         - `credentials`: The Google credentials to use. Default is to use the
           Google Application Default Credentials in the environment variables.
           See [application-default-credentials](https://cloud.google.com/docs/authentication/application-default-credentials).
-    @credentials (Google_Credential.default_widget display=..Always)
+    @credentials (Google_Credential.default_widget)
     @property Google_Analytics_Property.default_widget
     list_dimensions : Google_Credential -> Google_Analytics_Property -> Vector
     list_dimensions credentials:Google_Credential=(Missing_Argument.throw "credentials") property:Google_Analytics_Property=(Missing_Argument.throw "property") -> Vector =
@@ -154,7 +154,7 @@ type Google_Analytics
 ## ---
    private: true
    ---
-private _make_metrics_vector_selector self_arg cache display:Display=..Always -> Widget =
+private _make_metrics_vector_selector self_arg cache -> Widget =
     _ = self_arg
     items = Panic.catch Any handler=p->[p.payload.to_display_text] <|
         property = cache.if_not_nothing <| cache "property"
@@ -162,12 +162,12 @@ private _make_metrics_vector_selector self_arg cache display:Display=..Always ->
             credentials = cache.if_not_nothing <| cache "credentials"
             Google_Analytics.list_metrics (credentials.if_nothing Google_Credential.Default) property . map f-> Option (f.api_name + " (" + f.category + ")") f.api_name.pretty
     item_editor = make_single_choice (items.if_nothing ['activeUsers', 'bounceRate', 'conversions', 'newUsers', 'sessionsPerUser', 'userConversionRate'])
-    Widget.Vector_Editor item_editor=item_editor item_default=item_editor.values.first.value display=display
+    Widget.Vector_Editor item_editor=item_editor item_default=item_editor.values.first.value
 
 ## ---
    private: true
    ---
-private _make_dimensions_vector_selector self_arg cache display:Display=..Always -> Widget  =
+private _make_dimensions_vector_selector self_arg cache -> Widget  =
     _ = self_arg
     items = Panic.catch Any handler=p->[p.payload.to_display_text] <|
         property = cache.if_not_nothing <| cache "property"
@@ -175,14 +175,14 @@ private _make_dimensions_vector_selector self_arg cache display:Display=..Always
             credentials = cache.if_not_nothing <| cache "credentials"
             Google_Analytics.list_dimensions (credentials.if_nothing Google_Credential.Default) property . map f-> Option (f.api_name + " (" + f.category + ")") f.api_name.pretty
     item_editor = make_single_choice (items.if_nothing ['country', 'year', 'month', 'date', 'userAgeBracket', 'userGender'])
-    Vector_Editor item_editor=item_editor item_default=item_editor.values.first.value display=display
+    Vector_Editor item_editor=item_editor item_default=item_editor.values.first.value
 
 ## ---
    private: true
    ---
 private _make_start_date_widget -> Widget =
     options = [Option "<Fixed Date>" "Date.new", Option "<Start of Period>" "Date.today.previous"]
-    Widget.Single_Choice values=options display=..When_Modified
+    Widget.Single_Choice values=options
 
 ## ---
    private: true

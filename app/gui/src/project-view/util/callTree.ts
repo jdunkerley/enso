@@ -1,7 +1,6 @@
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import type { WidgetConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
 import * as widgetCfg from '$/providers/openedProjects/widgetRegistry/configuration'
-import { DisplayMode } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { syntheticPortId, type PortId } from '@/providers/portInfo'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { GraphDb, MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
@@ -76,7 +75,6 @@ class ArgumentFactory {
   }
 }
 
-export type DynamicConfig = WidgetConfiguration & { display?: DisplayMode }
 type WidgetInputValue = Ast.Expression | Ast.Token | string | undefined
 abstract class Argument {
   /** Why the engine has no widget for this argument, if its widget query failed. */
@@ -85,7 +83,7 @@ abstract class Argument {
   protected constructor(
     public callId: AstId,
     public kind: ApplicationKind,
-    public dynamicConfig: DynamicConfig | undefined,
+    public dynamicConfig: WidgetConfiguration | undefined,
     public index: number | undefined,
     public argInfo: SuggestionEntryArgument | undefined,
   ) {}
@@ -126,7 +124,7 @@ export class ArgumentPlaceholder extends Argument {
   constructor(
     callId: AstId,
     kind: ApplicationKind,
-    dynamicConfig: DynamicConfig | undefined,
+    dynamicConfig: WidgetConfiguration | undefined,
     index: number,
     argInfo: SuggestionEntryArgument,
     public insertAsNamed: boolean,
@@ -154,8 +152,6 @@ export class ArgumentPlaceholder extends Argument {
    */
   override isHidden(selected: boolean): boolean {
     if (!this.argInfo.hasDefault || isRequiredArgument(this.argInfo)) return false
-    // Transitional until the standard library's widgets lose `display`.
-    if (this.dynamicConfig?.display === DisplayMode.Always) return false
     switch (this.display ?? 'when_modified') {
       case 'always':
         return false
@@ -173,7 +169,7 @@ export class ArgumentAst extends Argument {
   constructor(
     callId: AstId,
     kind: ApplicationKind,
-    dynamicConfig: DynamicConfig | undefined,
+    dynamicConfig: WidgetConfiguration | undefined,
     index: number | undefined,
     argInfo: SuggestionEntryArgument | undefined,
     public ast: Ast.Expression,

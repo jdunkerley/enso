@@ -120,7 +120,7 @@ type EDI_Definition
          }
        }
        ```
-    @path (Text_Input display=..Always)
+    @path (Text_Input)
     From_Json path
 
     ## Structure is a definition of the loops within the document.

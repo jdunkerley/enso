@@ -144,9 +144,9 @@ Request_Body.from (that:Any) = Request_Body.Json that
    private: true
    ---
 make_all_with_json =
-    base_selector = make_all_selector Request_Body
+    base_selector = make_all_selector
     values = [Option "JSON Object" key_value_widget] + base_selector.values
-    Single_Choice display=..Always values=values
+    Single_Choice values=values
 
 ## ---
    private: true
@@ -154,7 +154,7 @@ make_all_with_json =
 dictionary_widget -> Widget =
     fqn = Pair.to Meta.Type . qualified_name . take (..Before_Last '.')
     default = 'pair "key" ""'
-    value_editor = Single_Choice display=..Always values=[Option "Text" '""', Option "File" "File.new ''"]
+    value_editor = Single_Choice values=[Option "Text" '""', Option "File" "File.new ''"]
     pair = Option "Pair" fqn+".pair" [["first", Text_Input], ["second", value_editor]]
-    item_editor = Single_Choice display=..Always values=[pair]
-    Vector_Editor item_editor=item_editor display=..Always item_default=default
+    item_editor = Single_Choice values=[pair]
+    Vector_Editor item_editor=item_editor item_default=default

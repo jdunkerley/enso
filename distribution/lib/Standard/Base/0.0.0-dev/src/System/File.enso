@@ -19,7 +19,6 @@ import project.Errors.Problem_Behavior.Problem_Behavior
 import project.Internal.Meta_Helpers
 import project.Internal.Path_Helpers
 import project.Meta
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Panic.Panic
 import project.Runtime
@@ -1168,7 +1167,7 @@ get_child_widget file =
         if file.is_directory.not then Nothing else
             children = file.list
             options = children.map c-> Option c.name c.name.pretty
-            Widget.Single_Choice values=options display=Display.Always
+            Widget.Single_Choice values=options
 
 ## ---
    private: true

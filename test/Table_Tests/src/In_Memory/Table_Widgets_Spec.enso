@@ -1,6 +1,5 @@
 from Standard.Base import all
 import Standard.Base.Metadata.Choice
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Query
 
@@ -19,13 +18,13 @@ add_specs suite_builder =
 
         group_builder.specify "works for `get` and `at`" <|
             choices = mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = answer "selector" (Widget.Single_Choice choices Nothing Display.Always)
+            expect = answer "selector" (Widget.Single_Choice choices)
             Widget_Query.resolve_call mock_table table_module table_type "get" ["selector"] . should_equal expect
             Widget_Query.resolve_call mock_table table_module table_type "at" ["selector"] . should_equal expect
 
         group_builder.specify "works for `filter`" <|
             choices = [Choice.Option "<Expression>" "(expr '[A]')"] + mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = answer "column" (Widget.Single_Choice choices Nothing Display.Always)
+            expect = answer "column" (Widget.Single_Choice choices)
             Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
 
         group_builder.specify "works for `join` with `right` table" <|
@@ -47,7 +46,7 @@ add_specs suite_builder =
             res.should_be_a Widget.Vector_Editor
 
             arr = case res of
-                Widget.Vector_Editor item _ _ _ -> item.values
+                Widget.Vector_Editor item _ -> item.values
                 _ -> Test.fail "Expecting Vector_Editor"
 
             arr.length . should_equal 3

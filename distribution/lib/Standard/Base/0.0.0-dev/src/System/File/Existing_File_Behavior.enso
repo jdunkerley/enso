@@ -1,5 +1,4 @@
 import project.Data.Vector.Vector
-import project.Metadata.Display
 import project.Metadata.Widget
 from project.Data.Boolean import Boolean, True
 from project.Metadata.Choice import Option
@@ -38,4 +37,4 @@ type Existing_File_Behavior
                 builder.append (Option "Append" "..Append")
             if include_error then
                 builder.append (Option "Error" "..Error")
-        Single_Choice display=Display.Always values=options
+        Single_Choice values=options

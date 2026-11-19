@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Metadata.Choice
+import Standard.Base.Metadata.Widget
 
 from Standard.Test import all
 
@@ -15,6 +16,15 @@ add_specs suite_builder =
         group_builder.specify "emits only the field that is set" <|
             Choice.Option "X" "..X" requires="A.B.C" . to_json . should_equal '{"label":"X","value":"..X","parameters":[],"icon":"","requires":"A.B.C"}'
             Choice.Option "X" "..X" patterns=["*.x"] . to_json . should_equal '{"label":"X","value":"..X","parameters":[],"icon":"","patterns":["*.x"]}'
+
+    suite_builder.group "Widget to_json" group_builder->
+        group_builder.specify "widget JSON carries no display or label" <|
+            json = (Widget.Single_Choice [Choice.Option "A" "'A'"]).to_json
+            expected = '{"constructor":"Single_Choice","values":[' + (Choice.Option "A" "'A'").to_json + ']}'
+            json . should_equal expected
+            json . should_not_contain '"display"'
+            json . should_not_contain '"label":null'
+            (Widget.Text_Input).to_json . should_equal '{"constructor":"Text_Input"}'
 
     suite_builder.group "File_Format.dropdown_options" group_builder->
         group_builder.specify "names a registered format's type and file patterns" <|

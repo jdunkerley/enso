@@ -8,7 +8,7 @@
     - Sample count:Standard.Base.Data.Numbers.Integer= seed:Standard.Base.Data.Numbers.Integer=
     - While predicate:(Standard.Base.Any.Any -> Standard.Base.Data.Boolean.Boolean)=
     - default_options count:(Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)= -> Standard.Base.Any.Any
-    - default_widget count:(Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)= display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - default_widget count:(Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)= -> Standard.Base.Metadata.Widget
     - to_display_text self -> Standard.Base.Any.Any
 - drop_helper length:Standard.Base.Any.Any at:Standard.Base.Any.Any single_slice:Standard.Base.Any.Any slice_ranges:Standard.Base.Any.Any range:(Standard.Base.Data.Index_Sub_Range.Index_Sub_Range|Standard.Base.Data.Range.Range|Standard.Base.Data.Numbers.Integer) -> Standard.Base.Any.Any
 - handle_unmatched_type expected_types:Standard.Base.Any.Any actual_value:Standard.Base.Any.Any -> Standard.Base.Any.Any

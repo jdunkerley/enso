@@ -22,7 +22,7 @@ import project.Panic.Panic
 from project.Data.Boolean import Boolean, False, True
 from project.Data.Text.Extensions import all
 from project.Internal.Time.Date_Helpers import ensure_in_epoch
-from project.Metadata import Display, Widget
+from project.Metadata import Widget
 from project.Metadata.Choice import Option
 from project.Nothing import all
 from project.Widget_Helpers import make_date_format_selector
@@ -113,8 +113,8 @@ type Date
        date = Date.new 1970
        # → 1970-01-01
        ```
-    @year (Widget.Numeric_Input display=Display.Always)
-    @month (Widget.Numeric_Input minimum=1 maximum=12 display=Display.Always)
+    @year (Widget.Numeric_Input)
+    @month (Widget.Numeric_Input minimum=1 maximum=12)
     @day make_day_picker
     new : Integer -> Integer -> Integer -> Date ! Time_Error
     new year:Integer (month:Integer=1) (day:Integer=1) =
@@ -1166,9 +1166,9 @@ type Date
        private: true
        ---
        Gets the default drop down option for Date.
-    default_widget (include_today:Boolean=False) display:Display=..When_Modified -> Widget =
+    default_widget (include_today:Boolean=False) -> Widget =
         options = [Option "<Fixed Date>" "Date.new"] + (if include_today then [Option "<Today>" "Date.today"] else [])
-        Widget.Single_Choice values=options display=display
+        Widget.Single_Choice values=options
 
     ## ---
        aliases: [greater than]
@@ -1282,11 +1282,11 @@ type Date
    number of years, months and days. `..Day` resolves against the
    `Period | Date_Period` union: the engine tries each member in turn, and
    only `Date_Period` has a `Day` constructor.
-make_period_selector display:Display=..When_Modified -> Widget =
+make_period_selector -> Widget =
     periods = ["Year", "Quarter", "Month", "Week", "Day"].map name->
         code = ".." + name
         Option code code
-    Widget.Single_Choice values=(periods + [Option "Period.new" "(Period.new)"]) display=display
+    Widget.Single_Choice values=(periods + [Option "Period.new" "(Period.new)"])
 
 ## ---
    private: true
@@ -1348,4 +1348,4 @@ private make_day_picker value cache =
     max = if month.is_nothing then 31 else
         if month != 2 || year.is_nothing then days.at (month - 1) else
             if Date.new year 1 1 . is_leap_year then 29 else 28
-    Widget.Numeric_Input minimum=1 maximum=max display=Display.Always
+    Widget.Numeric_Input minimum=1 maximum=max

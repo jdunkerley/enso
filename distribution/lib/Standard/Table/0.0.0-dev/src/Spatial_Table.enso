@@ -646,8 +646,8 @@ Join_Condition.from (that:Spatial_Join_Condition) = case that of
 private _spatial_widget table single_choice:Boolean=False =
     col_names = table.spatial_columns.map .name
     col_opts = col_names.map n-> Option n n.pretty
-    if single_choice then Single_Choice [Option "<Expression>" "(expr '["+col_names.first+"]')"]+col_opts display=..Always else
-        Multiple_Choice col_opts display=..Always
+    if single_choice then Single_Choice [Option "<Expression>" "(expr '["+col_names.first+"]')"]+col_opts else
+        Multiple_Choice col_opts
 
 private _resolve_column column parent = case column of
     _ : Column -> column

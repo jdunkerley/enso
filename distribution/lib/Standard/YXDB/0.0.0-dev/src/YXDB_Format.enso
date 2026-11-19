@@ -163,5 +163,5 @@ private handle_java_exceptions caught_panic =
 private _column_widget arg cache=Nothing =
     _ = arg
     table = cache.if_not_nothing <| cache "table"
-    if table.is_nothing then Text_Input display=..Always else
-        Widget_Helpers.make_column_name_selector table display=..Always
+    if table.is_nothing then Text_Input else
+        Widget_Helpers.make_column_name_selector table

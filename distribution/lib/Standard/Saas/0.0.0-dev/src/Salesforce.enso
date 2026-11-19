@@ -141,5 +141,5 @@ private _make_report_name_widget salesforce -> Widget =
     options = (_get_raw_reports salesforce).map r->
         name = r.get 'name'
         Option name name.pretty
-    Widget.Single_Choice values=options display=..Always
+    Widget.Single_Choice values=options
 

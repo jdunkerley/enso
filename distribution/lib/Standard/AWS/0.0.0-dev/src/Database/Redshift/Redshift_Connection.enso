@@ -108,7 +108,7 @@ type Redshift_Connection
 
        ## Arguments
         - database: The name of the database to connect to.
-    @database (self-> Single_Choice display=..Always values=(self.databases . map d-> Option d d.pretty))
+    @database (self-> Single_Choice values=(self.databases . map d-> Option d d.pretty))
     set_database : Text -> Connection ! SQL_Error
     set_database self database =
         if database . equals_ignore_case self.database then self else
@@ -324,7 +324,7 @@ type Redshift_Connection
           write operation and will only run if the output context is enabled. If
           set to `False`, the query is expected to be a read operation and will
           run regardless of the output context. Defaults to `True`.
-    @query Text_Input display=..Always
+    @query Text_Input
     @limit Rows_To_Read.default_widget
     execute_query : Text | SQL_Statement -> Rows_To_Read -> Boolean -> Table
     execute_query self query (limit : Rows_To_Read = ..First_With_Warning 1000) write_operation:Boolean=True =
@@ -507,7 +507,7 @@ type Redshift_Connection
          on_existing_file: always
        ---
        Creates a Data Link that will open the same connection.
-    @path (File_Browse file_types=[File_Type.Option "DataLink" ["datalink"]] existing_only=False display=..Always)
+    @path (File_Browse file_types=[File_Type.Option "DataLink" ["datalink"]] existing_only=False)
     @on_existing_file (Existing_File_Behavior.widget include_backup=False include_append=False)
     save_as_data_link self path:(Enso_File | File) (on_existing_file:Existing_File_Behavior = ..Error) =
         self.base_connection.save_as_data_link path on_existing_file
@@ -538,7 +538,7 @@ private _make_staging_bucket_widget connection cache=Nothing =
     _ = connection
     cached_credentials = cache.if_not_nothing <| cache "staging_bucket_credentials"
     credentials = if cached_credentials.is_nothing then AWS_Credential.Default else cached_credentials
-    Single_Choice display=..Always values=((S3.list_buckets credentials).map c-> (Option c ("'"+c+"'")))
+    Single_Choice values=((S3.list_buckets credentials).map c-> (Option c ("'"+c+"'")))
 
 ## ---
    private: true

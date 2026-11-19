@@ -16,7 +16,7 @@ import Standard.Base.Logging.Log_Level
 import Standard.Base.Logging.Progress
 import Standard.Base.Runtime.State
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
-from Standard.Base.Metadata import Display, make_single_choice, Widget
+from Standard.Base.Metadata import make_single_choice, Widget
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Widget_Helpers import make_any_selector, make_data_cleanse_vector_selector, make_delimiter_selector
 
@@ -2522,10 +2522,10 @@ type Table
        cases. The grouping and ordering settings affect how the row numbers are
        assigned to each row, but the order of the rows itself is not changed by
        this operation.
-    @name (Widget.Text_Input display=..Always)
-    @from (Widget.Numeric_Input display=..Always)
-    @group_by (Widget_Helpers.make_column_name_multi_selector display=..When_Modified)
-    @order_by (Widget_Helpers.make_order_by_selector display=..When_Modified)
+    @name (Widget.Text_Input)
+    @from (Widget.Numeric_Input)
+    @group_by (Widget_Helpers.make_column_name_multi_selector)
+    @order_by (Widget_Helpers.make_order_by_selector)
     add_row_number self name:Text="Row" from:Integer=0 step:Integer=1 (group_by : Vector (Text | Integer | Regex) | Text | Integer | Regex = []) (order_by : Vector | Text = []) on_problems:Problem_Behavior=..Report_Warning -> Table & Any = _profile_time_execution "Table.add_row_number" <|
         self.implementation.add_row_number self.underlying name from step group_by order_by on_problems
 
@@ -2633,9 +2633,9 @@ type Table
        the group numbers are assigned, depending on the grouping method.  The
        order of the rows itself is not changed by this operation.
        In the database backends, the ordering of rows is backend-dependent.
-    @grouping_method (Widget_Helpers.make_grouping_method_selector display=..Always)
-    @name (Widget.Text_Input display=..Always)
-    @from (Widget.Numeric_Input display=..Always)
+    @grouping_method (Widget_Helpers.make_grouping_method_selector)
+    @name (Widget.Text_Input)
+    @from (Widget.Numeric_Input)
     add_group_number self (grouping_method : Grouping_Method = Missing_Argument.throw "grouping_method") name:Text="Group" from:Integer=0 step:Integer=1 on_problems:Problem_Behavior=..Report_Warning -> Table & Any = _profile_time_execution "Table.add_group_number" <|
         self.implementation.add_group_number self.underlying grouping_method name from step on_problems
 
@@ -2660,7 +2660,7 @@ type Table
         - `name`: The name of the new column. Defaults to "Group".
         - `from`: The starting value for the enumeration. Defaults to 0.
         - `step`: The amount to increment the enumeration by. Defaults to 1.
-    @over (t-> make_single_choice ([Option "<Row>" "..Row"] + t.column_names) display=..When_Modified)
+    @over (t-> make_single_choice ([Option "<Row>" "..Row"] + t.column_names))
     find_group_number self (predicate=Missing_Argument.throw "predicate") (over:Predicate_Over = ..Row) group_row:Group_Row=..First name:Text="Group" from:Integer=0 step:Integer=1 on_problems:Problem_Behavior=..Report_Warning -> Table & Any = _profile_time_execution "Table.find_group_number" <|
         self.implementation.find_group_number self.underlying predicate over group_row name from step on_problems
 
@@ -3669,7 +3669,7 @@ type Table
        write out the table as plain text, the user needs to convert the Table to
        Text (e.g. using `to_delimited` method) and then use the `Text.write`
        function.
-    @path (Widget.File_Browse existing_only=False display=Display.Always)
+    @path (Widget.File_Browse existing_only=False)
     @format Widget_Helpers.write_table_selector
     write self (path : Writable_File = Missing_Argument.throw "path") format=Auto_Detect on_existing_file:Existing_File_Behavior=..Backup match_columns:Match_Columns=..By_Name on_problems:Problem_Behavior=..Report_Warning -> File | Any ! Column_Count_Mismatch | Illegal_Argument | File_Error =
         self.implementation.write self.underlying path format on_existing_file match_columns on_problems
@@ -3988,7 +3988,7 @@ type Table
        they are offset, but the order of the rows itself is not changed by this
        operation.
     @columns (Widget_Helpers.make_column_name_multi_selector add_regex=True add_by_type=True)
-    @n (Widget.Numeric_Input display=..Always)
+    @n (Widget.Numeric_Input)
     @default (self-> Widget_Helpers.make_fill_default_value_selector)
     @group_by (Widget_Helpers.make_column_name_multi_selector add_regex=True)
     @order_by Widget_Helpers.make_order_by_selector

@@ -32,7 +32,7 @@
     - stringify object:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - key_value_widget -> Standard.Base.Any.Any
 - make_enso object:Standard.Base.Any.Any -> Standard.Base.Any.Any
-- make_field_name_selector js_object:Standard.Base.Any.Any display:Standard.Base.Metadata.Display= -> Standard.Base.Any.Any
+- make_field_name_selector js_object:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - read_json_array node:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - read_json_node node:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - render object:Standard.Base.Any.Any depth:Standard.Base.Any.Any= max_depth:Standard.Base.Any.Any= max_length:Standard.Base.Any.Any= -> Standard.Base.Any.Any

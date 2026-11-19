@@ -1,7 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Data.Vector.No_Wrap
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
-import Standard.Base.Metadata.Display
 from Standard.Base.Metadata.Widget import Vector_Editor
 from Standard.Base.Widget_Helpers import make_date_format_selector, make_date_time_format_selector, make_time_format_selector
 
@@ -408,5 +407,5 @@ wrap_text_in_vector v = case v of
 ## ---
    private: true
    ---
-make_vector_widget single_choice_widget display=Display.Always =
-    Vector_Editor item_editor=single_choice_widget item_default=single_choice_widget.values.first.value display=display
+make_vector_widget single_choice_widget =
+    Vector_Editor item_editor=single_choice_widget item_default=single_choice_widget.values.first.value

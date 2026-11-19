@@ -42,7 +42,7 @@ type AWS
           to the default AWS credentials.
         - `region_service`: The region and service to use for signing the
           request. Defaults to the region and service parsed from the URI.
-    @uri (Text_Input display=..Always)
+    @uri (Text_Input)
     @method HTTP_Method.default_fetch_widget
     @headers Header.default_widget
     @format File_Format.default_widget
@@ -115,7 +115,7 @@ type AWS
                 |------|-------|
                 | John | 1     |
                 | Paul | 1     |
-    @uri (Text_Input display=..Always)
+    @uri (Text_Input)
     @method HTTP_Method.default_post_widget
     @headers Header.default_widget
     @format File_Format.default_widget
@@ -136,7 +136,7 @@ type AWS
 
        ## Arguments
         - uri: The URI to resolve.
-    @uri (Text_Input display=..Always)
+    @uri (Text_Input)
     resolve_region_and_service : URI -> AWS_Region_Service
     resolve_region_and_service (uri:URI=(Missing_Argument.throw "uri")) =
         region_regex = regex "^(([a-z]{2}-[^.]+?-\d+)|(global))$"

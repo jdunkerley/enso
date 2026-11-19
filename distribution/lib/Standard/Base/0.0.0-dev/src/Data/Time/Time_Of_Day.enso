@@ -18,7 +18,7 @@ import project.Meta
 import project.Panic.Panic
 from project.Data.Boolean import Boolean, False, True
 from project.Data.Text.Extensions import all
-from project.Metadata import Display, Widget
+from project.Metadata import Widget
 from project.Metadata.Choice import Option
 from project.Widget_Helpers import make_time_format_selector
 
@@ -89,12 +89,12 @@ type Time_Of_Day
 
              example_epoch = Time_Of_Day.new hour=9 minute=30
        ```
-    @hour (Widget.Numeric_Input minimum=0 maximum=23 display=Display.Always)
-    @minute (Widget.Numeric_Input minimum=0 maximum=59 display=Display.Always)
-    @second (Widget.Numeric_Input minimum=0 maximum=59 display=Display.When_Modified)
-    @millisecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
-    @microsecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
-    @nanosecond (Widget.Numeric_Input minimum=0 maximum=999 display=Display.When_Modified)
+    @hour (Widget.Numeric_Input minimum=0 maximum=23)
+    @minute (Widget.Numeric_Input minimum=0 maximum=59)
+    @second (Widget.Numeric_Input minimum=0 maximum=59)
+    @millisecond (Widget.Numeric_Input minimum=0 maximum=999)
+    @microsecond (Widget.Numeric_Input minimum=0 maximum=999)
+    @nanosecond (Widget.Numeric_Input minimum=0 maximum=999)
     new (hour : Integer = 0) (minute : Integer = 0) (second : Integer = 0) (millisecond : Integer = 0) (microsecond : Integer = 0) (nanosecond : Integer = 0) -> Time_Of_Day ! Time_Error =
         total_nanoseconds = nanosecond + microsecond * 1000 + millisecond * 1000000
         Panic.catch JException (Date_Helpers.time_new_builtin hour minute second total_nanoseconds) caught_panic->
@@ -574,9 +574,9 @@ type Time_Of_Day
        private: true
        ---
        Gets the default drop down option for Time_Of_Day.
-    default_widget (include_now:Boolean=False) display:Display=..When_Modified -> Widget =
+    default_widget (include_now:Boolean=False) -> Widget =
         options = [Option "<Fixed Time>" "Time_Of_Day.new"] + (if include_now then [Option "<Now>" "Time_Of_Day.now"] else [])
-        Widget.Single_Choice values=options display=display
+        Widget.Single_Choice values=options
 
     ## ---
        aliases: [greater than]
@@ -619,11 +619,11 @@ type Time_Of_Day
    `Duration | Time_Period` union: the engine tries each member in turn, and
    only `Time_Period` has an `Hour` constructor (as `Column.date_part`'s
    `Date_Period | Time_Period = ..Day` default does).
-make_time_period_selector display:Display=..When_Modified -> Widget =
+make_time_period_selector -> Widget =
     periods = ["Hour", "Minute", "Second", "Millisecond", "Microsecond", "Nanosecond"].map name->
         code = ".." + name
         Option code code
-    Widget.Single_Choice values=(periods + [Option "Duration.new" "(Duration.new)"]) display=display
+    Widget.Single_Choice values=(periods + [Option "Duration.new" "(Duration.new)"])
 
 ## ---
    private: true

@@ -6,7 +6,6 @@ import Standard.Base.Errors.Deprecated.Deprecated
 import Standard.Base.Errors.File_Error.File_Error
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.Widget
 import Standard.Base.System.File.Advanced.Temporary_File.Temporary_File
 import Standard.Base.System.Input_Stream.Input_Stream
@@ -152,7 +151,7 @@ type Excel_Workbook
 
        ## Arguments
         - schema: The name of the schema to connect to.
-    @schema (Single_Choice display=Display.Always values=[Option 'Nothing'])
+    @schema (Single_Choice values=[Option 'Nothing'])
     set_schema : Text | Nothing -> Excel_Workbook ! Illegal_Argument
     set_schema self schema =
         if schema == self.schema then self else
@@ -251,7 +250,7 @@ type Excel_Workbook
         - `alias`: optionally specify a friendly alias for the query (unused).
         - `headers`: whether to use the first row as headers (default is
           `Detect_Headers`).
-    @query (self-> Single_Choice display=Display.Always values=(self.tables.at "Name" . to_vector . map t-> Option t t.pretty))
+    @query (self-> Single_Choice values=(self.tables.at "Name" . to_vector . map t-> Option t t.pretty))
     query : Text -> Text -> Headers -> Table
     query self (query : Text) (alias : Text = "") (headers : Headers = Headers.Detect_Headers) =
         _ = [alias]
@@ -332,7 +331,7 @@ type Excel_Workbook
         - `name`: the name of the worksheet to read.
         - `headers`: whether to use the first row as headers (default is
           `Detect_Headers`).
-    @name (self-> Single_Choice display=Display.Always values=(self.sheet_names.map t-> Option t t.pretty))
+    @name (self-> Single_Choice values=(self.sheet_names.map t-> Option t t.pretty))
     sheet : Text | Integer -> Headers -> Table
     sheet self name:(Text | Integer) headers:Headers=Headers.Detect_Headers =
         Warning.attach (Deprecated.Warning "Standard.Excel.Excel_Workbook.Excel_Workbook" "sheet" "Deprecated: use `read` instead.") <|
@@ -423,9 +422,9 @@ type Excel_Workbook
 ## ---
    private: true
    ---
-build_sheet_selector workbook:Excel_Workbook display:Display=Display.Always -> Widget =
+build_sheet_selector workbook:Excel_Workbook -> Widget =
     names = workbook.sheet_names.map n-> Option n n.pretty
-    Multiple_Choice display=display values=names
+    Multiple_Choice values=names
 
 ## ---
    private: true
@@ -470,10 +469,10 @@ private _resolve_return_as_compatibility return =
                         Return_As_Table.As_Merged_Table columns_to_keep match
 
 ## Creates a query widget for the `read` method.
-private _query_widget wb:Excel_Workbook display:Display=..Always -> Widget =
+private _query_widget wb:Excel_Workbook -> Widget =
     default_address = "'" + wb.sheet_names.first.replace "'" "''" + "'!A1:E5"
     options = [Option "<By Index>" "1", Option "<Range>" "Excel_Range.from_address "+default_address.pretty] + (wb.tables.at "Name" . to_vector . map t-> Option t t.pretty)
-    Single_Choice display=display values=options
+    Single_Choice values=options
 
 private _read_sheets workbook:Excel_Workbook (sheet_names : Vector Text) headers:Headers on_problems:Problem_Behavior -> Vector (Pair Text (Table | Nothing)) =
     sheet_names.map on_problems=No_Wrap.Value address->

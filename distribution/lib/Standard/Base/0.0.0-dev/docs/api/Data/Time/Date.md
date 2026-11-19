@@ -16,7 +16,7 @@
     - day_of_week self -> Standard.Base.Any.Any
     - day_of_year self -> Standard.Base.Any.Any
     - days_until self end:Standard.Base.Data.Time.Date.Date include_end_date:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Numbers.Integer
-    - default_widget include_today:Standard.Base.Data.Boolean.Boolean= display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - default_widget include_today:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Metadata.Widget
     - down_to self end:Standard.Base.Data.Time.Date.Date include_end:Standard.Base.Data.Boolean.Boolean= step:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Period.Period)= -> Standard.Base.Any.Any
     - end_of self period:Standard.Base.Data.Time.Date_Period.Date_Period= -> Standard.Base.Data.Time.Date.Date
     - end_of_month self -> Standard.Base.Data.Time.Date.Date
@@ -47,6 +47,6 @@
     - yesterday -> Standard.Base.Data.Time.Date.Date
 - fits_in_range start:Standard.Base.Any.Any end:Standard.Base.Any.Any date:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - is_weekend date:Standard.Base.Any.Any -> Standard.Base.Any.Any
-- make_period_selector display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+- make_period_selector -> Standard.Base.Metadata.Widget
 - week_days_between start:Standard.Base.Any.Any end:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - Standard.Base.Data.Time.Date.Date.from that:Standard.Base.Data.Json.JS_Object -> Standard.Base.Data.Time.Date.Date

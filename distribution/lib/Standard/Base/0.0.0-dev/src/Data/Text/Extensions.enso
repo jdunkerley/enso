@@ -45,7 +45,7 @@ from project.Data.Numbers import Float, Integer, Number, Number_Parse_Error
 from project.Data.Range.Extensions import all
 from project.Data.Text.Text_Cleanse import Cleansable_Text, Text_Cleanse
 from project.Error import all
-from project.Metadata import Display, make_single_choice, Widget
+from project.Metadata import make_single_choice, Widget
 from project.Nothing import all
 from project.Widget_Helpers import make_data_cleanse_vector_selector, make_date_format_selector, make_date_time_format_selector, make_delimiter_selector, make_regex_text_widget, make_time_format_selector
 
@@ -211,7 +211,7 @@ Text.each self function =
    A character is defined as an Extended Grapheme Cluster, see Unicode Standard
    Annex 29. This is the smallest unit that still has semantic meaning in most
    text-processing applications.
-@index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1 display=Display.Always)
+@index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1)
 Text.at : Integer -> Text ! Index_Out_Of_Bounds
 Text.at self index:Integer=0 =
     self.get index (Error.throw (Index_Out_Of_Bounds.Error index self.length))
@@ -244,7 +244,7 @@ Text.at self index:Integer=0 =
    A character is defined as an Extended Grapheme Cluster, see Unicode Standard
    Annex 29. This is the smallest unit that still has semantic meaning in most
    text-processing applications.
-@index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1 display=Display.Always)
+@index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1)
 Text.get : Integer -> Any -> Any
 Text.get self index:Integer=0 ~if_missing=Nothing =
     new_index = if index < 0 then index + self.length else index
@@ -1461,8 +1461,8 @@ Text.to_case self case_option:Case=..Lower locale:Locale=Locale.default =
          "HELLO".pad 8 "AB" == "HELLOABA"
          "HELLO".pad 8 "AB" ..Left == "BABHELLO"
    ```
-@length (Widget.Numeric_Input display=Display.Always)
-@with_pad (Widget.Text_Input display=Display.Always)
+@length (Widget.Numeric_Input)
+@with_pad (Widget.Text_Input)
 @at (make_single_choice [["Left", "..Left"], ["Right", "..Right"]])
 Text.pad : Integer -> Text -> Location -> Text
 Text.pad self length:Integer=0 with_pad:Text=' ' at:Location=..Right = case at of
@@ -1513,7 +1513,7 @@ Text.pad self length:Integer=0 with_pad:Text=' ' at:Location=..Right = case at o
         "ABBA123".trim ..Left "ABC" == "123"
    ```
 @where (make_single_choice [["Both", "..Both"], ["Left", "..Left"], ["Right", "..Right"]])
-@what (Widget.Text_Input display=Display.Always)
+@what (Widget.Text_Input)
 Text.trim : Location -> (Text | (Text -> Boolean)) -> Text
 Text.trim self where:Location=..Both what=_.is_whitespace =
     predicate = case what of

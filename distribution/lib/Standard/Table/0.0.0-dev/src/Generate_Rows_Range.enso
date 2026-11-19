@@ -1,6 +1,5 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.Widget
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Single_Choice
@@ -67,12 +66,12 @@ type Generate_Rows_Range
        private: true
        ---
        Create a widget for operation
-    default_widget table:Table_Ref display:Display=..Always -> Widget =
+    default_widget table:Table_Ref -> Widget =
         integer_input_column = Widget_Helpers.make_column_ref_by_name_selector table add_number=True
         integer_range = Option "..Integer_Range" "..Integer_Range" [["from", integer_input_column], ["to", integer_input_column]]
         date_input_column = Widget_Helpers.make_column_ref_by_name_selector table add_date=True
         date_range = Option "..Date_Range" "..Date_Range" [["from", date_input_column], ["to", date_input_column]]
-        Single_Choice [integer_range, date_range] display=display
+        Single_Choice [integer_range, date_range]
 
     private _make_empty_column_of_correct_type self -> Column =
         case self of

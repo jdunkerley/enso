@@ -10,7 +10,7 @@
     - Before delimiter:Standard.Base.Data.Text.Text
     - Before_Last delimiter:Standard.Base.Data.Text.Text
     - default_options -> Standard.Base.Any.Any
-    - default_widget display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - default_widget -> Standard.Base.Metadata.Widget
     - to_display_text self -> Standard.Base.Any.Any
 - batch_resolve_indices_or_ranges text:Standard.Base.Any.Any descriptors:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - character_ranges text:Standard.Base.Any.Any -> Standard.Base.Any.Any

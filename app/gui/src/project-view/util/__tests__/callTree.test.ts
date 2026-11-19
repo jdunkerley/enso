@@ -38,16 +38,10 @@ const prefixFixture = {
   mockSuggestion: makeModuleMethod('local.Foo.Bar.func', {
     args: ['self', 'a', 'b', 'c', 'd'].map((name) => makeArgument(name)),
   }),
-  argsParameters: new Map<string, widgetCfg.WidgetConfiguration & widgetCfg.WithDisplay>([
-    [
-      'a',
-      { kind: 'Multiple_Choice', display: widgetCfg.DisplayMode.Always, label: null, values: [] },
-    ],
-    [
-      'b',
-      { kind: 'Single_Choice', display: widgetCfg.DisplayMode.Always, label: null, values: [] },
-    ],
-    ['c', { kind: 'Boolean_Input', display: widgetCfg.DisplayMode.Always }],
+  argsParameters: new Map<string, widgetCfg.WidgetConfiguration>([
+    ['a', { kind: 'Multiple_Choice', values: [] }],
+    ['b', { kind: 'Single_Choice', values: [] }],
+    ['c', { kind: 'Boolean_Input' }],
   ]),
 }
 
@@ -55,15 +49,9 @@ const infixFixture = {
   mockSuggestion: makeMethod('local.Foo.Bar.Buz.+', {
     args: ['lhs', 'rhs'].map((name) => makeArgument(name)),
   }),
-  argsParameters: new Map<string, widgetCfg.WidgetConfiguration & widgetCfg.WithDisplay>([
-    [
-      'lhs',
-      { kind: 'Multiple_Choice', display: widgetCfg.DisplayMode.Always, label: null, values: [] },
-    ],
-    [
-      'rhs',
-      { kind: 'Single_Choice', display: widgetCfg.DisplayMode.Always, label: null, values: [] },
-    ],
+  argsParameters: new Map<string, widgetCfg.WidgetConfiguration>([
+    ['lhs', { kind: 'Multiple_Choice', values: [] }],
+    ['rhs', { kind: 'Single_Choice', values: [] }],
   ]),
 }
 
@@ -466,7 +454,7 @@ function printArgPattern(application: ArgumentApplication | Ast.Expression) {
 
 function checkArgsConfig(
   application: ArgumentApplication | Ast.Expression,
-  argConfig: Map<string, widgetCfg.WidgetConfiguration | widgetCfg.WithDisplay>,
+  argConfig: Map<string, widgetCfg.WidgetConfiguration>,
 ) {
   let current: ArgumentApplication['target'] = application
   while (current instanceof ArgumentApplication) {

@@ -1,6 +1,5 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_State.Illegal_State
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.File_Type
 import Standard.Base.Metadata.Widget
 import Standard.Base.Runtime.Context as Execution_Context
@@ -553,7 +552,7 @@ type Connection
          on_existing_file: always
        ---
        Creates a Data Link that will open the same connection.
-    @path (File_Browse file_types=[File_Type.Option "DataLink" ["datalink"]] existing_only=False display=..Always)
+    @path (File_Browse file_types=[File_Type.Option "DataLink" ["datalink"]] existing_only=False)
     @on_existing_file (Existing_File_Behavior.widget include_backup=False include_append=False)
     save_as_data_link self path:(Enso_File | File) (on_existing_file:Existing_File_Behavior = ..Error) =
         case path.is_data_link of
@@ -638,7 +637,7 @@ make_table_name_selector connection add_custom:Boolean=True =
     tables_to_display = connection.tables.at "Name" . to_vector
     table_name_values = tables_to_display.map t-> Option t t.pretty
     values = table_name_values + (if add_custom then [Option '<Table_Name>' '..Table_Name ""', Option '<Raw_SQL>' '..Raw_SQL ""'] else [])
-    Single_Choice display=Display.Always values=values
+    Single_Choice values=values
 
 ## ---
    private: true
@@ -652,15 +651,15 @@ make_table_name_with_schema_selector connection schema_black_list=[] =
         sch = r.at "Schema"
         Option ((schema_text sch) + name) "(..Table_Name "+name.pretty+(if sch == schema then "" else " "+sch.pretty)+")"
     values = table_name_values + [Option '<Table_Name>' '..Table_Name ""', Option '<Raw_SQL>' '..Raw_SQL ""']
-    Single_Choice display=..Always values=values
+    Single_Choice values=values
 
 ## ---
    private: true
    ---
 make_structure_creator : Widget
 make_structure_creator =
-    item_editor = Single_Choice display=Display.Always values=[Option "new column" "(Column_Description.Value)"]
-    Vector_Editor item_editor=item_editor item_default=item_editor.values.first.value display=Display.Always
+    item_editor = Single_Choice values=[Option "new column" "(Column_Description.Value)"]
+    Vector_Editor item_editor=item_editor item_default=item_editor.values.first.value
 
 ## ---
    private: true

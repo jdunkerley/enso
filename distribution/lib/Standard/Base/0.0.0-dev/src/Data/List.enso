@@ -26,7 +26,7 @@ import project.Panic.Panic
 from project.Data.Boolean import Boolean, False, True
 from project.Data.List.List import Cons, Nil
 from project.Internal.Predicate_Helpers import unify_condition_or_predicate, unify_condition_predicate_or_element
-from project.Metadata import Display, Widget
+from project.Metadata import Widget
 from project.Nothing import all
 
 ## Cons lists.
@@ -90,7 +90,7 @@ type List
 
        ### Computational Complexity
        Note that this is a linear operation requiring O(n) time.
-    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1 display=Display.Always)
+    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1)
     at : Integer -> Any ! Index_Out_Of_Bounds
     at self index:Integer=0 =
         self.get index (Error.throw (Index_Out_Of_Bounds.Error index self.length))
@@ -113,7 +113,7 @@ type List
 
        ### Computational Complexity
        Note that this is a linear operation requiring O(n) time.
-    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1 display=Display.Always)
+    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.length-1)
     get : Integer -> Any -> Any
     get self index:Integer=0 ~if_missing=Nothing = case index >= 0 of
         True ->

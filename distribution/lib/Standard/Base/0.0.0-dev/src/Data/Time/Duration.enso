@@ -15,7 +15,6 @@ import project.Errors.Illegal_State.Illegal_State
 import project.Errors.Time_Error.Time_Error
 import project.Internal.Time.Date_Helpers
 import project.Meta
-import project.Metadata.Display
 import project.Metadata.Widget
 import project.Panic.Panic
 import project.Runtime
@@ -111,9 +110,9 @@ type Duration
        private: true
        ---
        Gets the default drop down option for Duration.
-    default_widget display:Display=..When_Modified -> Widget =
+    default_widget -> Widget =
         options = [Option "Seconds" "Duration.of_seconds", Option "Minutes" "Duration.of_minutes", Option "Hours" "Duration.of_hours", Option "Custom" "Duration.new"]
-        Widget.Single_Choice values=options display=display
+        Widget.Single_Choice values=options
 
     ## ---
        icon: time

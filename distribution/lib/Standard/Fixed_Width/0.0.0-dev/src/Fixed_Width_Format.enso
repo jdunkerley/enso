@@ -1,6 +1,5 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
-import Standard.Base.Metadata.Display
 import Standard.Base.Metadata.Widget
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
 import Standard.Base.System.File_Format.File_Name_Pattern
@@ -385,6 +384,6 @@ Fixed_Width_Layout.from (that : Function) =
 ## ---
    private: true
    ---
-_make_fixed_width_layout_widget display:Display=..When_Modified -> Widget =
+_make_fixed_width_layout_widget -> Widget =
     prepopulated_table = "Table.input [['names', ['column a']], ['starts', ['0']], ['widths', ['10']]]"
-    make_single_choice [["Infer (left justified)", "..Left"], ["Infer (right justified)", "..Right"], ["Table", prepopulated_table ]] display=display
+    make_single_choice [["Infer (left justified)", "..Left"], ["Infer (right justified)", "..Right"], ["Table", prepopulated_table ]]

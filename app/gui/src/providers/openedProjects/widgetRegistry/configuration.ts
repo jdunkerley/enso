@@ -18,27 +18,6 @@ const withKindSchema: z.ZodType<WithKind, z.ZodTypeDef, Input> = inputSchema.tra
   return { kind, ...structuredClone(value) }
 })
 
-/** Widget display mode. Determines when the widget should be expanded. */
-export enum DisplayMode {
-  /** The widget should always be in its expanded mode. */
-  Always,
-  /** The widget should only be in its expanded mode when it has non-default value. */
-  WhenModified,
-  /** The widget should only be in its expanded mode whe the whole node is expanded. */
-  ExpandedOnly,
-}
-
-const displaySchema = withKindSchema.pipe(
-  z.union([
-    z.object({ kind: z.literal('Always') }).transform((_) => DisplayMode.Always),
-    z.object({ kind: z.literal('When_Modified') }).transform((_) => DisplayMode.WhenModified),
-    z.object({ kind: z.literal('Expanded_Only') }).transform((_) => DisplayMode.ExpandedOnly),
-  ]),
-)
-
-const withDisplay = z.object({ display: displaySchema })
-export type WithDisplay = z.infer<typeof withDisplay>
-
 const choiceValueSchema = z.lazy(() => z.union([z.string(), z.array(choiceSchema)]))
 export type ChoiceValue = z.infer<typeof choiceValueSchema>
 
@@ -136,11 +115,8 @@ export interface PendingConfiguration {
 }
 
 /** Helper for creating a pending configuration record. */
-export function pending(): WidgetConfiguration & WithDisplay {
-  return {
-    kind: 'Pending',
-    display: DisplayMode.Always,
-  }
+export function pending(): WidgetConfiguration {
+  return { kind: 'Pending' }
 }
 
 export interface VectorEditor {
@@ -151,7 +127,6 @@ export interface VectorEditor {
 
 export interface MultipleChoice {
   kind: 'Multiple_Choice'
-  label: string | null
   values: Choice[]
 }
 
@@ -186,7 +161,6 @@ export interface SecretBrowse {
 
 export interface SingleChoice {
   kind: 'Single_Choice'
-  label: string | null
   values: Choice[]
 }
 
@@ -200,7 +174,7 @@ export interface AnyToTarget {
  */
 export interface FunctionCall {
   kind: 'FunctionCall'
-  parameters: Map<string, (WidgetConfiguration & WithDisplay) | null>
+  parameters: Map<string, WidgetConfiguration | null>
   /** Why the engine has no widget for these arguments (`Widget_Query.resolve_call`'s errors). */
   errors?: Map<string, WidgetQueryError> | undefined
 }
@@ -226,56 +200,35 @@ export interface SomeOfFunctionCalls {
   possibleFunctions: Map<string, FunctionCall>
 }
 
-export const widgetConfigurationSchema: z.ZodType<
-  WidgetConfiguration & WithDisplay,
-  z.ZodTypeDef,
-  any
-> = withKindSchema.pipe(
-  /* eslint-disable camelcase */
-  z.discriminatedUnion('kind', [
-    z
-      .object({
-        kind: z.literal('Single_Choice'),
-        label: z.string().nullable(),
-        values: z.array(choiceSchema),
-      })
-      .merge(withDisplay),
-    z
-      .object({
+export const widgetConfigurationSchema: z.ZodType<WidgetConfiguration, z.ZodTypeDef, any> =
+  withKindSchema.pipe(
+    /* eslint-disable camelcase */
+    z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('Single_Choice'), values: z.array(choiceSchema) }),
+      z.object({
         kind: z.literal('Vector_Editor'),
         item_editor: z.lazy(() => widgetConfigurationSchema),
         item_default: z.string(),
-      })
-      .merge(withDisplay),
-    z
-      .object({
-        kind: z.literal('Multiple_Choice'),
-        label: z.string().nullable(),
-        values: z.array(choiceSchema),
-      })
-      .merge(withDisplay),
-    z.object({ kind: z.literal('Boolean_Input') }).merge(withDisplay),
-    z
-      .object({
+      }),
+      z.object({ kind: z.literal('Multiple_Choice'), values: z.array(choiceSchema) }),
+      z.object({ kind: z.literal('Boolean_Input') }),
+      z.object({
         kind: z.literal('Numeric_Input'),
         maximum: z.number().optional(),
         minimum: z.number().optional(),
-      })
-      .merge(withDisplay),
-    z.object({ kind: z.literal('Text_Input'), syntax: z.string().optional() }).merge(withDisplay),
-    z.object({ kind: z.literal('Folder_Browse') }).merge(withDisplay),
-    z
-      .object({
+      }),
+      z.object({ kind: z.literal('Text_Input'), syntax: z.string().optional() }),
+      z.object({ kind: z.literal('Folder_Browse') }),
+      z.object({
         kind: z.literal('File_Browse'),
         existing_only: z.boolean().optional(),
         file_types: z.array(fileTypeSchema),
-      })
-      .merge(withDisplay),
-    z.object({ kind: z.literal('Secret_Browse') }).merge(withDisplay),
-    z.object({ kind: z.literal('Any_To_Target') }).merge(withDisplay),
-    /* eslint-enable camelcase */
-  ]),
-)
+      }),
+      z.object({ kind: z.literal('Secret_Browse') }),
+      z.object({ kind: z.literal('Any_To_Target') }),
+      /* eslint-enable camelcase */
+    ]),
+  )
 
 const argNameSchema = z.string()
 const argumentSchema = z.tuple([argNameSchema, widgetConfigurationSchema.nullable()])

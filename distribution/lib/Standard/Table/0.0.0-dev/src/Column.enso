@@ -1510,7 +1510,7 @@ type Column
        |       f        |      t     |     ✗    |    ✓   |
        +----------------+------------+----------+--------+
     @term make_regex_text_widget
-    @new_text (Text_Input display=..Always)
+    @new_text (Text_Input)
     text_replace self (term : Text | Regex | Column = "") (new_text : Text | Column = "") case_sensitivity:Case_Sensitivity=..Sensitive only_first:Boolean=False -> Column & Any =
         self.implementation.text_replace self term new_text case_sensitivity only_first
 
@@ -2607,7 +2607,7 @@ type Column
 
        ## Arguments
         - `statistics`: Set of statistics to calculate.
-    @statistics (Statistic.bulk_widget display=..Always)
+    @statistics (Statistic.bulk_widget)
     compute_bulk self (statistics : Vector Statistic = [Statistic.Count, Statistic.Sum]) -> Table | Any =
         self.implementation.compute_bulk self statistics
 

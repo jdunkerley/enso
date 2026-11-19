@@ -26,7 +26,7 @@ type Redshift_Details
         - `use_ssl`: Whether to use SSL (defaults to `SSL_Mode.Require`).
         - `client_cert`: The client certificate to use or `Nothing` if not
           needed.
-    @host (Text_Input display=..Always)
+    @host (Text_Input)
     @credentials AWS_Credential.default_widget add_user_password=True
     Redshift
         host:Text=(Missing_Argument.throw "host")

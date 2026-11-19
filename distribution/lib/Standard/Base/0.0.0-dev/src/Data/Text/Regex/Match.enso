@@ -12,7 +12,7 @@ import project.Data.Vector.Vector
 import project.Errors.Common.Index_Out_Of_Bounds
 from project.Data.Range.Extensions import all
 from project.Error import all
-from project.Metadata import Display, Widget
+from project.Metadata import Widget
 from project.Nothing import all
 
 type Match
@@ -329,7 +329,7 @@ type Match
        ## Arguments
         - `id`: The integer index or name of that group.
         - `if_missing`: The value to return if the index is out of bounds.
-    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.pattern.group_count display=Display.Always)
+    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.pattern.group_count)
     get : Integer -> Any -> Text | Any
     get self index:Integer=0 ~if_missing=Nothing =
         self.text index . catch No_Such_Group (_-> if_missing)
@@ -347,7 +347,7 @@ type Match
        ## Arguments
         - `id`: The integer index or name of that group.
         - `if_missing`: The value to return if the index is out of bounds.
-    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.pattern.group_count display=Display.Always)
+    @index (t-> Widget.Numeric_Input minimum=0 maximum=t.pattern.group_count)
     at : Integer -> Text ! Index_Out_Of_Bounds
     at self index:Integer=0 =
         self.get index if_missing=(Error.throw (Index_Out_Of_Bounds.Error index self.pattern.group_count))
