@@ -56,7 +56,7 @@ object FullyAppliedFunctionUses extends IRPass {
       case name: Name.Literal =>
         val meta = name.getMetadata(GlobalNames, classOf[GlobalNames.Metadata])
         meta match {
-          case Some(Resolution(ResolvedConstructor(_, cons)))
+          case Some(Resolution(ResolvedConstructor(_, cons), _))
               if cons.allFieldsDefaulted && cons.arity > 0 =>
             Application.Prefix
               .builder()

@@ -10,6 +10,7 @@ import org.enso.compiler.core.ir.expression.Application;
 import org.enso.compiler.core.ir.expression.Operator;
 import org.enso.compiler.core.ir.type.Set;
 import org.enso.compiler.data.BindingsMap;
+import org.enso.compiler.pass.resolve.EigentypeReference;
 import org.enso.compiler.pass.resolve.Patterns$;
 import org.enso.compiler.pass.resolve.TypeNames$;
 import org.enso.compiler.pass.resolve.TypeSignatures;
@@ -56,7 +57,11 @@ public class TypeResolver {
       case Type.Error error -> resolveTypeExpression(error.typed());
 
       case Name.Qualified qualified -> {
-        // TODO to be handled in further iterations
+        // `X.type` is resolved by `TypeNames`; other qualified names are to be handled in further
+        // iterations. See Note [Eigentype References] in EigentypeReference.java.
+        if (EigentypeReference.isEigentypeReference(qualified)) {
+          yield getResolvedTypeFromBindingsMap(qualified);
+        }
         yield TypeRepresentation.UNKNOWN;
       }
 
@@ -93,7 +98,11 @@ public class TypeResolver {
     if (resolutionOrNull != null) {
       BindingsMap.ResolvedName target = resolutionOrNull.target();
       return switch (target) {
-        case BindingsMap.ResolvedType resolvedType -> resolvedTypeAsAtomType(resolvedType);
+        // See Note [Eigentype References] in EigentypeReference.java.
+        case BindingsMap.ResolvedType resolvedType ->
+            resolutionOrNull.isEigentype()
+                ? resolvedTypeAsTypeObject(resolvedType)
+                : resolvedTypeAsAtomType(resolvedType);
         case BindingsMap.ResolvedPolyglotSymbol polyglotSymbol -> {
           // for now type inference is not able to deal with polyglot types, so we treat them as
           // unknown

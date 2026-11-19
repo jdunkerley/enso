@@ -1,0 +1,10 @@
+type Source
+    Value x
+
+type Target
+    Value tag
+
+## Without the eigentype flag both conversions register from Source and the
+   module fails to load.
+Target.from (that : Source) = Target.Value 0
+Target.from (that : Source.type) (tag = 42) = Target.Value tag

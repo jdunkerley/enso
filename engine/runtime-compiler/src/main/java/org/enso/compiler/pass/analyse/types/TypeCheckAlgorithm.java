@@ -30,6 +30,16 @@ public abstract class TypeCheckAlgorithm<R, E extends Exception> {
   protected abstract R forName(CompilerContext.Module module, String name) throws E;
 
   /**
+   * Finds a representation of a type check for the eigentype of a named type, {@code X.type}: only
+   * the type object {@code X} satisfies it. See Note [Eigentype References] in {@code
+   * EigentypeReference}.
+   *
+   * @param module the module
+   * @param name the name of a type inside of that module
+   */
+  protected abstract R forEigentypeName(CompilerContext.Module module, String name) throws E;
+
+  /**
    * Finds a representation of a polyglot type in a given module.
    *
    * @param module the module
@@ -116,7 +126,8 @@ public abstract class TypeCheckAlgorithm<R, E extends Exception> {
             case BindingsMap.ResolvedType binding -> {
               var module = binding.module().unsafeAsModule("convert to module");
               var name = binding.tp().name();
-              yield forName(module, name);
+              // See Note [Eigentype References] in EigentypeReference.java.
+              yield res.isEigentype() ? forEigentypeName(module, name) : forName(module, name);
             }
             case BindingsMap.ResolvedPolyglotSymbol ps -> {
               var mod = ps.module().unsafeAsModule("convert to module");

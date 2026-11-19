@@ -1644,6 +1644,137 @@ class SuggestionBuilderTest extends AnyWordSpecLike with Matchers {
       )
     }
 
+    "build conversion methods from a type object and from its values" in {
+      val code =
+        """type Foo
+          |    Value foo
+          |
+          |type Bar
+          |    Value bar
+          |
+          |Bar.from (that : Foo) = Bar.Value that.foo
+          |Bar.from (that : Foo.type) = Bar.Value 0
+          |""".stripMargin
+      val module = code.preprocessModule()
+
+      build(code, module) shouldEqual Tree.Root(
+        Vector(
+          ModuleNode,
+          Tree.Node(
+            Suggestion.Type(
+              externalId    = None,
+              module        = "Test",
+              name          = "Foo",
+              params        = Seq(),
+              returnType    = "Test.Foo",
+              parentType    = Some(SuggestionBuilder.Any),
+              documentation = None
+            ),
+            Vector()
+          ),
+          Tree.Node(
+            Suggestion.Constructor(
+              externalId = None,
+              module     = "Test",
+              name       = "Value",
+              arguments = Seq(
+                Suggestion
+                  .Argument("foo", SuggestionBuilder.Any, false, false, None)
+              ),
+              returnType    = "Test.Foo",
+              documentation = None,
+              annotations   = Seq()
+            ),
+            Vector()
+          ),
+          Tree.Node(
+            Suggestion.Getter(
+              externalId = None,
+              module     = "Test",
+              name       = "foo",
+              arguments = List(
+                Suggestion.Argument("self", "Test.Foo", false, false, None)
+              ),
+              selfType      = "Test.Foo",
+              returnType    = SuggestionBuilder.Any,
+              documentation = None,
+              annotations   = Seq()
+            ),
+            Vector()
+          ),
+          Tree.Node(
+            Suggestion.Type(
+              externalId    = None,
+              module        = "Test",
+              name          = "Bar",
+              params        = Seq(),
+              returnType    = "Test.Bar",
+              parentType    = Some(SuggestionBuilder.Any),
+              documentation = None
+            ),
+            Vector()
+          ),
+          Tree.Node(
+            Suggestion.Constructor(
+              externalId = None,
+              module     = "Test",
+              name       = "Value",
+              arguments = Seq(
+                Suggestion
+                  .Argument("bar", SuggestionBuilder.Any, false, false, None)
+              ),
+              returnType    = "Test.Bar",
+              documentation = None,
+              annotations   = Seq()
+            ),
+            Vector()
+          ),
+          Tree.Node(
+            Suggestion.Getter(
+              externalId = None,
+              module     = "Test",
+              name       = "bar",
+              arguments = List(
+                Suggestion.Argument("self", "Test.Bar", false, false, None)
+              ),
+              selfType      = "Test.Bar",
+              returnType    = SuggestionBuilder.Any,
+              documentation = None,
+              annotations   = Seq()
+            ),
+            Vector()
+          ),
+          Tree.Node(
+            Suggestion.Conversion(
+              externalId = None,
+              module     = "Test",
+              arguments = Seq(
+                Suggestion.Argument("that", "Test.Foo", false, false, None)
+              ),
+              selfType      = "Test.Bar",
+              returnType    = "Test.Bar",
+              documentation = None
+            ),
+            Vector()
+          ),
+          Tree.Node(
+            Suggestion.Conversion(
+              externalId = None,
+              module     = "Test",
+              arguments = Seq(
+                Suggestion
+                  .Argument("that", "Test.Foo.type", false, false, None)
+              ),
+              selfType      = "Test.Bar",
+              returnType    = "Test.Bar",
+              documentation = None
+            ),
+            Vector()
+          )
+        )
+      )
+    }
+
     "build function simple" in {
 
       val code =

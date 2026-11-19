@@ -73,7 +73,7 @@ object MethodCalls extends IRPass {
                   GlobalNames,
                   classOf[GlobalNames.Metadata]
                 ) match {
-                  case Some(Resolution(ResolvedModule(module))) =>
+                  case Some(Resolution(ResolvedModule(module), _)) =>
                     val moduleIr = module.unsafeAsModule().getIr
                     Option
                       .when(moduleIr != null)(

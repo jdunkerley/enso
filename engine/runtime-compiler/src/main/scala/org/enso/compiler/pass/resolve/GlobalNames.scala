@@ -351,7 +351,7 @@ case object GlobalNames extends IRPass {
       )
     )
     processedFun.getMetadata(this, classOf[GlobalNames.Metadata]) match {
-      case Some(Resolution(resMethod @ ResolvedModuleMethod(mod, _)))
+      case Some(Resolution(resMethod @ ResolvedModuleMethod(mod, _), _))
           if !isLocalVar(fun) =>
         if (app.hasDefaultsSuspended && app.arguments.isEmpty) {
           app

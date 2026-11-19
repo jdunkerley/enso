@@ -1088,6 +1088,41 @@ public class TypeInferenceTest extends StaticAnalysisTest {
     assertEquals(List.of(typeError), ModuleUtils.getImmediateDiagnostics(arg));
   }
 
+  /** See Note [Eigentype References] in EigentypeReference.java. */
+  @Test
+  public void eigentypeAscription() throws Exception {
+    final URI uri = new URI("memory://eigentypeAscription.enso");
+    final Source src =
+        Source.newBuilder(
+                "enso",
+                """
+                type My_Type
+                    Value v
+                    make -> My_Type = My_Type.Value 1
+                bar (t : My_Type.type) =
+                    x = t.make
+                    x
+                foo =
+                    y = bar My_Type
+                    y
+                """,
+                uri.getAuthority())
+            .uri(uri)
+            .buildLiteral();
+
+    var module = compile(src);
+    var bar = ModuleUtils.findStaticMethod(module, "bar");
+    var x = ModuleUtils.findAssignment(bar, "x");
+    // `t` is the type object, so the static method is found.
+    assertEquals(List.of(), ModuleUtils.getDescendantsDiagnostics(x.expression()));
+    assertAtomType("eigentypeAscription.My_Type", x);
+
+    var foo = ModuleUtils.findStaticMethod(module, "foo");
+    var y = ModuleUtils.findAssignment(foo, "y");
+    // The type object passes the ascription.
+    assertEquals(List.of(), ModuleUtils.getDescendantsDiagnostics(y.expression()));
+  }
+
   @Ignore("TODO: distinguish return type ascription (no conversions) from regular one: #12292")
   @Test
   public void typeErrorInReturn() throws Exception {

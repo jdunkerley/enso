@@ -193,6 +193,15 @@ case object TypeNames extends IRPass {
         } else {
           processResolvedName(n, bindingsMap.resolveName(n.name))
         }
+      case n: Name.Qualified if EigentypeReference.isEigentypeReference(n) =>
+        // Note [Eigentype References]
+        EigentypeReference.resolve(n, bindingsMap) match {
+          case Right(resolution) =>
+            n.updateMetadata(new MetadataPair(this, resolution))
+            n
+          case Left(reason) =>
+            errors.Resolution.create(n, reason)
+        }
       case n: Name.Qualified =>
         processResolvedName(
           n,
