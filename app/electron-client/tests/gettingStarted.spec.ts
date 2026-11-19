@@ -7,11 +7,13 @@ import { expect } from 'playwright/test'
 import {
   addBankData,
   addFirstElementToWidgetVector,
+  addParameter,
   closeWelcome,
   COLD_PROJECT_TIMEOUT,
   createNewProject,
   fillWidgetText,
   openComponentBrowser,
+  openDropdownInArgument,
   openDropdownInWidget,
   parkMouse,
   showAllComponents,
@@ -126,16 +128,23 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     await page.getByText('input', { exact: true }).click()
     await page.getByRole('button', { name: 'currency_code', exact: true }).click()
 
-    await showSelectedComponent(page)
-    await page.getByText('operation', { exact: true }).click()
+    // `operation` and `as` have defaults, so they are hidden: add each with a ＋.
+    const operation = await addParameter(page, 'operation')
+    await openDropdownInArgument(page, operation)
     await page.getByRole('button', { name: 'Text', exact: true }).click()
 
-    await page.getByText('operation', { exact: true }).click()
+    // `..Text` has an `operation` of its own, which it shows. Every argument shows its name, so
+    // the component shows two: the `operation` set to `..Text`, then `..Text`'s own (the last).
+    const operations = page.locator('.GraphNode.selected').getByText('operation', { exact: true })
+    await expect(operations).toHaveCount(2)
+    // The component has grown past the view's edge: bring it back into view.
+    await showSelectedComponent(page)
+    await operations.last().click()
     await page.getByRole('button', { name: 'length', exact: true }).click()
 
     // Typing in the column name
-    await showSelectedComponent(page)
-    await fillWidgetText(page, 'as“”', 'currency_code_length')
+    const as = await addParameter(page, 'as')
+    await as.getByTestId('widget-text-content').fill('currency_code_length')
 
     // Adding filter component
     await openComponentBrowser(page, 'set')
@@ -150,7 +159,7 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     await option.click()
 
     await showSelectedComponent(page)
-    openDropdownInWidget(page, 'filter')
+    await openDropdownInWidget(page, 'filter')
     const notEqualBtn = page.getByRole('button', { name: '..Not_Equal', exact: true })
     await notEqualBtn.waitFor({ state: 'visible', timeout: 10000 })
     await notEqualBtn.click()
@@ -162,7 +171,13 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     // Set the actual filtered number value
     const numberBox = page.locator('input.WidgetNumber')
     await expect(numberBox).toBeVisible()
-    await numberBox.fill('3')
+    // The component re-renders as `to` gets its value, and a box replaced while it is being
+    // filled loses the edit: fill it until it holds the number. Enter commits it.
+    await expect(async () => {
+      await numberBox.fill('3', { timeout: 2000 })
+      await numberBox.press('Enter', { timeout: 2000 })
+      await expect(numberBox).toHaveValue('3', { timeout: 2000 })
+    }).toPass({ timeout: 20_000 })
 
     // Visualize data frame
     await visualizeData(page)
@@ -202,7 +217,8 @@ test('Exercise 1', async ({ page, projectsDir }) => {
 
     // Set the filtered text value
     await showSelectedComponent(page)
-    await fillWidgetText(page, 'filter..Equal“”', 'Savings Account')
+    // A container's text includes its arguments' names (`to`).
+    await fillWidgetText(page, 'filter..Equalto“”', 'Savings Account')
   })
 
   // ---------------- Objective 4 ----------------
@@ -293,15 +309,16 @@ test('Exercise 2', async ({ page, projectsDir }) => {
     )
 
     // Choosing parameters
+    // The new item's `..Name` column: the innermost drop-down showing it in the selected component.
     await page
-      .locator('div')
-      .filter({ hasText: /^‘product_name’$/ })
-      .nth(4)
+      .locator('.GraphNode.selected .WidgetSelection')
+      .filter({ hasText: /‘product_name’$/ })
+      .last()
       .click()
     await page.getByRole('button', { name: 'Count', exact: true }).click()
 
-    await showSelectedComponent(page)
-    await openDropdownInWidget(page, 'direction')
+    const direction = await addParameter(page, 'direction')
+    await openDropdownInArgument(page, direction)
     await page.getByRole('button', { name: '..Descending', exact: true }).click()
 
     await visualizeData(page)
@@ -376,10 +393,12 @@ test('Exercise 2', async ({ page, projectsDir }) => {
     await openDropdownInWidget(page, 'input')
     await page.getByRole('button', { name: 'currency_code', exact: true }).click()
 
-    await showSelectedComponent(page)
-    await openDropdownInWidget(page, 'operation')
+    // `operation` has a default, so it is hidden: add it with a ＋.
+    const operation = await addParameter(page, 'operation')
+    await openDropdownInArgument(page, operation)
     await page.getByRole('button', { name: 'if', exact: true }).click()
 
+    // `..If` shows its arguments.
     await showSelectedComponent(page)
     await openDropdownInWidget(page, 'condition')
     await page.getByRole('button', { name: '..Equal', exact: true }).click()
@@ -390,7 +409,8 @@ test('Exercise 2', async ({ page, projectsDir }) => {
 
     // Write in the textbox
     await showSelectedComponent(page)
-    await fillWidgetText(page, '..Equal“”', 'G')
+    // A container's text includes its arguments' names (`to`).
+    await fillWidgetText(page, '..Equalto“”', 'G')
 
     await showSelectedComponent(page)
     await page.getByText('true_value', { exact: true }).click()
@@ -398,7 +418,7 @@ test('Exercise 2', async ({ page, projectsDir }) => {
 
     // // Write in the textbox
     await showSelectedComponent(page)
-    await fillWidgetText(page, '..If(..Equal“G”)“”', 'GBP', 1)
+    await fillWidgetText(page, '..Ifcondition(..Equalto“G”)true_value“”', 'GBP', 1)
 
     await showSelectedComponent(page)
     await page.getByText('false_value', { exact: true }).click()
@@ -406,9 +426,9 @@ test('Exercise 2', async ({ page, projectsDir }) => {
     await option.hover()
     await option.click()
 
-    // Write in the textbox
-    await showSelectedComponent(page)
-    await fillWidgetText(page, 'as“”', 'currency_code')
+    // Write in the textbox: `as` has a default, so it is hidden
+    const as = await addParameter(page, 'as')
+    await as.getByTestId('widget-text-content').fill('currency_code')
     await visualizeData(page)
     await expect(page.getByText('191')).toBeVisible()
   })
