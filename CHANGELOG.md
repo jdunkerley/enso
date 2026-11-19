@@ -497,6 +497,8 @@
 
 #### Enso Standard Library
 
+- [`Date_Time`'s functions are documented with examples you can copy into
+  the graph][903]
 - [The period and amount dropdowns of `Date` and `Date_Time` (`+`, `-`, `up_to`,
   `start_of` and so on) write `..Day`, `..Month`, `..Hour` rather than
   `Date_Period.Day`, like `Time_Of_Day`'s.][846]
@@ -582,6 +584,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[903]: https://github.com/jdunkerley/enso/pull/903
 [896]: https://github.com/jdunkerley/enso/pull/896
 [878]: https://github.com/jdunkerley/enso/pull/878
 [895]: https://github.com/jdunkerley/enso/pull/895
