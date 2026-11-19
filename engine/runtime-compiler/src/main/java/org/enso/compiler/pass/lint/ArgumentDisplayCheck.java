@@ -78,7 +78,8 @@ public final class ArgumentDisplayCheck implements MiniPassFactory {
           if (colon <= 0) {
             problems.add(NOT_A_BLOCK);
           } else {
-            entries.put(stripped.substring(0, colon).strip(), stripped.substring(colon + 1).strip());
+            entries.put(
+                stripped.substring(0, colon).strip(), stripped.substring(colon + 1).strip());
           }
           continue;
         }
@@ -111,8 +112,7 @@ public final class ArgumentDisplayCheck implements MiniPassFactory {
 
   @Override
   public Seq<? extends IRProcessingPass> precursorPasses() {
-    return ScalaConversions.asScala(
-        List.of(ComplexType$.MODULE$, GenerateMethodBodies$.MODULE$));
+    return ScalaConversions.asScala(List.of(ComplexType$.MODULE$, GenerateMethodBodies$.MODULE$));
   }
 
   @Override

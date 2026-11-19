@@ -134,7 +134,8 @@ public class ArgumentDisplayCheckTest {
     assertThat(
         warnings(code),
         containsInAnyOrder(
-            "The front matter gives `b` the value `sometimes`; use `always`, `selected` or `when_modified`."));
+            "The front matter gives `b` the value `sometimes`; use `always`, `selected` or"
+                + " `when_modified`."));
   }
 
   @Test
