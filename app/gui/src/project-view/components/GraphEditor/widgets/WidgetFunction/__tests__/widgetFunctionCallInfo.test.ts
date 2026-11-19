@@ -24,9 +24,15 @@ import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import type { MethodPointer } from '@/util/methodPointer'
 import type { Opt } from 'enso-common/src/utilities/data/opt'
-import { expect, test } from 'vitest'
-import { ref, toValue, type WatchSource } from 'vue'
+import { Ok, type Result } from 'enso-common/src/utilities/data/result'
+import { expect, test, vi } from 'vitest'
+import { effectScope, nextTick, ref, toValue, type Ref, type WatchSource } from 'vue'
 import { SourceRange } from 'ydoc-shared/util/data/text'
+
+vi.mock('$/providers/engineLogAppend', () => ({
+  reportWidgetSchemaMismatch: vi.fn(),
+  reportWidgetTiming: vi.fn(),
+}))
 
 const projectNames = mockProjectNameStore('local', 'Project')
 
@@ -147,3 +153,66 @@ test.each`
     expect(args[5]).toBe(attachedSpan == null ? 'True' : 'False')
   },
 )
+
+/** Set up the call info of `code` (a call of `callSuggestion`) with the widget query answering `data`. */
+function setUpCallInfo(
+  code: string,
+  callSuggestion: SuggestionEntry,
+  data: Ref<Result<unknown> | null>,
+) {
+  const { ast, id } = parseWithSpans(code, {
+    entireFunction: SourceRange.fromStartAndLength(0, code.length),
+  })
+  const statement = ast.lines[0]?.statement?.node
+  assert(statement instanceof Ast.ExpressionStatement)
+  return effectScope().run(() =>
+    useWidgetFunctionCallInfo(
+      WidgetInput.FromAst(statement.expression),
+      {
+        getMethodCallInfo(astId) {
+          if (astId === id('entireFunction')) {
+            return {
+              suggestion: callSuggestion,
+              methodCallSource: astId,
+              methodCall: { notAppliedArguments: [], methodPointer: callPointer(callSuggestion) },
+            }
+          }
+        },
+        getExpressionInfo() {},
+      } as GraphDb,
+      {
+        useVisualizationData: () => data,
+        moduleProjectPath: projectNames.parseProjectPathRaw('local.Project.Main'),
+        assetId: 'project-id',
+      },
+      projectNames,
+      [],
+    ),
+  )!
+}
+
+test('an answer the IDE cannot read is reported once, and the call keeps its pending widgets', async () => {
+  const { reportWidgetSchemaMismatch } = await import('$/providers/engineLogAppend')
+  const data = ref<Result<unknown> | null>(null)
+  const info = setUpCallInfo('local.Project.Type.method val1 val2', method, data)
+  data.value = Ok([['arg', 'not the new shape']])
+  expect(info.widgetConfiguration.value.parameters.get('arg')?.kind).toBe('Pending')
+  await nextTick()
+  expect(reportWidgetSchemaMismatch).toHaveBeenCalledTimes(1)
+  expect(vi.mocked(reportWidgetSchemaMismatch).mock.calls[0]![1]).toBe('local.Project.Type.method')
+})
+
+test('a readable answer is timed after it renders', async () => {
+  const { reportWidgetTiming } = await import('$/providers/engineLogAppend')
+  const data = ref<Result<unknown> | null>(null)
+  const info = setUpCallInfo('local.Project.Type.method val1 val2', method, data)
+  data.value = Ok({ arguments: [['arg', { widget: null }]] })
+  void info.widgetConfiguration.value
+  await nextTick()
+  expect(reportWidgetTiming).toHaveBeenCalledWith(
+    'project-id',
+    'local.Project.Type.method',
+    expect.any(Number),
+    expect.any(Number),
+  )
+})

@@ -1,3 +1,4 @@
+import { reportWidgetSchemaMismatch, reportWidgetTiming } from '$/providers/engineLogAppend'
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import type { ProjectStore } from '$/providers/openedProjects/project'
 import type { NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'
@@ -23,7 +24,7 @@ import {
 import type { MethodPointer } from '@/util/methodPointer'
 import type { ProjectPath } from '@/util/projectPath'
 import type { Opt } from 'enso-common/src/utilities/data/opt'
-import { computed, toValue, type DeepReadonly } from 'vue'
+import { computed, toValue, watch, type DeepReadonly } from 'vue'
 import type { IdentifierOrOperatorIdentifier } from 'ydoc-shared/ast'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { widgetQueryConfiguration } from './widgetQuery'
@@ -157,18 +158,49 @@ export function useWidgetFunctionCallInfo(
   //  change, or useCurrentRef should not return ref.
   const visualizationData = toValue(project).useVisualizationData(visualizationConfig)
 
-  const widgetConfiguration = computed(() => {
+  const queryMethod = computed(() => {
+    const pointer = methodCallInfo.value?.methodCall.methodPointer
+    if (!pointer) return ''
+    return `${toValue(projectNames).serializeProjectPathForBackend(pointer.definedOnType)}.${pointer.name}`
+  })
+
+  const parsedAnswer = computed(() => {
     const data = visualizationData.value
-    if (data?.ok) {
-      const parsed = widgetQueryAnswerSchema.safeParse(data.value)
-      if (parsed.success) {
-        return functionCallFromAnswer(parsed.data, inheritedConfig.value)
-      } else {
-        console.error('Unable to parse widget configuration.', data, parsed.error)
-      }
-    } else if (data != null && !data.ok) {
-      data.error.log('Cannot load dynamic configuration')
-    }
+    if (data == null) return undefined
+    if (!data.ok) return { kind: 'failed' as const, error: data.error }
+    const startedAt = performance.now()
+    const parsed = widgetQueryAnswerSchema.safeParse(data.value)
+    const parseMs = performance.now() - startedAt
+    return parsed.success ?
+        { kind: 'answer' as const, answer: parsed.data, startedAt, parseMs }
+      : { kind: 'mismatch' as const, issues: parsed.error.issues }
+  })
+
+  // Side effects of an answer, outside the computed: the reports, and the timing once the node has
+  // rendered it (`flush: 'post'` runs after the DOM update). The reporters deduplicate mismatches
+  // and drop timings unless the performance-timings setting is on.
+  watch(
+    parsedAnswer,
+    (parsed) => {
+      const projectId = toValue(project).assetId
+      if (parsed?.kind === 'failed') parsed.error.log('Cannot load dynamic configuration')
+      else if (parsed?.kind === 'mismatch')
+        reportWidgetSchemaMismatch(projectId, queryMethod.value, parsed.issues)
+      else if (parsed?.kind === 'answer')
+        reportWidgetTiming(
+          projectId,
+          queryMethod.value,
+          parsed.parseMs,
+          performance.now() - parsed.startedAt,
+        )
+    },
+    { flush: 'post' },
+  )
+
+  const widgetConfiguration = computed(() => {
+    const parsed = parsedAnswer.value
+    if (parsed?.kind === 'answer')
+      return functionCallFromAnswer(parsed.answer, inheritedConfig.value)
     const parameters: FunctionCall['parameters'] = new Map(inheritedConfig.value?.parameters ?? [])
     annotatedArguments.value?.forEach((name) => {
       if (parameters.get(name) == null) parameters.set(name, pending())
@@ -212,6 +244,7 @@ export function useWidgetFunctionCallInfo(
 
   return {
     methodCallInfo,
+    widgetConfiguration,
     application,
     subject,
     subjectInfo,
