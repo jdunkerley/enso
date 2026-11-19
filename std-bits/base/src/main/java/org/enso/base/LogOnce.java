@@ -6,9 +6,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Remembers which log entries this engine session has written, so that an entry repeated on every
- * evaluation (a widget failing on each keystroke) is written once. Bounded: the least recently seen
- * key is forgotten past {@link #CAPACITY}.
+ * Remembers which log entries this engine process has written, so that an entry repeated on every
+ * evaluation (a widget failing on each keystroke) is written once. The state is static, so it is
+ * per JVM: every engine context in the process shares it. Bounded: the least recently seen key is
+ * forgotten past {@link #CAPACITY}.
  */
 public final class LogOnce {
   private static final int CAPACITY = 10_000;

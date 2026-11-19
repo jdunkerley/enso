@@ -70,7 +70,7 @@ result = "not a number".parse_integer.catch _-> 0
   their own annotations. It answers
   `{"arguments":[[<name>,{"widget":…}|{"error":{"step","message"}}],…]}`: errors
   are results, one per argument, never a failed call. Each failure is logged
-  once per engine session on the logger `Standard.Base.Metadata.Widget_Query`
+  once per engine process on the logger `Standard.Base.Metadata.Widget_Query`
   (WARN, with the cause chain and, for a panic, the stack), and each call is
   timed under `Standard.Base.Logging.Progress` (handle
   `Widget_Query.<type>.<method>`, the IDE's Performance timings). The GUI still

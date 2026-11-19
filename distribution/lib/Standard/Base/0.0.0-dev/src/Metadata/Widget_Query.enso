@@ -94,7 +94,7 @@ resolve_argument (method : Widget_Method) (argument : Text) subject (cache : Fun
    private: true
    ---
    Logs `failure` at Warning, once per method, argument, inputs, step and
-   message in this engine session: a widget that fails on every keystroke is
+   message in this engine process: a widget that fails on every keystroke is
    logged once.
 
    ## Arguments
