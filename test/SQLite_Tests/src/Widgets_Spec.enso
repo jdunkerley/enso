@@ -15,6 +15,7 @@ from Standard.Test import all
 
 sqlite_module = "Standard.SQLite.SQLite_Connection"
 sqlite_type = "Standard.SQLite.SQLite_Connection.SQLite_Connection"
+# A DB table resolves against the in-memory `Table`: `get`, `at` and `filter` are defined there, not on `DB_Table`.
 table_module = "Standard.Table.Table"
 table_type = "Standard.Table.Table.Table"
 
