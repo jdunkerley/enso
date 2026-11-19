@@ -18,6 +18,7 @@ from project.Data.Boolean import Boolean, False, True
 from project.Data.Range.Extensions import all
 from project.Metadata.Choice import Option
 from project.Metadata.Widget import Numeric_Input, Single_Choice, Vector_Editor
+from project.Nothing import all
 from project.Random import Random
 
 type Index_Sub_Range

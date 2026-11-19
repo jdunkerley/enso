@@ -8,6 +8,7 @@ import project.In_Memory
 import project.Internal
 import project.IO
 import project.Util_Spec
+import project.Widgets_Spec
 
 main filter=Nothing =
     suite = Test.build suite_builder->
@@ -17,5 +18,6 @@ main filter=Nothing =
         Internal.Main.add_specs suite_builder
         IO.Main.add_specs suite_builder
         Util_Spec.add_specs suite_builder
+        Widgets_Spec.add_specs suite_builder
 
     suite.run_with_filter filter

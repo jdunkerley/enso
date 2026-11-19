@@ -1,0 +1,52 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Widget_Query
+
+from Standard.Table import Column, Table
+
+from Standard.Test import all
+
+## The widget the engine resolved for `argument`, as JSON. The query must have
+   answered with a widget, not an error and not `null`.
+resolved_widget json argument =
+    entry = json.parse_json . get "arguments" . find e-> e.first == argument
+    entry.second.get "error" . should_equal Nothing
+    widget = entry.second.get "widget"
+    widget.should_not_equal Nothing
+    widget
+
+add_specs suite_builder =
+    column_module = "Standard.Table.Column"
+    column_type = "Standard.Table.Column.Column"
+    table_module = "Standard.Table.Table"
+    table_type = "Standard.Table.Table.Table"
+
+    suite_builder.group "Table and Column widget annotations resolve (#897)" group_builder->
+        column = Column.from_vector "A" [1, 2, 3]
+        table = Table.new [["A", [1, 2, 3]], ["B", [4, 5, 6]]]
+
+        group_builder.specify "the `index` of Column.at and Column.get is limited by the row count" <|
+            ["at", "get"].each method->
+                json = Widget_Query.resolve_call column column_module column_type method ["index"]
+                widget = resolved_widget json "index"
+                widget.get "minimum" . should_equal 0
+                widget.get "maximum" . should_equal 2
+
+        group_builder.specify "the `range` of Column.take, Column.drop, Table.take and Table.drop" <|
+            ["take", "drop"].each method->
+                column_json = Widget_Query.resolve_call column column_module column_type method ["range"]
+                column_labels = resolved_widget column_json "range" . get "values" . map o-> o.get "label"
+                column_labels.should_contain "First"
+                column_labels.should_contain "By_Index"
+                table_json = Widget_Query.resolve_call table table_module table_type method ["range"]
+                resolved_widget table_json "range" . get "values" . map o-> o.get "label" . should_contain "First"
+
+        group_builder.specify "the `n` of Column.offset is limited by the row count" <|
+            json = Widget_Query.resolve_call column column_module column_type "offset" ["n"]
+            widget = resolved_widget json "n"
+            widget.get "minimum" . should_equal -3
+            widget.get "maximum" . should_equal 3
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter
