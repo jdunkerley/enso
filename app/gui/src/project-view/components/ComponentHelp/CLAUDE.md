@@ -44,7 +44,9 @@ component, or of the entry highlighted in the component browser. F1
   a GFM table, by the docs site generator's rule
   (`docs-site/generator/src/mdx.ts`).
 - `metadata.ts` — the doc comments' front matter (also used by the docs site's
-  generator).
+  generator). The panel drops the `group` and `arguments` keys from the front
+  matter it shows (`sections.ts`): `arguments:` is display configuration, not
+  documentation.
 
 The text itself is a read-only `MarkdownEditor`; its look (the docs site's) is
 in `../MarkdownEditor/`, from the `--docs-*` tokens in `assets/base.css`.

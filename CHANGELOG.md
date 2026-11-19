@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [Arguments a component always shows appear on its node at once, and a library
+  can show an argument only while its node is selected][896]
 - [Widgets show why they could not load, instead of disappearing: a warning
   marker on the argument gives the reason, the argument stays editable, and the
   Logs panel has the details. New projects no longer import
@@ -573,6 +575,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[896]: https://github.com/jdunkerley/enso/pull/896
 [891]: https://github.com/jdunkerley/enso/pull/891
 [846]: https://github.com/jdunkerley/enso/pull/846
 [822]: https://github.com/jdunkerley/enso/pull/822

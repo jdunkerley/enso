@@ -208,7 +208,21 @@ render only its own slot content. The icon is already on the row, drawn by
   one, with arguments of its own) is drawn as an outlined group (`.nestedCall`)
   with its smaller ＋ inside, after its own last argument; the outer
   call's ＋ ends the node, inside it. Selecting a node does not show its hidden
-  arguments.
+  arguments, except those the method's doc front matter marks `selected`.
+- **Display comes from the doc front matter, not the widget.** A method's
+  `arguments:` map (`always`, `selected`, `when_modified`; see
+  `suggestionDatabase/documentation.ts`, `entry.argumentDisplay`) decides
+  whether an argument shows on the collapsed node. An argument with no default
+  always shows; otherwise the front matter decides, `when_modified` (shown once
+  set, else via ＋) being the default. `ArgumentPlaceholder.isHidden(selected)`
+  takes `selected` = the node is the sole selection, so a `selected` argument
+  shows while its node is the only one selected and hides again with two
+  selected. The ＋ menu never lists a `selected` argument that is currently
+  shown. It is known statically, before the engine answers, so an `always`
+  argument no longer pops in (a pending widget query does not force it shown)
+  and shows even if its widget query fails. Widgets have no `display` or `label`
+  (`Choice.Option`'s `label` stays); the engine's `ArgumentDisplayCheck`
+  validates the block and `lintEnso` fails the standard library build on it.
 - Every argument shows its parameter's name (`WidgetArgumentName`): every prefix
   argument, set or not, positional or named, at any depth, and an infix operand
   whose parameter has a name of its own (not `self`, `that`, `lhs`, `rhs`). The

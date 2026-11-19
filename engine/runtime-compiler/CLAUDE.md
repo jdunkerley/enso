@@ -12,6 +12,13 @@ The IR itself lives in `engine/runtime-parser`.
   its `knownTypingFunctions`, walked by `pass/analyse/DataflowAnalysis.scala`,
   and read by `pass/analyse/types/TypeCheckAlgorithm.java`. Grep for an existing
   node's name to find every site.
+- **`pass/lint/ArgumentDisplayCheck`** (`Warning.ArgumentDisplay`) checks the
+  `arguments:` map of a definition's doc front matter (block form only): an
+  unknown argument, an argument without a default, an unknown value (not
+  `always`, `selected`, `when_modified`) or the flow form `{a: b}` is a warning.
+  The standard library build runs `lintEnso` with `-Werror`, so a warning fails
+  it. A doc on the first definition of a module without imports is the module's
+  doc and is not checked.
 - Pass metadata that goes into IR caches is registered in
   `pass/analyse/PassPersistance.java` with explicit `@Persistable` ids.
 - **`X.type` names X's eigentype in a type position** (a conversion's source, an
