@@ -55,3 +55,10 @@ get_rows_for_table : Any -> Integer -> Vector | Nothing -> Vector | Nothing -> V
 get_rows_for_table table_or_column start_number sort_col_index_list=Nothing sort_direction_list=Nothing filter_col=Nothing filter_condition=Nothing =
     time_visualization Visualization ("get_rows_for_table: " + (short_display table_or_column) + "[" + start_number.to_text + "]") <|
         (Viz_Table.from table_or_column).server_rows_json start_number sort_col_index_list sort_direction_list filter_col filter_condition
+
+## ---
+   private: true
+   ---
+   The names of a table's columns, as JSON: the table expression editor's
+   column completions (`app/gui/src/project-view/composables/tableColumns.ts`).
+column_names_json table = table.column_names.to_json

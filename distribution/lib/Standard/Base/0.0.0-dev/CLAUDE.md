@@ -76,9 +76,7 @@ result = "not a number".parse_integer.catch _-> 0
   `Widget_Query.<type>.<method>`, the IDE's Performance timings). An error
   subject (a dataflow error as `value`, not `subject_is_type`) is the user's own
   error: every argument answers `{"widget":null}`, nothing is logged and no
-  annotation runs. The GUI still calls
-  `Standard.Visualization.Widgets.get_widget_json`; it moves to `resolve_call`
-  in widgets PR 1b.
+  annotation runs. The GUI calls `resolve_call` for every widget query.
 - `Meta.get_method_annotation`, `Meta.find_type_or_module` and
   `Meta.call_module_method` are for the IDE only (`private: true`); do not use
   them in library code.

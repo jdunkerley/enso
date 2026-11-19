@@ -65,7 +65,8 @@ components and workflows should not.
   `GeoMapVisualization` (Sentry Replay blocks it).
 - `src/Table/Visualization.enso` — IDE entry points of the table view
   (`prepare_visualization`, `get_rows_for_table`,
-  `get_distinct_values_for_column`), written against `Viz_Table`.
+  `get_distinct_values_for_column`, and `column_names_json`, the table
+  expression editor's column names), written against `Viz_Table`.
 - `src/SQL/Visualization.enso` — the preprocessor of the SQL Query view, written
   against `SQL_Viz`. The view itself is no longer in the GUI: Standard.Database
   ships it as `visualizations/SQL_Query.vue`
@@ -73,8 +74,8 @@ components and workflows should not.
   names this module.
 - `src/Internal/Chart_Limits.enso` — the row bounds and `local_rows`, which the
   charts use to read a bounded number of rows from any `Viz_Table`.
-- `src/Widgets.enso`, `src/Id.enso`, `src/Warnings.enso`, `src/File_Upload.enso`
-  — supporting IDE utilities.
+- `src/Id.enso`, `src/Warnings.enso`, `src/File_Upload.enso` — supporting IDE
+  utilities.
 
 ## Data types
 
