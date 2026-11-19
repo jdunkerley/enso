@@ -147,14 +147,24 @@ public class VectorArraySignatureTest {
               var ad = documentation.get(head);
               assertNotNull("No documentation for Array." + name, ad);
               var exp =
-                  d.doc()
+                  withoutArgumentDisplay(d.doc())
                       .replace("]", "].to_array")
                       .replace("a vector", "an array")
                       .replace("vector", "array");
-              assertEquals("Bad documentation for Array." + name, exp, ad.doc());
+              assertEquals(
+                  "Bad documentation for Array." + name, exp, withoutArgumentDisplay(ad.doc()));
             }
           }
           return null;
         });
+  }
+
+  /**
+   * The front matter's {@code arguments} block says which arguments a node shows, like the widget
+   * annotations it replaced, and those are not compared either: {@code Vector} has widgets that
+   * {@code Array} does not.
+   */
+  private static String withoutArgumentDisplay(String doc) {
+    return doc.replaceAll("(?m)^[ \\t]*arguments[ \\t]*:[ \\t]*\\n(?:[ \\t]+\\S.*\\n)*", "");
   }
 }
