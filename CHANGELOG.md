@@ -2,8 +2,8 @@
 
 #### Enso IDE
 
-- [A plug icon at the right end of the top bar shows whether AI agents (MCP) are
-  off, have a problem, are on, connected or working. Click it to see the
+- [A plug icon in the left rail, above Settings, shows whether AI agents (MCP)
+  are off, have a problem, are on, connected or working. Click it to see the
   connected app and its last five calls, or to turn MCP on.][878]
 - [Widgets show why they could not load, instead of disappearing: a warning
   marker on the argument gives the reason, the argument stays editable, and the

@@ -1,22 +1,25 @@
 <script setup lang="ts">
 /**
- * @file The MCP activity icon at the right end of the top bar, and its view-only popover (#864):
+ * @file The MCP activity icon in the left rail, above Settings, and its view-only popover (#864):
  * whether MCP is off, has a problem, is on with no agent app seen lately, or has one connected or
  * working, with the connected app, its last few calls and, while it is off, an Enable button that
  * does what the Settings switch does. It controls nothing else about the agent.
  *
- * It renders only in the desktop app (`window.api.mcp`). It is its own element in
- * `AppContainer.vue`, not a child of the tab bar, so that it stays on the Drive with no tab open.
- * A call line shows only the tool's name, its outcome and its age: main never sends more.
+ * It renders only in the desktop app (`window.api.mcp`), as the first of `RailFooter.vue`'s
+ * buttons, looking and behaving as the rail's `SvgButton`s do (the rail's tooltip, hover and size,
+ * a label when the rail is extended). It is a plain button rather than an `SvgButton`: the
+ * popover's trigger must be the element itself, for focus to return to it on closing. The popover opens to its right, its bottom level with the icon's and kept inside the
+ * window. A call line shows only the tool's name, its outcome and its age: main never sends more.
  */
 import Alert from '$/components/Alert/Alert.vue'
 import Button from '$/components/Button/Button.vue'
 import Popover from '$/components/Dialog/Popover.vue'
-import Icon from '$/components/Icon/Icon.vue'
 import Text from '$/components/Text/Text.vue'
 import { SEARCH_PARAMS_PREFIX } from '$/appUtils'
 import SettingsTabType from '$/configurations/settingsTabs'
 import { useText } from '$/providers/text'
+import SvgIcon from '@/components/SvgIcon.vue'
+import TooltipTrigger from '@/components/TooltipTrigger.vue'
 import {
   MCP_DEFAULT_PORT,
   type McpActivityCall,
@@ -24,9 +27,14 @@ import {
   type McpStatus,
 } from 'enso-common/src/mcp'
 import { getMessageOrToString } from 'enso-common/src/utilities/errors'
-import { computed, onMounted, onScopeDispose, ref, watch, watchEffect } from 'vue'
+import { computed, onMounted, onScopeDispose, ref, useTemplateRef, watch, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import { connectedClients, mcpActivityState, relativeAgo } from './mcpActivityState'
+
+const { extended = false } = defineProps<{
+  /** The rail is expanded: the button shows its label, as the rail's other buttons do. */
+  extended?: boolean
+}>()
 
 /** At most this many clients get a line of their own. */
 const MAX_CLIENT_LINES = 3
@@ -48,6 +56,27 @@ const open = ref(false)
 const now = ref(Date.now())
 const enabling = ref(false)
 const enableError = ref<string | null>(null)
+
+const root = useTemplateRef('root')
+/**
+ * What the popover is placed against: the icon's square at the button's start, not the whole
+ * button, which widens with its label while the rail is expanded and narrows as the pointer leaves
+ * the rail for the popover.
+ */
+const anchor = {
+  getBoundingClientRect: () => {
+    const rect = root.value?.getBoundingClientRect() ?? new DOMRect()
+    return new DOMRect(rect.left, rect.top, rect.height, rect.height)
+  },
+}
+
+/** With an `anchor`, Reka leaves focus on the page as the popover closes; give it to the icon. */
+function onClosed() {
+  const focused = document.activeElement
+  if (focused == null || focused === document.body) {
+    root.value?.querySelector<HTMLElement>('[data-testid="mcp-activity-button"]')?.focus()
+  }
+}
 
 onMounted(() => {
   if (mcp == null) return
@@ -167,163 +196,193 @@ function openSettings() {
 </script>
 
 <template>
-  <Popover
-    v-if="mcp != null"
-    v-model:open="open"
-    placement="bottom-end"
-    size="auto"
-    class="w-80"
-    testId="mcp-activity-popover"
-    aria-labelledby="mcp-activity-heading"
-  >
-    <template #trigger>
-      <button
-        type="button"
-        class="McpActivityButton"
-        :class="`state-${state}`"
-        :aria-label="name"
-        :title="name"
-        data-testid="mcp-activity-button"
-        :data-state-name="state"
-      >
-        <Icon icon="mcp_activity" :color="state === 'off' ? 'disabled' : 'primary'" />
-        <span v-if="state !== 'off' && state !== 'idle'" class="badge" aria-hidden="true">
-          <template v-if="state === 'error'">!</template>
-        </span>
-      </button>
-    </template>
-    <div class="flex flex-col gap-2" data-testid="mcp-activity-content">
-      <div class="flex items-center justify-between gap-2">
-        <Text id="mcp-activity-heading" weight="bold" elementType="h2">
-          {{ getText('mcpActivityHeading') }}
-        </Text>
-        <Text :color="state === 'error' ? 'danger' : 'muted'" testId="mcp-activity-status-word">
-          {{ statusWord }}
-        </Text>
-      </div>
-
-      <template v-if="state === 'off'">
-        <Text>{{ getText('mcpActivityOffText') }}</Text>
-        <Text v-if="status.lockedByEnvironment" testId="mcp-activity-locked">
-          {{ getText('mcpLockedByEnvironment') }}
-        </Text>
-        <Alert v-else variant="warning">{{ getText('mcpWarning') }}</Alert>
-        <Button
-          variant="accent"
-          :isDisabled="status.lockedByEnvironment"
-          :isLoading="enabling"
-          testId="mcp-activity-enable"
-          :onPress="enable"
+  <div v-if="mcp != null" ref="root" class="McpActivity">
+    <TooltipTrigger>
+      <template #default="tooltipProps">
+        <Popover
+          v-model:open="open"
+          placement="right-end"
+          :offset="12"
+          :anchor="anchor"
+          size="auto"
+          class="w-80"
+          testId="mcp-activity-popover"
+          aria-labelledby="mcp-activity-heading"
+          @closed="onClosed"
         >
-          {{ getText('mcpActivityEnable') }}
-        </Button>
-        <Text v-if="enableError != null" color="danger" testId="mcp-activity-enable-error">
-          {{ enableError }}
-        </Text>
-      </template>
-
-      <template v-else-if="state === 'error'">
-        <Text color="danger" testId="mcp-activity-error">{{ status.error }}</Text>
-      </template>
-
-      <template v-else>
-        <Text monospace textSelection="all">{{ address }}</Text>
-        <Text v-if="lastClient == null" testId="mcp-activity-no-client">
-          {{ getText('mcpActivityNoClient') }}
-        </Text>
-        <Text v-else-if="connected.length === 0" testId="mcp-activity-last-seen">
-          {{ getText('mcpActivityLastSeen', lastClient.name, ago(lastClient.lastSeenAt)) }}
-        </Text>
-        <ul v-else class="flex flex-col gap-0.5" data-testid="mcp-activity-clients">
-          <li
-            v-for="client in shownClients"
-            :key="client.name"
-            class="flex items-baseline justify-between gap-2"
-          >
-            <Text weight="semibold" truncate="1">
-              {{ client.version != null ? `${client.name} ${client.version}` : client.name }}
-            </Text>
-            <Text color="muted" nowrap>
-              {{ getText('mcpActivitySeen', ago(client.lastSeenAt)) }}
-            </Text>
-          </li>
-          <li v-if="hiddenClients > 0">
-            <Text color="muted">{{ getText('mcpActivityAndMore', hiddenClients) }}</Text>
-          </li>
-        </ul>
-
-        <template v-if="showCalls">
-          <Text weight="bold">{{ getText('mcpActivityRecentCalls') }}</Text>
-          <ul class="flex flex-col gap-0.5" data-testid="mcp-activity-calls">
-            <li
-              v-for="call in activity.calls"
-              :key="call.id"
-              class="flex items-baseline gap-2"
-              :aria-label="callLabel(call)"
-              :data-outcome="call.outcome"
+          <template #trigger>
+            <button
+              type="button"
+              class="McpActivityButton clickable"
+              :class="`state-${state}`"
+              :aria-label="name"
+              data-testid="mcp-activity-button"
+              :data-state-name="state"
+              v-bind="tooltipProps"
             >
-              <span class="outcomeGlyph" aria-hidden="true">
-                {{
-                  call.outcome === 'running' ? '◌'
-                  : call.outcome === 'ok' ? '✓'
-                  : call.outcome === 'refused' ? '⊘'
-                  : '✕'
-                }}
+              <SvgIcon name="mcp_activity" />
+              <span v-if="state !== 'off' && state !== 'idle'" class="badge" aria-hidden="true">
+                <template v-if="state === 'error'">!</template>
               </span>
-              <Text monospace truncate="1" class="min-w-0 flex-1">
-                {{ nameCalls ? `${call.client} · ${call.tool}` : call.tool }}
+              <div v-if="extended">{{ name }}</div>
+            </button>
+          </template>
+          <div class="flex flex-col gap-2" data-testid="mcp-activity-content">
+            <div class="flex items-center justify-between gap-2">
+              <Text id="mcp-activity-heading" weight="bold" elementType="h2">
+                {{ getText('mcpActivityHeading') }}
               </Text>
               <Text
-                v-if="call.outcome === 'refused' || call.outcome === 'error'"
-                :color="call.outcome === 'error' ? 'danger' : 'muted'"
-                nowrap
+                :color="state === 'error' ? 'danger' : 'muted'"
+                testId="mcp-activity-status-word"
               >
-                {{ outcomeWord(call) }}
+                {{ statusWord }}
               </Text>
-              <Text v-else-if="call.outcome === 'running'" color="muted" nowrap>
-                {{ outcomeWord(call) }}
-              </Text>
-              <Text v-else color="muted" nowrap>{{ duration(call) }}</Text>
-              <Text v-if="call.outcome !== 'running'" color="muted" nowrap>
-                {{ ago(callTime(call)) }}
-              </Text>
-            </li>
-          </ul>
-        </template>
-      </template>
+            </div>
 
-      <Button
-        variant="link"
-        icon="chevron_right"
-        testId="mcp-activity-settings"
-        @press="openSettings"
-      >
-        {{ getText('mcpActivitySettingsLink') }}
-      </Button>
-    </div>
-  </Popover>
+            <template v-if="state === 'off'">
+              <Text>{{ getText('mcpActivityOffText') }}</Text>
+              <Text v-if="status.lockedByEnvironment" testId="mcp-activity-locked">
+                {{ getText('mcpLockedByEnvironment') }}
+              </Text>
+              <Alert v-else variant="warning">{{ getText('mcpWarning') }}</Alert>
+              <Button
+                variant="accent"
+                :isDisabled="status.lockedByEnvironment"
+                :isLoading="enabling"
+                testId="mcp-activity-enable"
+                :onPress="enable"
+              >
+                {{ getText('mcpActivityEnable') }}
+              </Button>
+              <Text v-if="enableError != null" color="danger" testId="mcp-activity-enable-error">
+                {{ enableError }}
+              </Text>
+            </template>
+
+            <template v-else-if="state === 'error'">
+              <Text color="danger" testId="mcp-activity-error">{{ status.error }}</Text>
+            </template>
+
+            <template v-else>
+              <Text monospace textSelection="all">{{ address }}</Text>
+              <Text v-if="lastClient == null" testId="mcp-activity-no-client">
+                {{ getText('mcpActivityNoClient') }}
+              </Text>
+              <Text v-else-if="connected.length === 0" testId="mcp-activity-last-seen">
+                {{ getText('mcpActivityLastSeen', lastClient.name, ago(lastClient.lastSeenAt)) }}
+              </Text>
+              <ul v-else class="flex flex-col gap-0.5" data-testid="mcp-activity-clients">
+                <li
+                  v-for="client in shownClients"
+                  :key="client.name"
+                  class="flex items-baseline justify-between gap-2"
+                >
+                  <Text weight="semibold" truncate="1">
+                    {{ client.version != null ? `${client.name} ${client.version}` : client.name }}
+                  </Text>
+                  <Text color="muted" nowrap>
+                    {{ getText('mcpActivitySeen', ago(client.lastSeenAt)) }}
+                  </Text>
+                </li>
+                <li v-if="hiddenClients > 0">
+                  <Text color="muted">{{ getText('mcpActivityAndMore', hiddenClients) }}</Text>
+                </li>
+              </ul>
+
+              <template v-if="showCalls">
+                <Text weight="bold">{{ getText('mcpActivityRecentCalls') }}</Text>
+                <ul class="flex flex-col gap-0.5" data-testid="mcp-activity-calls">
+                  <li
+                    v-for="call in activity.calls"
+                    :key="call.id"
+                    class="flex items-baseline gap-2"
+                    :aria-label="callLabel(call)"
+                    :data-outcome="call.outcome"
+                  >
+                    <span class="outcomeGlyph" aria-hidden="true">
+                      {{
+                        call.outcome === 'running' ? '◌'
+                        : call.outcome === 'ok' ? '✓'
+                        : call.outcome === 'refused' ? '⊘'
+                        : '✕'
+                      }}
+                    </span>
+                    <Text monospace truncate="1" class="min-w-0 flex-1">
+                      {{ nameCalls ? `${call.client} · ${call.tool}` : call.tool }}
+                    </Text>
+                    <Text
+                      v-if="call.outcome === 'refused' || call.outcome === 'error'"
+                      :color="call.outcome === 'error' ? 'danger' : 'muted'"
+                      nowrap
+                    >
+                      {{ outcomeWord(call) }}
+                    </Text>
+                    <Text v-else-if="call.outcome === 'running'" color="muted" nowrap>
+                      {{ outcomeWord(call) }}
+                    </Text>
+                    <Text v-else color="muted" nowrap>{{ duration(call) }}</Text>
+                    <Text v-if="call.outcome !== 'running'" color="muted" nowrap>
+                      {{ ago(callTime(call)) }}
+                    </Text>
+                  </li>
+                </ul>
+              </template>
+            </template>
+
+            <Button
+              variant="link"
+              icon="chevron_right"
+              testId="mcp-activity-settings"
+              @press="openSettings"
+            >
+              {{ getText('mcpActivitySettingsLink') }}
+            </Button>
+          </div>
+        </Popover>
+      </template>
+      <template #tooltip>{{ name }}</template>
+    </TooltipTrigger>
+  </div>
 </template>
 
 <style scoped>
+.McpActivity {
+  display: flex;
+}
+
+/* As the rail's `SvgButton`s (`MenuButton`), which the rail's variables style. */
 .McpActivityButton {
   position: relative;
   display: flex;
-  align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  align-items: center;
+  gap: 4px;
+  min-width: max-content;
+  height: var(--button-height);
+  padding: var(--button-padding, 4px);
+  border: none;
+  border-radius: var(--radius-full);
+  transition: background-color 0.1s;
+
   &:hover,
-  &:focus-visible {
-    background-color: var(--color-dashboard-background);
+  &:focus,
+  &:active {
+    background-color: var(--color-menu-entry-hover-bg);
   }
 }
 
-/* The state's dot: 6px at the glyph's bottom right, ringed in the bar's colour. */
+/* Greyed while MCP is off; the label stays readable. */
+.state-off > svg {
+  opacity: 0.4;
+}
+
+/* The state's dot: 6px at the glyph's bottom right (the glyph is 16px at a 4px padding), ringed in
+the rail's colour. */
 .badge {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
+  left: 15px;
+  top: 15px;
   box-sizing: content-box;
   width: 6px;
   height: 6px;
