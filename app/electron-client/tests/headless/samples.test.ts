@@ -84,7 +84,7 @@ describe('bundled samples', () => {
   })
 
   // Since the widget queries and the in-frame visualization queries name only `Standard.Base`
-  // (#<PR>), a sample needs no import of the IDE-only `Standard.Visualization`.
+  // (#891), a sample needs no import of the IDE-only `Standard.Visualization`.
   test.each(samples)(
     '%s imports Standard.Base and Standard.Table, and not Standard.Visualization',
     (sample) => {
