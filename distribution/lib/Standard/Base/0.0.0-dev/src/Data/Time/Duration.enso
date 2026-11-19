@@ -32,78 +32,171 @@ polyglot java import org.enso.base.Time_Utils
 @Builtin_Type
 type Duration
     ## ---
+       group: DateTime
        icon: time
+       arguments:
+         start_inclusive: always
+         end_exclusive: always
        ---
-       Create an interval representing the duration between two points in time.
+       Creates the duration between two date times.
+
+       The result is negative when `end_exclusive` is before `start_inclusive`.
 
        ## Arguments
-        - `start_inclusive`: The start datetime of the duration, included.
-        - `end_exclusive`: The end datetime of the duration, excluded.
-        - `timezone_aware`: Whether the duration between two given times should
-          be aware of the timezone, that can be set for start or end times.
+       - `start_inclusive`: The start of the duration, included.
+       - `end_exclusive`: The end of the duration, excluded.
+       - `timezone_aware`: Whether the time zones of the two date times count.
+         When on, they are compared as points on the time-line. When off, only
+         their clock readings are compared.
 
        ## Examples
-       ### An hour interval between two points in time.
-
+       ### The time between two date times
        ```
-             from Standard.Base import Date_Time
-             import Standard.Base.Data.Time.Duration
-
-             example_between = Duration.between Date_Time.now (Date_Time.new 2010 10 20)
+       start = Date_Time.new 2020 1 1 9 0
+       end = Date_Time.new 2020 1 1 17 30
+       duration = Duration.between start end
+       # → PT8H30M
        ```
-    between : Date_Time -> Date_Time -> Boolean -> Duration
-    between start_inclusive end_exclusive timezone_aware=True =
+
+       ### A duration across several days
+       ```
+       start = Date_Time.new 2020 1 1
+       end = Date_Time.new 2020 1 3
+       hours = (Duration.between start end).total_hours
+       # → 48.0
+       ```
+
+       ### The end before the start
+       ```
+       start = Date_Time.new 2020 1 1 12 0
+       end = Date_Time.new 2020 1 1 10 0
+       duration = Duration.between start end
+       # → PT-2H
+       ```
+
+       ### Time zones counted
+       ```
+       start = Date_Time.new 2020 1 1 12 0 zone=(Time_Zone.parse "Europe/London")
+       end = Date_Time.new 2020 1 1 12 0 zone=(Time_Zone.parse "Asia/Tokyo")
+       duration = Duration.between start end
+       # → PT-9H
+       ```
+
+       ### Time zones ignored
+       ```
+       start = Date_Time.new 2020 1 1 12 0 zone=(Time_Zone.parse "Europe/London")
+       end = Date_Time.new 2020 1 1 12 0 zone=(Time_Zone.parse "Asia/Tokyo")
+       duration = Duration.between start end timezone_aware=False
+       # → PT0S
+       ```
+    between (start_inclusive : Date_Time) (end_exclusive : Date_Time) (timezone_aware : Boolean = True) -> Duration =
         Date_Helpers.between_builtin start_inclusive end_exclusive timezone_aware
 
     ## ---
+       group: Constants
        icon: time
+       arguments:
+         hours: always
+         minutes: always
+         seconds: always
        ---
-       Create a duration from time units.
+       Creates a duration from hours, minutes, seconds, milliseconds and
+       nanoseconds.
 
        ## Arguments
-        - `hours`: hours
-        - `minutes`: minutes
-        - `seconds`: seconds
-        - `milliseconds`: milliseconds
-        - `nanoseconds`: nanoseconds
+       - `hours`: The number of hours.
+       - `minutes`: The number of minutes.
+       - `seconds`: The number of seconds.
+       - `milliseconds`: The number of milliseconds.
+       - `nanoseconds`: The number of nanoseconds.
 
        ## Examples
-       ### Duration of 2 hours.
-
+       ### A duration of two hours
        ```
-             import Standard.Base.Data.Time.Duration
-
-             example_duration = Duration.new hours=2
+       duration = Duration.new hours=2
+       # → PT2H
        ```
-    new : Integer -> Integer -> Integer -> Integer -> Integer -> Duration
-    new (hours : Integer = 0) (minutes : Integer = 0) (seconds : Integer = 0) (milliseconds : Integer = 0) (nanoseconds : Integer = 0) =
+
+       ### A duration of several units
+       ```
+       duration = Duration.new hours=1 minutes=30 seconds=15
+       # → PT1H30M15S
+       ```
+
+       ### A duration with a unit over its usual range
+       ```
+       duration = Duration.new minutes=90
+       # → PT1H30M
+       ```
+
+       ## Remarks
+
+       ### Units add up
+       Each unit is added to the others, so `Duration.new minutes=90` is the same
+       duration as `Duration.new hours=1 minutes=30`. Any of them may be negative.
+    @hours (Widget.Numeric_Input)
+    @minutes (Widget.Numeric_Input)
+    @seconds (Widget.Numeric_Input)
+    @milliseconds (Widget.Numeric_Input)
+    @nanoseconds (Widget.Numeric_Input)
+    new (hours : Integer = 0) (minutes : Integer = 0) (seconds : Integer = 0) (milliseconds : Integer = 0) (nanoseconds : Integer = 0) -> Duration =
         Date_Helpers.new_duration_builtin hours minutes seconds milliseconds nanoseconds
 
     ## ---
+       group: Constants
        icon: time
+       arguments:
+         hours: always
        ---
-       Create a duration for hours.
+       Creates a duration of a number of hours.
 
        ## Arguments
-        - `hours`: number of hours
+       - `hours`: The number of hours.
+
+       ## Examples
+       ### A duration of three hours
+       ```
+       duration = Duration.of_hours 3
+       # → PT3H
+       ```
     of_hours (hours : Integer = (Missing_Argument.throw "hours")) -> Duration = Duration.new hours=hours
 
     ## ---
+       group: Constants
        icon: time
+       arguments:
+         minutes: always
        ---
-       Create a duration for minutes.
+       Creates a duration of a number of minutes.
 
        ## Arguments
-        - `minutes`: number of minutes
+       - `minutes`: The number of minutes.
+
+       ## Examples
+       ### A duration of 45 minutes
+       ```
+       duration = Duration.of_minutes 45
+       # → PT45M
+       ```
     of_minutes (minutes : Integer = (Missing_Argument.throw "minutes")) -> Duration = Duration.new minutes=minutes
 
     ## ---
+       group: Constants
        icon: time
+       arguments:
+         seconds: always
        ---
-       Create a duration for seconds.
+       Creates a duration of a number of seconds.
 
        ## Arguments
-        - `seconds`: number of seconds
+       - `seconds`: The number of seconds.
+
+       ## Examples
+       ### A duration of 90 seconds
+       ```
+       duration = Duration.of_seconds 90
+       # → PT1M30S
+       ```
     of_seconds (seconds : Integer = (Missing_Argument.throw "seconds")) -> Duration = Duration.new seconds=seconds
 
     ## ---
@@ -115,32 +208,49 @@ type Duration
         Widget.Single_Choice values=options
 
     ## ---
+       group: Constants
        icon: time
        ---
-       Create a zero (empty) duration.
+       Creates a duration of no time at all.
 
        ## Examples
-       ### Folding a vector of durations.
-
+       ### The start of a sum of durations
        ```
-             import Standard.Base.Data.Time.Duration
-
-             durations = [(Duration.new seconds=1), (Duration.new seconds=2), (Duration.new seconds=3)]
-             example_sum = durations.fold Duration.zero (+)
+       durations = [(Duration.new seconds=1), (Duration.new seconds=2), (Duration.new seconds=3)]
+       total = durations.fold Duration.zero (+)
+       # → PT6S
        ```
-    zero : Duration
-    zero = Duration.new
+    zero -> Duration = Duration.new
 
     ## ---
        advanced: true
+       group: DateTime
        icon: time
        ---
-       Time the evaluation of a function, return a Pair of Duration and Result
+       Times the evaluation of an expression, giving the duration and the result.
+
+       The result is a `Pair` of the `Duration` the evaluation took and its
+       value.
 
        ## Arguments
-        - `function`: Function to execute.
-    time_execution : Any -> Pair
-    time_execution ~function =
+       - `function`: The expression to time. It is evaluated once, when the node
+         runs.
+
+       ## Examples
+       ### Time a sum
+       ```
+       timed = Duration.time_execution (Vector.new 1000 (i-> i * i) . fold 0 (+))
+       elapsed = timed.first
+       result = timed.second
+       # → 332833500
+       ```
+
+       ## Remarks
+
+       ### The `function` argument
+       This argument takes any expression, so it has no type and no widget. Type the
+       expression in place, or connect a node.
+    time_execution ~function -> Pair =
         start = System.nano_time
         result = Runtime.no_inline function
         end = System.nano_time
@@ -152,28 +262,28 @@ type Duration
        group: Operators
        icon: time
        ---
-       Add the specified amount of time to this duration.
+       Adds `that` to this duration.
+
+       Returns a `Time_Error` if the result is too large to represent.
 
        ## Arguments
-        - `that`: The duration to add to `self`.
+       - `that`: The duration to add.
 
        ## Examples
        ### Add 6 seconds to a duration of 3 minutes
-
        ```
-             import Standard.Base.Data.Time.Duration
-
-             example_add = (Duration.new minutes=3) + (Duration.new seconds=6)
-
+       duration = Duration.new minutes=3
+       longer = duration + (Duration.new seconds=6)
+       # → PT3M6S
        ```
 
-       ### Add 12 hours to a duration of 30 minutes.
-
+       ### Add 12 hours to a duration of 30 minutes
        ```
-             import Standard.Base.Data.Time.Duration
-
-             example_add = (Duration.new minutes=30) + (Duration.new hours=12)
+       duration = Duration.new minutes=30
+       longer = duration + (Duration.new hours=12)
+       # → PT12H30M
        ```
+    @that Duration.default_widget
     + self that:Duration -> Duration ! Time_Error =
         Date_Helpers.ensure_duration that <|
             Panic.catch ArithmeticException (Date_Helpers.duration_plus self that) err->
@@ -184,19 +294,21 @@ type Duration
        group: Operators
        icon: time
        ---
-       Subtract the specified amount of time from this duration.
+       Subtracts `that` from this duration.
+
+       Returns a `Time_Error` if the result is too large to represent.
 
        ## Arguments
-        - `that`: The duration to subtract from `self`.
+       - `that`: The duration to subtract.
 
        ## Examples
-       ### Subtract 30 minutes from a duration of 6 hours.
-
+       ### Subtract 30 minutes from a duration of 6 hours
        ```
-             import Standard.Base.Data.Time.Duration
-
-             example_subtract = (Duration.new hours=6) - (Duration.new minutes=30)
+       duration = Duration.new hours=6
+       shorter = duration - (Duration.new minutes=30)
+       # → PT5H30M
        ```
+    @that Duration.default_widget
     - self that:Duration -> Duration ! Time_Error =
         Date_Helpers.ensure_duration that <|
             Panic.catch ArithmeticException (Date_Helpers.duration_minus self that) err->
@@ -206,89 +318,137 @@ type Duration
        group: Metadata
        icon: metadata
        ---
-       Get the portion of the duration expressed in nanoseconds.
+       The nanoseconds part of this duration: the nanoseconds left after its whole
+       seconds, from 0 to 999,999,999.
 
        ## Examples
-       ### Get the portion of the duration expressed in nanoseconds.
-
+       ### The nanoseconds of a duration
        ```
-             import Standard.Examples
-
-             example_nanos = Examples.duration.nanoseconds
+       duration = Duration.new seconds=2 nanoseconds=120
+       nanoseconds = duration.nanoseconds
+       # → 120
        ```
+
+       ## Remarks
+
+       ### A part, not a total
+       The nanoseconds are counted from the last whole second, so they include the
+       milliseconds: a duration of 1.5 seconds has 500 milliseconds and
+       500,000,000 nanoseconds. For the whole duration in one unit use
+       `total_milliseconds` and the other `total_` functions.
     nanoseconds self -> Integer = Date_Helpers.duration_nanoseconds self
 
     ## ---
        group: Metadata
        icon: metadata
        ---
-       Get the portion of the duration expressed in milliseconds.
+       The milliseconds part of this duration: the milliseconds left after its whole
+       seconds, from 0 to 999.
 
        ## Examples
-       ### Get the portion of the duration expressed in milliseconds.
-
+       ### The milliseconds of a duration
        ```
-             import Standard.Examples
-
-             example_millis = Examples.duration.milliseconds
+       duration = Duration.new seconds=2 milliseconds=500
+       milliseconds = duration.milliseconds
+       # → 500
        ```
+
+       ## Remarks
+
+       ### A part, not a total
+       The milliseconds are the part left after the whole hours, minutes and
+       seconds are taken out. A duration of 1.5 seconds has 500 milliseconds.
+       Use `total_milliseconds` for the whole duration in milliseconds.
     milliseconds self -> Integer = Date_Helpers.duration_milliseconds self
 
     ## ---
        group: Metadata
        icon: metadata
        ---
-       Get the portion of the duration expressed in seconds.
+       The seconds part of this duration: the seconds left after its whole minutes,
+       from 0 to 59.
 
        ## Examples
-       ### Get the portion of the duration expressed in seconds.
-
+       ### The seconds of a duration
        ```
-             import Standard.Examples
-
-             example_seconds = Examples.duration.seconds
+       duration = Duration.new minutes=2 seconds=30
+       seconds = duration.seconds
+       # → 30
        ```
+
+       ## Remarks
+
+       ### A part, not a total
+       The seconds are the part left after the whole hours and minutes are taken
+       out, so a duration of 150 seconds has 30 seconds. Use `total_seconds` for
+       the whole duration in seconds.
     seconds self -> Integer = Date_Helpers.duration_seconds self
 
     ## ---
        group: Metadata
        icon: metadata
        ---
-       Get the portion of the duration expressed in minutes.
+       The minutes part of this duration: the minutes left after its whole hours,
+       from 0 to 59.
 
        ## Examples
-       ### Get the portion of the duration expressed in minutes.
-
+       ### The minutes of a duration
        ```
-             import Standard.Examples
-
-             example_minutes = Examples.duration.minutes
+       duration = Duration.new hours=1 minutes=30
+       minutes = duration.minutes
+       # → 30
        ```
+
+       ## Remarks
+
+       ### A part, not a total
+       The minutes are the part left after the whole hours are taken out, so a
+       duration of 90 minutes has 30 minutes. Use `total_minutes` for the whole
+       duration in minutes.
     minutes self -> Integer = Date_Helpers.duration_minutes self
 
     ## ---
        group: Metadata
        icon: metadata
        ---
-       Get the portion of the duration expressed in hours.
+       The whole hours of this duration, however many there are.
 
        ## Examples
-       ### Get the portion of the duration expressed in hours.
-
+       ### The hours of a duration
        ```
-             import Standard.Examples
-
-             example_hours = Examples.duration.milliseconds
+       duration = Duration.new hours=1 minutes=30
+       hours = duration.hours
+       # → 1
        ```
+
+       ## Remarks
+
+       ### A part, not a total
+       The hours are the whole hours only, so a duration of 90 minutes has 1
+       hour. Use `total_hours` for the fractional number of hours.
     hours self -> Integer = Date_Helpers.duration_hours self
 
     ## ---
        group: DateTime
        icon: convert
        ---
-       Convert the duration to total milliseconds.
-    total_milliseconds : Integer ! Illegal_State
-    total_milliseconds self =
+       The whole duration in milliseconds.
+
+       ## Examples
+       ### A duration in milliseconds
+       ```
+       duration = Duration.new seconds=3 milliseconds=500
+       milliseconds = duration.total_milliseconds
+       # → 3500
+       ```
+
+       ## Remarks
+
+       ### Very long durations
+       A duration of more than about 292 million years is too large to count in
+       milliseconds. That should give an `Illegal_State` error, but today it stops
+       the workflow with an overflow panic (#899).
+    total_milliseconds self -> Integer ! Illegal_State =
         Panic.catch ArithmeticException (Date_Helpers.total_milliseconds_builtin self) _->
             Error.throw (Illegal_State.Error "The duration is too large to convert it to milliseconds")
 
@@ -296,25 +456,64 @@ type Duration
        group: DateTime
        icon: convert
        ---
-       Convert the duration to total seconds.
-    total_seconds : Float ! Illegal_State
-    total_seconds self = self.total_milliseconds / 1000.0
+       The whole duration in seconds, as a decimal number.
+
+       ## Examples
+       ### A duration in seconds
+       ```
+       duration = Duration.new minutes=2 seconds=30
+       seconds = duration.total_seconds
+       # → 150.0
+       ```
+       ## Remarks
+
+       ### Very long durations
+       A duration of more than about 292 million years is too large to count in
+       milliseconds. That should give an `Illegal_State` error, but today it stops
+       the workflow with an overflow panic (#899).
+    total_seconds self -> Float ! Illegal_State = self.total_milliseconds / 1000.0
 
     ## ---
        group: DateTime
        icon: convert
        ---
-       Convert the duration to total minutes.
-    total_minutes : Float ! Illegal_State
-    total_minutes self = self.total_seconds / 60.0
+       The whole duration in minutes, as a decimal number.
+
+       ## Examples
+       ### A duration in minutes
+       ```
+       duration = Duration.new hours=1 minutes=30
+       minutes = duration.total_minutes
+       # → 90.0
+       ```
+       ## Remarks
+
+       ### Very long durations
+       A duration of more than about 292 million years is too large to count in
+       milliseconds. That should give an `Illegal_State` error, but today it stops
+       the workflow with an overflow panic (#899).
+    total_minutes self -> Float ! Illegal_State = self.total_seconds / 60.0
 
     ## ---
        group: DateTime
        icon: convert
        ---
-       Convert the duration to total minutes.
-    total_hours : Float ! Illegal_State
-    total_hours self = self.total_minutes / 60.0
+       The whole duration in hours, as a decimal number.
+
+       ## Examples
+       ### A duration in hours
+       ```
+       duration = Duration.new hours=1 minutes=30
+       hours = duration.total_hours
+       # → 1.5
+       ```
+       ## Remarks
+
+       ### Very long durations
+       A duration of more than about 292 million years is too large to count in
+       milliseconds. That should give an `Illegal_State` error, but today it stops
+       the workflow with an overflow panic (#899).
+    total_hours self -> Float ! Illegal_State = self.total_minutes / 60.0
 
     ## ---
        private: true
@@ -327,8 +526,7 @@ type Duration
        ```
              example_to_json = (Duration.new seconds=10).to_js_object
        ```
-    to_js_object : JS_Object
-    to_js_object self =
+    to_js_object self -> JS_Object =
         v = Vector.build initial_capacity=7 builder->
             builder.append ["type", "Duration"]
             builder.append ["constructor", "new"]
@@ -343,8 +541,7 @@ type Duration
        private: true
        ---
        Convert Duration to a friendly string.
-    to_display_text : Text
-    to_display_text self = if self == Duration.zero then "0s" else
+    to_display_text self -> Text = if self == Duration.zero then "0s" else
         h = if self.hours == 0 then "" else self.hours.to_text + "h "
 
         s = if self.seconds == 0 && self.nanoseconds == 0 then "" else
@@ -360,7 +557,25 @@ type Duration
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than `that`.
+       Checks if this duration is longer than `that` duration.
+
+       ## Arguments
+       - `that`: The duration to compare with.
+
+       ## Examples
+       ### A duration longer than another
+       ```
+       duration = Duration.new hours=2
+       other = Duration.new minutes=90
+       result = duration > other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no duration picker. Connect a duration, or type one such
+       as `Duration.new minutes=90`.
     > self that = Comparable.> self=self that
 
     ## ---
@@ -368,7 +583,25 @@ type Duration
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than or equal to `that`.
+       Checks if this duration is the same as, or longer than, `that` duration.
+
+       ## Arguments
+       - `that`: The duration to compare with.
+
+       ## Examples
+       ### A duration compared with an equal one
+       ```
+       duration = Duration.new hours=1 minutes=30
+       other = Duration.new minutes=90
+       result = duration >= other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no duration picker. Connect a duration, or type one such
+       as `Duration.new minutes=90`.
     >= self that = Comparable.>= self=self that
 
     ## ---
@@ -376,7 +609,25 @@ type Duration
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than `that`.
+       Checks if this duration is shorter than `that` duration.
+
+       ## Arguments
+       - `that`: The duration to compare with.
+
+       ## Examples
+       ### A duration shorter than another
+       ```
+       duration = Duration.new minutes=45
+       other = Duration.new hours=1
+       result = duration < other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no duration picker. Connect a duration, or type one such
+       as `Duration.new minutes=90`.
     < self that = Comparable.< self=self that
 
     ## ---
@@ -384,5 +635,23 @@ type Duration
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than or equal to `that`.
+       Checks if this duration is the same as, or shorter than, `that` duration.
+
+       ## Arguments
+       - `that`: The duration to compare with.
+
+       ## Examples
+       ### A duration longer than another
+       ```
+       duration = Duration.new hours=2
+       other = Duration.new minutes=90
+       result = duration <= other
+       # → False
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no duration picker. Connect a duration, or type one such
+       as `Duration.new minutes=90`.
     <= self that = Comparable.<= self=self that
