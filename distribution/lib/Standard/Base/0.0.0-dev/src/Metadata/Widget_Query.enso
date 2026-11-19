@@ -56,7 +56,8 @@ polyglot java import org.slf4j.LoggerFactory
 
    ## Returns
    `{"arguments":[[<name>,{"widget":<widget or null>}|{"error":{"step":…,"message":…}}],…]}`,
-   read by the GUI (its schema is added in PR 1b).
+   read by the GUI (its schema is `widgetQueryAnswerSchema` in
+   `app/gui/src/providers/openedProjects/widgetRegistry/configuration.ts`).
 resolve_call (value : Any) (module_name : Text) (type_name : Text) (method_name : Text) (argument_names : Vector Text) (uuids : Text = "{}") (subject_is_type : Boolean = False) -> Text =
     method = Widget_Method.Value module_name type_name method_name
     Progress.run label=method.qualified_name up_to=1 handle_name="Widget_Query."+method.qualified_name action=_->
