@@ -552,7 +552,13 @@ final class SuggestionBuilder[A: IndexedSource](
       case tname: Name =>
         tname
           .getMetadata(TypeNames, classOf[TypeNames.Metadata])
-          .map(t => buildResolvedTypeName(t.target))
+          .map { resolution =>
+            // See Note [Eigentype References] in EigentypeReference.java.
+            // `X.type` is the type object's type, reported as `….X.type`,
+            // never as X.
+            if (resolution.isEigentype) TypeArg.Value(resolution.referencedName)
+            else buildResolvedTypeName(resolution.target)
+          }
           .getOrElse(TypeArg.Value(QualifiedName.simpleName(tname.name)))
 
       case _ =>
