@@ -1,40 +1,44 @@
 ## Enso Signatures 1.0
 ## module Standard.Base.Data.Time.Date_Range
 - type Date_Range
-    - Internal_Constructor start:Standard.Base.Data.Time.Date.Date end:Standard.Base.Data.Time.Date.Date step:Standard.Base.Data.Time.Period.Period increasing:Standard.Base.Data.Boolean.Boolean cached_length:Standard.Base.Data.Numbers.Integer
-    - all self condition:(Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) -> Standard.Base.Any.Any
-    - any self condition:(Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) -> Standard.Base.Any.Any
-    - at self index:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Any.Any
-    - contains self value:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - Internal_Constructor start_internal:Standard.Base.Data.Time.Date.Date end_internal:Standard.Base.Data.Time.Date.Date step_internal:Standard.Base.Data.Time.Period.Period increasing_internal:Standard.Base.Data.Boolean.Boolean cached_length_internal:Standard.Base.Data.Numbers.Integer
+    - all self condition:(Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) -> Standard.Base.Data.Boolean.Boolean
+    - any self condition:(Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) -> Standard.Base.Data.Boolean.Boolean
+    - at self index:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Data.Time.Date.Date!Standard.Base.Errors.Common.Index_Out_Of_Bounds
+    - contains self value:Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean
     - default_column_name self -> Standard.Base.Any.Any
     - each self function:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - each_with_index self function:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - filter self filter:(Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) -> Standard.Base.Any.Any
+    - end self -> Standard.Base.Data.Time.Date.Date
+    - filter self filter:(Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Time.Date.Date)
     - find self condition:(Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) start:Standard.Base.Data.Numbers.Integer= ~if_missing:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - first self -> Standard.Base.Any.Any
-    - fold self init:Standard.Base.Any.Any function:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - first self -> Standard.Base.Data.Time.Date.Date!Standard.Base.Errors.Common.Index_Out_Of_Bounds
+    - fold self init:Standard.Base.Any.Any function:(Standard.Base.Any.Any -> Standard.Base.Data.Time.Date.Date -> Standard.Base.Any.Any) -> Standard.Base.Any.Any
     - get self index:Standard.Base.Data.Numbers.Integer= ~if_missing:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - index_of self condition:Standard.Base.Any.Any start:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Any.Any
+    - increasing self -> Standard.Base.Data.Boolean.Boolean
+    - index_of self condition:(Standard.Base.Data.Time.Date.Date|Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) start:Standard.Base.Data.Numbers.Integer= -> (Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)
     - internal_at self i:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - is_empty self -> Standard.Base.Any.Any
-    - last self -> Standard.Base.Any.Any
-    - last_index_of self condition:Standard.Base.Any.Any start:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Any.Any
-    - length self -> Standard.Base.Any.Any
-    - map self function:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - new start:Standard.Base.Any.Any= end:Standard.Base.Any.Any= step:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - is_empty self -> Standard.Base.Data.Boolean.Boolean
+    - last self -> Standard.Base.Data.Time.Date.Date!Standard.Base.Errors.Common.Index_Out_Of_Bounds
+    - last_index_of self condition:(Standard.Base.Data.Time.Date.Date|Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) start:Standard.Base.Data.Numbers.Integer= -> (Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)
+    - length self -> Standard.Base.Data.Numbers.Integer
+    - map self function:(Standard.Base.Data.Time.Date.Date -> Standard.Base.Any.Any) -> (Standard.Base.Data.Vector.Vector Standard.Base.Any.Any)
+    - new start:Standard.Base.Data.Time.Date.Date= end:Standard.Base.Data.Time.Date.Date= step:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Period.Period)= -> Standard.Base.Data.Time.Date_Range.Date_Range!Standard.Base.Errors.Illegal_Argument.Illegal_Argument
     - new_internal start:Standard.Base.Any.Any end:Standard.Base.Any.Any increasing:Standard.Base.Any.Any step:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - not_empty self -> Standard.Base.Any.Any
-    - partition self condition:(Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) -> Standard.Base.Any.Any
+    - not_empty self -> Standard.Base.Data.Boolean.Boolean
+    - partition self condition:(Standard.Base.Data.Filter_Condition.Filter_Condition|(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Boolean.Boolean)) -> (Standard.Base.Data.Pair.Pair Standard.Base.Any.Any Standard.Base.Any.Any)
     - pretty self -> Standard.Base.Any.Any
-    - reduce self function:Standard.Base.Any.Any ~if_empty:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - reverse self -> Standard.Base.Any.Any
-    - running_fold self init:Standard.Base.Any.Any function:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - second self -> Standard.Base.Any.Any
+    - reduce self function:(Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Time.Date.Date -> Standard.Base.Data.Time.Date.Date) ~if_empty:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - reverse self -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Time.Date.Date)
+    - running_fold self init:Standard.Base.Any.Any function:(Standard.Base.Any.Any -> Standard.Base.Data.Time.Date.Date -> Standard.Base.Any.Any) -> (Standard.Base.Data.Vector.Vector Standard.Base.Any.Any)
+    - second self -> Standard.Base.Data.Time.Date.Date!Standard.Base.Errors.Common.Index_Out_Of_Bounds
+    - start self -> Standard.Base.Data.Time.Date.Date
+    - step self -> Standard.Base.Data.Time.Period.Period
     - to_display_text self -> Standard.Base.Any.Any
     - to_js_object self -> Standard.Base.Any.Any
     - to_text self -> Standard.Base.Any.Any
-    - to_vector self -> Standard.Base.Any.Any
-    - with_step self new_step:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Period.Period) -> Standard.Base.Any.Any
+    - to_vector self -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Time.Date.Date)
+    - with_step self new_step:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Period.Period) -> Standard.Base.Data.Time.Date_Range.Date_Range!Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 - compute_length_and_verify start:Standard.Base.Any.Any end:Standard.Base.Any.Any step:Standard.Base.Any.Any increasing:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - compute_length_step_brute_force start:Standard.Base.Any.Any end:Standard.Base.Any.Any step:Standard.Base.Any.Any increasing:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - compute_length_step_days start:Standard.Base.Any.Any end:Standard.Base.Any.Any step:Standard.Base.Any.Any increasing:Standard.Base.Any.Any -> Standard.Base.Any.Any

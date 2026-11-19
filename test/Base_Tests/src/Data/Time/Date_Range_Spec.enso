@@ -1,4 +1,5 @@
 from Standard.Base import all
+import Standard.Base.Errors.Common.Index_Out_Of_Bounds
 import Standard.Base.Errors.Common.Not_Found
 import Standard.Base.Errors.Common.Type_Error
 import Standard.Base.Errors.Empty_Error.Empty_Error
@@ -193,6 +194,47 @@ add_specs suite_builder =
                 case r.length of
                     0 -> r.reduce reducer . should_fail_with (Empty_Error.Error Date_Range)
                     _ -> r.reduce reducer . should_equal (r.to_vector.reduce reducer)
+
+        group_builder.specify "should expose its start, end, step and direction" <|
+            up = (Date.new 2020 01 05).up_to (Date.new 2020 03 05) . with_step Date_Period.Month
+            up.start . should_equal (Date.new 2020 01 05)
+            up.end . should_equal (Date.new 2020 03 05)
+            up.step . should_equal (Period.new months=1)
+            up.increasing . should_be_true
+
+            down = (Date.new 2020 01 10).down_to (Date.new 2020 01 05)
+            down.start . should_equal (Date.new 2020 01 10)
+            down.end . should_equal (Date.new 2020 01 05)
+            down.step . should_equal (Period.new days=1)
+            down.increasing . should_be_false
+
+        group_builder.specify "first, second and last should follow the direction of the range" <|
+            up = (Date.new 2020 01 05).up_to (Date.new 2020 01 10)
+            up.first . should_equal (Date.new 2020 01 05)
+            up.second . should_equal (Date.new 2020 01 06)
+            up.last . should_equal (Date.new 2020 01 09)
+
+            down = (Date.new 2020 01 10).down_to (Date.new 2020 01 05)
+            down.first . should_equal (Date.new 2020 01 10)
+            down.second . should_equal (Date.new 2020 01 09)
+            down.last . should_equal (Date.new 2020 01 06)
+
+            monthly = (Date.new 2020 01 31).up_to (Date.new 2020 06 01) . with_step Date_Period.Month
+            monthly.last . should_equal (Date.new 2020 05 31)
+
+            empty = (Date.new 2020 01 05).up_to (Date.new 2020 01 05)
+            empty.first . should_fail_with Index_Out_Of_Bounds
+            empty.second . should_fail_with Index_Out_Of_Bounds
+            empty.last . should_fail_with Index_Out_Of_Bounds
+            (Date.new 2020 01 05).up_to (Date.new 2020 01 06) . second . should_fail_with Index_Out_Of_Bounds
+
+        group_builder.specify "contains should check for a date, and only a date" <|
+            r = (Date.new 2020 10 01).up_to (Date.new 2020 10 31) . with_step (Period.new days=2)
+            r.contains (Date.new 2020 10 15) . should_be_true
+            r.contains (Date.new 2020 10 16) . should_be_false
+            r.contains (Date.new 2020 10 31) . should_be_false
+            (Date.new 2020 10 01).up_to (Date.new 2020 10 01) . contains (Date.new 2020 10 01) . should_be_false
+            Test.expect_panic_with (r.contains 5) Type_Error
 
         group_builder.specify "should define friendly text representations" <|
             r1 = (Date.new 2020 02 28).up_to (Date.new 2020 03 02)
