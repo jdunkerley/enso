@@ -347,7 +347,6 @@ test.describe('Dynamic configuration updates', () => {
         {
           type: 'Widget',
           constructor: 'Single_Choice',
-          label: null,
           values: [
             {
               type: 'Choice',
@@ -364,7 +363,6 @@ test.describe('Dynamic configuration updates', () => {
               parameters: [],
             },
           ],
-          display: { type: 'Display', constructor: 'Always' },
         },
       ],
     ])
@@ -400,6 +398,34 @@ test.describe('Dynamic configuration updates', () => {
     await formatArg.click()
     await dropdown.expectVisible()
     await expect(dropdown.items.first()).toBeVisible()
+  })
+
+  /**
+   * An `always` argument (`aggregate`'s `columns`, in the mock's front matter) is drawn before the
+   * widget query is answered, and stays when the query fails: only its widget arrives late.
+   */
+  test('An always-displayed argument does not pop in', async ({ page, localApi, editorPage }) => {
+    await editorPage.mockMethodCallInfo('aggregated', {
+      methodPointer: {
+        module: 'Standard.Table.Table',
+        definedOnType: 'Standard.Table.Table.Table',
+        name: 'aggregate',
+      },
+      notAppliedArguments: [1, 2, 3, 4],
+    })
+    const node = locate.graphNodeByBinding(page, 'aggregated')
+    const args = node.locator('.WidgetTopLevelArgument')
+    // The mock holds the answer back: the query is pending, and only `columns` is shown.
+    await expect.poll(() => localApi.pendingVisualizationRequests('.aggregate')).toBeGreaterThan(0)
+    await expect(args).toHaveCount(1)
+    await expect(args.getByText('columns', { exact: true })).toBeVisible()
+    // The query fails: the argument stays, with the error marker.
+    await localApi.updateVisualization('.aggregate', {
+      arguments: [['columns', { error: { step: 'annotation', message: 'No columns today' } }]],
+    })
+    await expect(args.getByTestId('widget-query-error')).toBeVisible()
+    await expect(args).toHaveCount(1)
+    await expect(args.getByText('columns', { exact: true })).toBeVisible()
   })
 
   test('An answer the IDE cannot read reaches the Logs panel', async ({
@@ -459,7 +485,6 @@ test.describe('Dynamic configuration updates', () => {
           constructor: 'Numeric_Input',
           maximum: 10,
           minimum: 0,
-          display: { type: 'Display', constructor: 'Always' },
         },
       ],
     ])
@@ -488,7 +513,6 @@ test.describe('Dynamic configuration updates', () => {
         {
           type: 'Widget',
           constructor: 'Folder_Browse',
-          display: { type: 'Display', constructor: 'Always' },
         },
       ],
     ])
@@ -520,7 +544,6 @@ test.describe('Dynamic configuration updates', () => {
         {
           type: 'Widget',
           constructor: 'Single_Choice',
-          label: null,
           values: [
             {
               type: 'Choice',
@@ -533,7 +556,6 @@ test.describe('Dynamic configuration updates', () => {
                   {
                     type: 'Widget',
                     constructor: 'Single_Choice',
-                    label: null,
                     values: [
                       {
                         type: 'Choice',
@@ -550,13 +572,11 @@ test.describe('Dynamic configuration updates', () => {
                         parameters: [],
                       },
                     ],
-                    display: { type: 'Display', constructor: 'Always' },
                   },
                 ],
               ],
             },
           ],
-          display: { type: 'Display', constructor: 'Always' },
         },
       ],
     ])
@@ -601,7 +621,6 @@ test.describe('Dynamic configuration updates', () => {
         {
           type: 'Widget',
           constructor: 'Single_Choice',
-          label: null,
           values: [
             {
               type: 'Choice',
@@ -618,7 +637,6 @@ test.describe('Dynamic configuration updates', () => {
               parameters: [],
             },
           ],
-          display: { type: 'Display', constructor: 'Always' },
         },
       ],
     ])
@@ -631,7 +649,6 @@ test.describe('Dynamic configuration updates', () => {
         {
           type: 'Widget',
           constructor: 'Single_Choice',
-          label: null,
           values: [
             {
               type: 'Choice',
@@ -644,7 +661,6 @@ test.describe('Dynamic configuration updates', () => {
                   {
                     type: 'Widget',
                     constructor: 'Single_Choice',
-                    label: null,
                     values: [
                       {
                         type: 'Choice',
@@ -661,13 +677,11 @@ test.describe('Dynamic configuration updates', () => {
                         parameters: [],
                       },
                     ],
-                    display: { type: 'Display', constructor: 'Always' },
                   },
                 ],
               ],
             },
           ],
-          display: { type: 'Display', constructor: 'Always' },
         },
       ],
     ])

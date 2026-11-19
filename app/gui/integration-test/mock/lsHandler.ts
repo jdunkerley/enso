@@ -382,7 +382,6 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
         {
           type: 'Widget',
           constructor: 'Single_Choice',
-          label: null,
           values: [
             {
               type: 'Choice',
@@ -399,7 +398,6 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
               parameters: [],
             },
           ],
-          display: { type: 'Display', constructor: 'Always' },
         },
       ],
     ]),
@@ -412,7 +410,6 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
         {
           type: 'Widget',
           constructor: 'Multiple_Choice',
-          label: null,
           values: [
             {
               type: 'Choice',
@@ -429,7 +426,6 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
               parameters: [],
             },
           ],
-          display: { type: 'Display', constructor: 'Always' },
         },
       ],
     ]),
@@ -447,7 +443,6 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
           item_editor: {
             type: 'Widget',
             constructor: 'Single_Choice',
-            label: null,
             values: [
               {
                 type: 'Choice',
@@ -460,7 +455,6 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
                     {
                       type: 'Widget',
                       constructor: 'Single_Choice',
-                      label: null,
                       values: [
                         {
                           type: 'Choice',
@@ -477,7 +471,6 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
                           parameters: [],
                         },
                       ],
-                      display: { type: 'Display', constructor: 'Always' },
                     },
                   ],
                 ],
@@ -500,7 +493,6 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
                     {
                       type: 'Widget',
                       constructor: 'Single_Choice',
-                      label: null,
                       values: [
                         {
                           type: 'Choice',
@@ -517,16 +509,13 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
                           parameters: [],
                         },
                       ],
-                      display: { type: 'Display', constructor: 'Always' },
                     },
                   ],
                 ],
               },
             ],
-            display: { type: 'Display', constructor: 'Always' },
           },
           /* eslint-enable camelcase */
-          display: { type: 'Display', constructor: 'Always' },
         },
       ],
     ]),
@@ -540,7 +529,6 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
           type: 'Widget',
           constructor: 'Text_Input',
           syntax: 'enso-table-expression',
-          display: { type: 'Display', constructor: 'When_Modified' },
         },
       ],
     ]),
