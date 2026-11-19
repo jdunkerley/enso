@@ -2,6 +2,7 @@ package org.enso.interpreter.node.expression.builtin.meta;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.nodes.Node;
+import org.enso.interpreter.dsl.AcceptsError;
 import org.enso.interpreter.dsl.BuiltinMethod;
 import org.enso.interpreter.node.callable.InteropApplicationNode;
 import org.enso.interpreter.runtime.EnsoContext;
@@ -20,7 +21,7 @@ public final class CallModuleMethodNode extends Node {
   @Child private ArrayLikeCoerceToArrayNode coerce = ArrayLikeCoerceToArrayNode.build();
   @Child private InteropApplicationNode apply = InteropApplicationNode.build();
 
-  Object execute(Text moduleName, Text methodName, Object value, Object arguments) {
+  Object execute(Text moduleName, Text methodName, @AcceptsError Object value, Object arguments) {
     var module = moduleName.toString();
     var found = lookup(module, methodName.toString());
     if (!(found instanceof Function function)) {

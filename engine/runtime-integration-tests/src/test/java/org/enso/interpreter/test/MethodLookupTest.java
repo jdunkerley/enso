@@ -49,6 +49,8 @@ public class MethodLookupTest {
             sum3 a b c = a + b + c
 
             sum_defaults a b=10 c=100 = a + b + c
+
+            is_error_value value = value.is_error
             """);
     // Not imported by Main: the lookup compiles a registered module itself.
     var ext =
@@ -89,6 +91,7 @@ public class MethodLookupTest {
                     b.append (show (Meta.call_module_method m "sum_defaults" [2, 3] 1))
                     b.append (show (Meta.call_module_method m "sum_defaults" [2] 1))
                     b.append (show (Meta.call_module_method m "sum_defaults" [] 1))
+                    b.append (show (Meta.call_module_method m "is_error_value" [] (Error.throw "e")))
                 results.join "|"
             """);
     var projDir = tempFolder.newFolder().toPath();
@@ -98,7 +101,7 @@ public class MethodLookupTest {
         res ->
             assertEquals(
                 "instance a|static a|constructor x|extension a|module a|Any's probe|T's probe"
-                    + "|Nothing|error:No_Such_Method|error:Module_Does_Not_Exist|T|5|6|103|111",
+                    + "|Nothing|error:No_Such_Method|error:Module_Does_Not_Exist|T|5|6|103|111|True",
                 res.asString()));
   }
 }

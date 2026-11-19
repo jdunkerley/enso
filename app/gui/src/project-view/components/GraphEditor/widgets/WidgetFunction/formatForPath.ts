@@ -199,9 +199,8 @@ export async function formatTypeForDrop(
  * The query for `Data.read`'s `format` widget, as the `format` argument's own query asks it
  * (`widgetQuery.ts`), but in the current method's frame: a file dropped on the graph has no node to
  * hang a method-pointer visualization on. It names only `Standard.Base`, so the module needs no
- * import. The subject is the `Data` module itself, passed as the value: `call_module_method`
- * applies the arguments one by one, so `resolve_call`'s defaulted `uuids` and `subject_is_type`
- * cannot follow `['format']` (the call is complete, and a further argument applies to its answer).
+ * import. The subject is the `Data` module: it is passed as the value, which `resolve_call` takes as
+ * its subject.
  */
 export const DATA_READ_FORMAT_WIDGET_QUERY = `${MODULE_CALL} 'Standard.Base.Metadata.Widget_Query' 'resolve_call' ['Standard.Base.Data', 'Standard.Base.Data', 'read', ['format']] Standard.Base.Data`
 
