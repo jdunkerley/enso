@@ -604,7 +604,7 @@ export function reconcileVisualizationSlots(
  * `DetachVisualization` and an `AttachVisualization` of the same id. They run as concurrent jobs:
  * the upsert at high priority, deferring itself while an execution holds the context lock, the
  * detach after that execution, where it removed the visualization the upsert had just set. The
- * node's widget configuration (`get_widget_json`, re-attached whenever an argument changes) then
+ * node's widget configuration (the widget query, re-attached whenever an argument changes) then
  * never came, and its dropdowns stayed missing or showed raw tags (#634).
  */
 

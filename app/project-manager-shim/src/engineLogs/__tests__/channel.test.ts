@@ -1,3 +1,4 @@
+import type { EngineLogSource } from 'enso-common/src/services/engineLogs'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -37,7 +38,7 @@ function collect() {
     event: (event) => events.push(event),
     end: (reason) => ends.push(reason),
   })
-  const lines = (source?: 'file' | 'stderr') =>
+  const lines = (source?: EngineLogSource) =>
     events.flatMap((event) =>
       event.type === 'line' && (source == null || event.source === source) ? [event.text] : [],
     )
@@ -51,6 +52,19 @@ async function writeLog(baseName: string, content: string) {
 }
 
 describe('EngineLogChannel', () => {
+  test('appendGuiLines emits gui lines with the current session', () => {
+    const log = collect()
+    channel.appendGuiLines(['[WARN] [t] [enso.gui.Widgets] a', 'b'])
+    expect(log.events.filter((e) => e.type === 'line')).toEqual([
+      expect.objectContaining({
+        source: 'gui',
+        text: '[WARN] [t] [enso.gui.Widgets] a',
+        sessionId: null,
+      }),
+      expect.objectContaining({ source: 'gui', text: 'b' }),
+    ])
+  })
+
   test('notice emits one stderr line before any session', () => {
     const log = collect()
     channel.notice('A line of the shim')

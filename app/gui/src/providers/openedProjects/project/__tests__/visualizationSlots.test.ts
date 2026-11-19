@@ -21,8 +21,8 @@ const NODE_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc' as ExternalId
 function config(args: string[]): NodeVisualizationConfiguration {
   return {
     expressionId: NODE_ID,
-    visualizationModule: 'Standard.Visualization.Widgets',
-    expression: 'get_widget_json',
+    visualizationModule: 'Standard.Base.Metadata.Widget_Query',
+    expression: 'resolve_call',
     positionalArgumentsExpressions: args,
   }
 }

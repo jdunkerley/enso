@@ -17,6 +17,10 @@ spec_module = "enso_dev.Base_Tests.Widget_Query_Spec"
 
 add_three a b c = a + b + c
 
+add_defaults a b=10 c=100 = a + b + c
+
+is_error_value value = value.is_error
+
 
 sample_type = spec_module + ".Sample"
 
@@ -80,6 +84,20 @@ add_specs suite_builder =
     suite_builder.group "Meta.call_module_method" group_builder->
         group_builder.specify "applies a module's method to the value, then to the arguments" <|
             Meta.call_module_method spec_module "add_three" [2, 3] 1 . should_equal 6
+
+        group_builder.specify "fills the defaults of the parameters no argument is given for, as a written call does" <|
+            Meta.call_module_method spec_module "add_defaults" [2, 3] 1 . should_equal 6
+            Meta.call_module_method spec_module "add_defaults" [2] 1 . should_equal 103
+            Meta.call_module_method spec_module "add_defaults" [] 1 . should_equal 111
+            Meta.call_module_method spec_module "add_defaults" [2, 3] 1 . should_equal (add_defaults 1 2 3)
+
+        group_builder.specify "passes an error value to the method, as a written call does" <|
+            Meta.call_module_method spec_module "is_error_value" [] (Error.throw "e") . should_equal True
+
+        group_builder.specify "passes the warnings of the value through, as a written call does" <|
+            result = Meta.call_module_method spec_module "add_defaults" [2] (Warning.attach "w" 1)
+            result.should_equal 103
+            Warning.get_all result . map .value . should_equal ["w"]
 
         group_builder.specify "fails for a module that is not loaded, or a method it lacks" <|
             Meta.call_module_method "enso_dev.Base_Tests.No_Such_Module" "f" [] 1 . should_fail_with Module_Does_Not_Exist
@@ -147,6 +165,23 @@ add_specs suite_builder =
         group_builder.specify "a method that does not exist" <|
             error = error_of (Widget_Query.resolve_call sample spec_module sample_type "missing" ["arg"])
             error.get "step" . should_equal "lookup"
+
+    suite_builder.group "Widget_Query.resolve_call with an error as the subject" group_builder->
+        group_builder.specify "gives no widget for every argument, and no error" <|
+            subject = Error.throw (Illegal_Argument.Error "x")
+            json = Widget_Query.resolve_call subject spec_module sample_type "two" ["second", "first"]
+            json.should_equal '{"arguments":[["second",{"widget":null}],["first",{"widget":null}]]}'
+
+        group_builder.specify "does not evaluate a function annotation of the subject" <|
+            subject = Error.throw (Illegal_Argument.Error "x")
+            json = Widget_Query.resolve_call subject spec_module sample_type "of_self" ["arg"]
+            json.should_equal '{"arguments":[["arg",{"widget":null}]]}'
+
+    suite_builder.group "Widget_Query.resolve_call on the standard library's annotations" group_builder->
+        group_builder.specify "Data.fetch_many and Data.fetch_pages give a Numeric_Input for time_between_requests" <|
+            ["fetch_many", "fetch_pages"].each method->
+                json = Widget_Query.resolve_call Nothing "Standard.Base.Data" "Standard.Base.Data" method ["time_between_requests"] subject_is_type=True
+                json.should_equal (answer "time_between_requests" Widget.Numeric_Input)
 
     suite_builder.group "Widget_Query failures are logged once, with their causes and stack" group_builder->
         sample = Sample.Value "a label"

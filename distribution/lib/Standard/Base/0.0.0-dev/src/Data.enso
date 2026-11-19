@@ -581,7 +581,7 @@ download (uri:(URI | Text)=(Missing_Argument.throw "uri")) file:Writable_File (r
 @format Data_Read_Helpers.format_widget_with_raw_response
 @headers Header.default_widget
 @return Return_As.default_widget
-@time_between_requests Numeric_Input default=0
+@time_between_requests Numeric_Input
 fetch_many : Vector -> HTTP_Method -> Vector (Header | Pair Text Text) -> File_Format -> Return_As -> Integer -> Cache_Policy -> Problem_Behavior -> Any ! Request_Error | HTTP_Error
 fetch_many (uris:Vector=(Missing_Argument.throw "uris")) (method:HTTP_Method=..Get) (headers:(Vector (Header | Pair Text Text))=[]) (format = Auto_Detect) return=..As_Merged_Table time_between_requests:Integer=0 (cache_policy:Cache_Policy = ..Default) (on_problems : Problem_Behavior = ..Report_Warning) =
     if time_between_requests<0 then Error.throw (Illegal_Argument.Error "time_between_requests cannot be negative.")
@@ -664,7 +664,7 @@ fetch_many (uris:Vector=(Missing_Argument.throw "uris")) (method:HTTP_Method=..G
 @format Data_Read_Helpers.format_widget_with_raw_response
 @headers Header.default_widget
 @return Return_As.default_widget
-@time_between_requests Numeric_Input default=0
+@time_between_requests Numeric_Input
 fetch_pages : URI | Text -> HTTP_Method -> Vector (Header | Pair Text Text) -> Any -> Integer -> File_Format -> Return_As -> Integer -> Cache_Policy -> Problem_Behavior -> Any ! Request_Error | HTTP_Error
 fetch_pages (initial_uri:(URI | Text)=(Missing_Argument.throw "initial_uri")) (method:HTTP_Method=..Get) (headers:(Vector (Header | Pair Text Text))=[]) (paginator=(_->_->_->Nothing)) (max_pages:Integer=10) (format = Auto_Detect) return=..As_Merged_Table time_between_requests:Integer=0 (cache_policy:Cache_Policy = ..Default) (on_problems : Problem_Behavior = ..Report_Warning) =
     if time_between_requests<0 then Error.throw (Illegal_Argument.Error "time_between_requests cannot be negative.")

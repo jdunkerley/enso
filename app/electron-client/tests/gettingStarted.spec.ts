@@ -3,6 +3,8 @@
  * exercises of 'Getting Started with Enso Analytics', each in a new project.
  */
 
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { expect } from 'playwright/test'
 import {
   addBankData,
@@ -27,6 +29,14 @@ import {
 } from './electronTest'
 
 test.skip(SKIP_ON_WINDOWS_CI, SKIP_ON_WINDOWS_CI_REASON)
+
+/** The `Main.enso` of the one project created in `projectsDir` (the samples aside). */
+async function newProjectMain(projectsDir: string): Promise<string> {
+  const entries = await fs.readdir(projectsDir, { withFileTypes: true })
+  const project = entries.find((entry) => entry.isDirectory() && entry.name !== 'Samples')
+  if (!project) throw new Error(`No new project in ${projectsDir}`)
+  return fs.readFile(path.join(projectsDir, project.name, 'src', 'Main.enso'), 'utf8')
+}
 
 /** The nodes of `samples/Getting_Started`, in order. */
 const GETTING_STARTED_NODES = [
@@ -71,6 +81,12 @@ test('Exercise 1', async ({ page, projectsDir }) => {
   // ---------------- Objective 1 ----------------
   await test.step('Objective 1: Let’s read a single sheet in from Excel', async () => {
     await createNewProject(page)
+
+    // A new project imports only the core libraries: not the IDE-only Standard.Visualization,
+    // which the widget and visualization queries no longer need.
+    const projectMain = await newProjectMain(projectsDir)
+    expect(projectMain).not.toMatch(/^import Standard\.Visualization$/m)
+    expect(projectMain).toMatch(/^from Standard\.Base import all$/m)
 
     const addComponent = page.getByLabel('Add Component (Enter)')
     await expect(addComponent).toBeVisible()

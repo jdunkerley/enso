@@ -2,6 +2,7 @@ import type EditorPageActions from 'integration-test/actions/EditorPageActions'
 import { expect, test, type Locator, type Page } from 'integration-test/base'
 import {
   clearMockWidgetConfigurations,
+  lastWidgetQueryArguments,
   restoreMockMainFile,
   restoreMockWidgetConfigurations,
   setMockMainFile,
@@ -372,6 +373,49 @@ test.describe('Dynamic configuration updates', () => {
     const formatDropdown = new DropDownLocator(formatArg)
     await formatArg.click()
     await formatDropdown.expectVisibleWithOptions(['Csv', 'Excel'])
+  })
+
+  test('A widget whose query failed shows the error and stays editable', async ({
+    page,
+    localApi,
+    editorPage,
+  }) => {
+    const node = await dataReadNodeWithMethodCallInfo(editorPage)
+    await localApi.updateVisualization('.read', {
+      arguments: [['format', { error: { step: 'annotation', message: 'No formats today' } }]],
+    })
+    // With an answer, an unset `format` is hidden (its placeholder shows only while the query is
+    // pending): set it, so that its argument is drawn with the marker.
+    await actions.showHiddenArguments(page, node)
+    const formatArg = node
+      .locator('.WidgetTopLevelArgument')
+      .filter({ has: page.getByText('format') })
+    const marker = formatArg.getByTestId('widget-query-error')
+    await expect(marker).toBeVisible()
+    await expect(marker).toHaveAttribute('aria-label', 'No widget: No formats today')
+    await marker.hover()
+    await expect(page.locator('.Tooltip').getByText('No widget: No formats today')).toBeVisible()
+    // Still editable: the format's static tags give the fallback dropdown.
+    const dropdown = new DropDownLocator(formatArg)
+    await formatArg.click()
+    await dropdown.expectVisible()
+    await expect(dropdown.items.first()).toBeVisible()
+  })
+
+  test('An answer the IDE cannot read reaches the Logs panel', async ({
+    page,
+    localApi,
+    editorPage,
+  }) => {
+    const calls = localApi.trackCalls()
+    const node = await dataReadNodeWithMethodCallInfo(editorPage)
+    await actions.showHiddenArguments(page, node)
+    await localApi.updateVisualization('.read', { arguments: 'not a list' })
+    await expect
+      .poll(() => calls.engineLogAppends.map((entry) => entry.logger))
+      .toContain('enso.gui.Widgets')
+    // The node still shows its arguments, as without a widget.
+    await expect(node.locator('.WidgetTopLevelArgument')).toHaveCount(3)
   })
 
   /**
@@ -1043,6 +1087,16 @@ test('Autoscoped constructors', async ({ editorPage }) => {
       await expect(groupBy).toBeVisible()
       await expect(groupBy.locator('.WidgetArgumentName')).toContainText(['column'])
     })
+  // The nested autoscoped constructor's widgets are asked for by method pointer, with the
+  // constructor's type as the subject.
+  expect(lastWidgetQueryArguments('.Group_By')).toEqual([
+    "'Standard.Table.Aggregate_Column'",
+    "'Standard.Table.Aggregate_Column.Aggregate_Column'",
+    "'Group_By'",
+    expect.any(String),
+    expect.any(String),
+    'True',
+  ])
 })
 
 test('Table widget', async ({ editorPage, page }) => {

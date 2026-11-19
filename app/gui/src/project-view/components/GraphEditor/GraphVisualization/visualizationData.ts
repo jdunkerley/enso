@@ -4,6 +4,7 @@ import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegist
 import type { NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'
 import { visualizationConfigPreprocessorEqual } from '$/providers/openedProjects/project/executionContext'
 import type { ToValue } from '$/utils/reactivity'
+import { previewExpression } from '@/components/GraphEditor/GraphVisualization/previewExpression'
 import LoadingErrorVisualization from '@/components/visualizations/LoadingErrorVisualization.vue'
 import LoadingVisualization from '@/components/visualizations/LoadingVisualization.vue'
 import type { ToolbarItem } from '@/components/visualizations/toolbar'
@@ -185,30 +186,23 @@ export function useVisualizationData({
         if (dataSourceValue?.type !== 'expression') return
         if (preprocessorLoading.value) return
         const preprocessor = visPreprocessor.value
-        const args = preprocessor.positionalArgumentsExpressions
-        const tempModule = Ast.MutableModule.Transient()
-        const preprocessorModule = Ast.parseExpression(
-          preprocessor.visualizationModule,
-          tempModule,
-        )!
         // TODO[ao]: it work with builtin visualization, but does not work in general case.
         // Tracked in https://github.com/orgs/enso-org/discussions/6832#discussioncomment-7754474.
         if (!isIdentifier(preprocessor.expression)) {
           console.error(`Unsupported visualization preprocessor definition`, preprocessor)
           return
         }
-        const preprocessorQn = Ast.PropertyAccess.new(
-          tempModule,
-          preprocessorModule,
-          preprocessor.expression,
+        return projectStore.executeExpression(
+          dataSourceValue.contextId,
+          previewExpression(
+            {
+              visualizationModule: preprocessor.visualizationModule,
+              expression: preprocessor.expression,
+              positionalArgumentsExpressions: preprocessor.positionalArgumentsExpressions,
+            },
+            dataSourceValue.expression,
+          ),
         )
-        const preprocessorInvocation = Ast.App.PositionalSequence(preprocessorQn, [
-          Ast.Wildcard.new(tempModule),
-          ...args.map((arg) => Ast.Group.new(tempModule, Ast.parseExpression(arg, tempModule)!)),
-        ])
-        const rhs = Ast.parseExpression(dataSourceValue.expression, tempModule)!
-        const expression = Ast.OprApp.new(tempModule, preprocessorInvocation, '<|', rhs)
-        return projectStore.executeExpression(dataSourceValue.contextId, expression.code())
       } catch (e) {
         console.error(e)
         throw e

@@ -1,4 +1,5 @@
 import { Ast } from '@/util/ast'
+import { MODULE_CALL } from '@/util/moduleCall'
 import { expect, test } from 'vitest'
 import {
   childrenExpression,
@@ -7,21 +8,21 @@ import {
   TREE_MODULE,
 } from '../treeExpression'
 
-test('childrenExpression calls Tree.children on the node with a path, start and count', () => {
+test('childrenExpression calls Tree.children through Standard.Base, on the node', () => {
   const ast = childrenExpression(['a', 3], 100, 50)('node1')
   const { func, args } = Ast.analyzeAppLike(ast)
-  expect(func.code()).toBe(`${TREE_MODULE}.children`)
+  expect(func.code()).toBe(MODULE_CALL)
   expect(args.map((arg) => arg.code().replace(/\s/g, ''))).toEqual([
+    `'${TREE_MODULE}'`,
+    "'children'",
+    "[['a',3],100,50]",
     'node1',
-    "['a',3]",
-    '100',
-    '50',
   ])
 })
 
 test('childrenExpression of the root passes an empty path', () => {
   const { args } = Ast.analyzeAppLike(childrenExpression([], 0, 100)('node1'))
-  expect(args[1]!.code().replace(/\s/g, '')).toBe('[]')
+  expect(args[2]!.code().replace(/\s/g, '')).toBe('[[],0,100]')
 })
 
 test('isNodeExpression accepts a method call and nothing else', () => {

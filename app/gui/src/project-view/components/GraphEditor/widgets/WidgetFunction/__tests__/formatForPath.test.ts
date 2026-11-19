@@ -10,9 +10,11 @@ import {
 } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { Ast } from '@/util/ast'
 import { ArgumentApplication, ArgumentAst, interpretCall } from '@/util/callTree'
+import { MODULE_CALL } from '@/util/moduleCall'
 import { assert, describe, expect, test, vi } from 'vitest'
 import { assertDefined } from 'ydoc-shared/util/assert'
 import {
+  DATA_READ_FORMAT_WIDGET_QUERY,
   fileNameOf,
   formatTypeForDrop,
   formatTypeForDroppedFile,
@@ -271,27 +273,31 @@ describe('formatTypeForPathUpdate', () => {
 })
 
 describe('formatTypeForDrop', () => {
-  const answer = [
-    [
-      'format',
-      {
-        type: 'Widget',
-        constructor: 'Single_Choice',
-        label: null,
-        values: [
-          {
-            label: 'SQLite',
-            value: '..SQLite',
-            parameters: [],
-            icon: '',
-            requires: SQLITE,
-            patterns: ['*.db'],
+  const answer = {
+    arguments: [
+      [
+        'format',
+        {
+          widget: {
+            type: 'Widget',
+            constructor: 'Single_Choice',
+            label: null,
+            values: [
+              {
+                label: 'SQLite',
+                value: '..SQLite',
+                parameters: [],
+                icon: '',
+                requires: SQLITE,
+                patterns: ['*.db'],
+              },
+            ],
+            display: { type: 'Display', constructor: 'When_Modified' },
           },
-        ],
-        display: { type: 'Display', constructor: 'When_Modified' },
-      },
+        },
+      ],
     ],
-  ]
+  }
   test('asks the engine when no node has loaded the options', async () => {
     const query = vi.fn(async () => answer)
     expect(await formatTypeForDrop('S.db', 'project-none', query)).toBe(SQLITE)
@@ -337,7 +343,7 @@ describe('formatTypeForDrop', () => {
 })
 
 describe('formatTypeForDroppedFile', () => {
-  // What the `get_widget_json` query for `Data.read`'s `format` returns.
+  // What the `resolve_call` query for `Data.read`'s `format` returns.
   const choice = (label: string, value: string, requires?: string, patterns?: string[]) => ({
     label,
     value,
@@ -345,22 +351,23 @@ describe('formatTypeForDroppedFile', () => {
     icon: '',
     ...(requires ? { requires, patterns } : {}),
   })
-  const widgetJson = [
-    [
-      'format',
-      {
-        type: 'Widget',
-        constructor: 'Single_Choice',
-        label: null,
-        values: [
-          choice('Auto Detect', 'Standard.Base.System.File_Format.Auto_Detect'),
-          choice('SQLite', '..SQLite', SQLITE, ['*.sqlite', '*.db']),
-          choice('Delimited', '..Delimited', TABLE_DELIMITED, ['*.csv']),
-        ],
-        display: { type: 'Display', constructor: 'When_Modified' },
-      },
+  const widget = {
+    type: 'Widget',
+    constructor: 'Single_Choice',
+    label: null,
+    values: [
+      choice('Auto Detect', 'Standard.Base.System.File_Format.Auto_Detect'),
+      choice('SQLite', '..SQLite', SQLITE, ['*.sqlite', '*.db']),
+      choice('Delimited', '..Delimited', TABLE_DELIMITED, ['*.csv']),
     ],
-  ]
+    display: { type: 'Display', constructor: 'When_Modified' },
+  }
+  const widgetJson = { arguments: [['format', { widget }]] }
+  test('the dropped-file query names only Standard.Base', () => {
+    const { func, args } = Ast.analyzeAppLike(Ast.parseExpression(DATA_READ_FORMAT_WIDGET_QUERY)!)
+    expect(func.code()).toBe(MODULE_CALL)
+    expect(args[1]!.code()).toBe("'resolve_call'")
+  })
   test('a file the patterns of one format match names that format type', () => {
     expect(formatTypeForDroppedFile('Sales.db', widgetJson)).toBe(SQLITE)
     expect(formatTypeForDroppedFile('DATA.CSV', widgetJson)).toBe(TABLE_DELIMITED)

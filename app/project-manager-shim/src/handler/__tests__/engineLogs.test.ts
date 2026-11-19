@@ -1,3 +1,4 @@
+import { ENGINE_LOG_APPEND_PATH } from 'enso-common/src/services/engineLogs'
 import { EventEmitter } from 'node:events'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
@@ -6,8 +7,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { EngineLogChannel } from '../../engineLogs/channel.js'
 import { EngineLogHub } from '../../engineLogs/hub.js'
 import {
+  handleEngineLogAppend,
   handleEngineLogStream,
+  isEngineLogAppendRequest,
   isEngineLogStreamRequest,
+  type AppendRequest,
   type EngineLogStreamOptions,
   type EventStreamRequest,
   type EventStreamResponse,
@@ -241,5 +245,116 @@ describe('handleEngineLogStream', () => {
     channel.engineStderr(Buffer.from('later\n'))
     expect(response.body).not.toContain('later')
     expect(error).not.toHaveBeenCalled()
+  })
+})
+
+class FakePostRequest implements AppendRequest {
+  constructor(
+    readonly url: string,
+    private readonly body: string,
+    readonly method = 'POST',
+  ) {}
+  async *[Symbol.asyncIterator]() {
+    yield Buffer.from(this.body)
+  }
+}
+
+describe('isEngineLogAppendRequest', () => {
+  test('recognises the route only', () => {
+    expect(isEngineLogAppendRequest(ENGINE_LOG_APPEND_PATH)).toBe(true)
+    expect(isEngineLogAppendRequest('/api/engine-logs/stream')).toBe(false)
+  })
+})
+
+describe('handleEngineLogAppend', () => {
+  const projectId = () => `project-${encodeURIComponent(projectPath)}`
+  const bodyFor = (project: string, extra: object = {}) =>
+    JSON.stringify({ project, level: 'WARN', logger: 'enso.gui.Widgets', message: 'm', ...extra })
+
+  test('adds the formatted lines to the open project and answers 204', async () => {
+    const response = new FakeResponse()
+    const events: string[] = []
+    channel.subscribe({
+      event: (e) => e.type === 'line' && events.push(e.text),
+      end: () => {},
+    })
+    await handleEngineLogAppend(
+      new FakePostRequest(ENGINE_LOG_APPEND_PATH, bodyFor(projectId())),
+      response,
+      hub,
+      {},
+      () => new Date('2026-11-18T10:00:00.000Z'),
+    )
+    expect(response.status).toBe(204)
+    expect(events).toEqual(['[WARN] [2026-11-18T10:00:00.000Z] [enso.gui.Widgets] m'])
+  })
+
+  test('refuses a bad body, a closed project, GET and an oversized body', async () => {
+    const bad = new FakeResponse()
+    await handleEngineLogAppend(new FakePostRequest(ENGINE_LOG_APPEND_PATH, '{'), bad, hub, {})
+    expect(bad.status).toBe(400)
+    const noProject = new FakeResponse()
+    await handleEngineLogAppend(
+      new FakePostRequest(ENGINE_LOG_APPEND_PATH, bodyFor('not-a-project-id')),
+      noProject,
+      hub,
+      {},
+    )
+    expect(noProject.status).toBe(400)
+    const closed = new FakeResponse()
+    await handleEngineLogAppend(
+      new FakePostRequest(ENGINE_LOG_APPEND_PATH, bodyFor('project-%2Fnowhere')),
+      closed,
+      hub,
+      {},
+    )
+    expect(closed.status).toBe(404)
+    const get = new FakeResponse()
+    await handleEngineLogAppend(
+      new FakePostRequest(ENGINE_LOG_APPEND_PATH, '', 'GET'),
+      get,
+      hub,
+      {},
+    )
+    expect(get.status).toBe(405)
+    const big = new FakeResponse()
+    await handleEngineLogAppend(
+      new FakePostRequest(
+        ENGINE_LOG_APPEND_PATH,
+        bodyFor(projectId(), { message: 'x'.repeat(70_000) }),
+      ),
+      big,
+      hub,
+      {},
+    )
+    expect(big.status).toBe(413)
+  })
+})
+
+describe('handleEngineLogAppend aborts', () => {
+  test('a body that fails mid-read ends the response instead of rejecting', async () => {
+    const request: AppendRequest = {
+      method: 'POST',
+      async *[Symbol.asyncIterator]() {
+        yield Buffer.from('{')
+        throw new Error('aborted')
+      },
+    }
+    const response = new FakeResponse()
+    await expect(handleEngineLogAppend(request, response, hub, {})).resolves.toBeUndefined()
+    expect(response.ended).toBe(true)
+  })
+
+  test('an oversized body in several chunks is answered 413 once', async () => {
+    const request: AppendRequest = {
+      method: 'POST',
+      async *[Symbol.asyncIterator]() {
+        for (let i = 0; i < 5; i++) yield Buffer.alloc(20_000, 'x')
+      },
+    }
+    const response = new FakeResponse()
+    await handleEngineLogAppend(request, response, hub, {})
+    expect(response.status).toBe(413)
+    expect(response.headers.Connection).toBe('close')
   })
 })

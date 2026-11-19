@@ -83,17 +83,15 @@ describe('bundled samples', () => {
     expect(packageYaml).toMatch(/^description: \S.{10,}$/m)
   })
 
-  // Without the import, the Language Server cannot run the visualizations and widget queries of
-  // the nodes (`Fully qualified name references a library Standard.Visualization but an import
-  // statement for it is missing`, logged for Excel_Format and database values), so working on the
-  // sample produced errors.
+  // Since the widget queries and the in-frame visualization queries name only `Standard.Base`
+  // (#891), a sample needs no import of the IDE-only `Standard.Visualization`.
   test.each(samples)(
-    '%s imports Standard.Base, Standard.Table and Standard.Visualization',
+    '%s imports Standard.Base and Standard.Table, and not Standard.Visualization',
     (sample) => {
       const main = code(sample)
       expect(main).toMatch(/^from Standard\.Base import all$/m)
       expect(main).toMatch(/^from Standard\.Table import all$/m)
-      expect(main).toMatch(/^import Standard\.Visualization$/m)
+      expect(main).not.toMatch(/^import Standard\.Visualization$/m)
     },
   )
 

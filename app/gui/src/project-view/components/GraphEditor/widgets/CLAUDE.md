@@ -159,6 +159,26 @@ render only its own slot content. The icon is already on the row, drawn by
   `localSecrets.ts` (the local secrets and **New secret…**, which set
   `Enso_Secret.get 'secret://<name>'`), and `browsableTypes.ts` (which kind an
   argument takes, its current path, and the edit that sets one).
+- **Widget queries.** `WidgetFunction/widgetQuery.ts` builds the query of a
+  call: a method-pointer visualization of
+  `Standard.Base.Metadata.Widget_Query.resolve_call` on the call's subject, with
+  literal arguments (the method's module, type and name, the argument names, the
+  argument expression ids, and `subjectIsType`), so nothing is compiled in the
+  user's module and it needs no import. The answer is
+  `{"arguments":[[name, {"widget":…}|{"error":{"step","message"}}],…]}`, read by
+  `widgetQueryAnswerSchema`; `functionCallFromAnswer` turns it into the call's
+  configuration, and a failed argument lands in `FunctionCall.errors`. An error
+  subject (the user's own error) answers no widgets. `WidgetQueryError.vue`
+  (priority 2) draws a failed argument: a warning marker with the error as its
+  tooltip, then the argument as it is drawn with no answer.
+  `WidgetQueryErrorKey` is set on the input only on failure, so every other
+  widget is unaffected. Caveat: an unset optional argument whose query failed is
+  hidden like any other, so its marker shows only once it is revealed or set;
+  the error is in the Logs panel. An answer the IDE cannot read is reported once
+  per project, method and issues (`reportWidgetSchemaMismatch`), and the parse
+  and render times of an answer are reported when performance timings are on
+  (`reportWidgetTiming`; both in `$/providers/engineLogAppend.ts`, called from
+  `widgetFunctionCallInfo.ts`).
 - `WidgetFunction/formatForPath.ts` — with `format` on `Auto_Detect`, which
   format library a call's new `path` needs: the one format type whose options'
   `patterns` match the file name (case ignored). `WidgetFunction.vue`'s
@@ -170,7 +190,9 @@ render only its own slot content. The icon is already on the row, drawn by
   that a `path`-and-`format` node holds right now (`trackFormatConfig`, which
   `WidgetFunction.vue` calls and withdraws when the node or its configuration
   goes, so nothing outlives its node, an engine restart or a project switch),
-  and otherwise asks the engine (`DATA_READ_FORMAT_WIDGET_QUERY`, in the current
+  and otherwise asks the engine (`DATA_READ_FORMAT_WIDGET_QUERY`: an in-frame
+  `Standard.Base.Meta.call_module_method` of `resolve_call`
+  (`@/util/moduleCall`) whose value is the `Data` module, in the current
   method's body context, 1 s timeout, so the node creation waits at most that
   long and one undo still removes node and import); `formatTypeForDrop` does
   both. The import goes in the node creation's edit.

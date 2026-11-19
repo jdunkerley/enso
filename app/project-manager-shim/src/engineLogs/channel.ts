@@ -131,6 +131,12 @@ export class EngineLogChannel {
     this.emitLines('stderr', [text], null)
   }
 
+  /** Lines the IDE adds (`POST /api/engine-logs/append`), tagged with the session found so far. */
+  appendGuiLines(lines: readonly string[]): void {
+    if (this.state !== 'open') return
+    this.emitLines('gui', lines, this.sessionId)
+  }
+
   /** An engine process has started: the first one, or a respawn after a crash. */
   engineStarted(): void {
     if (this.state !== 'open') return

@@ -303,3 +303,10 @@ describe('SQL queries and performance timings', () => {
     expect(shown({}, 'warn')).toEqual([])
   })
 })
+
+describe('logOrigin of the IDE’s own lines', () => {
+  test('timings are performance; widget problems are the engine’s', () => {
+    expect(logOrigin('enso.gui.performance')).toBe('performance')
+    expect(logOrigin('enso.gui.Widgets')).toBe('engine')
+  })
+})

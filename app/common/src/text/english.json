@@ -717,6 +717,7 @@
   "localVersionsStatusError": "The versions status could not be read: $0",
   "librariesNotLoaded": "This project's libraries could not be loaded: $0.",
   "libraryNotInEdition": "$0 (not defined in the edition)",
+  "widgetQueryError": "No widget: $0",
   "libraryDownloadFailed": "$0 $1 (download failed: $2)",
   "libraryLocalMissing": "$0 (no local copy)",
   "libraryLoadingError": "$0 $1 (could not be loaded: $2)",

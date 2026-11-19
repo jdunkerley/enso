@@ -71,13 +71,19 @@ describe('a set filter on a column', () => {
     [[true, false], '(..Is_In [True, False])'],
   ])('of Booleans %j writes Enso Booleans: %s', (values, filter) => {
     const request = rowsRequest({ flag: { filterType: 'set', values } }, [['flag', 'Boolean']])
-    expect(request).toContain(`([${filter}])`)
+    expect(request).toContain(`[${filter}]`)
   })
 
   test('of Text still writes Text', () => {
     const request = rowsRequest({ name: { filterType: 'set', values: ['a', 'b'] } }, [
       ['name', 'Char'],
     ])
-    expect(request).toContain("([(..Is_In ['a', 'b'])])")
+    expect(request).toContain("[(..Is_In ['a', 'b'])]")
+  })
+  test('asks for the rows through Standard.Base', () => {
+    const request = rowsRequest({ name: { filterType: 'set', values: ['a'] } }, [['name', 'Char']])
+    expect(request).toMatch(
+      /^Standard\.Base\.Meta\.call_module_method 'Standard\.Visualization\.Table\.Visualization' 'get_rows_for_table' \[0, Nothing, Nothing, /,
+    )
   })
 })

@@ -21,6 +21,11 @@ import {
   type ProjectState,
   type RecentProjectEntry,
 } from 'enso-common/src/services/ProjectManager/types'
+import {
+  ENGINE_LOG_APPEND_PATH,
+  parseEngineLogAppendBody,
+  type EngineLogAppendBody,
+} from 'enso-common/src/services/engineLogs'
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import { unsafeMutable } from 'enso-common/src/utilities/data/object'
 import { getDirectoryAndName } from 'enso-common/src/utilities/file'
@@ -92,6 +97,7 @@ const INITIAL_CALLS_OBJECT = {
     channel: string | null
     after: string | null
   }>(),
+  engineLogAppends: array<EngineLogAppendBody>(),
 }
 
 const READONLY_INITIAL_CALLS_OBJECT: TrackedCallsInternal = INITIAL_CALLS_OBJECT
@@ -990,6 +996,12 @@ export async function mockLocalApi(page: Page) {
         contentType: 'text/plain',
         body: JSON.stringify(response),
       })
+    })
+
+    await page.route(ENGINE_LOG_APPEND_PATH, async (route, request) => {
+      const body = parseEngineLogAppendBody(request.postDataJSON())
+      if (body) called('engineLogAppends', body)
+      return route.fulfill({ status: body ? 204 : 400 })
     })
 
     await page.route('/api/engine-logs/stream?*', async (route, request) => {
