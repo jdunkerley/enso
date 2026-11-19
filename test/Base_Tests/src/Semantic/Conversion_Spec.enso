@@ -108,6 +108,12 @@ Blob.from (that:Text) = Blob.Text that
 Blob.from (that:File) = Blob.Binary that
 Blob.from (that:Any) = Blob.Json that
 
+type Type_Default
+    Value tag
+
+Type_Default.from (that : Foo.type) (suffix : Text = "") = Type_Default.Value "Foo.type"+suffix
+Type_Default.from (that : Integer.type) = Type_Default.Value "Integer.type"
+
 add_specs suite_builder =
     pending_js_missing = if Polyglot.is_language_installed "js" then Nothing else
         "Can't run JavaScript tests, language `js` is not installed."
@@ -752,6 +758,20 @@ add_specs suite_builder =
 
         group_builder.specify "f5 d" <|
             (f5 d).to_display_text . should_contain "HELLO: (Say 'Any fallback:ParseCaseSensitive(false)(Value"
+    suite_builder.group "Conversion from a type object" group_builder->
+        group_builder.specify "should dispatch on the type object, not on its values" <|
+            Type_Default.from Foo . tag . should_equal "Foo.type"
+            Type_Default.from Integer . tag . should_equal "Integer.type"
+            Panic.recover Any (Type_Default.from (Foo.Value 1)) . should_fail_with No_Such_Conversion
+            Panic.recover Any (Type_Default.from 1) . should_fail_with No_Such_Conversion
+            Panic.recover Any (Type_Default.from Bar) . should_fail_with No_Such_Conversion
+        group_builder.specify "should take extra defaulted arguments, directly and through a variable" <|
+            Type_Default.from Foo suffix="!" . tag . should_equal "Foo.type!"
+            t = Foo
+            Type_Default.from t . tag . should_equal "Foo.type"
+            Type_Default.from t suffix="?" . tag . should_equal "Foo.type?"
+        group_builder.specify "should be caught by a catch-all conversion from Any" <|
+            Not_Foo.from Foo . notfoo . should_equal "ANY!!!"
 
 Hello.from (that:Any) suffix="?" = Hello.Say <| ("Any fallback:"+that.to_text) + suffix
 Hello.from (that:Foo) suffix=" " = Hello.Say <| (that.foo.to_case Case.Upper) + suffix

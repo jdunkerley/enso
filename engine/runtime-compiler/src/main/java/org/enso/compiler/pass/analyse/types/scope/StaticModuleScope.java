@@ -135,7 +135,10 @@ public final class StaticModuleScope implements IRPass.IRMetadata {
 
     void registerConversionMethod(TypeScopeReference toType, TypeScopeReference fromType) {
       assert toType.getKind() == TypeScopeReference.Kind.ATOM_TYPE;
-      assert fromType.getKind() == TypeScopeReference.Kind.ATOM_TYPE;
+      // A conversion from `X.type` is keyed on X's eigentype.
+      // See Note [Eigentype References] in EigentypeReference.java.
+      assert fromType.getKind() == TypeScopeReference.Kind.ATOM_TYPE
+          || fromType.getKind() == TypeScopeReference.Kind.ATOM_EIGEN_TYPE;
       Set<TypeScopeReference> sourcesSet =
           conversions.computeIfAbsent(toType, k -> new HashSet<>());
       boolean isNew = sourcesSet.add(fromType);
