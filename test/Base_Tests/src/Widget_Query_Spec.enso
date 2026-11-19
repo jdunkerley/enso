@@ -17,6 +17,8 @@ spec_module = "enso_dev.Base_Tests.Widget_Query_Spec"
 
 add_three a b c = a + b + c
 
+add_defaults a b=10 c=100 = a + b + c
+
 
 sample_type = spec_module + ".Sample"
 
@@ -80,6 +82,17 @@ add_specs suite_builder =
     suite_builder.group "Meta.call_module_method" group_builder->
         group_builder.specify "applies a module's method to the value, then to the arguments" <|
             Meta.call_module_method spec_module "add_three" [2, 3] 1 . should_equal 6
+
+        group_builder.specify "fills the defaults of the parameters no argument is given for, as a written call does" <|
+            Meta.call_module_method spec_module "add_defaults" [2, 3] 1 . should_equal 6
+            Meta.call_module_method spec_module "add_defaults" [2] 1 . should_equal 103
+            Meta.call_module_method spec_module "add_defaults" [] 1 . should_equal 111
+            Meta.call_module_method spec_module "add_defaults" [2, 3] 1 . should_equal (add_defaults 1 2 3)
+
+        group_builder.specify "passes the warnings of the value through, as a written call does" <|
+            result = Meta.call_module_method spec_module "add_defaults" [2] (Warning.attach "w" 1)
+            result.should_equal 103
+            Warning.get_all result . map .value . should_equal ["w"]
 
         group_builder.specify "fails for a module that is not loaded, or a method it lacks" <|
             Meta.call_module_method "enso_dev.Base_Tests.No_Such_Module" "f" [] 1 . should_fail_with Module_Does_Not_Exist
