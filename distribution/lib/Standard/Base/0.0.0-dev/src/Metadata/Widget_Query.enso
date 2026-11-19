@@ -50,22 +50,27 @@ polyglot java import org.slf4j.LoggerFactory
       named by `type_name` rather than `value` (a call with no subject
       expression, such as an autoscoped constructor).
 
+   An error as `value` (with `subject_is_type` False) is the user's own error,
+   not a widget failure: the answer is `{"widget":null}` for every argument,
+   nothing is logged and no annotation is evaluated.
+
    ## Returns
    `{"arguments":[[<name>,{"widget":<widget or null>}|{"error":{"step":…,"message":…}}],…]}`,
    read by the GUI (its schema is added in PR 1b).
 resolve_call (value : Any) (module_name : Text) (type_name : Text) (method_name : Text) (argument_names : Vector Text) (uuids : Text = "{}") (subject_is_type : Boolean = False) -> Text =
     method = Widget_Method.Value module_name type_name method_name
     Progress.run label=method.qualified_name up_to=1 handle_name="Widget_Query."+method.qualified_name action=_->
-        subject = if subject_is_type then Meta.find_type_or_module type_name else Warning.clear value
-        cache = _cache_from uuids
-        inputs = _inputs_key subject uuids
-        entries = argument_names.map argument->
-            result = resolve_argument method argument subject cache
-            _ = case result of
-                Argument_Result.Failed failure -> log_failure failure inputs
-                _ -> False
-            '[' + argument.to_json + ',' + result.to_json + ']'
-        '{"arguments":[' + (entries.join ",") + ']}'
+        if value.is_error && subject_is_type.not then _no_widgets argument_names else
+            subject = if subject_is_type then Meta.find_type_or_module type_name else Warning.clear value
+            cache = _cache_from uuids
+            inputs = _inputs_key subject uuids
+            entries = argument_names.map argument->
+                result = resolve_argument method argument subject cache
+                _ = case result of
+                    Argument_Result.Failed failure -> log_failure failure inputs
+                    _ -> False
+                '[' + argument.to_json + ',' + result.to_json + ']'
+            '{"arguments":[' + (entries.join ",") + ']}'
 
 ## ---
    private: true
@@ -254,3 +259,7 @@ private _cache_from (uuids : Text) -> Function =
 private _inputs_key subject (uuids : Text) -> Text =
     subject_type = (Meta.type_of subject . to_text) . catch Any (_-> "<error>")
     subject_type + "|" + uuids
+
+private _no_widgets (argument_names : Vector Text) -> Text =
+    entries = argument_names.map argument-> '[' + argument.to_json + ',{"widget":null}]'
+    '{"arguments":[' + (entries.join ",") + ']}'

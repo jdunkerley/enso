@@ -148,6 +148,17 @@ add_specs suite_builder =
             error = error_of (Widget_Query.resolve_call sample spec_module sample_type "missing" ["arg"])
             error.get "step" . should_equal "lookup"
 
+    suite_builder.group "Widget_Query.resolve_call with an error as the subject" group_builder->
+        group_builder.specify "gives no widget for every argument, and no error" <|
+            subject = Error.throw (Illegal_Argument.Error "x")
+            json = Widget_Query.resolve_call subject spec_module sample_type "two" ["second", "first"]
+            json.should_equal '{"arguments":[["second",{"widget":null}],["first",{"widget":null}]]}'
+
+        group_builder.specify "does not evaluate a function annotation of the subject" <|
+            subject = Error.throw (Illegal_Argument.Error "x")
+            json = Widget_Query.resolve_call subject spec_module sample_type "of_self" ["arg"]
+            json.should_equal '{"arguments":[["arg",{"widget":null}]]}'
+
     suite_builder.group "Widget_Query failures are logged once, with their causes and stack" group_builder->
         sample = Sample.Value "a label"
         method name = Widget_Method.Value spec_module sample_type name
