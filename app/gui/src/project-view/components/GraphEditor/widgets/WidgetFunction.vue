@@ -122,7 +122,8 @@ const innerInput = computed(() => {
 
 /**
  * The parameters this call's ＋ menu offers: the unset ones with a default, which the tree hides.
- * Selecting the node does not show them; the menu is the way to reach them.
+ * Selecting the node does not show them, except those the method's front matter marks `selected`;
+ * the menu is the way to reach them.
  */
 const hidden = computed(() => (application.value ? hiddenParameters(application.value) : []))
 

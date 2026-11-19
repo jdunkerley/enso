@@ -24,6 +24,7 @@ public class ArgumentDisplayCheckTest {
           .build();
 
   private List<String> warnings(String code) {
+    compilerCtx.createModule(QualifiedName.fromString("local.Proj.Other"), "other = 0");
     var mod = compilerCtx.createModule(QualifiedName.fromString("local.Proj.Main"), code);
     compilerCtx.getCompiler().run(mod);
     var found = new ArrayList<String>();
@@ -212,5 +213,116 @@ public class ArgumentDisplayCheckTest {
   public void noFrontMatterMeansNoEntries() {
     var result = ArgumentDisplayCheck.readArguments("Just text.\n---\narguments:\n  b: always");
     assertThat(result.entries().isEmpty(), is(true));
+  }
+
+  @Test
+  public void readerReportsDuplicateKey() {
+    var result =
+        ArgumentDisplayCheck.readArguments("---\narguments:\n  b: always\n  b: selected\n---\n");
+    assertThat(result.problems(), is(List.of("The front matter's `arguments` lists `b` twice.")));
+  }
+
+  private static final String SPACES_MSG =
+      "Indent the front matter's `arguments` with spaces, not tabs.";
+
+  @Test
+  public void readerReportsTabIndentation() {
+    var result =
+        ArgumentDisplayCheck.readArguments("---\narguments:\n\tb: always\n\tc: always\n---\n");
+    assertThat(result.problems(), is(List.of(SPACES_MSG)));
+    var onKey = ArgumentDisplayCheck.readArguments("---\n\targuments:\n\t  b: always\n---\n");
+    assertThat(onKey.problems(), is(List.of(SPACES_MSG)));
+  }
+
+  @Test
+  public void readerAcceptsSpaceBeforeColon() {
+    var result = ArgumentDisplayCheck.readArguments("---\narguments :\n  b: always\n---\n");
+    assertThat(result.entries(), is(Map.of("b", "always")));
+    assertThat(result.problems(), is(empty()));
+    var flow = ArgumentDisplayCheck.readArguments("---\narguments : {b: always}\n---\n");
+    assertThat(
+        flow.problems(),
+        is(
+            List.of(
+                "Write the front matter's `arguments` as a block, one `name: value` per line.")));
+  }
+
+  @Test
+  public void duplicateKeyWarns() {
+    var code =
+        """
+        g = 0
+
+        ## ---
+           arguments:
+             b: always
+             b: selected
+           ---
+        f a b=1 = a + b
+        """;
+    assertThat(
+        warnings(code), containsInAnyOrder("The front matter's `arguments` lists `b` twice."));
+  }
+
+  @Test
+  public void libraryLayoutWithAnnotationAndSignature() {
+    var code =
+        """
+        import project.Other
+
+        type Num
+            V
+
+        ## ---
+           arguments:
+             z: always
+           ---
+        @b Num.V
+        f : Num -> Num -> Num
+        f a b=1 = a + b
+        """;
+    assertThat(
+        warnings(code),
+        containsInAnyOrder(
+            "The front matter's `arguments` names `z`, which is not an argument of `f`."));
+  }
+
+  @Test
+  public void documentedMethodAfterImport() {
+    var code =
+        """
+        import project.Other
+
+        ## ---
+           arguments:
+             z: always
+           ---
+        f a b=1 = a + b
+        """;
+    assertThat(
+        warnings(code),
+        containsInAnyOrder(
+            "The front matter's `arguments` names `z`, which is not an argument of `f`."));
+  }
+
+  @Test
+  public void extensionMethodAtModuleLevel() {
+    var code =
+        """
+        type T
+
+        ## ---
+           arguments:
+             self: always
+             nope: always
+             b: always
+           ---
+        T.m self b=1 = b
+        """;
+    assertThat(
+        warnings(code),
+        containsInAnyOrder(
+            "The front matter's `arguments` names `self`, which is not an argument of `m`.",
+            "The front matter's `arguments` names `nope`, which is not an argument of `m`."));
   }
 }

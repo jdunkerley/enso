@@ -22,6 +22,7 @@ import org.enso.compiler.pass.desugar.ComplexType$;
 import org.enso.compiler.pass.desugar.GenerateMethodBodies$;
 import org.enso.compiler.pass.resolve.DocumentationComments;
 import org.enso.compiler.pass.resolve.DocumentationComments$;
+import org.enso.compiler.pass.resolve.TypeSignatures$;
 import org.enso.scala.wrapper.ScalaConversions;
 import scala.collection.immutable.Seq;
 
@@ -40,6 +41,11 @@ public final class ArgumentDisplayCheck implements MiniPassFactory {
   /** A call of {@code Missing_Argument.throw}, as {@code showCode} prints it. */
   private static final Pattern MISSING_ARGUMENT =
       Pattern.compile("^[(\\s]*(\\(throw\\)\\s+Missing_Argument\\b|Missing_Argument\\.)");
+
+  private static final String TABS = "Indent the front matter's `arguments` with spaces, not tabs.";
+
+  /** The {@code arguments} key, with optional whitespace before the colon, as YAML allows. */
+  private static final Pattern ARGUMENTS_KEY = Pattern.compile("^arguments\\s*:(.*)$");
 
   private ArgumentDisplayCheck() {}
 
@@ -72,21 +78,28 @@ public final class ArgumentDisplayCheck implements MiniPassFactory {
       if (stripped.equals("---")) break;
       if (stripped.isEmpty()) continue;
       int indent = line.length() - line.stripLeading().length();
+      boolean tabbed = line.substring(0, indent).indexOf('\t') >= 0;
       if (keyIndent >= 0) {
         if (indent > keyIndent) {
+          if (tabbed && !problems.contains(TABS)) problems.add(TABS);
           int colon = stripped.indexOf(':');
           if (colon <= 0) {
             problems.add(NOT_A_BLOCK);
           } else {
-            entries.put(
-                stripped.substring(0, colon).strip(), stripped.substring(colon + 1).strip());
+            var key = stripped.substring(0, colon).strip();
+            if (entries.containsKey(key)) {
+              problems.add("The front matter's `arguments` lists `" + key + "` twice.");
+            }
+            entries.put(key, stripped.substring(colon + 1).strip());
           }
           continue;
         }
         keyIndent = -1;
       }
-      if (stripped.startsWith("arguments:")) {
-        if (!stripped.substring("arguments:".length()).isBlank()) {
+      var keyMatch = ARGUMENTS_KEY.matcher(stripped);
+      if (keyMatch.matches()) {
+        if (tabbed && !problems.contains(TABS)) problems.add(TABS);
+        if (!keyMatch.group(1).isBlank()) {
           problems.add(NOT_A_BLOCK);
         } else {
           keyIndent = indent;
@@ -112,7 +125,12 @@ public final class ArgumentDisplayCheck implements MiniPassFactory {
 
   @Override
   public Seq<? extends IRProcessingPass> precursorPasses() {
-    return ScalaConversions.asScala(List.of(ComplexType$.MODULE$, GenerateMethodBodies$.MODULE$));
+    return ScalaConversions.asScala(
+        List.of(
+            ComplexType$.MODULE$,
+            GenerateMethodBodies$.MODULE$,
+            DocumentationComments$.MODULE$,
+            TypeSignatures$.MODULE$));
   }
 
   @Override
