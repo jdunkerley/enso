@@ -177,6 +177,7 @@ test('left rail footer tree', async ({ drivePage }) => {
     const footer = page.locator('.RailFooter').locator('visible=true')
     await expect(footer).toBeVisible()
     await expect(footer).toMatchAriaSnapshot(`
+      - 'button "AI agents: off"'
       - button "Settings"
       - button "About Enso"
     `)

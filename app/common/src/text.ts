@@ -38,6 +38,13 @@ interface PlaceholderOverrides {
   readonly shortcutConflictsWith: [actionNames: string]
   readonly resizeColumnX: [columnName: string]
 
+  readonly mcpActivityLastSeen: [clientName: string, age: string]
+  readonly mcpActivitySeen: [age: string]
+  readonly mcpActivityAndMore: [count: number]
+  readonly mcpActivityNameConnected: [clientName: string]
+  readonly mcpActivityNameActive: [clientName: string]
+  readonly mcpActivityCallLabel: [tool: string, outcome: string, age: string]
+
   readonly updateAssetBackendError: [assetTitle: string]
   readonly getFileDetailsBackendError: [fileTitle: string]
   readonly getDatalinkBackendError: [datalinkTitle: string]

@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [A plug icon in the left rail, above Settings, shows whether AI agents (MCP)
+  are off, have a problem, are on, connected or working. Click it to see the
+  connected app and its last five calls, or to turn MCP on.][878]
 - [Widgets show why they could not load, instead of disappearing: a warning
   marker on the argument gives the reason, the argument stays editable, and the
   Logs panel has the details. New projects no longer import
@@ -573,6 +576,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[878]: https://github.com/jdunkerley/enso/pull/878
 [891]: https://github.com/jdunkerley/enso/pull/891
 [846]: https://github.com/jdunkerley/enso/pull/846
 [822]: https://github.com/jdunkerley/enso/pull/822

@@ -169,6 +169,23 @@ async function mockElectronApi(page: Page, jvmAotTrainingStatus: JvmAotTrainingS
                 },
                 status: async (): Promise<Status> => current(),
                 onStatusChanged: (): (() => void) => () => {},
+                // The activity record: seeded from `window.__mcpMockActivity`, and a spec pushes a
+                // new one with `window.__mcpEmitActivity(snapshot)`.
+                activity: async (): Promise<unknown> =>
+                  (window as unknown as { __mcpMockActivity?: unknown }).__mcpMockActivity ?? {
+                    clients: [],
+                    calls: [],
+                  },
+                onActivityChanged: (handler: (activity: unknown) => void): (() => void) => {
+                  ;(window as unknown as { __mcpEmitActivity: unknown }).__mcpEmitActivity = (
+                    activity: unknown,
+                  ) => {
+                    ;(window as unknown as { __mcpMockActivity?: unknown }).__mcpMockActivity =
+                      activity
+                    handler(activity)
+                  }
+                  return () => {}
+                },
                 setEnabled: async (enabled: boolean): Promise<Status> => {
                   w.__mcpMockStatus = {
                     enabled,
