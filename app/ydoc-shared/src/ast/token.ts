@@ -1,7 +1,7 @@
 import { assert } from '../util/assert'
 import type { ExternalId } from '../yjsModel'
 import { isUuid } from '../yjsModel'
-import { is_ident_or_operator, self_arg_separator } from './ffi'
+import { binary_operator_info, is_ident_or_operator, self_arg_separator } from './ffi'
 import * as RawAst from './generated/ast'
 import { newExternalId } from './idMap'
 import type { AstId, DeepReadonly, NodeChild, Owned } from './tree'
@@ -123,6 +123,19 @@ export function isIdentifierOrOperatorIdentifier(
   code: string,
 ): code is IdentifierOrOperatorIdentifier {
   return is_ident_or_operator(code) !== 0
+}
+
+/**
+ * A binary operator's precedence (a higher number binds tighter) and associativity, as the parser
+ * defines them; `undefined` when `code` is not exactly one operator with a binary precedence.
+ */
+export function binaryOperatorInfo(
+  code: string,
+): { precedence: number; rightAssociative: boolean } | undefined {
+  const info = binary_operator_info(code)
+  return info === 0 ? undefined : (
+      { precedence: info & 0xff, rightAssociative: (info & 0x100) !== 0 }
+    )
 }
 
 /** Whether the given code is lexically an identifier. */

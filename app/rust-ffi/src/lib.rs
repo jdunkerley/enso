@@ -25,6 +25,12 @@ pub fn is_ident_or_operator(code: &str) -> u32 {
     queries::is_ident_or_operator(code)
 }
 
+/// See [`queries::binary_operator_info`]. Only the GUI needs it, so the JNI binding has no copy.
+#[wasm_bindgen]
+pub fn binary_operator_info(code: &str) -> u32 {
+    queries::binary_operator_info(code)
+}
+
 /// See [`queries::self_arg_separator`]; the logic is shared with the JNI binding.
 #[wasm_bindgen]
 pub fn self_arg_separator(code: &str) -> i32 {

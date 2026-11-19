@@ -10,6 +10,7 @@ function notAvailable(): never {
   throw new Error('Parser FFI is not available in ydoc-inspect')
 }
 
+export const binary_operator_info = notAvailable as never
 export const is_ident_or_operator = notAvailable as never
 export const self_arg_separator = notAvailable as never
 export const is_numeric_literal = notAvailable as never
