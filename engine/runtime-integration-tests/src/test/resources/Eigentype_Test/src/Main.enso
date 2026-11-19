@@ -1,0 +1,4 @@
+import project.Conversions.Source
+import project.Conversions.Target
+
+main = (Target.from Source).tag
