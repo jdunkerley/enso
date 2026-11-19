@@ -29,14 +29,17 @@ export const widgetDefinition = defineWidget(
   <div class="WidgetQueryError widgetParent">
     <TooltipTrigger>
       <template #default="triggerProps">
-        <SvgIcon
+        <!-- A span, not the icon itself: `TooltipTrigger` reacts only to an `HTMLElement`, and the
+             icon is an `<svg>`. -->
+        <span
           v-bind="triggerProps"
           class="marker"
-          name="warning"
           role="img"
           :aria-label="title"
           data-testid="widget-query-error"
-        />
+        >
+          <SvgIcon name="warning" />
+        </span>
       </template>
       <template #tooltip>{{ title }}</template>
     </TooltipTrigger>
@@ -49,6 +52,8 @@ export const widgetDefinition = defineWidget(
   gap: var(--widget-token-pad-unit);
 }
 .marker {
+  display: flex;
+  align-items: center;
   color: var(--color-warning);
   flex-shrink: 0;
 }

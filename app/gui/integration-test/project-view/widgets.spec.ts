@@ -393,6 +393,8 @@ test.describe('Dynamic configuration updates', () => {
     const marker = formatArg.getByTestId('widget-query-error')
     await expect(marker).toBeVisible()
     await expect(marker).toHaveAttribute('aria-label', 'No widget: No formats today')
+    await marker.hover()
+    await expect(page.locator('.Tooltip').getByText('No widget: No formats today')).toBeVisible()
     // Still editable: the format's static tags give the fallback dropdown.
     const dropdown = new DropDownLocator(formatArg)
     await formatArg.click()
