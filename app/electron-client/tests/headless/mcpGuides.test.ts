@@ -85,8 +85,11 @@ describe('Guides', () => {
     expect(overview).toContain('add_nodes')
     expect(overview).not.toContain('None of these tools edits')
     expect(guides.instructions).not.toContain('none of these tools edits')
-    expect(guides.instructions.split(/\s+/).length).toBeLessThan(120)
+    expect(guides.instructions.split(/\s+/).length).toBeLessThan(140)
     expect(guides.instructions).toContain('get_guide')
+    expect(guides.instructions).toContain('Data.read_many')
+    expect(overview).toContain('## Write whole-table operations')
+    expect(overview).toContain('## Read several files at once')
   })
 
   test('guideUri names the topic', () => {

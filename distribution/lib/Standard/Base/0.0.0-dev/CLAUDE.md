@@ -100,6 +100,11 @@ result = "not a number".parse_integer.catch _-> 0
   Use the regular API.
 - Direct `polyglot java import` of internal classes — only the stdlib should
   reach across the polyglot boundary.
+- `files.map Data.read` followed by a `union` — use
+  `Data.read_many (Data.list "<dir>" name_filter="*.csv")` (or a Vector, Column
+  or Table of paths). It unions the files into one table with a `Path` column
+  and turns a failing file into a warning; `return=..With_New_Column` keeps one
+  row per file instead.
 
 ## Doc comments
 
