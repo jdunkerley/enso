@@ -38,7 +38,6 @@ import project.Text.Pretty
 import project.Text.Regex_Bench
 import project.Text.Reverse
 import project.Time.Work_Days
-import project.Widgets.Widget_Query_Bench
 import project.Time.Format
 import project.Vector.Array_Proxy_Bench
 import project.Vector.Build as Vector_Build
@@ -48,6 +47,7 @@ import project.Vector.Operations
 import project.Vector.Sort
 import project.Vector.Zip_Benchmark
 import project.Warnings
+import project.Widgets.Widget_Query_Bench
 
 all_benchmarks -> Vector Bench =
     Vector.build builder->
