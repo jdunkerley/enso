@@ -237,6 +237,14 @@ Run from `app/gui`:
 `CI=true corepack pnpm exec vitest run src/project-view/stores/visualization`
 (without `CI=true`, missing snapshots are written silently).
 
+## Expressions a visualization evaluates
+
+An expression a visualization evaluates in frame (`executeExpression`) must
+reach its library through `moduleCall` (`@/util/moduleCall`), which is
+`Standard.Base.Meta.call_module_method`, never by a fully qualified name: the
+user's module need not import the library, and a name it does not import does
+not compile. This applies to library-shipped visualizations too.
+
 ## On the Enso side
 
 `Standard.Visualization.Id` names the visualization a type opens with:

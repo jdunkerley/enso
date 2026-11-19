@@ -54,9 +54,9 @@ reads is in it (`tests/headless/samples.test.ts`). The data is synthetic.
 `tests/headless/samples.test.ts` checks every point it can.
 
 - **Imports**: `from Standard.Base import all`, `from Standard.Table import all`
-  and `import Standard.Visualization`, plus what the sample needs (for example
-  `Standard.Database`, `Standard.SQLite`). Without `Standard.Visualization`, the
-  Language Server cannot run the nodes' visualizations and widget queries.
+  and what the sample needs (for example `Standard.Database`,
+  `Standard.SQLite`); **not** `Standard.Visualization`, which the IDE reaches by
+  method pointer and so no module needs to import.
 - **A docblock on `main`**: a `## Title` line, then indented paragraphs saying
   what the sample shows, which nodes to select (as "Select `node`") and with
   which visualization, and where the data comes from (`Samples/Data`, and that
@@ -81,6 +81,15 @@ reads is in it (`tests/headless/samples.test.ts`). The data is synthetic.
   does.
 - **Lines of at most 100 characters** (the METADATA trailer aside). Split a long
   expression into two named nodes rather than wrap it.
+
+## Removing a line without losing the layout
+
+Samples have no metadata `snapshot`, so removing or inserting a line need not
+discard the trailer: shift the id map's spans instead. Delete the line, drop the
+entries inside it, move every span that starts after it by the line's length
+(characters, so its line break counts), and keep the rest. Do this for removing
+an import, as when the Visualization import went. Then check the layout came
+back, as in step 5 below.
 
 ## Regenerating METADATA after an edit
 

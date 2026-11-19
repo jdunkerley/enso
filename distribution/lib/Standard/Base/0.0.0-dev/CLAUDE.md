@@ -76,12 +76,20 @@ result = "not a number".parse_integer.catch _-> 0
   `Widget_Query.<type>.<method>`, the IDE's Performance timings). An error
   subject (a dataflow error as `value`, not `subject_is_type`) is the user's own
   error: every argument answers `{"widget":null}`, nothing is logged and no
-  annotation runs. The GUI calls `resolve_call` for every widget query.
+  annotation runs. The GUI calls `resolve_call` for every widget query, by
+  method pointer (`Standard.Base.Metadata.Widget_Query.resolve_call`, literal
+  arguments, so nothing is compiled in the user's module); the one in-frame
+  query, the dropped file's `format` options, goes through
+  `Meta.call_module_method`, with the `Data` module as the value.
 - `Meta.get_method_annotation`, `Meta.find_type_or_module` and
   `Meta.call_module_method` are for the IDE only (`private: true`); do not use
   them in library code.
 - `Meta.call_module_method` is how an expression evaluated in a user's module
-  reaches a library's entry point without importing the library.
+  reaches a library's entry point without importing the library. It applies the
+  method to the value and all its arguments in one call
+  (`CallModuleMethodNode`), and `value` is `@AcceptsError`: an error value goes
+  to the method, which decides what it means (`resolve_call` answers no
+  widgets).
 - `Meta.Type.find` prefers a module to a type of the same name:
   `Standard.Table.Table.Table` finds the module. `Meta.find_type_or_module` asks
   for the type first and falls back to the module.
