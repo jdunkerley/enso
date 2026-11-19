@@ -83,6 +83,7 @@ interface PlaceholderOverrides {
   readonly secretCreated: [path: string]
   readonly librariesNotLoaded: [libraries: string]
   readonly libraryNotInEdition: [library: string]
+  readonly widgetQueryError: [message: string]
   readonly libraryDownloadFailed: [library: string, version: string, reason: string]
   readonly libraryLocalMissing: [library: string]
   readonly libraryLoadingError: [library: string, version: string, reason: string]
