@@ -1,5 +1,6 @@
 import { Ast } from '@/util/ast'
 import { Pattern } from '@/util/ast/match'
+import { moduleCall } from '@/util/moduleCall'
 import type { SortModelItem } from 'ag-grid-community'
 import {
   actionMap,
@@ -203,13 +204,6 @@ export const createDistinctExpressionTemplate = (
   valueList: string[] | 'Nothing',
 ) => {
   const tempModule = Ast.MutableModule.Transient()
-  const preprocessorModule = Ast.parseExpression(visulizationModule, tempModule)!
-  const preprocessorQn = Ast.PropertyAccess.new(
-    tempModule,
-    preprocessorModule,
-    Ast.identifier(expressionString)!,
-  )
-
   const parseFilterArgs = (actions: string[] | 'Nothing') => {
     if (actions === 'Nothing') {
       return parseArgument('Nothing', tempModule)
@@ -227,12 +221,12 @@ export const createDistinctExpressionTemplate = (
     parseFilterArgs(filterActions),
   ]
 
-  const preprocessorInvocation = Ast.App.PositionalSequence(preprocessorQn, [
-    Ast.Wildcard.new(tempModule),
-    ...positionalArgumentsExpressions.map((arg) => {
-      return Ast.Group.new(tempModule, arg)
-    }),
-  ])
+  const preprocessorInvocation = moduleCall(
+    tempModule,
+    visulizationModule,
+    expressionString,
+    positionalArgumentsExpressions,
+  )
   return (nodeId: string) => {
     const rhs = Ast.parseExpression(nodeId, tempModule)!
     return Ast.OprApp.new(tempModule, preprocessorInvocation, '<|', rhs)
@@ -250,13 +244,6 @@ export const createExpressionRowTemplate = (
   valueList: string[] | 'Nothing',
 ) => {
   const tempModule = Ast.MutableModule.Transient()
-  const preprocessorModule = Ast.parseExpression(visulizationModule, tempModule)!
-  const preprocessorQn = Ast.PropertyAccess.new(
-    tempModule,
-    preprocessorModule,
-    Ast.identifier(expressionString)!,
-  )
-
   const parseFilterArgs = (actions: string[] | 'Nothing') => {
     if (actions === 'Nothing') {
       return parseArgument('Nothing', tempModule)
@@ -278,12 +265,12 @@ export const createExpressionRowTemplate = (
     parsedfilterConditions,
   ]
 
-  const preprocessorInvocation = Ast.App.PositionalSequence(preprocessorQn, [
-    Ast.Wildcard.new(tempModule),
-    ...positionalArgumentsExpressions.map((arg) => {
-      return Ast.Group.new(tempModule, arg)
-    }),
-  ])
+  const preprocessorInvocation = moduleCall(
+    tempModule,
+    visulizationModule,
+    expressionString,
+    positionalArgumentsExpressions,
+  )
   return (nodeId: string) => {
     const rhs = Ast.parseExpression(nodeId, tempModule)!
     return Ast.OprApp.new(tempModule, preprocessorInvocation, '<|', rhs)
