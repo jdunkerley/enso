@@ -159,6 +159,12 @@ add_specs suite_builder =
             json = Widget_Query.resolve_call subject spec_module sample_type "of_self" ["arg"]
             json.should_equal '{"arguments":[["arg",{"widget":null}]]}'
 
+    suite_builder.group "Widget_Query.resolve_call on the standard library's annotations" group_builder->
+        group_builder.specify "Data.fetch_many and Data.fetch_pages give a Numeric_Input for time_between_requests" <|
+            ["fetch_many", "fetch_pages"].each method->
+                json = Widget_Query.resolve_call Nothing "Standard.Base.Data" "Standard.Base.Data" method ["time_between_requests"] subject_is_type=True
+                json.should_equal (answer "time_between_requests" Widget.Numeric_Input)
+
     suite_builder.group "Widget_Query failures are logged once, with their causes and stack" group_builder->
         sample = Sample.Value "a label"
         method name = Widget_Method.Value spec_module sample_type name
