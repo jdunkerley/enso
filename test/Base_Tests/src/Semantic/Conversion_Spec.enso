@@ -111,8 +111,8 @@ Blob.from (that:Any) = Blob.Json that
 type Type_Default
     Value tag
 
-Type_Default.from (that : Foo.type) (suffix : Text = "") = Type_Default.Value "Foo.type"+suffix
-Type_Default.from (that : Integer.type) = Type_Default.Value "Integer.type"
+Type_Default.from (that : Foo.type) (suffix : Text = "") = Type_Default.Value that.to_text+".type"+suffix
+Type_Default.from (that : Integer.type) = Type_Default.Value that.to_text+".type"
 
 add_specs suite_builder =
     pending_js_missing = if Polyglot.is_language_installed "js" then Nothing else
