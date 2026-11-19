@@ -1,8 +1,8 @@
 /// <reference types="wicg-file-system-access" />
 
 import {
-  GET_WIDGETS_METHOD,
-  WIDGETS_ENSO_MODULE,
+  RESOLVE_CALL,
+  WIDGET_QUERY_MODULE,
 } from '@/components/GraphEditor/widgets/WidgetFunction/consts'
 import * as Ast from '@/util/ast/abstract'
 import type { QualifiedName } from '@/util/qualifiedName'
@@ -354,9 +354,6 @@ const mockVizPreprocessors: Record<string, Uint8Array | ((params: string[]) => U
         },
       ],
     }),
-    'Standard.Visualization.Widgets.get_widget_json': (params) =>
-      mockWidgetConfiguration(params[0]),
-
     // The following visualizations do not have unique transformation methods, and as such are only kept
     // for posterity.
     Image: encodeJSON({
@@ -370,7 +367,10 @@ IDAgMCAxIDkuNzcgMjAuMzZzMS41NSAyLjA4IDQuNTcgMi4wOGMzLjAxIDAgNC4zNi0xLjE0IDUuNi0y
 uMDktMyA1LjItMyAuNzMgMCAxLjQ2LjIgMS45OC40WiIvPjwvZz48ZGVmcz48Y2xpcFBhdGggaWQ9ImEiPjxwYXRoIGZpbGw9Ii\
 NmZmYiIGQ9Ik0wIDBoNDB2NDBIMHoiLz48L2NsaXBQYXRoPjwvZGVmcz48L3N2Zz4=`,
     }),
-    'Standard.Visualization.Widgets.column_names_json': encodeJSON(['Column A', 'Column B']),
+    'Standard.Visualization.Table.Visualization.column_names_json': encodeJSON([
+      'Column A',
+      'Column B',
+    ]),
   }
 
 const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
@@ -575,11 +575,7 @@ export function clearPreprocessorOverrides() {
     else mockWidgetConfigurations.delete(key)
   }
   preprocessorOverrides.clear()
-}
-
-function mockWidgetConfiguration(method: string | undefined) {
-  if (!method) return null
-  return mockWidgetConfigurations.get(method) ?? null
+  lastWidgetQueries.clear()
 }
 
 /** The execution contexts created on the open pages, each with the channel that notifies it. */
@@ -758,59 +754,111 @@ export const mockLSHandler = async (
 const preprocessorOverrides = new Map<string, Uint8Array>()
 
 /**
- * Extract the preprocessor identifier from a slot's immutable request, matching
- * the scheme the pre-refactor mock used for the binary `VisualizationUpdate`
- * path. The client serializes preprocessor module + expression + positional
- * args into the slot's `request` field; we recover the same composite key so
- * the mock can route responses by preprocessor name.
+ * `MODULE_CALL` of `@/util/moduleCall`, which this file cannot import: it pulls `@/util/ast` into
+ * `tsconfig.node.json`'s closed file set.
+ */
+const MODULE_CALL = 'Standard.Base.Meta.call_module_method'
+
+/** The text of an Enso text literal's code, or `undefined`. */
+function textOf(code: string | undefined): string | undefined {
+  const ast = code != null ? Ast.parseExpression(code) : undefined
+  return ast instanceof Ast.TextLiteral ? ast.rawTextContent : undefined
+}
+
+/** `call_module_method '<module>' '<method>' [args…] <value>`: its parts, with the value first. */
+function moduleCallParts(
+  inFrame: string,
+): { module: string; method: string; args: string[] } | undefined {
+  const exprAst = Ast.parseExpression(inFrame)
+  if (!exprAst) return undefined
+  const { func, args } = Ast.analyzeAppLike(exprAst)
+  if (func.code() !== MODULE_CALL) return undefined
+  const module = textOf(args[0]?.code())
+  const method = textOf(args[1]?.code())
+  const vector = args[2]
+  if (module == null || method == null || !(vector instanceof Ast.Vector)) return undefined
+  const value = args[3]?.code() ?? '_'
+  return { module, method, args: [value, ...[...vector.values()].map((v) => v.code())] }
+}
+
+const lastWidgetQueries = new Map<string, string[]>()
+/** Test entry point: the arguments of the last widget query for `.name` (after the subject). */
+export function lastWidgetQueryArguments(method: string): string[] | undefined {
+  return lastWidgetQueries.get(method)
+}
+
+/** The widget query's key, `.name`, from `resolve_call`'s arguments after the subject. */
+function widgetQueryKey(args: readonly string[]): string | null {
+  const name = textOf(args[2])
+  if (name == null) return null
+  lastWidgetQueries.set(`.${name}`, [...args])
+  return `.${name}`
+}
+
+/**
+ * Extract the preprocessor identifier from a slot's immutable request, so the mock can route
+ * responses by preprocessor name: `Module.method` for a visualization (a method pointer, or an
+ * in-frame `call_module_method`), and the called method's `.name` for a widget query
+ * (`Widget_Query.resolve_call`, in either form).
  */
 function slotPreprocessorKey(request: VisRequestPreprocessor): string | null {
   const expression = request.expression
-  if (typeof expression === 'string') {
-    if (/^[a-z_]+ *->.*get_widget_json/.test(expression)) {
-      return request.positionalArgumentsExpressions?.at(0) ?? null
-    }
-    return `${request.visualizationModule}.${expression}`
-  }
+  if (typeof expression === 'string') return `${request.visualizationModule}.${expression}`
   if ('inFrame' in expression) {
+    const call = moduleCallParts(expression.inFrame)
+    if (call) {
+      // A widget query evaluated directly (the format of a dropped file, #489).
+      if (call.module === WIDGET_QUERY_MODULE && call.method === RESOLVE_CALL)
+        return widgetQueryKey(call.args.slice(1))
+      return `${call.module}.${call.method}`
+    }
     const exprAst = Ast.parseExpression(expression.inFrame)
     if (!exprAst) return null
     const { func } = Ast.analyzeAppLike(exprAst)
     if (!(func instanceof Ast.PropertyAccess && func.lhs)) return null
-    const key = `${func.lhs.code()}.${func.rhs.code()}`
-    // A widget query evaluated directly (the format of a dropped file, #489): `get_widget_json
-    // <type> <call name> …`, routed like the visualization form, by its call name (`.read`).
-    if (key === `${WIDGETS_ENSO_MODULE}.${GET_WIDGETS_METHOD}`) {
-      return Ast.analyzeAppLike(exprAst).args.at(1)?.code() ?? null
-    }
-    return key
+    return `${func.lhs.code()}.${func.rhs.code()}`
   }
-  if (expression.module === WIDGETS_ENSO_MODULE && expression.name === GET_WIDGETS_METHOD) {
-    return request.positionalArgumentsExpressions?.at(0) ?? null
-  }
+  if (expression.module === WIDGET_QUERY_MODULE && expression.name === RESOLVE_CALL)
+    return widgetQueryKey(request.positionalArgumentsExpressions ?? [])
   return `${expression.definedOnType}.${expression.name}`
 }
 
+/** The preprocessor's arguments: for an in-frame call, the value first, then the rest. */
 function slotPositionalArgs(request: VisRequestPreprocessor): string[] {
   if (typeof request.expression === 'object' && 'inFrame' in request.expression) {
+    const call = moduleCallParts(request.expression.inFrame)
+    if (call) return call.args
     const exprAst = Ast.parseExpression(request.expression.inFrame)
     if (!exprAst) return []
-    const { args } = Ast.analyzeAppLike(exprAst)
-    return args.map((ast) => ast.code())
+    return Ast.analyzeAppLike(exprAst).args.map((ast) => ast.code())
   }
   return request.positionalArgumentsExpressions ?? []
+}
+
+/** Whether a request is a widget query (either form). */
+function isWidgetQuery(request: VisRequestPreprocessor): boolean {
+  const expression = request.expression
+  if (typeof expression === 'object' && 'inFrame' in expression)
+    return expression.inFrame.includes(`'${RESOLVE_CALL}'`)
+  return typeof expression === 'object' && expression.name === RESOLVE_CALL
+}
+
+/** An old-shape widget configuration (`[[name, widget]]`) as the new answer; anything else as is. */
+function asWidgetAnswer(bytes: Uint8Array): Uint8Array {
+  const json = JSON.parse(new TextDecoder().decode(bytes))
+  if (!Array.isArray(json)) return bytes
+  return encodeJSON({ arguments: json.map(([name, widget]) => [name, { widget }]) })
 }
 
 /**
  * Look up mock response bytes for a given preprocessor key. The preprocessor
  * space is unified across both visualization queries
- * (`Module.expression`-keyed) and widget queries (keyed by the first
- * positional arg, e.g. `.read`), so tests can push responses for either via a
+ * (`Module.expression`-keyed) and widget queries (keyed by the called
+ * method's name, e.g. `.read`), so tests can push responses for either via a
  * single {@link updateVisualizationData} call. Lookup order:
  *
  * 1. Test overrides set through {@link updateVisualizationData}.
- * 2. The widget configuration map - widget queries route here because the
- *    pre-refactor binary path called `mockWidgetConfiguration(positionalArgs[0])`.
+ * 2. The widget configuration map, for widget queries.
  * 3. Built-in visualization mocks in {@link mockVizPreprocessors}.
  */
 function responseBytesFor(
@@ -883,15 +931,15 @@ function maybeRespondToSlot(slot: YMap<unknown>): void {
   // the engine would run it in: a method's body. In the definition itself nothing ever
   // runs, so the real engine never answers there.
   if (
+    isWidgetQuery(request) &&
     typeof request.expression === 'object' &&
     'inFrame' in request.expression &&
-    request.expression.inFrame.includes(GET_WIDGETS_METHOD) &&
     !isMethodBodyId(slot.get(VIS_SLOT_FIELDS.nodeExternalId) as string | undefined)
   ) {
     return
   }
   const bytes = responseBytesFor(key, slotPositionalArgs(request))
-  if (bytes) writeSlotResponse(slot, bytes)
+  if (bytes) writeSlotResponse(slot, isWidgetQuery(request) ? asWidgetAnswer(bytes) : bytes)
 }
 
 /**
@@ -908,7 +956,8 @@ export function updateVisualizationData(preprocessor: string, data: unknown): vo
     for (const [, slot] of slots.entries()) {
       const request = slot.get(VIS_SLOT_FIELDS.request) as VisRequestPreprocessor | undefined
       if (!request) continue
-      if (slotPreprocessorKey(request) === preprocessor) writeSlotResponse(slot, bytes)
+      if (slotPreprocessorKey(request) === preprocessor)
+        writeSlotResponse(slot, isWidgetQuery(request) ? asWidgetAnswer(bytes) : bytes)
     }
   }
 }
