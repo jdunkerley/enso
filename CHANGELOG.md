@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [Widgets show why they could not load, instead of disappearing: a warning
+  marker on the argument gives the reason, the argument stays editable, and the
+  Logs panel has the details. New projects no longer import
+  `Standard.Visualization`.][891]
 - [Selecting a node no longer expands it to show every hidden argument: a
   round ＋ after a call's arguments, shown while the node is selected, adds any
   of that call's other arguments, and a call inside another call's argument is
@@ -569,6 +573,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[891]: https://github.com/jdunkerley/enso/pull/891
 [846]: https://github.com/jdunkerley/enso/pull/846
 [822]: https://github.com/jdunkerley/enso/pull/822
 [840]: https://github.com/jdunkerley/enso/pull/840
