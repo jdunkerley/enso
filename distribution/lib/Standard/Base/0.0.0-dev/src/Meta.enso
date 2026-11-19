@@ -485,6 +485,10 @@ find_type_or_module (qualified_name : Text) -> Any =
    import does not compile, but `Standard.Base.Meta.call_module_method`
    always does. The library must be loaded.
 
+   It applies the method's function directly, so it bypasses the check that
+   keeps a project-private method out of other projects. It is an escape hatch
+   for the IDE only; library code must not use it.
+
    ## Arguments
     - `module_name`: The qualified name of the module.
     - `method_name`: The name of a method the module defines.
