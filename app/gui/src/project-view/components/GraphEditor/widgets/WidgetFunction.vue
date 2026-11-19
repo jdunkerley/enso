@@ -135,7 +135,11 @@ const showParameterMenu = computed(() => hidden.value.length > 0 && !!tree?.show
  * its own last argument, clearly belongs to it; the outermost call's ＋ ends the node.
  */
 const nested = computed(
-  () => parentCall != null && application.value instanceof ArgumentApplication,
+  () =>
+    parentCall != null &&
+    application.value instanceof ArgumentApplication &&
+    // An operator level is part of a chain (flat, or a capsule), unless it has a ＋ to own.
+    (!(application.value.appTree instanceof Ast.OprApp) || hidden.value.length > 0),
 )
 
 /** Insert a hidden parameter with its default value's code. It is always written as a named argument. */
@@ -415,7 +419,8 @@ export const widgetDefinition = defineWidget(
 <style scoped>
 .nestedCall {
   gap: var(--widget-token-pad-unit);
-  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  /* An outline that takes no space, so a nested call is as high as a port at any depth. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 30%, transparent);
   border-radius: var(--node-port-border-radius);
 }
 </style>

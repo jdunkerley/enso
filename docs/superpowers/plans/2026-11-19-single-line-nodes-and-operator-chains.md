@@ -31,8 +31,8 @@ Playwright.
   `border-radius: var(--node-port-border-radius)`,
   `background: rgb(0 0 0 / 0.2)`, `gap: 4px`.
 - Operators are drawn as written in the code; no glyph substitution.
-- One rule: same precedence (and same spacing, same associativity side, not
-  parenthesised) flattens; anything else under an operator is a capsule.
+- One rule: same precedence (and same associativity side, not parenthesised)
+  flattens; anything else under an operator is a capsule.
 - CHANGELOG entry under `#### Enso IDE`; PR waits for the owner's installer
   test.
 

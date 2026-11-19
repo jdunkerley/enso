@@ -69,16 +69,9 @@ function hasKnownArgumentName(input: WidgetInput): input is WidgetInput & {
 }
 
 /**
- * An infix operand's parameter names that say nothing the operator does not: the left operand is
- * always `self`, a binary operator's right one is usually `that`, and an operator without
- * suggestion info names them `lhs` and `rhs`.
- */
-const UNINFORMATIVE_OPERAND_NAMES = new Set(['self', 'that', 'lhs', 'rhs'])
-
-/**
  * Whether an argument shows its parameter's name: every prefix argument, set or not, positional or
- * named, at any depth, and an infix operand whose parameter has a name of its own (the `amount` of
- * `Date.+`).
+ * named, at any depth. No operand of an infix operator does: an operator chain reads as code
+ * (`docs/superpowers/specs/2026-11-19-single-line-nodes-and-operator-chains-design.md`).
  */
 function showsArgumentName(
   input: WidgetInput & {
@@ -86,8 +79,7 @@ function showsArgumentName(
   },
 ): boolean {
   if (WidgetInput.isPlaceholder(input)) return true
-  const { appKind, info } = input[ArgumentInfoKey]
-  return appKind === ApplicationKind.Prefix || !UNINFORMATIVE_OPERAND_NAMES.has(info.name)
+  return input[ArgumentInfoKey].appKind === ApplicationKind.Prefix
 }
 
 export const widgetDefinition = defineWidget(

@@ -6,6 +6,7 @@
 import { createXXHash128 } from 'hash-wasm'
 import type { IDataType } from 'hash-wasm/dist/lib/util'
 import {
+  binary_operator_info,
   is_ident_or_operator,
   is_numeric_literal,
   parse_block,
@@ -22,4 +23,11 @@ export function xxHash128(input: IDataType) {
 }
 
 /* eslint-disable camelcase */
-export { is_ident_or_operator, is_numeric_literal, parse_block, parse_module, self_arg_separator }
+export {
+  binary_operator_info,
+  is_ident_or_operator,
+  is_numeric_literal,
+  parse_block,
+  parse_module,
+  self_arg_separator,
+}

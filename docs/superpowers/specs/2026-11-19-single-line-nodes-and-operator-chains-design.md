@@ -47,9 +47,8 @@ are each one flat row.
   operand of an operator, informative or not (this drops #850's rule for infix
   operands, such as `amount` on `Date.+`; prefix arguments keep their chips).
 - **Each operand keeps its port**, so it still takes an edge, opens its widget
-  and pops out. What is lost: the intermediate sub-expression (`a + b` inside
-  `a + b + c`) is no longer a port of its own. It never was a meaningful drop
-  target, and with no visible box there is nothing to aim at.
+  and pops out. Ports are unchanged: the intermediate sub-expression (`a + b`
+  inside `a + b + c`) stays a port, with no visible box until an edge connects.
 
 ### A change of precedence is a capsule
 
@@ -68,8 +67,8 @@ port, padded 3px left and right, with no border.
   precedence (`(a + b) + c` capsules `a + b`), since the author grouped it.
   Today's `WidgetGroup` already handles `Group`; it gets the capsule style when
   its content is an operator chain.
-- Enso's precedence is also space-sensitive (`a+b * c` is `(a+b) * c`): a tight
-  sub-chain under a spaced one is a capsule even when the operators match.
+- Spacing does not change how two operators bind (`a+b * c` is `a + (b * c)`),
+  so it plays no part in the roles.
 
 ### Prefix calls keep their group
 
@@ -93,10 +92,11 @@ colours and icon are unchanged.
 The Rust parser is the source of truth for operator precedence
 (`analyze_non_syntactic_operator` / `analyze_user_operator` in
 `lib/rust/parser/src/lexer.rs`). Duplicating that table in TypeScript would
-drift. Add `queries::binary_operator_precedence(token: &str) -> u32` (0 for a
-token that is not a binary value operator) next to `is_ident_or_operator`, and
-export it from `app/rust-ffi` the same way. A Rust unit test covers each class
-of the table; the GUI imports it like the existing queries.
+drift. Add `queries::binary_operator_info(token: &str) -> u32` (precedence and
+associativity; 0 for a token that is not a binary value operator) next to
+`is_ident_or_operator`, and export it from `app/rust-ffi` the same way. A Rust
+unit test covers each class of the table; the GUI imports it like the existing
+queries.
 
 ### Flattening is a role, not a new widget tree
 
@@ -113,9 +113,8 @@ function chainRole(app: Ast.OprApp, parent: Ast.Ast | undefined): ChainRole;
 
 - `continue`: the parent is an `OprApp`, this is its operand on the side it
   associates (left for left-associative operators), not parenthesised, with the
-  same precedence and the same spacing. The level's wrapper takes no box
-  (`display: contents`), no outline and no padding, so its operands and operator
-  sit in the parent's row.
+  same precedence. The level's wrapper takes no box (`display: contents`), no
+  outline and no padding, so its operands and operator sit in the parent's row.
 - `capsule`: the parent is an `OprApp` (or a `Group` whose parent is one) and
   the role is not `continue`. The level's wrapper gets `.operatorCapsule`.
 - `root`: anything else (the node's own expression, a prefix argument). Drawn
@@ -146,9 +145,9 @@ roles, and the dropped infix name chips.
 - **Unit (`util/__tests__/operatorChain.test.ts`):** `chainRole` for a
   same-operator chain, mixed `+`/`-` (continue), `*` under `+` (capsule), `&&`
   over comparisons, a parenthesised same-precedence group (capsule), a
-  right-associative operator (`<|`, `->`-style user operators), and spacing
-  (`a+b * c`).
-- **Rust:** `binary_operator_precedence` for each precedence class and for
+  right-associative operator (`<|`, `->`-style user operators), and tight
+  operators (`a+b * c`).
+- **Rust:** `binary_operator_info` for each precedence class and for
   non-operators.
 - **Integration (`widgets.spec.ts`):** nodes for the URL chain,
   `price * qty + tax * (rate - 1)`, and a three-deep nested prefix call. Each

@@ -31,6 +31,29 @@ pub fn is_ident_or_operator(code: &str) -> u32 {
     }
 }
 
+/// The binary infix precedence and associativity of a single operator token.
+///
+/// Returns:
+/// * 0 - if the input is not exactly one (non-syntactic) operator with a binary infix precedence.
+/// * otherwise - bits 0-7 hold [`token::Precedence::into_u8`], and bit 8 is set for a
+///   right-associative operator.
+///
+/// The GUI uses it to draw operator chains (`app/gui/src/project-view/util/operatorChain.ts`).
+pub fn binary_operator_info(code: &str) -> u32 {
+    let parsed = crate::lexer::run(code);
+    if parsed.internal_error.is_some() {
+        return 0;
+    }
+    let [token] = &parsed.value[..] else { return 0 };
+    if !matches!(token.variant, token::Variant::Operator(_)) {
+        return 0;
+    }
+    let Some(properties) = token.operator_properties() else { return 0 };
+    let Some(precedence) = properties.binary_infix_precedence() else { return 0 };
+    let right = properties.associativity() == token::Associativity::Right;
+    precedence.into_u8() as u32 | (right as u32) << 8
+}
+
 /// What should separate this expression from self argument applied to it.
 ///
 /// See `selfArgSeparator` docs in `app/ydoc-shared/src/ast/token.ts`.
@@ -106,5 +129,32 @@ mod tests {
         assert_eq!(self_arg_separator("- 2"), 1);
         assert_eq!(self_arg_separator("-2"), 0);
         assert_eq!(self_arg_separator("[]"), -1);
+    }
+
+    fn operator_info(code: &str) -> Option<(u8, bool)> {
+        match binary_operator_info(code) {
+            0 => None,
+            v => Some(((v & 0xff) as u8, v & 0x100 != 0)),
+        }
+    }
+
+    #[test]
+    fn test_binary_operator_info() {
+        use token::Precedence;
+        assert_eq!(operator_info("+"), Some((Precedence::Addition.into_u8(), false)));
+        assert_eq!(operator_info("-"), Some((Precedence::Addition.into_u8(), false)));
+        assert_eq!(operator_info("*"), Some((Precedence::Multiplication.into_u8(), false)));
+        assert_eq!(operator_info("&&"), Some((Precedence::Logical.into_u8(), false)));
+        assert_eq!(operator_info("=="), Some((Precedence::Equality.into_u8(), false)));
+        assert_eq!(operator_info(">"), Some((Precedence::Inequality.into_u8(), false)));
+        assert_eq!(operator_info("<|"), Some((Precedence::Functional.into_u8(), true)));
+        assert_eq!(operator_info("^"), Some((Precedence::Exponentiation.into_u8(), false)));
+    }
+
+    #[test]
+    fn test_binary_operator_info_rejects_non_operators() {
+        for code in ["", "a", ".", "=", "->", ",", ":", "..", "+ +", "1"] {
+            assert_eq!(binary_operator_info(code), 0, "{code:?}");
+        }
     }
 }
