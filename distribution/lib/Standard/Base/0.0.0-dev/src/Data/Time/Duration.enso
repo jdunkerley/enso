@@ -142,8 +142,6 @@ type Duration
     ## ---
        group: Constants
        icon: time
-       arguments:
-         hours: always
        ---
        Creates a duration of a number of hours.
 
@@ -161,8 +159,6 @@ type Duration
     ## ---
        group: Constants
        icon: time
-       arguments:
-         minutes: always
        ---
        Creates a duration of a number of minutes.
 
@@ -180,8 +176,6 @@ type Duration
     ## ---
        group: Constants
        icon: time
-       arguments:
-         seconds: always
        ---
        Creates a duration of a number of seconds.
 
