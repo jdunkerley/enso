@@ -458,7 +458,7 @@ type Vector a
        ```
              [1, 2, 3, 4, 5].find (> 3)
        ```
-    @condition Filter_Condition.default_widget
+    @condition (Widget.from Filter_Condition)
     find : (Filter_Condition | (Any -> Boolean)) -> Integer -> Any -> Any
     find self (condition : Filter_Condition | (Any -> Boolean)) (start : Integer = 0) ~if_missing=(Error.throw Not_Found) =
         Array_Like_Helpers.find self condition start if_missing
@@ -488,7 +488,7 @@ type Vector a
        ```
            ["ab", "abab", "aba", "bbb"].index_of (s-> s == s.reverse) == 2
        ```
-    @condition Filter_Condition.default_widget
+    @condition (Widget.from Filter_Condition)
     index_of : (Any | Filter_Condition | (Any -> Boolean)) -> Integer -> Integer | Nothing
     index_of self condition (start : Integer = 0) =
         Array_Like_Helpers.index_of self condition start
@@ -518,7 +518,7 @@ type Vector a
        ```
              ["ab", "abab", "aba", "bbb"].last_index_of (s-> s == s.reverse) == 3
        ```
-    @condition Filter_Condition.default_widget
+    @condition (Widget.from Filter_Condition)
     last_index_of : (Any | Filter_Condition | (Any -> Boolean)) -> Integer -> Integer | Nothing
     last_index_of self condition (start : Integer = -1) =
         Array_Like_Helpers.last_index_of self condition start
@@ -545,7 +545,7 @@ type Vector a
        ```
              [1, 2, 3, 4, 5].any (x-> x%2 == 0)
        ```
-    @condition Filter_Condition.default_widget
+    @condition (Widget.from Filter_Condition)
     any : (Filter_Condition | (Any -> Boolean)) -> Boolean
     any self (condition : Filter_Condition | (Any -> Boolean)) =
         Array_Like_Helpers.any self condition
@@ -572,7 +572,7 @@ type Vector a
        ```
              [-1, 1, 5, 8].all (x-> x%2 == 0)
        ```
-    @condition Filter_Condition.default_widget
+    @condition (Widget.from Filter_Condition)
     all : (Filter_Condition | (Any -> Boolean)) -> Boolean
     all self (condition : Filter_Condition | (Any -> Boolean)) =
         Array_Like_Helpers.all self condition
@@ -661,7 +661,7 @@ type Vector a
              [1, 2, 3, 4, 5].filter (> 3)
              [1, 2, 3, 4, 5].filter (..Greater than=3)
        ```
-    @filter Filter_Condition.default_widget
+    @filter (Widget.from Filter_Condition)
     filter : (Filter_Condition | (Any -> Boolean)) -> Vector Any
     filter self (filter : Filter_Condition | (Any -> Boolean)) =
         Array_Like_Helpers.filter self filter
@@ -715,7 +715,7 @@ type Vector a
        ```
              [1, 2, 3, 4, 5].partition (x -> x % 2 == 0) == (Pair [2, 4] [1, 3, 5])
        ```
-    @condition Filter_Condition.default_widget
+    @condition (Widget.from Filter_Condition)
     partition : (Filter_Condition | (Any -> Boolean)) -> Pair (Vector Any) (Vector Any)
     partition self (condition : Filter_Condition | (Any -> Boolean)) =
         Array_Like_Helpers.partition self condition
@@ -1158,7 +1158,7 @@ type Vector a
           `Index_Sub_Range`, then the selection is interpreted following the
           rules of that type. If a `Range`, the selection is specified by two
           indices, from and to.
-    @range (self-> Index_Sub_Range.default_widget self.length)
+    @range (self-> Widget.from Index_Sub_Range count=self.length)
     take : (Index_Sub_Range | Range | Integer) -> Vector Any
     take self range:(Index_Sub_Range | Range | Integer)=..First =
         Array_Like_Helpers.take self range
@@ -1179,7 +1179,7 @@ type Vector a
           `Index_Sub_Range`, then the selection is interpreted following the
           rules of that type. If a `Range`, the selection is specified by two
           indices, from and to.
-    @range (self-> Index_Sub_Range.default_widget self.length)
+    @range (self-> Widget.from Index_Sub_Range count=self.length)
     drop : (Index_Sub_Range | Range | Integer) -> Vector Any
     drop self range:(Index_Sub_Range | Range | Integer)=..First =
         Array_Like_Helpers.drop self range
@@ -1779,7 +1779,7 @@ type Builder
         - `condition`: A `Filter_Condition` or a function that takes a vector
           element and returns a boolean value that says whether that value
           satisfies a condition.
-    @condition Filter_Condition.default_widget
+    @condition (Widget.from Filter_Condition)
     any : (Filter_Condition | (Any -> Boolean)) -> Boolean
     any self (condition : Filter_Condition | (Any -> Boolean)) =
         Array_Like_Helpers.any self condition

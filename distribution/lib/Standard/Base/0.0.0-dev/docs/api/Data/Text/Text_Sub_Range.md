@@ -10,7 +10,6 @@
     - Before delimiter:Standard.Base.Data.Text.Text
     - Before_Last delimiter:Standard.Base.Data.Text.Text
     - default_options -> Standard.Base.Any.Any
-    - default_widget -> Standard.Base.Metadata.Widget
     - to_display_text self -> Standard.Base.Any.Any
 - batch_resolve_indices_or_ranges text:Standard.Base.Any.Any descriptors:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - character_ranges text:Standard.Base.Any.Any -> Standard.Base.Any.Any
@@ -18,3 +17,4 @@
 - normalize_range range:Standard.Base.Any.Any length:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - panic_on_non_positive_step -> Standard.Base.Any.Any
 - resolve_index_or_range text:Standard.Base.Any.Any descriptor:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Text.Text_Sub_Range.Text_Sub_Range.type -> Standard.Base.Metadata.Widget

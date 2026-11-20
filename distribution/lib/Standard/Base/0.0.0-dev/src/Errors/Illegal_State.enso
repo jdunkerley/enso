@@ -8,7 +8,6 @@ polyglot java import java.lang.IllegalStateException
 type Illegal_State
     ## ---
        private: true
-       unstable: true
        ---
        A generic error that indicates that a given operation cannot be performed
        in some specific conditions.

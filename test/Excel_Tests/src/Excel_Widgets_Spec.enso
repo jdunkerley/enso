@@ -1,0 +1,22 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Widget_Query
+
+from Standard.Test import all
+
+add_specs suite_builder =
+    module = "Standard.Excel.Internal.Excel_Section"
+    type_name = module + ".Excel_Section"
+
+    suite_builder.group "Excel_Section widget annotations resolve (#897)" group_builder->
+        group_builder.specify "the `row_limit` of Worksheet and Cell_Range is the Rows_To_Read widget" <|
+            ["Worksheet", "Cell_Range"].each constructor->
+                json = Widget_Query.resolve_call Nothing module type_name constructor ["row_limit"] subject_is_type=True
+                entry = json.parse_json . get "arguments" . first
+                entry.second.get "error" . should_equal Nothing
+                labels = entry.second.get "widget" . get "values" . map o-> o.get "label"
+                labels.should_contain "All_Rows"
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

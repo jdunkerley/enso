@@ -5,6 +5,6 @@
     - Proper
     - Title
     - Upper
-    - default_widget -> Standard.Base.Metadata.Widget
     - to_java self -> Standard.Base.Data.Text.Case.Java_Case
     - to_text self -> Standard.Base.Data.Text.Text
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Text.Case.Case.type -> Standard.Base.Metadata.Widget

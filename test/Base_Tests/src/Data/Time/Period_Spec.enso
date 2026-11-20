@@ -1,5 +1,8 @@
 from Standard.Base import all
 import Standard.Base.Errors.Common.Incomparable_Values
+import Standard.Base.Errors.Common.Type_Error
+import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+import Standard.Base.Errors.Time_Error.Time_Error
 import Standard.Base.Runtime.Debug
 
 from Standard.Test import all
@@ -41,6 +44,43 @@ add_specs suite_builder =
             ((Period.new days=(-5)) == (Period.new days=(-5))) . should_be_true
             ((Period.new years=1 days=10) == (Period.new years=1 days=10)) . should_be_true
             ((Period.new days=1) != (Period.new months=1)) . should_be_true
+
+        group_builder.specify "an equal Period is the only one it can be ordered against" <|
+            ((Period.new months=1) > (Period.new months=1)) . should_be_false
+            ((Period.new months=1) >= (Period.new months=1)) . should_be_true
+            ((Period.new months=1) < (Period.new months=1)) . should_be_false
+            ((Period.new months=1) <= (Period.new months=1)) . should_be_true
+            ((Period.new days=1) <= (Period.new months=1)) . should_fail_with Incomparable_Values
+            ((Period.new days=1) >= (Duration.new hours=1)) . should_fail_with Incomparable_Values
+
+        group_builder.specify "should multiply a Period by an Integer, and negate it" <|
+            ((Period.new years=1 months=2 days=3) * 2) . should_equal (Period.new years=2 months=4 days=6)
+            ((Period.new years=1 months=2 days=3) * (-1)) . should_equal (Period.new years=(-1) months=(-2) days=(-3))
+            (Period.new years=1 months=2 days=3) . negate . should_equal (Period.new years=(-1) months=(-2) days=(-3))
+            ((Period.new years=1000000000) * 100) . should_fail_with Time_Error
+
+        group_builder.specify "should keep months and years apart, and give total_months" <|
+            period = Period.new years=2 months=14 days=3
+            period.years . should_equal 2
+            period.months . should_equal 14
+            period.total_months . should_equal 38
+            period.days . should_equal 3
+            Meta.type_of period.years . should_equal_type Integer
+            Meta.type_of period.negate . should_equal_type Period
+
+        group_builder.specify "should not add or subtract anything but a Period" <|
+            ((Period.new months=1) + (Duration.new hours=1)) . should_fail_with Time_Error
+            ((Period.new months=1) - (Duration.new hours=1)) . should_fail_with Time_Error
+            ((Period.new months=1) + 5) . should_fail_with Illegal_Argument
+            ((Period.new months=1) - "a") . should_fail_with Illegal_Argument
+
+        group_builder.specify "Period methods reject arguments of the wrong type" <|
+            Test.expect_panic_with (Period.new "a") Type_Error
+            Test.expect_panic_with (Period.new months=1.5) Type_Error
+            Test.expect_panic_with (Period.between 5 (Date.new 2020 1 1)) Type_Error
+            Test.expect_panic_with (Period.between (Date.new 2020 1 1) "a") Type_Error
+            Test.expect_panic_with ((Period.new months=1) * 1.5) Type_Error
+            Test.expect_panic_with ((Period.new months=1) * "a") Type_Error
 
         group_builder.specify "should render a friendly to display text" <|
             Period.new . to_display_text . should_equal "0D"

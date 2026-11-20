@@ -1,5 +1,7 @@
 from Standard.Base import all
 
+import Standard.Base.Metadata.Widget
+
 import project.Column.Column
 import project.Internal.Column_Naming_Helper.Column_Naming_Helper
 
@@ -13,7 +15,7 @@ type Date_Time_Column
        ---
        Change the time zone of eadh date-time in the column to the specified
        time zone. This preserves the instant that the time represents.
-    @time_zone Time_Zone.default_widget
+    @time_zone (Widget.from Time_Zone)
     at_time_zone self (time_zone:Time_Zone|Text) -> Column & Date_Time_Column =
         self.operations_implementation.at_time_zone self.column time_zone
 
@@ -24,7 +26,7 @@ type Date_Time_Column
        Constructs a new time instant by changing the time zone but not altering
        the local date-time, which results in a value representing a different
        instant.
-    @time_zone Time_Zone.default_widget
+    @time_zone (Widget.from Time_Zone)
     set_time_zone self (time_zone:Time_Zone|Text) -> Column & Date_Time_Column =
         self.operations_implementation.set_time_zone self.column time_zone
 

@@ -5,6 +5,7 @@ import project.Data.Text.Text
 import project.Data.Vector.Vector
 import project.Errors.Common.Syntax_Error
 import project.Internal.Data_Read_Helpers
+import project.Metadata.Widget
 import project.Network.HTTP.Header.Header
 import project.Network.HTTP.HTTP_Method.HTTP_Method
 import project.Network.HTTP.Request_Body.Request_Body
@@ -53,7 +54,7 @@ Text.to_uri self = URI.parse self
       determined automatically, a raw HTTP `Response` will be returned.
 @format Data_Read_Helpers.format_widget_with_raw_response
 @method HTTP_Method.default_fetch_widget
-@headers Header.default_widget
+@headers (Widget.from Header)
 URI.fetch : HTTP_Method -> Vector (Header | Pair Text Text) -> File_Format -> Any
 URI.fetch self (method:HTTP_Method=..Get) headers=[] format=Auto_Detect =
     Data.fetch self method headers format
@@ -100,7 +101,7 @@ URI.fetch self (method:HTTP_Method=..Get) headers=[] format=Auto_Detect =
    - Text: shorthand for `Request_Body.Text that_text`.
    - File: shorthand for `Request_Body.Binary that_file`.
    - Any other Enso object: shorthand for `Request_Body.Json that_object`.
-@headers Header.default_widget
+@headers (Widget.from Header)
 @method HTTP_Method.default_post_widget
 @response_format Data_Read_Helpers.format_widget_with_raw_response
 URI.post : Request_Body -> HTTP_Method -> Vector (Header | Pair Text Text) -> File_Format -> Any

@@ -42,12 +42,6 @@ type Join_Kind
     ## ---
        private: true
        ---
-    default_widget -> Widget =
-        make_single_choice [Choice.Option "..Inner" "..Inner" icon="join_inner", Choice.Option "..Left_Outer" "..Left_Outer" icon="join_left_outer", Choice.Option "..Right_Outer" "..Right_Outer" icon="join_right_outer", Choice.Option "..Full" "..Full" icon="join_full", Choice.Option "..Left_Exclusive" "..Left_Exclusive" icon="join_left_exclusive", Choice.Option "..Right_Exclusive" "..Right_Exclusive" icon="join_right_exclusive"]
-
-    ## ---
-       private: true
-       ---
     to_java : Java_Join_Kind
     to_java self = case self of
         Join_Kind.Inner           -> Java_Join_Kind.INNER
@@ -56,3 +50,11 @@ type Join_Kind
         Join_Kind.Full            -> Java_Join_Kind.FULL
         Join_Kind.Left_Exclusive  -> Java_Join_Kind.LEFT_ANTI
         Join_Kind.Right_Exclusive -> Java_Join_Kind.RIGHT_ANTI
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Join_Kind`.
+Widget.from (that : Join_Kind.type) -> Widget =
+    _ = that
+    make_single_choice [Choice.Option "..Inner" "..Inner" icon="join_inner", Choice.Option "..Left_Outer" "..Left_Outer" icon="join_left_outer", Choice.Option "..Right_Outer" "..Right_Outer" icon="join_right_outer", Choice.Option "..Full" "..Full" icon="join_full", Choice.Option "..Left_Exclusive" "..Left_Exclusive" icon="join_left_exclusive", Choice.Option "..Right_Exclusive" "..Right_Exclusive" icon="join_right_exclusive"]
