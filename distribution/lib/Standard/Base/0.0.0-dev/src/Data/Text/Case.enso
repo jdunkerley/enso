@@ -43,10 +43,11 @@ type Case
         Case.Proper -> "Proper Case"
         Case.Title -> "Proper Case"
 
-    ## ---
-       private: true
-       ---
-       Gets the default drop down option for Case.
-    default_widget -> Widget =
-        values = [Option "..Lower", Option "..Upper", Option "..Proper"]
-        Single_Choice values=values
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Case`.
+Widget.from (that : Case.type) -> Widget =
+    _ = that
+    values = [Option "..Lower", Option "..Upper", Option "..Proper"]
+    Single_Choice values=values

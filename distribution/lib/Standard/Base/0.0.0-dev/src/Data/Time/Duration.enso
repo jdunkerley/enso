@@ -107,14 +107,6 @@ type Duration
     of_seconds (seconds : Integer = (Missing_Argument.throw "seconds")) -> Duration = Duration.new seconds=seconds
 
     ## ---
-       private: true
-       ---
-       Gets the default drop down option for Duration.
-    default_widget -> Widget =
-        options = [Option "Seconds" "Duration.of_seconds", Option "Minutes" "Duration.of_minutes", Option "Hours" "Duration.of_hours", Option "Custom" "Duration.new"]
-        Widget.Single_Choice values=options
-
-    ## ---
        icon: time
        ---
        Create a zero (empty) duration.
@@ -386,3 +378,12 @@ type Duration
        ---
        Checks if `self` is less than or equal to `that`.
     <= self that = Comparable.<= self=self that
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Duration`.
+Widget.from (that : Duration.type) -> Widget =
+    _ = that
+    options = [Option "Seconds" "Duration.of_seconds", Option "Minutes" "Duration.of_minutes", Option "Hours" "Duration.of_hours", Option "Custom" "Duration.new"]
+    Widget.Single_Choice values=options

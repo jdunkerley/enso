@@ -1,4 +1,5 @@
 from Standard.Base import all
+import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Query
 import Standard.Base.Network.HTTP.Request_Body.Request_Body
 from Standard.Base.Widget_Helpers import all
@@ -18,10 +19,10 @@ option_labels widget = widget.get "values" . map o-> o.get "label"
 
 add_specs suite_builder =
     suite_builder.group "Widget annotations of the standard library resolve (#897)" group_builder->
-        group_builder.specify "Index_Sub_Range.default_widget builds its options with and without a count" <|
+        group_builder.specify "Index_Sub_Range's default widget builds its options with and without a count" <|
             Index_Sub_Range.default_options . map .label . should_contain "First"
-            Index_Sub_Range.default_widget 5 . values . map .label . should_contain "By_Index"
-            Index_Sub_Range.default_widget . values . map .label . should_contain "By_Index"
+            (Widget.from Index_Sub_Range count=5) . values . map .label . should_contain "By_Index"
+            (Widget.from Index_Sub_Range) . values . map .label . should_contain "By_Index"
 
         group_builder.specify "the `range` of Vector.take, Vector.drop, Array.take and Array.drop" <|
             vector_module = "Standard.Base.Data.Vector"
@@ -59,7 +60,7 @@ add_specs suite_builder =
 
     suite_builder.group "Widgets for the Text type" group_builder->
         group_builder.specify "works for `take` and `drop`" <|
-            expect = '{"arguments":[["range",{"widget":' + Text_Sub_Range.default_widget.to_json + '}]]}'
+            expect = '{"arguments":[["range",{"widget":' + (Widget.from Text_Sub_Range).to_json + '}]]}'
             text_module = "Standard.Base.Data.Text.Extensions"
             text_type = "Standard.Base.Data.Text.Text"
             json = Widget_Query.resolve_call "abc def" text_module text_type "take" ["range"]

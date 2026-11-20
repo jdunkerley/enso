@@ -7,5 +7,5 @@
     - Left_Outer
     - Right_Exclusive
     - Right_Outer
-    - default_widget -> Standard.Base.Metadata.Widget
     - to_java self -> Standard.Base.Any.Any
+- Standard.Base.Metadata.Widget.from that:Standard.Table.Join_Kind.Join_Kind.type -> Standard.Base.Metadata.Widget

@@ -1,5 +1,6 @@
 from Standard.Base import all
 
+import Standard.Base.Metadata.Widget
 import Standard.Table.Rows_To_Read.Rows_To_Read
 from Standard.Table import Column
 from Standard.Table.Internal.Column_Type_Helpers import column_from_implementation
@@ -55,7 +56,7 @@ type DB_Column
 
        ## Arguments
         - `max_rows`: specifies the maximum number of rows to read.
-    @max_rows Rows_To_Read.default_widget
+    @max_rows (Widget.from Rows_To_Read)
     read self (max_rows : Rows_To_Read = ..First_With_Warning 1000) -> Column | Any =
         ## This method clashes with one defined on `Column` to redefine it as a public method.
            (On base Column it is purposefully hidden).

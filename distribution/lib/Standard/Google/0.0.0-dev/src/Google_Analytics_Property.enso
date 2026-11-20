@@ -64,7 +64,7 @@ type Google_Analytics_Property
        ## Arguments
         - `credentials`: The Google credentials to use. Default is the default
           credentials.
-    @credentials (Google_Credential.default_widget)
+    @credentials (Widget.from Google_Credential)
     metrics : Google_Credential -> Vector
     metrics self credentials:Google_Credential=..Default =
         Google_Analytics.list_metrics credentials self
@@ -78,7 +78,7 @@ type Google_Analytics_Property
        ## Arguments
         - `credentials`: The Google credentials to use. Default is the default
           credentials.
-    @credentials (Google_Credential.default_widget)
+    @credentials (Widget.from Google_Credential)
     dimensions : Google_Credential -> Vector
     dimensions self credentials:Google_Credential=..Default =
         Google_Analytics.list_dimensions credentials self

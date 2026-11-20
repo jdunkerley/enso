@@ -14,3 +14,5 @@
 - log_failure failure:Standard.Base.Metadata.Widget_Query.Widget_Failure inputs:Standard.Base.Data.Text.Text -> Standard.Base.Data.Boolean.Boolean
 - resolve_argument method:Standard.Base.Metadata.Widget_Query.Widget_Method argument:Standard.Base.Data.Text.Text subject:Standard.Base.Any.Any cache:Standard.Base.Function.Function -> Standard.Base.Metadata.Widget_Query.Argument_Result
 - resolve_call value:Standard.Base.Any.Any module_name:Standard.Base.Data.Text.Text type_name:Standard.Base.Data.Text.Text method_name:Standard.Base.Data.Text.Text argument_names:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text) uuids:Standard.Base.Data.Text.Text= subject_is_type:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Text.Text
+- resolve_type type_name:Standard.Base.Data.Text.Text -> Standard.Base.Data.Text.Text
+- resolve_type_argument method:Standard.Base.Metadata.Widget_Query.Widget_Method type_name:Standard.Base.Data.Text.Text -> Standard.Base.Metadata.Widget_Query.Argument_Result

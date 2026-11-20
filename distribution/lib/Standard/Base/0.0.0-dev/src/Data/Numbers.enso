@@ -11,6 +11,7 @@ import project.Errors.Common.Incomparable_Values
 import project.Errors.Common.Unsupported_Argument_Types
 import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Internal.Rounding_Helpers
+import project.Metadata.Widget
 import project.Panic.Panic
 from project.Data.Boolean import Boolean, False, True
 from project.Internal.Number_Builtins import all
@@ -390,7 +391,7 @@ type Number
              5000.format "#,##0"
        ```
     @format make_number_format_selector
-    @locale Locale.default_widget
+    @locale (Widget.from Locale)
     format : Text -> Locale -> Text
     format self format:Text="" locale:Locale=Locale.default =
         symbols = DecimalFormatSymbols.new locale.java_locale

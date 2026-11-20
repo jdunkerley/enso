@@ -1,6 +1,7 @@
 from Standard.Base import all
 import Standard.Base.Data.Json.Invalid_JSON
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+import Standard.Base.Metadata.Widget
 
 import project.Column.Column
 import project.Column.Rest_Of_String
@@ -24,8 +25,8 @@ type Text_Column
 
              example_to_case = Examples.text_column_1.to_case ..Upper
        ```
-    @case_option Case.default_widget
-    @locale Locale.default_widget
+    @case_option (Widget.from Case)
+    @locale (Widget.from Locale)
     to_case self case_option:Case=..Lower locale:Locale=Locale.default -> Column & Text_Column =
         self.operations_implementation.to_case self.column case_option locale
 

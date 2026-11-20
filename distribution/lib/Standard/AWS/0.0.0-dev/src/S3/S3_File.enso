@@ -9,6 +9,7 @@ import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
 import Standard.Base.Errors.Unimplemented.Unimplemented
 import Standard.Base.Internal.Path_Helpers
+import Standard.Base.Metadata.Widget
 import Standard.Base.Runtime.Context
 import Standard.Base.System.File.Data_Link_Access.Data_Link_Access
 import Standard.Base.System.File.Generic.File_Like.File_Like
@@ -52,7 +53,7 @@ type S3_File
        ## Errors
         - If the URI is not in the correct format, an `Illegal_Argument` error
           is thrown.
-    @credentials AWS_Credential.default_widget
+    @credentials (Widget.from AWS_Credential)
     new : Text -> AWS_Credential -> S3_File ! Illegal_Argument
     new (uri : Text = S3.uri_prefix) credentials:AWS_Credential=..Default =
         parsed_path = S3_Path.parse uri
@@ -117,7 +118,7 @@ type S3_File
        ## Arguments
        - `duration`: the duration for which the presigned URL will be valid. The
           default is 1 minute.
-    @duration Duration.default_widget
+    @duration (Widget.from Duration)
     presigned_uri self duration:Duration=(Duration.of_minutes 1) -> URI ! S3_Error | Illegal_Argument =
         if self.is_directory then Error.throw (Illegal_Argument.Error "Presigned URI cannot be generated for a directory." self.uri) else
             S3.presigned_url self.s3_path.bucket self.s3_path.key self.internal_version_id duration self.credentials
@@ -213,7 +214,7 @@ type S3_File
           error is thrown.
         - If using `Auto_Detect`, and there is no matching type then a
           `File_Error.Unsupported_Type` error is returned.
-    @format File_Format.default_widget
+    @format (Widget.from File_Format)
     read : File_Format -> Problem_Behavior -> Any ! S3_Error
     read self format=Auto_Detect (on_problems : Problem_Behavior = ..Report_Warning) =
         if self.is_directory_no_follow_links then Error.throw (Illegal_Argument.Error "Cannot `read` a directory, use `list`.")
@@ -314,7 +315,7 @@ type S3_File
           error is thrown.
         - If there is a problem decoding the byte stream to text, then an
           `Encoding_Error` will be raised following the `on_problems` behavior.
-    @encoding Encoding.default_widget
+    @encoding (Widget.from Encoding)
     read_text : Encoding -> Problem_Behavior -> Text ! File_Error
     read_text self (encoding : Encoding = Encoding.default) (on_problems : Problem_Behavior = ..Report_Warning) =
         if self.is_directory then Error.throw (Illegal_Argument.Error "Cannot `read_text` of a directory.") else

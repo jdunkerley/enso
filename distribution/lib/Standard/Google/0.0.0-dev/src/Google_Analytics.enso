@@ -39,7 +39,7 @@ type Google_Analytics
         - `credentials`: The Google credentials to use. Default is to use the
           Google Application Default Credentials in the environment variables.
           See [application-default-credentials](https://cloud.google.com/docs/authentication/application-default-credentials).
-    @credentials (Google_Credential.default_widget)
+    @credentials (Widget.from Google_Credential)
     @property Google_Analytics_Property.default_widget
     @dimensions _make_dimensions_vector_selector
     @metrics _make_metrics_vector_selector
@@ -71,8 +71,8 @@ type Google_Analytics
         - `limit`: The maximum number of accounts to read. Default is 1000.
         - `include_deleted`: Whether to include deleted accounts. Default is
           False.
-    @credentials (Google_Credential.default_widget)
-    @limit Rows_To_Read.default_widget
+    @credentials (Widget.from Google_Credential)
+    @limit (Widget.from Rows_To_Read)
     list_accounts : Google_Credential -> Rows_To_Read -> Boolean -> Vector
     list_accounts credentials:Google_Credential=..Default (limit : Rows_To_Read = ..First_With_Warning 1000) include_deleted:Boolean=False -> Vector =
         java_credentials = credentials.as_java
@@ -99,9 +99,9 @@ type Google_Analytics
         - `limit`: The maximum number of accounts to read. Default is 1000.
         - `include_deleted`: Whether to include deleted accounts. Default is
           False.
-    @credentials Google_Credential.default_widget
+    @credentials (Widget.from Google_Credential)
     @account Google_Analytics_Account_Filter.default_widget
-    @limit Rows_To_Read.default_widget
+    @limit (Widget.from Rows_To_Read)
     list_properties : Google_Credential -> Google_Analytics_Account_Filter -> Rows_To_Read -> Boolean -> Vector
     list_properties credentials:Google_Credential=..Default account:Google_Analytics_Account_Filter=..All_Accounts (limit : Rows_To_Read = ..First_With_Warning 1000) include_deleted:Boolean=False -> Vector =
         java_credentials = credentials.as_java
@@ -123,7 +123,7 @@ type Google_Analytics
         - `credentials`: The Google credentials to use. Default is to use the
           Google Application Default Credentials in the environment variables.
           See [application-default-credentials](https://cloud.google.com/docs/authentication/application-default-credentials).
-    @credentials (Google_Credential.default_widget)
+    @credentials (Widget.from Google_Credential)
     @property Google_Analytics_Property.default_widget
     list_metrics : Google_Credential -> Google_Analytics_Property -> Vector
     list_metrics credentials:Google_Credential=(Missing_Argument.throw "credentials") property:Google_Analytics_Property=(Missing_Argument.throw "property") -> Vector =
@@ -142,7 +142,7 @@ type Google_Analytics
         - `credentials`: The Google credentials to use. Default is to use the
           Google Application Default Credentials in the environment variables.
           See [application-default-credentials](https://cloud.google.com/docs/authentication/application-default-credentials).
-    @credentials (Google_Credential.default_widget)
+    @credentials (Widget.from Google_Credential)
     @property Google_Analytics_Property.default_widget
     list_dimensions : Google_Credential -> Google_Analytics_Property -> Vector
     list_dimensions credentials:Google_Credential=(Missing_Argument.throw "credentials") property:Google_Analytics_Property=(Missing_Argument.throw "property") -> Vector =

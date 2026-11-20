@@ -21,6 +21,7 @@ import project.Internal.Data_Read_Helpers
 import project.Internal.Telemetry
 import project.Logging.Progress
 import project.Meta
+import project.Metadata.Widget
 import project.Network.HTTP.Cache_Policy.Cache_Policy
 import project.Network.HTTP.Header.Header
 import project.Network.HTTP.HTTP
@@ -94,7 +95,7 @@ from project.System.File_Format import Auto_Detect, File_Format
    The cached values are retained as long as the project remains open. Closing a
    project will clear the cache.
 @path (Text_Input)
-@format File_Format.default_widget
+@format (Widget.from File_Format)
 read : Text | URI | File -> File_Format -> Problem_Behavior -> Any ! File_Error
 read path=(Missing_Argument.throw "path") format=Auto_Detect (on_problems : Problem_Behavior = ..Report_Warning) = case path of
     _ : Vector ->
@@ -164,8 +165,8 @@ read path=(Missing_Argument.throw "path") format=Auto_Detect (on_problems : Prob
    The cached values are retained as long as the project remains open. Closing a
    project will clear the cache.
 @paths (Vector_Editor item_editor=File_Browse item_default='""')
-@format File_Format.default_widget
-@return Return_As.default_widget
+@format (Widget.from File_Format)
+@return (Widget.from Return_As)
 read_many : Many_Files_List -> File_Format -> Return_As -> Problem_Behavior -> Any ! File_Error
 read_many (paths : Many_Files_List = Missing_Argument.throw "paths") format=Auto_Detect return=..As_Merged_Table (on_problems : Problem_Behavior = ..Report_Warning) =
     if paths.paths_to_load.contains Nothing then Error.throw (Illegal_Argument.Error Illegal_Argument.Error "`paths` cannot contain `Nothing`. Use `filter` with `..Not_Nothing` to remove.")
@@ -212,7 +213,7 @@ read_many (paths : Many_Files_List = Missing_Argument.throw "paths") format=Auto
          example_read = Data.read_text Examples.csv_path
    ```
 @path (Text_Input)
-@encoding Encoding.default_widget
+@encoding (Widget.from Encoding)
 read_text : (Text | File) -> Encoding -> Problem_Behavior -> Text
 read_text path=(Missing_Argument.throw "path") (encoding : Encoding = Encoding.default) (on_problems : Problem_Behavior = ..Report_Warning) =
     File.new path . read_text encoding on_problems
@@ -353,7 +354,7 @@ list (directory=enso_project.root) (name_filter:Text="") recursive:Boolean=False
 @uri (Text_Input)
 @method HTTP_Method.default_fetch_widget
 @format Data_Read_Helpers.format_widget_with_raw_response
-@headers Header.default_widget
+@headers (Widget.from Header)
 fetch : (URI | Text) -> HTTP_Method -> Vector (Header | Pair Text Text) -> File_Format -> Cache_Policy -> Any ! Request_Error | HTTP_Error
 fetch (uri:(URI | Text)=(Missing_Argument.throw "uri")) (method:HTTP_Method=..Get) (headers:(Vector (Header | Pair Text Text))=[]) (format = Auto_Detect) (cache_policy:Cache_Policy = ..Default) =
     Data_Read_Helpers.fetch_following_data_links uri method headers (Data_Read_Helpers.handle_legacy_format "fetch" "format" format) cache_policy=cache_policy
@@ -492,7 +493,7 @@ fetch (uri:(URI | Text)=(Missing_Argument.throw "uri")) (method:HTTP_Method=..Ge
    specified, then `"text/plain"` is used as the content type.
 @uri (Text_Input)
 @method HTTP_Method.default_post_widget
-@headers Header.default_widget
+@headers (Widget.from Header)
 @response_format Data_Read_Helpers.format_widget_with_raw_response
 post : (URI | Text) -> Request_Body -> HTTP_Method -> Vector (Header | Pair Text Text) -> File_Format -> Boolean -> Any ! Request_Error | HTTP_Error
 post (uri:(URI | Text)=(Missing_Argument.throw "uri")) (body:Request_Body=..Empty) (method:HTTP_Method=..Post) (headers:(Vector (Header | Pair Text Text))=[]) (response_format = Auto_Detect) write_operation:Boolean=True =
@@ -524,7 +525,7 @@ post (uri:(URI | Text)=(Missing_Argument.throw "uri")) (body:Request_Body=..Empt
       vector.
 @uri (Text_Input)
 @method HTTP_Method.default_fetch_widget
-@headers Header.default_widget
+@headers (Widget.from Header)
 download : (URI | Text) -> Writable_File -> Download_Mode -> HTTP_Method -> Vector (Header | Pair Text Text) -> File ! Request_Error | HTTP_Error
 download (uri:(URI | Text)=(Missing_Argument.throw "uri")) file:Writable_File (replace_existing:Download_Mode=..If_Not_Exists) (method:HTTP_Method=..Get) (headers:(Vector (Header | Pair Text Text))=[]) =
     Context.Output.check_enabled disabled_message="As writing is disabled, cannot download to a file. Press the Write button ▶ to perform the operation."
@@ -589,8 +590,8 @@ download (uri:(URI | Text)=(Missing_Argument.throw "uri")) file:Writable_File (r
 @uris Vector_Editor item_editor=Text_Input item_default='""'
 @method HTTP_Method.default_fetch_widget
 @format Data_Read_Helpers.format_widget_with_raw_response
-@headers Header.default_widget
-@return Return_As.default_widget
+@headers (Widget.from Header)
+@return (Widget.from Return_As)
 @time_between_requests Numeric_Input
 fetch_many : Vector -> HTTP_Method -> Vector (Header | Pair Text Text) -> File_Format -> Return_As -> Integer -> Cache_Policy -> Problem_Behavior -> Any ! Request_Error | HTTP_Error
 fetch_many (uris:Vector=(Missing_Argument.throw "uris")) (method:HTTP_Method=..Get) (headers:(Vector (Header | Pair Text Text))=[]) (format = Auto_Detect) return=..As_Merged_Table time_between_requests:Integer=0 (cache_policy:Cache_Policy = ..Default) (on_problems : Problem_Behavior = ..Report_Warning) =
@@ -674,8 +675,8 @@ fetch_many (uris:Vector=(Missing_Argument.throw "uris")) (method:HTTP_Method=..G
 @initial_uri (Text_Input)
 @method HTTP_Method.default_fetch_widget
 @format Data_Read_Helpers.format_widget_with_raw_response
-@headers Header.default_widget
-@return Return_As.default_widget
+@headers (Widget.from Header)
+@return (Widget.from Return_As)
 @time_between_requests Numeric_Input
 fetch_pages : URI | Text -> HTTP_Method -> Vector (Header | Pair Text Text) -> Any -> Integer -> File_Format -> Return_As -> Integer -> Cache_Policy -> Problem_Behavior -> Any ! Request_Error | HTTP_Error
 fetch_pages (initial_uri:(URI | Text)=(Missing_Argument.throw "initial_uri")) (method:HTTP_Method=..Get) (headers:(Vector (Header | Pair Text Text))=[]) (paginator=(_->_->_->Nothing)) (max_pages:Integer=10) (format = Auto_Detect) return=..As_Merged_Table time_between_requests:Integer=0 (cache_policy:Cache_Policy = ..Default) (on_problems : Problem_Behavior = ..Report_Warning) =

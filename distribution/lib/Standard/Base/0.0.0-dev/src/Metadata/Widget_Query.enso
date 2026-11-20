@@ -3,6 +3,7 @@ import project.Data.Numbers.Integer
 import project.Data.Text.Text
 import project.Data.Vector.Vector
 import project.Errors.Common.Module_Does_Not_Exist
+import project.Errors.Common.No_Such_Conversion
 import project.Errors.Common.No_Such_Method
 import project.Function.Function
 import project.Meta
@@ -72,6 +73,45 @@ resolve_call (value : Any) (module_name : Text) (type_name : Text) (method_name 
                     _ -> False
                 '[' + argument.to_json + ',' + result.to_json + ']'
             '{"arguments":[' + (entries.join ",") + ']}'
+
+## ---
+   private: true
+   ---
+   The IDE's query for a type's default widget: the `Widget.from` conversion
+   of the type object, evaluated with every extra argument at its default.
+   The IDE asks it once per type per session and caches the answer.
+
+   ## Arguments
+    - `type_name`: The type's qualified name.
+
+   ## Returns
+   `{"widget":<widget or null>}` (`null`: the type has no default) or
+   `{"error":{"step":"lookup"|"type_default","message":…}}`. Failures are
+   logged once, as `resolve_call`'s are.
+resolve_type (type_name : Text) -> Text =
+    method = Widget_Method.Value type_name type_name "from"
+    Progress.run label=type_name up_to=1 handle_name="Widget_Query.resolve_type "+type_name action=_->
+        ## `module_name` of the method is the type's name: the conversion is looked up on the type.
+        result = resolve_type_argument method type_name
+        _ = case result of
+            Argument_Result.Failed failure -> log_failure failure "type"
+            _ -> False
+        result.to_json
+
+## ---
+   private: true
+   ---
+   `resolve_type`'s result before it is logged (exposed for the tests).
+resolve_type_argument (method : Widget_Method) (type_name : Text) -> Argument_Result =
+    typ = Meta.find_type_or_module type_name
+    if typ.is_error then Argument_Result.Failed (_failure_from_error method "" "lookup" typ) else
+        handler caught = case _is_missing_default caught.payload typ of
+            True -> Argument_Result.Resolved Nothing "null"
+            False -> Argument_Result.Failed (_failure_from_panic method "" caught step="type_default")
+        Panic.catch Any handler=handler <|
+            widget = Widget.from typ
+            if widget.is_error && (_is_missing_default widget.catch typ) then Argument_Result.Resolved Nothing "null" else
+                _as_result method "" widget step="type_default"
 
 ## ---
    private: true
@@ -150,8 +190,9 @@ type Widget_Method
    ## Arguments
     - `method`: The method.
     - `argument`: The argument's name.
-    - `step`: `"lookup"` (no such method or module) or `"annotation"`
-      (evaluating the annotation failed, or did not give a `Widget`).
+    - `step`: `"lookup"` (no such method, module or type), `"annotation"`
+      (evaluating the annotation failed, or did not give a `Widget`) or
+      `"type_default"` (the same, for a type's default widget).
     - `message`: What went wrong.
     - `causes`: The error's causes, outermost first.
     - `stack`: For a panic, its Enso stack trace.
@@ -173,7 +214,8 @@ type Widget_Failure
        ---
        The failure as one log entry.
     log_text self -> Text =
-        head = "The widget of `" + self.argument + "` of " + self.method.qualified_name + " (defined in " + self.method.module_name + ") failed at the " + self.step + ": " + self.message
+        subject = if self.argument == "" then "The default widget of " + self.method.type_name else "The widget of `" + self.argument + "` of " + self.method.qualified_name
+        head = subject + " (defined in " + self.method.module_name + ") failed at the " + self.step + ": " + self.message
         causes = self.causes.map cause-> '\n    caused by: ' + cause
         stack = self.stack.map element-> '\n    ' + element
         head + (causes.join "") + (stack.join "")
@@ -203,17 +245,23 @@ type Argument_Result
         Argument_Result.Resolved _ json -> '{"widget":' + json + '}'
         Argument_Result.Failed failure -> '{"error":' + failure.to_json + '}'
 
-private _as_result (method : Widget_Method) (argument : Text) widget -> Argument_Result =
-    if widget.is_error then Argument_Result.Failed (_failure_from_error method argument "annotation" widget) else
+private _as_result (method : Widget_Method) (argument : Text) widget (step : Text = "annotation") -> Argument_Result =
+    if widget.is_error then Argument_Result.Failed (_failure_from_error method argument step widget) else
         case widget of
             Nothing -> Argument_Result.Resolved Nothing "null"
             _ : Widget ->
                 json = widget.to_json
-                if json.is_error then Argument_Result.Failed (_failure_from_error method argument "annotation" json) else
+                if json.is_error then Argument_Result.Failed (_failure_from_error method argument step json) else
                     Argument_Result.Resolved widget json
             _ ->
                 message = "The annotation gave " + (Meta.type_of widget . to_text) + ", not a Widget."
-                Argument_Result.Failed (Widget_Failure.Value method argument "annotation" message [] [])
+                Argument_Result.Failed (Widget_Failure.Value method argument step message [] [])
+
+## Whether `payload` is the top-level miss: no `Widget.from` for `typ` itself. A
+   `No_Such_Conversion` raised inside the type's own conversion is not.
+private _is_missing_default payload typ -> Boolean = case payload of
+    c : No_Such_Conversion -> (c.target == Widget) && (c.that == typ)
+    _ -> False
 
 private _is_lookup_error payload -> Boolean = case payload of
     _ : No_Such_Method -> True
@@ -224,10 +272,10 @@ private _failure_from_error (method : Widget_Method) (argument : Text) (step : T
     payload = error.catch
     Widget_Failure.Value method argument step (_describe payload) (_cause_chain payload) []
 
-private _failure_from_panic (method : Widget_Method) (argument : Text) (caught : Caught_Panic) -> Widget_Failure =
+private _failure_from_panic (method : Widget_Method) (argument : Text) (caught : Caught_Panic) (step : Text = "annotation") -> Widget_Failure =
     payload = caught.payload
     stack = caught.stack_trace . take 20 . map .to_display_text
-    Widget_Failure.Value method argument "annotation" (_describe payload) (_cause_chain payload) stack
+    Widget_Failure.Value method argument step (_describe payload) (_cause_chain payload) stack
 
 private _describe value -> Text = case value of
     t : Throwable -> t.getClass.getName + ": " + (t.getMessage . if_nothing "")

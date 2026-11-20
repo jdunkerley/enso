@@ -77,7 +77,7 @@ make_date_format_selector (date:Date=(Date.new 2012 3 14)) =
         format = Date_Time_Formatter.from_simple_pattern 'd MMMM yyyy' locale=Locale.france
         label = 'd MMMM yyyy - with custom Locale (e.g. ' + date.format format + ')'
         code = "(Date_Time_Formatter.from_simple_pattern 'd MMMM yyyy' locale=Locale.france)"
-        Option label code [["pattern", make_single_choice formats], ["locale", Locale.default_widget]]
+        Option label code [["pattern", make_single_choice formats], ["locale", Widget.from Locale]]
     week_date_formats = ['YYYY-ww-d', 'YYYY-ww', 'ddd, YYYY-ww'].map f->
         format = Date_Time_Formatter.from_iso_week_date_pattern f
         ["ISO Week-based Date: " + f + " (e.g. " + date.format format + ")", "("+fqn+".from_iso_week_date_pattern " + f.pretty + ")"]
@@ -106,7 +106,7 @@ make_date_time_format_selector (date_time:Date_Time=(Date_Time.new 2012 3 14 15 
         format = Date_Time_Formatter.from_simple_pattern 'd MMMM yyyy HH:mm' locale=Locale.france
         label = 'd MMMM yyyy HH:mm - with custom Locale (e.g. ' + date_time.format format + ')'
         code = "(Date_Time_Formatter.from_simple_pattern 'd MMMM yyyy HH:mm' locale=Locale.france)"
-        Option label code [["pattern", make_single_choice mapped_formats], ["locale", Locale.default_widget]]
+        Option label code [["pattern", make_single_choice mapped_formats], ["locale", Widget.from Locale]]
     week_date_formats = ['YYYY-ww-d HH:mm:ss.f'].map f->
         format = Date_Time_Formatter.from_iso_week_date_pattern f
         ["ISO Week-based Date-Time: " + f + " (e.g. " + date_time.format format + ")", "(Date_Time_Formatter.from_iso_week_date_pattern " + f.pretty + ")"]
@@ -144,7 +144,7 @@ make_format_chooser include_number:Boolean=True include_date:Boolean=True includ
         format = Date_Time_Formatter.from_simple_pattern first.second locale=Locale.france
         label = '<Date/Time> - with Locale (e.g. ' + Date_Time.now.format format + ')'
         code = "(Date_Time_Formatter.from_simple_pattern " + first.second + " locale=Locale.france)"
-        [Option label code [["pattern", make_single_choice patterns], ["locale", Locale.default_widget]]]
+        [Option label code [["pattern", make_single_choice patterns], ["locale", Widget.from Locale]]]
     time = if include_time.not then [] else
         ['HH:mm[:ss]', 'h:mm[:ss] a'].map f-> [f + " (e.g. " + (Time_Of_Day.new 13 30 55 123).format f + ")", f.pretty]
     boolean = if include_boolean.not then [] else ['Yes|No', '1|0'].map f-> [f + " (Boolean)", f.pretty]

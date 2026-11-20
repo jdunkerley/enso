@@ -25,21 +25,21 @@ type Azure_Storage
         Vector.from_polyglot_array proxy
 
     ## Lists the Blob Containers in the given storage account.
-    @cred Azure_Blob_Storage.default_widget
+    @cred (Widget.from Azure_Blob_Storage)
     blob_containers account:Text=(Missing_Argument.throw "account") prefix:Text="" (cred:(Azure_Credential | Azure_Blob_Storage)=..Default) -> Vector Text = handle_azure_exceptions <|
         java_cred = cred.to_java
         as_array = AzureBlobStorage.containers java_cred account prefix
         Vector.from_polyglot_array as_array
 
     ## Lists the Blob Files in the given storage account and container.
-    @cred Azure_Blob_Storage.default_widget
+    @cred (Widget.from Azure_Blob_Storage)
     list_blob account:Text=(Missing_Argument.throw "account") container:Text=(Missing_Argument.throw "container") prefix:Text="" (cred:(Azure_Credential | Azure_Blob_Storage)=..Default) -> Vector Text = handle_azure_exceptions <|
         java_cred = cred.to_java
         as_array = AzureBlobStorage.listBlob java_cred account container prefix
         Vector.from_polyglot_array as_array
 
     ## Reads a Blob File
-    @cred Azure_Blob_Storage.default_widget
+    @cred (Widget.from Azure_Blob_Storage)
     get_blob account:Text=(Missing_Argument.throw "account") container:Text=(Missing_Argument.throw "container") blob:Text=(Missing_Argument.throw "blob") (cred:(Azure_Credential | Azure_Blob_Storage)=..Default) -> File = handle_azure_exceptions <|
         java_cred = cred.to_java
         path = AzureBlobStorage.getBlob java_cred account container blob
@@ -56,13 +56,14 @@ type Azure_Blob_Storage
     private to_java self =
         AzureCredential.BlobStorageSASToken.new (Derived_Secret_Value.from self.token)
 
-    ## ---
-       private: true
-       ---
-    default_widget -> Widget =
-        options = ["Default", "Environment", "CLI", "Client_Secret", "SAS_Token"].map k-> Option k (".."+k)
-        Widget.Single_Choice values=options
-
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Azure_Blob_Storage`.
+Widget.from (that : Azure_Blob_Storage.type) -> Widget =
+    _ = that
+    options = ["Default", "Environment", "CLI", "Client_Secret", "SAS_Token"].map k-> Option k (".."+k)
+    Widget.Single_Choice values=options
 
 ## Enso representation of the Azure Storage Account
 type Azure_Storage_Account

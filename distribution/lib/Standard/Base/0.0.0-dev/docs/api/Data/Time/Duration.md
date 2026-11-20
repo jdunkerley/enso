@@ -8,7 +8,6 @@
     - > self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - >= self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - between start_inclusive:Standard.Base.Any.Any end_exclusive:Standard.Base.Any.Any timezone_aware:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-    - default_widget -> Standard.Base.Metadata.Widget
     - hours self -> Standard.Base.Data.Numbers.Integer
     - milliseconds self -> Standard.Base.Data.Numbers.Integer
     - minutes self -> Standard.Base.Data.Numbers.Integer
@@ -26,3 +25,4 @@
     - total_minutes self -> Standard.Base.Any.Any
     - total_seconds self -> Standard.Base.Any.Any
     - zero -> Standard.Base.Any.Any
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Time.Duration.Duration.type -> Standard.Base.Metadata.Widget
