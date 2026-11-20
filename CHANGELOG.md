@@ -497,6 +497,10 @@
 
 #### Enso Standard Library
 
+- [`Date_Time`'s functions are documented with examples you can copy into the
+  graph][903]
+- [`Time_Of_Day`'s functions are documented with examples you can copy into the
+  graph.][900]
 - [The period and amount dropdowns of `Date` and `Date_Time` (`+`, `-`, `up_to`,
   `start_of` and so on) write `..Day`, `..Month`, `..Hour` rather than
   `Date_Period.Day`, like `Time_Of_Day`'s.][846]
@@ -509,6 +513,11 @@
 - [`Duration`'s functions are documented with examples you can copy into the
   graph, every argument has a typed widget, and `Duration.new` and the `of_`
   functions show their arguments][905]
+- [`Date_Range`'s functions are documented with examples you can copy into the
+  graph, every argument has a type, and `first`, `second` and `last` give the
+  right dates for a decreasing range.][904]
+- [`Period`'s functions are documented with examples you can copy into the
+  graph, and every argument has a widget][902]
 - [`Date`'s functions are documented with examples you can copy into the graph,
   and every argument has a widget][800]
 - [`Date.yesterday` and `Date.tomorrow` give the day before and after
@@ -585,6 +594,8 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[903]: https://github.com/jdunkerley/enso/pull/903
+[900]: https://github.com/jdunkerley/enso/pull/900
 [896]: https://github.com/jdunkerley/enso/pull/896
 [878]: https://github.com/jdunkerley/enso/pull/878
 [895]: https://github.com/jdunkerley/enso/pull/895
@@ -604,6 +615,8 @@
 [809]: https://github.com/jdunkerley/enso/pull/809
 [827]: https://github.com/jdunkerley/enso/pull/827
 [905]: https://github.com/jdunkerley/enso/pull/905
+[904]: https://github.com/jdunkerley/enso/pull/904
+[902]: https://github.com/jdunkerley/enso/pull/902
 [800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795
 [790]: https://github.com/jdunkerley/enso/pull/790

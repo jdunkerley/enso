@@ -40,10 +40,12 @@ No tool changes the execution environment, settings or secrets;
    using them.
 3. Add a few nodes at a time with `add_nodes`: each statement is
    `name = expression`, and later statements may use the names of earlier ones.
-   Write whole-table operations, not `map` (see the section below), and read
-   several files with one `Data.read_many`. Pass whole import lines in
-   `imports`. Use `add_function` for a top-level function and call it from a
-   node as `Main.<name> args`.
+   Make each node one step: one function or method call, with the next step in a
+   new node that uses its name (see "One step per node" below). Write
+   whole-table operations, not `map` (see the section below), and read several
+   files with one `Data.read_many`. Pass whole import lines in `imports`. Use
+   `add_function` for a top-level function and call it from a node as
+   `Main.<name> args`.
 4. Read the result of every edit. `add_nodes` and `edit_node` return the nodes
    they made or changed, with their types and errors; `collapse_nodes` returns
    the function's name and the node that calls it; `set_node_comment` and
@@ -169,6 +171,25 @@ No tool changes the execution environment, settings or secrets;
     project, as the user's Save a version does, with a one-line `comment`. It
     answers `saved: false` when nothing changed, and is refused when the user
     has not turned versions on: it never turns them on.
+
+## One step per node
+
+The user reads a workflow node by node: each node shows its value, its arguments
+have widgets, and a step can be changed, inserted or removed on its own. A chain
+of method calls in one expression hides all of that. Write
+
+```
+filtered = sales.filter "Region" (..Equal "North")
+sorted = filtered.sort ["Date"]
+top = sorted.take 10
+```
+
+not `top = sales.filter "Region" (..Equal "North") . sort ["Date"] . take 10`.
+Arguments stay inline: an autoscoped constructor (`..Greater 30`), an
+`expr "..."`, a literal Vector or a short arithmetic expression is part of the
+step, not a step of its own. Chains are fine in `evaluate_expression`, which
+adds no nodes. To hide a long run of steps, group the nodes with
+`collapse_nodes` instead of chaining them.
 
 ## Write whole-table operations
 

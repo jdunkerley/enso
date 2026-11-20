@@ -45,7 +45,6 @@ type Error
 
     ## ---
        private: true
-       unstable: true
        ---
        Returns a textual representation of the stack trace attached to an error.
     get_stack_trace_text self -> Text = error_stack_trace_text self

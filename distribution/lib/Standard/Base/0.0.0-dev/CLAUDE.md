@@ -128,7 +128,9 @@ Doc comments follow the house style in the wiki's
 a one-sentence summary, `## Arguments` bullets, and `## Examples` that paste
 into the graph as nodes. The docs-site generator checks it for the modules in
 `STYLE_CHECKED_MODULES` in `docs-site/generator/src/style.ts`; today that is
-`Standard.Base.Data.Time.Date` and `Standard.Base.Data.Time.Duration`
+`Standard.Base.Data.Time.Date`, `Standard.Base.Data.Time.Date_Range`,
+`Standard.Base.Data.Time.Date_Time`, `Standard.Base.Data.Time.Duration`,
+`Standard.Base.Data.Time.Period` and `Standard.Base.Data.Time.Time_Of_Day`
 (`src/Data/Time/Date.enso` is the worked example). When you convert another
 module, add it to that list in the same PR.
 
