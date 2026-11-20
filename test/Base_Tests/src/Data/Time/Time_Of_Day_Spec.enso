@@ -51,6 +51,19 @@ add_specs suite_builder =
             widget.values.first.value . should_equal "..Hour"
             widget.values.last.value . should_equal "(Duration.new)"
 
+        group_builder.specify "the fractions of a second are milliseconds, then microseconds, then nanoseconds" <|
+            t = Time_Of_Day.new 13 45 30 123 456 789
+            t.millisecond . should_equal 123
+            t.microsecond . should_equal 456
+            t.nanosecond . should_equal 789
+            t.nanosecond include_milliseconds=True . should_equal 123456789
+
+        group_builder.specify "date_add, + and - wrap around midnight, and date_diff is signed" <|
+            (Time_Of_Day.new 23 30).date_add 45 ..Minute . should_equal (Time_Of_Day.new 0 15)
+            ((Time_Of_Day.new 9) - (Duration.new hours=12)) . should_equal (Time_Of_Day.new 21)
+            (Time_Of_Day.new 9).date_diff (Time_Of_Day.new 17 30) ..Minute . should_equal 510
+            (Time_Of_Day.new 17 30).date_diff (Time_Of_Day.new 9) ..Minute . should_equal -510
+
         group_builder.specify "methods reject arguments of the wrong type" <|
             t = Time_Of_Day.new 12 30
             Test.expect_panic_with (t.to_date_time 5) Type_Error

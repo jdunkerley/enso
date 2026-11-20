@@ -185,12 +185,6 @@ type File_Format
     ## ---
        private: true
        ---
-    default_widget -> Widget =
-        Single_Choice values=(File_Format.dropdown_options [Auto_Detect])
-
-    ## ---
-       private: true
-       ---
        Builds a widget intended to be used for `name_filter` of `File.list` and
        its siblings that allows to filter file names by file format.
     name_filter_widget -> Widget =
@@ -199,6 +193,14 @@ type File_Format
             value = (_combine_patterns file_name_pattern.patterns) . pretty
             Option file_name_pattern.display_name value
         Single_Choice values=options
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `File_Format`.
+Widget.from (that : File_Format.type) -> Widget =
+    _ = that
+    Single_Choice values=(File_Format.dropdown_options [Auto_Detect])
 
 ## Combines a set of file name patterns into a single pattern that will match any
    of them.
@@ -219,7 +221,7 @@ type Plain_Text_Format
           will be inferred from metadata if available, falling back to the
           default encoding (UTF-8 with Windows-1252 fallback). For writing, UTF-8
           is used as default, unless overridden.
-    @encoding Encoding.default_widget
+    @encoding (Widget.from Encoding)
     Plain_Text (encoding : Encoding | Infer = Infer)
 
     ## ---

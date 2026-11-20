@@ -64,15 +64,16 @@ type Text_Sub_Range
         o4 = Option "After_Last" "(..After_Last ' ')"
         [o1, o2, o3, o4]
 
-    ## ---
-       private: true
-       ---
-       The widget for `Text_Sub_Range` also displays options for
-       `Index_Sub_Range` since the former is supposed to 'expand' the latter and
-       is always used together with it.
-    default_widget -> Widget =
-        options = Index_Sub_Range.default_options + Text_Sub_Range.default_options
-        Single_Choice options
+## ---
+   private: true
+   ---
+   The widget for `Text_Sub_Range` also displays options for
+   `Index_Sub_Range` since the former is supposed to 'expand' the latter and
+   is always used together with it.
+Widget.from (that : Text_Sub_Range.type) -> Widget =
+    _ = that
+    options = Index_Sub_Range.default_options + Text_Sub_Range.default_options
+    Single_Choice options
 
 type Codepoint_Ranges
     ## ---

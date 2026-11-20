@@ -4,6 +4,10 @@ import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Query
 
 from Standard.Table import Table
+from Standard.Table.Columns_To_Add import Columns_To_Add
+from Standard.Table.Columns_To_Keep import Columns_To_Keep
+from Standard.Table.Join_Kind import Join_Kind
+from Standard.Table.Rows_To_Read import Rows_To_Read
 
 from Standard.Test import all
 
@@ -11,6 +15,14 @@ table_module = "Standard.Table.Table"
 table_type = "Standard.Table.Table.Table"
 
 answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
+
+## Checks that the type has a `Widget.from` conversion and that `resolve_type`
+   answers exactly that widget.
+check_default typ =
+    widget = Widget.from typ
+    widget.should_be_a Widget
+    type_name = Meta.meta typ . qualified_name
+    Widget_Query.resolve_type type_name . should_equal ('{"widget":' + widget.to_json + '}')
 
 add_specs suite_builder =
     suite_builder.group "Widgets for In-Memory with column name sets" group_builder->
@@ -69,6 +81,12 @@ add_specs suite_builder =
                 e.label
 
             labels . should_equal ['Equals', 'Equals (Ignore Case)', 'Between']
+
+    suite_builder.group "Type defaults by conversion" group_builder->
+        group_builder.specify "Columns_To_Add" <| check_default Columns_To_Add
+        group_builder.specify "Columns_To_Keep" <| check_default Columns_To_Keep
+        group_builder.specify "Join_Kind" <| check_default Join_Kind
+        group_builder.specify "Rows_To_Read" <| check_default Rows_To_Read
 
 main filter=Nothing =
     suite = Test.build suite_builder->

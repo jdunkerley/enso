@@ -17,7 +17,6 @@
 - type File_Format
     - all -> Standard.Base.Any.Any
     - all_known_name_patterns -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)
-    - default_widget -> Standard.Base.Metadata.Widget
     - dropdown_options fixed:Standard.Base.Data.Vector.Vector registered:Standard.Base.Data.Vector.Vector= -> (Standard.Base.Data.Vector.Vector Standard.Base.Metadata.Choice.Option)
     - get_dropdown_options -> Standard.Base.Any.Any
     - get_name_patterns -> (Standard.Base.Data.Vector.Vector Standard.Base.System.File_Format.File_Name_Pattern)
@@ -60,5 +59,6 @@
     - resolve_encoding self metadata:Standard.Base.System.File_Format_Metadata.File_Format_Metadata -> Standard.Base.Any.Any
 - get_format callback:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - parse_boolean_with_infer field_name:Standard.Base.Data.Text.Text value:(Standard.Base.Data.Boolean.Boolean|Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing) -> (Standard.Base.Data.Boolean.Boolean|Standard.Base.System.File_Format.Infer)
+- Standard.Base.Metadata.Widget.from that:Standard.Base.System.File_Format.File_Format.type -> Standard.Base.Metadata.Widget
 - Standard.Base.System.File_Format.JSON_Format.from that:Standard.Base.Data.Json.JS_Object -> Standard.Base.System.File_Format.JSON_Format
 - Standard.Base.System.File_Format.JSON_Lines_Format.from that:Standard.Base.Data.Json.JS_Object -> Standard.Base.System.File_Format.JSON_Lines_Format

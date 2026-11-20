@@ -299,7 +299,7 @@ type XML_Document
        will be automatically deleted on exit of the Enso process.
        This allows for building the workflow without affecting the real files.
     @path (Widget.Text_Input)
-    @encoding Encoding.default_widget
+    @encoding (Widget.from Encoding)
     write self path:Writable_File=(Missing_Argument.throw "path") (encoding : Encoding = Encoding.utf_8) (on_existing_file : Existing_File_Behavior = ..Backup) (include_xml_declaration : Boolean = True) (on_problems : Problem_Behavior = ..Report_Warning) -> File =
         write_impl self.java_document path encoding on_existing_file include_xml_declaration on_problems
 
@@ -727,7 +727,7 @@ type XML_Element
        will be automatically deleted on exit of the Enso process.
        This allows for building the workflow without affecting the real files.
     @path (Widget.Text_Input)
-    @encoding Encoding.default_widget
+    @encoding (Widget.from Encoding)
     write self path:Writable_File=(Missing_Argument.throw "path") (encoding : Encoding = Encoding.utf_8) (on_existing_file : Existing_File_Behavior = ..Backup) (include_xml_declaration : Boolean = True) (on_problems : Problem_Behavior = ..Report_Warning) -> File =
         write_impl self.java_element path encoding on_existing_file include_xml_declaration on_problems
 

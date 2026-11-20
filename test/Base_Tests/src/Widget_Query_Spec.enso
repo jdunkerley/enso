@@ -59,6 +59,33 @@ type Sample
 @arg (Widget.Folder_Browse)
 Any.probe self (arg = 0) = arg
 
+type Has_Default
+    Value
+
+Widget.from (that : Has_Default.type) (with_extra : Boolean = False) -> Widget =
+    _ = that
+    Widget.Single_Choice values=(if with_extra then [Choice.Option "A" "a", Choice.Option "B" "b"] else [Choice.Option "A" "a"])
+
+type No_Default
+    Value
+
+type Broken_Default
+    Value
+
+type Nested_Missing
+    Value
+
+type Lacks_Conversion
+    Value
+
+Widget.from (that : Nested_Missing.type) -> Widget =
+    _ = that
+    Widget.from Lacks_Conversion
+
+Widget.from (that : Broken_Default.type) -> Widget =
+    _ = that
+    Error.throw (Illegal_State.Error "broken on purpose")
+
 ## An extension method of a type defined elsewhere.
 @range (Widget.Secret_Browse)
 Text.widget_probe self (range = 0) = range
@@ -210,6 +237,31 @@ add_specs suite_builder =
             Widget_Query.log_failure failure inputs . should_be_false
             Widget_Query.log_failure failure inputs+"2" . should_be_true
 
+
+    suite_builder.group "Widget_Query.resolve_type" group_builder->
+        group_builder.specify "answers a type's default widget" <|
+            expected = '{"widget":' + (Widget.from Has_Default).to_json + '}'
+            Widget_Query.resolve_type spec_module+".Has_Default" . should_equal expected
+        group_builder.specify "answers null for a type without a default" <|
+            Widget_Query.resolve_type spec_module+".No_Default" . should_equal '{"widget":null}'
+        group_builder.specify "answers a lookup error for an unknown type" <|
+            json = Widget_Query.resolve_type spec_module+".Nope" . parse_json
+            json.get "error" . get "step" . should_equal "lookup"
+        group_builder.specify "answers a type_default error when the conversion fails" <|
+            json = Widget_Query.resolve_type spec_module+".Broken_Default" . parse_json
+            json.get "error" . get "step" . should_equal "type_default"
+            json.get "error" . get "message" . should_contain "broken on purpose"
+        group_builder.specify "answers a type_default error when the conversion itself hits a missing conversion" <|
+            json = Widget_Query.resolve_type spec_module+".Nested_Missing" . parse_json
+            json.get "error" . get "step" . should_equal "type_default"
+        group_builder.specify "a failing type default's log entry names the type" <|
+            method = Widget_Method.Value spec_module+".Broken_Default" spec_module+".Broken_Default" "from"
+            result = Widget_Query.resolve_type_argument method spec_module+".Broken_Default"
+            result.failure.step . should_equal "type_default"
+            result.failure.log_text . should_contain "The default widget of "+spec_module+".Broken_Default"
+            inputs = "test inputs " + Random.uuid
+            Widget_Query.log_failure result.failure inputs . should_be_true
+            Widget_Query.log_failure result.failure inputs . should_be_false
 
     suite_builder.group "LogOnce" group_builder->
         group_builder.specify "is true only the first time it sees a key" <|

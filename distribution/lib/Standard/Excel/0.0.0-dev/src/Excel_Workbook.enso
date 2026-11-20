@@ -271,7 +271,7 @@ type Excel_Workbook
         - `limit`: the maximum number of rows to read. If set to `Nothing`, all
           rows will be returned.
     @query self-> _query_widget self
-    @limit Rows_To_Read.default_widget
+    @limit (Widget.from Rows_To_Read)
     read : Text | Excel_Range | Integer -> Headers -> Rows_To_Read -> Integer -> Problem_Behavior -> Table
     read self (query : Text | Excel_Range | Integer) (headers : Headers = ..Detect_Headers) (limit : Rows_To_Read = ..All_Rows) (skip_rows:Integer=0) (on_problems:Problem_Behavior=..Report_Warning) = Excel_Reader.handle_bad_format self.file <| Illegal_State.handle_java_exception <| handle_invalid_location <| Empty_Sheet.handle_java_exception <|
         java_headers = Excel_Reader.make_java_headers headers

@@ -243,7 +243,7 @@ make_join_condition_selector table:Table cache=Nothing -> Widget =
         between = Option "Between" "..Between" [["left", self_selector], ["right_lower", right_selector], ["right_upper", right_selector]]
         names=[equals, equals_ci, between]
 
-        spatial = if table.is_a Spatial_Table then [Spatial_Join_Condition.default_widget self_selector right_selector] else []
+        spatial = if table.is_a Spatial_Table then [Spatial_Join_Condition.widget_option self_selector right_selector] else []
 
         item_editor = Single_Choice values=names+spatial
         Vector_Editor item_editor=item_editor item_default="(..Equals "+table.column_names.first.pretty+")"

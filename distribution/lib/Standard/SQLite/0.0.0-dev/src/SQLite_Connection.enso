@@ -3,6 +3,7 @@ from Standard.Visualization.Viz_Table import Viz_Table
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Single_Choice, Text_Input
 
+import Standard.Base.Metadata.Widget
 import Standard.Table.Rows_To_Read.Rows_To_Read
 from Standard.Table import Table
 
@@ -202,7 +203,7 @@ type SQLite_Connection
        `execute_update` for DML queries, or if they are supposed to return
        results, the `read` should be wrapped in an execution context check.
     @query make_table_name_selector
-    @limit Rows_To_Read.default_widget
+    @limit (Widget.from Rows_To_Read)
     read : SQL_Query -> Rows_To_Read -> Table ! Table_Not_Found
     read self query:SQL_Query (limit : Rows_To_Read = ..First_With_Warning 1000) =
         self.connection.read query limit
@@ -289,7 +290,7 @@ type SQLite_Connection
           set to `False`, the query is expected to be a read operation and will
           run regardless of the output context. Defaults to `True`.
     @query Text_Input
-    @limit Rows_To_Read.default_widget
+    @limit (Widget.from Rows_To_Read)
     execute_query : Text | SQL_Statement -> Rows_To_Read -> Boolean -> Table
     execute_query self query (limit : Rows_To_Read = ..First_With_Warning 1000) write_operation:Boolean=True =
         self.connection.execute_query query limit write_operation

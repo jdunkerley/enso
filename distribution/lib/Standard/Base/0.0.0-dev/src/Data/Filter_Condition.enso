@@ -55,7 +55,7 @@ type Filter_Condition
        texts are equal if they are identical after canonical decomposition.
        This ensures that different ways of expressing the same character in the
        underlying binary representation are considered equal.
-    @locale Locale.default_widget
+    @locale (Widget.from Locale)
     Equal_Ignore_Case (to = (Missing_Argument.throw "to")) (locale:Locale=Locale.default) keep_or_remove:Filter_Action=..Keep
 
     ## Does the value start with a prefix (Text only)?
@@ -295,54 +295,55 @@ type Filter_Condition
             Predicate p -> "predicated " + p.to_display_text
         "Filter Condition: " + condition + (if self.action == Filter_Action.Keep then "" else " (Remove)")
 
-    ## ---
-       private: true
-       ---
-       Creates a Single_Choice Widget for Filter_Conditions.
-    default_widget include_comparable:Boolean=True include_text:Boolean=True include_boolean:Boolean=True include_nullable:Boolean=True include_numeric:Boolean=True include_date:Boolean=True include_time:Boolean=True include_date_time:Boolean=True -> Widget =
-        options = Vector.build builder->
-            equatable_types = make_any_selector add_text=include_text add_boolean=include_boolean add_number=include_numeric add_date=include_date add_time=include_time add_date_time=include_date_time
-            builder.append (Option "..Equal" "..Equal" [["to", equatable_types]])
-            builder.append (Option "..Not_Equal" "..Not_Equal" [["to", equatable_types]])
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Filter_Condition`.
+Widget.from (that : Filter_Condition.type) (include_comparable:Boolean=True) (include_text:Boolean=True) (include_boolean:Boolean=True) (include_nullable:Boolean=True) (include_numeric:Boolean=True) (include_date:Boolean=True) (include_time:Boolean=True) (include_date_time:Boolean=True) -> Widget =
+    _ = that
+    options = Vector.build builder->
+        equatable_types = make_any_selector add_text=include_text add_boolean=include_boolean add_number=include_numeric add_date=include_date add_time=include_time add_date_time=include_date_time
+        builder.append (Option "..Equal" "..Equal" [["to", equatable_types]])
+        builder.append (Option "..Not_Equal" "..Not_Equal" [["to", equatable_types]])
 
-            if include_comparable then
-                comparable_types = make_any_selector add_text=include_text add_number=include_numeric add_date=include_date add_time=include_time add_date_time=include_date_time
-                builder.append (Option "..Less" "..Less" [["than", comparable_types]])
-                builder.append (Option "..Equal_Or_Less" "..Equal_Or_Less" [["than", comparable_types]])
-                builder.append (Option "..Greater" "..Greater" [["than", comparable_types]])
-                builder.append (Option "..Equal_Or_Greater" "..Equal_Or_Greater" [["than", comparable_types]])
-                builder.append (Option "..Between" "..Between" [["lower", comparable_types], ["upper", comparable_types]])
+        if include_comparable then
+            comparable_types = make_any_selector add_text=include_text add_number=include_numeric add_date=include_date add_time=include_time add_date_time=include_date_time
+            builder.append (Option "..Less" "..Less" [["than", comparable_types]])
+            builder.append (Option "..Equal_Or_Less" "..Equal_Or_Less" [["than", comparable_types]])
+            builder.append (Option "..Greater" "..Greater" [["than", comparable_types]])
+            builder.append (Option "..Equal_Or_Greater" "..Equal_Or_Greater" [["than", comparable_types]])
+            builder.append (Option "..Between" "..Between" [["lower", comparable_types], ["upper", comparable_types]])
 
-            if include_text then
-                builder.append (Option "..Equal_Ignore_Case" "..Equal_Ignore_Case" [["to", Widget.Text_Input]])
-                builder.append (Option "..Starts_With" "..Starts_With" [["prefix", Widget.Text_Input]])
-                builder.append (Option "..Ends_With" "..Ends_With" [["suffix", Widget.Text_Input]])
-                builder.append (Option "..Contains" "..Contains" [["substring", Widget.Text_Input]])
-                builder.append (Option "..Like" "..Like" [["pattern", Widget.Text_Input]])
-                builder.append (Option "..Regex_Match" "..Regex_Match" [["pattern", Widget.Text_Input]])
+        if include_text then
+            builder.append (Option "..Equal_Ignore_Case" "..Equal_Ignore_Case" [["to", Widget.Text_Input]])
+            builder.append (Option "..Starts_With" "..Starts_With" [["prefix", Widget.Text_Input]])
+            builder.append (Option "..Ends_With" "..Ends_With" [["suffix", Widget.Text_Input]])
+            builder.append (Option "..Contains" "..Contains" [["substring", Widget.Text_Input]])
+            builder.append (Option "..Like" "..Like" [["pattern", Widget.Text_Input]])
+            builder.append (Option "..Regex_Match" "..Regex_Match" [["pattern", Widget.Text_Input]])
 
-            if include_nullable then
-                builder.append (Option "..Is_Nothing" "..Is_Nothing")
-                builder.append (Option "..Not_Nothing" "..Not_Nothing")
+        if include_nullable then
+            builder.append (Option "..Is_Nothing" "..Is_Nothing")
+            builder.append (Option "..Not_Nothing" "..Not_Nothing")
 
-            if include_boolean then
-                builder.append (Option "..Is_True" "..Is_True")
-                builder.append (Option "..Is_False" "..Is_False")
+        if include_boolean then
+            builder.append (Option "..Is_True" "..Is_True")
+            builder.append (Option "..Is_False" "..Is_False")
 
-            value_editor = Widget.Vector_Editor item_editor=equatable_types item_default='""'
-            builder.append (Option "..Is_In" "..Is_In" [["values", value_editor]])
+        value_editor = Widget.Vector_Editor item_editor=equatable_types item_default='""'
+        builder.append (Option "..Is_In" "..Is_In" [["values", value_editor]])
 
-            if include_numeric then
-                builder.append (Option "..Is_Finite" "..Is_Finite")
-                builder.append (Option "..Is_Infinite" "..Is_Infinite")
-                builder.append (Option "..Is_Nan" "..Is_Nan")
-                builder.append (Option "..Not_Nan" "..Not_Nan")
+        if include_numeric then
+            builder.append (Option "..Is_Finite" "..Is_Finite")
+            builder.append (Option "..Is_Infinite" "..Is_Infinite")
+            builder.append (Option "..Is_Nan" "..Is_Nan")
+            builder.append (Option "..Not_Nan" "..Not_Nan")
 
-            if include_text then
-                builder.append (Option "..Is_Empty" "..Is_Empty")
-                builder.append (Option "..Not_Empty" "..Not_Empty")
+        if include_text then
+            builder.append (Option "..Is_Empty" "..Is_Empty")
+            builder.append (Option "..Not_Empty" "..Not_Empty")
 
-        make_single_choice options
+    make_single_choice options
 
 ## Specifies the action of a Filter_Condition.
 type Filter_Action

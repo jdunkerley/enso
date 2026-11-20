@@ -269,7 +269,7 @@ type Table
        that table. If there are columns that do not appear in the first table,
        they are appended to the end of the resulting table in the order they
        appear in the input.
-    @columns_to_keep Columns_To_Keep.default_widget
+    @columns_to_keep (Widget.from Columns_To_Keep)
     from_union (tables : Vector Table) columns_to_keep:Columns_To_Keep=..In_Any_Warn_On_Missing match_columns:Match_Columns=..By_Name on_problems:Problem_Behavior=..Report_Warning -> Table & In_Memory_Table & Any ! No_Output_Columns | Illegal_Argument =
         all_tables = (tables.map t-> t:Table)
         raw = if all_tables.is_empty then Error.throw (Illegal_Argument.Error "`Table.from_union` needs at least 1 input table.") else
@@ -1829,7 +1829,7 @@ type Table
        Format strings for `Boolean` consist of two values that represent true and
        false, separated by a `|`.
     @columns (Widget_Helpers.make_column_name_multi_selector add_regex=True add_by_type=True)
-    @locale Locale.default_widget
+    @locale (Widget.from Locale)
     @format Widget_Helpers.make_format_chooser_for_selection
     format self (columns : Table_Selector = Missing_Argument.throw "columns") (format : Text | Date_Time_Formatter | Column = "") locale:Locale=Locale.default error_on_missing_columns:Boolean=True on_problems:Problem_Behavior=..Report_Warning -> Table & Any ! Date_Time_Format_Parse_Error | Illegal_Argument = _profile_time_execution "Table.format" <|
         columns.act_if_any self error_on_missing_columns selected->
@@ -2047,7 +2047,7 @@ type Table
           be reported according to the `on_problems` behavior.
     @columns (Widget_Helpers.make_column_name_multi_selector add_regex=True add_by_type=True)
     @delimiter make_delimiter_selector
-    @column_count Columns_To_Add.default_widget
+    @column_count (Widget.from Columns_To_Add)
     split_to_columns self (columns : Table_Selector = Missing_Argument.throw "columns") (delimiter : Text | Vector = Missing_Argument.throw "delimiter") column_count:Columns_To_Add=..All_Columns on_problems:Problem_Behavior=..Report_Warning error_on_missing_columns:Boolean=True -> Table & Any = _profile_time_execution "Table.split_to_columns" <|
         columns.act_if_any self error_on_missing_columns selected->
             selected.fold self current->column_name->
@@ -2432,7 +2432,7 @@ type Table
        ### While
        For the purposes of the `Index_Sub_Range.While` predicate a single
        "element" of the table is represented by the `Row` type.
-    @range (self-> Index_Sub_Range.default_widget self.row_count)
+    @range (self-> Widget.from Index_Sub_Range count=self.row_count)
     take self (range : Index_Sub_Range | Range | Integer = ..First) -> Table & Any =
         self.implementation.take self.underlying range
 
@@ -2470,7 +2470,7 @@ type Table
        ### Supported Range Types
        Database backends support all range types except `While` and `Sample`
        In-memory tables support all range types.
-    @range (self-> Index_Sub_Range.default_widget self.row_count)
+    @range (self-> Widget.from Index_Sub_Range count=self.row_count)
     drop self (range : Index_Sub_Range | Range | Integer = ..First) -> Table & Any =
         self.implementation.drop self.underlying range
 
@@ -2879,7 +2879,7 @@ type Table
 
        ## Arguments
         - `max_rows`: specifies the maximum number of rows to read.
-    @max_rows Rows_To_Read.default_widget
+    @max_rows (Widget.from Rows_To_Read)
     rows self max_rows:Rows_To_Read=..All_Rows -> Vector Row =
         self.implementation.rows self.underlying max_rows
 
@@ -3023,7 +3023,7 @@ type Table
        So `table.join other on=["A", "B"]` is a shorthand for:
        `table.join other on=[..Equals "A" "A", ..Equals "B" "B"]`
     @on Widget_Helpers.make_join_condition_selector
-    @join_kind Join_Kind.default_widget
+    @join_kind (Widget.from Join_Kind)
     join self (right : Table = Missing_Argument.throw "right") join_kind:Join_Kind=..Left_Outer (on : Vector (Join_Condition | Text) | Text | Join_Condition = [Join_Condition.Equals self.column_names.first]) (right_prefix : Text = "Right ") on_problems:Problem_Behavior=..Report_Warning -> Table & Any = _profile_time_execution "Table.join" <|
         ## Resolve Spatial Join Conditions
         resolved = Spatial_Join_Condition.resolve on
@@ -3352,7 +3352,7 @@ type Table
        that table. If there are columns that do not appear in the first table,
        they are appended to the end of the resulting table in the order they
        appear in the input.
-    @columns_to_keep Columns_To_Keep.default_widget
+    @columns_to_keep (Widget.from Columns_To_Keep)
     union self (tables : Table | Vector = Missing_Argument.throw "tables") columns_to_keep:Columns_To_Keep=..In_Any_Warn_On_Missing match_columns:Match_Columns=..By_Name on_problems:Problem_Behavior=..Report_Warning -> Table & Any = _profile_time_execution "Table.union" <|
         self.implementation.union self.underlying tables columns_to_keep match_columns on_problems
 
@@ -3413,7 +3413,7 @@ type Table
 
        ## Arguments
         - `max_rows`: specifies the maximum number of rows to read.
-    @max_rows Rows_To_Read.default_widget
+    @max_rows (Widget.from Rows_To_Read)
     read self (max_rows : Rows_To_Read = self.implementation.default_max_rows) -> Table & Any =
         self.implementation.read self.underlying max_rows
 
@@ -3989,7 +3989,6 @@ type Table
        operation.
     @columns (Widget_Helpers.make_column_name_multi_selector add_regex=True add_by_type=True)
     @n (Widget.Numeric_Input)
-    @default (self-> Widget_Helpers.make_fill_default_value_selector)
     @group_by (Widget_Helpers.make_column_name_multi_selector add_regex=True)
     @order_by Widget_Helpers.make_order_by_selector
     offset self (columns : Table_Selector = Missing_Argument.throw "columns") n:Integer=-1 fill_with:Fill_With=..Nothing (group_by : Vector | Text | Integer | Regex = []) (order_by : Vector | Text = []) set_mode:Set_Mode=..Add on_problems:Problem_Behavior=..Report_Warning error_on_missing_columns:Boolean=True -> Table & Any = _profile_time_execution "Table.offset" <|

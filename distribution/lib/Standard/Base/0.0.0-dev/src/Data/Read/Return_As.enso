@@ -63,12 +63,14 @@ type Return_As
         _ : Return_As -> value
         _ -> Panic.throw (Type_Error.Error Return_As value "Expected `return` to be a Return_As type, but got {got}.")
 
-    ## ---
-       private: true
-       ---
-    default_widget -> Widget =
-        options = SPI._get_known_return_classes.flat_map .get_dropdown_options
-        Single_Choice values=options
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Return_As`.
+Widget.from (that : Return_As.type) -> Widget =
+    _ = that
+    options = SPI._get_known_return_classes.flat_map .get_dropdown_options
+    Single_Choice values=options
 
 ## ---
    private: true
