@@ -90,6 +90,8 @@ describe('Guides', () => {
     expect(guides.instructions).toContain('Data.read_many')
     expect(overview).toContain('## Write whole-table operations')
     expect(overview).toContain('## Read several files at once')
+    expect(overview).toContain('## One step per node')
+    expect(guides.instructions).toContain('one step')
   })
 
   test('guideUri names the topic', () => {
