@@ -589,13 +589,6 @@ type Locale
     ## ---
        private: true
        ---
-       Gets the default drop down option for Locale.
-    default_widget -> Widget =
-        Widget.Single_Choice values=Locale.widget_options
-
-    ## ---
-       private: true
-       ---
     predefined_locale_fields : Vector Text
     predefined_locale_fields =
         locale_meta = Meta.meta Locale
@@ -607,7 +600,6 @@ type Locale
             bldr.append "from_java"
             bldr.append "java_locale"
             bldr.append "predefined_locale_fields"
-            bldr.append "default_widget"
             bldr.append "widget_options"
             bldr.append "display_country"
             bldr.append "display_variant"
@@ -639,3 +631,11 @@ type Locale
             Panic.throw caught_panic
         JavaLocale.setDefault default_locale
         result
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Locale`.
+Widget.from (that : Locale.type) -> Widget =
+    _ = that
+    Widget.Single_Choice values=Locale.widget_options

@@ -158,6 +158,16 @@ The 30 types today, and what each becomes:
 | C. Needs the subject     | Simple_Expression, Generate_Rows_Range, Google_Analytics_Account, Google_Analytics_Property                                                                                                                                                                                                        | the conversion returns a `Widget.Resolver`             |
 | D. Hard-coded in the GUI | Boolean, Integer/Float/Number, Text, Date, Date_Time, Time_Of_Day, File, Writable_File, Enso_Secret                                                                                                                                                                                                | conversions in `Metadata.enso` (the target's module)   |
 
+**Decided 2026-11-19 (plans for PRs 3a and 3b):** group C (and
+`DuckDB_GeoFormat`, which reads a connection) keeps `default_widget` until PR 6,
+so PR 3 deletes it from the other types only. `Date` and `Time_Of_Day` have no
+group B default in use: their unused `default_widget`s are deleted and their
+defaults are group D's pickers. The spec's "Azure_Storage" is
+`Azure_Blob_Storage`. Until PR 4, a union takes its first member's default (not
+`Nothing`), except that an argument whose union contains `File`, `Writable_File`
+or `Enso_Secret` keeps the file browser. The GUI caches a type's default for the
+session.
+
 Group D's defaults: `Boolean_Input`; `Numeric_Input` (`decimal_places` 0 for
 Integer); `Text_Input`; new `Date_Input`, `Date_Time_Input` and `Time_Input`
 constructors for the existing pickers (today they cannot be requested, e.g. in a
@@ -381,7 +391,8 @@ standard libraries in the same change.
 | 0   | Engine: `X.type` conversions (proper eigentype metadata, not the spike's name check; reject modules) + suggestion database records `….X.type`                                                                                                                                      | none       | label     |
 | 1   | Plumbing: `Widget.resolve_type` / `resolve_call` in Base by method pointer (nested autoscoped calls included); errors as results + logging; query timing. Existing annotations keep evaluating. Template, samples and `samples.test.ts` drop `import Standard.Visualization`       | none       | label     |
 | 2   | Front-matter `display` (+ `selected`); migrate the 147 `display=` annotations; remove `display`/`label` from `Widget`; delete `Expanded_Only`                                                                                                                                      | 1, #850    | entry     |
-| 3   | Type defaults: `Widget.from` for groups A, B and D; `Date_Input` / `Date_Time_Input` / `Time_Input`; the GUI drops its type guesses; `default_widget` deleted from 30 types                                                                                                        | 0, 1       | label     |
+| 3a  | Type defaults: `Widget.from` for 24 types of groups A and B; `Widget_Query.resolve_type`; call sites rewritten; `default_widget` deleted from them (group C keeps it until PR 6). No GUI change                                                                                    | 0, 1       | label     |
+| 3b  | Group D conversions; `Date_Input` / `Date_Time_Input` / `Time_Input`; the GUI asks `resolve_type` once per type per session and drops its type guesses; annotations that repeat a type default deleted                                                                             | 3a         | entry     |
 | 4   | Unions: `Widget.Union` + kind picker                                                                                                                                                                                                                                               | 3          | entry     |
 | 5   | `Widget_Columns` + `Column_Kind` (replacing `Viz_Kind`); declarative pickers; column list sent once; schema cache; migrate Table, Database, DuckDB, Geo, XML and YXDB                                                                                                              | 1          | entry     |
 | 6   | Resolvers with declared dependencies + `search`; group C conversions returning resolvers; migrate every `cache=` helper (join, filter, rename, fill, Google, Redshift, DuckDB, Hyper); delete `cache`, `_with_table_cache`, `With_JSON_Cache` and `Standard.Visualization.Widgets` | 5          | entry     |

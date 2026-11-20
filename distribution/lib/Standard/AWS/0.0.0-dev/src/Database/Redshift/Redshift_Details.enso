@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Errors.Common.Type_Error
+import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget.Text_Input
 
 import Standard.Database.Connection.Client_Certificate.Client_Certificate
@@ -27,7 +28,7 @@ type Redshift_Details
         - `client_cert`: The client certificate to use or `Nothing` if not
           needed.
     @host (Text_Input)
-    @credentials AWS_Credential.default_widget add_user_password=True
+    @credentials (Widget.from AWS_Credential add_user_password=True)
     Redshift
         host:Text=(Missing_Argument.throw "host")
         port:Integer=5439

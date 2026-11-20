@@ -15,14 +15,16 @@ type Email_Address
     to_text self -> Text = 
         if self.name == "" then self.address else self.name + ' <' + self.address + '>'
 
-    ## ---
-       private: true
-       ---
-    default_widget -> Widget =
-        name = [Option "Address" "'name@domain.com'"]
-        name_address = [Option "Name And Address" "(..Address 'name@domain.com' 'Name')"]
-        values = name + name_address
-        Single_Choice values=values
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Email_Address`.
+Widget.from (that : Email_Address.type) -> Widget =
+    _ = that
+    name = [Option "Address" "'name@domain.com'"]
+    name_address = [Option "Name And Address" "(..Address 'name@domain.com' 'Name')"]
+    values = name + name_address
+    Single_Choice values=values
 
 ## ---
    private: true

@@ -3,8 +3,10 @@ from Standard.Base import all
 from Standard.Test import all
 
 import project.Excel_Spec
+import project.Excel_Widgets_Spec
 
 main filter=Nothing =
     suite = Test.build suite_builder->
         Excel_Spec.add_specs suite_builder
+        Excel_Widgets_Spec.add_specs suite_builder
     suite.run_with_filter filter

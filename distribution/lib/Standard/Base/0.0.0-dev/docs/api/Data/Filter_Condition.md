@@ -30,9 +30,9 @@
     - Regex_Match pattern:Standard.Base.Any.Any= keep_or_remove:Standard.Base.Data.Filter_Condition.Filter_Action=
     - Starts_With prefix:Standard.Base.Any.Any= case_sensitivity:Standard.Base.Data.Text.Case_Sensitivity.Case_Sensitivity= keep_or_remove:Standard.Base.Data.Filter_Condition.Filter_Action=
     - action self -> Standard.Base.Any.Any
-    - default_widget include_comparable:Standard.Base.Data.Boolean.Boolean= include_text:Standard.Base.Data.Boolean.Boolean= include_boolean:Standard.Base.Data.Boolean.Boolean= include_nullable:Standard.Base.Data.Boolean.Boolean= include_numeric:Standard.Base.Data.Boolean.Boolean= include_date:Standard.Base.Data.Boolean.Boolean= include_time:Standard.Base.Data.Boolean.Boolean= include_date_time:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Metadata.Widget
     - resolve_auto_scoped filter:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - to_display_text self -> Standard.Base.Any.Any
     - to_predicate self -> Standard.Base.Any.Any
 - handle_nothing f:Standard.Base.Any.Any elem:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - sql_like_to_regex sql_pattern:Standard.Base.Data.Text.Text -> Standard.Base.Any.Any
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Filter_Condition.Filter_Condition.type include_comparable:Standard.Base.Data.Boolean.Boolean= include_text:Standard.Base.Data.Boolean.Boolean= include_boolean:Standard.Base.Data.Boolean.Boolean= include_nullable:Standard.Base.Data.Boolean.Boolean= include_numeric:Standard.Base.Data.Boolean.Boolean= include_date:Standard.Base.Data.Boolean.Boolean= include_time:Standard.Base.Data.Boolean.Boolean= include_date_time:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Metadata.Widget

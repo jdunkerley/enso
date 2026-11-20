@@ -191,14 +191,6 @@ type Duration
     of_seconds (seconds : Integer = (Missing_Argument.throw "seconds")) -> Duration = Duration.new seconds=seconds
 
     ## ---
-       private: true
-       ---
-       Gets the default drop down option for Duration.
-    default_widget -> Widget =
-        options = [Option "Seconds" "Duration.of_seconds", Option "Minutes" "Duration.of_minutes", Option "Hours" "Duration.of_hours", Option "Custom" "Duration.new"]
-        Widget.Single_Choice values=options
-
-    ## ---
        group: Constants
        icon: time
        ---
@@ -274,7 +266,7 @@ type Duration
        longer = duration + (Duration.new hours=12)
        # → PT12H30M
        ```
-    @that Duration.default_widget
+    @that (Widget.from Duration)
     + self that:Duration -> Duration ! Time_Error =
         Date_Helpers.ensure_duration that <|
             Panic.catch ArithmeticException (Date_Helpers.duration_plus self that) err->
@@ -299,7 +291,7 @@ type Duration
        shorter = duration - (Duration.new minutes=30)
        # → PT5H30M
        ```
-    @that Duration.default_widget
+    @that (Widget.from Duration)
     - self that:Duration -> Duration ! Time_Error =
         Date_Helpers.ensure_duration that <|
             Panic.catch ArithmeticException (Date_Helpers.duration_minus self that) err->
@@ -646,3 +638,12 @@ type Duration
        This argument has no duration picker. Connect a duration, or type one such
        as `Duration.new minutes=90`.
     <= self that = Comparable.<= self=self that
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Duration`.
+Widget.from (that : Duration.type) -> Widget =
+    _ = that
+    options = [Option "Seconds" "Duration.of_seconds", Option "Minutes" "Duration.of_minutes", Option "Hours" "Duration.of_hours", Option "Custom" "Duration.new"]
+    Widget.Single_Choice values=options

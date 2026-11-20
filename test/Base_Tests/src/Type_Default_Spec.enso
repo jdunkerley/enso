@@ -1,0 +1,49 @@
+from Standard.Base import all
+import Standard.Base.Data.Read.Return_As.Return_As
+import Standard.Base.Errors.Common.No_Such_Conversion
+import Standard.Base.Metadata.Widget
+import Standard.Base.Metadata.Widget_Query
+import Standard.Base.Network.Email.Email_Address.Email_Address
+import Standard.Base.Network.Email.Email_Attachment.Email_Attachment
+import Standard.Base.Network.Email.Email_Provider.Email_Provider
+
+from Standard.Test import all
+
+## Checks that the type has a `Widget.from` conversion and that `resolve_type`
+   answers exactly that widget.
+check_default typ =
+    widget = Widget.from typ
+    widget.should_be_a Widget
+    type_name = Meta.meta typ . qualified_name
+    Widget_Query.resolve_type type_name . should_equal ('{"widget":' + widget.to_json + '}')
+
+add_specs suite_builder =
+    suite_builder.group "Type defaults by conversion" group_builder->
+        group_builder.specify "Locale" <| check_default Locale
+        group_builder.specify "Return_As" <| check_default Return_As
+        group_builder.specify "Case" <| check_default Case
+        group_builder.specify "Encoding" <| check_default Encoding
+        group_builder.specify "Text_Sub_Range" <| check_default Text_Sub_Range
+        group_builder.specify "Duration" <| check_default Duration
+        group_builder.specify "Time_Zone" <| check_default Time_Zone
+        group_builder.specify "Email_Address" <| check_default Email_Address
+        group_builder.specify "Email_Attachment" <| check_default Email_Attachment
+        group_builder.specify "Email_Provider" <| check_default Email_Provider
+        group_builder.specify "Header" <| check_default Header
+        group_builder.specify "File_Format" <| check_default File_Format
+        group_builder.specify "Filter_Condition" <| check_default Filter_Condition
+        group_builder.specify "Index_Sub_Range" <| check_default Index_Sub_Range
+        group_builder.specify "Filter_Condition takes its options as extra arguments" <|
+            all = Widget.from Filter_Condition
+            fewer = Widget.from Filter_Condition include_text=False include_boolean=False
+            (fewer.values.length < all.values.length) . should_be_true
+        group_builder.specify "Index_Sub_Range takes count" <|
+            (Widget.from Index_Sub_Range count=10).to_json . should_not_equal (Widget.from Index_Sub_Range).to_json
+        group_builder.specify "Date and Time_Of_Day have no default until PR 3b" <|
+            Widget_Query.resolve_type "Standard.Base.Data.Time.Date.Date" . should_equal '{"widget":null}'
+        group_builder.specify "a type with no default has no conversion (Text until PR 3b)" <|
+            Panic.recover Any (Widget.from Text) . should_fail_with No_Such_Conversion
+
+main filter=Nothing =
+    suite = Test.build suite_builder-> add_specs suite_builder
+    suite.run_with_filter filter

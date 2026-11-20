@@ -2,7 +2,6 @@
 ## module Standard.Microsoft.Azure_Storage
 - type Azure_Blob_Storage
     - SAS_Token token:(Standard.Base.Data.Text.Text|Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret)=
-    - default_widget -> Standard.Base.Metadata.Widget
 - type Azure_Storage
     - accounts environment:Standard.Microsoft.Azure_Environment.Azure_Environment= cred:Standard.Microsoft.Azure_Credential.Azure_Credential= subscription_id:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)= -> (Standard.Base.Data.Vector.Vector Standard.Microsoft.Azure_Storage.Azure_Storage_Account)
     - blob_containers account:Standard.Base.Data.Text.Text= prefix:Standard.Base.Data.Text.Text= cred:(Standard.Microsoft.Azure_Credential.Azure_Credential|Standard.Microsoft.Azure_Storage.Azure_Blob_Storage)= -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)
@@ -16,3 +15,4 @@
     - to_display_text self -> Standard.Base.Data.Text.Text
     - to_js_object self -> Standard.Base.Any.Any
     - to_text self -> Standard.Base.Data.Text.Text
+- Standard.Base.Metadata.Widget.from that:Standard.Microsoft.Azure_Storage.Azure_Blob_Storage.type -> Standard.Base.Metadata.Widget

@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Errors.Common.Type_Error
+import Standard.Base.Metadata.Widget
 import Standard.Base.Runtime.Ref.Ref
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Multiple_Choice, Single_Choice
@@ -44,7 +45,7 @@ type Spatial_Table
 
        ## Arguments
         - `max_rows`: specifies the maximum number of rows to read.
-    @max_rows Rows_To_Read.default_widget
+    @max_rows (Widget.from Rows_To_Read)
     read_as_geojson self (max_rows : Rows_To_Read = (self:Table).implementation.default_max_rows) -> Table & Any =
         folded = self.spatial_columns.fold self cur->col-> cur.st_to_geojson col as=col.name
         folded.read max_rows
@@ -58,7 +59,7 @@ type Spatial_Table
 
        ## Arguments
         - `max_rows`: specifies the maximum number of rows to read.
-    @max_rows Rows_To_Read.default_widget
+    @max_rows (Widget.from Rows_To_Read)
     read_as_wkt self (max_rows : Rows_To_Read = (self:Table).implementation.default_max_rows) -> Table & Any =
         folded = self.spatial_columns.fold self cur->col-> cur.st_to_wkt col as=col.name
         folded.read max_rows
@@ -360,7 +361,7 @@ type Spatial_Table
        ## Returns
        A new table with the existing columns and a new column containing the
        intersected spatial object.
-    @column _spatial_widget single_choice=False
+    @columns _spatial_widget single_choice=False
     st_intersection self (columns : Vector (Column | Expression | Text | Integer) = Missing_Argument.throw "columns") as:Text="" =
         resolved_columns = columns.map c-> _resolve_column c self.parent
         (self:Table).implementation.spatial_intersection self.parent.underlying resolved_columns as
@@ -379,7 +380,7 @@ type Spatial_Table
        ## Returns
        A new table with the existing columns and a new column containing the
        union of spatial objects.
-    @column _spatial_widget single_choice=False
+    @columns _spatial_widget single_choice=False
     st_union self (columns : Vector (Column | Expression | Text | Integer) = Missing_Argument.throw "columns") as:Text="" =
         resolved_columns = columns.map c-> _resolve_column c self.parent
         (self:Table).implementation.spatial_union self.parent.underlying resolved_columns as
@@ -616,8 +617,8 @@ type Spatial_Join_Condition
                 sjc
         [any_spatial.get, result]
 
-    ## Creates a Widget for selecting Spatial_Join_Condition
-    private default_widget left_selector right_selector =
+    ## The dropdown option for Spatial_Join_Condition, used by the join condition widget.
+    private widget_option left_selector right_selector =
         intersect = Option "Intersect" "..Intersect" [["left", left_selector], ["right", right_selector]]
         contains = Option "Contains" "..Contains" [["left", left_selector], ["right", right_selector]]
         contains_properly = Option "Contains_Properly" "..Contains_Properly" [["left", left_selector], ["right", right_selector]]
