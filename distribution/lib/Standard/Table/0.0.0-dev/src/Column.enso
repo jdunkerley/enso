@@ -2234,7 +2234,7 @@ type Column
 
              example_at = Examples.integer_column.at 0
        ```
-    @index (self-> Numeric_Input minimum=0 maximum=self.length-1)
+    @index (self-> Numeric_Input minimum=0 maximum=self.row_count-1)
     at self index:Integer=0 -> Any | Nothing ! Index_Out_Of_Bounds =
         self.implementation.at self index
 
@@ -2256,7 +2256,7 @@ type Column
 
              example_at = Examples.integer_column.get 0 -1
        ```
-    @index (self-> Numeric_Input minimum=0 maximum=self.length-1)
+    @index (self-> Numeric_Input minimum=0 maximum=self.row_count-1)
     get self index:Integer=0 ~default=Nothing -> Any | Nothing =
         self.implementation.get self index default
 
@@ -2455,7 +2455,7 @@ type Column
        ## Errors
         - If the range is out of bounds, an `Index_Out_Of_Bounds` error is
           raised.
-    @range (self-> Index_Sub_Range.default_widget self.length)
+    @range (self-> Index_Sub_Range.default_widget self.row_count)
     take self (range : Index_Sub_Range | Range | Integer = ..First) -> Column & Any =
         self.implementation.take self range
 
@@ -2471,7 +2471,7 @@ type Column
 
        ## Arguments
         - `range`: The selection of rows from the table to remove.
-    @range (self-> Index_Sub_Range.default_widget self.length)
+    @range (self-> Index_Sub_Range.default_widget self.row_count)
     drop self (range : Index_Sub_Range | Range | Integer = ..First) -> Column & Any =
         self.implementation.drop self range
 
@@ -2661,7 +2661,7 @@ type Column
         - `-`: ..Wrap_Around - In this mode values that slide off the top or
           bottom reappear at the other end. So no values get lost they are just
           rotated.
-    @n (self-> Numeric_Input minimum=0-self.length maximum=self.length)
+    @n (self-> Numeric_Input minimum=0-self.row_count maximum=self.row_count)
     offset self n:Integer=-1 fill_with:Fill_With=..Nothing -> Column & Any =
         self.implementation.offset self n fill_with
 
