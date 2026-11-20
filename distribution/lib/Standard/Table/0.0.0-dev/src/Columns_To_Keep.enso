@@ -24,12 +24,13 @@ type Columns_To_Keep
        `Nothing` for tables where it is missing.
     In_Any_Warn_On_Missing
 
-    ## ---
-       private: true
-       ---
-       The default widget for `Columns_To_Keep`.
-       It does not display the internal `In_Any_Warn_On_Missing` variant, since
-       that variant is only meant to be used as the default value.
-    default_widget -> Widget =
-        options = [Choice.Option "..In_Any" "..In_Any", Choice.Option "..In_All" "..In_All", Choice.Option "..In_List" "..In_List" parameters=[["column_names", Widget.Vector_Editor item_default='""']]]
-        make_single_choice values=options
+## ---
+   private: true
+   ---
+   The default widget for `Columns_To_Keep`.
+   It does not display the internal `In_Any_Warn_On_Missing` variant, since
+   that variant is only meant to be used as the default value.
+Widget.from (that : Columns_To_Keep.type) -> Widget =
+    _ = that
+    options = [Choice.Option "..In_Any" "..In_Any", Choice.Option "..In_All" "..In_All", Choice.Option "..In_List" "..In_List" parameters=[["column_names", Widget.Vector_Editor item_default='""']]]
+    make_single_choice values=options

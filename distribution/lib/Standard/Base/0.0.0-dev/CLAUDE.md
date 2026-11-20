@@ -87,6 +87,15 @@ result = "not a number".parse_integer.catch _-> 0
   matter (`always`, `selected`, `when_modified`), beside `group` and `icon`;
   arguments with no default always show. The compiler's `ArgumentDisplayCheck`
   validates it and `lintEnso` fails the build on a mistake.
+- **Type defaults.** A type's default widget is `Widget.from (that : X.type) …`
+  in `X`'s module. Extra defaulted arguments are tweaks
+  (`Widget.from Filter_Condition include_text=False`).
+  `Standard.Base.Metadata.Widget_Query.resolve_type` answers it for the GUI
+  (`{"widget":…}`, `{"widget":null}` for a type with no conversion, or an
+  `{"error":{"step":"lookup"|"type_default","message"}}`); a call in a node's
+  frame is
+  `Meta.call_module_method 'Standard.Base.Metadata.Widget_Query' 'resolve_type' [] '<qualified type name>'`.
+  Group C types keep `default_widget` until PR 6.
 - `Meta.get_method_annotation`, `Meta.find_type_or_module` and
   `Meta.call_module_method` are for the IDE only (`private: true`); do not use
   them in library code.
@@ -119,9 +128,9 @@ Doc comments follow the house style in the wiki's
 a one-sentence summary, `## Arguments` bullets, and `## Examples` that paste
 into the graph as nodes. The docs-site generator checks it for the modules in
 `STYLE_CHECKED_MODULES` in `docs-site/generator/src/style.ts`; today that is
-`Standard.Base.Data.Time.Date` and `Standard.Base.Data.Time.Date_Time`
-(`src/Data/Time/Date.enso` is the worked example). When you convert another
-module, add it to that list in the same PR.
+`Standard.Base.Data.Time.Date`, `Standard.Base.Data.Time.Date_Time` and
+`Standard.Base.Data.Time.Time_Of_Day` (`src/Data/Time/Date.enso` is the worked
+example). When you convert another module, add it to that list in the same PR.
 
 ## Where to read more
 

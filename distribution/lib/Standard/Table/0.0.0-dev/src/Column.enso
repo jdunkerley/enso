@@ -8,6 +8,7 @@ import Standard.Base.Errors.Common.Type_Error
 import Standard.Base.Errors.Deprecated.Deprecated
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
+import Standard.Base.Metadata.Widget
 from Standard.Base.Metadata.Widget import Numeric_Input, Text_Input
 from Standard.Base.Widget_Helpers import make_data_cleanse_vector_selector, make_regex_text_widget
 
@@ -214,7 +215,7 @@ type Column
           the comparison is performed pairwise between corresponding elements of
           `self` and `other`.
         - `locale`: The locale to use for the case-insensitive comparison.
-    @locale Locale.default_widget
+    @locale (Widget.from Locale)
     equals_ignore_case self (other : Column | Any) locale:Locale=Locale.default -> Column & Any =
         self.implementation.equals_ignore_case self other locale
 
@@ -1898,7 +1899,7 @@ type Column
        ### `Value_Type.Boolean` format strings
        Format strings for `Boolean` consist of two values that represent true and
        false, separated by a `|`.
-    @locale Locale.default_widget
+    @locale (Widget.from Locale)
     @format (self-> Widget_Helpers.make_format_chooser_for_type self.value_type)
     format self (format : Text | Date_Time_Formatter | Column = "") locale:Locale=Locale.default -> Column & Any ! Illegal_Argument =
         self.implementation.format self format locale
@@ -2234,7 +2235,7 @@ type Column
 
              example_at = Examples.integer_column.at 0
        ```
-    @index (self-> Numeric_Input minimum=0 maximum=self.length-1)
+    @index (self-> Numeric_Input minimum=0 maximum=self.row_count-1)
     at self index:Integer=0 -> Any | Nothing ! Index_Out_Of_Bounds =
         self.implementation.at self index
 
@@ -2256,7 +2257,7 @@ type Column
 
              example_at = Examples.integer_column.get 0 -1
        ```
-    @index (self-> Numeric_Input minimum=0 maximum=self.length-1)
+    @index (self-> Numeric_Input minimum=0 maximum=self.row_count-1)
     get self index:Integer=0 ~default=Nothing -> Any | Nothing =
         self.implementation.get self index default
 
@@ -2273,7 +2274,7 @@ type Column
         - `max_rows`: specifies the maximum number of rows to read. By default,
           it will return all rows for in-memory columns, but in Database it will
           read up to 1000 rows and warn if there are more.
-    @max_rows Rows_To_Read.default_widget
+    @max_rows (Widget.from Rows_To_Read)
     read self (max_rows : Rows_To_Read = default_row_limit_for_read self) -> Column & Any =
         self.implementation.read self max_rows
 
@@ -2455,7 +2456,7 @@ type Column
        ## Errors
         - If the range is out of bounds, an `Index_Out_Of_Bounds` error is
           raised.
-    @range (self-> Index_Sub_Range.default_widget self.length)
+    @range (self-> Widget.from Index_Sub_Range count=self.row_count)
     take self (range : Index_Sub_Range | Range | Integer = ..First) -> Column & Any =
         self.implementation.take self range
 
@@ -2471,7 +2472,7 @@ type Column
 
        ## Arguments
         - `range`: The selection of rows from the table to remove.
-    @range (self-> Index_Sub_Range.default_widget self.length)
+    @range (self-> Widget.from Index_Sub_Range count=self.row_count)
     drop self (range : Index_Sub_Range | Range | Integer = ..First) -> Column & Any =
         self.implementation.drop self range
 
@@ -2661,7 +2662,7 @@ type Column
         - `-`: ..Wrap_Around - In this mode values that slide off the top or
           bottom reappear at the other end. So no values get lost they are just
           rotated.
-    @n (self-> Numeric_Input minimum=0-self.length maximum=self.length)
+    @n (self-> Numeric_Input minimum=0-self.row_count maximum=self.row_count)
     offset self n:Integer=-1 fill_with:Fill_With=..Nothing -> Column & Any =
         self.implementation.offset self n fill_with
 

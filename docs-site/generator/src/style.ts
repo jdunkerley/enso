@@ -17,6 +17,7 @@ import { isFunctionPage, type SiteModel } from './model'
 export const STYLE_CHECKED_MODULES: readonly string[] = [
   'Standard.Base.Data.Time.Date',
   'Standard.Base.Data.Time.Date_Time',
+  'Standard.Base.Data.Time.Time_Of_Day',
 ]
 
 export interface StyleViolation {

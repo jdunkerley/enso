@@ -151,7 +151,7 @@ type Date_Time
     @millisecond (Widget.Numeric_Input minimum=0 maximum=999)
     @microsecond (Widget.Numeric_Input minimum=0 maximum=999)
     @nanosecond (Widget.Numeric_Input minimum=0 maximum=999)
-    @zone Time_Zone.default_widget
+    @zone (Widget.from Time_Zone)
     new (year:Integer=(Missing_Argument.throw "year")) (month:Integer=1) (day:Integer=1) (hour:Integer=0) (minute:Integer=0) (second:Integer=0) (millisecond:Integer=0) (microsecond:Integer=0) (nanosecond:Integer=0) (zone:Time_Zone=Time_Zone.system) -> Date_Time ! Time_Error =
         total_nanoseconds = nanosecond + microsecond * 1000 + millisecond * 1000000
         Panic.catch JException (Date_Helpers.date_time_new_builtin year month day hour minute second total_nanoseconds zone) cause->
@@ -598,7 +598,7 @@ type Date_Time
        first day of the week is Monday, and week 1 is the week containing the
        first Thursday of the year. Therefore it is important to properly specify
        the `locale` argument.
-    @locale Locale.default_widget
+    @locale (Widget.from Locale)
     week_of_year self (locale : Locale | Nothing = Nothing) -> Integer =
         ensure_in_epoch self <|
             if locale.is_nothing then Time_Utils.get_field_as_zoneddatetime self IsoFields.WEEK_OF_WEEK_BASED_YEAR else
@@ -859,7 +859,7 @@ type Date_Time
        local = time.at_time_zone (Time_Zone.new -4)
        # → 2020-01-01 08:00:00-04:00
        ```
-    @zone Time_Zone.default_widget
+    @zone (Widget.from Time_Zone)
     at_time_zone self (zone : Time_Zone) -> Date_Time =
         Time_Utils.with_zone_same_instant self zone
 
@@ -881,7 +881,7 @@ type Date_Time
        local = time.set_time_zone (Time_Zone.new -4)
        # → 2020-01-01 12:00:00-04:00
        ```
-    @zone Time_Zone.default_widget
+    @zone (Widget.from Time_Zone)
     set_time_zone self (zone : Time_Zone) -> Date_Time =
         Time_Utils.with_zone_same_local self zone
 

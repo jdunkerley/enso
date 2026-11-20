@@ -1,5 +1,7 @@
 from Standard.Base import all
 
+import Standard.Base.Metadata.Widget
+
 type Join_Condition
     ## ---
        arguments:
@@ -28,7 +30,7 @@ type Join_Condition
         - left: A name or index of a column in the left table. - right: A name or
           index of a column in the right table. - locale: The locale to use for
           case insensitive comparisons.
-    @locale Locale.default_widget
+    @locale (Widget.from Locale)
     Equals_Ignore_Case (left : Text | Integer = Missing_Argument.throw "left") (right : Text | Integer = "") (locale : Locale = Locale.default)
 
     ## ---

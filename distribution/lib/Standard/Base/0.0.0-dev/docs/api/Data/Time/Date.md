@@ -16,7 +16,6 @@
     - day_of_week self -> Standard.Base.Any.Any
     - day_of_year self -> Standard.Base.Any.Any
     - days_until self end:Standard.Base.Data.Time.Date.Date include_end_date:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Numbers.Integer
-    - default_widget include_today:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Metadata.Widget
     - down_to self end:Standard.Base.Data.Time.Date.Date include_end:Standard.Base.Data.Boolean.Boolean= step:(Standard.Base.Data.Time.Date_Period.Date_Period|Standard.Base.Data.Time.Period.Period)= -> Standard.Base.Any.Any
     - end_of self period:Standard.Base.Data.Time.Date_Period.Date_Period= -> Standard.Base.Data.Time.Date.Date
     - end_of_month self -> Standard.Base.Data.Time.Date.Date

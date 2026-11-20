@@ -9,7 +9,6 @@
     - china -> Standard.Base.Any.Any
     - country self -> Standard.Base.Any.Any
     - default -> Standard.Base.Any.Any
-    - default_widget -> Standard.Base.Metadata.Widget
     - display_country self -> Standard.Base.Any.Any
     - display_language self -> Standard.Base.Any.Any
     - display_variant self -> Standard.Base.Any.Any
@@ -38,3 +37,4 @@
     - us -> Standard.Base.Any.Any
     - variant self -> Standard.Base.Any.Any
     - widget_options -> Standard.Base.Any.Any
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Locale.Locale.type -> Standard.Base.Metadata.Widget

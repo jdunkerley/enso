@@ -11,13 +11,13 @@ import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Function.Function
 import project.Meta
 import project.Metadata.Widget
-import project.Nothing.Nothing
 import project.Panic.Panic
 import project.Runtime.Ref.Ref
 from project.Data.Boolean import Boolean, False, True
 from project.Data.Range.Extensions import all
 from project.Metadata.Choice import Option
 from project.Metadata.Widget import Numeric_Input, Single_Choice, Vector_Editor
+from project.Nothing import all
 from project.Random import Random
 
 type Index_Sub_Range
@@ -102,11 +102,13 @@ type Index_Sub_Range
         o3 = Option "While" "(..While (x-> False))"
         [o1, o2, o4, o5, o6, o7, o3]
 
-    ## ---
-       private: true
-       ---
-    default_widget count:(Integer|Nothing)=Nothing -> Widget =
-        Single_Choice (Index_Sub_Range.default_options count)
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Index_Sub_Range`.
+Widget.from (that : Index_Sub_Range.type) (count:(Integer|Nothing)=Nothing) -> Widget =
+    _ = that
+    Single_Choice (Index_Sub_Range.default_options count)
 
 ## ---
    private: true

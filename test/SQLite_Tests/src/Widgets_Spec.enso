@@ -21,6 +21,14 @@ table_type = "Standard.Table.Table.Table"
 ## The answer for one argument whose widget is `widget`.
 answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
 
+## Checks that the type has a `Widget.from` conversion and that `resolve_type`
+   answers exactly that widget.
+check_default typ =
+    widget = Widget.from typ
+    widget.should_be_a Widget
+    type_name = Meta.meta typ . qualified_name
+    Widget_Query.resolve_type type_name . should_equal ('{"widget":' + widget.to_json + '}')
+
 add_specs suite_builder =
     connection = Database.connect (SQLite.In_Memory)
     connection.execute_update 'CREATE TABLE "mock_table" ("A" VARCHAR, "B C" INTEGER, "D ""E""" BOOLEAN, "F.G/H\\I" REAL)'
@@ -65,6 +73,10 @@ add_specs suite_builder =
             result.should_contain "DuckDB"
             result.should_contain "Snowflake"
             result.should_contain "Microsoft SQL Server"
+
+    suite_builder.group "Type defaults by conversion" group_builder->
+        group_builder.specify "Connection_Options" <| check_default Connection_Options
+        group_builder.specify "Credentials" <| check_default Credentials
 
 main filter=Nothing =
     suite = Test.build suite_builder->

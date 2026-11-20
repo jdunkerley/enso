@@ -10,7 +10,6 @@
     - date_add self amount:Standard.Base.Data.Numbers.Integer period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day
     - date_diff self end:Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Data.Numbers.Integer
     - date_part self period:Standard.Base.Data.Time.Time_Period.Time_Period -> Standard.Base.Data.Numbers.Integer
-    - default_widget include_now:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Metadata.Widget
     - end_of self period:Standard.Base.Data.Time.Time_Period.Time_Period= -> Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day
     - format self format:Standard.Base.Data.Time.Date_Time_Formatter.Date_Time_Formatter -> Standard.Base.Data.Text.Text
     - hour self -> Standard.Base.Data.Numbers.Integer

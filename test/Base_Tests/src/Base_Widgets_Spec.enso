@@ -1,13 +1,66 @@
 from Standard.Base import all
+import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Query
+import Standard.Base.Network.HTTP.Request_Body.Request_Body
 from Standard.Base.Widget_Helpers import all
 
 from Standard.Test import all
 
+## The widget the engine resolved for `argument`, as JSON. The query must have
+   answered with a widget, not an error and not `null`.
+resolved_widget json argument =
+    entry = json.parse_json . get "arguments" . find e-> e.first == argument
+    entry.second.get "error" . should_equal Nothing
+    widget = entry.second.get "widget"
+    widget.should_not_equal Nothing
+    widget
+
+option_labels widget = widget.get "values" . map o-> o.get "label"
+
 add_specs suite_builder =
+    suite_builder.group "Widget annotations of the standard library resolve (#897)" group_builder->
+        group_builder.specify "Index_Sub_Range's default widget builds its options with and without a count" <|
+            Index_Sub_Range.default_options . map .label . should_contain "First"
+            (Widget.from Index_Sub_Range count=5) . values . map .label . should_contain "By_Index"
+            (Widget.from Index_Sub_Range) . values . map .label . should_contain "By_Index"
+
+        group_builder.specify "the `range` of Vector.take, Vector.drop, Array.take and Array.drop" <|
+            vector_module = "Standard.Base.Data.Vector"
+            vector_type = "Standard.Base.Data.Vector.Vector"
+            ["take", "drop"].each method->
+                json = Widget_Query.resolve_call [1, 2, 3] vector_module vector_type method ["range"]
+                labels = option_labels (resolved_widget json "range")
+                labels.should_contain "First"
+                labels.should_contain "Every"
+            array_module = "Standard.Base.Data.Array"
+            array_type = "Standard.Base.Data.Array.Array"
+            ["take", "drop"].each method->
+                json = Widget_Query.resolve_call [1, 2, 3].to_array array_module array_type method ["range"]
+                option_labels (resolved_widget json "range") . should_contain "First"
+
+        group_builder.specify "the `id` of Time_Zone.parse lists the zone names" <|
+            json = Widget_Query.resolve_call Time_Zone "Standard.Base.Data.Time.Time_Zone" "Standard.Base.Data.Time.Time_Zone.Time_Zone" "parse" ["id"] subject_is_type=True
+            labels = option_labels (resolved_widget json "id")
+            labels.should_contain "UTC"
+            labels.should_contain "Europe/London"
+
+        group_builder.specify "Time_Zone.zone_names is a Vector of Text, as its signature says" <|
+            Time_Zone.zone_names . should_be_a Vector
+            Time_Zone.zone_names . should_contain "UTC"
+
+        group_builder.specify "the `x` of Request_Body.Json offers a JSON object of key-value pairs" <|
+            module = "Standard.Base.Network.HTTP.Request_Body"
+            json = Widget_Query.resolve_call Request_Body module (module + ".Request_Body") "Json" ["x"] subject_is_type=True
+            options = (resolved_widget json "x").get "values"
+            object_option = options.find o-> o.get "label" == "JSON Object"
+            object_option.get "value" . should_equal "JS_Object.from_pairs"
+            parameter = object_option.get "parameters" . first
+            parameter.first . should_equal "pairs"
+            parameter.second.get "constructor" . should_equal "Vector_Editor"
+
     suite_builder.group "Widgets for the Text type" group_builder->
         group_builder.specify "works for `take` and `drop`" <|
-            expect = '{"arguments":[["range",{"widget":' + Text_Sub_Range.default_widget.to_json + '}]]}'
+            expect = '{"arguments":[["range",{"widget":' + (Widget.from Text_Sub_Range).to_json + '}]]}'
             text_module = "Standard.Base.Data.Text.Extensions"
             text_type = "Standard.Base.Data.Text.Text"
             json = Widget_Query.resolve_call "abc def" text_module text_type "take" ["range"]
