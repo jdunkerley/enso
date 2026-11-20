@@ -34,9 +34,6 @@ type Duration
     ## ---
        group: DateTime
        icon: time
-       arguments:
-         start_inclusive: always
-         end_exclusive: always
        ---
        Creates the duration between two date times.
 
