@@ -43,12 +43,9 @@ type Time_Of_Day
        Obtains the current time from the system clock in the default time-zone.
 
        ## Examples
-       ### Get the current time in the default time zone.
-
+       ### The time now
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_now = Time_Of_Day.now
+       time = Time_Of_Day.now
        ```
     now -> Time_Of_Day = Date_Helpers.time_now
 
@@ -59,35 +56,38 @@ type Time_Of_Day
          hour: always
          minute: always
        ---
-       Obtains an instance of `Time_Of_Day` from an hour, minute, second and
-       nanosecond.
+       Constructs a new `Time_Of_Day` from an hour, minute, second and fractions
+       of a second.
 
-       Returns a `Time_Error` if the provided time is not a valid time.
+       Returns a `Time_Error` if the provided time is not valid.
 
        ## Arguments
-        - `hour`: The hour-of-day to represent, from 0 to 23.
-        - `minute`: The minute-of-hour to represent, from 0 to 59.
-        - `second`: The second-of-minute to represent, from 0 to 59.
-        - `millisecond`: the millisecond-of-second to represent, from 0 to 999.
-        - `microsecond`: the microsecond-of-second to represent, from 0 to
-          999,999.
-        - `nanosecond`: The nano-of-second to represent, from 0 to 999,999,999.
+       - `hour`: The hour-of-day to represent, from 0 to 23.
+       - `minute`: The minute-of-hour to represent, from 0 to 59.
+       - `second`: The second-of-minute to represent, from 0 to 59.
+       - `millisecond`: The millisecond-of-second to represent, from 0 to 999.
+       - `microsecond`: The microsecond-of-millisecond to represent, from 0 to
+         999.
+       - `nanosecond`: The nanosecond-of-microsecond to represent, from 0 to
+         999.
 
        ## Examples
-       ### Create a new local time at Unix epoch.
-
+       ### A time from its hour and minute
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_epoch = Time_Of_Day.new
+       time = Time_Of_Day.new 9 30
+       # → 09:30:00
        ```
 
-       ### Get the local time at 9:30.
-
+       ### Midnight
        ```
-             from Standard.Base import Time_Of_Day
+       time = Time_Of_Day.new
+       # → 00:00:00
+       ```
 
-             example_epoch = Time_Of_Day.new hour=9 minute=30
+       ### A time with a fraction of a second
+       ```
+       time = Time_Of_Day.new 12 34 56 millisecond=789
+       # → 12:34:56.789
        ```
     @hour (Widget.Numeric_Input minimum=0 maximum=23)
     @minute (Widget.Numeric_Input minimum=0 maximum=59)
@@ -106,49 +106,35 @@ type Time_Of_Day
        arguments:
          format: always
        ---
-       Obtains an instance of `Time_Of_Day` from a text such as "10:15".
+       Converts text containing a time of day, such as "10:15", into a
+       `Time_Of_Day`.
 
-       Returns a `Time_Error` if the provided text cannot be parsed using the
-       default format.
+       Returns a `Time_Error` if the provided `text` cannot be parsed using the
+       provided `format`.
 
        ## Arguments
-        - `text`: The text to parse as a time of day.
-        - `format`: A pattern describing how to parse the text, or a
-          `Date_Time_Formatter`.
+       - `text`: The text to try and parse as a time of day.
+       - `format`: A pattern describing how to parse the text, or a
+         `Date_Time_Formatter`. By default the text is read as an ISO-8601 time.
 
        ## Examples
-       ### Get the time 15:05:30.
-
+       ### Parse an ISO time
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_parse = Time_Of_Day.parse "15:05:30"
+       time = Time_Of_Day.parse "15:05:30"
+       # → 15:05:30
        ```
 
-       ### Recover from the parse error.
-
+       ### Parse a time with a custom format
        ```
-             from Standard.Base import Time_Of_Day
-             from Standard.Base.Errors.Common import Time_Error
-
-             example_parse = Time_Of_Day.parse "half twelve" . catch Time_Error _->
-                 Time_Of_Day.new
+       time = Time_Of_Day.parse "4:30AM" "h:mma"
+       # → 04:30:00
        ```
 
-       ### Parse "04:30:20" as Time_Of_Day.
-
+       ### Fall back to a default time when the text is not a time
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_parse = Time_Of_Day.parse "04:30:20" "HH:mm:ss"
-       ```
-
-       ### Parse "4:30AM" as Time_Of_Day
-
-       ```
-             from Standard.Base import Time_Of_Day
-
-             example_parse = Time_Of_Day.parse "4:30AM" "h:mma"
+       parsed = Time_Of_Day.parse "half twelve"
+       time = parsed.catch Any _-> Time_Of_Day.new 12 30
+       # → 12:30:00
        ```
 
        ## Remarks
@@ -189,15 +175,14 @@ type Time_Of_Day
        group: Metadata
        icon: metadata
        ---
-       Get the hour portion of the time of day.
+       The hour of this time of day, from 0 to 23.
 
        ## Examples
-       ### Get the current hour.
-
+       ### The hour of a time
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_hour = Time_Of_Day.now.hour
+       time = Time_Of_Day.new 13 45 30
+       hour = time.hour
+       # → 13
        ```
     hour self -> Integer = Date_Helpers.time_hour self
 
@@ -205,15 +190,14 @@ type Time_Of_Day
        group: Metadata
        icon: metadata
        ---
-       Get the minute portion of the time of day.
+       The minute of the hour of this time of day, from 0 to 59.
 
        ## Examples
-       ### Get the current minute.
-
+       ### The minute of a time
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_minute = Time_Of_Day.now.minute
+       time = Time_Of_Day.new 13 45 30
+       minute = time.minute
+       # → 45
        ```
     minute self -> Integer = Date_Helpers.time_minute self
 
@@ -221,15 +205,14 @@ type Time_Of_Day
        group: Metadata
        icon: metadata
        ---
-       Get the second portion of the time of day.
+       The second of the minute of this time of day, from 0 to 59.
 
        ## Examples
-       ### Get the current second.
-
+       ### The second of a time
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_second = Time_Of_Day.now.second
+       time = Time_Of_Day.new 13 45 30
+       second = time.second
+       # → 30
        ```
     second self -> Integer = Date_Helpers.time_second self
 
@@ -237,15 +220,14 @@ type Time_Of_Day
        group: Metadata
        icon: metadata
        ---
-       Get the millisecond portion of the time of day.
+       The millisecond of the second of this time of day, from 0 to 999.
 
        ## Examples
-       ### Get the current millisecond.
-
+       ### The millisecond of a time
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_millisecond = Time_Of_Day.now.millisecond
+       time = Time_Of_Day.new 13 45 30 123 456 789
+       millisecond = time.millisecond
+       # → 123
        ```
     millisecond self -> Integer = Date_Helpers.time_millisecond self
 
@@ -253,15 +235,14 @@ type Time_Of_Day
        group: Metadata
        icon: metadata
        ---
-       Get the microsecond portion of the time of day.
+       The microsecond of the millisecond of this time of day, from 0 to 999.
 
        ## Examples
-       ### Get the current microsecond.
-
+       ### The microsecond of a time
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_microsecond = Time_Of_Day.now.microsecond
+       time = Time_Of_Day.new 13 45 30 123 456 789
+       microsecond = time.microsecond
+       # → 456
        ```
     microsecond self -> Integer = Date_Helpers.time_microsecond self
 
@@ -269,20 +250,26 @@ type Time_Of_Day
        group: Metadata
        icon: metadata
        ---
-       Get the nanosecond portion of the time of day.
+       The nanosecond part of this time of day.
 
        ## Arguments
-        - `include_milliseconds`: Specifies if the whole fractional part of the
-          second should be returned as nanoseconds. Defaults to `False`, meaning
-          it will only return the nanosecond part in the range 0-999.
+       - `include_milliseconds`: Whether to return the whole fractional part of
+         the second as nanoseconds. By default only the nanosecond of the
+         microsecond is returned, from 0 to 999.
 
        ## Examples
-       ### Get the current nanosecond.
-
+       ### The nanosecond of a time
        ```
-             from Standard.Base import Time_Of_Day
+       time = Time_Of_Day.new 13 45 30 123 456 789
+       nanosecond = time.nanosecond
+       # → 789
+       ```
 
-             example_nanosecond = Time_Of_Day.now.nanosecond
+       ### The whole fraction of the second in nanoseconds
+       ```
+       time = Time_Of_Day.new 13 45 30 123 456 789
+       nanosecond = time.nanosecond include_milliseconds=True
+       # → 123456789
        ```
     nanosecond self (include_milliseconds : Boolean = False) -> Integer =
         Date_Helpers.time_nanoseconds self include_milliseconds
@@ -291,29 +278,64 @@ type Time_Of_Day
        group: DateTime
        icon: time
        ---
-       Returns the first time within the `Time_Period` containing self.
+       The first time within the `Time_Period` that contains this time.
+
+       ## Arguments
+       - `period`: The period to find the start of. By default it is the hour.
+
+       ## Examples
+       ### The start of the hour
+       ```
+       time = Time_Of_Day.new 13 45 30
+       start = time.start_of
+       # → 13:00:00
+       ```
+
+       ### The start of the minute
+       ```
+       time = Time_Of_Day.new 13 45 30
+       start = time.start_of ..Minute
+       # → 13:45:00
+       ```
     start_of self (period : Time_Period = ..Hour) -> Time_Of_Day = period.adjust_start self
 
     ## ---
        group: DateTime
        icon: time
        ---
-       Returns the last time within the `Time_Period` containing self.
+       The last time within the `Time_Period` that contains this time.
+
+       ## Arguments
+       - `period`: The period to find the end of. By default it is the hour.
+
+       ## Examples
+       ### The end of the hour
+       ```
+       time = Time_Of_Day.new 13 45 30
+       end = time.end_of
+       # → 13:59:59.999999999
+       ```
+
+       ### The end of the minute
+       ```
+       time = Time_Of_Day.new 13 45 30
+       end = time.end_of ..Minute
+       # → 13:45:59.999999999
+       ```
     end_of self (period : Time_Period = ..Hour) -> Time_Of_Day = period.adjust_end self
 
     ## ---
        group: Conversions
        icon: convert
        ---
-       Extracts the time as the number of seconds, from 0 to 24 * 60 * 60 - 1.
+       The number of whole seconds since midnight, from 0 to 86,399.
 
        ## Examples
-       ### Convert the current time into elapsed seconds in the day.
-
+       ### The seconds since midnight
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_to_seconds = Time_Of_Day.now.to_seconds
+       time = Time_Of_Day.new 13 45 30
+       seconds = time.to_seconds
+       # → 49530
        ```
     to_seconds self -> Integer = Date_Helpers.time_to_seconds self
 
@@ -321,30 +343,41 @@ type Time_Of_Day
        group: Conversions
        icon: convert
        ---
-       Combine this time of day with a date to create a point in time.
+       Combines this time of day with a date to create a point in time.
 
        ## Arguments
-        - `date`: The date on which this time should occur.
-        - `zone`: The time-zone in which the time is specified.
+       - `date`: The date on which this time should occur.
+       - `zone`: The time zone in which the time is specified. By default it is
+         the system time zone.
 
        ## Examples
-       ### Convert local time to 1st January 2020 12:30 at system timezone.
-
+       ### Half past noon on a date, UTC
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_to_time = Time_Of_Day.new 12 30 . to_date_time (Date.new 2020)
+       time = Time_Of_Day.new 12 30
+       date_time = time.to_date_time (Date.new 2020 1 1) Time_Zone.utc
+       # → 2020-01-01 12:30:00Z[UTC]
        ```
     @zone (Widget.from Time_Zone)
     to_date_time self (date : Date) (zone : Time_Zone = Time_Zone.system) -> Date_Time =
         Time_Utils.make_zoned_date_time date self zone
 
-
     ## ---
        group: DateTime
        icon: time
        ---
-       Returns a requested time part as integer.
+       A part of this time of day, as a number.
+
+       ## Arguments
+       - `period`: The part to get: the hour, minute, second, millisecond,
+         microsecond or nanosecond.
+
+       ## Examples
+       ### The minute of a time
+       ```
+       time = Time_Of_Day.new 13 45 30
+       minute = time.date_part ..Minute
+       # → 45
+       ```
     date_part self (period : Time_Period) -> Integer =
         case period of
             Time_Period.Hour        -> self.hour
@@ -358,14 +391,29 @@ type Time_Of_Day
        group: DateTime
        icon: time
        ---
-       Computes a time difference between the two times of day.
-       It returns an integer expressing how many periods fit between the two
-       times of day.
-       The difference will be positive if `end` is greater than `self`.
+       The number of whole periods between this time of day and `end`.
+
+       The result is positive if `end` is later than this time, and negative if
+       it is earlier.
 
        ## Arguments
-        - `end`: A time of day to compute the difference from.
-        - `period`: The period to compute the difference in.
+       - `end`: The time of day to count to.
+       - `period`: The unit to count in.
+
+       ## Examples
+       ### The hours between two times
+       ```
+       time = Time_Of_Day.new 9
+       hours = time.date_diff (Time_Of_Day.new 17 30) ..Hour
+       # → 8
+       ```
+
+       ### The minutes between two times
+       ```
+       time = Time_Of_Day.new 9
+       minutes = time.date_diff (Time_Of_Day.new 17 30) ..Minute
+       # → 510
+       ```
     date_diff self (end : Time_Of_Day) (period : Time_Period) -> Integer =
         Time_Utils.unit_time_difference period.to_java_unit self end
 
@@ -373,11 +421,22 @@ type Time_Of_Day
        group: DateTime
        icon: time
        ---
-       Shifts the time of day by a specified period.
+       Shifts this time of day by a number of periods.
+
+       The time wraps around midnight.
 
        ## Arguments
-        - `amount`: An integer specifying by how many periods to shift the time.
-        - `period`: The period by which to shift.
+       - `amount`: The number of periods to shift by. A negative number shifts
+         back.
+       - `period`: The unit to shift in.
+
+       ## Examples
+       ### Shift a time forward past midnight
+       ```
+       time = Time_Of_Day.new 23 30
+       later = time.date_add 45 ..Minute
+       # → 00:15:00
+       ```
     date_add self (amount : Integer) (period : Time_Period) -> Time_Of_Day =
         Time_Utils.unit_time_add period.to_java_unit self amount
 
@@ -386,27 +445,27 @@ type Time_Of_Day
        group: Operators
        icon: time
        ---
-       Add the specified amount of time to this instant to get a new instant.
+       Adds an amount of time to this time of day to get another time of day.
+
+       The time wraps around midnight.
 
        ## Arguments
-        - `amount`: The amount of time to add to this instant. It can be a
-          `Duration` or `Time_Period`.
+       - `amount`: The amount of time to add: a `Time_Period`, or a `Duration`
+         for a custom number of hours, minutes and seconds.
 
        ## Examples
-       ### Add a `Duration` to a `Time_Of_Day`.
-
+       ### Add a duration to a time
        ```
-             from Standard.Base import Time_Of_Day, Duration
-
-             example_plus = Time_Of_Day.new + (Duration.new seconds=3)
+       time = Time_Of_Day.new 9
+       later = time + (Duration.new minutes=90)
+       # → 10:30:00
        ```
 
-       ### Add a `Time_Period` to a `Time_Of_Day`.
-
+       ### Add an hour to a time
        ```
-             from Standard.Base import Time_Of_Day, Time_Period
-
-             example_plus = Time_Of_Day.new + Time_Period.Hour
+       time = Time_Of_Day.new 9
+       later = time + Time_Period.Hour
+       # → 10:00:00
        ```
     @amount make_time_period_selector
     + self (amount : Duration | Time_Period) -> Time_Of_Day ! Time_Error =
@@ -420,28 +479,28 @@ type Time_Of_Day
        group: Operators
        icon: time
        ---
-       Subtract the  specified amount of time from this instant to get a new
-       instant.
+       Subtracts an amount of time from this time of day to get another time of
+       day.
+
+       The time wraps around midnight.
 
        ## Arguments
-        - `amount`: The amount of time to add to this instant. It can be a
-          `Duration` or `Time_Period`.
+       - `amount`: The amount of time to subtract: a `Time_Period`, or a
+         `Duration` for a custom number of hours, minutes and seconds.
 
        ## Examples
-       ### Subtract 12 hours from a local time.
-
+       ### Subtract 12 hours from a time
        ```
-             from Standard.Base import Time_Of_Day, Duration
-
-             example_minus = Time_Of_Day.now - (Duration.new hours=12)
+       time = Time_Of_Day.new 9
+       earlier = time - (Duration.new hours=12)
+       # → 21:00:00
        ```
 
-       ### Subtract a `Time_Period` from a `Time_Of_Day`.
-
+       ### Subtract a minute from a time
        ```
-             from Standard.Base import Time_Of_Day, Time_Period
-
-             example_plus = Time_Of_Day.new - Time_Period.Hour
+       time = Time_Of_Day.new 9
+       earlier = time - Time_Period.Minute
+       # → 08:59:00
        ```
     @amount make_time_period_selector
     - self (amount : Duration | Time_Period) -> Time_Of_Day ! Time_Error =
@@ -478,51 +537,46 @@ type Time_Of_Day
        group: Conversions
        icon: convert
        ---
-       Format this time of day using the provided formatter pattern.
+       Formats this time of day as text using the provided format specifier.
 
        ## Arguments
-        - `format`: A pattern describing how to format the text, or a
-          `Date_Time_Formatter`.
+       - `format`: A pattern describing how to format the text, or a
+         `Date_Time_Formatter`.
 
        ## Examples
-       ### Format "16:21:10" as "16:21:00.1234"
-
+       ### Format a time with a 24-hour clock
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_format = Time_Of_Day.new 16 21 10 . format "HH:mm:ss.SSSS"
-       ```
-
-       ### Format "16:21:10" as "16:21:00.123456789"
-
-       ```
-             from Standard.Base import Time_Of_Day
-
-             example_format = Time_Of_Day.new 16 21 10 . format "HH:mm:ss.n"
+       time = Time_Of_Day.new 16 21 10
+       text = time.format "HH:mm:ss"
+       # → "16:21:10"
        ```
 
-       ### Format "16:21:10" as "4:21pm"
-
+       ### Format a time with a 12-hour clock
        ```
-             from Standard.Base import Time_Of_Day
-
-             example_format = Time_Of_Day.new 16 21 10 . format "h:mma"
-       ```
-
-       ### Format "16:21:10" as "04:21:10pm"
-
-       ```
-             from Standard.Base import Time_Of_Day
-
-             example_format = Time_Of_Day.new 16 21 10 . format "hh:mm:ssa"
+       time = Time_Of_Day.new 16 21 10
+       text = time.format "h:mma"
+       # → "4:21PM"
        ```
 
-       ### Format "16:21:10" as "hour:4"
-
+       ### Format a time with a zero-padded 12-hour clock
        ```
-             from Standard.Base import Time_Of_Day
+       time = Time_Of_Day.new 16 21 10
+       text = time.format "hh:mm:ssa"
+       # → "04:21:10PM"
+       ```
 
-             example_format = Time_Of_Day.new 16 21 10 . format "'hour:'h"
+       ### Format a time with a fraction of a second
+       ```
+       time = Time_Of_Day.new 16 21 10 123
+       text = time.format "HH:mm:ss.fff"
+       # → "16:21:10.123"
+       ```
+
+       ### Format a time with literal text
+       ```
+       time = Time_Of_Day.new 16 21 10
+       text = time.format "'hour:'h"
+       # → "hour:4"
        ```
 
        ## Remarks
@@ -575,7 +629,25 @@ type Time_Of_Day
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than `that`.
+       Checks if this time of day is later than `that` time.
+
+       ## Arguments
+       - `that`: The time of day to compare with.
+
+       ## Examples
+       ### A time later than another
+       ```
+       time = Time_Of_Day.new 13 45
+       other = Time_Of_Day.new 9
+       result = time > other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no time picker. Connect a time of day, or type one such
+       as `Time_Of_Day.new 9`.
     > self that = Comparable.> self=self that
 
     ## ---
@@ -583,7 +655,25 @@ type Time_Of_Day
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than or equal to `that`.
+       Checks if this time of day is the same as, or later than, `that` time.
+
+       ## Arguments
+       - `that`: The time of day to compare with.
+
+       ## Examples
+       ### A time compared with itself
+       ```
+       time = Time_Of_Day.new 13 45
+       other = Time_Of_Day.new 13 45
+       result = time >= other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no time picker. Connect a time of day, or type one such
+       as `Time_Of_Day.new 9`.
     >= self that = Comparable.>= self=self that
 
     ## ---
@@ -591,7 +681,25 @@ type Time_Of_Day
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than `that`.
+       Checks if this time of day is earlier than `that` time.
+
+       ## Arguments
+       - `that`: The time of day to compare with.
+
+       ## Examples
+       ### A time earlier than another
+       ```
+       time = Time_Of_Day.new 9
+       other = Time_Of_Day.new 13 45
+       result = time < other
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no time picker. Connect a time of day, or type one such
+       as `Time_Of_Day.new 9`.
     < self that = Comparable.< self=self that
 
     ## ---
@@ -599,7 +707,25 @@ type Time_Of_Day
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than or equal to `that`.
+       Checks if this time of day is the same as, or earlier than, `that` time.
+
+       ## Arguments
+       - `that`: The time of day to compare with.
+
+       ## Examples
+       ### A time later than another
+       ```
+       time = Time_Of_Day.new 13 45
+       other = Time_Of_Day.new 9
+       result = time <= other
+       # → False
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument has no time picker. Connect a time of day, or type one such
+       as `Time_Of_Day.new 9`.
     <= self that = Comparable.<= self=self that
 
 ## ---

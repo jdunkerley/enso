@@ -14,7 +14,10 @@ import {
 import { isFunctionPage, type SiteModel } from './model'
 
 /** Modules whose functions must follow the house style. */
-export const STYLE_CHECKED_MODULES: readonly string[] = ['Standard.Base.Data.Time.Date']
+export const STYLE_CHECKED_MODULES: readonly string[] = [
+  'Standard.Base.Data.Time.Date',
+  'Standard.Base.Data.Time.Time_Of_Day',
+]
 
 export interface StyleViolation {
   /** The page's title (`Date.new`). */
