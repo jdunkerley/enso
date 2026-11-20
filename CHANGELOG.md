@@ -510,6 +510,9 @@
   `-` offer each time period and `Duration.new` for a custom amount, `start_of`
   and `end_of` write `..Hour`, `to_date_time` has a time zone dropdown, and
   `nanosecond` a checkbox.][829]
+- [`Duration`'s functions are documented with examples you can copy into the
+  graph, every argument has a typed widget, and `Duration.new` and the `of_`
+  functions show their arguments][905]
 - [`Date_Range`'s functions are documented with examples you can copy into the
   graph, every argument has a type, and `first`, `second` and `last` give the
   right dates for a decreasing range.][904]
@@ -611,6 +614,7 @@
 [817]: https://github.com/jdunkerley/enso/pull/817
 [809]: https://github.com/jdunkerley/enso/pull/809
 [827]: https://github.com/jdunkerley/enso/pull/827
+[905]: https://github.com/jdunkerley/enso/pull/905
 [904]: https://github.com/jdunkerley/enso/pull/904
 [902]: https://github.com/jdunkerley/enso/pull/902
 [800]: https://github.com/jdunkerley/enso/pull/800

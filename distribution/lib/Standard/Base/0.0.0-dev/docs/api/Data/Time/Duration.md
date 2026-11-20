@@ -7,22 +7,22 @@
     - <= self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - > self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - >= self that:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - between start_inclusive:Standard.Base.Any.Any end_exclusive:Standard.Base.Any.Any timezone_aware:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+    - between start_inclusive:Standard.Base.Data.Time.Date_Time.Date_Time end_exclusive:Standard.Base.Data.Time.Date_Time.Date_Time timezone_aware:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Data.Time.Duration.Duration
     - hours self -> Standard.Base.Data.Numbers.Integer
     - milliseconds self -> Standard.Base.Data.Numbers.Integer
     - minutes self -> Standard.Base.Data.Numbers.Integer
     - nanoseconds self -> Standard.Base.Data.Numbers.Integer
-    - new hours:Standard.Base.Data.Numbers.Integer= minutes:Standard.Base.Data.Numbers.Integer= seconds:Standard.Base.Data.Numbers.Integer= milliseconds:Standard.Base.Data.Numbers.Integer= nanoseconds:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Any.Any
+    - new hours:Standard.Base.Data.Numbers.Integer= minutes:Standard.Base.Data.Numbers.Integer= seconds:Standard.Base.Data.Numbers.Integer= milliseconds:Standard.Base.Data.Numbers.Integer= nanoseconds:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Data.Time.Duration.Duration
     - of_hours hours:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Data.Time.Duration.Duration
     - of_minutes minutes:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Data.Time.Duration.Duration
     - of_seconds seconds:Standard.Base.Data.Numbers.Integer= -> Standard.Base.Data.Time.Duration.Duration
     - seconds self -> Standard.Base.Data.Numbers.Integer
-    - time_execution ~function:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - to_display_text self -> Standard.Base.Any.Any
-    - to_js_object self -> Standard.Base.Any.Any
-    - total_hours self -> Standard.Base.Any.Any
-    - total_milliseconds self -> Standard.Base.Any.Any
-    - total_minutes self -> Standard.Base.Any.Any
-    - total_seconds self -> Standard.Base.Any.Any
-    - zero -> Standard.Base.Any.Any
+    - time_execution ~function:Standard.Base.Any.Any -> Standard.Base.Data.Pair.Pair
+    - to_display_text self -> Standard.Base.Data.Text.Text
+    - to_js_object self -> Standard.Base.Data.Json.JS_Object
+    - total_hours self -> Standard.Base.Data.Numbers.Float!Standard.Base.Errors.Illegal_State.Illegal_State
+    - total_milliseconds self -> Standard.Base.Data.Numbers.Integer!Standard.Base.Errors.Illegal_State.Illegal_State
+    - total_minutes self -> Standard.Base.Data.Numbers.Float!Standard.Base.Errors.Illegal_State.Illegal_State
+    - total_seconds self -> Standard.Base.Data.Numbers.Float!Standard.Base.Errors.Illegal_State.Illegal_State
+    - zero -> Standard.Base.Data.Time.Duration.Duration
 - Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Time.Duration.Duration.type -> Standard.Base.Metadata.Widget

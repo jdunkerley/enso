@@ -30,6 +30,47 @@ add_specs suite_builder =
             (Duration.new seconds=60).total_minutes . should_equal 1
             (Duration.new milliseconds=1000).total_seconds . should_equal 1
 
+        group_builder.specify "should create durations from a single unit" <|
+            Duration.of_hours 3 . should_equal (Duration.new hours=3)
+            Duration.of_minutes 45 . should_equal (Duration.new minutes=45)
+            Duration.of_seconds 90 . should_equal (Duration.new minutes=1 seconds=30)
+            Duration.zero . should_equal (Duration.new)
+
+        group_builder.specify "between honours timezone_aware" <|
+            london = Date_Time.new 2020 1 1 12 0 zone=(Time_Zone.parse "Europe/London")
+            tokyo = Date_Time.new 2020 1 1 12 0 zone=(Time_Zone.parse "Asia/Tokyo")
+            (Duration.between london tokyo).total_hours . should_equal (-9)
+            (Duration.between london tokyo timezone_aware=False).total_hours . should_equal 0
+            (Duration.between (Date_Time.new 2020 1 1 12) (Date_Time.new 2020 1 1 10)).total_hours . should_equal (-2)
+
+        group_builder.specify "between requires Date_Time arguments" <|
+            Panic.recover Type_Error (Duration.between 5 (Date_Time.new 2020)) . should_fail_with Type_Error
+            Panic.recover Type_Error (Duration.between (Date_Time.new 2020) "x") . should_fail_with Type_Error
+
+        group_builder.specify "the total functions return the whole duration" <|
+            duration = Duration.new hours=1 minutes=30
+            duration.total_milliseconds . should_equal 5400000
+            duration.total_seconds . should_equal 5400.0
+            duration.total_minutes . should_equal 90.0
+            duration.total_hours . should_equal 1.5
+            Meta.type_of duration.total_milliseconds . should_equal Integer
+            Meta.type_of duration.total_seconds . should_equal Float
+            Meta.type_of duration.total_hours . should_equal Float
+
+        group_builder.specify "the parts of a duration are what is left after the larger units" <|
+            duration = Duration.new hours=1 minutes=30 seconds=2 milliseconds=500
+            duration.hours . should_equal 1
+            duration.minutes . should_equal 30
+            duration.seconds . should_equal 2
+            duration.milliseconds . should_equal 500
+            duration.nanoseconds . should_equal 500000000
+
+        group_builder.specify "time_execution gives the duration and the result" <|
+            timed = Duration.time_execution (1 + 2)
+            timed.second . should_equal 3
+            Meta.type_of timed.first . should_equal Duration
+            (timed.first.total_milliseconds >= 0) . should_be_true
+
         group_builder.specify "should normalize addition" <|
             duration = (Duration.new hours=11) + (Duration.new hours=1)
             duration.hours . should_equal 12
