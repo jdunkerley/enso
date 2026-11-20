@@ -536,8 +536,6 @@ type Time_Of_Day
     ## ---
        group: Conversions
        icon: convert
-       arguments:
-         format: always
        ---
        Formats this time of day as text using the provided format specifier.
 
