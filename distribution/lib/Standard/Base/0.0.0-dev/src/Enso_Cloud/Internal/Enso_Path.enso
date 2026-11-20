@@ -13,7 +13,6 @@ from project.Data.Text.Extensions import all
 
 ## ---
    private: true
-   unstable: true
    ---
    This is a helper for handling `enso://` paths.
 type Enso_Path

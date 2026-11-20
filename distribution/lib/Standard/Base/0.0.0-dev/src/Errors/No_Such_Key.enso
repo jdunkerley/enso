@@ -3,7 +3,6 @@ import project.Data.Text.Text
 type No_Such_Key
     ## ---
        private: true
-       unstable: true
        ---
        An error for getting a missing value from a map.
 

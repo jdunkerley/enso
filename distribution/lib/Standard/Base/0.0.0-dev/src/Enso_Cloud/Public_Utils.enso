@@ -65,7 +65,6 @@ get_optional_field (key : Text) js_object (~if_missing = Nothing) (show_value : 
 
 ## ---
    private: true
-   unstable: true
    ---
    Re-exports parts of the functionality of `http_request_as_json` function that
    is needed in tests.

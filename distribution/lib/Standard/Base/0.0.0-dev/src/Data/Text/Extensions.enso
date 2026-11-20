@@ -2382,7 +2382,6 @@ Text.equals_ignore_case self (that : Text) (locale : Locale = Locale.default) ->
 ## ---
     private: true
     advanced: true
-    unstable: true
     ---
     Unifies the case of all letters in the text, generating a key which can be
     used to perform case-insensitive comparisons.
