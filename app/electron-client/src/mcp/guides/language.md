@@ -5,7 +5,8 @@ Enso is a functional, indentation-sensitive language for data work.
 ## Syntax essentials
 
 - Assignment: `name = expression`. The last expression in a block is its value.
-- Method chain: `table.filter predicate . sort ["date"]`.
+- Method chain: `table.filter predicate . sort ["date"]`. In the graph, put each
+  call in its own node instead (see the `overview` guide).
 - Lambda: `x -> x + 1`.
 - Text literals use double quotes: `"hello"`.
 - Comments start with `#`.

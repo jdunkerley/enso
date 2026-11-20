@@ -257,7 +257,9 @@ export function projectTools(bridge: Pick<WindowBridge, 'call'>): ToolDefinition
         'lines (`from Standard.Table import Table`) added to the module if missing. Returns ' +
         'each new node with its id, name, expression and type and any error or panic, and ' +
         '`settled` (see below): check the types and errors, ' +
-        'and fix a wrong node with `edit_node`. Add a few nodes at a time. The call is ' +
+        'and fix a wrong node with `edit_node`. Make each statement one step (one function or ' +
+        'method call); put the next step in a new statement that uses its name, not in a ' +
+        'chain of method calls. Add a few nodes at a time. The call is ' +
         'all-or-nothing: if any statement or import does not parse, a name is already ' +
         'taken, or `after_node` is unknown, nothing is added and the error says which.' +
         EDIT_RULES,
