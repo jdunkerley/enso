@@ -616,7 +616,7 @@ type Spatial_Join_Condition
                 sjc
         [any_spatial.get, result]
 
-    ## Creates a Widget for selecting Spatial_Join_Condition
+    ## The dropdown option for Spatial_Join_Condition, used by the join condition widget.
     private widget_option left_selector right_selector =
         intersect = Option "Intersect" "..Intersect" [["left", left_selector], ["right", right_selector]]
         contains = Option "Contains" "..Contains" [["left", left_selector], ["right", right_selector]]
