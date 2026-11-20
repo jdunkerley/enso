@@ -16,6 +16,7 @@ import { isFunctionPage, type SiteModel } from './model'
 /** Modules whose functions must follow the house style. */
 export const STYLE_CHECKED_MODULES: readonly string[] = [
   'Standard.Base.Data.Time.Date',
+  'Standard.Base.Data.Time.Date_Time',
   'Standard.Base.Data.Time.Time_Of_Day',
 ]
 

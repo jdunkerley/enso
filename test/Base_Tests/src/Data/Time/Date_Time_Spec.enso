@@ -100,6 +100,24 @@ add_specs suite_builder =
             (dt + ..Day) . should_equal (Date_Time.new 2020 3 29 12 0 zone=zone)
             (dt + ..Day) . should_equal (dt + Date_Period.Day)
 
+        group_builder.specify "add_work_days keeps the time of day and follows the documented weekend rules" <|
+            # 2020-02-01 is a Saturday, 2020-02-02 a Sunday, 2020-02-03 a Monday.
+            saturday = Date_Time.new 2020 2 1 11 45 zone=Time_Zone.utc
+            sunday = Date_Time.new 2020 2 2 11 45 zone=Time_Zone.utc
+            monday = Date_Time.new 2020 2 3 11 45 zone=Time_Zone.utc
+            sunday.add_work_days 0 . should_equal monday
+            sunday.add_work_days 1 . should_equal (Date_Time.new 2020 2 4 11 45 zone=Time_Zone.utc)
+            saturday.add_work_days -1 . should_equal (Date_Time.new 2020 1 31 11 45 zone=Time_Zone.utc)
+            sunday.add_work_days -1 . should_equal (Date_Time.new 2020 1 31 11 45 zone=Time_Zone.utc)
+            monday.add_work_days -1 . should_equal (Date_Time.new 2020 1 31 11 45 zone=Time_Zone.utc)
+            monday.add_work_days 5 . should_equal (Date_Time.new 2020 2 10 11 45 zone=Time_Zone.utc)
+            monday.add_work_days 5 [Date.new 2020 2 5] . should_equal (Date_Time.new 2020 2 11 11 45 zone=Time_Zone.utc)
+
+        group_builder.specify "nanosecond is the part below a microsecond, or the whole fraction of the second" <|
+            dt = Date_Time.new 2020 12 23 11 45 30 millisecond=250 microsecond=125 nanosecond=7
+            dt.nanosecond . should_equal 7
+            dt.nanosecond include_milliseconds=True . should_equal 250125007
+
         group_builder.specify "methods reject arguments of the wrong type" <|
             dt = Date_Time.new 2020 1 1 12 0
             Test.expect_panic_with (dt.at_time_zone 5) Type_Error
