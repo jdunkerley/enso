@@ -8,7 +8,6 @@ polyglot java import java.lang.IllegalArgumentException
 type Illegal_Argument
     ## ---
        private: true
-       unstable: true
        ---
        A generic error that indicates that the provided argument is not valid for
        the operation.

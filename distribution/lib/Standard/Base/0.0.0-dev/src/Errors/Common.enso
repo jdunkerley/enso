@@ -33,7 +33,6 @@ type Not_Found
 type Index_Out_Of_Bounds
     ## ---
        private: true
-       unstable: true
        ---
        An error indicating that a requested index was out of bounds of a
        collection.

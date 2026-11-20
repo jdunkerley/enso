@@ -4,7 +4,6 @@ import project.Nothing.Nothing
 type Time_Error
     ## ---
        private: true
-       unstable: true
        ---
        An error produced while working with time- and date-related methods.
 
