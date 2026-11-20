@@ -17,7 +17,7 @@ const SQLITE_IMPORT = 'from Standard.SQLite import SQLite_Format'
 const DB_FILE = '/home/user/enso/data/Sales.db'
 const UNKNOWN_FILE = '/home/user/enso/data/notes.xyz'
 
-// What `File_Format.default_widget` sends for these formats since #489.
+// What `Widget.from File_Format` sends for these formats since #489.
 const FORMAT_CONFIG = [
   [
     'format',

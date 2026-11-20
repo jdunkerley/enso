@@ -1,6 +1,7 @@
 from Standard.Base import all
 import Standard.Base.Errors.Common.Type_Error
 from Standard.Base.Metadata.Choice import Option
+import Standard.Base.Metadata.Widget
 import Standard.Base.Network.Email.Email_Provider.Email_Provider
 from Standard.Base.Network.Email.Email_Provider import make_email_provider
 
@@ -20,8 +21,8 @@ type Email_Provider_SES
        ## Arguments
         - `region`: AWS region where SES is enabled.
         - `credentials`: AWS credentials used to authorize the request.
-    @region (AWS_Region.default_widget)
-    @credentials (AWS_Credential.default_widget)
+    @region (Widget.from AWS_Region)
+    @credentials (Widget.from AWS_Credential)
     Amazon_SES region:AWS_Region=AWS_Region.Default credentials:AWS_Credential=AWS_Credential.Default
 
     ## Options displayed in the provider selector.

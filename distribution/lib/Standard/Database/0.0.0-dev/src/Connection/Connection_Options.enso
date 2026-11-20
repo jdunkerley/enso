@@ -11,7 +11,7 @@ type Connection_Options
        ---
        Additional customization options for the JDBC connection.
        Hold a set of key value pairs used to configure the connection.
-    @options Connection_Options.default_widget
+    @options (Widget.from Connection_Options)
     Value options:Vector=[]
 
     ## ---

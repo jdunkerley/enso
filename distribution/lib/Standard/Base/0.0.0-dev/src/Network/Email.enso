@@ -36,11 +36,11 @@ type Email
          attachments: always
        ---
        Creates an email object.
-    @from Email_Address.default_widget
+    @from (Widget.from Email_Address)
     @to _email_vector_widget
     @cc _email_vector_widget
     @bcc _email_vector_widget
-    @attachments Vector_Editor Email_Attachment.default_widget item_default="..File"
+    @attachments Vector_Editor (Widget.from Email_Attachment) item_default="..File"
     new from:Email_Address=(Missing_Argument.throw "from") to:(Vector Email_Address)=[] cc:(Vector Email_Address)=[] bcc:(Vector Email_Address)=[] subject:Text="" body:Email_Body="" attachments:(Vector Email_Attachment)=[] -> Email =
         resolved_to = to.map a->(a:Email_Address) on_problems=No_Wrap.Value
         resolved_cc = cc.map a->(a:Email_Address) on_problems=No_Wrap.Value
@@ -63,12 +63,12 @@ type Email
 
        Sends an email using the specified email provider. Only sends an email in write mode.
        The Test_Only email provider can be used to simulate sending an email without actually sending it.
-    @from Email_Address.default_widget
+    @from (Widget.from Email_Address)
     @to _email_vector_widget
     @cc _email_vector_widget
     @bcc _email_vector_widget
-    @attachments Vector_Editor Email_Attachment.default_widget item_default="..File"
-    @provider Email_Provider.default_widget
+    @attachments Vector_Editor (Widget.from Email_Attachment) item_default="..File"
+    @provider (Widget.from Email_Provider)
     send from:Email_Address=(Missing_Argument.throw "from") to:(Vector Email_Address)=[] cc:(Vector Email_Address)=[] bcc:(Vector Email_Address)=[] subject:Text="" body:Email_Body="" attachments:(Vector Email_Attachment)=[] provider=(Missing_Argument.throw "provider") -> Send_Response =
         if from.is_error then from
         resolved_to = to.map a->(a:Email_Address) on_problems=No_Wrap.Value
@@ -93,7 +93,7 @@ type Email
 
        Sends an email using the specified email provider. Only sends an email in write mode.
        The Test_Only email provider can be used to simulate sending an email without actually sending it.
-    @provider Email_Provider.default_widget
+    @provider (Widget.from Email_Provider)
     send_message self provider=(Missing_Argument.throw "provider") -> Send_Response =
         resolved_provider = Email_Provider.resolve provider
         if resolved_provider.is_nothing then Error.throw (Illegal_Argument.Error "Could not resolve email provider.")
@@ -117,4 +117,4 @@ private _send_email_with_provider email provider =
         Warning.attach warning (Send_Response.Dry_Run email)
 
 private _email_vector_widget -> Widget =
-    Vector_Editor Email_Address.default_widget item_default="'receiver@domain.com'"
+    Vector_Editor (Widget.from Email_Address) item_default="'receiver@domain.com'"

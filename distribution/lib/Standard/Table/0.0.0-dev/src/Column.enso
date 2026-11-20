@@ -8,6 +8,7 @@ import Standard.Base.Errors.Common.Type_Error
 import Standard.Base.Errors.Deprecated.Deprecated
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
+import Standard.Base.Metadata.Widget
 from Standard.Base.Metadata.Widget import Numeric_Input, Text_Input
 from Standard.Base.Widget_Helpers import make_data_cleanse_vector_selector, make_regex_text_widget
 
@@ -214,7 +215,7 @@ type Column
           the comparison is performed pairwise between corresponding elements of
           `self` and `other`.
         - `locale`: The locale to use for the case-insensitive comparison.
-    @locale Locale.default_widget
+    @locale (Widget.from Locale)
     equals_ignore_case self (other : Column | Any) locale:Locale=Locale.default -> Column & Any =
         self.implementation.equals_ignore_case self other locale
 
@@ -1898,7 +1899,7 @@ type Column
        ### `Value_Type.Boolean` format strings
        Format strings for `Boolean` consist of two values that represent true and
        false, separated by a `|`.
-    @locale Locale.default_widget
+    @locale (Widget.from Locale)
     @format (self-> Widget_Helpers.make_format_chooser_for_type self.value_type)
     format self (format : Text | Date_Time_Formatter | Column = "") locale:Locale=Locale.default -> Column & Any ! Illegal_Argument =
         self.implementation.format self format locale
@@ -2273,7 +2274,7 @@ type Column
         - `max_rows`: specifies the maximum number of rows to read. By default,
           it will return all rows for in-memory columns, but in Database it will
           read up to 1000 rows and warn if there are more.
-    @max_rows Rows_To_Read.default_widget
+    @max_rows (Widget.from Rows_To_Read)
     read self (max_rows : Rows_To_Read = default_row_limit_for_read self) -> Column & Any =
         self.implementation.read self max_rows
 
@@ -2455,7 +2456,7 @@ type Column
        ## Errors
         - If the range is out of bounds, an `Index_Out_Of_Bounds` error is
           raised.
-    @range (self-> Index_Sub_Range.default_widget self.length)
+    @range (self-> Widget.from Index_Sub_Range count=self.length)
     take self (range : Index_Sub_Range | Range | Integer = ..First) -> Column & Any =
         self.implementation.take self range
 
@@ -2471,7 +2472,7 @@ type Column
 
        ## Arguments
         - `range`: The selection of rows from the table to remove.
-    @range (self-> Index_Sub_Range.default_widget self.length)
+    @range (self-> Widget.from Index_Sub_Range count=self.length)
     drop self (range : Index_Sub_Range | Range | Integer = ..First) -> Column & Any =
         self.implementation.drop self range
 

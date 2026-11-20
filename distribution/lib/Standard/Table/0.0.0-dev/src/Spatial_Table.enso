@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Errors.Common.Type_Error
+import Standard.Base.Metadata.Widget
 import Standard.Base.Runtime.Ref.Ref
 from Standard.Base.Metadata.Choice import Option
 from Standard.Base.Metadata.Widget import Multiple_Choice, Single_Choice
@@ -44,7 +45,7 @@ type Spatial_Table
 
        ## Arguments
         - `max_rows`: specifies the maximum number of rows to read.
-    @max_rows Rows_To_Read.default_widget
+    @max_rows (Widget.from Rows_To_Read)
     read_as_geojson self (max_rows : Rows_To_Read = (self:Table).implementation.default_max_rows) -> Table & Any =
         folded = self.spatial_columns.fold self cur->col-> cur.st_to_geojson col as=col.name
         folded.read max_rows
@@ -58,7 +59,7 @@ type Spatial_Table
 
        ## Arguments
         - `max_rows`: specifies the maximum number of rows to read.
-    @max_rows Rows_To_Read.default_widget
+    @max_rows (Widget.from Rows_To_Read)
     read_as_wkt self (max_rows : Rows_To_Read = (self:Table).implementation.default_max_rows) -> Table & Any =
         folded = self.spatial_columns.fold self cur->col-> cur.st_to_wkt col as=col.name
         folded.read max_rows
