@@ -32,15 +32,6 @@ type AWS_Region
     ## ---
        private: true
        ---
-    default_widget -> Widget =
-        options = [Option "Default" ("..Default")] + AWS_Region.all_region_ids.map id->
-            code = "(..Region "+id.pretty+")"
-            Option id code
-        Widget.Single_Choice values=options
-
-    ## ---
-       private: true
-       ---
     resolve_id self -> Text = case self of
         AWS_Region.Region id -> id
         AWS_Region.Default ->
@@ -53,6 +44,17 @@ type AWS_Region
        ---
     as_java self -> AWSRegion =
         AWSRegion.of self.resolve_id
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `AWS_Region`.
+Widget.from (that : AWS_Region.type) -> Widget =
+    _ = that
+    options = [Option "Default" ("..Default")] + AWS_Region.all_region_ids.map id->
+        code = "(..Region "+id.pretty+")"
+        Option id code
+    Widget.Single_Choice values=options
 
 ## ---
    private: true

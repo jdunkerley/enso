@@ -23,16 +23,17 @@ type Connection_Options
     merge self base_options =
         base_options.filter x->(self.options.any (y->y.first==x.first) . not) + self.options
 
-    ## ---
-       private: true
-       ---
-       Widget to design connection options.
-    default_widget -> Widget =
-        fqn = Pair.to Meta.Type . qualified_name . take (..Before_Last '.')
-        default = 'pair "key" "value"'
-        pair = Option "Pair" fqn+".pair" [["first", Text_Input], ["second", make_text_secret_selector]]
-        item_editor = Single_Choice values=[pair]
-        Vector_Editor item_editor=item_editor item_default=default
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Connection_Options`.
+Widget.from (that : Connection_Options.type) -> Widget =
+    _ = that
+    fqn = Pair.to Meta.Type . qualified_name . take (..Before_Last '.')
+    default = 'pair "key" "value"'
+    pair = Option "Pair" fqn+".pair" [["first", Text_Input], ["second", make_text_secret_selector]]
+    item_editor = Single_Choice values=[pair]
+    Vector_Editor item_editor=item_editor item_default=default
 
 ## ---
    private: true

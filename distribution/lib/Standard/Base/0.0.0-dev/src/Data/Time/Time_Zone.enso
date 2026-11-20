@@ -208,14 +208,6 @@ type Time_Zone
     to_display_text self = self.to_text
 
     ## ---
-       private: true
-       ---
-       Gets the default drop down option for Time_Zone.
-    default_widget -> Widget =
-        options = [Option "System" "Time_Zone.system", Option "Local" "Time_Zone.local", Option "UTC" "Time_Zone.utc", Option "Named" "(Time_Zone.parse 'UTC')", Option "custom" "(Time_Zone.new 1 0 0)"]
-        Widget.Single_Choice values=options
-
-    ## ---
        icon: time
        ---
        Gets a list of all the time zone names that are predefined.
@@ -230,6 +222,15 @@ type Time_Zone
        Convert the value to a corresponding Enso code representation.
     pretty : Text
     pretty self = "Time_Zone.parse " + self.zone_id.pretty
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Time_Zone`.
+Widget.from (that : Time_Zone.type) -> Widget =
+    _ = that
+    options = [Option "System" "Time_Zone.system", Option "Local" "Time_Zone.local", Option "UTC" "Time_Zone.utc", Option "Named" "(Time_Zone.parse 'UTC')", Option "custom" "(Time_Zone.new 1 0 0)"]
+    Widget.Single_Choice values=options
 
 ## ---
    private: true

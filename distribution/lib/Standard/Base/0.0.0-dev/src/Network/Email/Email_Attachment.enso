@@ -13,11 +13,13 @@ type Email_Attachment
     @file (Widget.Text_Input)
     File file:Text|URI|File|File_Like=(Missing_Argument.throw "file") name:Text=""
 
-    ## ---
-       private: true
-       ---
-    default_widget -> Widget =
-        Single_Choice values=[Option "..File" "..File"]
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Email_Attachment`.
+Widget.from (that : Email_Attachment.type) -> Widget =
+    _ = that
+    Single_Choice values=[Option "..File" "..File"]
 
 ## ---
    private: true

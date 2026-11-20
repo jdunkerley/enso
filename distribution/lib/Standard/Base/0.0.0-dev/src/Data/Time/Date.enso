@@ -1163,14 +1163,6 @@ type Date
     pretty self = "Date.new " + self.year.to_text + " " + self.month.to_text + " " + self.day.to_text
 
     ## ---
-       private: true
-       ---
-       Gets the default drop down option for Date.
-    default_widget (include_today:Boolean=False) -> Widget =
-        options = [Option "<Fixed Date>" "Date.new"] + (if include_today then [Option "<Today>" "Date.today"] else [])
-        Widget.Single_Choice values=options
-
-    ## ---
        aliases: [greater than]
        group: Operators
        icon: operators

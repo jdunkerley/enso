@@ -58,13 +58,14 @@ type Azure_Blob_Storage
     private to_java self =
         AzureCredential.BlobStorageSASToken.new (Derived_Secret_Value.from self.token)
 
-    ## ---
-       private: true
-       ---
-    default_widget -> Widget =
-        options = ["Default", "Environment", "CLI", "Client_Secret", "SAS_Token"].map k-> Option k (".."+k)
-        Widget.Single_Choice values=options
-
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Azure_Blob_Storage`.
+Widget.from (that : Azure_Blob_Storage.type) -> Widget =
+    _ = that
+    options = ["Default", "Environment", "CLI", "Client_Secret", "SAS_Token"].map k-> Option k (".."+k)
+    Widget.Single_Choice values=options
 
 ## Enso representation of the Azure Storage Account
 type Azure_Storage_Account

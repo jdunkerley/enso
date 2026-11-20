@@ -571,14 +571,6 @@ type Time_Of_Day
         parts.join ""
 
     ## ---
-       private: true
-       ---
-       Gets the default drop down option for Time_Of_Day.
-    default_widget (include_now:Boolean=False) -> Widget =
-        options = [Option "<Fixed Time>" "Time_Of_Day.new"] + (if include_now then [Option "<Now>" "Time_Of_Day.now"] else [])
-        Widget.Single_Choice values=options
-
-    ## ---
        aliases: [greater than]
        group: Operators
        icon: operators

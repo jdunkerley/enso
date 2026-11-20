@@ -617,7 +617,7 @@ type Spatial_Join_Condition
         [any_spatial.get, result]
 
     ## Creates a Widget for selecting Spatial_Join_Condition
-    private default_widget left_selector right_selector =
+    private widget_option left_selector right_selector =
         intersect = Option "Intersect" "..Intersect" [["left", left_selector], ["right", right_selector]]
         contains = Option "Contains" "..Contains" [["left", left_selector], ["right", right_selector]]
         contains_properly = Option "Contains_Properly" "..Contains_Properly" [["left", left_selector], ["right", right_selector]]
