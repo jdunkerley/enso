@@ -145,7 +145,8 @@ Request_Body.from (that:Any) = Request_Body.Json that
    ---
 make_all_with_json =
     base_selector = make_all_selector
-    values = [Option "JSON Object" key_value_widget] + base_selector.values
+    json_object = Option "JSON Object" "JS_Object.from_pairs" [["pairs", key_value_widget]]
+    values = [json_object] + base_selector.values
     Single_Choice values=values
 
 ## ---

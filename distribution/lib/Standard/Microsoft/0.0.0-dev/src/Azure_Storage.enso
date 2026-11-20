@@ -16,7 +16,7 @@ polyglot java import org.enso.microsoft.azure.AzureResourceManager
 ## Access Azure Storage resources.
 type Azure_Storage
     ## Lists the storage accounts in the given subscription.
-    @subscription make_subscription_selector
+    @subscription_id make_subscription_selector
     accounts environment:Azure_Environment=..Default cred:Azure_Credential=..Default (subscription_id:Text|Nothing=Nothing) -> Vector Azure_Storage_Account = handle_azure_exceptions <|
         java_cred = cred.to_java
         java_env = environment.to_java
@@ -25,7 +25,6 @@ type Azure_Storage
         Vector.from_polyglot_array proxy
 
     ## Lists the Blob Containers in the given storage account.
-    @subscription make_subscription_selector
     @cred (Widget.from Azure_Blob_Storage)
     blob_containers account:Text=(Missing_Argument.throw "account") prefix:Text="" (cred:(Azure_Credential | Azure_Blob_Storage)=..Default) -> Vector Text = handle_azure_exceptions <|
         java_cred = cred.to_java
@@ -33,7 +32,6 @@ type Azure_Storage
         Vector.from_polyglot_array as_array
 
     ## Lists the Blob Files in the given storage account and container.
-    @subscription make_subscription_selector
     @cred (Widget.from Azure_Blob_Storage)
     list_blob account:Text=(Missing_Argument.throw "account") container:Text=(Missing_Argument.throw "container") prefix:Text="" (cred:(Azure_Credential | Azure_Blob_Storage)=..Default) -> Vector Text = handle_azure_exceptions <|
         java_cred = cred.to_java

@@ -212,7 +212,7 @@ type Time_Zone
        ---
        Gets a list of all the time zone names that are predefined.
     zone_names : Vector Text
-    zone_names = Time_Utils.getZoneNames
+    zone_names = Time_Utils.getZoneNames.to_vector
 
     ## ---
        private: true

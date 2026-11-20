@@ -361,7 +361,7 @@ type Spatial_Table
        ## Returns
        A new table with the existing columns and a new column containing the
        intersected spatial object.
-    @column _spatial_widget single_choice=False
+    @columns _spatial_widget single_choice=False
     st_intersection self (columns : Vector (Column | Expression | Text | Integer) = Missing_Argument.throw "columns") as:Text="" =
         resolved_columns = columns.map c-> _resolve_column c self.parent
         (self:Table).implementation.spatial_intersection self.parent.underlying resolved_columns as
@@ -380,7 +380,7 @@ type Spatial_Table
        ## Returns
        A new table with the existing columns and a new column containing the
        union of spatial objects.
-    @column _spatial_widget single_choice=False
+    @columns _spatial_widget single_choice=False
     st_union self (columns : Vector (Column | Expression | Text | Integer) = Missing_Argument.throw "columns") as:Text="" =
         resolved_columns = columns.map c-> _resolve_column c self.parent
         (self:Table).implementation.spatial_union self.parent.underlying resolved_columns as
