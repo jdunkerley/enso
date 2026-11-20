@@ -510,6 +510,8 @@
   `-` offer each time period and `Duration.new` for a custom amount, `start_of`
   and `end_of` write `..Hour`, `to_date_time` has a time zone dropdown, and
   `nanosecond` a checkbox.][829]
+- [`Period`'s functions are documented with examples you can copy into the
+  graph, and every argument has a widget][902]
 - [`Date`'s functions are documented with examples you can copy into the graph,
   and every argument has a widget][800]
 - [`Date.yesterday` and `Date.tomorrow` give the day before and after
@@ -606,6 +608,7 @@
 [817]: https://github.com/jdunkerley/enso/pull/817
 [809]: https://github.com/jdunkerley/enso/pull/809
 [827]: https://github.com/jdunkerley/enso/pull/827
+[902]: https://github.com/jdunkerley/enso/pull/902
 [800]: https://github.com/jdunkerley/enso/pull/800
 [795]: https://github.com/jdunkerley/enso/pull/795
 [790]: https://github.com/jdunkerley/enso/pull/790

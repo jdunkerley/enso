@@ -1,4 +1,5 @@
 import project.Any.Any
+import project.Data.Boolean.Boolean
 import project.Data.Json.JS_Object
 import project.Data.Numbers.Integer
 import project.Data.Ordering.Comparable
@@ -7,11 +8,14 @@ import project.Data.Time.Date.Date
 import project.Data.Time.Duration.Duration
 import project.Data.Vector.Vector
 import project.Error.Error
+import project.Errors.Common.Incomparable_Values
 import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Errors.Time_Error.Time_Error
 import project.Meta
 import project.Panic.Panic
 from project.Data.Text.Extensions import all
+from project.Metadata import Widget
+from project.Metadata.Choice import Option
 
 polyglot java import java.lang.ArithmeticException
 polyglot java import java.time.DateTimeException
@@ -39,42 +43,69 @@ type Period
     ## ---
        icon: time
        ---
-       Create a Period representing the time interval between two dates.
+       Creates a Period from the time between two dates.
+
+       The result is negative when `end_date_exclusive` is before
+       `start_date_inclusive`.
 
        ## Arguments
-        - `start_date_inclusive`: The start date of the period, included.
-        - `end_date_exclusive`: The end date of the period, excluded.
+       - `start_date_inclusive`: The start date of the period, included.
+       - `end_date_exclusive`: The end date of the period, excluded.
 
        ## Examples
-       ### Get a Period between 2022-10-21 and 2022-09-12
-
+       ### The period between two dates
        ```
-             import Standard.Base.Data.Time.Period
-
-             example_period = Period.between (Date.new 2022 10 21) (Date.new 2022 9 12)
+       start = Date.new 2022 9 12
+       end = Date.new 2022 10 21
+       period = Period.between start end
+       # → 1M 9D
        ```
-    between : Date -> Date -> Period
-    between start_date_inclusive end_date_exclusive =
+
+       ### The months between a later and an earlier date
+       ```
+       start = Date.new 2022 10 21
+       end = Date.new 2022 9 12
+       period = Period.between start end
+       months = period.total_months
+       # → -1
+       ```
+    between (start_date_inclusive : Date) (end_date_exclusive : Date) -> Period =
         Period.Value (Java_Period.between start_date_inclusive end_date_exclusive)
 
     ## ---
        icon: time
+       arguments:
+         years: always
+         months: always
+         days: always
        ---
-       Create a new Period for years, months, and days.
-       - years: Amount of years.
-       - months: Amount of months.
-       - days: Amount of days.
+       Creates a Period from a number of years, months and days.
+
+       ## Arguments
+       - `years`: The number of years.
+       - `months`: The number of months. It is not limited to 11: 18 months stay
+         18 months.
+       - `days`: The number of days.
 
        ## Examples
-       ### Create 2 years and 5 days `Period`.
-
+       ### A period of years and days
        ```
-             import Standard.Base.Data.Time.Period
-
-             example_period = Period.new 2 0 5
+       period = Period.new 2 0 5
+       # → 2Y 0M 5D
        ```
-    new : Integer -> Integer -> Integer -> Period
-    new years=0 months=0 days=0 =
+
+       ### A period of months only
+       ```
+       period = Period.new months=18
+       # → 1Y 6M
+       ```
+
+       ### An empty period
+       ```
+       period = Period.new
+       # → 0D
+       ```
+    new (years : Integer = 0) (months : Integer = 0) (days : Integer = 0) -> Period =
         Period.Value (Java_Period.of years months days)
 
     ## ---
@@ -90,56 +121,112 @@ type Period
        group: DateTime
        icon: time
        ---
-       Get the portion of the period expressed in years.
-    years : Integer
-    years self = self.internal_period.getYears
+       The years part of this period.
+
+       The years and the months are kept separately: use `total_months` to count
+       them together.
+
+       ## Examples
+       ### The years of a period
+       ```
+       period = Period.new years=2 months=3 days=4
+       years = period.years
+       # → 2
+       ```
+    years self -> Integer = self.internal_period.getYears
 
     ## ---
        group: DateTime
        icon: time
        ---
-       Get the portion of the period expressed in months.
-    months : Integer
-    months self = self.internal_period.getMonths
+       The months part of this period, not including its years.
+
+       ## Examples
+       ### The months of a period
+       ```
+       period = Period.new years=2 months=3 days=4
+       months = period.months
+       # → 3
+       ```
+
+       ### Months that do not roll over into years
+       ```
+       period = Period.new months=18
+       months = period.months
+       # → 18
+       ```
+    months self -> Integer = self.internal_period.getMonths
 
     ## ---
        group: DateTime
        icon: time
        ---
-       Get the portion of the period coming from months and years as months
-       (every year is translated to 12 months).
-    total_months : Integer
-    total_months self = self.internal_period.toTotalMonths
+       The years and months of this period together, as a number of months.
+
+       Every year counts as 12 months.
+
+       ## Examples
+       ### The total months of a period
+       ```
+       period = Period.new years=2 months=3 days=4
+       total = period.total_months
+       # → 27
+       ```
+    total_months self -> Integer = self.internal_period.toTotalMonths
 
     ## ---
        group: DateTime
        icon: time
        ---
-       Get the portion of the period expressed in days.
-    days : Integer
-    days self = self.internal_period.getDays
+       The days part of this period.
+
+       ## Examples
+       ### The days of a period
+       ```
+       period = Period.new years=2 months=3 days=4
+       days = period.days
+       # → 4
+       ```
+    days self -> Integer = self.internal_period.getDays
 
     ## ---
        aliases: [add period]
        group: Operators
        icon: time
        ---
-       Add the specified amount of time to this period.
+       Adds another period to this one.
+
+       Returns a `Time_Error` if `other_period` is a `Duration`, and an
+       `Illegal_Argument` if it is anything but a `Period`.
 
        ## Arguments
-        - `other_period`: The period to add to `self`. Note that this cannot be a
-          `Duration`, neither `Date_Time`.
+       - `other_period`: The period to add to this one.
 
        ## Examples
-       ### Add 1 day to 1 month.
-
+       ### Add a day to a month
        ```
-           import Standard.Base.Data.Time.Period
-
-           example_add = (Period.new months=1) + (Period.new days=1)
+       period = Period.new months=1
+       other = Period.new days=1
+       total = period + other
+       # → 1M 1D
        ```
-    + : Period -> Period ! (Time_Error | Illegal_Argument)
-    + self other_period =
+
+       ### Add months to months
+       ```
+       period = Period.new months=8
+       other = Period.new months=5
+       total = period + other
+       # → 1Y 1M
+       ```
+
+       ## Remarks
+
+       ### The `other_period` argument
+       This argument is not typed, so a `Duration` gives a `Time_Error` and any
+       other value an `Illegal_Argument`, rather than a `Type_Error`. It starts
+       from `Period.new`, which you then complete: `(Period.new months=1)`.
+    @other_period make_period_choice
+    + self other_period -> Period ! (Time_Error | Illegal_Argument) =
         ensure_period other_period <|
             catch_java_exceptions "Period.+" <|
                 Period.Value (self.internal_period.plus other_period.internal_period)
@@ -149,22 +236,31 @@ type Period
        group: Operators
        icon: time
        ---
-       Subtract a specified amount of time from this period.
+       Subtracts another period from this one.
+
+       Returns a `Time_Error` if `other_period` is a `Duration`, and an
+       `Illegal_Argument` if it is anything but a `Period`.
 
        ## Arguments
-        - `other_period`: Other Period to add to this Period. Note that this
-          cannot be a `Duration`, neither `Date_Time`.
+       - `other_period`: The period to subtract from this one.
 
        ## Examples
-       ### Subtract 11 months from a period of 3 years
-
+       ### Subtract 3 months from a year and a half
        ```
-             import Standard.Base.Data.Time.Period
-
-             example_subtract = (Period.new years=3) - (Period.new months=11)
+       period = Period.new years=1 months=6
+       other = Period.new months=3
+       result = period - other
+       # → 1Y 3M
        ```
-    - : Period -> Period ! (Time_Error | Illegal_Argument)
-    - self other_period =
+
+       ## Remarks
+
+       ### The `other_period` argument
+       This argument is not typed, so a `Duration` gives a `Time_Error` and any
+       other value an `Illegal_Argument`, rather than a `Type_Error`. It starts
+       from `Period.new`, which you then complete: `(Period.new months=1)`.
+    @other_period make_period_choice
+    - self other_period -> Period ! (Time_Error | Illegal_Argument) =
         ensure_period other_period <|
             catch_java_exceptions "Period.-" <|
                 Period.Value (self.internal_period.minus other_period.internal_period)
@@ -174,21 +270,29 @@ type Period
        group: Operators
        icon: time
        ---
-       Multiply the amount of time in this period by the specified scalar.
+       Multiplies every part of this period by a whole number.
+
+       Returns a `Time_Error` if the result is too large for a period.
 
        ## Arguments
-        - `factor`: The scalar to multiply by.
+       - `factor`: The number to multiply by. A negative factor reverses the
+         period.
 
        ## Examples
-       ### Multiply a period of 1 year and 2 months by 2
-
+       ### Double a period
        ```
-             import Standard.Base.Data.Time.Period
-
-             example_multiply = (Period.new years=1 months=2) * 2
+       period = Period.new years=1 months=2
+       doubled = period * 2
+       # → 2Y 4M
        ```
-    * : Integer -> Period ! Time_Error
-    * self factor =
+
+       ### Triple a number of days
+       ```
+       period = Period.new days=10
+       tripled = period * 3
+       # → 30D
+       ```
+    * self (factor : Integer) -> Period ! Time_Error =
         catch_java_exceptions "Period.*" <|
             Period.Value (self.internal_period.multipliedBy factor)
 
@@ -197,42 +301,175 @@ type Period
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than `that`.
-    > self that = Comparable.> self=self that
+       Checks if this period is greater than `that`.
+
+       Periods have no order, because a month is not a fixed number of days. They
+       can only be compared with an equal period, so this is `False` for that and
+       an `Incomparable_Values` error for any other.
+
+       ## Arguments
+       - `that`: The period to compare with.
+
+       ## Examples
+       ### Periods that cannot be ordered
+       ```
+       period = Period.new months=1
+       other = Period.new days=30
+       result = (period > other).is_error
+       # → True
+       ```
+
+       ### A period compared with an equal one
+       ```
+       period = Period.new months=1
+       other = Period.new months=1
+       result = period > other
+       # → False
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument is not typed and has no widget (#797): typing it would turn
+       the `Incomparable_Values` error for a `Duration` into a `Type_Error`.
+       Connect a period, or type one such as `Period.new months=1`.
+    > self that -> Boolean ! Incomparable_Values = Comparable.> self=self that
 
     ## ---
        aliases: [greater than or equal]
        group: Operators
        icon: operators
        ---
-       Checks if `self` is greater than or equal to `that`.
-    >= self that = Comparable.>= self=self that
+       Checks if this period is greater than or equal to `that`.
+
+       Periods have no order, because a month is not a fixed number of days. They
+       can only be compared with an equal period, so this is `True` for that and
+       an `Incomparable_Values` error for any other.
+
+       ## Arguments
+       - `that`: The period to compare with.
+
+       ## Examples
+       ### A period compared with an equal one
+       ```
+       period = Period.new months=1
+       other = Period.new months=1
+       result = period >= other
+       # → True
+       ```
+
+       ### Periods that cannot be ordered
+       ```
+       period = Period.new months=1
+       other = Period.new days=30
+       result = (period >= other).is_error
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument is not typed and has no widget (#797): typing it would turn
+       the `Incomparable_Values` error for a `Duration` into a `Type_Error`.
+       Connect a period, or type one such as `Period.new months=1`.
+    >= self that -> Boolean ! Incomparable_Values = Comparable.>= self=self that
 
     ## ---
        aliases: [less than]
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than `that`.
-    < self that = Comparable.< self=self that
+       Checks if this period is less than `that`.
+
+       Periods have no order, because a month is not a fixed number of days. They
+       can only be compared with an equal period, so this is `False` for that and
+       an `Incomparable_Values` error for any other.
+
+       ## Arguments
+       - `that`: The period to compare with.
+
+       ## Examples
+       ### Periods that cannot be ordered
+       ```
+       period = Period.new days=1
+       other = Period.new months=1
+       result = (period < other).is_error
+       # → True
+       ```
+
+       ### A period compared with an equal one
+       ```
+       period = Period.new days=1
+       other = Period.new days=1
+       result = period < other
+       # → False
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument is not typed and has no widget (#797): typing it would turn
+       the `Incomparable_Values` error for a `Duration` into a `Type_Error`.
+       Connect a period, or type one such as `Period.new months=1`.
+    < self that -> Boolean ! Incomparable_Values = Comparable.< self=self that
 
     ## ---
        aliases: [less than or equal]
        group: Operators
        icon: operators
        ---
-       Checks if `self` is less than or equal to `that`.
-    <= self that = Comparable.<= self=self that
+       Checks if this period is less than or equal to `that`.
+
+       Periods have no order, because a month is not a fixed number of days. They
+       can only be compared with an equal period, so this is `True` for that and
+       an `Incomparable_Values` error for any other.
+
+       ## Arguments
+       - `that`: The period to compare with.
+
+       ## Examples
+       ### A period compared with an equal one
+       ```
+       period = Period.new days=1
+       other = Period.new days=1
+       result = period <= other
+       # → True
+       ```
+
+       ### Periods that cannot be ordered
+       ```
+       period = Period.new days=1
+       other = Period.new months=1
+       result = (period <= other).is_error
+       # → True
+       ```
+
+       ## Remarks
+
+       ### The `that` argument
+       This argument is not typed and has no widget (#797): typing it would turn
+       the `Incomparable_Values` error for a `Duration` into a `Type_Error`.
+       Connect a period, or type one such as `Period.new months=1`.
+    <= self that -> Boolean ! Incomparable_Values = Comparable.<= self=self that
 
     ## ---
        group: Operators
        icon: operators
        ---
-       Negate all amounts in the period.
-       This is useful when a period used for going forward in time needs to be
-       used for going backwards instead.
-    negate : Period
-    negate self = Period.Value (self.internal_period.negated)
+       Negates every part of this period.
+
+       This turns a period used for going forward in time into one for going
+       backwards.
+
+       ## Examples
+       ### Negate a period
+       ```
+       period = Period.new months=3 days=5
+       negated = period.negate
+       months = negated.months
+       # → -3
+       ```
+    negate self -> Period = Period.Value (self.internal_period.negated)
 
     ## ---
        private: true
@@ -286,7 +523,7 @@ type Period
        ```
        Returns a Text
 
-                Time_Of_Day.new 12 34 millisecond=500
+                Period.new months=1 days=2
     pretty : Text
     pretty self =
         parts = Vector.build builder->
@@ -295,6 +532,14 @@ type Period
             if self.months != 0 then builder.append ((if builder.length!=2 then " months=" else " ") + self.months.to_text)
             if self.days != 0 then builder.append ((if builder.length!=3 then " days=" else " ") + self.days.to_text)
         parts.join ""
+
+## ---
+   private: true
+   ---
+   The choices for the period added to, or subtracted from, a Period: `Period.new`,
+   written in parentheses so that it can be completed with its arguments.
+make_period_choice -> Widget =
+    Widget.Single_Choice values=[Option "Period.new" "(Period.new)"]
 
 ## ---
    private: true
