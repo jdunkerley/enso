@@ -13,7 +13,6 @@
     - authorization_bearer token:(Standard.Base.Data.Text.Text|Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret|Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value) -> Standard.Base.Any.Any
     - content_type value:Standard.Base.Data.Text.Text encoding:(Standard.Base.Data.Text.Encoding.Encoding|Standard.Base.Nothing.Nothing)= -> Standard.Base.Any.Any
     - content_type_header_name -> Standard.Base.Any.Any
-    - default_widget -> Standard.Base.Metadata.Widget
     - multipart_form_data boundary:Standard.Base.Data.Text.Text= -> Standard.Base.Any.Any
     - new name:Standard.Base.Data.Text.Text value:(Standard.Base.Data.Text.Text|Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret|Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value) -> Standard.Base.Any.Any
     - text_plain -> Standard.Base.Any.Any
@@ -23,4 +22,5 @@
     - compare x:Standard.Base.Any.Any y:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - hash x:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - content_type_widget -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Network.HTTP.Header.Header.type -> Standard.Base.Metadata.Widget
 - Standard.Base.Data.Ordering.Comparable.from that:Standard.Base.Network.HTTP.Header.Header -> Standard.Base.Data.Ordering.Comparable

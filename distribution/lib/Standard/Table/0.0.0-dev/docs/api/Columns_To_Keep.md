@@ -5,4 +5,4 @@
     - In_Any
     - In_Any_Warn_On_Missing
     - In_List column_names:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)=
-    - default_widget -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Table.Columns_To_Keep.Columns_To_Keep.type -> Standard.Base.Metadata.Widget
