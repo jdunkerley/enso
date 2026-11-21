@@ -124,6 +124,28 @@ function isMacSigned(passedArgs: Arguments) {
   return passedArgs.sign && process.env.CSC_LINK != null && process.env.CSC_LINK !== ''
 }
 
+/**
+ * The SHA-1 hash of the `Developer ID Application: <holder> (<teamId>)` identity on the keychain
+ * search list (electron-builder has imported `CSC_LINK` into a temporary keychain by `afterSign`).
+ * The holder's name depends on the Apple account, so the identity is found by team id; the hash
+ * is unambiguous to `codesign` where a name substring might not be.
+ */
+function macSigningIdentity(teamId: string): string {
+  const output = childProcess
+    .execFileSync('security', ['find-identity', '-v', '-p', 'codesigning'])
+    .toString()
+  for (const line of output.split('\n')) {
+    const match = line.match(/\)\s+([0-9A-F]{40})\s+"([^"]+)"/i)
+    const [, hash, name] = match ?? []
+    if (hash && name?.startsWith('Developer ID Application: ') && name.endsWith(` (${teamId})`)) {
+      return hash
+    }
+  }
+  throw new Error(
+    `No 'Developer ID Application' identity for team ${teamId} on the keychain search list:\n${output}`,
+  )
+}
+
 /** Whether a Windows signing certificate is configured (`WIN_CSC_LINK`, or `CSC_LINK` for all). */
 function hasWindowsCertificate() {
   return [process.env.WIN_CSC_LINK, process.env.CSC_LINK].some(
@@ -310,7 +332,7 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
           productFilename: appName,
           // This will always be defined since we have an `entitlements.mac.plist`.
           entitlements: macConfig!.entitlements!,
-          identity: `Developer ID Application: Enso International Inc. (${process.env.APPLETEAMID})`,
+          identity: macSigningIdentity(process.env.APPLETEAMID!),
         })
 
         console.log('  • Notarizing.')
