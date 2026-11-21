@@ -12,6 +12,10 @@ import Standard.Base.Metadata.Widget_Query
 import Standard.Base.Metadata.Column_Kind.Column_Kind
 import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 
+import Standard.Database.Internal.IR.SQL_IR_Expression.SQL_IR_Expression
+import Standard.Database.Internal.IR.SQL_IR_Source.SQL_IR_Source
+import Standard.Database.Internal.SQL_Type_Reference.SQL_Type_Reference
+
 import Standard.Test.Test_Environment
 from Standard.Test import all
 
@@ -93,6 +97,17 @@ add_specs suite_builder =
             columns.names . should_equal ["a", "b", "c"]
             columns.kinds.take 2 . should_equal [Column_Kind.Numeric, Column_Kind.Textual]
             (log.exists.not || log.read . is_empty) . should_be_true
+
+        group_builder.specify "SQL_Type_Reference.known never queries for a type not yet fetched" <|
+            connection = Database.connect (SQLite.In_Memory)
+            reference = SQL_Type_Reference.new connection (SQL_IR_Source.for_table "wc_known" "") (SQL_IR_Expression.Literal "1")
+            reference.should_be_a SQL_Type_Reference.Computed_By_Database
+            log = File.create_temporary_file "widget_known_sql" ".log"
+            known = Test_Environment.unsafe_with_environment_override "ENSO_SQL_LOG_PATH" log.path <|
+                reference.known
+            known.should_equal Nothing
+            (log.exists.not || log.read . is_empty) . should_be_true
+            SQL_Type_Reference.Null.known . should_equal Nothing
 
 main filter=Nothing =
     suite = Test.build suite_builder->

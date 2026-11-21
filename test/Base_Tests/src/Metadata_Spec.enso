@@ -42,6 +42,15 @@ add_specs suite_builder =
             (Widget.Vector_Editor item_editor=Widget.Column_Name item_default="_").column_sources . should_equal [Nothing]
             Widget.Text_Input.column_sources . should_equal []
 
+        group_builder.specify "column_sources looks through With_JSON_Cache and Multiple_Choice, and lists a repeated source once" <|
+            cached = Widget.With_JSON_Cache (Widget.Column_Names from="right") "{}"
+            cached.column_sources . should_equal ["right"]
+            multiple = Widget.Multiple_Choice [Choice.Option "By" "..By" [["column", Widget.Order_By from="other"]]]
+            multiple.column_sources . should_equal ["other"]
+            Widget.Vector_Editor item_editor=(Widget.Column_Name from="right") item_default="_" . column_sources . should_equal ["right"]
+            twice = Widget.Single_Choice [Choice.Option "A" "..A" [["x", Widget.Column_Name from="right"], ["y", Widget.Column_Name from="right"]]]
+            twice.column_sources . should_equal ["right"]
+
     suite_builder.group "Widget to_json" group_builder->
         group_builder.specify "widget JSON carries no display or label" <|
             json = (Widget.Single_Choice [Choice.Option "A" "'A'"]).to_json

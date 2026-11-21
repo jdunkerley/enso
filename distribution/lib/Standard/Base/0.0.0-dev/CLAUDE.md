@@ -93,12 +93,12 @@ result = "not a number".parse_integer.catch _-> 0
   another library adds its own `Widget_Columns.from (that : X)`; Base knows
   none. The pickers are `Widget.Column_Name` (flags `expression`, `reference`,
   `extra`, `columns_first`), `Column_Names` (`regex`, `by_type`),
-  `Column_Vector` and `Order_By` (`name_only`); each takes `kinds` (which
-  columns to offer, except `Order_By`) and `from` (the argument naming the
-  table, default the subject). `Widget.column_sources` lists the `from` values a
-  widget needs, which is how `resolve_call` builds its `columns` block. In an
-  annotation write `@columns (Widget.Column_Names)`: `@column ..Column_Name`
-  does not resolve there (`resolve_call` answers
+  `Column_Vector` and `Order_By` (`name_only`); every picker but `Order_By`
+  takes `kinds` (which columns to offer), and every one takes `from` (the
+  argument naming the table, default the subject). `Widget.column_sources` lists
+  the `from` values a widget needs, which is how `resolve_call` builds its
+  `columns` block. In an annotation write `@columns (Widget.Column_Names)`:
+  `@column ..Column_Name` does not resolve there (`resolve_call` answers
   ``Method `arguments` of type Unresolved could not be found.``). No annotation
   uses the pickers yet; PR 5b migrates them.
 - **Widgets carry no display.** `Widget` constructors have no `display` or
