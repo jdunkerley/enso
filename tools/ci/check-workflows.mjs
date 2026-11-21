@@ -452,11 +452,19 @@ const RELEASE_REQUIRED = [
   'ENSO_BUILD_UPDATE_INFO',
 ]
 /**
- * The workflow token and the self-hosted Mac's status check. The fork ships unsigned and without
- * Sentry (build simplification, Phase 4): signing comes back as electron-builder's own settings,
- * with its secrets added here.
+ * The workflow token, the self-hosted Mac's status check, and the macOS signing and notarization
+ * secrets electron-builder reads (Note [Signing The Installers] in `release.yml`). The fork ships
+ * without Sentry (build simplification, Phase 4).
  */
-const RELEASE_SECRETS = new Set(['GITHUB_TOKEN', 'RUNNER_STATUS_TOKEN'])
+const RELEASE_SECRETS = new Set([
+  'GITHUB_TOKEN',
+  'RUNNER_STATUS_TOKEN',
+  'CSC_LINK',
+  'CSC_KEY_PASSWORD',
+  'APPLEID',
+  'APPLEIDPASS',
+  'APPLETEAMID',
+])
 
 /** Releases are IDE-only GitHub releases and need no cloud secrets (`release_is_ide_only_...`). */
 export function checkReleaseIsIdeOnly({ workflows }) {

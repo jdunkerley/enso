@@ -94,14 +94,19 @@ env:
 #
 # Note [Signing The Installers]
 # =============================
-# The fork ships unsigned. To sign later, configure electron-builder, not this workflow's logic:
-# Windows through `win.signtoolOptions` (`WIN_CSC_LINK`/`WIN_CSC_KEY_PASSWORD`) or
-# `win.azureSignOptions` (Azure Trusted Signing), and macOS through `CSC_LINK`/`CSC_KEY_PASSWORD`
-# with the notarization `afterSign` hook that `app/electron-client/electron-builder-config.ts`
-# already has (`APPLEID`, `APPLEIDPASS`, `APPLETEAMID`). Pass the secrets as `env` on the
-# "Package the IDE" steps and add them to `RELEASE_SECRETS` in `tools/ci/check-workflows.mjs`.
-# `ide-build --sign` is already passed; without a certificate it changes nothing. A signed Mac
-# build also writes `latest-mac.yml` and the zip, which `upload-ide` then uploads.
+# macOS is signed and notarized: `upload-ide-macos` passes `CSC_LINK`/`CSC_KEY_PASSWORD` (the
+# base64 of the Developer ID Application `.p12` and its password) to electron-builder, and
+# `APPLEID`, `APPLEIDPASS` (an app-specific password) and `APPLETEAMID` to the notarization
+# `afterSign` hook in `app/electron-client/electron-builder-config.ts`, which finds the signing
+# identity by team id. A signed Mac build also writes `latest-mac.yml` and the zip, which
+# `upload-ide` then uploads, and turns on automatic updates (`updateMode` in `ideBuild.ts`). With
+# the secrets unset (a fork), `ide-build` drops the empty variables and the build is unsigned.
+#
+# Windows still ships unsigned. To sign it, configure electron-builder, not this workflow's logic:
+# `win.signtoolOptions` (`WIN_CSC_LINK`/`WIN_CSC_KEY_PASSWORD`) or `win.azureSignOptions` (Azure
+# Trusted Signing). Pass the secrets as `env` on its "Package the IDE" step and add them to
+# `RELEASE_SECRETS` in `tools/ci/check-workflows.mjs`. `ide-build --sign` is already passed;
+# without a certificate it changes nothing.
 
 permissions:
   contents: read
@@ -443,6 +448,13 @@ jobs:
           path: app
       - name: Package the IDE
         run: corepack pnpm --filter build-scripts run ide-build --sign
+        # Note [Signing The Installers]
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLEID: ${{ secrets.APPLEID }}
+          APPLEIDPASS: ${{ secrets.APPLEIDPASS }}
+          APPLETEAMID: ${{ secrets.APPLETEAMID }}
       - name: Upload the installer to the draft release
         run: corepack pnpm --filter build-scripts run release upload-ide
         env:

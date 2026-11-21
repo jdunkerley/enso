@@ -1,18 +1,24 @@
 /**
- * @file This script signs the content of all archives that we have for macOS.
- * For this to work this needs to run on macOS with `codesign`, and a JDK installed.
- * `codesign` is needed to sign the files, while the JDK is needed for correct packing
- * and unpacking of java archives.
+ * @file Signs the macOS binaries that sit inside the engine's archives (jars and zips).
  *
- * We require this extra step as our dependencies contain files that require us
- * to re-sign jar contents that cannot be opened as pure zip archives,
- * but require a java toolchain to extract and re-assemble to preserve manifest information.
- * This functionality is not provided by `electron-osx-sign` out of the box.
+ * electron-builder signs every loose binary in the app bundle, but not the ones packed inside an
+ * archive, and notarization rejects an app whose archives hold an unsigned Mach-O file. This runs
+ * from the `afterSign` hook: it finds those files, signs them, writes them back into their archives,
+ * and then re-signs the app so its seal covers the changed archives.
  *
- * This code is based on https://github.com/electron/electron-osx-sign/pull/231
- * but our use-case is unlikely to be supported by `electron-osx-sign`
- * as it adds a java toolchain as additional dependency.
- * This script should be removed once the engine is signed.
+ * Note [Signing Inside Archives]
+ * ==============================
+ * The archives are found, not listed: every `.jar` and `.zip` under `Contents/Resources/enso` is
+ * listed with `unzip -Z1`, and an entry is a candidate when its name looks like a native library
+ * (`.dylib`, `.jnilib`, `.so`) or an executable in a `bin/` directory. Candidates are extracted and
+ * kept only when their first bytes are a Mach-O header, so the Linux and Windows natives that the
+ * same jars carry are left alone. A hand-written list went stale: by 2026-11 most of its entries
+ * matched nothing (the bundled JDK is a jlinked runtime with no `jmods`, and the libraries' natives
+ * moved out of their jars into `polyglot/lib`). The whole scan takes a few seconds.
+ *
+ * The signed files are written back with `zip`, which replaces just those entries and keeps the
+ * rest of the archive (the manifest included) as it was, so no `jar` tool or JDK is needed. `zip`,
+ * `unzip` and `codesign` ship with macOS.
  */
 
 import * as childProcess from 'node:child_process'
@@ -22,390 +28,115 @@ import * as pathModule from 'node:path'
 
 import glob from 'fast-glob'
 
-// ===============================================
-// === Patterns of entities that need signing. ===
-// ===============================================
+/** Archive entry names that may be a native binary. */
+const CANDIDATE_ENTRY = /\.(dylib|jnilib|so)$|(^|\/)bin\/[^/.]+$/
 
-/** Parts of the GraalVM distribution that need to be signed by us in an extra step. */
-async function graalSignables(resourcesDir: string): Promise<Signable[]> {
-  const archivePatterns: ArchivePattern[] = [
-    ['Contents/Home/jmods/java.base.jmod', ['bin/java', 'bin/keytool', 'lib/jspawnhelper']],
-    ['Contents/Home/jmods/java.rmi.jmod', ['bin/rmiregistry']],
-    ['Contents/Home/jmods/java.scripting.jmod', ['bin/jrunscript']],
-    ['Contents/Home/jmods/jdk.compiler.jmod', ['bin/javac', 'bin/serialver']],
-    ['Contents/Home/jmods/jdk.hotspot.agent.jmod', ['bin/jhsdb']],
-    ['Contents/Home/jmods/jdk.httpserver.jmod', ['bin/jwebserver']],
-    ['Contents/Home/jmods/jdk.jartool.jmod', ['bin/jarsigner', 'bin/jar']],
-    ['Contents/Home/jmods/jdk.javadoc.jmod', ['bin/javadoc']],
-    ['Contents/Home/jmods/jdk.javadoc.jmod', ['bin/javadoc']],
-    ['Contents/Home/jmods/jdk.jconsole.jmod', ['bin/jconsole']],
-    ['Contents/Home/jmods/jdk.jdeps.jmod', ['bin/javap', 'bin/jdeprscan', 'bin/jdeps']],
-    ['Contents/Home/jmods/jdk.jdi.jmod', ['bin/jdb']],
-    ['Contents/Home/jmods/jdk.jfr.jmod', ['bin/jfr']],
-    ['Contents/Home/jmods/jdk.jlink.jmod', ['bin/jmod', 'bin/jlink', 'bin/jimage']],
-    ['Contents/Home/jmods/jdk.jshell.jmod', ['bin/jshell']],
-    [
-      'Contents/Home/jmods/jdk.jpackage.jmod',
-      ['bin/jpackage', 'classes/jdk/jpackage/internal/resources/jpackageapplauncher'],
-    ],
-    ['Contents/Home/jmods/jdk.jstatd.jmod', ['bin/jstatd']],
-    [
-      'Contents/Home/jmods/jdk.jcmd.jmod',
-      ['bin/jstack', 'bin/jcmd', 'bin/jps', 'bin/jmap', 'bin/jstat', 'bin/jinfo'],
-    ],
-  ]
+/** The magic numbers of thin Mach-O files, both byte orders, 32 and 64 bit. */
+const THIN_MACHO_MAGICS = new Set([0xfeedface, 0xfeedfacf, 0xcefaedfe, 0xcffaedfe])
+/** The magic number of a fat (universal) Mach-O file; Java class files share it. */
+const FAT_MACHO_MAGIC = 0xcafebabe
 
-  const binariesPatterns = ['Contents/MacOS/libjli.dylib']
-
-  // We use `*` for Graal versioned directory to not have to update this script on every GraalVM
-  // update. Updates might still be needed when the list of binaries to sign changes.
-  const graalDir = pathModule.join(resourcesDir, 'enso', 'runtime', '*')
-  const archives = await ArchiveToSign.lookupMany(graalDir, archivePatterns)
-  const binaries = await BinaryToSign.lookupMany(graalDir, binariesPatterns)
-  return [...archives, ...binaries]
+/** Run a program and return its standard output. */
+export function run(cmd: string, args: string[], cwd?: string) {
+  console.log('Running', cmd, args, cwd ?? '')
+  return childProcess.execFileSync(cmd, args, { cwd, maxBuffer: 64 * 1024 * 1024 }).toString()
 }
 
-/** Parts of the Enso Engine distribution that need to be signed by us in an extra step. */
-async function ensoPackageSignables(resourcesDir: string): Promise<Signable[]> {
-  // Archives, and their content that need to be signed in an extra step. If a new archive is
-  // added to the engine dependencies this also needs to be added here. If an archive is not added
-  // here, it will show up as a failure to notarise the IDE. The offending archive will be named
-  // in the error message provided by Apple and can then be added here.
-  const engineDir = `${resourcesDir}/enso/dist/*`
-  const archivePatterns: ArchivePattern[] = [
-    [
-      'component/python-resources-*.jar',
-      [
-        'META-INF/resources/darwin/*/lib/graalpy*/*.dylib',
-        'META-INF/resources/darwin/*/lib/graalpy*/modules/*.so',
-      ],
-    ],
-    [
-      'component/truffle-api-*.jar',
-      [
-        'META-INF/resources/engine/libtruffleattach/darwin/amd64/bin/libtruffleattach.dylib',
-        'META-INF/resources/engine/libtruffleattach/darwin/aarch64/bin/libtruffleattach.dylib',
-      ],
-    ],
-    [
-      'component/truffle-nfi-libffi-*.jar',
-      ['META-INF/resources/nfi-native/libnfi/darwin/*/bin/libtrufflenfi.dylib'],
-    ],
-    [
-      'component/truffle-runtime-*.jar',
-      [
-        'META-INF/resources/engine/libtruffleattach/darwin/amd64/bin/libtruffleattach.dylib',
-        'META-INF/resources/engine/libtruffleattach/darwin/aarch64/bin/libtruffleattach.dylib',
-      ],
-    ],
-
-    ['component/jna-*.jar', ['com/sun/jna/*/libjnidispatch.jnilib']],
-    [
-      'component/jline-native-*.jar',
-      [
-        'org/jline/nativ/Mac/arm64/libjlinenative.jnilib',
-        'org/jline/nativ/Mac/x86_64/libjlinenative.jnilib',
-        'org/jline/nativ/Mac/x86/libjlinenative.jnilib',
-      ],
-    ],
-    [
-      'lib/Standard/Snowflake/*/polyglot/java/conscrypt-openjdk-uber-*.jar',
-      ['META-INF/native/libconscrypt_openjdk_jni-osx-*.dylib'],
-    ],
-    [
-      'lib/Standard/Snowflake/*/polyglot/java/grpc-netty-shaded-*.jar',
-      ['META-INF/native/libio_grpc_netty_shaded_netty_tcnative_osx_*.jnilib'],
-    ],
-    [
-      'lib/Standard/Snowflake/*/polyglot/java/netty-resolver-dns-native-macos-*.jar',
-      ['META-INF/native/libnetty_resolver_dns_native_macos_*.jnilib'],
-    ],
-    [
-      'lib/Standard/Snowflake/*/polyglot/java/netty-transport-native-kqueue-*.jar',
-      ['META-INF/native/libnetty_transport_native_kqueue_*.jnilib'],
-    ],
-    [
-      'lib/Standard/Snowflake/*/polyglot/java/snowflake-jdbc-thin-*.jar',
-      [
-        'META-INF/native/libnetty_resolver_dns_native_macos_*.jnilib',
-        'META-INF/native/libnetty_transport_native_kqueue_*.jnilib',
-        'minicore/libsf_mini_core_macos_*.dylib',
-      ],
-    ],
-    [
-      'lib/Standard/Google/*/polyglot/java/grpc-netty-shaded-*.jar',
-      ['META-INF/native/libio_grpc_netty_shaded_netty_tcnative_osx_*.jnilib'],
-    ],
-    [
-      'lib/Standard/Google/*/polyglot/java/conscrypt-openjdk-uber-*.jar',
-      ['META-INF/native/libconscrypt_openjdk_jni-osx-*.dylib'],
-    ],
-    ['lib/Standard/Microsoft/*/polyglot/java/jna-*.jar', ['com/sun/jna/*/libjnidispatch.jnilib']],
-    [
-      'lib/Standard/Microsoft/*/polyglot/java/netty-resolver-dns-native-macos-*.jar',
-      ['META-INF/native/libnetty_resolver_dns_native_macos_*.jnilib'],
-    ],
-    [
-      'lib/Standard/Microsoft/*/polyglot/java/netty-tcnative-boringssl-static-*.jar',
-      ['META-INF/native/libnetty_tcnative_osx_*.jnilib'],
-    ],
-    [
-      'lib/Standard/Microsoft/*/polyglot/java/netty-transport-native-kqueue-*.jar',
-      ['META-INF/native/libnetty_transport_native_kqueue_*.jnilib'],
-    ],
-    ['lib/Standard/Tableau/*/polyglot/java/jna-*.jar', ['com/sun/jna/*/libjnidispatch.jnilib']],
-  ]
-  // SQLite's driver is a thin jar (no natives inside); its native library is under
-  // `polyglot/lib/<arch>/macos` and is loaded from there by the JVM.
-  const binariesPatterns = [
-    'lib/Standard/Image/*/polyglot/lib/*.dylib',
-    'lib/Standard/SQLite/*/polyglot/lib/*/macos/*.dylib',
-  ]
-
-  const binaries = await BinaryToSign.lookupMany(engineDir, binariesPatterns)
-  const archives = await ArchiveToSign.lookupMany(engineDir, archivePatterns)
-  return [...archives, ...binaries]
+/** Whether the file at `path` starts with a Mach-O header. */
+async function isMachO(path: string): Promise<boolean> {
+  const file = await fs.open(path, 'r')
+  try {
+    const head = Buffer.alloc(8)
+    const { bytesRead } = await file.read(head, 0, 8, 0)
+    if (bytesRead < 8) return false
+    const magic = head.readUInt32BE(0)
+    if (THIN_MACHO_MAGICS.has(magic)) return true
+    // A fat binary's second word is its (small) architecture count; a class file's is its
+    // version, 45 or more.
+    return magic === FAT_MACHO_MAGIC && head.readUInt32BE(4) < 20
+  } finally {
+    await file.close()
+  }
 }
 
-// ================
-// === Signing. ===
-// ================
-
-/** Information we need to sign a given binary. */
+/** What `codesign` needs to sign a binary. */
 interface SigningContext {
-  /**
-   * A digital identity that is stored in a keychain that is on the calling user's keychain
-   * search list. We rely on this already being set up by the Electron Builder.
-   */
+  /** The signing identity: a name or SHA-1 hash on the keychain search list. */
   readonly identity: string
   /** Path to the entitlements file. */
   readonly entitlements: string
 }
 
-/** An entity that we want to sign. */
-interface Signable {
-  /** Sign this entity. */
-  readonly sign: (context: SigningContext) => Promise<void>
-}
-
-/** Placeholder name for temporary archives. */
-const TEMPORARY_ARCHIVE_PATH = 'temporary_archive.zip'
-
-/** Helper to execute a program in a given directory and return the output. */
-export function run(cmd: string, args: string[], cwd?: string) {
-  console.log('Running', cmd, args, cwd)
-  return childProcess.execFileSync(cmd, args, { cwd }).toString()
+/** Sign one file or bundle for notarization: hardened runtime and a secure timestamp. */
+function codesign(target: string, { identity, entitlements }: SigningContext) {
+  run('codesign', [
+    '--force',
+    '--options=runtime',
+    '--timestamp',
+    '--entitlements',
+    entitlements,
+    '--sign',
+    identity,
+    target,
+  ])
 }
 
 /**
- * Archive with some binaries that we want to sign.
- *
- * Can be either a zip or a jar file.
+ * Sign the Mach-O files inside `archive` and write them back into it. Returns the names of the
+ * entries it signed.
  */
-class ArchiveToSign implements Signable {
-  /** Looks up for archives to sign using the given path patterns. */
-  static lookupMany = lookupManyHelper(ArchiveToSign.lookup.bind(this))
+async function signInsideArchive(archive: string, context: SigningContext): Promise<string[]> {
+  const candidates = run('unzip', ['-Z1', archive])
+    .split('\n')
+    .filter((entry) => CANDIDATE_ENTRY.test(entry))
+  if (candidates.length === 0) return []
 
-  /** Create a new instance. */
-  constructor(
-    /** An absolute path to the archive. */
-    public path: string,
-    /**
-     * A list of patterns for files to sign inside the archive.
-     * Relative to the root of the archive.
-     */
-    public binaries: glob.Pattern[],
-  ) {}
-
-  /** Looks up for archives to sign using the given path pattern. */
-  static async lookup(base: string, [pattern, binaries]: ArchivePattern) {
-    return lookupHelper((path) => new ArchiveToSign(path, binaries))(base, pattern)
-  }
-
-  /**
-   * Sign content of an archive. This function extracts the archive, signs the required files,
-   * re-packages the archive and replaces the original.
-   */
-  async sign(context: SigningContext) {
-    console.log(`Signing archive ${this.path}`)
-    const archiveName = pathModule.basename(this.path)
-    const workingDir = await getTmpDir()
-    try {
-      const isJar = archiveName.endsWith('jar')
-
-      if (isJar) {
-        run('jar', ['xf', this.path], workingDir)
-      } else {
-        // We cannot use `unzip` here because of the following issue:
-        // https://unix.stackexchange.com/questions/115825/
-        // This started to be an issue with GraalVM 22.3.0 release.
-        run('7za', ['X', `-o${workingDir}`, this.path])
-      }
-
-      const binariesToSign = await BinaryToSign.lookupMany(workingDir, this.binaries)
-      for (const binaryToSign of binariesToSign) {
-        void binaryToSign.sign(context)
-      }
-
-      if (isJar) {
-        const meta = 'META-INF/MANIFEST.MF'
-        try {
-          run('jar', ['-cfm', TEMPORARY_ARCHIVE_PATH, meta, '.'], workingDir)
-        } catch {
-          run('jar', ['-cf', TEMPORARY_ARCHIVE_PATH, '.'], workingDir)
-        }
-      } else {
-        run('zip', ['-rm', TEMPORARY_ARCHIVE_PATH, '.'], workingDir)
-      }
-
-      // We cannot use fs.rename because temp and target might be on different volumes.
-      console.log(run('/bin/mv', [pathModule.join(workingDir, TEMPORARY_ARCHIVE_PATH), this.path]))
-      console.log(`Successfully repacked ${this.path} to handle signing inner native dependency.`)
-      return
-    } catch (error) {
-      console.error(
-        `Could not repackage ${archiveName}. Please check the ${import.meta.url} task to ` +
-          "ensure that it's working. This jar has to be treated specially " +
-          "because it has a native library and Apple's codesign does not sign inner " +
-          'native libraries correctly for jar files.',
-      )
-      throw error
-    } finally {
-      await rmRf(workingDir)
+  const workingDir = await fs.mkdtemp(pathModule.join(os.tmpdir(), 'enso-signing-'))
+  try {
+    run('unzip', ['-q', '-o', archive, ...candidates, '-d', workingDir])
+    const signed: string[] = []
+    for (const entry of candidates) {
+      const extracted = pathModule.join(workingDir, entry)
+      if (!(await isMachO(extracted))) continue
+      codesign(extracted, context)
+      signed.push(entry)
     }
+    if (signed.length > 0) {
+      // `zip` replaces the named entries and leaves the rest of the archive untouched.
+      run('zip', ['-q', '-X', archive, ...signed], workingDir)
+    }
+    return signed
+  } finally {
+    await fs.rm(workingDir, { recursive: true, force: true })
   }
 }
 
-/** A single code binary file to be signed. */
-class BinaryToSign implements Signable {
-  /** Looks up for binaries to sign using the given path pattern. */
-  static lookup = lookupHelper((path) => new BinaryToSign(path))
-
-  /** Looks up for binaries to sign using the given path patterns. */
-  static lookupMany = lookupManyHelper(BinaryToSign.lookup)
-
-  /** Create a new instance. */
-  constructor(
-    /** An absolute path to the binary. */
-    public path: string,
-  ) {}
-
-  /** Sign this binary. */
-  async sign({ entitlements, identity }: SigningContext) {
-    console.log(`Signing ${this.path}`)
-    run('codesign', [
-      '-vvv',
-      '--entitlements',
-      entitlements,
-      '--force',
-      '--options=runtime',
-      '--sign',
-      identity,
-      this.path,
-    ])
-    // Async functions should contain await.
-    await Promise.resolve()
-  }
-}
-
-// ==============================
-// === Discovering Signables. ===
-// ==============================
-
-/**
- * Helper used to concisely define patterns for an archive to sign.
- *
- * Consists of pattern of the archive path
- * and set of patterns for files to sign inside the archive.
- */
-type ArchivePattern = [glob.Pattern, glob.Pattern[]]
-
-/** Like `glob` but returns absolute paths by default. */
-async function globAbsolute(pattern: glob.Pattern, options?: glob.Options): Promise<string[]> {
-  const paths = await glob(pattern, { absolute: true, ...options })
-  return paths
-}
-
-/**
- * Glob patterns relative to a given base directory. The base directory is allowed to be a pattern
- * as well.
- */
-async function globAbsoluteIn(
-  base: glob.Pattern,
-  pattern: glob.Pattern,
-  options?: glob.Options,
-): Promise<string[]> {
-  return globAbsolute(pathModule.join(base, pattern), options)
-}
-
-/** Generate a lookup function for a given Signable type. */
-function lookupHelper<R extends Signable>(mapper: (path: string) => R) {
-  return async (base: string, pattern: glob.Pattern) => {
-    const paths = await globAbsoluteIn(base, pattern)
-    return paths.map(mapper)
-  }
-}
-
-/** Generate a lookup function for a given Signable type. */
-function lookupManyHelper<T, R extends Signable>(
-  lookup: (base: string, pattern: T) => Promise<R[]>,
-) {
-  return async function (base: string, patterns: T[]) {
-    const results = await Promise.all(
-      patterns.map(async (pattern) => {
-        const ret = await lookup(base, pattern)
-        if (ret.length === 0) {
-          console.warn(`No files found for pattern ${String(pattern)} in ${base}`)
-        }
-        return ret
-      }),
-    )
-    return results.flat()
-  }
-}
-
-// ==================
-// === Utilities. ===
-// ==================
-
-/** Remove file recursively. */
-async function rmRf(path: string) {
-  await fs.rm(path, { recursive: true, force: true })
-}
-
-/** Get a new temporary directory. Caller is responsible for cleaning up the directory. */
-async function getTmpDir(prefix?: string) {
-  return await fs.mkdtemp(pathModule.join(os.tmpdir(), prefix ?? 'enso-signing-'))
-}
-
-// ====================
-// === Entry point. ===
-// ====================
-
-/** Input for this script. */
+/** Input of {@link signArchives}. */
 interface Input extends SigningContext {
   readonly appOutDir: string
   readonly productFilename: string
 }
 
-/** Entry point, meant to be used from an afterSign Electron Builder's hook. */
+/**
+ * Sign the binaries inside the engine's archives (Note [Signing Inside Archives]), then re-sign
+ * the app. Meant to be called from electron-builder's `afterSign` hook, before notarization.
+ */
 export async function signArchives(context: Input) {
-  console.log('Environment: ', process.env)
-  const { appOutDir, productFilename } = context
-  const appDir = pathModule.join(appOutDir, `${productFilename}.app`)
-  const contentsDir = pathModule.join(appDir, 'Contents')
-  const resourcesDir = pathModule.join(contentsDir, 'Resources')
+  const appDir = pathModule.join(context.appOutDir, `${context.productFilename}.app`)
+  const ensoDir = pathModule.join(appDir, 'Contents', 'Resources', 'enso')
+  const archives = await glob('**/*.{jar,zip}', { cwd: ensoDir, absolute: true })
+  console.log(`Looking for binaries inside ${archives.length} archives under ${ensoDir}.`)
 
-  // Sign archives.
-  console.log('Signing GraalVM elemenets...')
-  for (const signable of await graalSignables(resourcesDir)) await signable.sign(context)
+  let signedCount = 0
+  for (const archive of archives) {
+    const signed = await signInsideArchive(archive, context)
+    for (const entry of signed)
+      console.log(`  Signed ${pathModule.relative(ensoDir, archive)}!${entry}`)
+    signedCount += signed.length
+  }
+  console.log(`Signed ${signedCount} binaries inside archives.`)
 
-  console.log('Signing Engine elements...')
-  for (const signable of await ensoPackageSignables(resourcesDir)) await signable.sign(context)
-
-  // Finally re-sign the top-level enso.
-  const topLevelExecutable = new BinaryToSign(
-    pathModule.join(contentsDir, 'MacOS', productFilename),
-  )
-  await topLevelExecutable.sign(context)
+  // The archives changed after electron-builder sealed the app, so seal it again. Nested code
+  // keeps its own signatures; only the app's resource seal and main executable are redone.
+  codesign(appDir, context)
 }

@@ -150,18 +150,20 @@ export function resolveSigningIdentity({ appleteamid, keychainPath, verbose = fa
 
   const identityNames = identities.map((identity) => identity.name)
 
-  const expectedIdentity = `Developer ID Application: Enso International Inc. (${appleteamid})`
-  const expected = identities.find((identity) => identity.name === expectedIdentity)
+  // The certificate is named `Developer ID Application: <holder> (<team id>)`; the holder is
+  // whoever owns the Apple developer account, so match on the team id rather than a fixed name.
+  const isDeveloperId = (identity) => identity.name.startsWith('Developer ID Application: ')
+  const expected = identities.find(
+    (identity) => isDeveloperId(identity) && identity.name.endsWith(` (${appleteamid})`),
+  )
   if (expected) {
     return expected.hash
   }
 
-  const fallback = identities.find((identity) =>
-    identity.name.startsWith('Developer ID Application: '),
-  )
+  const fallback = identities.find(isDeveloperId)
   if (fallback) {
     logger.warn(
-      `Expected identity '${expectedIdentity}' not found. Using '${fallback.name}' from imported keychain.`,
+      `No 'Developer ID Application' identity for team ${appleteamid}. Using '${fallback.name}' from imported keychain.`,
     )
     return fallback.hash
   }

@@ -186,6 +186,20 @@ an existing `dist/gui` and `dist/backend` (what CI does). Don't call
 those commands wire the engine bundle, the GUI and Electron together with the
 right env vars.
 
+### macOS signing
+
+Release builds are signed with a Developer ID Application certificate and
+notarized (Note [Signing The Installers] in `.github/workflows/release.yml`).
+The certificate's name carries the Apple account holder, so the identity is
+found by team id (`APPLETEAMID`): `macSigningIdentity` in
+`electron-builder-config.ts` and `resolveSigningIdentity` in
+`macos/lib/keychain.mjs`. Don't hardcode a holder name.
+
+electron-builder signs the loose binaries; the `afterSign` hook
+(`tasks/signArchivesMacOs.ts`) signs the Mach-O files inside the engine's jars,
+which it finds itself rather than from a list (Note [Signing Inside Archives]),
+and re-seals the app before notarizing.
+
 ### Windows installer
 
 The Windows installer is built by electron-builder's NSIS target, not a custom

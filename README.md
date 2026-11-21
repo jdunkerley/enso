@@ -27,7 +27,8 @@ Installers are on this repository's
 | macOS (Apple silicon) | `enso-mac-arm64-<version>.dmg`         |
 
 Stable releases are marked "Latest". Release candidates and nightly builds are
-prereleases. The installers are unsigned. See
+prereleases. The macOS installer is signed and notarized; the Windows and Linux
+installers are unsigned. See
 [Getting Enso](https://github.com/jdunkerley/enso/wiki/Getting-Enso) for the
 release channels and updates.
 
