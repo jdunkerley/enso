@@ -15,13 +15,17 @@ import { computed, ref } from 'vue'
 const props = defineProps(widgetProps(widgetDefinition))
 const { module } = useCurrentProject()
 
-const pattern = computed(() => regexPattern(astValue(props.input)))
+const call = computed(() => astValue(props.input))
+const pattern = computed(() => regexPattern(call.value))
+/** The call's head as written (`regex`, `Regex.compile`, a qualified name); a pattern is only found in an application. */
+const head = computed(() => (call.value instanceof Ast.App ? call.value.function : undefined))
 const typed = ref('')
 
 /** An empty commit writes nothing; otherwise one edit writes `regex '<text>'`, the text escaped. */
 function commit() {
   const text = typed.value
   if (text === '') return
+  typed.value = ''
   module.value.edit((edit) => {
     const literal = Ast.TextLiteral.new(text, edit)
     const value = Ast.App.new(
@@ -54,11 +58,11 @@ export function regexScore(input: WidgetInput): Score {
 }
 
 /**
- * The input of a regex argument: `regex '…'` shows only its pattern, which `WidgetText` edits in place;
+ * The input of a regex argument: `regex '…'` shows the call as written, with the pattern edited in place by `WidgetText`;
  * an unset argument is an empty input that writes `regex '<text>'`.
  *
  * Priority 48: after the kind picker (44) and `WidgetAnyToTarget` (45), before `WidgetFileBrowser` (49)
- * and `WidgetFunction` (200), so the application is drawn as the pattern and not as a call.
+ * and `WidgetFunction` (200), so the application is drawn by this widget and not as a generic call.
  */
 export const widgetDefinition = defineWidget(
   WidgetInput.isAstOrPlaceholder,
@@ -68,7 +72,10 @@ export const widgetDefinition = defineWidget(
 </script>
 
 <template>
-  <NodeWidget v-if="pattern" class="WidgetRegex" :input="WidgetInput.FromAst(pattern)" />
+  <div v-if="pattern && head" class="WidgetRegex">
+    <NodeWidget :input="WidgetInput.FromAst(head)" />
+    <NodeWidget :input="WidgetInput.FromAst(pattern)" />
+  </div>
   <AutoSizedInput
     v-else
     v-model="typed"
@@ -79,6 +86,12 @@ export const widgetDefinition = defineWidget(
 </template>
 
 <style scoped>
+div.WidgetRegex {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .WidgetRegex,
 .WidgetRegex :deep(.cm-content) {
   font-family: var(--font-mono);
