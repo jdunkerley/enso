@@ -232,6 +232,23 @@ in brackets carries each.
       own types is a later idea, not PR 4.**
     - **Lists** (`Vector (A | B)`): each item gets the same icon chip.
 
+11. **The node stays close to the code (owner, 2026-11-21; a design principle to
+    keep).** The icon is the only thing the picker adds. Beside it the node
+    still shows the code itself, drawn by the chosen kind's existing widget as
+    it is today: `Date.new 2026 11 21`, `File.new 'sales.csv'`,
+    `Enso_Secret.get 'db-password'`, `regex 'a.*c'`, never a formatted stand-in
+    (`2026-11-21`, `db-password`) that the code does not hold. An unselected
+    `Nothing` is plain `Nothing`, as the node draws the identifier today (not a
+    pill). Switching kind writes real code (decision 5's table, with Enso_Secret
+    writing `Enso_Secret.get ''`, since a bare `''` reads back as Text).
+    Playwright asserts the node's text still contains the written code after a
+    switch.
+12. **Follow-up answers (owner, 2026-11-21):** `Nothing` is exempt from the
+    conversion rule (`Rows_To_Read`, `Row_Limit` convert from it) and stays the
+    explicit choice; `Derived_Secret_Value` (HTTP `Header`) has no widget, so it
+    absorbs nothing and the test pinning that stays; `Integer | Float | Nothing`
+    is labelled Float (`Float.from Integer` exists).
+
 ## Spec amendment (made in the plans PR, #911)
 
 §4's "Plan for PR 4" note became:

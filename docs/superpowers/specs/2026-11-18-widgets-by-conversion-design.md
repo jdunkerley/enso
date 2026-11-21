@@ -239,7 +239,9 @@ default value (not a blank `_`, which would make the list a function). `Regex`
 gets a type default, `Widget.Regex_Input`, which writes `regex '…'`. The picker
 is a 14 px type icon in front of the value, which becomes a button with an arrow
 when the node is selected; with `Nothing` chosen, the `Nothing` value itself is
-the picker.
+the picker. **The node stays close to the code:** the icon is all the picker
+adds; beside it the node shows the code itself (`Date.new 2026 11 21`,
+`Enso_Secret.get 'db-password'`), never a formatted stand-in.
 
 Of the 170 union-typed arguments in the standard libraries, most are
 `T | Nothing` or a main type plus shorthand forms (`Text | Enso_Secret`,
