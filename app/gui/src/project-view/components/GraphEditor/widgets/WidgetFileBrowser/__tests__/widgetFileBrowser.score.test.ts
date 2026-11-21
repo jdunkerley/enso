@@ -1,7 +1,8 @@
-/** @file Which inputs the file browser widget takes: only a browse configuration, never a declared type. */
+/** @file Which inputs the file browser widget takes: a browse configuration, or an annotation's options on a declared browsable type; never a declared type alone. */
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import { Score, WidgetInput, type WidgetProps } from '$/providers/openedProjects/widgetRegistry'
 import { widgetDefinition as fileBrowserWidget } from '@/components/GraphEditor/widgets/WidgetFileBrowser.vue'
+import { UnderKindPickerKey } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import { ArgumentInfoKey } from '@/util/callTree'
 import { describe, expect, test } from 'vitest'
 
@@ -38,5 +39,40 @@ describe('the file browser widget scores', () => {
         }),
       ),
     ).toBe(Score.Perfect)
+  })
+
+  const fileUnion = 'Standard.Base.Data.Text.Text | Standard.Base.System.File.File'
+  const options = {
+    kind: 'Single_Choice',
+    values: [{ value: "'a'", label: 'A', parameters: [] }],
+  } as const
+
+  test("an annotation's options on a declared File Perfect: the browse items join them", () => {
+    expect(score(placeholder({ ...typedArgument(fileUnion), dynamicConfig: options }))).toBe(
+      Score.Perfect,
+    )
+  })
+
+  test("an annotation's options on a declared type that cannot be browsed, Mismatch", () => {
+    expect(
+      score(
+        placeholder({
+          ...typedArgument('Standard.Base.Data.Text.Text'),
+          dynamicConfig: options,
+        }),
+      ),
+    ).toBe(Score.Mismatch)
+  })
+
+  test("the kind picker's inner input, Mismatch even with options", () => {
+    expect(
+      score(
+        placeholder({
+          ...typedArgument(fileUnion),
+          dynamicConfig: options,
+          [UnderKindPickerKey]: true,
+        }),
+      ),
+    ).toBe(Score.Mismatch)
   })
 })
