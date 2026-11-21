@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Metadata.Choice
+import Standard.Base.Metadata.Column_Kind.Column_Kind
 import Standard.Base.Metadata.Widget
 
 from Standard.Test import all
@@ -16,6 +17,30 @@ add_specs suite_builder =
         group_builder.specify "emits only the field that is set" <|
             Choice.Option "X" "..X" requires="A.B.C" . to_json . should_equal '{"label":"X","value":"..X","parameters":[],"icon":"","requires":"A.B.C"}'
             Choice.Option "X" "..X" patterns=["*.x"] . to_json . should_equal '{"label":"X","value":"..X","parameters":[],"icon":"","patterns":["*.x"]}'
+
+    suite_builder.group "Column pickers to_json" group_builder->
+        group_builder.specify "Column_Name with its defaults" <|
+            Widget.Column_Name . to_json . should_equal '{"constructor":"Column_Name","kinds":[],"from":null,"expression":false,"reference":false,"extra":[],"columns_first":false}'
+
+        group_builder.specify "Column_Name with kinds, a source and extras" <|
+            w = Widget.Column_Name kinds=[Column_Kind.Numeric] from="right" reference=True extra=[Choice.Option "<Nothing>" "Nothing"]
+            json = w.to_json . parse_json
+            json.get "kinds" . should_equal ["Numeric"]
+            json.get "from" . should_equal "right"
+            json.get "reference" . should_be_true
+            json.get "extra" . first . get "value" . should_equal "Nothing"
+
+        group_builder.specify "Column_Names, Column_Vector and Order_By" <|
+            Widget.Column_Names regex=True . to_json . should_equal '{"constructor":"Column_Names","kinds":[],"from":null,"regex":true,"by_type":false}'
+            Widget.Column_Vector . to_json . should_equal '{"constructor":"Column_Vector","kinds":[],"from":null}'
+            Widget.Order_By name_only=True . to_json . should_equal '{"constructor":"Order_By","from":null,"name_only":true}'
+
+        group_builder.specify "column_sources finds pickers at any depth, once each" <|
+            nested = Widget.Single_Choice [Choice.Option "Equals" "..Equals" [["left", Widget.Column_Name], ["right", Widget.Column_Name from="right"]]]
+            editor = Widget.Vector_Editor item_editor=nested item_default="_"
+            editor.column_sources . should_equal [Nothing, "right"]
+            (Widget.Vector_Editor item_editor=Widget.Column_Name item_default="_").column_sources . should_equal [Nothing]
+            Widget.Text_Input.column_sources . should_equal []
 
     suite_builder.group "Widget to_json" group_builder->
         group_builder.specify "widget JSON carries no display or label" <|
