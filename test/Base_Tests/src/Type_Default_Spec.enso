@@ -6,6 +6,7 @@ import Standard.Base.Metadata.Widget_Query
 import Standard.Base.Network.Email.Email_Address.Email_Address
 import Standard.Base.Network.Email.Email_Attachment.Email_Attachment
 import Standard.Base.Network.Email.Email_Provider.Email_Provider
+import Standard.Base.System.File.Generic.Writable_File.Writable_File
 
 from Standard.Test import all
 
@@ -39,10 +40,29 @@ add_specs suite_builder =
             (fewer.values.length < all.values.length) . should_be_true
         group_builder.specify "Index_Sub_Range takes count" <|
             (Widget.from Index_Sub_Range count=10).to_json . should_not_equal (Widget.from Index_Sub_Range).to_json
-        group_builder.specify "Date and Time_Of_Day have no default until PR 3b" <|
-            Widget_Query.resolve_type "Standard.Base.Data.Time.Date.Date" . should_equal '{"widget":null}'
-        group_builder.specify "a type with no default has no conversion (Text until PR 3b)" <|
-            Panic.recover Any (Widget.from Text) . should_fail_with No_Such_Conversion
+        group_builder.specify "a type with no default has no conversion (a bare Vector stays with the GUI)" <|
+            Panic.recover Any (Widget.from Vector) . should_fail_with No_Such_Conversion
+
+    suite_builder.group "Group D type defaults" group_builder->
+        group_builder.specify "Boolean" <| (Widget.from Boolean).to_json . should_equal '{"constructor":"Boolean_Input"}'
+        group_builder.specify "Integer, Float and Number" <|
+            [Integer, Float, Number].each t-> (Widget.from t).to_json . should_equal '{"constructor":"Numeric_Input"}'
+        group_builder.specify "Text" <| (Widget.from Text).to_json . should_equal '{"constructor":"Text_Input"}'
+        group_builder.specify "Date" <| (Widget.from Date).to_json . should_equal '{"constructor":"Date_Input"}'
+        group_builder.specify "Date_Time" <| (Widget.from Date_Time).to_json . should_equal '{"constructor":"Date_Time_Input"}'
+        group_builder.specify "Time_Of_Day" <| (Widget.from Time_Of_Day).to_json . should_equal '{"constructor":"Time_Input"}'
+        group_builder.specify "File" <|
+            json = (Widget.from File).to_json . parse_json
+            json.get "constructor" . should_equal "File_Browse"
+            json.get "existing_only" . should_be_true
+            json.get "action" . should_equal "Open"
+        group_builder.specify "Writable_File" <|
+            json = (Widget.from Writable_File).to_json . parse_json
+            json.get "existing_only" . should_be_false
+            json.get "action" . should_equal "Save"
+        group_builder.specify "Enso_Secret" <| (Widget.from Enso_Secret).to_json . should_equal '{"constructor":"Secret_Browse"}'
+        group_builder.specify "through resolve_type" <|
+            Widget_Query.resolve_type "Standard.Base.Data.Time.Date.Date" . should_equal '{"widget":{"constructor":"Date_Input"}}'
 
 main filter=Nothing =
     suite = Test.build suite_builder-> add_specs suite_builder

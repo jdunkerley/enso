@@ -12,6 +12,8 @@
 - type Widget
     - Any_To_Target
     - Boolean_Input
+    - Date_Input
+    - Date_Time_Input
     - File_Browse existing_only:Standard.Base.Data.Boolean.Boolean= action:Standard.Base.Metadata.File_Action= file_types:(Standard.Base.Data.Vector.Vector Standard.Base.Metadata.File_Type)=
     - Folder_Browse
     - Multiple_Choice values:(Standard.Base.Data.Vector.Vector Standard.Base.Metadata.Choice) quote_values:Standard.Base.Data.Boolean.Boolean=
@@ -19,9 +21,21 @@
     - Secret_Browse
     - Single_Choice values:(Standard.Base.Data.Vector.Vector Standard.Base.Metadata.Choice) allow_custom:Standard.Base.Data.Boolean.Boolean=
     - Text_Input quote_values:Standard.Base.Data.Boolean.Boolean= suggestions:(Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)= syntax:(Standard.Base.Nothing.Nothing|Standard.Base.Data.Text.Text)=
+    - Time_Input
     - Vector_Editor item_editor:Standard.Base.Metadata.Widget item_default:Standard.Base.Data.Text.Text
     - With_JSON_Cache parent:Standard.Base.Metadata.Widget json:Standard.Base.Data.Text.Text
     - to_js_object self -> Standard.Base.Any.Any
     - to_json self -> Standard.Base.Data.Text.Text
     - to_text self -> Standard.Base.Data.Text.Text
 - make_single_choice values:Standard.Base.Data.Vector.Vector -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Boolean.Boolean.type -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Numbers.Integer.type -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Numbers.Float.type -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Numbers.Number.type -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Text.Text.type -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Time.Date.Date.type -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Time.Date_Time.Date_Time.type -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day.type -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.System.File.File.type -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.System.File.Generic.Writable_File.Writable_File.type -> Standard.Base.Metadata.Widget
+- Standard.Base.Metadata.Widget.from that:Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret.type -> Standard.Base.Metadata.Widget
