@@ -33,7 +33,7 @@ export function kindDefaultCode(config: WidgetConfiguration | null): string | un
     case 'Folder_Browse':
       return "''"
     case 'Numeric_Input':
-      return String(config.minimum ?? 0)
+      return config.minimum != null && config.minimum > 0 ? String(config.minimum) : '0'
     case 'Boolean_Input':
       return 'False'
     case 'Date_Input':
