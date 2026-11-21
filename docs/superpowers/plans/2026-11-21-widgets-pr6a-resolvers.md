@@ -105,7 +105,8 @@ today), and 6b can be reviewed against a merged engine. Merging back to back
 would couple two long CI runs and two owner tests for no gain. Task 10 pins the
 compatibility with a GUI unit test on today's schema.
 
-**Open decisions (owner), with a recommendation each:**
+**Further decisions (owner), decided 2026-11-21: every recommendation below is
+taken (A: the subject is the first parameter, any name).**
 
 - **A. How the subject is spelled.** The spec writes the subject parameter as
   `self` (`_join_on_widget self (right …)`). Enso forbids that in a module

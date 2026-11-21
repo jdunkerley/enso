@@ -69,8 +69,8 @@ is in the 6a plan):
    GUI, a violation is an ordinary widget error (`step: "resolver"`), drawn by
    `WidgetQueryError` as today.
 
-**Open decisions (owner), with a recommendation each** (6a's A–E are about the
-engine; these continue the letters):
+**Further decisions (owner), decided 2026-11-21: every recommendation below is
+taken** (6a's A–E are about the engine; these continue the letters):
 
 - **F. Static answers.** The spec's levels table caches a static annotation
   "once per method". _Recommended:_ an answer is static when no argument has
