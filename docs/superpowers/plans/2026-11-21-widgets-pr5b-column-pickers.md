@@ -39,7 +39,12 @@ expansion", "Performance"; PR table row 5).
 (`docs/superpowers/plans/2026-11-21-widgets-pr5a-column-pickers.md`) merged.
 Independent of PRs 3b and 4 (see "Shared files").
 
-## Owner decisions needed
+## Owner decisions
+
+**Decided 2026-11-21 (owner):** the recommendations of 8, 9, 10, 12, 13 and 14
+are taken (10: `type_names` parsed and kept, not shown; 14: size asserted, time
+reported). **Decision 11 is the alternative: kind filters are added now** (Task
+5b below). Decisions 1–7 (PR 5a plan) all take their recommendation.
 
 Decisions 1–7 are in the PR 5a plan (split; database types never queried;
 `Other` always offered; `Widget.Column_Name` spelling; the flag set; no engine
@@ -706,6 +711,53 @@ if any), `test/YXDB_Tests`, `test/Table_Tests/src/Widgets_Spec.enso`.
       `sbt "all lintEnso"`; regenerate API docs (Table, Database, Geo, XML,
       YXDB) and `stdlib-api-check`.
 - [ ] **Step 5: Commit** `Standard libraries: column pickers are declarative`.
+
+## Task 5b: Kind filters on type-restricted column arguments (owner decision 11)
+
+The owner chose to add `kinds` beyond today's one-to-one set: a column picker
+offers only the columns its method can accept.
+
+**The rule (objective, so the inventory is checkable):** a column argument gets
+`kinds` when the method, given a column of any other kind, fails with
+`Invalid_Value_Type` (or an equivalent type error) before doing any work, that
+is, its implementation checks the type (`check_value_type`,
+`Value_Type_Helpers.*`, an `is_numeric` / `is_text` guard, a
+`case value_type of` with an error branch, or a backend's
+`Unsupported_Database_Operation` for the type). A method that merely returns
+`Nothing` or a warning for other kinds is **not** restricted. Columns of kind
+`Other` are still offered everywhere (decision 3).
+
+**Files:** Table, Database, DuckDB and Geo sources found by the inventory;
+`Widget_Helpers.enso` only if a builder needs a `kinds` argument; the libraries'
+widget specs; a GUI unit test beside `columnPickers.ts`.
+
+- [ ] **Step 1: Inventory** (a sonnet subagent, read-only): every column
+      argument with a picker after Task 5 (`Column_Name` / `Column_Names` /
+      `Column_Vector` / `Order_By`, top-level or nested in a choice such as
+      aggregate's `..Sum` / `..Average` / `..Median` / `..Percentile` /
+      `..Standard_Deviation`, `..Shortest` / `..Longest`, `..Concatenate`), and
+      for each the kinds its implementation accepts, with the `file:line` of the
+      check that proves it. Write the table to the ledger. Arguments that accept
+      every kind are listed too (one line each), so the review can see nothing
+      was skipped.
+- [ ] **Step 2: Tests first.** One `Widget_Query.resolve_call` assertion per
+      changed argument family (e.g. aggregate `..Sum`'s `column` gives
+      `kinds == ["Numeric"]`; a text-only method `["Textual"]`; a date method
+      the date and time kinds) in `Table_Widgets_Spec.enso` and the SQLite
+      widgets spec; plus a GUI unit test that a `kinds=[Numeric]` picker over a
+      `Textual` / `Numeric` / `Other` schema lists only the numeric and `Other`
+      columns.
+- [ ] **Step 3: Run, verify they fail.**
+- [ ] **Step 4: Implement:** add `kinds=[…]` to each reference found. Where the
+      kind is decided by another argument (e.g. `filter`'s value picker from the
+      column's type), keep today's mechanism.
+- [ ] **Step 5: Run** `Table_Tests`, `SQLite_Tests`, `Geo_Tests` in full; lint;
+      regenerate API docs; `stdlib-api-check`.
+- [ ] **Step 6: Commit**
+      `Standard libraries: column pickers filter by the kinds a method accepts`.
+      List every argument that gained `kinds` in the PR body, and add an
+      installer-checklist line: "aggregate `..Sum` on a table with text and
+      number columns offers only the number columns (and Mixed ones)".
 
 ## Task 6: Playwright
 
