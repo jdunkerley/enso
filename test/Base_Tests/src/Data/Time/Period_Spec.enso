@@ -68,6 +68,22 @@ add_specs suite_builder =
             Meta.type_of period.years . should_equal_type Integer
             Meta.type_of period.negate . should_equal_type Period
 
+        group_builder.specify "should display a Period, with the sign on every part (#901)" <|
+            Period.new . to_display_text . should_equal "0D"
+            (Period.new years=2 months=3 days=4) . to_display_text . should_equal "2Y 3M 4D"
+            (Period.new months=14) . to_display_text . should_equal "1Y 2M"
+            (Period.new years=1 days=5) . to_display_text . should_equal "1Y 0M 5D"
+            (Period.new months=3 days=5) . negate . to_display_text . should_equal "-3M -5D"
+            (Period.new months=(-1) days=(-9)) . to_display_text . should_equal "-1M -9D"
+            (Period.new months=(-15)) . to_display_text . should_equal "-1Y -3M"
+            (Period.new years=(-1) days=(-5)) . to_display_text . should_equal "-1Y 0M -5D"
+            (Period.new years=1 months=2 days=3) . negate . to_display_text . should_equal "-1Y -2M -3D"
+            # A mixed-sign Period is shown by its total months.
+            (Period.new years=1 months=(-1)) . to_display_text . should_equal "11M"
+            (Period.new years=(-1) months=1) . to_display_text . should_equal "-11M"
+            (Period.new months=5 days=(-2)) . to_display_text . should_equal "5M -2D"
+            (Period.between (Date.new 2022 11 1) (Date.new 2022 8 1)) . to_display_text . should_equal "-3M"
+
         group_builder.specify "should not add or subtract anything but a Period" <|
             ((Period.new months=1) + (Duration.new hours=1)) . should_fail_with Time_Error
             ((Period.new months=1) - (Duration.new hours=1)) . should_fail_with Time_Error
