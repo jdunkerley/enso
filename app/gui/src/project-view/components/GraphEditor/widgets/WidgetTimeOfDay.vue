@@ -12,17 +12,18 @@ import {
   unparenthesisedCode,
 } from '@/components/GraphEditor/widgets/WidgetPicker/parentheses'
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
-import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
+import {
+  isWholeNodeCall,
+  type CallShapes,
+} from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import TimeOfDayMenu from '@/components/GraphEditor/widgets/WidgetTimeOfDay/TimeOfDayMenu.vue'
 import {
-  TIME_OF_DAY_TYPE,
   parseTimeExpression,
   timeExpressionCode,
   withKeptParts,
   type TimeChoice,
 } from '@/components/GraphEditor/widgets/WidgetTimeOfDay/timeExpression'
-import { ArgumentInfoKey } from '@/util/callTree'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
 import { computed } from 'vue'
@@ -63,20 +64,19 @@ function choose(picked: TimeChoice, done: () => void) {
 </script>
 
 <script lang="ts">
+const TIME_CALLS: CallShapes = { bare: ['Time_Of_Day.now'], applied: ['Time_Of_Day.new'] }
+
 function isTimeTyped(input: WidgetInput): boolean {
-  return (
-    input.expectedType === TIME_OF_DAY_TYPE ||
-    input[ArgumentInfoKey]?.info?.reprType === TIME_OF_DAY_TYPE
-  )
+  return input.dynamicConfig?.kind === 'Time_Input'
 }
 
 /** A node that is only a time: `Time_Of_Day.now`, `Time_Of_Day.new` with whatever arguments. */
 function isWholeTimeNode(input: WidgetInput): boolean {
-  return isWholeNodeCall(input, { bare: ['Time_Of_Day.now'], applied: ['Time_Of_Day.new'] })
+  return isWholeNodeCall(input, TIME_CALLS)
 }
 
 /**
- * The date widget's counterpart for a `Time_Of_Day`-typed argument or item, or a whole node that is
+ * The date widget's counterpart for an argument or item configured `Time_Input`, or a whole node that is
  * a time (it takes no second dropdown where `WidgetSelection` already gives one): its own widgets show
  * the code (`Time_Of_Day.now`, or `Time_Of_Day.new` with `hour`, `minute` ports), and an arrow
  * under it opens a menu that replaces the whole value. Priority 52, after the date widget (51).

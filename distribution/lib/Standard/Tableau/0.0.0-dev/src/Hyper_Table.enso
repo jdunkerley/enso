@@ -1,6 +1,5 @@
 from Standard.Base import all
 
-import Standard.Base.Metadata.Widget
 import Standard.Table.Internal.Java_Exports
 import Standard.Table.Rows_To_Read.Rows_To_Read
 from Standard.Table import Table, Value_Type
@@ -104,7 +103,6 @@ type Hyper_Table
 
        ## Arguments
         - `max_rows`: specifies the maximum number of rows to read.
-    @max_rows (Widget.from Rows_To_Read)
     read : Rows_To_Read -> Table
     read self (max_rows : Rows_To_Read = ..All_Rows) =
         row_count = if max_rows == Rows_To_Read.All_Rows then Nothing else max_rows.rows

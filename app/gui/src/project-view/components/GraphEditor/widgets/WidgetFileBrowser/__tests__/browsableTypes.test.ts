@@ -15,6 +15,7 @@ import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
 import type { Identifier } from '@/util/qualifiedName'
 import { unwrap } from 'enso-common/src/utilities/data/result'
 import { describe, expect, test, vi } from 'vitest'
+import { typeDefaultConfig } from '../../__tests__/typeDefaultFixture'
 
 const FILE_TYPE_QN = 'Standard.Base.System.File.File'
 const WRITABLE_FILE_TYPE_QN = 'Standard.Base.System.File.Generic.Writable_File.Writable_File'
@@ -29,6 +30,29 @@ interface TypeInfoCase {
   }
   expected: Partial<BrowserTypeInfo>
 }
+
+test('A type default does not narrow a union: File | Enso_Secret offers both', async () => {
+  const types = [FILE_TYPE_QN, ENSO_SECRET_TYPE_QN].join(' | ')
+  const typeInfo = (dynamicConfig: WidgetConfiguration) =>
+    useBrowserTypeInfo({ reprType: types, dynamicConfig }).value
+  // eslint-disable-next-line camelcase
+  expect(typeInfo(await typeDefaultConfig('File_Browse', { file_types: [] })).types).toEqual({
+    file: true,
+    directory: false,
+    secret: true,
+  })
+  expect(typeInfo(await typeDefaultConfig('Secret_Browse')).types).toEqual({
+    file: true,
+    directory: false,
+    secret: true,
+  })
+  // An annotation's configuration still decides.
+  expect(typeInfo({ kind: 'Secret_Browse' }).types).toEqual({
+    file: false,
+    directory: false,
+    secret: true,
+  })
+})
 
 test.each<TypeInfoCase>([
   {

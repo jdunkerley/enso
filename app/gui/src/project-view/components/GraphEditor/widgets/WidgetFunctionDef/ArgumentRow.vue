@@ -25,14 +25,17 @@ import { Err, Ok } from 'enso-common/src/utilities/data/result'
 import { computed, useTemplateRef } from 'vue'
 import type { ComponentProps } from 'vue-component-type-helpers'
 import type { ArgumentDefinition, ConcreteRefs } from 'ydoc-shared/ast'
+import type { ExternalId } from 'ydoc-shared/yjsModel'
 import WidgetTreeRoot from '../../WidgetTreeRoot.vue'
 
-const { definition, updateCallback, portIdBase, preprocessName } = defineProps<{
+const { definition, updateCallback, portIdBase, preprocessName, frame } = defineProps<{
   root: Opt<HTMLElement>
   definition: ArgumentDefinition<ConcreteRefs>
   updateCallback: UpdateHandler
   portIdBase: PortId
   preprocessName: (input: string) => string
+  /** The expression the engine runs the type default's query in: the function's body. */
+  frame?: ExternalId | undefined
 }>()
 
 const emit = defineEmits<{
@@ -122,6 +125,9 @@ const nodeDefault = computed((): TreeProps | undefined => {
     input: {
       ...WidgetInput.FromAstOrPlaceholder(expr, () => syntheticId),
       expectedType,
+      // Without a frame to ask in, the type default is not looked up.
+      dynamicConfig:
+        frame != null ? openedProject.typeDefaults.value.lookup(expectedType, frame) : undefined,
       [EnsoExpression]: {
         weakMatch: true,
       },

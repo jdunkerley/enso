@@ -12,6 +12,7 @@ import {
   widgetQueryAnswerSchema,
   type FunctionCall,
 } from '$/providers/openedProjects/widgetRegistry/configuration'
+import type { TypeDefaults } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import type { ToValue } from '$/utils/reactivity'
 import { Ast } from '@/util/ast'
 import {
@@ -40,6 +41,7 @@ export function useWidgetFunctionCallInfo(
   project: ToValue<Pick<ProjectStore, 'useVisualizationData' | 'moduleProjectPath' | 'assetId'>>,
   projectNames: ToValue<ProjectNameStore>,
   groups: ToValue<DeepReadonly<GroupInfo[]>>,
+  typeDefaults?: ToValue<Pick<TypeDefaults, 'lookup'> | undefined>,
 ) {
   const methodCallInfo = computed(() => {
     const _project = toValue(project)
@@ -211,6 +213,8 @@ export function useWidgetFunctionCallInfo(
     } satisfies FunctionCall
   })
 
+  const callFrame = computed(() => toValue(input).value.externalId)
+
   const application = computed(() => {
     const call = interpreted.value
     if (!call) return null
@@ -239,6 +243,9 @@ export function useWidgetFunctionCallInfo(
        * and fulfilling those placeholders would break the calls at use sites.
        */
       suppressPlaceholders: appFuncIsNodeUsage.value,
+      // The call's own expression is the preferred frame; the engine may not have computed it,
+      // and then another computed frame of the graph asks.
+      typeDefault: (reprType) => toValue(typeDefaults)?.lookup(reprType, callFrame.value),
     })
   })
 

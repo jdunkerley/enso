@@ -928,7 +928,6 @@ Text.is_whitespace self =
    ```
          "Hello".bytes (Encoding.ascii)
    ```
-@encoding (Widget.from Encoding)
 Text.bytes : Encoding -> Problem_Behavior -> Vector Integer
 Text.bytes self (encoding : Encoding = Encoding.utf_8) (on_problems : Problem_Behavior = ..Report_Warning) =
     result = Encoding_Utils.get_bytes self encoding.to_java_charset : ResultWithWarnings
@@ -954,7 +953,6 @@ Text.bytes self (encoding : Encoding = Encoding.utf_8) (on_problems : Problem_Be
    ```
          Text.from_bytes [72, 101, 108, 108, 111] (Encoding.ascii)
    ```
-@encoding (Widget.from Encoding)
 Text.from_bytes : Vector Integer -> Encoding -> Problem_Behavior -> Text
 Text.from_bytes bytes (encoding : Encoding = Encoding.default) (on_problems : Problem_Behavior = ..Report_Error) =
     byte_vector = Vector.unify_vector_or_element bytes
@@ -1309,7 +1307,6 @@ Text.repeat self count:Integer=1 =
          "Hello World!".take (..By_Index [Range 0 3, 6, Range 6 12 2]) == "HelWWrd"
          "Hello World!".take (..Sample 3 seed=42) == "l d"
    ```
-@range (Widget.from Text_Sub_Range)
 Text.take : (Text_Sub_Range | Index_Sub_Range | Range | Integer) -> Text ! Index_Out_Of_Bounds
 Text.take self range:(Text_Sub_Range | Index_Sub_Range | Range | Integer)=..First =
     ranges = Codepoint_Ranges.resolve self range
@@ -1361,7 +1358,6 @@ Text.take self range:(Text_Sub_Range | Index_Sub_Range | Range | Integer)=..Firs
          "Hello World!".drop (..By_Index [Range 0 3, 6, Range 6 12 2]) == "lo ol!"
          "Hello World!".drop (..Sample 3 seed=42) == "HeloWorl!"
    ```
-@range (Widget.from Text_Sub_Range)
 Text.drop : (Text_Sub_Range | Index_Sub_Range | Range | Integer) -> Text ! Index_Out_Of_Bounds
 Text.drop self range:(Text_Sub_Range | Index_Sub_Range | Range | Integer)=..First =
     ranges = Codepoint_Ranges.resolve self range
@@ -1421,8 +1417,6 @@ Text.drop self range:(Text_Sub_Range | Index_Sub_Range | Range | Integer)=..Firs
    Some definitions of proper case avoid capitalizing minor words (like the
    article "the" in English) but this implementation treats all words in
    the same way.
-@case_option (Widget.from Case)
-@locale (Widget.from Locale)
 Text.to_case : Case -> Locale -> Text
 Text.to_case self case_option:Case=..Lower locale:Locale=Locale.default =
     Text_Utils.toCase self case_option.to_java locale.java_locale
@@ -1836,7 +1830,6 @@ Text.last_index_of self term:Text="" start=-1 case_sensitivity:Case_Sensitivity=
    ```
          "7.6".parse_float
    ```
-@locale (Widget.from Locale)
 Text.parse_float : Locale | Nothing -> Float ! Number_Parse_Error
 Text.parse_float self locale=Locale.default = Float.parse self locale
 
@@ -2375,7 +2368,6 @@ Text.<= self that = Comparable.<= self=self that
     texts are equal if they are identical after canonical decomposition. This
     ensures that different ways of expressing the same character in the
     underlying binary representation are considered equal.
-@locale (Widget.from Locale)
 Text.equals_ignore_case self (that : Text) (locale : Locale = Locale.default) -> Boolean =
     Text_Utils.equals_ignore_case self that locale.java_locale
 
@@ -2385,7 +2377,6 @@ Text.equals_ignore_case self (that : Text) (locale : Locale = Locale.default) ->
     ---
     Unifies the case of all letters in the text, generating a key which can be
     used to perform case-insensitive comparisons.
-@locale (Widget.from Locale)
 Text.to_case_insensitive_key self (locale : Locale = Locale.default) -> Text =
     Text_Utils.case_insensitive_key self locale.java_locale
 
@@ -2403,7 +2394,6 @@ Text.to_case_insensitive_key self (locale : Locale = Locale.default) -> Text =
     ```
             "a".compare_to_ignore_case "b"
     ```
-@locale (Widget.from Locale)
 Text.compare_to_ignore_case self that (locale : Locale = Locale.default) -> Ordering =
     if that.is_nothing then Panic.throw (Type_Error.Error Text that "Expected `that` to be a Text, but got {got}") else
         comparison_result = Text_Utils.compare_normalized_ignoring_case self that locale.java_locale

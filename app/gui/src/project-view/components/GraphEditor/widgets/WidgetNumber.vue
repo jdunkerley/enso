@@ -6,6 +6,7 @@ import {
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
+import { isTypeDefault } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import NumericInputWidget from '@/components/widgets/NumericInputWidget.vue'
 import { Ast } from '@/util/ast'
 import { targetIsOutside } from '@/util/autoBlur'
@@ -68,20 +69,16 @@ export const widgetDefinition = defineWidget(
   {
     priority: 1001,
     score: (props) => {
+      // A type default claims only an unset argument (the number literals are caught below): a
+      // reference, `_`, `Nothing`, a vector or a text literal keeps the widget that draws it.
       if (
-        props.input.dynamicConfig?.kind === 'Numeric_Input' ||
+        (props.input.dynamicConfig?.kind === 'Numeric_Input' &&
+          (!isTypeDefault(props.input.dynamicConfig) || WidgetInput.isPlaceholder(props.input))) ||
         props.input.value instanceof Ast.NumericLiteral ||
         (props.input.value instanceof Ast.NegationApp &&
           props.input.value.argument instanceof Ast.NumericLiteral)
       )
         return Score.Perfect
-      const type = props.input.expectedType
-      if (
-        type === 'Standard.Base.Data.Numbers.Number' ||
-        type === 'Standard.Base.Data.Numbers.Integer' ||
-        type === 'Standard.Base.Data.Numbers.Float'
-      )
-        return Score.Good
       return Score.Mismatch
     },
   },

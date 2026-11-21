@@ -136,3 +136,29 @@ test('an answer from an older library, still carrying display and label, parses 
   })
   expect(textInput).toEqual({ kind: 'Text_Input' })
 })
+
+test.each(['Date_Input', 'Date_Time_Input', 'Time_Input'] as const)('parses %s', (kind) => {
+  const parsed = widgetConfigurationSchema.parse({ constructor: kind })
+  expect(parsed).toEqual({ kind })
+})
+
+/* eslint-disable camelcase */
+test('parses File_Browse with an action', () => {
+  const parsed = widgetConfigurationSchema.parse({
+    constructor: 'File_Browse',
+    existing_only: false,
+    action: 'Save',
+    file_types: [],
+  })
+  expect(parsed).toMatchObject({ kind: 'File_Browse', existing_only: false, action: 'Save' })
+})
+
+test('parses File_Browse without an action', () => {
+  const parsed = widgetConfigurationSchema.parse({
+    constructor: 'File_Browse',
+    existing_only: true,
+    file_types: [],
+  })
+  expect(parsed).toMatchObject({ kind: 'File_Browse', existing_only: true })
+})
+/* eslint-enable camelcase */

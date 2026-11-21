@@ -22,7 +22,6 @@ from project.Errors import SQL_Error
     - `details`: `Connection_Details` specifying the database to connect to.
     - `options`: Additional custom connection options for the JDBC connection.
 @details connection_details_widget
-@options (Widget.from Connection_Options)
 connect : Connection_Details -> Connection_Options -> Connection ! SQL_Error
 connect details options:Connection_Options=..Value =
     result = case details of

@@ -79,8 +79,9 @@ result = "not a number".parse_integer.catch _-> 0
   annotation runs. The GUI calls `resolve_call` for every widget query, by
   method pointer (`Standard.Base.Metadata.Widget_Query.resolve_call`, literal
   arguments, so nothing is compiled in the user's module); the one in-frame
-  query, the dropped file's `format` options, goes through
-  `Meta.call_module_method`, with the `Data` module as the value.
+  queries, the dropped file's `format` options and `Widget_Query.resolve_type`
+  (a type's default widget, no subject), go through `Meta.call_module_method`
+  (the first with the `Data` module as the value).
 - **Widgets carry no display.** `Widget` constructors have no `display` or
   `label` (`Metadata.Display` is gone; `Choice.Option`'s `label` stays). Which
   arguments the node shows is the `arguments:` map in the method's doc front
@@ -88,7 +89,15 @@ result = "not a number".parse_integer.catch _-> 0
   arguments with no default always show. The compiler's `ArgumentDisplayCheck`
   validates it and `lintEnso` fails the build on a mistake.
 - **Type defaults.** A type's default widget is `Widget.from (that : X.type) …`
-  in `X`'s module. Extra defaulted arguments are tweaks
+  in `X`'s own module. Group D, the types the GUI widgets now choose from, lives
+  in `Metadata.enso` instead, because the conversion belongs to its target's
+  (`Widget`'s) module, beside the constructors it returns: Boolean, Integer,
+  Float, Number, Text, `Date`, `Date_Time`, `Time_Of_Day` (`Date_Input`,
+  `Date_Time_Input`, `Time_Input`), `File`, `Writable_File` and `Enso_Secret`.
+  Prefer the type's own module for any other type. **Annotate an argument (`?` /
+  `@`) only to override its type default**: an annotation that repeats the
+  default is redundant and was removed from the standard library. Extra
+  defaulted arguments are tweaks
   (`Widget.from Filter_Condition include_text=False`).
   `Standard.Base.Metadata.Widget_Query.resolve_type` answers it for the GUI
   (`{"widget":…}`, `{"widget":null}` for a type with no conversion, or an

@@ -537,16 +537,77 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
 
 let mockWidgetConfigurations: Map<string, Uint8Array> = new Map(initialMockWidgetConfigurations)
 
+const typeBase = 'Standard.Base.Data'
+/* eslint-disable camelcase */
+const fileBrowse = {
+  constructor: 'File_Browse',
+  existing_only: true,
+  action: 'Open',
+  // The engine's default is `All Files`; no test reads the filters yet.
+  file_types: [],
+}
+/**
+ * The answers of `Widget_Query.resolve_type`, by the qualified type name: the default widget of
+ * each type with a `Widget.from` conversion in `mockSuggestions.json`.
+ */
+const initialMockTypeDefaults: Record<string, unknown> = {
+  [`${typeBase}.Boolean.Boolean`]: { widget: { constructor: 'Boolean_Input' } },
+  [`${typeBase}.Numbers.Integer`]: { widget: { constructor: 'Numeric_Input' } },
+  [`${typeBase}.Numbers.Float`]: { widget: { constructor: 'Numeric_Input' } },
+  [`${typeBase}.Numbers.Number`]: { widget: { constructor: 'Numeric_Input' } },
+  [`${typeBase}.Text.Text`]: { widget: { constructor: 'Text_Input' } },
+  [`${typeBase}.Time.Date.Date`]: { widget: { constructor: 'Date_Input' } },
+  [`${typeBase}.Time.Date_Time.Date_Time`]: { widget: { constructor: 'Date_Time_Input' } },
+  [`${typeBase}.Time.Time_Of_Day.Time_Of_Day`]: { widget: { constructor: 'Time_Input' } },
+  'Standard.Base.System.File.File': { widget: fileBrowse },
+  'Standard.Base.System.File.Generic.Writable_File.Writable_File': {
+    widget: { ...fileBrowse, existing_only: false, action: 'Save' },
+  },
+  'Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret': { widget: { constructor: 'Secret_Browse' } },
+}
+
+/* eslint-enable camelcase */
+let mockTypeDefaults: Map<string, unknown> = new Map(Object.entries(initialMockTypeDefaults))
+
+/** The types `resolve_type` was asked about, in order, since the last reset. */
+const typeDefaultQueries: string[] = []
+
+/** Set the answer `resolve_type` gives for `type` (`{ widget: null }` for none). */
+export function updateMockTypeDefault(type: string, answer: unknown) {
+  mockTypeDefaults.set(type, answer)
+}
+
+/** Test entry point: how many times `resolve_type` was asked about `type`. */
+export function typeDefaultQueryCount(type: string): number {
+  return typeDefaultQueries.filter((asked) => asked === type).length
+}
+
+/**
+ * The `resolve_type` answer's bytes for the routing key `resolve_type:<type>`; `{ widget: null }`
+ * stands for a type without a default.
+ */
+function typeDefaultBytes(key: string): Uint8Array | null {
+  if (!key.startsWith(RESOLVE_TYPE_KEY)) return null
+  return encodeJSON(mockTypeDefaults.get(key.slice(RESOLVE_TYPE_KEY.length)) ?? { widget: null })
+}
+
 /** Clear standard widget configurations. Use `updateMockWidgetConfiguration` to set a specific configuration needed for test. */
 export function clearMockWidgetConfigurations() {
   mockWidgetConfigurations.clear()
   preprocessorOverrides.clear()
+  resetTypeDefaults()
 }
 
 /** Restore standard mocks of widget configurations. */
 export function restoreMockWidgetConfigurations() {
   mockWidgetConfigurations = new Map(initialMockWidgetConfigurations)
   preprocessorOverrides.clear()
+  resetTypeDefaults()
+}
+
+function resetTypeDefaults() {
+  mockTypeDefaults = new Map(Object.entries(initialMockTypeDefaults))
+  typeDefaultQueries.length = 0
 }
 
 /**
@@ -564,6 +625,7 @@ export function clearPreprocessorOverrides() {
   }
   preprocessorOverrides.clear()
   lastWidgetQueries.clear()
+  typeDefaultQueries.length = 0
 }
 
 /** The execution contexts created on the open pages, each with the channel that notifies it. */
@@ -769,6 +831,9 @@ function moduleCallParts(
   return { module, method, args: [value, ...[...vector.values()].map((v) => v.code())] }
 }
 
+const RESOLVE_TYPE = 'resolve_type'
+const RESOLVE_TYPE_KEY = 'resolve_type:'
+
 const lastWidgetQueries = new Map<string, string[]>()
 /** Test entry point: the arguments of the last widget query for `.name` (after the subject). */
 export function lastWidgetQueryArguments(method: string): string[] | undefined {
@@ -798,6 +863,10 @@ function slotPreprocessorKey(request: VisRequestPreprocessor): string | null {
       // A widget query evaluated directly (the format of a dropped file, #489).
       if (call.module === WIDGET_QUERY_MODULE && call.method === RESOLVE_CALL)
         return widgetQueryKey(call.args.slice(1))
+      if (call.module === WIDGET_QUERY_MODULE && call.method === RESOLVE_TYPE) {
+        const type = textOf(call.args[0])
+        return type == null ? null : `${RESOLVE_TYPE_KEY}${type}`
+      }
       return `${call.module}.${call.method}`
     }
     const exprAst = Ast.parseExpression(expression.inFrame)
@@ -855,6 +924,11 @@ function responseBytesFor(
 ): Uint8Array | null {
   const override = preprocessorOverrides.get(preprocessorKey)
   if (override) return override
+  const typeDefault = typeDefaultBytes(preprocessorKey)
+  if (typeDefault) {
+    typeDefaultQueries.push(preprocessorKey.slice(RESOLVE_TYPE_KEY.length))
+    return typeDefault
+  }
   const widget = mockWidgetConfigurations.get(preprocessorKey)
   if (widget) return widget
   const mock = mockVizPreprocessors[preprocessorKey]

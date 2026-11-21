@@ -4,7 +4,6 @@ import Standard.Base.Errors.Common.Type_Error
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
 
-import Standard.Base.Metadata.Widget
 import Standard.Database.Connection.Client_Certificate.Client_Certificate
 import Standard.Database.Connection.Connection_Options.Connection_Options
 import Standard.Database.Connection.Credentials.Credentials
@@ -37,7 +36,6 @@ type Postgres
         - `use_ssl`: Whether to use SSL (defaults to `SSL_Mode.Prefer`).
         - `client_cert`: The client certificate to use or `Nothing` if not
           needed.
-    @credentials (Widget.from Credentials)
     Server
         host : Text = default_postgres_host
         port : Integer = default_postgres_port

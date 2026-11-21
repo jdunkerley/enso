@@ -3,6 +3,7 @@ import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import { Ast } from '@/util/ast'
 import { ApplicationKind, ArgumentInfoKey } from '@/util/callTree'
 import { describe, expect, test } from 'vitest'
+import { typeDefaultConfig } from '../../__tests__/typeDefaultFixture'
 import {
   BOOLEAN_TYPE,
   booleanExpressionTags,
@@ -82,9 +83,30 @@ describe('isBooleanArgument', () => {
     expect(isBooleanArgument(argument({ tagValues: ['False', 'True'] }))).toBe(true)
   })
 
-  test('a Boolean reprType or expected type', () => {
-    expect(isBooleanArgument(argument({ reprType: BOOLEAN_TYPE }))).toBe(true)
-    expect(isBooleanArgument(argument({}, { expectedType: BOOLEAN_TYPE as never }))).toBe(true)
+  test('an argument configured Boolean_Input', () => {
+    expect(isBooleanArgument(argument({}, { dynamicConfig: { kind: 'Boolean_Input' } }))).toBe(true)
+  })
+
+  test('a Boolean type default claims an unset argument or a literal, not a reference', async () => {
+    const dynamicConfig = await typeDefaultConfig('Boolean_Input')
+    expect(isBooleanArgument(argument({}, { dynamicConfig }))).toBe(true)
+    const value = (code: string) => Ast.parseExpression(code)!
+    expect(isBooleanArgument(argument({}, { dynamicConfig, value: value('True') }))).toBe(true)
+    for (const code of ['operator3', '_', 'Nothing', '(flag)'])
+      expect(isBooleanArgument(argument({}, { dynamicConfig, value: value(code) })), code).toBe(
+        false,
+      )
+    // An annotation keeps claiming whatever the argument holds.
+    expect(
+      isBooleanArgument(
+        argument({}, { dynamicConfig: { kind: 'Boolean_Input' }, value: value('operator3') }),
+      ),
+    ).toBe(true)
+  })
+
+  test('a declared Boolean type without the configuration is not one', () => {
+    expect(isBooleanArgument(argument({ reprType: BOOLEAN_TYPE }))).toBe(false)
+    expect(isBooleanArgument(argument({}, { expectedType: BOOLEAN_TYPE as never }))).toBe(false)
   })
 
   test('an untyped argument whose value is a literal', () => {

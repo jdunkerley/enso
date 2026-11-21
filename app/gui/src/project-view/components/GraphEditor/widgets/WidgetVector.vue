@@ -10,6 +10,7 @@ import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/edi
 import {
   defaultItemCode,
   vectorElementType,
+  vectorItemConfig,
 } from '@/components/GraphEditor/widgets/WidgetVector/elementType'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import DraggableList from '@/components/widgets/DraggableList.vue'
@@ -41,15 +42,23 @@ function doEdit(editFn: (ast: Ast.MutableVector) => void) {
   })
 }
 
-const itemConfig = computed(() =>
-  props.input.dynamicConfig?.kind === 'Vector_Editor' ?
-    props.input.dynamicConfig.item_editor
-  : undefined,
-)
-
 // A `Vector Date` argument's items are Dates, so each gets the date picker (and likewise for any type
 // whose widget is keyed on it).
 const itemType = computed(() => vectorElementType(props.input.expectedType))
+
+// The vector's own expression is the frame the type default is asked in.
+const itemConfig = computed(() =>
+  vectorItemConfig(
+    props.input.dynamicConfig?.kind === 'Vector_Editor' ?
+      props.input.dynamicConfig.item_editor
+    : undefined,
+    itemType.value,
+    (type) =>
+      props.input.value instanceof Ast.Ast ?
+        project.typeDefaults.value.lookup(type, props.input.value.externalId)
+      : undefined,
+  ),
+)
 
 const defaultItem = computed(() => {
   if (props.input.dynamicConfig?.kind === 'Vector_Editor')

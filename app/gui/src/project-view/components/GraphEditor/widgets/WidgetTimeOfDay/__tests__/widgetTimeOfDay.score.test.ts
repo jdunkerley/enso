@@ -49,13 +49,17 @@ const typedArgument = (reprType: string | undefined) =>
     [ArgumentInfoKey]: { appKind: 0, info: { name: 'time_of_day', reprType } },
   }) as Partial<WidgetInput>
 
+const timeInput = { kind: 'Time_Input' } as const
+
 describe('the time-of-day widget scores', () => {
-  test('a Time_Of_Day-typed argument Perfect, by reprType or expected type', () => {
-    expect(score(placeholder(typedArgument(TIME_OF_DAY_TYPE)))).toBe(Score.Perfect)
-    expect(score(placeholder({ expectedType: TIME_OF_DAY_TYPE as never }))).toBe(Score.Perfect)
-    expect(score({ ...inputFor('Time_Of_Day.now'), ...typedArgument(TIME_OF_DAY_TYPE) })).toBe(
-      Score.Perfect,
-    )
+  test('an argument configured Time_Input Perfect', () => {
+    expect(score(placeholder({ dynamicConfig: timeInput }))).toBe(Score.Perfect)
+    expect(score({ ...inputFor('Time_Of_Day.now'), dynamicConfig: timeInput })).toBe(Score.Perfect)
+  })
+
+  test('a declared Time_Of_Day type without the configuration Mismatch', () => {
+    expect(score(placeholder(typedArgument(TIME_OF_DAY_TYPE)))).toBe(Score.Mismatch)
+    expect(score(placeholder({ expectedType: TIME_OF_DAY_TYPE as never }))).toBe(Score.Mismatch)
   })
 
   test('a node that is only a time Perfect, whatever its arguments', () => {

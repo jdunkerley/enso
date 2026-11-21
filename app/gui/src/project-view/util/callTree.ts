@@ -27,19 +27,23 @@ export const enum ApplicationKind {
   Infix,
 }
 
+/** The default widget of a declared argument type, if it is known and has one. */
+export type TypeDefault = (reprType: string | undefined) => WidgetConfiguration | undefined
+
 class ArgumentFactory {
   constructor(
     private callId: AstId,
     private kind: ApplicationKind,
     private widgetCfg: widgetCfg.FunctionCall | undefined,
     private display: ReadonlyMap<string, ArgumentDisplay> | undefined,
+    private typeDefault: TypeDefault | undefined,
   ) {}
 
   placeholder(index: number, info: SuggestionEntryArgument, insertAsNamed: boolean) {
     const argument = new ArgumentPlaceholder(
       this.callId,
       this.kind,
-      this.dynamicConfig(info.name),
+      this.dynamicConfig(info),
       index,
       info,
       insertAsNamed,
@@ -57,7 +61,7 @@ class ArgumentFactory {
     const argument = new ArgumentAst(
       this.callId,
       this.kind,
-      info && this.dynamicConfig(info.name),
+      info && this.dynamicConfig(info),
       index,
       info,
       ast,
@@ -70,8 +74,9 @@ class ArgumentFactory {
     return this.widgetCfg?.errors?.get(name)
   }
 
-  private dynamicConfig(name: string) {
-    return this.widgetCfg?.parameters.get(name) ?? undefined
+  /** The annotation's (or inherited) widget, else the default widget of the argument's type. */
+  private dynamicConfig(info: SuggestionEntryArgument) {
+    return this.widgetCfg?.parameters.get(info.name) ?? this.typeDefault?.(info.reprType)
   }
 }
 
@@ -250,6 +255,8 @@ interface CallInfo {
   widgetCfg?: widgetCfg.FunctionCall | undefined
   subjectAsSelf?: boolean | undefined
   suppressPlaceholders?: boolean | undefined
+  /** The default widget of an argument's type, for arguments the call's widget query left open. */
+  typeDefault?: TypeDefault | undefined
 }
 
 /** TODO: Add docs */
@@ -264,13 +271,14 @@ export class ArgumentApplication {
   ) {}
 
   private static FromInterpretedInfix(interpreted: InterpretedInfix, callInfo: CallInfo) {
-    const { suggestion, widgetCfg } = callInfo
+    const { suggestion, widgetCfg, typeDefault } = callInfo
 
     const makeArg = new ArgumentFactory(
       interpreted.appTree.id,
       ApplicationKind.Infix,
       widgetCfg,
       suggestion?.argumentDisplay,
+      typeDefault,
     )
     const argFor = (key: 'lhs' | 'rhs', index: number) => {
       const tree = interpreted[key]
@@ -290,8 +298,14 @@ export class ArgumentApplication {
   }
 
   private static FromInterpretedPrefix(interpreted: InterpretedPrefix, callInfo: CallInfo) {
-    const { notAppliedArguments, suggestion, widgetCfg, subjectAsSelf, suppressPlaceholders } =
-      callInfo
+    const {
+      notAppliedArguments,
+      suggestion,
+      widgetCfg,
+      subjectAsSelf,
+      suppressPlaceholders,
+      typeDefault,
+    } = callInfo
 
     const knownArguments = suggestion?.arguments
     const allPossiblePrefixArguments = Array.from(knownArguments ?? [], (_, i) => i)
@@ -352,6 +366,7 @@ export class ArgumentApplication {
       ApplicationKind.Prefix,
       widgetCfg,
       suggestion?.argumentDisplay,
+      typeDefault,
     )
 
     // Always insert a placeholder for the missing argument at the first position that is legal

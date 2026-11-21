@@ -5,6 +5,7 @@
  */
 import { requiredImportsByProjectPath } from '$/providers/openedProjects/module/imports'
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
+import { isTypeDefault } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import { ExpressionTag } from '@/components/GraphEditor/widgets/WidgetSelection/tags'
 import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
@@ -58,7 +59,14 @@ export function isBooleanArgument(input: WidgetInput): boolean {
   const info = argument.info
   if (info == null) return false
   if (hasBooleanTags(info.tagValues)) return true
-  if (info.reprType === BOOLEAN_TYPE || input.expectedType === BOOLEAN_TYPE) return true
+  if (input.dynamicConfig?.kind === 'Boolean_Input') {
+    // A type default claims only an unset argument or a literal: a reference keeps its own widget.
+    return (
+      !isTypeDefault(input.dynamicConfig) ||
+      WidgetInput.isPlaceholder(input) ||
+      booleanLiteral(input.value) != null
+    )
+  }
   return (
     info.tagValues == null && input.dynamicConfig == null && booleanLiteral(input.value) != null
   )

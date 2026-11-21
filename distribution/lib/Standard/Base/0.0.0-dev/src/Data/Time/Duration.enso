@@ -266,7 +266,6 @@ type Duration
        longer = duration + (Duration.new hours=12)
        # → PT12H30M
        ```
-    @that (Widget.from Duration)
     + self that:Duration -> Duration ! Time_Error =
         Date_Helpers.ensure_duration that <|
             Panic.catch ArithmeticException (Date_Helpers.duration_plus self that) err->
@@ -291,7 +290,6 @@ type Duration
        shorter = duration - (Duration.new minutes=30)
        # → PT5H30M
        ```
-    @that (Widget.from Duration)
     - self that:Duration -> Duration ! Time_Error =
         Date_Helpers.ensure_duration that <|
             Panic.catch ArithmeticException (Date_Helpers.duration_minus self that) err->
