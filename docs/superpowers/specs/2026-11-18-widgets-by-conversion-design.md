@@ -201,6 +201,26 @@ private _join_on_widget self (right : Table | Nothing = Nothing) (search : Text 
   resolver without it returns its full list and the GUI filters locally.
 - **A test is a call**: `_join_on_widget t1 right=t2 . should_equal …`.
 
+**Decided 2026-11-21 (owner; plans for PRs 6a and 6b):** PR 6 is split into 6a
+(engine and libraries: resolvers, the answer's
+`{resolver: {dependencies, searchable}}`, group C conversions, every `cache`
+helper migrated, `cache` / `_with_table_cache` / `_table_key` /
+`TableValueCache`'s widget use / `With_JSON_Cache` deleted) and 6b (GUI:
+re-query only on a declared dependency or `search`, the fallback with a note,
+the 2 s time-box, the search box). `search` has one real user, the database
+table-name pickers (DuckDB first; Hyper is a follow-up). The rule is enforced in
+the standard library build (a lint pass under `lintEnso`) and reported at run
+time as the widget's error. Plans, pending the owner's decisions in them: Enso
+forbids a `self` parameter in a module function, where widget helpers live, so
+**the subject is the resolver's first open parameter, under any name** (reported
+as `"self"`); every other open parameter is an argument of the call **defaulted
+to `Nothing`** (dependencies are passed positionally, `Nothing` when unset) or
+`search : Text = ""`; a configuration parameter is pre-applied in the
+annotation. A type default resolver's dependencies are not checked against a
+call; one the call lacks is `Nothing`. The spec's "Google_Analytics_Account" is
+`Google_Analytics_Account_Filter`. 6a stays backward compatible with today's
+GUI, so 6a and 6b merge independently.
+
 ### 4. Unions and vectors: the kind picker
 
 ```
@@ -331,6 +351,16 @@ arrives (the run is not cancelled). A run over 10 s is logged at Warning.
 table hit. `_with_table_cache`, `_table_key`, `TableValueCache` use for widgets,
 and `With_JSON_Cache` are deleted.
 
+**Plans for PRs 6a and 6b (2026-11-21):** PR 5b caches the expansion in the GUI
+and removes `_with_table_cache` from the helpers it rewrites; 6a deletes the
+rest. `resolve_call` gains `search`, `type_defaults` and `revision` (defaulted,
+after today's arguments) and echoes `search` and `revision`. A column picker
+reports its sources as dependencies. An answer with no resolver and no column
+list is static: the GUI keeps it per method for the session. The GUI sends the
+expression ids of the declared dependencies only, and `revision` changes when a
+dependency's value changes. During a re-query the previous widget stays up to
+the 2 s time-box.
+
 **Targets** (500 columns, every backend in the baseline): every widget answer
 under 50 KB and under 20 ms of engine time; type defaults evaluated once per
 type per session. PR 1 adds timing of each widget query under the existing
@@ -384,6 +414,8 @@ join self right:Table on=… join_kind=… = …
 - The new-project template, the samples and `samples.test.ts` drop
   `import Standard.Visualization`.
 
+`Standard.Visualization.Widgets` was deleted by PR 1b (#891), not PR 6.
+
 ## Testing
 
 - **Engine** (PR 0): runtime-integration tests for `X.type` conversions covering
@@ -421,6 +453,11 @@ standard libraries in the same change.
 | 4   | Unions: `Widget.Union` + kind picker; `Regex` type default (`Widget.Regex_Input`)                                                                                                                                                                                                  | 3          | entry     |
 | 5   | `Widget_Columns` + `Column_Kind` (replacing `Viz_Kind`); declarative pickers; column list sent once; schema cache; migrate Table, Database, DuckDB, Geo, XML and YXDB                                                                                                              | 1          | entry     |
 | 6   | Resolvers with declared dependencies + `search`; group C conversions returning resolvers; migrate every `cache=` helper (join, filter, rename, fill, Google, Redshift, DuckDB, Hyper); delete `cache`, `_with_table_cache`, `With_JSON_Cache` and `Standard.Visualization.Widgets` | 5          | entry     |
+
+Row 6 is split (decided 2026-11-21): **6a**, engine and libraries (resolvers,
+the answer shape, group C conversions, the `cache` helpers, the lint; label),
+depends on 5; **6b**, GUI (re-query on dependencies, fallback note, time-box,
+search; entry), depends on 6a.
 
 PRs 0, 1 and 2 can run in parallel (2 once #850 is merged); 3 and 5 can follow
 in parallel. Each gets its own plan.
