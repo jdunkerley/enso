@@ -227,6 +227,15 @@ Text | Regex               →   [Regex ▾] [ a.*c ]      (regex syntax)
   type default or resolver can produce one too. GUI side: a new composite widget
   (working name `WidgetKindPicker`) wrapping the chosen kind's widget.
 
+**Plan for PR 4 (2026-11-21, pending the owner's decisions in the plan):** the
+GUI composes a declared union's picker from its members' cached type defaults;
+`Widget.Union` has a second field `include_nothing:Boolean=False`. In a union
+with a browser kind (`File_Browse`, `Folder_Browse`, `Secret_Browse`) the `Text`
+member is dropped; members with equal widgets collapse. A set value that matches
+no kind gets no picker. A `Vector T` item's default is the first option of a
+dropdown, otherwise the first kind's default value (not a blank `_`, which would
+make the list a function).
+
 Of the 170 union-typed arguments in the standard libraries, most are
 `T | Nothing` or a main type plus shorthand forms (`Text | Enso_Secret`,
 `URI | Text`, `Index_Sub_Range | Range | Integer`). Selector unions
@@ -266,6 +275,15 @@ Widget_Columns.from (that : Table) = …       # next to each table-like type
 - **The builders in `Table/Internal/Widget_Helpers.enso` are rewritten over
   `Widget_Columns`** in Base, and the Table, Database, DuckDB, Geo, XML and YXDB
   callers migrate to the declarative form.
+
+**Plans for PRs 5a and 5b (2026-11-21, pending the owner's decisions in the
+plans):** PR 5 is split into 5a (Base and libraries: `Column_Kind`,
+`Widget_Columns`, the pickers, the `columns` block; invisible) and 5b (GUI
+expansion, migration, benchmark). Annotations spell pickers with their type,
+`@columns (Widget.Column_Names)`: an annotation has no expected type for `..`. A
+database column whose SQL type is not known yet is kind `Other` rather than
+queried (a computed column's type costs one query per column), and a picker
+filtered by `kinds` always offers `Other` columns.
 
 ### 6. Queries, caching and performance
 
