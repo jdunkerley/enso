@@ -2542,6 +2542,44 @@ test.describe('Kind picker', () => {
     expect(await moduleCode(page)).toContain('textn = Data.text_nothing value=Nothing\n')
   })
 
+  const heightOf = async (locator: Locator) => (await locator.boundingBox())?.height ?? NaN
+
+  test('the kind button is as high as a value chip, and selecting does not change the node height', async ({
+    editorPage,
+    page,
+  }) => {
+    const node = await kindNode(
+      editorPage,
+      page,
+      'textint',
+      unionMethod('text_int', `${TEXT} | ${INTEGER}`),
+      true,
+    )
+    const textChip = node.locator('.WidgetText').first()
+    const unselectedNode = await heightOf(node)
+    // The faint icon, unselected, is already a chip's height.
+    expect(
+      Math.abs((await heightOf(node.locator('.kindIcon'))) - (await heightOf(textChip))),
+    ).toBeLessThan(1)
+    await select(page, node)
+    expect(Math.abs((await heightOf(node)) - unselectedNode)).toBeLessThan(1)
+    // The icon form.
+    const button = changeKind(node, 'Text')
+    expect(Math.abs((await heightOf(button)) - (await heightOf(textChip)))).toBeLessThan(1)
+    // The Nothing form, beside a number chip.
+    await button.click()
+    await list(page).clickOption('Integer')
+    const numberChip = node.locator('.NumericInputWidget').first()
+    await expect(numberChip).toBeVisible()
+    const numberHeight = await heightOf(numberChip)
+    await changeKind(node, 'Integer').click()
+    await list(page).clickOption('Nothing')
+    const nothing = changeKind(node, 'Nothing')
+    await expect(nothing).toBeVisible()
+    expect(Math.abs((await heightOf(nothing)) - numberHeight)).toBeLessThan(1)
+    expect(Math.abs((await heightOf(node)) - unselectedNode)).toBeLessThan(1)
+  })
+
   test('switching kind is one undo step', async ({ editorPage, page }) => {
     const node = await kindNode(
       editorPage,

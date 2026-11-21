@@ -188,11 +188,14 @@ function clearPendingFocus() {
   align-items: center;
 }
 
+/* The chip is as high as a value chip (`.widgetPill`: a port high, a port's radius), so a selected
+   node does not grow and the button sits in the argument like the value beside it. */
 .kindIcon {
   display: inline-flex;
   align-items: center;
-  height: 18px;
-  padding: 0 4px;
+  justify-content: center;
+  height: var(--node-port-height);
+  padding: 0 calc(var(--widget-token-pad-unit) / 2);
   color: rgba(255 255 255 / 0.9);
   pointer-events: none;
 }
@@ -200,21 +203,22 @@ function clearPendingFocus() {
 .kindButton {
   display: inline-flex;
   align-items: center;
-  height: 18px;
-  padding: 0 3px 0 4px;
+  height: var(--node-port-height);
+  padding: 0 calc(var(--widget-token-pad-unit) / 2);
   gap: 1px;
   border: 0;
-  border-radius: 9px;
-  background: rgba(0 0 0 / 0.22);
-  color: white;
+  border-radius: var(--node-port-border-radius);
+  background: var(--color-widget);
+  color: var(--color-node-text);
+  font: inherit;
   cursor: pointer;
   &:hover {
-    background: rgba(0 0 0 / 0.34);
+    background: var(--color-widget-selected);
   }
 }
 
 .nothingButton {
-  padding: 0 6px 0 8px;
+  padding: 0 var(--widget-token-pad-unit);
   font-weight: bold;
 }
 
