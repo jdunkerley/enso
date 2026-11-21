@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Metadata.Column_Kind.Column_Kind
+import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 
 from Standard.Test import all
 
@@ -18,6 +19,11 @@ add_specs suite_builder =
 
         group_builder.specify "as JSON is its name" <|
             Column_Kind.Date_And_Time.to_json . should_equal '"Date_And_Time"'
+
+    suite_builder.group "Widget_Columns" group_builder->
+        group_builder.specify "as JSON" <|
+            columns = Widget_Columns.Value ["A", 'B "C"'] [Column_Kind.Numeric, Column_Kind.Other] ["Integer", ""]
+            columns.to_json . should_equal '{"names":["A","B \\"C\\""],"kinds":["Numeric","Other"],"type_names":["Integer",""]}'
 
 main filter=Nothing =
     suite = Test.build suite_builder-> add_specs suite_builder

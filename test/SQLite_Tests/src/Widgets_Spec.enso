@@ -5,10 +5,14 @@ import Standard.Base.Metadata.Widget
 
 from Standard.Database import all
 from Standard.SQLite import all
+from Standard.Table import Table, expr
 from Standard.Base.Metadata.Choice import Option
 
 import Standard.Base.Metadata.Widget_Query
+import Standard.Base.Metadata.Column_Kind.Column_Kind
+import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 
+import Standard.Test.Test_Environment
 from Standard.Test import all
 
 
@@ -77,6 +81,18 @@ add_specs suite_builder =
     suite_builder.group "Type defaults by conversion" group_builder->
         group_builder.specify "Connection_Options" <| check_default Connection_Options
         group_builder.specify "Credentials" <| check_default Credentials
+
+    suite_builder.group "Widget_Columns.from a database table" group_builder->
+        group_builder.specify "reads the known schema and makes no query" <|
+            connection = Database.connect (SQLite.In_Memory)
+            t = (Table.new [["a", [1, 2]], ["b", ["x", "y"]]]).select_into_database_table connection "wc" temporary=True
+            computed = t.set (expr "[a] + 1") as="c"
+            log = File.create_temporary_file "widget_columns_sql" ".log"
+            columns = Test_Environment.unsafe_with_environment_override "ENSO_SQL_LOG_PATH" log.path <|
+                Widget_Columns.from computed
+            columns.names . should_equal ["a", "b", "c"]
+            columns.kinds.take 2 . should_equal [Column_Kind.Numeric, Column_Kind.Textual]
+            (log.exists.not || log.read . is_empty) . should_be_true
 
 main filter=Nothing =
     suite = Test.build suite_builder->

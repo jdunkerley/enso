@@ -1,0 +1,27 @@
+import project.Data.Text.Text
+import project.Data.Vector.Vector
+import project.Metadata.Column_Kind.Column_Kind
+from project.Data.Json.Extensions import all
+from project.Data.Text.Extensions import all
+
+## ---
+   private: true
+   ---
+   A table's columns as the IDE's widgets see them: the names, the kinds and
+   the names of the value types, in column order. It is read from the table's
+   schema only, so it never queries a database.
+type Widget_Columns
+    ## ---
+       private: true
+       ---
+       The three vectors have one entry per column. A column of unknown type
+       has the kind `Other` and the type name `""`.
+    Value (names : Vector Text) (kinds : Vector Column_Kind) (type_names : Vector Text)
+
+    ## ---
+       private: true
+       ---
+       The columns as JSON: `{"names":[…],"kinds":[…],"type_names":[…]}`.
+    to_json self -> Text =
+        kinds_json = "[" + (self.kinds.map .to_json . join ",") + "]"
+        '{"names":' + self.names.to_json + ',"kinds":' + kinds_json + ',"type_names":' + self.type_names.to_json + '}'

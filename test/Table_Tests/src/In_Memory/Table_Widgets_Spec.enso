@@ -2,6 +2,8 @@ from Standard.Base import all
 import Standard.Base.Metadata.Choice
 import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Query
+import Standard.Base.Metadata.Column_Kind.Column_Kind
+import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 
 from Standard.Table import Table
 from Standard.Table.Columns_To_Add import Columns_To_Add
@@ -87,6 +89,26 @@ add_specs suite_builder =
         group_builder.specify "Columns_To_Keep" <| check_default Columns_To_Keep
         group_builder.specify "Join_Kind" <| check_default Join_Kind
         group_builder.specify "Rows_To_Read" <| check_default Rows_To_Read
+
+    suite_builder.group "Widget_Columns.from" group_builder->
+        group_builder.specify "an in-memory table: names, kinds and Value_Type names, in order" <|
+            t = Table.new [["i", [1, 2]], ["f", [1.5, 2]], ["s", ["a", "b"]], ["b", [True, False]], ["d", [Date.new 2020, Date.new 2021]], ["m", [1, "a"]]]
+            columns = Widget_Columns.from t
+            columns.names . should_equal ["i", "f", "s", "b", "d", "m"]
+            columns.kinds . should_equal [Column_Kind.Numeric, Column_Kind.Numeric, Column_Kind.Textual, Column_Kind.Logical, Column_Kind.Date_Only, Column_Kind.Other]
+            columns.type_names . should_equal ["Integer", "Float", "Char", "Boolean", "Date", "Mixed"]
+
+        group_builder.specify "a row: names, kinds from its values" <|
+            row = (Table.new [["i", [1]], ["s", ["a"]]]).rows.first
+            columns = Widget_Columns.from row
+            columns.names . should_equal ["i", "s"]
+            columns.kinds . should_equal [Column_Kind.Numeric, Column_Kind.Textual]
+            columns.type_names . should_equal ["", ""]
+
+        group_builder.specify "a recomputed table with the same schema converts equal" <|
+            t1 = Table.new [["a", [1]], ["b", ["x"]]]
+            t2 = t1.set (t1.at "a" + 1) as="a"
+            (Widget_Columns.from t1) . should_equal (Widget_Columns.from t2)
 
 main filter=Nothing =
     suite = Test.build suite_builder->
