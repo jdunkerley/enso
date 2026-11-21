@@ -68,7 +68,7 @@ result = "not a number".parse_integer.catch _-> 0
   (`src/Metadata/Widget_Query.enso`). It looks the method up exactly, by module,
   type and name, so static methods, extension methods and methods of `Any` get
   their own annotations. It answers
-  `{"arguments":[[<name>,{"widget":…}|{"error":{"step","message"}}],…]}`: errors
+  `{"arguments":[[<name>,{"widget":…}|{"error":{"step","message"}}],…]}`, plus a `"columns"` block (`{<source>:{names,kinds,type_names}}`, `""` for the subject) when a resolved widget has a column picker: errors
   are results, one per argument, never a failed call. Each failure is logged
   once per engine process on the logger `Standard.Base.Metadata.Widget_Query`
   (WARN, with the cause chain and, for a panic, the stack), and each call is

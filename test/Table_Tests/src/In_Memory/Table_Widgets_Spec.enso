@@ -16,6 +16,9 @@ from Standard.Test import all
 table_module = "Standard.Table.Table"
 table_type = "Standard.Table.Table.Table"
 
+@columns (Widget.Column_Names)
+Table.widget_test_pick self columns = columns
+
 answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
 
 ## Checks that the type has a `Widget.from` conversion and that `resolve_type`
@@ -109,6 +112,12 @@ add_specs suite_builder =
             t1 = Table.new [["a", [1]], ["b", ["x"]]]
             t2 = t1.set (t1.at "a" + 1) as="a"
             (Widget_Columns.from t1) . should_equal (Widget_Columns.from t2)
+
+    suite_builder.group "Widget_Query.resolve_call on a Table" group_builder->
+        group_builder.specify "a Table's answer carries its columns once" <|
+            t = Table.new [["a", [1]], ["b", ["x"]]]
+            json = Widget_Query.resolve_call t "enso_dev.Table_Tests.In_Memory.Table_Widgets_Spec" table_type "widget_test_pick" ["columns"] . parse_json
+            json.get "columns" . get "" . get "kinds" . should_equal ["Numeric", "Textual"]
 
 main filter=Nothing =
     suite = Test.build suite_builder->
