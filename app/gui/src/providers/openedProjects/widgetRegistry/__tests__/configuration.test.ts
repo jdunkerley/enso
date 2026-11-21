@@ -162,3 +162,55 @@ test('parses File_Browse without an action', () => {
   expect(parsed).toMatchObject({ kind: 'File_Browse', existing_only: true })
 })
 /* eslint-enable camelcase */
+
+test('parses a Union, Nothing last', () => {
+  const parsed = widgetConfigurationSchema.parse({
+    type: 'Widget',
+    constructor: 'Union',
+    kinds: [
+      ['Text', { type: 'Widget', constructor: 'Text_Input' }],
+      ['Integer', { type: 'Widget', constructor: 'Numeric_Input' }],
+    ],
+    include_nothing: true,
+  })
+  expect(parsed).toEqual({
+    kind: 'Union',
+    kinds: [
+      { label: 'Text', config: { kind: 'Text_Input' } },
+      { label: 'Integer', config: { kind: 'Numeric_Input' } },
+      { label: 'Nothing', config: null },
+    ],
+  })
+})
+
+test('parses a Union without Nothing', () => {
+  const parsed = widgetConfigurationSchema.parse({
+    constructor: 'Union',
+    kinds: [['Text', { constructor: 'Text_Input' }]],
+    include_nothing: false,
+  })
+  expect(parsed).toEqual({
+    kind: 'Union',
+    kinds: [{ label: 'Text', config: { kind: 'Text_Input' } }],
+  })
+})
+
+test("a Union as a Vector_Editor's item editor", () => {
+  const parsed = widgetConfigurationSchema.parse({
+    constructor: 'Vector_Editor',
+    item_default: "''",
+    item_editor: {
+      constructor: 'Union',
+      kinds: [['Text', { constructor: 'Text_Input' }]],
+      include_nothing: true,
+    },
+  })
+  assert(parsed.kind === 'Vector_Editor')
+  expect(parsed.item_editor.kind).toBe('Union')
+})
+
+test('parses a Regex_Input', () => {
+  expect(widgetConfigurationSchema.parse({ constructor: 'Regex_Input' })).toEqual({
+    kind: 'Regex_Input',
+  })
+})
