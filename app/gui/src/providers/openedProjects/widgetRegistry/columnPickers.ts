@@ -30,7 +30,9 @@ const PRETTY_ESCAPES: Record<string, string> = {
 /**
  * Enso's `Text.pretty` of a name: a single-quoted text literal. It escapes as
  * `Core_Text_Utils.prettyPrint` does (`lib/scala/common-polyglot-core-utils`): `\`, `'` and the
- * control characters `\n \t \0 \a \b \f \r \v \e`.
+ * control characters `\n \t \0 \a \b \f \r \v \e`. Observed in Enso on Linux: `'F.G/H\I'.pretty` is
+ * `'F.G/H\\I'`, `"it's".pretty` is `'it\'s'`, `'D "E"'.pretty` is `'D "E"'`, a tab is `\t`, a
+ * newline `\n` and ESC `\e`.
  */
 export function prettyText(name: string): string {
   let result = "'"
@@ -129,6 +131,8 @@ export function expandPicker(
         ...(picker.regex ? [option('<Regular Expression>', 'regex')] : []),
         ...(picker.by_type ? [option('<By Type>', '(..By_Type ..Integer)')] : []),
       ]
+      // An absent source with no flags offers nothing to choose from: free text (owner decision 13).
+      if (!columns && flags.length === 0) return { kind: 'Text_Input' }
       const names =
         columns ? offeredNames(columns, picker.kinds).map((n) => option(n, prettyText(n))) : []
       return { kind: 'Multiple_Choice', values: [...flags, ...names] }
@@ -207,7 +211,26 @@ export function expandColumnPickers(
   columns: Readonly<Record<string, WidgetColumns>> | undefined,
   cache?: SchemaCache,
 ): WidgetConfiguration {
-  const expandNested = (c: WidgetConfiguration) => expandColumnPickers(c, columns, cache)
+  const schemaKeys = new Map<string, string>()
+  const schemaKeyOf = (from: string, source: WidgetColumns | undefined) => {
+    if (!source) return 'absent'
+    let key = schemaKeys.get(from)
+    if (key == null) {
+      key = JSON.stringify({ names: source.names, kinds: source.kinds })
+      schemaKeys.set(from, key)
+    }
+    return key
+  }
+  return expandWith(config, columns, cache, schemaKeyOf)
+}
+
+function expandWith(
+  config: WidgetConfiguration,
+  columns: Readonly<Record<string, WidgetColumns>> | undefined,
+  cache: SchemaCache | undefined,
+  schemaKeyOf: (from: string, source: WidgetColumns | undefined) => string,
+): WidgetConfiguration {
+  const expandNested = (c: WidgetConfiguration) => expandWith(c, columns, cache, schemaKeyOf)
   const expandChoice = (choice: Choice): Choice => {
     const parameters = mapPreserving(choice.parameters, (arg) => {
       const [name, widget] = arg
@@ -221,12 +244,11 @@ export function expandColumnPickers(
       : { ...choice, parameters, value }
   }
   if (isPicker(config)) {
-    const source = columns?.[config.from ?? '']
+    const from = config.from ?? ''
+    const source = columns?.[from]
     const compute = () => expandNested(expandPicker(config, source))
     if (cache == null) return compute()
-    const schemaKey =
-      source ? JSON.stringify({ names: source.names, kinds: source.kinds }) : 'absent'
-    return cache.get(schemaKey, JSON.stringify(config), compute)
+    return cache.get(schemaKeyOf(from, source), JSON.stringify(config), compute)
   }
   switch (config.kind) {
     case 'Single_Choice':

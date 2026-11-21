@@ -170,3 +170,32 @@ test('the same schema hits the cache; a different one does not', () => {
   cache.get('s2', 'p', compute)
   expect(computed).toBe(2)
 })
+
+test('Column_Names with an absent source and no flags is free text (owner decision 13)', () => {
+  expect(
+    expandPicker({ kind: 'Column_Names', ...base, regex: false, by_type: false }, undefined),
+  ).toEqual({ kind: 'Text_Input' })
+})
+
+test('expandColumnPickers returns the identical object for the same schema', () => {
+  const cache = new SchemaCache()
+  const first = expandColumnPickers(name, { '': cols }, cache)
+  const second = expandColumnPickers({ ...name }, { '': { ...cols } }, cache)
+  expect(second).toBe(first)
+  expect(expandColumnPickers(name, { '': { ...cols, names: ['Z'] } }, cache)).not.toBe(first)
+})
+
+test('the least recently used schema is dropped', () => {
+  const cache = new SchemaCache(2)
+  let computed = 0
+  const compute = () => (computed++, { kind: 'Text_Input' }) as const
+  cache.get('s1', 'p', compute)
+  cache.get('s2', 'p', compute)
+  cache.get('s1', 'p', compute) // s1 is now the most recent
+  cache.get('s3', 'p', compute) // drops s2
+  expect(computed).toBe(3)
+  cache.get('s1', 'p', compute)
+  expect(computed).toBe(3)
+  cache.get('s2', 'p', compute)
+  expect(computed).toBe(4)
+})
