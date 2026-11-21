@@ -10,7 +10,7 @@ desktop binary (AppImage/DMG/exe + installer).
   orchestration (bundles `src/` with esbuild, runs `electron-builder`).
 - `electron-builder-config.ts` — packaging config (icons, code signing,
   entitlements).
-- `macos/`, `entitlements.mac.plist` — macOS DMG/notarization extras.
+- `entitlements.mac.plist` — macOS hardened-runtime entitlements (signing).
 - `tasks/` — one-shot CLI tasks exposed for `vite-node`.
 - `assets/` — icons/images that end up in the installer.
 - `paths.ts` — canonical path resolution (userData, logs, bundled engine).
@@ -191,9 +191,8 @@ right env vars.
 Release builds are signed with a Developer ID Application certificate and
 notarized (Note [Signing The Installers] in `.github/workflows/release.yml`).
 The certificate's name carries the Apple account holder, so the identity is
-found by team id (`APPLETEAMID`): `macSigningIdentity` in
-`electron-builder-config.ts` and `resolveSigningIdentity` in
-`macos/lib/keychain.mjs`. Don't hardcode a holder name.
+found by team id (`APPLETEAMID`, `macSigningIdentity` in
+`electron-builder-config.ts`). Don't hardcode a holder name.
 
 electron-builder signs the loose binaries; the `afterSign` hook
 (`tasks/signArchivesMacOs.ts`) signs the Mach-O files inside the engine's jars,
