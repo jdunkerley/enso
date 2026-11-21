@@ -163,6 +163,7 @@ test('parses File_Browse without an action', () => {
 })
 /* eslint-enable camelcase */
 
+/* eslint-disable camelcase */
 test('parses a Union, Nothing last', () => {
   const parsed = widgetConfigurationSchema.parse({
     type: 'Widget',
@@ -214,3 +215,4 @@ test('parses a Regex_Input', () => {
     kind: 'Regex_Input',
   })
 })
+/* eslint-enable camelcase */
