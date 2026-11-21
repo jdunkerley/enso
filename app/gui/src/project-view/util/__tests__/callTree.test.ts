@@ -490,6 +490,38 @@ test('an argument whose widget query failed carries the error, the others do not
   expect(WidgetQueryErrorKey in inputs.get('a')!).toBe(false)
 })
 
+describe('an argument without an annotation takes its type default', () => {
+  const DATE = 'Standard.Base.Data.Time.Date.Date'
+  const suggestion = makeModuleMethod('local.Foo.Bar.func', {
+    args: [makeArgument('when', DATE), makeArgument('other')],
+  })
+  const typeDefault = (reprType: string | undefined): widgetCfg.WidgetConfiguration | undefined =>
+    reprType === DATE ? { kind: 'Date_Input' } : undefined
+  const configOf = (name: string, parameters: Map<string, widgetCfg.WidgetConfiguration>) => {
+    const call = ArgumentApplication.FromInterpretedWithInfo(
+      interpretCall(Ast.parseExpression('func')!),
+      {
+        suggestion,
+        widgetCfg: { kind: 'FunctionCall', parameters },
+        typeDefault,
+      },
+    )
+    assert(call instanceof ArgumentApplication)
+    const app = [...call.iterApplications()].find((a) => a.argument.argInfo?.name === name)
+    return app?.argument.toWidgetInput().dynamicConfig
+  }
+
+  test('the type default fills a missing configuration', () => {
+    expect(configOf('when', new Map())).toEqual({ kind: 'Date_Input' })
+    expect(configOf('other', new Map())).toBeUndefined()
+  })
+
+  test('the annotation or inherited configuration wins', () => {
+    const answer: widgetCfg.WidgetConfiguration = { kind: 'Single_Choice', values: [] }
+    expect(configOf('when', new Map([['when', answer]]))).toEqual(answer)
+  })
+})
+
 describe('ArgumentPlaceholder.isHidden', () => {
   // `f a b=1 c=2 d=3 e=(Missing_Argument.throw "e")`, front matter:
   // b: always, c: selected (d unlisted → when_modified).

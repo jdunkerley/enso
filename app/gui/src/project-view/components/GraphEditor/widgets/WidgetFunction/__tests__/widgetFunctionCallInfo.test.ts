@@ -15,6 +15,7 @@ import {
   makeStaticMethod,
 } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
+import type { TypeDefaults } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import {
   RESOLVE_CALL_POINTER,
   WIDGET_QUERY_MODULE,
@@ -22,6 +23,7 @@ import {
 import { useWidgetFunctionCallInfo } from '@/components/GraphEditor/widgets/WidgetFunction/widgetFunctionCallInfo'
 import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
+import { ArgumentApplication } from '@/util/callTree'
 import type { MethodPointer } from '@/util/methodPointer'
 import type { Opt } from 'enso-common/src/utilities/data/opt'
 import { Ok, type Result } from 'enso-common/src/utilities/data/result'
@@ -159,6 +161,7 @@ function setUpCallInfo(
   code: string,
   callSuggestion: SuggestionEntry,
   data: Ref<Result<unknown> | null>,
+  typeDefaults?: { lookup: TypeDefaults['lookup'] },
 ) {
   const { ast, id } = parseWithSpans(code, {
     entireFunction: SourceRange.fromStartAndLength(0, code.length),
@@ -179,6 +182,7 @@ function setUpCallInfo(
           }
         },
         getExpressionInfo() {},
+        isNodeUsage: () => false,
       } as GraphDb,
       {
         useVisualizationData: () => data,
@@ -187,6 +191,7 @@ function setUpCallInfo(
       },
       projectNames,
       [],
+      typeDefaults,
     ),
   )!
 }
@@ -215,4 +220,22 @@ test('a readable answer is timed after it renders', async () => {
     expect.any(Number),
     expect.any(Number),
   )
+})
+
+test('an argument takes its type default, asked in the call own frame', () => {
+  const DATE = 'Standard.Base.Data.Time.Date.Date'
+  const dated = makeMethod('local.Project.Type.dated', {
+    returnType: 'Standard.Data.Text',
+    args: [makeArgument('self'), makeArgument('when', DATE)],
+    annotations: [],
+    projectNames,
+  })
+  const lookup = vi.fn((type: string | undefined) =>
+    type === DATE ? ({ kind: 'Date_Input' } as const) : undefined,
+  )
+  const info = setUpCallInfo('local.Project.Type.dated val1', dated, ref(null), { lookup })
+  const application = info.application.value
+  assert(application instanceof ArgumentApplication)
+  expect(application.argument.toWidgetInput().dynamicConfig).toEqual({ kind: 'Date_Input' })
+  expect(lookup).toHaveBeenCalledWith(DATE, expect.any(String))
 })

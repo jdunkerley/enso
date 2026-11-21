@@ -1,4 +1,5 @@
 /** @file The element type of a `Vector`-typed argument, so each item gets the widget its type asks for. */
+import type { WidgetConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { DATE_TYPE } from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
 import { DATE_TIME_TYPE } from '@/components/GraphEditor/widgets/WidgetDateTime/dateTimeExpression'
 import { TIME_OF_DAY_TYPE } from '@/components/GraphEditor/widgets/WidgetTimeOfDay/timeExpression'
@@ -33,4 +34,16 @@ export function vectorElementType(type: string | undefined): string | undefined 
   if (!reprType.startsWith(VECTOR_TYPE + ' ')) return undefined
   const element = reprType.slice(VECTOR_TYPE.length + 1).trim()
   return /^[\w.]+$/.test(element) ? element : undefined
+}
+
+/**
+ * The widget configuration of a vector's items: the argument's own `item_editor`, else the default
+ * widget of the element type.
+ */
+export function vectorItemConfig(
+  itemEditor: WidgetConfiguration | undefined,
+  elementType: string | undefined,
+  typeDefault: (reprType: string | undefined) => WidgetConfiguration | undefined,
+): WidgetConfiguration | undefined {
+  return itemEditor ?? typeDefault(elementType)
 }
