@@ -2,7 +2,6 @@
  * @file Recognising the date and time-of-day widgets' own expressions when they are a whole node.
  */
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
-import { isTypeDefault } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import { Ast } from '@/util/ast'
 
 /** Whether the expression is the whole expression of a node (parentheses around it do not count). */
@@ -35,15 +34,4 @@ export function isCallOfShape(ast: Ast.Ast, shapes: CallShapes): boolean {
   let callee: Ast.Ast = ast
   while (callee instanceof Ast.App) callee = callee.function
   return shapes.applied.includes(callee.code())
-}
-
-/**
- * Whether a picker typed by `Date_Input` and the like claims the input. A configuration that came from
- * a type's default (and not from an annotation) claims only an unset argument or a call of its own
- * kind: a reference, `_`, `Nothing` or a vector keeps the widget that draws it.
- */
-export function pickerClaimsInput(input: WidgetInput, ownCalls: CallShapes): boolean {
-  if (!isTypeDefault(input.dynamicConfig)) return true
-  if (WidgetInput.isPlaceholder(input)) return true
-  return input.value instanceof Ast.Ast && isCallOfShape(input.value, ownCalls)
 }

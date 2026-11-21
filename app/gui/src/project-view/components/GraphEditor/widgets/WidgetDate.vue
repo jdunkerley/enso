@@ -14,7 +14,6 @@ import {
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
 import {
   isWholeNodeCall,
-  pickerClaimsInput,
   type CallShapes,
 } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
@@ -72,7 +71,7 @@ const DATE_CALLS: CallShapes = {
 }
 
 function isDateTyped(input: WidgetInput): boolean {
-  return input.dynamicConfig?.kind === 'Date_Input' && pickerClaimsInput(input, DATE_CALLS)
+  return input.dynamicConfig?.kind === 'Date_Input'
 }
 
 /** A node that is only a date: `Date.today`, `Date.new` with whatever arguments, and so on. */

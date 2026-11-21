@@ -14,7 +14,6 @@ import {
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
 import {
   isWholeNodeCall,
-  pickerClaimsInput,
   type CallShapes,
 } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
@@ -68,7 +67,7 @@ function choose(picked: TimeChoice, done: () => void) {
 const TIME_CALLS: CallShapes = { bare: ['Time_Of_Day.now'], applied: ['Time_Of_Day.new'] }
 
 function isTimeTyped(input: WidgetInput): boolean {
-  return input.dynamicConfig?.kind === 'Time_Input' && pickerClaimsInput(input, TIME_CALLS)
+  return input.dynamicConfig?.kind === 'Time_Input'
 }
 
 /** A node that is only a time: `Time_Of_Day.now`, `Time_Of_Day.new` with whatever arguments. */

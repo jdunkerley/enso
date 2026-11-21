@@ -81,12 +81,13 @@ render only its own slot content. The icon is already on the row, drawn by
     kind** (R8). A reference or connection, `_`, `Nothing`, a vector, a
     parenthesised group or a literal of another kind keeps the widget that draws
     it (an `Integer`-first union holding a text literal shows the text input).
-    The number widget, `isBooleanArgument` and the date, time and date-time
-    pickers (`pickerClaimsInput` in `WidgetPicker/wholeNode.ts`) check this;
-    `WidgetText`'s matcher already admits only placeholders and text literals,
-    and `WidgetFileBrowser` keeps its transitional type rule (it claimed any
-    value of a browsable type before). An annotation's configuration keeps
-    claiming whatever the argument holds.
+    The number widget and `isBooleanArgument` check this. The date, time and
+    date-time pickers are exempt (R10): they claim any value of a configured
+    argument, as the declared-type rule did on develop, and draw its code
+    through `NodeWidget` with a ▾ over it; `WidgetText`'s matcher already admits
+    only placeholders and text literals, and `WidgetFileBrowser` keeps its
+    transitional type rule (it claimed any value of a browsable type before). An
+    annotation's configuration keeps claiming whatever the argument holds.
   - **A type default does not set the browse mode** (R9): `useBrowserTypeInfo`
     treats it as no configuration, so the declared type decides and a
     `File | Enso_Secret` union offers both.
