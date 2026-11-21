@@ -16,13 +16,11 @@ import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/w
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import TimeOfDayMenu from '@/components/GraphEditor/widgets/WidgetTimeOfDay/TimeOfDayMenu.vue'
 import {
-  TIME_OF_DAY_TYPE,
   parseTimeExpression,
   timeExpressionCode,
   withKeptParts,
   type TimeChoice,
 } from '@/components/GraphEditor/widgets/WidgetTimeOfDay/timeExpression'
-import { ArgumentInfoKey } from '@/util/callTree'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
 import { computed } from 'vue'
@@ -64,10 +62,7 @@ function choose(picked: TimeChoice, done: () => void) {
 
 <script lang="ts">
 function isTimeTyped(input: WidgetInput): boolean {
-  return (
-    input.expectedType === TIME_OF_DAY_TYPE ||
-    input[ArgumentInfoKey]?.info?.reprType === TIME_OF_DAY_TYPE
-  )
+  return input.dynamicConfig?.kind === 'Time_Input'
 }
 
 /** A node that is only a time: `Time_Of_Day.now`, `Time_Of_Day.new` with whatever arguments. */

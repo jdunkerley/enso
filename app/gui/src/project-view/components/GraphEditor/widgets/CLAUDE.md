@@ -54,32 +54,40 @@ render only its own slot content. The icon is already on the row, drawn by
 - `WidgetIcon.vue` — owns the `DisplayIcon` symbol. Other widgets attach to it
   via `input[DisplayIcon] = { icon, showContents?, noGap? }` to request an
   inline icon in front of a child widget.
-- `WidgetDate.vue` — a dropdown wrapper for a `Date`-typed input (the argument's
-  `reprType` or the input's `expectedType`, vector items included; nothing else
-  untyped) and for a whole node that is `Date.today`/`yesterday`/`tomorrow` or
-  `Date.new` with any arguments (`WidgetPicker/wholeNode.ts`: a node root,
-  parentheses skipped; not a call's target such as `Date.today.add_days 3`'s).
-  It scores `Mismatch` where `WidgetSelection` already draws a dropdown
-  (`hasDropdown`, exported from it), so there are never two arrows. It renders
-  `<NodeWidget>` over its own input, so the argument shows its real code
-  (`Date.today`, or `Date.new` with `year`, `month` and `day` ports), plus a
-  `SelectionArrow` under it; the arrow opens a menu (`WidgetDate/DateMenu.vue`:
-  `Date.today`, `Date.yesterday`, `Date.tomorrow`, which write at once, then the
-  Reka calendar of `WidgetDate/DateCalendar.vue` and Cancel and Set: a day click
-  only selects the day, Set or Enter on a day writes it, a click outside writes
-  only a changed day, and Cancel and Escape write nothing) that **replaces the
-  whole value** in one `module.edit` (the import goes in the same edit).
-  Priority 51, after `WidgetSelection` (50), so an argument with its own `@`
-  dropdown keeps it, and before `WidgetArgumentName`, which draws the name
-  inside it. `WidgetDate/dateExpression.ts` is the framework-free expression <->
-  choice mapping. A specific date is written parenthesised
-  (`(Date.new 2020 1 15)`) wherever it becomes an argument: an unparenthesised
-  application written as a string splits into one group per argument. The
-  decision is made on the AST the _port_ names
-  (`parenthesisedApplication(code, value, portId)`), not on the value's parent:
-  `WidgetGroup` hands its inner expression on with the Group's port, so the
-  write replaces the parentheses too. Only a node's expression and a vector item
-  are written bare. The menu opens on the current value through
+- **Widgets choose on the configuration, not the declared type.** An argument
+  with no annotation takes its type's default widget (`TypeDefaults`) as
+  `dynamicConfig`, and the Date, Time_Of_Day, Date_Time, Boolean, number and
+  text widgets score on its `kind` (`Date_Input`, `Time_Input`,
+  `Date_Time_Input`, `Boolean_Input`, `Numeric_Input`, `Text_Input`).
+  `WidgetSelection` keeps an argument's own `tagValues` dropdown under any of
+  those default kinds. `WidgetFileBrowser` still also matches a declared type
+  that contains `File`, `Writable_File` or `Enso_Secret`, and `WidgetVector` a
+  bare `Vector`.
+- `WidgetDate.vue` — a dropdown wrapper for an input configured `Date_Input`
+  (vector items included; nothing else untyped) and for a whole node that is
+  `Date.today`/`yesterday`/`tomorrow` or `Date.new` with any arguments
+  (`WidgetPicker/wholeNode.ts`: a node root, parentheses skipped; not a call's
+  target such as `Date.today.add_days 3`'s). It scores `Mismatch` where
+  `WidgetSelection` already draws a dropdown (`hasDropdown`, exported from it),
+  so there are never two arrows. It renders `<NodeWidget>` over its own input,
+  so the argument shows its real code (`Date.today`, or `Date.new` with `year`,
+  `month` and `day` ports), plus a `SelectionArrow` under it; the arrow opens a
+  menu (`WidgetDate/DateMenu.vue`: `Date.today`, `Date.yesterday`,
+  `Date.tomorrow`, which write at once, then the Reka calendar of
+  `WidgetDate/DateCalendar.vue` and Cancel and Set: a day click only selects the
+  day, Set or Enter on a day writes it, a click outside writes only a changed
+  day, and Cancel and Escape write nothing) that **replaces the whole value** in
+  one `module.edit` (the import goes in the same edit). Priority 51, after
+  `WidgetSelection` (50), so an argument with its own `@` dropdown keeps it, and
+  before `WidgetArgumentName`, which draws the name inside it.
+  `WidgetDate/dateExpression.ts` is the framework-free expression <-> choice
+  mapping. A specific date is written parenthesised (`(Date.new 2020 1 15)`)
+  wherever it becomes an argument: an unparenthesised application written as a
+  string splits into one group per argument. The decision is made on the AST the
+  _port_ names (`parenthesisedApplication(code, value, portId)`), not on the
+  value's parent: `WidgetGroup` hands its inner expression on with the Group's
+  port, so the write replaces the parentheses too. Only a node's expression and
+  a vector item are written bare. The menu opens on the current value through
   `unparenthesisedCode`. Design:
   `docs/superpowers/specs/2026-11-15-date-widget-design.md`.
 - `WidgetTimeOfDay.vue` — the same for a `Time_Of_Day`-typed input (priority 52;

@@ -9,7 +9,6 @@ import {
 } from '$/providers/openedProjects/widgetRegistry'
 import DateTimeMenu from '@/components/GraphEditor/widgets/WidgetDateTime/DateTimeMenu.vue'
 import {
-  DATE_TIME_TYPE,
   dateTimeExpressionCode,
   keptDateTimeArguments,
   parseDateTimeExpression,
@@ -23,7 +22,6 @@ import {
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
 import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
-import { ArgumentInfoKey } from '@/util/callTree'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
 import { computed } from 'vue'
@@ -68,10 +66,7 @@ function choose(picked: DateTimeChoice, done: () => void) {
 
 <script lang="ts">
 function isDateTimeTyped(input: WidgetInput): boolean {
-  return (
-    input.expectedType === DATE_TIME_TYPE ||
-    input[ArgumentInfoKey]?.info?.reprType === DATE_TIME_TYPE
-  )
+  return input.dynamicConfig?.kind === 'Date_Time_Input'
 }
 
 /** A node that is only a date-time: `Date_Time.now`, or `Date_Time.new` with whatever arguments. */

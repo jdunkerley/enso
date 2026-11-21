@@ -99,7 +99,7 @@ const configuredTags = useExpressionTags({
 })
 /** A Boolean argument lists `True` and `False` with their imports, whatever its tag values say. */
 const expressionTags = computed(() =>
-  isBooleanArgument(props.input) && props.input.dynamicConfig == null ?
+  isBooleanArgument(props.input) && isBooleanDefault(props.input.dynamicConfig) ?
     booleanExpressionTags(suggestionDbStore.value.entries)
   : configuredTags.value,
 )
@@ -240,6 +240,24 @@ export function withDropdownItems(input: WidgetInput, items: Iterable<DropdownIt
   return { ...input, [CustomDropdownItemsKey]: [...existingItems, ...items] }
 }
 
+/** The widget kinds a type's default can be: they never replace an argument's own tag values. */
+const TYPE_DEFAULT_KINDS: ReadonlySet<string> = new Set([
+  'Boolean_Input',
+  'Numeric_Input',
+  'Text_Input',
+  'Date_Input',
+  'Date_Time_Input',
+  'Time_Input',
+])
+
+function isTypeDefaultOrNone(config: WidgetInput['dynamicConfig']): boolean {
+  return config == null || TYPE_DEFAULT_KINDS.has(config.kind)
+}
+
+function isBooleanDefault(config: WidgetInput['dynamicConfig']): boolean {
+  return config == null || config.kind === 'Boolean_Input'
+}
+
 function selectionScore(input: WidgetInput): Score {
   return (
     // We don’t want to show the dropdown until the dynamic config is received
@@ -247,11 +265,12 @@ function selectionScore(input: WidgetInput): Score {
     input[CustomDropdownItemsKey] != null ? Score.Perfect
     : input.dynamicConfig?.kind === 'Pending' ? Score.Mismatch
     : input.dynamicConfig?.kind === 'Single_Choice' ? Score.Perfect
-    : isBooleanArgument(input) && input.dynamicConfig == null ? Score.Perfect
+    : isBooleanArgument(input) && isBooleanDefault(input.dynamicConfig) ? Score.Perfect
       // TODO[ao] here, instead of checking for existing dynamic config, we should rather return
       // Score.Good. But this does not work with WidgetArgument which would then take precedence
       // over selection (and we want to have name always under it)
-    : input[ArgumentInfoKey]?.info?.tagValues != null && input.dynamicConfig == null ? Score.Perfect
+    : input[ArgumentInfoKey]?.info?.tagValues != null && isTypeDefaultOrNone(input.dynamicConfig) ?
+      Score.Perfect
     : Score.Mismatch
   )
 }

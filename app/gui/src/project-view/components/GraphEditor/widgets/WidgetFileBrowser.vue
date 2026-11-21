@@ -107,6 +107,7 @@ export const widgetDefinition = defineWidget(
       return (
           (props.input.dynamicConfig &&
             SUPPORTED_DYNAMIC_CONFIG_KINDS.includes(props.input.dynamicConfig.kind)) ||
+            // Until PR 4's kind picker: a union containing a browsable type keeps the browser.
             (reprType && SUPPORTED_TYPES.some((type) => reprType.includes(type)))
         ) ?
           Score.Perfect

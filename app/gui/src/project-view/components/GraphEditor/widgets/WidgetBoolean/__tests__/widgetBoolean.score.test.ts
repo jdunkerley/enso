@@ -18,6 +18,7 @@ const placeholder = (extra: Partial<WidgetInput> = {}): WidgetInput => ({
   ...extra,
 })
 const booleanArgument = {
+  dynamicConfig: { kind: 'Boolean_Input' },
   [ArgumentInfoKey]: {
     appKind: 0,
     info: {
@@ -47,6 +48,11 @@ describe('the Boolean widget scores', () => {
     expect(
       score({ ...WidgetInput.FromAst(Ast.parseExpression('a > b')!), ...booleanArgument }),
     ).toBe(Score.Mismatch)
+  })
+
+  test('a declared Boolean type without the configuration Mismatch', () => {
+    const { dynamicConfig: _, ...declaredOnly } = booleanArgument
+    expect(score(placeholder(declaredOnly))).toBe(Score.Mismatch)
   })
 
   test('an unset argument of another type Mismatch', () => {

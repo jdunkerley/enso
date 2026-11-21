@@ -75,13 +75,6 @@ export const widgetDefinition = defineWidget(
           props.input.value.argument instanceof Ast.NumericLiteral)
       )
         return Score.Perfect
-      const type = props.input.expectedType
-      if (
-        type === 'Standard.Base.Data.Numbers.Number' ||
-        type === 'Standard.Base.Data.Numbers.Integer' ||
-        type === 'Standard.Base.Data.Numbers.Float'
-      )
-        return Score.Good
       return Score.Mismatch
     },
   },

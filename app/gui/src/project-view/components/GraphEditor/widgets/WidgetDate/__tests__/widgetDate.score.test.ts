@@ -49,11 +49,18 @@ const typedArgument = (reprType: string | undefined) =>
     [ArgumentInfoKey]: { appKind: 0, info: { name: 'end', reprType } },
   }) as Partial<WidgetInput>
 
+const dateInput = { kind: 'Date_Input' } as const
+
 describe('the date widget scores', () => {
-  test('a Date-typed argument Perfect, by reprType or expected type', () => {
-    expect(score(placeholder(typedArgument(DATE_TYPE)))).toBe(Score.Perfect)
-    expect(score(placeholder({ expectedType: DATE_TYPE as never }))).toBe(Score.Perfect)
-    expect(score({ ...inputFor('Date.today'), ...typedArgument(DATE_TYPE) })).toBe(Score.Perfect)
+  test('an argument configured Date_Input Perfect', () => {
+    expect(score(placeholder({ dynamicConfig: dateInput }))).toBe(Score.Perfect)
+    expect(score({ ...inputFor('Date.today'), dynamicConfig: dateInput })).toBe(Score.Perfect)
+  })
+
+  test('a declared Date type without the configuration Mismatch', () => {
+    expect(score(placeholder(typedArgument(DATE_TYPE)))).toBe(Score.Mismatch)
+    expect(score(placeholder({ expectedType: DATE_TYPE as never }))).toBe(Score.Mismatch)
+    expect(score({ ...inputFor('Date.today'), ...typedArgument(DATE_TYPE) })).toBe(Score.Mismatch)
   })
 
   test('a node that is only a date Perfect, whatever its arguments', () => {
@@ -95,7 +102,7 @@ describe('the date widget scores', () => {
         info: { name: 'end', reprType: DATE_TYPE, tagValues: ['Date.today'] },
       },
     } as Partial<WidgetInput>
-    expect(score(placeholder(tags))).toBe(Score.Mismatch)
+    expect(score(placeholder({ ...tags, dynamicConfig: dateInput }))).toBe(Score.Mismatch)
   })
 
   test('an untyped expression Mismatch, whatever its shape', () => {

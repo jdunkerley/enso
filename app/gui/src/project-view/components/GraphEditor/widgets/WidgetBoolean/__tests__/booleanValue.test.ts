@@ -82,9 +82,13 @@ describe('isBooleanArgument', () => {
     expect(isBooleanArgument(argument({ tagValues: ['False', 'True'] }))).toBe(true)
   })
 
-  test('a Boolean reprType or expected type', () => {
-    expect(isBooleanArgument(argument({ reprType: BOOLEAN_TYPE }))).toBe(true)
-    expect(isBooleanArgument(argument({}, { expectedType: BOOLEAN_TYPE as never }))).toBe(true)
+  test('an argument configured Boolean_Input', () => {
+    expect(isBooleanArgument(argument({}, { dynamicConfig: { kind: 'Boolean_Input' } }))).toBe(true)
+  })
+
+  test('a declared Boolean type without the configuration is not one', () => {
+    expect(isBooleanArgument(argument({ reprType: BOOLEAN_TYPE }))).toBe(false)
+    expect(isBooleanArgument(argument({}, { expectedType: BOOLEAN_TYPE as never }))).toBe(false)
   })
 
   test('an untyped argument whose value is a literal', () => {
