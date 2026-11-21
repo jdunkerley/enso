@@ -9,6 +9,7 @@ test.each([
   'regex "a"',
   "Regex.compile 'a'",
   "Standard.Base.Data.Text.Regex.regex 'a'",
+  "Standard.Base.Data.Text.Regex.Regex.compile 'a'",
 ])('regexPattern(%s) is the literal', (code) => {
   expect(regexPattern(parse(code))?.rawTextContent).toBe('a')
 })

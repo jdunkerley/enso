@@ -61,6 +61,10 @@ function withoutParentheses(ast: Ast.Expression): Ast.Expression {
   return ast
 }
 
+function unwrapParentheses(code: string): string {
+  return code.startsWith('(') && code.endsWith(')') ? code.slice(1, -1).trim() : code
+}
+
 function applicationHead(ast: Ast.Expression): Ast.Expression {
   while (ast instanceof Ast.App) ast = ast.function
   return ast
@@ -98,9 +102,11 @@ function isKind(config: WidgetConfiguration | null, ast: Ast.Expression): boolea
     case 'Single_Choice': {
       const code = ast.code()
       return config.values.flatMap(flattenChoice).some(({ value }) => {
-        const option = value.trim()
+        const option = unwrapParentheses(value.trim())
         if (code === option) return true
-        return ast instanceof Ast.App && applicationHead(ast).code() === option.split(/\s+/)[0]
+        // An option with arguments (`..Equals that=1`) matches any application of its head.
+        const [head, ...rest] = option.split(/\s+/)
+        return rest.length > 0 && ast instanceof Ast.App && applicationHead(ast).code() === head
       })
     }
     case 'Multiple_Choice':

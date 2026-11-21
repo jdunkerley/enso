@@ -20,6 +20,32 @@ const kase = {
     ],
   },
 } as const
+const bool = { label: 'Boolean', config: { kind: 'Boolean_Input' } } as const
+const time = { label: 'Time', config: { kind: 'Time_Input' } } as const
+const dateTime = { label: 'Date_Time', config: { kind: 'Date_Time_Input' } } as const
+const vector = {
+  label: 'Vector',
+  config: { kind: 'Vector_Editor', item_editor: { kind: 'Text_Input' }, item_default: "''" },
+} as const
+const multi = {
+  label: 'Multi',
+  config: {
+    kind: 'Multiple_Choice',
+    values: [{ value: '..Upper', label: 'Upper', parameters: [] }],
+  },
+} as const
+const folder = { label: 'Folder', config: { kind: 'Folder_Browse' } } as const
+const equals = {
+  label: 'Filter',
+  config: {
+    kind: 'Single_Choice',
+    values: [
+      { value: '..Equals that=1', label: 'Equals', parameters: [] },
+      { value: '(..Plain)', label: 'Plain', parameters: [] },
+      { value: '..Foo', label: 'Foo', parameters: [] },
+    ],
+  },
+} as const
 const parse = (code: string) => Ast.parseExpression(code)!
 
 test.each([
@@ -41,6 +67,16 @@ test.each([
   ["'my password'", [text, secret], 0],
   ["Enso_Secret.get 'db-password'", [text, secret], 1],
   ["'db-password'", [secret, nothing], undefined], // a bare text is no secret
+  ['False', [bool, nothing], 0],
+  ['Boolean.True', [bool, nothing], 0],
+  ['Time_Of_Day.now', [time, nothing], 0],
+  ['Time_Of_Day.new 10 30', [time, nothing], 0],
+  ['Date_Time.now', [dateTime, nothing], 0],
+  ['[]', [vector, nothing], 0],
+  ['[1, 2]', [vector, nothing], 0],
+  ['..Equals that=5', [equals, nothing], 0],
+  ['..Plain', [equals, nothing], 0],
+  ['..Foo x', [equals, nothing], undefined], // an option without arguments is not an application
   ['x', [text, integer, nothing], undefined],
   ['foo 1', [text, integer, nothing], undefined],
 ] as const)('matchKind(%s)', (code, kinds, expected) => {
@@ -71,11 +107,32 @@ test.each([
 })
 
 test("every kind's default value reads back as that kind", () => {
-  const kinds = [text, regex, integer, date, kase, file, secret, nothing]
+  const kinds = [
+    text,
+    regex,
+    integer,
+    bool,
+    date,
+    time,
+    dateTime,
+    kase,
+    multi,
+    vector,
+    file,
+    folder,
+    secret,
+    nothing,
+  ]
   kinds.forEach((kind) => {
     const code = kindDefaultCode(kind.config)!
-    // Text precedes File only in a union without a conversion; File's '' is checked without Text.
-    const others = kind === file ? kinds.filter((k) => k !== text) : kinds
+    // Kinds sharing a code shape are never in one union: a text literal is Text before File or
+    // Folder (and File before Folder), and a vector literal is Multiple_Choice before Vector_Editor.
+    const shadowed =
+      kind === file ? [text]
+      : kind === folder ? [text, file]
+      : kind === vector ? [multi]
+      : []
+    const others = kinds.filter((k) => !shadowed.includes(k as never))
     expect(matchKind(others, parse(code))).toBe(others.indexOf(kind))
   })
 })
