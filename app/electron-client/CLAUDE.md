@@ -202,7 +202,10 @@ certificates needs it too, or electron-builder silently signs ad hoc.
 electron-builder signs the loose binaries; the `afterSign` hook
 (`tasks/signArchivesMacOs.ts`) signs the Mach-O files inside the engine's jars,
 which it finds itself rather than from a list (Note [Signing Inside Archives]),
-and re-seals the app before notarizing.
+and re-seals the app before notarizing. It does not open `.tgz` files: the one
+kind there was, a library's source archive (`main.tgz`, `Standard.Image`'s holds
+an OpenCV dylib), is left out of the bundle by the `extraResources` filter, as
+the engine never reads it for a bundled library.
 
 ### Windows installer
 
