@@ -214,13 +214,31 @@ function onMenuKey(e: KeyboardEvent) {
   items[(current + step + items.length) % items.length]?.focus({ preventScroll: true })
 }
 
+watch(buttonElement, (element) => {
+  // The picker may be a new instance by then (the edit changes the widget tree), hence the module-level flag.
+  if (element == null || !focusAfterSwitch) return
+  focusAfterSwitch = false
+  element.focus()
+})
+
 function onEntry(entry: KindEntry) {
   closeMenu(true)
-  if (!entry.selected) switchTo(entry.kind)
+  if (entry.selected) return
+  focusAfterSwitch = true
+  // The button stays the same element when both kinds have an icon: nothing is left to wait for.
+  setTimeout(() => (focusAfterSwitch = false), 1000)
+  switchTo(entry.kind)
 }
 </script>
 
 <script lang="ts">
+/**
+ * Whether the next button to appear takes the focus: a kind was just chosen, and the Nothing button
+ * and the icon button are different elements (of a picker that may itself be new, its port being
+ * the new value's), which appear only once the edit has been applied.
+ */
+let focusAfterSwitch = false
+
 function unionKinds(input: WidgetInput): readonly UnionKind[] {
   return input.dynamicConfig?.kind === 'Union' ? input.dynamicConfig.kinds : []
 }
