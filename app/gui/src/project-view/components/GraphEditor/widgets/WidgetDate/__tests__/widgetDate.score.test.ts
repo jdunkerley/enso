@@ -115,7 +115,7 @@ describe('the date widget scores', () => {
         info: { name: 'end', reprType: DATE_TYPE, tagValues: ['Date.today'] },
       },
     } as Partial<WidgetInput>
-    // Pins "tag values win over a type default" (until PR 4's kind picker): the dropdown stays.
+    // Pins "tag values win over a type default" (outside the kind picker): the dropdown stays.
     const typeDefault = await typeDefaultConfig('Date_Input')
     expect(score(placeholder({ ...tags, dynamicConfig: typeDefault }))).toBe(Score.Mismatch)
     // An annotation's own Date_Input is not a type default: the picker wins over the tag values.

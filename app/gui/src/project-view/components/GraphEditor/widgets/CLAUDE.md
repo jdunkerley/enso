@@ -84,17 +84,23 @@ render only its own slot content. The icon is already on the row, drawn by
   - **A type default claims only an unset argument or a literal of its own
     kind** (R8). A reference or connection, `_`, `Nothing`, a vector, a
     parenthesised group or a literal of another kind keeps the widget that draws
-    it (an `Integer`-first union holding a text literal shows the text input).
-    The number widget and `isBooleanArgument` check this. The date, time and
-    date-time pickers are exempt (R10): they claim any value of a configured
-    argument, as the declared-type rule did on develop, and draw its code
-    through `NodeWidget` with a ▾ over it; `WidgetText`'s matcher already admits
-    only placeholders and text literals, and `WidgetFileBrowser` keeps its
-    transitional type rule (it claimed any value of a browsable type before). An
-    annotation's configuration keeps claiming whatever the argument holds.
+    it (an `Integer` argument holding a text literal shows the text input; in an
+    `Integer | Text` union the kind picker shows the Text kind). The number
+    widget and `isBooleanArgument` check this. The date, time and date-time
+    pickers are exempt (R10): they claim any value of a configured argument, as
+    the declared-type rule did on develop, and draw its code through
+    `NodeWidget` with a ▾ over it; `WidgetText`'s matcher already admits only
+    placeholders and text literals. `WidgetFileBrowser` claims a browse
+    configuration, and otherwise only an argument of a declared `File`,
+    `Writable_File` or `Enso_Secret` type whose configuration is an annotation's
+    `Single_Choice` or still `Pending` (the browse items join its options),
+    never under the kind picker and never from the type alone. An annotation's
+    configuration keeps claiming whatever the argument holds.
   - **A type default does not set the browse mode** (R9): `useBrowserTypeInfo`
-    treats it as no configuration, so the declared type decides and a
-    `File | Enso_Secret` union offers both.
+    treats it as no configuration, so the declared type decides. A
+    `File | Enso_Secret` union is a kind picker with File and Secret kinds, and
+    each kind's browser still offers both item types (its inner configuration is
+    a type default, which `useBrowserTypeInfo` ignores).
   - **A query runs in an executed frame**: the caller's expression when it has a
     computed value, otherwise any computed node of the graph shown
     (`graph.db.nodeIds()`; the answer does not depend on the frame). Failed or
@@ -258,25 +264,41 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
   separately. `Nothing` is a kind of its own. A member with no widget is
   dropped. **The conversion rule:** a member A is dropped when another member B
   has `B.from (that : A)` (`convertsBetween`, read from the suggestion
-  database's `conversionSources`), so `Text | File` is just a File and
-  `Text | Regex` a Regex; of two that convert to each other the earlier stays,
-  and if every member would go the first stays. Members with deep-equal widgets
-  collapse. Only `Single_Choice` kinds merge into one `Single_Choice` (`Nothing`
-  an option); a single kind stays that widget; otherwise a `Union` with
-  `Nothing` last. The result is memoised per type while the member widgets and
-  the conversion verdicts are unchanged, so a conversion appearing later
-  re-composes it. An engine-built `Widget.Union` (and a `@` annotation) parse to
-  the same `Union` configuration.
-- **The look:** the icon of the kind the value is, in front of the value, which
-  is drawn by that kind's own widget (the node still shows its code). On a
-  selected node the icon is a button opening a list of the kinds; `Nothing` is
-  the picker's last entry, written as plain `Nothing`. Arrow keys move in the
-  list (in the picker, not in `DropdownWidget`); Enter chooses. Switching writes
-  the kind's default code and its imports in one edit.
-- **Priority 44**: before `WidgetAnyToTarget` (45), `WidgetRegex` (48),
-  `WidgetFileBrowser` (49) and `WidgetSelection` (50), which draw the chosen
-  kind inside it. It scores only when the value is one of the kinds (or unset),
-  otherwise it steps aside and the value is drawn as any other.
+  database's `conversionSources`), but only when B itself has a widget (`URI`
+  absorbs nothing): `Text | File` is just a File (`File.from (that : Text)`),
+  while `Text | Regex` keeps both kinds (no `Regex.from (that : Text)` exists).
+  Of two that convert to each other the earlier stays, and if every member would
+  go the first stays. `Nothing` is never absorbed and never absorbs. Members
+  with deep-equal widgets collapse. Only `Single_Choice` kinds merge into one
+  `Single_Choice` (`Nothing` an option); a single kind stays that widget;
+  otherwise a `Union` with `Nothing` last. The result is memoised per type while
+  the member widgets and the conversion verdicts are unchanged, so a conversion
+  appearing later re-composes it. An engine-built `Widget.Union` (and a `@`
+  annotation) parse to the same `Union` configuration.
+- **The look:** the icon of the kind the value is
+  (`WidgetKindPicker/KindChip.vue`), directly in front of the value, which is
+  drawn by that kind's own widget (the node still shows its code). On a selected
+  node the icon is a button opening a list of the kinds; `Nothing` is the
+  picker's last entry, written as plain `Nothing`, and with `Nothing` chosen
+  there is no icon: the selected node shows a `Nothing ▼` button in place of the
+  value, the unselected one plain `Nothing`. **The argument's name stays in
+  every state**: where `WidgetArgumentName` will draw the name
+  (`argumentNameShown`, its own score), the picker does not draw the chip itself
+  but hands it down on the input (`KindChipKey`,
+  `WidgetKindPicker/kindChipKey.ts`), and `WidgetArgumentName` draws it between
+  the name and the value (and leaves the value out while it is the `Nothing ▼`
+  button). Elsewhere (a vector item, an operand) the picker draws the chip in
+  front of its inner widget. Arrow keys move in the list (in `KindChip`, not in
+  `DropdownWidget`); Enter chooses. Switching writes the kind's default code and
+  its imports in one edit.
+- **Priority 44**: before `WidgetAnyToTarget` (45), `WidgetFileBrowser` (49),
+  `WidgetSelection` (50), the date and time pickers and `WidgetRegex` (102),
+  which draw the chosen kind inside it: a `Union` configuration must reach the
+  picker first. A widget between the picker and `WidgetArgumentName` (100) must
+  hand its input on to `<NodeWidget>` (spread, so `KindChipKey` survives), or
+  the name and the chip are lost. It scores only when the value is one of the
+  kinds (or unset), otherwise it steps aside and the value is drawn as any
+  other.
 - **`kindIcon`** (`WidgetKindPicker/kindIcon.ts`) is the one place to give a
   kind an icon; without one the chip shows the label.
 - **`matchKind` / `kindDefaultCode`** (`WidgetKindPicker/kindMatch.ts`) are the
@@ -285,10 +307,11 @@ A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
   test checks that each default reads back as its own kind). A vector's new item
   uses the first kind with a default (`vectorItemDefault`,
   `WidgetVector/elementType.ts`).
-- `WidgetRegex.vue` (priority 48) is the input of a `Regex_Input` argument:
-  `regex '…'` is drawn as the call's head (`regex`, `Regex.compile`, as written)
-  with the pattern edited in place by `WidgetText`; an unset argument is an
-  empty input that writes `regex '<text>'` on blur.
+- `WidgetRegex.vue` (priority 102, after `WidgetArgumentName`, since it draws
+  the call from its parts) is the input of a `Regex_Input` argument: `regex '…'`
+  is drawn as the call's head (`regex`, `Regex.compile`, as written) with the
+  pattern edited in place by `WidgetText`; an unset argument is an empty input
+  that writes `regex '<text>'` on blur.
 
 ## Argument access
 

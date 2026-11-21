@@ -112,8 +112,10 @@ result = "not a number".parse_integer.catch _-> 0
   `Widget.Regex_Input` is the default widget of `Regex`
   (`Widget.from (that : Regex.type)`): the IDE edits the pattern and writes
   `regex '…'`. **A conversion `B.from (that : A)` makes A no kind of its own in
-  a union with B**: `Text | File` shows only File, `Text | Regex` only Regex;
-  add the conversion only when A really is accepted wherever B is.
+  a union with B, when B has a widget**: `Text | File` shows only File
+  (`File.from (that : Text)`), while `Text | Regex` keeps both kinds (there is
+  no `Regex.from (that : Text)`) and `URI`, which has no widget, absorbs
+  nothing. Add the conversion only when A really is accepted wherever B is.
 - `Meta.get_method_annotation`, `Meta.find_type_or_module` and
   `Meta.call_module_method` are for the IDE only (`private: true`); do not use
   them in library code.
