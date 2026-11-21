@@ -429,8 +429,7 @@ type Duration
 
        ### Very long durations
        A duration of more than about 292 million years is too large to count in
-       milliseconds. That should give an `Illegal_State` error, but today it stops
-       the workflow with an overflow panic (#899).
+       milliseconds, so it gives an `Illegal_State` error.
     total_milliseconds self -> Integer ! Illegal_State =
         Panic.catch ArithmeticException (Date_Helpers.total_milliseconds_builtin self) _->
             Error.throw (Illegal_State.Error "The duration is too large to convert it to milliseconds")
@@ -452,8 +451,7 @@ type Duration
 
        ### Very long durations
        A duration of more than about 292 million years is too large to count in
-       milliseconds. That should give an `Illegal_State` error, but today it stops
-       the workflow with an overflow panic (#899).
+       milliseconds, so it gives an `Illegal_State` error.
     total_seconds self -> Float ! Illegal_State = self.total_milliseconds / 1000.0
 
     ## ---
@@ -473,8 +471,7 @@ type Duration
 
        ### Very long durations
        A duration of more than about 292 million years is too large to count in
-       milliseconds. That should give an `Illegal_State` error, but today it stops
-       the workflow with an overflow panic (#899).
+       milliseconds, so it gives an `Illegal_State` error.
     total_minutes self -> Float ! Illegal_State = self.total_seconds / 60.0
 
     ## ---
@@ -494,8 +491,7 @@ type Duration
 
        ### Very long durations
        A duration of more than about 292 million years is too large to count in
-       milliseconds. That should give an `Illegal_State` error, but today it stops
-       the workflow with an overflow panic (#899).
+       milliseconds, so it gives an `Illegal_State` error.
     total_hours self -> Float ! Illegal_State = self.total_minutes / 60.0
 
     ## ---

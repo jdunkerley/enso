@@ -1,6 +1,7 @@
 from Standard.Base import all
 import Standard.Base.Errors.Common.Incomparable_Values
 import Standard.Base.Errors.Common.Type_Error
+import Standard.Base.Errors.Illegal_State.Illegal_State
 import Standard.Base.Errors.Time_Error.Time_Error
 
 from Standard.Test import all
@@ -56,6 +57,14 @@ add_specs suite_builder =
             Meta.type_of duration.total_milliseconds . should_equal Integer
             Meta.type_of duration.total_seconds . should_equal Float
             Meta.type_of duration.total_hours . should_equal Float
+
+        group_builder.specify "a duration too large to count in milliseconds is an Illegal_State error, not a panic (#899)" <|
+            huge = Duration.new hours=10000000000000
+            huge.total_milliseconds . should_fail_with Illegal_State
+            huge.total_seconds . should_fail_with Illegal_State
+            huge.total_minutes . should_fail_with Illegal_State
+            huge.total_hours . should_fail_with Illegal_State
+            (Duration.new hours=(-10000000000000)).total_milliseconds . should_fail_with Illegal_State
 
         group_builder.specify "the parts of a duration are what is left after the larger units" <|
             duration = Duration.new hours=1 minutes=30 seconds=2 milliseconds=500
