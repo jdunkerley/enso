@@ -33,6 +33,7 @@ import type { ProjectInfo, RunningProjectInfo } from './projectInfo'
 import { createProjectNameStore, type ProjectNameStore } from './projectNames'
 import { createSuggestionDbStore, type SuggestionDbStore } from './suggestionDatabase'
 import { WidgetRegistry } from './widgetRegistry'
+import { TypeDefaults, hasWidgetConversion } from './widgetRegistry/typeDefaults'
 
 /** Project which is not opened by this app instance. */
 export interface NotOpened {
@@ -68,6 +69,7 @@ export interface Initialized {
   module: ModuleStore
   graph: GraphStore
   widgetRegistry: WidgetRegistry
+  typeDefaults: TypeDefaults
 }
 
 /**
@@ -200,6 +202,11 @@ export function useProjectStates() {
     return scope.run(() => {
       const graph = createGraphStore(store, suggestionDb, projectNames, module.value)
       const widgetRegistry = new WidgetRegistry(graph.db)
+      const typeDefaults = new TypeDefaults(
+        (typeName) => hasWidgetConversion(suggestionDb.entries, typeName),
+        (frame, code) => store.queuedExecuteExpression(frame, code, 5000),
+        project.info.id,
+      )
       const projectId = project.info.id
       localVersioning.watchProject(projectId, () => store.flushModules())
       onScopeDispose(() => localVersioning.unwatchProject(projectId))
@@ -218,6 +225,7 @@ export function useProjectStates() {
           module: module.value,
           graph,
           widgetRegistry,
+          typeDefaults,
           scope,
         } satisfies Initialized),
       )
