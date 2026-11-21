@@ -227,6 +227,22 @@ Text | Regex               →   [Regex ▾] [ a.*c ]      (regex syntax)
   type default or resolver can produce one too. GUI side: a new composite widget
   (working name `WidgetKindPicker`) wrapping the chosen kind's widget.
 
+**Decided 2026-11-21 (owner; plan for PR 4):** the GUI composes a declared
+union's picker from its members' cached type defaults; `Widget.Union` has a
+second field `include_nothing:Boolean=False`. A member A is not a kind when
+another member B with a widget has a conversion `B.from (that : A)` (B's widget
+edits A's literals): `Text | File` is File alone, while `Text | Enso_Secret` and
+`Text | Regex` keep both kinds. `Nothing` is never absorbed. Members with equal
+widgets collapse. A set value that matches no kind gets no picker. A `Vector T`
+item's default is the first option of a dropdown, otherwise the first kind's
+default value (not a blank `_`, which would make the list a function). `Regex`
+gets a type default, `Widget.Regex_Input`, which writes `regex '…'`. The picker
+is a 14 px type icon in front of the value, which becomes a button with an arrow
+when the node is selected; with `Nothing` chosen, the `Nothing` value itself is
+the picker. **The node stays close to the code:** the icon is all the picker
+adds; beside it the node shows the code itself (`Date.new 2026 11 21`,
+`Enso_Secret.get 'db-password'`), never a formatted stand-in.
+
 Of the 170 union-typed arguments in the standard libraries, most are
 `T | Nothing` or a main type plus shorthand forms (`Text | Enso_Secret`,
 `URI | Text`, `Index_Sub_Range | Range | Integer`). Selector unions
@@ -266,6 +282,15 @@ Widget_Columns.from (that : Table) = …       # next to each table-like type
 - **The builders in `Table/Internal/Widget_Helpers.enso` are rewritten over
   `Widget_Columns`** in Base, and the Table, Database, DuckDB, Geo, XML and YXDB
   callers migrate to the declarative form.
+
+**Plans for PRs 5a and 5b (2026-11-21, pending the owner's decisions in the
+plans):** PR 5 is split into 5a (Base and libraries: `Column_Kind`,
+`Widget_Columns`, the pickers, the `columns` block; invisible) and 5b (GUI
+expansion, migration, benchmark). Annotations spell pickers with their type,
+`@columns (Widget.Column_Names)`: an annotation has no expected type for `..`. A
+database column whose SQL type is not known yet is kind `Other` rather than
+queried (a computed column's type costs one query per column), and a picker
+filtered by `kinds` always offers `Other` columns.
 
 ### 6. Queries, caching and performance
 
@@ -393,7 +418,7 @@ standard libraries in the same change.
 | 2   | Front-matter `display` (+ `selected`); migrate the 147 `display=` annotations; remove `display`/`label` from `Widget`; delete `Expanded_Only`                                                                                                                                      | 1, #850    | entry     |
 | 3a  | Type defaults: `Widget.from` for 24 types of groups A and B; `Widget_Query.resolve_type`; call sites rewritten; `default_widget` deleted from them (group C keeps it until PR 6). No GUI change                                                                                    | 0, 1       | label     |
 | 3b  | Group D conversions; `Date_Input` / `Date_Time_Input` / `Time_Input`; the GUI asks `resolve_type` once per type per session and drops its type guesses; annotations that repeat a type default deleted                                                                             | 3a         | entry     |
-| 4   | Unions: `Widget.Union` + kind picker                                                                                                                                                                                                                                               | 3          | entry     |
+| 4   | Unions: `Widget.Union` + kind picker; `Regex` type default (`Widget.Regex_Input`)                                                                                                                                                                                                  | 3          | entry     |
 | 5   | `Widget_Columns` + `Column_Kind` (replacing `Viz_Kind`); declarative pickers; column list sent once; schema cache; migrate Table, Database, DuckDB, Geo, XML and YXDB                                                                                                              | 1          | entry     |
 | 6   | Resolvers with declared dependencies + `search`; group C conversions returning resolvers; migrate every `cache=` helper (join, filter, rename, fill, Google, Redshift, DuckDB, Hyper); delete `cache`, `_with_table_cache`, `With_JSON_Cache` and `Standard.Visualization.Widgets` | 5          | entry     |
 
@@ -405,7 +430,8 @@ in parallel. Each gets its own plan.
 - Library-shipped widget components (Vue files in a library, as for
   visualizations). Possible later on top of this; not needed for any widget
   here.
-- New widget kinds beyond `Widget.Union` and the three date/time inputs.
+- New widget kinds beyond `Widget.Union`, `Widget.Regex_Input` and the three
+  date/time inputs.
 - Sharing the conversion index between `WidgetAnyToTarget` and the visualization
   picker (piece 1 note 13) beyond what PR 0's database fix needs.
 

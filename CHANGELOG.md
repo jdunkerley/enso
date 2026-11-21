@@ -174,6 +174,8 @@
   tray and the offline notice are gone, and Settings opens on the Local
   tab.][519]
 - [Projects open faster: a new project shows its first table sooner.][514]
+- [The macOS installer is signed and notarized, so macOS opens it without a
+  warning, and the app updates itself.][913]
 - [New projects import only Base, Table, Database, Examples and Visualization
   instead of a dozen libraries. Components of other libraries stay in the
   component browser, and using one adds its import.][482]
@@ -665,6 +667,7 @@
 [519]: https://github.com/jdunkerley/enso/pull/519
 [514]: https://github.com/jdunkerley/enso/pull/514
 [476]: https://github.com/jdunkerley/enso/pull/476
+[913]: https://github.com/jdunkerley/enso/pull/913
 [482]: https://github.com/jdunkerley/enso/pull/482
 [466]: https://github.com/jdunkerley/enso/pull/466
 [465]: https://github.com/jdunkerley/enso/pull/465

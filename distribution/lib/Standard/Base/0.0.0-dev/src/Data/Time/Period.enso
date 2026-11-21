@@ -477,12 +477,17 @@ type Period
        Convert Period to a friendly string.
     to_display_text : Text
     to_display_text self = if self == Period.new then "0D" else
-        years = self.years + (self.months/12).floor
+        # Normalise on the total months, truncating towards zero: every part
+        # keeps the sign of the total (-15 months is `-1Y -3M`, not `-2Y 9M`).
+        total = self.total_months
+        sign = if total < 0 then -1 else 1
+        years = sign * (total.abs.div 12)
+        months = sign * (total.abs % 12)
+
         y = if years == 0 then "" else years.to_text + "Y "
 
         d = if self.days == 0 then "" else self.days.to_text + "D "
 
-        months = self.months % 12
         m = if months == 0 && (y=="" || d=="") then "" else months.to_text + "M "
 
         (y + m + d) . trim
