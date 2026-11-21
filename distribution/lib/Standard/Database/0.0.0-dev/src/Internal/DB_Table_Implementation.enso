@@ -41,7 +41,6 @@ import Standard.Table.Internal.Table_Helpers.Union_Result_Type
 import Standard.Table.Internal.Table_Ref.Table_Ref
 import Standard.Table.Internal.Value_Type_Checks
 import Standard.Table.Internal.Value_Type_Helpers
-import Standard.Table.Internal.Widget_Helpers
 import Standard.Table.Prefix_Name.Prefix_Name
 import Standard.Table.Refined_Types.Spatial_Column.Spatial_Column
 import Standard.Table.Row_Limit.Row_Limit

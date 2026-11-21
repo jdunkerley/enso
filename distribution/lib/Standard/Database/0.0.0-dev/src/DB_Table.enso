@@ -20,7 +20,6 @@ import Standard.Table.Internal.Problem_Builder.Problem_Builder
 import Standard.Table.Internal.Replace_Helpers
 import Standard.Table.Internal.Table_Helpers
 import Standard.Table.Internal.Value_Type_Helpers
-import Standard.Table.Internal.Widget_Helpers
 from Standard.Table import Column, Table
 from Standard.Table.Errors import all
 

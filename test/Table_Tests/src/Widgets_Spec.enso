@@ -33,6 +33,20 @@ add_specs suite_builder =
                 widget.get "minimum" . should_equal 0
                 widget.get "maximum" . should_equal 2
 
+        group_builder.specify "Row.get and Row.at pick a column of the row" <|
+            row = table.rows.first
+            ["get", "at"].each method->
+                json = Widget_Query.resolve_call row "Standard.Table.Row" "Standard.Table.Row.Row" method ["column"] . parse_json
+                json.get "arguments" . first . second . get "widget" . get "constructor" . should_equal "Column_Name"
+                json.get "columns" . get "" . get "names" . should_equal ["A", "B"]
+
+        group_builder.specify "Spatial_Table's st_point offers the table's columns (the subject is a Table)" <|
+            json = Widget_Query.resolve_call table "Standard.Table.Spatial_Table" "Standard.Table.Spatial_Table.Spatial_Table" "st_point" ["longitude", "latitude"] . parse_json
+            widget = json.get "arguments" . first . second . get "widget"
+            widget.get "constructor" . should_equal "Column_Name"
+            widget.get "expression" . should_be_true
+            json.get "columns" . get "" . get "names" . should_equal ["A", "B"]
+
         group_builder.specify "the `range` of Column.take, Column.drop, Table.take and Table.drop" <|
             ["take", "drop"].each method->
                 column_json = Widget_Query.resolve_call column column_module column_type method ["range"]

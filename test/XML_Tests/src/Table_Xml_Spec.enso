@@ -1,4 +1,5 @@
 from Standard.Base import all
+import Standard.Base.Metadata.Widget_Query
 from Standard.Table import Table
 from Standard.Table.Errors import all
 from Standard.Test import all
@@ -32,6 +33,14 @@ type Data
         Data.Value make_table
 
 add_specs suite_builder =
+    suite_builder.group "to_xml widgets" group_builder->
+        group_builder.specify "to_xml's element_columns is a column vector over the table's columns" <|
+            t = Table.new [["a", [1]], ["b", ["x"]]]
+            json = Widget_Query.resolve_call t "Standard.XML.Table_Extensions" "Standard.Table.Table.Table" "to_xml" ["element_columns", "value_column"] . parse_json
+            json.get "arguments" . first . second . get "widget" . get "constructor" . should_equal "Column_Vector"
+            json.get "arguments" . second . second . get "widget" . get "constructor" . should_equal "Column_Name"
+            json.get "columns" . get "" . get "names" . should_equal ["a", "b"]
+
     suite_builder.group "to_xml" group_builder->
         data = Data.setup
         group_builder.specify "table with no rows should become empty Table element" <|

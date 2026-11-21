@@ -7,7 +7,6 @@ from Standard.Base.Metadata.Widget import Multiple_Choice, Single_Choice
 
 import project.Column.Column
 import project.Expression.Expression
-import project.Internal.Widget_Helpers
 import project.Join_Condition.Join_Condition
 import project.Rows_To_Read.Rows_To_Read
 import project.Sort_Column.Sort_Column
@@ -80,8 +79,8 @@ type Spatial_Table
 
        ## Returns
        A new table with the existing columns and the new point column.
-    @longitude Widget_Helpers.make_column_name_selector add_expression=True
-    @latitude Widget_Helpers.make_column_name_selector add_expression=True
+    @longitude (Widget.Column_Name expression=True)
+    @latitude (Widget.Column_Name expression=True)
     st_point self (longitude : Column | Expression | Text | Integer = Missing_Argument.throw "longitude") (latitude : Column | Expression | Text | Integer = Missing_Argument.throw "latitude") as:Text="" =
         lon_resolved = _resolve_column longitude self.parent
         lat_resolved = _resolve_column latitude self.parent
@@ -121,8 +120,8 @@ type Spatial_Table
        ## Returns
        A new table with the existing columns and the new geometry type column as text.
     @column _spatial_widget single_choice=True
-    @group_by Widget_Helpers.make_column_name_multi_selector
-    @order_by Widget_Helpers.make_order_by_selector
+    @group_by (Widget.Column_Names)
+    @order_by (Widget.Order_By)
     st_make_lines self (column : Column | Expression | Text | Integer = _default_if_single self) as:Text="" (group_by : Vector (Text | Integer | Regex) | Text | Integer | Regex = []) (order_by : Vector (Text | Sort_Column) | Text = []) =
         _column_resolved = _resolve_column column self.parent
         (self:Table).implementation.spatial_shape "st_make_lines" self.parent.underlying _column_resolved as group_by order_by
@@ -161,8 +160,8 @@ type Spatial_Table
        ## Returns
        A new table with the existing columns and the new geometry type column as text.
     @column _spatial_widget single_choice=True
-    @group_by Widget_Helpers.make_column_name_multi_selector
-    @order_by Widget_Helpers.make_order_by_selector
+    @group_by (Widget.Column_Names)
+    @order_by (Widget.Order_By)
     st_make_polygons self (column : Column | Expression | Text | Integer = _default_if_single self) as:Text="" (group_by : Vector (Text | Integer | Regex) | Text | Integer | Regex = []) (order_by : Vector (Text | Sort_Column) | Text = []) =
         _column_resolved = _resolve_column column self.parent
         (self:Table).implementation.spatial_shape "st_make_polygons" self.parent.underlying _column_resolved as group_by order_by
@@ -418,7 +417,7 @@ type Spatial_Table
        ## Returns
        A new table with the existing columns and a new column containing the
        spatial objects.
-    @column Widget_Helpers.make_column_name_selector add_expression=True
+    @column (Widget.Column_Name expression=True)
     st_from_geojson self (column : Column | Expression | Text | Integer = _default_if_single self) as:Text="" =
         resolved = _resolve_column column self.parent
         (self:Table).implementation.spatial_from_geojson self.parent.underlying resolved as
@@ -459,7 +458,7 @@ type Spatial_Table
        ## Returns
        A new table with the existing columns and a new column containing the
        spatial objects.
-    @column Widget_Helpers.make_column_name_selector add_expression=True
+    @column (Widget.Column_Name expression=True)
     st_from_wkt self (column : Column | Expression | Text | Integer = _default_if_single self) as:Text="" =
         resolved = _resolve_column column self.parent
         (self:Table).implementation.spatial_from_wkt self.parent.underlying resolved as
@@ -477,7 +476,7 @@ type Spatial_Table
        ## Returns
        A new table with the existing columns and a new column containing the
        convex-hull spatial objects.
-    @column Widget_Helpers.make_column_name_selector add_expression=True
+    @column (Widget.Column_Name expression=True)
     st_convex_hull self (column : Column | Expression | Text | Integer = _default_if_single self) as:Text="" =
         resolved = _resolve_column column self.parent
         (self:Table).implementation.spatial_convex_hull self.parent.underlying resolved as

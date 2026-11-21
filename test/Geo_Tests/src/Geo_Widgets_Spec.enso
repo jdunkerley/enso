@@ -1,6 +1,4 @@
 from Standard.Base import all
-import Standard.Base.Metadata.Choice
-import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Query
 
 from Standard.Table import Table
@@ -8,15 +6,18 @@ from Standard.Geo import all
 
 from Standard.Test import all
 
-answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
-
 add_specs suite_builder =
     suite_builder.group "Geo widgets" group_builder->
-        group_builder.specify "geo_distance, an extension method of Table defined in Standard.Geo" <|
-            mock_table = Table.from_rows ["A", "B C", 'D "E"', "F.G/H\I"] []
-            choices = [Choice.Option "<Number Value>" "0", Choice.Option "<Expression>" "(expr '[A]')"]
-            expect = answer "lat1" (Widget.Single_Choice choices)
-            Widget_Query.resolve_call mock_table "Standard.Geo.Table_Extensions" "Standard.Table.Table.Table" "geo_distance" ["lat1"] . should_equal expect
+        group_builder.specify "geo_distance's latitude offers numeric columns by reference" <|
+            t = Table.new [["lat", [1.5]], ["name", ["a"]], ["n", [1]]]
+            json = Widget_Query.resolve_call t "Standard.Geo.Table_Extensions" "Standard.Table.Table.Table" "geo_distance" ["lat1"] . parse_json
+            widget = json.get "arguments" . first . second . get "widget"
+            widget.get "constructor" . should_equal "Column_Name"
+            widget.get "kinds" . should_equal ["Numeric"]
+            widget.get "reference" . should_be_true
+            widget.get "expression" . should_be_true
+            widget.get "extra" . map (o-> o.get "label") . should_equal ["<Number Value>"]
+            json.get "columns" . get "" . get "names" . should_equal ["lat", "name", "n"]
 
 main filter=Nothing =
     suite = Test.build suite_builder->

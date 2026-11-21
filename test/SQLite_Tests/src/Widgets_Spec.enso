@@ -71,6 +71,11 @@ add_specs suite_builder =
             expect = answer "column" (Widget.Column_Name expression=True) columns_json
             Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
 
+        group_builder.specify "works for `update_rows`, a Database extension method" <|
+            json = Widget_Query.resolve_call mock_table "Standard.Database.Extensions.Upload_Table" table_type "update_rows" ["key_columns"] . parse_json
+            json.get "arguments" . first . second . get "widget" . get "constructor" . should_equal "Column_Vector"
+            json.get "columns" . get "" . get "names" . should_equal ["A", "B C", 'D "E"', "F.G/H\I"]
+
     suite_builder.group "Widgets for Database" group_builder->
         group_builder.specify "works for `connect`, listing every installed backend" <|
             result = Widget_Query.resolve_call Nothing "Standard.Database.Connection.Database" "Standard.Database.Connection.Database" "connect" ["details"] subject_is_type=True

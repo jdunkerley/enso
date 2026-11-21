@@ -3,8 +3,10 @@ from Standard.Base import all
 import Standard.Table.Expression.Expression
 import Standard.Table.Internal.Column_Naming_Helper.Column_Naming_Helper
 import Standard.Table.Internal.Table_Ref.Table_Ref
-import Standard.Table.Internal.Widget_Helpers
-from Standard.Table import Column, Column_Ref, Table, Value_Type
+import Standard.Base.Metadata.Column_Kind.Column_Kind
+import Standard.Base.Metadata.Widget
+from Standard.Base.Widget_Helpers import make_any_selector
+from Standard.Table import Column, Column_Ref, Table
 
 ## ---
    unstable: true
@@ -24,10 +26,10 @@ from Standard.Table import Column, Column_Ref, Table, Value_Type
       value.
     - `units`: The unit to return the result in.
     - `as`: The name of the resulting column to add.
-@lat1 (Widget_Helpers.make_column_ref_by_name_selector_for_type value_type=Value_Type.Float)
-@long1 (Widget_Helpers.make_column_ref_by_name_selector_for_type value_type=Value_Type.Float)
-@lat2 (Widget_Helpers.make_column_ref_by_name_selector_for_type value_type=Value_Type.Float)
-@long2 (Widget_Helpers.make_column_ref_by_name_selector_for_type value_type=Value_Type.Float)
+@lat1 (Widget.Column_Name kinds=[Column_Kind.Numeric] reference=True expression=True extra=(make_any_selector add_number=True).values)
+@long1 (Widget.Column_Name kinds=[Column_Kind.Numeric] reference=True expression=True extra=(make_any_selector add_number=True).values)
+@lat2 (Widget.Column_Name kinds=[Column_Kind.Numeric] reference=True expression=True extra=(make_any_selector add_number=True).values)
+@long2 (Widget.Column_Name kinds=[Column_Kind.Numeric] reference=True expression=True extra=(make_any_selector add_number=True).values)
 Table.geo_distance self lat1:(Float | Column | Column_Ref | Expression)=(_find_column_with_similar_name  self "latitude" "lat" (Missing_Argument.throw "lat1")) long1:(Float | Column | Column_Ref | Expression)=(_find_column_with_similar_name  self "longitude" "long" (Missing_Argument.throw "long1")) lat2:(Float | Column | Column_Ref | Expression)=(Missing_Argument.throw "lat2") long2:(Float | Column | Column_Ref | Expression)=(Missing_Argument.throw "long2") units:Distance_Units=..Meters as:Text="" -> Table =
     table_ref = (self:Table_Ref)
     resolved_lat1 = table_ref.resolve lat1

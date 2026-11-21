@@ -1,7 +1,7 @@
 from Standard.Base import all
 
 import Standard.Table.Internal.Problem_Builder.Problem_Builder
-import Standard.Table.Internal.Widget_Helpers
+import Standard.Base.Metadata.Widget
 from Standard.Table import Table
 from Standard.Table.Errors import Unexpected_Extra_Columns
 
@@ -62,9 +62,9 @@ import project.XML.XML_Document
     - If any incoming columns are not specified in one of `element_columns`,
       `attribute_columns` or `value_column`, a `Unexpected_Extra_Columns` is
       reported according to the `on_problems` setting.
-@element_columns Widget_Helpers.make_column_name_vector_selector
-@attribute_columns Widget_Helpers.make_column_name_vector_selector
-@value_column Widget_Helpers.make_column_name_selector
+@element_columns (Widget.Column_Vector)
+@attribute_columns (Widget.Column_Vector)
+@value_column (Widget.Column_Name)
 Table.to_xml self (element_columns : Vector (Integer | Text | Regex) | Text | Integer | Regex = self.column_names) (attribute_columns : Vector (Integer | Text | Regex) | Text | Integer | Regex = []) (value_column : Text | Integer | Nothing = Nothing) root_name:Text="Table" row_name:Text="Row" on_problems:Problem_Behavior=..Report_Warning -> XML_Document =
     columns_helper = self.columns_helper
     problem_builder = Problem_Builder.new error_on_missing_columns=True
