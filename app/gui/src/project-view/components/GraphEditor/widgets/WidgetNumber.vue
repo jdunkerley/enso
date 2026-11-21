@@ -69,11 +69,11 @@ export const widgetDefinition = defineWidget(
   {
     priority: 1001,
     score: (props) => {
-      // A text literal keeps its text input over the number input of a type default.
-      const ownsLiteral =
-        isTypeDefault(props.input.dynamicConfig) && props.input.value instanceof Ast.TextLiteral
+      // A type default claims only an unset argument (the number literals are caught below): a
+      // reference, `_`, `Nothing`, a vector or a text literal keeps the widget that draws it.
       if (
-        (props.input.dynamicConfig?.kind === 'Numeric_Input' && !ownsLiteral) ||
+        (props.input.dynamicConfig?.kind === 'Numeric_Input' &&
+          (!isTypeDefault(props.input.dynamicConfig) || WidgetInput.isPlaceholder(props.input))) ||
         props.input.value instanceof Ast.NumericLiteral ||
         (props.input.value instanceof Ast.NegationApp &&
           props.input.value.argument instanceof Ast.NumericLiteral)

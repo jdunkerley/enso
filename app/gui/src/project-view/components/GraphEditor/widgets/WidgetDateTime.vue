@@ -20,7 +20,11 @@ import {
   unparenthesisedCode,
 } from '@/components/GraphEditor/widgets/WidgetPicker/parentheses'
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
-import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
+import {
+  isWholeNodeCall,
+  pickerClaimsInput,
+  type CallShapes,
+} from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
@@ -65,16 +69,17 @@ function choose(picked: DateTimeChoice, done: () => void) {
 </script>
 
 <script lang="ts">
+const DATE_TIME_CALLS: CallShapes = { bare: ['Date_Time.now'], applied: ['Date_Time.new'] }
+
 function isDateTimeTyped(input: WidgetInput): boolean {
-  return input.dynamicConfig?.kind === 'Date_Time_Input'
+  return (
+    input.dynamicConfig?.kind === 'Date_Time_Input' && pickerClaimsInput(input, DATE_TIME_CALLS)
+  )
 }
 
 /** A node that is only a date-time: `Date_Time.now`, or `Date_Time.new` with whatever arguments. */
 function isWholeDateTimeNode(input: WidgetInput): boolean {
-  return isWholeNodeCall(input, {
-    bare: ['Date_Time.now'],
-    applied: ['Date_Time.new'],
-  })
+  return isWholeNodeCall(input, DATE_TIME_CALLS)
 }
 
 /**

@@ -243,7 +243,8 @@ export function useWidgetFunctionCallInfo(
        * and fulfilling those placeholders would break the calls at use sites.
        */
       suppressPlaceholders: appFuncIsNodeUsage.value,
-      // The frame is the call's own expression, which the engine always knows.
+      // The call's own expression is the preferred frame; the engine may not have computed it,
+      // and then another computed frame of the graph asks.
       typeDefault: (reprType) => toValue(typeDefaults)?.lookup(reprType, callFrame.value),
     })
   })

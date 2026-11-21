@@ -6,7 +6,7 @@ from Standard.Test import all
 
 add_specs suite_builder =
     suite_builder.group "Excel_Section widgets resolve (#897)" group_builder->
-        group_builder.specify "the `row_limit` of Worksheet and Cell_Range takes the Rows_To_Read type default" <|
+        group_builder.specify "resolve_type of Rows_To_Read returns its widget, with the All_Rows option" <|
             json = Widget_Query.resolve_type (Meta.meta Rows_To_Read . qualified_name)
             result = json.parse_json
             result.get "error" . should_equal Nothing

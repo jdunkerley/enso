@@ -29,7 +29,7 @@ make_table width (date_as_text : Boolean = False) =
     Table.new columns
 
 ## The baseline's widget queries: method and arguments.
-queries = [["select_columns", ["columns"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["join", ["on", "join_kind"]]]
+queries = [["select_columns", ["columns"]], ["filter", ["column", "filter"]], ["set", ["value"]], ["aggregate", ["group_by", "columns"]], ["join", ["on"]]]
 
 ## The tables, built when first used. `duckdb` is `Nothing` where DuckDB
    cannot start (the benchmark job also runs off Linux).

@@ -58,6 +58,22 @@ describe('the date widget scores', () => {
     expect(score({ ...inputFor('Date.today'), dynamicConfig: dateInput })).toBe(Score.Perfect)
   })
 
+  test('a type default claims a placeholder or a date call, not a reference, `_` or `Nothing`', async () => {
+    const dynamicConfig = await typeDefaultConfig('Date_Input')
+    expect(score(placeholder({ dynamicConfig }))).toBe(Score.Perfect)
+    // A date call is its own wherever it stands, as an argument's value too.
+    expect(
+      score({ ...inputFor('foo (Date.new 2020 1 15)', 'Date.new 2020 1 15'), dynamicConfig }),
+    ).toBe(Score.Perfect)
+    expect(score({ ...inputFor('foo Date.today', 'Date.today'), dynamicConfig })).toBe(
+      Score.Perfect,
+    )
+    for (const code of ['operator3', '_', 'Nothing', '[Date.today]', '(x)'])
+      expect(score({ ...inputFor(code), dynamicConfig }), code).toBe(Score.Mismatch)
+    // An annotation claims whatever the argument holds.
+    expect(score({ ...inputFor('operator3'), dynamicConfig: dateInput })).toBe(Score.Perfect)
+  })
+
   test('a declared Date type without the configuration Mismatch', () => {
     expect(score(placeholder(typedArgument(DATE_TYPE)))).toBe(Score.Mismatch)
     expect(score(placeholder({ expectedType: DATE_TYPE as never }))).toBe(Score.Mismatch)

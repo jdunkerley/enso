@@ -77,16 +77,27 @@ render only its own slot content. The icon is already on the row, drawn by
   - **Union types use the first member that is not `Nothing`**
     (`Integer | Nothing` asks about `Integer`; `Text | <constructors>` asks
     about `Text`). This is interim, until PR 4 replaces it.
-  - **A literal of another kind keeps its own widget** over a type default (an
-    `Integer`-first union holding a text literal shows the text input).
+  - **A type default claims only an unset argument or a literal of its own
+    kind** (R8). A reference or connection, `_`, `Nothing`, a vector, a
+    parenthesised group or a literal of another kind keeps the widget that draws
+    it (an `Integer`-first union holding a text literal shows the text input).
+    The number widget, `isBooleanArgument` and the date, time and date-time
+    pickers (`pickerClaimsInput` in `WidgetPicker/wholeNode.ts`) check this;
+    `WidgetText`'s matcher already admits only placeholders and text literals,
+    and `WidgetFileBrowser` keeps its transitional type rule (it claimed any
+    value of a browsable type before). An annotation's configuration keeps
+    claiming whatever the argument holds.
+  - **A type default does not set the browse mode** (R9): `useBrowserTypeInfo`
+    treats it as no configuration, so the declared type decides and a
+    `File | Enso_Secret` union offers both.
   - **A query runs in an executed frame**: the caller's expression when it has a
-    computed value, otherwise any expression of the project that has one (the
-    answer does not depend on the frame). Failed or stale frames back off and
-    are retried choosing a frame again. Until some frame executes, an
-    un-annotated argument shows no widget; the first appearance of a type costs
-    one round trip.
+    computed value, otherwise any computed node of the graph shown
+    (`graph.db.nodeIds()`; the answer does not depend on the frame). Failed or
+    stale frames back off and are retried choosing a frame again. Until some
+    frame executes, an un-annotated argument shows no widget; the first
+    appearance of a type costs one round trip.
 - `WidgetDate.vue` — a dropdown wrapper for an input configured `Date_Input`
-  (vector items included; nothing else untyped) and for a whole node that is
+  (vector items included) and for a whole node that is
   `Date.today`/`yesterday`/`tomorrow` or `Date.new` with any arguments
   (`WidgetPicker/wholeNode.ts`: a node root, parentheses skipped; not a call's
   target such as `Date.today.add_days 3`'s). It scores `Mismatch` where
@@ -179,13 +190,15 @@ render only its own slot content. The icon is already on the row, drawn by
   unset argument's default greyed), drawn after the argument name (priority
   101). The ▾ is `WidgetSelection`'s: it lists `True` and `False`, with their
   imports, for every Boolean argument (`WidgetBoolean/booleanValue.ts`'s
-  `isBooleanArgument`: `True`/`False` tag values, a `Boolean` type, or a literal
-  value; never an infix operator's operand, though the call tree gives it the
-  operator's argument info) that has no `@` dropdown of its own. An unset
-  argument's ▾ sits under its greyed default (the widget requests the arrow like
-  `WidgetSelectionArrow`). A value that is not a literal is left to the other
-  widgets, so it has no checkbox; a literal that is not an argument (a whole
-  node, an operand) has the checkbox and no ▾. It replaced `WidgetCheckbox`.
+  `isBooleanArgument`: `True`/`False` tag values, a `Boolean_Input`
+  configuration (the Boolean type default, which claims only an unset argument
+  or a literal), or a literal value; never an infix operator's operand, though
+  the call tree gives it the operator's argument info) that has no `@` dropdown
+  of its own. An unset argument's ▾ sits under its greyed default (the widget
+  requests the arrow like `WidgetSelectionArrow`). A value that is not a literal
+  is left to the other widgets, so it has no checkbox; a literal that is not an
+  argument (a whole node, an operand) has the checkbox and no ▾. It replaced
+  `WidgetCheckbox`.
 - `WidgetFileBrowser.vue` — a file, folder or `Enso_Secret` argument's dropdown:
   `WidgetFileBrowser/localBrowser.ts` (the native file dialog),
   `localSecrets.ts` (the local secrets and **New secret…**, which set

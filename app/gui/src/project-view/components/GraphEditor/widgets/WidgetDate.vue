@@ -12,7 +12,11 @@ import {
   unparenthesisedCode,
 } from '@/components/GraphEditor/widgets/WidgetPicker/parentheses'
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
-import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
+import {
+  isWholeNodeCall,
+  pickerClaimsInput,
+  type CallShapes,
+} from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import DateMenu from '@/components/GraphEditor/widgets/WidgetDate/DateMenu.vue'
 import {
@@ -62,16 +66,18 @@ function codeToWrite(
   return choice.kind === 'date' ? parenthesisedApplication(code, current, portId) : code
 }
 
+const DATE_CALLS: CallShapes = {
+  bare: ['Date.today', 'Date.yesterday', 'Date.tomorrow'],
+  applied: ['Date.new'],
+}
+
 function isDateTyped(input: WidgetInput): boolean {
-  return input.dynamicConfig?.kind === 'Date_Input'
+  return input.dynamicConfig?.kind === 'Date_Input' && pickerClaimsInput(input, DATE_CALLS)
 }
 
 /** A node that is only a date: `Date.today`, `Date.new` with whatever arguments, and so on. */
 function isWholeDateNode(input: WidgetInput): boolean {
-  return isWholeNodeCall(input, {
-    bare: ['Date.today', 'Date.yesterday', 'Date.tomorrow'],
-    applied: ['Date.new'],
-  })
+  return isWholeNodeCall(input, DATE_CALLS)
 }
 
 /**

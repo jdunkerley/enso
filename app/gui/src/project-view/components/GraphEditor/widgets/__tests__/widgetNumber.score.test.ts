@@ -34,6 +34,33 @@ describe('the number widget scores', () => {
     expect(score({ ...text, dynamicConfig: { kind: 'Numeric_Input' } })).toBe(Score.Perfect)
   })
 
+  test('a type default claims a placeholder, not a reference, `_`, `Nothing`, a vector or a group', async () => {
+    const dynamicConfig = await typeDefaultConfig('Numeric_Input')
+    expect(score(placeholder({ dynamicConfig }))).toBe(Score.Perfect)
+    for (const code of [
+      'operator3',
+      'Number.positive_infinity',
+      '_',
+      'Nothing',
+      '[1, 2]',
+      '(x + 1)',
+    ])
+      expect(
+        score({ ...WidgetInput.FromAst(Ast.parseExpression(code)!), dynamicConfig }),
+        code,
+      ).toBe(Score.Mismatch)
+    // The literals are still its own, and an annotation claims whatever the argument holds.
+    expect(score({ ...WidgetInput.FromAst(Ast.parseExpression('7')!), dynamicConfig })).toBe(
+      Score.Perfect,
+    )
+    expect(
+      score({
+        ...WidgetInput.FromAst(Ast.parseExpression('operator3')!),
+        dynamicConfig: { kind: 'Numeric_Input' },
+      }),
+    ).toBe(Score.Perfect)
+  })
+
   test('a declared number type without the configuration Mismatch', () => {
     for (const type of ['Number', 'Integer', 'Float'])
       expect(

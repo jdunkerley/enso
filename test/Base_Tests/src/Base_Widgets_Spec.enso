@@ -59,7 +59,7 @@ add_specs suite_builder =
             parameter.second.get "constructor" . should_equal "Vector_Editor"
 
     suite_builder.group "Widgets for the Text type" group_builder->
-        group_builder.specify "the `range` of `take` and `drop` takes the type default of Text_Sub_Range" <|
+        group_builder.specify "resolve_type of Text_Sub_Range returns its Widget.from conversion with the sub-range options" <|
             expect = '{"widget":' + (Widget.from Text_Sub_Range).to_json + '}'
             type_name = Meta.meta Text_Sub_Range . qualified_name
             json = Widget_Query.resolve_type type_name

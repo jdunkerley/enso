@@ -1,5 +1,6 @@
 import type { WidgetInput, WidgetUpdate } from '$/providers/openedProjects/widgetRegistry'
 import type { WidgetConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
+import { isTypeDefault } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import type { ToValue } from '$/utils/reactivity'
 import { withDropdownItems } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import {
@@ -123,7 +124,9 @@ export function useBrowserTypeInfo({
   const SECRET_ONLY = { file: false, directory: false, secret: true }
 
   return computed((): BrowserTypeInfo => {
-    const config = toValue(dynamicConfig)
+    // A type default says nothing the declared type does not: it must not narrow a union.
+    const given = toValue(dynamicConfig)
+    const config = isTypeDefault(given) ? undefined : given
     switch (config?.kind) {
       case 'File_Browse':
         return {

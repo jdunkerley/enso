@@ -7,11 +7,14 @@ import type { ExternalId } from 'ydoc-shared/yjsModel'
 
 const FRAME = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' as ExternalId
 
-/** The default widget of a type whose answer is `kind`. */
-export async function typeDefaultConfig(kind: string): Promise<WidgetConfiguration> {
+/** The default widget of a type whose answer is `kind` (with the constructor's `fields`, if it has any). */
+export async function typeDefaultConfig(
+  kind: string,
+  fields: Record<string, unknown> = {},
+): Promise<WidgetConfiguration> {
   const defaults = new TypeDefaults(
     () => true,
-    async () => Ok({ widget: { constructor: kind } }),
+    async () => Ok({ widget: { constructor: kind, ...fields } }),
     (frame) => frame,
     'project',
   )
