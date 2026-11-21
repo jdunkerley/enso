@@ -106,10 +106,10 @@ Visualization and not on each data library.
 
   A source lists the capabilities it has in `supported_operations`; calling an
   operation it lacks gives `Viz_Unsupported.Error operation`. `Viz_Column_Kind`
-  (`Numeric`, `Textual`, `Logical`, `Date_Only`, `Date_And_Time`, `Time_Only`,
-  `Other`, plus a display name) describes a column. `Internal/Columns_Source`,
-  `Internal/View_Source` and `Internal/Names` are the in-memory sources and name
-  matching.
+  (a Base `Column_Kind`: `Numeric`, `Textual`, `Logical`, `Date_Only`,
+  `Date_And_Time`, `Time_Only`, `Other`, plus a display name) describes a
+  column. `Internal/Columns_Source`, `Internal/View_Source` and `Internal/Names`
+  are the in-memory sources and name matching.
 
 - `SQL_Viz` (`src/SQL_Viz.enso`) - what the SQL view shows: dialect, code and
   interpolations.

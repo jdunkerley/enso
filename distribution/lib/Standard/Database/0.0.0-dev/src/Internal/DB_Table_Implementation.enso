@@ -17,6 +17,8 @@ import Standard.Base.Errors.Deprecated.Deprecated
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
 import Standard.Base.Errors.Unimplemented.Unimplemented
+import Standard.Base.Metadata.Column_Kind.Column_Kind
+import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 import Standard.Base.System.File.Generic.Writable_File.Writable_File
 
 import Standard.Table.Column_Operation.Column_Operation
@@ -26,6 +28,7 @@ import Standard.Table.Expression.Expression
 import Standard.Table.Grouping_Method.Grouping_Method
 import Standard.Table.Internal.Add_Row_Number
 import Standard.Table.Internal.Column_Type_Helpers
+import Standard.Table.Internal.Column_Kinds
 import Standard.Table.Internal.Constant_Column.Constant_Column
 import Standard.Table.Internal.Display_Helpers
 import Standard.Table.Internal.Join_Kind_Cross.Join_Kind_Cross
@@ -475,6 +478,26 @@ type DB_Table_Implementation
     column_names (this_table : Table & DB_Table) = Vector.from_polyglot_array <|
         Array_Proxy.new this_table.internal_columns.length i->
             this_table.internal_columns.at i . name
+
+    widget_columns (this_table : Table & DB_Table) =
+        mapping = this_table.connection.type_mapping
+        internal_columns = this_table.internal_columns
+        vectors = Vector.build_multiple 3 initial_capacity=internal_columns.length builders->
+            names = builders.at 0
+            kinds = builders.at 1
+            type_names = builders.at 2
+            internal_columns.each column->
+                names.append column.name
+                known = column.sql_type_reference.known
+                case known of
+                    sql_type : SQL_Type ->
+                        value_type = mapping.sql_type_to_value_type sql_type
+                        kinds.append (Column_Kinds.of_value_type value_type)
+                        type_names.append value_type.to_name
+                    _ ->
+                        kinds.append Column_Kind.Other
+                        type_names.append ""
+        Widget_Columns.Value (vectors.at 0) (vectors.at 1) (vectors.at 2)
 
     rows (this_table : Table & DB_Table) (max_rows : Rows_To_Read) =
         this_table.read max_rows . rows

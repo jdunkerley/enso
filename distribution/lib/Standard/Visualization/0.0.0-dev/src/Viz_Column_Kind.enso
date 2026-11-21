@@ -1,40 +1,5 @@
 from Standard.Base import all
-
-## ---
-   private: true
-   ---
-   The broad kind of values in a visualised column. Charts choose columns by
-   kind; the kinds are Visualization's own, as Base cannot name Table's
-   `Value_Type`.
-type Viz_Kind
-    ## ---
-       private: true
-       ---
-    Numeric
-    ## ---
-       private: true
-       ---
-    Textual
-    ## ---
-       private: true
-       ---
-    Logical
-    ## ---
-       private: true
-       ---
-    Date_Only
-    ## ---
-       private: true
-       ---
-    Date_And_Time
-    ## ---
-       private: true
-       ---
-    Time_Only
-    ## ---
-       private: true
-       ---
-    Other
+import Standard.Base.Metadata.Column_Kind.Column_Kind
 
 ## ---
    private: true
@@ -45,18 +10,18 @@ type Viz_Column_Kind
     ## ---
        private: true
        ---
-    Value (kind : Viz_Kind) (display_name : Text)
+    Value (kind : Column_Kind) (display_name : Text)
 
     ## ---
        private: true
        ---
-    is_numeric self -> Boolean = self.kind == Viz_Kind.Numeric
+    is_numeric self -> Boolean = self.kind == Column_Kind.Numeric
 
     ## ---
        private: true
        ---
     is_date_or_time self -> Boolean =
-        [Viz_Kind.Date_Only, Viz_Kind.Date_And_Time, Viz_Kind.Time_Only].contains self.kind
+        [Column_Kind.Date_Only, Column_Kind.Date_And_Time, Column_Kind.Time_Only].contains self.kind
 
     ## ---
        private: true
@@ -66,11 +31,11 @@ type Viz_Column_Kind
     infer (values : Vector) -> Viz_Column_Kind =
         present = values.filter (v-> v.is_nothing.not)
         all_are predicate = present.not_empty && (present.all predicate)
-        if all_are (v-> v.is_a Integer) then Viz_Column_Kind.Value Viz_Kind.Numeric "Integer" else
-            if all_are (v-> v.is_a Number) then Viz_Column_Kind.Value Viz_Kind.Numeric "Float" else
-                if all_are (v-> v.is_a Text) then Viz_Column_Kind.Value Viz_Kind.Textual "Char" else
-                    if all_are (v-> v.is_a Boolean) then Viz_Column_Kind.Value Viz_Kind.Logical "Boolean" else
-                        if all_are (v-> v.is_a Date_Time) then Viz_Column_Kind.Value Viz_Kind.Date_And_Time "Date_Time" else
-                            if all_are (v-> v.is_a Date) then Viz_Column_Kind.Value Viz_Kind.Date_Only "Date" else
-                                if all_are (v-> v.is_a Time_Of_Day) then Viz_Column_Kind.Value Viz_Kind.Time_Only "Time" else
-                                    Viz_Column_Kind.Value Viz_Kind.Other "Mixed"
+        if all_are (v-> v.is_a Integer) then Viz_Column_Kind.Value Column_Kind.Numeric "Integer" else
+            if all_are (v-> v.is_a Number) then Viz_Column_Kind.Value Column_Kind.Numeric "Float" else
+                if all_are (v-> v.is_a Text) then Viz_Column_Kind.Value Column_Kind.Textual "Char" else
+                    if all_are (v-> v.is_a Boolean) then Viz_Column_Kind.Value Column_Kind.Logical "Boolean" else
+                        if all_are (v-> v.is_a Date_Time) then Viz_Column_Kind.Value Column_Kind.Date_And_Time "Date_Time" else
+                            if all_are (v-> v.is_a Date) then Viz_Column_Kind.Value Column_Kind.Date_Only "Date" else
+                                if all_are (v-> v.is_a Time_Of_Day) then Viz_Column_Kind.Value Column_Kind.Time_Only "Time" else
+                                    Viz_Column_Kind.Value Column_Kind.Other "Mixed"

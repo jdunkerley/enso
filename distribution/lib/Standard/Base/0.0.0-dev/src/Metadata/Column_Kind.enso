@@ -1,0 +1,58 @@
+import project.Any.Any
+import project.Data.Numbers.Float
+import project.Data.Numbers.Integer
+import project.Data.Numbers.Number
+import project.Data.Text.Text
+import project.Data.Time.Date.Date
+import project.Data.Time.Date_Time.Date_Time
+import project.Data.Time.Time_Of_Day.Time_Of_Day
+import project.Meta
+from project.Data.Boolean import Boolean
+from project.Data.Json.Extensions import all
+from project.Data.Text.Extensions import all
+
+## The broad kind of the values in a column, which library annotations use to
+   say which columns a parameter accepts.
+type Column_Kind
+    ## Numbers, whole or fractional.
+    Numeric
+
+    ## Text.
+    Textual
+
+    ## True or False.
+    Logical
+
+    ## A date without a time.
+    Date_Only
+
+    ## A date together with a time.
+    Date_And_Time
+
+    ## A time without a date.
+    Time_Only
+
+    ## Anything else, or a mix of kinds.
+    Other
+
+    ## ---
+       private: true
+       ---
+       The kind of one value held in memory; `Nothing` is `Other`.
+    of_value value -> Column_Kind =
+        case value of
+            _ : Integer -> Column_Kind.Numeric
+            _ : Float -> Column_Kind.Numeric
+            _ : Number -> Column_Kind.Numeric
+            _ : Text -> Column_Kind.Textual
+            _ : Boolean -> Column_Kind.Logical
+            _ : Date_Time -> Column_Kind.Date_And_Time
+            _ : Date -> Column_Kind.Date_Only
+            _ : Time_Of_Day -> Column_Kind.Time_Only
+            _ -> Column_Kind.Other
+
+    ## ---
+       private: true
+       ---
+       The constructor's name as a JSON string, such as `'"Numeric"'`.
+    to_json self -> Text = (Meta.meta self . constructor . name).to_json

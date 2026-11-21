@@ -42,6 +42,18 @@ type SQL_Type_Reference
     ## ---
        private: true
        ---
+       The SQL type if it is already known, without querying: `Nothing` for a
+       type the database has not been asked for yet.
+    known self -> SQL_Type | Nothing = case self of
+        SQL_Type_Reference.Computed_By_Database ref -> case ref.get of
+            t : SQL_Type -> t
+            _ -> Nothing
+        SQL_Type_Reference.Overridden value -> value
+        SQL_Type_Reference.Null -> Nothing
+
+    ## ---
+       private: true
+       ---
        Creates an `SQL_Type_Reference` from a known constant.
        This is useful when the type is already known (for example in
        `Database.make_table`, because the column types were already fetched) or

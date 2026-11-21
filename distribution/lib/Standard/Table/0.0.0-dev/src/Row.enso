@@ -1,6 +1,8 @@
 from Standard.Base import all
 import Standard.Base.Data.Array_Proxy.Array_Proxy
 import Standard.Base.Errors.Common.Index_Out_Of_Bounds
+import Standard.Base.Metadata.Column_Kind.Column_Kind
+import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 
 import project.Errors.No_Such_Column
 import Standard.Visualization.Viz_Actions.Viz_Actions
@@ -148,6 +150,21 @@ Comparable.from (that:Row) = Comparable.new that Row_Comparator
    private: true
    ---
 Viz_Table.from (that:Row) = Viz_Table.from_view (_-> Viz_Helpers.row_table_view_json that) has_actions=False
+
+## ---
+   private: true
+   ---
+   The row's column names and the kinds of its values; a row has no type names.
+Widget_Columns.from (that:Row) =
+    vectors = Vector.build_multiple 3 initial_capacity=that.length builders->
+        names = builders.at 0
+        kinds = builders.at 1
+        type_names = builders.at 2
+        0.up_to that.length . each index->
+            names.append (that.java_row.get_name index)
+            kinds.append (Column_Kind.of_value (that.get index))
+            type_names.append ""
+    Widget_Columns.Value (vectors.at 0) (vectors.at 1) (vectors.at 2)
 
 ## ---
    private: true

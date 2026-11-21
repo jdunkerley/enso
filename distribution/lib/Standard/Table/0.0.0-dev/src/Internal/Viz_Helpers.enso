@@ -5,8 +5,9 @@ from Standard.Visualization.Internal.View_Json import View_Column, View_Link
 import Standard.Visualization.Viz_Action.Viz_Action
 import Standard.Visualization.Viz_Actions.Viz_Actions
 import Standard.Visualization.Viz_Cell.Viz_Cell
-from Standard.Visualization.Viz_Column_Kind import Viz_Column_Kind, Viz_Kind
+from Standard.Visualization.Viz_Column_Kind import Viz_Column_Kind
 
+import project.Internal.Column_Kinds
 import project.Value_Type.Value_Type
 
 polyglot java import org.enso.table.util.TableValueCache
@@ -16,15 +17,7 @@ polyglot java import org.enso.table.util.TableValueCache
    ---
    Visualization's kind for a column of this value type.
 column_kind (value_type : Value_Type) -> Viz_Column_Kind =
-    kind = if value_type.is_numeric then Viz_Kind.Numeric else
-        if value_type.is_text then Viz_Kind.Textual else
-            if value_type.is_boolean then Viz_Kind.Logical else
-                case value_type of
-                    Value_Type.Date -> Viz_Kind.Date_Only
-                    Value_Type.Date_Time _ -> Viz_Kind.Date_And_Time
-                    Value_Type.Time -> Viz_Kind.Time_Only
-                    _ -> Viz_Kind.Other
-    Viz_Column_Kind.Value kind value_type.to_name
+    Viz_Column_Kind.Value (Column_Kinds.of_value_type value_type) value_type.to_name
 
 ## ---
    private: true
