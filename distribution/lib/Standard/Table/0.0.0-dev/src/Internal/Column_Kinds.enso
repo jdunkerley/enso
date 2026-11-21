@@ -1,0 +1,18 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Column_Kind.Column_Kind
+
+import project.Value_Type.Value_Type
+
+## ---
+   private: true
+   ---
+   The `Column_Kind` of a column of this value type.
+of_value_type (value_type : Value_Type) -> Column_Kind =
+    if value_type.is_numeric then Column_Kind.Numeric else
+        if value_type.is_text then Column_Kind.Textual else
+            if value_type.is_boolean then Column_Kind.Logical else
+                case value_type of
+                    Value_Type.Date -> Column_Kind.Date_Only
+                    Value_Type.Date_Time _ -> Column_Kind.Date_And_Time
+                    Value_Type.Time -> Column_Kind.Time_Only
+                    _ -> Column_Kind.Other

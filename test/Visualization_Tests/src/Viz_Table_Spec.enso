@@ -1,7 +1,8 @@
 from Standard.Base import all
 
 import Standard.Visualization.Internal.Names
-from Standard.Visualization.Viz_Column_Kind import Viz_Column_Kind, Viz_Kind
+import Standard.Base.Metadata.Column_Kind.Column_Kind
+from Standard.Visualization.Viz_Column_Kind import Viz_Column_Kind
 from Standard.Visualization.Viz_Table import Viz_Table, Viz_Header, Viz_Unsupported
 
 from Standard.Test import all
@@ -20,7 +21,7 @@ add_specs suite_builder =
 
         group_builder.specify "describes its columns" <|
             grid.column_names . should_equal ["Table", "Rows"]
-            grid.column_kinds . map .kind . should_equal [Viz_Kind.Textual, Viz_Kind.Numeric]
+            grid.column_kinds . map .kind . should_equal [Column_Kind.Textual, Column_Kind.Numeric]
             grid.column_kinds . map .display_name . should_equal ["Char", "Integer"]
             grid.row_count . should_equal 3
 
@@ -52,10 +53,10 @@ add_specs suite_builder =
         group_builder.specify "classifies vectors" <|
             Viz_Column_Kind.infer [1, Nothing, 2] . display_name . should_equal "Integer"
             Viz_Column_Kind.infer [1, 2.5] . display_name . should_equal "Float"
-            Viz_Column_Kind.infer [True] . kind . should_equal Viz_Kind.Logical
-            Viz_Column_Kind.infer [Date.new 2020] . kind . should_equal Viz_Kind.Date_Only
-            Viz_Column_Kind.infer [1, "a"] . kind . should_equal Viz_Kind.Other
-            Viz_Column_Kind.infer [] . kind . should_equal Viz_Kind.Other
+            Viz_Column_Kind.infer [True] . kind . should_equal Column_Kind.Logical
+            Viz_Column_Kind.infer [Date.new 2020] . kind . should_equal Column_Kind.Date_Only
+            Viz_Column_Kind.infer [1, "a"] . kind . should_equal Column_Kind.Other
+            Viz_Column_Kind.infer [] . kind . should_equal Column_Kind.Other
 
     suite_builder.group "Names" group_builder->
         names = ["x", "Colour", "label", "Row_Number", "y"]

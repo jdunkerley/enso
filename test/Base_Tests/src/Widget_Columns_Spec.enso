@@ -1,0 +1,24 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Column_Kind.Column_Kind
+
+from Standard.Test import all
+
+add_specs suite_builder =
+    suite_builder.group "Column_Kind" group_builder->
+        group_builder.specify "of a value held in memory" <|
+            Column_Kind.of_value 1 . should_equal Column_Kind.Numeric
+            Column_Kind.of_value 1.5 . should_equal Column_Kind.Numeric
+            Column_Kind.of_value "a" . should_equal Column_Kind.Textual
+            Column_Kind.of_value True . should_equal Column_Kind.Logical
+            Column_Kind.of_value (Date.new 2020) . should_equal Column_Kind.Date_Only
+            Column_Kind.of_value (Date_Time.new 2020) . should_equal Column_Kind.Date_And_Time
+            Column_Kind.of_value (Time_Of_Day.new 12) . should_equal Column_Kind.Time_Only
+            Column_Kind.of_value Nothing . should_equal Column_Kind.Other
+            Column_Kind.of_value [1] . should_equal Column_Kind.Other
+
+        group_builder.specify "as JSON is its name" <|
+            Column_Kind.Date_And_Time.to_json . should_equal '"Date_And_Time"'
+
+main filter=Nothing =
+    suite = Test.build suite_builder-> add_specs suite_builder
+    suite.run_with_filter filter
