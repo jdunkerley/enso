@@ -9,6 +9,7 @@
     - cache_computed_type self ~sql_type:Standard.Database.SQL.SQL_Type -> Standard.Base.Any.Any
     - from_constant sql_type:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - get self -> Standard.Base.Any.Any
+    - known self -> (Standard.Database.SQL.SQL_Type|Standard.Base.Nothing.Nothing)
     - new connection:Standard.Base.Any.Any context:Standard.Base.Any.Any expression:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - null -> Standard.Base.Any.Any
     - to_type_override self -> Standard.Base.Any.Any

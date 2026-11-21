@@ -4,7 +4,9 @@ import Standard.Base.Errors.Common.No_Such_Method
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
 import Standard.Base.Metadata.Choice
+import Standard.Base.Metadata.Column_Kind.Column_Kind
 import Standard.Base.Metadata.Widget
+import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 import Standard.Base.Metadata.Widget_Query
 from Standard.Base.Metadata.Widget_Query import Argument_Result, Widget_Method
 
@@ -58,6 +60,25 @@ type Sample
 ## Defined on `Any`: a `Sample` value has its own `probe`.
 @arg (Widget.Folder_Browse)
 Any.probe self (arg = 0) = arg
+
+type Fake_Table
+    Value names:(Vector Text)
+
+    @column (Widget.Column_Name)
+    @other (Widget.Column_Name from="other")
+    pick self column other = [column, other]
+
+    @column Widget.Text_Input
+    plain self column = column
+
+type Panicky_Table
+    Value
+
+Widget_Columns.from (that : Fake_Table) = Widget_Columns.Value that.names (that.names.map _-> Column_Kind.Other) (that.names.map _-> "")
+
+Widget_Columns.from (that : Panicky_Table) =
+    _ = that
+    Panic.throw (Illegal_State.Error "conversion boom")
 
 type Has_Default
     Value
@@ -262,6 +283,37 @@ add_specs suite_builder =
             inputs = "test inputs " + Random.uuid
             Widget_Query.log_failure result.failure inputs . should_be_true
             Widget_Query.log_failure result.failure inputs . should_be_false
+
+    suite_builder.group "Widget_Query.resolve_call sends each column list once" group_builder->
+        fake_type = spec_module + ".Fake_Table"
+
+        group_builder.specify "the subject's columns, keyed by the empty source" <|
+            json = Widget_Query.resolve_call (Fake_Table.Value ["A", "B"]) spec_module fake_type "pick" ["column"] . parse_json
+            json.get "columns" . get "" . get "names" . should_equal ["A", "B"]
+            json.get "arguments" . first . second . get "widget" . get "constructor" . should_equal "Column_Name"
+
+        group_builder.specify "another argument's columns, by its name" <|
+            mock_cache name = if name == "other" then Fake_Table.Value ["X"] else Nothing
+            json = Widget_Query.columns_json [Nothing, "other"] (Fake_Table.Value ["A"]) mock_cache
+            json . should_equal ',"columns":{"":{"names":["A"],"kinds":["Other"],"type_names":[""]},"other":{"names":["X"],"kinds":["Other"],"type_names":[""]}}'
+
+        group_builder.specify "a source that is not set is absent" <|
+            Widget_Query.columns_json ["other"] (Fake_Table.Value ["A"]) (_-> Nothing) . should_equal ""
+
+        group_builder.specify "no picker, no columns field" <|
+            Widget_Query.resolve_call (Fake_Table.Value ["A"]) spec_module fake_type "plain" ["column"] . should_equal '{"arguments":[["column",{"widget":{"constructor":"Text_Input"}}]]}'
+
+        group_builder.specify "a source without a conversion is absent" <|
+            Widget_Query.columns_json [Nothing] 42 (_-> Nothing) . should_equal ""
+
+        group_builder.specify "an error source is absent" <|
+            Widget_Query.columns_json ["other"] (Fake_Table.Value ["A"]) (_-> Error.throw "e") . should_equal ""
+
+        group_builder.specify "a panicking conversion is logged and the source skipped" <|
+            mock_cache name = if name == "other" then Fake_Table.Value ["X"] else Nothing
+            inputs = "columns inputs " + Random.uuid
+            method = Widget_Method.Value spec_module spec_module+".Fake_Table" "pick"
+            Widget_Query.columns_json [Nothing, "other"] Panicky_Table.Value mock_cache method inputs . should_equal ',"columns":{"other":{"names":["X"],"kinds":["Other"],"type_names":[""]}}'
 
     suite_builder.group "LogOnce" group_builder->
         group_builder.specify "is true only the first time it sees a key" <|

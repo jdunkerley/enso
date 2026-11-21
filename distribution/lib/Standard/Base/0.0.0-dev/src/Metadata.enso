@@ -11,6 +11,7 @@ import project.Data.Time.Date_Time.Date_Time
 import project.Data.Time.Time_Of_Day.Time_Of_Day
 import project.Data.Vector.Vector
 import project.Enso_Cloud.Enso_Secret.Enso_Secret
+import project.Metadata.Column_Kind.Column_Kind
 import project.Meta
 import project.System.File.File
 import project.System.File.Generic.Writable_File.Writable_File
@@ -165,6 +166,45 @@ type Widget
     ## Cached JSON Widget
     With_JSON_Cache parent:Widget json:Text
 
+    ## Describes a column name chooser, for a parameter that takes the name of a
+       column of a table.
+
+       ## Arguments
+        - `kinds`: The kinds of column offered; empty offers every column.
+        - `from`: The name of the argument holding the table the columns come
+          from; `Nothing` means the table the node is called on.
+        - `expression`: Also accept an expression in place of a name?
+        - `reference`: Offer the names as column references?
+        - `extra`: Further entries offered alongside the columns.
+        - `columns_first`: List the columns before the extra entries?
+    Column_Name kinds:(Vector Column_Kind)=[] from:(Text|Nothing)=Nothing expression:Boolean=False reference:Boolean=False extra:(Vector Choice)=[] columns_first:Boolean=False
+
+    ## Describes a chooser of several column names.
+
+       ## Arguments
+        - `kinds`: The kinds of column offered; empty offers every column.
+        - `from`: The name of the argument holding the table the columns come
+          from; `Nothing` means the table the node is called on.
+        - `regex`: Also accept a regular expression?
+        - `by_type`: Also accept a selection by column type?
+    Column_Names kinds:(Vector Column_Kind)=[] from:(Text|Nothing)=Nothing regex:Boolean=False by_type:Boolean=False
+
+    ## Describes a chooser of a vector of columns.
+
+       ## Arguments
+        - `kinds`: The kinds of column offered; empty offers every column.
+        - `from`: The name of the argument holding the table the columns come
+          from; `Nothing` means the table the node is called on.
+    Column_Vector kinds:(Vector Column_Kind)=[] from:(Text|Nothing)=Nothing
+
+    ## Describes a chooser of sort orders over the columns of a table.
+
+       ## Arguments
+        - `from`: The name of the argument holding the table the columns come
+          from; `Nothing` means the table the node is called on.
+        - `name_only`: Offer plain column names rather than ordering objects?
+    Order_By from:(Text|Nothing)=Nothing name_only:Boolean=False
+
     ## ---
        private: true
        ---
@@ -205,8 +245,60 @@ type Widget
             kinds_json = '[' + (kinds.map p-> '[' + p.first.to_json + ',' + p.second.to_json + ']').join ',' + ']'
             '{"constructor":"Union","kinds":' + kinds_json + ',"include_nothing":' + (if include_nothing then "true" else "false") + '}'
         Widget.Regex_Input -> '{"constructor":"Regex_Input"}'
+        Widget.Column_Name kinds source expression reference extra columns_first ->
+            '{"constructor":"Column_Name","kinds":' + '[' + (kinds.map .to_json . join ',') + ']' + ',"from":' + source.to_json + ',"expression":' + expression.to_json + ',"reference":' + reference.to_json + ',"extra":' + '[' + (extra.map .to_json . join ',') + ']' + ',"columns_first":' + columns_first.to_json + '}'
+        Widget.Column_Names kinds source regex by_type ->
+            '{"constructor":"Column_Names","kinds":' + '[' + (kinds.map .to_json . join ',') + ']' + ',"from":' + source.to_json + ',"regex":' + regex.to_json + ',"by_type":' + by_type.to_json + '}'
+        Widget.Column_Vector kinds source ->
+            '{"constructor":"Column_Vector","kinds":' + '[' + (kinds.map .to_json . join ',') + ']' + ',"from":' + source.to_json + '}'
+        Widget.Order_By source name_only ->
+            '{"constructor":"Order_By","from":' + source.to_json + ',"name_only":' + name_only.to_json + '}'
         Widget.With_JSON_Cache _ json -> json
         _ -> self.to_js_object.to_json
+
+    ## ---
+       private: true
+       ---
+       The distinct `from` values of every column picker in the widget, in the
+       order first seen, looking through choices, vector editors and cached
+       widgets. `Nothing` stands for the table the node is called on.
+    column_sources self -> Vector (Text | Nothing) =
+        Vector.build builder-> self.collect_column_sources builder
+
+    ## ---
+       private: true
+       ---
+       Appends the sources of the pickers in this widget to the builder, each
+       once.
+    collect_column_sources self builder -> Nothing = case self of
+        Widget.Column_Name _ source _ _ _ _ -> Widget.add_source builder source
+        Widget.Column_Names _ source _ _ -> Widget.add_source builder source
+        Widget.Column_Vector _ source -> Widget.add_source builder source
+        Widget.Order_By source _ -> Widget.add_source builder source
+        Widget.Single_Choice values _ -> Widget.collect_choice_sources values builder
+        Widget.Multiple_Choice values _ -> Widget.collect_choice_sources values builder
+        Widget.Vector_Editor item_editor _ -> item_editor.collect_column_sources builder
+        Widget.Union kinds _ -> kinds.each pair-> pair.second.collect_column_sources builder
+        Widget.With_JSON_Cache parent _ -> parent.collect_column_sources builder
+        _ -> Nothing
+
+    ## ---
+       private: true
+       ---
+    collect_choice_sources values builder -> Nothing =
+        values.each choice->
+            choice.parameters.each pair-> pair.second.collect_column_sources builder
+            case choice.value of
+                nested : Vector -> Widget.collect_choice_sources nested builder
+                _ -> Nothing
+
+    ## ---
+       private: true
+       ---
+       Appends the source unless the builder already holds it.
+    add_source builder source -> Nothing =
+        seen = 0.up_to builder.length . any i-> builder.at i == source
+        if seen.not then builder.append source
 
     ## ---
        private: true

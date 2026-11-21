@@ -424,7 +424,9 @@ jobs:
       [check-the-mac-os-runner, draft-release, build-backend-macos, gui-build]
     if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on: [self-hosted, macOS]
-    timeout-minutes: 30
+    # Packaging takes ~15 minutes and Apple's notarization (`afterSign`, `notarytool --wait`) as
+    # long again or more: the first submission ran past 12 minutes and was cut off at the old 30.
+    timeout-minutes: 120
     permissions:
       contents: write
     env:

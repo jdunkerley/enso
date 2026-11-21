@@ -38,7 +38,12 @@ PRs 3b and 4; may run in parallel with both (see "Shared files").
 (`docs/superpowers/plans/2026-11-21-widgets-pr5b-column-pickers.md`): the GUI
 expands the references, the libraries migrate, the benchmark is re-run.
 
-## Owner decisions needed
+## Owner decisions
+
+**Decided 2026-11-21 (owner):** every recommendation below is taken (1–10,
+12–14), with one exception: **decision 11 is "add kind filters now"** (see the
+PR 5b plan, Task 5b). Decision 2 is "never query". The text below keeps the
+options for the record; the recommendation is the decision.
 
 Shared with PR 5b (the numbers are the same in both plans).
 

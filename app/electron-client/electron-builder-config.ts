@@ -230,7 +230,12 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
       {
         from: `${passedArgs.backendDist}/`,
         to: 'enso',
-        filter: ['!**.tar.gz', '!**.zip'],
+        // `main.tgz` is a library's source archive, made for uploading it to a library
+        // repository (`librariesToUpload` in `build.sbt`; today `Standard.Image`, 51 MB). Only a
+        // download from a repository reads it: the engine loads a bundled library from its
+        // folder. It also holds a second, unsigned copy of the library's native binaries, which
+        // notarization rejects, so it stays out of the installer.
+        filter: ['!**.tar.gz', '!**.zip', '!**/main.tgz'],
       },
       // The sample projects, copied to `<projects>/Samples` on first start (`LocalSamples`).
       // Keep `to` in step with `samplesPath` in `src/paths.ts`. `samples/CLAUDE.md` is for

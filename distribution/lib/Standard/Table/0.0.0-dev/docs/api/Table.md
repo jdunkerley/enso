@@ -104,6 +104,7 @@
 - Standard.Base.Data.Read.Many_Files_List.Many_Files_List.from that:Standard.Table.Table.Table -> Standard.Base.Data.Read.Many_Files_List.Many_Files_List
 - Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Table.Viz_Table
 - Standard.Visualization.SQL_Viz.SQL_Viz.from that:Standard.Table.Table.Table -> Standard.Visualization.SQL_Viz.SQL_Viz
+- Standard.Base.Metadata.Widget_Columns.Widget_Columns.from that:Standard.Table.Table.Table -> Standard.Base.Metadata.Widget_Columns.Widget_Columns
 - Standard.Visualization.Viz_Cell.Viz_Cell.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Cell.Viz_Cell
 - Standard.Visualization.Viz_Json.Viz_Json.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Json.Viz_Json
 - Standard.Visualization.Viz_Tree.Viz_Tree.from that:Standard.Table.Table.Table -> Standard.Visualization.Viz_Tree.Viz_Tree

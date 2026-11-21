@@ -68,20 +68,40 @@ result = "not a number".parse_integer.catch _-> 0
   (`src/Metadata/Widget_Query.enso`). It looks the method up exactly, by module,
   type and name, so static methods, extension methods and methods of `Any` get
   their own annotations. It answers
-  `{"arguments":[[<name>,{"widget":…}|{"error":{"step","message"}}],…]}`: errors
-  are results, one per argument, never a failed call. Each failure is logged
-  once per engine process on the logger `Standard.Base.Metadata.Widget_Query`
-  (WARN, with the cause chain and, for a panic, the stack), and each call is
-  timed under `Standard.Base.Logging.Progress` (handle
-  `Widget_Query.<type>.<method>`, the IDE's Performance timings). An error
-  subject (a dataflow error as `value`, not `subject_is_type`) is the user's own
-  error: every argument answers `{"widget":null}`, nothing is logged and no
-  annotation runs. The GUI calls `resolve_call` for every widget query, by
-  method pointer (`Standard.Base.Metadata.Widget_Query.resolve_call`, literal
-  arguments, so nothing is compiled in the user's module); the one in-frame
-  queries, the dropped file's `format` options and `Widget_Query.resolve_type`
-  (a type's default widget, no subject), go through `Meta.call_module_method`
-  (the first with the `Data` module as the value).
+  `{"arguments":[[<name>,{"widget":…}|{"error":{"step","message"}}],…]}`, plus a
+  `"columns"` block (`{<source>:{names,kinds,type_names}}`, `""` for the
+  subject) when a resolved widget has a column picker: errors are results, one
+  per argument, never a failed call. Each failure is logged once per engine
+  process on the logger `Standard.Base.Metadata.Widget_Query` (WARN, with the
+  cause chain and, for a panic, the stack), and each call is timed under
+  `Standard.Base.Logging.Progress` (handle `Widget_Query.<type>.<method>`, the
+  IDE's Performance timings). An error subject (a dataflow error as `value`, not
+  `subject_is_type`) is the user's own error: every argument answers
+  `{"widget":null}`, nothing is logged and no annotation runs. The GUI calls
+  `resolve_call` for every widget query, by method pointer
+  (`Standard.Base.Metadata.Widget_Query.resolve_call`, literal arguments, so
+  nothing is compiled in the user's module); the one in-frame queries, the
+  dropped file's `format` options and `Widget_Query.resolve_type` (a type's
+  default widget, no subject), go through `Meta.call_module_method` (the first
+  with the `Data` module as the value).
+- **Column pickers.** `Metadata.Column_Kind` (`Numeric`, `Textual`, `Logical`,
+  `Date_Only`, `Date_And_Time`, `Time_Only`, `Other`; `of_value` for one value)
+  is the broad kind of a column. `Widget_Columns`
+  (`src/Metadata/Widget_Columns.enso`) is a table's column names, kinds and type
+  names, read from its schema only, never its data (and, for a database, never
+  by querying: see Database's `SQL_Type_Reference.known`). A table-like type in
+  another library adds its own `Widget_Columns.from (that : X)`; Base knows
+  none. The pickers are `Widget.Column_Name` (flags `expression`, `reference`,
+  `extra`, `columns_first`), `Column_Names` (`regex`, `by_type`),
+  `Column_Vector` and `Order_By` (`name_only`); every picker but `Order_By`
+  takes `kinds` (which columns to offer), and every one takes `from` (the
+  argument naming the table, default the subject). `Widget.column_sources` lists
+  the `from` values a widget needs (inside nested widgets and `Union` kinds
+  too), which is how `resolve_call` builds its `columns` block. In an annotation
+  write `@columns (Widget.Column_Names)`: `@column ..Column_Name` does not
+  resolve there (`resolve_call` answers
+  ``Method `arguments` of type Unresolved could not be found.``). No annotation
+  uses the pickers yet; PR 5b migrates them.
 - **Widgets carry no display.** `Widget` constructors have no `display` or
   `label` (`Metadata.Display` is gone; `Choice.Option`'s `label` stays). Which
   arguments the node shows is the `arguments:` map in the method's doc front

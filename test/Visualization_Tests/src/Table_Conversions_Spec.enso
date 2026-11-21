@@ -9,7 +9,7 @@ import Standard.Visualization.Id.Id
 import Standard.Visualization.Preprocessor
 from Standard.Visualization.SQL_Viz import SQL_Viz
 from Standard.Visualization.Viz_Cell import Viz_Cell
-from Standard.Visualization.Viz_Column_Kind import Viz_Kind
+import Standard.Base.Metadata.Column_Kind.Column_Kind
 from Standard.Visualization.Viz_Table import Viz_Table
 
 from Standard.Test import all
@@ -21,7 +21,7 @@ add_specs suite_builder =
         group_builder.specify "describes an in-memory table" <|
             vt = Viz_Table.from t
             vt.column_names . should_equal ["x", "s"]
-            vt.column_kinds . map .kind . should_equal [Viz_Kind.Numeric, Viz_Kind.Textual]
+            vt.column_kinds . map .kind . should_equal [Column_Kind.Numeric, Column_Kind.Textual]
             vt.column_kinds . map .display_name . should_equal ["Integer", "Char"]
             vt.row_count . should_equal 3
             vt.supported_operations . should_equal ["rows", "server_rows", "view_pieces"]

@@ -9,6 +9,7 @@ import Standard.Base.Errors.Common.Floating_Point_Equality
 import Standard.Base.Errors.Common.Incomparable_Values
 import Standard.Base.Errors.Common.Index_Out_Of_Bounds
 import Standard.Base.Errors.Common.No_Such_Conversion
+import Standard.Base.Metadata.Widget_Columns.Widget_Columns
 import Standard.Visualization.Id.Id
 import Standard.Visualization.SQL_Viz.SQL_Viz
 import Standard.Visualization.Viz_Table.Viz_Table
@@ -46,6 +47,7 @@ import project.Internal.Add_Row_Number
 import project.Internal.Add_Running
 import project.Internal.Aggregate_Column_Helper
 import project.Internal.Column_Naming_Helper.Column_Naming_Helper
+import project.Internal.Column_Kinds
 import project.Internal.Column_Type_Helpers
 import project.Internal.Constant_Column.Constant_Column
 import project.Internal.Display_Helpers
@@ -479,6 +481,20 @@ type In_Memory_Table_Implementation
     column_names (this_table : Table & In_Memory_Table) = Vector.from_polyglot_array <|
         Array_Proxy.new this_table.java_table.getColumns.length i->
             this_table.java_table.getColumns.at i . getName
+
+    widget_columns (this_table : Table & In_Memory_Table) =
+        java_columns = this_table.java_table.getColumns
+        vectors = Vector.build_multiple 3 initial_capacity=java_columns.length builders->
+            names = builders.at 0
+            kinds = builders.at 1
+            type_names = builders.at 2
+            0.up_to java_columns.length . each i->
+                java_column = java_columns.at i
+                value_type = In_Memory_Column.from_java_column java_column . value_type
+                names.append java_column.getName
+                kinds.append (Column_Kinds.of_value_type value_type)
+                type_names.append value_type.to_name
+        Widget_Columns.Value (vectors.at 0) (vectors.at 1) (vectors.at 2)
 
     rows (this_table : Table & In_Memory_Table) max_rows:Rows_To_Read =
         length = max_rows.rows_to_read . if_nothing this_table.row_count . min this_table.row_count

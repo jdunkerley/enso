@@ -8,11 +8,13 @@ import project.Errors.Common.No_Such_Method
 import project.Function.Function
 import project.Meta
 import project.Metadata.Widget
+import project.Metadata.Widget_Columns.Widget_Columns
 import project.Panic.Caught_Panic
 import project.Panic.Panic
 import project.Runtime
 import project.Warning.Warning
 from project.Data.Boolean import Boolean, False, True
+from project.Data.Range.Extensions import all
 from project.Data.Json.Extensions import all
 from project.Data.Text.Extensions import all
 from project.Error import all
@@ -56,8 +58,14 @@ polyglot java import org.slf4j.LoggerFactory
    nothing is logged and no annotation is evaluated.
 
    ## Returns
-   `{"arguments":[[<name>,{"widget":<widget or null>}|{"error":{"step":…,"message":…}}],…]}`,
-   read by the GUI (its schema is `widgetQueryAnswerSchema` in
+   `{"arguments":[[<name>,{"widget":<widget or null>}|{"error":{"step":…,"message":…}}],…]}`
+   and, when a resolved widget has a column picker, a `"columns"` block beside
+   `"arguments"`: `,"columns":{<source>:<Widget_Columns>,…}`, one entry for each
+   distinct source the pickers name (`""`: the subject; otherwise the name of
+   another argument), sent once however many pickers use it. A source that is
+   not set, is an error, or has no `Widget_Columns` conversion is absent (a
+   conversion that panics is logged and also absent). It is read by the GUI (its
+   schema is `widgetQueryAnswerSchema` in
    `app/gui/src/providers/openedProjects/widgetRegistry/configuration.ts`).
 resolve_call (value : Any) (module_name : Text) (type_name : Text) (method_name : Text) (argument_names : Vector Text) (uuids : Text = "{}") (subject_is_type : Boolean = False) -> Text =
     method = Widget_Method.Value module_name type_name method_name
@@ -66,13 +74,49 @@ resolve_call (value : Any) (module_name : Text) (type_name : Text) (method_name 
             subject = if subject_is_type then Meta.find_type_or_module type_name else Warning.clear value
             cache = _cache_from uuids
             inputs = _inputs_key subject uuids
-            entries = argument_names.map argument->
-                result = resolve_argument method argument subject cache
+            results = argument_names.map argument-> resolve_argument method argument subject cache
+            entries = argument_names.zip results argument-> result->
                 _ = case result of
                     Argument_Result.Failed failure -> log_failure failure inputs
                     _ -> False
                 '[' + argument.to_json + ',' + result.to_json + ']'
-            '{"arguments":[' + (entries.join ",") + ']}'
+            sources = Vector.build builder->
+                results.each result-> case result of
+                    Argument_Result.Resolved widget _ -> if widget.is_nothing.not then widget.collect_column_sources builder
+                    _ -> Nothing
+            columns = columns_json sources subject cache method inputs
+            '{"arguments":[' + (entries.join ",") + ']' + columns + '}'
+
+## ---
+   private: true
+   ---
+   The `,"columns":{…}` text of `resolve_call`'s answer, or `""`.
+
+   ## Arguments
+    - `sources`: The column sources: `Nothing` for the subject, else the name
+      of an argument.
+    - `subject`: The call's subject.
+    - `cache`: Looks an argument's value up by name.
+    - `method`: The method, for the log.
+    - `inputs`: What the result depends on, for the log.
+columns_json (sources : Vector) subject (cache : Function) (method : Widget_Method = Widget_Method.Value "" "" "") (inputs : Text = "") -> Text =
+    entries = Vector.build builder->
+        sources.each source->
+            value = if source.is_nothing then subject else cache source
+            columns = if value.is_error || value.is_nothing then Nothing else
+                handler caught = case caught.payload of
+                    _ : No_Such_Conversion -> Nothing
+                    _ ->
+                        failure = _failure_from_panic method "columns" caught step="columns"
+                        _ = log_failure failure inputs
+                        Nothing
+                Panic.catch Any handler=handler <|
+                    converted = Widget_Columns.from value
+                    if converted.is_error then Nothing else converted
+            if columns.is_nothing.not then
+                key = if source.is_nothing then "" else source
+                builder.append (key.to_json + ":" + columns.to_json)
+    if entries.is_empty then "" else ',"columns":{' + (entries.join ",") + '}'
 
 ## ---
    private: true
@@ -192,7 +236,8 @@ type Widget_Method
     - `argument`: The argument's name.
     - `step`: `"lookup"` (no such method, module or type), `"annotation"`
       (evaluating the annotation failed, or did not give a `Widget`) or
-      `"type_default"` (the same, for a type's default widget).
+      `"type_default"` (the same, for a type's default widget) or `"columns"`
+      (converting a column source to `Widget_Columns` panicked).
     - `message`: What went wrong.
     - `causes`: The error's causes, outermost first.
     - `stack`: For a panic, its Enso stack trace.

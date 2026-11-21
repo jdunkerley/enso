@@ -12,12 +12,16 @@
 - type Widget
     - Any_To_Target
     - Boolean_Input
+    - Column_Name kinds:(Standard.Base.Data.Vector.Vector Standard.Base.Metadata.Column_Kind.Column_Kind)= from:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)= expression:Standard.Base.Data.Boolean.Boolean= reference:Standard.Base.Data.Boolean.Boolean= extra:(Standard.Base.Data.Vector.Vector Standard.Base.Metadata.Choice)= columns_first:Standard.Base.Data.Boolean.Boolean=
+    - Column_Names kinds:(Standard.Base.Data.Vector.Vector Standard.Base.Metadata.Column_Kind.Column_Kind)= from:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)= regex:Standard.Base.Data.Boolean.Boolean= by_type:Standard.Base.Data.Boolean.Boolean=
+    - Column_Vector kinds:(Standard.Base.Data.Vector.Vector Standard.Base.Metadata.Column_Kind.Column_Kind)= from:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)=
     - Date_Input
     - Date_Time_Input
     - File_Browse existing_only:Standard.Base.Data.Boolean.Boolean= action:Standard.Base.Metadata.File_Action= file_types:(Standard.Base.Data.Vector.Vector Standard.Base.Metadata.File_Type)=
     - Folder_Browse
     - Multiple_Choice values:(Standard.Base.Data.Vector.Vector Standard.Base.Metadata.Choice) quote_values:Standard.Base.Data.Boolean.Boolean=
     - Numeric_Input minimum:(Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)= maximum:(Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)= step:Standard.Base.Data.Numbers.Number= decimal_places:Standard.Base.Data.Numbers.Integer= allow_outside:Standard.Base.Data.Boolean.Boolean=
+    - Order_By from:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)= name_only:Standard.Base.Data.Boolean.Boolean=
     - Regex_Input
     - Secret_Browse
     - Single_Choice values:(Standard.Base.Data.Vector.Vector Standard.Base.Metadata.Choice) allow_custom:Standard.Base.Data.Boolean.Boolean=
@@ -26,6 +30,10 @@
     - Union kinds:(Standard.Base.Data.Vector.Vector Standard.Base.Any.Any) include_nothing:Standard.Base.Data.Boolean.Boolean=
     - Vector_Editor item_editor:Standard.Base.Metadata.Widget item_default:Standard.Base.Data.Text.Text
     - With_JSON_Cache parent:Standard.Base.Metadata.Widget json:Standard.Base.Data.Text.Text
+    - add_source builder:Standard.Base.Any.Any source:Standard.Base.Any.Any -> Standard.Base.Nothing.Nothing
+    - collect_choice_sources values:Standard.Base.Any.Any builder:Standard.Base.Any.Any -> Standard.Base.Nothing.Nothing
+    - collect_column_sources self builder:Standard.Base.Any.Any -> Standard.Base.Nothing.Nothing
+    - column_sources self -> (Standard.Base.Data.Vector.Vector Standard.Base.Any.Any)
     - to_js_object self -> Standard.Base.Any.Any
     - to_json self -> Standard.Base.Data.Text.Text
     - to_text self -> Standard.Base.Data.Text.Text
