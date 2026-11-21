@@ -10,7 +10,7 @@ import {
   RETRY_DELAY_MS,
   TypeDefaults,
   chooseComputedFrame,
-  defaultSourceType,
+  convertsBetween,
   hasWidgetConversion,
   isTypeDefault,
 } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
@@ -22,12 +22,18 @@ import type { ExternalId } from 'ydoc-shared/yjsModel'
 
 const make = (
   ...args: ConstructorParameters<typeof TypeDefaults> extends (
-    [infer H, infer Q, infer F, ...unknown[]]
+    [infer H, infer Q, infer F, infer _P, infer C]
   ) ?
-    [H, Q, F?]
+    [H, Q, F?, C?]
   : never
 ) => {
-  const defaults = new TypeDefaults(args[0], args[1], args[2] ?? ((frame) => frame), 'project')
+  const defaults = new TypeDefaults(
+    args[0],
+    args[1],
+    args[2] ?? ((frame) => frame),
+    'project',
+    args[3],
+  )
   created.push(defaults)
   return defaults
 }
@@ -44,21 +50,12 @@ afterEach(() => {
 })
 
 const DATE = 'Standard.Base.Data.Time.Date.Date'
+const TEXT = 'Standard.Base.Data.Text.Text'
+const INTEGER = 'Standard.Base.Data.Numbers.Integer'
+const FILE = 'Standard.Base.System.File.File'
+const NOTHING = 'Standard.Base.Nothing.Nothing'
 const frameA = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' as ExternalId
 const frameB = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' as ExternalId
-
-test.each([
-  ['Standard.Base.Data.Numbers.Integer', 'Standard.Base.Data.Numbers.Integer'],
-  [
-    'Standard.Base.Data.Numbers.Integer | Standard.Base.Nothing.Nothing',
-    'Standard.Base.Data.Numbers.Integer',
-  ],
-  ['Standard.Base.Nothing.Nothing | Standard.Base.Data.Text.Text', 'Standard.Base.Data.Text.Text'],
-  ['Standard.Base.Nothing.Nothing', undefined],
-  [undefined, undefined],
-])('defaultSourceType(%s)', (repr, expected) => {
-  expect(defaultSourceType(repr)).toBe(expected)
-})
 
 test('asks once per type and caches the answer', async () => {
   const query = vi.fn(async () => Ok({ widget: { constructor: 'Date_Input' } }))
@@ -274,4 +271,92 @@ test('a frame the query failed in is not asked again while another exists', asyn
   defaults.lookup(DATE, frameA)
   await flushPromises()
   expect(query.mock.calls.map(([frame]) => frame)).toEqual([frameA, frameB, frameA])
+})
+
+const answerFor = (answers: Record<string, unknown>) => async (_frame: ExternalId, code: string) =>
+  Ok(answers[Object.keys(answers).find((t) => code.includes(`'${t}'`))!])
+
+test('a union asks each member once and composes them', async () => {
+  const query = vi.fn(
+    answerFor({
+      [TEXT]: { widget: { constructor: 'Text_Input' } },
+      [INTEGER]: { widget: { constructor: 'Numeric_Input' } },
+    }),
+  )
+  const defaults = make(() => true, query)
+  const union = `${TEXT} | ${INTEGER} | ${NOTHING}`
+  expect(defaults.lookup(union, frameA)).toBeUndefined() // pending
+  await flushPromises()
+  expect(defaults.lookup(union, frameA)).toMatchObject({
+    kind: 'Union',
+    kinds: [{ label: 'Text' }, { label: 'Integer' }, { label: 'Nothing', config: null }],
+  })
+  expect(query).toHaveBeenCalledTimes(2) // Nothing is never asked
+  defaults.lookup(TEXT, frameB)
+  expect(query).toHaveBeenCalledTimes(2) // members are cached as types
+})
+
+test('a composed union is a type default, with a stable identity', async () => {
+  const defaults = make(
+    () => true,
+    answerFor({
+      [TEXT]: { widget: { constructor: 'Text_Input' } },
+      [INTEGER]: { widget: { constructor: 'Numeric_Input' } },
+    }),
+  )
+  const union = `${TEXT} | ${INTEGER}`
+  defaults.lookup(union, frameA)
+  await flushPromises()
+  const first = defaults.lookup(union, frameA)
+  expect(first?.kind).toBe('Union')
+  expect(isTypeDefault(first)).toBe(true)
+  expect(defaults.lookup(union, frameA)).toBe(first)
+})
+
+test('a member without a Widget conversion is not asked and not a kind', async () => {
+  const query = vi.fn(async () => Ok({ widget: { constructor: 'Text_Input' } }))
+  const defaults = make((t) => t === TEXT, query)
+  const repr = `${TEXT} | Standard.Base.Network.URI.URI`
+  defaults.lookup(repr, frameA)
+  await flushPromises()
+  expect(defaults.lookup(repr, frameA)).toEqual({ kind: 'Text_Input' })
+  expect(query).toHaveBeenCalledTimes(1)
+})
+
+test('Integer | Nothing is no longer just Integers widget', async () => {
+  const defaults = make(
+    () => true,
+    async () => Ok({ widget: { constructor: 'Numeric_Input' } }),
+  )
+  const repr = `${INTEGER} | ${NOTHING}`
+  defaults.lookup(repr, frameA)
+  await flushPromises()
+  expect(defaults.lookup(repr, frameA)?.kind).toBe('Union')
+})
+
+test('a conversion between members drops the absorbed one', async () => {
+  const defaults = make(
+    () => true,
+    answerFor({
+      [TEXT]: { widget: { constructor: 'Text_Input' } },
+      [FILE]: {
+        /* eslint-disable camelcase */
+        widget: { constructor: 'File_Browse', existing_only: true, action: 'Open', file_types: [] },
+        /* eslint-enable camelcase */
+      },
+    }),
+    undefined,
+    (source, target) => source === TEXT && target === FILE,
+  )
+  defaults.lookup(`${TEXT} | ${FILE}`, frameA)
+  await flushPromises()
+  expect(defaults.lookup(`${TEXT} | ${FILE}`, frameA)?.kind).toBe('File_Browse')
+})
+
+test('convertsBetween reads the suggestion database `Target.from` entries', () => {
+  const db = SuggestionDb.createMock([
+    makeMethod(`${FILE}.from`, { args: [makeArgument('that', TEXT)] }),
+  ])
+  expect(convertsBetween(db, TEXT, FILE)).toBe(true)
+  expect(convertsBetween(db, FILE, TEXT)).toBe(false)
 })
