@@ -131,6 +131,7 @@ public final class EnsoDuration extends BuiltinObject {
   @Builtin.Method(
       name = "total_milliseconds_builtin",
       description = "Gets the total amount of milliseconds")
+  @Builtin.WrapException(from = ArithmeticException.class)
   @TruffleBoundary
   public static long totalMilliseconds(EnsoDuration d) {
     return d.duration.toMillis();

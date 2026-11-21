@@ -64,7 +64,7 @@ add_specs suite_builder =
             huge.total_seconds . should_fail_with Illegal_State
             huge.total_minutes . should_fail_with Illegal_State
             huge.total_hours . should_fail_with Illegal_State
-            (huge.negate.total_milliseconds) . should_fail_with Illegal_State
+            (Duration.new hours=(-10000000000000)).total_milliseconds . should_fail_with Illegal_State
 
         group_builder.specify "the parts of a duration are what is left after the larger units" <|
             duration = Duration.new hours=1 minutes=30 seconds=2 milliseconds=500
