@@ -2567,17 +2567,23 @@ test.describe('Kind picker', () => {
     const button = changeKind(node, 'Text')
     expect(Math.abs((await heightOf(button)) - (await heightOf(textChip)))).toBeLessThan(1)
     // The Nothing form, beside a number chip.
-    await button.click()
-    await list(page).clickOption('Integer')
-    const numberChip = node.locator('.NumericInputWidget').first()
+    const intNode = await kindNode(
+      editorPage,
+      page,
+      'intn',
+      unionMethod('int_nothing', `${INTEGER} | ${NOTHING}`),
+    )
+    const intUnselected = await heightOf(intNode)
+    await select(page, intNode)
+    const numberChip = intNode.locator('.NumericInputWidget').first()
     await expect(numberChip).toBeVisible()
     const numberHeight = await heightOf(numberChip)
-    await changeKind(node, 'Integer').click()
+    await changeKind(intNode, 'Integer').click()
     await list(page).clickOption('Nothing')
-    const nothing = changeKind(node, 'Nothing')
+    const nothing = changeKind(intNode, 'Nothing')
     await expect(nothing).toBeVisible()
     expect(Math.abs((await heightOf(nothing)) - numberHeight)).toBeLessThan(1)
-    expect(Math.abs((await heightOf(node)) - unselectedNode)).toBeLessThan(1)
+    expect(Math.abs((await heightOf(intNode)) - intUnselected)).toBeLessThan(1)
   })
 
   test('switching kind is one undo step', async ({ editorPage, page }) => {
