@@ -99,6 +99,9 @@ export type WidgetConfiguration =
   | TextInput
   | FolderBrowse
   | FileBrowse
+  | DateInput
+  | DateTimeInput
+  | TimeInput
   | SecretBrowse
   | AnyToTarget
   | FunctionCall
@@ -152,7 +155,20 @@ export interface FolderBrowse {
 export interface FileBrowse {
   kind: 'File_Browse'
   existing_only?: boolean | undefined
+  action?: 'Open' | 'Save' | undefined
   file_types?: FileType[] | undefined
+}
+
+export interface DateInput {
+  kind: 'Date_Input'
+}
+
+export interface DateTimeInput {
+  kind: 'Date_Time_Input'
+}
+
+export interface TimeInput {
+  kind: 'Time_Input'
 }
 
 export interface SecretBrowse {
@@ -222,8 +238,12 @@ export const widgetConfigurationSchema: z.ZodType<WidgetConfiguration, z.ZodType
       z.object({
         kind: z.literal('File_Browse'),
         existing_only: z.boolean().optional(),
+        action: z.enum(['Open', 'Save']).optional(),
         file_types: z.array(fileTypeSchema),
       }),
+      z.object({ kind: z.literal('Date_Input') }),
+      z.object({ kind: z.literal('Date_Time_Input') }),
+      z.object({ kind: z.literal('Time_Input') }),
       z.object({ kind: z.literal('Secret_Browse') }),
       z.object({ kind: z.literal('Any_To_Target') }),
       /* eslint-enable camelcase */
