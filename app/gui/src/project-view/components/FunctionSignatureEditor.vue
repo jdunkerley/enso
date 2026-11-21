@@ -161,7 +161,7 @@ function makeArgRowId(arg: Ast.ArgumentDefinition<Ast.ConcreteRefs>) {
               :root="rootElement"
               :portIdBase="syntheticPortId(functionAst.id, `argRow:${index}`)"
               :definition="item"
-              :frame="functionAst.name.externalId"
+              :frame="functionAst.body?.externalId"
               :updateCallback="handleWidgetUpdates"
               :preprocessName="(name) => preprocessName(index, name)"
               @rename="handleRename(index, $event)"

@@ -1,7 +1,7 @@
 /** @file The configuration of a vector's items. */
 import type { WidgetConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { describe, expect, test } from 'vitest'
-import { vectorItemConfig } from '../elementType'
+import { vectorElementType, vectorItemConfig } from '../elementType'
 
 const DATE = 'Standard.Base.Data.Time.Date.Date'
 const VECTOR = 'Standard.Base.Data.Vector.Vector'
@@ -23,8 +23,7 @@ describe('vectorItemConfig', () => {
     expect(vectorItemConfig(undefined, undefined, typeDefault)).toBeUndefined()
   })
 
-  test('a Vector Date gets Date_Input', async () => {
-    const { vectorElementType } = await import('../elementType')
+  test('a Vector Date gets Date_Input', () => {
     const element = vectorElementType(`${VECTOR} ${DATE}`)
     expect(vectorItemConfig(undefined, element, typeDefault)).toEqual({ kind: 'Date_Input' })
   })

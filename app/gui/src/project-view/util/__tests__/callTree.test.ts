@@ -516,6 +516,10 @@ describe('an argument without an annotation takes its type default', () => {
     expect(configOf('other', new Map())).toBeUndefined()
   })
 
+  test('a pending annotation blocks the type default', () => {
+    expect(configOf('when', new Map([['when', widgetCfg.pending()]]))?.kind).toBe('Pending')
+  })
+
   test('the annotation or inherited configuration wins', () => {
     const answer: widgetCfg.WidgetConfiguration = { kind: 'Single_Choice', values: [] }
     expect(configOf('when', new Map([['when', answer]]))).toEqual(answer)

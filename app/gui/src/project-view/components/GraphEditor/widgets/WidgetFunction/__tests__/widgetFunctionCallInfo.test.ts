@@ -168,7 +168,8 @@ function setUpCallInfo(
   })
   const statement = ast.lines[0]?.statement?.node
   assert(statement instanceof Ast.ExpressionStatement)
-  return effectScope().run(() =>
+  const callExternalId = statement.expression.externalId
+  const info = effectScope().run(() =>
     useWidgetFunctionCallInfo(
       WidgetInput.FromAst(statement.expression),
       {
@@ -194,6 +195,7 @@ function setUpCallInfo(
       typeDefaults,
     ),
   )!
+  return { ...info, callExternalId }
 }
 
 test('an answer the IDE cannot read is reported once, and the call keeps its pending widgets', async () => {
@@ -222,7 +224,7 @@ test('a readable answer is timed after it renders', async () => {
   )
 })
 
-test('an argument takes its type default, asked in the call own frame', () => {
+test('an argument takes its type default, asked in the frame of the call itself', () => {
   const DATE = 'Standard.Base.Data.Time.Date.Date'
   const dated = makeMethod('local.Project.Type.dated', {
     returnType: 'Standard.Data.Text',
@@ -237,5 +239,5 @@ test('an argument takes its type default, asked in the call own frame', () => {
   const application = info.application.value
   assert(application instanceof ArgumentApplication)
   expect(application.argument.toWidgetInput().dynamicConfig).toEqual({ kind: 'Date_Input' })
-  expect(lookup).toHaveBeenCalledWith(DATE, expect.any(String))
+  expect(lookup).toHaveBeenCalledWith(DATE, info.callExternalId)
 })

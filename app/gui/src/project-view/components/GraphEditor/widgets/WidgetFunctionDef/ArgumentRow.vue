@@ -34,8 +34,8 @@ const { definition, updateCallback, portIdBase, preprocessName, frame } = define
   updateCallback: UpdateHandler
   portIdBase: PortId
   preprocessName: (input: string) => string
-  /** The expression the engine runs the type default's query in: the function's name. */
-  frame: ExternalId
+  /** The expression the engine runs the type default's query in: the function's body. */
+  frame?: ExternalId | undefined
 }>()
 
 const emit = defineEmits<{
@@ -125,7 +125,9 @@ const nodeDefault = computed((): TreeProps | undefined => {
     input: {
       ...WidgetInput.FromAstOrPlaceholder(expr, () => syntheticId),
       expectedType,
-      dynamicConfig: openedProject.typeDefaults.value.lookup(expectedType, frame),
+      // Without a frame to ask in, the type default is not looked up.
+      dynamicConfig:
+        frame != null ? openedProject.typeDefaults.value.lookup(expectedType, frame) : undefined,
       [EnsoExpression]: {
         weakMatch: true,
       },
