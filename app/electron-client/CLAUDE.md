@@ -194,6 +194,11 @@ The certificate's name carries the Apple account holder, so the identity is
 found by team id (`APPLETEAMID`, `macSigningIdentity` in
 `electron-builder-config.ts`). Don't hardcode a holder name.
 
+The identity is valid only when Apple's Developer ID G2 intermediate is on the
+keychain search list. The release job adds it (Note [The Developer ID
+Intermediate] in `release.yml`); a local signed build on a Mac without Xcode's
+certificates needs it too, or electron-builder silently signs ad hoc.
+
 electron-builder signs the loose binaries; the `afterSign` hook
 (`tasks/signArchivesMacOs.ts`) signs the Mach-O files inside the engine's jars,
 which it finds itself rather than from a list (Note [Signing Inside Archives]),
