@@ -1677,5 +1677,85 @@
     "isStatic": false,
     "documentation": " ---\nprivate: true\n---",
     "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Text.Regex.Regex.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Locale.Locale.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.System.File",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Text.Text",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.System.File.File",
+    "returnType": "Standard.Base.System.File.File",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Data.Numbers",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Numbers.Integer",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Data.Numbers.Float",
+    "returnType": "Standard.Base.Data.Numbers.Float",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
   }
 ]
