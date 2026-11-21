@@ -108,6 +108,18 @@ env:
 # `RELEASE_SECRETS` in `tools/ci/check-workflows.mjs`. `ide-build --sign` is already passed;
 # without a certificate it changes nothing.
 
+# Note [The Developer ID Intermediate]
+# ====================================
+# `codesign` and `security find-identity -v` count an identity as valid only when its chain
+# builds to Apple's root from the keychains on the search list. The Developer ID Application
+# certificate is issued by "Developer ID Certification Authority" G2, and neither the `.p12`
+# (`CSC_LINK`) nor electron-builder's bundled `root_certs.keychain` (only the WWDR intermediate)
+# carries it, and the self-hosted Mac does not have it either (Xcode would install it). Without
+# it electron-builder falls back to an ad-hoc signature, skips notarization, and the `afterSign`
+# hook finds "0 valid identities". So `upload-ide-macos` downloads the intermediate from Apple,
+# checks it against the pinned SHA-256 (it is valid until 2031-09-17; a renewed one needs a new
+# hash), and puts it on the search list in a keychain of its own, deleted at the end of the job.
+
 permissions:
   contents: read
 
@@ -446,6 +458,28 @@ jobs:
         with:
           name: wasm-artifacts
           path: app
+      # Note [The Developer ID Intermediate]
+      - name: Add Apple's Developer ID intermediate to the keychain search list
+        run: |-
+          set -euo pipefail
+          cert="$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          curl -fsSL --retry 3 -o "$cert" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          echo "$DEVELOPER_ID_G2_SHA256  $cert" | shasum -a 256 -c -
+          keychain="$RUNNER_TEMP/enso-intermediates.keychain-db"
+          security delete-keychain "$keychain" 2>/dev/null || true
+          security create-keychain -p '' "$keychain"
+          security add-certificates -k "$keychain" "$cert"
+          keychains=("$keychain")
+          while IFS= read -r line; do
+            line="${line#"${line%%[![:space:]]*}"}"
+            line="${line#\"}"
+            line="${line%\"}"
+            if [ -n "$line" ]; then keychains+=("$line"); fi
+          done < <(security list-keychains -d user)
+          security list-keychains -d user -s "${keychains[@]}"
+          security list-keychains -d user
+        env:
+          DEVELOPER_ID_G2_SHA256: f16cd3c54c7f83cea4bf1a3e6a0819c8aaa8e4a1528fd144715f350643d2df3a
       - name: Package the IDE
         run: corepack pnpm --filter build-scripts run ide-build --sign
         # Note [Signing The Installers]
@@ -464,6 +498,10 @@ jobs:
         with:
           name: ide-macos-aarch64
           path: dist/ide/enso-*.dmg
+      # Deleting a keychain also takes it off the search list.
+      - name: Remove the intermediate keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/enso-intermediates.keychain-db" || true
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean
