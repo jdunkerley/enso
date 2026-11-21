@@ -10,7 +10,6 @@ import {
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import {
   SUPPORTED_DYNAMIC_CONFIG_KINDS,
-  SUPPORTED_TYPES,
   useBrowserTypeInfo,
   useCurrentPath,
   useSetPath,
@@ -102,17 +101,13 @@ export const widgetDefinition = defineWidget(
   WidgetInput.isAstOrPlaceholder,
   {
     priority: 49,
-    score: (props) => {
-      const reprType = props.input[ArgumentInfoKey]?.info?.reprType
-      return (
-          (props.input.dynamicConfig &&
-            SUPPORTED_DYNAMIC_CONFIG_KINDS.includes(props.input.dynamicConfig.kind)) ||
-            // Until PR 4's kind picker: a union containing a browsable type keeps the browser.
-            (reprType && SUPPORTED_TYPES.some((type) => reprType.includes(type)))
-        ) ?
-          Score.Perfect
-        : Score.Mismatch
-    },
+    score: (props) =>
+      (
+        props.input.dynamicConfig &&
+        SUPPORTED_DYNAMIC_CONFIG_KINDS.includes(props.input.dynamicConfig.kind)
+      ) ?
+        Score.Perfect
+      : Score.Mismatch,
   },
   import.meta.hot,
 )

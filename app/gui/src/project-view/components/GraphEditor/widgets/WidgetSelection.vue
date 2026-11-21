@@ -241,7 +241,8 @@ export function withDropdownItems(input: WidgetInput, items: Iterable<DropdownIt
   return { ...input, [CustomDropdownItemsKey]: [...existingItems, ...items] }
 }
 
-// Until PR 4's kind picker: tag values win over a type default (today's behaviour).
+// Tag values win over a type default: a deliberate departure from the spec's literal order,
+// kept until a follow-up decides.
 function isTypeDefaultOrNone(config: WidgetInput['dynamicConfig']): boolean {
   return config == null || isTypeDefault(config)
 }

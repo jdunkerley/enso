@@ -56,7 +56,6 @@ const TEXT_TYPE = ProjectPath.create(
 const TEXT_TYPE_QN = printAbsoluteProjectPath(TEXT_TYPE)
 
 export const SUPPORTED_DYNAMIC_CONFIG_KINDS = ['File_Browse', 'Folder_Browse', 'Secret_Browse']
-export const SUPPORTED_TYPES = [FILE_TYPE_QN, WRITABLE_FILE_TYPE_QN, ENSO_SECRET_TYPE_QN]
 
 /** Information about the type(s) of browsable items. */
 export interface BrowserTypeInfo {

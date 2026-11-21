@@ -66,14 +66,13 @@ render only its own slot content. The icon is already on the row, drawn by
   widgets score on the configuration's `kind` (`Date_Input`, `Time_Input`,
   `Date_Time_Input`, `Boolean_Input`, `Numeric_Input`, `Text_Input`), never on
   `expectedType` or `reprType`; the exceptions are `WidgetFileBrowser`'s
-  transitional rule (it also matches a declared type that contains `File`,
-  `Writable_File` or `Enso_Secret`, and its behaviour logic reads the type) and
+  behaviour logic (it reads the declared type, not to choose the widget) and
   `WidgetVector` (a bare `Vector`). Rulings to keep in mind:
-  - **Until PR 4, an argument's own `tagValues` win over a type default**,
-    decided by origin (`isTypeDefault`), not by kind: an explicit annotation
-    beats `tagValues`, a type default does not (`WidgetSelection`). This is
-    today's behaviour, kept on purpose; a departure from the spec's literal
-    order.
+  - **An argument's own `tagValues` win over a type default**, decided by origin
+    (`isTypeDefault`), not by kind: an explicit annotation beats `tagValues`, a
+    type default does not (`WidgetSelection`). This is today's behaviour, a
+    deliberate departure from the spec's literal order, kept until a follow-up
+    decides.
   - **Union types use the first member that is not `Nothing`**
     (`Integer | Nothing` asks about `Integer`; `Text | <constructors>` asks
     about `Text`). This is interim, until PR 4 replaces it.
