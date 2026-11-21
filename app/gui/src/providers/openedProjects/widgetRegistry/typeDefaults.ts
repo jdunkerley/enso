@@ -42,6 +42,16 @@ export const RETRY_DELAY_MS = 1000
 /** The longest delay between two asks of a failing type. */
 export const MAX_RETRY_DELAY_MS = 30000
 
+const typeDefaultConfigs = new WeakSet<object>()
+
+/**
+ * Whether `config` is a type's default widget (as {@link TypeDefaults.lookup} returns it), as
+ * opposed to a configuration the argument's own annotation gave.
+ */
+export function isTypeDefault(config: WidgetConfiguration | undefined): boolean {
+  return config != null && typeDefaultConfigs.has(toRaw(config))
+}
+
 type CacheEntry =
   | { state: 'pending' }
   | { state: 'retry' }
@@ -59,6 +69,9 @@ export function hasWidgetConversion(db: SuggestionDb, typeName: string): boolean
  * The default widgets of types. Each type is asked of the engine until it answers, once while the
  * instance lives (the opened project's session); an answer, including "none", is kept.
  *
+ * The query goes to the first caller's frame if the engine has computed it, otherwise to any
+ * computed expression (`pickFrame`); with none, it is a failed query. Every retry picks again.
+ *
  * A failed query (no result yet, a timeout, a rejection) is retried after a delay that doubles up
  * to {@link MAX_RETRY_DELAY_MS}. The failure is recorded without notifying dependents, so a render
  * that called {@link lookup} does not run again at once and re-ask in a loop; the timer deletes
@@ -73,6 +86,11 @@ export class TypeDefaults {
   constructor(
     private readonly hasDefault: (typeName: string) => boolean,
     private readonly query: (frame: ExternalId, code: string) => Promise<Result<unknown> | null>,
+    /**
+     * The frame to ask in: `preferred` when the engine has computed it, else any expression it
+     * has; `undefined` when there is none.
+     */
+    private readonly pickFrame: (preferred: ExternalId) => ExternalId | undefined,
     private readonly projectId: string,
   ) {}
 
@@ -111,10 +129,11 @@ export class TypeDefaults {
     this.timers.add(timer)
   }
 
-  private async ask(type: string, frame: ExternalId) {
+  private async ask(type: string, preferredFrame: ExternalId) {
     let result: Result<unknown> | null
     try {
-      result = await this.query(frame, RESOLVE_TYPE_EXPRESSION(type))
+      const frame = this.pickFrame(preferredFrame)
+      result = frame == null ? null : await this.query(frame, RESOLVE_TYPE_EXPRESSION(type))
     } catch {
       result = null
     }
@@ -136,6 +155,7 @@ export class TypeDefaults {
     }
     // An `error` answer was already logged by the engine.
     const config = 'widget' in parsed.data ? (parsed.data.widget ?? undefined) : undefined
+    if (config != null) typeDefaultConfigs.add(config)
     this.cache.set(type, { state: 'done', config })
   }
 }

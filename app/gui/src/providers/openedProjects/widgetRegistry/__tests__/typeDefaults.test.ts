@@ -11,6 +11,7 @@ import {
   TypeDefaults,
   defaultSourceType,
   hasWidgetConversion,
+  isTypeDefault,
 } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import { flushPromises } from '@vue/test-utils'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
@@ -19,11 +20,13 @@ import { computed, effectScope } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 
 const make = (
-  ...args: ConstructorParameters<typeof TypeDefaults> extends [infer H, infer Q, ...unknown[]] ?
-    [H, Q]
+  ...args: ConstructorParameters<typeof TypeDefaults> extends (
+    [infer H, infer Q, infer F, ...unknown[]]
+  ) ?
+    [H, Q, F?]
   : never
 ) => {
-  const defaults = new TypeDefaults(args[0], args[1], 'project')
+  const defaults = new TypeDefaults(args[0], args[1], args[2] ?? ((frame) => frame), 'project')
   created.push(defaults)
   return defaults
 }
@@ -187,4 +190,49 @@ test('hasWidgetConversion reads the suggestion database `Widget.from` entries', 
   ])
   expect(hasWidgetConversion(db, DATE)).toBe(true)
   expect(hasWidgetConversion(db, 'Standard.Base.Data.Text.Text')).toBe(false)
+})
+
+test('a query goes to another computed frame when the first callers frame is not computed', async () => {
+  const query = vi.fn<Query>().mockResolvedValue(WIDGET)
+  const defaults = make(
+    () => true,
+    query,
+    (preferred) => (preferred === frameA ? frameB : preferred),
+  )
+  defaults.lookup(DATE, frameA)
+  await flushPromises()
+  expect(query).toHaveBeenCalledWith(frameB, RESOLVE_TYPE_EXPRESSION(DATE))
+  expect(defaults.lookup(DATE, frameA)).toEqual({ kind: 'Date_Input' })
+})
+
+test('with no computed frame nothing is asked, and a retry picks the frame again', async () => {
+  const query = vi.fn<Query>().mockResolvedValue(WIDGET)
+  let available: ExternalId | undefined = undefined
+  const defaults = make(
+    () => true,
+    query,
+    () => available,
+  )
+  defaults.lookup(DATE, frameA)
+  await flushPromises()
+  expect(query).not.toHaveBeenCalled()
+  expect(defaults.lookup(DATE, frameA)).toBeUndefined() // waiting for the retry
+  available = frameB
+  vi.advanceTimersByTime(RETRY_DELAY_MS)
+  expect(defaults.lookup(DATE, frameA)).toBeUndefined() // asks again
+  await flushPromises()
+  expect(query).toHaveBeenCalledWith(frameB, RESOLVE_TYPE_EXPRESSION(DATE))
+  expect(defaults.lookup(DATE, frameA)).toEqual({ kind: 'Date_Input' })
+})
+
+test('only a configuration a lookup returned is a type default', async () => {
+  const defaults = make(
+    () => true,
+    async () => WIDGET,
+  )
+  defaults.lookup(DATE, frameA)
+  await flushPromises()
+  expect(isTypeDefault(defaults.lookup(DATE, frameA))).toBe(true)
+  expect(isTypeDefault({ kind: 'Date_Input' })).toBe(false)
+  expect(isTypeDefault(undefined)).toBe(false)
 })

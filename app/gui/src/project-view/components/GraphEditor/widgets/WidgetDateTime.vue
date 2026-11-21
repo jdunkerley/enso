@@ -78,7 +78,7 @@ function isWholeDateTimeNode(input: WidgetInput): boolean {
 }
 
 /**
- * The date and time-of-day widgets' counterpart for a `Date_Time`-typed argument or item, or a
+ * The date and time-of-day widgets' counterpart for an argument or item configured `Date_Time_Input`, or a
  * whole node that is a date-time (no second dropdown where `WidgetSelection` gives one): its own
  * widgets show the code (`Date_Time.now`, or `Date_Time.new` with its ports), and an arrow under it
  * opens a menu of `Date_Time.now`, a calendar and a time field. Priority 53, after the time-of-day

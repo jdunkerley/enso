@@ -205,6 +205,12 @@ export function useProjectStates() {
       const typeDefaults = new TypeDefaults(
         (typeName) => hasWidgetConversion(suggestionDb.entries, typeName),
         (frame, code) => store.queuedExecuteExpression(frame, code, 5000),
+        (preferred) => {
+          const computed = store.computedValueRegistry.db
+          if (computed.get(preferred)?.payload.type === 'Value') return preferred
+          for (const [id, info] of computed.entries()) if (info.payload.type === 'Value') return id
+          return undefined
+        },
         project.info.id,
       )
       onScopeDispose(() => typeDefaults.dispose())

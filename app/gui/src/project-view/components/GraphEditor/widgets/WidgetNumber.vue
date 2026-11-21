@@ -6,6 +6,7 @@ import {
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
+import { isTypeDefault } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import NumericInputWidget from '@/components/widgets/NumericInputWidget.vue'
 import { Ast } from '@/util/ast'
 import { targetIsOutside } from '@/util/autoBlur'
@@ -68,8 +69,11 @@ export const widgetDefinition = defineWidget(
   {
     priority: 1001,
     score: (props) => {
+      // A text literal keeps its text input over the number input of a type default.
+      const ownsLiteral =
+        isTypeDefault(props.input.dynamicConfig) && props.input.value instanceof Ast.TextLiteral
       if (
-        props.input.dynamicConfig?.kind === 'Numeric_Input' ||
+        (props.input.dynamicConfig?.kind === 'Numeric_Input' && !ownsLiteral) ||
         props.input.value instanceof Ast.NumericLiteral ||
         (props.input.value instanceof Ast.NegationApp &&
           props.input.value.argument instanceof Ast.NumericLiteral)

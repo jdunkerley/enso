@@ -7,6 +7,7 @@ import {
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
 import { singleChoiceConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
+import { isTypeDefault } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import type { ToValue } from '$/utils/reactivity'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
@@ -240,18 +241,9 @@ export function withDropdownItems(input: WidgetInput, items: Iterable<DropdownIt
   return { ...input, [CustomDropdownItemsKey]: [...existingItems, ...items] }
 }
 
-/** The widget kinds a type's default can be: they never replace an argument's own tag values. */
-const TYPE_DEFAULT_KINDS: ReadonlySet<string> = new Set([
-  'Boolean_Input',
-  'Numeric_Input',
-  'Text_Input',
-  'Date_Input',
-  'Date_Time_Input',
-  'Time_Input',
-])
-
+// Until PR 4's kind picker: tag values win over a type default (today's behaviour).
 function isTypeDefaultOrNone(config: WidgetInput['dynamicConfig']): boolean {
-  return config == null || TYPE_DEFAULT_KINDS.has(config.kind)
+  return config == null || isTypeDefault(config)
 }
 
 function isBooleanDefault(config: WidgetInput['dynamicConfig']): boolean {
@@ -266,7 +258,7 @@ function selectionScore(input: WidgetInput): Score {
     : input.dynamicConfig?.kind === 'Pending' ? Score.Mismatch
     : input.dynamicConfig?.kind === 'Single_Choice' ? Score.Perfect
     : isBooleanArgument(input) && isBooleanDefault(input.dynamicConfig) ? Score.Perfect
-      // TODO[ao] here, instead of checking for existing dynamic config, we should rather return
+      // TODO[ao] here, instead of checking for an annotation's dynamic config, we should rather return
       // Score.Good. But this does not work with WidgetArgument which would then take precedence
       // over selection (and we want to have name always under it)
     : input[ArgumentInfoKey]?.info?.tagValues != null && isTypeDefaultOrNone(input.dynamicConfig) ?

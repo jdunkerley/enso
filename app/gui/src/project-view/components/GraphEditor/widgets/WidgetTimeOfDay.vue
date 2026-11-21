@@ -71,7 +71,7 @@ function isWholeTimeNode(input: WidgetInput): boolean {
 }
 
 /**
- * The date widget's counterpart for a `Time_Of_Day`-typed argument or item, or a whole node that is
+ * The date widget's counterpart for an argument or item configured `Time_Input`, or a whole node that is
  * a time (it takes no second dropdown where `WidgetSelection` already gives one): its own widgets show
  * the code (`Time_Of_Day.now`, or `Time_Of_Day.new` with `hour`, `minute` ports), and an arrow
  * under it opens a menu that replaces the whole value. Priority 52, after the date widget (51).

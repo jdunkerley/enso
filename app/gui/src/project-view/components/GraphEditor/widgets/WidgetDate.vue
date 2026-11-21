@@ -75,7 +75,7 @@ function isWholeDateNode(input: WidgetInput): boolean {
 }
 
 /**
- * A dropdown around a `Date`-typed argument or item, or a whole node that is a date (`Date.today`,
+ * A dropdown around an argument or item configured `Date_Input`, or a whole node that is a date (`Date.today`,
  * `Date.new 2020 1 15`, even with a connected argument): its own widgets show the code (`Date.today`,
  * or `Date.new` with `year`, `month` and `day` ports), and an arrow under it opens a menu that
  * replaces the whole value. Any other untyped `Date.new ...` is drawn as any other expression.

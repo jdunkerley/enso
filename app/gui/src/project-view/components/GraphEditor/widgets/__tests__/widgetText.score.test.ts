@@ -23,6 +23,11 @@ describe('the text widget scores', () => {
     expect(score(WidgetInput.FromAst(Ast.parseExpression("'hello'")!))).toBe(Score.Perfect)
   })
 
+  test('a number literal is not taken at all, so it keeps its number input over a type default', () => {
+    const number = WidgetInput.FromAst(Ast.parseExpression('42')!)
+    expect(textWidget.match(number)).toBe(false)
+  })
+
   test('a declared Text type without the configuration Mismatch', () => {
     expect(score(placeholder({ expectedType: 'Standard.Base.Data.Text.Text' as never }))).toBe(
       Score.Mismatch,
