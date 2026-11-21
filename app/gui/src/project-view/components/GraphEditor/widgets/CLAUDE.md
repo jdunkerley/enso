@@ -72,10 +72,15 @@ render only its own slot content. The icon is already on the row, drawn by
     (`isTypeDefault`), not by kind: an explicit annotation beats `tagValues`, a
     type default does not (`WidgetSelection`). This is today's behaviour, a
     deliberate departure from the spec's literal order, kept until a follow-up
-    decides.
-  - **Union types use the first member that is not `Nothing`**
-    (`Integer | Nothing` asks about `Integer`; `Text | <constructors>` asks
-    about `Text`). This is interim, until PR 4 replaces it.
+    decides. The kind picker marks the input it hands its chosen kind's widget
+    (`UnderKindPickerKey`, `underKindPicker`), and `WidgetSelection`'s
+    `tagValues` and Boolean fallbacks leave a marked input alone: under the
+    picker the kind's own configuration decides (an explicit `Single_Choice`
+    still claims it).
+  - **A declared union's widget is composed from its members'**
+    (`A | B | Nothing`; see "Kind picker" below), and a composed union counts as
+    a type default (`isTypeDefault`), so the precedence rules above treat it as
+    they treat a single type's.
   - **A type default claims only an unset argument or a literal of its own
     kind** (R8). A reference or connection, `_`, `Nothing`, a vector, a
     parenthesised group or a literal of another kind keeps the widget that draws
@@ -241,6 +246,49 @@ render only its own slot content. The icon is already on the row, drawn by
   method's body context, 1 s timeout, so the node creation waits at most that
   long and one undo still removes node and import); `formatTypeForDrop` does
   both. The import goes in the node creation's edit.
+
+## Kind picker
+
+A declared union (`Integer | Nothing`, `Text | File | Nothing`) is drawn by
+`WidgetKindPicker.vue` over a composed configuration.
+
+- **Composition** (`providers/openedProjects/widgetRegistry/unionKinds.ts`,
+  `composeUnion`, reached from `TypeDefaults.lookup`): `unionMembers` splits the
+  declared type on top-level `|`; each member's type default is asked
+  separately. `Nothing` is a kind of its own. A member with no widget is
+  dropped. **The conversion rule:** a member A is dropped when another member B
+  has `B.from (that : A)` (`convertsBetween`, read from the suggestion
+  database's `conversionSources`), so `Text | File` is just a File and
+  `Text | Regex` a Regex; of two that convert to each other the earlier stays,
+  and if every member would go the first stays. Members with deep-equal widgets
+  collapse. Only `Single_Choice` kinds merge into one `Single_Choice` (`Nothing`
+  an option); a single kind stays that widget; otherwise a `Union` with
+  `Nothing` last. The result is memoised per type while the member widgets and
+  the conversion verdicts are unchanged, so a conversion appearing later
+  re-composes it. An engine-built `Widget.Union` (and a `@` annotation) parse to
+  the same `Union` configuration.
+- **The look:** the icon of the kind the value is, in front of the value, which
+  is drawn by that kind's own widget (the node still shows its code). On a
+  selected node the icon is a button opening a list of the kinds; `Nothing` is
+  the picker's last entry, written as plain `Nothing`. Arrow keys move in the
+  list (in the picker, not in `DropdownWidget`); Enter chooses. Switching writes
+  the kind's default code and its imports in one edit.
+- **Priority 44**: before `WidgetAnyToTarget` (45), `WidgetRegex` (48),
+  `WidgetFileBrowser` (49) and `WidgetSelection` (50), which draw the chosen
+  kind inside it. It scores only when the value is one of the kinds (or unset),
+  otherwise it steps aside and the value is drawn as any other.
+- **`kindIcon`** (`WidgetKindPicker/kindIcon.ts`) is the one place to give a
+  kind an icon; without one the chip shows the label.
+- **`matchKind` / `kindDefaultCode`** (`WidgetKindPicker/kindMatch.ts`) are the
+  one place to teach a new widget kind its value shape: `matchKind` says which
+  kind an expression is, `kindDefaultCode` the code switching to it writes (a
+  test checks that each default reads back as its own kind). A vector's new item
+  uses the first kind with a default (`vectorItemDefault`,
+  `WidgetVector/elementType.ts`).
+- `WidgetRegex.vue` (priority 48) is the input of a `Regex_Input` argument:
+  `regex '…'` is drawn as the call's head (`regex`, `Regex.compile`, as written)
+  with the pattern edited in place by `WidgetText`; an unset argument is an
+  empty input that writes `regex '<text>'` on blur.
 
 ## Argument access
 

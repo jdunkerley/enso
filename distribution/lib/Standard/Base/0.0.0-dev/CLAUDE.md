@@ -105,6 +105,15 @@ result = "not a number".parse_integer.catch _-> 0
   frame is
   `Meta.call_module_method 'Standard.Base.Metadata.Widget_Query' 'resolve_type' [] '<qualified type name>'`.
   Group C types keep `default_widget` until PR 6.
+- **Unions.** A declared union (`Integer | Nothing`) needs nothing: the IDE
+  composes its widget from the members' type defaults and shows a kind picker.
+  Use `Widget.Union kinds include_nothing` (kinds are `[label, widget]` pairs)
+  only in an annotation or a type default that wants a picker of its own.
+  `Widget.Regex_Input` is the default widget of `Regex`
+  (`Widget.from (that : Regex.type)`): the IDE edits the pattern and writes
+  `regex '…'`. **A conversion `B.from (that : A)` makes A no kind of its own in
+  a union with B**: `Text | File` shows only File, `Text | Regex` only Regex;
+  add the conversion only when A really is accepted wherever B is.
 - `Meta.get_method_annotation`, `Meta.find_type_or_module` and
   `Meta.call_module_method` are for the IDE only (`private: true`); do not use
   them in library code.
