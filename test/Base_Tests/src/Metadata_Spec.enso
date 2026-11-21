@@ -26,6 +26,23 @@ add_specs suite_builder =
             json . should_not_contain '"label":null'
             (Widget.Text_Input).to_json . should_equal '{"constructor":"Text_Input"}'
 
+        group_builder.specify "a Union lists its kinds in order, each with its widget" <|
+            union = Widget.Union [Pair.new "Text" Widget.Text_Input, Pair.new "Integer" Widget.Numeric_Input] include_nothing=True
+            union.to_json . should_equal '{"constructor":"Union","kinds":[["Text",{"constructor":"Text_Input"}],["Integer",{"constructor":"Numeric_Input"}]],"include_nothing":true}'
+
+        group_builder.specify "a Union without Nothing says so" <|
+            union = Widget.Union [Pair.new "Locale" (Widget.Single_Choice [Choice.Option "A" "'A'"])]
+            json = union.to_json . parse_json
+            json.get "include_nothing" . should_be_false
+            json.get "kinds" . first . first . should_equal "Locale"
+
+        group_builder.specify "a Regex_Input" <| Widget.Regex_Input.to_json . should_equal '{"constructor":"Regex_Input"}'
+
+        group_builder.specify "a Union nests inside a Vector_Editor" <|
+            union = Widget.Union [Pair.new "Text" Widget.Text_Input] include_nothing=True
+            editor = Widget.Vector_Editor item_editor=union item_default="''"
+            editor.to_json . should_contain '"item_editor":{"constructor":"Union"'
+
     suite_builder.group "File_Format.dropdown_options" group_builder->
         group_builder.specify "names a registered format's type and file patterns" <|
             options = File_Format.dropdown_options [Auto_Detect]
