@@ -36,6 +36,8 @@ add_specs suite_builder =
             json.get "include_nothing" . should_be_false
             json.get "kinds" . first . first . should_equal "Locale"
 
+        group_builder.specify "a Regex_Input" <| Widget.Regex_Input.to_json . should_equal '{"constructor":"Regex_Input"}'
+
         group_builder.specify "a Union nests inside a Vector_Editor" <|
             union = Widget.Union [Pair.new "Text" Widget.Text_Input] include_nothing=True
             editor = Widget.Vector_Editor item_editor=union item_default="''"

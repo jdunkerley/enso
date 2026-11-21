@@ -43,6 +43,13 @@ add_specs suite_builder =
         group_builder.specify "a type with no default has no conversion (a bare Vector stays with the GUI)" <|
             Panic.recover Any (Widget.from Vector) . should_fail_with No_Such_Conversion
 
+    suite_builder.group "Regex type default" group_builder->
+        group_builder.specify "Regex" <| (Widget.from Regex).to_json . should_equal '{"constructor":"Regex_Input"}'
+        group_builder.specify "through resolve_type" <|
+            Widget_Query.resolve_type "Standard.Base.Data.Text.Regex.Regex" . should_equal '{"widget":{"constructor":"Regex_Input"}}'
+        group_builder.specify "Text still answers Text_Input" <|
+            (Widget.from Text).to_json . should_equal '{"constructor":"Text_Input"}'
+
     suite_builder.group "Group D type defaults" group_builder->
         group_builder.specify "Boolean" <| (Widget.from Boolean).to_json . should_equal '{"constructor":"Boolean_Input"}'
         group_builder.specify "Integer, Float and Number" <|

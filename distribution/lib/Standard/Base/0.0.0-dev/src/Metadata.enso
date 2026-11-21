@@ -4,6 +4,7 @@ import project.Data.Numbers.Float
 import project.Data.Numbers.Integer
 import project.Data.Numbers.Number
 import project.Data.Pair.Pair
+import project.Data.Text.Regex.Regex
 import project.Data.Text.Text
 import project.Data.Time.Date.Date
 import project.Data.Time.Date_Time.Date_Time
@@ -154,6 +155,13 @@ type Widget
         - `include_nothing`: Whether `Nothing` is a kind too (listed last).
     Union kinds:(Vector (Pair Text Widget)) include_nothing:Boolean=False
 
+    ## ---
+       private: true
+       ---
+       A regular-expression input: the IDE edits the pattern's text and writes
+       `regex '…'`.
+    Regex_Input
+
     ## Cached JSON Widget
     With_JSON_Cache parent:Widget json:Text
 
@@ -196,6 +204,7 @@ type Widget
         Widget.Union kinds include_nothing ->
             kinds_json = '[' + (kinds.map p-> '[' + p.first.to_json + ',' + p.second.to_json + ']').join ',' + ']'
             '{"constructor":"Union","kinds":' + kinds_json + ',"include_nothing":' + (if include_nothing then "true" else "false") + '}'
+        Widget.Regex_Input -> '{"constructor":"Regex_Input"}'
         Widget.With_JSON_Cache _ json -> json
         _ -> self.to_js_object.to_json
 
@@ -317,3 +326,11 @@ Widget.from (that : Writable_File.type) -> Widget =
 Widget.from (that : Enso_Secret.type) -> Widget =
     _ = that
     Widget.Secret_Browse
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Regex`.
+Widget.from (that : Regex.type) -> Widget =
+    _ = that
+    Widget.Regex_Input
