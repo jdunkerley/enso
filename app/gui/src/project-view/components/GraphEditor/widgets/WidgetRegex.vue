@@ -61,12 +61,13 @@ export function regexScore(input: WidgetInput): Score {
  * The input of a regex argument: `regex '…'` shows the call as written, with the pattern edited in place by `WidgetText`;
  * an unset argument is an empty input that writes `regex '<text>'`.
  *
- * Priority 48: after the kind picker (44) and `WidgetAnyToTarget` (45), before `WidgetFileBrowser` (49)
- * and `WidgetFunction` (200), so the application is drawn by this widget and not as a generic call.
+ * Priority 102: after `WidgetArgumentName` (100), which draws the argument's name in front of it (this
+ * widget draws the call from its parts, so the name would be lost above it), and before
+ * `WidgetFunction` (200), so the application is drawn by this widget and not as a generic call.
  */
 export const widgetDefinition = defineWidget(
   WidgetInput.isAstOrPlaceholder,
-  { priority: 48, score: (props) => regexScore(props.input) },
+  { priority: 102, score: (props) => regexScore(props.input) },
   import.meta.hot,
 )
 </script>
