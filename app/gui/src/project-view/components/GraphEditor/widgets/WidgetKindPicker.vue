@@ -20,8 +20,10 @@ import {
 import { pickerMenuStyles } from '@/components/GraphEditor/widgets/WidgetSelection/styles'
 import {
   ExpressionTag,
+  NestedChoiceTag,
   useExpressionTags,
 } from '@/components/GraphEditor/widgets/WidgetSelection/tags'
+import { underKindPicker } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import DropdownWidget, { type DropdownEntry } from '@/components/widgets/DropdownWidget.vue'
 import { unrefElement, useEvent } from '@/composables/events'
@@ -48,10 +50,12 @@ const isNothing = computed(() => chosen.value?.config === null)
 const icon = computed(() => (chosen.value ? kindIcon(chosen.value) : undefined))
 
 /** The argument's own widget for the chosen kind. The picker is excluded on the same port, so it is not chosen again. */
-const innerInput = computed<WidgetInput>(() => ({
-  ...props.input,
-  dynamicConfig: chosen.value?.config ?? undefined,
-}))
+const innerInput = computed<WidgetInput>(() =>
+  underKindPicker({ ...props.input, dynamicConfig: chosen.value?.config ?? undefined }),
+)
+const nothingInput = computed<WidgetInput>(() =>
+  underKindPicker({ ...props.input, dynamicConfig: undefined }),
+)
 
 const open = ref(false)
 const buttonElement = useTemplateRef<HTMLElement>('buttonElement')
@@ -109,7 +113,12 @@ useEvent(
   { capture: true },
 )
 
-/** A `Single_Choice` kind's first option as the dropdown resolves it: its `requires` imports come with it. */
+/**
+ * The configuration whose options `choiceTags` lists. `useExpressionTags` is how the dropdown turns a
+ * `Single_Choice`'s options into tags that carry their `requires` imports, but it reads a
+ * configuration reactively: `switchTo` points it at the kind being switched to and reads the
+ * tags straight away (the computed re-evaluates on read), so the dropdown's own resolution is reused.
+ */
 const switchTarget = shallowRef<WidgetConfiguration | null>(null)
 const choiceTags = useExpressionTags({
   dynamicConfig: switchTarget,
@@ -156,8 +165,12 @@ function addKindImports(
     )
   } else if (config.kind === 'Single_Choice') {
     switchTarget.value = config
-    const first = choiceTags.value.find((tag) => tag instanceof ExpressionTag)
-    if (first instanceof ExpressionTag) first.resolveExpression(edit, module.value)
+    // The option whose code is written (kindDefaultCode's first, nested options flattened).
+    const code = kindDefaultCode(config)
+    const written = choiceTags.value
+      .flatMap((tag) => (tag instanceof NestedChoiceTag ? tag.flatten() : [tag]))
+      .find((tag) => tag instanceof ExpressionTag && tag.expression === code)
+    if (written instanceof ExpressionTag) written.resolveExpression(edit, module.value)
   }
 }
 
@@ -173,6 +186,32 @@ function switchTo(kind: UnionKind) {
       directInteraction: true,
     })
   })
+}
+
+/** When the list opens, the focus goes to the current kind; the arrow keys then move it (Enter clicks). */
+watch(open, (isOpen) => {
+  if (!isOpen) return
+  void nextTick(() => {
+    const items = menuItems()
+    ;(items.find((item) => item.classList.contains('selected')) ?? items[0])?.focus({
+      preventScroll: true,
+    })
+  })
+})
+
+function menuItems(): HTMLElement[] {
+  return Array.from(menuElement.value?.querySelectorAll<HTMLElement>('button.item') ?? [])
+}
+
+function onMenuKey(e: KeyboardEvent) {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+  e.preventDefault()
+  e.stopPropagation()
+  const items = menuItems()
+  if (items.length === 0) return
+  const current = items.indexOf(document.activeElement as HTMLElement)
+  const step = e.key === 'ArrowDown' ? 1 : -1
+  items[(current + step + items.length) % items.length]?.focus({ preventScroll: true })
 }
 
 function onEntry(entry: KindEntry) {
@@ -211,7 +250,7 @@ export const widgetDefinition = defineWidget(
 </script>
 
 <template>
-  <div class="WidgetKindPicker widgetParent">
+  <div class="WidgetKindPicker widgetParent" @keydown.enter.stop>
     <template v-if="chosen">
       <template v-if="isNothing">
         <button
@@ -228,7 +267,7 @@ export const widgetDefinition = defineWidget(
           <span>Nothing</span>
           <SvgIcon name="arrow_right_head_only" class="kindArrow" />
         </button>
-        <NodeWidget v-else :input="{ ...props.input, dynamicConfig: undefined }" />
+        <NodeWidget v-else :input="nothingInput" />
       </template>
       <template v-else>
         <button
@@ -254,7 +293,12 @@ export const widgetDefinition = defineWidget(
       </template>
     </template>
     <Teleport v-if="open && selected" :to="popoverRoot">
-      <div ref="menuElement" class="menuElement widgetOutOfLayout" :style="floatingStyles">
+      <div
+        ref="menuElement"
+        class="menuElement widgetOutOfLayout"
+        :style="floatingStyles"
+        @keydown="onMenuKey"
+      >
         <DropdownWidget class="outlined" :entries="entries" @clickEntry="onEntry" />
       </div>
     </Teleport>
