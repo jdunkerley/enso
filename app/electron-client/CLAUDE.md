@@ -195,6 +195,11 @@ found by team id (`APPLETEAMID`): `macSigningIdentity` in
 `electron-builder-config.ts` and `resolveSigningIdentity` in
 `macos/lib/keychain.mjs`. Don't hardcode a holder name.
 
+electron-builder signs the loose binaries; the `afterSign` hook
+(`tasks/signArchivesMacOs.ts`) signs the Mach-O files inside the engine's jars,
+which it finds itself rather than from a list (Note [Signing Inside Archives]),
+and re-seals the app before notarizing.
+
 ### Windows installer
 
 The Windows installer is built by electron-builder's NSIS target, not a custom
