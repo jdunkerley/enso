@@ -9,9 +9,15 @@ import {
 } from '$/providers/openedProjects/widgetRegistry'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import RequiredArgumentArrow from '@/components/GraphEditor/widgets/WidgetArgumentName/RequiredArgumentArrow.vue'
+import KindChip from '@/components/GraphEditor/widgets/WidgetKindPicker/KindChip.vue'
+import {
+  KindChipKey,
+  chipReplacesValue,
+} from '@/components/GraphEditor/widgets/WidgetKindPicker/kindChipKey'
 import WidgetMultiSelection from '@/components/GraphEditor/widgets/WidgetMultiSelection.vue'
 import WidgetSelection from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import { injectPortInfo } from '@/providers/portInfo'
+import { injectWidgetTree } from '@/providers/widgetTree'
 import { injectWidgetUsageInfo, usageKeyForInput } from '@/providers/widgetUsageInfo'
 import { Ast } from '@/util/ast'
 import { ApplicationKind, ArgumentInfoKey } from '@/util/callTree'
@@ -21,6 +27,7 @@ import type { SuggestionEntryArgument } from 'ydoc-shared/languageServerTypes/su
 const props = defineProps(widgetProps(widgetDefinition))
 
 const currentProject = useCurrentProject()
+const tree = injectWidgetTree()
 const graph = computed(() => currentProject.graph.value)
 const portInfo = injectPortInfo(true)
 const parentUsageInfo = injectWidgetUsageInfo(true)
@@ -43,9 +50,18 @@ const missing = computed(
 )
 const primary = computed(() => props.nesting < 2)
 
+/** The kind picker's chip, handed down to stand between the name and the value. */
+const kindChip = computed(() => props.input[KindChipKey])
+const showValue = computed(
+  () =>
+    showArgumentValue.value &&
+    !(kindChip.value && chipReplacesValue(kindChip.value, tree.showDetails)),
+)
+
 const innerInput = computed(() => ({
   ...props.input,
   [ArgumentNameShownKey]: true,
+  [KindChipKey]: undefined,
 }))
 
 const childWidgetRef = useTemplateRef<typeof NodeWidget>('childWidgetRef')
@@ -82,6 +98,11 @@ function showsArgumentName(
   return input[ArgumentInfoKey].appKind === ApplicationKind.Prefix
 }
 
+/** Whether `WidgetArgumentName` draws this input's parameter name (its own score). */
+export function argumentNameShown(input: WidgetInput): boolean {
+  return hasKnownArgumentName(input) && showsArgumentName(input)
+}
+
 export const widgetDefinition = defineWidget(
   hasKnownArgumentName,
   {
@@ -106,7 +127,8 @@ export const ArgumentNameShownKey: unique symbol = Symbol.for('WidgetInput:Argum
         props.input[ArgumentInfoKey].info.name
       }}</span>
     </span>
-    <NodeWidget v-if="showArgumentValue" ref="childWidgetRef" :input="innerInput" allowEmpty />
+    <KindChip v-if="kindChip" v-bind="kindChip" />
+    <NodeWidget v-if="showValue" ref="childWidgetRef" :input="innerInput" allowEmpty />
   </div>
 </template>
 

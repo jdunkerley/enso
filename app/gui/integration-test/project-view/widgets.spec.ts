@@ -2429,6 +2429,9 @@ test.describe('Kind picker', () => {
   const changeKind = (node: Locator, name: string) =>
     node.getByRole('button', { name: `${name}, change kind` })
   const list = (page: Page) => new DropDownLocator(page.locator('body'))
+  /** The argument's name, and the chip directly after it (in front of the value). */
+  const argumentName = (node: Locator) => node.locator('.WidgetArgumentName > .name')
+  const chipAfterName = (node: Locator) => node.locator('.WidgetArgumentName > .name + .KindChip')
 
   test('Integer | Nothing: unselected shows only the icon, which does not open anything', async ({
     editorPage,
@@ -2441,6 +2444,8 @@ test.describe('Kind picker', () => {
       unionMethod('int_nothing', `${INTEGER} | ${NOTHING}`),
     )
     await expect(node.locator('.kindIcon')).toBeVisible()
+    await expect(argumentName(node)).toHaveText('value')
+    await expect(chipAfterName(node)).toHaveCount(1)
     await expect(node.getByRole('button', { name: /change kind/ })).toHaveCount(0)
     await node.locator('.kindIcon').click({ force: true })
     await expect(node).toBeSelected()
@@ -2468,9 +2473,16 @@ test.describe('Kind picker', () => {
     await dropdown.clickOption('Nothing')
     await expect(changeKind(node, 'Nothing')).toBeVisible()
     await expect(node.locator('.kindIcon, .kindSymbol')).toHaveCount(0)
+    // The name stays, and the Nothing button stands in for the value right after it.
+    await expect(argumentName(node)).toHaveText('value')
+    await expect(
+      chipAfterName(node).getByRole('button', { name: 'Nothing, change kind' }),
+    ).toBeVisible()
+    await expect(node.locator('.WidgetArgumentName')).toHaveText(/^\s*value\s*Nothing\s*$/)
     expect(await moduleCode(page)).toContain('intn = Data.int_nothing Nothing\n')
     await actions.clickAtBackground(page)
     await expect(node).not.toBeSelected()
+    await expect(argumentName(node)).toHaveText('value')
     await expect(node.getByRole('button', { name: /change kind/ })).toHaveCount(0)
     await expect(node.locator('.WidgetKindPicker')).toContainText('Nothing')
     await expect(node.locator('.kindIcon')).toHaveCount(0)
@@ -2518,6 +2530,7 @@ test.describe('Kind picker', () => {
     const node = locate.graphNodeByBinding(page, 'textn')
     await actions.addArgument(page, node, 'value')
     await expect(changeKind(node, 'Nothing')).toBeVisible()
+    await expect(argumentName(node)).toHaveText('value')
     expect(await moduleCode(page)).toContain('textn = Data.text_nothing value=Nothing\n')
     await changeKind(node, 'Nothing').click()
     await list(page).clickOption('Text')
@@ -2565,6 +2578,8 @@ test.describe('Kind picker', () => {
     await list(page).clickOption('Regex')
     await expect(changeKind(node, 'Regex')).toBeVisible()
     expect(await moduleCode(page)).toContain("textre = Data.text_regex (regex '.*')\n")
+    await expect(argumentName(node)).toHaveText('value')
+    await expect(chipAfterName(node)).toHaveCount(1)
     // The node still shows the code, not a stand-in for it.
     await expect(node).toContainText(/regex\W*\.\*/)
     const pattern = node.locator('.WidgetRegex').getByTestId('widget-text-content')
