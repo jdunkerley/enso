@@ -9,6 +9,7 @@ import {
 } from '$/providers/openedProjects/widgetRegistry'
 import DateTimeMenu from '@/components/GraphEditor/widgets/WidgetDateTime/DateTimeMenu.vue'
 import {
+  DATE_TIME_CALLS,
   dateTimeExpressionCode,
   keptDateTimeArguments,
   parseDateTimeExpression,
@@ -20,10 +21,7 @@ import {
   unparenthesisedCode,
 } from '@/components/GraphEditor/widgets/WidgetPicker/parentheses'
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
-import {
-  isWholeNodeCall,
-  type CallShapes,
-} from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
+import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
@@ -68,8 +66,6 @@ function choose(picked: DateTimeChoice, done: () => void) {
 </script>
 
 <script lang="ts">
-const DATE_TIME_CALLS: CallShapes = { bare: ['Date_Time.now'], applied: ['Date_Time.new'] }
-
 function isDateTimeTyped(input: WidgetInput): boolean {
   return input.dynamicConfig?.kind === 'Date_Time_Input'
 }

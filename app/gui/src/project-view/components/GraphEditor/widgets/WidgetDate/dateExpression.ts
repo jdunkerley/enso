@@ -2,6 +2,7 @@
  * @file The date widget's expression <-> choice mapping: which code a value holds as a date, and the code a choice writes. Framework-free, so it is
  * unit-tested alone (`docs/superpowers/specs/2026-11-15-date-widget-design.md`).
  */
+import type { CallShapes } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 
 /** The qualified name of the `Date` type, which a typed argument's `reprType` or `expectedType` has. */
 export const DATE_TYPE = 'Standard.Base.Data.Time.Date.Date'
@@ -117,4 +118,10 @@ export function resolveChoice(choice: DateChoice, today: YearMonthDay): YearMont
 /** The local date of `now`. */
 export function localToday(now: Date = new Date()): YearMonthDay {
   return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() }
+}
+
+/** The whole-node calls the picker draws itself (see `isCallOfShape`). */
+export const DATE_CALLS: CallShapes = {
+  bare: ['Date.today', 'Date.yesterday', 'Date.tomorrow'],
+  applied: ['Date.new'],
 }
