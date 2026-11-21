@@ -7,7 +7,7 @@ import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase
 import { MODULE_CALL } from '@/util/moduleCall'
 import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
 import type { Result } from 'enso-common/src/utilities/data/result'
-import { reactive } from 'vue'
+import { reactive, toRaw } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { z } from 'zod'
 import { type WidgetConfiguration, widgetConfigurationSchema } from './configuration'
@@ -37,7 +37,15 @@ const answerSchema = z.union([
   z.object({ error: z.object({ step: z.string(), message: z.string() }) }),
 ])
 
-type CacheEntry = { state: 'pending' } | { state: 'done'; config: WidgetConfiguration | undefined }
+/** First delay before a failed query is asked again; doubles per failure of the same type. */
+export const RETRY_DELAY_MS = 1000
+/** The longest delay between two asks of a failing type. */
+export const MAX_RETRY_DELAY_MS = 30000
+
+type CacheEntry =
+  | { state: 'pending' }
+  | { state: 'retry' }
+  | { state: 'done'; config: WidgetConfiguration | undefined }
 
 /** Whether `Widget.from` converts the type `typeName`. Keys are built as `conversionSources` does. */
 export function hasWidgetConversion(db: SuggestionDb, typeName: string): boolean {
@@ -48,30 +56,59 @@ export function hasWidgetConversion(db: SuggestionDb, typeName: string): boolean
 }
 
 /**
- * The default widgets of types. Each type is asked of the engine at most once while the instance
- * lives (the opened project's session); an answer, including "none", is kept.
+ * The default widgets of types. Each type is asked of the engine until it answers, once while the
+ * instance lives (the opened project's session); an answer, including "none", is kept.
+ *
+ * A failed query (no result yet, a timeout, a rejection) is retried after a delay that doubles up
+ * to {@link MAX_RETRY_DELAY_MS}. The failure is recorded without notifying dependents, so a render
+ * that called {@link lookup} does not run again at once and re-ask in a loop; the timer deletes
+ * the entry reactively, and the dependents then look the type up again.
  */
 export class TypeDefaults {
   private readonly cache = reactive(new Map<string, CacheEntry>())
+  private readonly delays = new Map<string, number>()
+  private readonly timers = new Set<ReturnType<typeof setTimeout>>()
 
   /** Constructor. */
   constructor(
     private readonly hasDefault: (typeName: string) => boolean,
     private readonly query: (frame: ExternalId, code: string) => Promise<Result<unknown> | null>,
-    private readonly projectId: string = '',
+    private readonly projectId: string,
   ) {}
 
-  /** The type's default widget: `undefined` while unknown or when it has none. Reactive. */
+  /**
+   * The type's default widget: `undefined` while unknown or when it has none. Reactive. It may
+   * start the query of a type not asked yet, which is safe inside a computed or a render.
+   */
   lookup(reprType: string | undefined, frame: ExternalId): WidgetConfiguration | undefined {
     const type = defaultSourceType(reprType)
     if (type == null || !this.hasDefault(type)) return undefined
     const entry = this.cache.get(type)
     if (entry == null) {
-      this.cache.set(type, { state: 'pending' })
+      // Not through the proxy: the caller is still reading, and `done` notifies it.
+      toRaw(this.cache).set(type, { state: 'pending' })
       void this.ask(type, frame)
       return undefined
     }
     return entry.state === 'done' ? entry.config : undefined
+  }
+
+  /** Stop the pending retries. */
+  dispose() {
+    this.timers.forEach(clearTimeout)
+    this.timers.clear()
+  }
+
+  private retryLater(type: string) {
+    // Not through the reactive proxy: dependents must not run before the timer fires.
+    toRaw(this.cache).set(type, { state: 'retry' })
+    const delay = this.delays.get(type) ?? RETRY_DELAY_MS
+    this.delays.set(type, Math.min(delay * 2, MAX_RETRY_DELAY_MS))
+    const timer = setTimeout(() => {
+      this.timers.delete(timer)
+      this.cache.delete(type)
+    }, delay)
+    this.timers.add(timer)
   }
 
   private async ask(type: string, frame: ExternalId) {
@@ -81,15 +118,12 @@ export class TypeDefaults {
     } catch {
       result = null
     }
-    if (result == null) {
-      // No answer yet (no frame, timeout): the next lookup asks again.
-      this.cache.delete(type)
+    // No answer yet (no frame, subdoc not synced), a timeout or a failed slot: ask again later.
+    if (result == null || !result.ok) {
+      this.retryLater(type)
       return
     }
-    if (!result.ok) {
-      this.cache.set(type, { state: 'done', config: undefined })
-      return
-    }
+    this.delays.delete(type)
     const parsed = answerSchema.safeParse(result.value)
     if (!parsed.success) {
       reportWidgetSchemaMismatch(

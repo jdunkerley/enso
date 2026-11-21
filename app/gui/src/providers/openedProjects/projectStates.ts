@@ -207,6 +207,7 @@ export function useProjectStates() {
         (frame, code) => store.queuedExecuteExpression(frame, code, 5000),
         project.info.id,
       )
+      onScopeDispose(() => typeDefaults.dispose())
       const projectId = project.info.id
       localVersioning.watchProject(projectId, () => store.flushModules())
       onScopeDispose(() => localVersioning.unwatchProject(projectId))
