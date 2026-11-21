@@ -77,7 +77,6 @@
     "typecheck": "tsc --noEmit",
     "build": "vite-node bundle.ts",
     "dist": "vite-node dist.ts",
-    "macos:build-dmg": "node macos/build-dmg.mjs",
     "lint": "eslint . --cache --max-warnings=0",
     "test:unit": "vitest run",
     "ide-integration-test": "playwright test",

@@ -593,12 +593,7 @@ const config = [
     },
   },
   {
-    files: [
-      'app/electron-client/esbuild.config.mjs',
-      'app/electron-client/macos/*.cjs',
-      'app/electron-client/macos/*.mjs',
-      'app/electron-client/macos/lib/*.mjs',
-    ],
+    files: ['app/electron-client/esbuild.config.mjs'],
     languageOptions: {
       parserOptions: {
         projectService: false,
