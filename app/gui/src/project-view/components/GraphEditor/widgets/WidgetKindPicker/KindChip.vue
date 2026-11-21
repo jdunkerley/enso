@@ -208,12 +208,12 @@ function clearPendingFocus() {
   gap: 1px;
   border: 0;
   border-radius: var(--node-port-border-radius);
-  background: var(--color-widget);
-  color: var(--color-node-text);
+  background: rgba(0 0 0 / 0.22);
+  color: white;
   font: inherit;
   cursor: pointer;
   &:hover {
-    background: var(--color-widget-selected);
+    background: rgba(0 0 0 / 0.34);
   }
 }
 
