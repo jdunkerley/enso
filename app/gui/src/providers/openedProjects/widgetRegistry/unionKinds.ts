@@ -74,7 +74,8 @@ export function kindLabel(typeName: string): string {
  * - a member A is dropped when another member B with a widget has `converts(A, B)`; of two members
  *   converting to each other the earlier stays; if every member would go, the first stays;
  * - members with deep-equal widgets collapse into the first;
- * - every remaining non-Nothing kind a `Single_Choice` → one merged `Single_Choice` (`Nothing` an option);
+ * - every remaining non-Nothing kind a `Single_Choice` → one merged `Single_Choice` (`Nothing` an option;
+ *   it keeps the first kind's other fields);
  * - one kind (Nothing not counted unless present) → that kind's widget alone, `undefined` if it is only Nothing;
  * - otherwise a `Union` (`Nothing` last).
  */

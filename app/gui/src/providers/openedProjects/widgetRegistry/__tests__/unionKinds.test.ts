@@ -37,8 +37,10 @@ const textInput = { kind: 'Text_Input' } as const
 const numeric = { kind: 'Numeric_Input' } as const
 const regex = { kind: 'Regex_Input' } as const
 const secret = { kind: 'Secret_Browse' } as const
+/* eslint-disable camelcase */
 const file = { kind: 'File_Browse', existing_only: true, file_types: [] } as const
 const save = { kind: 'File_Browse', existing_only: false, file_types: [] } as const
+/* eslint-enable camelcase */
 const choice = (v: string) => ({ value: v, label: v, parameters: [] })
 const locales = { kind: 'Single_Choice', values: [choice('..Default')] } as const
 const cases = { kind: 'Single_Choice', values: [choice('..Upper'), choice('..Lower')] } as const
@@ -194,4 +196,8 @@ test('pending while any member is pending', () => {
 
 test('Nothing alone has no widget', () => {
   expect(composeUnion([nothing], converts)).toBeUndefined()
+})
+
+test('unionMembers splits only at the top level', () => {
+  expect(unionMembers('A | (B | C)')).toEqual(['A', 'B | C'])
 })
