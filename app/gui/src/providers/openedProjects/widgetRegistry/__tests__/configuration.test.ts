@@ -142,6 +142,7 @@ test.each(['Date_Input', 'Date_Time_Input', 'Time_Input'] as const)('parses %s',
   expect(parsed).toEqual({ kind })
 })
 
+/* eslint-disable camelcase */
 test('parses File_Browse with an action', () => {
   const parsed = widgetConfigurationSchema.parse({
     constructor: 'File_Browse',
@@ -160,3 +161,4 @@ test('parses File_Browse without an action', () => {
   })
   expect(parsed).toMatchObject({ kind: 'File_Browse', existing_only: true })
 })
+/* eslint-enable camelcase */

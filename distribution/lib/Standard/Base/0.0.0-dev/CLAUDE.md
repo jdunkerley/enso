@@ -88,7 +88,15 @@ result = "not a number".parse_integer.catch _-> 0
   arguments with no default always show. The compiler's `ArgumentDisplayCheck`
   validates it and `lintEnso` fails the build on a mistake.
 - **Type defaults.** A type's default widget is `Widget.from (that : X.type) …`
-  in `X`'s module. Extra defaulted arguments are tweaks
+  in `X`'s own module, or, for the core types whose modules should not depend on
+  the widget library, in `Metadata.enso` (`Widget`'s module). Group D, the types
+  the GUI widgets now choose from, lives in `Metadata.enso`: Boolean, Integer,
+  Float, Number, Text, `Date`, `Date_Time`, `Time_Of_Day` (`Date_Input`,
+  `Date_Time_Input`, `Time_Input`), `File`, `Writable_File` and `Enso_Secret`.
+  Prefer the type's own module for any other type. **Annotate an argument (`?` /
+  `@`) only to override its type default**: an annotation that repeats the
+  default is redundant and was removed from the standard library. Extra
+  defaulted arguments are tweaks
   (`Widget.from Filter_Condition include_text=False`).
   `Standard.Base.Metadata.Widget_Query.resolve_type` answers it for the GUI
   (`{"widget":…}`, `{"widget":null}` for a type with no conversion, or an

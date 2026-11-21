@@ -538,6 +538,7 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
 let mockWidgetConfigurations: Map<string, Uint8Array> = new Map(initialMockWidgetConfigurations)
 
 const typeBase = 'Standard.Base.Data'
+/* eslint-disable camelcase */
 const fileBrowse = {
   constructor: 'File_Browse',
   existing_only: true,
@@ -565,6 +566,7 @@ const initialMockTypeDefaults: Record<string, unknown> = {
   'Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret': { widget: { constructor: 'Secret_Browse' } },
 }
 
+/* eslint-enable camelcase */
 let mockTypeDefaults: Map<string, unknown> = new Map(Object.entries(initialMockTypeDefaults))
 
 /** The types `resolve_type` was asked about, in order, since the last reset. */

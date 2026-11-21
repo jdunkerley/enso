@@ -2,6 +2,9 @@
 
 #### Enso IDE
 
+- [Date, time and number pickers and other widgets now come from the argument's
+  type in the standard library, so they also appear inside nested calls and for
+  optional arguments such as `Integer | Nothing`.][912]
 - [Arguments a component always shows appear on its node at once, and a library
   can show an argument only while its node is selected][896]
 - [A plug icon in the left rail, above Settings, shows whether AI agents (MCP)
@@ -594,6 +597,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[912]: https://github.com/jdunkerley/enso/pull/912
 [903]: https://github.com/jdunkerley/enso/pull/903
 [900]: https://github.com/jdunkerley/enso/pull/900
 [896]: https://github.com/jdunkerley/enso/pull/896

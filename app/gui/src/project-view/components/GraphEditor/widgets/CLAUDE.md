@@ -54,15 +54,37 @@ render only its own slot content. The icon is already on the row, drawn by
 - `WidgetIcon.vue` — owns the `DisplayIcon` symbol. Other widgets attach to it
   via `input[DisplayIcon] = { icon, showContents?, noGap? }` to request an
   inline icon in front of a child widget.
-- **Widgets choose on the configuration, not the declared type.** An argument
-  with no annotation takes its type's default widget (`TypeDefaults`) as
-  `dynamicConfig`, and the Date, Time_Of_Day, Date_Time, Boolean, number and
-  text widgets score on its `kind` (`Date_Input`, `Time_Input`,
-  `Date_Time_Input`, `Boolean_Input`, `Numeric_Input`, `Text_Input`).
-  `WidgetSelection` keeps an argument's own `tagValues` dropdown under any of
-  those default kinds. `WidgetFileBrowser` still also matches a declared type
-  that contains `File`, `Writable_File` or `Enso_Secret`, and `WidgetVector` a
-  bare `Vector`.
+- **Widgets choose on the configuration, not the declared type.** An argument's
+  configuration (`WidgetInput.dynamicConfig`) is chosen in this order: (1) its
+  own `@` annotation, or one inherited from the parent (a choice's constructor
+  argument, a vector's items); (2) otherwise its type's default widget, asked of
+  the engine by `TypeDefaults`
+  (`providers/openedProjects/widgetRegistry/typeDefaults.ts`:
+  `Widget_Query.resolve_type`, once per type per session, cached; the answer is
+  marked `isTypeDefault`); (3) with neither, literals and an argument's
+  `tagValues` decide. The Date, Time_Of_Day, Date_Time, Boolean, number and text
+  widgets score on the configuration's `kind` (`Date_Input`, `Time_Input`,
+  `Date_Time_Input`, `Boolean_Input`, `Numeric_Input`, `Text_Input`), never on
+  `expectedType` or `reprType`; the exceptions are `WidgetFileBrowser`'s
+  transitional rule (it also matches a declared type that contains `File`,
+  `Writable_File` or `Enso_Secret`, and its behaviour logic reads the type) and
+  `WidgetVector` (a bare `Vector`). Rulings to keep in mind:
+  - **Until PR 4, an argument's own `tagValues` win over a type default**,
+    decided by origin (`isTypeDefault`), not by kind: an explicit annotation
+    beats `tagValues`, a type default does not (`WidgetSelection`). This is
+    today's behaviour, kept on purpose; a departure from the spec's literal
+    order.
+  - **Union types use the first member that is not `Nothing`**
+    (`Integer | Nothing` asks about `Integer`; `Text | <constructors>` asks
+    about `Text`). This is interim, until PR 4 replaces it.
+  - **A literal of another kind keeps its own widget** over a type default (an
+    `Integer`-first union holding a text literal shows the text input).
+  - **A query runs in an executed frame**: the caller's expression when it has a
+    computed value, otherwise any expression of the project that has one (the
+    answer does not depend on the frame). Failed or stale frames back off and
+    are retried choosing a frame again. Until some frame executes, an
+    un-annotated argument shows no widget; the first appearance of a type costs
+    one round trip.
 - `WidgetDate.vue` — a dropdown wrapper for an input configured `Date_Input`
   (vector items included; nothing else untyped) and for a whole node that is
   `Date.today`/`yesterday`/`tomorrow` or `Date.new` with any arguments
