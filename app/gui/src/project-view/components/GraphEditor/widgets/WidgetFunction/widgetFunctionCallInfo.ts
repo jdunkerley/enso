@@ -6,6 +6,7 @@ import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
 import { entryIsAnnotatable } from '$/providers/openedProjects/suggestionDatabase/entry'
 import type { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
+import type { SchemaCache } from '$/providers/openedProjects/widgetRegistry/columnPickers'
 import {
   functionCallFromAnswer,
   pending,
@@ -42,6 +43,7 @@ export function useWidgetFunctionCallInfo(
   projectNames: ToValue<ProjectNameStore>,
   groups: ToValue<DeepReadonly<GroupInfo[]>>,
   typeDefaults?: ToValue<Pick<TypeDefaults, 'lookup'> | undefined>,
+  schemaCache?: ToValue<SchemaCache | undefined>,
 ) {
   const methodCallInfo = computed(() => {
     const _project = toValue(project)
@@ -202,7 +204,7 @@ export function useWidgetFunctionCallInfo(
   const widgetConfiguration = computed(() => {
     const parsed = parsedAnswer.value
     if (parsed?.kind === 'answer')
-      return functionCallFromAnswer(parsed.answer, inheritedConfig.value)
+      return functionCallFromAnswer(parsed.answer, inheritedConfig.value, toValue(schemaCache))
     const parameters: FunctionCall['parameters'] = new Map(inheritedConfig.value?.parameters ?? [])
     annotatedArguments.value?.forEach((name) => {
       if (parameters.get(name) == null) parameters.set(name, pending())

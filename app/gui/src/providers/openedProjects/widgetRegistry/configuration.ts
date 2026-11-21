@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { expandColumnPickers, type SchemaCache } from './columnPickers'
 
 /**
  * Intermediate step in the parsing process, when we rename `constructor` field to `kind`.
@@ -372,16 +373,24 @@ export const widgetQueryAnswerSchema = z.object({
 })
 export type WidgetQueryAnswer = z.infer<typeof widgetQueryAnswerSchema>
 
-/** {@link functionCallConfiguration} of an answer: its widgets as parameters, its errors apart. */
+/**
+ * {@link functionCallConfiguration} of an answer: its widgets as parameters, its errors apart.
+ * Column picker references are expanded from the answer's columns (through `cache`, if given).
+ */
 export function functionCallFromAnswer(
   answer: WidgetQueryAnswer,
   inherited?: FunctionCall,
+  cache?: SchemaCache,
 ): FunctionCall {
   const parameters: ArgumentWidgetConfiguration[] = []
   const errors = new Map<string, WidgetQueryError>()
   for (const [name, result] of answer.arguments) {
     if ('error' in result) errors.set(name, result.error)
-    else parameters.push([name, result.widget])
+    else
+      parameters.push([
+        name,
+        result.widget && expandColumnPickers(result.widget, answer.columns, cache),
+      ])
   }
   const call = functionCallConfiguration(parameters, inherited)
   return errors.size > 0 ? { ...call, errors } : call

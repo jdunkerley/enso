@@ -87,6 +87,33 @@ describe('column pickers in an answer', () => {
 })
 
 describe('functionCallFromAnswer', () => {
+  test('expands column pickers from the answer columns', () => {
+    const answer = widgetQueryAnswerSchema.parse({
+      arguments: [
+        [
+          'columns',
+          {
+            widget: {
+              constructor: 'Column_Names',
+              kinds: [],
+              from: null,
+              regex: false,
+              by_type: false,
+            },
+          },
+        ],
+      ],
+      columns: { '': { names: ['A', 'B'], kinds: ['Textual', 'Numeric'], type_names: ['', ''] } },
+    })
+    expect(functionCallFromAnswer(answer).parameters.get('columns')).toEqual({
+      kind: 'Multiple_Choice',
+      values: [
+        { label: 'A', value: "'A'", parameters: [] },
+        { label: 'B', value: "'B'", parameters: [] },
+      ],
+    })
+  })
+
   test('keeps the errors apart from the widgets', () => {
     const answer = widgetQueryAnswerSchema.parse({
       arguments: [

@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import { parseWithSpans } from '$/providers/openedProjects/graph/__tests__/parseWithSpans'
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegistry'
@@ -28,7 +29,7 @@ import type { MethodPointer } from '@/util/methodPointer'
 import type { Opt } from 'enso-common/src/utilities/data/opt'
 import { Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { expect, test, vi } from 'vitest'
-import { effectScope, nextTick, ref, toValue, type Ref, type WatchSource } from 'vue'
+import { effectScope, nextTick, ref, shallowRef, toValue, type Ref, type WatchSource } from 'vue'
 import { SourceRange } from 'ydoc-shared/util/data/text'
 
 vi.mock('$/providers/engineLogAppend', () => ({
@@ -240,4 +241,33 @@ test('an argument takes its type default, asked in the frame of the call itself'
   assert(application instanceof ArgumentApplication)
   expect(application.argument.toWidgetInput().dynamicConfig).toEqual({ kind: 'Date_Input' })
   expect(lookup).toHaveBeenCalledWith(DATE, info.callExternalId)
+})
+
+test('an answer expands its column pickers from the columns it sends', () => {
+  // The engine's data is not deep-reactive (a deep proxy cannot be `structuredClone`d).
+  const data = shallowRef<Result<unknown> | null>(null)
+  const info = setUpCallInfo('local.Project.Type.method val1 val2', method, data)
+  data.value = Ok({
+    arguments: [
+      [
+        'arg',
+        {
+          widget: {
+            constructor: 'Column_Name',
+            kinds: [],
+            from: null,
+            expression: false,
+            reference: false,
+            extra: [],
+            columns_first: false,
+          },
+        },
+      ],
+    ],
+    columns: { '': { names: ['A'], kinds: ['Textual'], type_names: ['Char'] } },
+  })
+  expect(info.widgetConfiguration.value.parameters.get('arg')).toEqual({
+    kind: 'Single_Choice',
+    values: [{ label: 'A', value: "'A'", parameters: [] }],
+  })
 })
