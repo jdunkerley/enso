@@ -69,7 +69,6 @@ type Excel_Format
         - `xls_format`: The Excel file format. XLSX for Excel 2007 and later, XLS for
            Excel 97-2003. `Infer` will attempt to deduce this from the extension of the filename.
     @sheet (Text_Input)
-    @row_limit (Widget.from Rows_To_Read)
     Sheet (sheet:(Integer|Text)=1) (headers:Headers=..Detect_Headers) (skip_rows:Integer=0) (row_limit:Rows_To_Read=..All_Rows) (xls_format:Excel_File_Format|Infer=Infer)
 
     ## Reads a range from an Excel file as a `Table`.
@@ -86,7 +85,6 @@ type Excel_Format
         - `xls_format`:  The Excel file format. XLSX for Excel 2007 and later, XLS for
            Excel 97-2003. `Infer` will attempt to deduce this from the extension of the filename.
     @address Text_Input
-    @row_limit (Widget.from Rows_To_Read)
     Range (address:(Text|Excel_Range)=(Missing_Argument.throw 'address')) (headers:Headers=..Detect_Headers) (skip_rows:Integer=0) (row_limit:Rows_To_Read=..All_Rows) (xls_format : Excel_File_Format | Infer = Infer)
 
     ## ---

@@ -10,7 +10,6 @@ import project.Data.Pair.Pair
 import project.Error.Error
 import project.Errors.Deprecated.Deprecated
 import project.Errors.Illegal_Argument.Illegal_Argument
-import project.Metadata.Widget
 import project.Nothing.Nothing
 import project.Panic.Panic
 import project.Warning.Warning
@@ -1260,7 +1259,6 @@ type Decimal
              # => 123,456,789.88"
        ```
     @format make_number_format_selector
-    @locale (Widget.from Locale)
     format : Text -> Locale -> Text
     format self format:Text="" locale:Locale=Locale.default -> Text =
         symbols = DecimalFormatSymbols.new locale.java_locale

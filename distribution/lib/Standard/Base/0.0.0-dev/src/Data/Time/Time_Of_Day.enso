@@ -357,7 +357,6 @@ type Time_Of_Day
        date_time = time.to_date_time (Date.new 2020 1 1) Time_Zone.utc
        # → 2020-01-01 12:30:00Z[UTC]
        ```
-    @zone (Widget.from Time_Zone)
     to_date_time self (date : Date) (zone : Time_Zone = Time_Zone.system) -> Date_Time =
         Time_Utils.make_zoned_date_time date self zone
 

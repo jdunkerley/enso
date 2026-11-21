@@ -215,7 +215,6 @@ type Column
           the comparison is performed pairwise between corresponding elements of
           `self` and `other`.
         - `locale`: The locale to use for the case-insensitive comparison.
-    @locale (Widget.from Locale)
     equals_ignore_case self (other : Column | Any) locale:Locale=Locale.default -> Column & Any =
         self.implementation.equals_ignore_case self other locale
 
@@ -1899,7 +1898,6 @@ type Column
        ### `Value_Type.Boolean` format strings
        Format strings for `Boolean` consist of two values that represent true and
        false, separated by a `|`.
-    @locale (Widget.from Locale)
     @format (self-> Widget_Helpers.make_format_chooser_for_type self.value_type)
     format self (format : Text | Date_Time_Formatter | Column = "") locale:Locale=Locale.default -> Column & Any ! Illegal_Argument =
         self.implementation.format self format locale
@@ -2274,7 +2272,6 @@ type Column
         - `max_rows`: specifies the maximum number of rows to read. By default,
           it will return all rows for in-memory columns, but in Database it will
           read up to 1000 rows and warn if there are more.
-    @max_rows (Widget.from Rows_To_Read)
     read self (max_rows : Rows_To_Read = default_row_limit_for_read self) -> Column & Any =
         self.implementation.read self max_rows
 

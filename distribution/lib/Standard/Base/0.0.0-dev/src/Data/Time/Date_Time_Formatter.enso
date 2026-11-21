@@ -12,7 +12,6 @@ import project.Internal.Time.Format.Analyzer.Analyzer
 import project.Internal.Time.Format.As_Java_Formatter_Interpreter
 import project.Internal.Time.Format.Parser
 import project.Internal.Time.Format.Tokenizer.Tokenizer
-import project.Metadata.Widget
 import project.Panic.Panic
 from project.Function import all
 from project.Nothing import all
@@ -136,7 +135,6 @@ type Date_Time_Formatter
        - V: Time zone ID (same as T).
        Some parts, like fractions of a second may not be required. The square
        brackets `[]` can be used to surround such optional sections.
-    @locale (Widget.from Locale)
     from_simple_pattern : Text -> Locale -> Date_Time_Formatter ! Date_Time_Format_Parse_Error
     from_simple_pattern pattern:Text='' locale:Locale=Locale.default =
         used_locale = if locale == Locale.default then Locale.us else locale
@@ -190,7 +188,6 @@ type Date_Time_Formatter
        ```
              Date.parse (Date_Time_Formatter.from_iso_week_date_pattern "YYYY-'W'WW") "1978-W01" == (Date.new 1978 01 02)
        ```
-    @locale (Widget.from Locale)
     from_iso_week_date_pattern : Text -> Locale -> Date_Time_Formatter ! Date_Time_Format_Parse_Error
     from_iso_week_date_pattern pattern:Text locale:Locale=Locale.default =
         used_locale = if locale == Locale.default then Locale.us else locale
