@@ -6,6 +6,7 @@ import { reportWidgetSchemaMismatch } from '$/providers/engineLogAppend'
 import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import { MODULE_CALL } from '@/util/moduleCall'
 import { parseAbsoluteProjectPathRaw } from '@/util/projectPath'
+import { pauseTracking, resetTracking } from '@vue/reactivity'
 import type { Result } from 'enso-common/src/utilities/data/result'
 import { reactive, toRaw } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
@@ -42,6 +43,22 @@ export const RETRY_DELAY_MS = 1000
 /** The longest delay between two asks of a failing type. */
 export const MAX_RETRY_DELAY_MS = 30000
 
+/**
+ * The frame to ask a type's query in: `preferred` if `isComputed`, else the first of `candidates`
+ * (the expressions of the graph shown) that is; never one of `avoid`.
+ */
+export function chooseComputedFrame(
+  preferred: ExternalId,
+  avoid: ReadonlySet<ExternalId>,
+  candidates: Iterable<ExternalId>,
+  isComputed: (frame: ExternalId) => boolean,
+): ExternalId | undefined {
+  const usable = (frame: ExternalId) => !avoid.has(frame) && isComputed(frame)
+  if (usable(preferred)) return preferred
+  for (const frame of candidates) if (usable(frame)) return frame
+  return undefined
+}
+
 const typeDefaultConfigs = new WeakSet<object>()
 
 /**
@@ -70,7 +87,8 @@ export function hasWidgetConversion(db: SuggestionDb, typeName: string): boolean
  * instance lives (the opened project's session); an answer, including "none", is kept.
  *
  * The query goes to the first caller's frame if the engine has computed it, otherwise to any
- * computed expression (`pickFrame`); with none, it is a failed query. Every retry picks again.
+ * computed expression (`pickFrame`); with none, it is a failed query. Every retry picks again,
+ * avoiding the frames that failed the type before (all of them once none is left).
  *
  * A failed query (no result yet, a timeout, a rejection) is retried after a delay that doubles up
  * to {@link MAX_RETRY_DELAY_MS}. The failure is recorded without notifying dependents, so a render
@@ -81,16 +99,22 @@ export class TypeDefaults {
   private readonly cache = reactive(new Map<string, CacheEntry>())
   private readonly delays = new Map<string, number>()
   private readonly timers = new Set<ReturnType<typeof setTimeout>>()
+  /** The frames each type's query failed in, since its last answer. */
+  private readonly failedFrames = new Map<string, Set<ExternalId>>()
 
   /** Constructor. */
   constructor(
     private readonly hasDefault: (typeName: string) => boolean,
     private readonly query: (frame: ExternalId, code: string) => Promise<Result<unknown> | null>,
     /**
-     * The frame to ask in: `preferred` when the engine has computed it, else any expression it
-     * has; `undefined` when there is none.
+     * The frame to ask in, not one of `avoid` (frames that just failed this type): `preferred`
+     * when the engine has computed it, else another computed expression; `undefined` when there
+     * is none.
      */
-    private readonly pickFrame: (preferred: ExternalId) => ExternalId | undefined,
+    private readonly pickFrame: (
+      preferred: ExternalId,
+      avoid: ReadonlySet<ExternalId>,
+    ) => ExternalId | undefined,
     private readonly projectId: string,
   ) {}
 
@@ -129,20 +153,41 @@ export class TypeDefaults {
     this.timers.add(timer)
   }
 
+  /** Picks the frame without making the calling computed depend on what it reads. */
+  private chooseFrame(type: string, preferred: ExternalId): ExternalId | undefined {
+    const failed = this.failedFrames.get(type) ?? new Set<ExternalId>()
+    pauseTracking()
+    try {
+      const frame = this.pickFrame(preferred, failed)
+      if (frame != null || failed.size === 0) return frame
+      // Every candidate failed: start over rather than never ask again.
+      this.failedFrames.delete(type)
+      return this.pickFrame(preferred, new Set())
+    } finally {
+      resetTracking()
+    }
+  }
+
   private async ask(type: string, preferredFrame: ExternalId) {
     let result: Result<unknown> | null
+    let frame: ExternalId | undefined
     try {
-      const frame = this.pickFrame(preferredFrame)
+      frame = this.chooseFrame(type, preferredFrame)
       result = frame == null ? null : await this.query(frame, RESOLVE_TYPE_EXPRESSION(type))
     } catch {
       result = null
     }
     // No answer yet (no frame, subdoc not synced), a timeout or a failed slot: ask again later.
     if (result == null || !result.ok) {
+      if (frame != null) {
+        const failed = this.failedFrames.get(type) ?? new Set<ExternalId>()
+        this.failedFrames.set(type, failed.add(frame))
+      }
       this.retryLater(type)
       return
     }
     this.delays.delete(type)
+    this.failedFrames.delete(type)
     const parsed = answerSchema.safeParse(result.value)
     if (!parsed.success) {
       reportWidgetSchemaMismatch(

@@ -9,6 +9,7 @@ import {
   RESOLVE_TYPE_EXPRESSION,
   RETRY_DELAY_MS,
   TypeDefaults,
+  chooseComputedFrame,
   defaultSourceType,
   hasWidgetConversion,
   isTypeDefault,
@@ -235,4 +236,42 @@ test('only a configuration a lookup returned is a type default', async () => {
   expect(isTypeDefault(defaults.lookup(DATE, frameA))).toBe(true)
   expect(isTypeDefault({ kind: 'Date_Input' })).toBe(false)
   expect(isTypeDefault(undefined)).toBe(false)
+})
+
+const frameC = 'cccccccc-cccc-cccc-cccc-cccccccccccc' as ExternalId
+const frameStale = 'dddddddd-dddd-dddd-dddd-dddddddddddd' as ExternalId
+
+test('a computed entry that is not a candidate (a stale one) is never chosen', () => {
+  const computed = new Set([frameStale, frameB])
+  const isComputed = (frame: ExternalId) => computed.has(frame)
+  // The registry holds the stale entry; the graph's nodes are only B and C.
+  expect(chooseComputedFrame(frameA, new Set(), [frameB, frameC], isComputed)).toBe(frameB)
+  expect(chooseComputedFrame(frameA, new Set([frameB]), [frameB, frameC], isComputed)).toBe(
+    undefined,
+  )
+})
+
+test('the caller frame is chosen when computed and not avoided', () => {
+  const isComputed = () => true
+  expect(chooseComputedFrame(frameA, new Set(), [frameB], isComputed)).toBe(frameA)
+  expect(chooseComputedFrame(frameA, new Set([frameA]), [frameB], isComputed)).toBe(frameB)
+})
+
+test('a frame the query failed in is not asked again while another exists', async () => {
+  const query = vi.fn<Query>().mockResolvedValue(null)
+  const pick = vi.fn((preferred: ExternalId, avoid: ReadonlySet<ExternalId>) =>
+    [preferred, frameB].find((frame) => !avoid.has(frame)),
+  )
+  const defaults = make(() => true, query, pick)
+  defaults.lookup(DATE, frameA)
+  await flushPromises()
+  vi.advanceTimersByTime(RETRY_DELAY_MS)
+  defaults.lookup(DATE, frameA)
+  await flushPromises()
+  expect(query.mock.calls.map(([frame]) => frame)).toEqual([frameA, frameB])
+  // Both failed: it starts over instead of giving up.
+  vi.advanceTimersByTime(2 * RETRY_DELAY_MS)
+  defaults.lookup(DATE, frameA)
+  await flushPromises()
+  expect(query.mock.calls.map(([frame]) => frame)).toEqual([frameA, frameB, frameA])
 })
