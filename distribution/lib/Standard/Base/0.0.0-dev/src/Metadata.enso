@@ -145,6 +145,15 @@ type Widget
     ## Describes possible target types for Any.to conversion.
     Any_To_Target
 
+    ## Describes an argument that takes one of several kinds of value: the IDE
+       shows a picker of the kinds in front of the chosen kind's widget.
+
+       ## Arguments
+        - `kinds`: The kinds, in the order the picker lists them: a label and
+          the widget for a value of that kind.
+        - `include_nothing`: Whether `Nothing` is a kind too (listed last).
+    Union kinds:(Vector (Pair Text Widget)) include_nothing:Boolean=False
+
     ## Cached JSON Widget
     With_JSON_Cache parent:Widget json:Text
 
@@ -184,6 +193,9 @@ type Widget
         Widget.Date_Input -> '{"constructor":"Date_Input"}'
         Widget.Date_Time_Input -> '{"constructor":"Date_Time_Input"}'
         Widget.Time_Input -> '{"constructor":"Time_Input"}'
+        Widget.Union kinds include_nothing ->
+            kinds_json = '[' + (kinds.map p-> '[' + p.first.to_json + ',' + p.second.to_json + ']').join ',' + ']'
+            '{"constructor":"Union","kinds":' + kinds_json + ',"include_nothing":' + (if include_nothing then "true" else "false") + '}'
         Widget.With_JSON_Cache _ json -> json
         _ -> self.to_js_object.to_json
 
