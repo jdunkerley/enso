@@ -6,6 +6,7 @@ import {
   restoreMockMainFile,
   restoreMockWidgetConfigurations,
   setMockMainFile,
+  typeDefaultQueryCount,
 } from 'integration-test/mock/lsHandler'
 import * as actions from './actions'
 import { mockMethodCallInfo } from './expressionUpdates'
@@ -2177,5 +2178,120 @@ test.describe('Boolean widget', () => {
     await expect(node.locator('.WidgetSelection')).toHaveCount(0)
     await widget.locator('.Checkbox').click()
     expect(await moduleCode(page)).toContain('flag = False\n')
+  })
+})
+
+test.describe('Type defaults from the library', () => {
+  const DATE_TYPE = 'Standard.Base.Data.Time.Date.Date'
+  const TEXT_TYPE = 'Standard.Base.Data.Text.Text'
+  const INTEGER_OR_NOTHING = 'Standard.Base.Data.Numbers.Integer | Standard.Base.Nothing.Nothing'
+  test.afterEach(restoreMockMainFile)
+  test.afterEach(restoreMockWidgetConfigurations)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile(
+          'from Standard.Base import Data\n\nmain =\n    first = Data.days_since\n    second = Data.days_since\n    limited = Data.limit\n    nest = Data.outer (Data.weeks_since)\n    picked = Data.pick\n',
+        ),
+    },
+  })
+
+  const dateParam = { name: 'date', reprType: DATE_TYPE, isSuspended: false, hasDefault: false }
+
+  function staticMethod(
+    name: string,
+    param: { name: string; reprType: string; isSuspended: boolean; hasDefault: boolean },
+    annotations: string[] = [],
+  ) {
+    return {
+      type: 'method' as const,
+      module: 'Standard.Base.Data',
+      name,
+      arguments: [param],
+      selfType: 'Standard.Base.Data',
+      returnType: 'Standard.Base.Data.Numbers.Integer',
+      isStatic: true,
+      annotations,
+    }
+  }
+
+  function pointer(name: string) {
+    return {
+      methodPointer: {
+        module: 'Standard.Base.Data',
+        definedOnType: 'Standard.Base.Data',
+        name,
+      },
+      notAppliedArguments: [0],
+    }
+  }
+
+  test("a type's default widget is asked once", async ({ editorPage, page }) => {
+    await editorPage.mockSuggestion(staticMethod('days_since', dateParam))
+    await mockMethodCallInfo(page, 'first', pointer('days_since'))
+    await mockMethodCallInfo(page, 'second', pointer('days_since'))
+    await expect(locate.graphNodeByBinding(page, 'first').locator('.WidgetDate')).toHaveCount(1)
+    await expect(locate.graphNodeByBinding(page, 'second').locator('.WidgetDate')).toHaveCount(1)
+    expect(typeDefaultQueryCount(DATE_TYPE)).toBe(1)
+  })
+
+  test("optional arguments take their first member's widget", async ({ editorPage, page }) => {
+    await editorPage.mockSuggestion(
+      staticMethod('limit', {
+        name: 'count',
+        reprType: INTEGER_OR_NOTHING,
+        isSuspended: false,
+        hasDefault: false,
+      }),
+    )
+    await mockMethodCallInfo(page, 'limited', pointer('limit'))
+    await expect(locate.graphNodeByBinding(page, 'limited').locator('.WidgetNumber')).toHaveCount(1)
+  })
+
+  test("a nested call's date argument gets the picker", async ({ editorPage, page }) => {
+    await editorPage
+      .mockSuggestion(
+        staticMethod('outer', {
+          name: 'inner',
+          reprType: 'Standard.Base.Any.Any',
+          isSuspended: false,
+          hasDefault: false,
+        }),
+      )
+      .mockSuggestion(staticMethod('weeks_since', dateParam))
+    await mockMethodCallInfo(page, 'nest', pointer('outer'))
+    await mockMethodCallInfo(
+      page,
+      { binding: 'nest', expr: 'Data.weeks_since' },
+      pointer('weeks_since'),
+    )
+    await expect(locate.graphNodeByBinding(page, 'nest').locator('.WidgetDate')).toHaveCount(1)
+  })
+
+  test('an annotation still wins over the type default', async ({ editorPage, page, localApi }) => {
+    await editorPage.mockSuggestion(
+      staticMethod(
+        'pick',
+        { name: 'word', reprType: TEXT_TYPE, isSuspended: false, hasDefault: false },
+        ['word'],
+      ),
+    )
+    await localApi.updateVisualization('.pick', [
+      [
+        'word',
+        {
+          type: 'Widget',
+          constructor: 'Single_Choice',
+          values: [
+            { type: 'Choice', constructor: 'Option', value: "'a'", label: 'A', parameters: [] },
+            { type: 'Choice', constructor: 'Option', value: "'b'", label: 'B', parameters: [] },
+          ],
+        },
+      ],
+    ])
+    await mockMethodCallInfo(page, 'picked', pointer('pick'))
+    const node = locate.graphNodeByBinding(page, 'picked')
+    await expect(node.locator('.WidgetSelection')).toHaveCount(1)
+    await expect(node.locator('.WidgetText')).toHaveCount(0)
   })
 })
