@@ -3743,7 +3743,7 @@ type Table
              fill_empty = table.fill_empty ["col0", "col1"] "hello"
        ```
     @columns (Widget_Helpers.make_column_name_multi_selector add_regex=True add_by_type=True)
-    @default (self-> Widget_Helpers.make_fill_default_value_selector (self.select_columns (..By_Type ..Char)) value_types=Value_Type.Char add_nothing=True)
+    @default (self-> Widget_Helpers.make_fill_default_value_selector self value_types=Value_Type.Char add_nothing=True)
     fill_empty self (columns : Table_Selector = Missing_Argument.throw "columns") (default : Column | Column_Ref | Expression | Previous_Value | Any = Missing_Argument.throw "default") error_on_missing_columns:Boolean=True -> Table & Any = _profile_time_execution "Table.fill_empty" <|
         columns.act_if_any self error_on_missing_columns selected->
             self.implementation.fill_empty self.underlying selected default

@@ -27,7 +27,7 @@ table_module = "Standard.Table.Table"
 table_type = "Standard.Table.Table.Table"
 
 ## The answer for one argument whose widget is `widget`.
-answer argument widget = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]}'
+answer argument widget columns_json="" = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]' + columns_json + '}'
 
 ## Checks that the type has a `Widget.from` conversion and that `resolve_type`
    answers exactly that widget.
@@ -60,15 +60,15 @@ add_specs suite_builder =
     suite_builder.group "Widgets for In-Database Table with column name sets" group_builder->
         mock_table = connection.query "mock_table"
 
+        columns_json = ',"columns":{"":' + (Widget_Columns.from mock_table . to_json) + '}'
+
         group_builder.specify "works for `get` and `at`" <|
-            choices = mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = answer "selector" (Widget.Single_Choice choices)
+            expect = answer "selector" Widget.Column_Name columns_json
             Widget_Query.resolve_call mock_table table_module table_type "get" ["selector"] . should_equal expect
             Widget_Query.resolve_call mock_table table_module table_type "at" ["selector"] . should_equal expect
 
         group_builder.specify "works for `filter`" <|
-            choices = [Choice.Option "<Expression>" "(expr '[A]')"] + mock_table.column_names . map n-> Choice.Option n n.pretty
-            expect = answer "column" (Widget.Single_Choice choices)
+            expect = answer "column" (Widget.Column_Name expression=True) columns_json
             Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
 
     suite_builder.group "Widgets for Database" group_builder->

@@ -1,4 +1,6 @@
 from Standard.Base import all
+import Standard.Base.Metadata.Widget
+import Standard.Base.Metadata.Column_Kind.Column_Kind
 
 from Standard.Table.Internal.Widget_Helpers import all
 from Standard.Table import Value_Type
@@ -13,45 +15,87 @@ main filter=Nothing =
         add_specs suite_builder
     suite.run_with_filter filter
 
+## The labels of the extra entries of a `Widget.Column_Name`.
+extra_labels widget = case widget of
+    Widget.Column_Name _ _ _ _ extra _ -> extra.map .label
+    _ -> Test.fail "Expecting a Column_Name, got "+widget.to_text
 
 add_specs suite_builder =
     table = Table.new [["X", [1, 2, 3, 4]], ["Y", ["a", "b", "c", "d"]]]
     suite_builder.group "Can run each helper" group_builder->
+        group_builder.specify "make_column_name_selector" <|
+            make_column_name_selector table . should_equal Widget.Column_Name
+            make_column_name_selector table add_expression=True . should_equal (Widget.Column_Name expression=True)
+        group_builder.specify "make_column_name_vector_selector" <|
+            make_column_name_vector_selector table . should_equal Widget.Column_Vector
+        group_builder.specify "make_order_by_selector" <|
+            make_order_by_selector table . should_equal Widget.Order_By
+            make_order_by_selector table name_only=True . should_equal (Widget.Order_By name_only=True)
         group_builder.specify "make_column_name_multi_selector with regex and by_type" <|
-            w = make_column_name_multi_selector table add_regex=True add_by_type=True
-            j = w.to_text
-            j.should_contain "(Multiple_Choice [(Option '<Regular Expression>' 'regex' [] '' '' []), (Option '<By Type>' '(..By_Type ..Integer)' [] '' '' []), (Option 'X' '\'X\'' [] '' '' []), (Option 'Y' '\'Y\'' [] '' '' [])"
+            make_column_name_multi_selector table add_regex=True add_by_type=True . should_equal (Widget.Column_Names regex=True by_type=True)
+            make_column_name_multi_selector table . should_equal Widget.Column_Names
         group_builder.specify "make_column_ref_by_name_selector with named_pattern" <|
             w = make_column_ref_by_name_selector table add_named_pattern=True
             j = w.to_text
             j.should_contain "(Option '<Leading_Whitespace>' 'Named_Pattern.Leading_Whitespace'"
+            (Meta.meta w . constructor . name) . should_equal "Column_Name"
         group_builder.specify "make_column_ref_by_name_selector without named_pattern" <|
             w = make_column_ref_by_name_selector table
             j = w.to_text
             j.should_not_contain "(Option '<Leading_Whitespace>' 'Named_Pattern.Leading_Whitespace'"
+            w . should_equal (Widget.Column_Name expression=True reference=True extra=(make_any_selector_values))
+        group_builder.specify "make_column_ref_by_name_selector columns_first" <|
+            w = make_column_ref_by_name_selector table columns_first=True
+            case w of
+                Widget.Column_Name _ _ expression reference _ columns_first ->
+                    [expression, reference, columns_first] . should_equal [True, True, True]
+                _ -> Test.fail "Expecting a Column_Name"
+        group_builder.specify "make_column_ref_by_name_selector without a table keeps the constants" <|
+            w = make_column_ref_by_name_selector Nothing add_number=True
+            w.should_be_a Widget.Single_Choice
+            w.values.map .label . should_equal ["<Number Value>"]
         group_builder.specify "make_filter_condition_selector" <|
             w = make_filter_condition_selector table
             j = w.to_text
             ## Just testing the start as this is very long...
-            j.should_contain "(Single_Choice [(Option '..Equal' '..Equal' [['to', (Single_Choice [(Option '<Text Value>'"
+            j.should_contain "(Single_Choice [(Option '..Equal' '..Equal' [['to', (Column_Name "
     suite_builder.group "Can run make_column_ref_by_name_selector_for_type" group_builder->
         table2 = Table.new [["Ints1", [1, 2, 3, 4]], ["Ints2", [1, 2, 3, 4]], ["Floats", [1.0, 2.0, 3.0, 4.0]], ["Texts", ["a", "b", "c", "d"]], ["Texts2", ["a", "b", "c", "d"]]]
-        group_builder.specify "make_column_ref_by_name_selector_for_type with integer column includes integer columns" <|
+        group_builder.specify "an integer type offers the Numeric kind and the number constant" <|
             w = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Integer
-            j = w.to_text
-            j.should_contain "Single_Choice [(Option '<Number Value>' '0' [] '' '' []), (Option '<Expression>' '(expr \'[Ints1]\')' [] '' '' []), (Option 'Ints1' '(..Name \'Ints1\')' [] '' '' []), (Option 'Ints2' '(..Name \'Ints2\')' [] '' '' [])]"
-        group_builder.specify "make_column_ref_by_name_selector_for_type with Float column includes matching Float column" <|
-            w = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Float
-            j = w.to_text
-            j.should_contain "Single_Choice [(Option '<Number Value>' '0' [] '' '' []), (Option '<Expression>' '(expr \'[Ints1]\')' [] '' '' []), (Option 'Floats' '(..Name \'Floats\')' [] '' '' [])]"
-        group_builder.specify "make_column_ref_by_name_selector_for_type with numeric column and if_value_type_numeric_include_all_numeric=True includes all nummeric columns" <|
-            w = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Integer if_value_type_numeric_include_all_numeric=True
-            j = w.to_text
-            j.should_contain "Single_Choice [(Option '<Number Value>' '0' [] '' '' []), (Option '<Expression>' '(expr \'[Ints1]\')' [] '' '' []), (Option 'Ints1' '(..Name \'Ints1\')' [] '' '' []), (Option 'Ints2' '(..Name \'Ints2\')' [] '' '' []), (Option 'Floats' '(..Name \'Floats\')' [] '' '' [])]"
-        group_builder.specify "make_column_ref_by_name_selector_for_type with text column and if_value_type_numeric_include_all_numeric=True just includes Text columns" <|
+            (Meta.meta w . constructor . name) . should_equal "Column_Name"
+            w.kinds . should_equal [Column_Kind.Numeric]
+            w.expression . should_be_true
+            w.reference . should_be_true
+            extra_labels w . should_equal ["<Number Value>"]
+        group_builder.specify "the include-all-numeric flag no longer changes the answer" <|
+            a = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Integer if_value_type_numeric_include_all_numeric=True
+            b = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Float
+            a . should_equal (make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Integer)
+            a . should_equal b
+        group_builder.specify "a text type offers the Textual kind" <|
             w = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Char if_value_type_numeric_include_all_numeric=True
-            j = w.to_text
-            j.should_contain "(Option '<Expression>' '(expr \'[Ints1]\')' [] '' '' []), (Option 'Texts' '(..Name \'Texts\')' [] '' '' []), (Option 'Texts2' '(..Name \'Texts2\')' [] '' '' [])]"
+            w.kinds . should_equal [Column_Kind.Textual]
+            extra_labels w . should_equal ["<Text Value>"]
+        group_builder.specify "other types map to their kind" <|
+            (make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Boolean).kinds . should_equal [Column_Kind.Logical]
+            (make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Date).kinds . should_equal [Column_Kind.Date_Only]
+            (make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Time).kinds . should_equal [Column_Kind.Time_Only]
+            (make_column_ref_by_name_selector_for_type table2 value_type=(Value_Type.Date_Time True)).kinds . should_equal [Column_Kind.Date_And_Time]
+        group_builder.specify "Mixed offers every kind" <|
+            w = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Mixed
+            w.kinds . should_equal []
+    suite_builder.group "make_fill_default_value_selector" group_builder->
+        group_builder.specify "without a source it is a plain Single_Choice" <|
+            w = make_fill_default_value_selector Nothing value_types=Value_Type.Char
+            w.should_be_a Widget.Single_Choice
+            w.values.first.label . should_equal "Previous Value"
+        group_builder.specify "with a table it is a Column_Name with the kinds of the types" <|
+            w = make_fill_default_value_selector table value_types=Value_Type.Char
+            (Meta.meta w . constructor . name) . should_equal "Column_Name"
+            w.kinds . should_equal [Column_Kind.Textual]
+            (extra_labels w).first . should_equal "Previous Value"
+            (make_fill_default_value_selector table value_types=Value_Type.Mixed).kinds . should_equal []
 
-
-            
+## The constants of `make_column_ref_by_name_selector` with no flags.
+make_any_selector_values = (make_column_ref_by_name_selector Nothing).values
