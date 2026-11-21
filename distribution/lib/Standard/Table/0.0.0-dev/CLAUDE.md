@@ -46,6 +46,9 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
 - `src/Extensions/` — type-extension methods (e.g. `Vector.to_table`).
 - `src/Internal/Viz_Helpers.enso`, `src/Internal/In_Memory_Viz_Source.enso` —
   the conversion of `Table` to `Viz_Table`.
+- `src/Internal/Column_Kinds.enso` — `of_value_type`, the `Column_Kind` of a
+  `Value_Type`; `Table` and `Row` answer `Widget_Columns` from it (schema only).
+  The database does the same without querying: see Database's CLAUDE.md.
 
 ## Things to avoid in generated code
 
