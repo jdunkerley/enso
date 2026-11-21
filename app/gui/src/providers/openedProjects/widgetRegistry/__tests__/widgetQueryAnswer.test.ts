@@ -31,6 +31,60 @@ describe('widgetQueryAnswerSchema', () => {
   })
 })
 
+describe('column pickers in an answer', () => {
+  test('an answer with pickers and its columns', () => {
+    const answer = widgetQueryAnswerSchema.parse({
+      arguments: [
+        [
+          'columns',
+          {
+            widget: {
+              type: 'Widget',
+              constructor: 'Column_Names',
+              kinds: [],
+              from: null,
+              regex: true,
+              by_type: false,
+            },
+          },
+        ],
+        [
+          'on',
+          {
+            widget: {
+              constructor: 'Column_Name',
+              kinds: ['Numeric'],
+              from: 'right',
+              expression: false,
+              reference: false,
+              extra: [],
+              columns_first: false,
+            },
+          },
+        ],
+      ],
+      columns: { '': { names: ['A'], kinds: ['Textual'], type_names: ['Char'] } },
+    })
+    expect(answer.columns?.['']?.names).toEqual(['A'])
+    expect(answer.arguments[0]![1]).toMatchObject({
+      widget: { kind: 'Column_Names', kinds: [], from: null, regex: true, by_type: false },
+    })
+  })
+
+  test('an answer without columns still parses', () => {
+    expect(widgetQueryAnswerSchema.parse({ arguments: [] }).columns).toBeUndefined()
+  })
+
+  test('an unknown column kind is a schema mismatch', () => {
+    expect(
+      widgetQueryAnswerSchema.safeParse({
+        arguments: [],
+        columns: { '': { names: ['A'], kinds: ['Weird'], type_names: [''] } },
+      }).success,
+    ).toBe(false)
+  })
+})
+
 describe('functionCallFromAnswer', () => {
   test('keeps the errors apart from the widgets', () => {
     const answer = widgetQueryAnswerSchema.parse({
