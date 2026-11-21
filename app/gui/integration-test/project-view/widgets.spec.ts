@@ -2191,7 +2191,7 @@ test.describe('Type defaults from the library', () => {
     setupApi: {
       local: () =>
         setMockMainFile(
-          'from Standard.Base import Data\n\nmain =\n    first = Data.days_since\n    second = Data.days_since\n    limited = Data.limit\n    nest = Data.outer (Data.weeks_since)\n    picked = Data.pick\n',
+          'from Standard.Base import Data\n\nmain =\n    first = Data.days_since\n    second = Data.days_since\n    limited = Data.limit\n    nest = Data.outer (Data.weeks_since)\n    picked = Data.pick\n    chosen = Data.choose (..Between)\n',
         ),
     },
   })
@@ -2246,6 +2246,8 @@ test.describe('Type defaults from the library', () => {
     )
     await mockMethodCallInfo(page, 'limited', pointer('limit'))
     await expect(locate.graphNodeByBinding(page, 'limited').locator('.WidgetNumber')).toHaveCount(1)
+    // The union was reduced to its first member in the request.
+    expect(typeDefaultQueryCount('Standard.Base.Data.Numbers.Integer')).toBe(1)
   })
 
   test("a nested call's date argument gets the picker", async ({ editorPage, page }) => {
@@ -2266,6 +2268,50 @@ test.describe('Type defaults from the library', () => {
       pointer('weeks_since'),
     )
     await expect(locate.graphNodeByBinding(page, 'nest').locator('.WidgetDate')).toHaveCount(1)
+  })
+
+  // The nested constructor's argument is in the choice's configuration (`parameters: []`) but has
+  // no entry there: it takes the type default.
+  test("a choice's constructor argument gets its type default", async ({
+    editorPage,
+    page,
+    localApi,
+  }) => {
+    await editorPage
+      .mockSuggestion(
+        staticMethod(
+          'choose',
+          {
+            name: 'condition',
+            reprType: 'Standard.Base.Any.Any',
+            isSuspended: false,
+            hasDefault: false,
+          },
+          ['condition'],
+        ),
+      )
+      .mockSuggestion(staticMethod('Between', dateParam))
+    await localApi.updateVisualization('.choose', [
+      [
+        'condition',
+        {
+          type: 'Widget',
+          constructor: 'Single_Choice',
+          values: [
+            {
+              type: 'Choice',
+              constructor: 'Option',
+              value: '..Between',
+              label: 'Between',
+              parameters: [],
+            },
+          ],
+        },
+      ],
+    ])
+    await mockMethodCallInfo(page, 'chosen', pointer('choose'))
+    await mockMethodCallInfo(page, { binding: 'chosen', expr: '..Between' }, pointer('Between'))
+    await expect(locate.graphNodeByBinding(page, 'chosen').locator('.WidgetDate')).toHaveCount(1)
   })
 
   test('an annotation still wins over the type default', async ({ editorPage, page, localApi }) => {

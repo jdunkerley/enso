@@ -542,6 +542,7 @@ const fileBrowse = {
   constructor: 'File_Browse',
   existing_only: true,
   action: 'Open',
+  // The engine's default is `All Files`; no test reads the filters yet.
   file_types: [],
 }
 /**
@@ -579,7 +580,10 @@ export function typeDefaultQueryCount(type: string): number {
   return typeDefaultQueries.filter((asked) => asked === type).length
 }
 
-/** The `resolve_type` answer's bytes for the routing key `resolve_type:<type>`. */
+/**
+ * The `resolve_type` answer's bytes for the routing key `resolve_type:<type>`; `{ widget: null }`
+ * stands for a type without a default.
+ */
 function typeDefaultBytes(key: string): Uint8Array | null {
   if (!key.startsWith(RESOLVE_TYPE_KEY)) return null
   return encodeJSON(mockTypeDefaults.get(key.slice(RESOLVE_TYPE_KEY.length)) ?? { widget: null })
