@@ -64,6 +64,16 @@ test.each([
     },
     "''",
   ],
+  [
+    {
+      kind: 'Union',
+      kinds: [
+        { label: 'Odd', config: { kind: 'Union', kinds: [] } },
+        { label: 'Text', config: { kind: 'Text_Input' } },
+      ],
+    },
+    "''",
+  ],
   [{ kind: 'Numeric_Input' }, '0'],
   [{ kind: 'Date_Input' }, 'Date.today'],
   [{ kind: 'Regex_Input' }, "regex '.*'"],

@@ -64,18 +64,20 @@ type CacheEntry =
 
 /** Whether `Widget.from` converts the type `typeName`. Keys are built as `conversionSources` does. */
 export function hasWidgetConversion(db: SuggestionDb, typeName: string): boolean {
-  const widget = parseAbsoluteProjectPathRaw(WIDGET_TYPE)
-  const source = parseAbsoluteProjectPathRaw(`${typeName}.type`)
-  if (!widget.ok || !source.ok) return false
-  return db.conversionSources.lookup(widget.value.key())?.has(source.value.key()) ?? false
+  return hasConversion(db, WIDGET_TYPE, `${typeName}.type`)
 }
 
-/** Whether `target.from (that : source)` exists. Keys are built as `conversionSources` does. */
-export function convertsBetween(db: SuggestionDb, source: string, target: string): boolean {
+/** Whether `target` has a `from (that : source)` conversion (reactive). */
+function hasConversion(db: SuggestionDb, target: string, source: string): boolean {
   const targetPath = parseAbsoluteProjectPathRaw(target)
   const sourcePath = parseAbsoluteProjectPathRaw(source)
   if (!targetPath.ok || !sourcePath.ok) return false
   return db.conversionSources.lookup(targetPath.value.key())?.has(sourcePath.value.key()) ?? false
+}
+
+/** Whether `target.from (that : source)` exists. Keys are built as `conversionSources` does. */
+export function convertsBetween(db: SuggestionDb, source: string, target: string): boolean {
+  return hasConversion(db, target, source)
 }
 
 /**
@@ -102,6 +104,8 @@ export class TypeDefaults {
     string,
     {
       members: (WidgetConfiguration | undefined | 'pending')[]
+      /** What `converts` said of each ordered pair of the members with a widget. */
+      verdicts: boolean[]
       result: WidgetConfiguration | undefined
     }
   >()
@@ -143,8 +147,19 @@ export class TypeDefaults {
       config: typeName === NOTHING_TYPE ? undefined : this.lookupType(typeName, frame),
     }))
     const configs = memberWidgets.map((member) => member.config)
+    // Asked every time, so the caller keeps depending on the suggestion database's conversions.
+    const widgetTypes = memberWidgets
+      .filter((member) => member.config != null && member.config !== 'pending')
+      .map((member) => member.typeName)
+    const verdicts = widgetTypes.flatMap((a) =>
+      widgetTypes.filter((b) => b !== a).map((b) => this.converts(a, b)),
+    )
     const known = this.composed.get(reprType)
-    if (known != null && known.members.every((config, i) => config === configs[i]))
+    if (
+      known != null &&
+      known.members.every((config, i) => config === configs[i]) &&
+      known.verdicts.every((verdict, i) => verdict === verdicts[i])
+    )
       return known.result
     const composed = composeUnion(memberWidgets, this.converts)
     if (composed === 'pending') {
@@ -152,7 +167,7 @@ export class TypeDefaults {
       return undefined
     }
     if (composed != null) typeDefaultConfigs.add(composed)
-    this.composed.set(reprType, { members: configs, result: composed })
+    this.composed.set(reprType, { members: configs, verdicts, result: composed })
     return composed
   }
 

@@ -17,7 +17,7 @@ import {
 import { flushPromises } from '@vue/test-utils'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { computed, effectScope } from 'vue'
+import { computed, effectScope, reactive, watch } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 
 const make = (
@@ -351,6 +351,33 @@ test('a conversion between members drops the absorbed one', async () => {
   defaults.lookup(`${TEXT} | ${FILE}`, frameA)
   await flushPromises()
   expect(defaults.lookup(`${TEXT} | ${FILE}`, frameA)?.kind).toBe('File_Browse')
+})
+
+test('a union re-composes when a conversion appears, and is stable until then', async () => {
+  const known = reactive(new Set<string>())
+  const defaults = make(
+    () => true,
+    answerFor({
+      [TEXT]: { widget: { constructor: 'Text_Input' } },
+      [INTEGER]: { widget: { constructor: 'Numeric_Input' } },
+    }),
+    undefined,
+    (source, target) => known.has(`${source}>${target}`),
+  )
+  const union = `${TEXT} | ${INTEGER}`
+  defaults.lookup(union, frameA)
+  await flushPromises()
+  const seen: (string | undefined)[] = []
+  const scope = effectScope()
+  const config = scope.run(() => computed(() => defaults.lookup(union, frameA)))!
+  scope.run(() => watch(config, (value) => seen.push(value?.kind), { flush: 'sync' }))
+  const first = config.value
+  expect(first?.kind).toBe('Union')
+  expect(defaults.lookup(union, frameA)).toBe(first)
+  known.add(`${TEXT}>${INTEGER}`)
+  expect(config.value?.kind).toBe('Numeric_Input')
+  expect(seen).toEqual(['Numeric_Input'])
+  scope.stop()
 })
 
 test('convertsBetween reads the suggestion database `Target.from` entries', () => {

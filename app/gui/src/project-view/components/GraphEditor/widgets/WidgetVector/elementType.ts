@@ -1,8 +1,5 @@
 /** @file The element type of a `Vector`-typed argument, so each item gets the widget its type asks for. */
-import {
-  flattenChoice,
-  type WidgetConfiguration,
-} from '$/providers/openedProjects/widgetRegistry/configuration'
+import type { WidgetConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { unionMembers } from '$/providers/openedProjects/widgetRegistry/unionKinds'
 import { DATE_TYPE } from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
 import { DATE_TIME_TYPE } from '@/components/GraphEditor/widgets/WidgetDateTime/dateTimeExpression'
@@ -61,12 +58,17 @@ export function vectorItemConfig(
 }
 
 /**
- * The code a new item starts as, from the item widget's configuration: a choice's first option, a
- * union's first kind, else what the widget kind itself starts as.
+ * The code a new item starts as, from the item widget's configuration: a union's first kind that
+ * has one, else what the widget kind itself starts as.
  */
 export function vectorItemDefault(config: WidgetConfiguration | undefined): string | undefined {
   if (config == null) return undefined
-  if (config.kind === 'Single_Choice') return config.values.flatMap(flattenChoice)[0]?.value
-  if (config.kind === 'Union') return kindDefaultCode(config.kinds[0]?.config ?? null)
+  if (config.kind === 'Union') {
+    for (const kind of config.kinds) {
+      const code = kindDefaultCode(kind.config)
+      if (code != null) return code
+    }
+    return undefined
+  }
   return kindDefaultCode(config)
 }
