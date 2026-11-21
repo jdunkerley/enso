@@ -3,7 +3,6 @@ import project.Data.Locale.Locale
 import project.Data.Text.Text
 import project.Error.Error
 import project.Errors.Illegal_Argument.Illegal_Argument
-import project.Metadata.Widget
 from project.Data.Boolean import Boolean, False, True
 
 polyglot java import org.enso.base.text.TextFoldingStrategy
@@ -21,7 +20,6 @@ type Case_Sensitivity
 
        ## Arguments
         - `locale`: The locale used for the comparison.
-    @locale (Widget.from Locale)
     Insensitive (locale : Locale = Locale.default)
 
     ## ---

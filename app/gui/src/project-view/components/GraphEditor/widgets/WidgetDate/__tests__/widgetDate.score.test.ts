@@ -8,6 +8,7 @@ import { widgetDefinition as selectionWidget } from '@/components/GraphEditor/wi
 import { Ast } from '@/util/ast'
 import { ArgumentInfoKey } from '@/util/callTree'
 import { describe, expect, test } from 'vitest'
+import { typeDefaultConfig } from '../../__tests__/typeDefaultFixture'
 import { DATE_TYPE } from '../dateExpression'
 
 function score(input: WidgetInput): Score {
@@ -49,11 +50,18 @@ const typedArgument = (reprType: string | undefined) =>
     [ArgumentInfoKey]: { appKind: 0, info: { name: 'end', reprType } },
   }) as Partial<WidgetInput>
 
+const dateInput = { kind: 'Date_Input' } as const
+
 describe('the date widget scores', () => {
-  test('a Date-typed argument Perfect, by reprType or expected type', () => {
-    expect(score(placeholder(typedArgument(DATE_TYPE)))).toBe(Score.Perfect)
-    expect(score(placeholder({ expectedType: DATE_TYPE as never }))).toBe(Score.Perfect)
-    expect(score({ ...inputFor('Date.today'), ...typedArgument(DATE_TYPE) })).toBe(Score.Perfect)
+  test('an argument configured Date_Input Perfect', () => {
+    expect(score(placeholder({ dynamicConfig: dateInput }))).toBe(Score.Perfect)
+    expect(score({ ...inputFor('Date.today'), dynamicConfig: dateInput })).toBe(Score.Perfect)
+  })
+
+  test('a declared Date type without the configuration Mismatch', () => {
+    expect(score(placeholder(typedArgument(DATE_TYPE)))).toBe(Score.Mismatch)
+    expect(score(placeholder({ expectedType: DATE_TYPE as never }))).toBe(Score.Mismatch)
+    expect(score({ ...inputFor('Date.today'), ...typedArgument(DATE_TYPE) })).toBe(Score.Mismatch)
   })
 
   test('a node that is only a date Perfect, whatever its arguments', () => {
@@ -81,7 +89,7 @@ describe('the date widget scores', () => {
     expect(score(inBlock('x = Time_Of_Day.now', 'Time_Of_Day.now'))).toBe(Score.Mismatch)
   })
 
-  test('an argument that has its own dropdown Mismatch, so it gets no second one', () => {
+  test('an argument that has its own dropdown Mismatch, so it gets no second one', async () => {
     const singleChoice = { dynamicConfig: { kind: 'Single_Choice', values: [] } } as never
     expect(score(placeholder({ ...typedArgument(DATE_TYPE), ...singleChoice }))).toBe(
       Score.Mismatch,
@@ -95,7 +103,11 @@ describe('the date widget scores', () => {
         info: { name: 'end', reprType: DATE_TYPE, tagValues: ['Date.today'] },
       },
     } as Partial<WidgetInput>
-    expect(score(placeholder(tags))).toBe(Score.Mismatch)
+    // Pins "tag values win over a type default" (until PR 4's kind picker): the dropdown stays.
+    const typeDefault = await typeDefaultConfig('Date_Input')
+    expect(score(placeholder({ ...tags, dynamicConfig: typeDefault }))).toBe(Score.Mismatch)
+    // An annotation's own Date_Input is not a type default: the picker wins over the tag values.
+    expect(score(placeholder({ ...tags, dynamicConfig: dateInput }))).toBe(Score.Perfect)
   })
 
   test('an untyped expression Mismatch, whatever its shape', () => {

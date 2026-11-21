@@ -9,7 +9,6 @@ import {
 } from '$/providers/openedProjects/widgetRegistry'
 import DateTimeMenu from '@/components/GraphEditor/widgets/WidgetDateTime/DateTimeMenu.vue'
 import {
-  DATE_TIME_TYPE,
   dateTimeExpressionCode,
   keptDateTimeArguments,
   parseDateTimeExpression,
@@ -23,7 +22,6 @@ import {
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
 import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
-import { ArgumentInfoKey } from '@/util/callTree'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
 import { computed } from 'vue'
@@ -68,10 +66,7 @@ function choose(picked: DateTimeChoice, done: () => void) {
 
 <script lang="ts">
 function isDateTimeTyped(input: WidgetInput): boolean {
-  return (
-    input.expectedType === DATE_TIME_TYPE ||
-    input[ArgumentInfoKey]?.info?.reprType === DATE_TIME_TYPE
-  )
+  return input.dynamicConfig?.kind === 'Date_Time_Input'
 }
 
 /** A node that is only a date-time: `Date_Time.now`, or `Date_Time.new` with whatever arguments. */
@@ -83,7 +78,7 @@ function isWholeDateTimeNode(input: WidgetInput): boolean {
 }
 
 /**
- * The date and time-of-day widgets' counterpart for a `Date_Time`-typed argument or item, or a
+ * The date and time-of-day widgets' counterpart for an argument or item configured `Date_Time_Input`, or a
  * whole node that is a date-time (no second dropdown where `WidgetSelection` gives one): its own
  * widgets show the code (`Date_Time.now`, or `Date_Time.new` with its ports), and an arrow under it
  * opens a menu of `Date_Time.now`, a calendar and a time field. Priority 53, after the time-of-day

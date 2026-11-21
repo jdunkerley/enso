@@ -218,7 +218,6 @@ type Postgres_Connection
        `execute_update` for DML queries, or if they are supposed to return
        results, the `read` should be wrapped in an execution context check.
     @query make_table_name_selector
-    @limit (Widget.from Rows_To_Read)
     read : SQL_Query -> Rows_To_Read -> Table ! Table_Not_Found
     read self query:SQL_Query (limit : Rows_To_Read = ..First_With_Warning 1000) =
         self.connection.read query limit
@@ -305,7 +304,6 @@ type Postgres_Connection
           set to `False`, the query is expected to be a read operation and will
           run regardless of the output context. Defaults to `True`.
     @query Text_Input
-    @limit (Widget.from Rows_To_Read)
     execute_query : Text | SQL_Statement -> Rows_To_Read -> Boolean -> Table
     execute_query self query (limit : Rows_To_Read = ..First_With_Warning 1000) write_operation:Boolean=True =
         self.connection.execute_query query limit write_operation

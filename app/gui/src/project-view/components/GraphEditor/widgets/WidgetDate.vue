@@ -16,12 +16,10 @@ import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/w
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import DateMenu from '@/components/GraphEditor/widgets/WidgetDate/DateMenu.vue'
 import {
-  DATE_TYPE,
   dateExpressionCode,
   parseDateExpression,
   type DateChoice,
 } from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
-import { ArgumentInfoKey } from '@/util/callTree'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
 import { computed } from 'vue'
@@ -65,7 +63,7 @@ function codeToWrite(
 }
 
 function isDateTyped(input: WidgetInput): boolean {
-  return input.expectedType === DATE_TYPE || input[ArgumentInfoKey]?.info?.reprType === DATE_TYPE
+  return input.dynamicConfig?.kind === 'Date_Input'
 }
 
 /** A node that is only a date: `Date.today`, `Date.new` with whatever arguments, and so on. */
@@ -77,7 +75,7 @@ function isWholeDateNode(input: WidgetInput): boolean {
 }
 
 /**
- * A dropdown around a `Date`-typed argument or item, or a whole node that is a date (`Date.today`,
+ * A dropdown around an argument or item configured `Date_Input`, or a whole node that is a date (`Date.today`,
  * `Date.new 2020 1 15`, even with a connected argument): its own widgets show the code (`Date.today`,
  * or `Date.new` with `year`, `month` and `day` ports), and an arrow under it opens a menu that
  * replaces the whole value. Any other untyped `Date.new ...` is drawn as any other expression.

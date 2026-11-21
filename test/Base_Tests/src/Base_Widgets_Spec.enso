@@ -59,14 +59,12 @@ add_specs suite_builder =
             parameter.second.get "constructor" . should_equal "Vector_Editor"
 
     suite_builder.group "Widgets for the Text type" group_builder->
-        group_builder.specify "works for `take` and `drop`" <|
-            expect = '{"arguments":[["range",{"widget":' + (Widget.from Text_Sub_Range).to_json + '}]]}'
-            text_module = "Standard.Base.Data.Text.Extensions"
-            text_type = "Standard.Base.Data.Text.Text"
-            json = Widget_Query.resolve_call "abc def" text_module text_type "take" ["range"]
+        group_builder.specify "the `range` of `take` and `drop` takes the type default of Text_Sub_Range" <|
+            expect = '{"widget":' + (Widget.from Text_Sub_Range).to_json + '}'
+            type_name = Meta.meta Text_Sub_Range . qualified_name
+            json = Widget_Query.resolve_type type_name
             json . should_equal expect
-            Widget_Query.resolve_call "abc def" text_module text_type "drop" ["range"] . should_equal expect
-            labels = json.parse_json . get "arguments" . first . second . get "widget" . get "values" . map o-> o.get "label"
+            labels = json.parse_json . get "widget" . get "values" . map o-> o.get "label"
             labels.should_contain "First"
             labels.should_contain "While"
             labels.should_contain "After"

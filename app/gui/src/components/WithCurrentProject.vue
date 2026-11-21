@@ -28,6 +28,7 @@ const [provideCurrentProject, useCurrentProjectRaw] = createContextStore(
       module: computed(() => ref.value.module),
       graph: computed(() => ref.value.graph),
       widgetRegistry: computed(() => ref.value.widgetRegistry),
+      typeDefaults: computed(() => ref.value.typeDefaults),
     }
   },
 )

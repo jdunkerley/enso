@@ -221,7 +221,6 @@ type Plain_Text_Format
           will be inferred from metadata if available, falling back to the
           default encoding (UTF-8 with Windows-1252 fallback). For writing, UTF-8
           is used as default, unless overridden.
-    @encoding (Widget.from Encoding)
     Plain_Text (encoding : Encoding | Infer = Infer)
 
     ## ---

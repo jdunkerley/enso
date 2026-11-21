@@ -208,7 +208,6 @@ type List
 
              example_any = Examples.list.any (x-> x%2 == 0)
        ```
-    @condition (Widget.from Filter_Condition)
     any : (Filter_Condition | (Any -> Boolean)) -> Boolean
     any self (condition : Filter_Condition | (Any -> Boolean)) =
         predicate = unify_condition_or_predicate condition
@@ -245,7 +244,6 @@ type List
 
              example_all = Examples.list.all (x-> x%2 == 0)
        ```
-    @condition (Widget.from Filter_Condition)
     all : (Filter_Condition | (Any -> Boolean)) -> Boolean
     all self (condition : Filter_Condition | (Any -> Boolean)) =
         predicate = unify_condition_or_predicate condition
@@ -344,7 +342,6 @@ type List
              example_filter = Examples.list.filter (< 3)
              example_filter = Examples.list.filter (..Less than=3)
        ```
-    @filter (Widget.from Filter_Condition)
     filter : (Filter_Condition | (Any -> Boolean)) -> List Any
     filter self (filter : Filter_Condition | (Any -> Boolean)) =
         predicate = unify_condition_or_predicate filter
@@ -384,7 +381,6 @@ type List
        ```
              (Cons 1 (Cons 2 (Cons 3 Nil))).partition (x -> x % 2 == 0) == (Pair (Cons 2 Nil) (Cons 1 (Cons 3 Nil)))
        ```
-    @condition (Widget.from Filter_Condition)
     partition : (Filter_Condition | (Any -> Boolean)) -> Pair (List Any) (List Any)
     partition self (condition : Filter_Condition | (Any -> Boolean)) =
         predicate = unify_condition_or_predicate condition
@@ -702,7 +698,6 @@ type List
 
              example_first = Examples.list.find (> 2)
        ```
-    @condition (Widget.from Filter_Condition)
     find : (Filter_Condition | (Any -> Boolean)) -> Integer -> Any -> Any
     find self (condition : Filter_Condition | (Any -> Boolean)) (start : Integer = 0) ~if_missing=(Error.throw Not_Found) =
         predicate = unify_condition_or_predicate condition

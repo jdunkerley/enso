@@ -58,7 +58,7 @@ export function isBooleanArgument(input: WidgetInput): boolean {
   const info = argument.info
   if (info == null) return false
   if (hasBooleanTags(info.tagValues)) return true
-  if (info.reprType === BOOLEAN_TYPE || input.expectedType === BOOLEAN_TYPE) return true
+  if (input.dynamicConfig?.kind === 'Boolean_Input') return true
   return (
     info.tagValues == null && input.dynamicConfig == null && booleanLiteral(input.value) != null
   )

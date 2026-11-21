@@ -38,10 +38,16 @@ const typedArgument = (reprType: string | undefined) =>
     [ArgumentInfoKey]: { appKind: 0, info: { name: 'moment', reprType } },
   }) as Partial<WidgetInput>
 
+const dateTimeInput = { kind: 'Date_Time_Input' } as const
+
 describe('the date-time widget scores', () => {
-  test('a Date_Time-typed argument Perfect, by reprType or expected type', () => {
-    expect(score(placeholder(typedArgument(DATE_TIME_TYPE)))).toBe(Score.Perfect)
-    expect(score(placeholder({ expectedType: DATE_TIME_TYPE as never }))).toBe(Score.Perfect)
+  test('an argument configured Date_Time_Input Perfect', () => {
+    expect(score(placeholder({ dynamicConfig: dateTimeInput }))).toBe(Score.Perfect)
+  })
+
+  test('a declared Date_Time type without the configuration Mismatch', () => {
+    expect(score(placeholder(typedArgument(DATE_TIME_TYPE)))).toBe(Score.Mismatch)
+    expect(score(placeholder({ expectedType: DATE_TIME_TYPE as never }))).toBe(Score.Mismatch)
   })
 
   test('a node that is only a date-time Perfect, whatever its arguments', () => {

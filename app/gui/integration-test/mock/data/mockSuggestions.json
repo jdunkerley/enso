@@ -1457,5 +1457,225 @@
     "isStatic": false,
     "documentation": " ---\nprivate: true\n---",
     "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Boolean.Boolean.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Numbers.Integer.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Numbers.Float.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Numbers.Number.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Text.Text.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Time.Date.Date.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Time.Date_Time.Date_Time.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.System.File.File.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.System.File.Generic.Writable_File.Writable_File.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
+  },
+  {
+    "type": "method",
+    "module": "Standard.Base.Metadata",
+    "name": "from",
+    "arguments": [
+      {
+        "name": "that",
+        "reprType": "Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret.type",
+        "isSuspended": false,
+        "hasDefault": false,
+        "defaultValue": null,
+        "tagValues": null
+      }
+    ],
+    "selfType": "Standard.Base.Metadata.Widget",
+    "returnType": "Standard.Base.Metadata.Widget",
+    "isStatic": false,
+    "documentation": " ---\nprivate: true\n---",
+    "annotations": []
   }
 ]

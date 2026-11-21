@@ -108,8 +108,6 @@ export const widgetDefinition = defineWidget(
     score: (props) => {
       if (props.input.value instanceof Ast.TextLiteral) return Score.Perfect
       if (props.input.dynamicConfig?.kind === 'Text_Input') return Score.Perfect
-      const type = props.input.expectedType
-      if (type === 'Standard.Base.Data.Text.Text') return Score.Good
       return Score.Mismatch
     },
   },

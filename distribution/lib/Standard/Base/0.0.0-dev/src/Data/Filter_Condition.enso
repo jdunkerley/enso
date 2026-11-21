@@ -55,7 +55,6 @@ type Filter_Condition
        texts are equal if they are identical after canonical decomposition.
        This ensures that different ways of expressing the same character in the
        underlying binary representation are considered equal.
-    @locale (Widget.from Locale)
     Equal_Ignore_Case (to = (Missing_Argument.throw "to")) (locale:Locale=Locale.default) keep_or_remove:Filter_Action=..Keep
 
     ## Does the value start with a prefix (Text only)?

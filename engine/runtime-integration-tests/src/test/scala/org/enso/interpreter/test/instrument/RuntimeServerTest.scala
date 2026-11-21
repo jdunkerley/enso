@@ -5801,7 +5801,7 @@ class RuntimeServerTest
             "Type error: expected `that` to be Integer, but got Function.",
             None,
             Some(
-              model.Range(model.Position(1061, 4), model.Position(1080, 59))
+              model.Range(model.Position(1059, 4), model.Position(1078, 59))
             ),
             None,
             Vector(
@@ -5809,7 +5809,7 @@ class RuntimeServerTest
                 "Integer.+",
                 None,
                 Some(
-                  model.Range(model.Position(1061, 4), model.Position(1080, 59))
+                  model.Range(model.Position(1059, 4), model.Position(1078, 59))
                 ),
                 None
               ),
@@ -5913,7 +5913,7 @@ class RuntimeServerTest
             "Type error: expected `that` to be Integer, but got Function.",
             None,
             Some(
-              model.Range(model.Position(1061, 4), model.Position(1080, 59))
+              model.Range(model.Position(1059, 4), model.Position(1078, 59))
             ),
             None,
             Vector(
@@ -5921,7 +5921,7 @@ class RuntimeServerTest
                 "Integer.+",
                 None,
                 Some(
-                  model.Range(model.Position(1061, 4), model.Position(1080, 59))
+                  model.Range(model.Position(1059, 4), model.Position(1078, 59))
                 ),
                 None
               ),

@@ -1,11 +1,18 @@
 import project.Any.Any
 import project.Data.Json.JS_Object
+import project.Data.Numbers.Float
 import project.Data.Numbers.Integer
 import project.Data.Numbers.Number
 import project.Data.Pair.Pair
 import project.Data.Text.Text
+import project.Data.Time.Date.Date
+import project.Data.Time.Date_Time.Date_Time
+import project.Data.Time.Time_Of_Day.Time_Of_Day
 import project.Data.Vector.Vector
+import project.Enso_Cloud.Enso_Secret.Enso_Secret
 import project.Meta
+import project.System.File.File
+import project.System.File.Generic.Writable_File.Writable_File
 from project.Data.Boolean import Boolean, False, True
 from project.Data.Json.Extensions import all
 from project.Data.Range.Extensions import all
@@ -117,6 +124,24 @@ type Widget
     ## Describes a secret chooser.
     Secret_Browse
 
+    ## ---
+       private: true
+       ---
+       The date picker.
+    Date_Input
+
+    ## ---
+       private: true
+       ---
+       The date-and-time picker.
+    Date_Time_Input
+
+    ## ---
+       private: true
+       ---
+       The time-of-day picker.
+    Time_Input
+
     ## Describes possible target types for Any.to conversion.
     Any_To_Target
 
@@ -150,9 +175,15 @@ type Widget
         Widget.Text_Input _ _ syntax ->
             '{"constructor":"Text_Input"' + (if syntax.is_nothing then '' else ',"syntax":' + syntax.to_json) + '}'
         Widget.Folder_Browse -> '{"constructor":"Folder_Browse"}'
-        Widget.File_Browse existing_only _ file_types ->
-            '{"constructor":"File_Browse","existing_only":' + (if existing_only then "true" else "false") + ',"file_types":' + file_types.to_json + '}'
+        Widget.File_Browse existing_only action file_types ->
+            action_json = case action of
+                File_Action.Save -> '"Save"'
+                _ -> '"Open"'
+            '{"constructor":"File_Browse","existing_only":' + (if existing_only then "true" else "false") + ',"action":' + action_json + ',"file_types":' + file_types.to_json + '}'
         Widget.Secret_Browse -> '{"constructor":"Secret_Browse"}'
+        Widget.Date_Input -> '{"constructor":"Date_Input"}'
+        Widget.Date_Time_Input -> '{"constructor":"Date_Time_Input"}'
+        Widget.Time_Input -> '{"constructor":"Time_Input"}'
         Widget.With_JSON_Cache _ json -> json
         _ -> self.to_js_object.to_json
 
@@ -186,3 +217,91 @@ make_single_choice values:Vector -> Widget =
         _ : Text -> Choice.Option value value.pretty
         _ : Choice -> value
     Widget.Single_Choice (values.map make_option)
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Boolean`.
+Widget.from (that : Boolean.type) -> Widget =
+    _ = that
+    Widget.Boolean_Input
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Integer`.
+Widget.from (that : Integer.type) -> Widget =
+    _ = that
+    Widget.Numeric_Input
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Float`.
+Widget.from (that : Float.type) -> Widget =
+    _ = that
+    Widget.Numeric_Input
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Number`.
+Widget.from (that : Number.type) -> Widget =
+    _ = that
+    Widget.Numeric_Input
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Text`.
+Widget.from (that : Text.type) -> Widget =
+    _ = that
+    Widget.Text_Input
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Date`.
+Widget.from (that : Date.type) -> Widget =
+    _ = that
+    Widget.Date_Input
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Date_Time`.
+Widget.from (that : Date_Time.type) -> Widget =
+    _ = that
+    Widget.Date_Time_Input
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Time_Of_Day`.
+Widget.from (that : Time_Of_Day.type) -> Widget =
+    _ = that
+    Widget.Time_Input
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `File`.
+Widget.from (that : File.type) -> Widget =
+    _ = that
+    Widget.File_Browse
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Writable_File`.
+Widget.from (that : Writable_File.type) -> Widget =
+    _ = that
+    Widget.File_Browse existing_only=False action=..Save
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Enso_Secret`.
+Widget.from (that : Enso_Secret.type) -> Widget =
+    _ = that
+    Widget.Secret_Browse

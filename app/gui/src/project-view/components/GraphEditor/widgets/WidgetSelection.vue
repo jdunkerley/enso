@@ -7,6 +7,7 @@ import {
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
 import { singleChoiceConfiguration } from '$/providers/openedProjects/widgetRegistry/configuration'
+import { isTypeDefault } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import { WidgetEditHandler } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import type { ToValue } from '$/utils/reactivity'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
@@ -99,7 +100,7 @@ const configuredTags = useExpressionTags({
 })
 /** A Boolean argument lists `True` and `False` with their imports, whatever its tag values say. */
 const expressionTags = computed(() =>
-  isBooleanArgument(props.input) && props.input.dynamicConfig == null ?
+  isBooleanArgument(props.input) && isBooleanDefault(props.input.dynamicConfig) ?
     booleanExpressionTags(suggestionDbStore.value.entries)
   : configuredTags.value,
 )
@@ -240,6 +241,15 @@ export function withDropdownItems(input: WidgetInput, items: Iterable<DropdownIt
   return { ...input, [CustomDropdownItemsKey]: [...existingItems, ...items] }
 }
 
+// Until PR 4's kind picker: tag values win over a type default (today's behaviour).
+function isTypeDefaultOrNone(config: WidgetInput['dynamicConfig']): boolean {
+  return config == null || isTypeDefault(config)
+}
+
+function isBooleanDefault(config: WidgetInput['dynamicConfig']): boolean {
+  return config == null || config.kind === 'Boolean_Input'
+}
+
 function selectionScore(input: WidgetInput): Score {
   return (
     // We don’t want to show the dropdown until the dynamic config is received
@@ -247,11 +257,12 @@ function selectionScore(input: WidgetInput): Score {
     input[CustomDropdownItemsKey] != null ? Score.Perfect
     : input.dynamicConfig?.kind === 'Pending' ? Score.Mismatch
     : input.dynamicConfig?.kind === 'Single_Choice' ? Score.Perfect
-    : isBooleanArgument(input) && input.dynamicConfig == null ? Score.Perfect
-      // TODO[ao] here, instead of checking for existing dynamic config, we should rather return
+    : isBooleanArgument(input) && isBooleanDefault(input.dynamicConfig) ? Score.Perfect
+      // TODO[ao] here, instead of checking for an annotation's dynamic config, we should rather return
       // Score.Good. But this does not work with WidgetArgument which would then take precedence
       // over selection (and we want to have name always under it)
-    : input[ArgumentInfoKey]?.info?.tagValues != null && input.dynamicConfig == null ? Score.Perfect
+    : input[ArgumentInfoKey]?.info?.tagValues != null && isTypeDefaultOrNone(input.dynamicConfig) ?
+      Score.Perfect
     : Score.Mismatch
   )
 }

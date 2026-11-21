@@ -95,7 +95,6 @@ type Hyper_File
         - `limit`: the maximum number of rows to read.
     @table make_table_selector
     @schema (hyper -> make_schema_selector hyper True)
-    @limit (Widget.from Rows_To_Read)
     read : Text -> Text -> Rows_To_Read -> Table
     read self (table : Text) (schema : Text = self.schema) (limit : Rows_To_Read = ..All_Rows) = case schema of
         "" -> self.read table self.schema limit
