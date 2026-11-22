@@ -235,6 +235,48 @@ render only its own slot content. The icon is already on the row, drawn by
   and render times of an answer are reported when performance timings are on
   (`reportWidgetTiming`; both in `$/providers/engineLogAppend.ts`, called from
   `widgetFunctionCallInfo.ts`).
+- **Resolvers: when a widget query runs again.** An argument whose widget a
+  resolver computes answers
+  `"resolver":{"dependencies":["self",…],"searchable"}`
+  (`FunctionCall.resolvers`). The query follows the plan in
+  `providers/openedProjects/widgetRegistry/widgetQueryPlan.ts` (Note [When A
+  Widget Query Re-Runs]): the first query sends every argument's expression id;
+  after an answer, only the named dependencies' ids, and a `revision` stamp of
+  their code and computed value (the payload object; an edit may keep an
+  expression's id). The configuration keeps its identity while that plan is
+  equal (`WidgetFunction/stableConfig.ts`), so an argument nothing depends on
+  changing asks nothing; the subject being recomputed re-runs the visualization
+  in the engine. An answer is taken only when it is new since its query was sent
+  and echoes the query's `revision` (latest wins). **Static answers** (no
+  `resolver`, no `columns`) are kept per method and argument names for the
+  project's session (`StaticAnswerCache`, an LRU of 256 in `projectStates.ts`),
+  and a node they answer detaches its query; entries of a module are dropped
+  when the engine sends that module's suggestions again (it was recompiled, or
+  its library reloaded). A mock answer that is meant to change within a test
+  must therefore declare a `resolver`. Arguments with no annotation whose type
+  default is a resolver (`TypeDefaults.resolverDefault`, single types only) are
+  resolved by the query too, named in `type_defaults`.
+- **Notes: the fallback, and why.** `WidgetQueryNote.vue` (priority 3, after
+  `WidgetQueryError`) draws a marker before the argument when the input carries
+  `WidgetQueryNoteKey`: `unavailable` (an `info` icon; a dependency of the
+  resolver is an error, "Choices unavailable: right has an error.") or `loading`
+  (a spinner; "Loading choices…"). The argument itself has no widget from the
+  query then, so it shows the call tree's ordinary fallback: its type default,
+  else literals and `tagValues`. **The time-box** (`RESOLVER_TIME_BOX_MS`, 2 s):
+  until a query is answered, the previous answer's widgets stay (`Pending` on a
+  node's first query); after 2 s the resolvers' arguments (all queried arguments
+  on a first query) show the fallback with the loading note, until the answer
+  replaces it. The query is not cancelled.
+- **Search as you type.** A searchable argument's input carries
+  `WidgetSearchKey`, a callback `WidgetSelection` calls with the text typed in
+  its dropdown (`''` when it opens or closes). `WidgetFunction/widgetSearch.ts`
+  sends a second query for that argument alone, with `search` set to the text
+  once typing pauses for `SEARCH_DEBOUNCE_MS` (250 ms); an answer whose `search`
+  echo is not the current text is dropped (latest wins), and the answer's widget
+  replaces the argument's while the text is there. The local filter still
+  applies on top, matching anywhere in a name for a searchable argument (the
+  engine's search does) and the start of a name otherwise. Only the Database
+  table-name pickers are searchable today.
 - `WidgetFunction/formatForPath.ts` — with `format` on `Auto_Detect`, which
   format library a call's new `path` needs: the one format type whose options'
   `patterns` match the file name (case ignored). `WidgetFunction.vue`'s
