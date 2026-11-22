@@ -18,6 +18,14 @@ add_specs suite_builder =
             Choice.Option "X" "..X" requires="A.B.C" . to_json . should_equal '{"label":"X","value":"..X","parameters":[],"icon":"","requires":"A.B.C"}'
             Choice.Option "X" "..X" patterns=["*.x"] . to_json . should_equal '{"label":"X","value":"..X","parameters":[],"icon":"","patterns":["*.x"]}'
 
+        group_builder.specify "a grouped option serialises its nested options and their pickers with their own JSON" <|
+            picker = Widget.Column_Name kinds=[Column_Kind.Textual]
+            inner = Choice.Option "..Regex_Match" "..Regex_Match" [["pattern", picker]]
+            json = Choice.Option "Text" [inner] . to_json
+            json.should_equal ('{"label":"Text","value":[' + inner.to_json + '],"parameters":[],"icon":""}')
+            json.should_contain '"kinds":["Textual"]'
+            json.should_contain '"from":null'
+
     suite_builder.group "Column pickers to_json" group_builder->
         group_builder.specify "Column_Name with its defaults" <|
             Widget.Column_Name . to_json . should_equal '{"constructor":"Column_Name","kinds":[],"from":null,"expression":false,"reference":false,"extra":[],"columns_first":false}'

@@ -114,6 +114,51 @@ describe('functionCallFromAnswer', () => {
     })
   })
 
+  test('expands a picker nested in a grouped option', () => {
+    const picker = {
+      constructor: 'Column_Name',
+      kinds: ['Textual'],
+      from: null,
+      expression: false,
+      reference: false,
+      extra: [],
+      columns_first: false,
+    }
+    const answer = widgetQueryAnswerSchema.parse({
+      arguments: [
+        [
+          'filter',
+          {
+            widget: {
+              constructor: 'Single_Choice',
+              values: [
+                {
+                  label: 'Text',
+                  value: [
+                    {
+                      label: '..Regex_Match',
+                      value: '..Regex_Match',
+                      parameters: [['pattern', picker]],
+                    },
+                  ],
+                  parameters: [],
+                },
+              ],
+            },
+          },
+        ],
+      ],
+      columns: { '': { names: ['A', 'B'], kinds: ['Textual', 'Numeric'], type_names: ['', ''] } },
+    })
+    const filter = functionCallFromAnswer(answer).parameters.get('filter')
+    const group = filter?.kind === 'Single_Choice' ? filter.values[0] : undefined
+    const inner = Array.isArray(group?.value) ? group.value[0] : undefined
+    expect(inner?.parameters[0]?.[1]).toEqual({
+      kind: 'Single_Choice',
+      values: [{ label: 'A', value: "'A'", parameters: [] }],
+    })
+  })
+
   test('keeps the errors apart from the widgets', () => {
     const answer = widgetQueryAnswerSchema.parse({
       arguments: [

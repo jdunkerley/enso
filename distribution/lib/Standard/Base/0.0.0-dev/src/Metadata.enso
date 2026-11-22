@@ -63,7 +63,10 @@ type Choice
             '[' + ((self.parameters.map p-> '[' + p.first.to_json + ',' + p.second.to_json + ']').join ',') + ']'
         requires_json = if self.requires == "" then "" else ',"requires":' + self.requires.to_json
         patterns_json = if self.patterns.is_empty then "" else ',"patterns":' + self.patterns.to_json
-        '{"label":' + self.label.to_json + ',"value":' + self.value.to_json + ',"parameters":' + parameter_json + ',"icon":' + self.icon.to_json + requires_json + patterns_json + '}'
+        value_json = case self.value of
+            _ : Vector -> '[' + (self.value.map v-> v.to_json).join ',' + ']'
+            _ -> self.value.to_json
+        '{"label":' + self.label.to_json + ',"value":' + value_json + ',"parameters":' + parameter_json + ',"icon":' + self.icon.to_json + requires_json + patterns_json + '}'
 
 type File_Type
     ## Describes a file type.

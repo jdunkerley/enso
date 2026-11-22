@@ -145,6 +145,16 @@ add_specs suite_builder =
             pattern.kinds . should_equal [Column_Kind.Textual]
             pattern.extra.map .label . should_equal ["<Regular Expression>"]
 
+        group_builder.specify "the nested Regex_Match pattern picker travels as a picker in the filter answer" <|
+            json = Widget_Query.resolve_call mock_table table_module table_type "filter" ["filter"] . parse_json
+            choice = json.get "arguments" . first . second . get "widget"
+            text_group = choice.get "values" . find o-> o.get "label" == "Text"
+            regex = text_group.get "value" . find o-> o.get "label" == "..Regex_Match"
+            pattern = regex.get "parameters" . first . second
+            pattern.get "constructor" . should_equal "Column_Name"
+            pattern.get "kinds" . should_equal ["Textual"]
+            pattern.get "from" . should_equal Nothing
+
         group_builder.specify "set's Simple_Expression operands offer the kinds the operation accepts" <|
             json = Widget_Query.resolve_call mock_table table_module table_type "set" ["value"]
             kinds_for label parameter kinds_vector =
