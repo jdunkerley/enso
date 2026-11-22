@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [Widgets that depend on other arguments (join conditions, filter values,
+  column formats) update only when those arguments change, show a loading marker
+  when slow, and fall back to the type's own widget when an input has an error.
+  Database table-name pickers search the database as you type.][933]
 - [Arguments that accept several types of value, such as a number or `Nothing`,
   show a small icon for the kind of value; on a selected node it opens a list of
   the kinds, and choosing one writes a value of that kind. Regular-expression
@@ -607,6 +611,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[933]: https://github.com/jdunkerley/enso/pull/933
 [926]: https://github.com/jdunkerley/enso/pull/926
 [917]: https://github.com/jdunkerley/enso/pull/917
 [912]: https://github.com/jdunkerley/enso/pull/912
