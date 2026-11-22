@@ -21,7 +21,8 @@ export const WIDGET_TYPE = 'Standard.Base.Metadata.Widget'
 export const RESOLVE_TYPE_EXPRESSION = (typeName: string) =>
   `${MODULE_CALL} 'Standard.Base.Metadata.Widget_Query' 'resolve_type' [] '${typeName}'`
 
-const answerSchema = z.union([
+/** The answer of `Widget_Query.resolve_type` (exported for the tests). */
+export const answerSchema = z.union([
   z.object({ widget: widgetConfigurationSchema.nullable() }),
   z.object({ error: z.object({ step: z.string(), message: z.string() }) }),
 ])
