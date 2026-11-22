@@ -24,6 +24,7 @@ import {
   namedDependencies,
   queryUuids,
   revisionStamp,
+  withoutUnsetDependencyNotes,
 } from '$/providers/openedProjects/widgetRegistry/widgetQueryPlan'
 import type { ToValue } from '$/utils/reactivity'
 import { Ast } from '@/util/ast'
@@ -473,6 +474,8 @@ export function useWidgetFunctionCallInfo(
     const inherited = inheritedConfig.value
     if (answer) {
       const call = functionCallFromAnswer(answer, inherited, toValue(schemaCache))
+      // An unset dependency is no problem to show (`withoutUnsetDependencyNotes`).
+      call.notes = withoutUnsetDependencyNotes(call.notes, new Set(Object.keys(allUuids.value)))
       const searched = search.answer.value
       if (
         searched &&

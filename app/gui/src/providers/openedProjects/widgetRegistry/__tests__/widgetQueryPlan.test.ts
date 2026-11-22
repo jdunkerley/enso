@@ -7,6 +7,7 @@ import {
   namedDependencies,
   queryUuids,
   revisionStamp,
+  withoutUnsetDependencyNotes,
 } from '../widgetQueryPlan'
 
 const all = { right: 'id-right', on: 'id-on', join_kind: 'id-kind' }
@@ -84,4 +85,29 @@ test('isStaticAnswer', () => {
 test('the time constants', () => {
   expect(SEARCH_DEBOUNCE_MS).toBe(250)
   expect(RESOLVER_TIME_BOX_MS).toBe(2000)
+})
+
+describe('withoutUnsetDependencyNotes', () => {
+  const unavailable = (dependency: string) =>
+    ({ kind: 'unavailable', dependency, message: 'boom' }) as const
+  test('an unset dependency gets no marker (a Missing_Argument, not a problem)', () => {
+    expect(withoutUnsetDependencyNotes(new Map([['on', unavailable('right')]]), new Set())).toBe(
+      undefined,
+    )
+  })
+  test('a set dependency whose value is an error keeps it', () => {
+    const notes = new Map([['on', unavailable('right')]])
+    expect(withoutUnsetDependencyNotes(notes, new Set(['right']))).toEqual(notes)
+  })
+  test('`self` and loading notes are kept', () => {
+    const notes = new Map<string, ReturnType<typeof unavailable> | { kind: 'loading' }>([
+      ['on', unavailable('self')],
+      ['columns', { kind: 'loading' }],
+      ['other', unavailable('right')],
+    ])
+    expect([...(withoutUnsetDependencyNotes(notes, new Set())?.keys() ?? [])]).toEqual([
+      'on',
+      'columns',
+    ])
+  })
 })

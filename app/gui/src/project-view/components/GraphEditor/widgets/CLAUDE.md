@@ -238,7 +238,12 @@ render only its own slot content. The icon is already on the row, drawn by
   `Standard.Base.Metadata.Widget_Query.resolve_call` on the call's subject, with
   literal arguments (the method's module, type and name, the argument names, the
   argument expression ids, and `subjectIsType`), so nothing is compiled in the
-  user's module and it needs no import. The answer is
+  user's module and it needs no import. A call with no subject (an auto-scoped
+  constructor, `format=..Delimited`) hangs its query on its node's expression,
+  not on itself: the engine caches only binding expressions and self arguments,
+  so a query on a constructor inside a computed node was answered only when the
+  node ran again (Note [A Query With No Subject Hangs On Its Node],
+  `subjectlessQueryFrame`). The answer is
   `{"arguments":[[name, {"widget":…}|{"error":{"step","message"}}],…]}`, read by
   `widgetQueryAnswerSchema`; `functionCallFromAnswer` turns it into the call's
   configuration, and a failed argument lands in `FunctionCall.errors`. An error
@@ -275,16 +280,25 @@ render only its own slot content. The icon is already on the row, drawn by
   default is a resolver (`TypeDefaults.resolverDefault`, single types only) are
   resolved by the query too, named in `type_defaults`.
 - **Notes: the fallback, and why.** `WidgetQueryNote.vue` (priority 3, after
-  `WidgetQueryError`) draws a marker before the argument when the input carries
+  `WidgetQueryError`) marks an argument whose input carries
   `WidgetQueryNoteKey`: `unavailable` (an `info` icon; a dependency of the
   resolver is an error, "Choices unavailable: right has an error.") or `loading`
-  (a spinner; "Loading choices…"). The argument itself has no widget from the
-  query then, so it shows the call tree's ordinary fallback: its type default,
-  else literals and `tagValues`. **The time-box** (`RESOLVER_TIME_BOX_MS`, 2 s):
-  until a query is answered, the previous answer's widgets stay (`Pending` on a
-  node's first query); after 2 s the resolvers' arguments (all queried arguments
-  on a first query) show the fallback with the loading note, until the answer
-  replaces it. The query is not cancelled.
+  (a spinner; "Loading choices…"). The marker
+  (`WidgetQueryNote/QueryNoteMarker.vue`, the kind chip's box: a port high,
+  centred on the row) stands inside the argument's chip, after its name: where
+  `WidgetArgumentName` draws the name, the note is handed down to it
+  (`NoteAfterNameKey`, as the kind chip is), elsewhere it stands in front of the
+  value. A dependency the call does not set gets no `unavailable` note
+  (`withoutUnsetDependencyNotes` in `widgetQueryPlan.ts`): unset, it is a
+  `Missing_Argument` to the engine, not a problem to show; only a set argument
+  whose value is an error (a connected `Error.throw` node, say) does. The
+  argument itself has no widget from the query then, so it shows the call tree's
+  ordinary fallback: its type default, else literals and `tagValues`. **The
+  time-box** (`RESOLVER_TIME_BOX_MS`, 2 s): until a query is answered, the
+  previous answer's widgets stay (`Pending` on a node's first query); after 2 s
+  the resolvers' arguments (all queried arguments on a first query) show the
+  fallback with the loading note, until the answer replaces it. The query is not
+  cancelled.
 - **Search as you type.** A searchable argument's input carries
   `WidgetSearchKey`, a callback `WidgetSelection` calls with the text typed in
   its dropdown (`''` when it opens or closes). `WidgetFunction/widgetSearch.ts`

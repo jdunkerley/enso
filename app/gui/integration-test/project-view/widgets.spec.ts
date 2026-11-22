@@ -3284,7 +3284,7 @@ test.describe('Resolvers', () => {
     setupApi: {
       local: () =>
         setMockMainFile(
-          "from Standard.Base import Data\n\nmain =\n    joined = Data.join_like 'r1' 'a' 'k1'\n    first = Data.static_like 'a'\n    second = Data.static_like 'b'\n    listed = Data.tables_like 'q'\n",
+          "from Standard.Base import Data\n\nmain =\n    joined = Data.join_like 'r1' 'a' 'k1'\n    first = Data.static_like 'a'\n    second = Data.static_like 'b'\n    listed = Data.tables_like 'q'\n    unjoined = Data.join_like on='a'\n",
         ),
     },
   })
@@ -3431,6 +3431,34 @@ test.describe('Resolvers', () => {
     // The fallback is Text's own widget, still editable.
     await expect(on.locator('.WidgetText')).toHaveCount(1)
     await expect(on.locator('.WidgetSelection')).toHaveCount(0)
+  })
+
+  // An unset `right` is a `Missing_Argument` to the engine, which answers `unavailable` as for a
+  // real error; the GUI shows no marker for an argument the call does not set (#933).
+  test('an unset dependency gets no note', async ({ editorPage, page }) => {
+    setMockResolverAnswer('.join_like', () => ({
+      arguments: [
+        ['right', { widget: choice('r1', 'r2') }],
+        [
+          'on',
+          {
+            widget: null,
+            resolver: onResolver,
+            unavailable: { dependency: 'right', message: 'Provide a value for right.' },
+          },
+        ],
+        ['join_kind', { widget: choice('k1', 'k2') }],
+      ],
+    }))
+    await editorPage.mockSuggestion(method('join_like', ['right', 'on', 'join_kind']))
+    await mockMethodCallInfo(page, 'unjoined', {
+      ...pointer('join_like'),
+      notAppliedArguments: [0, 2],
+    })
+    const node = locate.graphNodeByBinding(page, 'unjoined')
+    const on = argument(node, 'on')
+    await expect(on.locator('.WidgetText')).toHaveCount(1)
+    await expect(node.getByTestId('widget-query-note-unavailable')).toHaveCount(0)
   })
 
   test('a slow resolver shows a loading marker, then its widget', async ({ editorPage, page }) => {

@@ -13,7 +13,7 @@
  * or the search text. An argument nothing depends on changing leaves the configuration equal, so
  * nothing is asked.
  */
-import type { ResolverInfo, WidgetQueryAnswer } from './configuration'
+import type { ResolverInfo, WidgetQueryAnswer, WidgetQueryNote } from './configuration'
 
 /** How long typing pauses before a searchable argument's text is sent. */
 export const SEARCH_DEBOUNCE_MS = 250
@@ -74,3 +74,24 @@ export function revisionStamp(
     .join('.')
 }
 let nextRevisionId = 1
+
+/**
+ * `notes` without the "unavailable" ones whose dependency is not set in the call (`applied`: the
+ * names of the arguments the call's code has). An unset argument is a `Missing_Argument` error to
+ * the engine, but not a problem to show: the argument keeps the widget it has without the
+ * resolver (`join`'s `on` with `right` unset, whose right column is then free text). Only a set
+ * argument whose value is an error (a dataflow error or a panic) gets the marker.
+ */
+export function withoutUnsetDependencyNotes(
+  notes: ReadonlyMap<string, WidgetQueryNote> | undefined,
+  applied: ReadonlySet<string>,
+): Map<string, WidgetQueryNote> | undefined {
+  if (notes == null) return undefined
+  const kept = new Map(
+    [...notes].filter(
+      ([, note]) =>
+        note.kind !== 'unavailable' || note.dependency === 'self' || applied.has(note.dependency),
+    ),
+  )
+  return kept.size > 0 ? kept : undefined
+}

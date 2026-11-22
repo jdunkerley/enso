@@ -10,6 +10,8 @@ import {
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import RequiredArgumentArrow from '@/components/GraphEditor/widgets/WidgetArgumentName/RequiredArgumentArrow.vue'
 import KindChip from '@/components/GraphEditor/widgets/WidgetKindPicker/KindChip.vue'
+import { NoteAfterNameKey } from '@/components/GraphEditor/widgets/WidgetQueryNote/noteAfterNameKey'
+import QueryNoteMarker from '@/components/GraphEditor/widgets/WidgetQueryNote/QueryNoteMarker.vue'
 import {
   KindChipKey,
   chipReplacesValue,
@@ -52,6 +54,8 @@ const primary = computed(() => props.nesting < 2)
 
 /** The kind picker's chip, handed down to stand between the name and the value. */
 const kindChip = computed(() => props.input[KindChipKey])
+/** A widget query note's marker, handed down to stand after the name, inside the argument. */
+const queryNote = computed(() => props.input[NoteAfterNameKey])
 const showValue = computed(
   () =>
     showArgumentValue.value &&
@@ -62,6 +66,7 @@ const innerInput = computed(() => ({
   ...props.input,
   [ArgumentNameShownKey]: true,
   [KindChipKey]: undefined,
+  [NoteAfterNameKey]: undefined,
 }))
 
 const childWidgetRef = useTemplateRef<typeof NodeWidget>('childWidgetRef')
@@ -127,6 +132,7 @@ export const ArgumentNameShownKey: unique symbol = Symbol.for('WidgetInput:Argum
         props.input[ArgumentInfoKey].info.name
       }}</span>
     </span>
+    <QueryNoteMarker v-if="queryNote" :note="queryNote" />
     <KindChip v-if="kindChip" v-bind="kindChip" />
     <NodeWidget v-if="showValue" ref="childWidgetRef" :input="innerInput" allowEmpty />
   </div>
