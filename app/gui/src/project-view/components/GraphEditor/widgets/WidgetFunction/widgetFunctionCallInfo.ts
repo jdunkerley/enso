@@ -35,6 +35,28 @@ import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { widgetQueryConfiguration } from './widgetQuery'
 
 /**
+ * The expression a query with no subject hangs on: the node the call is in, else the call itself.
+ *
+ * Note [A Query With No Subject Hangs On Its Node]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A widget query is a visualization, and the engine runs a visualization when it computes the
+ * expression it is attached to, or at once if that expression's value is in its cache. It caches
+ * a node's value, but not those of the expressions inside it. A call with no subject (an
+ * auto-scoped constructor such as `format=..Delimited`) is usually inside a node, and one picked
+ * from a dropdown is new code in a node the engine has already computed: attached to the call
+ * itself, its query was answered only when something re-ran the node (#933: `delimiter`'s
+ * choices came only after a refresh). Such a query sends `subject_is_type`, so the value it is
+ * attached to is never read, and the node's is as good as any; the arguments the query reads are
+ * looked up by their own ids.
+ */
+export function subjectlessQueryFrame(
+  call: Ast.Expression,
+  graphDb: Pick<GraphDb, 'getExpressionNodeId'>,
+): ExternalId {
+  return graphDb.getExpressionNodeId(call.id) ?? call.externalId
+}
+
+/**
  * A composable gathering information about call for WidgetFunction basing on AST and
  * expression updates.
  */
@@ -138,11 +160,12 @@ export function useWidgetFunctionCallInfo(
     if (!annotatedArgs?.length) return null
     const names = toValue(projectNames)
     const pointer = info.methodCall.methodPointer
-    // No subject expression (an autoscoped constructor, a static call with no subject): the query
-    // hangs on the call itself, and annotations see the method's type, as before.
+    // No subject expression (an autoscoped constructor, a static call with no subject): the
+    // annotations see the method's type, and the query hangs on the call's node (Note [A Query
+    // With No Subject Hangs On Its Node]).
     const subjectId = widgetQuerySubjectExpressionId.value
     return widgetQueryConfiguration(
-      subjectId ?? toValue(input).value.externalId,
+      subjectId ?? subjectlessQueryFrame(toValue(input).value, toValue(graphDb)),
       {
         module: names.serializeProjectPathForBackend(pointer.module),
         definedOnType: names.serializeProjectPathForBackend(pointer.definedOnType),
@@ -235,7 +258,9 @@ export function useWidgetFunctionCallInfo(
     } satisfies FunctionCall
   })
 
-  const callFrame = computed(() => toValue(input).value.externalId)
+  // A type's query does not read the frame's value either: its node is a frame the engine answers
+  // in at once (Note [A Query With No Subject Hangs On Its Node]).
+  const callFrame = computed(() => subjectlessQueryFrame(toValue(input).value, toValue(graphDb)))
 
   const application = computed(() => {
     const call = interpreted.value

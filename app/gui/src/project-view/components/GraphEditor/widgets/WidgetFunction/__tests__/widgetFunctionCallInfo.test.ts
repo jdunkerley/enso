@@ -111,6 +111,7 @@ test.each`
             }
           }
         },
+        getExpressionNodeId: () => undefined,
         getExpressionInfo(astId) {
           if (subjectSpan != null && astId === id('subject')) {
             return {
@@ -157,6 +158,57 @@ test.each`
   },
 )
 
+// Note [A Query With No Subject Hangs On Its Node]: `format=..Delimited` picked in a computed
+// node. The engine caches the node's value, not the constructor's, so a query on the constructor
+// was answered only when the node ran again (#933).
+test('a query with no subject inside a node hangs on the node', () => {
+  const code = 'outer (..Con val1)'
+  const { ast, eid, id } = parseWithSpans(code, {
+    node: SourceRange.fromStartAndLength(0, code.length),
+    call: SourceRange.fromStartAndLength(7, 10),
+  })
+  let inner: Ast.Expression | undefined
+  Ast.visitRecursive(ast, (a) => {
+    if (a.externalId === eid('call') && a instanceof Ast.App) inner = a
+    return inner == null
+  })
+  assert(inner != null)
+  let visConfig: WatchSource<Opt<NodeVisualizationConfiguration>> | undefined
+  useWidgetFunctionCallInfo(
+    WidgetInput.FromAst(inner),
+    {
+      getMethodCallInfo(astId) {
+        if (astId === id('call')) {
+          return {
+            suggestion: con,
+            methodCallSource: astId,
+            methodCall: { notAppliedArguments: [], methodPointer: callPointer(con) },
+          }
+        }
+      },
+      getExpressionInfo() {},
+      getExpressionNodeId: (astId) => (astId === id('call') ? eid('node') : undefined),
+      isNodeUsage: () => false,
+    } as GraphDb,
+    {
+      useVisualizationData(config) {
+        visConfig = config
+        return ref(null)
+      },
+      moduleProjectPath: projectNames.parseProjectPathRaw('local.Project.Main'),
+      assetId: 'project-id',
+    },
+    projectNames,
+    [],
+  )
+  const config = toValue<Opt<NodeVisualizationConfiguration>>(visConfig!)
+  assert(config != null)
+  expect(config.expressionId).toBe(eid('node'))
+  expect(config.expressionId).not.toBe(eid('call'))
+  // `subject_is_type`: the node's value is not read.
+  expect(config.positionalArgumentsExpressions![5]).toBe('True')
+})
+
 /** Set up the call info of `code` (a call of `callSuggestion`) with the widget query answering `data`. */
 function setUpCallInfo(
   code: string,
@@ -184,6 +236,7 @@ function setUpCallInfo(
           }
         },
         getExpressionInfo() {},
+        getExpressionNodeId: () => undefined,
         isNodeUsage: () => false,
       } as GraphDb,
       {
