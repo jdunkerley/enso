@@ -98,6 +98,7 @@ import project.Base_Widgets_Spec
 import project.Type_Default_Spec
 import project.Widget_Columns_Spec
 import project.Widget_Query_Spec
+import project.Widget_Resolver_Spec
 import project.Random_Spec
 
 
@@ -190,6 +191,7 @@ main filter=Nothing =
         Widget_Query_Spec.add_specs suite_builder
         Type_Default_Spec.add_specs suite_builder
         Widget_Columns_Spec.add_specs suite_builder
+        Widget_Resolver_Spec.add_specs suite_builder
         Decimal_Spec.add_specs suite_builder
         Runner_Spec.add_specs suite_builder
 
