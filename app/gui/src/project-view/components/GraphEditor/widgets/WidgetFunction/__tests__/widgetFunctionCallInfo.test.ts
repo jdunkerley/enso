@@ -207,7 +207,8 @@ test('a query with no subject inside a node hangs on the node', () => {
     } as GraphDb,
     {
       useVisualizationData(config) {
-        visConfig = config
+        // The node's query is the first; the second is the search query.
+        visConfig ??= config
         return ref(null)
       },
       moduleProjectPath: projectNames.parseProjectPathRaw('local.Project.Main'),
@@ -413,6 +414,7 @@ function setUpResolverQuery(
         getExpressionInfo(exprId) {
           return values.get(exprId as string) as never
         },
+        getExpressionNodeId: () => undefined,
         isNodeUsage: () => false,
       } as GraphDb,
       {
