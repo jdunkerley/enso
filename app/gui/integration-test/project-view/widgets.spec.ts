@@ -2341,3 +2341,147 @@ test.describe('Type defaults from the library', () => {
     await expect(node.locator('.WidgetText')).toHaveCount(0)
   })
 })
+
+test.describe('Column pickers', () => {
+  const ANY_TYPE = 'Standard.Base.Any.Any'
+  test.afterEach(restoreMockMainFile)
+  test.afterEach(restoreMockWidgetConfigurations)
+  test.use({
+    setupApi: {
+      local: () =>
+        setMockMainFile(
+          'from Standard.Base import Data\n\nmain =\n    summed = Data.aggregate_by (..Sum)\n    joined = Data.join_on\n    lone = Data.lone_column\n',
+        ),
+    },
+  })
+
+  /* eslint-disable camelcase */
+  const picker = (from: string | null) => ({
+    type: 'Widget',
+    constructor: 'Column_Name',
+    kinds: [],
+    from,
+    expression: false,
+    reference: false,
+    extra: [],
+    columns_first: false,
+  })
+  const columnsOf = (...names: string[]) => ({
+    names,
+    kinds: names.map(() => 'Textual'),
+    type_names: names.map(() => 'Char'),
+  })
+  /* eslint-enable camelcase */
+
+  function method(name: string, args: string[]) {
+    return {
+      type: 'method' as const,
+      module: 'Standard.Base.Data',
+      name,
+      arguments: args.map((arg) => ({
+        name: arg,
+        reprType: ANY_TYPE,
+        isSuspended: false,
+        hasDefault: false,
+      })),
+      selfType: 'Standard.Base.Data',
+      returnType: 'Standard.Base.Data.Numbers.Integer',
+      isStatic: true,
+      annotations: args,
+    }
+  }
+
+  function pointer(name: string) {
+    return {
+      methodPointer: {
+        module: 'Standard.Base.Data',
+        definedOnType: 'Standard.Base.Data',
+        name,
+      },
+      notAppliedArguments: [0],
+    }
+  }
+
+  test('a nested column picker inside an aggregate choice expands', async ({
+    editorPage,
+    page,
+    localApi,
+  }) => {
+    await editorPage
+      .mockSuggestion(method('aggregate_by', ['aggregate']))
+      .mockSuggestion(method('Sum', ['column']))
+    await localApi.updateVisualization('.aggregate_by', {
+      arguments: [
+        [
+          'aggregate',
+          {
+            widget: {
+              type: 'Widget',
+              constructor: 'Single_Choice',
+              values: [
+                {
+                  type: 'Choice',
+                  constructor: 'Option',
+                  value: '..Sum',
+                  label: 'Sum',
+                  parameters: [['column', picker(null)]],
+                },
+              ],
+            },
+          },
+        ],
+      ],
+      columns: { '': columnsOf('Column A', 'Column B') },
+    })
+    await mockMethodCallInfo(page, 'summed', pointer('aggregate_by'))
+    await mockMethodCallInfo(page, { binding: 'summed', expr: '..Sum' }, pointer('Sum'))
+    const node = locate.graphNodeByBinding(page, 'summed')
+    // The first selection inside the call's argument is the nested `column`'s.
+    const aggregateSelection = node.locator('.WidgetSelection').first()
+    await expect(aggregateSelection.locator('.WidgetSelection')).toHaveCount(1)
+    const dropDown = new DropDownLocator(aggregateSelection)
+    await dropDown.clickWidget()
+    await dropDown.expectVisibleWithOptions(['Column A', 'Column B'])
+  })
+
+  test("join's right columns appear once right is set", async ({ editorPage, page, localApi }) => {
+    await editorPage.mockSuggestion(method('join_on', ['right_on']))
+    const answer = (columns: Record<string, unknown>) => ({
+      arguments: [['right_on', { widget: picker('right') }]],
+      columns,
+    })
+    // `right` is not set: its picker has no source and is free text.
+    await localApi.updateVisualization(
+      '.join_on',
+      answer({ '': columnsOf('Column A', 'Column B') }),
+    )
+    await mockMethodCallInfo(page, 'joined', pointer('join_on'))
+    const node = locate.graphNodeByBinding(page, 'joined')
+    await expect(node.locator('.WidgetSelection')).toHaveCount(0)
+    await expect(node.locator('.WidgetText')).toHaveCount(1)
+    // `right` is set: the right table's columns are offered.
+    await localApi.updateVisualization(
+      '.join_on',
+      answer({
+        '': columnsOf('Column A', 'Column B'),
+        right: columnsOf('Right X', 'Right Y'),
+      }),
+    )
+    const arg = node.locator('.WidgetTopLevelArgument').first()
+    const dropDown = new DropDownLocator(arg)
+    await dropDown.clickWidget()
+    await dropDown.expectVisibleWithOptions(['Right X', 'Right Y'])
+  })
+
+  test('a column picker with no source is a text input', async ({ editorPage, page, localApi }) => {
+    await editorPage.mockSuggestion(method('lone_column', ['column']))
+    await localApi.updateVisualization('.lone_column', {
+      arguments: [['column', { widget: picker(null) }]],
+    })
+    await mockMethodCallInfo(page, 'lone', pointer('lone_column'))
+    const node = locate.graphNodeByBinding(page, 'lone')
+    await expect(node.locator('.WidgetTopLevelArgument')).toHaveCount(1)
+    await expect(node.locator('.WidgetText')).toHaveCount(1)
+    await expect(node.locator('.WidgetSelection')).toHaveCount(0)
+  })
+})

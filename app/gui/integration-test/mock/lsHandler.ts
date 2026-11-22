@@ -373,6 +373,20 @@ NmZmYiIGQ9Ik0wIDBoNDB2NDBIMHoiLz48L2NsaXBQYXRoPjwvZGVmcz48L3N2Zz4=`,
     ]),
   }
 
+/* eslint-disable camelcase */
+/** A reference to a single-column picker over the subject's columns. */
+const COLUMN_PICKER = {
+  type: 'Widget',
+  constructor: 'Column_Name',
+  kinds: [],
+  from: null,
+  expression: false,
+  reference: false,
+  extra: [],
+  columns_first: false,
+}
+/* eslint-enable camelcase */
+
 const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
   [
     '.read',
@@ -404,121 +418,89 @@ const initialMockWidgetConfigurations: Map<string, Uint8Array> = new Map([
   ],
   [
     '.select_columns',
-    encodeJSON([
-      [
-        'columns',
-        {
-          type: 'Widget',
-          constructor: 'Multiple_Choice',
-          values: [
-            {
-              type: 'Choice',
-              constructor: 'Option',
-              value: "'Column A'",
-              label: 'Column A',
-              parameters: [],
+    // The engine sends a reference to the column picker and the subject's columns once; the GUI
+    // expands the reference into the choices.
+    encodeJSON({
+      arguments: [
+        [
+          'columns',
+          {
+            widget: {
+              type: 'Widget',
+              constructor: 'Column_Names',
+              /* eslint-disable camelcase */
+              kinds: [],
+              from: null,
+              regex: false,
+              by_type: false,
+              /* eslint-enable camelcase */
             },
-            {
-              type: 'Choice',
-              constructor: 'Option',
-              value: "'Column B'",
-              label: 'Column B',
-              parameters: [],
-            },
-          ],
-        },
+          },
+        ],
       ],
-    ]),
+      columns: {
+        '': {
+          names: ['Column A', 'Column B'],
+          kinds: ['Textual', 'Textual'],
+          // eslint-disable-next-line camelcase
+          type_names: ['Char', 'Char'],
+        },
+      },
+    }),
   ],
   [
     '.aggregate',
-    encodeJSON([
-      [
-        'columns',
-        {
-          type: 'Widget',
-          constructor: 'Vector_Editor',
-          /* eslint-disable camelcase */
-          item_default: 'Aggregate_Column.Group_By',
-          item_editor: {
-            type: 'Widget',
-            constructor: 'Single_Choice',
-            values: [
-              {
-                type: 'Choice',
-                constructor: 'Option',
-                value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Group_By',
-                label: null,
-                parameters: [
-                  [
-                    'column',
-                    {
-                      type: 'Widget',
-                      constructor: 'Single_Choice',
-                      values: [
-                        {
-                          type: 'Choice',
-                          constructor: 'Option',
-                          value: '"column 1"',
-                          label: 'column 1',
-                          parameters: [],
-                        },
-                        {
-                          type: 'Choice',
-                          constructor: 'Option',
-                          value: '"column 2"',
-                          label: 'column 2',
-                          parameters: [],
-                        },
-                      ],
-                    },
-                  ],
+    encodeJSON({
+      arguments: [
+        [
+          'columns',
+          {
+            widget: {
+              type: 'Widget',
+              constructor: 'Vector_Editor',
+              /* eslint-disable camelcase */
+              item_default: 'Aggregate_Column.Group_By',
+              item_editor: {
+                type: 'Widget',
+                constructor: 'Single_Choice',
+                values: [
+                  {
+                    type: 'Choice',
+                    constructor: 'Option',
+                    value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Group_By',
+                    label: null,
+                    parameters: [['column', COLUMN_PICKER]],
+                  },
+                  {
+                    type: 'Choice',
+                    constructor: 'Option',
+                    value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Count',
+                    label: null,
+                    parameters: [],
+                  },
+                  {
+                    type: 'Choice',
+                    constructor: 'Option',
+                    value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Count_Distinct',
+                    label: null,
+                    parameters: [['columns', COLUMN_PICKER]],
+                  },
                 ],
               },
-              {
-                type: 'Choice',
-                constructor: 'Option',
-                value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Count',
-                label: null,
-                parameters: [],
-              },
-              {
-                type: 'Choice',
-                constructor: 'Option',
-                value: 'Standard.Table.Aggregate_Column.Aggregate_Column.Count_Distinct',
-                label: null,
-                parameters: [
-                  [
-                    'columns',
-                    {
-                      type: 'Widget',
-                      constructor: 'Single_Choice',
-                      values: [
-                        {
-                          type: 'Choice',
-                          constructor: 'Option',
-                          value: '"column 1"',
-                          label: 'column 1',
-                          parameters: [],
-                        },
-                        {
-                          type: 'Choice',
-                          constructor: 'Option',
-                          value: '"column 2"',
-                          label: 'column 2',
-                          parameters: [],
-                        },
-                      ],
-                    },
-                  ],
-                ],
-              },
-            ],
+              /* eslint-enable camelcase */
+            },
           },
-          /* eslint-enable camelcase */
-        },
+        ],
       ],
-    ]),
+      columns: {
+        '': {
+          names: ['column 1', 'column 2'],
+          kinds: ['Textual', 'Textual'],
+          // eslint-disable-next-line camelcase
+          type_names: ['Char', 'Char'],
+        },
+      },
+    }),
   ],
   [
     '.expr',
