@@ -93,9 +93,18 @@ render only its own slot content. The icon is already on the row, drawn by
     placeholders and text literals. `WidgetFileBrowser` claims a browse
     configuration, and otherwise only an argument of a declared `File`,
     `Writable_File` or `Enso_Secret` type whose configuration is an annotation's
-    `Single_Choice` or still `Pending` (the browse items join its options),
-    never under the kind picker and never from the type alone. An annotation's
-    configuration keeps claiming whatever the argument holds.
+    `Single_Choice` or `Text_Input`, or still `Pending` (the browse items join
+    its options, or sit in a dropdown over the text input: `Data.read`'s `path`
+    is `@path (Text_Input)` on `Text | URI | File`), never under the kind picker
+    and never from the type alone. An annotation's configuration keeps claiming
+    whatever the argument holds. A test of a browsable argument should answer
+    what the engine answers for it: a mocked `Single_Choice` hid the
+    `Text_Input` case (#926).
+  - **A submenu stays open while its item is in sight**
+    (`WidgetSelection/SelectionSubmenu.vue`): a list longer than the dropdown
+    scrolls, and clicking a partly hidden group (`filter`'s `Text →`) scrolls it
+    into view; only a scroll that takes the item out of sight closes its
+    submenu.
   - **A type default does not set the browse mode** (R9): `useBrowserTypeInfo`
     treats it as no configuration, so the declared type decides. A
     `File | Enso_Secret` union is a kind picker with File and Secret kinds, and

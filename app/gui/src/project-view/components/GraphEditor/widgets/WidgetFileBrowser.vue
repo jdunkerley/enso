@@ -101,17 +101,20 @@ const innerWidgetInput = computed(() => withBrowserItems(props.input, items.valu
 
 <script lang="ts">
 /**
- * Perfect for a browse configuration. A declared browsable type claims an input too when a
- * configuration that is not a type default (an annotation's options, or one still pending) is drawn
- * by a dropdown: the browse items join its options, as before the kind picker. Never from the type
- * alone, which the kind picker and the type defaults own.
+ * Perfect for a browse configuration. A declared browsable type claims an input too when its
+ * configuration is not a type default but an annotation's options, an annotation's text input, or
+ * one still pending: the browse items join the options, or sit in a dropdown over the text input, as
+ * before the kind picker. `Data.read`'s `path` (`Text | URI | File`, `@path (Text_Input)`) is the
+ * text input case. Never from the type alone, which the kind picker and the type defaults own.
  */
 function browseScore(input: WidgetInput): Score {
   const config = input.dynamicConfig
   if (config && SUPPORTED_DYNAMIC_CONFIG_KINDS.includes(config.kind)) return Score.Perfect
   const reprType = input[ArgumentInfoKey]?.info?.reprType
   return (
-      (config?.kind === 'Single_Choice' || config?.kind === 'Pending') &&
+      (config?.kind === 'Single_Choice' ||
+        config?.kind === 'Text_Input' ||
+        config?.kind === 'Pending') &&
         !isTypeDefault(config) &&
         input[UnderKindPickerKey] !== true &&
         reprType &&

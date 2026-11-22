@@ -1,5 +1,6 @@
 import type EditorPageActions from 'integration-test/actions/EditorPageActions'
 import { expect, test, type Locator, type Page } from 'integration-test/base'
+import type { MockLocalApi } from 'integration-test/mock/localApi'
 import {
   clearMockWidgetConfigurations,
   lastWidgetQueryArguments,
@@ -2695,6 +2696,34 @@ test.describe('Kind picker', () => {
     await expect(node.getByRole('button', { name: /change kind/ })).toHaveCount(0)
   })
 
+  // What the engine answers for `Data.read`'s `path` (`@path (Text_Input)`, declared
+  // `Text | URI | File`): an annotation's text input on a browsable type keeps the file browser, with
+  // the text input under its dropdown (#926).
+  test("Data.read's path with the engine's Text_Input keeps its file browser", async ({
+    page,
+    editorPage,
+    localApi,
+  }) => {
+    await editorPage
+    await localApi.updateVisualization('.read', {
+      arguments: [['path', { widget: { type: 'Widget', constructor: 'Text_Input' } }]],
+    })
+    await mockMethodCallInfo(page, 'rd', {
+      methodPointer: { module: T, definedOnType: T, name: 'read' },
+      notAppliedArguments: [0, 1, 2],
+    })
+    const node = locate.graphNodeByBinding(page, 'rd')
+    const pathArg = node.locator('.WidgetTopLevelArgument').filter({ has: page.getByText('path') })
+    await expect(pathArg).toHaveCount(1)
+    await expect(node.locator('.WidgetKindPicker')).toHaveCount(0)
+    await expect(pathArg.locator('.WidgetText')).toHaveCount(1)
+    const pathDropdown = new DropDownLocator(pathArg)
+    await pathArg.click()
+    await pathDropdown.expectVisibleWithOptions(CHOOSE_FILE_OPTIONS)
+    await pathDropdown.clickOption(CHOOSE_LOCAL_FILE)
+    await expect(pathArg.getByTestId('widget-text-content')).toHaveText('/path/to/some/mock/file')
+  })
+
   test('Text | File | Nothing offers File and Nothing, with the file browser beside the icon', async ({
     editorPage,
     page,
@@ -2771,7 +2800,7 @@ test.describe('Column pickers', () => {
     setupApi: {
       local: () =>
         setMockMainFile(
-          'from Standard.Base import Data\n\nmain =\n    summed = Data.aggregate_by (..Sum)\n    joined = Data.join_on\n    lone = Data.lone_column\n',
+          "from Standard.Base import Data\n\nmain =\n    summed = Data.aggregate_by (..Sum)\n    joined = Data.join_on\n    lone = Data.lone_column\n    filtered = Data.filter_by 'county' ..Contains\n    picked = Data.filter_by 'county'\n",
         ),
     },
   })
@@ -2905,5 +2934,133 @@ test.describe('Column pickers', () => {
     await expect(node.locator('.WidgetTopLevelArgument')).toHaveCount(1)
     await expect(node.locator('.WidgetText')).toHaveCount(1)
     await expect(node.locator('.WidgetSelection')).toHaveCount(0)
+  })
+
+  // As `Table.filter` answers (owner's #926 test): the conditions are grouped (`Text`), their
+  // operand is a picker referencing the call's subject, and a condition's constructor has no
+  // annotations of its own, so the operand's widget comes from the group's option alone.
+  async function mockFilterBy(editorPage: EditorPageActions, localApi: MockLocalApi) {
+    const operand = {
+      ...picker(null),
+      expression: true,
+      reference: true,
+      extra: [
+        {
+          type: 'Choice',
+          constructor: 'Option',
+          value: '""',
+          label: '<Text Value>',
+          parameters: [],
+        },
+      ],
+    }
+    const option = (value: string, parameters: unknown[] = []) => ({
+      type: 'Choice',
+      constructor: 'Option',
+      value,
+      label: value,
+      parameters,
+    })
+    await editorPage
+      .mockSuggestion(method('filter_by', ['column', 'filter']))
+      .mockSuggestion({ ...method('Contains', ['substring', 'case_sensitivity']), annotations: [] })
+    await localApi.updateVisualization('.filter_by', {
+      arguments: [
+        ['column', { widget: { ...picker(null), expression: true } }],
+        [
+          'filter',
+          {
+            widget: {
+              type: 'Widget',
+              constructor: 'Single_Choice',
+              // All of `Table.filter`'s top-level entries: more than the list shows at once, so
+              // it scrolls, and the last group is only partly visible.
+              values: [
+                option('..Equal', [['to', operand]]),
+                option('..Not_Equal', [['to', operand]]),
+                option('..Is_Nothing'),
+                option('..Not_Nothing'),
+                option('..Is_In'),
+                {
+                  type: 'Choice',
+                  constructor: 'Option',
+                  label: 'Comparisons',
+                  value: [option('..Less', [['than', operand]])],
+                  parameters: [],
+                },
+                {
+                  type: 'Choice',
+                  constructor: 'Option',
+                  label: 'Text',
+                  value: [
+                    option('..Is_Empty'),
+                    option('..Starts_With', [['prefix', operand]]),
+                    option('..Contains', [['substring', operand]]),
+                  ],
+                  parameters: [],
+                },
+              ],
+            },
+          },
+        ],
+      ],
+      columns: {
+        '': {
+          names: ['county', 'n'],
+          kinds: ['Textual', 'Numeric'],
+          // eslint-disable-next-line camelcase
+          type_names: ['Char', 'Integer'],
+        },
+      },
+    })
+  }
+
+  test('a grouped condition is picked from its submenu', async ({ editorPage, page, localApi }) => {
+    await mockFilterBy(editorPage, localApi)
+    await mockMethodCallInfo(page, 'picked', { ...pointer('filter_by'), notAppliedArguments: [1] })
+    const node = locate.graphNodeByBinding(page, 'picked')
+    const filterArg = node
+      .locator('.WidgetArgumentName')
+      .filter({ has: page.getByText('filter', { exact: true }) })
+      .last()
+    await expect(filterArg).toBeVisible()
+    await filterArg.click()
+    const dropDown = new DropDownLocator(filterArg)
+    await dropDown.expectVisibleWithOptions([
+      '..Equal',
+      '..Not_Equal',
+      '..Is_Nothing',
+      '..Not_Nothing',
+      '..Is_In',
+      'Comparisons →',
+      'Text →',
+    ])
+    // The click scrolls the partly hidden group into view; the submenu it opened stays open.
+    await dropDown.clickOption('Text →')
+    await expect(
+      page.locator('.DropdownWidget .item').filter({ hasText: '..Contains' }),
+    ).toBeVisible()
+    await page.locator('.DropdownWidget .item').filter({ hasText: '..Contains' }).click()
+    expect(await moduleCode(page)).toContain("picked = Data.filter_by 'county' ..Contains\n")
+  })
+
+  test("a grouped condition's operand lists the subject's columns", async ({
+    editorPage,
+    page,
+    localApi,
+  }) => {
+    await mockFilterBy(editorPage, localApi)
+    await mockMethodCallInfo(page, 'filtered', pointer('filter_by'))
+    await mockMethodCallInfo(page, { binding: 'filtered', expr: '..Contains' }, pointer('Contains'))
+    const node = locate.graphNodeByBinding(page, 'filtered')
+    const substring = node
+      .locator('.WidgetArgumentName')
+      .filter({ has: page.getByText('substring', { exact: true }) })
+      // The innermost: `filter`'s name chip holds the whole condition, `substring` included.
+      .last()
+    await expect(substring).toBeVisible()
+    await substring.click()
+    const dropDown = new DropDownLocator(substring)
+    await dropDown.expectVisibleWithOptions(['<Text Value>', '<Expression>', 'county', 'n'])
   })
 })
