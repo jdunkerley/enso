@@ -781,7 +781,6 @@ type DuckDB_Connection
        A file pointing at the written file.
     @query (make_table_name_with_schema_selector schema_black_list=schema_black_list add_custom=True)
     @on_existing_file Existing_File_Behavior.widget include_append=False
-    @format (Widget.from DuckDB_GeoFormat)
     write_spatial_file : (SQL_Query_With_Schema | SQL_Query | Table) -> Writable_File -> DuckDB_GeoFormat -> Existing_File_Behavior -> Writable_File
     write_spatial_file self (query:(SQL_Query_With_Schema | SQL_Query | Table)=Missing_Argument.throw "query") (path:Writable_File=Missing_Argument.throw "path") (format:DuckDB_GeoFormat=Missing_Argument.throw "format") on_existing_file:Existing_File_Behavior=..Backup =
         Error.return_if_error query

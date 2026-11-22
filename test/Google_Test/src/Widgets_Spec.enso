@@ -20,6 +20,10 @@ add_specs suite_builder =
             ["Standard.Google.Google_Analytics_Account.Google_Analytics_Account_Filter", "Standard.Google.Google_Analytics_Property.Google_Analytics_Property"].each type_name->
                 Widget_Query.resolve_type type_name . should_equal '{"widget":null,"resolver":{"dependencies":["self","credentials"],"searchable":false}}'
 
+        group_builder.specify "the property and account arguments have no annotation repeating their type default" <|
+            [["read", "property"], ["list_metrics", "property"], ["list_dimensions", "property"], ["list_properties", "account"]].each pair->
+                Meta.get_method_annotation module typ pair.first pair.second . should_equal Nothing
+
         group_builder.specify "read's metrics and dimensions read the property and the credentials" <|
             ["metrics", "dimensions"].each argument->
                 dependencies_of module typ "read" argument . should_equal '{"dependencies":["self","property","credentials"],"searchable":false}'

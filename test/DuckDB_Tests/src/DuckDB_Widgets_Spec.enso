@@ -12,8 +12,8 @@ duckdb_module = "Standard.DuckDB.DuckDB_Connection"
 duckdb_type = "Standard.DuckDB.DuckDB_Connection.DuckDB_Connection"
 
 ## The result for the one argument asked for, parsed.
-result_of connection method argument search="" uuids="{}" =
-    json = Widget_Query.resolve_call connection duckdb_module duckdb_type method [argument] uuids False search . parse_json
+result_of connection method argument search="" uuids="{}" type_defaults="{}" =
+    json = Widget_Query.resolve_call connection duckdb_module duckdb_type method [argument] uuids False search type_defaults . parse_json
     json.get "arguments" . first . second
 
 ## The labels of a Single_Choice or Multiple_Choice result.
@@ -86,10 +86,14 @@ add_specs suite_builder =
         group_builder.specify "resolve_type announces it" <|
             Widget_Query.resolve_type "Standard.DuckDB.DuckDB_GeoFormat.DuckDB_GeoFormat" . should_equal '{"widget":null,"resolver":{"dependencies":["self"],"searchable":false}}'
 
-        group_builder.specify "write_spatial_file's format is resolved against the connection" <|
+        group_builder.specify "write_spatial_file's format is resolved against the connection, through its type default" <|
             connection = Database.connect DuckDB.In_Memory
-            result = result_of connection "write_spatial_file" "format"
+            result = result_of connection "write_spatial_file" "format" type_defaults='{"format":"Standard.DuckDB.DuckDB_GeoFormat.DuckDB_GeoFormat"}'
             result.get "resolver" . get "dependencies" . should_equal ["self"]
+            result.get "widget" . get "constructor" . should_equal "Single_Choice"
+
+        group_builder.specify "write_spatial_file's format has no annotation repeating its type default" <|
+            Meta.get_method_annotation duckdb_module duckdb_type "write_spatial_file" "format" . should_equal Nothing
 
 main filter=Nothing =
     suite = Test.build suite_builder->

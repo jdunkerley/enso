@@ -176,7 +176,7 @@ add_specs suite_builder =
             json.contains '"kinds":["Numeric","Textual"]' . should_be_true
 
         group_builder.specify "generate_rows ranges offer numeric and date columns" <|
-            json = Widget_Query.resolve_call mock_table table_module table_type "generate_rows" ["over"]
+            json = Widget_Query.resolve_call mock_table table_module table_type "generate_rows" ["over"] "{}" False "" '{"over":"Standard.Table.Generate_Rows_Range.Generate_Rows_Range"}'
             json.contains '"kinds":["Numeric"]' . should_be_true
             json.contains '"kinds":["Date_Only"]' . should_be_true
 
@@ -240,11 +240,14 @@ add_specs suite_builder =
         group_builder.specify "Generate_Rows_Range's type default is a resolver of the table" <|
             Widget_Query.resolve_type "Standard.Table.Generate_Rows_Range.Generate_Rows_Range" . should_equal '{"widget":null,"resolver":{"dependencies":["self"],"searchable":false}}'
 
-        group_builder.specify "generate_rows' over resolves Generate_Rows_Range's widget against the table" <|
-            json = Widget_Query.resolve_call t table_module table_type "generate_rows" ["over"] . parse_json
+        group_builder.specify "generate_rows' over resolves Generate_Rows_Range's widget against the table, through its type default" <|
+            json = Widget_Query.resolve_call t table_module table_type "generate_rows" ["over"] "{}" False "" '{"over":"Standard.Table.Generate_Rows_Range.Generate_Rows_Range"}' . parse_json
             result = json.get "arguments" . first . second
             result.get "resolver" . get "dependencies" . should_equal ["self"]
             result.get "widget" . get "values" . map (o-> o.get "label") . should_equal ["..Integer_Range", "..Date_Range"]
+
+        group_builder.specify "generate_rows' over has no annotation repeating its type default" <|
+            Meta.get_method_annotation table_module table_type "generate_rows" "over" . should_equal Nothing
 
         group_builder.specify "type_defaults resolves an unannotated argument of that type against the table" <|
             json = Widget_Query.resolve_call t "enso_dev.Table_Tests.In_Memory.Table_Widgets_Spec" table_type "widget_test_expression" ["expression"] "{}" False "" '{"expression":"Standard.Table.Simple_Expression.Simple_Expression"}' . parse_json
