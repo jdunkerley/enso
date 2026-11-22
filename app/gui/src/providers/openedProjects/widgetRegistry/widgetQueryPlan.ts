@@ -8,7 +8,8 @@
  * The query is a visualization of the call's subject, so the engine re-runs it whenever the subject
  * is recomputed; that covers every resolver depending on `self`. Beyond that, it re-runs exactly
  * when its configuration changes: the ids it sends (only the declared dependencies', once an answer
- * said what they are), the revision stamp (which changes when a dependency's computed value does),
+ * said what they are), the revision stamp (which changes when a dependency's code or computed value
+ * does: an edit may keep the expression's id),
  * or the search text. An argument nothing depends on changing leaves the configuration equal, so
  * nothing is asked.
  */
@@ -52,8 +53,8 @@ export function queryUuids(
 }
 
 /**
- * The revision stamp: changes exactly when one of `dependencyValues` (a dependency's computed
- * value, by identity) changes. `''` with no named dependency.
+ * The revision stamp: changes exactly when one of `dependencyValues` (a dependency's code, or its
+ * computed value, by identity) changes. `''` with no named dependency.
  */
 export function revisionStamp(
   dependencyValues: readonly unknown[],

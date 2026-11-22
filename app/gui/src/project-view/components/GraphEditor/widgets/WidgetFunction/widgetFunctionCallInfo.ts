@@ -242,15 +242,24 @@ export function useWidgetFunctionCallInfo(
   const resolvers = computed(() => resolversOf(acceptedAnswer.value?.answer))
   const sentUuids = computed(() => queryUuids(allUuids.value, resolvers.value))
   const revisionIds = new WeakMap<object, number>()
-  // A dependency's value is its expression's payload: the registry replaces the payload object on
-  // every update of the expression (and keeps the info object).
+  /** The code of each subexpression of the call, by external id. */
+  const codeById = computed(() => {
+    const codes = new Map<string, string>()
+    Ast.visitRecursive(toValue(input).value, (ast) => {
+      codes.set(ast.externalId, ast.code())
+    })
+    return codes
+  })
+  // A dependency is its expression and its value. Its code is not enough: an edit may keep the
+  // expression's id. Its value is the expression's payload: the registry replaces the payload
+  // object on every update of the expression (and keeps the info object).
   function revisionFor(known: ReadonlyMap<string, ResolverInfo> | undefined) {
     if (!known) return ''
     const db = toValue(graphDb)
-    const values = namedDependencies(known).map((name) => {
+    const values = namedDependencies(known).flatMap((name) => {
       const id = allUuids.value[name] as ExternalId | undefined
       const payload = id && db.getExpressionInfo(id)?.payload
-      return payload && toRaw(payload)
+      return [id && codeById.value.get(id), payload && toRaw(payload)]
     })
     return revisionStamp(values, revisionIds)
   }
@@ -303,14 +312,16 @@ export function useWidgetFunctionCallInfo(
   //  change, or useCurrentRef should not return ref.
   const visualizationData = toValue(project).useVisualizationData(visualizationConfig)
 
-  // The data present when a query is sent answers an older one, whatever its revision.
+  // The data present when a query is sent answers an older one, whatever its revision. Not a
+  // synchronous watcher: the configuration reads the call's AST, which is inconsistent in the
+  // middle of an edit; an answer cannot arrive before the next flush anyway.
   let dataBeforeQuery: unknown = undefined
   watch(
     visualizationConfig,
     () => {
       dataBeforeQuery = visualizationData.value
     },
-    { flush: 'sync', immediate: true },
+    { immediate: true },
   )
 
   const parsedAnswer = computed(() => {
@@ -385,7 +396,7 @@ export function useWidgetFunctionCallInfo(
         timedOut.value = true
       }, RESOLVER_TIME_BOX_MS)
     },
-    { flush: 'sync', immediate: true },
+    { immediate: true },
   )
   onScopeDispose(stopTimeBox)
   /** Whether a query is waiting for its answer past the time-box. */

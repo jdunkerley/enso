@@ -522,10 +522,12 @@ describe('notes and the time-box', () => {
     expect(q.note('on')).toBeUndefined()
   })
 
-  test('a re-query keeps the previous widget for 2 s, then shows the loading fallback', () => {
+  test('a re-query keeps the previous widget for 2 s, then shows the loading fallback', async () => {
     const q = setUpResolverQuery('val1.join val2 val3 val4', join)
     q.answer({ arguments: [['on', { widget: textInput, resolver: onResolver }]] })
     q.recompute('right')
+    void q.nodeQuery()
+    await nextTick()
     vi.advanceTimersByTime(RESOLVER_TIME_BOX_MS - 1)
     expect(q.param('on')).toMatchObject({ kind: 'Text_Input' })
     vi.advanceTimersByTime(1)
