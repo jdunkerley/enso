@@ -9,5 +9,5 @@
     - set_schema self schema:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - tables self schema:Standard.Base.Data.Text.Text= -> Standard.Base.Any.Any
 - make_schema_selector hyper_file:Standard.Tableau.Hyper_File.Hyper_File include_any:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Any.Any
-- make_table_selector hyper_file:Standard.Tableau.Hyper_File.Hyper_File cache:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+- make_table_selector hyper_file:Standard.Tableau.Hyper_File.Hyper_File schema:Standard.Base.Any.Any= -> Standard.Base.Any.Any
 - Standard.Visualization.Viz_Table.Viz_Table.from that:Standard.Tableau.Hyper_File.Hyper_File -> Standard.Visualization.Viz_Table.Viz_Table

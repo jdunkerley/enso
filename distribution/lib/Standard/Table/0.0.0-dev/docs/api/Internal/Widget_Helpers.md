@@ -15,15 +15,15 @@
 - make_column_ref_by_name_selector table:Standard.Base.Any.Any add_text:Standard.Base.Data.Boolean.Boolean= add_regex:Standard.Base.Data.Boolean.Boolean= add_number:Standard.Base.Data.Boolean.Boolean= add_boolean:Standard.Base.Data.Boolean.Boolean= add_named_pattern:Standard.Base.Data.Boolean.Boolean= add_date:Standard.Base.Data.Boolean.Boolean= add_time:Standard.Base.Data.Boolean.Boolean= add_date_time:Standard.Base.Data.Boolean.Boolean= add_nothing:Standard.Base.Data.Boolean.Boolean= columns_first:Standard.Base.Data.Boolean.Boolean= kinds:Standard.Base.Data.Vector.Vector= -> Standard.Base.Metadata.Widget
 - make_column_ref_by_name_selector_for_type table:Standard.Base.Any.Any value_type:Standard.Table.Value_Type.Value_Type add_nothing:Standard.Base.Data.Boolean.Boolean= if_value_type_numeric_include_all_numeric:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Metadata.Widget
 - make_fill_default_value_selector column_source:Standard.Base.Any.Any= value_types:Standard.Base.Any.Any= add_nothing:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Metadata.Widget
-- make_filter_condition_selector table:Standard.Base.Any.Any cache:Standard.Base.Any.Any= -> Standard.Base.Metadata.Widget
-- make_format_chooser_for_parse table:Standard.Base.Any.Any cache:Standard.Base.Any.Any -> Standard.Base.Any.Any
-- make_format_chooser_for_selection table:Standard.Base.Any.Any cache:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- make_filter_condition_selector table:Standard.Base.Any.Any column:Standard.Base.Any.Any= -> Standard.Base.Metadata.Widget
+- make_format_chooser_for_parse table:Standard.Base.Any.Any type:Standard.Base.Any.Any= -> Standard.Base.Any.Any
+- make_format_chooser_for_selection table:Standard.Base.Any.Any columns:Standard.Base.Any.Any= -> Standard.Base.Any.Any
 - make_format_chooser_for_type value_types:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - make_grouping_method_selector table:Standard.Table.Table.Table -> Standard.Base.Metadata.Widget
-- make_join_condition_selector table:Standard.Table.Table.Table cache:Standard.Base.Any.Any= -> Standard.Base.Metadata.Widget
+- make_join_condition_selector table:Standard.Table.Table.Table right:Standard.Base.Any.Any= -> Standard.Base.Metadata.Widget
 - make_keep_unmatched_selector -> Standard.Base.Any.Any
 - make_order_by_selector table:Standard.Table.Table.Table name_only:Standard.Base.Data.Boolean.Boolean= -> Standard.Base.Metadata.Widget
-- make_rename_name_vector_selector table:Standard.Table.Table.Table cache:Standard.Base.Any.Any= -> Standard.Base.Metadata.Widget
+- make_rename_name_vector_selector table:Standard.Table.Table.Table column_map:Standard.Base.Any.Any= -> Standard.Base.Metadata.Widget
 - make_replace_selector -> Standard.Base.Any.Any
 - make_value_type_vector_selector -> Standard.Base.Any.Any
 - parse_type_selector -> Standard.Base.Metadata.Widget

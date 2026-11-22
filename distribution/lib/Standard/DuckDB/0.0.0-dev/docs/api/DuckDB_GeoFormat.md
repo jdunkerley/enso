@@ -6,3 +6,4 @@
     - KML
     - MapInfo
     - Shapefile
+- Standard.Base.Metadata.Widget.from that:Standard.DuckDB.DuckDB_GeoFormat.DuckDB_GeoFormat.type -> Standard.Base.Metadata.Widget

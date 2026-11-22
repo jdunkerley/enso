@@ -40,6 +40,7 @@
 - find_type_or_module qualified_name:Standard.Base.Data.Text.Text -> Standard.Base.Any.Any
 - get_annotation target:Standard.Base.Any.Any method:Standard.Base.Any.Any parameter_name:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - get_method_annotation module_name:Standard.Base.Data.Text.Text type_name:Standard.Base.Data.Text.Text method_name:Standard.Base.Data.Text.Text parameter_name:Standard.Base.Data.Text.Text -> Standard.Base.Any.Any
+- get_method_argument_names module_name:Standard.Base.Data.Text.Text type_name:Standard.Base.Data.Text.Text method_name:Standard.Base.Data.Text.Text -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)
 - is_a value:Standard.Base.Any.Any typ:Standard.Base.Any.Any -> Standard.Base.Data.Boolean.Boolean
 - is_atom value:Standard.Base.Any.Any -> Standard.Base.Data.Boolean.Boolean
 - is_atom_constructor ~value:Standard.Base.Any.Any -> Standard.Base.Data.Boolean.Boolean

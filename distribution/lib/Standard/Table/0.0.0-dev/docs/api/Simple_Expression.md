@@ -71,7 +71,6 @@
 - type Simple_Expression
     - From input:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Any.Any)= operation:Standard.Table.Simple_Expression.Simple_Calculation=
     - Simple_Expr input:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Any.Any)= operation:Standard.Table.Simple_Expression.Simple_Calculation=
-    - default_widget table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Metadata.Widget
     - evaluate self table:Standard.Table.Internal.Table_Ref.Table_Ref use_input_name:Standard.Base.Data.Boolean.Boolean on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior -> Standard.Base.Any.Any
 - type Text_Operation
     - Contains substring:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Text.Text)=
@@ -83,3 +82,4 @@
     - Trim where:Standard.Base.Data.Text.Location.Location= what:(Standard.Table.Column_Ref.Column_Ref|Standard.Table.Expression.Expression|Standard.Base.Data.Text.Text)=
     - create_widget table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Any.Any
     - evaluate self column:Standard.Base.Any.Any table:Standard.Table.Internal.Table_Ref.Table_Ref -> Standard.Base.Any.Any
+- Standard.Base.Metadata.Widget.from that:Standard.Table.Simple_Expression.Simple_Expression.type -> Standard.Base.Metadata.Widget
