@@ -99,8 +99,10 @@ result = "not a number".parse_integer.catch _-> 0
   the `from` values a widget needs, which is how `resolve_call` builds its
   `columns` block. In an annotation write `@columns (Widget.Column_Names)`:
   `@column ..Column_Name` does not resolve there (`resolve_call` answers
-  ``Method `arguments` of type Unresolved could not be found.``). No annotation
-  uses the pickers yet; PR 5b migrates them.
+  ``Method `arguments` of type Unresolved could not be found.``). Table's
+  annotations use the pickers (static `Widget.Column_Name …` values, no column
+  names copied in); a grouped `Choice.Option` serialises its nested option
+  values, pickers included, with their own `to_json`.
 - **Widgets carry no display.** `Widget` constructors have no `display` or
   `label` (`Metadata.Display` is gone; `Choice.Option`'s `label` stays). Which
   arguments the node shows is the `arguments:` map in the method's doc front

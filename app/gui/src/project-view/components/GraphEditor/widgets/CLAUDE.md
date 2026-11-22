@@ -243,6 +243,30 @@ render only its own slot content. The icon is already on the row, drawn by
   long and one undo still removes node and import); `formatTypeForDrop` does
   both. The import goes in the node creation's edit.
 
+## Column pickers
+
+- A column picker in an annotation is a **reference** (`Column_Name`,
+  `Column_Names`, `Column_Vector`, `Order_By`), not a list of options. The
+  answer's `columns` block holds each table's column names, kinds and type names
+  once, and `columnPickers.ts` (`$/providers/openedProjects/widgetRegistry/`)
+  expands every reference from it while `functionCallFromAnswer` builds the
+  configuration, so a node with fifty pickers sends its columns once. The
+  reference and `columns` schemas are zod types in `configuration.ts`.
+- The parsed schemas are cached per project (`SchemaCache`, an LRU of 64, in
+  `projectStates.ts` beside `TypeDefaults`), so a recomputed table that answers
+  the same columns reuses them.
+- `kinds` filters the columns offered; `Other` is always included.
+- **Absent source** (no `columns` entry for the picker's `from`): `Column_Name`
+  without `extra` or `expression` is a `Text_Input`; with `extra` it is a
+  `Single_Choice` of the extras; `Column_Names` is a `Multiple_Choice` of its
+  regex and by-type options, or a `Text_Input` when it has none; `Column_Vector`
+  and `Order_By` are a `Vector_Editor` of `Text_Input`, new items `''`.
+- **Adding a picker flag**: the Enso constructor field in `Metadata.enso` (Base)
+  and its `to_json`, the zod schema in `configuration.ts`, the expansion in
+  `columnPickers.ts`, and a test in `columnPickers.test.ts` and the Base/Table
+  Enso tests. A flag the GUI does not know is dropped by zod, so forgetting the
+  schema fails silently.
+
 ## Argument access
 
 - Each call with hidden parameters has a round ＋ after its arguments

@@ -75,6 +75,19 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
   library either: it moved to `Standard.Excel`
   (`from Standard.Excel import all`).
 
+## Column pickers in annotations
+
+- Annotate a column argument with a static `Widget.Column_Name …`,
+  `Widget.Column_Names …`, `Widget.Column_Vector` or `Widget.Order_By` value
+  (`from Standard.Base.Metadata import Widget`). The widget is a _reference_:
+  the IDE reads the table's columns once per node and expands the reference, so
+  never copy column names into a widget.
+- Add `kinds=[Column_Kind.Numeric]` (and so on) only where the method rejects
+  other kinds with a type error; leave it off where any column is fine.
+- The builders in `src/Internal/Widget_Helpers.enso` return references too. A
+  composite builder nests the references of its parts as the options of a
+  grouped choice; it never builds a column list.
+
 ## Where to read more
 
 - `src/Table.enso` — type definition with method docs.
