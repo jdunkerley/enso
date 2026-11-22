@@ -1,6 +1,6 @@
 /** @file The element type of a `Vector`-typed argument. */
 import { describe, expect, test } from 'vitest'
-import { defaultItemCode, vectorElementType } from '../elementType'
+import { defaultItemCode, vectorElementType, vectorItemDefault } from '../elementType'
 
 const DATE = 'Standard.Base.Data.Time.Date.Date'
 const VECTOR = 'Standard.Base.Data.Vector.Vector'
@@ -42,4 +42,42 @@ describe('defaultItemCode', () => {
     expect(defaultItemCode('Standard.Base.Data.Text.Text')).toBeUndefined()
     expect(defaultItemCode(undefined)).toBeUndefined()
   })
+})
+
+test('a union element type', () => {
+  expect(
+    vectorElementType(
+      `${VECTOR} (Standard.Base.Data.Text.Text | Standard.Base.Data.Numbers.Integer)`,
+    ),
+  ).toBe('Standard.Base.Data.Text.Text | Standard.Base.Data.Numbers.Integer')
+})
+
+test.each([
+  [{ kind: 'Single_Choice', values: [{ value: '..A', label: 'A', parameters: [] }] }, '..A'],
+  [
+    {
+      kind: 'Union',
+      kinds: [
+        { label: 'Text', config: { kind: 'Text_Input' } },
+        { label: 'Nothing', config: null },
+      ],
+    },
+    "''",
+  ],
+  [
+    {
+      kind: 'Union',
+      kinds: [
+        { label: 'Odd', config: { kind: 'Union', kinds: [] } },
+        { label: 'Text', config: { kind: 'Text_Input' } },
+      ],
+    },
+    "''",
+  ],
+  [{ kind: 'Numeric_Input' }, '0'],
+  [{ kind: 'Date_Input' }, 'Date.today'],
+  [{ kind: 'Regex_Input' }, "regex '.*'"],
+  [undefined, undefined],
+] as const)('vectorItemDefault(%o)', (config, expected) => {
+  expect(vectorItemDefault(config as never)).toBe(expected)
 })

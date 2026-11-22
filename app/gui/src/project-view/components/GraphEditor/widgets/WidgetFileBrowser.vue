@@ -7,6 +7,7 @@ import {
   defineWidget,
   widgetProps,
 } from '$/providers/openedProjects/widgetRegistry'
+import { isTypeDefault } from '$/providers/openedProjects/widgetRegistry/typeDefaults'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import {
   SUPPORTED_DYNAMIC_CONFIG_KINDS,
@@ -23,6 +24,7 @@ import {
   type CustomDropdownItem,
   ExpressionTag,
 } from '@/components/GraphEditor/widgets/WidgetSelection/tags'
+import { UnderKindPickerKey } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import { ArgumentInfoKey } from '@/util/callTree'
 import { computed } from 'vue'
 
@@ -98,21 +100,32 @@ const innerWidgetInput = computed(() => withBrowserItems(props.input, items.valu
 </script>
 
 <script lang="ts">
+/**
+ * Perfect for a browse configuration. A declared browsable type claims an input too when a
+ * configuration that is not a type default (an annotation's options, or one still pending) is drawn
+ * by a dropdown: the browse items join its options, as before the kind picker. Never from the type
+ * alone, which the kind picker and the type defaults own.
+ */
+function browseScore(input: WidgetInput): Score {
+  const config = input.dynamicConfig
+  if (config && SUPPORTED_DYNAMIC_CONFIG_KINDS.includes(config.kind)) return Score.Perfect
+  const reprType = input[ArgumentInfoKey]?.info?.reprType
+  return (
+      (config?.kind === 'Single_Choice' || config?.kind === 'Pending') &&
+        !isTypeDefault(config) &&
+        input[UnderKindPickerKey] !== true &&
+        reprType &&
+        SUPPORTED_TYPES.some((type) => reprType.includes(type))
+    ) ?
+      Score.Perfect
+    : Score.Mismatch
+}
+
 export const widgetDefinition = defineWidget(
   WidgetInput.isAstOrPlaceholder,
   {
     priority: 49,
-    score: (props) => {
-      const reprType = props.input[ArgumentInfoKey]?.info?.reprType
-      return (
-          (props.input.dynamicConfig &&
-            SUPPORTED_DYNAMIC_CONFIG_KINDS.includes(props.input.dynamicConfig.kind)) ||
-            // Until PR 4's kind picker: a union containing a browsable type keeps the browser.
-            (reprType && SUPPORTED_TYPES.some((type) => reprType.includes(type)))
-        ) ?
-          Score.Perfect
-        : Score.Mismatch
-    },
+    score: (props) => browseScore(props.input),
   },
   import.meta.hot,
 )

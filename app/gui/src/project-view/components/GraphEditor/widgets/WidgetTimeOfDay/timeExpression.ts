@@ -3,6 +3,7 @@
  * time, and the code a choice writes. Framework-free, so it is unit-tested
  * alone (`docs/superpowers/specs/2026-11-15-date-widget-design.md`, "Time_Of_Day").
  */
+import type { CallShapes } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 
 /** The qualified name of the `Time_Of_Day` type, which a typed argument's `reprType` or `expectedType` has. */
 export const TIME_OF_DAY_TYPE = 'Standard.Base.Data.Time.Time_Of_Day.Time_Of_Day'
@@ -116,3 +117,6 @@ export function withKeptParts(picked: TimeChoice, current: TimeChoice | undefine
 export function localNow(now: Date = new Date()): HourMinuteSecond {
   return { hour: now.getHours(), minute: now.getMinutes(), second: now.getSeconds() }
 }
+
+/** The whole-node calls the picker draws itself (see `isCallOfShape`). */
+export const TIME_CALLS: CallShapes = { bare: ['Time_Of_Day.now'], applied: ['Time_Of_Day.new'] }

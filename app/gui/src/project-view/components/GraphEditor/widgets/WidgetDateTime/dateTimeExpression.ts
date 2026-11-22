@@ -8,6 +8,7 @@ import {
   isValidDate,
   type YearMonthDay,
 } from '@/components/GraphEditor/widgets/WidgetDate/dateExpression'
+import type { CallShapes } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { Ast } from '@/util/ast'
 
 /** The qualified name of the `Date_Time` type. */
@@ -179,3 +180,6 @@ export function localDateTimeNow(now: Date = new Date()): DateTimeParts {
     second: now.getSeconds(),
   }
 }
+
+/** The whole-node calls the picker draws itself (see `isCallOfShape`). */
+export const DATE_TIME_CALLS: CallShapes = { bare: ['Date_Time.now'], applied: ['Date_Time.new'] }

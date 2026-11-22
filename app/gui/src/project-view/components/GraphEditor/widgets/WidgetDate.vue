@@ -12,13 +12,11 @@ import {
   unparenthesisedCode,
 } from '@/components/GraphEditor/widgets/WidgetPicker/parentheses'
 import PickerShell from '@/components/GraphEditor/widgets/WidgetPicker/PickerShell.vue'
-import {
-  isWholeNodeCall,
-  type CallShapes,
-} from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
+import { isWholeNodeCall } from '@/components/GraphEditor/widgets/WidgetPicker/wholeNode'
 import { hasDropdown } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import DateMenu from '@/components/GraphEditor/widgets/WidgetDate/DateMenu.vue'
 import {
+  DATE_CALLS,
   dateExpressionCode,
   parseDateExpression,
   type DateChoice,
@@ -63,11 +61,6 @@ function codeToWrite(
 ): string {
   const code = dateExpressionCode(choice)
   return choice.kind === 'date' ? parenthesisedApplication(code, current, portId) : code
-}
-
-const DATE_CALLS: CallShapes = {
-  bare: ['Date.today', 'Date.yesterday', 'Date.tomorrow'],
-  applied: ['Date.new'],
 }
 
 function isDateTyped(input: WidgetInput): boolean {

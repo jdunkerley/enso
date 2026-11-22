@@ -12,26 +12,14 @@ import { reactive, toRaw } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import { z } from 'zod'
 import { type WidgetConfiguration, widgetConfigurationSchema } from './configuration'
+import { type Converts, NOTHING_TYPE, composeUnion, unionMembers } from './unionKinds'
 
 /** The type of widgets: a type has a default when `Widget.from` converts it. */
 export const WIDGET_TYPE = 'Standard.Base.Metadata.Widget'
 
-const NOTHING_TYPE = 'Standard.Base.Nothing.Nothing'
-
 /** The expression asking the engine for the default widget of the type `typeName`. */
 export const RESOLVE_TYPE_EXPRESSION = (typeName: string) =>
   `${MODULE_CALL} 'Standard.Base.Metadata.Widget_Query' 'resolve_type' [] '${typeName}'`
-
-/**
- * The type whose default an argument of declared type `reprType` takes: for now the first member
- * that is not `Nothing`.
- */
-export function defaultSourceType(reprType: string | undefined): string | undefined {
-  return reprType
-    ?.split('|')
-    .map((member) => member.trim())
-    .find((member) => member !== '' && member !== NOTHING_TYPE)
-}
 
 const answerSchema = z.union([
   z.object({ widget: widgetConfigurationSchema.nullable() }),
@@ -76,10 +64,20 @@ type CacheEntry =
 
 /** Whether `Widget.from` converts the type `typeName`. Keys are built as `conversionSources` does. */
 export function hasWidgetConversion(db: SuggestionDb, typeName: string): boolean {
-  const widget = parseAbsoluteProjectPathRaw(WIDGET_TYPE)
-  const source = parseAbsoluteProjectPathRaw(`${typeName}.type`)
-  if (!widget.ok || !source.ok) return false
-  return db.conversionSources.lookup(widget.value.key())?.has(source.value.key()) ?? false
+  return hasConversion(db, WIDGET_TYPE, `${typeName}.type`)
+}
+
+/** Whether `target` has a `from (that : source)` conversion (reactive). */
+function hasConversion(db: SuggestionDb, target: string, source: string): boolean {
+  const targetPath = parseAbsoluteProjectPathRaw(target)
+  const sourcePath = parseAbsoluteProjectPathRaw(source)
+  if (!targetPath.ok || !sourcePath.ok) return false
+  return db.conversionSources.lookup(targetPath.value.key())?.has(sourcePath.value.key()) ?? false
+}
+
+/** Whether `target.from (that : source)` exists. Keys are built as `conversionSources` does. */
+export function convertsBetween(db: SuggestionDb, source: string, target: string): boolean {
+  return hasConversion(db, target, source)
 }
 
 /**
@@ -101,6 +99,16 @@ export class TypeDefaults {
   private readonly timers = new Set<ReturnType<typeof setTimeout>>()
   /** The frames each type's query failed in, since its last answer. */
   private readonly failedFrames = new Map<string, Set<ExternalId>>()
+  /** The composed widget of each union asked for, with the member widgets it was built from. */
+  private readonly composed = new Map<
+    string,
+    {
+      members: (WidgetConfiguration | undefined | 'pending')[]
+      /** What `converts` said of each ordered pair of the members with a widget. */
+      verdicts: boolean[]
+      result: WidgetConfiguration | undefined
+    }
+  >()
 
   /** Constructor. */
   constructor(
@@ -116,23 +124,63 @@ export class TypeDefaults {
       avoid: ReadonlySet<ExternalId>,
     ) => ExternalId | undefined,
     private readonly projectId: string,
+    /** Whether `target.from (that : source)` exists; a union drops a member its sibling absorbs. */
+    private readonly converts: Converts = () => false,
   ) {}
 
   /**
-   * The type's default widget: `undefined` while unknown or when it has none. Reactive. It may
-   * start the query of a type not asked yet, which is safe inside a computed or a render.
+   * The default widget of a declared type: `undefined` while unknown or when it has none. For a
+   * union, the widget composed from its members' (see {@link composeUnion}), which is as much a type
+   * default as a single type's. Reactive. It may start the query of a type not asked yet, which is
+   * safe inside a computed or a render.
    */
   lookup(reprType: string | undefined, frame: ExternalId): WidgetConfiguration | undefined {
-    const type = defaultSourceType(reprType)
-    if (type == null || !this.hasDefault(type)) return undefined
+    if (reprType == null) return undefined
+    const members = unionMembers(reprType)
+    if (members.length === 1) {
+      if (members[0] === NOTHING_TYPE) return undefined
+      const config = this.lookupType(members[0]!, frame)
+      return config === 'pending' ? undefined : config
+    }
+    const memberWidgets = members.map((typeName) => ({
+      typeName,
+      config: typeName === NOTHING_TYPE ? undefined : this.lookupType(typeName, frame),
+    }))
+    const configs = memberWidgets.map((member) => member.config)
+    // Asked every time, so the caller keeps depending on the suggestion database's conversions.
+    const widgetTypes = memberWidgets
+      .filter((member) => member.config != null && member.config !== 'pending')
+      .map((member) => member.typeName)
+    const verdicts = widgetTypes.flatMap((a) =>
+      widgetTypes.filter((b) => b !== a).map((b) => this.converts(a, b)),
+    )
+    const known = this.composed.get(reprType)
+    if (
+      known != null &&
+      known.members.every((config, i) => config === configs[i]) &&
+      known.verdicts.every((verdict, i) => verdict === verdicts[i])
+    )
+      return known.result
+    const composed = composeUnion(memberWidgets, this.converts)
+    if (composed === 'pending') {
+      this.composed.delete(reprType)
+      return undefined
+    }
+    if (composed != null) typeDefaultConfigs.add(composed)
+    this.composed.set(reprType, { members: configs, verdicts, result: composed })
+    return composed
+  }
+
+  private lookupType(type: string, frame: ExternalId): WidgetConfiguration | undefined | 'pending' {
+    if (!this.hasDefault(type)) return undefined
     const entry = this.cache.get(type)
     if (entry == null) {
       // Not through the proxy: the caller is still reading, and `done` notifies it.
       toRaw(this.cache).set(type, { state: 'pending' })
       void this.ask(type, frame)
-      return undefined
+      return 'pending'
     }
-    return entry.state === 'done' ? entry.config : undefined
+    return entry.state === 'done' ? entry.config : 'pending'
   }
 
   /** Stop the pending retries. */

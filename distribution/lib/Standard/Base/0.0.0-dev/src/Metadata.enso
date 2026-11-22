@@ -4,6 +4,7 @@ import project.Data.Numbers.Float
 import project.Data.Numbers.Integer
 import project.Data.Numbers.Number
 import project.Data.Pair.Pair
+import project.Data.Text.Regex.Regex
 import project.Data.Text.Text
 import project.Data.Time.Date.Date
 import project.Data.Time.Date_Time.Date_Time
@@ -146,6 +147,22 @@ type Widget
     ## Describes possible target types for Any.to conversion.
     Any_To_Target
 
+    ## Describes an argument that takes one of several kinds of value: the IDE
+       shows a picker of the kinds in front of the chosen kind's widget.
+
+       ## Arguments
+        - `kinds`: The kinds, in the order the picker lists them: a label and
+          the widget for a value of that kind.
+        - `include_nothing`: Whether `Nothing` is a kind too (listed last).
+    Union kinds:(Vector (Pair Text Widget)) include_nothing:Boolean=False
+
+    ## ---
+       private: true
+       ---
+       A regular-expression input: the IDE edits the pattern's text and writes
+       `regex '…'`.
+    Regex_Input
+
     ## Cached JSON Widget
     With_JSON_Cache parent:Widget json:Text
 
@@ -224,6 +241,10 @@ type Widget
         Widget.Date_Input -> '{"constructor":"Date_Input"}'
         Widget.Date_Time_Input -> '{"constructor":"Date_Time_Input"}'
         Widget.Time_Input -> '{"constructor":"Time_Input"}'
+        Widget.Union kinds include_nothing ->
+            kinds_json = '[' + (kinds.map p-> '[' + p.first.to_json + ',' + p.second.to_json + ']').join ',' + ']'
+            '{"constructor":"Union","kinds":' + kinds_json + ',"include_nothing":' + (if include_nothing then "true" else "false") + '}'
+        Widget.Regex_Input -> '{"constructor":"Regex_Input"}'
         Widget.Column_Name kinds source expression reference extra columns_first ->
             '{"constructor":"Column_Name","kinds":' + '[' + (kinds.map .to_json . join ',') + ']' + ',"from":' + source.to_json + ',"expression":' + expression.to_json + ',"reference":' + reference.to_json + ',"extra":' + '[' + (extra.map .to_json . join ',') + ']' + ',"columns_first":' + columns_first.to_json + '}'
         Widget.Column_Names kinds source regex by_type ->
@@ -257,6 +278,7 @@ type Widget
         Widget.Single_Choice values _ -> Widget.collect_choice_sources values builder
         Widget.Multiple_Choice values _ -> Widget.collect_choice_sources values builder
         Widget.Vector_Editor item_editor _ -> item_editor.collect_column_sources builder
+        Widget.Union kinds _ -> kinds.each pair-> pair.second.collect_column_sources builder
         Widget.With_JSON_Cache parent _ -> parent.collect_column_sources builder
         _ -> Nothing
 
@@ -396,3 +418,11 @@ Widget.from (that : Writable_File.type) -> Widget =
 Widget.from (that : Enso_Secret.type) -> Widget =
     _ = that
     Widget.Secret_Browse
+
+## ---
+   private: true
+   ---
+   The default widget for arguments of type `Regex`.
+Widget.from (that : Regex.type) -> Widget =
+    _ = that
+    Widget.Regex_Input

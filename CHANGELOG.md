@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [Arguments that accept several types of value, such as a number or `Nothing`,
+  show a small icon for the kind of value; on a selected node it opens a list of
+  the kinds, and choosing one writes a value of that kind. Regular-expression
+  arguments get their own input.][917]
 - [Date, time and number pickers and other widgets now come from the argument's
   type in the standard library, so they also appear inside nested calls and for
   optional arguments such as `Integer | Nothing`.][912]
@@ -599,6 +603,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[917]: https://github.com/jdunkerley/enso/pull/917
 [912]: https://github.com/jdunkerley/enso/pull/912
 [903]: https://github.com/jdunkerley/enso/pull/903
 [900]: https://github.com/jdunkerley/enso/pull/900
