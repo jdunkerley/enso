@@ -1,12 +1,15 @@
 from Standard.Base import all
+import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Metadata.Choice
 from Standard.Base.Metadata.Choice import Option
 import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Widget_Query
 import Standard.Base.Metadata.Column_Kind.Column_Kind
 import Standard.Base.Metadata.Widget_Columns.Widget_Columns
+from Standard.Base.Metadata.Widget_Query import Widget_Method
 
-from Standard.Table import Table
+from Standard.Table import Table, Value_Type
+import Standard.Table.Internal.Widget_Helpers
 from Standard.Table.Columns_To_Add import Columns_To_Add
 from Standard.Table.Columns_To_Keep import Columns_To_Keep
 from Standard.Table.Join_Kind import Join_Kind
@@ -20,7 +23,18 @@ table_type = "Standard.Table.Table.Table"
 @columns (Widget.Column_Names)
 Table.widget_test_pick self columns = columns
 
-answer argument widget columns_json="" = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + '}]]' + columns_json + '}'
+Table.widget_test_expression self expression = expression
+
+answer argument widget columns_json="" resolver="" = '{"arguments":[[' + argument.to_json + ',{"widget":' + widget.to_json + resolver + '}]]' + columns_json + '}'
+
+## The `resolver` part of an answer whose widget depends on `dependencies`.
+resolver_of dependencies searchable=False = ',"resolver":{"dependencies":' + dependencies.to_json + ',"searchable":' + searchable.to_json + '}'
+
+## The result of the widget query for one argument of a Table method, with
+   the other arguments' values given by `values` (a name to value function).
+resolved table method argument values =
+    call_arguments = Meta.get_method_argument_names table_module table_type method
+    Widget_Query.resolve_argument (Widget_Method.Value table_module table_type method) argument table (Widget_Query.values_from_lookup values) "" call_arguments Nothing
 
 ## The `columns` block of an answer whose pickers all read the subject table.
 subject_columns table = ',"columns":{"":' + (Widget_Columns.from table . to_json) + '}'
@@ -51,12 +65,12 @@ add_specs suite_builder =
         mock_table = Table.from_rows ["A", "B C", 'D "E"', "F.G/H\I"] []
 
         group_builder.specify "works for `get` and `at`" <|
-            expect = answer "selector" Widget.Column_Name (subject_columns mock_table)
+            expect = answer "selector" Widget.Column_Name (subject_columns mock_table) (resolver_of ["self"])
             Widget_Query.resolve_call mock_table table_module table_type "get" ["selector"] . should_equal expect
             Widget_Query.resolve_call mock_table table_module table_type "at" ["selector"] . should_equal expect
 
         group_builder.specify "works for `filter`" <|
-            expect = answer "column" (Widget.Column_Name expression=True) (subject_columns mock_table)
+            expect = answer "column" (Widget.Column_Name expression=True) (subject_columns mock_table) (resolver_of ["self"])
             Widget_Query.resolve_call mock_table table_module table_type "filter" ["column"] . should_equal expect
 
         group_builder.specify "works for `join` with `right` table" <|
@@ -65,11 +79,7 @@ add_specs suite_builder =
             self_mock_table = Table.from_rows abc []
             right_mock_table = Table.from_rows uvw []
 
-            mock_cache name = case name of
-                "right" -> right_mock_table
-                _ -> Nothing
-
-            res = Standard.Table.Internal.Widget_Helpers.make_join_condition_selector self_mock_table cache=mock_cache
+            res = Standard.Table.Internal.Widget_Helpers.make_join_condition_selector self_mock_table right=right_mock_table
             res.should_be_a Widget.Vector_Editor
 
             arr = case res of
@@ -130,8 +140,7 @@ add_specs suite_builder =
 
         group_builder.specify "join's Ignore Case condition offers text columns, Equals offers every kind" <|
             abc = Table.from_rows ["A", "B", "C"] []
-            cache name = if name == "right" then abc else Nothing
-            item = Standard.Table.Internal.Widget_Helpers.make_join_condition_selector abc cache=cache . item_editor
+            item = Standard.Table.Internal.Widget_Helpers.make_join_condition_selector abc right=abc . item_editor
             equals = item.values.find o-> o.label == "Equals"
             ci = item.values.find o-> o.label == "Equals (Ignore Case)"
             ci.parameters.map .second . should_equal [Widget.Column_Name kinds=textual, Widget.Column_Name kinds=textual from="right"]
@@ -170,6 +179,78 @@ add_specs suite_builder =
             json = Widget_Query.resolve_call mock_table table_module table_type "generate_rows" ["over"]
             json.contains '"kinds":["Numeric"]' . should_be_true
             json.contains '"kinds":["Date_Only"]' . should_be_true
+
+    suite_builder.group "Table's resolvers read their dependencies by name" group_builder->
+        t = Table.new [["A", [1, 2]], ["B", ["x", "y"]], ["D", [Date.new 2020, Date.new 2021]]]
+        labels json = json.parse_json . get "widget" . get "values" . map (o-> o.get "label")
+
+        group_builder.specify "filter's conditions follow the column's type" <|
+            on_text = resolved t "filter" "filter" (name-> if name == "column" then "B" else Nothing) . to_json
+            on_text . should_contain (resolver_of ["self", "column"])
+            (labels on_text) . should_contain "Text"
+            (labels on_text) . should_not_contain "Numeric"
+            unset = resolved t "filter" "filter" (_-> Nothing) . to_json
+            (labels unset) . should_contain "Numeric"
+            (labels unset) . should_contain "Text"
+
+        group_builder.specify "filter's column that is an error makes the argument unavailable" <|
+            json = resolved t "filter" "filter" (_-> Error.throw (Illegal_Argument.Error "no column")) . to_json . parse_json
+            json.get "widget" . should_equal Nothing
+            json.get "unavailable" . get "dependency" . should_equal "column"
+
+        group_builder.specify "join's right columns are offered only when right is set" <|
+            with_right = resolved t "join" "on" (name-> if name == "right" then t else Nothing) . to_json
+            with_right . should_contain (resolver_of ["self", "right"])
+            with_right . should_contain (Widget.Column_Name from="right").to_json
+            unset = resolved t "join" "on" (_-> Nothing) . to_json
+            unset . should_not_contain '"from":"right"'
+
+        group_builder.specify "rename_columns' new pair starts at the first name the map does not use" <|
+            json = resolved t "rename_columns" "column_map" (name-> if name == "column_map" then ["X"] else Nothing) . to_json
+            json . should_contain (resolver_of ["self", "column_map"])
+            json.parse_json . get "widget" . get "item_default" . should_equal "(Pair.Value 'B' 'New Name')"
+
+        group_builder.specify "format's formats follow the selected columns' types" <|
+            json = resolved t "format" "format" (name-> if name == "columns" then ["D"] else Nothing) . to_json
+            json . should_contain (resolver_of ["self", "columns"])
+            json . should_contain (Widget_Helpers.make_format_chooser_for_type [Value_Type.Date]).to_json
+
+        group_builder.specify "parse's formats follow the type argument" <|
+            json = resolved t "parse" "format" (name-> if name == "type" then Value_Type.Date else Nothing) . to_json
+            json . should_contain (resolver_of ["self", "type"])
+            json . should_contain (Widget_Helpers.make_format_chooser_for_type Value_Type.Date).to_json
+
+        group_builder.specify "fill_nothing's default follows the selected columns' types" <|
+            json = resolved t "fill_nothing" "default" (name-> if name == "columns" then ["B"] else Nothing) . to_json
+            json . should_contain (resolver_of ["self", "columns"])
+            json . should_contain (Widget_Helpers.make_fill_default_value_selector t value_types=[(t.at "B").value_type]).to_json
+
+    suite_builder.group "Group C type defaults are resolvers of the table" group_builder->
+        t = Table.new [["A", [1]], ["B", ["x"]]]
+
+        group_builder.specify "Simple_Expression's type default is a resolver of the table" <|
+            Widget_Query.resolve_type "Standard.Table.Simple_Expression.Simple_Expression" . should_equal '{"widget":null,"resolver":{"dependencies":["self"],"searchable":false}}'
+
+        group_builder.specify "set's value resolves Simple_Expression's widget against the table" <|
+            json = Widget_Query.resolve_call t table_module table_type "set" ["value"] . parse_json
+            result = json.get "arguments" . first . second
+            result.get "resolver" . get "dependencies" . should_equal ["self"]
+            result.get "widget" . get "constructor" . should_equal "Single_Choice"
+
+        group_builder.specify "Generate_Rows_Range's type default is a resolver of the table" <|
+            Widget_Query.resolve_type "Standard.Table.Generate_Rows_Range.Generate_Rows_Range" . should_equal '{"widget":null,"resolver":{"dependencies":["self"],"searchable":false}}'
+
+        group_builder.specify "generate_rows' over resolves Generate_Rows_Range's widget against the table" <|
+            json = Widget_Query.resolve_call t table_module table_type "generate_rows" ["over"] . parse_json
+            result = json.get "arguments" . first . second
+            result.get "resolver" . get "dependencies" . should_equal ["self"]
+            result.get "widget" . get "values" . map (o-> o.get "label") . should_equal ["..Integer_Range", "..Date_Range"]
+
+        group_builder.specify "type_defaults resolves an unannotated argument of that type against the table" <|
+            json = Widget_Query.resolve_call t "enso_dev.Table_Tests.In_Memory.Table_Widgets_Spec" table_type "widget_test_expression" ["expression"] "{}" False "" '{"expression":"Standard.Table.Simple_Expression.Simple_Expression"}' . parse_json
+            result = json.get "arguments" . first . second
+            result.get "resolver" . get "dependencies" . should_equal ["self"]
+            result.get "widget" . get "constructor" . should_equal "Single_Choice"
 
     suite_builder.group "Type defaults by conversion" group_builder->
         group_builder.specify "Columns_To_Add" <| check_default Columns_To_Add

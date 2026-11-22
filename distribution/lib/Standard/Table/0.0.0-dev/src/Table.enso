@@ -80,6 +80,8 @@ import project.Value_Type.Value_Type
 from project.Errors import all
 from project.Extensions.Table_Conversions import all
 
+polyglot java import org.enso.table.util.TableValueCache
+
 ## Represents a column-oriented table data structure.
 type Table
     ## ---
@@ -2713,7 +2715,7 @@ type Table
           `Arithmetic_Error`.
         - If more than 10 rows encounter computation issues, an
           `Additional_Warnings`.
-    @value Simple_Expression.default_widget
+    @value (Widget.from Simple_Expression)
     set self (value : Text | Expression | Column | Constant_Column | Simple_Expression | SQL_Function = Missing_Argument.throw "value") as:Text="" set_mode:Set_Mode=..Add_Or_Update on_problems:Problem_Behavior=..Report_Warning -> Table & Any ! Existing_Column | Missing_Column | No_Such_Column | Expression_Error = _profile_time_execution "Table.set" <|
         self.implementation.set self.underlying value as set_mode on_problems
 
@@ -3798,8 +3800,8 @@ type Table
              table.text_replace ["Input"] '"(.*?)"'.to_regex '($1)'
        ```
     @columns (Widget.Column_Names kinds=[Column_Kind.Textual] regex=True by_type=True)
-    @term (Widget_Helpers.make_column_ref_by_name_selector add_regex=True add_text=True add_named_pattern=True kinds=[Column_Kind.Textual])
-    @new_text (Widget_Helpers.make_column_ref_by_name_selector add_text=True kinds=[Column_Kind.Textual])
+    @term (table-> Widget_Helpers.make_column_ref_by_name_selector table add_regex=True add_text=True add_named_pattern=True kinds=[Column_Kind.Textual])
+    @new_text (table-> Widget_Helpers.make_column_ref_by_name_selector table add_text=True kinds=[Column_Kind.Textual])
     text_replace self (columns : Table_Selector = Missing_Argument.throw "columns") (term : Text | Column | Column_Ref | Expression | Regex = "") (new_text : Text | Column | Column_Ref | Expression = "") case_sensitivity:Case_Sensitivity=..Sensitive only_first:Boolean=False error_on_missing_columns:Boolean=True -> Table & Any = _profile_time_execution "Table.text_replace" <|
         columns.act_if_any self error_on_missing_columns selected->
             self.implementation.text_replace self.underlying selected term new_text case_sensitivity only_first
@@ -4023,7 +4025,7 @@ type Table
           Returns a Table | Input | Generated Row | |-------|---------------| |
           Hello | 0             | | Hello | 1             | | World | 0
           | | World | 1             |
-    @over Generate_Rows_Range.default_widget
+    @over (Widget.from Generate_Rows_Range)
     generate_rows self over:Generate_Rows_Range=(Missing_Argument.throw "over") as:Text="" on_problems:Problem_Behavior=..Report_Warning = _profile_time_execution "Table.generate_rows" <|
         self.implementation.generate_rows self.underlying over as on_problems
 
@@ -4095,8 +4097,9 @@ Table.from (that:Date_Range) (name:Text=that.default_column_name) = Table.new [C
 ## ---
    private: true
    ---
-make_fill_nothing_default_widget table cache=Nothing =
-    columns = cache.if_not_nothing <| cache "columns"
+   The widget of `fill_nothing`'s `default`: a resolver of the table and the
+   `columns` argument (their value types decide the constants offered).
+make_fill_nothing_default_widget table (columns = Nothing) =
     types = if columns.is_nothing then [Value_Type.Mixed] else
         ##  (selectors:(Text | Integer | Regex | By_Type | Vector)) (case_sensitivity:Case_Sensitivity) (reorder:Boolean) (error_on_missing_columns:Boolean) (on_problems:Problem_Behavior) (error_on_empty:Boolean=True) =
         real_columns = table.columns_helper.select_columns columns case_sensitivity=..Sensitive reorder=False error_on_missing_columns=False on_problems=..Ignore error_on_empty=False
@@ -4144,7 +4147,7 @@ Viz_Cell.from (that:Table) = Viz_Cell.Value (level-> Viz_Helpers.table_cell that
    reads 10 rows first.
 Viz_Json.from (that:Table) = case that.is_a In_Memory_Table of
     True ->
-        text = Widget_Helpers._with_table_cache that "viz_json" <|
+        text = TableValueCache.getOrCompute (that.table_version_hash + "viz_json") _->
             max_size = 10
             cols = that.columns.map c->
                 name = c.name.to_json

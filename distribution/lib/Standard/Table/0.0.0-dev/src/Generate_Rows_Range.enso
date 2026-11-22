@@ -63,23 +63,28 @@ type Generate_Rows_Range
                 Generate_Rows_Range.Integer_Column column ->
                     column.map t->(0.up_to t)
 
-    ## ---
-       private: true
-       ---
-       Create a widget for operation
-    default_widget table:Table_Ref -> Widget =
-        integer_input_column = Widget_Helpers.make_column_ref_by_name_selector table add_number=True kinds=[Column_Kind.Numeric]
-        integer_range = Option "..Integer_Range" "..Integer_Range" [["from", integer_input_column], ["to", integer_input_column]]
-        date_input_column = Widget_Helpers.make_column_ref_by_name_selector table add_date=True kinds=[Column_Kind.Date_Only]
-        date_range = Option "..Date_Range" "..Date_Range" [["from", date_input_column], ["to", date_input_column]]
-        Single_Choice [integer_range, date_range]
-
     private _make_empty_column_of_correct_type self -> Column =
         case self of
             Generate_Rows_Range.Integer_Range _ _ _ _ -> Column.from_vector "Empty" [] Value_Type.Integer
             Generate_Rows_Range.Date_Range _ _ _ _ -> Column.from_vector "Empty" [] Value_Type.Date
             Generate_Rows_Range.Range value -> Column.from_vector "Empty" [] value.to_column.value_type
             Generate_Rows_Range.Integer_Column _ -> Column.from_vector "Empty" [] Value_Type.Integer
+
+## The widget of a `Generate_Rows_Range` for the call's table.
+private _generate_rows_range_widget table:Table_Ref -> Widget =
+    integer_input_column = Widget_Helpers.make_column_ref_by_name_selector table add_number=True kinds=[Column_Kind.Numeric]
+    integer_range = Option "..Integer_Range" "..Integer_Range" [["from", integer_input_column], ["to", integer_input_column]]
+    date_input_column = Widget_Helpers.make_column_ref_by_name_selector table add_date=True kinds=[Column_Kind.Date_Only]
+    date_range = Option "..Date_Range" "..Date_Range" [["from", date_input_column], ["to", date_input_column]]
+    Single_Choice [integer_range, date_range]
+
+## ---
+   private: true
+   ---
+   The default widget of `Generate_Rows_Range`: a resolver of the call's table.
+Widget.from (that : Generate_Rows_Range.type) -> Widget =
+    _ = that
+    Widget.Resolver _generate_rows_range_widget
 
 ## Convert an integer to a Generate_Rows_Range
 Generate_Rows_Range.from (that:Integer) =

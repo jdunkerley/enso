@@ -3,13 +3,11 @@ import Standard.Base.Metadata.Column_Kind.Column_Kind
 import Standard.Base.Metadata.Widget
 from Standard.Base.Metadata import make_single_choice
 from Standard.Base.Metadata.Choice import Option
-from Standard.Base.Metadata.Widget import Single_Choice, Text_Input, Vector_Editor, With_JSON_Cache
+from Standard.Base.Metadata.Widget import Single_Choice, Text_Input, Vector_Editor
 from Standard.Base.System.File_Format import File_Format_SPI
 from Standard.Base.Widget_Helpers import make_any_selector, make_format_chooser, make_separator_selector
 
-import project.Column.Column
 import project.Expression.Expression
-import project.In_Memory_Column.In_Memory_Column
 import project.In_Memory_Table.In_Memory_Table
 import project.Internal.Column_Kinds
 import project.Internal.Parse_Values_Helper
@@ -20,8 +18,6 @@ import project.Table.Table
 import project.Value_Type.Auto
 import project.Value_Type.Value_Type
 from project.Extensions.Table_Conversions import all
-
-polyglot java import org.enso.table.util.TableValueCache
 
 ## ---
    private: true
@@ -159,9 +155,10 @@ make_fill_default_value_selector column_source=Nothing value_types=Value_Type.Mi
 ## ---
    private: true
    ---
-   Make a filter condition selector.
-make_filter_condition_selector table cache=Nothing -> Widget =
-    column_value_type = _get_column_value_type table cache
+   Make a filter condition selector: a resolver of the table and the `column`
+   argument (its value type decides the conditions offered).
+make_filter_condition_selector table (column = Nothing) -> Widget =
+    column_value_type = _get_column_value_type table column
     column_chooser = make_column_ref_by_name_selector_for_type table add_nothing=False value_type=column_value_type if_value_type_numeric_include_all_numeric=True
     regex_chooser = make_column_ref_by_name_selector table add_regex=True kinds=[Column_Kind.Textual]
 
@@ -218,11 +215,11 @@ make_filter_condition_selector table cache=Nothing -> Widget =
 ## ---
    private: true
    ---
-   Make a join condition selector.
-   The pickers name the call's subject (and `from="right"`), not the `table`
-   passed in; `table` only decides whether spatial conditions are offered.
-make_join_condition_selector table:Table cache=Nothing -> Widget =
-    right = cache.if_not_nothing <| cache "right"
+   Make a join condition selector: a resolver of the table and the `right`
+   argument. The pickers name the call's subject (and `from="right"`), not the
+   `table` passed in; `table` only decides whether spatial conditions are
+   offered, and `right` whether its columns can be picked.
+make_join_condition_selector table:Table (right = Nothing) -> Widget =
     self_selector = Widget.Column_Name
     right_selector = if right.is_nothing then Text_Input else
         Widget.Column_Name from="right"
@@ -268,12 +265,13 @@ make_order_by_selector table:Table name_only:Boolean=False -> Widget =
 ## ---
    private: true
    ---
-   Make a column rename name selector.
-make_rename_name_vector_selector table:Table cache=Nothing -> Widget =
+   Make a column rename name selector: a resolver of the table and the
+   `column_map` argument (the names it already uses).
+make_rename_name_vector_selector table:Table (column_map = Nothing) -> Widget =
     col_names = table.column_names
 
     ## Resolved Used Names
-    col_map  = cache.if_not_nothing <| cache "column_map"
+    col_map = column_map
     used_names = case col_map of
         _ : Dictionary -> col_map
         _ : Vector ->
@@ -297,7 +295,7 @@ make_rename_name_vector_selector table:Table cache=Nothing -> Widget =
    private: true
    ---
    Selector for type argument on `Column.parse`.
-parse_type_selector -> Widget = _with_table_cache Nothing "parse_type_selector" <|
+parse_type_selector -> Widget =
     valid_parse_targets = Parse_Values_Helper.valid_parse_targets
 
     names = ['Auto'] + valid_parse_targets
@@ -320,9 +318,9 @@ write_table_selector -> Widget =
 ## ---
    private: true
    ---
-   Make a format chooser for a selection of columns.
-make_format_chooser_for_selection table cache =
-    columns = cache.if_not_nothing <| cache "columns"
+   Make a format chooser for a selection of columns: a resolver of the table
+   and the `columns` argument (their value types decide the formats offered).
+make_format_chooser_for_selection table (columns = Nothing) =
     types = if columns.is_nothing then [Value_Type.Mixed] else
         ##  (selectors:(Text | Integer | Regex | By_Type | Vector)) (case_sensitivity:Case_Sensitivity) (reorder:Boolean) (error_on_missing_columns:Boolean) (on_problems:Problem_Behavior) (error_on_empty:Boolean=True) =
         real_columns = table.columns_helper.select_columns columns case_sensitivity=..Sensitive reorder=False error_on_missing_columns=False on_problems=..Ignore error_on_empty=False
@@ -332,12 +330,11 @@ make_format_chooser_for_selection table cache =
 ## ---
    private: true
    ---
-   Make a format chooser for a parse function.
-   The picker names the call's subject, not the `table` passed in.
-make_format_chooser_for_parse table cache =
+   Make a format chooser for a parse function: a resolver of the table (or
+   column) and the `type` argument.
+make_format_chooser_for_parse table (type = Nothing) =
     _ = table
-    value_type = cache.if_not_nothing <| cache "type"
-    make_format_chooser_for_type (value_type.if_nothing Value_Type.Mixed)
+    make_format_chooser_for_type (type.if_nothing Value_Type.Mixed)
 
 ## ---
    private: true
@@ -346,15 +343,12 @@ make_format_chooser_for_parse table cache =
 make_format_chooser_for_type : Value_Type | Vector -> Widget
 make_format_chooser_for_type value_types =
     vector = Vector.unify_vector_or_element value_types
-
-    type_key = vector.map (vt-> Meta.meta vt . constructor . name) . join "_"
-    _with_table_cache Nothing "make_format_chooser_for_type_"+type_key <|
-        include_number    = vector.any value_type-> value_type.is_numeric || value_type==Value_Type.Mixed
-        include_date      = vector.any value_type-> value_type==Value_Type.Date || value_type==Value_Type.Mixed
-        include_date_time = vector.any value_type-> value_type.is_date_time || value_type==Value_Type.Mixed
-        include_time      = vector.any value_type-> value_type==Value_Type.Time || value_type==Value_Type.Mixed
-        include_boolean   = vector.any value_type-> value_type.is_boolean || value_type==Value_Type.Mixed
-        make_format_chooser include_number include_date include_date_time include_time include_boolean
+    include_number    = vector.any value_type-> value_type.is_numeric || value_type==Value_Type.Mixed
+    include_date      = vector.any value_type-> value_type==Value_Type.Date || value_type==Value_Type.Mixed
+    include_date_time = vector.any value_type-> value_type.is_date_time || value_type==Value_Type.Mixed
+    include_time      = vector.any value_type-> value_type==Value_Type.Time || value_type==Value_Type.Mixed
+    include_boolean   = vector.any value_type-> value_type.is_boolean || value_type==Value_Type.Mixed
+    make_format_chooser include_number include_date include_date_time include_time include_boolean
 
 ## ---
    private: true
@@ -440,8 +434,9 @@ type Types_To_Include
 ## ---
    private: true
    ---
-private _get_column_value_type table cache parameter:Text="column" default:Value_Type=Value_Type.Mixed =
-    raw_column = cache.if_not_nothing <| cache parameter
+   The value type of the column `raw_column` names (a name, an expression or
+   a column), or `default`.
+private _get_column_value_type table raw_column default:Value_Type=Value_Type.Mixed =
     column = case raw_column of
         Nothing -> Nothing
         _ : Text -> table.get raw_column
@@ -469,17 +464,3 @@ private _include_all value_type:Value_Type -> Boolean =
 private _kinds_for value_types:Vector -> Vector Column_Kind =
     if value_types.any (t-> (_include_all t) || (t == Value_Type.Null)) then [] else
         value_types.map Column_Kinds.of_value_type . distinct
-
-private _table_key table = case table of
-    t : In_Memory_Table -> (t:Table).table_version_hash
-    c : In_Memory_Column -> (c:Column).table_version_hash
-    Nothing -> ""
-    _ -> Nothing
-
-private _with_table_cache table suffix ~action =
-    key = _table_key table
-    if key.is_nothing || suffix.is_nothing then action else
-        TableValueCache.getOrCompute (key+suffix) k->
-            _ = k
-            v = action
-            if v.is_a Widget then With_JSON_Cache v v.to_json else v
