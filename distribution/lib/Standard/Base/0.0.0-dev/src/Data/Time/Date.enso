@@ -1330,10 +1330,8 @@ Date.from (that:JS_Object) =
 ## ---
    private: true
    ---
-private make_day_picker value cache =
+private make_day_picker value (year = Nothing) (month = Nothing) =
     _ = value
-    year = cache.if_not_nothing <| cache "year"
-    month = cache.if_not_nothing <| cache "month"
     days = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     max = if month.is_nothing then 31 else
         if month != 2 || year.is_nothing then days.at (month - 1) else

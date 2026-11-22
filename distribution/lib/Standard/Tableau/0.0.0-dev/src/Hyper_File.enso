@@ -119,8 +119,7 @@ make_schema_selector hyper_file:Hyper_File include_any:Boolean=False =
 ## ---
    private: true
    ---
-make_table_selector hyper_file:Hyper_File cache=Nothing =
-    schema = cache.if_not_nothing <| cache "schema"
+make_table_selector hyper_file:Hyper_File (schema = Nothing) =
     used_schema = if schema == "" || schema == Nothing then hyper_file.schema else schema
     tables = hyper_file.tables used_schema . map t-> Option t.table t.table.pretty
     Single_Choice values=tables

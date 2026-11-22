@@ -130,7 +130,7 @@ type SQLServer_Connection
 
        ## Arguments
         - schema: The name of the schema to connect to.
-    @schema make_schema_selector
+    @schema (make_schema_selector include_any=False)
     set_schema : Text -> Connection ! SQL_Error
     set_schema self schema =
         if schema . equals_ignore_case self.schema then self else
@@ -196,7 +196,7 @@ type SQLServer_Connection
           is raised.
         - If provided with a `Table_Name` or a text short-hand and the table is
           not found, a `Table_Not_Found` error is raised.
-    @query make_table_name_with_schema_selector schema_black_list=schema_black_list
+    @query (make_table_name_with_schema_selector schema_black_list=schema_black_list add_custom=True)
     query : (SQLServer_Query | SQL_Query) -> Text -> Table & DB_Table ! Table_Not_Found
     query self query:(SQLServer_Query | SQL_Query) alias="" =
         used_query = case query of
@@ -225,7 +225,7 @@ type SQLServer_Connection
        it is provided with a DML query. Usually it is preferred to use
        `execute_update` for DML queries, or if they are supposed to return
        results, the `read` should be wrapped in an execution context check.
-    @query make_table_name_with_schema_selector schema_black_list=schema_black_list
+    @query (make_table_name_with_schema_selector schema_black_list=schema_black_list add_custom=True)
     read : (SQLServer_Query | SQL_Query) -> Rows_To_Read -> Table ! Table_Not_Found
     read self query:(SQLServer_Query | SQL_Query) (limit : Rows_To_Read = ..First_With_Warning 1000) =
         self.query query . read limit
@@ -436,7 +436,7 @@ type SQLServer_Connection
        ## Arguments
        - `table_name`: the name of the table to get the primary key for.
        - `schema_name`: optionally, the schema name where the table is located.
-    @table_name make_table_name_selector add_custom=False
+    @table_name (make_table_name_selector add_custom=False)
     fetch_primary_key : Text -> Text -> Vector Text ! Nothing
     fetch_primary_key self table_name:Text schema_name:Text="" =
         self.base_connection.fetch_primary_key table_name schema_name

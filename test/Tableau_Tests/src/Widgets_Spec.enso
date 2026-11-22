@@ -1,0 +1,33 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Widget_Query
+from Standard.Base.Metadata.Widget_Query import Widget_Method
+
+from Standard.Test import all
+
+from Standard.Tableau import Hyper_File
+
+hyper_module = "Standard.Tableau.Hyper_File"
+hyper_type = "Standard.Tableau.Hyper_File.Hyper_File"
+
+add_specs suite_builder =
+    suite_builder.group "Hyper_File widgets" group_builder->
+        hyper = Hyper_File.new (enso_project.data / "names.hyper")
+        method = Widget_Method.Value hyper_module hyper_type "read"
+        call_arguments = Meta.get_method_argument_names hyper_module hyper_type "read"
+        table_of schema =
+            values = Widget_Query.values_from_lookup (name-> if name == "schema" then schema else Nothing)
+            Widget_Query.resolve_argument method "table" hyper values "" call_arguments Nothing . to_json . parse_json
+
+        group_builder.specify "read's table lists the tables of the schema argument" <|
+            json = table_of "Extract"
+            json.get "resolver" . get "dependencies" . should_equal ["self", "schema"]
+            json.get "widget" . get "values" . map (o-> o.get "label") . should_equal ["Extract"]
+
+        group_builder.specify "without a schema, the file's own schema is listed" <|
+            json = table_of Nothing
+            json.get "widget" . get "values" . map (o-> o.get "label") . should_equal ["Extract"]
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

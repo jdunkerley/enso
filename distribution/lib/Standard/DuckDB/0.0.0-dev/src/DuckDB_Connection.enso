@@ -138,7 +138,7 @@ type DuckDB_Connection
 
        ## Arguments
         - schema: The name of the schema to connect to.
-    @schema make_schema_selector
+    @schema (make_schema_selector include_any=False)
     set_schema : Text -> Connection ! SQL_Error
     set_schema self schema =
         if schema . equals_ignore_case self.schema then self else
@@ -203,7 +203,7 @@ type DuckDB_Connection
           is raised.
         - If provided with a `Table_Name` or a text short-hand and the table is
           not found, a `Table_Not_Found` error is raised.
-    @query make_table_name_with_schema_selector schema_black_list=schema_black_list
+    @query (make_table_name_with_schema_selector schema_black_list=schema_black_list add_custom=True)
     query : (SQL_Query_With_Schema | SQL_Query) -> Text -> Table & DB_Table ! Table_Not_Found
     query self query:(SQL_Query_With_Schema | SQL_Query) alias="" =
         used_query = case query of
@@ -232,7 +232,7 @@ type DuckDB_Connection
        it is provided with a DML query. Usually it is preferred to use
        `execute_update` for DML queries, or if they are supposed to return
        results, the `read` should be wrapped in an execution context check.
-    @query make_table_name_with_schema_selector schema_black_list=schema_black_list
+    @query (make_table_name_with_schema_selector schema_black_list=schema_black_list add_custom=True)
     read : (SQL_Query_With_Schema | SQL_Query) -> Rows_To_Read -> Table ! Table_Not_Found
     read self query:(SQL_Query_With_Schema | SQL_Query) (limit : Rows_To_Read = ..First_With_Warning 1000) =
         self.query query . read limit
@@ -352,7 +352,7 @@ type DuckDB_Connection
 
        ## Returns
        A `DB_Table` referencing the newly created table.
-    @table make_table_name_selector
+    @table (make_table_name_selector add_custom=True)
     @key_columns _column_names_widget
     @as Text_Input
     create_index : Text -> Vector Text -> Text -> Boolean -> DB_Table
@@ -393,8 +393,8 @@ type DuckDB_Connection
 
        ## Returns
        A `DB_Table` referencing the newly created table.
-    @table make_table_name_selector
-    @column _column_names_widget single_choice=True
+    @table (make_table_name_selector add_custom=True)
+    @column _column_name_widget
     @as Text_Input
     create_spatial_index : Text -> Text -> Text -> Boolean -> DB_Table
     create_spatial_index self (table=Missing_Argument.throw "table") (column:Text=Missing_Argument.throw "column") as:Text="" replace_if_present:Boolean=False =
@@ -660,7 +660,7 @@ type DuckDB_Connection
        ## Arguments
        - `table_name`: the name of the table to get the primary key for.
        - `schema_name`: optionally, the schema name where the table is located.
-    @table_name make_table_name_selector add_custom=False
+    @table_name (make_table_name_selector add_custom=False)
     fetch_primary_key : Text -> Text -> Vector Text ! Nothing
     fetch_primary_key self table_name:Text schema_name:Text="" =
         self.base_connection.fetch_primary_key table_name schema_name
@@ -731,7 +731,7 @@ type DuckDB_Connection
 
        ## Returns
        A file pointing at the written file.
-    @query make_table_name_with_schema_selector schema_black_list=schema_black_list
+    @query (make_table_name_with_schema_selector schema_black_list=schema_black_list add_custom=True)
     @on_existing_file Existing_File_Behavior.widget include_append=False
     write_file : (SQL_Query_With_Schema | SQL_Query | Table) -> Writable_File -> DuckDB_Format -> Existing_File_Behavior -> Writable_File
     write_file self (query:(SQL_Query_With_Schema | SQL_Query | Table)=Missing_Argument.throw "query") (path:Writable_File=Missing_Argument.throw "path") (format:DuckDB_Format=..Auto) on_existing_file:Existing_File_Behavior=..Backup =
@@ -779,9 +779,9 @@ type DuckDB_Connection
 
        ## Returns
        A file pointing at the written file.
-    @query make_table_name_with_schema_selector schema_black_list=schema_black_list
+    @query (make_table_name_with_schema_selector schema_black_list=schema_black_list add_custom=True)
     @on_existing_file Existing_File_Behavior.widget include_append=False
-    @format DuckDB_GeoFormat.default_widget
+    @format (Widget.from DuckDB_GeoFormat)
     write_spatial_file : (SQL_Query_With_Schema | SQL_Query | Table) -> Writable_File -> DuckDB_GeoFormat -> Existing_File_Behavior -> Writable_File
     write_spatial_file self (query:(SQL_Query_With_Schema | SQL_Query | Table)=Missing_Argument.throw "query") (path:Writable_File=Missing_Argument.throw "path") (format:DuckDB_GeoFormat=Missing_Argument.throw "format") on_existing_file:Existing_File_Behavior=..Backup =
         Error.return_if_error query
@@ -848,13 +848,21 @@ private _resolve_table connection table = case table of
         names.last
     _ -> Error.throw (Illegal_Argument.Error "Expect table name or a DB_Table.")
 
-private _column_names_widget connection single_choice:Boolean=False cache=Nothing =
-    table = cache.if_not_nothing <| cache "table"
+## A picker of several of the columns of the call's `table` (a name or a
+   table), or a list of names to type when it is not set.
+private _column_names_widget connection (table = Nothing) =
     if table.is_nothing then Vector_Editor item_editor=Text_Input item_default='"Column"' else
-        db_table = if table.is_a Table then table else connection.query (SQL_Query.Table_Name table)
-        col_names = db_table.column_names.map n-> Option n n.pretty
-        if single_choice then Single_Choice [Option "<Custom>" '"Column"']+col_names else
-            Multiple_Choice col_names
+        Multiple_Choice (_column_options connection table)
+
+## A picker of one of the columns of the call's `table` (a name or a table),
+   or a list of names to type when it is not set.
+private _column_name_widget connection (table = Nothing) =
+    if table.is_nothing then Vector_Editor item_editor=Text_Input item_default='"Column"' else
+        Single_Choice [Option "<Custom>" '"Column"']+(_column_options connection table)
+
+private _column_options connection table =
+    db_table = if table.is_a Table then table else connection.query (SQL_Query.Table_Name table)
+    db_table.column_names.map n-> Option n n.pretty
 
 private _spatial_driver_widget connection =
     names = connection.spatial_drivers.at "short_name" . to_vector

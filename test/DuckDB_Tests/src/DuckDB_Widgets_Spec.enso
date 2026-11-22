@@ -1,0 +1,93 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Widget_Query
+from Standard.Base.Metadata.Widget_Query import Widget_Method
+
+from Standard.Database import all
+
+from Standard.Test import all
+
+import Standard.DuckDB.DuckDB.DuckDB
+
+duckdb_module = "Standard.DuckDB.DuckDB_Connection"
+duckdb_type = "Standard.DuckDB.DuckDB_Connection.DuckDB_Connection"
+
+## The result for the one argument asked for, parsed.
+result_of connection method argument search="" uuids="{}" =
+    json = Widget_Query.resolve_call connection duckdb_module duckdb_type method [argument] uuids False search . parse_json
+    json.get "arguments" . first . second
+
+## The labels of a Single_Choice or Multiple_Choice result.
+labels_of result = result.get "widget" . get "values" . map (o-> o.get "label")
+
+add_specs suite_builder =
+    suite_builder.group "DuckDB widgets: searchable table names" group_builder->
+        connection = Database.connect DuckDB.In_Memory
+        ["Sales_2024", "sales_2025", "Costs", "a_b", "aXb"].each name->
+            connection.execute_update 'CREATE TABLE "'+name+'" ("x" INTEGER, "label" VARCHAR)'
+
+        group_builder.specify "query's table names are searchable" <|
+            result = result_of connection "query" "query" search="ales"
+            result.get "resolver" . get "searchable" . should_be_true
+            result.get "resolver" . get "dependencies" . should_equal ["self"]
+            labels = labels_of result
+            labels . should_contain "Sales_2024"
+            labels . should_contain "sales_2025"
+            labels . should_not_contain "Costs"
+
+        group_builder.specify "the search echoes in the answer" <|
+            json = Widget_Query.resolve_call connection duckdb_module duckdb_type "query" ["query"] "{}" False "ales" . parse_json
+            json.get "search" . should_equal "ales"
+
+        group_builder.specify "search escapes LIKE wildcards" <|
+            labels = labels_of (result_of connection "query" "query" search="a_b")
+            labels . should_contain "a_b"
+            labels . should_not_contain "aXb"
+
+        group_builder.specify "matching follows DuckDB's own rule for case" <|
+            ## DuckDB's metadata pattern is case-sensitive: `Sales` does not match `sales_2025`.
+            labels = labels_of (result_of connection "query" "query" search="Sales")
+            labels . should_contain "Sales_2024"
+            labels . should_not_contain "sales_2025"
+
+        group_builder.specify "an empty search gives every table, and the custom entries" <|
+            labels = labels_of (result_of connection "query" "query")
+            ["Sales_2024", "sales_2025", "Costs", "a_b", "aXb", "<Table_Name>", "<Raw_SQL>"].each name->
+                labels . should_contain name
+            labels.last . should_equal "<Raw_SQL>"
+
+    suite_builder.group "DuckDB widgets: column pickers read the table argument" group_builder->
+        connection = Database.connect DuckDB.In_Memory
+        connection.execute_update 'CREATE TABLE "points" ("id" INTEGER, "name" VARCHAR)'
+        lookup name = if name == "table" then "points" else Nothing
+        values = Widget_Query.values_from_lookup lookup
+        method name = Widget_Method.Value duckdb_module duckdb_type name
+        call_arguments name = Meta.get_method_argument_names duckdb_module duckdb_type name
+
+        group_builder.specify "create_index's key_columns pick the table's columns" <|
+            result = Widget_Query.resolve_argument (method "create_index") "key_columns" connection values "" (call_arguments "create_index") Nothing . to_json . parse_json
+            result.get "resolver" . get "dependencies" . should_equal ["self", "table"]
+            result.get "widget" . get "constructor" . should_equal "Multiple_Choice"
+            labels_of result . should_equal ["id", "name"]
+
+        group_builder.specify "without a table, key_columns are typed" <|
+            result = Widget_Query.resolve_argument (method "create_index") "key_columns" connection (Widget_Query.values_from_lookup (_-> Nothing)) "" (call_arguments "create_index") Nothing . to_json . parse_json
+            result.get "widget" . get "constructor" . should_equal "Vector_Editor"
+
+        group_builder.specify "create_spatial_index's column offers <Custom> first" <|
+            result = Widget_Query.resolve_argument (method "create_spatial_index") "column" connection values "" (call_arguments "create_spatial_index") Nothing . to_json . parse_json
+            result.get "widget" . get "constructor" . should_equal "Single_Choice"
+            labels_of result . should_equal ["<Custom>", "id", "name"]
+
+    suite_builder.group "DuckDB widgets: DuckDB_GeoFormat's default is a resolver" group_builder->
+        group_builder.specify "resolve_type announces it" <|
+            Widget_Query.resolve_type "Standard.DuckDB.DuckDB_GeoFormat.DuckDB_GeoFormat" . should_equal '{"widget":null,"resolver":{"dependencies":["self"],"searchable":false}}'
+
+        group_builder.specify "write_spatial_file's format is resolved against the connection" <|
+            connection = Database.connect DuckDB.In_Memory
+            result = result_of connection "write_spatial_file" "format"
+            result.get "resolver" . get "dependencies" . should_equal ["self"]
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter
