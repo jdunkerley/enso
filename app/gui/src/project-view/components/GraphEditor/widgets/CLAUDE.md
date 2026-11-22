@@ -100,6 +100,15 @@ render only its own slot content. The icon is already on the row, drawn by
     whatever the argument holds. A test of a browsable argument should answer
     what the engine answers for it: a mocked `Single_Choice` hid the
     `Text_Input` case (#926).
+  - **An offered auto-scoped constructor resolves without the engine**
+    (`deriveAutoscopedCallInfo` in `@/util/callTree`, used by
+    `widgetFunctionCallInfo.ts`): the engine resolves `..Equals` only when the
+    call it is passed to reads it, and a call that fails first never does
+    (`table.join on=[(..Equals 'county')]` without `right`: no call info, so no
+    `left`/`right` and nothing to enter). When the engine has no call info and
+    the parent's choice offers `..Name`, the constructor is taken from the
+    suggestion database: the one of that name whose type the expected type
+    names, else the only one of that name.
   - **A submenu stays open while its item is in sight**
     (`WidgetSelection/SelectionSubmenu.vue`): a list longer than the dropdown
     scrolls, and clicking a partly hidden group (`filter`'s `Text →`) scrolls it

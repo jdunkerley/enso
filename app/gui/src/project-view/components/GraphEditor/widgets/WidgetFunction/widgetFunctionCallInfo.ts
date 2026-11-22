@@ -3,7 +3,7 @@ import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import type { ProjectStore } from '$/providers/openedProjects/project'
 import type { NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'
 import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
-import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
+import type { GroupInfo, SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import { entryIsAnnotatable } from '$/providers/openedProjects/suggestionDatabase/entry'
 import type { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import type { SchemaCache } from '$/providers/openedProjects/widgetRegistry/columnPickers'
@@ -18,6 +18,9 @@ import type { ToValue } from '$/utils/reactivity'
 import { Ast } from '@/util/ast'
 import {
   ArgumentApplication,
+  ArgumentInfoKey,
+  autoscopedConstructorName,
+  deriveAutoscopedCallInfo,
   deriveLocalCallInfoFromCode,
   getAccessOprSubject,
   getMethodCallInfoRecursively,
@@ -44,6 +47,7 @@ export function useWidgetFunctionCallInfo(
   groups: ToValue<DeepReadonly<GroupInfo[]>>,
   typeDefaults?: ToValue<Pick<TypeDefaults, 'lookup'> | undefined>,
   schemaCache?: ToValue<SchemaCache | undefined>,
+  suggestionDb?: ToValue<SuggestionDb | undefined>,
 ) {
   const methodCallInfo = computed(() => {
     const _project = toValue(project)
@@ -53,8 +57,24 @@ export function useWidgetFunctionCallInfo(
     const ptr = getPotentialModuleFunctionPointer(expression, projectPath, projectNames, graphDb)
     const derivedLocal = ptr && deriveLocalCallInfoFromCode(ptr, expression, toValue(groups))
     if (derivedLocal) return derivedLocal
-    return getMethodCallInfoRecursively(toValue(input).value, toValue(graphDb))
+    return (
+      getMethodCallInfoRecursively(toValue(input).value, toValue(graphDb)) ??
+      offeredAutoscopedCall()
+    )
   })
+
+  /**
+   * An auto-scoped constructor the engine has not resolved (`deriveAutoscopedCallInfo`), only when
+   * the parent's choice offers it: its option's parameters are then this call's configuration.
+   */
+  function offeredAutoscopedCall() {
+    const db = toValue(suggestionDb)
+    const { value, dynamicConfig, expectedType, [ArgumentInfoKey]: argInfo } = toValue(input)
+    const name = autoscopedConstructorName(value)
+    if (db == null || name == null || dynamicConfig?.kind !== 'OneOfFunctionCalls') return
+    if (!dynamicConfig.possibleFunctions.has('..' + name)) return
+    return deriveAutoscopedCallInfo(value, db, expectedType ?? argInfo?.info?.reprType)
+  }
 
   const interpreted = computed(() => interpretCall(toValue(input).value))
 

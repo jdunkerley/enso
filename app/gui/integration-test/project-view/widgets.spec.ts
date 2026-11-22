@@ -2800,7 +2800,7 @@ test.describe('Column pickers', () => {
     setupApi: {
       local: () =>
         setMockMainFile(
-          "from Standard.Base import Data\n\nmain =\n    summed = Data.aggregate_by (..Sum)\n    joined = Data.join_on\n    lone = Data.lone_column\n    filtered = Data.filter_by 'county' ..Contains\n    picked = Data.filter_by 'county'\n",
+          "from Standard.Base import Data\n\nmain =\n    summed = Data.aggregate_by (..Sum)\n    joined = Data.join_on\n    lone = Data.lone_column\n    filtered = Data.filter_by 'county' ..Contains\n    picked = Data.filter_by 'county'\n    conditioned = Data.join_with on=[(..Equals 'county')]\n",
         ),
     },
   })
@@ -3062,5 +3062,111 @@ test.describe('Column pickers', () => {
     await substring.click()
     const dropDown = new DropDownLocator(substring)
     await dropDown.expectVisibleWithOptions(['<Text Value>', '<Expression>', 'county', 'n'])
+  })
+
+  // As `Table.join` answers (owner's #926 test): the conditions are a vector of choices whose
+  // `right` is a text input until `right` is set, then a picker of the right table's columns. With
+  // `right` unset the engine never runs `join`'s body, so it never resolves `..Equals` and sends no
+  // call info for it: the condition's arguments come from the suggestion database alone.
+  async function mockJoinWith(
+    editorPage: EditorPageActions,
+    page: Page,
+    localApi: MockLocalApi,
+    right: unknown,
+  ) {
+    const argument = (name: string) => ({
+      name,
+      reprType: ANY_TYPE,
+      isSuspended: false,
+      hasDefault: false,
+    })
+    await editorPage.mockSuggestion(method('join_with', ['right', 'on'])).mockSuggestion({
+      type: 'constructor' as const,
+      module: 'Standard.Base.Join_Condition',
+      name: 'Equals',
+      arguments: [argument('left'), argument('right')],
+      returnType: 'Standard.Base.Join_Condition.Join_Condition',
+      documentation: '',
+      annotations: [],
+    })
+    await localApi.updateVisualization('.join_with', {
+      arguments: [
+        [
+          'on',
+          {
+            widget: {
+              type: 'Widget',
+              constructor: 'Vector_Editor',
+              // eslint-disable-next-line camelcase
+              item_editor: {
+                type: 'Widget',
+                constructor: 'Single_Choice',
+                values: [
+                  {
+                    type: 'Choice',
+                    constructor: 'Option',
+                    value: '..Equals',
+                    label: 'Equals',
+                    parameters: [
+                      ['left', picker(null)],
+                      ['right', right],
+                    ],
+                  },
+                ],
+              },
+              // eslint-disable-next-line camelcase
+              item_default: "(..Equals 'county')",
+            },
+          },
+        ],
+      ],
+      columns: { '': columnsOf('county', 'n'), right: columnsOf('Right X', 'Right Y') },
+    })
+    await mockMethodCallInfo(page, 'conditioned', {
+      ...pointer('join_with'),
+      notAppliedArguments: [0],
+    })
+  }
+  /**
+   * The condition's argument `name`: the innermost argument chip with that name (the join's own
+   * `right` comes first, and the `on` chip holds the whole condition).
+   */
+  function conditionArg(node: Locator, name: string) {
+    return node
+      .locator('.WidgetArgumentName')
+      .filter({ has: node.page().getByText(name, { exact: true }) })
+      .last()
+  }
+
+  test("a join condition's right is a text input while right is unset", async ({
+    editorPage,
+    page,
+    localApi,
+  }) => {
+    await mockJoinWith(editorPage, page, localApi, { type: 'Widget', constructor: 'Text_Input' })
+    const node = locate.graphNodeByBinding(page, 'conditioned')
+    await expect(conditionArg(node, 'left')).toBeVisible()
+    const right = conditionArg(node, 'right')
+    await expect(right.locator('.WidgetText')).toHaveCount(1)
+    await right.locator('.WidgetText').click()
+    await page.keyboard.type('Right X')
+    await page.keyboard.press('Enter')
+    await expect
+      .poll(() => moduleCode(page))
+      .toMatch(/conditioned = Data\.join_with on=\[\(\.\.Equals 'county' (right=)?'Right X'\)\]/)
+  })
+
+  test("a join condition's right lists the right table's columns once right is set", async ({
+    editorPage,
+    page,
+    localApi,
+  }) => {
+    await mockJoinWith(editorPage, page, localApi, picker('right'))
+    const node = locate.graphNodeByBinding(page, 'conditioned')
+    const right = conditionArg(node, 'right')
+    await expect(right).toBeVisible()
+    await right.click()
+    const dropDown = new DropDownLocator(right)
+    await dropDown.expectVisibleWithOptions(['Right X', 'Right Y'])
   })
 })
