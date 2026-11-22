@@ -8,6 +8,7 @@ import scala.Function1;
 /** A trait for all warnings in Enso's IR. */
 public sealed interface Warning extends Diagnostic
     permits Warning.ArgumentDisplay,
+        Warning.ResolverSignature,
         Warning.DiscardedValue,
         Warning.DuplicatedImport,
         Warning.FailedParallelism,
@@ -121,6 +122,21 @@ public sealed interface Warning extends Diagnostic
    * @param text the message
    */
   record ArgumentDisplay(IdentifiedLocation identifiedLocation, String text) implements Warning {
+    @Override
+    public String message(Function1<IdentifiedLocation, String> source) {
+      return text;
+    }
+  }
+
+  /**
+   * A widget resolver (a function given as an argument's annotation) whose parameters break the
+   * rule the IDE's widget query applies it by: the first receives the call's subject, every other
+   * is an argument of the method defaulted to {@code Nothing}, or {@code search}.
+   *
+   * @param identifiedLocation the location of the annotation
+   * @param text the message
+   */
+  record ResolverSignature(IdentifiedLocation identifiedLocation, String text) implements Warning {
     @Override
     public String message(Function1<IdentifiedLocation, String> source) {
       return text;
