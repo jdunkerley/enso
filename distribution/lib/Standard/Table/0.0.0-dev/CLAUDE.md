@@ -86,7 +86,9 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
   other kinds with a type error; leave it off where any column is fine.
 - The builders in `src/Internal/Widget_Helpers.enso` return references too. A
   composite builder nests the references of its parts as the options of a
-  grouped choice; it never builds a column list.
+  grouped choice; it does not build a column list (except rename's item default,
+  which needs the names). A `kinds=` argument needs
+  `import Standard.Base.Metadata.Column_Kind.Column_Kind`.
 
 ## Where to read more
 

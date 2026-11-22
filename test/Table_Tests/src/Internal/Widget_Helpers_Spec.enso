@@ -96,6 +96,7 @@ add_specs suite_builder =
             w.kinds . should_equal [Column_Kind.Textual]
             (extra_labels w).first . should_equal "Previous Value"
             (make_fill_default_value_selector table value_types=Value_Type.Mixed).kinds . should_equal []
+            (make_fill_default_value_selector table value_types=Value_Type.Null).kinds . should_equal []
 
 ## The constants of `make_column_ref_by_name_selector` with no flags.
 make_any_selector_values = (make_column_ref_by_name_selector Nothing).values

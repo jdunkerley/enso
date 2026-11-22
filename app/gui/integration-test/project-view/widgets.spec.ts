@@ -2436,7 +2436,8 @@ test.describe('Column pickers', () => {
     await mockMethodCallInfo(page, 'summed', pointer('aggregate_by'))
     await mockMethodCallInfo(page, { binding: 'summed', expr: '..Sum' }, pointer('Sum'))
     const node = locate.graphNodeByBinding(page, 'summed')
-    // The first selection inside the call's argument is the nested `column`'s.
+    // The outer selection is the aggregate choice; it holds the nested `column` selection,
+    // which `DropDownLocator` reaches through its own `.first()`.
     const aggregateSelection = node.locator('.WidgetSelection').first()
     await expect(aggregateSelection.locator('.WidgetSelection')).toHaveCount(1)
     const dropDown = new DropDownLocator(aggregateSelection)

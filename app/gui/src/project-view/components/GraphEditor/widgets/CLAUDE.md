@@ -252,15 +252,16 @@ render only its own slot content. The icon is already on the row, drawn by
   expands every reference from it while `functionCallFromAnswer` builds the
   configuration, so a node with fifty pickers sends its columns once. The
   reference and `columns` schemas are zod types in `configuration.ts`.
-- The parsed schemas are cached per project (`SchemaCache`, an LRU of 64, in
-  `projectStates.ts` beside `TypeDefaults`), so a recomputed table that answers
-  the same columns reuses them.
+- The expansions are cached per project, keyed on the schema (`SchemaCache`, an
+  LRU of 64, in `projectStates.ts` beside `TypeDefaults`), so a recomputed table
+  that answers the same columns reuses them.
 - `kinds` filters the columns offered; `Other` is always included.
 - **Absent source** (no `columns` entry for the picker's `from`): `Column_Name`
-  without `extra` or `expression` is a `Text_Input`; with `extra` it is a
-  `Single_Choice` of the extras; `Column_Names` is a `Multiple_Choice` of its
-  regex and by-type options, or a `Text_Input` when it has none; `Column_Vector`
-  and `Order_By` are a `Vector_Editor` of `Text_Input`, new items `''`.
+  without `extra` is a `Text_Input` (`expression` is ignored without a source);
+  with `extra` it is a `Single_Choice` of the extras; `Column_Names` is a
+  `Multiple_Choice` of its regex and by-type options, or a `Text_Input` when it
+  has none; `Column_Vector` and `Order_By` are a `Vector_Editor` of
+  `Text_Input`, new items `''`.
 - **Adding a picker flag**: the Enso constructor field in `Metadata.enso` (Base)
   and its `to_json`, the zod schema in `configuration.ts`, the expansion in
   `columnPickers.ts`, and a test in `columnPickers.test.ts` and the Base/Table

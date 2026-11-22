@@ -495,10 +495,16 @@ type In_Memory_Table_Implementation
                 java_column = java_columns.at i
                 value_type = Storage.to_value_type java_column.getStorageType
                 names.append java_column.getName
-                entry = known.get value_type if_missing=(Pair.new (Column_Kinds.of_value_type value_type) value_type.to_name)
-                kinds.append entry.first
-                type_names.append entry.second
-                known.insert value_type entry
+                case known.get value_type if_missing=Nothing of
+                    Nothing ->
+                        entry = Pair.new (Column_Kinds.of_value_type value_type) value_type.to_name
+                        kinds.append entry.first
+                        type_names.append entry.second
+                        known.insert value_type entry
+                    entry ->
+                        kinds.append entry.first
+                        type_names.append entry.second
+                        known
         Widget_Columns.Value (vectors.at 0) (vectors.at 1) (vectors.at 2)
 
     rows (this_table : Table & In_Memory_Table) max_rows:Rows_To_Read =
