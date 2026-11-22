@@ -238,11 +238,7 @@ resolve_argument (method : Widget_Method) (argument : Text) subject (value_of : 
                         Widget.Resolver f -> run_resolver method argument f subject value_of search Nothing
                         _ -> default
                 Widget.Resolver f -> run_resolver method argument f subject value_of search call_arguments
-                f : Function ->
-                    ## The legacy form, until every library's helpers are resolvers.
-                    with_cache = Meta.meta f . arguments pending=True defaulted=True . contains "cache"
-                    if with_cache then _as_result method argument (f cache=value_of subject) else
-                        run_resolver method argument f subject value_of search call_arguments
+                f : Function -> run_resolver method argument f subject value_of search call_arguments
                 _ -> _static_result method argument annotation
 
 ## ---

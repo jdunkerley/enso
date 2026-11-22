@@ -39,7 +39,7 @@ type Sample
     @arg _choice_of_label
     of_self self (arg = 0) = arg
 
-    @arg _choice_of_cache
+    @arg Bad_Resolvers.choice_of_cache
     of_cache self (arg = 0) (other = 0) = arg + other
 
     @arg (Error.throw (Illegal_Argument.Error "no choices" (Illegal_State.Error "the cause")))
@@ -59,7 +59,7 @@ type Sample
     @arg _choice_of_search
     searching self (arg = 0) = arg
 
-    @arg _misspelt
+    @arg Bad_Resolvers.misspelt
     misspelt self (arg = 0) (other = 0) = arg + other
 
     @arg (Widget.Resolver _choice_of_other)
@@ -132,8 +132,18 @@ module_probe (arg = 0) = arg
 private _choice_of_label subject -> Widget =
     Widget.Single_Choice [Choice.Option subject.label]
 
-private _choice_of_cache _ cache=Nothing -> Widget =
-    Widget.Single_Choice [Choice.Option (cache "other" . to_text)]
+## Resolvers that break the rule on purpose, to test the run-time check. A
+   type's methods, which the compiler's lint (`ResolverSignatureCheck`, which
+   reads module methods) does not see.
+type Bad_Resolvers
+    ## The old form, reading other arguments through `cache`.
+    choice_of_cache _ cache=Nothing -> Widget =
+        Widget.Single_Choice [Choice.Option (cache "other" . to_text)]
+
+    ## A dependency that is not an argument.
+    misspelt subject (othr = Nothing) -> Widget =
+        _ = [subject, othr]
+        Widget.Text_Input
 
 private _choice_of_other subject (other = Nothing) -> Widget =
     _ = subject
@@ -142,10 +152,6 @@ private _choice_of_other subject (other = Nothing) -> Widget =
 private _choice_of_search subject (search : Text = "") -> Widget =
     _ = subject
     Widget.Single_Choice [Choice.Option ("found " + search)]
-
-private _misspelt subject (othr = Nothing) -> Widget =
-    _ = [subject, othr]
-    Widget.Text_Input
 
 private _not_a_widget subject = subject
 
@@ -227,8 +233,10 @@ add_specs suite_builder =
             expected = '{"arguments":[["arg",{"widget":' + (Widget.Single_Choice [Choice.Option "a label"]).to_json + ',"resolver":{"dependencies":["self"],"searchable":false}}]]}'
             Widget_Query.resolve_call sample spec_module sample_type "of_self" ["arg"] . should_equal expected
 
-        group_builder.specify "a function of self taking cache, which reads the uuids" <|
-            Widget_Query.resolve_call sample spec_module sample_type "of_cache" ["arg"] "{}" . should_equal (answer "arg" (Widget.Single_Choice [Choice.Option "Nothing"]))
+        group_builder.specify "a function taking `cache` breaks the resolver rule" <|
+            error = error_of (Widget_Query.resolve_call sample spec_module sample_type "of_cache" ["arg"] "{}")
+            error.get "step" . should_equal "resolver"
+            error.get "message" . should_contain "`cache`"
 
         group_builder.specify "no annotation gives a null widget" <|
             Widget_Query.resolve_call sample spec_module sample_type "plain" ["arg"] . should_equal '{"arguments":[["arg",{"widget":null}]]}'
@@ -248,7 +256,7 @@ add_specs suite_builder =
         group_builder.specify "a dependency's value reaches the resolver, and is announced" <|
             values = Widget_Query.values_from_lookup (name-> if name == "other" then 42 else Nothing)
             result = Widget_Query.resolve_argument (method "of_other") "arg" sample values "" ["arg", "other"] Nothing
-            result.to_json . should_equal '{"widget":' + (Widget.Single_Choice [Choice.Option "42"]).to_json + (resolver_json ["self", "other"] False) + '}'
+            result.to_json . should_equal ('{"widget":' + (Widget.Single_Choice [Choice.Option "42"]).to_json + (resolver_json ["self", "other"] False) + '}')
 
         group_builder.specify "an unset dependency is Nothing" <|
             json = Widget_Query.resolve_call sample spec_module sample_type "of_other" ["arg"] . parse_json
@@ -360,6 +368,32 @@ add_specs suite_builder =
             ["fetch_many", "fetch_pages"].each method->
                 json = Widget_Query.resolve_call Nothing "Standard.Base.Data" "Standard.Base.Data" method ["time_between_requests"] subject_is_type=True
                 json.should_equal (answer "time_between_requests" Widget.Numeric_Input)
+
+    suite_builder.group "Date.new's and Date_Time.new's day picker reads year and month" group_builder->
+        date_module = "Standard.Base.Data.Time.Date"
+        day_of module type year month =
+            method = Widget_Method.Value module type "new"
+            values = Widget_Query.values_from_lookup name-> case name of
+                "year" -> year
+                "month" -> month
+                _ -> Nothing
+            json = Widget_Query.resolve_argument method "day" Date values "" (Meta.get_method_argument_names module type "new") Nothing . to_json . parse_json
+            json
+        maximum json = json.get "widget" . get "maximum"
+
+        group_builder.specify "February of a leap year has 29 days" <|
+            json = day_of date_module date_module+".Date" 2024 2
+            maximum json . should_equal 29
+            json.get "resolver" . get "dependencies" . should_equal ["self", "year", "month"]
+
+        group_builder.specify "February of another year has 28" <|
+            maximum (day_of date_module date_module+".Date" 2023 2) . should_equal 28
+
+        group_builder.specify "an unset month allows 31" <|
+            maximum (day_of date_module date_module+".Date" Nothing Nothing) . should_equal 31
+
+        group_builder.specify "Date_Time.new shares it" <|
+            maximum (day_of "Standard.Base.Data.Time.Date_Time" "Standard.Base.Data.Time.Date_Time.Date_Time" 2023 4) . should_equal 30
 
     suite_builder.group "Widget_Query failures are logged once, with their causes and stack" group_builder->
         sample = Sample.Value "a label"
